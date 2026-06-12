@@ -1250,14 +1250,17 @@ const microReasonerWakeReason = (input: {
       ? "live_env.record_live_source_mail_decision"
       : null
   );
-  if (input.processedPacket?.microReasonerDeck && input.processedPacket.arbiter) {
-    return `${input.processedPacket.microReasonerDeck.presetTitle} selected ${input.processedPacket.arbiter.recommendedNext}: ${input.processedPacket.arbiter.reason}`;
-  }
   if (decisionRun && selectedDecision) {
     return [
       `decision_selector selected ${selectedDecision}`,
+      input.processedPacket?.microReasonerDeck && input.processedPacket.arbiter
+        ? `${input.processedPacket.microReasonerDeck.presetTitle} selected ${input.processedPacket.arbiter.recommendedNext}: ${input.processedPacket.arbiter.reason}`
+        : null,
       nextTool ? `next tool ${nextTool}` : null,
     ].filter(Boolean).join("; ");
+  }
+  if (input.processedPacket?.microReasonerDeck && input.processedPacket.arbiter) {
+    return `${input.processedPacket.microReasonerDeck.presetTitle} selected ${input.processedPacket.arbiter.recommendedNext}: ${input.processedPacket.arbiter.reason}`;
   }
   if (input.processedPacket?.recommendedNext) {
     return `processed packet recommended ${input.processedPacket.recommendedNext}`;

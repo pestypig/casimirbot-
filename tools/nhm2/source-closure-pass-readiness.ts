@@ -57,6 +57,11 @@ export type Nhm2SourceClosurePassReadinessArtifact = {
 const asString = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value != null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
 const parseArgs = (argv: string[]): Record<string, string | boolean> => {
   const parsed: Record<string, string | boolean> = {};
   for (let index = 0; index < argv.length; index += 1) {
@@ -264,6 +269,55 @@ export const renderNhm2SourceClosurePassReadiness = (
     "",
   );
   return `${lines.join("\n")}\n`;
+};
+
+export const isNhm2SourceClosurePassReadinessArtifact = (
+  value: unknown,
+): value is Nhm2SourceClosurePassReadinessArtifact => {
+  const record = asRecord(value);
+  const refs = asRecord(record?.artifactRefs);
+  const claimBoundary = asRecord(record?.claimBoundary);
+  return (
+    record != null &&
+    record.schemaVersion === NHM2_SOURCE_CLOSURE_PASS_READINESS_SCHEMA_VERSION &&
+    asString(record.generatedAt) != null &&
+    asString(record.runId) != null &&
+    asString(record.laneId) != null &&
+    asString(record.selectedProfileId) != null &&
+    refs != null &&
+    asString(refs.regionalSourceClosureEvidence) != null &&
+    (refs.sourceSideSameBasisTensorAuthority === null ||
+      asString(refs.sourceSideSameBasisTensorAuthority) != null) &&
+    typeof record.sourceClosurePassSignalAllowed === "boolean" &&
+    record.fullSolvePassSignalAllowed === false &&
+    asString(record.firstRetirableBlocker) != null &&
+    Array.isArray(record.preflightBlockers) &&
+    record.preflightBlockers.every((entry) => asString(entry) != null) &&
+    Array.isArray(record.regions) &&
+    record.regions.every((entry) => {
+      const region = asRecord(entry);
+      return (
+        region != null &&
+        NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS.includes(
+          region.regionId as Nhm2RegionalSourceClosureRegionId,
+        ) &&
+        asString(region.regionalEvidenceStatus) != null &&
+        asString(region.firstDivergenceBoundary) != null &&
+        asString(region.sourceAuthorityStatus) != null &&
+        (region.relLInf === null || typeof region.relLInf === "number") &&
+        (region.toleranceRelLInf === null ||
+          typeof region.toleranceRelLInf === "number") &&
+        typeof region.sourceClosurePassReady === "boolean" &&
+        Array.isArray(region.blockers) &&
+        region.blockers.every((blocker) => asString(blocker) != null) &&
+        asString(region.nextRequiredEvidence) != null
+      );
+    }) &&
+    claimBoundary?.diagnosticOnly === true &&
+    claimBoundary?.doesNotRecomputePhysics === true &&
+    claimBoundary?.doesNotPromoteViability === true &&
+    claimBoundary?.fullSolvePassRequiresSeparateClosureStack === true
+  );
 };
 
 export const runNhm2SourceClosurePassReadiness = (args: {

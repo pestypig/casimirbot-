@@ -105,6 +105,7 @@ export function formatHelixVisibleTerminalSourceLabel(
     live_pipeline_receipt: "live pipeline receipt",
     live_environment_binding_diagnosis: "live environment diagnosis",
     situation_context_pack: "situation context",
+    compound_research_locator_answer: "compound research locator answer",
     scholarly_research_answer: "scholarly research answer",
     internet_search_answer: "internet search answer",
     repo_code_evidence_answer: "repo code evidence answer",

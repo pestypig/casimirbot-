@@ -81,6 +81,7 @@ export type StagePlayLiveSourceMailWakeRequestV1 = {
   failureReason?: string | null;
   expiresAt?: string | null;
   supersededByWakeRequestId?: string | null;
+  supersededWakeIds?: string[];
   lifecycleStage?: StagePlayLiveSourceMailWakeLifecycleStageV1;
   lifecycleReason?: string | null;
   deckPresetId?: string | null;
@@ -123,6 +124,7 @@ export type StagePlayLiveSourceMailWakeResultV1 = {
   failedReason?: string | null;
   lifecycleStage?: StagePlayLiveSourceMailWakeLifecycleStageV1;
   lifecycleReason?: string | null;
+  supersededWakeIds?: string[];
   deckPresetId?: string | null;
   deckPresetTitle?: string | null;
   deckRunPlan?: StagePlayMicroReasonerDeckRunPlanV1 | string | null;
@@ -156,6 +158,7 @@ export type StagePlayLiveSourceMailWakeResultV1 = {
     deckPresetTitle?: string | null;
     deckRunPlan?: StagePlayMicroReasonerDeckRunPlanV1 | string | null;
     packetIds?: string[];
+    supersededWakeIds?: string[];
     deckVerdict?: StagePlayLiveSourceMailWakeDeckVerdictV1 | null;
     assistant_answer: false;
     terminal_eligible: false;

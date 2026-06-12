@@ -30,6 +30,8 @@ const validLedger = () =>
       tileCounterpartProvenanceAudit: null,
       sourceTensorArtifact: null,
       conservationArtifact: null,
+      sourceSideSameBasisTensorAuthority: null,
+      sourceClosurePassReadiness: null,
       referenceRunValidation: "validation.json",
     },
     tileCounterpartSource: {
@@ -37,6 +39,14 @@ const validLedger = () =>
       sourceTensorAuthorityMode: null,
       conservationStatus: null,
       qeiLinkageStatus: null,
+      sourceSideAuthorityRef: null,
+      sourceSideAuthorityStatus: "missing",
+      hasWallAuthority: null,
+      allRequiredRegionsAuthoritative: null,
+      authorityMissingRegionIds: [],
+      sourceClosurePassSignalAllowed: null,
+      firstRetirableBlocker: null,
+      preflightBlockers: [],
     },
     gateSummary: [
       {

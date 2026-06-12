@@ -21,6 +21,7 @@ export type StartSettings = {
   enableSplashCursor: boolean;
   voiceNoisyEnvironmentMode: boolean;
   showHelixAskDebug: boolean;
+  showHelixAskConsoleDebug: boolean;
   showHelixAskObserverLane: boolean;
   showDottieVoiceDebugClips: boolean;
   showHelixVoiceCaptureDiagnostics: boolean;
@@ -35,13 +36,14 @@ export type StartSettings = {
 export type SettingsTab = "preferences" | "knowledge";
 
 export const DEFAULT_SETTINGS: StartSettings = {
-  settingsVersion: 13,
+  settingsVersion: 14,
   rememberChoice: true,
   preferDesktop: false,
   showZen: true,
   enableSplashCursor: false,
   voiceNoisyEnvironmentMode: false,
   showHelixAskDebug: true,
+  showHelixAskConsoleDebug: false,
   showHelixAskObserverLane: false,
   showDottieVoiceDebugClips: false,
   showHelixVoiceCaptureDiagnostics: false,
@@ -82,6 +84,9 @@ export function useHelixStartSettings() {
           merged.showHelixAskDebug = legacyUnifiedPreference;
         }
       }
+      if (typeof parsed.showHelixAskConsoleDebug !== "boolean") {
+        merged.showHelixAskConsoleDebug = DEFAULT_SETTINGS.showHelixAskConsoleDebug;
+      }
       if (parsed.settingsVersion !== DEFAULT_SETTINGS.settingsVersion) {
         merged.settingsVersion = DEFAULT_SETTINGS.settingsVersion;
         merged.voiceNoisyEnvironmentMode = DEFAULT_SETTINGS.voiceNoisyEnvironmentMode;
@@ -91,6 +96,10 @@ export function useHelixStartSettings() {
             ? parsed.showDottieVoiceDebugClips
             : DEFAULT_SETTINGS.showDottieVoiceDebugClips;
         merged.showHelixAskObserverLane = DEFAULT_SETTINGS.showHelixAskObserverLane;
+        merged.showHelixAskConsoleDebug =
+          typeof parsed.showHelixAskConsoleDebug === "boolean"
+            ? parsed.showHelixAskConsoleDebug
+            : DEFAULT_SETTINGS.showHelixAskConsoleDebug;
         merged.showAlcubierreRenderDebugLog = DEFAULT_SETTINGS.showAlcubierreRenderDebugLog;
         merged.showWorkstationDebug =
           typeof parsed.showWorkstationDebug === "boolean"

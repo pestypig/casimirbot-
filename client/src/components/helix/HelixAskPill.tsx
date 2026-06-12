@@ -12104,6 +12104,45 @@ function resolveAskLiveEventTimestampMs(event: AskLiveEventEntry): number | null
   return parseTimestampMs(event.ts);
 }
 
+function readAskLiveEventIdentity(event: AskLiveEventEntry): {
+  turnId: string | null;
+  traceId: string | null;
+} {
+  const meta = asObjectRecord(event.meta ?? null);
+  return {
+    turnId:
+      readEventMetaString(meta ?? undefined, ["turn_id", "turnId", "active_turn_id", "activeTurnId", "ask_turn_id", "askTurnId"]) ??
+      null,
+    traceId: readEventMetaString(meta ?? undefined, ["trace_id", "traceId", "ask_trace_id", "askTraceId"]) ?? null,
+  };
+}
+
+function askLiveEventBelongsToActiveTurn(args: {
+  event: AskLiveEventEntry;
+  activeTurnId?: string | null;
+  activeTraceId?: string | null;
+  activeStartedAtMs?: number | null;
+}): boolean {
+  const activeIds = new Set(
+    [args.activeTurnId, args.activeTraceId]
+      .map((value) => String(value ?? "").trim())
+      .filter(Boolean),
+  );
+  const identity = readAskLiveEventIdentity(args.event);
+  const eventIds = [identity.turnId, identity.traceId].filter((value): value is string => Boolean(value));
+  if (eventIds.length > 0) return eventIds.some((value) => activeIds.has(value));
+  const eventTs = resolveAskLiveEventTimestampMs(args.event);
+  if (
+    typeof eventTs === "number" &&
+    Number.isFinite(eventTs) &&
+    typeof args.activeStartedAtMs === "number" &&
+    Number.isFinite(args.activeStartedAtMs)
+  ) {
+    return eventTs >= args.activeStartedAtMs - 500;
+  }
+  return true;
+}
+
 function formatAskLiveEventLogLine(event: AskLiveEventEntry): string {
   const tsMs = resolveAskLiveEventTimestampMs(event);
   const timestamp =
@@ -23265,9 +23304,7 @@ export function HelixAskPill({
       });
       const eventMeta = readAgentLoopAuditRecord(entry.meta);
       const targetTurnId =
-        coerceText(eventMeta?.turn_id ?? eventMeta?.turnId ?? eventMeta?.active_turn_id ?? eventMeta?.ask_turn_id).trim() ||
-        activeAskTurnIdRef.current?.trim() ||
-        "";
+        coerceText(eventMeta?.turn_id ?? eventMeta?.turnId ?? eventMeta?.active_turn_id ?? eventMeta?.ask_turn_id).trim();
       if (targetTurnId) {
         setAskReplies((prev) =>
           prev.map((reply) => {
@@ -30357,9 +30394,21 @@ export function HelixAskPill({
     };
   }, [appendLiveEventToHelixTimeline, appendWorkstationEventToLatestActReply, askBusy, askLiveTraceId, contextId, updateReasoningAttempt]);
 
+  const activeAskLiveEvents = useMemo(
+    () =>
+      askLiveEvents.filter((event) =>
+        askLiveEventBelongsToActiveTurn({
+          event,
+          activeTurnId: activeAskTurnIdRef.current,
+          activeTraceId: askLiveTraceId,
+          activeStartedAtMs: activeAskStartedAtMsRef.current,
+        }),
+      ),
+    [askLiveEvents, askLiveTraceId],
+  );
   const askLiveAgenticEventRows = useMemo(
-    () => buildAskLiveAgenticEventRows(askLiveEvents),
-    [askLiveEvents],
+    () => buildAskLiveAgenticEventRows(activeAskLiveEvents),
+    [activeAskLiveEvents],
   );
   const activeTurnStreamRows = useMemo(
     () =>
@@ -30380,6 +30429,62 @@ export function HelixAskPill({
   })
     ? filterHelixAskActiveTurnStreamRows(activeTurnStreamRows)
     : [];
+  const helixAskConsoleDebugSnapshot = useMemo(() => {
+    if (!userSettings.showHelixAskConsoleDebug) return null;
+    const activeTurnId = activeAskTurnIdRef.current;
+    const activeStartedAtMs = activeAskStartedAtMsRef.current;
+    return {
+      schema: "helix.ask.console_assembly_debug.v1",
+      askBusy,
+      activeTurnId,
+      activeTraceId: askLiveTraceId,
+      activeStartedAtMs,
+      activeQuestion: askActiveQuestion,
+      totalLiveEventCount: askLiveEvents.length,
+      activeLiveEventCount: activeAskLiveEvents.length,
+      activeRowCount: visibleActiveTurnStreamRows.length,
+      replyCount: chronologicalAskReplies.length,
+      latestReplyId: transcriptLatestAskReplyId,
+      renderOrder: [
+        ...(visibleActiveTurnStreamRows.length > 0
+          ? [
+              {
+                kind: "active_turn_stream",
+                key: activeTurnId ?? askLiveTraceId ?? "active",
+                rowCount: visibleActiveTurnStreamRows.length,
+              },
+            ]
+          : []),
+        ...chronologicalAskReplies.map((reply, index) => ({
+          kind: "completed_reply",
+          index,
+          replyId: reply.id,
+          canonicalKey: resolveHelixAskReplyCanonicalKey(reply),
+          createdAtMs: resolveHelixAskReplyOrderMs(reply),
+          isLatest: reply.id === transcriptLatestAskReplyId,
+        })),
+      ],
+      filteredLiveEvents: askLiveEvents.length - activeAskLiveEvents.length,
+      activeRows: visibleActiveTurnStreamRows.map((row, index) => ({
+        index,
+        key: row.key,
+        source: row.source,
+        label: row.label,
+        status: row.status,
+        text: clipText(row.text, 180),
+      })),
+    };
+  }, [
+    activeAskLiveEvents,
+    askActiveQuestion,
+    askBusy,
+    askLiveEvents,
+    askLiveTraceId,
+    chronologicalAskReplies,
+    transcriptLatestAskReplyId,
+    userSettings.showHelixAskConsoleDebug,
+    visibleActiveTurnStreamRows,
+  ]);
   const steeringQueueItems = useMemo(
     () =>
       buildHelixAskSteeringQueueItems({

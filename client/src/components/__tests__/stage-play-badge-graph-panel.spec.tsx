@@ -2464,6 +2464,95 @@ describe("StagePlayBadgeGraphPanel", () => {
       entry.askTurnId === null
     )).toBe(true);
     expect(await screen.findByTestId("stage-play-mail-loop-debug-copy-state")).toHaveTextContent("unified trace copied");
+
+    fireEvent.click(await screen.findByTestId("stage-play-copy-mail-loop-packet-trace"));
+    expect(writeText).toHaveBeenCalledTimes(2);
+    const packetTrace = JSON.parse(String(writeText.mock.calls[1]?.[0] ?? "{}")) as Record<string, any>;
+    expect(packetTrace).toMatchObject({
+      schema: "helix.stage_play.packet_trace.v1",
+      authority: {
+        assistant_answer: false,
+        terminal_eligible: false,
+        context_role: "tool_evidence",
+      },
+      deck: expect.objectContaining({
+        presetId: null,
+        title: null,
+        runPlan: null,
+      }),
+      wake: expect.objectContaining({
+        wakeRequestId: "stage_play_live_source_mail_wake:auto-pressure-after-timeout-ui",
+        status: "deferred_for_pressure",
+        askTurnId: null,
+      }),
+      result: expect.objectContaining({
+        wakeResultId: "stage_play_live_source_mail_wake_result:auto-pressure-after-timeout-ui",
+        status: "deferred_for_pressure",
+        askTurnId: null,
+      }),
+      continuationState: expect.objectContaining({
+        wakeAdmissionStatus: "deferred_for_pressure",
+      }),
+    });
+    expect(packetTrace.rawVisualMail.map((entry: any) => entry.mailId)).toContain("stage_play_live_source_mail:ui");
+    expect(packetTrace.rawVisualMail[0]?.visualEvidenceRefs).toEqual(expect.arrayContaining([
+      "visual_frame:ui",
+      "visual_evidence:ui",
+      "live_source_observation:ui",
+    ]));
+    expect(packetTrace.processedPacket).toBeNull();
+    expect(await screen.findByTestId("stage-play-mail-loop-debug-copy-state")).toHaveTextContent("packet trace copied");
+
+    fireEvent.click(await screen.findByTestId("stage-play-copy-mail-loop-wake-trace"));
+    expect(writeText).toHaveBeenCalledTimes(3);
+    const wakeTrace = JSON.parse(String(writeText.mock.calls[2]?.[0] ?? "{}")) as Record<string, any>;
+    expect(wakeTrace).toMatchObject({
+      schema: "helix.stage_play.wake_trace.v1",
+      wakeRequestId: "stage_play_live_source_mail_wake:auto-pressure-after-timeout-ui",
+      wake: expect.objectContaining({
+        status: "deferred_for_pressure",
+        askTurnId: null,
+      }),
+      continuationState: expect.objectContaining({
+        wakeAdmissionStatus: "deferred_for_pressure",
+      }),
+      authority: {
+        assistant_answer: false,
+        terminal_eligible: false,
+        context_role: "tool_evidence",
+      },
+    });
+    expect(wakeTrace.mailIds).toContain("stage_play_live_source_mail:ui");
+    expect(wakeTrace.wakeResults.some((entry: any) =>
+      entry.wakeResultId === "stage_play_live_source_mail_wake_result:auto-pressure-after-timeout-ui"
+    )).toBe(true);
+    expect(await screen.findByTestId("stage-play-mail-loop-debug-copy-state")).toHaveTextContent("wake trace copied");
+
+    fireEvent.click(await screen.findByTestId("stage-play-copy-mail-loop-ask-debug"));
+    expect(writeText).toHaveBeenCalledTimes(4);
+    const askDebugTrace = JSON.parse(String(writeText.mock.calls[3]?.[0] ?? "{}")) as Record<string, any>;
+    expect(askDebugTrace).toMatchObject({
+      schema: "helix.stage_play.ask_debug_trace.v1",
+      wakeRequestId: "stage_play_live_source_mail_wake:auto-pressure-after-timeout-ui",
+      askTurnId: null,
+      failureCode: "runtime_memory_queue_deferrable",
+      authority: {
+        assistant_answer: false,
+        terminal_eligible: false,
+        context_role: "debug_trace",
+      },
+    });
+    expect(askDebugTrace.wakeTrace.wakeRequestId).toBe("stage_play_live_source_mail_wake:auto-pressure-after-timeout-ui");
+    expect(await screen.findByTestId("stage-play-mail-loop-debug-copy-state")).toHaveTextContent("Ask debug copied");
+
+    fireEvent.click(await screen.findByTestId("stage-play-copy-mail-loop-full-state"));
+    expect(writeText).toHaveBeenCalledTimes(5);
+    const fullLoopState = JSON.parse(String(writeText.mock.calls[4]?.[0] ?? "{}")) as Record<string, any>;
+    expect(fullLoopState).toMatchObject({
+      schema: "helix.stage_play.mail_loop_full_state.v1",
+      graphId: "stage_play_badge_graph:ui",
+    });
+    expect(await screen.findByTestId("stage-play-mail-loop-debug-copy-state")).toHaveTextContent("full mailbox copied");
   });
 
   it("renders the Theory-style shell with Stage Play badge semantics", async () => {

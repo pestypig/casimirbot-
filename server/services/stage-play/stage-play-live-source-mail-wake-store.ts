@@ -189,6 +189,9 @@ const hasVoiceCheckpointForDecisions = (
 const wakeHasVoiceCheckpoint = (wake: StagePlayLiveSourceMailWakeRequestV1): boolean =>
   voiceCheckpointRefsFromEvidence(wake.evidenceRefs).length > 0;
 
+const wakeHasResult = (wakeRequestId: string): boolean =>
+  Array.from(resultById.values()).some((result) => result.wakeRequestId === wakeRequestId);
+
 const wakeIsPhaseLocked = (wake: StagePlayLiveSourceMailWakeRequestV1): boolean =>
   wake.status === "running" ||
   Boolean(wake.askTurnId) ||
@@ -199,6 +202,11 @@ const wakeIsPhaseLocked = (wake: StagePlayLiveSourceMailWakeRequestV1): boolean 
 
 const wakeCanBeExpired = (wake: StagePlayLiveSourceMailWakeRequestV1): boolean =>
   EXPIRABLE_WAKE_STATUSES.has(wake.status) && !wakeIsPhaseLocked(wake);
+
+const wakeCanBeDeckCoalesced = (wake: StagePlayLiveSourceMailWakeRequestV1): boolean =>
+  (wake.status === "queued" || wake.status === "deferred_for_pressure") &&
+  !wakeIsPhaseLocked(wake) &&
+  !wakeHasResult(wake.wakeRequestId);
 
 const wakeIsOlderThan = (
   wake: StagePlayLiveSourceMailWakeRequestV1,
@@ -247,6 +255,7 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
   deckRunPlan?: StagePlayLiveSourceMailWakeRequestV1["deckRunPlan"];
   packetIds?: string[];
   deckVerdict?: StagePlayLiveSourceMailWakeDeckVerdictV1 | null;
+  coalescible?: boolean;
   causalTraces?: Array<LiveSourceCausalTraceV1 | null | undefined>;
   now?: string;
   expiresAfterMs?: number | null;
@@ -259,6 +268,13 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
   const deckPresetTitle = input.deckPresetTitle ?? null;
   const deckRunPlan = input.deckRunPlan ?? null;
   const deckVerdict = normalizeWakeDeckVerdict(input.deckVerdict);
+  const reason = input.reason ?? "unread_mail";
+  const deckCoalescingEligible =
+    deckVerdict?.wakeAsk === true &&
+    Boolean(deckPresetId) &&
+    Boolean(deckRunPlan) &&
+    reason !== "user_requested_watch";
+  const shouldDeckCoalesce = deckCoalescingEligible || input.coalescible === true;
   const now = input.now ?? new Date().toISOString();
   expireStaleStagePlayLiveSourceMailWakeRequests({
     threadId: input.threadId,
@@ -285,7 +301,20 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
     boundedMailIds,
     now,
   ])}`;
-  if (sourceIds.length > 0) {
+  let deckSupersededWakes: StagePlayLiveSourceMailWakeRequestV1[] = [];
+  if (sourceIds.length > 0 && shouldDeckCoalesce) {
+    deckSupersededWakes = supersedePendingStagePlayMailWakesByDeckVerdict({
+      threadId: input.threadId,
+      roomId: input.roomId ?? null,
+      environmentId: input.environmentId ?? null,
+      jobId: input.jobId ?? null,
+      sourceIds,
+      deckPresetId,
+      deckRunPlan,
+      replacementWakeRequestId: wakeRequestId,
+      now,
+    });
+  } else if (sourceIds.length > 0) {
     supersedeActiveStagePlayLiveSourceMailWakeRequests({
       threadId: input.threadId,
       roomId: input.roomId ?? null,
@@ -297,13 +326,13 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
       now,
     });
   }
-  const queuedSameSource = input.expiresAfterMs == null && sourceIds.length > 0
+  const queuedSameSource = !shouldDeckCoalesce && input.expiresAfterMs == null && sourceIds.length > 0
     ? Array.from(wakeById.values()).find((wake) =>
         wake.threadId === input.threadId &&
         wake.roomId === (input.roomId ?? null) &&
         wake.environmentId === (input.environmentId ?? null) &&
         wake.jobId === (input.jobId ?? null) &&
-        wake.reason === (input.reason ?? "unread_mail") &&
+        wake.reason === reason &&
         (wake.status === "queued" || wake.status === "waiting_for_ui_handoff" || wake.status === "deferred_for_pressure") &&
         sortedKey(wake.sourceIds) === sortedKey(sourceIds) &&
         wake.mailIds.length < MAX_MAIL_IDS_PER_WAKE_BATCH
@@ -359,6 +388,14 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
   const ttlMs = typeof input.expiresAfterMs === "number" && Number.isFinite(input.expiresAfterMs) && input.expiresAfterMs > 0
     ? input.expiresAfterMs
     : null;
+  const supersededWakeIds = uniqueStrings(deckSupersededWakes.map((wake) => wake.wakeRequestId));
+  const supersededEvidenceRefs = uniqueStrings(deckSupersededWakes.flatMap((wake) => [
+    wake.wakeRequestId,
+    ...wake.mailIds,
+    ...(wake.packetIds ?? []),
+    ...wake.evidenceRefs,
+  ]));
+  const supersededPacketIds = uniqueStrings(deckSupersededWakes.flatMap((wake) => wake.packetIds ?? []));
   const wake: StagePlayLiveSourceMailWakeRequestV1 = {
     artifactId: "stage_play_live_source_mail_wake_request",
     schemaVersion: STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_REQUEST_SCHEMA,
@@ -369,7 +406,7 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
     jobId: input.jobId ?? null,
     mailIds: boundedMailIds,
     sourceIds,
-    reason: input.reason ?? "unread_mail",
+    reason,
     status: "queued",
     askTurnId: null,
     askLaunchId: null,
@@ -385,6 +422,7 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
     failureReason: null,
     expiresAt: ttlMs ? addMsIso(now, ttlMs) : null,
     supersededByWakeRequestId: null,
+    supersededWakeIds,
     lifecycleStage: "queued",
     lifecycleReason: deckVerdict
       ? `${deckPresetTitle ?? "Micro-reasoner deck"} selected ${deckVerdict.recommendedNext}: ${deckVerdict.reason}`
@@ -392,16 +430,32 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
     deckPresetId,
     deckPresetTitle,
     deckRunPlan,
-    packetIds,
+    packetIds: uniqueStrings([...packetIds, ...supersededPacketIds]),
     deckVerdict,
-    evidenceRefs: uniqueStrings([deckPresetId, ...packetIds, ...boundedMailIds, ...sourceIds, ...(input.evidenceRefs ?? [])]),
+    evidenceRefs: uniqueStrings([
+      deckPresetId,
+      ...packetIds,
+      ...boundedMailIds,
+      ...sourceIds,
+      ...supersededWakeIds,
+      ...supersededEvidenceRefs,
+      ...(input.evidenceRefs ?? []),
+    ]),
     causalTrace: mergeLiveSourceCausalTraces(input.causalTraces ?? [], {
       parentRefs: boundedMailIds,
       causedBy: boundedMailIds,
       producedRefs: [wakeRequestId],
       sourceIds,
       jobId: input.jobId ?? null,
-      evidenceRefs: [deckPresetId, ...packetIds, ...boundedMailIds, ...sourceIds, ...(input.evidenceRefs ?? [])],
+      evidenceRefs: [
+        deckPresetId,
+        ...packetIds,
+        ...boundedMailIds,
+        ...sourceIds,
+        ...supersededWakeIds,
+        ...supersededEvidenceRefs,
+        ...(input.evidenceRefs ?? []),
+      ],
     }),
     queuedAt: now,
     updatedAt: now,
@@ -623,7 +677,7 @@ export function releaseStaleRunningStagePlayMailWakeRequests(input: {
 
 const updateWake = (
   wakeRequestId: string,
-  patch: Partial<Pick<StagePlayLiveSourceMailWakeRequestV1, "status" | "askTurnId" | "askLaunchId" | "askLaunchStatus" | "askLaunchStartedAt" | "askLaunchCompletedAt" | "askLaunchRouteMetadata" | "routeMetadata" | "decisionIds" | "attemptCount" | "lastAttemptAt" | "nextRetryAt" | "failureReason" | "expiresAt" | "supersededByWakeRequestId" | "lifecycleStage" | "lifecycleReason" | "deckPresetId" | "deckPresetTitle" | "deckRunPlan" | "packetIds" | "deckVerdict" | "evidenceRefs" | "updatedAt">>,
+  patch: Partial<Pick<StagePlayLiveSourceMailWakeRequestV1, "status" | "askTurnId" | "askLaunchId" | "askLaunchStatus" | "askLaunchStartedAt" | "askLaunchCompletedAt" | "askLaunchRouteMetadata" | "routeMetadata" | "decisionIds" | "attemptCount" | "lastAttemptAt" | "nextRetryAt" | "failureReason" | "expiresAt" | "supersededByWakeRequestId" | "supersededWakeIds" | "lifecycleStage" | "lifecycleReason" | "deckPresetId" | "deckPresetTitle" | "deckRunPlan" | "packetIds" | "deckVerdict" | "evidenceRefs" | "updatedAt">>,
 ): StagePlayLiveSourceMailWakeRequestV1 | null => {
   const existing = wakeById.get(wakeRequestId);
   if (!existing) return null;
@@ -631,6 +685,7 @@ const updateWake = (
     ...existing,
     ...patch,
     decisionIds: patch.decisionIds ? uniqueStrings(patch.decisionIds) : existing.decisionIds,
+    supersededWakeIds: patch.supersededWakeIds ? uniqueStrings(patch.supersededWakeIds) : existing.supersededWakeIds,
     packetIds: patch.packetIds ? uniqueStrings(patch.packetIds) : existing.packetIds,
     deckVerdict: patch.deckVerdict !== undefined ? normalizeWakeDeckVerdict(patch.deckVerdict) : existing.deckVerdict,
     evidenceRefs: patch.evidenceRefs ? uniqueStrings(patch.evidenceRefs) : existing.evidenceRefs,
@@ -1086,6 +1141,63 @@ export function supersedeActiveStagePlayLiveSourceMailWakeRequests(input: {
   return superseded;
 }
 
+export function supersedePendingStagePlayMailWakesByDeckVerdict(input: {
+  threadId: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+  jobId?: string | null;
+  sourceIds: string[];
+  deckPresetId?: string | null;
+  deckRunPlan?: StagePlayLiveSourceMailWakeRequestV1["deckRunPlan"];
+  replacementWakeRequestId: string;
+  now?: string;
+}): StagePlayLiveSourceMailWakeRequestV1[] {
+  const now = input.now ?? new Date().toISOString();
+  const sourceKey = sortedKey(input.sourceIds);
+  const deckPresetId = input.deckPresetId ?? null;
+  const deckRunPlan = input.deckRunPlan ?? null;
+  if (!sourceKey || !deckPresetId || !deckRunPlan) return [];
+  const superseded: StagePlayLiveSourceMailWakeRequestV1[] = [];
+  for (const wake of Array.from(wakeById.values())) {
+    if (wake.threadId !== input.threadId) continue;
+    if (wake.roomId !== (input.roomId ?? null)) continue;
+    if (wake.environmentId !== (input.environmentId ?? null)) continue;
+    if (wake.jobId !== (input.jobId ?? null)) continue;
+    if (wake.wakeRequestId === input.replacementWakeRequestId) continue;
+    if (sortedKey(wake.sourceIds) !== sourceKey) continue;
+    if (wake.deckPresetId !== deckPresetId) continue;
+    if (wake.deckRunPlan !== deckRunPlan) continue;
+    if (wake.deckVerdict?.wakeAsk !== true) continue;
+    if (!wakeCanBeDeckCoalesced(wake)) continue;
+    const updated = updateWake(wake.wakeRequestId, {
+      status: "expired_superseded",
+      failureReason: "superseded_by_newer_deck_verdict",
+      lifecycleStage: "expired",
+      lifecycleReason: "superseded_by_newer_deck_verdict",
+      supersededByWakeRequestId: input.replacementWakeRequestId,
+      nextRetryAt: null,
+      expiresAt: now,
+      updatedAt: now,
+    });
+    if (!updated) continue;
+    recordStagePlayMailWakeResult({
+      wakeRequestId: updated.wakeRequestId,
+      threadId: updated.threadId,
+      roomId: updated.roomId ?? null,
+      environmentId: updated.environmentId ?? null,
+      status: "expired_superseded",
+      failedReason: "superseded_by_newer_deck_verdict",
+      evidenceRefs: uniqueStrings([
+        ...updated.evidenceRefs,
+        input.replacementWakeRequestId,
+      ]),
+      createdAt: now,
+    });
+    superseded.push(updated);
+  }
+  return superseded;
+}
+
 export function recordStagePlayMailWakeResult(input: {
   wakeRequestId: string;
   threadId: string;
@@ -1131,6 +1243,7 @@ export function recordStagePlayMailWakeResult(input: {
   const evidenceRefs = uniqueStrings([...(existing?.evidenceRefs ?? []), ...inputEvidenceRefs]);
   const voiceCheckpointRefs = voiceCheckpointRefsFromEvidence(evidenceRefs);
   const packetIds = uniqueStrings([...(wake?.packetIds ?? []), ...evidenceRefs.filter((ref) => /^stage_play_processed_mail_packet:/i.test(ref))]);
+  const supersededWakeIds = uniqueStrings(wake?.supersededWakeIds ?? []);
   const deckVerdict = normalizeWakeDeckVerdict(wake?.deckVerdict);
   const routeMetadata = wake?.routeMetadata ?? wake?.askLaunchRouteMetadata ?? null;
   const selectedTargetSource =
@@ -1180,6 +1293,7 @@ export function recordStagePlayMailWakeResult(input: {
     deckPresetTitle: wake?.deckPresetTitle ?? null,
     deckRunPlan: wake?.deckRunPlan ?? null,
     packetIds,
+    supersededWakeIds,
     deckVerdict,
     assistant_answer: false,
     terminal_eligible: false,
@@ -1219,6 +1333,7 @@ export function recordStagePlayMailWakeResult(input: {
     deckPresetTitle: wake?.deckPresetTitle ?? null,
     deckRunPlan: wake?.deckRunPlan ?? null,
     packetIds,
+    supersededWakeIds,
     deckVerdict,
     stagePlayWakeTransaction,
     evidenceRefs,

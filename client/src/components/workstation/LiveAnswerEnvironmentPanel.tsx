@@ -817,9 +817,22 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   }, [microReasonerPromptPresets]);
   const visualProducerState = useVisualSourceCaptureStore((state: { producers: Record<string, VisualSourceCaptureState> }) => {
     const sourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id ?? null;
-    return sourceId ? state.producers[sourceId] ?? null : null;
+    if (sourceId) return state.producers[sourceId] ?? null;
+    return Object.values(state.producers)
+      .filter((producer: VisualSourceCaptureState) => producer.thread_id === threadId && producer.track_ready_state !== "ended")
+      .sort((left: VisualSourceCaptureState, right: VisualSourceCaptureState) =>
+        Date.parse(right.last_frame_at ?? right.last_heartbeat_at ?? "0") -
+        Date.parse(left.last_frame_at ?? left.last_heartbeat_at ?? "0"))
+      .at(0) ?? null;
   });
-  const activeVisualSourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id ?? null;
+  const activeVisualSourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id ?? visualProducerState?.source_id ?? null;
+  const visualCaptureStatus =
+    visualEvidenceHealth?.status ??
+    visualLatest?.active_source?.status ??
+    visualLatest?.source?.status ??
+    (visualProducerState?.last_frame_preview_data_url ? "manual_frame_ready" : null) ??
+    visualSourceCapability?.status ??
+    "not registered";
   const visualFrameHistory = visualProducerState?.frame_history ?? [];
   const selectedVisualFrameHistory =
     visualFrameHistory.find((item: VisualSourceCaptureFrameHistoryItem) => item.history_id === selectedVisualFrameHistoryId) ??
@@ -1064,7 +1077,12 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   useEffect(() => {
     void refresh();
     const interval = window.setInterval(() => void refresh(), 5000);
-    return () => window.clearInterval(interval);
+    const handleImageLensFrame = () => void refresh();
+    window.addEventListener("helix:image-lens:visual-frame-sent", handleImageLensFrame);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("helix:image-lens:visual-frame-sent", handleImageLensFrame);
+    };
   }, [threadId]);
 
   useEffect(() => {
@@ -1976,15 +1994,15 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             </p>
           </div>
           <span className={`rounded border px-2 py-0.5 text-[10px] uppercase ${
-            visualEvidenceHealth?.status === "analysis_ready" || visualLatest?.source?.status === "active"
+            visualCaptureStatus === "analysis_ready" || visualCaptureStatus === "active" || visualCaptureStatus === "manual_frame_ready"
               ? "border-emerald-300/30 text-emerald-100"
-              : visualEvidenceHealth?.status === "permission_required" || visualEvidenceHealth?.status === "waiting_for_first_frame" || visualLatest?.source?.status === "permission_required"
+              : visualCaptureStatus === "permission_required" || visualCaptureStatus === "waiting_for_first_frame"
                 ? "border-amber-300/30 text-amber-100"
-                : visualEvidenceHealth?.status === "analysis_failed" || visualSourceCapability?.status === "configured_missing"
+                : visualCaptureStatus === "analysis_failed" || visualCaptureStatus === "configured_missing"
                   ? "border-rose-300/30 text-rose-100"
                   : "border-white/10 text-slate-400"
           }`}>
-            {visualEvidenceHealth?.status ?? visualLatest?.source?.status ?? visualSourceCapability?.status ?? "not registered"}
+            {visualCaptureStatus}
           </span>
         </div>
         <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)]">
@@ -2000,7 +2018,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                 <div className="px-3 text-center">
                   <p className="text-[11px] font-semibold text-slate-400">No frame preview</p>
                   <p className="mt-1 text-[10px] text-slate-600">
-                    {visualProducerState?.stream_active || visualLatest?.source
+                    {visualProducerState?.stream_active || visualLatest?.active_source || visualLatest?.source
                       ? "Waiting for first captured frame."
                       : "Hook up a visual source to start preview."}
                   </p>
@@ -2012,15 +2030,15 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             <div className="grid gap-x-3 gap-y-1 text-[11px] md:grid-cols-2">
               <div className="min-w-0">
                 <span className="text-[10px] uppercase text-slate-500">Source</span>{" "}
-                <span className="break-all font-mono text-slate-200">{visualLatest?.source?.source_id ?? "none"}</span>
+                <span className="break-all font-mono text-slate-200">{activeVisualSourceId ?? "none"}</span>
               </div>
               <div className="min-w-0">
                 <span className="text-[10px] uppercase text-slate-500">Frame</span>{" "}
-                <span className="break-all font-mono text-slate-200">{visualLatest?.frame?.frame_id ?? "none"}</span>
+                <span className="break-all font-mono text-slate-200">{visualLatest?.frame?.frame_id ?? selectedVisualFrameHistory?.frame_id ?? "none"}</span>
               </div>
               <div className="min-w-0">
                 <span className="text-[10px] uppercase text-slate-500">Evidence</span>{" "}
-                <span className="break-all font-mono text-slate-200">{visualEvidenceHealth?.latest_evidence_id ?? visualLatest?.evidence?.evidence_id ?? "none"}</span>
+                <span className="break-all font-mono text-slate-200">{visualEvidenceHealth?.latest_evidence_id ?? visualLatest?.evidence?.evidence_id ?? selectedVisualFrameHistory?.evidence_id ?? "none"}</span>
               </div>
               <div className="min-w-0">
                 <span className="text-[10px] uppercase text-slate-500">Vision</span>{" "}

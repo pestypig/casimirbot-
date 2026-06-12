@@ -27,6 +27,8 @@ const ledger = () =>
       tileCounterpartProvenanceAudit: "provenance.md",
       sourceTensorArtifact: "source-tensor.json",
       conservationArtifact: null,
+      sourceSideSameBasisTensorAuthority: "source-authority.json",
+      sourceClosurePassReadiness: "readiness.json",
       referenceRunValidation: "validation.json",
     },
     tileCounterpartSource: {
@@ -34,6 +36,14 @@ const ledger = () =>
       sourceTensorAuthorityMode: "reconstituted_from_source_channels",
       conservationStatus: "unknown",
       qeiLinkageStatus: "UNKNOWN",
+      sourceSideAuthorityRef: "source-authority.json",
+      sourceSideAuthorityStatus: "counterpart_missing",
+      hasWallAuthority: false,
+      allRequiredRegionsAuthoritative: false,
+      authorityMissingRegionIds: ["wall"],
+      sourceClosurePassSignalAllowed: false,
+      firstRetirableBlocker: "wall_source_side_authority_incomplete",
+      preflightBlockers: ["wall_source_side_authority_incomplete"],
     },
     gateSummary: [
       {
@@ -96,6 +106,12 @@ describe("render reference-run blocker ledger", () => {
 
   it("renders next required evidence", () => {
     expect(renderReferenceRunBlockerLedger(ledger())).toMatch(/emit tile_effective_counterpart tensor/);
+  });
+
+  it("renders source-side authority and pass-readiness preflight", () => {
+    const report = renderReferenceRunBlockerLedger(ledger());
+    expect(report).toMatch(/Source-Side Same-Basis Authority/);
+    expect(report).toMatch(/wall_source_side_authority_incomplete/);
   });
 
   it("renders literature non-validation boundary", () => {

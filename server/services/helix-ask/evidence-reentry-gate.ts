@@ -196,6 +196,53 @@ const collectInternetSearchEvidenceRefs = (input: {
     .filter(Boolean);
 };
 
+const collectCapabilityItineraryEvidenceRefs = (payload: RecordLike): string[] => {
+  const itinerary = readRecord(payload.capability_itinerary);
+  const executionState = readRecord(itinerary?.execution_state);
+  const requiredFamilies = readStringArray(
+    executionState?.required_observation_families ??
+      readRecord(itinerary?.terminal_success_criteria)?.required_observation_families,
+  );
+  const observedFamilies = readStringArray(executionState?.observed_families);
+  if (requiredFamilies.length === 0) return [];
+  const requiredObserved = new Set(
+    requiredFamilies.filter((family) => observedFamilies.length === 0 || observedFamilies.includes(family)),
+  );
+  const ledger = Array.isArray(payload.current_turn_artifact_ledger)
+    ? payload.current_turn_artifact_ledger
+    : [];
+  return ledger
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry))
+    .filter((entry) => {
+      const payloadRecord = readRecord(entry.payload);
+      const haystack = [
+        readString(entry.kind),
+        readString(payloadRecord?.schema),
+        readString(payloadRecord?.capability),
+        readString(payloadRecord?.tool_id),
+      ].join(" ");
+      return (
+        (requiredObserved.has("scholarly_research") &&
+          /scholarly_research_observation|scholarly_full_text_observation/i.test(haystack)) ||
+        (requiredObserved.has("internet_search") && /internet_search_observation/i.test(haystack)) ||
+        (requiredObserved.has("theory_locator") &&
+          /helix_theory_context_reflection_tool_receipt|theory_context_reflection|reflect_theory_context/i.test(haystack))
+      );
+    })
+    .flatMap((entry) => {
+      const payloadRecord = readRecord(entry.payload);
+      return [
+        readString(entry.artifact_id),
+        readString(payloadRecord?.artifact_id),
+        ...readStringArray(payloadRecord?.evidence_refs),
+        ...readStringArray(payloadRecord?.support_refs),
+        ...readStringArray(payloadRecord?.produced_artifact_refs),
+      ];
+    })
+    .filter(Boolean);
+};
+
 const collectInternetSearchObservationArtifacts = (payload: RecordLike): RecordLike[] => {
   const ledger = Array.isArray(payload.current_turn_artifact_ledger)
     ? payload.current_turn_artifact_ledger
@@ -316,6 +363,7 @@ export function buildEvidenceReentryGate(input: {
       terminalArtifactKind: input.terminalArtifactKind,
       finalAnswerSource: input.finalAnswerSource,
     }),
+    ...collectCapabilityItineraryEvidenceRefs(input.payload),
   ]);
   const rejectedEvidenceRefs = collectRejectedEvidence(loopTrace);
   const rejectedRefSet = new Set(rejectedEvidenceRefs.map((entry) => entry.ref));

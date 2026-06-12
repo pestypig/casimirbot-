@@ -1,6 +1,7 @@
 export type HelixTerminalCandidateSource =
   | "final_answer_draft"
   | "repo_code_evidence_answer"
+  | "compound_research_locator_answer"
   | "internet_search_answer"
   | "situation_room_live_job_setup_answer"
   | "request_user_input"
@@ -98,6 +99,7 @@ export type HelixTerminalAuthoritySingleWriterResult = {
   selected_terminal_artifact_kind:
     | "model_synthesized_answer"
     | "repo_code_evidence_answer"
+    | "compound_research_locator_answer"
     | "scholarly_research_answer"
     | "internet_search_answer"
     | "situation_room_live_job_setup_answer"
@@ -115,6 +117,7 @@ export type HelixTerminalAuthoritySingleWriterResult = {
   source:
     | "final_answer_draft"
     | "repo_code_evidence_answer"
+    | "compound_research_locator_answer"
     | "scholarly_research_answer"
     | "internet_search_answer"
     | "situation_room_live_job_setup_answer"

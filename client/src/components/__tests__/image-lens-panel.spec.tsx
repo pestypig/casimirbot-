@@ -105,8 +105,11 @@ describe("ImageLensPanel", () => {
 
   it("sends a crop frame to Live Answer visual source receipts", async () => {
     const liveEvents: Array<CustomEvent> = [];
+    const imageLensEvents: Array<CustomEvent> = [];
     const handler = (event: Event) => liveEvents.push(event as CustomEvent);
+    const imageLensHandler = (event: Event) => imageLensEvents.push(event as CustomEvent);
     window.addEventListener(HELIX_ASK_LIVE_EVENT_BUS_EVENT, handler);
+    window.addEventListener("helix:image-lens:visual-frame-sent", imageLensHandler);
     try {
       render(<ImageLensPanel />);
 
@@ -145,8 +148,14 @@ describe("ImageLensPanel", () => {
       expect(producer?.frame_history?.[0]?.evidence_id).toBe("visual_evidence:crop");
       expect(liveEvents[0]?.detail.entry.tool).toBe("image-lens.visual_frame");
       expect(liveEvents[0]?.detail.entry.meta.terminal_eligible).toBe(false);
+      expect(imageLensEvents[0]?.detail).toEqual({
+        sourceId: "visual_source:active",
+        frameId: "visual_frame:crop",
+        evidenceId: "visual_evidence:crop",
+      });
     } finally {
       window.removeEventListener(HELIX_ASK_LIVE_EVENT_BUS_EVENT, handler);
+      window.removeEventListener("helix:image-lens:visual-frame-sent", imageLensHandler);
     }
   });
 

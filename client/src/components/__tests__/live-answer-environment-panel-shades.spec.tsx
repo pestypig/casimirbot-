@@ -113,6 +113,17 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(producer).toContain("frame_history: pruneVisualFrameHistory");
   });
 
+  it("uses the freshest local visual producer when server visual latest has no source", () => {
+    const source = panelSource();
+
+    expect(source).toContain("Object.values(state.producers)");
+    expect(source).toContain("producer.thread_id === threadId");
+    expect(source).toContain("visualProducerState?.source_id ?? null");
+    expect(source).toContain('visualCaptureStatus');
+    expect(source).toContain('"manual_frame_ready"');
+    expect(source).toContain('window.addEventListener("helix:image-lens:visual-frame-sent"');
+  });
+
   it("adds a separate action replay section for re-lensing captured frames", () => {
     const source = panelSource();
 

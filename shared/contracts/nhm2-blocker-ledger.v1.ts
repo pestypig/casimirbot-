@@ -63,6 +63,8 @@ export type Nhm2BlockerLedgerArtifact = {
     tileCounterpartProvenanceAudit: string | null;
     sourceTensorArtifact: string | null;
     conservationArtifact: string | null;
+    sourceSideSameBasisTensorAuthority: string | null;
+    sourceClosurePassReadiness: string | null;
     referenceRunValidation: string | null;
   };
   tileCounterpartSource: {
@@ -70,6 +72,14 @@ export type Nhm2BlockerLedgerArtifact = {
     sourceTensorAuthorityMode: string | null;
     conservationStatus: string | null;
     qeiLinkageStatus: string | null;
+    sourceSideAuthorityRef: string | null;
+    sourceSideAuthorityStatus: string | null;
+    hasWallAuthority: boolean | null;
+    allRequiredRegionsAuthoritative: boolean | null;
+    authorityMissingRegionIds: string[];
+    sourceClosurePassSignalAllowed: boolean | null;
+    firstRetirableBlocker: string | null;
+    preflightBlockers: string[];
   };
   gateSummary: Array<{
     gateId: string;
@@ -143,6 +153,9 @@ const isNullableText = (value: unknown): value is string | null =>
 
 const isNullableNumber = (value: unknown): value is number | null =>
   value === null || (typeof value === "number" && Number.isFinite(value));
+
+const isNullableBoolean = (value: unknown): value is boolean | null =>
+  value === null || typeof value === "boolean";
 
 const isState = (value: unknown): value is Nhm2BlockerLedgerState =>
   value === "pass" || value === "review" || value === "fail";
@@ -323,12 +336,24 @@ export const isNhm2BlockerLedgerArtifact = (
     !isNullableText(refs.tileCounterpartProvenanceAudit) ||
     !isNullableText(refs.sourceTensorArtifact) ||
     !isNullableText(refs.conservationArtifact) ||
+    !isNullableText(refs.sourceSideSameBasisTensorAuthority) ||
+    !isNullableText(refs.sourceClosurePassReadiness) ||
     !isNullableText(refs.referenceRunValidation) ||
     tileCounterpartSource == null ||
     !isNullableText(tileCounterpartSource.sourceTensorArtifactRef) ||
     !isNullableText(tileCounterpartSource.sourceTensorAuthorityMode) ||
     !isNullableText(tileCounterpartSource.conservationStatus) ||
     !isNullableText(tileCounterpartSource.qeiLinkageStatus) ||
+    !isNullableText(tileCounterpartSource.sourceSideAuthorityRef) ||
+    !isNullableText(tileCounterpartSource.sourceSideAuthorityStatus) ||
+    !isNullableBoolean(tileCounterpartSource.hasWallAuthority) ||
+    !isNullableBoolean(tileCounterpartSource.allRequiredRegionsAuthoritative) ||
+    !Array.isArray(tileCounterpartSource.authorityMissingRegionIds) ||
+    !tileCounterpartSource.authorityMissingRegionIds.every(isText) ||
+    !isNullableBoolean(tileCounterpartSource.sourceClosurePassSignalAllowed) ||
+    !isNullableText(tileCounterpartSource.firstRetirableBlocker) ||
+    !Array.isArray(tileCounterpartSource.preflightBlockers) ||
+    !tileCounterpartSource.preflightBlockers.every(isText) ||
     !Array.isArray(record.gateSummary) ||
     !record.gateSummary.every(isGate) ||
     !Array.isArray(record.regionalBlockers) ||

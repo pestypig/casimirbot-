@@ -161,6 +161,13 @@ export function HelixSettingsDialogContent({
               onChange={(value) => updateSettings({ showHelixAskDebug: value })}
             />
             <PreferenceToggleRow
+              id="helix-ask-console-debug"
+              label="Helix Ask console debug"
+              description="Show the console turn assembly snapshot used to order active stream rows and completed replies."
+              checked={userSettings.showHelixAskConsoleDebug}
+              onChange={(value) => updateSettings({ showHelixAskConsoleDebug: value })}
+            />
+            <PreferenceToggleRow
               id="helix-ask-observer-lane"
               label="Show Observer lane"
               description="Render a live overseer interpretation lane in Helix Ask while actions run."

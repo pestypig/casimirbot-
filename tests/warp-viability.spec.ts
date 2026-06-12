@@ -1230,7 +1230,7 @@ describe("warp viability congruence wiring", () => {
     expect(layer?.artifact.sections.source_closure.reasons).not.toContain(
       "source_closure_missing",
     );
-    expect(layer?.artifact.sections.source_closure.assumptionsDrifted).toBe(false);
+    expect(layer?.artifact.sections.source_closure.assumptionsDrifted).toBe(true);
     expect(layer?.artifact.sections.source_closure.residualByRegion.hull).toBeGreaterThan(0.1);
     expect(layer?.artifact.sections.source_closure.leadBlocker).toMatchObject({
       regionId: "hull",

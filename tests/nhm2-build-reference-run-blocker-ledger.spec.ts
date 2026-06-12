@@ -14,7 +14,9 @@ import {
   buildNhm2TileEffectiveCounterpartArtifact,
   type Nhm2TileEffectiveCounterpartRegion,
 } from "../shared/contracts/nhm2-tile-effective-counterpart.v1";
+import { buildNhm2SourceSideSameBasisTensorAuthorityArtifact } from "../shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1";
 import { buildReferenceRunBlockerLedger } from "../tools/nhm2/build-reference-run-blocker-ledger";
+import { assessNhm2SourceClosurePassReadiness } from "../tools/nhm2/source-closure-pass-readiness";
 import type { Nhm2ReferenceRunValidationArtifact } from "../tools/nhm2/validate-reference-run";
 
 const profile = "stage1_centerline_alpha_0p995_v1";
@@ -194,6 +196,26 @@ const regionalEvidence = () =>
     literatureRefs: ["natario_2001_zero_expansion"],
   });
 
+const sourceAuthority = () =>
+  buildNhm2SourceSideSameBasisTensorAuthorityArtifact({
+    generatedAt: "2026-05-05T00:00:00.000Z",
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId: profile,
+    chartId: "comoving_cartesian",
+    sourceModelId: "cycle_averaged_tile_model",
+    counterpartArtifactRef: "tile.json",
+    counterpartArtifact: tileCounterpart(),
+  });
+
+const passReadiness = () =>
+  assessNhm2SourceClosurePassReadiness({
+    generatedAt: "2026-05-05T00:00:00.000Z",
+    regionalEvidenceRef: "regional.json",
+    regionalEvidence: regionalEvidence(),
+    sourceAuthorityRef: "source-authority.json",
+    sourceAuthority: sourceAuthority(),
+  });
+
 const qei = () =>
   buildNhm2QeiDossierArtifact({
     runId: "ledger-run",
@@ -238,6 +260,8 @@ const withTemp = (fn: (root: string) => void) => {
     writeFileSync(join(root, "validation.json"), JSON.stringify(validation()), "utf8");
     writeFileSync(join(root, "tile.json"), JSON.stringify(tileCounterpart()), "utf8");
     writeFileSync(join(root, "regional.json"), JSON.stringify(regionalEvidence()), "utf8");
+    writeFileSync(join(root, "source-authority.json"), JSON.stringify(sourceAuthority()), "utf8");
+    writeFileSync(join(root, "readiness.json"), JSON.stringify(passReadiness()), "utf8");
     writeFileSync(join(root, "qei.json"), JSON.stringify(qei()), "utf8");
     writeFileSync(join(root, "literature.json"), JSON.stringify(literatureMap()), "utf8");
     fn(root);
@@ -256,12 +280,16 @@ describe("build reference-run blocker ledger", () => {
         validationPath: "validation.json",
         tileEffectiveCounterpartPath: "tile.json",
         regionalSourceClosureEvidencePath: "regional.json",
+        sourceSideAuthorityPath: "source-authority.json",
+        sourceClosurePassReadinessPath: "readiness.json",
         qeiDossierPath: "qei.json",
         literatureMapPath: "literature.json",
         outPath: "ledger.json",
       });
       expect(ledger.artifactId).toBe("nhm2_blocker_ledger");
       expect(ledger.claimLock.validationClaimAllowed).toBe(false);
+      expect(ledger.tileCounterpartSource.sourceSideAuthorityStatus).toBe("authoritative_same_basis");
+      expect(ledger.tileCounterpartSource.sourceClosurePassSignalAllowed).toBe(false);
     }));
 
   it("fails closed on missing reference run", () =>
@@ -274,6 +302,8 @@ describe("build reference-run blocker ledger", () => {
           validationPath: "validation.json",
           tileEffectiveCounterpartPath: "tile.json",
           regionalSourceClosureEvidencePath: "regional.json",
+          sourceSideAuthorityPath: "source-authority.json",
+          sourceClosurePassReadinessPath: "readiness.json",
           literatureMapPath: "literature.json",
           outPath: "ledger.json",
         }),
@@ -291,6 +321,8 @@ describe("build reference-run blocker ledger", () => {
           validationPath: "validation.json",
           tileEffectiveCounterpartPath: "tile.json",
           regionalSourceClosureEvidencePath: "regional.json",
+          sourceSideAuthorityPath: "source-authority.json",
+          sourceClosurePassReadinessPath: "readiness.json",
           literatureMapPath: "literature.json",
           outPath: "ledger.json",
         }),
@@ -306,6 +338,8 @@ describe("build reference-run blocker ledger", () => {
         validationPath: "validation.json",
         tileEffectiveCounterpartPath: "tile.json",
         regionalSourceClosureEvidencePath: "regional.json",
+        sourceSideAuthorityPath: "source-authority.json",
+        sourceClosurePassReadinessPath: "readiness.json",
         qeiDossierPath: "qei.json",
         literatureMapPath: "literature.json",
         outPath: "ledger.json",
@@ -323,6 +357,8 @@ describe("build reference-run blocker ledger", () => {
         validationPath: "validation.json",
         tileEffectiveCounterpartPath: "tile.json",
         regionalSourceClosureEvidencePath: "regional.json",
+        sourceSideAuthorityPath: "source-authority.json",
+        sourceClosurePassReadinessPath: "readiness.json",
         qeiDossierPath: "qei.json",
         literatureMapPath: "literature.json",
         outPath: "ledger.json",
@@ -339,6 +375,8 @@ describe("build reference-run blocker ledger", () => {
         validationPath: "validation.json",
         tileEffectiveCounterpartPath: "tile.json",
         regionalSourceClosureEvidencePath: "regional.json",
+        sourceSideAuthorityPath: "source-authority.json",
+        sourceClosurePassReadinessPath: "readiness.json",
         qeiDossierPath: "qei.json",
         literatureMapPath: "literature.json",
         outPath: "ledger.json",

@@ -220,6 +220,7 @@ const runChain = async (args: CliArgs): Promise<number> => {
     resolved.outRoot,
     "--run-id",
     resolved.runId,
+    ...(args["audit-only"] === true ? ["--audit-only"] : []),
   ];
 
   let exitCode: number | null = null;

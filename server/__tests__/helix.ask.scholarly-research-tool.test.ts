@@ -9,7 +9,9 @@ import { HELIX_INTERNET_SEARCH_CAPABILITY } from "@shared/helix-internet-search-
 import { arbitrateAskSourceTarget } from "../services/helix-ask/ask-source-target-arbitrator";
 import { buildCapabilityPlan } from "../services/helix-ask/capability-planner";
 import { buildCapabilityResultGate } from "../services/helix-ask/capability-result-gate";
+import { buildEvidenceReentryGate } from "../services/helix-ask/evidence-reentry-gate";
 import { evaluateFinalAnswerDraftQualityGate } from "../services/helix-ask/final-answer-draft-quality-gate";
+import { materializeFinalAnswerDraftTerminal } from "../services/helix-ask/final-answer-draft-terminal-materializer";
 import { buildRouteProductContract } from "../services/helix-ask/route-product-contract";
 import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
 import { buildHelixCapabilityItineraryExecutionState } from "../services/helix-ask/capability-itinerary-execution";
@@ -415,6 +417,139 @@ describe("Helix scholarly research tool admission", () => {
     expect(decision.decision).toBe("allow_terminal");
     expect(decision.next_step).toBe("answer");
     expect(decision.continuation_policy).toBe("terminal_only");
+  });
+
+  it("selects theory locator evidence refs when a compound itinerary observed both families", () => {
+    const turnId = "ask:compound-evidence-reentry";
+    const scholarlyRef = `${turnId}:lookup:scholarly_research_observation`;
+    const locatorRef = `${turnId}:theory:helix_theory_context_reflection_tool_receipt`;
+    const payload = {
+      capability_itinerary: {
+        ...compoundScholarlyLocatorItinerary(turnId),
+        execution_state: {
+          applies: true,
+          complete: true,
+          required_observation_families: ["scholarly_research", "theory_locator"],
+          observed_families: ["scholarly_research", "theory_locator"],
+          missing_observation_families: [],
+        },
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: scholarlyRef,
+          kind: "scholarly_research_observation",
+          payload: {
+            schema: "helix.scholarly_research_observation.v1",
+            artifact_id: scholarlyRef,
+          },
+        },
+        {
+          artifact_id: locatorRef,
+          kind: "helix_theory_context_reflection_tool_receipt",
+          payload: {
+            schema: "helix.theory_context_reflection_tool_receipt.v1",
+            artifact_id: locatorRef,
+            capability: "helix_ask.reflect_theory_context",
+          },
+        },
+      ],
+    };
+
+    const gate = buildEvidenceReentryGate({
+      turnId,
+      payload,
+      loopTrace: {
+        evidence_selected_for_answer: [scholarlyRef],
+        actual_tool_calls: [],
+        observations_created: [],
+      },
+      primaryIntent: "question_answering" as any,
+      terminalArtifactKind: "compound_research_locator_answer",
+      finalAnswerSource: "final_answer_draft",
+      finalArbitrationRan: true,
+      sourceEvidenceRequired: true,
+      allowedTerminalProducts: ["compound_research_locator_answer"],
+    });
+
+    expect(gate.selected_evidence_refs).toEqual(expect.arrayContaining([scholarlyRef, locatorRef]));
+    expect(gate.completed).toBe(true);
+    expect(gate.violation_codes).not.toContain("source_observation_terminal_without_selection");
+  });
+
+  it("materializes completed scholarly plus theory locator itineraries as compound answers", () => {
+    const turnId = "ask:compound-terminal-kind";
+    const scholarlyRef = `${turnId}:lookup:scholarly_research_observation`;
+    const locatorRef = `${turnId}:theory:helix_theory_context_reflection_tool_receipt`;
+    const draftRef = `${turnId}:draft:final_answer_draft`;
+    const routeProductContract = {
+      schema: "helix.route_product_contract.v1",
+      turn_id: turnId,
+      source_target: "scholarly_research",
+      allowed_terminal_artifact_kinds: ["scholarly_research_answer", "compound_research_locator_answer"],
+    };
+    const payload: Record<string, unknown> = {
+      active_prompt:
+        "Use scholarly research about quantum coherence in photosynthesis and place it on the theory locator with uncertainty.",
+      route_product_contract: routeProductContract,
+      capability_itinerary: {
+        ...compoundScholarlyLocatorItinerary(turnId),
+        execution_state: {
+          applies: true,
+          complete: true,
+          required_observation_families: ["scholarly_research", "theory_locator"],
+          observed_families: ["scholarly_research", "theory_locator"],
+          missing_observation_families: [],
+        },
+      },
+    };
+    const artifactLedger = [
+      {
+        artifact_id: scholarlyRef,
+        kind: "scholarly_research_observation",
+        payload: {
+          schema: "helix.scholarly_research_observation.v1",
+          artifact_id: scholarlyRef,
+          papers: [{ result_id: "paper:coherence", title: "Quantum coherence in photosynthesis" }],
+        },
+      },
+      {
+        artifact_id: locatorRef,
+        kind: "helix_theory_context_reflection_tool_receipt",
+        payload: {
+          schema: "helix.theory_context_reflection_tool_receipt.v1",
+          artifact_id: locatorRef,
+          capability: "helix_ask.reflect_theory_context",
+        },
+      },
+      {
+        artifact_id: draftRef,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          artifact_id: draftRef,
+          text: "Scholarly evidence supports photosynthetic coherence as biology-scale physics context; the locator places it as a diagnostic bridge, not consciousness validation.",
+          artifact_refs: [scholarlyRef, locatorRef],
+        },
+      },
+    ];
+
+    const result = materializeFinalAnswerDraftTerminal({
+      turnId,
+      payload,
+      artifactLedger,
+      routeProductContract,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      materialized_terminal_artifact_kind: "compound_research_locator_answer",
+    });
+    expect(payload.compound_research_locator_answer).toMatchObject({
+      schema: "helix.compound_research_locator_answer.v1",
+      support_refs: expect.arrayContaining([scholarlyRef, locatorRef]),
+      source_families: ["scholarly_research", "theory_locator"],
+    });
+    expect(payload.scholarly_research_answer).toBeUndefined();
   });
 
   it("fails closed when a missing itinerary family has no admitted executable capability", () => {

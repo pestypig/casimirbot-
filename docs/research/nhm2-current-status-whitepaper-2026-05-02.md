@@ -920,6 +920,8 @@ The May 8 source-side full-tensor update adds the following validation-hardening
 npm run nhm2:publish-tile-effective-full-tensor-source
 npm run nhm2:publish-tile-counterpart-conservation
 npm run nhm2:audit-tile-counterpart-source-independence
+npm run nhm2:publish-source-side-same-basis-authority
+npm run nhm2:source-closure-pass-readiness
 ```
 
 The intended chain is:
@@ -929,7 +931,9 @@ freeze reference run
 publish source-side tile-effective full-tensor candidate
 publish conservation diagnostics
 publish tile-effective counterpart
+publish source-side same-basis authority receipt
 publish regional source-closure evidence
+publish source-closure pass-readiness preflight
 render source-to-geometry divergence report
 validate reference run
 build and render blocker ledger
@@ -942,6 +946,8 @@ The representation-space navigation patch adds no run-free validation command. I
 The June closure-stack contracts add placeholder-safe runtime artifacts rather than a new numerical relativity solver. Their builders are allowed to emit `missing`, `blocked`, `not_run`, `proxy`, or `ideal_scalar_only` when the current runtime lacks a component. That behavior is part of the reproducibility boundary: an incomplete artifact is still useful because it preserves the blocker instead of omitting it.
 
 The source-side same-basis authority receipt follows the same placeholder-safe rule. Its presence is not a source-closure pass by itself; its value is that it prevents a tile-effective scalar, diagonal projection, or metric-shaped proxy from being silently promoted into source-side tensor evidence. A future frozen run should be judged by whether this receipt moves the source-side blocker forward, not by whether the receipt merely exists.
+
+The June pass-path wiring makes this receipt a first-class output of the frozen reference validation chain. The chain now writes `nhm2-source-side-same-basis-tensor-authority.json` and feeds it into both `nhm2-source-closure-pass-readiness.json` and the blocker ledger. That changes the pass-path interpretation: a regional residual is not eligible to become a source-closure pass signal until the wall and all required regions have an independently meaningful same-basis source tensor authority. Current observation-channel, diagonal-only, metric-echo, or material-unreceipted surfaces stay explicit blockers.
 
 The current operator preflight for this decision is:
 

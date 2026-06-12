@@ -135,7 +135,7 @@ export const collectFinalAnswerDraftSupportRefs = (input: {
     const payload = readRecord(artifact.payload);
     const kind = readString(artifact.kind);
     const schema = readString(payload?.schema);
-    if (!/repo_code_evidence_observation|scholarly_research_observation|scholarly_full_text_observation|internet_search_observation|doc_|docs|calculator|workspace_action|agent_step_observation/i.test([kind, schema].join(" "))) return [];
+    if (!/repo_code_evidence_observation|scholarly_research_observation|scholarly_full_text_observation|internet_search_observation|helix_theory_context_reflection_tool_receipt|theory_context_reflection|reflect_theory_context|doc_|docs|calculator|workspace_action|agent_step_observation/i.test([kind, schema].join(" "))) return [];
     return [
       readString(artifact.artifact_id),
       ...readArray(payload?.evidence_refs).map(readString),

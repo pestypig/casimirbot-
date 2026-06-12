@@ -12,12 +12,21 @@ import {
 import { isNhm2QeiDossierArtifact } from "../../shared/contracts/nhm2-qei-dossier.v1";
 import { isNhm2ReferenceRunArtifact } from "../../shared/contracts/nhm2-reference-run.v1";
 import { isNhm2RegionalSourceClosureEvidenceArtifact } from "../../shared/contracts/nhm2-regional-source-closure-evidence.v1";
+import {
+  isNhm2SourceSideSameBasisTensorAuthorityArtifact,
+  type Nhm2SourceSideSameBasisTensorAuthorityArtifactV1,
+  type Nhm2SourceSideSameBasisTensorAuthorityStatus,
+} from "../../shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1";
 import { isNhm2TileEffectiveCounterpartArtifact } from "../../shared/contracts/nhm2-tile-effective-counterpart.v1";
 import { isNhm2TileEffectiveFullTensorSourceArtifact } from "../../shared/contracts/nhm2-tile-effective-full-tensor-source.v1";
 import { isNhm2TileCounterpartConservationArtifact } from "../../shared/contracts/nhm2-tile-counterpart-conservation.v1";
 import {
   classifySourceToGeometryDivergence,
 } from "./report-source-to-geometry-divergence";
+import {
+  isNhm2SourceClosurePassReadinessArtifact,
+  type Nhm2SourceClosurePassReadinessArtifact,
+} from "./source-closure-pass-readiness";
 import type {
   Nhm2ReferenceRunValidationArtifact,
   Nhm2ReferenceRunValidationGate,
@@ -120,6 +129,7 @@ const classifyGate = (gateId: string): Nhm2BlockerClass => {
   if (id.includes("latest") || id.includes("profile")) return "provenance";
   if (id.includes("observer")) return "observer";
   if (id.includes("qei")) return "qei";
+  if (id.includes("source_side_same_basis")) return "tile_counterpart";
   if (id.includes("tile_counterpart") || id.includes("tile_effective")) return "tile_counterpart";
   if (id.includes("source_closure") || id.includes("regional")) return "source_closure";
   if (id.includes("tensor")) return "tensor_authority";
@@ -245,6 +255,82 @@ const observerSummary = (
   };
 };
 
+const sourceAuthorityStatus = (
+  artifact: Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 | null,
+): Nhm2SourceSideSameBasisTensorAuthorityStatus | "missing" => {
+  if (artifact == null) return "missing";
+  if (artifact.summary.anyMetricEcho) return "metric_echo_forbidden";
+  if (
+    artifact.summary.hasWallAuthority &&
+    artifact.summary.allRequiredRegionsAuthoritative
+  ) {
+    return "authoritative_same_basis";
+  }
+  if (artifact.summary.anyMissingCounterpart) return "counterpart_missing";
+  if (artifact.summary.anyProxy) return "proxy_limited";
+  if (artifact.summary.blockerCount > 0) return "blocked";
+  return "diagnostic_only";
+};
+
+const sourceAuthorityGate = (
+  artifact: Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 | null,
+): Nhm2BlockerLedgerArtifact["gateSummary"][number] => {
+  const reasonCodes: string[] = [];
+  if (artifact == null) {
+    reasonCodes.push("source_side_authority_artifact_missing");
+  } else {
+    if (!artifact.summary.hasWallAuthority) {
+      reasonCodes.push("wall_source_side_authority_missing");
+    }
+    if (!artifact.summary.allRequiredRegionsAuthoritative) {
+      reasonCodes.push("required_region_source_side_authority_incomplete");
+    }
+    if (artifact.summary.anyMetricEcho) {
+      reasonCodes.push("source_side_metric_echo_forbidden");
+    }
+    if (artifact.summary.anyProxy) {
+      reasonCodes.push("source_side_proxy_limited");
+    }
+    if (artifact.summary.anyMissingCounterpart) {
+      reasonCodes.push("source_side_counterpart_missing");
+    }
+  }
+  return {
+    gateId: "GATE_SOURCE_SIDE_SAME_BASIS_TENSOR_AUTHORITY",
+    state: artifact?.summary.anyMetricEcho === true ? "fail" : reasonCodes.length > 0 ? "review" : "pass",
+    reasonCodes,
+    blockerClass: "tile_counterpart",
+  };
+};
+
+const sourceClosureReadinessGate = (
+  artifact: Nhm2SourceClosurePassReadinessArtifact | null,
+): Nhm2BlockerLedgerArtifact["gateSummary"][number] => {
+  if (artifact == null) {
+    return {
+      gateId: "GATE_SOURCE_CLOSURE_PASS_READINESS_PREFLIGHT",
+      state: "review",
+      reasonCodes: ["source_closure_pass_readiness_missing"],
+      blockerClass: "source_closure",
+    };
+  }
+  return {
+    gateId: "GATE_SOURCE_CLOSURE_PASS_READINESS_PREFLIGHT",
+    state: artifact.sourceClosurePassSignalAllowed ? "pass" : "review",
+    reasonCodes: artifact.sourceClosurePassSignalAllowed
+      ? []
+      : artifact.preflightBlockers.length > 0
+        ? artifact.preflightBlockers
+        : [artifact.firstRetirableBlocker],
+    blockerClass:
+      artifact.preflightBlockers.some((blocker) =>
+        /authority|counterpart|tensor/.test(blocker),
+      )
+        ? "tile_counterpart"
+        : "source_closure",
+  };
+};
+
 const primaryBlockerClass = (
   gates: Nhm2BlockerLedgerArtifact["gateSummary"],
 ): string | null => {
@@ -302,6 +388,8 @@ export const buildReferenceRunBlockerLedger = (args: {
   qeiDossierPath?: string | null;
   sourceTensorArtifactPath?: string | null;
   conservationArtifactPath?: string | null;
+  sourceSideAuthorityPath?: string | null;
+  sourceClosurePassReadinessPath?: string | null;
   auditOnly?: boolean;
 }): Nhm2BlockerLedgerArtifact => {
   const paths = [
@@ -315,6 +403,8 @@ export const buildReferenceRunBlockerLedger = (args: {
     args.qeiDossierPath,
     args.sourceTensorArtifactPath,
     args.conservationArtifactPath,
+    args.sourceSideAuthorityPath,
+    args.sourceClosurePassReadinessPath,
     args.literatureMapPath,
   ];
   if (!args.auditOnly && paths.some(pathUsesLatestAlias)) {
@@ -368,13 +458,47 @@ export const buildReferenceRunBlockerLedger = (args: {
   if (conservation != null && !isNhm2TileCounterpartConservationArtifact(conservation)) {
     throw new Error("conservation artifact must be nhm2_tile_counterpart_conservation/v1");
   }
+  const sourceAuthority =
+    args.sourceSideAuthorityPath == null
+      ? null
+      : readJson(resolvePath(args.repoRoot, args.sourceSideAuthorityPath));
+  if (
+    sourceAuthority != null &&
+    !isNhm2SourceSideSameBasisTensorAuthorityArtifact(sourceAuthority)
+  ) {
+    throw new Error(
+      "source-side authority must be nhm2_source_side_same_basis_tensor_authority/v1",
+    );
+  }
+  const passReadiness =
+    args.sourceClosurePassReadinessPath == null
+      ? null
+      : readJson(resolvePath(args.repoRoot, args.sourceClosurePassReadinessPath));
+  if (
+    passReadiness != null &&
+    !isNhm2SourceClosurePassReadinessArtifact(passReadiness)
+  ) {
+    throw new Error(
+      "source closure pass-readiness must be nhm2_source_closure_pass_readiness/v1",
+    );
+  }
 
-  const gateSummary = validation.gates.map((entry: Nhm2ReferenceRunValidationGate) => ({
-    gateId: entry.gateId,
-    state: entry.state,
-    reasonCodes: entry.reasonCodes,
-    blockerClass: classifyGate(entry.gateId),
-  }));
+  const sourceAuthorityArtifact = isNhm2SourceSideSameBasisTensorAuthorityArtifact(sourceAuthority)
+    ? sourceAuthority
+    : null;
+  const passReadinessArtifact = isNhm2SourceClosurePassReadinessArtifact(passReadiness)
+    ? passReadiness
+    : null;
+  const gateSummary = [
+    ...validation.gates.map((entry: Nhm2ReferenceRunValidationGate) => ({
+      gateId: entry.gateId,
+      state: entry.state,
+      reasonCodes: entry.reasonCodes,
+      blockerClass: classifyGate(entry.gateId),
+    })),
+    sourceAuthorityGate(sourceAuthorityArtifact),
+    sourceClosureReadinessGate(passReadinessArtifact),
+  ];
   const qeiArtifact = isNhm2QeiDossierArtifact(qei) ? qei : null;
   const qeiMissingFields = missingQeiFields(qeiArtifact);
   const qeiBlockers: Nhm2BlockerLedgerArtifact["qeiBlockers"] = {
@@ -428,6 +552,8 @@ export const buildReferenceRunBlockerLedger = (args: {
       tileCounterpartProvenanceAudit: args.tileProvenanceAuditPath ?? null,
       sourceTensorArtifact: args.sourceTensorArtifactPath ?? null,
       conservationArtifact: args.conservationArtifactPath ?? null,
+      sourceSideSameBasisTensorAuthority: args.sourceSideAuthorityPath ?? null,
+      sourceClosurePassReadiness: args.sourceClosurePassReadinessPath ?? null,
       referenceRunValidation: args.validationPath,
     },
     tileCounterpartSource: {
@@ -441,6 +567,16 @@ export const buildReferenceRunBlockerLedger = (args: {
           ? conservation.overallState
           : tile.conservationStatus) ?? null,
       qeiLinkageStatus: tile.qeiApplicabilityStatus,
+      sourceSideAuthorityRef: args.sourceSideAuthorityPath ?? null,
+      sourceSideAuthorityStatus: sourceAuthorityStatus(sourceAuthorityArtifact),
+      hasWallAuthority: sourceAuthorityArtifact?.summary.hasWallAuthority ?? null,
+      allRequiredRegionsAuthoritative:
+        sourceAuthorityArtifact?.summary.allRequiredRegionsAuthoritative ?? null,
+      authorityMissingRegionIds: sourceAuthorityArtifact?.summary.missingRegionIds ?? [],
+      sourceClosurePassSignalAllowed:
+        passReadinessArtifact?.sourceClosurePassSignalAllowed ?? null,
+      firstRetirableBlocker: passReadinessArtifact?.firstRetirableBlocker ?? null,
+      preflightBlockers: passReadinessArtifact?.preflightBlockers ?? [],
     },
     gateSummary,
     regionalBlockers,
@@ -499,6 +635,8 @@ if (normalize(process.argv[1] ?? "") === normalize(fileURLToPath(import.meta.url
     qeiDossierPath: asString(args["qei-dossier"]),
     sourceTensorArtifactPath: asString(args["source-tensor-artifact"]),
     conservationArtifactPath: asString(args.conservation),
+    sourceSideAuthorityPath: asString(args["source-side-authority"]),
+    sourceClosurePassReadinessPath: asString(args["source-closure-pass-readiness"]),
     literatureMapPath: args["literature-map"] as string,
     outPath: args.out as string,
     auditOnly: args["audit-only"] === true,

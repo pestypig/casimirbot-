@@ -63,7 +63,10 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
   const sourceTensor = `${outRoot}/nhm2-tile-effective-full-tensor-source.json`;
   const conservation = `${outRoot}/nhm2-tile-counterpart-conservation.json`;
   const sourceIndependenceAudit = `${outRoot}/nhm2-tile-counterpart-source-independence.md`;
+  const sourceAuthority = `${outRoot}/nhm2-source-side-same-basis-tensor-authority.json`;
   const regionalEvidence = `${outRoot}/nhm2-regional-source-closure-evidence.json`;
+  const sourceClosurePassReadiness = `${outRoot}/nhm2-source-closure-pass-readiness.json`;
+  const sourceClosurePassReadinessReport = `${outRoot}/nhm2-source-closure-pass-readiness.md`;
   const divergenceReport = `${outRoot}/nhm2-source-to-geometry-divergence.md`;
   const provenanceAudit = `${outRoot}/nhm2-tile-counterpart-provenance.md`;
   const validation = `${outRoot}/nhm2-reference-run-validation.json`;
@@ -109,6 +112,17 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
     tileCounterpart,
     ...auditOnly,
   ]);
+  run("nhm2:publish-source-side-same-basis-authority", [
+    "--reference-run",
+    referenceRun,
+    "--tile-effective-counterpart",
+    tileCounterpart,
+    "--source-closure",
+    sourceClosure,
+    "--out",
+    sourceAuthority,
+    ...auditOnly,
+  ]);
   run("nhm2:publish-regional-source-closure-evidence", [
     "--reference-run",
     referenceRun,
@@ -119,6 +133,16 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
     "--out",
     regionalEvidence,
     ...auditOnly,
+  ]);
+  run("nhm2:source-closure-pass-readiness", [
+    "--regional-evidence",
+    regionalEvidence,
+    "--source-authority",
+    sourceAuthority,
+    "--out-json",
+    sourceClosurePassReadiness,
+    "--out-md",
+    sourceClosurePassReadinessReport,
   ]);
   run("nhm2:report-source-to-geometry-divergence", [
     "--regional-evidence",
@@ -167,6 +191,10 @@ export const runReferenceValidationChain = (args: Record<string, string | boolea
     ...(sourceInput == null
       ? []
       : ["--source-tensor-artifact", sourceTensor, "--conservation", conservation]),
+    "--source-side-authority",
+    sourceAuthority,
+    "--source-closure-pass-readiness",
+    sourceClosurePassReadiness,
     ...(qeiDossier == null ? [] : ["--qei-dossier", qeiDossier]),
     "--literature-map",
     literatureMap,

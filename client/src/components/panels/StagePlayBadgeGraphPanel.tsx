@@ -1691,6 +1691,270 @@ function buildStagePlayMailLoopUnifiedTrace(input: {
   };
 }
 
+const isStagePlayVoiceCheckpointRef = (ref: string): boolean =>
+  /(?:voice_receipt|voice_callout_receipt|voice_hold_receipt|voice_block_receipt|voice_delivery_receipt|live_source_interim_voice_callout_receipt|helix_interim_voice_callout_receipt)/i.test(ref);
+
+function latestByIso<T>(values: T[], readIso: (value: T) => string | null | undefined): T | null {
+  return values
+    .slice()
+    .sort((left, right) => String(readIso(left) ?? "").localeCompare(String(readIso(right) ?? "")))
+    .at(-1) ?? null;
+}
+
+function buildStagePlayPacketScopedTrace(input: {
+  graph: StagePlayBadgeGraphV1;
+  mailbox: StagePlayLiveSourceMailListResponse | null | undefined;
+  packetKey?: string | null;
+}) {
+  const mailbox = input.mailbox ?? null;
+  const mailItems = mailbox?.mailItems ?? [];
+  const packets = mailbox?.processedMailPackets ?? [];
+  const runs = mailbox?.microReasonerRuns ?? [];
+  const wakeRequests = mailbox?.wakeRequests ?? [];
+  const wakeResults = mailbox?.wakeResults ?? [];
+  const decisions = mailbox?.decisions ?? [];
+  const key = input.packetKey ?? null;
+  const selectedPacket =
+    packets.find((packet) => packet.packetId === key) ??
+    packets.find((packet) => packet.mailIds.includes(String(key ?? ""))) ??
+    latestStagePlayPacketForMail(packets, String(key ?? "")) ??
+    latestByIso(packets, (packet) => packet.createdAt);
+  const selectedMailIds = selectedPacket?.mailIds ?? (key ? [key] : []);
+  const rawVisualMail = mailItems.filter((mail) =>
+    selectedMailIds.includes(mail.mailId) || selectedPacket?.sourceId === mail.sourceId
+  );
+  const selectedWake =
+    wakeRequests
+      .filter((wake) =>
+        (selectedPacket?.packetId && (wake.packetIds ?? []).includes(selectedPacket.packetId)) ||
+        wake.mailIds.some((mailId) => selectedMailIds.includes(mailId))
+      )
+      .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
+      .at(-1) ??
+    latestStagePlayMailWakeRequest(wakeRequests, selectedMailIds[0] ?? null);
+  const selectedWakeResult = selectedWake
+    ? latestStagePlayMailWakeResult(wakeResults, selectedWake.wakeRequestId)
+    : null;
+  const decisionIds = uniqueSorted([
+    ...(selectedWake?.decisionIds ?? []),
+    ...(selectedWakeResult?.decisionIds ?? []),
+  ]);
+  const selectedDecisions = decisions.filter((decision) =>
+    decisionIds.includes(decision.decisionId) ||
+    decision.mailIds.some((mailId) => selectedMailIds.includes(mailId))
+  );
+  const voiceCheckpointRefs = uniqueSorted([
+    ...(selectedWakeResult?.voiceCheckpointRefs ?? []),
+    ...((selectedWakeResult?.evidenceRefs ?? []).filter(isStagePlayVoiceCheckpointRef)),
+    ...((selectedWake?.evidenceRefs ?? []).filter(isStagePlayVoiceCheckpointRef)),
+  ]);
+  const transaction = selectedWakeResult?.stagePlayWakeTransaction ?? null;
+  const finalDebugRefs = uniqueSorted([
+    ...(transaction?.producedRefs ?? []),
+    ...(selectedWakeResult?.evidenceRefs ?? []),
+    ...(selectedWakeResult?.budgetStateRef ? [selectedWakeResult.budgetStateRef] : []),
+  ]);
+  const packetRunRefs = selectedPacket?.microReasonerRunRefs ?? [];
+  const packetRuns = runs.filter((run) => packetRunRefs.includes(run.runId));
+  const latestJob = latestByIso(mailbox?.jobStates ?? [], (job) => job.updatedAt ?? job.createdAt);
+  const latestDecision = latestByIso(selectedDecisions, (decision) => decision.createdAt);
+  return {
+    schema: "helix.stage_play.packet_trace.v1",
+    exportedAt: new Date().toISOString(),
+    graphId: input.graph.graphId,
+    selectedPacketKey: key,
+    deck: {
+      presetId: selectedPacket?.microReasonerDeck?.presetId ?? selectedWake?.deckPresetId ?? selectedWakeResult?.deckPresetId ?? null,
+      title: selectedPacket?.microReasonerDeck?.presetTitle ?? selectedWake?.deckPresetTitle ?? selectedWakeResult?.deckPresetTitle ?? null,
+      runPlan: selectedPacket?.microReasonerDeck?.deckRunPlan ?? selectedWake?.deckRunPlan ?? selectedWakeResult?.deckRunPlan ?? null,
+      promptedRoles: selectedPacket?.microReasonerDeck?.promptedRoles ?? [],
+      rolePromptIds: selectedPacket?.microReasonerDeck?.rolePromptIds ?? {},
+    },
+    rawVisualMail: rawVisualMail.map((mail) => ({
+      mailId: mail.mailId,
+      sourceId: mail.sourceId,
+      status: mail.status,
+      createdAt: mail.createdAt,
+      summaryPreview: compactStagePlayMailPreview(mail.summary.preview || mail.summary.text, "", 220),
+      visualEvidenceRefs: uniqueSorted([
+        mail.sourceRefs.frameRef,
+        mail.sourceRefs.evidenceRef,
+        mail.sourceRefs.observationRef,
+        ...mail.evidenceRefs,
+      ]),
+    })),
+    processedPacket: selectedPacket ? {
+      packetId: selectedPacket.packetId,
+      sourceId: selectedPacket.sourceId,
+      mailIds: selectedPacket.mailIds,
+      microReasonerRunRefs: selectedPacket.microReasonerRunRefs,
+      recommendedNext: selectedPacket.recommendedNext,
+      resolutionState: selectedPacket.resolutionState,
+      evidenceRefs: selectedPacket.evidenceRefs,
+      arbiterVerdict: selectedPacket.arbiter ?? null,
+      salience: selectedPacket.salience,
+      effortEstimate: selectedPacket.effortEstimate ?? null,
+      axioms: selectedPacket.axioms ?? null,
+      hypotheses: selectedPacket.hypotheses ?? [],
+    } : null,
+    microReasonerRuns: packetRuns.map((run) => ({
+      runId: run.runId,
+      role: run.role,
+      status: run.status,
+      promptId: run.promptId,
+      deckPresetId: run.deckPresetId ?? null,
+      deckPresetTitle: run.deckPresetTitle ?? null,
+      deckRunPlan: run.deckRunPlan ?? null,
+      selectedDecision: run.selectedDecision ?? null,
+      recommendedNextTool: run.recommendedNextTool ?? null,
+      voiceCandidate: run.voiceCandidate ?? null,
+      latencyMs: run.latencyMs,
+      inputRefs: run.inputRefs,
+      outputRefs: run.outputRefs,
+      outputPreview: run.outputPreview,
+    })),
+    wake: selectedWake ? {
+      wakeRequestId: selectedWake.wakeRequestId,
+      status: selectedWake.status,
+      lifecycleStage: selectedWake.lifecycleStage ?? null,
+      lifecycleReason: selectedWake.lifecycleReason ?? null,
+      deckPresetId: selectedWake.deckPresetId ?? null,
+      deckPresetTitle: selectedWake.deckPresetTitle ?? null,
+      deckRunPlan: selectedWake.deckRunPlan ?? null,
+      deckVerdict: selectedWake.deckVerdict ?? null,
+      packetIds: selectedWake.packetIds ?? [],
+      supersededWakeIds: selectedWake.supersededWakeIds ?? [],
+      askTurnId: selectedWake.askTurnId ?? null,
+      decisionIds: selectedWake.decisionIds,
+      evidenceRefs: selectedWake.evidenceRefs,
+      failureReason: selectedWake.failureReason ?? null,
+    } : null,
+    result: selectedWakeResult ? {
+      wakeResultId: selectedWakeResult.wakeResultId,
+      status: selectedWakeResult.status,
+      lifecycleStage: selectedWakeResult.lifecycleStage ?? null,
+      lifecycleReason: selectedWakeResult.lifecycleReason ?? null,
+      askTurnId: selectedWakeResult.askTurnId ?? null,
+      decisionReceiptIds: selectedWakeResult.decisionIds,
+      voiceCheckpointRefs,
+      wakeResultRefs: selectedWakeResult.evidenceRefs,
+      budgetStateRef: selectedWakeResult.budgetStateRef ?? null,
+      failedReason: selectedWakeResult.failedReason ?? null,
+      skippedReason: selectedWakeResult.skippedReason ?? null,
+      finalDebugRefs,
+      stagePlayWakeTransaction: transaction,
+    } : null,
+    decisions: selectedDecisions.map((decision) => ({
+      decisionReceiptId: decision.decisionId,
+      decision: decision.decision,
+      requestedTool: decision.requestedTool ?? null,
+      nextLoopState: decision.nextLoopState,
+      modelReviewed: decision.modelReviewed,
+      evidenceRefs: decision.evidenceRefs,
+      createdAt: decision.createdAt,
+    })),
+    continuationState: {
+      wakeAdmissionContinuation: mailbox?.wakeAdmissionCycle?.continuation ?? null,
+      wakeAdmissionStatus: mailbox?.wakeAdmissionCycle?.status ?? null,
+      latestJobStatus: latestJob?.status ?? null,
+      latestJobNextLoopState: latestJob?.nextLoopState ?? null,
+      latestDecisionNextLoopState: latestDecision?.nextLoopState ?? null,
+    },
+    authority: {
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    },
+  };
+}
+
+function buildStagePlayWakeScopedTrace(input: {
+  graph: StagePlayBadgeGraphV1;
+  mailbox: StagePlayLiveSourceMailListResponse | null | undefined;
+  wakeRequestId?: string | null;
+}) {
+  const mailbox = input.mailbox ?? null;
+  const wakeRequests = mailbox?.wakeRequests ?? [];
+  const wakeResults = mailbox?.wakeResults ?? [];
+  const packets = mailbox?.processedMailPackets ?? [];
+  const decisions = mailbox?.decisions ?? [];
+  const wake =
+    wakeRequests.find((candidate) => candidate.wakeRequestId === input.wakeRequestId) ??
+    latestStagePlayMailWakeRequest(wakeRequests);
+  const results = wake ? wakeResults.filter((result) => result.wakeRequestId === wake.wakeRequestId) : [];
+  const latestResult = latestByIso(results, (result) => result.createdAt);
+  const packetIds = uniqueSorted([
+    ...(wake?.packetIds ?? []),
+    ...(latestResult?.packetIds ?? []),
+    ...((latestResult?.stagePlayWakeTransaction?.artifactRefs.processedPacketIds) ?? []),
+  ]);
+  const packetMailIds = packets
+    .filter((packet) => packetIds.includes(packet.packetId) || wake?.mailIds.some((mailId) => packet.mailIds.includes(mailId)))
+    .flatMap((packet) => packet.mailIds);
+  const decisionIds = uniqueSorted([...(wake?.decisionIds ?? []), ...(latestResult?.decisionIds ?? [])]);
+  return {
+    schema: "helix.stage_play.wake_trace.v1",
+    exportedAt: new Date().toISOString(),
+    graphId: input.graph.graphId,
+    wakeRequestId: wake?.wakeRequestId ?? null,
+    wake,
+    wakeResults: results,
+    packetIds,
+    mailIds: uniqueSorted([...(wake?.mailIds ?? []), ...packetMailIds]),
+    decisions: decisions.filter((decision) => decisionIds.includes(decision.decisionId)),
+    voiceCheckpointRefs: uniqueSorted([
+      ...(latestResult?.voiceCheckpointRefs ?? []),
+      ...((latestResult?.evidenceRefs ?? []).filter(isStagePlayVoiceCheckpointRef)),
+    ]),
+    supersededWakeIds: wake?.supersededWakeIds ?? latestResult?.supersededWakeIds ?? [],
+    continuationState: {
+      wakeAdmissionContinuation: mailbox?.wakeAdmissionCycle?.continuation ?? null,
+      wakeAdmissionStatus: mailbox?.wakeAdmissionCycle?.status ?? null,
+    },
+    authority: {
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    },
+  };
+}
+
+function buildStagePlayAskDebugTrace(input: {
+  graph: StagePlayBadgeGraphV1;
+  mailbox: StagePlayLiveSourceMailListResponse | null | undefined;
+  wakeRequestId?: string | null;
+}) {
+  const wakeTrace = buildStagePlayWakeScopedTrace(input);
+  const latestResult = latestByIso(wakeTrace.wakeResults, (result) => result.createdAt);
+  return {
+    schema: "helix.stage_play.ask_debug_trace.v1",
+    exportedAt: new Date().toISOString(),
+    graphId: input.graph.graphId,
+    wakeRequestId: wakeTrace.wakeRequestId,
+    askTurnId: wakeTrace.wake?.askTurnId ?? latestResult?.askTurnId ?? null,
+    stagePlayWakeTransaction: latestResult?.stagePlayWakeTransaction ?? null,
+    routeMetadata: wakeTrace.wake?.routeMetadata ?? wakeTrace.wake?.askLaunchRouteMetadata ?? latestResult?.stagePlayWakeTransaction?.routeMetadata ?? null,
+    selectedTargetSource: latestResult?.stagePlayWakeTransaction?.selectedTargetSource ?? null,
+    selectedCapability: latestResult?.stagePlayWakeTransaction?.selectedCapability ?? null,
+    producedRefs: latestResult?.stagePlayWakeTransaction?.producedRefs ?? [],
+    artifactRefs: latestResult?.stagePlayWakeTransaction?.artifactRefs ?? null,
+    decisionReceiptId: latestResult?.stagePlayWakeTransaction?.decisionReceiptId ?? latestResult?.decisionIds?.[0] ?? null,
+    voiceReceiptId: latestResult?.stagePlayWakeTransaction?.voiceReceiptId ?? latestResult?.voiceCheckpointRefs?.[0] ?? null,
+    terminalKind: latestResult?.stagePlayWakeTransaction?.terminalKind ?? null,
+    failureCode: latestResult?.stagePlayWakeTransaction?.failureCode ?? latestResult?.failedReason ?? null,
+    wakeTrace,
+    authority: {
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "debug_trace",
+      raw_content_included: false,
+      note: "This is the Stage Play mailbox projection of Ask debug. Use full Ask debug export when an Ask turn payload is available.",
+    },
+  };
+}
+
 function firstLiveBindingSummary(badge: StagePlayBadgeV1): string | null {
   const binding = badge.liveBindings.find((entry) =>
     entry.compactValue !== null && entry.compactValue !== undefined && entry.compactValue !== ""
@@ -4406,7 +4670,7 @@ function StagePlayMailLoopLiveOverview({
   mailbox: StagePlayLiveSourceMailListResponse | null | undefined;
 }) {
   const queryClient = useQueryClient();
-  const [debugCopyState, setDebugCopyState] = useState<"idle" | "trace" | "full">("idle");
+  const [debugCopyState, setDebugCopyState] = useState<"idle" | "trace" | "packet" | "wake" | "ask" | "full">("idle");
   const [dismissingWakeId, setDismissingWakeId] = useState<string | null>(null);
   const [selectedTrafficPayloadId, setSelectedTrafficPayloadId] = useState<string | null>(null);
   const [selectedPacketTrafficKey, setSelectedPacketTrafficKey] = useState<string | null>(null);
@@ -5463,11 +5727,46 @@ function StagePlayMailLoopLiveOverview({
     () => buildStagePlayMailLoopUnifiedTrace({ graph, mailbox }),
     [graph, mailbox],
   );
-  const handleCopyUnifiedTrace = () => {
-    copyStagePlayText(JSON.stringify(unifiedTrace, null, 2));
-    setDebugCopyState("trace");
+  const selectedPacketTrace = useMemo(
+    () => buildStagePlayPacketScopedTrace({ graph, mailbox, packetKey: selectedPacketTrafficKey }),
+    [graph, mailbox, selectedPacketTrafficKey],
+  );
+  const selectedWakeTrace = useMemo(
+    () => buildStagePlayWakeScopedTrace({
+      graph,
+      mailbox,
+      wakeRequestId: selectedPacketTrace.wake?.wakeRequestId ?? latestWake?.wakeRequestId ?? null,
+    }),
+    [graph, latestWake?.wakeRequestId, mailbox, selectedPacketTrace.wake?.wakeRequestId],
+  );
+  const selectedAskDebugTrace = useMemo(
+    () => buildStagePlayAskDebugTrace({
+      graph,
+      mailbox,
+      wakeRequestId: selectedWakeTrace.wakeRequestId,
+    }),
+    [graph, mailbox, selectedWakeTrace.wakeRequestId],
+  );
+  const markDebugCopied = (state: typeof debugCopyState) => {
+    setDebugCopyState(state);
     if (debugCopyResetTimerRef.current) window.clearTimeout(debugCopyResetTimerRef.current);
     debugCopyResetTimerRef.current = window.setTimeout(() => setDebugCopyState("idle"), 1800);
+  };
+  const handleCopyUnifiedTrace = () => {
+    copyStagePlayText(JSON.stringify(unifiedTrace, null, 2));
+    markDebugCopied("trace");
+  };
+  const handleCopyPacketTrace = () => {
+    copyStagePlayText(JSON.stringify(selectedPacketTrace, null, 2));
+    markDebugCopied("packet");
+  };
+  const handleCopyWakeTrace = () => {
+    copyStagePlayText(JSON.stringify(selectedWakeTrace, null, 2));
+    markDebugCopied("wake");
+  };
+  const handleCopyAskDebugTrace = () => {
+    copyStagePlayText(JSON.stringify(selectedAskDebugTrace, null, 2));
+    markDebugCopied("ask");
   };
   const handleCopyFullMailbox = async () => {
     const fullMailbox = await fetchStagePlayLiveSourceMail({
@@ -5482,9 +5781,7 @@ function StagePlayMailLoopLiveOverview({
       graphId: graph.graphId,
       mailbox: fullMailbox,
     }, null, 2));
-    setDebugCopyState("full");
-    if (debugCopyResetTimerRef.current) window.clearTimeout(debugCopyResetTimerRef.current);
-    debugCopyResetTimerRef.current = window.setTimeout(() => setDebugCopyState("idle"), 1800);
+    markDebugCopied("full");
   };
 
   useEffect(() => () => {
@@ -5681,6 +5978,39 @@ function StagePlayMailLoopLiveOverview({
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="button"
+              onClick={handleCopyPacketTrace}
+              disabled={!selectedPacketTrace.processedPacket && selectedPacketTrace.rawVisualMail.length === 0}
+              className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-45"
+              data-testid="stage-play-copy-mail-loop-packet-trace"
+              title="Copy the selected packet trace from raw mail through deck, wake, Ask, decision, voice, and continuation state."
+            >
+              <Copy className="h-3 w-3" aria-hidden="true" />
+              Copy packet trace
+            </button>
+            <button
+              type="button"
+              onClick={handleCopyWakeTrace}
+              disabled={!selectedWakeTrace.wakeRequestId}
+              className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-45"
+              data-testid="stage-play-copy-mail-loop-wake-trace"
+              title="Copy the selected wake trace, including superseded wake ids and wake results."
+            >
+              <Copy className="h-3 w-3" aria-hidden="true" />
+              Copy wake trace
+            </button>
+            <button
+              type="button"
+              onClick={handleCopyAskDebugTrace}
+              disabled={!selectedAskDebugTrace.wakeRequestId}
+              className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-45"
+              data-testid="stage-play-copy-mail-loop-ask-debug"
+              title="Copy the mailbox projection of Ask debug for this wake."
+            >
+              <Copy className="h-3 w-3" aria-hidden="true" />
+              Copy Ask debug
+            </button>
+            <button
+              type="button"
               onClick={handleCopyUnifiedTrace}
               className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100"
               data-testid="stage-play-copy-mail-loop-unified-trace"
@@ -5702,6 +6032,12 @@ function StagePlayMailLoopLiveOverview({
             <span className="text-[10px] text-slate-500" data-testid="stage-play-mail-loop-debug-copy-state">
               {debugCopyState === "trace"
                 ? "unified trace copied"
+                : debugCopyState === "packet"
+                  ? "packet trace copied"
+                : debugCopyState === "wake"
+                  ? "wake trace copied"
+                : debugCopyState === "ask"
+                  ? "Ask debug copied"
                 : debugCopyState === "full"
                   ? "full mailbox copied"
                   : "debug covers pre-Ask and final-answer paths"}

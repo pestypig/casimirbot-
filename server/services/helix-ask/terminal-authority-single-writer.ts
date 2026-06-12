@@ -1113,7 +1113,13 @@ export function applyHelixTerminalAuthoritySingleWriter(
       selectedArtifactKind === "internet_search_answer"
         ? readRecord(input.payload.internet_search_answer)
         : null;
+    const materializedCompoundResearchLocatorAnswer =
+      selectedArtifactKind === "compound_research_locator_answer"
+        ? readRecord(input.payload.compound_research_locator_answer)
+        : null;
     const baseText =
+      readString(materializedCompoundResearchLocatorAnswer?.answer_text) ??
+      readString(materializedCompoundResearchLocatorAnswer?.text) ??
       readString(materializedScholarlyAnswer?.answer_text) ??
       readString(materializedScholarlyAnswer?.text) ??
       readString(materializedInternetSearchAnswer?.answer_text) ??
@@ -1122,10 +1128,17 @@ export function applyHelixTerminalAuthoritySingleWriter(
       readString(input.payload.selected_final_answer) ??
       "I could not produce a terminal answer for this turn.";
     const citationFooter =
-      selectedArtifactKind === "scholarly_research_answer"
+      selectedArtifactKind === "scholarly_research_answer" ||
+      selectedArtifactKind === "compound_research_locator_answer"
         ? appendScholarlyCitationFooter(baseText, artifacts)
         : { text: baseText, citations: [] as ScholarlyCitation[], footer: null };
     const text = citationFooter.text;
+    if (materializedCompoundResearchLocatorAnswer) {
+      materializedCompoundResearchLocatorAnswer.text = text;
+      materializedCompoundResearchLocatorAnswer.answer_text = text;
+      materializedCompoundResearchLocatorAnswer.citations = citationFooter.citations;
+      materializedCompoundResearchLocatorAnswer.citation_footer = citationFooter.footer;
+    }
     if (materializedScholarlyAnswer) {
       materializedScholarlyAnswer.text = text;
       materializedScholarlyAnswer.answer_text = text;
@@ -1256,6 +1269,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const latestDraftForIntegrity = findLatestFinalAnswerDraftCandidate(artifacts);
   const draftText = latestDraftForIntegrity?.text ?? (selectedDraft ? artifactText(selectedDraft.artifact) : null);
   const selectedMaterializedAnswerText =
+    readString(readRecord(input.payload.compound_research_locator_answer)?.answer_text) ??
     readString(readRecord(input.payload.scholarly_research_answer)?.answer_text) ??
     readString(readRecord(input.payload.internet_search_answer)?.answer_text) ??
     readString(readRecord(input.payload.repo_code_evidence_answer)?.answer_text);

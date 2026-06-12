@@ -379,6 +379,15 @@ export default function ImageLensPanel() {
         evidenceId,
         summary: analyzedSummary,
       });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("helix:image-lens:visual-frame-sent", {
+          detail: {
+            sourceId: visualSource.sourceId,
+            frameId,
+            evidenceId,
+          },
+        }));
+      }
       emitHelixAskLiveEvent({
         contextId: HELIX_ASK_CONTEXT_ID.desktop,
         entry: {

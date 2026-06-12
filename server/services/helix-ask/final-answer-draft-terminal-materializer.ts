@@ -16,6 +16,7 @@ export type FinalAnswerDraftTerminalMaterializerResult = {
   materialized_terminal_artifact_kind?:
     | "model_synthesized_answer"
     | "repo_code_evidence_answer"
+    | "compound_research_locator_answer"
     | "scholarly_research_answer"
     | "internet_search_answer"
     | "situation_room_live_job_setup_answer"
@@ -98,6 +99,14 @@ const isScholarlyResearchObservation = (artifact: ArtifactLike): boolean =>
 
 const isInternetSearchObservation = (artifact: ArtifactLike): boolean =>
   /internet_search_observation/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" "));
+
+const isCompleteCompoundResearchLocatorItinerary = (payload: Record<string, unknown>): boolean => {
+  const itinerary = readRecord(payload.capability_itinerary);
+  const executionState = readRecord(itinerary?.execution_state);
+  if (executionState?.complete !== true) return false;
+  const families = new Set(readArray(executionState?.required_observation_families).map(readString).filter(Boolean));
+  return families.has("theory_locator") && (families.has("scholarly_research") || families.has("internet_search"));
+};
 
 export const findLatestFinalAnswerDraftCandidate = (
   artifacts: ArtifactLike[],
@@ -324,7 +333,11 @@ export function materializeFinalAnswerDraftTerminal(input: {
         raw_content_included: false,
       };
     }
-    if (!contractAllows(contract, "scholarly_research_answer")) {
+    const compoundResearchLocator = isCompleteCompoundResearchLocatorItinerary(input.payload);
+    const targetKind = compoundResearchLocator
+      ? "compound_research_locator_answer"
+      : "scholarly_research_answer";
+    if (!contractAllows(contract, targetKind)) {
       return {
         schema: "helix.final_answer_draft_terminal_materializer_result.v1",
         turn_id: input.turnId,
@@ -337,27 +350,39 @@ export function materializeFinalAnswerDraftTerminal(input: {
         raw_content_included: false,
       };
     }
-    const scholarlyAnswerRef = materializedRef(input.turnId, "scholarly_research_answer");
-    input.payload.scholarly_research_answer = {
-      schema: "helix.scholarly_research_answer.v1",
+    const scholarlyAnswerRef = materializedRef(input.turnId, targetKind);
+    const answerPayload = {
+      schema: compoundResearchLocator
+        ? "helix.compound_research_locator_answer.v1"
+        : "helix.scholarly_research_answer.v1",
       artifact_id: scholarlyAnswerRef,
       turn_id: input.turnId,
       text: draft.text,
       answer_text: draft.text,
       support_refs: supportRefs,
       model_authored: true,
-      model_step_capability: "model.synthesize_from_scholarly_research",
+      model_step_capability: compoundResearchLocator
+        ? "model.synthesize_from_compound_research_locator"
+        : "model.synthesize_from_scholarly_research",
       final_answer_draft_ref: draft.ref,
+      source_families: compoundResearchLocator
+        ? ["scholarly_research", "theory_locator"]
+        : ["scholarly_research"],
       assistant_answer: false,
       raw_content_included: false,
     };
+    if (compoundResearchLocator) {
+      input.payload.compound_research_locator_answer = answerPayload;
+    } else {
+      input.payload.scholarly_research_answer = answerPayload;
+    }
     return {
       schema: "helix.final_answer_draft_terminal_materializer_result.v1",
       turn_id: input.turnId,
       final_answer_draft_ref: draft.ref,
       ok: true,
       materialized_terminal_artifact_ref: scholarlyAnswerRef,
-      materialized_terminal_artifact_kind: "scholarly_research_answer",
+      materialized_terminal_artifact_kind: targetKind,
       route_allowed_terminal_artifact_kinds: routeAllowed,
       final_answer_draft_quality_gate: qualityGate,
       assistant_answer: false,
@@ -396,7 +421,11 @@ export function materializeFinalAnswerDraftTerminal(input: {
         raw_content_included: false,
       };
     }
-    if (!contractAllows(contract, "internet_search_answer")) {
+    const compoundResearchLocator = isCompleteCompoundResearchLocatorItinerary(input.payload);
+    const targetKind = compoundResearchLocator
+      ? "compound_research_locator_answer"
+      : "internet_search_answer";
+    if (!contractAllows(contract, targetKind)) {
       return {
         schema: "helix.final_answer_draft_terminal_materializer_result.v1",
         turn_id: input.turnId,
@@ -409,27 +438,39 @@ export function materializeFinalAnswerDraftTerminal(input: {
         raw_content_included: false,
       };
     }
-    const internetAnswerRef = materializedRef(input.turnId, "internet_search_answer");
-    input.payload.internet_search_answer = {
-      schema: "helix.internet_search_answer.v1",
+    const internetAnswerRef = materializedRef(input.turnId, targetKind);
+    const answerPayload = {
+      schema: compoundResearchLocator
+        ? "helix.compound_research_locator_answer.v1"
+        : "helix.internet_search_answer.v1",
       artifact_id: internetAnswerRef,
       turn_id: input.turnId,
       text: draft.text,
       answer_text: draft.text,
       support_refs: supportRefs,
       model_authored: true,
-      model_step_capability: "model.synthesize_from_internet_search",
+      model_step_capability: compoundResearchLocator
+        ? "model.synthesize_from_compound_research_locator"
+        : "model.synthesize_from_internet_search",
       final_answer_draft_ref: draft.ref,
+      source_families: compoundResearchLocator
+        ? ["internet_search", "theory_locator"]
+        : ["internet_search"],
       assistant_answer: false,
       raw_content_included: false,
     };
+    if (compoundResearchLocator) {
+      input.payload.compound_research_locator_answer = answerPayload;
+    } else {
+      input.payload.internet_search_answer = answerPayload;
+    }
     return {
       schema: "helix.final_answer_draft_terminal_materializer_result.v1",
       turn_id: input.turnId,
       final_answer_draft_ref: draft.ref,
       ok: true,
       materialized_terminal_artifact_ref: internetAnswerRef,
-      materialized_terminal_artifact_kind: "internet_search_answer",
+      materialized_terminal_artifact_kind: targetKind,
       route_allowed_terminal_artifact_kinds: routeAllowed,
       final_answer_draft_quality_gate: qualityGate,
       assistant_answer: false,

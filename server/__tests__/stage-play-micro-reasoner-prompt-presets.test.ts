@@ -12,10 +12,18 @@ import {
   listStagePlayMicroReasonerPromptPresets,
   resetStagePlayProcessedMailPacketStoreForTest,
 } from "../services/stage-play/stage-play-processed-mail-packet-store";
+import {
+  listStagePlayLiveSourceMailWakeRequests,
+  listStagePlayLiveSourceMailWakeResults,
+  queueStagePlayLiveSourceMailWakeRequest,
+  recordStagePlayMailWakeResult,
+  resetStagePlayLiveSourceMailWakeStoreForTest,
+} from "../services/stage-play/stage-play-live-source-mail-wake-store";
 
 describe("stage play micro-reasoner prompt presets", () => {
   beforeEach(() => {
     resetStagePlayProcessedMailPacketStoreForTest();
+    resetStagePlayLiveSourceMailWakeStoreForTest();
     ensureDefaultStagePlayMicroReasonerPromptPresets();
   });
 
@@ -354,5 +362,144 @@ describe("stage play micro-reasoner prompt presets", () => {
       voiceCandidate: true,
       context_role: "micro_reasoner_evidence",
     });
+
+    const deckVerdict = {
+      recommendedNext: result.packet.arbiter?.recommendedNext ?? result.packet.recommendedNext,
+      wakeAsk: result.packet.arbiter?.wakeAsk ?? true,
+      voiceCandidate: result.packet.arbiter?.voiceCandidate ?? result.packet.salience.voiceCandidate,
+      reason: result.packet.arbiter?.reason ?? "Minimal Operator selected a voice candidate.",
+    };
+    const wake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId: "helix-ask:desktop",
+      jobId: "stage_play_live_source_job:minecraft",
+      mailIds: result.packet.mailIds,
+      sourceIds: [result.packet.sourceId],
+      reason: "unread_mail",
+      evidenceRefs: result.packet.evidenceRefs,
+      deckPresetId: result.packet.microReasonerDeck?.presetId,
+      deckPresetTitle: result.packet.microReasonerDeck?.presetTitle,
+      deckRunPlan: result.packet.microReasonerDeck?.deckRunPlan,
+      packetIds: [result.packet.packetId],
+      deckVerdict,
+      now: "2026-06-04T12:00:01.000Z",
+    });
+
+    expect(wake).toMatchObject({
+      deckPresetId: "stage_play_micro_reasoner_prompt_preset:minecraft_minimal_operator:v1",
+      deckPresetTitle: "Minecraft Minimal Operator",
+      deckRunPlan: "minimal_prompted_arbiter",
+      packetIds: [result.packet.packetId],
+      deckVerdict: {
+        recommendedNext: "request_voice_callout",
+        wakeAsk: true,
+        voiceCandidate: true,
+        reason: "Low health and hostile cue are urgent enough for a callout candidate.",
+      },
+      lifecycleReason: "Minecraft Minimal Operator selected request_voice_callout: Low health and hostile cue are urgent enough for a callout candidate.",
+    });
+
+    const wakeResult = recordStagePlayMailWakeResult({
+      wakeRequestId: wake?.wakeRequestId ?? "missing",
+      threadId: "helix-ask:desktop",
+      status: "completed",
+      askTurnId: null,
+      decisionIds: ["stage_play_live_source_mail_decision:test"],
+      evidenceRefs: [
+        result.packet.packetId,
+        "stage_play_live_source_mail_decision:test",
+      ],
+      skippedReason: "test_completed",
+      createdAt: "2026-06-04T12:00:02.000Z",
+    });
+
+    expect(wakeResult).toMatchObject({
+      deckPresetId: "stage_play_micro_reasoner_prompt_preset:minecraft_minimal_operator:v1",
+      deckPresetTitle: "Minecraft Minimal Operator",
+      deckRunPlan: "minimal_prompted_arbiter",
+      packetIds: [result.packet.packetId],
+      deckVerdict,
+      stagePlayWakeTransaction: {
+        deckPresetId: "stage_play_micro_reasoner_prompt_preset:minecraft_minimal_operator:v1",
+        deckPresetTitle: "Minecraft Minimal Operator",
+        deckRunPlan: "minimal_prompted_arbiter",
+        packetIds: [result.packet.packetId],
+        deckVerdict,
+        artifactRefs: {
+          processedPacketIds: [result.packet.packetId],
+        },
+      },
+    });
+  });
+
+  it("coalesces pending same-source same-deck wake verdicts before Ask launch", () => {
+    const firstWake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId: "helix-ask:desktop",
+      jobId: "stage_play_live_source_job:minecraft",
+      mailIds: ["stage_play_live_source_mail:first-minimal"],
+      sourceIds: ["visual_source:minecraft"],
+      reason: "unread_mail",
+      deckPresetId: "stage_play_micro_reasoner_prompt_preset:minecraft_minimal_operator:v1",
+      deckPresetTitle: "Minecraft Minimal Operator",
+      deckRunPlan: "minimal_prompted_arbiter",
+      packetIds: ["stage_play_processed_mail_packet:first-minimal"],
+      deckVerdict: {
+        recommendedNext: "request_voice_callout",
+        wakeAsk: true,
+        voiceCandidate: true,
+        reason: "First urgent packet.",
+      },
+      evidenceRefs: ["stage_play_processed_mail_packet:first-minimal"],
+      now: "2026-06-04T12:01:00.000Z",
+    });
+    const secondWake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId: "helix-ask:desktop",
+      jobId: "stage_play_live_source_job:minecraft",
+      mailIds: ["stage_play_live_source_mail:second-minimal"],
+      sourceIds: ["visual_source:minecraft"],
+      reason: "unread_mail",
+      deckPresetId: "stage_play_micro_reasoner_prompt_preset:minecraft_minimal_operator:v1",
+      deckPresetTitle: "Minecraft Minimal Operator",
+      deckRunPlan: "minimal_prompted_arbiter",
+      packetIds: ["stage_play_processed_mail_packet:second-minimal"],
+      deckVerdict: {
+        recommendedNext: "request_voice_callout",
+        wakeAsk: true,
+        voiceCandidate: true,
+        reason: "Second urgent packet supersedes the pending first packet.",
+      },
+      evidenceRefs: ["stage_play_processed_mail_packet:second-minimal"],
+      now: "2026-06-04T12:01:01.000Z",
+    });
+
+    expect(secondWake?.wakeRequestId).not.toBe(firstWake?.wakeRequestId);
+    expect(secondWake).toMatchObject({
+      status: "queued",
+      supersededWakeIds: [firstWake?.wakeRequestId],
+      packetIds: [
+        "stage_play_processed_mail_packet:second-minimal",
+        "stage_play_processed_mail_packet:first-minimal",
+      ],
+    });
+    expect(secondWake?.evidenceRefs).toEqual(expect.arrayContaining([
+      firstWake?.wakeRequestId,
+      "stage_play_live_source_mail:first-minimal",
+      "stage_play_processed_mail_packet:first-minimal",
+      "stage_play_processed_mail_packet:second-minimal",
+    ]));
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId: "helix-ask:desktop", status: "queued" }).map((wake) => wake.wakeRequestId)).toEqual([
+      secondWake?.wakeRequestId,
+    ]);
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId: "helix-ask:desktop", status: "expired_superseded" })[0]).toMatchObject({
+      wakeRequestId: firstWake?.wakeRequestId,
+      supersededByWakeRequestId: secondWake?.wakeRequestId,
+      failureReason: "superseded_by_newer_deck_verdict",
+    });
+    expect(listStagePlayLiveSourceMailWakeResults({ threadId: "helix-ask:desktop" })).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        wakeRequestId: firstWake?.wakeRequestId,
+        status: "expired_superseded",
+        failedReason: "superseded_by_newer_deck_verdict",
+      }),
+    ]));
   });
 });

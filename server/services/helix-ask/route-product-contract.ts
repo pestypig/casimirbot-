@@ -17,6 +17,7 @@ export const CORE_TERMINAL_PRODUCTS = [
   "live_pipeline_receipt",
   "doc_location_result",
   "repo_code_evidence_answer",
+  "compound_research_locator_answer",
   "scholarly_research_answer",
   "internet_search_answer",
   "process_graph_overview",
@@ -461,7 +462,7 @@ export function buildRouteProductContract(input: {
       turnId: input.turnId,
       threadId: input.threadId,
       sourceTarget,
-      allowedCore: ["scholarly_research_answer"],
+      allowedCore: ["scholarly_research_answer", "compound_research_locator_answer"],
       allowedExtra: [],
       forbiddenExtra: [
         "direct_answer_text",
@@ -486,6 +487,7 @@ export function buildRouteProductContract(input: {
         "scholarly_pdf_page_image_observation",
         "scholarly_research_synthesis_attempt",
         "scholarly_research_claim_support",
+        "helix_theory_context_reflection_tool_receipt",
       ],
     });
   }
@@ -495,7 +497,7 @@ export function buildRouteProductContract(input: {
       turnId: input.turnId,
       threadId: input.threadId,
       sourceTarget,
-      allowedCore: ["internet_search_answer"],
+      allowedCore: ["internet_search_answer", "compound_research_locator_answer"],
       allowedExtra: [],
       forbiddenExtra: [
         "direct_answer_text",
@@ -519,6 +521,7 @@ export function buildRouteProductContract(input: {
         "internet_search_observation",
         "internet_search_synthesis_attempt",
         "internet_search_claim_support",
+        "helix_theory_context_reflection_tool_receipt",
       ],
     });
   }
