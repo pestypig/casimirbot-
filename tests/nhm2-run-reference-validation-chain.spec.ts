@@ -107,10 +107,30 @@ describe("NHM2 reference validation chain planner", () => {
     expect(scripts.indexOf("nhm2:build-coupled-closure-pass-candidate")).toBeLessThan(
       scripts.indexOf("nhm2:build-reference-run-blocker-ledger"),
     );
+    expect(scripts.indexOf("nhm2:build-reference-run-blocker-ledger")).toBeLessThan(
+      scripts.indexOf("nhm2:build-full-solve-claim-admission"),
+    );
+    expect(scripts.indexOf("nhm2:build-full-solve-claim-admission")).toBeLessThan(
+      scripts.indexOf("nhm2:render-reference-run-blocker-ledger"),
+    );
     expect(coupled.args).toContain("--regional-material-source-tensor-model");
     expect(coupled.args).toContain("--qei-worldline-dossier");
     expect(coupled.args).toContain("--observer-robust-energy-conditions");
     expect(coupled.args).toContain("--casimir-material-receipt");
+
+    const admission = findCommand(plan, "nhm2:build-full-solve-claim-admission");
+    expect(admission.args).toContain("--coupled-closure-pass-candidate");
+    expect(admission.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-coupled-closure-pass-candidate.json",
+    );
+    expect(admission.args).toContain("--blocker-ledger");
+    expect(admission.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-blocker-ledger-run-1.json",
+    );
+    expect(admission.args).toContain("--reference-run-validation");
+    expect(admission.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-reference-run-validation.json",
+    );
   });
 
   it("builds a layered full-tensor audit when both a candidate and source tensor model are available", () => {

@@ -15,6 +15,28 @@ export const THEORY_CONTEXT_REFLECTION_CONFIDENCE_MODES = [
   "strict_badge_match",
 ] as const;
 
+export const THEORY_CONTEXT_REFLECTION_RESOLUTION_ROLES = [
+  "prompt_center",
+  "first_principles_path",
+  "observable_path",
+  "claim_boundary",
+  "consequence_context",
+  "analogy_context",
+  "ambient_context",
+] as const;
+
+export const THEORY_CONTEXT_REFLECTION_RESOLUTION_MODES = [
+  "focused",
+  "path",
+  "wide_context",
+] as const;
+
+export const THEORY_CONTEXT_REFLECTION_EXPLANATION_DEPTH_HINTS = [
+  "specific",
+  "path",
+  "cross_scale",
+] as const;
+
 const THEORY_CONTEXT_REFLECTION_BIOME_BANDS = [
   "planck_quantum",
   "nuclear",
@@ -35,6 +57,15 @@ export type TheoryContextReflectionSource =
 
 export type TheoryContextReflectionConfidenceMode =
   (typeof THEORY_CONTEXT_REFLECTION_CONFIDENCE_MODES)[number];
+
+export type TheoryContextReflectionResolutionRole =
+  (typeof THEORY_CONTEXT_REFLECTION_RESOLUTION_ROLES)[number];
+
+export type TheoryContextReflectionResolutionMode =
+  (typeof THEORY_CONTEXT_REFLECTION_RESOLUTION_MODES)[number];
+
+export type TheoryContextReflectionExplanationDepthHint =
+  (typeof THEORY_CONTEXT_REFLECTION_EXPLANATION_DEPTH_HINTS)[number];
 
 export type TheoryContextReflectionMatchV1 = {
   badgeId: string;
@@ -100,6 +131,13 @@ export type TheoryContextReflectionRecommendedActionV1 = {
   solves: boolean;
 };
 
+export type TheoryContextReflectionResolutionV1 = {
+  mode: TheoryContextReflectionResolutionMode;
+  roleByBadgeId: Record<string, TheoryContextReflectionResolutionRole>;
+  rankedBadgeIdsByRole: Record<TheoryContextReflectionResolutionRole, string[]>;
+  explanationDepthHint: TheoryContextReflectionExplanationDepthHint;
+};
+
 export type TheoryContextReflectionV1 = {
   artifactId: typeof THEORY_CONTEXT_REFLECTION_ARTIFACT_ID;
   schemaVersion: typeof THEORY_CONTEXT_REFLECTION_SCHEMA_VERSION;
@@ -119,6 +157,7 @@ export type TheoryContextReflectionV1 = {
   likelyMatches: TheoryContextReflectionMatchV1[];
   inferredDomains: TheoryContextReflectionDomainV1[];
   overlay: TheoryContextReflectionOverlayV1;
+  resolution?: TheoryContextReflectionResolutionV1;
   evidenceForAsk: {
     summary: string;
     claimBoundaries: string[];
@@ -139,6 +178,7 @@ type BuildTheoryContextReflectionInput = Omit<
   | "schemaVersion"
   | "generatedAt"
   | "reflectionId"
+  | "resolution"
   | "assistant_answer"
   | "raw_content_included"
   | "terminal_eligible"
@@ -149,6 +189,7 @@ type BuildTheoryContextReflectionInput = Omit<
 > & {
   generatedAt?: string;
   reflectionId?: string;
+  resolution?: TheoryContextReflectionResolutionV1;
 };
 
 const FORBIDDEN_THEORY_CONTEXT_REFLECTION_PATTERNS = [
@@ -356,6 +397,56 @@ function validateRecommendedAction(prefix: string, value: unknown, issues: strin
   if (typeof value.solves !== "boolean") issues.push(`${prefix}.solves must be boolean`);
 }
 
+function emptyResolution(): TheoryContextReflectionResolutionV1 {
+  return {
+    mode: "path",
+    roleByBadgeId: {},
+    rankedBadgeIdsByRole: {
+      prompt_center: [],
+      first_principles_path: [],
+      observable_path: [],
+      claim_boundary: [],
+      consequence_context: [],
+      analogy_context: [],
+      ambient_context: [],
+    },
+    explanationDepthHint: "path",
+  };
+}
+
+function validateResolution(value: unknown, issues: string[]): void {
+  if (value === undefined) return;
+  if (!isRecord(value)) {
+    issues.push("resolution must be an object");
+    return;
+  }
+  if (!includes(THEORY_CONTEXT_REFLECTION_RESOLUTION_MODES, value.mode)) {
+    issues.push("resolution.mode is invalid");
+  }
+  if (!includes(THEORY_CONTEXT_REFLECTION_EXPLANATION_DEPTH_HINTS, value.explanationDepthHint)) {
+    issues.push("resolution.explanationDepthHint is invalid");
+  }
+  if (!isRecord(value.roleByBadgeId)) {
+    issues.push("resolution.roleByBadgeId must be an object");
+  } else {
+    for (const [badgeId, role] of Object.entries(value.roleByBadgeId)) {
+      if (!badgeId) issues.push("resolution.roleByBadgeId keys must be non-empty");
+      if (!includes(THEORY_CONTEXT_REFLECTION_RESOLUTION_ROLES, role)) {
+        issues.push(`resolution.roleByBadgeId.${badgeId} is invalid`);
+      }
+    }
+  }
+  if (!isRecord(value.rankedBadgeIdsByRole)) {
+    issues.push("resolution.rankedBadgeIdsByRole must be an object");
+  } else {
+    for (const role of THEORY_CONTEXT_REFLECTION_RESOLUTION_ROLES) {
+      if (!isStringArray(value.rankedBadgeIdsByRole[role])) {
+        issues.push(`resolution.rankedBadgeIdsByRole.${role} must be an array of strings`);
+      }
+    }
+  }
+}
+
 function validateEvidenceForAsk(value: unknown, issues: string[]): void {
   if (!isRecord(value)) {
     issues.push("evidenceForAsk must be an object");
@@ -388,6 +479,7 @@ export function buildTheoryContextReflectionV1(
     likelyMatches: input.likelyMatches,
     inferredDomains: input.inferredDomains,
     overlay: input.overlay,
+    resolution: input.resolution ?? emptyResolution(),
     evidenceForAsk: input.evidenceForAsk,
     assistant_answer: false,
     raw_content_included: false,
@@ -441,6 +533,7 @@ export function validateTheoryContextReflectionV1(value: unknown): string[] {
     );
   }
   validateOverlay(value.overlay, issues);
+  validateResolution(value.resolution, issues);
   validateEvidenceForAsk(value.evidenceForAsk, issues);
 
   if (value.assistant_answer !== false) issues.push("assistant_answer must be false");

@@ -103,6 +103,14 @@ const passingClosurePipeline = () =>
       stability: { convergenceStatus: "pass" },
       blockers: [],
     },
+    nhm2FullSolveClaimAdmission: {
+      admission: {
+        status: "reduced_order_numerical_candidate",
+        diagnosticClosurePassed: true,
+        numericalReliabilityPassed: true,
+      },
+      blockers: ["external_physical_validation_missing"],
+    },
   }) as any;
 
 describe("buildNhm2SolveState", () => {
@@ -214,6 +222,14 @@ describe("buildNhm2SolveState", () => {
           invariants: { status: "computed" },
           stability: { convergenceStatus: "pass" },
           blockers: [],
+        },
+        nhm2FullSolveClaimAdmission: {
+          admission: {
+            status: "reduced_order_numerical_candidate",
+            diagnosticClosurePassed: true,
+            numericalReliabilityPassed: true,
+          },
+          blockers: ["external_physical_validation_missing"],
         },
       } as any,
       proofPack,
@@ -352,8 +368,36 @@ describe("buildNhm2SolveState", () => {
         "QEI worldline dossier incomplete",
         "Casimir material receipt missing",
         expect.stringMatching(/invariant audit incomplete/),
+        "full-solve claim admission missing",
       ]),
     );
+  });
+
+  it("keeps diagnostic claim admission guarded when numerical reliability is incomplete", () => {
+    const pipeline = passingClosurePipeline();
+    pipeline.nhm2FullSolveClaimAdmission = {
+      admission: {
+        status: "diagnostic_closure_candidate",
+        diagnosticClosurePassed: true,
+        numericalReliabilityPassed: false,
+      },
+      blockers: ["reference_run_validation_not_pass:review"],
+    };
+
+    const state = buildNhm2SolveState({
+      ...makeAuthorityInputs(),
+      pipeline,
+    });
+
+    expect(state.overall.label).toBe("Guarded / partial");
+    expect(state.claimAdmission.available).toBe(true);
+    expect(state.claimAdmission.status).toBe("diagnostic_closure_candidate");
+    expect(state.claimAdmission.diagnosticClosurePassed).toBe(true);
+    expect(state.claimAdmission.numericalReliabilityPassed).toBe(false);
+    expect(state.claimAdmission.physicalClaimAllowed).toBe(false);
+    expect(state.claimAdmission.transportClaimAllowed).toBe(false);
+    expect(state.claimAdmission.blockers).toContain("reference_run_validation_not_pass:review");
+    expect(state.overall.reasons).toContain("physical claim admission remains diagnostic");
   });
 
   it("keeps wall closure failure blocking even when global residual-style context passes", () => {

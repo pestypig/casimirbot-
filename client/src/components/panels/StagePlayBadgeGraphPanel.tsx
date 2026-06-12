@@ -3299,6 +3299,11 @@ const MICRO_REASONER_DISPLAY: Record<StagePlayMicroReasonerRoleV1, {
     subtitle: "council -> wake verdict",
     missingPreview: "waiting for arbiter verdict",
   },
+  prompt_router: {
+    title: "Prompt Router",
+    subtitle: "summary -> Ask prompt",
+    missingPreview: "waiting for prompt routing",
+  },
   decision_selector: {
     title: "Decision Selector",
     subtitle: "packet -> procedural next step",
@@ -4585,6 +4590,7 @@ const STAGE_PLAY_DECK_ROLES: StagePlayMicroReasonerRoleV1[] = [
   "prediction_validator",
   "salience_scorer",
   "hypothesis_arbiter",
+  "prompt_router",
   "decision_selector",
   "voice_callout_drafter",
   "packet_composer",
@@ -4608,7 +4614,7 @@ const STAGE_PLAY_MICRO_REASONER_ROLE_CLUSTERS: Array<{
   {
     key: "arbiter",
     title: "Arbiter",
-    roles: ["salience_scorer", "hypothesis_arbiter", "decision_selector", "voice_callout_drafter", "packet_composer"],
+    roles: ["salience_scorer", "hypothesis_arbiter", "prompt_router", "decision_selector", "voice_callout_drafter", "packet_composer"],
   },
 ];
 

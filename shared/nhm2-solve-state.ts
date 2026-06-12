@@ -234,6 +234,15 @@ export type Nhm2SolveState = {
       invariantStatus: string | null;
     };
   };
+  claimAdmission: {
+    available: boolean;
+    status: string | null;
+    diagnosticClosurePassed: boolean | null;
+    numericalReliabilityPassed: boolean | null;
+    physicalClaimAllowed: false;
+    transportClaimAllowed: false;
+    blockers: string[];
+  };
   vacuum: {
     available: boolean;
     status: string | null;
@@ -588,6 +597,18 @@ export function buildNhm2SolveState(input: Nhm2SolveStateInput = {}): Nhm2SolveS
         : natarioInvariantBlockers.length > 0
           ? "review"
           : "pass");
+  const fullSolveClaimAdmission =
+    readRecord(
+      pipelineRecord,
+      "nhm2FullSolveClaimAdmission",
+      "nhm2_full_solve_claim_admission",
+    ) ??
+    readRecord(
+      natarioRecord,
+      "nhm2FullSolveClaimAdmission",
+      "nhm2_full_solve_claim_admission",
+    );
+  const fullSolveClaimAdmissionState = readRecord(fullSolveClaimAdmission, "admission");
   const closureStack: Nhm2SolveState["closureStack"] = {
     sameChartFullTensor: {
       available: sameChartTensor != null,
@@ -669,6 +690,19 @@ export function buildNhm2SolveState(input: Nhm2SolveStateInput = {}): Nhm2SolveS
         readText(pipelineRecord, "nhm2_natario_invariant_status"),
     },
   };
+  const claimAdmission: Nhm2SolveState["claimAdmission"] = {
+    available: fullSolveClaimAdmission != null,
+    status: readText(fullSolveClaimAdmissionState, "status"),
+    diagnosticClosurePassed:
+      readBoolean(fullSolveClaimAdmissionState, "diagnosticClosurePassed") ??
+      readBoolean(pipelineRecord, "nhm2_full_solve_diagnostic_closure_passed"),
+    numericalReliabilityPassed:
+      readBoolean(fullSolveClaimAdmissionState, "numericalReliabilityPassed") ??
+      readBoolean(pipelineRecord, "nhm2_full_solve_numerical_reliability_passed"),
+    physicalClaimAllowed: false,
+    transportClaimAllowed: false,
+    blockers: readStringArray(fullSolveClaimAdmission, "blockers"),
+  };
   const overallReasons: string[] = [];
 
   if (!pipeline) overallReasons.push("pipeline unavailable");
@@ -747,11 +781,21 @@ export function buildNhm2SolveState(input: Nhm2SolveStateInput = {}): Nhm2SolveS
     overallReasons.push("Natário invariant audit incomplete");
   }
 
+  if (!claimAdmission.available) {
+    overallReasons.push("full-solve claim admission missing");
+  } else if (claimAdmission.diagnosticClosurePassed !== true) {
+    overallReasons.push("diagnostic closure ledger not passed");
+  } else if (claimAdmission.numericalReliabilityPassed !== true) {
+    overallReasons.push("physical claim admission remains diagnostic");
+  }
+
   const closureBlocked =
     closureStack.sourceSideSameBasisTensorAuthority.hasWallAuthority === false ||
     closureStack.wallSourceClosure.pass === false ||
     closureStack.observerRobustEnergyConditions.anyViolation === true ||
-    closureStack.natarioInvariantAudit.status === "fail";
+    closureStack.natarioInvariantAudit.status === "fail" ||
+    claimAdmission.status === "blocked" ||
+    claimAdmission.diagnosticClosurePassed === false;
   const overallTone: OverallTone =
     !pipeline ||
     strictProxy ||
@@ -891,6 +935,7 @@ export function buildNhm2SolveState(input: Nhm2SolveStateInput = {}): Nhm2SolveS
       guardrails,
     },
     closureStack,
+    claimAdmission,
     vacuum: {
       available: Boolean(vacuumContract),
       status: vacuumContract?.status ?? null,

@@ -243,6 +243,86 @@ describe("theory context reflector", () => {
     expect(reasons).not.toMatch(/\btext match:.*\b(?:do|treat|physics|theory|badge|graph|proof)\b/i);
   });
 
+  it("classifies collective-mode reflection matches by resolution role without dropping broad context", () => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt:
+        "Reflect the theory badge graph for a 4.6 ms soliton-polariton reservoir lifetime, Fourier linewidth proxy, polariton decoherence boundary, noisy synchrony margin, stabilized versus noisy DTC T2 prime linewidth, and magnon space-time lattice k_um_inv 5 and 10.",
+      mentionedEquations: [
+        "Gamma_life_s_inv = 1 / tau_s",
+        "linewidth_proxy_Hz = 1 / (2 * pi * tau_s)",
+        "delta_f_collective_Hz = 1 / (2 * pi * T2_prime_s)",
+        "stability_margin_s_inv = locking_rate_s_inv - noise_dephasing_rate_s_inv - loss_rate_s_inv",
+        "lambda_um = 1 / k_um_inv",
+      ],
+      mentionedSymbols: [
+        "tau_s",
+        "Gamma_life_s_inv",
+        "linewidth_proxy_Hz",
+        "T2_prime_s",
+        "T2_s",
+        "g1_tau",
+        "linewidth_Hz",
+        "stability_margin_s_inv",
+        "k_um_inv",
+        "lambda_um",
+      ],
+      generatedAt: "2026-06-12T00:00:00.000Z",
+      reflectionId: "reflection:collective-mode-resolution",
+      limit: 20,
+    });
+    const roleByBadgeId = reflection.resolution?.roleByBadgeId ?? {};
+
+    expect(isTheoryContextReflectionV1(reflection)).toBe(true);
+    expect(reflection.resolution?.mode).toBe("path");
+    expect(roleByBadgeId["matter.collective.polariton_reservoir_lifetime_context"]).toBe("prompt_center");
+    expect(roleByBadgeId["matter.time_crystal.noisy_synchrony_margin_context"]).toBe("prompt_center");
+    expect(roleByBadgeId["matter.time_crystal.collective_lifetime_limited_linewidth_context"]).toBe("prompt_center");
+    expect(roleByBadgeId["matter.time_crystal.magnon_space_time_lattice_context"]).toBe("prompt_center");
+    expect(roleByBadgeId["matter.collective.polariton_decoherence_boundary"]).toBe("claim_boundary");
+    if (roleByBadgeId["matter.time_crystal.polariton_stc_bridge_boundary"]) {
+      expect(roleByBadgeId["matter.time_crystal.polariton_stc_bridge_boundary"]).toBe("claim_boundary");
+    }
+
+    for (const badgeId of [
+      "curvature.uncertainty.margin",
+      "relativity.lorentz.transform_context",
+      "casimir.cavity.parallel_plate_pressure",
+      "matter.phase.structural_order_context",
+    ]) {
+      if (roleByBadgeId[badgeId]) {
+        expect(["analogy_context", "ambient_context", "consequence_context"]).toContain(roleByBadgeId[badgeId]);
+      }
+    }
+
+    expect(reflection.resolution?.rankedBadgeIdsByRole.prompt_center).toEqual(
+      expect.arrayContaining([
+        "matter.collective.polariton_reservoir_lifetime_context",
+        "matter.time_crystal.noisy_synchrony_margin_context",
+      ]),
+    );
+    expect(reflection.evidenceForAsk.claimBoundaries.join(" ")).toMatch(/diagnostic-only|promotion not allowed/i);
+    expect(reflection.evidenceForAsk.recommendedNextActions.some(
+      (action) => action.actionId === "theory-badge-graph.load_payloads_to_calculator",
+    )).toBe(true);
+    expect(reflection.evidenceForAsk.recommendedNextActions.every((action) => action.solves === false)).toBe(true);
+  });
+
+  it("maps resolution modes to explanation depth without changing evidence-only actions", () => {
+    const reflection = buildTheoryContextReflection({
+      graph: buildNhm2TheoryBadgeGraphV1(),
+      prompt: "Map the wide context around magnon space-time lattice and polariton reservoir lifetime.",
+      resolutionMode: "wide_context",
+      generatedAt: "2026-06-12T00:00:00.000Z",
+      reflectionId: "reflection:wide-resolution",
+    });
+
+    expect(isTheoryContextReflectionV1(reflection)).toBe(true);
+    expect(reflection.resolution?.mode).toBe("wide_context");
+    expect(reflection.resolution?.explanationDepthHint).toBe("cross_scale");
+    expect(reflection.evidenceForAsk.recommendedNextActions.every((action) => action.solves === false)).toBe(true);
+  });
+
   it("prioritizes requested physics concepts over atlas-neighborhood noise for Theory/Zen bridge prompts", () => {
     const reflection = buildTheoryContextReflection({
       graph: buildNhm2TheoryBadgeGraphV1(),
@@ -280,7 +360,11 @@ describe("theory context reflector", () => {
 
     expect(isTheoryContextReflectionV1(reflection)).toBe(true);
     expect(reflection.overlay.highlightedBadgeIds).toContain("astrochemistry.fullerene.c60_stellar_context");
-    expect(reflection.overlay.suggestedScaleBands).toEqual(expect.arrayContaining(["molecular", "stellar"]));
+    expect(reflection.overlay.highlightedBadgeIds).toEqual(expect.arrayContaining([
+      "stellar.spectroscopy.atomic_line_identification_context",
+      "stellar.nucleosynthesis.reaction_network_context",
+    ]));
+    expect(reflection.overlay.suggestedScaleBands).toEqual(expect.arrayContaining(["molecular", "claim_boundary"]));
     expect(reflection.overlay.suggestedBiomeChunkIds).toContain(c60Coordinate.renderChunkId);
     expect(reflection.overlay.suggestedSemanticChunkIds).toContain(c60Coordinate.semanticChunkId);
     expect(reflection.overlay.uncertainty?.badgeProbabilityById).toHaveProperty(

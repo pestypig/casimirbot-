@@ -121,6 +121,7 @@ export function WarpProofPanel() {
   const contractQuery = useGrConstraintContract({ enabled: true, refetchInterval: 2000 });
   const nhm2Solve = useNhm2SolveState();
   const closureStack = nhm2Solve.state.closureStack;
+  const claimAdmission = nhm2Solve.state.claimAdmission;
   const pipelineRecord = asPanelRecord(nhm2Solve.pipelineQuery.data);
   const natarioPipelineRecord = readPanelRecord(pipelineRecord, "natario");
   const sameChartTensorArtifact = readFirstArtifactRecord(
@@ -153,6 +154,10 @@ export function WarpProofPanel() {
   const natarioInvariantArtifact = readFirstArtifactRecord(
     [pipelineRecord, natarioPipelineRecord],
     ["nhm2NatarioInvariantAudit", "nhm2_natario_invariant_audit"],
+  );
+  const claimAdmissionArtifact = readFirstArtifactRecord(
+    [pipelineRecord, natarioPipelineRecord],
+    ["nhm2FullSolveClaimAdmission", "nhm2_full_solve_claim_admission"],
   );
   const wallRequiredRecord = readPanelRecord(wallClosureArtifact, "required");
   const wallAvailableRecord = readPanelRecord(wallClosureArtifact, "available");
@@ -230,6 +235,27 @@ export function WarpProofPanel() {
           closureStack.natarioInvariantAudit.invariantStatus === "computed"
         ? "pass"
         : "review";
+  const claimAdmissionStatus: ClosureStackStatus = !claimAdmission.available
+    ? "missing"
+    : claimAdmission.status === "blocked" ||
+        claimAdmission.status === "physical_claim_forbidden"
+      ? "fail"
+      : claimAdmission.status === "reduced_order_numerical_candidate"
+        ? "pass"
+        : "review";
+  const claimAdmissionPrimaryBlocker =
+    claimAdmission.blockers[0] ??
+    (claimAdmissionStatus === "missing"
+      ? "full-solve claim admission artifact missing"
+      : claimAdmission.numericalReliabilityPassed !== true
+        ? "numerical reliability evidence incomplete"
+        : "external physical validation missing");
+  const claimAdmissionNote =
+    claimAdmission.status === "reduced_order_numerical_candidate"
+      ? "Reduced-order numerical candidate; physical and transport claims remain forbidden."
+      : claimAdmission.status === "diagnostic_closure_candidate"
+        ? "Diagnostic closure candidate; numerical reliability and external evidence still gate claims."
+        : "Physical claim admission is locked behind diagnostic, numerical, and external evidence.";
   const closureRows = [
     {
       id: "same-chart-full-tensor",
@@ -979,6 +1005,48 @@ export function WarpProofPanel() {
                 <p className="mt-2 text-[11px] text-slate-400">{row.note}</p>
               </div>
             ))}
+          </div>
+        </section>
+
+        <section className="md:col-span-3 rounded-xl border border-white/10 bg-black/40 p-3 text-[12px]">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                Claim Admission
+              </h2>
+              <p className="mt-1 text-[11px] text-slate-300">
+                Diagnostic closure and numerical reliability are separated from physical or transport claims.
+              </p>
+            </div>
+            <Badge className={cn("border px-2 py-0.5 text-[10px]", statusBadgeClass(claimAdmissionStatus))}>
+              {`status: ${claimAdmission.status ?? claimAdmissionStatus}`}
+            </Badge>
+          </div>
+
+          <div className="rounded-lg border border-slate-800/80 bg-slate-950/60 p-3">
+            <dl className="grid gap-2 text-[11px] md:grid-cols-2">
+              <Row label="primary blocker">{claimAdmissionPrimaryBlocker}</Row>
+              <Row label="artifact ref">
+                {artifactRefFrom(claimAdmissionArtifact, "nhm2FullSolveClaimAdmission") ?? "not available"}
+              </Row>
+              <Row label="diagnostic closure">
+                {claimAdmission.diagnosticClosurePassed === true
+                  ? "passed"
+                  : claimAdmission.diagnosticClosurePassed === false
+                    ? "not passed"
+                    : "unknown"}
+              </Row>
+              <Row label="numerical reliability">
+                {claimAdmission.numericalReliabilityPassed === true
+                  ? "passed"
+                  : claimAdmission.numericalReliabilityPassed === false
+                    ? "not passed"
+                    : "unknown"}
+              </Row>
+              <Row label="physical claim">forbidden</Row>
+              <Row label="transport claim">forbidden</Row>
+            </dl>
+            <p className="mt-2 text-[11px] text-slate-400">{claimAdmissionNote}</p>
           </div>
         </section>
 

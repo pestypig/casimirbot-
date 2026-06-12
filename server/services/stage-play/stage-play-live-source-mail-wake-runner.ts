@@ -1228,6 +1228,8 @@ const microReasonerTranscriptTitle = (role: StagePlayMicroReasonerRunV1["role"])
       return "Salience scored";
     case "decision_selector":
       return "Decision selected";
+    case "prompt_router":
+      return "Prompt routed";
     case "voice_callout_drafter":
       return "Voice draft prepared";
     case "packet_composer":

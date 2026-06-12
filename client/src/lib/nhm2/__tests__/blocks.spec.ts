@@ -62,6 +62,19 @@ const makeAuthorityState = () => {
       nhm2SameChartFullTensor: {
         completeness: { fullTensorComplete: true, missingComponentIds: [] },
       },
+      nhm2SourceSideSameBasisTensorAuthority: {
+        summary: {
+          hasWallAuthority: true,
+          allRequiredRegionsAuthoritative: true,
+        },
+        regions: [
+          {
+            regionId: "wall",
+            status: "authoritative_same_basis",
+            blockers: [],
+          },
+        ],
+      },
       nhm2WallSourceClosure: {
         residual: { pass: true, relative: 0 },
         blockers: [],
@@ -95,6 +108,14 @@ const makeAuthorityState = () => {
         invariants: { status: "computed" },
         stability: { convergenceStatus: "pass" },
         blockers: [],
+      },
+      nhm2FullSolveClaimAdmission: {
+        admission: {
+          status: "reduced_order_numerical_candidate",
+          diagnosticClosurePassed: true,
+          numericalReliabilityPassed: true,
+        },
+        blockers: ["external_physical_validation_missing"],
       },
     } as any,
     proofPack,

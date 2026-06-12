@@ -224,6 +224,7 @@
     "nhm2:source-closure-pass-readiness": "tsx tools/nhm2/source-closure-pass-readiness.ts",
     "nhm2:build-coupled-closure-pass-candidate": "tsx tools/nhm2/build-coupled-closure-pass-candidate.ts",
     "nhm2:build-reference-run-blocker-ledger": "tsx tools/nhm2/build-reference-run-blocker-ledger.ts",
+    "nhm2:build-full-solve-claim-admission": "tsx tools/nhm2/build-full-solve-claim-admission.ts",
     "nhm2:render-reference-run-blocker-ledger": "tsx tools/nhm2/render-reference-run-blocker-ledger.ts",
     "nhm2:run-reference-validation-chain": "tsx tools/nhm2/run-reference-validation-chain.ts",
     "nhm2:run-reference-validation-chain:latest": "tsx tools/nhm2/run-reference-validation-chain-latest.ts",

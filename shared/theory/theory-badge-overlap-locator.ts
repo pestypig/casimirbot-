@@ -125,7 +125,7 @@ const tokenize = (value: string | undefined) =>
       .toLowerCase()
       .split(/[^a-z0-9_./^-]+/i)
       .map((token) => token.trim())
-      .filter((token) => token.length >= 2 && !TOKEN_STOP_WORDS.has(token)),
+      .filter((token) => token.length >= 2 && !TOKEN_STOP_WORDS.has(token) && !TOKEN_STOP_WORDS.has(normalizeKey(token))),
   );
 
 function badgeSymbols(badge: TheoryBadgeV1) {

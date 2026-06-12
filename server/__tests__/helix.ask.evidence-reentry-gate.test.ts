@@ -106,6 +106,70 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
     expect(trace.solver_risk_flags).not.toContain("missing_followup_reasoning");
   });
 
+  it("allows route-authorized docs open receipts to terminal without phantom follow-up reasoning", () => {
+    const trace = buildAskTurnSolverTrace({
+      turnId: "turn:docs-open-receipt",
+      promptText: "Search docs for Helix Ask console debug and tell me which document path you found.",
+      selectedRoute: "dispatch:act",
+      terminalArtifactKind: "doc_open_receipt",
+      finalAnswerSource: "doc_open_receipt",
+      payload: {
+        canonical_goal_frame: {
+          schema: "helix.canonical_goal_frame.v1",
+          goal_kind: "doc_open_best",
+          required_terminal_kind: "doc_open_receipt",
+        },
+        route_product_contract: {
+          schema: "helix.route_product_contract.v1",
+          source_target: "docs_viewer",
+          allowed_terminal_artifact_kinds: ["doc_open_receipt", "typed_failure", "request_user_input"],
+          forbidden_terminal_artifact_kinds: ["direct_answer_text"],
+        },
+        route_authority_audit: {
+          route_authority_ok: true,
+        },
+        poison_audit: {
+          ok: true,
+        },
+        terminal_answer_authority: {
+          server_authoritative: true,
+        },
+        goal_satisfaction_evaluation: {
+          satisfaction: "satisfied",
+          next_decision: "allow_terminal",
+        },
+      },
+      loopParityTrace: {
+        actual_tool_calls: [{
+          tool_id: "docs-viewer.open_doc_by_path",
+          family: "docs_viewer",
+          admitted: true,
+          mutating: false,
+          result_ref: "ask:docs-open-receipt:doc_open_receipt",
+        }],
+        observations_created: [{
+          observation_id: "ask:docs-open-receipt:doc_open_receipt",
+          source_kind: "docs_viewer",
+        }],
+        evidence_selected_for_answer: ["ask:docs-open-receipt:doc_open_receipt"],
+        evidence_rejected_for_answer: [],
+        terminal_selection_ran_after_observations: true,
+        route_authority_ok: true,
+        poison_audit_ok: true,
+        terminal_authority_ok: true,
+      },
+    });
+
+    expect(trace.followup_reasoning_gate).toMatchObject({
+      required: false,
+      completed: true,
+      reason: "simple_no_source_turn",
+    });
+    expect(trace.solver_risk_flags).not.toContain("tool_result_terminal_without_reasoning");
+    expect(trace.solver_risk_flags).not.toContain("missing_followup_reasoning");
+    expect(trace.completed_solver_path).toBe(true);
+  });
+
   it("keeps the original negated cadence prompt on content intent without receipt terminal authority", () => {
     const trace = buildAskTurnSolverTrace({
       turnId: "turn:negated-cadence",

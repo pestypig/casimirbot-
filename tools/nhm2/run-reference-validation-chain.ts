@@ -139,6 +139,7 @@ export const planReferenceValidationChain = (
   const validation = `${outRoot}/nhm2-reference-run-validation.json`;
   const ledger = `${outRoot}/nhm2-blocker-ledger-${runId}.json`;
   const ledgerReport = `${outRoot}/nhm2-blocker-ledger-${runId}.md`;
+  const claimAdmission = `${outRoot}/nhm2-full-solve-claim-admission.json`;
   const wallSourceLayeringSweep = `${outRoot}/nhm2-wall-source-layering-sweep.json`;
   const generatedLayeredWallSourceCandidate =
     `${outRoot}/nhm2-layered-wall-source-candidate.json`;
@@ -466,6 +467,18 @@ export const planReferenceValidationChain = (
     "--out",
     ledger,
     ...auditOnly,
+  ]));
+  commands.push(command("nhm2:build-full-solve-claim-admission", [
+    "--coupled-closure-pass-candidate",
+    coupledClosurePassCandidate,
+    "--blocker-ledger",
+    ledger,
+    "--full-loop-audit",
+    fullLoopAudit,
+    "--reference-run-validation",
+    validation,
+    "--out",
+    claimAdmission,
   ]));
   commands.push(command("nhm2:render-reference-run-blocker-ledger", [
     "--ledger",

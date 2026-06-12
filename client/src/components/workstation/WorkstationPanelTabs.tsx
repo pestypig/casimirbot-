@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { panelRegistry } from "@/lib/desktop/panelRegistry";
 import { isUserLaunchPanel } from "@/lib/workstation/launchPanelPolicy";
 import {
@@ -18,15 +18,6 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
   const [plusPulseActive, setPlusPulseActive] = useState(false);
   const [plusPulseTick, setPlusPulseTick] = useState(0);
   const [targetPanelId, setTargetPanelId] = useState<string | null>(null);
-  const openSettings = useCallback(() => {
-    if (typeof window === "undefined") return;
-    window.dispatchEvent(
-      new CustomEvent("open-helix-settings", {
-        detail: { tab: "preferences" },
-      }),
-    );
-    setPickerOpen(false);
-  }, []);
 
   const availablePanels = useMemo(
     () =>
@@ -154,13 +145,6 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
         {pickerOpen ? (
           <div className="absolute right-0 top-8 z-[90] w-72 rounded-lg border border-white/20 bg-slate-950/95 p-2 shadow-xl">
             <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-400">Launch panel</div>
-            <button
-              type="button"
-              onClick={openSettings}
-              className="mb-2 block w-full rounded border border-sky-300/30 bg-sky-500/10 px-2 py-1 text-left text-xs text-sky-100 hover:bg-sky-500/20"
-            >
-              Helix Start Settings
-            </button>
             <div className="max-h-72 space-y-1 overflow-y-auto">
               {availablePanels.map((panel) => (
                 <button
@@ -179,11 +163,6 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
                 >
                   <span className="inline-flex items-center gap-2">
                     <span>{panel.title}</span>
-                    {panel.workstationCapabilities?.v1_job_ready ? (
-                      <span className="rounded border border-emerald-300/40 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-emerald-200">
-                        Job-ready
-                      </span>
-                    ) : null}
                   </span>
                 </button>
               ))}

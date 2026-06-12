@@ -3,8 +3,12 @@ import type { TheoryBiomeBand } from "../contracts/theory-biome-layout.v1";
 import {
   buildTheoryContextReflectionV1,
   type TheoryContextReflectionConfidenceMode,
+  type TheoryContextReflectionExplanationDepthHint,
   type TheoryContextReflectionMatchV1,
   type TheoryContextReflectionRecommendedActionV1,
+  type TheoryContextReflectionResolutionMode,
+  type TheoryContextReflectionResolutionRole,
+  type TheoryContextReflectionResolutionV1,
   type TheoryContextReflectionSource,
   type TheoryContextReflectionUncertaintyV1,
   type TheoryContextReflectionV1,
@@ -28,6 +32,7 @@ export type BuildTheoryContextReflectionInput = {
   mentionedSymbols?: string[];
   mentionedDomains?: string[];
   confidenceMode?: TheoryContextReflectionConfidenceMode;
+  resolutionMode?: TheoryContextReflectionResolutionMode;
   source?: TheoryContextReflectionSource;
   limit?: number;
   generatedAt?: string;
@@ -35,6 +40,43 @@ export type BuildTheoryContextReflectionInput = {
 };
 
 const STRONG_MATCH_SCORE = 70;
+const RESOLUTION_ROLES: TheoryContextReflectionResolutionRole[] = [
+  "prompt_center",
+  "first_principles_path",
+  "observable_path",
+  "claim_boundary",
+  "consequence_context",
+  "analogy_context",
+  "ambient_context",
+];
+
+const GENERIC_CONGRUENCE_TOKENS = new Set([
+  "bound",
+  "gamma",
+  "g_r",
+  "lattice",
+  "margin",
+  "pi",
+  "prime",
+  "proxy",
+]);
+
+const TOKEN_STOP_WORDS = new Set([
+  "and",
+  "are",
+  "badge",
+  "context",
+  "for",
+  "from",
+  "graph",
+  "into",
+  "near",
+  "reflect",
+  "the",
+  "theory",
+  "this",
+  "with",
+]);
 
 const DIRECT_MATCH_REASON_PATTERNS = [
   /direct badge id match/i,
@@ -61,12 +103,53 @@ function unique(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
 }
 
+function tokenizeResolutionQuery(value: string): string[] {
+  return unique(
+    value
+      .toLowerCase()
+      .split(/[^a-z0-9_./^-]+/i)
+      .map((token) => token.trim())
+      .filter((token) => token.length >= 2 && !TOKEN_STOP_WORDS.has(token)),
+  );
+}
+
 function queryText(args: BuildTheoryContextReflectionInput): string {
   return unique([
     args.prompt,
     args.conversationContext ?? "",
     ...(args.mentionedEquations ?? []),
   ]).join("\n");
+}
+
+function badgeResolutionText(badge: TheoryBadgeV1): string {
+  return [
+    badge.id,
+    badge.title,
+    badge.plainMeaning,
+    badge.whyItMatters,
+    ...badge.subjects,
+    ...badge.tags,
+    ...badge.equationFamilies,
+    ...badge.simulationOwners,
+    ...badge.hintKeys.subjects,
+    ...badge.hintKeys.symbols,
+    ...badge.hintKeys.equationFamilies,
+    ...badge.equations.flatMap((equation) => [
+      equation.id,
+      equation.displayLatex,
+      equation.computableExpression ?? "",
+      equation.operatorKind ?? "",
+      ...equation.inputSymbols,
+      ...equation.outputSymbols,
+    ]),
+    ...badge.calculatorPayloads.flatMap((payload) => [
+      payload.id,
+      payload.expression,
+      payload.displayLatex,
+      payload.targetVariable ?? "",
+    ]),
+    ...badge.sourceRefs.flatMap((ref) => [ref.id ?? "", ref.path ?? "", ref.note ?? ""]),
+  ].join(" ");
 }
 
 function textIncludes(value: string, candidate: string): boolean {
@@ -421,10 +504,207 @@ function mergeTheoryLookupMatches(matches: TheoryBadgeLookupMatch[]): TheoryBadg
   return Array.from(byBadgeId.values());
 }
 
+function roleRecord(): Record<TheoryContextReflectionResolutionRole, string[]> {
+  return {
+    prompt_center: [],
+    first_principles_path: [],
+    observable_path: [],
+    claim_boundary: [],
+    consequence_context: [],
+    analogy_context: [],
+    ambient_context: [],
+  };
+}
+
+function explanationDepthHint(mode: TheoryContextReflectionResolutionMode): TheoryContextReflectionExplanationDepthHint {
+  if (mode === "focused") return "specific";
+  if (mode === "wide_context") return "cross_scale";
+  return "path";
+}
+
+function hasClaimBoundaryShape(badge: TheoryBadgeV1): boolean {
+  return (
+    badge.level === "claim_boundary" ||
+    badge.equations.some((equation) => equation.operatorKind === "gate_status") ||
+    /claim[_\s-]?boundary|boundary|no[_\s-]?go|decoherence/i.test(
+      `${badge.id} ${badge.title} ${badge.equationFamilies.join(" ")}`,
+    )
+  );
+}
+
+function hasFirstPrinciplesShape(badge: TheoryBadgeV1): boolean {
+  return (
+    badge.level === "first_principle" ||
+    badge.level === "law" ||
+    /dimension|conservation|energy_frequency|thermodynamic|equation_of_state|symmetry|invariance|unit/i.test(
+      `${badge.id} ${badge.title} ${badge.equationFamilies.join(" ")} ${badge.tags.join(" ")}`,
+    )
+  );
+}
+
+function hasObservableShape(badge: TheoryBadgeV1): boolean {
+  return /observable|signature|spectrum|spectroscopy|frequency|linewidth|lifetime|density|wavelength|trace|T2|tau|Hz|1\/s|kg\/m\^3/i.test(
+    [
+      badge.id,
+      badge.title,
+      ...badge.subjects,
+      ...badge.tags,
+      ...badge.equationFamilies,
+      ...badge.units.flatMap((unit) => [unit.symbol, unit.unit ?? "", unit.quantity, unit.dimensionSignature ?? ""]),
+      ...badge.calculatorPayloads.flatMap((payload) => [payload.id, payload.expression, payload.displayLatex]),
+    ].join(" "),
+  );
+}
+
+function hasSpecificDirectEvidence(args: {
+  badge: TheoryBadgeV1;
+  match: TheoryBadgeLookupMatch;
+  queryTokens: string[];
+}): boolean {
+  const text = normalize(badgeResolutionText(args.badge));
+  const specificTokenHits = args.queryTokens.filter(
+    (token) =>
+      !GENERIC_CONGRUENCE_TOKENS.has(normalizeKey(token)) &&
+      normalizeKey(token).length >= 3 &&
+      text.includes(normalize(token)),
+  );
+  const nonGenericSymbolHits = args.match.matchedSymbols.filter(
+    (symbol) => !GENERIC_CONGRUENCE_TOKENS.has(normalizeKey(symbol)),
+  );
+  const directIdOrTitle = args.match.reasons.some((reason) => /direct badge (?:id|title) match/i.test(reason));
+  const equationFamilyHit = args.match.matchedEquationFamilies.length > 0;
+
+  return directIdOrTitle || nonGenericSymbolHits.length > 0 || equationFamilyHit || specificTokenHits.length >= 2;
+}
+
+function isAnalogyLikeMatch(args: {
+  badge: TheoryBadgeV1;
+  match: TheoryBadgeLookupMatch | null;
+  queryTokens: string[];
+}): boolean {
+  if (!args.match) return false;
+  const genericSymbolHits = args.match.matchedSymbols.filter((symbol) =>
+    GENERIC_CONGRUENCE_TOKENS.has(normalizeKey(symbol)),
+  );
+  const nonGenericSymbolHits = args.match.matchedSymbols.filter(
+    (symbol) => !GENERIC_CONGRUENCE_TOKENS.has(normalizeKey(symbol)),
+  );
+  const text = normalize(badgeResolutionText(args.badge));
+  const specificTokenHits = args.queryTokens.filter(
+    (token) =>
+      !GENERIC_CONGRUENCE_TOKENS.has(normalizeKey(token)) &&
+      normalizeKey(token).length >= 3 &&
+      text.includes(normalize(token)),
+  );
+
+  return genericSymbolHits.length > 0 && nonGenericSymbolHits.length === 0 && specificTokenHits.length === 0;
+}
+
+function classifyBadgeResolutionRole(args: {
+  badge: TheoryBadgeV1;
+  match: TheoryBadgeLookupMatch | null;
+  queryTokens: string[];
+  connectedBadgeIds: Set<string>;
+}): TheoryContextReflectionResolutionRole {
+  if (hasClaimBoundaryShape(args.badge)) return "claim_boundary";
+  if (args.match && hasSpecificDirectEvidence({ badge: args.badge, match: args.match, queryTokens: args.queryTokens })) {
+    return "prompt_center";
+  }
+  if (hasFirstPrinciplesShape(args.badge)) return "first_principles_path";
+  if (hasObservableShape(args.badge) && args.connectedBadgeIds.has(args.badge.id)) return "observable_path";
+  if (args.connectedBadgeIds.has(args.badge.id)) return "consequence_context";
+  if (isAnalogyLikeMatch({ badge: args.badge, match: args.match, queryTokens: args.queryTokens })) return "analogy_context";
+  if (args.match && args.match.score >= STRONG_MATCH_SCORE) return "analogy_context";
+  return "ambient_context";
+}
+
+function buildResolution(args: {
+  graph: TheoryBadgeGraphV1;
+  matches: TheoryBadgeLookupMatch[];
+  highlightedBadgeIds: string[];
+  connectedBadgeIds: string[];
+  query: string;
+  mode: TheoryContextReflectionResolutionMode;
+}): TheoryContextReflectionResolutionV1 {
+  const badges = badgeById(args.graph);
+  const matchesByBadgeId = new Map(args.matches.map((match) => [match.badgeId, match]));
+  const queryTokens = tokenizeResolutionQuery(args.query);
+  const connectedBadgeIds = new Set(args.connectedBadgeIds);
+  const roleByBadgeId: Record<string, TheoryContextReflectionResolutionRole> = {};
+  const rankedBadgeIdsByRole = roleRecord();
+
+  for (const badgeId of unique([...args.highlightedBadgeIds, ...args.matches.map((match) => match.badgeId)])) {
+    const badge = badges.get(badgeId);
+    if (!badge) continue;
+    const role = classifyBadgeResolutionRole({
+      badge,
+      match: matchesByBadgeId.get(badgeId) ?? null,
+      queryTokens,
+      connectedBadgeIds,
+    });
+    roleByBadgeId[badgeId] = role;
+    rankedBadgeIdsByRole[role].push(badgeId);
+  }
+
+  return {
+    mode: args.mode,
+    roleByBadgeId,
+    rankedBadgeIdsByRole,
+    explanationDepthHint: explanationDepthHint(args.mode),
+  };
+}
+
+function resolutionSortWeight(args: {
+  badge: TheoryBadgeV1;
+  match: TheoryBadgeLookupMatch;
+  queryTokens: string[];
+}): number {
+  const hasSpecificEvidence = hasSpecificDirectEvidence({
+    badge: args.badge,
+    match: args.match,
+    queryTokens: args.queryTokens,
+  });
+  const atlasOnlyWeight = args.match.reasons.some((reason) => /direct atlas primary badge|inside selected atlas lens/i.test(reason)) &&
+    !hasSpecificEvidence
+    ? -500
+    : 0;
+  const roleWeight = hasClaimBoundaryShape(args.badge) && hasSpecificEvidence
+    ? 9000
+    : hasSpecificEvidence
+      ? 10000
+      : hasObservableShape(args.badge)
+        ? 1000
+        : 0;
+  const analogyWeight = isAnalogyLikeMatch({ badge: args.badge, match: args.match, queryTokens: args.queryTokens }) ? -250 : 0;
+
+  return roleWeight + atlasOnlyWeight + analogyWeight + args.match.score;
+}
+
+function prioritizeResolutionAwareMatches(args: {
+  graph: TheoryBadgeGraphV1;
+  query: string;
+  matches: TheoryBadgeLookupMatch[];
+}): TheoryBadgeLookupMatch[] {
+  const badges = badgeById(args.graph);
+  const queryTokens = tokenizeResolutionQuery(args.query);
+  return [...args.matches].sort((left, right) => {
+    const leftBadge = badges.get(left.badgeId);
+    const rightBadge = badges.get(right.badgeId);
+    const leftWeight = leftBadge
+      ? resolutionSortWeight({ badge: leftBadge, match: left, queryTokens })
+      : left.score;
+    const rightWeight = rightBadge
+      ? resolutionSortWeight({ badge: rightBadge, match: right, queryTokens })
+      : right.score;
+    return rightWeight - leftWeight || right.score - left.score || left.badgeId.localeCompare(right.badgeId);
+  });
+}
+
 export function buildTheoryContextReflection(
   args: BuildTheoryContextReflectionInput,
 ): TheoryContextReflectionV1 {
   const confidenceMode = args.confidenceMode ?? "soft_locator";
+  const resolutionMode = args.resolutionMode ?? "path";
   const source = args.source ?? "helix_ask";
   const limit = Math.max(1, Math.min(24, args.limit ?? 12));
   const atlas = buildHelixPhysicsAtlasV1({ graph: args.graph });
@@ -440,35 +720,55 @@ export function buildTheoryContextReflection(
   });
   const equationFamilies = inferEquationFamilies(args.graph, query, mentionedEquations);
   const simulationOwners = inferSimulationOwners(args.graph, query, mentionedDomains);
-  const lookupLimit = bridgePrompt ? Math.max(limit, 40) : limit;
+  const lookupLimit = Math.max(limit, 40);
   const bridgeFocusGroups = bridgePrompt ? requestedBridgeFocusGroups(query) : [];
 
-  const locatedMatches = prioritizeTheoryIdeologyBridgeMatches({
-    query,
-    matches: mergeTheoryLookupMatches([
-      ...locateTheoryBadges({
+  const mergedLookupMatches = mergeTheoryLookupMatches([
+    ...locateTheoryBadges({
+      graph: args.graph,
+      input: {
+        query,
+        symbols: mentionedSymbols,
+        subjects: mentionedDomains,
+        equationFamilies,
+        simulationOwners,
+        limit: lookupLimit,
+      },
+    }),
+    ...locateTheoryBadges({
+      graph: args.graph,
+      input: {
+        query,
+        symbols: mentionedSymbols,
+        subjects: mentionedDomains,
+        equationFamilies,
+        simulationOwners,
+        atlasBlockIds,
+        limit: lookupLimit,
+      },
+    }),
+    ...bridgeFocusGroups.flatMap((group) =>
+      locateTheoryBadges({
         graph: args.graph,
         input: {
-          query,
-          symbols: mentionedSymbols,
-          subjects: mentionedDomains,
-          equationFamilies,
-          simulationOwners,
-          atlasBlockIds,
-          limit: lookupLimit,
+          query: group.lookupQuery,
+          limit: 8,
         },
       }),
-      ...bridgeFocusGroups.flatMap((group) =>
-        locateTheoryBadges({
-          graph: args.graph,
-          input: {
-            query: group.lookupQuery,
-            limit: 8,
-          },
-        }),
-      ),
-    ]),
-  }).slice(0, limit);
+    ),
+  ]);
+  const bridgeRankedMatches = prioritizeTheoryIdeologyBridgeMatches({
+    query,
+    matches: mergedLookupMatches,
+  });
+  const sortedLookupMatches = bridgePrompt
+    ? bridgeRankedMatches
+    : prioritizeResolutionAwareMatches({
+        graph: args.graph,
+        query,
+        matches: bridgeRankedMatches,
+      });
+  const locatedMatches = sortedLookupMatches.slice(0, limit);
 
   const exactLookupMatches = locatedMatches.filter(isExactMatch);
   const likelyLookupMatches =
@@ -482,6 +782,14 @@ export function buildTheoryContextReflection(
   const connectedBadgeIds = trace.connectingBadgeIds;
   const highlightedBadgeIds = unique([...traceTargetIds, ...connectedBadgeIds]);
   const highlightedEdgeIds = unique(trace.pathSegments.flatMap((segment) => segment.edgeIds));
+  const resolution = buildResolution({
+    graph: args.graph,
+    matches: locatedMatches,
+    highlightedBadgeIds,
+    connectedBadgeIds,
+    query,
+    mode: resolutionMode,
+  });
   const maxScore = Math.max(1, ...locatedMatches.map((match) => match.score));
   const heatByBadgeId = Object.fromEntries(
     locatedMatches.map((match) => [match.badgeId, Math.min(1, Number((match.score / maxScore).toFixed(4)))]),
@@ -595,6 +903,7 @@ export function buildTheoryContextReflection(
           }
         : null,
     },
+    resolution,
     evidenceForAsk: {
       summary: summaryText({
         domains: inferredDomains,

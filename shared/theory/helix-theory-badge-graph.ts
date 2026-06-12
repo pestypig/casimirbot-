@@ -61,6 +61,9 @@ import {
   buildNucleosynthesisOriginTheoryBadgesV1,
 } from "./nucleosynthesis-origin-theory-badges";
 import {
+  buildNuclearBindingFirstPrinciplesTheoryBadgesV1,
+} from "./nuclear-binding-first-principles-theory-badges";
+import {
   buildPeriodicElementOriginTheoryBadgesV1,
 } from "./periodic-element-origin-theory-badges";
 import {
@@ -932,6 +935,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
   const curvature = buildCurvatureCollapseTheoryBadgesV1();
   const orchOr = buildOrchOrCoherenceTheoryBadgesV1();
   const nucleosynthesisOrigins = buildNucleosynthesisOriginTheoryBadgesV1();
+  const nuclearBindingFirstPrinciples = buildNuclearBindingFirstPrinciplesTheoryBadgesV1();
   const periodicElements = buildPeriodicElementOriginTheoryBadgesV1();
   const phasesOfMatter = buildPhaseOfMatterTheoryBadgesV1();
   const collectiveModeSynchrony = buildCollectiveModeSynchronyTheoryBadgesV1();
@@ -960,6 +964,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...curvature.badges,
       ...orchOr.badges,
       ...nucleosynthesisOrigins.badges,
+      ...nuclearBindingFirstPrinciples.badges,
       ...periodicElements.badges,
       ...phasesOfMatter.badges,
       ...collectiveModeSynchrony.badges,
@@ -983,6 +988,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...curvature.edges,
       ...orchOr.edges,
       ...nucleosynthesisOrigins.edges,
+      ...nuclearBindingFirstPrinciples.edges,
       ...periodicElements.edges,
       ...phasesOfMatter.edges,
       ...collectiveModeSynchrony.edges,

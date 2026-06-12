@@ -997,6 +997,7 @@ npm run nhm2:build-layered-wall-source-tensor-candidate
 npm run nhm2:publish-source-side-same-basis-authority
 npm run nhm2:source-closure-pass-readiness
 npm run nhm2:build-coupled-closure-pass-candidate
+npm run nhm2:build-full-solve-claim-admission
 ```
 
 The intended chain is:
@@ -1020,7 +1021,9 @@ publish source-closure pass-readiness preflight
 build coupled closure pass-candidate audit
 render source-to-geometry divergence report
 validate reference run
-build and render blocker ledger
+build blocker ledger
+build full-solve claim-admission gate
+render blocker ledger
 ```
 
 This chain may end in `fail` or `review`. That is acceptable when the ledger identifies the first remaining blocker precisely.
@@ -1068,6 +1071,14 @@ npm run nhm2:build-coupled-closure-pass-candidate -- --regional-source-closure-e
 
 This audit can emit `passCandidate=true` only when the regional same-basis source authority, source-closure readiness, regional residuals, conservation diagnostics, QEI worldline dossier, observer-robust energy-condition artifact, and Casimir material receipt all pass together. It still keeps `physicalViabilityClaimAllowed=false` and `transportClaimAllowed=false`. Its purpose is to identify whether the current frozen evidence stack is internally synchronized enough to deserve the next numerical review, not to certify NHM2 as a physical transport mechanism.
 
+The full-solve claim-admission gate sits above the coupled closure candidate and blocker ledger:
+
+```text
+npm run nhm2:build-full-solve-claim-admission -- --coupled-closure-pass-candidate <coupled.json> --blocker-ledger <ledger.json> --full-loop-audit <audit.json> --reference-run-validation <validation.json> --out <claim-admission.json>
+```
+
+This artifact, `nhm2_full_solve_claim_admission/v1`, formalizes the boundary between an internally synchronized diagnostic closure ledger and any stronger claim. If the coupled closure candidate is missing or false, admission is `blocked`. If coupled closure passes but reference validation, reproducibility, blocker-ledger state, or certificate integrity is incomplete, admission remains `diagnostic_closure_candidate`. If those numerical/reproducibility gates pass together, admission may become `reduced_order_numerical_candidate`. In all cases, `physicalClaimAllowed=false` and `transportClaimAllowed=false`; external physical validation remains missing from the repo evidence stack.
+
 ## Appendix C. Equation-to-artifact and equation-to-claim map
 
 | Equation / construct | Scientific role | NHM2 use | Claim boundary |
@@ -1085,6 +1096,7 @@ This audit can emit `passCandidate=true` only when the regional same-basis sourc
 | `nhm2_layered_wall_full_tensor_source_audit/v1` | layered source tensor component audit | checks whether selected stack supplies `T00`, `T0i`, diagonal stresses, and off-diagonal stresses | missing components remain missing; material receipt alone does not create tensor authority |
 | `nhm2_tile_effective_full_tensor_source/v1` | source-side tensor candidate contract | separates source-side tensor authority from metric echo | not source closure by itself |
 | `nhm2_coupled_closure_pass_candidate/v1` | synchronized diagnostic pass-candidate ledger | checks source authority, source readiness, residuals, conservation, QEI dossier, observer robustness, and material receipt together | `passCandidate` is still diagnostic; physical and transport claims remain forbidden |
+| `nhm2_full_solve_claim_admission/v1` | full-solve claim-admission gate | classifies blocked, diagnostic closure candidate, or reduced-order numerical candidate using coupled closure, blocker ledger, validation, reproducibility, and certificate evidence | never grants physical or transport claims; external physical validation remains required |
 | `nhm2_source_side_same_basis_tensor_authority/v1` | source-side authority receipt | decides whether tile/material tensor evidence is same-chart, same-basis, regional, non-proxy, and non-metric-echo before wall closure can promote | runtime reference only; no scalar calculator payload |
 | `nhm2_tile_counterpart_conservation/v1` | conservation diagnostic surface | records divT / continuity / momentum residual status | not physical realizability by itself |
 | `nhm2_same_chart_full_tensor/v1` | full metric-required tensor component ledger | records complete, missing, or blocked `T00`, `T0i`, and `Tij` surfaces | noncomputable runtime reference; no scalar replay |

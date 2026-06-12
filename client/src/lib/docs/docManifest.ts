@@ -80,15 +80,14 @@ export function filterDocManifestEntries(
   if (!exactQuery) return entries;
   const normalizedQuery = normalizeDocSearchText(exactQuery);
   const tokens = tokenizeDocSearchQuery(normalizedQuery);
-  if (tokens.length === 0) {
-    return entries.filter((entry) => entry.searchText.includes(exactQuery));
-  }
-  return entries.filter((entry) => {
-    if (entry.searchText.includes(exactQuery)) return true;
-    const haystack = buildDocSearchHaystack(entry);
-    if (normalizedQuery && haystack.includes(normalizedQuery)) return true;
-    return tokens.every((token) => haystack.includes(token));
-  });
+  const scored = entries
+    .map((entry) => ({
+      entry,
+      score: scoreDocSearchEntry(entry, exactQuery, normalizedQuery, tokens),
+    }))
+    .filter((candidate): candidate is { entry: DocManifestEntry; score: number } => candidate.score !== null)
+    .sort((a, b) => b.score - a.score || a.entry.title.localeCompare(b.entry.title));
+  return scored.map((candidate) => candidate.entry);
 }
 
 function normalizeDocKey(raw: string) {
@@ -123,6 +122,66 @@ function buildDocSearchHaystack(entry: DocManifestEntry): string {
     aliases.push("nhm2");
   }
   return normalizeDocSearchText(`${normalized} ${aliases.join(" ")}`);
+}
+
+function scoreDocSearchEntry(
+  entry: DocManifestEntry,
+  exactQuery: string,
+  normalizedQuery: string,
+  tokens: string[],
+): number | null {
+  const title = entry.title.toLowerCase();
+  const path = entry.relativePath.toLowerCase();
+  const normalizedTitle = normalizeDocSearchText(entry.title);
+  const normalizedPath = normalizeDocSearchText(entry.relativePath);
+  const compactQuery = normalizedQuery.replace(/\s+/g, "");
+  const compactTitle = normalizedTitle.replace(/\s+/g, "");
+  const compactPath = normalizedPath.replace(/\s+/g, "");
+  const haystack = buildDocSearchHaystack(entry);
+
+  if (title.includes(exactQuery)) {
+    return 1200 + titleDirectnessScore(title, exactQuery);
+  }
+  if (normalizedQuery && normalizedTitle.includes(normalizedQuery)) {
+    return 1100 + titleDirectnessScore(normalizedTitle, normalizedQuery);
+  }
+  if (compactQuery && compactTitle.includes(compactQuery)) {
+    return 1000 + titleDirectnessScore(compactTitle, compactQuery);
+  }
+  if (path.includes(exactQuery)) {
+    return 700 + pathDirectnessScore(path, exactQuery);
+  }
+  if (normalizedQuery && normalizedPath.includes(normalizedQuery)) {
+    return 650 + pathDirectnessScore(normalizedPath, normalizedQuery);
+  }
+  if (compactQuery && compactPath.includes(compactQuery)) {
+    return 625 + pathDirectnessScore(compactPath, compactQuery);
+  }
+  if (normalizedQuery && haystack.includes(normalizedQuery)) {
+    return 500;
+  }
+  if (tokens.length > 0 && tokens.every((token) => haystack.includes(token))) {
+    const titleTokenHits = tokens.filter((token) => normalizedTitle.includes(token)).length;
+    return 250 + titleTokenHits * 25;
+  }
+  if (tokens.length === 0 && entry.searchText.includes(exactQuery)) {
+    return 100;
+  }
+  return null;
+}
+
+function titleDirectnessScore(value: string, query: string): number {
+  const index = value.indexOf(query);
+  if (index === 0) return 90;
+  if (index > 0 && /\s/.test(value[index - 1] ?? "")) return 70;
+  return Math.max(10, 60 - index);
+}
+
+function pathDirectnessScore(value: string, query: string): number {
+  const index = value.indexOf(query);
+  if (index === 0) return 50;
+  if (index > 0 && /[\\/]/.test(value[index - 1] ?? "")) return 40;
+  return Math.max(5, 30 - index);
 }
 
 function tokenizeDocSearchQuery(value: string): string[] {

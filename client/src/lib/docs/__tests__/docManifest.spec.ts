@@ -39,6 +39,26 @@ describe("filterDocManifestEntries", () => {
     expect(matches.map((entry) => entry.id)).toEqual(["mission-time"]);
   });
 
+  it("keeps matching direct title characters as the typed title grows", () => {
+    const matches = filterDocManifestEntries("Needle Hull Ma", entries);
+    expect(matches[0]?.id).toBe("needle-directory");
+  });
+
+  it("matches titles when the user omits spaces or punctuation", () => {
+    const matches = filterDocManifestEntries("helixaskfl", entries);
+    expect(matches.map((entry) => entry.id)).toEqual(["helix-flow"]);
+  });
+
+  it("ranks direct title matches above path-only token matches", () => {
+    const localEntries: DocManifestEntry[] = [
+      makeEntry("path-only", "General Research Notes", "docs/helix/ask/flow-archive.md"),
+      makeEntry("title", "Helix Ask Flow", "docs/reference/flow.md"),
+    ];
+
+    const matches = filterDocManifestEntries("Helix Ask Flow", localEntries);
+    expect(matches.map((entry) => entry.id)).toEqual(["title", "path-only"]);
+  });
+
   it("finds the real NHM2 theory directory from the generated docs manifest", () => {
     const matches = filterDocManifestEntries("NHM2 Theory white paper", DOC_MANIFEST);
     expect(

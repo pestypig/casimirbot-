@@ -132,6 +132,15 @@ const makeNhm2SolveState = () =>
           invariantStatus: "missing",
         },
       },
+      claimAdmission: {
+        available: true,
+        status: "diagnostic_closure_candidate",
+        diagnosticClosurePassed: true,
+        numericalReliabilityPassed: false,
+        physicalClaimAllowed: false,
+        transportClaimAllowed: false,
+        blockers: ["reference_run_validation_not_pass:review"],
+      },
     },
     pipelineQuery: {
       data: {
@@ -179,6 +188,15 @@ const makeNhm2SolveState = () =>
         nhm2NatarioInvariantAudit: {
           contractVersion: "nhm2_natario_invariant_audit/v1",
           stability: { convergenceStatus: "not_run" },
+        },
+        nhm2FullSolveClaimAdmission: {
+          contractVersion: "nhm2_full_solve_claim_admission/v1",
+          admission: {
+            status: "diagnostic_closure_candidate",
+            diagnosticClosurePassed: true,
+            numericalReliabilityPassed: false,
+          },
+          blockers: ["reference_run_validation_not_pass:review"],
         },
       },
     },
@@ -244,6 +262,11 @@ describe("TS strict proof-pack rendering", () => {
     expect(screen.getByText("Observer scope: Eulerian only.")).toBeDefined();
     expect(screen.getByText("Ideal Casimir scalar budget is not material-receipted.")).toBeDefined();
     expect(screen.getByText("Zero expansion is separate from curvature, stability, and safety diagnostics.")).toBeDefined();
+    expect(screen.getByText("Claim Admission")).toBeDefined();
+    expect(screen.getByText("reference_run_validation_not_pass:review")).toBeDefined();
+    expect(screen.getByText("Diagnostic closure candidate; numerical reliability and external evidence still gate claims.")).toBeDefined();
+    expect(screen.getByText("physical claim")).toBeDefined();
+    expect(screen.getByText("transport claim")).toBeDefined();
     expect(container.textContent).not.toMatch(/validated|viable|certified transport/i);
   });
 

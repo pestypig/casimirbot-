@@ -14629,12 +14629,13 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     backend_debug_response_ref:
       readAgentLoopAuditRecord(debug?.debug_export_ref) ??
       readAgentLoopAuditRecord(payload.debug_export_ref) ??
-      (canonicalActiveTurnId
-        ? {
-            endpoint: `/api/agi/ask/turn/${encodeURIComponent(canonicalActiveTurnId)}/debug-export`,
-            turn_id: canonicalActiveTurnId,
-          }
-        : undefined),
+      undefined,
+    debug_export_source: readAgentLoopAuditRecord(debug?.debug_export_ref) || readAgentLoopAuditRecord(payload.debug_export_ref)
+      ? "backend_ref_advertised"
+      : "client_projection",
+    backend_debug_response_status: readAgentLoopAuditRecord(debug?.debug_export_ref) || readAgentLoopAuditRecord(payload.debug_export_ref)
+      ? "ref_advertised"
+      : "not_advertised",
     debug_export_anti_determinism_audit: {
       verdict: "clean",
       checks: [
@@ -14948,27 +14949,53 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
   } catch {
     return localPayload;
   }
+  const projectionPayload = (status: string, extra: Record<string, unknown> = {}) =>
+    JSON.stringify({
+      ...parsed,
+      debug_export_source: status === "not_advertised"
+        ? "client_projection"
+        : "client_projection_backend_unresolved",
+      backend_debug_response_status: status,
+      ...extra,
+    }, null, 2);
   const backendRef = readAgentLoopAuditRecord(parsed.backend_debug_response_ref);
   const endpoint = coerceText(backendRef?.endpoint).trim();
   const backendTurnId = coerceText(backendRef?.turn_id).trim();
   const activeTurnId = coerceText(parsed.active_turn_id).trim();
-  if (!endpoint || !endpoint.startsWith("/api/agi/ask/turn/")) return localPayload;
-  if (backendTurnId && activeTurnId && backendTurnId !== activeTurnId) return localPayload;
+  if (!endpoint || !endpoint.startsWith("/api/agi/ask/turn/")) {
+    return projectionPayload("not_advertised", { backend_debug_response_ref: undefined });
+  }
+  if (backendTurnId && activeTurnId && backendTurnId !== activeTurnId) {
+    return projectionPayload("turn_mismatch", { backend_debug_response_ref: backendRef });
+  }
   try {
     const response = await fetch(endpoint, {
       method: "GET",
       headers: { Accept: "application/json" },
     });
-    if (!response.ok) return localPayload;
+    if (!response.ok) {
+      return projectionPayload("fetch_failed", {
+        backend_debug_response_ref: backendRef,
+        backend_debug_response_http_status: response.status,
+      });
+    }
     const body = await response.json() as Record<string, unknown>;
     const authoritativePayload = readAgentLoopAuditRecord(body.payload) ?? readAgentLoopAuditRecord(body);
-    if (!authoritativePayload) return localPayload;
+    if (!authoritativePayload) {
+      return projectionPayload("payload_missing", { backend_debug_response_ref: backendRef });
+    }
     const authoritativeTurnId = coerceText(authoritativePayload.active_turn_id).trim();
-    if (activeTurnId && authoritativeTurnId && authoritativeTurnId !== activeTurnId) return localPayload;
+    if (activeTurnId && authoritativeTurnId && authoritativeTurnId !== activeTurnId) {
+      return projectionPayload("turn_mismatch", {
+        backend_debug_response_ref: backendRef,
+        backend_debug_response_turn_id: authoritativeTurnId || null,
+      });
+    }
     const clientProjection = buildClientProjectionDebugFields(parsed);
     const mergedPayload = {
       ...authoritativePayload,
       debug_export_source: "backend_endpoint",
+      backend_debug_response_status: "fetched",
       client_projection_payload_hash: hashDebugExportText(localPayload),
       client_debug_projection: clientProjection,
       client_voice_debug: clientProjection.voice,
@@ -14985,8 +15012,11 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
         source: mergedPayload,
       }),
     }, null, 2);
-  } catch {
-    return localPayload;
+  } catch (error) {
+    return projectionPayload("fetch_error", {
+      backend_debug_response_ref: backendRef,
+      backend_debug_response_error: error instanceof Error ? error.message : "debug_export_fetch_error",
+    });
   }
 }
 
@@ -20220,6 +20250,7 @@ export function HelixAskPill({
     async (reply: HelixAskReply, payload: string | null | undefined) => {
       if (debugCopyInFlightRef.current) return;
       debugCopyInFlightRef.current = true;
+      setDebugExportDrawer(null);
       try {
         const localExportPayload = normalizeReplyMasterDebugPayload(reply, payload);
         const exportPayload = await resolveAuthoritativeDebugExportPayload(localExportPayload);

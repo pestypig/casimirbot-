@@ -132,6 +132,10 @@ describe("theory context reflection v1", () => {
     expect(reflection.overlay.uncertainty?.normalizedMass).toBe(1);
     expect(reflection.overlay.uncertainty?.posteriorEntropyBits).toBeGreaterThan(0);
     expect(reflection.overlay.uncertainty?.informationGainBits).toBeGreaterThanOrEqual(0);
+    expect(reflection.resolution).toEqual(expect.objectContaining({
+      mode: "path",
+      explanationDepthHint: "path",
+    }));
   });
 
   it("rejects terminal eligible receipts", () => {
@@ -258,6 +262,23 @@ describe("theory context reflection v1", () => {
 
     expect(validateTheoryContextReflectionV1(invalid)).toContain(
       "overlay.uncertainty.badgeProbabilityById.nhm2.qei.sampling_window must be between 0 and 1",
+    );
+  });
+
+  it("rejects invalid resolution roles", () => {
+    const reflection = baseReflection();
+    const invalid = {
+      ...reflection,
+      resolution: {
+        ...reflection.resolution,
+        roleByBadgeId: {
+          "nhm2.qei.sampling_window": "too_specific",
+        },
+      },
+    };
+
+    expect(validateTheoryContextReflectionV1(invalid)).toContain(
+      "resolution.roleByBadgeId.nhm2.qei.sampling_window is invalid",
     );
   });
 

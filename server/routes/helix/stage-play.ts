@@ -394,6 +394,7 @@ const STAGE_PLAY_MICRO_REASONER_ROLES: StagePlayMicroReasonerRoleV1[] = [
   "prediction_validator",
   "salience_scorer",
   "hypothesis_arbiter",
+  "prompt_router",
   "decision_selector",
   "voice_callout_drafter",
   "packet_composer",

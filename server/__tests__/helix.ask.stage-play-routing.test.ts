@@ -422,14 +422,19 @@ describe("Helix Ask Stage Play routing", () => {
       iteration?.executed_action_key,
       iteration?.tool_observation?.tool_name,
     ]).filter(Boolean);
+    const responseText = JSON.stringify(response.body);
     const routeDebug = JSON.stringify({
       selectedTool: response.body?.selected_tool,
       selectedCapability: response.body?.selected_capability,
       lifecycle: response.body?.tool_lifecycle_trace,
       phase: response.body?.live_source_turn_phase_resolution,
       mandatory: response.body?.mandatory_next_tool,
-      loop: response.body?.agent_runtime_loop,
-      artifacts: response.body?.current_turn_artifact_ledger,
+      iterations: iterations.map((iteration: any) => ({
+        chosen_capability: iteration?.chosen_capability,
+        executed_action_key: iteration?.executed_action_key,
+        observation_role: iteration?.observation_role,
+        tool_name: iteration?.tool_observation?.tool_name,
+      })),
       answer: response.body?.answer,
     }, null, 2);
 
@@ -448,13 +453,13 @@ describe("Helix Ask Stage Play routing", () => {
     expect(executedCapabilities, routeDebug).toContain("live_env.query_micro_reasoner_presets");
     expect(executedCapabilities, routeDebug).not.toContain("live_env.read_processed_live_source_mail");
     expect(executedCapabilities, routeDebug).not.toContain("live_env.process_live_source_mail");
-    expect(JSON.stringify(response.body?.agent_runtime_loop ?? {}), routeDebug)
+    expect(responseText, routeDebug)
       .toContain("stage_play_micro_reasoner_prompt_preset_query_result/v1");
     expect(response.body?.selected_tool, routeDebug).toBe("live_env.query_micro_reasoner_presets");
     expect(response.body?.selected_tool, routeDebug).toBe(response.body?.selected_capability);
     expect(response.body?.tool_lifecycle_trace, routeDebug).toMatchObject({
-      selected_tool: "live_env.query_micro_reasoner_presets",
-      selected_capability: "live_env.query_micro_reasoner_presets",
+      requested_capability: "live_env.query_micro_reasoner_presets",
+      admitted_capability: "live_env.query_micro_reasoner_presets",
       executed_capability: "live_env.query_micro_reasoner_presets",
     });
     expect(response.body?.stage_play_live_source_mailbox_debug?.executed_capabilities_seen ?? [], routeDebug)
@@ -462,6 +467,107 @@ describe("Helix Ask Stage Play routing", () => {
         "live_env.read_processed_live_source_mail",
         "live_env.process_live_source_mail",
       ]));
+  }, 60_000);
+
+  it("executes MicroDeck prompt routing as a delegation observation without processed-mail tools", async () => {
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
+      {
+        next_step: "next_action",
+        chosen_capability: "live_env.route_micro_reasoner_prompt",
+        reason: "Route the candidate prompts from the live-source summary.",
+        args: {
+          source_id: sourceId,
+          source_summary: "The visual source shows a calculator workflow with a multiplication result and a tool-call shaped expression.",
+          candidate_prompts: [
+            {
+              candidateId: "tool_call",
+              title: "Calculator tool call",
+              promptText: "Create a calculator tool call when the live source shows equations, arithmetic, multiplication, or a computed result.",
+            },
+            {
+              candidateId: "combat",
+              title: "Minecraft combat",
+              promptText: "Assess hostile mobs, damage, weapons, armor, and urgent survival risk in Minecraft.",
+            },
+            {
+              candidateId: "ui_navigation",
+              title: "Browser navigation",
+              promptText: "Identify page navigation, menus, forms, tabs, and browser workflow blockers.",
+            },
+          ],
+          confidence_threshold: 0.2,
+          escalation_mode: "handoff_only_if_confident",
+          allow_none: true,
+        },
+        expected_artifacts: ["stage_play_micro_reasoner_prompt_delegation_result"],
+        confidence: 0.91,
+      },
+      {
+        next_step: "answer",
+        chosen_capability: "model.direct_answer",
+        reason: "Summarize the delegation receipt after observation re-entry.",
+        args: {},
+        expected_artifacts: ["model_synthesized_answer"],
+        confidence: 0.8,
+      },
+    ]);
+
+    startVisualSnapshotSource({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      source_surface: "browser_tab",
+      capture_mode: "interval",
+      status: "active",
+    });
+
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Use the MicroDeck prompt router to choose one of these three candidate prompts for the current live-source summary.",
+        sessionId: `${threadId}:microdeck-prompt-router`,
+        debug: true,
+      })
+      .expect(200);
+
+    const iterations = Array.isArray(response.body?.agent_runtime_loop?.iterations)
+      ? response.body.agent_runtime_loop.iterations
+      : [];
+    const executedCapabilities = iterations.flatMap((iteration: any) => [
+      iteration?.chosen_capability,
+      iteration?.executed_action_key,
+      iteration?.tool_observation?.tool_name,
+    ]).filter(Boolean);
+    const responseText = JSON.stringify(response.body);
+    const routeDebug = JSON.stringify({
+      selectedTool: response.body?.selected_tool,
+      selectedCapability: response.body?.selected_capability,
+      lifecycle: response.body?.tool_lifecycle_trace,
+      sourceTarget: response.body?.source_target_intent,
+      iterations: iterations.map((iteration: any) => ({
+        chosen_capability: iteration?.chosen_capability,
+        executed_action_key: iteration?.executed_action_key,
+        observation_role: iteration?.observation_role,
+        tool_name: iteration?.tool_observation?.tool_name,
+      })),
+      answer: response.body?.answer,
+    }, null, 2);
+
+    expect(executedCapabilities, routeDebug).toContain("live_env.route_micro_reasoner_prompt");
+    expect(executedCapabilities, routeDebug).not.toContain("live_env.read_processed_live_source_mail");
+    expect(executedCapabilities, routeDebug).not.toContain("live_env.process_live_source_mail");
+    expect(responseText, routeDebug)
+      .toContain("stage_play_micro_reasoner_prompt_delegation_result/v1");
+    expect(responseText, routeDebug)
+      .toContain("tool_call");
+    expect(response.body?.selected_tool, routeDebug).toBe("live_env.route_micro_reasoner_prompt");
+    expect(response.body?.selected_tool, routeDebug).toBe(response.body?.selected_capability);
+    expect(response.body?.tool_lifecycle_trace, routeDebug).toMatchObject({
+      requested_capability: "live_env.route_micro_reasoner_prompt",
+      admitted_capability: "live_env.route_micro_reasoner_prompt",
+      executed_capability: "live_env.route_micro_reasoner_prompt",
+    });
   }, 60_000);
 
   it("keeps interpreter profile setup on configure_interpreter_profile without reading mail", async () => {

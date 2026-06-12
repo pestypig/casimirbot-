@@ -1074,6 +1074,26 @@ export function buildAskTurnSolverTrace(input: {
   const routeAuthorityOk = readBoolean(loopTrace?.route_authority_ok) || readBoolean(readRecord(input.payload.route_authority_audit)?.route_authority_ok);
   const poisonAuditOk = readBoolean(loopTrace?.poison_audit_ok) || readBoolean(readRecord(input.payload.poison_audit)?.ok);
   const terminalAuthorityOk = readBoolean(loopTrace?.terminal_authority_ok) || readBoolean(readRecord(input.payload.terminal_answer_authority)?.server_authoritative);
+  const goalSatisfaction = readRecord(input.payload.goal_satisfaction_evaluation);
+  const routeAuthorizedReceiptTerminalAllowed =
+    /receipt/i.test(terminalArtifactKind) &&
+    routeAuthorityOk &&
+    poisonAuditOk &&
+    terminalAuthorityOk &&
+    readString(goalSatisfaction?.satisfaction) === "satisfied" &&
+    readString(goalSatisfaction?.next_decision) === "allow_terminal" &&
+    terminalMatchesCanonicalGoalContract(input.payload, terminalArtifactKind);
+  const effectiveFollowupReasoningGate: typeof followupReasoningGate = routeAuthorizedReceiptTerminalAllowed
+    ? {
+        schema: followupReasoningGate.schema,
+        turn_id: followupReasoningGate.turn_id,
+        required: false,
+        completed: true,
+        reason: "simple_no_source_turn",
+        assistant_answer: false,
+        raw_content_included: false,
+      }
+    : followupReasoningGate;
   const finalTraceTerminalArtifactKind =
     repoConceptRequiresEvidence && repoEvidenceResultSelected && /repo_code_evidence_answer|repo_entity_definition|repo_code_evidence_observation/i.test(terminalArtifactKind)
       ? "repo_code_evidence_answer"
@@ -1122,14 +1142,14 @@ export function buildAskTurnSolverTrace(input: {
     actualToolCalls,
     evidenceReentryRequired: evidenceReentryGate.required,
     evidenceReentryCompleted: evidenceReentryGate.completed,
-    followupRequired: followupReasoningGate.required,
-    followupCompleted: followupReasoningGate.completed,
+    followupRequired: effectiveFollowupReasoningGate.required,
+    followupCompleted: effectiveFollowupReasoningGate.completed,
     finalArbitrationRan,
     routeAuthorityOk,
     terminalAuthorityOk,
     evidenceReentryViolationCodes: evidenceReentryGate.violation_codes,
-    followupReasoningRequired: followupReasoningGate.required,
-    followupReasoningCompleted: followupReasoningGate.completed,
+    followupReasoningRequired: effectiveFollowupReasoningGate.required,
+    followupReasoningCompleted: effectiveFollowupReasoningGate.completed,
     liveSourceIdentityAuditPresent: Boolean(liveSourceIdentityAudit),
     liveSourceIdentityOk,
     liveSourceIdentityTerminalAllowed,
@@ -1141,7 +1161,7 @@ export function buildAskTurnSolverTrace(input: {
     terminalAuthorityOk &&
     liveSourceIdentityOk &&
     evidenceReentryGate.completed &&
-    followupReasoningGate.completed &&
+    effectiveFollowupReasoningGate.completed &&
     solverRiskFlags.length === 0;
 
   return {
@@ -1201,11 +1221,11 @@ export function buildAskTurnSolverTrace(input: {
     },
     evidence_reentry_gate: evidenceReentryGate,
     followup_reasoning: {
-      required: followupReasoningGate.required,
-      completed: followupReasoningGate.completed,
-      ...(followupReasoningGate.completed ? {} : { skipped_reason: followupReasoningGate.skipped_reason ?? "final_arbitration_missing_after_evidence_or_tool_result" }),
+      required: effectiveFollowupReasoningGate.required,
+      completed: effectiveFollowupReasoningGate.completed,
+      ...(effectiveFollowupReasoningGate.completed ? {} : { skipped_reason: effectiveFollowupReasoningGate.skipped_reason ?? "final_arbitration_missing_after_evidence_or_tool_result" }),
     },
-    followup_reasoning_gate: followupReasoningGate,
+    followup_reasoning_gate: effectiveFollowupReasoningGate,
     ...(liveSourceIdentityAudit
       ? {
           live_source_identity_audit: liveSourceIdentityAudit,

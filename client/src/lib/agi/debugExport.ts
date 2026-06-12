@@ -721,12 +721,13 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     backend_debug_response_ref:
       asRecord(debug?.debug_export_ref) ??
       asRecord(payload.debug_export_ref) ??
-      (canonicalActiveTurnId
-        ? {
-            endpoint: `/api/agi/ask/turn/${encodeURIComponent(canonicalActiveTurnId)}/debug-export`,
-            turn_id: canonicalActiveTurnId,
-          }
-        : undefined),
+      undefined,
+    debug_export_source: asRecord(debug?.debug_export_ref) || asRecord(payload.debug_export_ref)
+      ? "backend_ref_advertised"
+      : "client_projection",
+    backend_debug_response_status: asRecord(debug?.debug_export_ref) || asRecord(payload.debug_export_ref)
+      ? "ref_advertised"
+      : "not_advertised",
     debug_export_anti_determinism_audit: {
       verdict: "clean",
       checks: [

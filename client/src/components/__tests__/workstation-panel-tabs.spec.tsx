@@ -12,6 +12,9 @@ describe("WorkstationPanelTabs layering", () => {
 
     expect(tabsSource).toContain("top-8 z-[90] w-72");
     expect(tabsSource).toContain("Launch panel");
+    expect(tabsSource).not.toContain("Job-ready");
+    expect(tabsSource).not.toContain("Helix Start Settings");
+    expect(tabsSource).not.toContain("open-helix-settings");
     expect(stagePlaySource).toContain("fixed z-[80]");
   });
 });
