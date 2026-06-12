@@ -117,6 +117,13 @@ const isExplicitDocumentAcquisitionPrompt = (prompt: string): boolean =>
   !isDocsPanelOpenPrompt(prompt) &&
   /\b(?:open|open\s+up|show|view|pull\s+up|bring\s+up|load)\b[\s\S]{0,140}\b(?:NHM[-\s]?2|white\s*paper|whitepaper|paper|document|doc)\b[\s\S]{0,100}\b(?:docs?|docks?|documents?|viewer)\b/i.test(prompt);
 
+const isDocsOpenAndSummarizePrompt = (prompt: string): boolean =>
+  /\b(?:summari[sz]e|summary|overview|takeaways?|explain|describe|gist|what\s+(?:it|the\s+(?:doc|document|paper))\s+says)\b/i.test(
+    prompt,
+  ) &&
+  /\b(?:docs?|documents?|papers?|white\s*papers?|whitepapers?)\b/i.test(prompt) &&
+  /\b(?:find|search|open|show|get|load|best|matching|relevant)\b/i.test(prompt);
+
 const isExplicitProcessGraphPrompt = (prompt: string): boolean =>
   /\b(?:process\s+graph|workstation\s+(?:process\s+)?graph|workstation\s+state|what\s+panels\s+are\s+open|which\s+panels\s+are\s+open|panels\s+open)\b/i.test(prompt);
 
@@ -932,6 +939,23 @@ export function arbitrateAskSourceTarget(input: {
         allowNoToolDirect: docsRule.allowNoToolDirect,
       });
     }
+  }
+  if (isDocsOpenAndSummarizePrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "docs_viewer",
+      targetKind: "docs_viewer",
+      strength: "hard",
+      explicitCues: ["docs_open_and_summary"],
+      reasons: ["docs_open_and_summary_source_target", "docs_summary_requires_document_tool_path"],
+      requestedOutputs: ["file_path", "tool_call_eligibility"],
+      suppressedRoutes: ["situation_context_question", "visual_deictic", "visual_frame_evidence", "active_doc_identity", "model_only_concept", "no_tool_direct"],
+      precedenceReason: "docs_open_and_summary_source_target",
+      confidence: 0.97,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
   }
   if (isExplicitDocumentAcquisitionPrompt(prompt)) {
     return toSourceTargetIntent({

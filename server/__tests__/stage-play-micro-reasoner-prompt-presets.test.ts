@@ -36,6 +36,21 @@ describe("stage play micro-reasoner prompt presets", () => {
     expect(presets.map((preset) => preset.presetId)).toContain("stage_play_micro_reasoner_prompt_preset:generic-live-source:v1");
     expect(presets.map((preset) => preset.presetId)).toContain("stage_play_micro_reasoner_prompt_preset:calculator-tool-call:v1");
     expect(presets.map((preset) => preset.presetId)).toContain("stage_play_micro_reasoner_prompt_preset:minecraft_minimal_operator:v1");
+    expect(presets.map((preset) => preset.presetId)).toEqual(expect.arrayContaining([
+      "stage_play_micro_reasoner_prompt_preset:automation-task-delegation:v1",
+      "stage_play_micro_reasoner_prompt_preset:escalation-gate:v1",
+      "stage_play_micro_reasoner_prompt_preset:wake-bound-contract-appender:v1",
+      "stage_play_micro_reasoner_prompt_preset:human-approval-filter:v1",
+      "stage_play_micro_reasoner_prompt_preset:workflow-stage-matcher:v1",
+      "stage_play_micro_reasoner_prompt_preset:blocker-extractor:v1",
+    ]));
+    const wakeContractPreset = presets.find((preset) =>
+      preset.presetId === "stage_play_micro_reasoner_prompt_preset:wake-bound-contract-appender:v1"
+    );
+    expect(wakeContractPreset?.wakePromptContract).toMatchObject({
+      attachOnlyWhenWakeBound: true,
+      title: "Wake-Bound Operator Contract",
+    });
     expect(getActiveStagePlayMicroReasonerPromptPresetForSource({ sourceId: "calculator_source:test" })?.presetId)
       .toBe("stage_play_micro_reasoner_prompt_preset:generic-live-source:v1");
   });

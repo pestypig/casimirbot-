@@ -178,7 +178,7 @@ function symbolMatchesQuery(queryTokens: string[], symbols: string[]) {
   const tokenKeys = new Set(queryTokens.map(normalizeKey));
   return symbols.filter((symbol) => {
     const key = normalizeKey(symbol);
-    if (key.length <= 2) return tokenKeys.has(key);
+    if (key.length <= 3) return tokenKeys.has(key);
     return queryTokens.some((token) => normalize(token).includes(normalize(symbol)));
   });
 }

@@ -1170,6 +1170,18 @@ describe("helix ask E52 panel control terminal contract", () => {
       expect(String(response.body?.selected_final_answer ?? response.body?.answer ?? "")).not.toMatch(/workspace_step_failed|Failed to execute/i);
       expect(response.body?.capability_lifecycle_ledger?.failure_codes ?? []).not.toContain("capability_receipt_terminal_without_goal");
       expect(response.body?.goal_satisfaction_evaluation?.satisfaction).toBe("satisfied");
+      expect(response.body?.route_authority_audit?.route_authority_ok).toBe(true);
+      expect(response.body?.ask_turn_solver_trace?.route_authority_ok).toBe(true);
+      expect(response.body?.ask_turn_solver_trace?.completed_solver_path).toBe(true);
+      expect(response.body?.ask_turn_solver_trace?.evidence_reentry_gate?.completed).toBe(true);
+      expect(response.body?.ask_turn_solver_trace?.solver_risk_flags ?? []).not.toContain("missing_followup_reasoning");
+      const debugExportRef = response.body?.debug_export_ref?.endpoint;
+      expect(debugExportRef).toBeTruthy();
+      const debugExport = await request(app).get(debugExportRef).expect(200);
+      expect(debugExport.body?.payload?.route_authority_audit?.route_authority_ok).toBe(true);
+      expect(debugExport.body?.payload?.loop_parity_trace?.route_authority_ok).toBe(true);
+      expect(debugExport.body?.payload?.ask_turn_solver_trace?.route_authority_ok).toBe(true);
+      expect(debugExport.body?.payload?.ask_turn_solver_trace?.completed_solver_path).toBe(true);
       expect(response.body?.goal_satisfaction_evaluation?.required_actions).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ action_key: "docs-viewer.search_docs", satisfied: true }),

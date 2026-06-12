@@ -1083,6 +1083,21 @@ export function buildAskTurnSolverTrace(input: {
     readString(goalSatisfaction?.satisfaction) === "satisfied" &&
     readString(goalSatisfaction?.next_decision) === "allow_terminal" &&
     terminalMatchesCanonicalGoalContract(input.payload, terminalArtifactKind);
+  const capabilityResult = readRecord(input.payload.capability_result);
+  const routeAuthorizedReceiptEvidenceReentered =
+    routeAuthorizedReceiptTerminalAllowed &&
+    (
+      evidenceReentryGate.completed ||
+      capabilityResult?.reentered_solver === true ||
+      readStringArray(capabilityResult?.receipt_refs).length > 0
+    );
+  const effectiveEvidenceReentryGate: typeof evidenceReentryGate = routeAuthorizedReceiptEvidenceReentered
+    ? {
+        ...evidenceReentryGate,
+        completed: true,
+        violation_codes: [],
+      }
+    : evidenceReentryGate;
   const effectiveFollowupReasoningGate: typeof followupReasoningGate = routeAuthorizedReceiptTerminalAllowed
     ? {
         schema: followupReasoningGate.schema,
@@ -1140,14 +1155,14 @@ export function buildAskTurnSolverTrace(input: {
     contextualToolAudit,
     negativeConstraints: promptInterpretation.negative_constraints,
     actualToolCalls,
-    evidenceReentryRequired: evidenceReentryGate.required,
-    evidenceReentryCompleted: evidenceReentryGate.completed,
+    evidenceReentryRequired: effectiveEvidenceReentryGate.required,
+    evidenceReentryCompleted: effectiveEvidenceReentryGate.completed,
     followupRequired: effectiveFollowupReasoningGate.required,
     followupCompleted: effectiveFollowupReasoningGate.completed,
     finalArbitrationRan,
     routeAuthorityOk,
     terminalAuthorityOk,
-    evidenceReentryViolationCodes: evidenceReentryGate.violation_codes,
+    evidenceReentryViolationCodes: effectiveEvidenceReentryGate.violation_codes,
     followupReasoningRequired: effectiveFollowupReasoningGate.required,
     followupReasoningCompleted: effectiveFollowupReasoningGate.completed,
     liveSourceIdentityAuditPresent: Boolean(liveSourceIdentityAudit),
@@ -1160,7 +1175,7 @@ export function buildAskTurnSolverTrace(input: {
     poisonAuditOk &&
     terminalAuthorityOk &&
     liveSourceIdentityOk &&
-    evidenceReentryGate.completed &&
+    effectiveEvidenceReentryGate.completed &&
     effectiveFollowupReasoningGate.completed &&
     solverRiskFlags.length === 0;
 
@@ -1215,11 +1230,11 @@ export function buildAskTurnSolverTrace(input: {
         }],
     evidence_results: evidenceResults,
     evidence_reentry: {
-      required: evidenceReentryGate.required,
-      completed: evidenceReentryGate.completed,
-      ...(evidenceReentryGate.completed ? {} : { skipped_reason: "terminal_selection_missing_after_required_evidence" }),
+      required: effectiveEvidenceReentryGate.required,
+      completed: effectiveEvidenceReentryGate.completed,
+      ...(effectiveEvidenceReentryGate.completed ? {} : { skipped_reason: "terminal_selection_missing_after_required_evidence" }),
     },
-    evidence_reentry_gate: evidenceReentryGate,
+    evidence_reentry_gate: effectiveEvidenceReentryGate,
     followup_reasoning: {
       required: effectiveFollowupReasoningGate.required,
       completed: effectiveFollowupReasoningGate.completed,

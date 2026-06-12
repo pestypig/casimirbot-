@@ -3,6 +3,7 @@ import type {
   StagePlayMicroReasonerRoleV1,
   StagePlayMicroReasonerPromptV1,
   StagePlayMicroReasonerPromptDelegationCandidateV1,
+  StagePlayMicroReasonerWakePromptContractV1,
   StagePlayMicroReasonerRunV1,
   StagePlayProcessedMailPacketV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
@@ -817,6 +818,29 @@ const DEFAULT_WAKE_COALESCING_POLICY: StagePlayMicroReasonerPromptPresetV1["wake
   preserveSupersededRefs: true,
 };
 
+const promptDelegationCandidates = (
+  prefix: string,
+  candidates: Array<{ title: string; promptText: string }>,
+): StagePlayMicroReasonerPromptDelegationCandidateV1[] =>
+  candidates.slice(0, 3).map((candidate, index) => ({
+    candidateId: `${prefix}_${["a", "b", "c"][index] ?? index + 1}`,
+    title: candidate.title,
+    promptText: candidate.promptText,
+  }));
+
+const wakePromptContract = (
+  contractId: string,
+  title: string,
+  promptText: string,
+): StagePlayMicroReasonerWakePromptContractV1 => ({
+  contractId,
+  title,
+  promptText,
+  attachOnlyWhenWakeBound: true,
+  includeSourceSummary: true,
+  includeEvidenceRefs: true,
+});
+
 const DEFAULT_MICRO_REASONER_PROMPT_PRESETS: Array<Omit<StagePlayMicroReasonerPromptPresetV1, "createdAt" | "updatedAt">> = [
   {
     artifactId: "stage_play_micro_reasoner_prompt_preset",
@@ -923,6 +947,263 @@ const DEFAULT_MICRO_REASONER_PROMPT_PRESETS: Array<Omit<StagePlayMicroReasonerPr
     delegationRouter: {
       candidates: [],
       confidenceThreshold: 0.45,
+      escalationMode: "handoff_only_if_confident",
+      allowNone: true,
+    },
+    wakeCoalescingPolicy: DEFAULT_WAKE_COALESCING_POLICY,
+    outputPolicy: "ask_prompt_delegation",
+    active: true,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  },
+  {
+    artifactId: "stage_play_micro_reasoner_prompt_preset",
+    schemaVersion: STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA,
+    presetId: "stage_play_micro_reasoner_prompt_preset:automation-task-delegation:v1",
+    title: "Automation Task Delegation",
+    description: "Routes wake-bound packets into broad task families before Ask handoff.",
+    domain: "custom",
+    sourceKinds: ["visual_frame", "screen_summary", "manual_feed", "custom"],
+    sourceIds: [],
+    rolePromptIds: {
+      prompt_router: defaultPromptIdForRole("prompt_router"),
+    },
+    promptedRoles: ["prompt_router"],
+    deckRunPlan: "prompt_delegation_router",
+    baselineRoles: [],
+    delegationRouter: {
+      candidates: promptDelegationCandidates("task_delegate", [
+        {
+          title: "Run or prepare a tool",
+          promptText: "If the live source shows a concrete calculation, command, API payload, form submission, file operation, or other tool-shaped action, prepare a tool-call candidate with required arguments and missing evidence. Do not execute it without normal runtime admission.",
+        },
+        {
+          title: "Summarize or append context",
+          promptText: "If the live source provides useful context but does not require immediate action, summarize the observation for Ask and propose whether it should be appended to the current task context.",
+        },
+        {
+          title: "Ask for user decision",
+          promptText: "If the live source implies a branch, irreversible action, account change, purchase, deletion, or unclear operator intent, request a user decision before any action.",
+        },
+      ]),
+      confidenceThreshold: 0.34,
+      escalationMode: "handoff_only_if_confident",
+      allowNone: true,
+    },
+    wakeCoalescingPolicy: DEFAULT_WAKE_COALESCING_POLICY,
+    outputPolicy: "ask_prompt_delegation",
+    active: true,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  },
+  {
+    artifactId: "stage_play_micro_reasoner_prompt_preset",
+    schemaVersion: STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA,
+    presetId: "stage_play_micro_reasoner_prompt_preset:escalation-gate:v1",
+    title: "Escalation Gate",
+    description: "Classifies live-source packets as ignore, log-only, Ask wake, or urgent Ask wake.",
+    domain: "custom",
+    sourceKinds: ["visual_frame", "screen_summary", "manual_feed", "custom"],
+    sourceIds: [],
+    rolePromptIds: {
+      prompt_router: defaultPromptIdForRole("prompt_router"),
+    },
+    promptedRoles: ["prompt_router"],
+    deckRunPlan: "prompt_delegation_router",
+    baselineRoles: [],
+    delegationRouter: {
+      candidates: promptDelegationCandidates("escalation", [
+        {
+          title: "Ignore routine interval",
+          promptText: "Select this when the live source shows routine continuation, no meaningful state change, no risk, no operator-relevant result, and no need to wake Ask.",
+        },
+        {
+          title: "Log context only",
+          promptText: "Select this when the packet has context worth recording for a future turn, but it is not enough to wake Ask right now.",
+        },
+        {
+          title: "Wake Helix Ask",
+          promptText: "Select this when the packet includes a completed result, an actionable blocker, a risk, a tool-call candidate, or a meaningful state transition that should wake Ask.",
+        },
+      ]),
+      confidenceThreshold: 0.3,
+      escalationMode: "handoff_only_if_confident",
+      allowNone: true,
+    },
+    wakeCoalescingPolicy: DEFAULT_WAKE_COALESCING_POLICY,
+    outputPolicy: "ask_prompt_delegation",
+    active: true,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  },
+  {
+    artifactId: "stage_play_micro_reasoner_prompt_preset",
+    schemaVersion: STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA,
+    presetId: "stage_play_micro_reasoner_prompt_preset:wake-bound-contract-appender:v1",
+    title: "Wake-Bound Contract Appender",
+    description: "Appends a standing procedural contract only to packets that are selected for Ask wake.",
+    domain: "custom",
+    sourceKinds: ["visual_frame", "screen_summary", "manual_feed", "custom"],
+    sourceIds: [],
+    rolePromptIds: {
+      prompt_router: defaultPromptIdForRole("prompt_router"),
+    },
+    promptedRoles: ["prompt_router"],
+    deckRunPlan: "prompt_delegation_router",
+    baselineRoles: [],
+    delegationRouter: {
+      candidates: promptDelegationCandidates("wake_contract", [
+        {
+          title: "Attach contract and wake Ask",
+          promptText: "Use the live-source summary as evidence, attach the preset wake-bound contract, and ask Helix Ask to evaluate the packet under that contract.",
+        },
+        {
+          title: "Record packet only",
+          promptText: "Record the packet as evidence only. Do not wake Ask and do not append the contract.",
+        },
+        {
+          title: "Request more evidence",
+          promptText: "Ask the live-source loop for another interval because the current packet is too ambiguous for a wake-bound contract.",
+        },
+      ]),
+      confidenceThreshold: 0.32,
+      escalationMode: "handoff_only_if_confident",
+      allowNone: true,
+    },
+    wakePromptContract: wakePromptContract(
+      "stage_play_micro_reasoner_wake_prompt_contract:operator-default:v1",
+      "Wake-Bound Operator Contract",
+      [
+        "Use this contract only for the packet that woke Helix Ask.",
+        "Treat the packet as evidence, not as an answer.",
+        "Identify the smallest safe next step.",
+        "If the next step would mutate external state, require normal runtime admission and user confirmation when policy requires it.",
+        "If the packet is stale, superseded, or no longer wake-bound, ignore this contract.",
+      ].join("\n"),
+    ),
+    wakeCoalescingPolicy: DEFAULT_WAKE_COALESCING_POLICY,
+    outputPolicy: "ask_prompt_delegation",
+    active: true,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  },
+  {
+    artifactId: "stage_play_micro_reasoner_prompt_preset",
+    schemaVersion: STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA,
+    presetId: "stage_play_micro_reasoner_prompt_preset:human-approval-filter:v1",
+    title: "Human Approval Filter",
+    description: "Detects mutating or high-impact packets and routes them to a confirmation-first Ask prompt.",
+    domain: "custom",
+    sourceKinds: ["visual_frame", "screen_summary", "manual_feed", "custom"],
+    sourceIds: [],
+    rolePromptIds: {
+      prompt_router: defaultPromptIdForRole("prompt_router"),
+    },
+    promptedRoles: ["prompt_router"],
+    deckRunPlan: "prompt_delegation_router",
+    baselineRoles: [],
+    delegationRouter: {
+      candidates: promptDelegationCandidates("approval", [
+        {
+          title: "Requires confirmation",
+          promptText: "Select this when the observation implies deletion, purchase, account change, file mutation, sending a message, deployment, or another side effect. Ask must require explicit user confirmation before execution.",
+        },
+        {
+          title: "Read-only review",
+          promptText: "Select this when Ask should inspect, summarize, classify, compare, or explain evidence without mutating external state.",
+        },
+        {
+          title: "No action",
+          promptText: "Select this when the packet contains no actionable decision or meaningful update.",
+        },
+      ]),
+      confidenceThreshold: 0.34,
+      escalationMode: "handoff_only_if_confident",
+      allowNone: true,
+    },
+    wakeCoalescingPolicy: DEFAULT_WAKE_COALESCING_POLICY,
+    outputPolicy: "ask_prompt_delegation",
+    active: true,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  },
+  {
+    artifactId: "stage_play_micro_reasoner_prompt_preset",
+    schemaVersion: STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA,
+    presetId: "stage_play_micro_reasoner_prompt_preset:workflow-stage-matcher:v1",
+    title: "Workflow Stage Matcher",
+    description: "Routes source updates by workflow stage: waiting, input-ready, complete, error, or next-step needed.",
+    domain: "browser_workflow",
+    sourceKinds: ["visual_frame", "screen_summary", "manual_feed", "custom"],
+    sourceIds: [],
+    rolePromptIds: {
+      prompt_router: defaultPromptIdForRole("prompt_router"),
+    },
+    promptedRoles: ["prompt_router"],
+    deckRunPlan: "prompt_delegation_router",
+    baselineRoles: [],
+    delegationRouter: {
+      candidates: promptDelegationCandidates("workflow", [
+        {
+          title: "Input ready",
+          promptText: "Select this when the source shows forms, fields, command inputs, parameters, or setup state that is ready for the next operator/tool step.",
+        },
+        {
+          title: "Result complete",
+          promptText: "Select this when the source shows a completed calculation, generated artifact, response, confirmation, or terminal result that Ask should inspect.",
+        },
+        {
+          title: "Blocked or error",
+          promptText: "Select this when the source shows an error, modal, missing permission, validation failure, loading hang, auth issue, or workflow blocker.",
+        },
+      ]),
+      confidenceThreshold: 0.34,
+      escalationMode: "handoff_only_if_confident",
+      allowNone: true,
+    },
+    wakeCoalescingPolicy: DEFAULT_WAKE_COALESCING_POLICY,
+    outputPolicy: "ask_prompt_delegation",
+    active: true,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  },
+  {
+    artifactId: "stage_play_micro_reasoner_prompt_preset",
+    schemaVersion: STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA,
+    presetId: "stage_play_micro_reasoner_prompt_preset:blocker-extractor:v1",
+    title: "Failure / Blocker Extractor",
+    description: "Routes packets to extract the blocker when UI, tool, or workflow progress fails.",
+    domain: "browser_workflow",
+    sourceKinds: ["visual_frame", "screen_summary", "manual_feed", "custom"],
+    sourceIds: [],
+    rolePromptIds: {
+      prompt_router: defaultPromptIdForRole("prompt_router"),
+    },
+    promptedRoles: ["prompt_router"],
+    deckRunPlan: "prompt_delegation_router",
+    baselineRoles: [],
+    delegationRouter: {
+      candidates: promptDelegationCandidates("blocker", [
+        {
+          title: "UI blocker",
+          promptText: "Extract visible UI blockers such as disabled controls, validation errors, modal dialogs, missing selections, auth prompts, navigation dead ends, or unexpected page state.",
+        },
+        {
+          title: "Tool or API blocker",
+          promptText: "Extract command, API, calculator, or tool-call failures including missing arguments, invalid inputs, timeout, unavailable service, rejected request, or unsafe operation.",
+        },
+        {
+          title: "Evidence gap",
+          promptText: "Extract what evidence is missing before Ask can safely decide: source identity, latest result, active selection, error text, user intent, or required arguments.",
+        },
+      ]),
+      confidenceThreshold: 0.34,
       escalationMode: "handoff_only_if_confident",
       allowNone: true,
     },
@@ -1154,6 +1435,7 @@ export function recordStagePlayPromptDelegationRouterPreset(input: {
   confidenceThreshold?: number | null;
   escalationMode?: "suggest_only" | "handoff_to_helix_ask" | "handoff_only_if_confident" | null;
   allowNone?: boolean | null;
+  wakePromptContract?: StagePlayMicroReasonerWakePromptContractV1 | null;
   now?: string;
 }): StagePlayMicroReasonerPromptPresetV1 | null {
   ensureDefaultStagePlayMicroReasonerPromptPresets();
@@ -1188,6 +1470,7 @@ export function recordStagePlayPromptDelegationRouterPreset(input: {
       escalationMode: input.escalationMode ?? "handoff_only_if_confident",
       allowNone: input.allowNone ?? true,
     },
+    wakePromptContract: input.wakePromptContract ?? null,
     wakeCoalescingPolicy: DEFAULT_WAKE_COALESCING_POLICY,
     outputPolicy: "ask_prompt_delegation",
     active: true,

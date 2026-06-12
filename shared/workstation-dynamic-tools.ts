@@ -917,6 +917,7 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
   { panel_id: "situation-room-pipelines", action_id: "source_health.query", required_args: [], optional_args: ["thread_id", "room_id", "source_id", "job_id"], returns_artifact: true },
   { panel_id: "workstation-workflow-timeline", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "workstation-process-graph", action_id: "open", required_args: [], optional_args: [] },
+  { panel_id: "workstation-task-manager", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "workstation-process-graph", action_id: "get_snapshot", required_args: [], optional_args: ["scope", "max_nodes", "include_timeline", "include_artifacts"], returns_artifact: true },
   { panel_id: "workstation-process-graph", action_id: "get_context_pack", required_args: [], optional_args: ["max_nodes", "max_artifacts", "max_timeline", "include_timeline"], returns_artifact: true },
   { panel_id: "workstation-process-graph", action_id: "query_snapshot", required_args: ["query"], optional_args: ["max_nodes", "include_timeline", "include_artifacts"], returns_artifact: true },
@@ -1141,6 +1142,17 @@ export const WORKSPACE_ACTION_REGISTRY: WorkspaceActionRegistryEntry[] = [
     enabled: true,
   },
   {
+    action_key: "workstation-task-manager.open",
+    family: "task_history",
+    target_id: "workstation-task-manager",
+    action_id: "open",
+    label: "Task Manager",
+    aliases: ["open task manager", "show task manager", "open workstation task manager", "show memory usage"],
+    terminal_receipt_required: true,
+    source: "desktop_panel_manifest",
+    enabled: true,
+  },
+  {
     action_key: "agi-essence-console.open",
     family: "console",
     target_id: "agi-essence-console",
@@ -1214,6 +1226,7 @@ export const WORKSPACE_ACTION_VISIBLE_PANEL_IDS = [
   "situation-room-pipelines",
   "workstation-workflow-timeline",
   "workstation-process-graph",
+  "workstation-task-manager",
   "agi-essence-console",
   "account-session",
   "agi-task-history",
@@ -1558,7 +1571,7 @@ function resolveAffordanceFamily(panelId: string, actionId: string): HelixWorkst
   if (panelId === "docs-viewer") return "documents";
   if (panelId === "mission-ethos") return "ideology";
   if (panelId === "workstation-clipboard-history") return "clipboard";
-  if (panelId === "workstation-workflow-timeline" || panelId === "workstation-process-graph" || panelId === "agi-task-history") return "history";
+  if (panelId === "workstation-workflow-timeline" || panelId === "workstation-process-graph" || panelId === "workstation-task-manager" || panelId === "agi-task-history") return "history";
   if (panelId === "agi-essence-console") return "debug";
   if (panelId === "situation-room-sources") return "live_source";
   if (panelId === "situation-room-pipelines") {

@@ -417,6 +417,15 @@ export type StagePlayMicroReasonerPromptDelegationRouterV1 = {
   allowNone: boolean;
 };
 
+export type StagePlayMicroReasonerWakePromptContractV1 = {
+  contractId: string;
+  title: string;
+  promptText: string;
+  attachOnlyWhenWakeBound: true;
+  includeSourceSummary: boolean;
+  includeEvidenceRefs: boolean;
+};
+
 export type StagePlayMicroReasonerPromptPresetV1 = {
   artifactId: "stage_play_micro_reasoner_prompt_preset";
   schemaVersion: typeof STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA;
@@ -437,6 +446,7 @@ export type StagePlayMicroReasonerPromptPresetV1 = {
   deckRunPlan: StagePlayMicroReasonerDeckRunPlanV1;
   baselineRoles?: StagePlayMicroReasonerRoleV1[];
   delegationRouter?: StagePlayMicroReasonerPromptDelegationRouterV1 | null;
+  wakePromptContract?: StagePlayMicroReasonerWakePromptContractV1 | null;
   wakeCoalescingPolicy?: StagePlayMicroReasonerWakeCoalescingPolicyV1;
   outputPolicy: "watch_officer" | "tool_call_candidate" | "voice_candidate" | "ask_prompt_delegation" | "record_only";
   active: boolean;
@@ -489,6 +499,8 @@ export type StagePlayMicroReasonerPromptDelegationResultV1 = {
     sourceSummary: string;
     evidenceRefs: string[];
     selectedCandidateId: string;
+    wakePromptContract?: StagePlayMicroReasonerWakePromptContractV1 | null;
+    appendedPrompt?: string | null;
   } | null;
   evidenceRefs: string[];
   createdAt: string;

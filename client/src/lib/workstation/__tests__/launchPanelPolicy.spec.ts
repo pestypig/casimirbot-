@@ -24,6 +24,7 @@ describe("launchPanelPolicy", () => {
     expect(isUserLaunchPanel("document-image-lens")).toBe(false);
     expect(isUserLaunchPanel("workstation-clipboard-history")).toBe(true);
     expect(isUserLaunchPanel("workstation-workflow-timeline")).toBe(true);
+    expect(isUserLaunchPanel("workstation-task-manager")).toBe(true);
     expect(isUserLaunchPanel("scientific-calculator")).toBe(true);
   });
 

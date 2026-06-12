@@ -72,6 +72,9 @@ import {
 import {
   buildCollectiveModeSynchronyTheoryBadgesV1,
 } from "./collective-mode-synchrony-theory-badges";
+import {
+  buildCrossScaleConnectiveTissueTheoryBadgesV1,
+} from "./cross-scale-connective-tissue-theory-badges";
 
 const DIAGNOSTIC_BOUNDARY: TheoryBadgeClaimBoundaryV1 = {
   diagnosticOnly: true,
@@ -939,6 +942,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
   const periodicElements = buildPeriodicElementOriginTheoryBadgesV1();
   const phasesOfMatter = buildPhaseOfMatterTheoryBadgesV1();
   const collectiveModeSynchrony = buildCollectiveModeSynchronyTheoryBadgesV1();
+  const crossScaleConnectiveTissue = buildCrossScaleConnectiveTissueTheoryBadgesV1();
 
   return buildTheoryBadgeGraphV1({
     graphId: "nhm2-theory-badge-graph",
@@ -968,6 +972,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...periodicElements.badges,
       ...phasesOfMatter.badges,
       ...collectiveModeSynchrony.badges,
+      ...crossScaleConnectiveTissue.badges,
     ],
     edges: [
       ...FIRST_PRINCIPLES_THEORY_EDGES,
@@ -992,6 +997,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...periodicElements.edges,
       ...phasesOfMatter.edges,
       ...collectiveModeSynchrony.edges,
+      ...crossScaleConnectiveTissue.edges,
     ],
   });
 }

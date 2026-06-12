@@ -329,6 +329,15 @@ const BASE_PANELS: PanelDefinition[] = [
     keywords: ["process", "graph", "workflow", "tools", "jobs", "artifacts", "timeline"],
   },
   {
+    id: "workstation-task-manager",
+    title: "Task Manager",
+    loader: load(() => import("@/components/workstation/WorkstationTaskManagerPanel")),
+    defaultSize: { w: 980, h: 680 },
+    defaultPosition: { x: 320, y: 190 },
+    keywords: ["task", "manager", "memory", "ram", "runtime", "process", "performance"],
+    heavy: false,
+  },
+  {
     id: "casimir-tiles",
     title: "Casimir Tiles",
     loader: load(() => import("@/components/panels/CasimirTilesPanel")),

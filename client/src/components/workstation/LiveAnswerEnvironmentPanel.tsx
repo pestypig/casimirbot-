@@ -58,6 +58,7 @@ import {
   type VisualSourceCaptureFrameHistoryItem,
   type VisualSourceCaptureState,
 } from "@/store/useVisualSourceCaptureStore";
+import { useImageLensLiveSourceStore } from "@/store/useImageLensLiveSourceStore";
 
 type LiveEnvironmentTab = "present_state" | "navigation_evidence" | "worker_lanes" | "line_checks" | "interpreted_log" | "clarification" | "live_cognition" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
 type ClientCapabilityActionRead = {
@@ -608,7 +609,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [selectedVisualFrameHistoryId, setSelectedVisualFrameHistoryId] = useState<string | null>(null);
   const [visualFrameReplayRunning, setVisualFrameReplayRunning] = useState(false);
   const [visualFrameReplayResult, setVisualFrameReplayResult] = useState<VisualFrameReplayResult | null>(null);
+  const [visualCaptureRoute, setVisualCaptureRoute] = useState<"live_answer" | "image_lens">("live_answer");
   const visualReplayJobsInFlightRef = React.useRef<Set<string>>(new Set());
+  const setImageLensLiveSource = useImageLensLiveSourceStore((state) => state.setLiveSource);
+  const clearImageLensLiveSource = useImageLensLiveSourceStore((state) => state.clearLiveSource);
+  const imageLensLiveSource = useImageLensLiveSourceStore((state) => state.liveSource);
   const [sourceSignal, setSourceSignal] = useState<SourceSignalCheck>({
     status: "unchecked",
     summary: "No source signal has been checked in this panel.",
@@ -1282,6 +1287,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     });
   };
 
+  const openImageLensPanel = (): void => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(new CustomEvent("open-helix-panel", { detail: { id: "image-lens" } }));
+  };
+
   const ensureVisualSourceRegistered = async (): Promise<VisualSourceRead> => {
     const existing = visualLatest?.active_source ?? visualLatest?.source ?? null;
     if (existing) return existing;
@@ -1386,6 +1396,77 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     }
   };
 
+  const routeVisualCaptureToImageLens = async () => {
+    let stream: MediaStream | null = null;
+    try {
+      const source = await ensureVisualSourceRegistered();
+      stream = getActiveVisualFrameStream(source.source_id) ?? getLatestActiveVisualFrameStream(threadId)?.stream ?? null;
+      if (!stream) stream = await requestDisplayStream();
+      await postJson("/api/agi/situation/visual-source/permission-granted", {
+        source_id: source.source_id,
+        client_stream_confirmed: true,
+      });
+      await postJson("/api/agi/situation/source/heartbeat", {
+        source_id: source.source_id,
+        thread_id: threadId,
+        room_id: environment?.room_id ?? null,
+        modality: "visual_frame",
+        status: "active",
+        ts: new Date().toISOString(),
+      }).catch(() => null);
+      useVisualSourceCaptureStore.getState().upsertProducer({
+        source_id: source.source_id,
+        thread_id: threadId,
+        environment_id: environment?.environment_id ?? null,
+        pipeline_id: null,
+        stream_active: true,
+        interval_active: false,
+        track_ready_state: "live",
+        capture_mode: "manual",
+        cadence_ms: null,
+        last_heartbeat_at: new Date().toISOString(),
+        last_error: null,
+      });
+      const firstTrack = stream.getVideoTracks()[0] ?? stream.getTracks()[0] ?? null;
+      firstTrack?.addEventListener("ended", () => {
+        useVisualSourceCaptureStore.getState().patchProducer(source.source_id, {
+          stream_active: false,
+          interval_active: false,
+          track_ready_state: "ended",
+          last_heartbeat_at: new Date().toISOString(),
+        });
+        clearImageLensLiveSource(source.source_id);
+      }, { once: true });
+      setImageLensLiveSource({
+        sourceId: source.source_id,
+        threadId,
+        environmentId: environment?.environment_id ?? null,
+        pipelineId: null,
+        roomId: environment?.room_id ?? null,
+        stream,
+        streamActive: true,
+        captureMode: "screen_share_lens",
+        latestFrameDataUrl: null,
+        lastFrameAt: null,
+        createdAt: new Date().toISOString(),
+      });
+      openImageLensPanel();
+      setLastActionStatus(`Screen share routed to Image Lens. Raw frames will not be summarized until a crop is sent for ${source.source_id}.`);
+      await refresh();
+    } catch (error) {
+      stream?.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+      setLastActionStatus(error instanceof Error ? error.message : "visual_capture_image_lens_route_failed");
+    }
+  };
+
+  const startVisualCaptureByRoute = async () => {
+    if (visualCaptureRoute === "image_lens") {
+      await routeVisualCaptureToImageLens();
+      return;
+    }
+    await grantVisualCapture();
+  };
+
   const applyVisualObserverProfile = async (profile: StagePlayVisualObserverProfileV1 | null) => {
     if (!profile) {
       setLastActionStatus("Visual observer shade preset is not available.");
@@ -1467,7 +1548,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   };
 
   const pauseVisualInterval = async () => {
-    const sourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id ?? null;
+    const sourceId = activeVisualSourceId;
     if (!sourceId) {
       setLastActionStatus("No visual source is registered.");
       return;
@@ -1490,12 +1571,15 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   };
 
   const stopVisualSharing = async () => {
-    const sourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id ?? null;
+    const sourceId = activeVisualSourceId;
     if (!sourceId) {
       setLastActionStatus("No visual source is registered.");
       return;
     }
     stopVisualFrameProducerInterval(sourceId, { stopStream: true });
+    if (imageLensLiveSource?.sourceId === sourceId) {
+      imageLensLiveSource.stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+    }
     await postJson("/api/agi/situation/live-source/producer/heartbeat", {
       source_id: sourceId,
       thread_id: threadId,
@@ -1505,6 +1589,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       ts: new Date().toISOString(),
     }).catch(() => null);
     await setSourceStatus(sourceId, "stop").catch(() => null);
+    clearImageLensLiveSource(sourceId);
     setLastActionStatus("Stopped visual sharing and interval capture. Restart visual capture to resume frames.");
     await refresh();
   };
@@ -2222,12 +2307,26 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           )}
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
+          <label className="inline-flex items-center gap-1 rounded border border-white/10 bg-black/20 px-2 py-1 text-[11px] text-slate-300">
+            Route screen share to
+            <select
+              value={visualCaptureRoute}
+              onChange={(event: React.ChangeEvent<HTMLSelectElement>) => setVisualCaptureRoute(event.target.value as "live_answer" | "image_lens")}
+              className="rounded border border-white/10 bg-slate-950 px-1.5 py-0.5 text-[11px] text-slate-100"
+              aria-label="Visual capture route"
+            >
+              <option value="live_answer">Live Answer first</option>
+              <option value="image_lens">Image Lens first</option>
+            </select>
+          </label>
           <button
             type="button"
-            onClick={() => void grantVisualCapture()}
+            onClick={() => void startVisualCaptureByRoute()}
             className="rounded border border-sky-300/30 px-2 py-1 text-[11px] text-sky-100 hover:bg-sky-400/10 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            {visualLatest?.source ? "Grant visual capture + first frame" : "Register + first frame"}
+            {visualCaptureRoute === "image_lens"
+              ? "Share to Image Lens"
+              : visualLatest?.source ? "Grant visual capture + first frame" : "Register + first frame"}
           </button>
           <button
             type="button"

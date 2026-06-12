@@ -133,6 +133,69 @@ describe("Helix Ask docs summary output coverage", () => {
     }
   }, 60000);
 
+  it("does not let open-best receipts satisfy docs search-open-summary prompts", async () => {
+    const app = createApp();
+    const sessionId = `docs-open-summary-terminal-${Date.now()}`;
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Search docs for Helix Ask console debug, open the best matching doc, and summarize what it says about debug exports.",
+        mode: "read",
+        debug: true,
+        sessionId,
+        workspace_context_snapshot: {
+          sessionId,
+          activePanel: "docs-viewer",
+          hasDocContext: true,
+          hasNoteContext: false,
+        },
+      })
+      .expect(200);
+
+    const iterations = response.body?.agent_runtime_loop?.iterations ?? [];
+    const answerText = String(response.body?.selected_final_answer ?? response.body?.answer ?? response.body?.text ?? "");
+    const failureDebug = JSON.stringify({
+      text: response.body?.text,
+      terminal_artifact_kind: response.body?.terminal_artifact_kind,
+      terminal_error_code: response.body?.terminal_error_code,
+      canonical_goal_frame: response.body?.canonical_goal_frame,
+      route_product_contract: response.body?.route_product_contract,
+      tool_call_admission_decision: response.body?.tool_call_admission_decision,
+      agent_step_decision: response.body?.agent_step_decision,
+      initial_agent_step_decision: response.body?.initial_agent_step_decision,
+      solver_controller_decision: response.body?.solver_controller_decision,
+      satisfaction_report: response.body?.satisfaction_report,
+      goal_satisfaction_evaluation: response.body?.goal_satisfaction_evaluation,
+      runtime_authority_audit: response.body?.runtime_authority_audit,
+      turn_runtime: response.body?.turn_runtime,
+      agent_loop_budget: response.body?.agent_loop_budget,
+      agent_runtime_loop: response.body?.agent_runtime_loop,
+    });
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("doc_summary");
+    expect(response.body?.canonical_goal_frame?.required_terminal_kind).toBe("doc_summary");
+    expect(response.body?.terminal_artifact_kind, failureDebug).toBe("doc_summary");
+    expect(response.body?.terminal_artifact_kind).not.toBe("doc_open_receipt");
+    expect(response.body?.final_answer_source).not.toBe("doc_open_receipt");
+    expect(response.body?.final_status).toBe("final_answer");
+    expect(response.body?.solver_controller_decision?.decision).toBe("allow_terminal");
+    expect(response.body?.route_authority_audit?.route_authority_ok).toBe(true);
+    expect(response.body?.ask_turn_solver_trace?.completed_solver_path).toBe(true);
+    expect(response.body?.ask_turn_solver_trace?.evidence_reentry_gate?.completed).toBe(true);
+    expect(response.body?.ask_turn_solver_trace?.solver_risk_flags ?? []).not.toContain("tool_result_terminal_without_reasoning");
+    expect(response.body?.tool_call_admission_decision?.source_target).toBe("docs_viewer");
+    expect(response.body?.tool_call_admission_decision?.admitted_tool_families).toContain("docs_viewer");
+    expect(iterations.some((iteration: any) => iteration?.chosen_capability === "docs-viewer.search_docs")).toBe(true);
+    expect(
+      iterations.some(
+        (iteration: any) =>
+          iteration?.chosen_capability === "docs-viewer.summarize_doc" &&
+          Array.isArray(iteration?.observed_artifact_refs) &&
+          iteration.observed_artifact_refs.some((ref: unknown) => String(ref).includes(":doc_summary:")),
+      ),
+    ).toBe(true);
+    expect(answerText).toMatch(/debug|export|\/docs\//i);
+  }, 60000);
+
   it("reconciles natural exact-path docs summaries from dispatch into docs terminal authority", async () => {
     const app = createApp();
     const sessionId = `docs-summary-natural-path-${Date.now()}`;

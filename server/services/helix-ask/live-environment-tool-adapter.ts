@@ -21,6 +21,7 @@ import type {
   StagePlayLiveSourceMailItemV1,
   StagePlayMicroReasonerPromptDelegationCandidateV1,
   StagePlayMicroReasonerPromptDelegationResultV1,
+  StagePlayMicroReasonerWakePromptContractV1,
   StagePlayMicroReasonerRoleV1,
   StagePlayMicroReasonerRunV1,
   StagePlayProcessedMailPacketV1,
@@ -913,6 +914,48 @@ const rawDelegationCandidateCount = (args: Record<string, unknown>): number => {
   return raw.length;
 };
 
+const wakePromptContractFromArgs = (
+  args: Record<string, unknown>,
+): StagePlayMicroReasonerWakePromptContractV1 | null => {
+  const record =
+    readRecord(args.wake_prompt_contract) ??
+    readRecord(args.wakePromptContract) ??
+    readRecord(args.contract);
+  const promptText =
+    readString(record?.promptText) ??
+    readString(record?.prompt_text) ??
+    readString(args.wake_contract_prompt) ??
+    readString(args.wakeContractPrompt) ??
+    readString(args.contract_prompt);
+  if (!promptText) return null;
+  const title =
+    readString(record?.title) ??
+    readString(args.wake_contract_title) ??
+    readString(args.wakeContractTitle) ??
+    "Wake-Bound Prompt Contract";
+  return {
+    contractId:
+      readString(record?.contractId) ??
+      readString(record?.contract_id) ??
+      `stage_play_micro_reasoner_wake_prompt_contract:custom:${hashShort([title, promptText])}`,
+    title,
+    promptText,
+    attachOnlyWhenWakeBound: true,
+    includeSourceSummary:
+      typeof record?.includeSourceSummary === "boolean"
+        ? record.includeSourceSummary
+        : typeof record?.include_source_summary === "boolean"
+          ? record.include_source_summary
+          : true,
+    includeEvidenceRefs:
+      typeof record?.includeEvidenceRefs === "boolean"
+        ? record.includeEvidenceRefs
+        : typeof record?.include_evidence_refs === "boolean"
+          ? record.include_evidence_refs
+          : true,
+  };
+};
+
 const latestLiveSourceSummaryForDelegation = (args: Record<string, unknown>, sourceId: string | null): {
   summary: string;
   evidenceRefs: string[];
@@ -982,6 +1025,7 @@ const routeMicroReasonerPromptCandidates = (input: {
   escalationMode: "suggest_only" | "handoff_to_helix_ask" | "handoff_only_if_confident";
   presetId?: string | null;
   presetTitle?: string | null;
+  wakePromptContract?: StagePlayMicroReasonerWakePromptContractV1 | null;
   sourceId?: string | null;
   evidenceRefs: string[];
 }): StagePlayMicroReasonerPromptDelegationResultV1 => {
@@ -1027,6 +1071,21 @@ const routeMicroReasonerPromptCandidates = (input: {
     : best
       ? `No prompt met the delegation threshold; strongest candidate was ${best.candidate.title} at ${best.score.toFixed(2)}.`
       : "No candidate prompts were available for routing.";
+  const wakePromptContract = selected && shouldHandoffToHelixAsk
+    ? input.wakePromptContract ?? null
+    : null;
+  const appendedPrompt = selected && shouldHandoffToHelixAsk
+    ? [
+        selected.candidate.promptText,
+        wakePromptContract
+          ? [
+              "",
+              "Wake-bound contract:",
+              wakePromptContract.promptText,
+            ].join("\n")
+          : "",
+      ].filter((part) => part.trim().length > 0).join("\n")
+    : null;
   return {
     artifactId: "stage_play_micro_reasoner_prompt_delegation_result",
     schema: "stage_play_micro_reasoner_prompt_delegation_result/v1",
@@ -1059,6 +1118,8 @@ const routeMicroReasonerPromptCandidates = (input: {
           sourceSummary: input.sourceSummary,
           evidenceRefs: input.evidenceRefs,
           selectedCandidateId: selected.candidate.candidateId,
+          wakePromptContract,
+          appendedPrompt,
         }
       : null,
     evidenceRefs: input.evidenceRefs,
@@ -2624,6 +2685,7 @@ export function executeLiveEnvironmentTool(
       escalationMode,
       presetId: activePreset?.presetId ?? presetId ?? null,
       presetTitle: activePreset?.title ?? null,
+      wakePromptContract: activePreset?.wakePromptContract ?? null,
       sourceId,
       evidenceRefs: uniqueStrings([
         activePreset?.presetId,
@@ -2846,6 +2908,7 @@ export function executeLiveEnvironmentTool(
             : typeof args.allowNone === "boolean"
               ? args.allowNone
               : true,
+          wakePromptContract: wakePromptContractFromArgs(args),
           now,
         });
         const prompts = routerPreset

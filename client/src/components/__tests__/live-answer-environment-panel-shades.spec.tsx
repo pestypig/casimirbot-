@@ -124,6 +124,19 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain('window.addEventListener("helix:image-lens:visual-frame-sent"');
   });
 
+  it("offers an Image Lens-first screen share route without starting direct frame summarization", () => {
+    const source = panelSource();
+
+    expect(source).toContain('aria-label="Visual capture route"');
+    expect(source).toContain("Live Answer first");
+    expect(source).toContain("Image Lens first");
+    expect(source).toContain("Share to Image Lens");
+    expect(source).toContain("routeVisualCaptureToImageLens");
+    expect(source).toContain("setImageLensLiveSource");
+    expect(source).toContain("Raw frames will not be summarized until a crop is sent");
+    expect(source).toContain('window.dispatchEvent(new CustomEvent("open-helix-panel", { detail: { id: "image-lens" } }))');
+  });
+
   it("adds a separate action replay section for re-lensing captured frames", () => {
     const source = panelSource();
 

@@ -146,11 +146,12 @@ describe("nuclear binding first-principles theory badges", () => {
     const reflection = buildTheoryContextReflection({
       graph: buildHelixTheoryBadgeGraphV1(),
       prompt:
-        "Reflect Coulomb repulsion, tunneling, strong force short range binding, mass defect binding energy, Schrodinger atomic bound states, Pauli shell structure, and electron uncertainty for molecular binding.",
+        "Reflect Coulomb repulsion, tunneling, strong_force_context, strong force short range binding, mass defect binding energy, Schrodinger atomic bound states, Pauli shell structure, and electron uncertainty for molecular binding.",
       mentionedEquations: [
         "E_b_J = delta_m_kg * c_m_s^2",
         "V_c_J = (Z1 * Z2 * e_C^2) / (4 * pi * epsilon0_F_m * r_m)",
         "P_tunnel_proxy = exp(-2 * pi * eta)",
+        "strong_force_context: r_nuclear_m ~ 1e-15 => strong_binding_context",
         "delta_p_min_kg_m_s = hbar_J_s / (2 * delta_x_m)",
       ],
       mentionedSymbols: [
@@ -162,6 +163,7 @@ describe("nuclear binding first-principles theory badges", () => {
         "eta",
         "P_tunnel_proxy",
         "r_nuclear_m",
+        "strong_binding_context",
         "delta_x_m",
         "delta_p_min_kg_m_s",
         "hbar_J_s",

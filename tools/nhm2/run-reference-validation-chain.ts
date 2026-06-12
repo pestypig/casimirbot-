@@ -130,10 +130,14 @@ export const planReferenceValidationChain = (
   const sourceIndependenceAudit = `${outRoot}/nhm2-tile-counterpart-source-independence.md`;
   const sourceAuthority = `${outRoot}/nhm2-source-side-same-basis-tensor-authority.json`;
   const regionalEvidence = `${outRoot}/nhm2-regional-source-closure-evidence.json`;
+  const regionalSourceTensorTargets =
+    `${outRoot}/nhm2-regional-source-tensor-targets.json`;
   const sourceClosurePassReadiness = `${outRoot}/nhm2-source-closure-pass-readiness.json`;
   const sourceClosurePassReadinessReport = `${outRoot}/nhm2-source-closure-pass-readiness.md`;
   const coupledClosurePassCandidate =
     `${outRoot}/nhm2-coupled-closure-pass-candidate.json`;
+  const regionalTensorPassPathHarness =
+    `${outRoot}/nhm2-regional-tensor-pass-path-harness.json`;
   const divergenceReport = `${outRoot}/nhm2-source-to-geometry-divergence.md`;
   const provenanceAudit = `${outRoot}/nhm2-tile-counterpart-provenance.md`;
   const validation = `${outRoot}/nhm2-reference-run-validation.json`;
@@ -368,6 +372,12 @@ export const planReferenceValidationChain = (
     regionalEvidence,
     ...auditOnly,
   ]));
+  commands.push(command("nhm2:build-regional-source-tensor-targets", [
+    "--regional-source-closure-evidence",
+    regionalEvidence,
+    "--out",
+    regionalSourceTensorTargets,
+  ]));
   commands.push(command("nhm2:source-closure-pass-readiness", [
     "--regional-evidence",
     regionalEvidence,
@@ -405,6 +415,31 @@ export const planReferenceValidationChain = (
       : ["--casimir-material-receipt", casimirMaterialReceipt]),
     "--out",
     coupledClosurePassCandidate,
+  ]));
+  commands.push(command("nhm2:build-regional-tensor-pass-path-harness", [
+    ...(regionalMaterialSourceTensorModel == null
+      ? []
+      : ["--regional-material-source-tensor-model", regionalMaterialSourceTensorModel]),
+    "--source-side-authority",
+    sourceAuthority,
+    "--regional-source-closure-evidence",
+    regionalEvidence,
+    "--source-closure-pass-readiness",
+    sourceClosurePassReadiness,
+    ...(conservation == null ? [] : ["--conservation", conservation]),
+    ...(qeiWorldlineDossier == null
+      ? []
+      : ["--qei-worldline-dossier", qeiWorldlineDossier]),
+    ...(observerRobustEnergyConditions == null
+      ? []
+      : ["--observer-robust-energy-conditions", observerRobustEnergyConditions]),
+    ...(casimirMaterialReceipt == null
+      ? []
+      : ["--casimir-material-receipt", casimirMaterialReceipt]),
+    "--coupled-closure-pass-candidate",
+    coupledClosurePassCandidate,
+    "--out",
+    regionalTensorPassPathHarness,
   ]));
   commands.push(command("nhm2:report-source-to-geometry-divergence", [
     "--regional-evidence",

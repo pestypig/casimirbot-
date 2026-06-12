@@ -34,6 +34,7 @@ import {
   WORKSTATION_SHELL_CAPABILITY_CONTRACT_VERSION,
   type WorkstationShellCapabilityDefinition,
 } from "@shared/workstation-shell-capabilities";
+import { HELIX_WORKSTATION_TASK_MANAGER_SCHEMA } from "@shared/helix-workstation-task-manager";
 import { listClientCapabilityActions } from "../client-capabilities/client-action-queue";
 import { listClientCapabilityAdoptions } from "../client-capabilities/client-adoption-store";
 import { readSituationSourceCapabilities } from "../situation-room/situation-source-capability-store";
@@ -406,6 +407,25 @@ export async function buildHelixWorkspaceOsStatus(
     source: "workspace_os_status_endpoint",
     missing_reason: "no_existing_dev_server_health_signal",
     next_required_action: "inspect_runtime_or_process_status",
+  }));
+
+  capabilities.push(makeRecord({
+    capability_id: "workstation.task_manager",
+    surface: "runtime_memory",
+    mode: "read_only",
+    status: "available",
+    label: "Workstation Task Manager",
+    source: "workspace_os_task_manager_endpoint",
+    last_verified_at: generatedAt,
+    fallbacks: ["runtime.memory", "workstation-process-graph.open"],
+    evidence_refs: [HELIX_WORKSTATION_TASK_MANAGER_SCHEMA],
+    diagnostics: {
+      endpoint: "/api/workspace-os/task-manager",
+      exposes_raw_process_command_lines: false,
+      exposes_raw_dom_text: false,
+      executes_task_control: false,
+      browser_panel_memory_is_approximate: true,
+    },
   }));
 
   try {

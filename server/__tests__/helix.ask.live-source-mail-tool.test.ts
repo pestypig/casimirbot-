@@ -401,6 +401,47 @@ describe("live-source mail live environment tools", () => {
     });
   });
 
+  it("routes wake-bound contract appender presets only into Ask handoff receipts", () => {
+    const route = executeLiveEnvironmentTool({
+      tool_name: "live_env.route_micro_reasoner_prompt",
+      thread_id: threadId,
+      args: {
+        source_id: sourceId,
+        preset_id: "stage_play_micro_reasoner_prompt_preset:wake-bound-contract-appender:v1",
+        source_summary: "The live source has a completed result that should wake Ask under the operator contract.",
+      },
+    });
+
+    expect(route).toMatchObject({
+      tool_name: "live_env.route_micro_reasoner_prompt",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(route.observation).toMatchObject({
+      schema: "stage_play_micro_reasoner_prompt_delegation_result/v1",
+      presetId: "stage_play_micro_reasoner_prompt_preset:wake-bound-contract-appender:v1",
+      selectedCandidateId: "wake_contract_a",
+      shouldHandoffToHelixAsk: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "micro_reasoner_evidence",
+      ask_context_policy: "evidence_only",
+      helixAskHandoff: {
+        selectedCandidateId: "wake_contract_a",
+        wakePromptContract: {
+          title: "Wake-Bound Operator Contract",
+          attachOnlyWhenWakeBound: true,
+        },
+      },
+    });
+    expect((route.observation as any).helixAskHandoff.appendedPrompt).toContain("Wake-bound contract:");
+    expect((route.observation as any).helixAskHandoff.appendedPrompt).toContain("If the packet is stale, superseded, or no longer wake-bound, ignore this contract.");
+  });
+
   it("rejects MicroDeck prompt delegation presets with more than three prompts", () => {
     const create = executeLiveEnvironmentTool({
       tool_name: "live_env.create_micro_reasoner_preset",

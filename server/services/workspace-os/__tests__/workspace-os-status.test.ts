@@ -211,6 +211,20 @@ describe("Workspace OS status", () => {
         terminal_receipt_required_count: expect.any(Number),
       }),
     });
+    expect(status.capabilities.find((entry) => entry.capability_id === "workstation.task_manager")).toMatchObject({
+      status: "available",
+      surface: "runtime_memory",
+      mode: "read_only",
+      authority: {
+        assistant_answer: false,
+        raw_content_included: false,
+        terminal_eligible: false,
+      },
+      diagnostics: expect.objectContaining({
+        endpoint: "/api/workspace-os/task-manager",
+        executes_task_control: false,
+      }),
+    });
     expect(status.runtime).toMatchObject({
       memory_pressure: "normal",
       active_task_count: 0,

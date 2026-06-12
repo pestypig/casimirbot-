@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   FileImage,
@@ -21,14 +21,11 @@ import {
   cropImageToDataUrl,
   hashDocumentImageString,
 } from "@/lib/document-image/documentImageRegions";
-import { emitHelixAskLiveEvent } from "@/lib/helix/liveEventsBus";
+import { captureFrameDataUrlFromStream } from "@/lib/helix/visualFrameProducer";
+import { submitImageLensCropFrame } from "@/lib/helix/imageLensVisualFrame";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 import { useDocumentImageRegionStore, type DocumentImageRegionState } from "@/store/useDocumentImageRegionStore";
-import {
-  VISUAL_SOURCE_FRAME_HISTORY_TTL_MS,
-  useVisualSourceCaptureStore,
-  type VisualSourceCaptureFrameHistoryItem,
-} from "@/store/useVisualSourceCaptureStore";
+import { useImageLensLiveSourceStore } from "@/store/useImageLensLiveSourceStore";
 
 type DragState = {
   pointerId: number;
@@ -130,7 +127,7 @@ async function resolveLiveAnswerVisualSource(): Promise<{ sourceId: string; envi
 }
 
 function pointToNaturalBbox(
-  image: HTMLImageElement,
+  image: HTMLElement,
   startClientX: number,
   startClientY: number,
   endClientX: number,
@@ -155,8 +152,18 @@ function pointToNaturalBbox(
   );
 }
 
+function dataUrlToImage(dataUrl: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("image_lens_snapshot_load_failed"));
+    image.src = dataUrl;
+  });
+}
+
 export default function ImageLensPanel() {
   const imageRef = useRef<HTMLImageElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [urlDraft, setUrlDraft] = useState("");
   const [sourceKind, setSourceKind] = useState<DocumentImageSourceKindV1>("manual_image_url");
@@ -170,11 +177,25 @@ export default function ImageLensPanel() {
   const naturalSize = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.naturalSize);
   const cropDraft = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.cropDraft);
   const receipts = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.receipts);
+  const liveSource = useImageLensLiveSourceStore((state) => state.liveSource);
+  const patchLiveSource = useImageLensLiveSourceStore((state) => state.patchLiveSource);
   const setSourceImage = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.setSourceImage);
   const setNaturalSize = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.setNaturalSize);
   const setCropDraft = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.setCropDraft);
   const addReceipt = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.addReceipt);
   const clearReceipts = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.clearReceipts);
+  const liveSourceActive = Boolean(liveSource?.streamActive && liveSource.stream);
+  const hasVisualInput = Boolean(source || liveSourceActive);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !liveSourceActive || !liveSource?.stream) return;
+    video.srcObject = liveSource.stream;
+    void video.play().catch(() => null);
+    return () => {
+      if (video.srcObject === liveSource.stream) video.srcObject = null;
+    };
+  }, [liveSource?.stream, liveSourceActive]);
 
   const clampedCrop = useMemo(() => {
     if (!naturalSize) return cropDraft;
@@ -232,7 +253,8 @@ export default function ImageLensPanel() {
   };
 
   const startCropDrag = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!source || !naturalSize || !imageRef.current) return;
+    const target = liveSourceActive ? videoRef.current : imageRef.current;
+    if (!hasVisualInput || !naturalSize || !target) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture?.(event.pointerId);
     setDragState({
@@ -240,14 +262,15 @@ export default function ImageLensPanel() {
       startClientX: event.clientX,
       startClientY: event.clientY,
     });
-    setCropDraft(pointToNaturalBbox(imageRef.current, event.clientX, event.clientY, event.clientX + 1, event.clientY + 1, naturalSize));
+    setCropDraft(pointToNaturalBbox(target, event.clientX, event.clientY, event.clientX + 1, event.clientY + 1, naturalSize));
   };
 
   const updateCropDrag = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragState || dragState.pointerId !== event.pointerId || !naturalSize || !imageRef.current) return;
+    const target = liveSourceActive ? videoRef.current : imageRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId || !naturalSize || !target) return;
     event.preventDefault();
     setCropDraft(pointToNaturalBbox(
-      imageRef.current,
+      target,
       dragState.startClientX,
       dragState.startClientY,
       event.clientX,
@@ -263,15 +286,36 @@ export default function ImageLensPanel() {
   };
 
   const sendFrameToLiveAnswer = async () => {
-    if (!source || !naturalSize) {
-      setStatusMessage("Load an image before sending a visual-source frame.");
+    if (!hasVisualInput || !naturalSize) {
+      setStatusMessage("Load an image or route a live visual source before sending a visual-source frame.");
       return;
     }
     setStatusMessage("Sending crop frame to Live Answer visual source...");
     const img = imageRef.current;
     const bboxPx = clampDocumentImageBbox(cropDraft, naturalSize);
-    let imageRefValue = `${source.sourceImageUrl}#crop=${bboxPx.x},${bboxPx.y},${bboxPx.width},${bboxPx.height}`;
-    if (img) {
+    let sourceImageRef = source?.sourceImageUrl ?? liveSource?.latestFrameDataUrl ?? `live-source://${liveSource?.sourceId ?? "unknown"}`;
+    let sourceAttachmentId = source?.sourceAttachmentId ?? `live-source:${liveSource?.sourceId ?? "unknown"}`;
+    let pageNumber = source?.pageNumber ?? null;
+    let sourceKindForReceipt: DocumentImageSourceKindV1 = source?.sourceKind ?? "manual_image_url";
+    let imageRefValue = `${sourceImageRef}#crop=${bboxPx.x},${bboxPx.y},${bboxPx.width},${bboxPx.height}`;
+    if (liveSourceActive && liveSource?.stream) {
+      try {
+        const snapshot = await captureFrameDataUrlFromStream(liveSource.stream);
+        const snapshotImage = await dataUrlToImage(snapshot);
+        imageRefValue = await cropImageToDataUrl(snapshotImage, bboxPx);
+        sourceImageRef = snapshot;
+        sourceAttachmentId = `live-source:${liveSource.sourceId}`;
+        pageNumber = null;
+        sourceKindForReceipt = "manual_image_url";
+        patchLiveSource({
+          latestFrameDataUrl: snapshot,
+          lastFrameAt: new Date().toISOString(),
+        });
+      } catch {
+        setStatusMessage("Could not sample the live visual source. Try sharing the screen again.");
+        return;
+      }
+    } else if (img && source) {
       try {
         imageRefValue = await cropImageToDataUrl(img, bboxPx);
       } catch {
@@ -287,11 +331,11 @@ export default function ImageLensPanel() {
 
     const summary = `Manual crop frame from Image Lens (${bboxPx.width}x${bboxPx.height}px). Live Answer visual shades own interpretation.`;
     const receipt = buildDocumentImageRegionReceipt({
-      sourceAttachmentId: source.sourceAttachmentId,
-      sourceKind: source.sourceKind,
-      sourceImageRef: source.sourceImageUrl,
-      pageNumber: source.pageNumber,
-      pageImageRef: source.sourceKind === "pdf_page_render" ? source.sourceImageUrl : undefined,
+      sourceAttachmentId,
+      sourceKind: sourceKindForReceipt,
+      sourceImageRef,
+      pageNumber,
+      pageImageRef: sourceKindForReceipt === "pdf_page_render" ? sourceImageRef : undefined,
       bboxPx,
       imageRef: imageRefValue,
       kind,
@@ -302,109 +346,36 @@ export default function ImageLensPanel() {
     });
 
     try {
-      const visualSource = await resolveLiveAnswerVisualSource();
-      const now = new Date().toISOString();
-      useVisualSourceCaptureStore.getState().upsertProducer({
-        source_id: visualSource.sourceId,
-        thread_id: HELIX_ASK_CONTEXT_ID.desktop,
-        environment_id: visualSource.environmentId,
-        pipeline_id: visualSource.pipelineId,
-        stream_active: true,
-        interval_active: false,
-        track_ready_state: "live",
-        capture_mode: "manual",
-        cadence_ms: null,
-        last_heartbeat_at: now,
-        last_error: null,
+      const visualSource = liveSourceActive && liveSource
+        ? {
+            sourceId: liveSource.sourceId,
+            environmentId: liveSource.environmentId ?? null,
+            pipelineId: liveSource.pipelineId ?? null,
+            roomId: liveSource.roomId ?? null,
+          }
+        : {
+            ...(await resolveLiveAnswerVisualSource()),
+            roomId: null,
+          };
+      const result = await submitImageLensCropFrame({
+        postJson,
+        receipt,
+        sourceId: visualSource.sourceId,
+        threadId: liveSource?.threadId ?? HELIX_ASK_CONTEXT_ID.desktop,
+        roomId: visualSource.roomId,
+        environmentId: visualSource.environmentId,
+        pipelineId: visualSource.pipelineId,
+        imageDataUrl: imageRefValue,
+        objective: liveSourceActive
+          ? "Image Lens crop frame sampled from routed screen-share visual source."
+          : "Image Lens manual crop frame for Live Answer visual-source analysis.",
       });
-
-      const analysis = await postJson("/api/agi/situation/visual-frame/analyze", {
-        thread_id: HELIX_ASK_CONTEXT_ID.desktop,
-        room_id: null,
-        source_id: visualSource.sourceId,
-        environment_id: visualSource.environmentId,
-        capture_mode: "manual",
-        image_data_url: imageRefValue,
-        mime_type: imageRefValue.slice(0, 32).includes("image/png") ? "image/png" : "image/jpeg",
-        objective: "Image Lens manual crop frame for Live Answer visual-source analysis.",
-        related_event_refs: [receipt.crop.regionId],
-      });
-
-      const evidence = readRecord(analysis.evidence);
-      const frameId = readString(evidence?.frame_id);
-      const evidenceId = readString(evidence?.evidence_id);
-      const chunk = readRecord(analysis.live_source_chunk);
-      const chunkId = readString(chunk?.chunk_id);
-      const analyzedSummary =
-        readString(evidence?.summary) ??
-        "Image Lens crop frame submitted to Live Answer visual source.";
-      const frameAt = new Date().toISOString();
-      const frameHistoryNowMs = Date.parse(frameAt);
-      const frameHistoryItem: VisualSourceCaptureFrameHistoryItem = {
-        history_id: `${frameId ?? "image-lens"}:${receipt.crop.imageHash}:${frameHistoryNowMs}`,
-        source_id: visualSource.sourceId,
-        frame_id: frameId,
-        evidence_id: evidenceId,
-        captured_at: frameAt,
-        preview_data_url: imageRefValue,
-        preview_hash: receipt.crop.imageHash,
-        summary: analyzedSummary,
-        visual_observer_profile_id: readString(evidence?.visual_observer_profile_id),
-        visual_observer_profile_title: readString(evidence?.visual_observer_profile_title),
-        visual_prompt_hash: readString(evidence?.visual_prompt_hash),
-        expires_at: new Date(frameHistoryNowMs + VISUAL_SOURCE_FRAME_HISTORY_TTL_MS).toISOString(),
-      };
-      const analyzedReceipt = {
-        ...receipt,
-        visualSource: {
-          ...receipt.visualSource,
-          sourceId: visualSource.sourceId,
-          frameId: frameId ?? receipt.visualSource.frameId,
-        },
-        classification: {
-          ...receipt.classification,
-          summary: analyzedSummary,
-        },
-      };
-      addReceipt(analyzedReceipt);
-      useVisualSourceCaptureStore.getState().appendFrameHistory(visualSource.sourceId, frameHistoryItem, {
-        last_chunk_id: chunkId,
-        pending_analysis_job_id: Array.isArray(analysis.live_source_analysis_jobs)
-          ? readString(readRecord(analysis.live_source_analysis_jobs.at(-1))?.job_id)
-          : null,
-      });
+      addReceipt(result.receipt);
       setLastSentFrame({
         sourceId: visualSource.sourceId,
-        frameId,
-        evidenceId,
-        summary: analyzedSummary,
-      });
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("helix:image-lens:visual-frame-sent", {
-          detail: {
-            sourceId: visualSource.sourceId,
-            frameId,
-            evidenceId,
-          },
-        }));
-      }
-      emitHelixAskLiveEvent({
-        contextId: HELIX_ASK_CONTEXT_ID.desktop,
-        entry: {
-          id: `image-lens-region:${receipt.crop.regionId}`,
-          ts: frameAt,
-          text: `Image Lens sent a manual crop frame ${receipt.crop.regionId} to Live Answer visual evidence; observation only, not answer authority.`,
-          tool: "image-lens.visual_frame",
-          meta: {
-            artifact_kind: "helix.visual_frame_evidence",
-            assistant_answer: false,
-            terminal_eligible: false,
-            receipt: analyzedReceipt,
-            source_id: visualSource.sourceId,
-            frame_id: frameId,
-            evidence_id: evidenceId,
-          },
-        },
+        frameId: result.frameId,
+        evidenceId: result.evidenceId,
+        summary: result.summary,
       });
       setStatusMessage("Crop frame sent to Live Answer visual source.");
     } catch (error) {
@@ -477,7 +448,7 @@ export default function ImageLensPanel() {
           <button
             type="button"
             onClick={sendFrameToLiveAnswer}
-            disabled={!source || !naturalSize}
+            disabled={!hasVisualInput || !naturalSize}
             className="inline-flex items-center gap-1 rounded border border-emerald-400/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-100 hover:bg-emerald-500/20 disabled:opacity-50"
           >
             <Scissors className="h-3.5 w-3.5" />
@@ -494,6 +465,11 @@ export default function ImageLensPanel() {
           </button>
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-slate-400">{statusMessage}</p>
+        {liveSourceActive ? (
+          <p className="mt-1 text-[11px] leading-relaxed text-cyan-100">
+            Image Lens is using live visual source {liveSource?.sourceId}. Raw screen frames are not summarized until a crop is sent.
+          </p>
+        ) : null}
         {lastSentFrame ? (
           <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-emerald-400/30 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-100">
             <span className="min-w-0 flex-1 truncate">
@@ -515,7 +491,31 @@ export default function ImageLensPanel() {
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="min-h-0 flex-1 overflow-auto bg-slate-950 p-4">
           <div className="relative flex min-h-[420px] items-center justify-center rounded border border-white/10 bg-[linear-gradient(45deg,rgba(255,255,255,0.04)_25%,transparent_25%,transparent_75%,rgba(255,255,255,0.04)_75%),linear-gradient(45deg,rgba(255,255,255,0.04)_25%,transparent_25%,transparent_75%,rgba(255,255,255,0.04)_75%)] bg-[length:24px_24px] bg-[position:0_0,12px_12px]">
-            {source ? (
+            {liveSourceActive ? (
+              <div
+                className="relative max-h-full max-w-full cursor-crosshair touch-none"
+                onPointerDown={startCropDrag}
+                onPointerMove={updateCropDrag}
+                onPointerUp={endCropDrag}
+                onPointerCancel={endCropDrag}
+              >
+                <video
+                  ref={videoRef}
+                  muted
+                  playsInline
+                  className="max-h-[68vh] max-w-full select-none object-contain"
+                  onLoadedMetadata={(event: React.SyntheticEvent<HTMLVideoElement>) => {
+                    const video = event.currentTarget;
+                    setNaturalSize({ width: video.videoWidth || 1, height: video.videoHeight || 1 });
+                  }}
+                />
+                <div
+                  className="pointer-events-none absolute border-2 border-cyan-300 bg-cyan-300/10 shadow-[0_0_0_9999px_rgba(2,6,23,0.35)]"
+                  style={cropBoxStyle}
+                  data-testid="image-lens-crop-box"
+                />
+              </div>
+            ) : source ? (
               <div
                 className="relative max-h-full max-w-full cursor-crosshair touch-none"
                 onPointerDown={startCropDrag}

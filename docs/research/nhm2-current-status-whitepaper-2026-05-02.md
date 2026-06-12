@@ -995,8 +995,10 @@ npm run nhm2:build-regional-material-source-tensor-model
 npm run nhm2:build-layered-wall-full-tensor-source-audit
 npm run nhm2:build-layered-wall-source-tensor-candidate
 npm run nhm2:publish-source-side-same-basis-authority
+npm run nhm2:build-regional-source-tensor-targets
 npm run nhm2:source-closure-pass-readiness
 npm run nhm2:build-coupled-closure-pass-candidate
+npm run nhm2:build-regional-tensor-pass-path-harness
 npm run nhm2:build-full-solve-claim-admission
 ```
 
@@ -1017,8 +1019,10 @@ emit honest wall T00-only tensor candidate when no full tensor source exists
 publish tile-effective counterpart
 publish source-side same-basis authority receipt
 publish regional source-closure evidence
+build regional source tensor target report
 publish source-closure pass-readiness preflight
 build coupled closure pass-candidate audit
+build regional tensor pass-path harness
 render source-to-geometry divergence report
 validate reference run
 build blocker ledger
@@ -1047,6 +1051,14 @@ The `latest` wrapper forwards the same wall-source flags when they are supplied 
 
 The next pass-path branch is regional rather than wall-only. A regional component model can be supplied through `--regional-source-component-model` or as a prebuilt `--regional-material-source-tensor-model`. The chain then feeds `nhm2_regional_material_source_tensor_model/v1` into tile-local source generation before regional aggregation and source-side authority are recomputed. This is the preferred path when hull, wall, and exterior-shell source tensors are available. A wall-only tensor may make the wall row authoritative, but it must not become global authority by copy; global authority can only come from a legitimate aggregate of non-proxy regional elements or an explicitly receipted global row with its own provenance.
 
+The regional source tensor target report is the scalar tuning map for that branch:
+
+```text
+npm run nhm2:build-regional-source-tensor-targets -- --regional-source-closure-evidence <regional-evidence.json> --out <targets.json>
+```
+
+This artifact, `nhm2_regional_source_tensor_targets/v1`, reads the frozen regional evidence and reports the source-side `T00` multiplier required to bring each region to the metric-required scalar `T00`. For the current May 5 frozen evidence, the scalar read is: global is already numerically tight but still authority/metadata incomplete; hull needs about `43.8394x` source magnitude increase; wall needs about `0.0626933x` of its current magnitude, equivalently a `15.9507x` decrease; exterior-shell needs about `0.330974x` of its current magnitude, equivalently a `3.02139x` decrease. This is a tuning target only. It does not create regional tensor authority, material receipts, conservation, QEI, observer robustness, physical viability, or transport permission.
+
 The representation-space navigation patch adds no run-free validation command. It is a static claim-boundary map. The relevant review action is to verify that code paths using `QST_PROXY`, tile-effective source tensors, and bounded contracts expose the correct boundary id and do not treat the boundary id as a promotion token.
 
 The June closure-stack contracts add placeholder-safe runtime artifacts rather than a new numerical relativity solver. Their builders are allowed to emit `missing`, `blocked`, `not_run`, `proxy`, or `ideal_scalar_only` when the current runtime lacks a component. That behavior is part of the reproducibility boundary: an incomplete artifact is still useful because it preserves the blocker instead of omitting it.
@@ -1070,6 +1082,14 @@ npm run nhm2:build-coupled-closure-pass-candidate -- --regional-source-closure-e
 ```
 
 This audit can emit `passCandidate=true` only when the regional same-basis source authority, source-closure readiness, regional residuals, conservation diagnostics, QEI worldline dossier, observer-robust energy-condition artifact, and Casimir material receipt all pass together. It still keeps `physicalViabilityClaimAllowed=false` and `transportClaimAllowed=false`. Its purpose is to identify whether the current frozen evidence stack is internally synchronized enough to deserve the next numerical review, not to certify NHM2 as a physical transport mechanism.
+
+The regional tensor pass-path harness is the numerical scoreboard above that coupled candidate:
+
+```text
+npm run nhm2:build-regional-tensor-pass-path-harness -- --regional-material-source-tensor-model <regional-model.json> --source-side-authority <source-authority.json> --regional-source-closure-evidence <regional-evidence.json> --source-closure-pass-readiness <readiness.json> --conservation <conservation.json> --qei-worldline-dossier <qei-worldline.json> --observer-robust-energy-conditions <observer.json> --casimir-material-receipt <material-receipt.json> --coupled-closure-pass-candidate <coupled.json> --out <pass-path.json>
+```
+
+This artifact, `nhm2_regional_tensor_pass_path_harness/v1`, is the preferred machine-readable answer to the question "what still has to pass numerically?" It requires real regional same-basis source tensors, wall `T00` residual closure, all regional residuals, conservation, QEI dossier, observer-robust checks, material receipts, and the coupled closure candidate to pass together. It deliberately does not recompute physics, fill missing tensor components with zero, or transform a scalar wall lead into source authority. A wall-only tensor, scalar QEI margin, ideal Casimir row, or Eulerian-only observer check remains a visible non-pass gate.
 
 The full-solve claim-admission gate sits above the coupled closure candidate and blocker ledger:
 
@@ -1096,6 +1116,8 @@ This artifact, `nhm2_full_solve_claim_admission/v1`, formalizes the boundary bet
 | `nhm2_layered_wall_full_tensor_source_audit/v1` | layered source tensor component audit | checks whether selected stack supplies `T00`, `T0i`, diagonal stresses, and off-diagonal stresses | missing components remain missing; material receipt alone does not create tensor authority |
 | `nhm2_tile_effective_full_tensor_source/v1` | source-side tensor candidate contract | separates source-side tensor authority from metric echo | not source closure by itself |
 | `nhm2_coupled_closure_pass_candidate/v1` | synchronized diagnostic pass-candidate ledger | checks source authority, source readiness, residuals, conservation, QEI dossier, observer robustness, and material receipt together | `passCandidate` is still diagnostic; physical and transport claims remain forbidden |
+| `nhm2_regional_source_tensor_targets/v1` | scalar regional source target report | reports required/current source `T00` multipliers for global, hull, wall, and exterior-shell | tuning map only; tensor authority, material receipts, conservation, observer, and QEI gates remain required |
+| `nhm2_regional_tensor_pass_path_harness/v1` | numerical pass-path scoreboard | requires regional source tensors, wall residual closure, regional residuals, conservation, QEI dossier, observer robustness, material receipt, and coupled candidate to pass together | diagnostic only; scalar, wall-only, or proxy evidence cannot pass the harness |
 | `nhm2_full_solve_claim_admission/v1` | full-solve claim-admission gate | classifies blocked, diagnostic closure candidate, or reduced-order numerical candidate using coupled closure, blocker ledger, validation, reproducibility, and certificate evidence | never grants physical or transport claims; external physical validation remains required |
 | `nhm2_source_side_same_basis_tensor_authority/v1` | source-side authority receipt | decides whether tile/material tensor evidence is same-chart, same-basis, regional, non-proxy, and non-metric-echo before wall closure can promote | runtime reference only; no scalar calculator payload |
 | `nhm2_tile_counterpart_conservation/v1` | conservation diagnostic surface | records divT / continuity / momentum residual status | not physical realizability by itself |

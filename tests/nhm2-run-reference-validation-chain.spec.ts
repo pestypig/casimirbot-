@@ -105,6 +105,9 @@ describe("NHM2 reference validation chain planner", () => {
       scripts.indexOf("nhm2:build-coupled-closure-pass-candidate"),
     );
     expect(scripts.indexOf("nhm2:build-coupled-closure-pass-candidate")).toBeLessThan(
+      scripts.indexOf("nhm2:build-regional-tensor-pass-path-harness"),
+    );
+    expect(scripts.indexOf("nhm2:build-regional-tensor-pass-path-harness")).toBeLessThan(
       scripts.indexOf("nhm2:build-reference-run-blocker-ledger"),
     );
     expect(scripts.indexOf("nhm2:build-reference-run-blocker-ledger")).toBeLessThan(
@@ -117,6 +120,43 @@ describe("NHM2 reference validation chain planner", () => {
     expect(coupled.args).toContain("--qei-worldline-dossier");
     expect(coupled.args).toContain("--observer-robust-energy-conditions");
     expect(coupled.args).toContain("--casimir-material-receipt");
+
+    const targets = findCommand(plan, "nhm2:build-regional-source-tensor-targets");
+    expect(scripts.indexOf("nhm2:publish-regional-source-closure-evidence")).toBeLessThan(
+      scripts.indexOf("nhm2:build-regional-source-tensor-targets"),
+    );
+    expect(scripts.indexOf("nhm2:build-regional-source-tensor-targets")).toBeLessThan(
+      scripts.indexOf("nhm2:source-closure-pass-readiness"),
+    );
+    expect(targets.args).toContain("--regional-source-closure-evidence");
+    expect(targets.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-regional-source-closure-evidence.json",
+    );
+    expect(targets.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-regional-source-tensor-targets.json",
+    );
+
+    const passPathHarness = findCommand(
+      plan,
+      "nhm2:build-regional-tensor-pass-path-harness",
+    );
+    expect(passPathHarness.args).toContain("--regional-material-source-tensor-model");
+    expect(passPathHarness.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-regional-material-source-tensor-model.json",
+    );
+    expect(passPathHarness.args).toContain("--source-side-authority");
+    expect(passPathHarness.args).toContain("--regional-source-closure-evidence");
+    expect(passPathHarness.args).toContain("--source-closure-pass-readiness");
+    expect(passPathHarness.args).toContain("--qei-worldline-dossier");
+    expect(passPathHarness.args).toContain("--observer-robust-energy-conditions");
+    expect(passPathHarness.args).toContain("--casimir-material-receipt");
+    expect(passPathHarness.args).toContain("--coupled-closure-pass-candidate");
+    expect(passPathHarness.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-coupled-closure-pass-candidate.json",
+    );
+    expect(passPathHarness.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-regional-tensor-pass-path-harness.json",
+    );
 
     const admission = findCommand(plan, "nhm2:build-full-solve-claim-admission");
     expect(admission.args).toContain("--coupled-closure-pass-candidate");

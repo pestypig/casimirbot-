@@ -98,7 +98,7 @@ const evidenceForRegion = (
   evidence.regions.find((region) => region.regionId === regionId) ?? null;
 
 const nextRequiredEvidence = (
-  region: Nhm2RegionalSourceClosurePassReadinessRegion,
+  region: Nhm2SourceClosurePassReadinessRegion,
 ): string => {
   if (region.sourceAuthorityStatus === "artifact_missing") {
     return "emit nhm2_source_side_same_basis_tensor_authority/v1 for this frozen run";
@@ -331,18 +331,22 @@ export const runNhm2SourceClosurePassReadiness = (args: {
   if (!isNhm2RegionalSourceClosureEvidenceArtifact(regionalEvidence)) {
     throw new Error("regional evidence must be nhm2_regional_source_closure_evidence/v1");
   }
-  const sourceAuthority =
+  const rawSourceAuthority =
     args.sourceAuthorityPath == null
       ? null
       : readJson(args.repoRoot, args.sourceAuthorityPath);
   if (
-    sourceAuthority != null &&
-    !isNhm2SourceSideSameBasisTensorAuthorityArtifact(sourceAuthority)
+    rawSourceAuthority != null &&
+    !isNhm2SourceSideSameBasisTensorAuthorityArtifact(rawSourceAuthority)
   ) {
     throw new Error(
       "source authority must be nhm2_source_side_same_basis_tensor_authority/v1",
     );
   }
+  const sourceAuthority: Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 | null =
+    rawSourceAuthority == null
+      ? null
+      : (rawSourceAuthority as Nhm2SourceSideSameBasisTensorAuthorityArtifactV1);
   const artifact = assessNhm2SourceClosurePassReadiness({
     regionalEvidenceRef: args.regionalEvidencePath,
     regionalEvidence,
