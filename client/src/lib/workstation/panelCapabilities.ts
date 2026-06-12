@@ -1595,6 +1595,25 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
       },
     ],
   }),
+  "image-lens": makeCapabilities({
+    can_read_state: true,
+    can_run_action: true,
+    v1_job_ready: true,
+    actions: [
+      {
+        id: "open",
+        title: "Open Image Lens",
+        description: "Open and focus the image crop panel for sending manual frames to Live Answer visual sources.",
+        risk: "low",
+        aliases: [
+          "open image lens",
+          "show image lens",
+          "open image crop panel",
+          "send image frame",
+        ],
+      },
+    ],
+  }),
   "document-image-lens": makeCapabilities({
     can_read_state: true,
     can_run_action: true,
@@ -1602,15 +1621,10 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
     actions: [
       {
         id: "open",
-        title: "Open Document Image Lens",
-        description: "Open and focus the document image crop and candidate receipt panel.",
+        title: "Open Image Lens",
+        description: "Open the legacy Image Lens panel route.",
         risk: "low",
-        aliases: [
-          "open document image lens",
-          "show image lens",
-          "open pdf image lens",
-          "open image crop panel",
-        ],
+        aliases: ["open document image lens"],
       },
     ],
   }),

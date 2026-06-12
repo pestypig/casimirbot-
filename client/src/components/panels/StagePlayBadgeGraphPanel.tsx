@@ -229,7 +229,7 @@ type StagePlayCheckpointRequest = NonNullable<StagePlayBadgeGraphV1["checkpointR
 type StagePlayLiveSourceMailListResponse = {
   ok: boolean;
   schema: "stage_play_live_source_mail_list_response/v1";
-  view?: "overview" | "full";
+  view?: "operator" | "overview" | "full";
   requestedThreadId?: string;
   mailboxThreadId?: string;
   mailboxThreadResolution?: Record<string, unknown>;
@@ -680,14 +680,14 @@ async function fetchStagePlayLiveSourceMail(input: {
   mailboxThreadId?: string | null;
   roomId?: string | null;
   environmentId?: string | null;
-  view?: "overview" | "full";
+  view?: "operator" | "overview" | "full";
   limit?: number;
 }): Promise<StagePlayLiveSourceMailListResponse> {
   const params = new URLSearchParams();
   params.set("threadId", input.threadId);
   if (input.mailboxThreadId) params.set("mailboxThreadId", input.mailboxThreadId);
   params.set("view", input.view ?? "full");
-  params.set("limit", String(input.limit ?? (input.view === "overview" ? 8 : 50)));
+  params.set("limit", String(input.limit ?? (input.view === "operator" ? 4 : input.view === "overview" ? 8 : 50)));
   const response = await fetch(`/api/helix/stage-play/live-source-mail?${params.toString()}`, {
     headers: { Accept: "application/json" },
   });
@@ -9410,7 +9410,7 @@ export default function StagePlayBadgeGraphPanel() {
       environmentId,
     ],
     queryFn: () => fetchStagePlayBadgeGraph({ threadId, roomId, environmentId }),
-    refetchInterval: 1000,
+    refetchInterval: graphDisplayMode === "observer_mail_loop_v1" ? 5000 : 1000,
   });
   const { data: graph, isLoading, error } = graphQuery;
   const mailboxQuery = useQuery<StagePlayLiveSourceMailListResponse>({
@@ -9418,8 +9418,8 @@ export default function StagePlayBadgeGraphPanel() {
     queryFn: () => fetchStagePlayLiveSourceMail({
       threadId: STAGE_PLAY_PANEL_THREAD_ID,
       mailboxThreadId: STAGE_PLAY_PANEL_THREAD_ID,
-      view: "overview",
-      limit: 8,
+      view: "operator",
+      limit: 4,
     }),
     refetchInterval: graphDisplayMode === "observer_mail_loop_v1" ? 1000 : false,
   });

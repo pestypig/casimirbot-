@@ -4,7 +4,7 @@ const USER_LAUNCH_PANEL_IDS = new Set<string>([
   "workstation-notes",
   "situation-room-pipelines",
   "live-answer-environment",
-  "document-image-lens",
+  "image-lens",
   "workstation-clipboard-history",
   "workstation-workflow-timeline",
   "agi-task-history",

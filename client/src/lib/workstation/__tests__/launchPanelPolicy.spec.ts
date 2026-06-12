@@ -20,7 +20,8 @@ describe("launchPanelPolicy", () => {
   });
 
   it("includes workstation clipboard and workflow timeline panels", () => {
-    expect(isUserLaunchPanel("document-image-lens")).toBe(true);
+    expect(isUserLaunchPanel("image-lens")).toBe(true);
+    expect(isUserLaunchPanel("document-image-lens")).toBe(false);
     expect(isUserLaunchPanel("workstation-clipboard-history")).toBe(true);
     expect(isUserLaunchPanel("workstation-workflow-timeline")).toBe(true);
     expect(isUserLaunchPanel("scientific-calculator")).toBe(true);

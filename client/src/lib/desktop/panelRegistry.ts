@@ -23,6 +23,7 @@ export type PanelId =
   | "situation-room-sources"
   | "situation-room-pipelines"
   | "live-answer-environment"
+  | "image-lens"
   | "document-image-lens"
   | HelixPanelRef["id"];
 
@@ -290,12 +291,20 @@ const BASE_PANELS: PanelDefinition[] = [
     keywords: ["live", "answer", "cortana", "minecraft", "game source", "plugin signal", "present state", "line checks", "interpreted log"],
   },
   {
+    id: "image-lens",
+    title: "Image Lens",
+    loader: load(() => import("@/components/workstation/ImageLensPanel")),
+    defaultSize: { w: 1180, h: 760 },
+    defaultPosition: { x: 260, y: 150 },
+    keywords: ["image", "crop", "visual source", "live answer", "frame", "attachment", "url"],
+  },
+  {
     id: "document-image-lens",
-    title: "Document Image Lens",
+    title: "Image Lens",
     loader: load(() => import("@/components/workstation/DocumentImageLensPanel")),
     defaultSize: { w: 1180, h: 760 },
     defaultPosition: { x: 260, y: 150 },
-    keywords: ["image", "pdf", "crop", "document", "equation", "ocr", "visual source", "attachment"],
+    keywords: ["image", "crop", "visual source", "legacy", "document image lens"],
   },
   {
     id: "workstation-clipboard-history",

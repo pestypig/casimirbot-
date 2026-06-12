@@ -446,10 +446,14 @@ const readOptionalNumber = (value: unknown): number | null =>
       ? Number(value)
       : null;
 
-type StagePlayLiveSourceMailView = "overview" | "full";
+type StagePlayLiveSourceMailView = "operator" | "overview" | "full";
 
 const readLiveSourceMailView = (value: unknown): StagePlayLiveSourceMailView =>
-  readQueryString(value)?.toLowerCase() === "overview" ? "overview" : "full";
+  readQueryString(value)?.toLowerCase() === "operator"
+    ? "operator"
+    : readQueryString(value)?.toLowerCase() === "overview"
+      ? "overview"
+      : "full";
 
 const compactStagePlayRouteText = (value: unknown, max = 360): string => {
   const text = String(value ?? "").replace(/\s+/g, " ").trim();
@@ -561,6 +565,80 @@ const compactStagePlayWakeResultForOverview = <T extends Record<string, any>>(re
     : result.stagePlayWakeTransaction,
   causalTrace: undefined,
 });
+
+const STAGE_PLAY_OPERATOR_WAKE_STATUSES = new Set([
+  "queued",
+  "waiting_for_ui_handoff",
+  "running",
+  "failed_retryable",
+  "deferred_for_pressure",
+]);
+
+const sortStagePlayRecordsByUpdatedAtDesc = <T extends Record<string, any>>(records: T[]): T[] =>
+  records.slice().sort((left, right) =>
+    String(right.updatedAt ?? right.createdAt ?? right.queuedAt ?? "").localeCompare(
+      String(left.updatedAt ?? left.createdAt ?? left.queuedAt ?? ""),
+    )
+  );
+
+const uniqueStagePlayRecordsById = <T extends Record<string, any>>(
+  records: T[],
+  idForRecord: (record: T) => string | null | undefined,
+): T[] => {
+  const seen = new Set<string>();
+  const unique: T[] = [];
+  for (const record of records) {
+    const id = idForRecord(record);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    unique.push(record);
+  }
+  return unique;
+};
+
+const selectStagePlayOperatorWakeRequests = <T extends Record<string, any>>(
+  wakes: T[],
+  mailItems: Array<Record<string, any>>,
+): T[] => {
+  const latestMailIds = new Set(mailItems.slice(-3).map((mail) => String(mail.mailId ?? "")).filter(Boolean));
+  const pending = sortStagePlayRecordsByUpdatedAtDesc(
+    wakes.filter((wake) => STAGE_PLAY_OPERATOR_WAKE_STATUSES.has(String(wake.status ?? ""))),
+  );
+  const completed = sortStagePlayRecordsByUpdatedAtDesc(
+    wakes.filter((wake) => String(wake.status ?? "") === "completed"),
+  );
+  const linkedToLatestMail = sortStagePlayRecordsByUpdatedAtDesc(
+    wakes.filter((wake) =>
+      Array.isArray(wake.mailIds) &&
+      wake.mailIds.some((mailId: unknown) => latestMailIds.has(String(mailId)))
+    ),
+  );
+  return uniqueStagePlayRecordsById(
+    [
+      ...pending.slice(0, 3),
+      ...linkedToLatestMail.slice(0, 2),
+      ...completed.slice(0, 1),
+    ],
+    (wake) => String(wake.wakeRequestId ?? ""),
+  ).slice(0, 5);
+};
+
+const selectStagePlayOperatorWakeResults = <T extends Record<string, any>>(
+  results: T[],
+  selectedWakeIds: Set<string>,
+): T[] => {
+  const linked = results.filter((result) => selectedWakeIds.has(String(result.wakeRequestId ?? "")));
+  const completed = sortStagePlayRecordsByUpdatedAtDesc(
+    results.filter((result) => String(result.status ?? "") === "completed"),
+  );
+  return uniqueStagePlayRecordsById(
+    [
+      ...sortStagePlayRecordsByUpdatedAtDesc(linked).slice(0, 5),
+      ...completed.slice(0, 1),
+    ],
+    (result) => String(result.wakeResultId ?? ""),
+  ).slice(0, 5);
+};
 
 const readInterpretationPayload = (
   value: unknown,
@@ -954,16 +1032,18 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
     const sourceId = readQueryString(req.query.sourceId) ?? readQueryString(req.query.source_id);
     const status = readQueryString(req.query.status) as any;
     const view = readLiveSourceMailView(req.query.view);
-    const overview = view === "overview";
+    const operator = view === "operator";
+    const overview = view === "overview" || operator;
+    const includeConfig = !operator || readQueryString(req.query.includeConfig)?.toLowerCase() === "1";
     const limit = Math.min(
-      Math.max(readOptionalNumber(req.query.limit) ?? (overview ? 8 : 50), 1),
-      overview ? 12 : 100,
+      Math.max(readOptionalNumber(req.query.limit) ?? (operator ? 4 : overview ? 8 : 50), 1),
+      operator ? 6 : overview ? 12 : 100,
     );
     const decisions = listStagePlayMailDecisions({
       threadId,
       roomId,
       environmentId,
-      limit: overview ? 8 : 20,
+      limit: operator ? 3 : overview ? 8 : 20,
     });
     expireStaleStagePlayLiveSourceMailWakeRequests({
       threadId,
@@ -989,57 +1069,63 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
     const mailIds = new Set(mailItems.map((item) => item.mailId));
     const processedMailPackets = listStagePlayProcessedMailPackets({
       sourceId,
-      limit: overview ? 16 : 50,
+      limit: operator ? 8 : overview ? 16 : 50,
     }).filter((packet) =>
       packet.mailIds.some((mailId) => mailIds.has(mailId))
     );
     const microReasonerRuns = listStagePlayMicroReasonerRuns({
       sourceId,
-      limit: overview ? 64 : 100,
+      limit: operator ? 24 : overview ? 64 : 100,
     }).filter((run) =>
       run.mailIds.some((mailId) => mailIds.has(mailId)) ||
       processedMailPackets.some((packet) => packet.microReasonerRunRefs.includes(run.runId))
     );
-    ensureDefaultStagePlayVisualObserverProfiles();
-    const visualObserverProfiles = listStagePlayVisualObserverProfiles({
-      sourceId,
-      includePresets: true,
-      limit: 50,
-    });
+    if (includeConfig) ensureDefaultStagePlayVisualObserverProfiles();
+    const visualObserverProfiles = includeConfig
+      ? listStagePlayVisualObserverProfiles({
+          sourceId,
+          includePresets: true,
+          limit: operator ? 2 : 50,
+        })
+      : [];
     const activeVisualObserverProfile = getActiveStagePlayVisualObserverProfileForSource({
       sourceId: sourceId ?? mailItems.find((item) => item.sourceKind === "visual_frame")?.sourceId ?? null,
     });
     const activeMicroReasonerSourceId = sourceId ?? mailItems.at(-1)?.sourceId ?? null;
-    const microReasonerPromptPresets = listStagePlayMicroReasonerPromptPresets({
-      sourceId: activeMicroReasonerSourceId,
-      includePresets: true,
-      active: true,
-      limit: 100,
-    });
-    const activeMicroReasonerPromptPreset = getActiveStagePlayMicroReasonerPromptPresetForSource({
-      sourceId: activeMicroReasonerSourceId,
-    });
+    const microReasonerPromptPresets = includeConfig
+      ? listStagePlayMicroReasonerPromptPresets({
+          sourceId: activeMicroReasonerSourceId,
+          includePresets: true,
+          active: true,
+          limit: operator ? 2 : 100,
+        })
+      : [];
+    const activeMicroReasonerPromptPreset = includeConfig
+      ? getActiveStagePlayMicroReasonerPromptPresetForSource({
+          sourceId: activeMicroReasonerSourceId,
+        })
+      : null;
     const jobStates = listStagePlayLiveSourceJobStates({
       threadId,
       roomId,
       environmentId,
-      limit: overview ? 4 : 10,
+      limit: operator ? 2 : overview ? 4 : 10,
     });
     const watchJobPolicies = listStagePlayLiveSourceWatchJobPolicies({
       threadId,
       roomId,
       environmentId,
-      limit: overview ? 4 : 10,
+      limit: operator ? 2 : overview ? 4 : 10,
     });
     const interpreterProfiles = listStagePlayLiveSourceInterpreterProfiles({
       threadId,
       roomId,
       environmentId,
       includeArchived: true,
-      limit: overview ? 8 : 20,
+      limit: operator ? 2 : overview ? 8 : 20,
     });
     const interpreterProfileComparisons = listStagePlayLiveSourceInterpreterProfileComparisons({
-      limit: overview ? 16 : 50,
+      limit: operator ? 4 : overview ? 16 : 50,
     }).filter((comparison) =>
       comparison.mailIds.some((mailId) => mailIds.has(mailId))
     );
@@ -1047,18 +1133,25 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       threadId,
       roomId,
       environmentId,
-      limit: overview ? 6 : 20,
+      limit: operator ? 2 : overview ? 6 : 20,
     });
     const wakeRequests = listStagePlayLiveSourceMailWakeRequests({
       threadId,
       roomId,
       environmentId,
-      limit: overview ? 12 : 20,
+      limit: operator ? 20 : overview ? 12 : 20,
     });
     const wakeResults = listStagePlayLiveSourceMailWakeResults({
       threadId,
-      limit: overview ? 12 : 20,
+      limit: operator ? 20 : overview ? 12 : 20,
     });
+    const responseWakeRequests = operator
+      ? selectStagePlayOperatorWakeRequests(wakeRequests, mailItems)
+      : wakeRequests;
+    const responseWakeRequestIds = new Set(responseWakeRequests.map((wake) => String(wake.wakeRequestId ?? "")).filter(Boolean));
+    const responseWakeResults = operator
+      ? selectStagePlayOperatorWakeResults(wakeResults, responseWakeRequestIds)
+      : wakeResults;
     return res.json({
       ok: true,
       schema: "stage_play_live_source_mail_list_response/v1",
@@ -1071,23 +1164,27 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       watchJobPolicies,
       interpreterProfiles,
       interpreterProfileComparisons,
-      microReasonerPrompts: listStagePlayActiveMicroReasonerPromptsForSource({
-        sourceId: activeMicroReasonerSourceId,
-      }),
+      microReasonerPrompts: includeConfig
+        ? listStagePlayActiveMicroReasonerPromptsForSource({
+            sourceId: activeMicroReasonerSourceId,
+          })
+        : [],
       microReasonerPromptPresets,
       activeMicroReasonerPromptPreset,
-      microReasonerPromptToolActivities: listStagePlayMicroReasonerPromptToolActivities({
-        sourceId: activeMicroReasonerSourceId,
-        limit: 12,
-      }),
+      microReasonerPromptToolActivities: includeConfig
+        ? listStagePlayMicroReasonerPromptToolActivities({
+            sourceId: activeMicroReasonerSourceId,
+            limit: operator ? 4 : 12,
+          })
+        : [],
       visualObserverProfiles,
       activeVisualObserverProfile,
       microReasonerRuns: overview ? microReasonerRuns.map(compactStagePlayRunForOverview) : microReasonerRuns,
       processedMailPackets: overview ? processedMailPackets.map(compactStagePlayPacketForOverview) : processedMailPackets,
       decisions: overview ? decisions.map(compactStagePlayDecisionForOverview) : decisions,
       narrativeStates,
-      wakeRequests: overview ? wakeRequests.map(compactStagePlayWakeForOverview) : wakeRequests,
-      wakeResults: overview ? wakeResults.map(compactStagePlayWakeResultForOverview) : wakeResults,
+      wakeRequests: overview ? responseWakeRequests.map(compactStagePlayWakeForOverview) : responseWakeRequests,
+      wakeResults: overview ? responseWakeResults.map(compactStagePlayWakeResultForOverview) : responseWakeResults,
       assistant_answer: false,
       terminal_eligible: false,
       context_role: "tool_evidence",

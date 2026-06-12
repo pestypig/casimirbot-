@@ -8741,6 +8741,7 @@ type StagePlayLiveSourceMailTranscriptResponse = {
 
 type StagePlayLiveSourceMailStateResponse = {
   ok?: boolean;
+  view?: "operator" | "overview" | "full";
   requestedThreadId?: string | null;
   mailboxThreadId?: string | null;
   mailboxThreadResolution?: Record<string, unknown> | null;
@@ -8764,10 +8765,14 @@ const uniqueTextValues = (values: Array<string | null | undefined>): string[] =>
 async function fetchStagePlayLiveSourceMailState(input: {
   threadId: string;
   mailboxThreadId?: string | null;
+  view?: "operator" | "overview" | "full";
+  limit?: number;
 }): Promise<StagePlayLiveSourceMailStateResponse> {
   const params = new URLSearchParams();
   params.set("threadId", input.threadId);
   if (input.mailboxThreadId) params.set("mailboxThreadId", input.mailboxThreadId);
+  params.set("view", input.view ?? "operator");
+  params.set("limit", String(input.limit ?? 4));
   const response = await fetch(`/api/helix/stage-play/live-source-mail?${params.toString()}`, {
     method: "GET",
     headers: { Accept: "application/json" },
@@ -17615,6 +17620,8 @@ export function HelixAskPill({
         const response = await fetchStagePlayLiveSourceMailState({
           threadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID,
           mailboxThreadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID,
+          view: "operator",
+          limit: 4,
         });
         if (cancelled || response.ok === false) return;
         setLiveSourceMailState(response);
