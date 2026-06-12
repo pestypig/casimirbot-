@@ -322,6 +322,44 @@ const terminalMatchesEvidenceProductContract = (payload: RecordLike, terminalArt
   return evidenceTerminals.has(terminalArtifactKind) && allowed.includes(terminalArtifactKind) && !forbidden.includes(terminalArtifactKind);
 };
 
+const compliantContextualToolSuppressionAllowsDirectAnswer = (input: {
+  payload: RecordLike;
+  terminalArtifactKind: string;
+  finalAnswerSource: string;
+  contextualToolMentions: HelixPromptInterpretation["contextual_tool_mentions"];
+  contextualToolAudit: HelixAskTurnSolverTrace["contextual_tool_audit"];
+  negativeConstraints: string[];
+  actualToolCalls: RecordLike[];
+}): boolean => {
+  if (input.terminalArtifactKind !== "direct_answer_text") return false;
+  if (/receipt|typed_failure|request_user_input/i.test(input.finalAnswerSource)) return false;
+  if (!terminalMatchesCanonicalGoalContract(input.payload, input.terminalArtifactKind)) return false;
+  if (input.contextualToolMentions.length === 0 && input.negativeConstraints.length === 0) return false;
+  if (input.contextualToolAudit.blocked_contextual_tool_executed) return false;
+  if (input.actualToolCalls.length > 0) return false;
+  return true;
+};
+
+const terminalAllowedByCanonicalOrCompliantConstraintPolicy = (input: {
+  payload: RecordLike;
+  terminalArtifactKind: string;
+  finalAnswerSource: string;
+  contextualToolMentions: HelixPromptInterpretation["contextual_tool_mentions"];
+  contextualToolAudit: HelixAskTurnSolverTrace["contextual_tool_audit"];
+  negativeConstraints: string[];
+  actualToolCalls: RecordLike[];
+}): boolean =>
+  (
+    terminalMatchesCanonicalGoalContract(input.payload, input.terminalArtifactKind) &&
+    input.contextualToolMentions.length === 0 &&
+    input.negativeConstraints.length === 0
+  ) ||
+  (
+    terminalMatchesEvidenceProductContract(input.payload, input.terminalArtifactKind) &&
+    input.negativeConstraints.length === 0
+  ) ||
+  compliantContextualToolSuppressionAllowsDirectAnswer(input);
+
 const sourceTargeted = new Set([
   "visual_capture",
   "procedure_memory",
@@ -869,16 +907,15 @@ const buildRiskFlags = (input: {
   const actualToolIds = input.actualToolCalls.map((entry) => readString(entry.tool_id)).filter(Boolean);
   const mutatingToolExecuted = input.actualToolCalls.some((entry) => entry.mutating === true);
   const routeCandidates = readStringArray(readRecord(input.payload.ask_turn_preflight_context)?.route_candidate_labels);
-  const canonicalTerminalAllowed =
-    (
-      terminalMatchesCanonicalGoalContract(input.payload, input.terminalArtifactKind) &&
-      input.contextualToolMentions.length === 0 &&
-      input.negativeConstraints.length === 0
-    ) ||
-    (
-      terminalMatchesEvidenceProductContract(input.payload, input.terminalArtifactKind) &&
-      input.negativeConstraints.length === 0
-    );
+  const canonicalTerminalAllowed = terminalAllowedByCanonicalOrCompliantConstraintPolicy({
+    payload: input.payload,
+    terminalArtifactKind: input.terminalArtifactKind,
+    finalAnswerSource: input.finalAnswerSource,
+    contextualToolMentions: input.contextualToolMentions,
+    contextualToolAudit: input.contextualToolAudit,
+    negativeConstraints: input.negativeConstraints,
+    actualToolCalls: input.actualToolCalls,
+  });
   return unique([
     !readRecord(input.payload.source_target_intent) && routeCandidates.length > 0
       ? "classifier_became_decision"
@@ -1022,24 +1059,6 @@ export function buildAskTurnSolverTrace(input: {
     repoConceptRequiresEvidence && repoEvidenceResultSelected && finalTraceTerminalArtifactKind === "repo_code_evidence_answer"
       ? "model_synthesis_from_repo_evidence"
       : finalAnswerSource;
-  const canonicalTerminalAllowed =
-    (
-      terminalMatchesCanonicalGoalContract(input.payload, terminalArtifactKind) &&
-      promptInterpretation.contextual_tool_mentions.length === 0 &&
-      promptInterpretation.negative_constraints.length === 0
-    ) ||
-    (
-      terminalMatchesEvidenceProductContract(input.payload, terminalArtifactKind) &&
-      promptInterpretation.negative_constraints.length === 0
-    );
-  const liveSourceIdentityOk = !liveSourceIdentityAudit || liveSourceIdentityAudit.identity_ok === true;
-  const liveSourceIdentityTerminalAllowed =
-    terminalArtifactKind === "live_environment_binding_diagnosis" ||
-    terminalArtifactKind === "live_source_typed_failure" ||
-    terminalArtifactKind === "source_binding_status" ||
-    terminalArtifactKind === "source_binding_repair_candidate" ||
-    terminalArtifactKind === "typed_failure" ||
-    finalAnswerSource === "typed_failure";
   const actualToolCalls = (Array.isArray(loopTrace?.actual_tool_calls) ? loopTrace.actual_tool_calls : [])
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry));
@@ -1048,6 +1067,23 @@ export function buildAskTurnSolverTrace(input: {
     actualToolCalls,
     unexpectedToolCalls: readStringArray(loopTrace?.unexpected_tool_calls),
   });
+  const canonicalTerminalAllowed = terminalAllowedByCanonicalOrCompliantConstraintPolicy({
+    payload: input.payload,
+    terminalArtifactKind,
+    finalAnswerSource,
+    contextualToolMentions: promptInterpretation.contextual_tool_mentions,
+    contextualToolAudit,
+    negativeConstraints: promptInterpretation.negative_constraints,
+    actualToolCalls,
+  });
+  const liveSourceIdentityOk = !liveSourceIdentityAudit || liveSourceIdentityAudit.identity_ok === true;
+  const liveSourceIdentityTerminalAllowed =
+    terminalArtifactKind === "live_environment_binding_diagnosis" ||
+    terminalArtifactKind === "live_source_typed_failure" ||
+    terminalArtifactKind === "source_binding_status" ||
+    terminalArtifactKind === "source_binding_repair_candidate" ||
+    terminalArtifactKind === "typed_failure" ||
+    finalAnswerSource === "typed_failure";
   const solverRiskFlags = buildRiskFlags({
     payload: input.payload,
     loopTrace,

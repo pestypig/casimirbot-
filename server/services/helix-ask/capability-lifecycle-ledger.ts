@@ -188,6 +188,9 @@ export const buildCapabilityLifecycleLedger = (input: {
         .map((artifact) => readString(artifact.artifact_id))
     : [];
   const dispatched = actionRefs.length > 0;
+  const intentionallySuppressed =
+    plan?.tool_admission_suppressed === true &&
+    plan.requested_action === "suppressed_contextual_tool_reference";
   const admitted =
     satisfiedWorkstationEvaluation ||
     Boolean(plan && (plan.admission_status === "admitted" || plan.admission_status === "needs_evidence"));
@@ -208,7 +211,7 @@ export const buildCapabilityLifecycleLedger = (input: {
 
   const failureCodes: HelixCapabilityLifecycleFailureCode[] = [];
   if (dispatched && !plan && !satisfiedWorkstationEvaluation) failureCodes.push("capability_dispatched_without_admission");
-  if (dispatched && plan && !admitted) failureCodes.push("capability_dispatched_without_admission");
+  if (dispatched && plan && !admitted && !intentionallySuppressed) failureCodes.push("capability_dispatched_without_admission");
   if (plan && admitted && !dispatched && !resultObserved) failureCodes.push("capability_admitted_not_dispatched");
   if (plan?.mutating && plan.operator_command_required && !plan.operator_command_present) failureCodes.push("mutating_capability_without_operator_command");
   if (plan && !resultObserved) failureCodes.push("capability_result_missing");
