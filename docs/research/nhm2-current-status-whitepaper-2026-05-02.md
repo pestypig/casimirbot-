@@ -996,6 +996,7 @@ npm run nhm2:build-layered-wall-full-tensor-source-audit
 npm run nhm2:build-layered-wall-source-tensor-candidate
 npm run nhm2:publish-source-side-same-basis-authority
 npm run nhm2:source-closure-pass-readiness
+npm run nhm2:build-coupled-closure-pass-candidate
 ```
 
 The intended chain is:
@@ -1016,6 +1017,7 @@ publish tile-effective counterpart
 publish source-side same-basis authority receipt
 publish regional source-closure evidence
 publish source-closure pass-readiness preflight
+build coupled closure pass-candidate audit
 render source-to-geometry divergence report
 validate reference run
 build and render blocker ledger
@@ -1058,6 +1060,14 @@ npm run nhm2:source-closure-pass-readiness -- --regional-evidence <regional-evid
 
 This command does not recompute physics and does not produce a full-solve pass. It reads frozen regional source-closure evidence and, when available, the source-side same-basis authority receipt. A `false` pass-readiness result should be treated as a stop-before-recompute signal: retire the named source-authority, counterpart, tensor-authority, basis, conservation, or QEI blocker before spending a full reference-run cycle trying to get a pass.
 
+The coupled closure pass-candidate audit is the synchronized ledger above that preflight:
+
+```text
+npm run nhm2:build-coupled-closure-pass-candidate -- --regional-source-closure-evidence <regional-evidence.json> --source-side-authority <source-authority.json> --source-closure-pass-readiness <readiness.json> --conservation <conservation.json> --qei-worldline-dossier <qei-worldline.json> --observer-robust-energy-conditions <observer.json> --casimir-material-receipt <material-receipt.json> --out <coupled.json>
+```
+
+This audit can emit `passCandidate=true` only when the regional same-basis source authority, source-closure readiness, regional residuals, conservation diagnostics, QEI worldline dossier, observer-robust energy-condition artifact, and Casimir material receipt all pass together. It still keeps `physicalViabilityClaimAllowed=false` and `transportClaimAllowed=false`. Its purpose is to identify whether the current frozen evidence stack is internally synchronized enough to deserve the next numerical review, not to certify NHM2 as a physical transport mechanism.
+
 ## Appendix C. Equation-to-artifact and equation-to-claim map
 
 | Equation / construct | Scientific role | NHM2 use | Claim boundary |
@@ -1074,6 +1084,7 @@ This command does not recompute physics and does not produce a full-solve pass. 
 | `nhm2_wall_material_source_tensor_model/v1` | source-side wall tensor model receipt | supplies independently declared wall `T00`, `T0i`, diagonal stress, and off-diagonal stress components when available | explicit zeros require computed provenance; metric-required tensor echoes are forbidden |
 | `nhm2_layered_wall_full_tensor_source_audit/v1` | layered source tensor component audit | checks whether selected stack supplies `T00`, `T0i`, diagonal stresses, and off-diagonal stresses | missing components remain missing; material receipt alone does not create tensor authority |
 | `nhm2_tile_effective_full_tensor_source/v1` | source-side tensor candidate contract | separates source-side tensor authority from metric echo | not source closure by itself |
+| `nhm2_coupled_closure_pass_candidate/v1` | synchronized diagnostic pass-candidate ledger | checks source authority, source readiness, residuals, conservation, QEI dossier, observer robustness, and material receipt together | `passCandidate` is still diagnostic; physical and transport claims remain forbidden |
 | `nhm2_source_side_same_basis_tensor_authority/v1` | source-side authority receipt | decides whether tile/material tensor evidence is same-chart, same-basis, regional, non-proxy, and non-metric-echo before wall closure can promote | runtime reference only; no scalar calculator payload |
 | `nhm2_tile_counterpart_conservation/v1` | conservation diagnostic surface | records divT / continuity / momentum residual status | not physical realizability by itself |
 | `nhm2_same_chart_full_tensor/v1` | full metric-required tensor component ledger | records complete, missing, or blocked `T00`, `T0i`, and `Tij` surfaces | noncomputable runtime reference; no scalar replay |

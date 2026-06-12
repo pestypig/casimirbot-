@@ -13,6 +13,8 @@ export const STAGE_PLAY_LIVE_SOURCE_PREDICTION_VALIDATION_SCHEMA =
 export const STAGE_PLAY_MICRO_REASONER_PROMPT_SCHEMA = "stage_play_micro_reasoner_prompt/v1" as const;
 export const STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA = "stage_play_micro_reasoner_prompt_preset/v1" as const;
 export const STAGE_PLAY_MICRO_REASONER_RUN_SCHEMA = "stage_play_micro_reasoner_run/v1" as const;
+export const STAGE_PLAY_MICRO_REASONER_PROMPT_DELEGATION_RESULT_SCHEMA =
+  "stage_play_micro_reasoner_prompt_delegation_result/v1" as const;
 export const STAGE_PLAY_PROCESSED_MAIL_PACKET_SCHEMA = "stage_play_processed_mail_packet/v1" as const;
 export const LIVE_SOURCE_CAUSAL_TRACE_SCHEMA = "live_source_causal_trace/v1" as const;
 export const LIVE_SOURCE_TURN_PHASE_RESOLUTION_SCHEMA = "live_source_turn_phase_resolution/v1" as const;
@@ -361,6 +363,7 @@ export type StagePlayMicroReasonerRoleV1 =
   | "prediction_validator"
   | "salience_scorer"
   | "hypothesis_arbiter"
+  | "prompt_router"
   | "packet_composer"
   | "decision_selector"
   | "voice_callout_drafter";
@@ -392,12 +395,26 @@ export type StagePlayMicroReasonerDeckRunPlanV1 =
   | "full_baseline"
   | "baseline_plus_prompted"
   | "minimal_prompted_arbiter"
+  | "prompt_delegation_router"
   | "custom";
 
 export type StagePlayMicroReasonerWakeCoalescingPolicyV1 = {
   coalescePendingSameSource: boolean;
   supersedeOnlyBeforeAskTurn: true;
   preserveSupersededRefs: true;
+};
+
+export type StagePlayMicroReasonerPromptDelegationCandidateV1 = {
+  candidateId: "candidate_a" | "candidate_b" | "candidate_c" | string;
+  title: string;
+  promptText: string;
+};
+
+export type StagePlayMicroReasonerPromptDelegationRouterV1 = {
+  candidates: StagePlayMicroReasonerPromptDelegationCandidateV1[];
+  confidenceThreshold: number;
+  escalationMode: "suggest_only" | "handoff_to_helix_ask" | "handoff_only_if_confident";
+  allowNone: boolean;
 };
 
 export type StagePlayMicroReasonerPromptPresetV1 = {
@@ -419,8 +436,9 @@ export type StagePlayMicroReasonerPromptPresetV1 = {
   promptedRoles: StagePlayMicroReasonerRoleV1[];
   deckRunPlan: StagePlayMicroReasonerDeckRunPlanV1;
   baselineRoles?: StagePlayMicroReasonerRoleV1[];
+  delegationRouter?: StagePlayMicroReasonerPromptDelegationRouterV1 | null;
   wakeCoalescingPolicy?: StagePlayMicroReasonerWakeCoalescingPolicyV1;
-  outputPolicy: "watch_officer" | "tool_call_candidate" | "voice_candidate" | "record_only";
+  outputPolicy: "watch_officer" | "tool_call_candidate" | "voice_candidate" | "ask_prompt_delegation" | "record_only";
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -442,6 +460,43 @@ export type StagePlayMicroReasonerDeckTraceV1 = {
   deckRunPlan: StagePlayMicroReasonerDeckRunPlanV1;
   wakeCoalescingPolicy?: StagePlayMicroReasonerWakeCoalescingPolicyV1;
   presetUpdatedAt?: string | null;
+};
+
+export type StagePlayMicroReasonerPromptDelegationResultV1 = {
+  artifactId: "stage_play_micro_reasoner_prompt_delegation_result";
+  schema: typeof STAGE_PLAY_MICRO_REASONER_PROMPT_DELEGATION_RESULT_SCHEMA;
+  schemaVersion: typeof STAGE_PLAY_MICRO_REASONER_PROMPT_DELEGATION_RESULT_SCHEMA;
+  delegationId: string;
+  sourceId?: string | null;
+  presetId?: string | null;
+  presetTitle?: string | null;
+  sourceSummary: string;
+  candidates: StagePlayMicroReasonerPromptDelegationCandidateV1[];
+  selectedCandidateId: string | null;
+  selectedPromptText: string | null;
+  confidence: number;
+  confidenceLabel: "low" | "medium" | "high";
+  threshold: number;
+  shouldHandoffToHelixAsk: boolean;
+  reason: string;
+  rejectedCandidates: Array<{
+    candidateId: string;
+    reason: string;
+    score: number;
+  }>;
+  helixAskHandoff: {
+    prompt: string;
+    sourceSummary: string;
+    evidenceRefs: string[];
+    selectedCandidateId: string;
+  } | null;
+  evidenceRefs: string[];
+  createdAt: string;
+  assistant_answer: false;
+  terminal_eligible: false;
+  raw_content_included: false;
+  context_role: "micro_reasoner_evidence";
+  ask_context_policy: "evidence_only";
 };
 
 export type StagePlayMicroReasonerRunV1 = {

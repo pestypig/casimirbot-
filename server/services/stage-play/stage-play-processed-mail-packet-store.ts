@@ -2,6 +2,7 @@ import type {
   StagePlayMicroReasonerPromptPresetV1,
   StagePlayMicroReasonerRoleV1,
   StagePlayMicroReasonerPromptV1,
+  StagePlayMicroReasonerPromptDelegationCandidateV1,
   StagePlayMicroReasonerRunV1,
   StagePlayProcessedMailPacketV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
@@ -23,7 +24,7 @@ export type StagePlayMicroReasonerPromptToolActivityV1 = {
   schemaVersion: "stage_play_micro_reasoner_prompt_tool_activity/v1";
   activityId: string;
   toolName: string;
-  action: "query" | "apply" | "create" | "update" | "test";
+  action: "query" | "apply" | "create" | "update" | "test" | "route";
   status: "running" | "completed" | "failed";
   summary: string;
   sourceIds: string[];
@@ -47,7 +48,6 @@ const presetPromptIdForRole = (
 
 const MINECRAFT_MINIMAL_OPERATOR_ARBITER_PROMPT_ID =
   "stage_play_micro_reasoner_prompt:minecraft_minimal_operator_arbiter:v1";
-
 const customSlug = (value: string): string =>
   value
     .toLowerCase()
@@ -516,6 +516,50 @@ const DEFAULT_MICRO_REASONER_PROMPTS: Array<Omit<StagePlayMicroReasonerPromptV1,
   {
     artifactId: "stage_play_micro_reasoner_prompt",
     schemaVersion: "stage_play_micro_reasoner_prompt/v1",
+    promptId: defaultPromptIdForRole("prompt_router"),
+    title: "Prompt Router",
+    role: "prompt_router",
+    version: 1,
+    active: true,
+    template: [
+      "You are a bounded MicroDeck prompt router.",
+      "",
+      "Input:",
+      "- a compact live-source visual/source summary",
+      "- up to three candidate prompts supplied by the operator",
+      "",
+      "Task:",
+      "Select the one candidate prompt that best fits the incoming live-source observation.",
+      "If none is clearly relevant, select none.",
+      "",
+      "Rules:",
+      "- Do not answer the selected prompt.",
+      "- Do not execute tools.",
+      "- Do not create final authority.",
+      "- Use only the source summary and candidate prompt text.",
+      "- Return JSON only.",
+      "",
+      "Return JSON:",
+      "{",
+      '  "selectedCandidateId": "candidate_a" | "candidate_b" | "candidate_c" | "none",',
+      '  "confidence": number,',
+      '  "reason": string,',
+      '  "rejectedCandidates": [{ "candidateId": string, "reason": string, "score": number }]',
+      "}",
+    ].join("\n"),
+    inputSchemaName: "StagePlayMicroReasonerPromptDelegationInputV1",
+    outputSchemaName: "StagePlayMicroReasonerPromptDelegationResultV1",
+    modelPreference: "small_fast_llm",
+    maxInputItems: 1,
+    maxOutputTokens: 320,
+    linkedNoteId: null,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  },
+  {
+    artifactId: "stage_play_micro_reasoner_prompt",
+    schemaVersion: "stage_play_micro_reasoner_prompt/v1",
     promptId: defaultPromptIdForRole("decision_selector"),
     title: "Decision Selector",
     role: "decision_selector",
@@ -865,6 +909,33 @@ const DEFAULT_MICRO_REASONER_PROMPT_PRESETS: Array<Omit<StagePlayMicroReasonerPr
   {
     artifactId: "stage_play_micro_reasoner_prompt_preset",
     schemaVersion: STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA,
+    presetId: "stage_play_micro_reasoner_prompt_preset:prompt-delegation-router:v1",
+    title: "Prompt Delegation Router",
+    description: "Procedural MicroDeck preset that chooses one of up to three operator prompts from the live-source summary.",
+    domain: "custom",
+    sourceKinds: ["visual_frame", "screen_summary", "manual_feed", "custom"],
+    sourceIds: [],
+    rolePromptIds: {
+      prompt_router: defaultPromptIdForRole("prompt_router"),
+    },
+    promptedRoles: ["prompt_router"],
+    deckRunPlan: "prompt_delegation_router",
+    delegationRouter: {
+      candidates: [],
+      confidenceThreshold: 0.45,
+      escalationMode: "handoff_only_if_confident",
+      allowNone: true,
+    },
+    wakeCoalescingPolicy: DEFAULT_WAKE_COALESCING_POLICY,
+    outputPolicy: "ask_prompt_delegation",
+    active: true,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  },
+  {
+    artifactId: "stage_play_micro_reasoner_prompt_preset",
+    schemaVersion: STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA,
     presetId: "stage_play_micro_reasoner_prompt_preset:science-visual:v1",
     title: "Science Visual Watch",
     description: "Scientific image/video monitoring that emphasizes instrument limits and uncertainty.",
@@ -1060,6 +1131,76 @@ export function recordStagePlayCustomMicroReasonerPromptPreset(input: {
   return { preset, prompt };
 }
 
+const normalizeDelegationCandidates = (
+  candidates: StagePlayMicroReasonerPromptDelegationCandidateV1[],
+): StagePlayMicroReasonerPromptDelegationCandidateV1[] =>
+  candidates
+    .slice(0, 3)
+    .map((candidate, index) => {
+      const fallbackId = ["candidate_a", "candidate_b", "candidate_c"][index] ?? `candidate_${index + 1}`;
+      return {
+        candidateId: (candidate.candidateId || fallbackId).trim() || fallbackId,
+        title: (candidate.title || `Candidate ${index + 1}`).trim() || `Candidate ${index + 1}`,
+        promptText: candidate.promptText.trim(),
+      };
+    })
+    .filter((candidate) => candidate.promptText.length > 0);
+
+export function recordStagePlayPromptDelegationRouterPreset(input: {
+  title?: string | null;
+  description?: string | null;
+  candidates: StagePlayMicroReasonerPromptDelegationCandidateV1[];
+  sourceIds?: string[];
+  confidenceThreshold?: number | null;
+  escalationMode?: "suggest_only" | "handoff_to_helix_ask" | "handoff_only_if_confident" | null;
+  allowNone?: boolean | null;
+  now?: string;
+}): StagePlayMicroReasonerPromptPresetV1 | null {
+  ensureDefaultStagePlayMicroReasonerPromptPresets();
+  const candidates = normalizeDelegationCandidates(input.candidates);
+  if (candidates.length === 0 || input.candidates.length > 3) return null;
+  const now = input.now ?? new Date().toISOString();
+  const title = input.title?.trim() || "Custom Prompt Delegation Router";
+  const presetSlug = customSlug(`${title}-prompt-router-${Date.now().toString(36)}`);
+  const presetId = `stage_play_micro_reasoner_prompt_preset:custom:${presetSlug}:v1`;
+  const threshold = typeof input.confidenceThreshold === "number" && Number.isFinite(input.confidenceThreshold)
+    ? Math.max(0, Math.min(1, Number(input.confidenceThreshold)))
+    : 0.45;
+  const preset: StagePlayMicroReasonerPromptPresetV1 = {
+    artifactId: "stage_play_micro_reasoner_prompt_preset",
+    schemaVersion: STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA,
+    presetId,
+    title: title.endsWith("Deck") ? title : `${title} Deck`,
+    description: input.description?.trim() ||
+      "Custom MicroDeck prompt router; selects one supplied prompt from the live-source summary.",
+    domain: "custom",
+    sourceKinds: ["visual_frame", "screen_summary", "manual_feed", "custom"],
+    sourceIds: uniqueStrings(input.sourceIds ?? []),
+    rolePromptIds: {
+      prompt_router: defaultPromptIdForRole("prompt_router"),
+    },
+    promptedRoles: ["prompt_router"],
+    deckRunPlan: "prompt_delegation_router",
+    baselineRoles: [],
+    delegationRouter: {
+      candidates,
+      confidenceThreshold: threshold,
+      escalationMode: input.escalationMode ?? "handoff_only_if_confident",
+      allowNone: input.allowNone ?? true,
+    },
+    wakeCoalescingPolicy: DEFAULT_WAKE_COALESCING_POLICY,
+    outputPolicy: "ask_prompt_delegation",
+    active: true,
+    createdAt: now,
+    updatedAt: now,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  };
+  promptPresetsById.set(preset.presetId, preset);
+  return preset;
+}
+
 export function getStagePlayMicroReasonerPromptPreset(
   presetId: string,
 ): StagePlayMicroReasonerPromptPresetV1 | null {
@@ -1170,6 +1311,7 @@ export function listStagePlayActiveMicroReasonerPromptsForSource(input: {
     "prediction_validator",
     "salience_scorer",
     "hypothesis_arbiter",
+    "prompt_router",
     "decision_selector",
     "voice_callout_drafter",
     "packet_composer",

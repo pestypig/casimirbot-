@@ -19,6 +19,8 @@ import type {
   StagePlayLiveSourceImmersionStateV1,
   StagePlayLiveSourceMailInterpretationPayloadV1,
   StagePlayLiveSourceMailItemV1,
+  StagePlayMicroReasonerPromptDelegationCandidateV1,
+  StagePlayMicroReasonerPromptDelegationResultV1,
   StagePlayMicroReasonerRoleV1,
   StagePlayMicroReasonerRunV1,
   StagePlayProcessedMailPacketV1,
@@ -139,6 +141,7 @@ import {
   listStagePlayMicroReasonerPromptToolActivities,
   listStagePlayMicroReasonerRuns,
   listStagePlayProcessedMailPackets,
+  recordStagePlayPromptDelegationRouterPreset,
   recordStagePlayCustomMicroReasonerPromptPreset,
   recordStagePlayMicroReasonerPrompt,
   recordStagePlayMicroReasonerPromptToolActivity,
@@ -213,6 +216,7 @@ const STAGE_PLAY_MICRO_REASONER_ROLES: StagePlayMicroReasonerRoleV1[] = [
   "prediction_validator",
   "salience_scorer",
   "hypothesis_arbiter",
+  "prompt_router",
   "packet_composer",
   "decision_selector",
   "voice_callout_drafter",
@@ -865,6 +869,208 @@ const buildSteeringAckTranscriptRows = (input: {
 const readNumber = (value: unknown, fallback: number): number =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
 
+const readDelegationCandidatePrompts = (value: unknown): StagePlayMicroReasonerPromptDelegationCandidateV1[] => {
+  const entries = Array.isArray(value) ? value : [];
+  return entries
+    .map((entry, index) => {
+      const fallbackId = ["candidate_a", "candidate_b", "candidate_c"][index] ?? `candidate_${index + 1}`;
+      if (typeof entry === "string") {
+        return {
+          candidateId: fallbackId,
+          title: `Candidate ${index + 1}`,
+          promptText: entry.trim(),
+        };
+      }
+      const record = readRecord(entry);
+      if (!record) return null;
+      const promptText =
+        readString(record.promptText) ??
+        readString(record.prompt_text) ??
+        readString(record.prompt) ??
+        readString(record.template);
+      if (!promptText) return null;
+      return {
+        candidateId: readString(record.candidateId) ?? readString(record.candidate_id) ?? readString(record.id) ?? fallbackId,
+        title: readString(record.title) ?? readString(record.label) ?? `Candidate ${index + 1}`,
+        promptText,
+      };
+    })
+    .filter((entry): entry is StagePlayMicroReasonerPromptDelegationCandidateV1 => Boolean(entry));
+};
+
+const delegationCandidatesFromArgs = (args: Record<string, unknown>): StagePlayMicroReasonerPromptDelegationCandidateV1[] =>
+  readDelegationCandidatePrompts(args.candidates)
+    .concat(readDelegationCandidatePrompts(args.candidate_prompts))
+    .concat(readDelegationCandidatePrompts(args.candidatePrompts))
+    .slice(0, 3);
+
+const rawDelegationCandidateCount = (args: Record<string, unknown>): number => {
+  const raw =
+    Array.isArray(args.candidates) ? args.candidates :
+      Array.isArray(args.candidate_prompts) ? args.candidate_prompts :
+        Array.isArray(args.candidatePrompts) ? args.candidatePrompts :
+          [];
+  return raw.length;
+};
+
+const latestLiveSourceSummaryForDelegation = (args: Record<string, unknown>, sourceId: string | null): {
+  summary: string;
+  evidenceRefs: string[];
+} => {
+  const explicitSummary =
+    readString(args.source_summary) ??
+    readString(args.sourceSummary) ??
+    readString(args.visual_summary) ??
+    readString(args.visualSummary) ??
+    readString(args.summary);
+  const explicitRefs = uniqueStrings([
+    ...readStringArray(args.evidence_refs),
+    ...readStringArray(args.evidenceRefs),
+  ]);
+  if (explicitSummary) {
+    return {
+      summary: explicitSummary,
+      evidenceRefs: explicitRefs,
+    };
+  }
+  const latestMail = listStagePlayLiveSourceMailItems({ sourceId, limit: 1 }).at(-1);
+  const summary = latestMail?.summary.text || latestMail?.summary.preview || "";
+  return {
+    summary,
+    evidenceRefs: uniqueStrings([
+      ...explicitRefs,
+      latestMail?.mailId,
+      ...(latestMail?.evidenceRefs ?? []),
+    ]),
+  };
+};
+
+const delegationTokens = (value: string): Set<string> =>
+  new Set(
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9_\s-]+/g, " ")
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter((token) => token.length > 2)
+      .filter((token) => ![
+        "the",
+        "and",
+        "for",
+        "with",
+        "from",
+        "that",
+        "this",
+        "what",
+        "when",
+        "where",
+        "which",
+        "should",
+        "would",
+        "could",
+        "prompt",
+        "source",
+        "summary",
+      ].includes(token)),
+  );
+
+const routeMicroReasonerPromptCandidates = (input: {
+  candidates: StagePlayMicroReasonerPromptDelegationCandidateV1[];
+  sourceSummary: string;
+  threshold: number;
+  allowNone: boolean;
+  escalationMode: "suggest_only" | "handoff_to_helix_ask" | "handoff_only_if_confident";
+  presetId?: string | null;
+  presetTitle?: string | null;
+  sourceId?: string | null;
+  evidenceRefs: string[];
+}): StagePlayMicroReasonerPromptDelegationResultV1 => {
+  const summaryTokens = delegationTokens(input.sourceSummary);
+  const scored = input.candidates.map((candidate) => {
+    const candidateTokens = delegationTokens(`${candidate.title}\n${candidate.promptText}`);
+    const overlap = Array.from(candidateTokens).filter((token) => summaryTokens.has(token));
+    const denominator = Math.max(1, Math.min(candidateTokens.size, Math.max(3, summaryTokens.size)));
+    const score = Math.max(0, Math.min(1, overlap.length / denominator));
+    return {
+      candidate,
+      score,
+      overlap,
+    };
+  }).sort((left, right) => right.score - left.score);
+  const best = scored[0] ?? null;
+  const selected =
+    best && (!input.allowNone || best.score >= input.threshold)
+      ? best
+      : null;
+  const confidence = selected ? selected.score : best?.score ?? 0;
+  const confidenceLabel: StagePlayMicroReasonerPromptDelegationResultV1["confidenceLabel"] =
+    confidence >= 0.7 ? "high" : confidence >= input.threshold ? "medium" : "low";
+  const shouldHandoffToHelixAsk = Boolean(
+    selected &&
+      (
+        input.escalationMode === "handoff_to_helix_ask" ||
+        (input.escalationMode === "handoff_only_if_confident" && confidence >= input.threshold)
+      ),
+  );
+  const selectedCandidateId = selected?.candidate.candidateId ?? null;
+  const selectedPromptText = selected?.candidate.promptText ?? null;
+  const createdAt = new Date().toISOString();
+  const delegationId = `stage_play_micro_reasoner_prompt_delegation:${hashShort([
+    input.sourceId,
+    input.presetId,
+    input.sourceSummary,
+    input.candidates.map((candidate) => candidate.promptText),
+    createdAt,
+  ])}`;
+  const reason = selected
+    ? `Selected ${selected.candidate.title} because ${selected.overlap.length > 0 ? `it overlaps source cues: ${selected.overlap.slice(0, 6).join(", ")}` : "it is the strongest available candidate"}.`
+    : best
+      ? `No prompt met the delegation threshold; strongest candidate was ${best.candidate.title} at ${best.score.toFixed(2)}.`
+      : "No candidate prompts were available for routing.";
+  return {
+    artifactId: "stage_play_micro_reasoner_prompt_delegation_result",
+    schema: "stage_play_micro_reasoner_prompt_delegation_result/v1",
+    schemaVersion: "stage_play_micro_reasoner_prompt_delegation_result/v1",
+    delegationId,
+    sourceId: input.sourceId ?? null,
+    presetId: input.presetId ?? null,
+    presetTitle: input.presetTitle ?? null,
+    sourceSummary: input.sourceSummary,
+    candidates: input.candidates,
+    selectedCandidateId,
+    selectedPromptText,
+    confidence,
+    confidenceLabel,
+    threshold: input.threshold,
+    shouldHandoffToHelixAsk,
+    reason,
+    rejectedCandidates: scored
+      .filter((entry) => entry.candidate.candidateId !== selectedCandidateId)
+      .map((entry) => ({
+        candidateId: entry.candidate.candidateId,
+        reason: entry.overlap.length > 0
+          ? `Matched ${entry.overlap.slice(0, 4).join(", ")} but scored below the selected prompt.`
+          : "No strong source-summary overlap.",
+        score: entry.score,
+      })),
+    helixAskHandoff: selected && shouldHandoffToHelixAsk
+      ? {
+          prompt: selected.candidate.promptText,
+          sourceSummary: input.sourceSummary,
+          evidenceRefs: input.evidenceRefs,
+          selectedCandidateId: selected.candidate.candidateId,
+        }
+      : null,
+    evidenceRefs: input.evidenceRefs,
+    createdAt,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+    context_role: "micro_reasoner_evidence",
+    ask_context_policy: "evidence_only",
+  };
+};
+
 const clipText = (value: string | null | undefined, limit = 260): string => {
   const normalized = String(value ?? "").replace(/\s+/g, " ").trim();
   return normalized.length > limit ? `${normalized.slice(0, Math.max(0, limit - 3)).trimEnd()}...` : normalized;
@@ -886,6 +1092,8 @@ const microReasonerTranscriptTitle = (role: StagePlayMicroReasonerRunV1["role"])
       return "Salience scored";
     case "decision_selector":
       return "Decision selected";
+    case "prompt_router":
+      return "Prompt routed";
     case "voice_callout_drafter":
       return "Voice callout drafted";
     case "packet_composer":
@@ -2355,6 +2563,101 @@ export function executeLiveEnvironmentTool(
     });
   }
 
+  if (input.tool_name === "live_env.route_micro_reasoner_prompt") {
+    ensureDefaultStagePlayMicroReasonerPromptPresets();
+    const sourceIds = uniqueStrings([
+      ...readStringArray(args.source_ids ?? args.sourceIds),
+      readString(args.source_id) ?? readString(args.sourceId) ?? explicitSourceId,
+    ]);
+    const sourceId = sourceIds[0] ?? explicitSourceId ?? null;
+    const presetId = readString(args.preset_id) ?? readString(args.presetId);
+    const activePreset = getActiveStagePlayMicroReasonerPromptPresetForSource({ sourceId, presetId });
+    const router = activePreset?.delegationRouter ?? null;
+    const candidateCount = rawDelegationCandidateCount(args);
+    if (candidateCount > 3) {
+      return makeObservation({
+        threadId: input.thread_id,
+        environmentId: environment?.environment_id ?? input.environment_id,
+        toolName: input.tool_name,
+        ok: false,
+        summary: "MicroDeck prompt routing accepts at most three candidate prompts.",
+        observation: {
+          schema: "stage_play_micro_reasoner_prompt_delegation_result/v1",
+          routed: false,
+          reason: "too_many_candidate_prompts",
+          candidateCount,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          context_role: "micro_reasoner_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        evidenceRefs: uniqueStrings([activePreset?.presetId, ...sourceIds]),
+      });
+    }
+    const candidates = delegationCandidatesFromArgs(args);
+    const effectiveCandidates = candidates.length > 0
+      ? candidates
+      : (router?.candidates ?? []);
+    const sourceSummary = latestLiveSourceSummaryForDelegation(args, sourceId);
+    const threshold = Math.max(0, Math.min(1, readNumber(
+      args.confidence_threshold ?? args.confidenceThreshold,
+      router?.confidenceThreshold ?? 0.45,
+    )));
+    const escalationMode =
+      readString(args.escalation_mode) === "suggest_only" ||
+      readString(args.escalationMode) === "suggest_only"
+        ? "suggest_only"
+        : readString(args.escalation_mode) === "handoff_to_helix_ask" ||
+          readString(args.escalationMode) === "handoff_to_helix_ask"
+          ? "handoff_to_helix_ask"
+          : router?.escalationMode ?? "handoff_only_if_confident";
+    const result = routeMicroReasonerPromptCandidates({
+      candidates: effectiveCandidates,
+      sourceSummary: sourceSummary.summary,
+      threshold,
+      allowNone: typeof args.allow_none === "boolean"
+        ? args.allow_none
+        : typeof args.allowNone === "boolean"
+          ? args.allowNone
+          : router?.allowNone ?? true,
+      escalationMode,
+      presetId: activePreset?.presetId ?? presetId ?? null,
+      presetTitle: activePreset?.title ?? null,
+      sourceId,
+      evidenceRefs: uniqueStrings([
+        activePreset?.presetId,
+        ...sourceSummary.evidenceRefs,
+        ...sourceIds,
+      ]),
+    });
+    recordStagePlayMicroReasonerPromptToolActivity({
+      activityId: `stage_play_micro_reasoner_prompt_tool_activity:${hashShort([result.delegationId, input.thread_id])}`,
+      toolName: input.tool_name,
+      action: "route",
+      status: "completed",
+      summary: result.reason,
+      sourceIds,
+      presetId: activePreset?.presetId ?? presetId ?? null,
+      promptId: activePreset?.rolePromptIds.prompt_router ?? null,
+      createdAt: result.createdAt,
+      updatedAt: result.createdAt,
+      evidenceRefs: uniqueStrings([result.delegationId, ...result.evidenceRefs]),
+    });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: environment?.environment_id ?? input.environment_id,
+      toolName: input.tool_name,
+      ok: true,
+      summary: result.selectedCandidateId
+        ? `MicroDeck routed live-source summary to ${result.selectedCandidateId}.`
+        : "MicroDeck did not find a candidate prompt above threshold.",
+      observation: result,
+      evidenceRefs: uniqueStrings([result.delegationId, ...result.evidenceRefs]),
+      producedRefs: [result.delegationId],
+    });
+  }
+
   if (
     input.tool_name === "live_env.query_micro_reasoner_presets" ||
     input.tool_name === "live_env.apply_micro_reasoner_preset" ||
@@ -2485,6 +2788,125 @@ export function executeLiveEnvironmentTool(
     }
 
     if (input.tool_name === "live_env.create_micro_reasoner_preset") {
+      const candidateCount = rawDelegationCandidateCount(args);
+      if (candidateCount > 0) {
+        if (candidateCount > 3) {
+          recordStagePlayMicroReasonerPromptToolActivity({
+            activityId,
+            toolName: input.tool_name,
+            action: "create",
+            status: "failed",
+            summary: "Custom MicroDeck prompt-router presets accept at most three candidate prompts.",
+            sourceIds,
+            presetId: basePresetId ?? presetId,
+            promptId: null,
+            createdAt: now,
+            updatedAt: new Date().toISOString(),
+            evidenceRefs: uniqueStrings([basePresetId, presetId, ...sourceIds]),
+          });
+          return makeObservation({
+            threadId: input.thread_id,
+            environmentId: environment?.environment_id ?? input.environment_id,
+            toolName: input.tool_name,
+            ok: false,
+            summary: "Custom MicroDeck prompt-router presets accept at most three candidate prompts.",
+            observation: {
+              schema: "stage_play_micro_reasoner_prompt_preset_create_response/v1",
+              created: false,
+              reason: "too_many_candidate_prompts",
+              candidateCount,
+              maxCandidatePrompts: 3,
+              sourceIds,
+              source_ids: sourceIds,
+              assistant_answer: false,
+              terminal_eligible: false,
+              raw_content_included: false,
+              context_role: "tool_evidence",
+              ask_context_policy: "evidence_only",
+            },
+            evidenceRefs: uniqueStrings([basePresetId, presetId, ...sourceIds, activityId]),
+          });
+        }
+        const routerPreset = recordStagePlayPromptDelegationRouterPreset({
+          title: readString(args.title),
+          description: readString(args.description),
+          candidates: delegationCandidatesFromArgs(args),
+          sourceIds,
+          confidenceThreshold: readNumber(args.confidence_threshold ?? args.confidenceThreshold, Number.NaN),
+          escalationMode:
+            readString(args.escalation_mode) === "suggest_only" ||
+            readString(args.escalationMode) === "suggest_only"
+              ? "suggest_only"
+              : readString(args.escalation_mode) === "handoff_to_helix_ask" ||
+                readString(args.escalationMode) === "handoff_to_helix_ask"
+                ? "handoff_to_helix_ask"
+                : "handoff_only_if_confident",
+          allowNone: typeof args.allow_none === "boolean"
+            ? args.allow_none
+            : typeof args.allowNone === "boolean"
+              ? args.allowNone
+              : true,
+          now,
+        });
+        const prompts = routerPreset
+          ? listStagePlayActiveMicroReasonerPromptsForSource({
+              sourceId,
+              presetId: routerPreset.presetId,
+            })
+          : [];
+        const summary = routerPreset
+          ? `Created custom MicroDeck prompt-router preset ${routerPreset.title}.`
+          : "Custom MicroDeck prompt-router preset could not be created from the supplied candidates.";
+        recordStagePlayMicroReasonerPromptToolActivity({
+          activityId,
+          toolName: input.tool_name,
+          action: "create",
+          status: routerPreset ? "completed" : "failed",
+          summary,
+          sourceIds,
+          presetId: routerPreset?.presetId ?? basePresetId ?? presetId,
+          promptId: routerPreset?.rolePromptIds.prompt_router ?? null,
+          createdAt: now,
+          updatedAt: new Date().toISOString(),
+          evidenceRefs: uniqueStrings([
+            routerPreset?.presetId,
+            routerPreset?.rolePromptIds.prompt_router,
+            ...sourceIds,
+            ...prompts.map((prompt) => prompt.promptId),
+          ]),
+        });
+        return makeObservation({
+          threadId: input.thread_id,
+          environmentId: environment?.environment_id ?? input.environment_id,
+          toolName: input.tool_name,
+          ok: Boolean(routerPreset),
+          summary,
+          observation: {
+            schema: "stage_play_micro_reasoner_prompt_preset_create_response/v1",
+            created: Boolean(routerPreset),
+            reason: routerPreset ? "created_prompt_delegation_router" : "custom_micro_reasoner_preset_not_created",
+            preset: routerPreset,
+            prompts,
+            microReasonerPrompts: prompts,
+            sourceIds,
+            source_ids: sourceIds,
+            toolActivities: listStagePlayMicroReasonerPromptToolActivities({ sourceId, limit: 10 }),
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+            context_role: "tool_evidence",
+            ask_context_policy: "evidence_only",
+          },
+          evidenceRefs: uniqueStrings([
+            routerPreset?.presetId,
+            routerPreset?.rolePromptIds.prompt_router,
+            ...sourceIds,
+            ...prompts.map((prompt) => prompt.promptId),
+            activityId,
+          ]),
+          producedRefs: routerPreset ? uniqueStrings([routerPreset.presetId]) : [],
+        });
+      }
       const role = readMicroReasonerRole(args.role);
       const template = readString(args.template) ?? readString(args.prompt);
       if (!role || !template) {

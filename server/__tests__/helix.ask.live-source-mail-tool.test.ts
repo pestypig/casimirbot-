@@ -178,6 +178,13 @@ describe("live-source mail live environment tools", () => {
         can_run_automatically: true,
       }),
       expect.objectContaining({
+        tool_id: "live_env.route_micro_reasoner_prompt",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
         tool_id: "live_env.update_micro_reasoner_prompt",
         family: "live_env",
         creates_assistant_answer: false,
@@ -306,9 +313,123 @@ describe("live-source mail live environment tools", () => {
     });
     expect((observation.observation as any).presets.length).toBeGreaterThan(0);
     expect((observation.observation as any).prompts.length).toBeGreaterThan(0);
-    expect(observation.evidenceRefs).toEqual(
+    expect(observation.evidence_refs).toEqual(
       expect.arrayContaining([sourceId]),
     );
+  });
+
+  it("creates and routes a MicroDeck prompt delegation preset from up to three prompts", () => {
+    const create = executeLiveEnvironmentTool({
+      tool_name: "live_env.create_micro_reasoner_preset",
+      thread_id: threadId,
+      args: {
+        source_id: sourceId,
+        title: "Visual Prompt Router",
+        candidate_prompts: [
+          {
+            candidateId: "candidate_a",
+            title: "Calculator follow-up",
+            promptText: "Explain the calculator result and identify any missing variables.",
+          },
+          {
+            candidateId: "candidate_b",
+            title: "Minecraft hazard review",
+            promptText: "Review the Minecraft visual capture for lava, mobs, low health, and urgent survival hazards.",
+          },
+          {
+            candidateId: "candidate_c",
+            title: "Document summary",
+            promptText: "Summarize the visible document section and cite its headings.",
+          },
+        ],
+        confidence_threshold: 0.12,
+        escalation_mode: "handoff_only_if_confident",
+      },
+    });
+
+    expect(create).toMatchObject({
+      tool_name: "live_env.create_micro_reasoner_preset",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    const preset = (create.observation as any).preset;
+    expect(preset).toMatchObject({
+      deckRunPlan: "prompt_delegation_router",
+      outputPolicy: "ask_prompt_delegation",
+      promptedRoles: ["prompt_router"],
+      delegationRouter: {
+        confidenceThreshold: 0.12,
+        escalationMode: "handoff_only_if_confident",
+        allowNone: true,
+      },
+    });
+    expect(preset.delegationRouter.candidates).toHaveLength(3);
+
+    const route = executeLiveEnvironmentTool({
+      tool_name: "live_env.route_micro_reasoner_prompt",
+      thread_id: threadId,
+      args: {
+        source_id: sourceId,
+        preset_id: preset.presetId,
+        source_summary: "The Minecraft scene shows lava beside the player, low health, and a hostile mob nearby.",
+      },
+    });
+
+    expect(route).toMatchObject({
+      tool_name: "live_env.route_micro_reasoner_prompt",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(route.observation).toMatchObject({
+      schema: "stage_play_micro_reasoner_prompt_delegation_result/v1",
+      schemaVersion: "stage_play_micro_reasoner_prompt_delegation_result/v1",
+      selectedCandidateId: "candidate_b",
+      shouldHandoffToHelixAsk: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "micro_reasoner_evidence",
+      ask_context_policy: "evidence_only",
+      helixAskHandoff: {
+        selectedCandidateId: "candidate_b",
+        prompt: "Review the Minecraft visual capture for lava, mobs, low health, and urgent survival hazards.",
+      },
+    });
+  });
+
+  it("rejects MicroDeck prompt delegation presets with more than three prompts", () => {
+    const create = executeLiveEnvironmentTool({
+      tool_name: "live_env.create_micro_reasoner_preset",
+      thread_id: threadId,
+      args: {
+        source_id: sourceId,
+        candidate_prompts: [
+          "Prompt one",
+          "Prompt two",
+          "Prompt three",
+          "Prompt four",
+        ],
+      },
+    });
+
+    expect(create).toMatchObject({
+      tool_name: "live_env.create_micro_reasoner_preset",
+      ok: false,
+      summary: "Custom MicroDeck prompt-router presets accept at most three candidate prompts.",
+      observation: {
+        schema: "stage_play_micro_reasoner_prompt_preset_create_response/v1",
+        created: false,
+        reason: "too_many_candidate_prompts",
+        candidateCount: 4,
+        maxCandidatePrompts: 3,
+        assistant_answer: false,
+        terminal_eligible: false,
+      },
+    });
   });
 
   it("configures an interpreter profile without reading mail or answering", () => {

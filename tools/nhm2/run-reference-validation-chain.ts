@@ -76,7 +76,13 @@ export const planReferenceValidationChain = (
   const sourceClosure = required(args, "source-closure");
   const fullLoopAudit = required(args, "full-loop-audit");
   const qeiDossier = asOptionalString(args, "qei-dossier");
+  const qeiWorldlineDossier = asOptionalString(args, "qei-worldline-dossier");
+  const observerRobustEnergyConditions = asOptionalString(
+    args,
+    "observer-robust-energy-conditions",
+  );
   const sourceInput = asOptionalString(args, "source-input");
+  const inputConservation = asOptionalString(args, "conservation");
   const inputTileLocalSourceElements = asOptionalString(args, "tile-local-source-elements");
   const buildTileLocalSourceElements = args["build-tile-local-source-elements"] === true;
   const casimirMaterialReceipt = asOptionalString(args, "casimir-material-receipt");
@@ -119,12 +125,15 @@ export const planReferenceValidationChain = (
     inputTileLocalSourceElements ??
     (buildTileLocalSourceElements ? generatedTileLocalSourceElements : null);
   const sourceTensor = `${outRoot}/nhm2-tile-effective-full-tensor-source.json`;
-  const conservation = `${outRoot}/nhm2-tile-counterpart-conservation.json`;
+  const generatedConservation = `${outRoot}/nhm2-tile-counterpart-conservation.json`;
+  const conservation = inputConservation ?? (sourceInput == null ? null : generatedConservation);
   const sourceIndependenceAudit = `${outRoot}/nhm2-tile-counterpart-source-independence.md`;
   const sourceAuthority = `${outRoot}/nhm2-source-side-same-basis-tensor-authority.json`;
   const regionalEvidence = `${outRoot}/nhm2-regional-source-closure-evidence.json`;
   const sourceClosurePassReadiness = `${outRoot}/nhm2-source-closure-pass-readiness.json`;
   const sourceClosurePassReadinessReport = `${outRoot}/nhm2-source-closure-pass-readiness.md`;
+  const coupledClosurePassCandidate =
+    `${outRoot}/nhm2-coupled-closure-pass-candidate.json`;
   const divergenceReport = `${outRoot}/nhm2-source-to-geometry-divergence.md`;
   const provenanceAudit = `${outRoot}/nhm2-tile-counterpart-provenance.md`;
   const validation = `${outRoot}/nhm2-reference-run-validation.json`;
@@ -154,6 +163,11 @@ export const planReferenceValidationChain = (
   if (regionalMaterialSourceTensorModelInput != null && regionalSourceComponentModel != null) {
     throw new Error(
       "--regional-material-source-tensor-model and --regional-source-component-model are mutually exclusive",
+    );
+  }
+  if (inputConservation != null && sourceInput != null) {
+    throw new Error(
+      "--conservation and --source-input are mutually exclusive; source-input generates conservation inside the frozen chain",
     );
   }
   if (regionalMaterialSourceTensorModel != null && wallMaterialSourceTensorModel != null) {
@@ -204,7 +218,7 @@ export const planReferenceValidationChain = (
       "--tile-full-tensor-source",
       sourceTensor,
       "--out",
-      conservation,
+      generatedConservation,
       ...auditOnly,
     ]));
     commands.push(command("nhm2:audit-tile-counterpart-source-independence", [
@@ -248,7 +262,7 @@ export const planReferenceValidationChain = (
         ...(casimirMaterialReceipt == null
           ? []
           : ["--material-receipt", casimirMaterialReceipt]),
-        ...(sourceInput == null ? [] : ["--conservation", conservation]),
+        ...(conservation == null ? [] : ["--conservation", conservation]),
         ...(qeiDossier == null ? [] : ["--qei-dossier", qeiDossier]),
         "--out",
         generatedLayeredWallSourceCandidate,
@@ -325,7 +339,7 @@ export const planReferenceValidationChain = (
       "--source-closure",
       sourceClosure,
       ...(qeiDossier == null ? [] : ["--qei-dossier", qeiDossier]),
-      ...(sourceInput == null ? [] : ["--tile-full-tensor-source", sourceTensor, "--conservation", conservation]),
+      ...(sourceInput == null ? [] : ["--tile-full-tensor-source", sourceTensor, "--conservation", generatedConservation]),
       "--out",
       tileCounterpart,
       ...auditOnly,
@@ -362,6 +376,34 @@ export const planReferenceValidationChain = (
     sourceClosurePassReadiness,
     "--out-md",
     sourceClosurePassReadinessReport,
+  ]));
+  commands.push(command("nhm2:build-coupled-closure-pass-candidate", [
+    "--tile-effective-counterpart",
+    tileCounterpart,
+    ...(regionalMaterialSourceTensorModel == null
+      ? []
+      : ["--regional-material-source-tensor-model", regionalMaterialSourceTensorModel]),
+    ...(tileLocalSourceElements == null
+      ? []
+      : ["--tile-local-source-elements", tileLocalSourceElements]),
+    "--source-side-authority",
+    sourceAuthority,
+    "--regional-source-closure-evidence",
+    regionalEvidence,
+    "--source-closure-pass-readiness",
+    sourceClosurePassReadiness,
+    ...(conservation == null ? [] : ["--conservation", conservation]),
+    ...(qeiWorldlineDossier == null
+      ? []
+      : ["--qei-worldline-dossier", qeiWorldlineDossier]),
+    ...(observerRobustEnergyConditions == null
+      ? []
+      : ["--observer-robust-energy-conditions", observerRobustEnergyConditions]),
+    ...(casimirMaterialReceipt == null
+      ? []
+      : ["--casimir-material-receipt", casimirMaterialReceipt]),
+    "--out",
+    coupledClosurePassCandidate,
   ]));
   commands.push(command("nhm2:report-source-to-geometry-divergence", [
     "--regional-evidence",
@@ -407,9 +449,8 @@ export const planReferenceValidationChain = (
     divergenceReport,
     "--tile-provenance-audit",
     provenanceAudit,
-    ...(sourceInput == null
-      ? []
-      : ["--source-tensor-artifact", sourceTensor, "--conservation", conservation]),
+    ...(sourceInput == null ? [] : ["--source-tensor-artifact", sourceTensor]),
+    ...(conservation == null ? [] : ["--conservation", conservation]),
     ...(tileLocalSourceElements == null
       ? []
       : ["--tile-local-source-elements", tileLocalSourceElements]),
@@ -417,6 +458,8 @@ export const planReferenceValidationChain = (
     sourceAuthority,
     "--source-closure-pass-readiness",
     sourceClosurePassReadiness,
+    "--coupled-closure-pass-candidate",
+    coupledClosurePassCandidate,
     ...(qeiDossier == null ? [] : ["--qei-dossier", qeiDossier]),
     "--literature-map",
     literatureMap,

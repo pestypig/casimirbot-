@@ -222,6 +222,7 @@
     "nhm2:build-layered-wall-full-tensor-source-audit": "tsx tools/nhm2/build-layered-wall-full-tensor-source-audit.ts",
     "nhm2:build-layered-wall-source-tensor-candidate": "tsx tools/nhm2/build-layered-wall-source-tensor-candidate.ts",
     "nhm2:source-closure-pass-readiness": "tsx tools/nhm2/source-closure-pass-readiness.ts",
+    "nhm2:build-coupled-closure-pass-candidate": "tsx tools/nhm2/build-coupled-closure-pass-candidate.ts",
     "nhm2:build-reference-run-blocker-ledger": "tsx tools/nhm2/build-reference-run-blocker-ledger.ts",
     "nhm2:render-reference-run-blocker-ledger": "tsx tools/nhm2/render-reference-run-blocker-ledger.ts",
     "nhm2:run-reference-validation-chain": "tsx tools/nhm2/run-reference-validation-chain.ts",

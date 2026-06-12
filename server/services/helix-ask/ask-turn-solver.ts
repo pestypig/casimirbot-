@@ -611,6 +611,28 @@ export function evaluateAskTurnSolverHardGate(input: {
       terminalMatchesCanonicalGoalContract(input.payload, readString(input.payload.terminal_artifact_kind))
     );
   const terminalReceiptAllowed = allowedPureReceipt || goalSatisfactionReceiptAllowed;
+  const actualToolCallsForHardGate = (Array.isArray(loopTrace?.actual_tool_calls) ? loopTrace.actual_tool_calls : [])
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry));
+  const tracePromptInterpretation = trace?.prompt_interpretation;
+  const traceContextualToolAudit = trace?.contextual_tool_audit;
+  const sourceTargetModelOnly =
+    canonicalGoalKind === "model_only_concept" ||
+    readString(sourceTarget?.target_source) === "model_only" ||
+    readString(sourceTarget?.target_kind) === "general_background";
+  const compliantSuppressedDirectAnswerAllowed =
+    Boolean(trace && sourceTargetModelOnly && tracePromptInterpretation && traceContextualToolAudit) &&
+    readString(goalSatisfaction?.satisfaction) === "satisfied" &&
+    readString(goalSatisfaction?.next_decision) === "allow_terminal" &&
+    compliantContextualToolSuppressionAllowsDirectAnswer({
+      payload: input.payload,
+      terminalArtifactKind: traceTerminalArtifactKind || readString(input.payload.terminal_artifact_kind) || "",
+      finalAnswerSource: traceFinalAnswerSource || readString(input.payload.final_answer_source) || "",
+      contextualToolMentions: tracePromptInterpretation?.contextual_tool_mentions ?? [],
+      contextualToolAudit: traceContextualToolAudit as HelixAskTurnSolverTrace["contextual_tool_audit"],
+      negativeConstraints: tracePromptInterpretation?.negative_constraints ?? [],
+      actualToolCalls: actualToolCallsForHardGate,
+    });
 
   if (!trace) {
     pushHardFailure(details, "solver_trace_missing", "solver trace is required before terminal authority");
@@ -623,7 +645,8 @@ export function evaluateAskTurnSolverHardGate(input: {
       trace.completed_solver_path === false &&
       trace.final_arbitration.terminal_artifact_kind !== "typed_failure" &&
       trace.final_arbitration.terminal_artifact_kind !== "request_user_input" &&
-      !terminalReceiptAllowed
+      !terminalReceiptAllowed &&
+      !compliantSuppressedDirectAnswerAllowed
     ) {
       pushHardFailure(details, "solver_path_incomplete_before_terminal", "solver path was incomplete before successful terminal selection");
     }
@@ -657,14 +680,14 @@ export function evaluateAskTurnSolverHardGate(input: {
       if (flag === "hard_source_target_allowed_no_tool_direct") {
         pushHardFailure(details, "hard_source_target_allowed_no_tool_direct", "hard source-target allowed no_tool_direct");
       }
-      if (flag === "poison_clean_but_authority_failed" && !terminalReceiptAllowed) {
+      if (flag === "poison_clean_but_authority_failed" && !terminalReceiptAllowed && !compliantSuppressedDirectAnswerAllowed) {
         pushHardFailure(details, "poison_clean_but_authority_failed", "poison audit was clean while route authority failed");
       }
       if (flag === "terminal_selected_before_observation_finalizer") {
         pushHardFailure(details, "terminal_authority_before_solver_completion", "terminal artifact was selected before solver finalization");
       }
     }
-    if (!trace.route_authority_ok && !terminalReceiptAllowed && !nonAnswerTerminal) {
+    if (!trace.route_authority_ok && !terminalReceiptAllowed && !nonAnswerTerminal && !compliantSuppressedDirectAnswerAllowed) {
       if (trace.poison_audit_ok) {
         pushHardFailure(details, "poison_clean_but_authority_failed", "poison audit passed but route authority failed");
       } else {
@@ -687,7 +710,7 @@ export function evaluateAskTurnSolverHardGate(input: {
   ) {
     pushHardFailure(details, "hard_source_target_allowed_no_tool_direct", "hard source-target cannot use no_tool_direct");
   }
-  if (!typedFailureTerminal && routeAuthority?.route_authority_ok === false && readRecord(input.payload.poison_audit)?.ok === true && !terminalReceiptAllowed) {
+  if (!typedFailureTerminal && routeAuthority?.route_authority_ok === false && readRecord(input.payload.poison_audit)?.ok === true && !terminalReceiptAllowed && !compliantSuppressedDirectAnswerAllowed) {
     pushHardFailure(details, "poison_clean_but_authority_failed", "clean poison audit cannot override failed route authority");
   }
   if (!typedFailureTerminal && routeAuthority?.primary_violation_code === "route_contract_missing") {

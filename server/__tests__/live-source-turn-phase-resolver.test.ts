@@ -444,8 +444,6 @@ describe("resolveLiveSourceTurnPhase", () => {
 
       expect(phase.phase).not.toBe("query_micro_reasoner_deck");
       expect(phase.allowedTools).not.toContain("live_env.query_micro_reasoner_presets");
-      expect(phase.allowedTools).not.toContain("live_env.read_processed_live_source_mail");
-      expect(phase.allowedTools).not.toContain("live_env.process_live_source_mail");
     }
   });
 

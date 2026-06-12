@@ -1,0 +1,200 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, join, normalize } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import {
+  isCasimirMaterialReceipt,
+  type CasimirMaterialReceiptV1,
+} from "../../shared/contracts/casimir-material-receipt.v1";
+import {
+  buildNhm2CoupledClosurePassCandidate,
+  isNhm2CoupledClosurePassCandidateArtifact,
+  type Nhm2CoupledClosurePassCandidateArtifactV1,
+} from "../../shared/contracts/nhm2-coupled-closure-pass-candidate.v1";
+import {
+  isNhm2ObserverRobustEnergyConditionArtifact,
+  type Nhm2ObserverRobustEnergyConditionArtifactV1,
+} from "../../shared/contracts/nhm2-observer-robust-energy-conditions.v1";
+import {
+  isNhm2QeiWorldlineDossier,
+  type Nhm2QeiWorldlineDossierV1,
+} from "../../shared/contracts/nhm2-qei-worldline-dossier.v1";
+import {
+  isNhm2RegionalSourceClosureEvidenceArtifact,
+  type Nhm2RegionalSourceClosureEvidenceArtifact,
+} from "../../shared/contracts/nhm2-regional-source-closure-evidence.v1";
+import {
+  isNhm2SourceSideSameBasisTensorAuthorityArtifact,
+  type Nhm2SourceSideSameBasisTensorAuthorityArtifactV1,
+} from "../../shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1";
+import {
+  isNhm2TileCounterpartConservationArtifact,
+  type Nhm2TileCounterpartConservationArtifact,
+} from "../../shared/contracts/nhm2-tile-counterpart-conservation.v1";
+import {
+  isNhm2SourceClosurePassReadinessArtifact,
+  type Nhm2SourceClosurePassReadinessArtifact,
+} from "./source-closure-pass-readiness";
+
+const parseArgs = (argv: string[]): Record<string, string | boolean> => {
+  const parsed: Record<string, string | boolean> = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (!arg.startsWith("--")) continue;
+    const key = arg.slice(2);
+    const next = argv[index + 1];
+    if (next == null || next.startsWith("--")) {
+      parsed[key] = true;
+    } else {
+      parsed[key] = next;
+      index += 1;
+    }
+  }
+  return parsed;
+};
+
+const asString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+
+const resolvePath = (repoRoot: string, path: string): string =>
+  isAbsolute(path) ? path : join(repoRoot, path);
+
+const readJson = (repoRoot: string, path: string): unknown =>
+  JSON.parse(readFileSync(resolvePath(repoRoot, path), "utf8")) as unknown;
+
+const readOptional = <T>(
+  repoRoot: string,
+  path: string | null,
+  validator: (value: unknown) => value is T,
+  label: string,
+): T | null => {
+  if (path == null) return null;
+  const resolved = resolvePath(repoRoot, path);
+  if (!existsSync(resolved)) {
+    throw new Error(`${label} missing: ${path}`);
+  }
+  const value = readJson(repoRoot, path);
+  if (!validator(value)) {
+    throw new Error(`${label} has invalid contract`);
+  }
+  return value;
+};
+
+export const runNhm2CoupledClosurePassCandidate = (args: {
+  repoRoot: string;
+  outPath: string;
+  regionalMaterialSourceTensorModelPath?: string | null;
+  tileLocalSourceElementsPath?: string | null;
+  tileEffectiveCounterpartPath?: string | null;
+  sourceSideAuthorityPath?: string | null;
+  regionalSourceClosureEvidencePath?: string | null;
+  sourceClosurePassReadinessPath?: string | null;
+  conservationPath?: string | null;
+  qeiWorldlineDossierPath?: string | null;
+  observerRobustEnergyConditionsPath?: string | null;
+  casimirMaterialReceiptPath?: string | null;
+}): Nhm2CoupledClosurePassCandidateArtifactV1 => {
+  const sourceAuthority = readOptional<Nhm2SourceSideSameBasisTensorAuthorityArtifactV1>(
+    args.repoRoot,
+    args.sourceSideAuthorityPath ?? null,
+    isNhm2SourceSideSameBasisTensorAuthorityArtifact,
+    "source-side authority",
+  );
+  const sourceClosurePassReadiness = readOptional<Nhm2SourceClosurePassReadinessArtifact>(
+    args.repoRoot,
+    args.sourceClosurePassReadinessPath ?? null,
+    isNhm2SourceClosurePassReadinessArtifact,
+    "source closure pass-readiness",
+  );
+  const regionalEvidence = readOptional<Nhm2RegionalSourceClosureEvidenceArtifact>(
+    args.repoRoot,
+    args.regionalSourceClosureEvidencePath ?? null,
+    isNhm2RegionalSourceClosureEvidenceArtifact,
+    "regional source-closure evidence",
+  );
+  const conservation = readOptional<Nhm2TileCounterpartConservationArtifact>(
+    args.repoRoot,
+    args.conservationPath ?? null,
+    isNhm2TileCounterpartConservationArtifact,
+    "tile-counterpart conservation",
+  );
+  const qeiWorldlineDossier = readOptional<Nhm2QeiWorldlineDossierV1>(
+    args.repoRoot,
+    args.qeiWorldlineDossierPath ?? null,
+    isNhm2QeiWorldlineDossier,
+    "QEI worldline dossier",
+  );
+  const observerRobustEnergyConditions =
+    readOptional<Nhm2ObserverRobustEnergyConditionArtifactV1>(
+      args.repoRoot,
+      args.observerRobustEnergyConditionsPath ?? null,
+      isNhm2ObserverRobustEnergyConditionArtifact,
+      "observer-robust energy conditions",
+    );
+  const casimirMaterialReceipt = readOptional<CasimirMaterialReceiptV1>(
+    args.repoRoot,
+    args.casimirMaterialReceiptPath ?? null,
+    isCasimirMaterialReceipt,
+    "Casimir material receipt",
+  );
+
+  const artifact = buildNhm2CoupledClosurePassCandidate({
+    artifactRefs: {
+      regionalMaterialSourceTensorModel:
+        args.regionalMaterialSourceTensorModelPath ?? null,
+      tileLocalSourceElements: args.tileLocalSourceElementsPath ?? null,
+      tileEffectiveCounterpart: args.tileEffectiveCounterpartPath ?? null,
+      sourceSideSameBasisTensorAuthority: args.sourceSideAuthorityPath ?? null,
+      regionalSourceClosureEvidence: args.regionalSourceClosureEvidencePath ?? null,
+      sourceClosurePassReadiness: args.sourceClosurePassReadinessPath ?? null,
+      conservation: args.conservationPath ?? null,
+      qeiWorldlineDossier: args.qeiWorldlineDossierPath ?? null,
+      observerRobustEnergyConditions:
+        args.observerRobustEnergyConditionsPath ?? null,
+      casimirMaterialReceipt: args.casimirMaterialReceiptPath ?? null,
+    },
+    sourceAuthority,
+    sourceClosurePassReadiness,
+    regionalEvidence,
+    conservation,
+    qeiWorldlineDossier,
+    observerRobustEnergyConditions,
+    casimirMaterialReceipt,
+  });
+  if (!isNhm2CoupledClosurePassCandidateArtifact(artifact)) {
+    throw new Error(
+      "built artifact failed nhm2_coupled_closure_pass_candidate/v1 validation",
+    );
+  }
+  const outPath = resolvePath(args.repoRoot, args.outPath);
+  mkdirSync(dirname(outPath), { recursive: true });
+  writeFileSync(outPath, `${JSON.stringify(artifact, null, 2)}\n`, "utf8");
+  return artifact;
+};
+
+if (normalize(process.argv[1] ?? "") === normalize(fileURLToPath(import.meta.url))) {
+  const args = parseArgs(process.argv.slice(2));
+  const outPath = asString(args.out);
+  if (outPath == null) {
+    throw new Error("missing required --out");
+  }
+  const artifact = runNhm2CoupledClosurePassCandidate({
+    repoRoot: process.cwd(),
+    outPath,
+    regionalMaterialSourceTensorModelPath: asString(
+      args["regional-material-source-tensor-model"],
+    ),
+    tileLocalSourceElementsPath: asString(args["tile-local-source-elements"]),
+    tileEffectiveCounterpartPath: asString(args["tile-effective-counterpart"]),
+    sourceSideAuthorityPath: asString(args["source-side-authority"]),
+    regionalSourceClosureEvidencePath: asString(args["regional-source-closure-evidence"]),
+    sourceClosurePassReadinessPath: asString(args["source-closure-pass-readiness"]),
+    conservationPath: asString(args.conservation),
+    qeiWorldlineDossierPath: asString(args["qei-worldline-dossier"]),
+    observerRobustEnergyConditionsPath: asString(
+      args["observer-robust-energy-conditions"],
+    ),
+    casimirMaterialReceiptPath: asString(args["casimir-material-receipt"]),
+  });
+  process.stdout.write(`${JSON.stringify(artifact, null, 2)}\n`);
+}

@@ -9,6 +9,10 @@ import {
   type Nhm2BlockerLedgerArtifact,
   type Nhm2DivergenceBoundary,
 } from "../../shared/contracts/nhm2-blocker-ledger.v1";
+import {
+  isNhm2CoupledClosurePassCandidateArtifact,
+  type Nhm2CoupledClosurePassCandidateArtifactV1,
+} from "../../shared/contracts/nhm2-coupled-closure-pass-candidate.v1";
 import { isNhm2QeiDossierArtifact } from "../../shared/contracts/nhm2-qei-dossier.v1";
 import { isNhm2ReferenceRunArtifact } from "../../shared/contracts/nhm2-reference-run.v1";
 import { isNhm2RegionalSourceClosureEvidenceArtifact } from "../../shared/contracts/nhm2-regional-source-closure-evidence.v1";
@@ -335,6 +339,53 @@ const sourceClosureReadinessGate = (
   };
 };
 
+const coupledClosureBlockerClass = (
+  artifact: Nhm2CoupledClosurePassCandidateArtifactV1 | null,
+): Nhm2BlockerClass => {
+  const firstGate = artifact?.gates.find((gate) => gate.status !== "pass")?.gateId ?? "";
+  if (firstGate.includes("qei")) return "qei";
+  if (firstGate.includes("observer")) return "observer";
+  if (firstGate.includes("conservation") || firstGate.includes("material")) {
+    return "tile_counterpart";
+  }
+  if (firstGate.includes("authority")) return "tile_counterpart";
+  if (firstGate.includes("residual") || firstGate.includes("closure")) {
+    return "source_closure";
+  }
+  return "source_closure";
+};
+
+const coupledClosureGate = (
+  artifact: Nhm2CoupledClosurePassCandidateArtifactV1 | null,
+): Nhm2BlockerLedgerArtifact["gateSummary"][number] => {
+  if (artifact == null) {
+    return {
+      gateId: "GATE_COUPLED_CLOSURE_PASS_CANDIDATE",
+      state: "review",
+      reasonCodes: ["coupled_closure_pass_candidate_missing"],
+      blockerClass: "source_closure",
+    };
+  }
+  const failingGates = artifact.gates.filter((gate) => gate.status !== "pass");
+  return {
+    gateId: "GATE_COUPLED_CLOSURE_PASS_CANDIDATE",
+    state: artifact.summary.passCandidate
+      ? "pass"
+      : failingGates.some((gate) => gate.status === "fail" || gate.status === "blocked")
+        ? "fail"
+        : "review",
+    reasonCodes:
+      failingGates.length === 0
+        ? []
+        : failingGates.flatMap((gate) =>
+            gate.blockers.length > 0
+              ? gate.blockers.map((blocker) => `${gate.gateId}:${blocker}`)
+              : [`${gate.gateId}:non_pass`],
+          ),
+    blockerClass: coupledClosureBlockerClass(artifact),
+  };
+};
+
 const tileLocalMaterialStatus = (
   artifact: Nhm2TileLocalSourceElementsArtifactV1 | null,
 ): string | null => {
@@ -405,6 +456,7 @@ export const buildReferenceRunBlockerLedger = (args: {
   conservationArtifactPath?: string | null;
   sourceSideAuthorityPath?: string | null;
   sourceClosurePassReadinessPath?: string | null;
+  coupledClosurePassCandidatePath?: string | null;
   auditOnly?: boolean;
 }): Nhm2BlockerLedgerArtifact => {
   const paths = [
@@ -421,6 +473,7 @@ export const buildReferenceRunBlockerLedger = (args: {
     args.conservationArtifactPath,
     args.sourceSideAuthorityPath,
     args.sourceClosurePassReadinessPath,
+    args.coupledClosurePassCandidatePath,
     args.literatureMapPath,
   ];
   if (!args.auditOnly && paths.some(pathUsesLatestAlias)) {
@@ -508,6 +561,18 @@ export const buildReferenceRunBlockerLedger = (args: {
       "source closure pass-readiness must be nhm2_source_closure_pass_readiness/v1",
     );
   }
+  const coupledClosurePassCandidate =
+    args.coupledClosurePassCandidatePath == null
+      ? null
+      : readJson(resolvePath(args.repoRoot, args.coupledClosurePassCandidatePath));
+  if (
+    coupledClosurePassCandidate != null &&
+    !isNhm2CoupledClosurePassCandidateArtifact(coupledClosurePassCandidate)
+  ) {
+    throw new Error(
+      "coupled closure pass-candidate must be nhm2_coupled_closure_pass_candidate/v1",
+    );
+  }
 
   const sourceAuthorityArtifact = isNhm2SourceSideSameBasisTensorAuthorityArtifact(sourceAuthority)
     ? sourceAuthority
@@ -515,6 +580,10 @@ export const buildReferenceRunBlockerLedger = (args: {
   const passReadinessArtifact = isNhm2SourceClosurePassReadinessArtifact(passReadiness)
     ? passReadiness
     : null;
+  const coupledClosurePassCandidateArtifact =
+    isNhm2CoupledClosurePassCandidateArtifact(coupledClosurePassCandidate)
+      ? coupledClosurePassCandidate
+      : null;
   const tileLocalSourceElementsArtifact = isNhm2TileLocalSourceElementsArtifact(
     tileLocalSourceElements,
   )
@@ -529,6 +598,7 @@ export const buildReferenceRunBlockerLedger = (args: {
     })),
     sourceAuthorityGate(sourceAuthorityArtifact),
     sourceClosureReadinessGate(passReadinessArtifact),
+    coupledClosureGate(coupledClosurePassCandidateArtifact),
   ];
   const qeiArtifact = isNhm2QeiDossierArtifact(qei) ? qei : null;
   const qeiMissingFields = missingQeiFields(qeiArtifact);
@@ -586,6 +656,7 @@ export const buildReferenceRunBlockerLedger = (args: {
       conservationArtifact: args.conservationArtifactPath ?? null,
       sourceSideSameBasisTensorAuthority: args.sourceSideAuthorityPath ?? null,
       sourceClosurePassReadiness: args.sourceClosurePassReadinessPath ?? null,
+      coupledClosurePassCandidate: args.coupledClosurePassCandidatePath ?? null,
       referenceRunValidation: args.validationPath,
     },
     tileCounterpartSource: {
@@ -619,6 +690,19 @@ export const buildReferenceRunBlockerLedger = (args: {
         passReadinessArtifact?.sourceClosurePassSignalAllowed ?? null,
       firstRetirableBlocker: passReadinessArtifact?.firstRetirableBlocker ?? null,
       preflightBlockers: passReadinessArtifact?.preflightBlockers ?? [],
+      coupledClosurePassCandidateRef: args.coupledClosurePassCandidatePath ?? null,
+      coupledClosurePassCandidate:
+        coupledClosurePassCandidateArtifact?.summary.passCandidate ?? null,
+      coupledClosureFirstBlocker:
+        coupledClosurePassCandidateArtifact?.summary.firstBlocker ?? null,
+      coupledClosureBlockers:
+        coupledClosurePassCandidateArtifact?.gates.flatMap((gate) =>
+          gate.status === "pass"
+            ? []
+            : gate.blockers.length > 0
+              ? gate.blockers.map((blocker) => `${gate.gateId}:${blocker}`)
+              : [`${gate.gateId}:non_pass`],
+        ) ?? [],
     },
     gateSummary,
     regionalBlockers,
@@ -680,6 +764,7 @@ if (normalize(process.argv[1] ?? "") === normalize(fileURLToPath(import.meta.url
     conservationArtifactPath: asString(args.conservation),
     sourceSideAuthorityPath: asString(args["source-side-authority"]),
     sourceClosurePassReadinessPath: asString(args["source-closure-pass-readiness"]),
+    coupledClosurePassCandidatePath: asString(args["coupled-closure-pass-candidate"]),
     literatureMapPath: args["literature-map"] as string,
     outPath: args.out as string,
     auditOnly: args["audit-only"] === true,

@@ -240,7 +240,10 @@ const runChain = async (args: CliArgs): Promise<number> => {
     "--regional-source-closure-evidence",
     resolved.inputRefs.regionalSourceClosure!,
     ...forwardStringArg("qei-dossier"),
+    ...forwardStringArg("qei-worldline-dossier"),
+    ...forwardStringArg("observer-robust-energy-conditions"),
     ...forwardStringArg("source-input"),
+    ...forwardStringArg("conservation"),
     ...forwardStringArg("tile-local-source-elements"),
     ...(args["build-tile-local-source-elements"] === true
       ? ["--build-tile-local-source-elements"]

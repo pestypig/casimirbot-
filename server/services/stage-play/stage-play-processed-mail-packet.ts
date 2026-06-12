@@ -190,6 +190,7 @@ const readPromptedRoleList = (): StagePlayMicroReasonerRoleV1[] => {
     "prediction_validator",
     "salience_scorer",
     "hypothesis_arbiter",
+    "prompt_router",
     "packet_composer",
     "decision_selector",
     "voice_callout_drafter",
@@ -278,6 +279,9 @@ const promptedOutputPreview = (role: StagePlayMicroReasonerRoleV1, json: Record<
   }
   if (role === "hypothesis_arbiter") {
     return clipText(`${readStringFromJson(json, "recommendedNext") ?? "unknown"}; wake ${readBooleanFromJson(json, "wakeAsk") ? "yes" : "no"}; ${readStringFromJson(json, "reason") ?? fallback}`, 320);
+  }
+  if (role === "prompt_router") {
+    return clipText(`${readStringFromJson(json, "selectedCandidateId") ?? "none"}; confidence ${readStringFromJson(json, "confidence") ?? "unknown"}; ${readStringFromJson(json, "reason") ?? fallback}`, 320);
   }
   if (role === "decision_selector") {
     return clipText(`${readStringFromJson(json, "selectedDecision") ?? "unknown"}; next tool ${readStringFromJson(json, "recommendedNextTool") ?? "none"}; ${readStringArrayFromJson(json, "reasons").slice(0, 3).join(" | ")}`, 320);

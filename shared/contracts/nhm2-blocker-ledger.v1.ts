@@ -66,6 +66,7 @@ export type Nhm2BlockerLedgerArtifact = {
     conservationArtifact: string | null;
     sourceSideSameBasisTensorAuthority: string | null;
     sourceClosurePassReadiness: string | null;
+    coupledClosurePassCandidate: string | null;
     referenceRunValidation: string | null;
   };
   tileCounterpartSource: {
@@ -86,6 +87,10 @@ export type Nhm2BlockerLedgerArtifact = {
     sourceClosurePassSignalAllowed: boolean | null;
     firstRetirableBlocker: string | null;
     preflightBlockers: string[];
+    coupledClosurePassCandidateRef: string | null;
+    coupledClosurePassCandidate: boolean | null;
+    coupledClosureFirstBlocker: string | null;
+    coupledClosureBlockers: string[];
   };
   gateSummary: Array<{
     gateId: string;
@@ -345,6 +350,7 @@ export const isNhm2BlockerLedgerArtifact = (
     !isNullableText(refs.conservationArtifact) ||
     !isNullableText(refs.sourceSideSameBasisTensorAuthority) ||
     !isNullableText(refs.sourceClosurePassReadiness) ||
+    !isNullableText(refs.coupledClosurePassCandidate) ||
     !isNullableText(refs.referenceRunValidation) ||
     tileCounterpartSource == null ||
     !isNullableText(tileCounterpartSource.sourceTensorArtifactRef) ||
@@ -368,6 +374,11 @@ export const isNhm2BlockerLedgerArtifact = (
     !isNullableText(tileCounterpartSource.firstRetirableBlocker) ||
     !Array.isArray(tileCounterpartSource.preflightBlockers) ||
     !tileCounterpartSource.preflightBlockers.every(isText) ||
+    !isNullableText(tileCounterpartSource.coupledClosurePassCandidateRef) ||
+    !isNullableBoolean(tileCounterpartSource.coupledClosurePassCandidate) ||
+    !isNullableText(tileCounterpartSource.coupledClosureFirstBlocker) ||
+    !Array.isArray(tileCounterpartSource.coupledClosureBlockers) ||
+    !tileCounterpartSource.coupledClosureBlockers.every(isText) ||
     !Array.isArray(record.gateSummary) ||
     !record.gateSummary.every(isGate) ||
     !Array.isArray(record.regionalBlockers) ||

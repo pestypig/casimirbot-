@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY } from "@shared/helix-scholarly-research-observation";
 import { arbitrateAskSourceTarget } from "../services/helix-ask/ask-source-target-arbitrator";
-import { buildAskTurnSolverTrace } from "../services/helix-ask/ask-turn-solver";
+import { buildAskTurnSolverTrace, evaluateAskTurnSolverHardGate } from "../services/helix-ask/ask-turn-solver";
 import { buildCapabilityLifecycleLedger } from "../services/helix-ask/capability-lifecycle-ledger";
 import { buildHelixCapabilityItinerary } from "../services/helix-ask/capability-itinerary";
 import { buildCapabilityPlan } from "../services/helix-ask/capability-planner";
+import { buildSolverContinuationObservation } from "../services/helix-ask/solver-continuation";
 import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
 
 const turnId = "ask:test:negated-tool-admission";
@@ -153,6 +154,114 @@ describe("Helix Ask negated/contextual tool admission", () => {
     expect(trace.contextual_tool_audit.blocked_contextual_tool_executed).toBe(false);
     expect(trace.completed_solver_path).toBe(true);
     expect(trace.solver_risk_flags).not.toContain("terminal_authority_before_solver_completion");
+  });
+
+  it("does not convert satisfied suppressed contextual tool answers into route-authority typed failures", () => {
+    const promptText =
+      "Earlier I saw docs-viewer.search_docs in debug. Do not run it; just explain whether mentioning a tool name should execute it.";
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, sourceTargetIntent, promptText });
+    const plan = buildCapabilityPlan({
+      turnId,
+      promptText,
+      sourceTargetIntent,
+      toolCallAdmissionDecision: admission,
+      canonicalGoalFrame: canonicalGoal,
+    });
+    const payload = {
+      active_prompt: promptText,
+      selected_final_answer: "Mentioning a tool name should not execute it unless the prompt is an affirmative operator command.",
+      final_answer_source: "model_synthesis",
+      terminal_artifact_kind: "direct_answer_text",
+      canonical_goal_frame: canonicalGoal,
+      source_target_intent: sourceTargetIntent,
+      tool_call_admission_decision: admission,
+      capability_plan: plan,
+      route_authority_audit: {
+        schema: "helix.route_authority_audit.v1",
+        route_authority_ok: false,
+        violation_codes: ["poison_clean_but_authority_failed"],
+        primary_violation_code: "poison_clean_but_authority_failed",
+      },
+      poison_audit: {
+        schema: "helix.turn_poison_audit.v1",
+        ok: true,
+        violations: [],
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        turn_id: turnId,
+        route: "conversation:simple",
+        terminal_artifact_kind: "direct_answer_text",
+        final_answer_source: "model_synthesis",
+        server_authoritative: true,
+      },
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        turn_id: turnId,
+        goal_kind: "model_only_concept",
+        required_terminal_kind: "direct_answer_text",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+        required_evidence: [
+          {
+            kind: "direct_answer_text",
+            satisfied: true,
+            evidence_ref: "direct_answer_text:test",
+          },
+        ],
+        terminal_contract: {
+          goal_kind: "model_only_concept",
+          required_terminal_kinds: ["direct_answer_text"],
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      loop_parity_trace: {
+        schema: "helix.loop_parity_trace.v1",
+        actual_tool_calls: [],
+        unexpected_tool_calls: [],
+        route_authority_ok: false,
+        poison_audit_ok: true,
+        terminal_authority_ok: true,
+        short_circuit_risk_flags: ["poison_clean_but_authority_failed"],
+      },
+      current_turn_artifact_ledger: [],
+    };
+
+    payload.ask_turn_solver_trace = buildAskTurnSolverTrace({
+      turnId,
+      promptText,
+      selectedRoute: "conversation:simple",
+      terminalArtifactKind: "direct_answer_text",
+      finalAnswerSource: "model_synthesis",
+      payload,
+    });
+
+    expect(
+      buildSolverContinuationObservation({
+        turnId,
+        payload,
+        hardGateCode: "poison_clean_but_authority_failed",
+        finalRoute: "conversation:simple",
+        terminalKind: "direct_answer_text",
+        artifactLedger: [],
+      }),
+    ).toBeNull();
+
+    const hardGate = evaluateAskTurnSolverHardGate({
+      turnId,
+      payload,
+      trace: payload.ask_turn_solver_trace,
+      loopParityTrace: payload.loop_parity_trace,
+    });
+
+    expect(hardGate.failed).toBe(false);
+    expect(hardGate.failure_codes).not.toContain("poison_clean_but_authority_failed");
+    expect(payload.ask_turn_solver_trace.contextual_tool_audit).toMatchObject({
+      contextual_tool_family_blocked: true,
+      blocked_contextual_tool_executed: false,
+    });
   });
 
   it("does not flag intentionally suppressed contextual references as dispatched without admission", () => {

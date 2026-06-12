@@ -86,7 +86,9 @@ const LIVE_PIPELINE_RECEIPT_GOAL_KINDS = new Set([
 ]);
 
 const MICRODECK_QUERY_CAPABILITY = "live_env.query_micro_reasoner_presets";
+const MICRODECK_PROMPT_ROUTER_CAPABILITY = "live_env.route_micro_reasoner_prompt";
 const MICRODECK_QUERY_OBSERVATION_SCHEMA = "stage_play_micro_reasoner_prompt_preset_query_result/v1";
+const MICRODECK_PROMPT_DELEGATION_OBSERVATION_SCHEMA = "stage_play_micro_reasoner_prompt_delegation_result/v1";
 
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -148,6 +150,9 @@ const artifactKindMatchesCapability = (
   const microDeckPresetQueryObservation =
     observationSchema === MICRODECK_QUERY_OBSERVATION_SCHEMA ||
     /stage_play_micro_reasoner_prompt_preset_query_result\/v1/i.test(joined);
+  const microDeckPromptDelegationObservation =
+    observationSchema === MICRODECK_PROMPT_DELEGATION_OBSERVATION_SCHEMA ||
+    /stage_play_micro_reasoner_prompt_delegation_result\/v1/i.test(joined);
 
   if (capability === MICRODECK_QUERY_CAPABILITY) {
     return (
@@ -155,7 +160,13 @@ const artifactKindMatchesCapability = (
       /live_env\.query_micro_reasoner_presets|stage_play_micro_reasoner_prompt_preset_query_result\/v1/i.test(joined)
     );
   }
-  if (microDeckPresetQueryObservation && capability.startsWith("live_env.")) return false;
+  if (capability === MICRODECK_PROMPT_ROUTER_CAPABILITY) {
+    return (
+      microDeckPromptDelegationObservation &&
+      /live_env\.route_micro_reasoner_prompt|stage_play_micro_reasoner_prompt_delegation_result\/v1/i.test(joined)
+    );
+  }
+  if ((microDeckPresetQueryObservation || microDeckPromptDelegationObservation) && capability.startsWith("live_env.")) return false;
   if (capability === "repo-code.search_concept") return /repo_code_evidence_observation|helix\.repo_code_evidence_observation\.v1|repo_search/i.test(joined);
   if (capability === "scholarly-research.lookup_papers") return /scholarly_research_observation|helix\.scholarly_research_observation\.v1|scholarly_research/i.test(joined);
   if (capability === "scholarly-research.fetch_full_text") return /scholarly_full_text_observation|helix\.scholarly_full_text_observation\.v1|scholarly_research/i.test(joined);
@@ -264,6 +275,9 @@ const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): 
   ].filter(Boolean).join(" ");
   if (/stage_play_micro_reasoner_prompt_preset_query_result\/v1/i.test(joined)) {
     return MICRODECK_QUERY_CAPABILITY;
+  }
+  if (/stage_play_micro_reasoner_prompt_delegation_result\/v1/i.test(joined)) {
+    return MICRODECK_PROMPT_ROUTER_CAPABILITY;
   }
   if (/repo_code_evidence_observation|helix\.repo_code_evidence_observation\.v1|repo_search/i.test(joined)) {
     return "repo-code.search_concept";

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { buildNhm2QeiDossierArtifact } from "../shared/contracts/nhm2-qei-dossier.v1";
+import { buildNhm2CoupledClosurePassCandidate } from "../shared/contracts/nhm2-coupled-closure-pass-candidate.v1";
 import { buildNhm2ReferenceRunArtifact } from "../shared/contracts/nhm2-reference-run.v1";
 import {
   buildNhm2RegionalSourceClosureEvidenceArtifact,
@@ -216,6 +217,18 @@ const passReadiness = () =>
     sourceAuthority: sourceAuthority(),
   });
 
+const coupledClosurePassCandidate = () =>
+  buildNhm2CoupledClosurePassCandidate({
+    artifactRefs: {
+      sourceSideSameBasisTensorAuthority: "source-authority.json",
+      regionalSourceClosureEvidence: "regional.json",
+      sourceClosurePassReadiness: "readiness.json",
+    },
+    sourceAuthority: sourceAuthority(),
+    sourceClosurePassReadiness: passReadiness(),
+    regionalEvidence: regionalEvidence(),
+  });
+
 const qei = () =>
   buildNhm2QeiDossierArtifact({
     runId: "ledger-run",
@@ -262,6 +275,11 @@ const withTemp = (fn: (root: string) => void) => {
     writeFileSync(join(root, "regional.json"), JSON.stringify(regionalEvidence()), "utf8");
     writeFileSync(join(root, "source-authority.json"), JSON.stringify(sourceAuthority()), "utf8");
     writeFileSync(join(root, "readiness.json"), JSON.stringify(passReadiness()), "utf8");
+    writeFileSync(
+      join(root, "coupled.json"),
+      JSON.stringify(coupledClosurePassCandidate()),
+      "utf8",
+    );
     writeFileSync(join(root, "qei.json"), JSON.stringify(qei()), "utf8");
     writeFileSync(join(root, "literature.json"), JSON.stringify(literatureMap()), "utf8");
     fn(root);
@@ -382,5 +400,33 @@ describe("build reference-run blocker ledger", () => {
         outPath: "ledger.json",
       });
       expect(ledger.adapterVerification.physicsImpact).toBe("none_claimed");
+    }));
+
+  it("records coupled closure pass-candidate blockers without promoting the ledger", () =>
+    withTemp((root) => {
+      const ledger = buildReferenceRunBlockerLedger({
+        repoRoot: root,
+        referenceRunPath: "reference.json",
+        fullLoopAuditPath: "full-loop.json",
+        validationPath: "validation.json",
+        tileEffectiveCounterpartPath: "tile.json",
+        regionalSourceClosureEvidencePath: "regional.json",
+        sourceSideAuthorityPath: "source-authority.json",
+        sourceClosurePassReadinessPath: "readiness.json",
+        coupledClosurePassCandidatePath: "coupled.json",
+        qeiDossierPath: "qei.json",
+        literatureMapPath: "literature.json",
+        outPath: "ledger.json",
+      });
+
+      expect(ledger.artifactRefs.coupledClosurePassCandidate).toBe("coupled.json");
+      expect(ledger.tileCounterpartSource.coupledClosurePassCandidate).toBe(false);
+      expect(ledger.tileCounterpartSource.coupledClosureFirstBlocker).not.toBe("none");
+      expect(
+        ledger.gateSummary.find(
+          (gate) => gate.gateId === "GATE_COUPLED_CLOSURE_PASS_CANDIDATE",
+        )?.state,
+      ).not.toBe("pass");
+      expect(ledger.claimLock.physicalMechanismClaimAllowed).toBe(false);
     }));
 });

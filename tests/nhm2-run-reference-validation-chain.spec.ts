@@ -79,6 +79,9 @@ describe("NHM2 reference validation chain planner", () => {
       ...baseArgs(),
       "build-tile-local-source-elements": true,
       "casimir-material-receipt": "artifacts/reference/casimir-material-receipt.json",
+      "qei-worldline-dossier": "artifacts/reference/nhm2-qei-worldline-dossier.json",
+      "observer-robust-energy-conditions":
+        "artifacts/reference/nhm2-observer-robust-energy-conditions.json",
       "regional-source-component-model": "fixtures/nhm2/regional-source-components.json",
     });
     const scripts = plan.map((command) => command.script);
@@ -96,6 +99,18 @@ describe("NHM2 reference validation chain planner", () => {
     expect(tileLocal.args).toContain(
       "artifacts/research/full-solve/reference/run-1/nhm2-regional-material-source-tensor-model.json",
     );
+
+    const coupled = findCommand(plan, "nhm2:build-coupled-closure-pass-candidate");
+    expect(scripts.indexOf("nhm2:source-closure-pass-readiness")).toBeLessThan(
+      scripts.indexOf("nhm2:build-coupled-closure-pass-candidate"),
+    );
+    expect(scripts.indexOf("nhm2:build-coupled-closure-pass-candidate")).toBeLessThan(
+      scripts.indexOf("nhm2:build-reference-run-blocker-ledger"),
+    );
+    expect(coupled.args).toContain("--regional-material-source-tensor-model");
+    expect(coupled.args).toContain("--qei-worldline-dossier");
+    expect(coupled.args).toContain("--observer-robust-energy-conditions");
+    expect(coupled.args).toContain("--casimir-material-receipt");
   });
 
   it("builds a layered full-tensor audit when both a candidate and source tensor model are available", () => {
@@ -179,5 +194,15 @@ describe("NHM2 reference validation chain planner", () => {
           "artifacts/reference/nhm2-regional-material-source-tensor-model.json",
       }),
     ).toThrow(/prebuilt --tile-local-source-elements/);
+  });
+
+  it("rejects ambiguous generated and prebuilt conservation inputs", () => {
+    expect(() =>
+      planReferenceValidationChain({
+        ...baseArgs(),
+        "source-input": "fixtures/nhm2/source-input.json",
+        "conservation": "artifacts/reference/nhm2-tile-counterpart-conservation.json",
+      }),
+    ).toThrow(/mutually exclusive/);
   });
 });

@@ -78,6 +78,37 @@ const readStringArray = (value: unknown): string[] =>
     ? value.filter((entry: unknown): entry is string => typeof entry === "string" && entry.trim().length > 0)
     : [];
 
+const modelOnlySuppressedContextualDirectAnswerSatisfied = (payload: RecordLike, terminalKind: string | null | undefined): boolean => {
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  const sourceTarget = readRecord(payload.source_target_intent);
+  const goalSatisfaction = readRecord(payload.goal_satisfaction_evaluation);
+  const admission = readRecord(payload.tool_call_admission_decision);
+  const loopTrace = readRecord(payload.loop_parity_trace);
+  const solverTrace = readRecord(payload.ask_turn_solver_trace);
+  const contextualAudit = readRecord(solverTrace?.contextual_tool_audit);
+  const sourceIsModelOnly =
+    readString(canonicalGoal?.goal_kind) === "model_only_concept" ||
+    readString(sourceTarget?.target_source) === "model_only" ||
+    readString(sourceTarget?.target_kind) === "general_background";
+  const requiredTerminalKind = readString(canonicalGoal?.required_terminal_kind);
+  const selectedTerminalKind = readString(terminalKind) ?? readString(payload.terminal_artifact_kind);
+  const finalAnswerSource = readString(payload.final_answer_source);
+  const actualToolCalls = Array.isArray(loopTrace?.actual_tool_calls) ? loopTrace.actual_tool_calls : [];
+  return (
+    sourceIsModelOnly &&
+    requiredTerminalKind === "direct_answer_text" &&
+    selectedTerminalKind === "direct_answer_text" &&
+    finalAnswerSource !== "typed_failure" &&
+    finalAnswerSource !== "request_user_input" &&
+    readString(goalSatisfaction?.satisfaction) === "satisfied" &&
+    readString(goalSatisfaction?.next_decision) === "allow_terminal" &&
+    admission?.tool_admission_suppressed === true &&
+    /negated_tool_instruction|explanatory_only|contextual/i.test(readString(admission?.suppression_reason) ?? "") &&
+    contextualAudit?.blocked_contextual_tool_executed !== true &&
+    actualToolCalls.length === 0
+  );
+};
+
 const normalizeContinuationReason = (code: string): HelixSolverContinuationReason | null => {
   if (code === "poison_clean_but_authority_failed") return "route_authority_missing";
   if (code === "tool_result_terminal_without_reasoning") return "tool_observation_without_model_reentry";
@@ -142,6 +173,12 @@ export function buildSolverContinuationObservation(input: {
 }): HelixSolverContinuationObservation | null {
   const code = String(input.hardGateCode ?? "").trim();
   if (!RECOVERABLE_SOLVER_FAILURES.has(code)) return null;
+  if (
+    (code === "route_authority_missing" || code === "poison_clean_but_authority_failed") &&
+    modelOnlySuppressedContextualDirectAnswerSatisfied(input.payload, input.terminalKind)
+  ) {
+    return null;
+  }
   const continuationCount = Number(input.payload.solver_continuation_count ?? 0);
   const reason = normalizeContinuationReason(code);
   if (!reason) return null;
