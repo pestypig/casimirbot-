@@ -3,6 +3,7 @@ import type {
   StagePlayLiveSourceMailWakeReasonV1,
   StagePlayLiveSourceMailWakeAskLaunchStatusV1,
   StagePlayLiveSourceMailWakeLifecycleStageV1,
+  StagePlayLiveSourceMailWakeDeckVerdictV1,
   StagePlayLiveSourceMailWakeRequestV1,
   StagePlayLiveSourceMailWakeResultV1,
   StagePlayLiveSourceMailWakeStatusV1,
@@ -28,6 +29,21 @@ const hashShort = (value: unknown, size = 18): string =>
 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)));
+
+const normalizeWakeDeckVerdict = (
+  value: StagePlayLiveSourceMailWakeDeckVerdictV1 | null | undefined,
+): StagePlayLiveSourceMailWakeDeckVerdictV1 | null => {
+  if (!value) return null;
+  const recommendedNext = String(value.recommendedNext ?? "").trim();
+  const reason = String(value.reason ?? "").trim();
+  if (!recommendedNext) return null;
+  return {
+    recommendedNext,
+    wakeAsk: value.wakeAsk === true,
+    voiceCandidate: value.voiceCandidate === true,
+    reason: reason || `Deck selected ${recommendedNext}.`,
+  };
+};
 
 const makeAskLaunchId = (wakeRequestId: string, now: string, attemptCount: number): string =>
   `stage_play_live_source_mail_wake_launch:${hashShort([wakeRequestId, now, attemptCount])}`;
@@ -226,6 +242,11 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
   sourceIds: string[];
   reason?: StagePlayLiveSourceMailWakeReasonV1;
   evidenceRefs?: string[];
+  deckPresetId?: string | null;
+  deckPresetTitle?: string | null;
+  deckRunPlan?: StagePlayLiveSourceMailWakeRequestV1["deckRunPlan"];
+  packetIds?: string[];
+  deckVerdict?: StagePlayLiveSourceMailWakeDeckVerdictV1 | null;
   causalTraces?: Array<LiveSourceCausalTraceV1 | null | undefined>;
   now?: string;
   expiresAfterMs?: number | null;
@@ -233,6 +254,11 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
   const mailIds = uniqueStrings(input.mailIds);
   if (mailIds.length === 0) return null;
   const sourceIds = uniqueStrings(input.sourceIds);
+  const packetIds = uniqueStrings(input.packetIds ?? []);
+  const deckPresetId = input.deckPresetId ?? null;
+  const deckPresetTitle = input.deckPresetTitle ?? null;
+  const deckRunPlan = input.deckRunPlan ?? null;
+  const deckVerdict = normalizeWakeDeckVerdict(input.deckVerdict);
   const now = input.now ?? new Date().toISOString();
   expireStaleStagePlayLiveSourceMailWakeRequests({
     threadId: input.threadId,
@@ -291,8 +317,19 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
         ...queuedSameSource,
         mailIds: uniqueStrings([...queuedSameSource.mailIds, ...appendMailIds]),
         sourceIds: uniqueStrings([...queuedSameSource.sourceIds, ...sourceIds]),
+        deckPresetId: deckPresetId ?? queuedSameSource.deckPresetId ?? null,
+        deckPresetTitle: deckPresetTitle ?? queuedSameSource.deckPresetTitle ?? null,
+        deckRunPlan: deckRunPlan ?? queuedSameSource.deckRunPlan ?? null,
+        packetIds: uniqueStrings([...(queuedSameSource.packetIds ?? []), ...packetIds]),
+        deckVerdict: deckVerdict ?? queuedSameSource.deckVerdict ?? null,
+        lifecycleReason:
+          deckVerdict
+            ? `${deckPresetTitle ?? "Micro-reasoner deck"} selected ${deckVerdict.recommendedNext}: ${deckVerdict.reason}`
+            : queuedSameSource.lifecycleReason,
         evidenceRefs: uniqueStrings([
           ...queuedSameSource.evidenceRefs,
+          deckPresetId,
+          ...packetIds,
           ...appendMailIds,
           ...sourceIds,
           ...(input.evidenceRefs ?? []),
@@ -304,6 +341,8 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
           sourceIds,
           jobId: input.jobId ?? null,
           evidenceRefs: [
+            deckPresetId,
+            ...packetIds,
             ...appendMailIds,
             ...sourceIds,
             ...(input.evidenceRefs ?? []),
@@ -347,15 +386,22 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
     expiresAt: ttlMs ? addMsIso(now, ttlMs) : null,
     supersededByWakeRequestId: null,
     lifecycleStage: "queued",
-    lifecycleReason: "wake_request_queued",
-    evidenceRefs: uniqueStrings([...boundedMailIds, ...sourceIds, ...(input.evidenceRefs ?? [])]),
+    lifecycleReason: deckVerdict
+      ? `${deckPresetTitle ?? "Micro-reasoner deck"} selected ${deckVerdict.recommendedNext}: ${deckVerdict.reason}`
+      : "wake_request_queued",
+    deckPresetId,
+    deckPresetTitle,
+    deckRunPlan,
+    packetIds,
+    deckVerdict,
+    evidenceRefs: uniqueStrings([deckPresetId, ...packetIds, ...boundedMailIds, ...sourceIds, ...(input.evidenceRefs ?? [])]),
     causalTrace: mergeLiveSourceCausalTraces(input.causalTraces ?? [], {
       parentRefs: boundedMailIds,
       causedBy: boundedMailIds,
       producedRefs: [wakeRequestId],
       sourceIds,
       jobId: input.jobId ?? null,
-      evidenceRefs: [...boundedMailIds, ...sourceIds, ...(input.evidenceRefs ?? [])],
+      evidenceRefs: [deckPresetId, ...packetIds, ...boundedMailIds, ...sourceIds, ...(input.evidenceRefs ?? [])],
     }),
     queuedAt: now,
     updatedAt: now,
@@ -577,7 +623,7 @@ export function releaseStaleRunningStagePlayMailWakeRequests(input: {
 
 const updateWake = (
   wakeRequestId: string,
-  patch: Partial<Pick<StagePlayLiveSourceMailWakeRequestV1, "status" | "askTurnId" | "askLaunchId" | "askLaunchStatus" | "askLaunchStartedAt" | "askLaunchCompletedAt" | "askLaunchRouteMetadata" | "routeMetadata" | "decisionIds" | "attemptCount" | "lastAttemptAt" | "nextRetryAt" | "failureReason" | "expiresAt" | "supersededByWakeRequestId" | "lifecycleStage" | "lifecycleReason" | "evidenceRefs" | "updatedAt">>,
+  patch: Partial<Pick<StagePlayLiveSourceMailWakeRequestV1, "status" | "askTurnId" | "askLaunchId" | "askLaunchStatus" | "askLaunchStartedAt" | "askLaunchCompletedAt" | "askLaunchRouteMetadata" | "routeMetadata" | "decisionIds" | "attemptCount" | "lastAttemptAt" | "nextRetryAt" | "failureReason" | "expiresAt" | "supersededByWakeRequestId" | "lifecycleStage" | "lifecycleReason" | "deckPresetId" | "deckPresetTitle" | "deckRunPlan" | "packetIds" | "deckVerdict" | "evidenceRefs" | "updatedAt">>,
 ): StagePlayLiveSourceMailWakeRequestV1 | null => {
   const existing = wakeById.get(wakeRequestId);
   if (!existing) return null;
@@ -585,6 +631,8 @@ const updateWake = (
     ...existing,
     ...patch,
     decisionIds: patch.decisionIds ? uniqueStrings(patch.decisionIds) : existing.decisionIds,
+    packetIds: patch.packetIds ? uniqueStrings(patch.packetIds) : existing.packetIds,
+    deckVerdict: patch.deckVerdict !== undefined ? normalizeWakeDeckVerdict(patch.deckVerdict) : existing.deckVerdict,
     evidenceRefs: patch.evidenceRefs ? uniqueStrings(patch.evidenceRefs) : existing.evidenceRefs,
     lifecycleStage: patch.lifecycleStage ?? existing.lifecycleStage,
     lifecycleReason: patch.lifecycleReason ?? existing.lifecycleReason ?? null,
@@ -592,6 +640,39 @@ const updateWake = (
   };
   wakeById.set(wakeRequestId, updated);
   return updated;
+};
+
+export const attachDeckTraceToWakeRequest = (input: {
+  wakeRequestId: string;
+  deckPresetId?: string | null;
+  deckPresetTitle?: string | null;
+  deckRunPlan?: StagePlayLiveSourceMailWakeRequestV1["deckRunPlan"];
+  packetIds?: string[];
+  deckVerdict?: StagePlayLiveSourceMailWakeDeckVerdictV1 | null;
+  evidenceRefs?: string[];
+  now?: string;
+}): StagePlayLiveSourceMailWakeRequestV1 | null => {
+  const existing = wakeById.get(input.wakeRequestId);
+  if (!existing) return null;
+  const deckVerdict = normalizeWakeDeckVerdict(input.deckVerdict) ?? existing.deckVerdict ?? null;
+  const deckPresetTitle = input.deckPresetTitle ?? existing.deckPresetTitle ?? null;
+  return updateWake(input.wakeRequestId, {
+    deckPresetId: input.deckPresetId ?? existing.deckPresetId ?? null,
+    deckPresetTitle,
+    deckRunPlan: input.deckRunPlan ?? existing.deckRunPlan ?? null,
+    packetIds: uniqueStrings([...(existing.packetIds ?? []), ...(input.packetIds ?? [])]),
+    deckVerdict,
+    lifecycleReason: deckVerdict
+      ? `${deckPresetTitle ?? "Micro-reasoner deck"} selected ${deckVerdict.recommendedNext}: ${deckVerdict.reason}`
+      : existing.lifecycleReason,
+    evidenceRefs: uniqueStrings([
+      ...existing.evidenceRefs,
+      input.deckPresetId ?? existing.deckPresetId,
+      ...(input.packetIds ?? []),
+      ...(input.evidenceRefs ?? []),
+    ]),
+    updatedAt: input.now,
+  });
 };
 
 export const markStagePlayMailWakeRunning = (
@@ -1049,6 +1130,8 @@ export function recordStagePlayMailWakeResult(input: {
   const decisionIds = uniqueStrings([...(existing?.decisionIds ?? []), ...inputDecisionIds]);
   const evidenceRefs = uniqueStrings([...(existing?.evidenceRefs ?? []), ...inputEvidenceRefs]);
   const voiceCheckpointRefs = voiceCheckpointRefsFromEvidence(evidenceRefs);
+  const packetIds = uniqueStrings([...(wake?.packetIds ?? []), ...evidenceRefs.filter((ref) => /^stage_play_processed_mail_packet:/i.test(ref))]);
+  const deckVerdict = normalizeWakeDeckVerdict(wake?.deckVerdict);
   const routeMetadata = wake?.routeMetadata ?? wake?.askLaunchRouteMetadata ?? null;
   const selectedTargetSource =
     typeof routeMetadata?.sourceTarget === "string"
@@ -1081,7 +1164,7 @@ export function recordStagePlayMailWakeResult(input: {
       wakeResultId,
     ]),
     artifactRefs: {
-      processedPacketIds: evidenceRefs.filter((ref) => /^stage_play_processed_mail_packet:/i.test(ref)),
+      processedPacketIds: packetIds,
       decisionIds,
       voiceReceiptIds: voiceCheckpointRefs,
       wakeRequestId: input.wakeRequestId,
@@ -1093,6 +1176,11 @@ export function recordStagePlayMailWakeResult(input: {
     terminalKind: "stage_play_live_source_mail_wake_result",
     failureCode: failedReason,
     failureReason: failedReason,
+    deckPresetId: wake?.deckPresetId ?? null,
+    deckPresetTitle: wake?.deckPresetTitle ?? null,
+    deckRunPlan: wake?.deckRunPlan ?? null,
+    packetIds,
+    deckVerdict,
     assistant_answer: false,
     terminal_eligible: false,
     context_role: "debug_trace",
@@ -1123,8 +1211,15 @@ export function recordStagePlayMailWakeResult(input: {
       status === "deferred_for_pressure"
         ? failedReason ?? "runtime_pressure_deferred_before_ask"
         : status === "completed"
-          ? "wake_result_completion_evidence_satisfied"
+          ? deckVerdict
+            ? `${wake?.deckPresetTitle ?? "Micro-reasoner deck"} selected ${deckVerdict.recommendedNext}: ${deckVerdict.reason}`
+            : "wake_result_completion_evidence_satisfied"
         : failedReason ?? input.skippedReason ?? null,
+    deckPresetId: wake?.deckPresetId ?? null,
+    deckPresetTitle: wake?.deckPresetTitle ?? null,
+    deckRunPlan: wake?.deckRunPlan ?? null,
+    packetIds,
+    deckVerdict,
     stagePlayWakeTransaction,
     evidenceRefs,
     causalTrace: mergeLiveSourceCausalTraces([wake?.causalTrace], {

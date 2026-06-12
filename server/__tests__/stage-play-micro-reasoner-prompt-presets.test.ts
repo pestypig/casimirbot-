@@ -27,6 +27,7 @@ describe("stage play micro-reasoner prompt presets", () => {
 
     expect(presets.map((preset) => preset.presetId)).toContain("stage_play_micro_reasoner_prompt_preset:generic-live-source:v1");
     expect(presets.map((preset) => preset.presetId)).toContain("stage_play_micro_reasoner_prompt_preset:calculator-tool-call:v1");
+    expect(presets.map((preset) => preset.presetId)).toContain("stage_play_micro_reasoner_prompt_preset:minecraft_minimal_operator:v1");
     expect(getActiveStagePlayMicroReasonerPromptPresetForSource({ sourceId: "calculator_source:test" })?.presetId)
       .toBe("stage_play_micro_reasoner_prompt_preset:generic-live-source:v1");
   });
@@ -173,11 +174,184 @@ describe("stage play micro-reasoner prompt presets", () => {
       { role: "decision_selector", title: "Calculator Tool-Call Decision Selector" },
     ]);
     expect(result.packet.recommendedNext).toBe("record_interpretation");
+    expect(result.packet.microReasonerDeck).toMatchObject({
+      presetId: "stage_play_micro_reasoner_prompt_preset:calculator-tool-call:v1",
+      presetTitle: "Calculator Tool-Call Monitor",
+      domain: "calculator_stream",
+      outputPolicy: "tool_call_candidate",
+      promptedRoles: ["claim_extractor", "observation_classifier", "salience_scorer", "decision_selector"],
+      sourceId: "calculator_source:test",
+      deckRunPlan: "baseline_plus_prompted",
+      presetUpdatedAt: "2026-06-04T12:00:00.000Z",
+    });
     expect(result.microReasonerRuns.find((run) => run.role === "decision_selector")).toMatchObject({
       promptId: "stage_play_micro_reasoner_prompt:calculator-tool-call:decision_selector:v1",
+      deckPresetId: "stage_play_micro_reasoner_prompt_preset:calculator-tool-call:v1",
+      deckPresetTitle: "Calculator Tool-Call Monitor",
+      deckRunPlan: "baseline_plus_prompted",
       recommendedNextTool: "calculator.record_result",
       assistant_answer: false,
       terminal_eligible: false,
+      context_role: "micro_reasoner_evidence",
+    });
+  });
+
+  it("applies the Minecraft Minimal Operator deck as a single prompted arbiter", async () => {
+    applyStagePlayMicroReasonerPromptPreset({
+      presetId: "stage_play_micro_reasoner_prompt_preset:minecraft_minimal_operator:v1",
+      sourceIds: ["visual_source:minecraft"],
+      now: "2026-06-04T12:00:00.000Z",
+    });
+    const activePreset = getActiveStagePlayMicroReasonerPromptPresetForSource({ sourceId: "visual_source:minecraft" });
+    const arbiterPrompt = getActiveStagePlayMicroReasonerPromptForRole("hypothesis_arbiter", {
+      sourceId: "visual_source:minecraft",
+    });
+    const calls: Array<{ role: string; title: string }> = [];
+    const executor: StagePlayPromptedMicroReasonerExecutor = async (input) => {
+      calls.push({ role: input.role, title: input.promptTitle });
+      const json = {
+        recommendedNext: "request_voice_callout",
+        wakeAsk: true,
+        reason: "Low health and hostile cue are urgent enough for a callout candidate.",
+        confidence: "high",
+        currentEffort: "combat_or_recovery",
+        axioms: ["health is low", "hostile mob cue is visible"],
+        selectedHypothesis: "recover_or_create_distance",
+        voiceCandidate: true,
+        calloutDraft: "Low health with hostile cue; recover or create distance.",
+        missingEvidence: [],
+      };
+      return {
+        ok: true,
+        text: JSON.stringify(json),
+        json,
+        model: "test-minimal-operator",
+        latencyMs: 4,
+      };
+    };
+
+    const result = await buildStagePlayProcessedMailPacketWithPromptedReasoners({
+      jobId: "stage_play_live_source_job:minecraft",
+      sourceId: "visual_source:minecraft",
+      now: "2026-06-04T12:00:00.000Z",
+      mailItems: [{
+        mailId: "mail:minecraft:1",
+        sourceId: "visual_source:minecraft",
+        sourceKind: "visual_frame",
+        summary: {
+          text: "Minecraft cave scene: low health, hostile mob visible.",
+          preview: "Minecraft cave scene: low health, hostile mob visible.",
+        },
+        sourceRefs: {
+          sourceId: "visual_source:minecraft",
+          evidenceRef: "minecraft_evidence:test",
+          frameRef: "minecraft_frame:test",
+          observationRef: "minecraft_observation:test",
+        },
+        evidenceRefs: ["minecraft_evidence:test", "minecraft_frame:test"],
+      } as any],
+      immersionState: {
+        immersionStateId: "stage_play_immersion_state:minecraft",
+        policyId: null,
+        profileId: null,
+        sourceIds: ["visual_source:minecraft"],
+        latestMailIds: ["mail:minecraft:1"],
+        latestEvidenceRefs: ["minecraft_evidence:test"],
+        sourceIdentity: { label: "Minecraft", confidence: 0.8, stable: true },
+        stableFacts: [],
+        currentSceneFacts: ["Minecraft cave scene: low health, hostile mob visible."],
+        changedFacts: ["hostile mob cue is visible"],
+        uncertainties: [],
+        currentActivity: "combat_or_recovery",
+        salience: {
+          level: "urgent",
+          reasons: ["hostile mob cue", "low health cue"],
+          voiceCandidate: true,
+          calloutDraft: "Low health with hostile cue.",
+        },
+        prediction: null,
+        lastValidation: null,
+        evidenceRefs: ["stage_play_immersion_state:minecraft"],
+        createdAt: "2026-06-04T12:00:00.000Z",
+        assistant_answer: false,
+        terminal_eligible: false,
+        context_role: "tool_evidence",
+      } as any,
+      predictionValidation: {
+        validationId: "stage_play_prediction_validation:minecraft",
+        priorPredictionId: null,
+        result: "no_prior_prediction",
+        supportedSignals: [],
+        contradictedSignals: [],
+        newSignals: ["hostile mob cue is visible"],
+        salienceHint: "urgent",
+        recommendedNext: "request_voice_callout",
+        evidenceRefs: ["stage_play_prediction_validation:minecraft"],
+        createdAt: "2026-06-04T12:00:00.000Z",
+      } as any,
+      promptedMicroReasoners: {
+        enabled: true,
+        executor,
+      },
+    });
+
+    expect(activePreset).toMatchObject({
+      presetId: "stage_play_micro_reasoner_prompt_preset:minecraft_minimal_operator:v1",
+      title: "Minecraft Minimal Operator",
+      promptedRoles: ["hypothesis_arbiter"],
+      outputPolicy: "voice_candidate",
+      deckRunPlan: "minimal_prompted_arbiter",
+    });
+    expect(arbiterPrompt).toMatchObject({
+      promptId: "stage_play_micro_reasoner_prompt:minecraft_minimal_operator_arbiter:v1",
+      title: "Minecraft Minimal Operator Arbiter",
+    });
+    expect(calls).toEqual([
+      { role: "hypothesis_arbiter", title: "Minecraft Minimal Operator Arbiter" },
+    ]);
+    expect(result.packet.microReasonerRunRefs).toEqual([
+      expect.stringContaining("stage_play_micro_reasoner_run:"),
+    ]);
+    expect(result.microReasonerRuns.filter((run) => run.status === "completed").map((run) => run.role)).toEqual([
+      "hypothesis_arbiter",
+    ]);
+    expect(result.microReasonerRuns.filter((run) => run.status === "skipped").map((run) => run.role).sort()).toEqual([
+      "axiom_extractor",
+      "claim_extractor",
+      "decision_selector",
+      "delta_extractor",
+      "effort_estimator",
+      "hypothesis_generator",
+      "observation_classifier",
+      "packet_composer",
+      "prediction_validator",
+      "salience_scorer",
+      "voice_callout_drafter",
+    ]);
+    expect(result.packet).toMatchObject({
+      recommendedNext: "request_voice_callout",
+      effortEstimate: {
+        currentEffort: "combat_or_recovery",
+      },
+      axioms: {
+        axioms: ["health is low", "hostile mob cue is visible"],
+      },
+      microReasonerDeck: {
+        presetId: "stage_play_micro_reasoner_prompt_preset:minecraft_minimal_operator:v1",
+        presetTitle: "Minecraft Minimal Operator",
+        domain: "minecraft_gameplay",
+        outputPolicy: "voice_candidate",
+        promptedRoles: ["hypothesis_arbiter"],
+        deckRunPlan: "minimal_prompted_arbiter",
+      },
+    });
+    expect(result.microReasonerRuns.find((run) => run.role === "hypothesis_arbiter")).toMatchObject({
+      promptId: "stage_play_micro_reasoner_prompt:minecraft_minimal_operator_arbiter:v1",
+      deckPresetId: "stage_play_micro_reasoner_prompt_preset:minecraft_minimal_operator:v1",
+      deckPresetTitle: "Minecraft Minimal Operator",
+      deckRunPlan: "minimal_prompted_arbiter",
+      selectedDecision: "request_voice_callout",
+      voiceCandidate: true,
       context_role: "micro_reasoner_evidence",
     });
   });

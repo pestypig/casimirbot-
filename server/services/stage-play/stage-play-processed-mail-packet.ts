@@ -11,7 +11,9 @@ import {
   type StagePlayLiveSourceMailItemV1,
   type StagePlayLiveSourcePredictionValidationRecommendedNextV1,
   type StagePlayLiveSourcePredictionValidationV1,
+  type StagePlayMicroReasonerDeckTraceV1,
   type StagePlayMicroReasonerRoleV1,
+  type StagePlayMicroReasonerPromptPresetV1,
   type StagePlayMicroReasonerRunV1,
   type StagePlayProcessedMailPacketV1,
   type StagePlaySceneBeatHypothesisV1,
@@ -43,6 +45,93 @@ export type StagePlayProcessedMailPacketTimingEntry = {
 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)));
+
+const deckRunPlanFor = (input: {
+  preset: StagePlayMicroReasonerPromptPresetV1 | null;
+  prompted: boolean;
+  roles?: StagePlayMicroReasonerRoleV1[];
+}): StagePlayMicroReasonerDeckTraceV1["deckRunPlan"] => {
+  if (input.preset?.deckRunPlan) return input.preset.deckRunPlan;
+  const roles = input.roles ?? input.preset?.promptedRoles ?? [];
+  if (
+    input.prompted &&
+    roles.length === 1 &&
+    roles[0] === "hypothesis_arbiter"
+  ) {
+    return "minimal_prompted_arbiter";
+  }
+  if (input.preset?.domain === "custom") return "custom";
+  return input.prompted ? "baseline_plus_prompted" : "full_baseline";
+};
+
+const deckTraceFor = (input: {
+  preset: StagePlayMicroReasonerPromptPresetV1 | null;
+  sourceId: string;
+  deckRunPlan: StagePlayMicroReasonerDeckTraceV1["deckRunPlan"];
+}): StagePlayMicroReasonerDeckTraceV1 | undefined => {
+  if (!input.preset) return undefined;
+  return {
+    presetId: input.preset.presetId,
+    presetTitle: input.preset.title,
+    domain: input.preset.domain,
+    outputPolicy: input.preset.outputPolicy,
+    promptedRoles: input.preset.promptedRoles,
+    baselineRoles: input.preset.baselineRoles,
+    rolePromptIds: input.preset.rolePromptIds,
+    sourceId: input.sourceId,
+    appliedAt: input.preset.updatedAt,
+    deckRunPlan: input.deckRunPlan,
+    wakeCoalescingPolicy: input.preset.wakeCoalescingPolicy,
+    presetUpdatedAt: input.preset.updatedAt ?? null,
+  };
+};
+
+const applyDeckTraceToRun = (
+  run: StagePlayMicroReasonerRunV1,
+  deck: StagePlayMicroReasonerDeckTraceV1 | undefined,
+): StagePlayMicroReasonerRunV1 => {
+  if (!deck) return run;
+  return recordStagePlayMicroReasonerRun({
+    ...run,
+    deckPresetId: deck.presetId,
+    deckPresetTitle: deck.presetTitle,
+    deckRunPlan: deck.deckRunPlan,
+  });
+};
+
+const markRunSkippedByDeckPlan = (input: {
+  run: StagePlayMicroReasonerRunV1;
+  deck: StagePlayMicroReasonerDeckTraceV1 | undefined;
+  now: string;
+}): StagePlayMicroReasonerRunV1 => {
+  const deckTitle = input.deck?.presetTitle ?? "selected MicroDeck";
+  return recordStagePlayMicroReasonerRun({
+    ...input.run,
+    deckPresetId: input.deck?.presetId ?? input.run.deckPresetId ?? null,
+    deckPresetTitle: input.deck?.presetTitle ?? input.run.deckPresetTitle ?? null,
+    deckRunPlan: input.deck?.deckRunPlan ?? input.run.deckRunPlan ?? null,
+    outputRefs: uniqueStrings([
+      ...input.run.outputRefs,
+      "skipped_by_deck_run_plan",
+      input.deck?.deckRunPlan,
+    ]),
+    outputPreview: `Skipped by ${deckTitle}; role is not active for this deck run plan.`,
+    status: "skipped",
+    reasoningMode: "micro_live_interval",
+    selectedDecision: null,
+    voiceCandidate: null,
+    recommendedNextTool: null,
+    confidence: null,
+    latencyMs: 0,
+    tokenEstimateOut: null,
+    error: null,
+    completedAt: input.now,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+    context_role: "micro_reasoner_evidence",
+  });
+};
 
 const clipText = (value: string | null | undefined, limit = 260): string => {
   const normalized = String(value ?? "").replace(/\s+/g, " ").trim();
@@ -728,6 +817,15 @@ const makeRun = (input: {
   causalTrace?: LiveSourceCausalTraceV1;
 }): StagePlayMicroReasonerRunV1 => {
   const activePrompt = getActiveStagePlayMicroReasonerPromptForRole(input.role, { sourceId: input.sourceId });
+  const activePreset = getActiveStagePlayMicroReasonerPromptPresetForSource({ sourceId: input.sourceId });
+  const deck = deckTraceFor({
+    preset: activePreset,
+    sourceId: input.sourceId,
+    deckRunPlan: deckRunPlanFor({
+      preset: activePreset,
+      prompted: false,
+    }),
+  });
   return recordStagePlayMicroReasonerRun({
     artifactId: "stage_play_micro_reasoner_run",
     schemaVersion: STAGE_PLAY_MICRO_REASONER_RUN_SCHEMA,
@@ -739,6 +837,9 @@ const makeRun = (input: {
       input.now,
     ])}`,
     promptId: activePrompt?.promptId ?? null,
+    deckPresetId: deck?.presetId ?? null,
+    deckPresetTitle: deck?.presetTitle ?? null,
+    deckRunPlan: deck?.deckRunPlan ?? null,
     role: input.role,
     jobId: input.jobId,
     sourceId: input.sourceId,
@@ -804,6 +905,14 @@ export function buildStagePlayProcessedMailPacket(input: {
   const mailIds = input.mailItems.map((item) => item.mailId);
   const sourceId = input.sourceId || input.mailItems[0]?.sourceId || "unknown_source";
   const activeMicroReasonerPromptPreset = getActiveStagePlayMicroReasonerPromptPresetForSource({ sourceId });
+  const microReasonerDeck = deckTraceFor({
+    preset: activeMicroReasonerPromptPreset,
+    sourceId,
+    deckRunPlan: deckRunPlanFor({
+      preset: activeMicroReasonerPromptPreset,
+      prompted: false,
+    }),
+  });
   const activePromptSignature = activeMicroReasonerPromptPreset
     ? [
         activeMicroReasonerPromptPreset.presetId,
@@ -1191,6 +1300,7 @@ export function buildStagePlayProcessedMailPacket(input: {
     activityTags: uniqueStrings([input.immersionState.currentActivity, ...structured.activityTags]),
     objectTags: uniqueStrings([...objectTagsFor(input.mailItems, input.immersionState.currentSceneFacts), ...structured.objectTags]),
     profileRef: input.activeProfile?.profileId ?? null,
+    microReasonerDeck,
     matchedCriteria: comparison?.matchedCriteria ?? [],
     suppressedCriteria: comparison?.suppressedCriteria ?? [],
     riskMatches: uniqueStrings([...(comparison?.riskMatches ?? []), ...structured.riskMatches]),
@@ -1227,6 +1337,7 @@ export function buildStagePlayProcessedMailPacket(input: {
       input.predictionValidation.validationId,
       comparison?.comparisonId,
       input.activeProfile?.profileId,
+      microReasonerDeck?.presetId,
       ...microReasonerRuns.map((run) => run.runId),
     ]),
     causalTrace: input.causalTrace,
@@ -1357,9 +1468,27 @@ const applyPromptedMicroReasonerOutput = (input: {
   if (role === "hypothesis_arbiter") {
     const recommendedNext = readStringFromJson(json, "recommendedNext");
     const next = isRecommendedNext(recommendedNext) ? recommendedNext : packet.recommendedNext;
+    const currentEffort = readStringFromJson(json, "currentEffort");
+    const axioms = readStringArrayFromJson(json, "axioms");
     return {
       ...packet,
       recommendedNext: next,
+      effortEstimate: currentEffort
+        ? {
+            currentEffort,
+            evidenceFor: packet.effortEstimate?.evidenceFor ?? [],
+            evidenceAgainst: packet.effortEstimate?.evidenceAgainst ?? [],
+            confidence: packet.effortEstimate?.confidence ?? 0.5,
+            nextLikelyEfforts: packet.effortEstimate?.nextLikelyEfforts ?? [],
+          }
+        : packet.effortEstimate,
+      axioms: axioms.length > 0
+        ? {
+            axioms,
+            missingAxioms: packet.axioms?.missingAxioms ?? [],
+            predictionRelevantVariables: packet.axioms?.predictionRelevantVariables ?? axioms,
+          }
+        : packet.axioms,
       arbiter: {
         recommendedNext: next,
         wakeAsk: readBooleanFromJson(json, "wakeAsk") ?? packet.arbiter?.wakeAsk ?? next !== "wait_for_next_summary",
@@ -1454,10 +1583,20 @@ export async function buildStagePlayProcessedMailPacketWithPromptedReasoners(inp
   const executor = input.promptedMicroReasoners?.executor ?? defaultPromptedMicroReasonerExecutor;
   const sourceId = input.sourceId || input.mailItems[0]?.sourceId || "unknown_source";
   const requestedRoles = promptedRolesForSource(sourceId, input.promptedMicroReasoners);
+  const activeMicroReasonerPromptPreset = getActiveStagePlayMicroReasonerPromptPresetForSource({ sourceId });
+  const microReasonerDeck = deckTraceFor({
+    preset: activeMicroReasonerPromptPreset,
+    sourceId,
+    deckRunPlan: deckRunPlanFor({
+      preset: activeMicroReasonerPromptPreset,
+      prompted: true,
+      roles: requestedRoles,
+    }),
+  });
   const runByRole = new Map(baseline.microReasonerRuns.map((run) => [run.role, run]));
   const promptedOutputs: Record<string, unknown> = {};
   let packet = baseline.packet;
-  const runs = baseline.microReasonerRuns.slice();
+  let runs = baseline.microReasonerRuns.slice();
   const timing = baseline.timing.slice();
 
   for (const role of requestedRoles) {
@@ -1541,12 +1680,30 @@ export async function buildStagePlayProcessedMailPacketWithPromptedReasoners(inp
     runByRole.set(role, updatedRun);
   }
 
+  const minimalPromptedArbiter = microReasonerDeck?.deckRunPlan === "minimal_prompted_arbiter";
+  const requestedRoleSet = new Set<StagePlayMicroReasonerRoleV1>(requestedRoles);
+  const baselineRunIds = new Set(baseline.microReasonerRuns.map((run) => run.runId));
+  const activeDeckRuns = runs
+    .filter((run) => !minimalPromptedArbiter || requestedRoleSet.has(run.role))
+    .map((run) => applyDeckTraceToRun(run, microReasonerDeck));
+  const skippedDeckRuns = minimalPromptedArbiter
+    ? runs
+        .filter((run) => !requestedRoleSet.has(run.role))
+        .map((run) => markRunSkippedByDeckPlan({ run, deck: microReasonerDeck, now }))
+    : [];
+  runs = [...activeDeckRuns, ...skippedDeckRuns];
+  const packetEvidenceRefs = minimalPromptedArbiter
+    ? packet.evidenceRefs.filter((ref) => !baselineRunIds.has(ref))
+    : packet.evidenceRefs;
+
   const finalPacket = recordStagePlayProcessedMailPacket({
     ...packet,
-    microReasonerRunRefs: uniqueStrings(runs.map((run) => run.runId)),
+    microReasonerDeck,
+    microReasonerRunRefs: uniqueStrings(activeDeckRuns.map((run) => run.runId)),
     evidenceRefs: uniqueStrings([
-      ...packet.evidenceRefs,
-      ...runs.map((run) => run.runId),
+      ...packetEvidenceRefs,
+      microReasonerDeck?.presetId,
+      ...activeDeckRuns.map((run) => run.runId),
       ...Object.keys(promptedOutputs).map((role) => `prompted_micro_reasoner:${role}`),
     ]),
     resolutionState: packet.recommendedNext === "request_voice_callout" ? "voice_candidate_prepared" : "processed_packet_ready",

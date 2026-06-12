@@ -943,6 +943,14 @@ The June closure-stack contracts add placeholder-safe runtime artifacts rather t
 
 The source-side same-basis authority receipt follows the same placeholder-safe rule. Its presence is not a source-closure pass by itself; its value is that it prevents a tile-effective scalar, diagonal projection, or metric-shaped proxy from being silently promoted into source-side tensor evidence. A future frozen run should be judged by whether this receipt moves the source-side blocker forward, not by whether the receipt merely exists.
 
+The current operator preflight for this decision is:
+
+```text
+npm run nhm2:source-closure-pass-readiness -- --regional-evidence <regional-evidence.json> --source-authority <source-authority.json> --out-json <readiness.json> --out-md <readiness.md>
+```
+
+This command does not recompute physics and does not produce a full-solve pass. It reads frozen regional source-closure evidence and, when available, the source-side same-basis authority receipt. A `false` pass-readiness result should be treated as a stop-before-recompute signal: retire the named source-authority, counterpart, tensor-authority, basis, conservation, or QEI blocker before spending a full reference-run cycle trying to get a pass.
+
 ## Appendix C. Equation-to-artifact and equation-to-claim map
 
 | Equation / construct | Scientific role | NHM2 use | Claim boundary |

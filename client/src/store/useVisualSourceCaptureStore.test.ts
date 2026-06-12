@@ -74,4 +74,53 @@ describe("visual source capture store", () => {
     expect(producer.last_frame_preview_data_url).toBeNull();
     expect(producer.frame_history).toEqual([]);
   });
+
+  it("appends visual frame history without replacing existing frames", () => {
+    useVisualSourceCaptureStore.getState().upsertProducer({
+      ...baseProducer,
+      frame_history: [historyItem],
+      post_count: 1,
+    });
+
+    const nextItem: VisualSourceCaptureFrameHistoryItem = {
+      ...historyItem,
+      history_id: "history:next",
+      frame_id: "visual_frame:next",
+      evidence_id: "visual_evidence:next",
+      captured_at: "2026-06-11T12:01:00.000Z",
+      preview_data_url: "data:image/jpeg;base64,next",
+      preview_hash: "hash:next",
+      summary: "Captured next frame.",
+      expires_at: "2026-06-11T12:11:00.000Z",
+    };
+
+    useVisualSourceCaptureStore.getState().appendFrameHistory("visual_source:test", nextItem, {
+      last_chunk_id: "chunk:next",
+    });
+
+    const producer = useVisualSourceCaptureStore.getState().producers["visual_source:test"];
+    expect(producer.frame_history?.map((item) => item.history_id)).toEqual(["history:test", "history:next"]);
+    expect(producer.last_frame_hash).toBe("hash:next");
+    expect(producer.last_frame_preview_data_url).toBe("data:image/jpeg;base64,next");
+    expect(producer.last_chunk_id).toBe("chunk:next");
+    expect(producer.post_count).toBe(2);
+  });
+
+  it("keeps appended visual frame history bounded to recent frames", () => {
+    useVisualSourceCaptureStore.getState().upsertProducer(baseProducer);
+
+    for (let index = 0; index < 25; index += 1) {
+      useVisualSourceCaptureStore.getState().appendFrameHistory("visual_source:test", {
+        ...historyItem,
+        history_id: `history:${index}`,
+        captured_at: `2026-06-11T12:${String(index).padStart(2, "0")}:00.000Z`,
+        expires_at: "2026-06-11T13:00:00.000Z",
+      });
+    }
+
+    const producer = useVisualSourceCaptureStore.getState().producers["visual_source:test"];
+    expect(producer.frame_history).toHaveLength(20);
+    expect(producer.frame_history?.[0]?.history_id).toBe("history:5");
+    expect(producer.frame_history?.at(-1)?.history_id).toBe("history:24");
+  });
 });

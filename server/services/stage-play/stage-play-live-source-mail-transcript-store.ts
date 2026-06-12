@@ -43,6 +43,11 @@ export function recordStagePlayLiveSourceMailTranscriptEntries(input: {
   decisionIds?: string[];
   mailIds?: string[];
   sourceIds?: string[];
+  deckPresetId?: string | null;
+  deckPresetTitle?: string | null;
+  deckRunPlan?: string | null;
+  packetIds?: string[];
+  deckVerdict?: StagePlayLiveSourceMailTranscriptEntryV1["deckVerdict"];
   rows: AskTurnTranscriptRowDraftV1[];
   evidenceRefs?: string[];
   causalTrace?: LiveSourceCausalTraceV1;
@@ -52,17 +57,25 @@ export function recordStagePlayLiveSourceMailTranscriptEntries(input: {
   const decisionIds = uniqueStrings(input.decisionIds ?? []);
   const mailIds = uniqueStrings(input.mailIds ?? []);
   const sourceIds = uniqueStrings(input.sourceIds ?? []);
+  const packetIds = uniqueStrings(input.packetIds ?? []);
+  const deckPresetId = input.deckPresetId ?? null;
+  const deckPresetTitle = input.deckPresetTitle ?? null;
+  const deckRunPlan = input.deckRunPlan ?? null;
+  const deckVerdict = input.deckVerdict ?? null;
   const baseEvidenceRefs = uniqueStrings([
     input.wakeRequestId,
     input.wakeResultId,
     input.askTurnId,
+    deckPresetId,
     ...decisionIds,
     ...mailIds,
     ...sourceIds,
+    ...packetIds,
     ...(input.evidenceRefs ?? []),
   ]);
   const entries = input.rows.map((row, index): StagePlayLiveSourceMailTranscriptEntryV1 => {
     const evidenceRefs = uniqueStrings([...baseEvidenceRefs, ...row.evidenceRefs]);
+    const rowPacketIds = uniqueStrings([...packetIds, ...(row.packetIds ?? [])]);
     const entryId = `stage_play_live_source_mail_transcript_entry:${hashShort([
       input.threadId,
       input.wakeRequestId ?? null,
@@ -100,9 +113,19 @@ export function recordStagePlayLiveSourceMailTranscriptEntries(input: {
       decisionIds,
       mailIds,
       sourceIds,
+      deckPresetId: row.deckPresetId ?? deckPresetId,
+      deckPresetTitle: row.deckPresetTitle ?? deckPresetTitle,
+      deckRunPlan: row.deckRunPlan ?? deckRunPlan,
+      packetIds: rowPacketIds,
+      deckVerdict: row.deckVerdict ?? deckVerdict,
       sequence: index,
       row: {
         ...row,
+        deckPresetId: row.deckPresetId ?? deckPresetId,
+        deckPresetTitle: row.deckPresetTitle ?? deckPresetTitle,
+        deckRunPlan: row.deckRunPlan ?? deckRunPlan,
+        packetIds: rowPacketIds,
+        deckVerdict: row.deckVerdict ?? deckVerdict,
         evidenceRefs,
         causalTrace,
         assistantAnswer: false,

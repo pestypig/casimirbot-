@@ -1,6 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
 import {
-  Check,
   ChevronDown,
   FileImage,
   Image as ImageIcon,
@@ -9,7 +8,6 @@ import {
   RotateCcw,
   Scissors,
   Trash2,
-  X,
 } from "lucide-react";
 import {
   DOCUMENT_IMAGE_REGION_KIND_VALUES,
@@ -18,8 +16,6 @@ import {
   type DocumentImageSourceKindV1,
 } from "@shared/contracts/document-image-region-receipt.v1";
 import {
-  DEFAULT_DOCUMENT_IMAGE_OBSERVER_PROFILE_ID,
-  DEFAULT_DOCUMENT_IMAGE_SHADE_PROMPT_ID,
   buildDocumentImageRegionReceipt,
   clampDocumentImageBbox,
   cropImageToDataUrl,
@@ -28,12 +24,23 @@ import {
 import { emitHelixAskLiveEvent } from "@/lib/helix/liveEventsBus";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 import { useDocumentImageRegionStore, type DocumentImageRegionState } from "@/store/useDocumentImageRegionStore";
-import { useVisualSourceCaptureStore } from "@/store/useVisualSourceCaptureStore";
+import {
+  VISUAL_SOURCE_FRAME_HISTORY_TTL_MS,
+  useVisualSourceCaptureStore,
+  type VisualSourceCaptureFrameHistoryItem,
+} from "@/store/useVisualSourceCaptureStore";
 
 type DragState = {
   pointerId: number;
   startClientX: number;
   startClientY: number;
+};
+
+type SentFrameState = {
+  sourceId: string;
+  frameId: string | null;
+  evidenceId: string | null;
+  summary: string;
 };
 
 const SOURCE_KIND_LABELS: Record<DocumentImageSourceKindV1, string> = {
@@ -60,6 +67,66 @@ function buildImageSourceId(value: string): string {
 function openLiveAnswerPanel(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent("open-helix-panel", { detail: { id: "live-answer-environment" } }));
+}
+
+function readRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function readString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+async function fetchJson(path: string): Promise<Record<string, unknown> | null> {
+  const response = await fetch(path, { headers: { Accept: "application/json" } });
+  if (!response.ok) return null;
+  return readRecord(await response.json().catch(() => null));
+}
+
+async function postJson(path: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  const payload = readRecord(await response.json().catch(() => null)) ?? {};
+  if (!response.ok) {
+    const error = readString(payload.error) ?? readString(payload.message) ?? `request_failed:${response.status}`;
+    throw new Error(error);
+  }
+  return payload;
+}
+
+async function resolveLiveAnswerVisualSource(): Promise<{ sourceId: string; environmentId: string | null; pipelineId: string | null }> {
+  const latest = await fetchJson(`/api/agi/situation/visual-frame/latest?thread_id=${encodeURIComponent(HELIX_ASK_CONTEXT_ID.desktop)}`);
+  const activeSource = readRecord(latest?.active_source) ?? readRecord(latest?.source);
+  const activeSourceId = readString(activeSource?.source_id);
+  if (activeSourceId) {
+    return {
+      sourceId: activeSourceId,
+      environmentId: readString(activeSource?.environment_id),
+      pipelineId: readString(activeSource?.pipeline_id),
+    };
+  }
+
+  const receipt = await postJson("/api/agi/situation/visual-source/start", {
+    thread_id: HELIX_ASK_CONTEXT_ID.desktop,
+    room_id: null,
+    session_id: "image_lens_manual_upload",
+    capture_mode: "manual",
+    source_surface: "manual_upload",
+    source_family: "visual_snapshot",
+    status: "active",
+    raw_image_storage_policy: "ephemeral",
+  });
+  const source = readRecord(receipt.source);
+  const sourceId = readString(source?.source_id);
+  if (!sourceId) throw new Error("visual_source_start_missing_source_id");
+  return {
+    sourceId,
+    environmentId: readString(source?.environment_id),
+    pipelineId: readString(source?.pipeline_id),
+  };
 }
 
 function pointToNaturalBbox(
@@ -97,6 +164,7 @@ export default function ImageLensPanel() {
   const [kind, setKind] = useState<DocumentImageRegionKindV1>("unknown");
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [dragState, setDragState] = useState<DragState | null>(null);
+  const [lastSentFrame, setLastSentFrame] = useState<SentFrameState | null>(null);
   const [statusMessage, setStatusMessage] = useState("Load an image, drag a crop region, then send the crop as a visual-source frame.");
   const source = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.source);
   const naturalSize = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.naturalSize);
@@ -106,7 +174,6 @@ export default function ImageLensPanel() {
   const setNaturalSize = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.setNaturalSize);
   const setCropDraft = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.setCropDraft);
   const addReceipt = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.addReceipt);
-  const updateReceiptStatus = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.updateReceiptStatus);
   const clearReceipts = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.clearReceipts);
 
   const clampedCrop = useMemo(() => {
@@ -200,6 +267,7 @@ export default function ImageLensPanel() {
       setStatusMessage("Load an image before sending a visual-source frame.");
       return;
     }
+    setStatusMessage("Sending crop frame to Live Answer visual source...");
     const img = imageRef.current;
     const bboxPx = clampDocumentImageBbox(cropDraft, naturalSize);
     let imageRefValue = `${source.sourceImageUrl}#crop=${bboxPx.x},${bboxPx.y},${bboxPx.width},${bboxPx.height}`;
@@ -207,11 +275,17 @@ export default function ImageLensPanel() {
       try {
         imageRefValue = await cropImageToDataUrl(img, bboxPx);
       } catch {
-        imageRefValue = `${source.sourceImageUrl}#crop=${bboxPx.x},${bboxPx.y},${bboxPx.width},${bboxPx.height}`;
+        imageRefValue = source.sourceImageUrl.startsWith("data:image/")
+          ? source.sourceImageUrl
+          : `${source.sourceImageUrl}#crop=${bboxPx.x},${bboxPx.y},${bboxPx.width},${bboxPx.height}`;
       }
     }
+    if (!imageRefValue.startsWith("data:image/")) {
+      setStatusMessage("The crop could not be converted into an inline image frame. Use a local image or a CORS-readable image URL.");
+      return;
+    }
 
-    const summary = `Manual crop frame from Image Lens (${bboxPx.width}x${bboxPx.height}px). Use Live Answer visual shades for interpretation.`;
+    const summary = `Manual crop frame from Image Lens (${bboxPx.width}x${bboxPx.height}px). Live Answer visual shades own interpretation.`;
     const receipt = buildDocumentImageRegionReceipt({
       sourceAttachmentId: source.sourceAttachmentId,
       sourceKind: source.sourceKind,
@@ -224,57 +298,110 @@ export default function ImageLensPanel() {
       confidence: 0.5,
       summary,
       status: "candidate",
-      observerProfileId: DEFAULT_DOCUMENT_IMAGE_OBSERVER_PROFILE_ID,
-      shadePromptId: DEFAULT_DOCUMENT_IMAGE_SHADE_PROMPT_ID,
       nearbyText: summary,
     });
 
-    addReceipt(receipt);
-    useVisualSourceCaptureStore.getState().upsertProducer({
-      source_id: receipt.visualSource.sourceId,
-      thread_id: HELIX_ASK_CONTEXT_ID.desktop,
-      stream_active: true,
-      track_ready_state: "live",
-      capture_mode: "manual",
-      cadence_ms: null,
-      last_frame_at: receipt.generatedAt,
-      last_frame_hash: receipt.crop.imageHash,
-      last_frame_preview_data_url: receipt.crop.imageRef.startsWith("data:image/") ? receipt.crop.imageRef : null,
-      frame_history: [
-        {
-          history_id: `history:${receipt.crop.regionId}`,
-          source_id: receipt.visualSource.sourceId,
-          frame_id: receipt.visualSource.frameId,
-          evidence_id: receipt.crop.regionId,
-          captured_at: receipt.generatedAt,
-          preview_data_url: receipt.crop.imageRef.startsWith("data:image/") ? receipt.crop.imageRef : source.sourceImageUrl,
-          preview_hash: receipt.crop.imageHash,
-          summary: receipt.classification.summary,
-          visual_observer_profile_id: receipt.visualSource.observerProfileId,
-          visual_observer_profile_title: "Image Lens manual frame",
-          visual_prompt_hash: receipt.visualSource.shadePromptId
-            ? hashDocumentImageString(receipt.visualSource.shadePromptId)
-            : null,
-          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    try {
+      const visualSource = await resolveLiveAnswerVisualSource();
+      const now = new Date().toISOString();
+      useVisualSourceCaptureStore.getState().upsertProducer({
+        source_id: visualSource.sourceId,
+        thread_id: HELIX_ASK_CONTEXT_ID.desktop,
+        environment_id: visualSource.environmentId,
+        pipeline_id: visualSource.pipelineId,
+        stream_active: true,
+        interval_active: false,
+        track_ready_state: "live",
+        capture_mode: "manual",
+        cadence_ms: null,
+        last_heartbeat_at: now,
+        last_error: null,
+      });
+
+      const analysis = await postJson("/api/agi/situation/visual-frame/analyze", {
+        thread_id: HELIX_ASK_CONTEXT_ID.desktop,
+        room_id: null,
+        source_id: visualSource.sourceId,
+        environment_id: visualSource.environmentId,
+        capture_mode: "manual",
+        image_data_url: imageRefValue,
+        mime_type: imageRefValue.slice(0, 32).includes("image/png") ? "image/png" : "image/jpeg",
+        objective: "Image Lens manual crop frame for Live Answer visual-source analysis.",
+        related_event_refs: [receipt.crop.regionId],
+      });
+
+      const evidence = readRecord(analysis.evidence);
+      const frameId = readString(evidence?.frame_id);
+      const evidenceId = readString(evidence?.evidence_id);
+      const chunk = readRecord(analysis.live_source_chunk);
+      const chunkId = readString(chunk?.chunk_id);
+      const analyzedSummary =
+        readString(evidence?.summary) ??
+        "Image Lens crop frame submitted to Live Answer visual source.";
+      const frameAt = new Date().toISOString();
+      const frameHistoryNowMs = Date.parse(frameAt);
+      const frameHistoryItem: VisualSourceCaptureFrameHistoryItem = {
+        history_id: `${frameId ?? "image-lens"}:${receipt.crop.imageHash}:${frameHistoryNowMs}`,
+        source_id: visualSource.sourceId,
+        frame_id: frameId,
+        evidence_id: evidenceId,
+        captured_at: frameAt,
+        preview_data_url: imageRefValue,
+        preview_hash: receipt.crop.imageHash,
+        summary: analyzedSummary,
+        visual_observer_profile_id: readString(evidence?.visual_observer_profile_id),
+        visual_observer_profile_title: readString(evidence?.visual_observer_profile_title),
+        visual_prompt_hash: readString(evidence?.visual_prompt_hash),
+        expires_at: new Date(frameHistoryNowMs + VISUAL_SOURCE_FRAME_HISTORY_TTL_MS).toISOString(),
+      };
+      const analyzedReceipt = {
+        ...receipt,
+        visualSource: {
+          ...receipt.visualSource,
+          sourceId: visualSource.sourceId,
+          frameId: frameId ?? receipt.visualSource.frameId,
         },
-      ],
-    });
-    emitHelixAskLiveEvent({
-      contextId: HELIX_ASK_CONTEXT_ID.desktop,
-      entry: {
-        id: `image-lens-region:${receipt.crop.regionId}`,
-        ts: receipt.generatedAt,
-        text: `Image Lens sent a manual crop frame ${receipt.crop.regionId} to the visual source; candidate only, not proof authority.`,
-        tool: "image-lens.region_receipt",
-        meta: {
-          artifact_kind: "document_image_region_receipt/v1",
-          assistant_answer: false,
-          terminal_eligible: false,
-          receipt,
+        classification: {
+          ...receipt.classification,
+          summary: analyzedSummary,
         },
-      },
-    });
-    setStatusMessage("Crop frame sent to Live Answer visual source.");
+      };
+      addReceipt(analyzedReceipt);
+      useVisualSourceCaptureStore.getState().appendFrameHistory(visualSource.sourceId, frameHistoryItem, {
+        last_chunk_id: chunkId,
+        pending_analysis_job_id: Array.isArray(analysis.live_source_analysis_jobs)
+          ? readString(readRecord(analysis.live_source_analysis_jobs.at(-1))?.job_id)
+          : null,
+      });
+      setLastSentFrame({
+        sourceId: visualSource.sourceId,
+        frameId,
+        evidenceId,
+        summary: analyzedSummary,
+      });
+      emitHelixAskLiveEvent({
+        contextId: HELIX_ASK_CONTEXT_ID.desktop,
+        entry: {
+          id: `image-lens-region:${receipt.crop.regionId}`,
+          ts: frameAt,
+          text: `Image Lens sent a manual crop frame ${receipt.crop.regionId} to Live Answer visual evidence; observation only, not answer authority.`,
+          tool: "image-lens.visual_frame",
+          meta: {
+            artifact_kind: "helix.visual_frame_evidence",
+            assistant_answer: false,
+            terminal_eligible: false,
+            receipt: analyzedReceipt,
+            source_id: visualSource.sourceId,
+            frame_id: frameId,
+            evidence_id: evidenceId,
+          },
+        },
+      });
+      setStatusMessage("Crop frame sent to Live Answer visual source.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "visual_frame_send_failed";
+      setStatusMessage(`Could not send crop frame to Live Answer: ${message}`);
+    }
   };
 
   return (
@@ -349,14 +476,6 @@ export default function ImageLensPanel() {
           </button>
           <button
             type="button"
-            onClick={openLiveAnswerPanel}
-            className="inline-flex items-center gap-1 rounded border border-violet-400/40 bg-violet-500/10 px-2 py-1.5 text-xs text-violet-100 hover:bg-violet-500/20"
-          >
-            <ImageIcon className="h-3.5 w-3.5" />
-            Open Live Answer
-          </button>
-          <button
-            type="button"
             onClick={useFullImage}
             disabled={!naturalSize}
             className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-slate-200 hover:bg-white/10 disabled:opacity-50"
@@ -366,6 +485,22 @@ export default function ImageLensPanel() {
           </button>
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-slate-400">{statusMessage}</p>
+        {lastSentFrame ? (
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-emerald-400/30 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-100">
+            <span className="min-w-0 flex-1 truncate">
+              Sent to Live Answer source {lastSentFrame.sourceId}
+              {lastSentFrame.evidenceId ? ` - evidence ${lastSentFrame.evidenceId}` : ""}
+            </span>
+            <button
+              type="button"
+              onClick={openLiveAnswerPanel}
+              className="inline-flex items-center gap-1 rounded border border-emerald-300/40 px-2 py-1 text-[11px] hover:bg-emerald-500/20"
+            >
+              <ImageIcon className="h-3.5 w-3.5" />
+              Open Live Answer
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -486,7 +621,7 @@ export default function ImageLensPanel() {
         <div className="max-h-56 overflow-auto border-t border-white/10 bg-black/20 p-3">
           <div className="mb-2 flex items-center justify-between">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">Manual visual-source frames</div>
-            <div className="text-[11px] text-slate-500">candidate only / not proof authority</div>
+            <div className="text-[11px] text-slate-500">observation only / not answer authority</div>
           </div>
           {receipts.length === 0 ? (
             <p className="text-xs text-slate-500">No crop frames sent yet.</p>
@@ -498,31 +633,14 @@ export default function ImageLensPanel() {
                     <div className="font-medium text-slate-100">
                       {receipt.classification.kind} - {receipt.extraction.status}
                     </div>
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => updateReceiptStatus(receipt.crop.regionId, "confirmed")}
-                        className="inline-flex items-center gap-1 rounded border border-emerald-400/30 px-1.5 py-1 text-[11px] text-emerald-100 hover:bg-emerald-500/10"
-                      >
-                        <Check className="h-3 w-3" />
-                        Confirm candidate
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateReceiptStatus(receipt.crop.regionId, "rejected")}
-                        className="inline-flex items-center gap-1 rounded border border-rose-400/30 px-1.5 py-1 text-[11px] text-rose-100 hover:bg-rose-500/10"
-                      >
-                        <X className="h-3 w-3" />
-                        Reject
-                      </button>
-                    </div>
+                    <div className="text-[11px] text-slate-500">source {receipt.visualSource.sourceId}</div>
                   </div>
                   <p className="mt-1 text-slate-300">{receipt.classification.summary}</p>
                   <p className="mt-1 break-all text-[11px] text-slate-500">
                     {receipt.crop.regionId} - bbox={receipt.crop.bboxPx.x},{receipt.crop.bboxPx.y},{receipt.crop.bboxPx.width},{receipt.crop.bboxPx.height} - hash={receipt.crop.imageHash}
                   </p>
                   <p className="mt-1 text-[11px] text-amber-200">
-                    Claim boundary: visual crop candidate only; not proof authority.
+                    Claim boundary: visual crop observation only; not answer authority.
                   </p>
                 </article>
               ))}

@@ -41,9 +41,25 @@ export type VisualSourceCaptureState = {
   last_error?: string | null;
 };
 
+export const VISUAL_SOURCE_FRAME_HISTORY_LIMIT = 20;
+export const VISUAL_SOURCE_FRAME_HISTORY_TTL_MS = 10 * 60 * 1000;
+
+export const pruneVisualSourceFrameHistory = (
+  history: VisualSourceCaptureFrameHistoryItem[],
+  nowMs: number,
+): VisualSourceCaptureFrameHistoryItem[] =>
+  history
+    .filter((item: VisualSourceCaptureFrameHistoryItem) => Date.parse(item.expires_at) > nowMs)
+    .slice(-VISUAL_SOURCE_FRAME_HISTORY_LIMIT);
+
 type VisualSourceCaptureStore = {
   producers: Record<string, VisualSourceCaptureState>;
   upsertProducer: (state: VisualSourceCaptureState) => void;
+  appendFrameHistory: (
+    sourceId: string,
+    frame: VisualSourceCaptureFrameHistoryItem,
+    patch?: Partial<VisualSourceCaptureState>,
+  ) => void;
   patchProducer: (sourceId: string, patch: Partial<VisualSourceCaptureState>) => void;
   removeProducer: (sourceId: string) => void;
 };
@@ -67,6 +83,36 @@ export const useVisualSourceCaptureStore = create<VisualSourceCaptureStore>((set
               ? state.last_frame_preview_data_url ?? null
               : existing?.last_frame_preview_data_url ?? null,
             frame_history: hasFrameHistory ? state.frame_history : existing?.frame_history,
+          },
+        },
+      };
+    }),
+  appendFrameHistory: (
+    sourceId: string,
+    frame: VisualSourceCaptureFrameHistoryItem,
+    patch: Partial<VisualSourceCaptureState> = {},
+  ) =>
+    set((current: VisualSourceCaptureStore) => {
+      const existing = current.producers[sourceId];
+      if (!existing) return current;
+      const nowMs = Date.parse(frame.captured_at);
+      const nextHistory = pruneVisualSourceFrameHistory(
+        [...(existing.frame_history ?? []), frame],
+        Number.isFinite(nowMs) ? nowMs : Date.now(),
+      );
+      return {
+        producers: {
+          ...current.producers,
+          [sourceId]: {
+            ...existing,
+            ...patch,
+            last_frame_at: patch.last_frame_at ?? frame.captured_at,
+            last_heartbeat_at: patch.last_heartbeat_at ?? frame.captured_at,
+            last_frame_hash: patch.last_frame_hash ?? frame.preview_hash,
+            last_frame_preview_data_url: patch.last_frame_preview_data_url ?? frame.preview_data_url,
+            post_count: patch.post_count ?? (existing.post_count ?? 0) + 1,
+            frame_history: nextHistory,
+            last_error: patch.last_error ?? null,
           },
         },
       };

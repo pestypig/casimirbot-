@@ -388,6 +388,18 @@ export type StagePlayMicroReasonerPromptV1 = {
   context_role: "tool_policy";
 };
 
+export type StagePlayMicroReasonerDeckRunPlanV1 =
+  | "full_baseline"
+  | "baseline_plus_prompted"
+  | "minimal_prompted_arbiter"
+  | "custom";
+
+export type StagePlayMicroReasonerWakeCoalescingPolicyV1 = {
+  coalescePendingSameSource: boolean;
+  supersedeOnlyBeforeAskTurn: true;
+  preserveSupersededRefs: true;
+};
+
 export type StagePlayMicroReasonerPromptPresetV1 = {
   artifactId: "stage_play_micro_reasoner_prompt_preset";
   schemaVersion: typeof STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA;
@@ -405,6 +417,9 @@ export type StagePlayMicroReasonerPromptPresetV1 = {
   sourceIds: string[];
   rolePromptIds: Partial<Record<StagePlayMicroReasonerRoleV1, string>>;
   promptedRoles: StagePlayMicroReasonerRoleV1[];
+  deckRunPlan: StagePlayMicroReasonerDeckRunPlanV1;
+  baselineRoles?: StagePlayMicroReasonerRoleV1[];
+  wakeCoalescingPolicy?: StagePlayMicroReasonerWakeCoalescingPolicyV1;
   outputPolicy: "watch_officer" | "tool_call_candidate" | "voice_candidate" | "record_only";
   active: boolean;
   createdAt: string;
@@ -414,11 +429,29 @@ export type StagePlayMicroReasonerPromptPresetV1 = {
   context_role: "tool_policy";
 };
 
+export type StagePlayMicroReasonerDeckTraceV1 = {
+  presetId: string;
+  presetTitle: string;
+  domain: StagePlayMicroReasonerPromptPresetV1["domain"];
+  outputPolicy: StagePlayMicroReasonerPromptPresetV1["outputPolicy"];
+  promptedRoles: StagePlayMicroReasonerRoleV1[];
+  baselineRoles?: StagePlayMicroReasonerRoleV1[];
+  rolePromptIds: Partial<Record<StagePlayMicroReasonerRoleV1, string>>;
+  sourceId: string;
+  appliedAt: string;
+  deckRunPlan: StagePlayMicroReasonerDeckRunPlanV1;
+  wakeCoalescingPolicy?: StagePlayMicroReasonerWakeCoalescingPolicyV1;
+  presetUpdatedAt?: string | null;
+};
+
 export type StagePlayMicroReasonerRunV1 = {
   artifactId: "stage_play_micro_reasoner_run";
   schemaVersion: typeof STAGE_PLAY_MICRO_REASONER_RUN_SCHEMA;
   runId: string;
   promptId?: string | null;
+  deckPresetId?: string | null;
+  deckPresetTitle?: string | null;
+  deckRunPlan?: StagePlayMicroReasonerDeckRunPlanV1 | null;
   role: StagePlayMicroReasonerRoleV1;
   jobId: string;
   sourceId: string;
@@ -516,6 +549,7 @@ export type StagePlayProcessedMailPacketV1 = {
   activityTags: string[];
   objectTags: string[];
   profileRef?: string | null;
+  microReasonerDeck?: StagePlayMicroReasonerDeckTraceV1;
   matchedCriteria: string[];
   suppressedCriteria: string[];
   riskMatches: string[];
@@ -873,6 +907,16 @@ export type AskTurnTranscriptRowDraftV1 = {
     artifactKind?: string | null;
   };
   evidenceRefs: string[];
+  deckPresetId?: string | null;
+  deckPresetTitle?: string | null;
+  deckRunPlan?: StagePlayMicroReasonerDeckRunPlanV1 | string | null;
+  packetIds?: string[];
+  deckVerdict?: {
+    recommendedNext: string;
+    wakeAsk: boolean;
+    voiceCandidate: boolean;
+    reason: string;
+  } | null;
   causalTrace?: LiveSourceCausalTraceV1;
   authority: "tool_evidence" | "model_decision_receipt" | "generated_prompt" | "model_synthesized_answer" | "blocked";
   assistantAnswer: boolean;
@@ -893,6 +937,16 @@ export type StagePlayLiveSourceMailTranscriptEntryV1 = {
   decisionIds: string[];
   mailIds: string[];
   sourceIds: string[];
+  deckPresetId?: string | null;
+  deckPresetTitle?: string | null;
+  deckRunPlan?: StagePlayMicroReasonerDeckRunPlanV1 | string | null;
+  packetIds?: string[];
+  deckVerdict?: {
+    recommendedNext: string;
+    wakeAsk: boolean;
+    voiceCandidate: boolean;
+    reason: string;
+  } | null;
   sequence: number;
   row: AskTurnTranscriptRowDraftV1;
   evidenceRefs: string[];

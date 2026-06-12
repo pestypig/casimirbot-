@@ -1,4 +1,7 @@
-import type { LiveSourceCausalTraceV1 } from "./stage-play-live-source-mail.v1";
+import type {
+  LiveSourceCausalTraceV1,
+  StagePlayMicroReasonerDeckRunPlanV1,
+} from "./stage-play-live-source-mail.v1";
 
 export const STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_REQUEST_SCHEMA = "stage_play_live_source_mail_wake_request/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_RESULT_SCHEMA = "stage_play_live_source_mail_wake_result/v1" as const;
@@ -45,6 +48,13 @@ export type StagePlayLiveSourceMailWakeAskLaunchStatusV1 =
   | "completed"
   | "failed";
 
+export type StagePlayLiveSourceMailWakeDeckVerdictV1 = {
+  recommendedNext: string;
+  wakeAsk: boolean;
+  voiceCandidate: boolean;
+  reason: string;
+};
+
 export type StagePlayLiveSourceMailWakeRequestV1 = {
   artifactId: "stage_play_live_source_mail_wake_request";
   schemaVersion: typeof STAGE_PLAY_LIVE_SOURCE_MAIL_WAKE_REQUEST_SCHEMA;
@@ -73,6 +83,11 @@ export type StagePlayLiveSourceMailWakeRequestV1 = {
   supersededByWakeRequestId?: string | null;
   lifecycleStage?: StagePlayLiveSourceMailWakeLifecycleStageV1;
   lifecycleReason?: string | null;
+  deckPresetId?: string | null;
+  deckPresetTitle?: string | null;
+  deckRunPlan?: StagePlayMicroReasonerDeckRunPlanV1 | string | null;
+  packetIds?: string[];
+  deckVerdict?: StagePlayLiveSourceMailWakeDeckVerdictV1 | null;
   evidenceRefs: string[];
   causalTrace?: LiveSourceCausalTraceV1;
   queuedAt: string;
@@ -108,6 +123,11 @@ export type StagePlayLiveSourceMailWakeResultV1 = {
   failedReason?: string | null;
   lifecycleStage?: StagePlayLiveSourceMailWakeLifecycleStageV1;
   lifecycleReason?: string | null;
+  deckPresetId?: string | null;
+  deckPresetTitle?: string | null;
+  deckRunPlan?: StagePlayMicroReasonerDeckRunPlanV1 | string | null;
+  packetIds?: string[];
+  deckVerdict?: StagePlayLiveSourceMailWakeDeckVerdictV1 | null;
   stagePlayWakeTransaction?: {
     schema: "stage_play_wake_transaction_debug/v1";
     wakeRequestId: string;
@@ -132,6 +152,11 @@ export type StagePlayLiveSourceMailWakeResultV1 = {
     terminalKind?: string | null;
     failureCode?: string | null;
     failureReason?: string | null;
+    deckPresetId?: string | null;
+    deckPresetTitle?: string | null;
+    deckRunPlan?: StagePlayMicroReasonerDeckRunPlanV1 | string | null;
+    packetIds?: string[];
+    deckVerdict?: StagePlayLiveSourceMailWakeDeckVerdictV1 | null;
     assistant_answer: false;
     terminal_eligible: false;
     context_role: "debug_trace";

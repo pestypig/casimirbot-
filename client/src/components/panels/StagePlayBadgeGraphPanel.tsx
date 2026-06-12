@@ -30,6 +30,7 @@ import type {
   StagePlayLiveSourceMailWakeRequestV1,
   StagePlayLiveSourceMailWakeResultV1,
 } from "@shared/contracts/stage-play-live-source-mail-wake.v1";
+import type { LiveSourceBudgetStateV1 } from "@shared/contracts/stage-play-live-source-current-state.v1";
 import type { StagePlayRawSessionBufferEntryV1 } from "@shared/stage-play-raw-session-buffer";
 import type {
   StagePlayBuilderCatalogV1,
@@ -226,6 +227,61 @@ type StagePlayCheckpointQueueStatus = {
 
 type StagePlayCheckpointRequest = NonNullable<StagePlayBadgeGraphV1["checkpointRequests"]>[number];
 
+type StagePlayMailLoopWorkBudgetV1 = {
+  schema: "stage_play_mail_loop_work_budget/v1";
+  now?: string;
+  selectedDeck?: {
+    presetId?: string | null;
+    title?: string | null;
+    domain?: string | null;
+    outputPolicy?: string | null;
+    promptedRoles?: string[];
+    roleCount?: number;
+  } | null;
+  limits?: {
+    maxVisiblePackets?: number;
+    maxActivePackets?: number;
+    maxQueuedPackets?: number;
+    maxReasonerRolesPerPacket?: number;
+    maxConcurrentReasonerRuns?: number;
+    maxReasonerRunsPerMinute?: number;
+    maxActiveAskWakes?: number;
+    dropPolicy?: string;
+  };
+  usage?: {
+    retainedMailCount?: number;
+    processedPacketCount?: number;
+    activePacketCount?: number;
+    mailPerMinute?: number;
+    packetsPerMinute?: number;
+    rolesPerPacket?: number;
+    estimatedDeckCallsPerMinute?: number;
+    reasonerRunsPerMinute?: number;
+    visibleReasonerRuns?: number;
+    queuedWakeCount?: number;
+    runningWakeCount?: number;
+    deferredWakeCount?: number;
+    activeAskWakeCount?: number;
+    completedWakeResults?: number;
+    budgetStateCount?: number;
+  };
+  pressure?: {
+    level?: "normal" | "watch" | "limited" | string;
+    ratio?: number;
+    reasons?: string[];
+    queueLoad?: number;
+    packetLoad?: number;
+    reasonerLoad?: number;
+    estimatedReasonerLoad?: number;
+    askLoad?: number;
+  };
+  allowedNextAction?: string;
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_evidence";
+  raw_content_included: false;
+};
+
 type StagePlayLiveSourceMailListResponse = {
   ok: boolean;
   schema: "stage_play_live_source_mail_list_response/v1";
@@ -280,6 +336,8 @@ type StagePlayLiveSourceMailListResponse = {
   narrativeStates?: StagePlayLiveSourceNarrativeStateV1[];
   wakeRequests?: StagePlayLiveSourceMailWakeRequestV1[];
   wakeResults?: StagePlayLiveSourceMailWakeResultV1[];
+  budgetStates?: LiveSourceBudgetStateV1[];
+  mailLoopWorkBudget?: StagePlayMailLoopWorkBudgetV1 | null;
   assistant_answer: false;
   terminal_eligible: false;
   context_role: "tool_evidence";
@@ -497,6 +555,12 @@ type StagePlayPacketTrafficViewV1 = {
     heapMb?: number | null;
     rssMb?: number | null;
     pressure?: string | null;
+    rolesPerPacket?: number | null;
+    estimatedDeckCallsPerMinute?: number | null;
+    reasonerRunsPerMinute?: number | null;
+    estimatedReasonerLoad?: number | null;
+    activePacketLoad?: number | null;
+    queueLoad?: number | null;
   };
 };
 
@@ -2210,6 +2274,9 @@ function StagePlayTrafficHeader({
   heapRamLabel,
   rssRamLabel,
   pressureTone,
+  workBudgetLabel,
+  workBudgetTone,
+  deckBudgetLabel,
 }: {
   cadenceMs: number;
   mailAgeMs: number | null;
@@ -2223,16 +2290,21 @@ function StagePlayTrafficHeader({
   heapRamLabel: string;
   rssRamLabel: string;
   pressureTone: "good" | "warn" | "blocked" | "default";
+  workBudgetLabel: string;
+  workBudgetTone: "good" | "warn" | "blocked" | "default";
+  deckBudgetLabel: string;
 }) {
   return (
     <div className="rounded-md border border-slate-800 bg-black/25 p-3" data-testid="stage-play-packet-traffic-header">
       <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Traffic header</div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-10">
         <StagePlayMetricPill label="interval" value={formatStagePlayMs(cadenceMs)} tone={cadenceMs <= 1000 ? "good" : cadenceMs <= 10_000 ? "warn" : "default"} />
         <StagePlayMetricPill label="mail age" value={formatStagePlayMs(mailAgeMs)} tone={mailAgeMs != null && mailAgeMs <= cadenceMs * 1.5 ? "good" : "warn"} />
         <StagePlayMetricPill label="packet age" value={formatStagePlayMs(packetAgeMs)} tone={packetAgeMs != null && packetAgeMs <= cadenceMs * 1.5 ? "good" : "warn"} />
         <StagePlayMetricPill label="deck time" value={formatStagePlayMs(deckLatencyMs)} tone={deckLatencyMs <= 1000 ? "good" : deckLatencyMs <= cadenceMs ? "warn" : "blocked"} />
         <StagePlayMetricPill label="wake / ask" value={wakeLabel} tone={wakeTone} />
+        <StagePlayMetricPill label="workload" value={workBudgetLabel} tone={workBudgetTone} />
+        <StagePlayMetricPill label="deck budget" value={deckBudgetLabel} tone={workBudgetTone} />
         <StagePlayMetricPill label="pressure" value={runtimePressureLabel} tone={pressureTone} />
         <StagePlayMetricPill label="unread / retained" value={`${unreadCount} / ${retainedCount}`} />
         <StagePlayMetricPill label="heap / rss" value={`${heapRamLabel} | ${rssRamLabel}`} tone={pressureTone} />
@@ -2286,12 +2358,21 @@ function StagePlayPacketTrafficBoard({
   traffic,
   selectedPacketKey,
   onSelectPacket,
+  workBudget,
 }: {
   traffic: StagePlayPacketTrafficViewV1[];
   selectedPacketKey: string | null;
   onSelectPacket: (packetKey: string) => void;
+  workBudget?: StagePlayMailLoopWorkBudgetV1 | null;
 }) {
   const selected = traffic.find((row) => row.packetKey === selectedPacketKey) ?? null;
+  const workBudgetTone = stagePlayBudgetTone(workBudget?.pressure?.level, workBudget?.pressure?.ratio);
+  const budgetLevel = workBudget?.pressure?.level ? labelize(workBudget.pressure.level) : "n/a";
+  const rolesPerPacket = workBudget?.usage?.rolesPerPacket;
+  const estimatedDeckCallsPerMinute = workBudget?.usage?.estimatedDeckCallsPerMinute;
+  const maxReasonerRunsPerMinute = workBudget?.limits?.maxReasonerRunsPerMinute;
+  const activeAskWakeCount = workBudget?.usage?.activeAskWakeCount;
+  const maxActiveAskWakes = workBudget?.limits?.maxActiveAskWakes;
   return (
     <div className="rounded-md border border-cyan-900/60 bg-cyan-950/10 p-3" data-testid="stage-play-packet-traffic-board">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -2300,6 +2381,29 @@ function StagePlayPacketTrafficBoard({
           <div className="mt-0.5 text-xs text-cyan-100/70">One packet, one visible path. Colors stay stable across refresh.</div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {workBudget ? (
+            <>
+              <StagePlayMetricPill
+                label="budget"
+                value={`${budgetLevel} ${formatStagePlayBudgetRatio(workBudget.pressure?.ratio)}`}
+                tone={workBudgetTone}
+              />
+              <StagePlayMetricPill
+                label="roles / packet"
+                value={typeof rolesPerPacket === "number" ? formatStagePlayCount(rolesPerPacket) : "n/a"}
+              />
+              <StagePlayMetricPill
+                label="deck calls/min"
+                value={`${typeof estimatedDeckCallsPerMinute === "number" ? formatStagePlayCount(estimatedDeckCallsPerMinute) : "n/a"} / ${typeof maxReasonerRunsPerMinute === "number" ? formatStagePlayCount(maxReasonerRunsPerMinute) : "n/a"}`}
+                tone={stagePlayBudgetTone(null, workBudget.pressure?.estimatedReasonerLoad)}
+              />
+              <StagePlayMetricPill
+                label="Ask lane"
+                value={`${typeof activeAskWakeCount === "number" ? activeAskWakeCount : "n/a"} / ${typeof maxActiveAskWakes === "number" ? maxActiveAskWakes : "n/a"}`}
+                tone={stagePlayBudgetTone(null, workBudget.pressure?.askLoad)}
+              />
+            </>
+          ) : null}
           <a
             href="#stage-play-microdeck-panel"
             className="rounded border border-cyan-600/60 bg-cyan-950/40 px-2.5 py-1.5 text-[10px] font-semibold text-cyan-100 hover:border-cyan-300"
@@ -2411,12 +2515,27 @@ function StagePlayPacketTrafficBoard({
             </div>
             <div className="rounded border border-slate-700 px-2 py-1 font-mono text-[10px] text-slate-300">{labelize(selected.status)}</div>
           </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-5">
+          <div className="mt-3 grid gap-2 sm:grid-cols-5 xl:grid-cols-8">
             <StagePlayMetricPill label="raw mail chars" value={formatStagePlayCount(selected.metrics.rawMailChars ?? 0)} />
             <StagePlayMetricPill label="packet chars" value={formatStagePlayCount(selected.metrics.packetChars ?? 0)} />
             <StagePlayMetricPill label="compact chars" value={formatStagePlayCount(selected.metrics.compactChars ?? 0)} />
             <StagePlayMetricPill label="deck ms" value={formatStagePlayMs(selected.metrics.deckMs ?? null)} />
             <StagePlayMetricPill label="reasoners" value={`${selected.microReasonerRuns.filter((run) => run.status === "completed").length}/${STAGE_PLAY_DECK_ROLES.length}`} />
+            <StagePlayMetricPill
+              label="workload"
+              value={formatStagePlayBudgetRatio(selected.metrics.activePacketLoad)}
+              tone={stagePlayBudgetTone(null, selected.metrics.activePacketLoad)}
+            />
+            <StagePlayMetricPill
+              label="wake queue"
+              value={formatStagePlayBudgetRatio(selected.metrics.queueLoad)}
+              tone={stagePlayBudgetTone(null, selected.metrics.queueLoad)}
+            />
+            <StagePlayMetricPill
+              label="deck calls/min"
+              value={typeof selected.metrics.estimatedDeckCallsPerMinute === "number" ? formatStagePlayCount(selected.metrics.estimatedDeckCallsPerMinute) : "n/a"}
+              tone={stagePlayBudgetTone(null, selected.metrics.estimatedReasonerLoad)}
+            />
           </div>
           <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {selected.microReasonerRuns.map((run) => (
@@ -4197,6 +4316,23 @@ function formatStagePlayRuntimeMiB(
   return "n/a";
 }
 
+function stagePlayBudgetTone(level?: string | null, ratio?: number | null): "default" | "good" | "warn" | "blocked" {
+  const normalized = String(level ?? "").toLowerCase();
+  if (normalized === "limited" || normalized.includes("blocked") || normalized.includes("hard")) return "blocked";
+  if (normalized === "watch" || normalized.includes("pressure") || normalized.includes("deferred")) return "warn";
+  if (typeof ratio === "number" && Number.isFinite(ratio)) {
+    if (ratio >= 1) return "blocked";
+    if (ratio >= 0.75) return "warn";
+    return "good";
+  }
+  return normalized === "normal" ? "good" : "default";
+}
+
+function formatStagePlayBudgetRatio(ratio?: number | null): string {
+  if (typeof ratio !== "number" || !Number.isFinite(ratio)) return "n/a";
+  return `${Math.round(ratio * 100)}%`;
+}
+
 function stagePlayRuntimeTone(percent: number | null, pressureLevel?: string | null): "default" | "good" | "warn" | "blocked" {
   const normalizedPressure = (pressureLevel ?? "").toLowerCase();
   if (normalizedPressure.includes("hard") || normalizedPressure.includes("blocked")) return "blocked";
@@ -4476,6 +4612,14 @@ function StagePlayMailLoopLiveOverview({
     ? Math.max(heapRamPercent ?? 0, rssRamPercent ?? 0)
     : null;
   const combinedRuntimeTone = stagePlayRuntimeTone(combinedRuntimePercent, runtimePressureLevel);
+  const mailLoopWorkBudget = mailbox?.mailLoopWorkBudget ?? null;
+  const workBudgetTone = stagePlayBudgetTone(mailLoopWorkBudget?.pressure?.level, mailLoopWorkBudget?.pressure?.ratio);
+  const workBudgetLabel = mailLoopWorkBudget?.pressure?.level
+    ? `${labelize(mailLoopWorkBudget.pressure.level)} ${formatStagePlayBudgetRatio(mailLoopWorkBudget.pressure.ratio)}`
+    : "budget n/a";
+  const deckBudgetLabel = mailLoopWorkBudget
+    ? `${typeof mailLoopWorkBudget.usage?.rolesPerPacket === "number" ? `${formatStagePlayCount(mailLoopWorkBudget.usage.rolesPerPacket)} roles` : "roles n/a"} | ${typeof mailLoopWorkBudget.usage?.estimatedDeckCallsPerMinute === "number" ? `${formatStagePlayCount(mailLoopWorkBudget.usage.estimatedDeckCallsPerMinute)}/min` : "calls n/a"}`
+    : "deck n/a";
   const currentWakeForOperator = liveOverviewPendingWake ?? latestWake;
   const currentWakeResultForOperator =
     (currentWakeForOperator
@@ -5066,6 +5210,12 @@ function StagePlayMailLoopLiveOverview({
         heapMb: runtimeAdmission?.memory?.heapUsedMiB ?? null,
         rssMb: runtimeAdmission?.memory?.rssMiB ?? null,
         pressure: runtimePressureLabel,
+        rolesPerPacket: mailLoopWorkBudget?.usage?.rolesPerPacket ?? null,
+        estimatedDeckCallsPerMinute: mailLoopWorkBudget?.usage?.estimatedDeckCallsPerMinute ?? null,
+        reasonerRunsPerMinute: mailLoopWorkBudget?.usage?.reasonerRunsPerMinute ?? null,
+        estimatedReasonerLoad: mailLoopWorkBudget?.pressure?.estimatedReasonerLoad ?? null,
+        activePacketLoad: mailLoopWorkBudget?.pressure?.packetLoad ?? null,
+        queueLoad: mailLoopWorkBudget?.pressure?.queueLoad ?? null,
       },
     };
   };
@@ -5154,6 +5304,12 @@ function StagePlayMailLoopLiveOverview({
       heapMb: runtimeAdmission?.memory?.heapUsedMiB ?? null,
       rssMb: runtimeAdmission?.memory?.rssMiB ?? null,
       pressure: runtimePressureLabel,
+      rolesPerPacket: mailLoopWorkBudget?.usage?.rolesPerPacket ?? null,
+      estimatedDeckCallsPerMinute: mailLoopWorkBudget?.usage?.estimatedDeckCallsPerMinute ?? null,
+      reasonerRunsPerMinute: mailLoopWorkBudget?.usage?.reasonerRunsPerMinute ?? null,
+      estimatedReasonerLoad: mailLoopWorkBudget?.pressure?.estimatedReasonerLoad ?? null,
+      activePacketLoad: mailLoopWorkBudget?.pressure?.packetLoad ?? null,
+      queueLoad: mailLoopWorkBudget?.pressure?.queueLoad ?? null,
     },
   });
   const packetTrafficRows = [
@@ -5567,12 +5723,16 @@ function StagePlayMailLoopLiveOverview({
         heapRamLabel={heapRamLabel}
         rssRamLabel={rssRamLabel}
         pressureTone={combinedRuntimeTone}
+        workBudgetLabel={workBudgetLabel}
+        workBudgetTone={workBudgetTone}
+        deckBudgetLabel={deckBudgetLabel}
       />
 
       <StagePlayPacketTrafficBoard
         traffic={packetTrafficRows}
         selectedPacketKey={selectedPacketTrafficKey}
         onSelectPacket={setSelectedPacketTrafficKey}
+        workBudget={mailLoopWorkBudget}
       />
 
       <section

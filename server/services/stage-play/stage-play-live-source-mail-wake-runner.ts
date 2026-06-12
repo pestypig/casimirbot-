@@ -65,6 +65,7 @@ import {
   markStagePlayMailWakeRetryable,
   markStagePlayMailWakeRunning,
   markStagePlayMailWakeTerminalFailed,
+  attachDeckTraceToWakeRequest,
   attachAskTurnToWakeRequest,
   markStagePlayMailWakeUiHandoffRequired,
   queueStagePlayLiveSourceMailWakeRequest,
@@ -1249,6 +1250,9 @@ const microReasonerWakeReason = (input: {
       ? "live_env.record_live_source_mail_decision"
       : null
   );
+  if (input.processedPacket?.microReasonerDeck && input.processedPacket.arbiter) {
+    return `${input.processedPacket.microReasonerDeck.presetTitle} selected ${input.processedPacket.arbiter.recommendedNext}: ${input.processedPacket.arbiter.reason}`;
+  }
   if (decisionRun && selectedDecision) {
     return [
       `decision_selector selected ${selectedDecision}`,
@@ -1910,6 +1914,11 @@ const recordNonTerminalWakeTranscript = (input: {
     decisionIds: budgetReceipt.wakeResult.decisionIds,
     mailIds: input.wake.mailIds,
     sourceIds: input.wake.sourceIds,
+    deckPresetId: input.wake.deckPresetId ?? budgetReceipt.wakeResult.deckPresetId ?? null,
+    deckPresetTitle: input.wake.deckPresetTitle ?? budgetReceipt.wakeResult.deckPresetTitle ?? null,
+    deckRunPlan: input.wake.deckRunPlan ?? budgetReceipt.wakeResult.deckRunPlan ?? null,
+    packetIds: uniqueStrings([...(input.wake.packetIds ?? []), ...(budgetReceipt.wakeResult.packetIds ?? [])]),
+    deckVerdict: input.wake.deckVerdict ?? budgetReceipt.wakeResult.deckVerdict ?? null,
     rows: buildNonTerminalWakeTranscriptRows({
       ...input,
       wakeResult: budgetReceipt.wakeResult,
@@ -2493,6 +2502,35 @@ const voiceReceiptStatusRefs = (receipt: StagePlayLiveSourceVoiceDeliveryReceipt
 const isPressure503 = (err: unknown): boolean =>
   /\b(?:mail_wake_ask_turn_failed:503|503)\b/i.test(err instanceof Error ? err.message : String(err));
 
+const deckVerdictFromProcessedPacket = (
+  processedPacket: StagePlayProcessedMailPacketV1,
+): StagePlayLiveSourceMailWakeRequestV1["deckVerdict"] => ({
+  recommendedNext: processedPacket.arbiter?.recommendedNext ?? processedPacket.recommendedNext,
+  wakeAsk: processedPacket.arbiter?.wakeAsk ?? processedPacket.recommendedNext !== "wait_for_next_summary",
+  voiceCandidate: processedPacket.arbiter?.voiceCandidate ?? processedPacket.salience.voiceCandidate,
+  reason:
+    processedPacket.arbiter?.reason ??
+    processedPacket.salience.reasons[0] ??
+    `Processed packet selected ${processedPacket.recommendedNext}.`,
+});
+
+const attachProcessedPacketDeckTraceToWake = (input: {
+  wake: StagePlayLiveSourceMailWakeRequestV1;
+  processedPacket: StagePlayProcessedMailPacketV1;
+  evidenceRefs: string[];
+  now: string;
+}): StagePlayLiveSourceMailWakeRequestV1 =>
+  attachDeckTraceToWakeRequest({
+    wakeRequestId: input.wake.wakeRequestId,
+    deckPresetId: input.processedPacket.microReasonerDeck?.presetId ?? null,
+    deckPresetTitle: input.processedPacket.microReasonerDeck?.presetTitle ?? null,
+    deckRunPlan: input.processedPacket.microReasonerDeck?.deckRunPlan ?? null,
+    packetIds: [input.processedPacket.packetId],
+    deckVerdict: deckVerdictFromProcessedPacket(input.processedPacket),
+    evidenceRefs: input.evidenceRefs,
+    now: input.now,
+  }) ?? input.wake;
+
 const wakeMatchesScope = (
   wake: StagePlayLiveSourceMailWakeRequestV1,
   input: {
@@ -2682,7 +2720,7 @@ export async function runNextMailWakeRequest(input: {
     maxMailIds: selectedBatchLimit,
     now,
   });
-  const running = splitWake?.wake ?? selectedWake;
+  let running = splitWake?.wake ?? selectedWake;
   const retainedMailCount = splitWake?.retainedMailIds.length ?? 0;
   const mailBatch = mailBatchForWake(running);
   const policy = resolveActiveWatchPolicy({ wake: running, mailBatch });
@@ -2754,7 +2792,14 @@ export async function runNextMailWakeRequest(input: {
     now,
     manualRun: input.manualRun,
   });
+  running = attachProcessedPacketDeckTraceToWake({
+    wake: running,
+    processedPacket: fastLayer.processedPacket,
+    evidenceRefs: uniqueStrings([fastLayer.processedPacket.packetId, ...(fastLayer.processedPacket.evidenceRefs ?? [])]),
+    now,
+  });
   evidenceRefs = uniqueStrings([
+    ...running.evidenceRefs,
     ...evidenceRefs,
     fastLayer.immersionState.immersionStateId,
     fastLayer.predictionValidation.validationId,
@@ -2873,6 +2918,11 @@ export async function runNextMailWakeRequest(input: {
       decisionIds: [decision.decisionId],
       mailIds: running.mailIds,
       sourceIds: running.sourceIds,
+      deckPresetId: running.deckPresetId ?? budgetReceipt.wakeResult.deckPresetId ?? null,
+      deckPresetTitle: running.deckPresetTitle ?? budgetReceipt.wakeResult.deckPresetTitle ?? null,
+      deckRunPlan: running.deckRunPlan ?? budgetReceipt.wakeResult.deckRunPlan ?? null,
+      packetIds: uniqueStrings([...(running.packetIds ?? []), ...(budgetReceipt.wakeResult.packetIds ?? []), fastLayer.processedPacket.packetId]),
+      deckVerdict: running.deckVerdict ?? budgetReceipt.wakeResult.deckVerdict ?? deckVerdictFromProcessedPacket(fastLayer.processedPacket),
       rows: transcriptRows,
       evidenceRefs: uniqueStrings([
         ...budgetReceipt.wakeResult.evidenceRefs,
@@ -3332,6 +3382,11 @@ export async function runNextMailWakeRequest(input: {
       decisionIds: budgetReceipt.wakeResult.decisionIds,
       mailIds: running.mailIds,
       sourceIds: running.sourceIds,
+      deckPresetId: (completed ?? launchBoundWake ?? running).deckPresetId ?? budgetReceipt.wakeResult.deckPresetId ?? null,
+      deckPresetTitle: (completed ?? launchBoundWake ?? running).deckPresetTitle ?? budgetReceipt.wakeResult.deckPresetTitle ?? null,
+      deckRunPlan: (completed ?? launchBoundWake ?? running).deckRunPlan ?? budgetReceipt.wakeResult.deckRunPlan ?? null,
+      packetIds: uniqueStrings([...(completed?.packetIds ?? launchBoundWake?.packetIds ?? running.packetIds ?? []), ...(budgetReceipt.wakeResult.packetIds ?? []), fastLayer.processedPacket.packetId]),
+      deckVerdict: (completed ?? launchBoundWake ?? running).deckVerdict ?? budgetReceipt.wakeResult.deckVerdict ?? deckVerdictFromProcessedPacket(fastLayer.processedPacket),
       rows: transcriptRows,
       evidenceRefs: uniqueStrings([
         ...budgetReceipt.wakeResult.evidenceRefs,

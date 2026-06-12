@@ -93,6 +93,9 @@ import {
   type StagePlayRawSessionBufferRawKindV1,
   type StagePlayRawSessionBufferRetentionPolicyV1,
 } from "../../../shared/stage-play-raw-session-buffer";
+import {
+  listLiveSourceBudgetStates,
+} from "../../services/stage-play/stage-play-live-source-budget-store";
 
 const helixStagePlayRouter = Router();
 const STAGE_PLAY_ROUTE_MAX_BODY_BYTES = 256 * 1024;
@@ -640,6 +643,151 @@ const selectStagePlayOperatorWakeResults = <T extends Record<string, any>>(
   ).slice(0, 5);
 };
 
+const readPositiveIntegerEnv = (name: string, fallback: number): number => {
+  const parsed = Number(process.env[name]);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+};
+
+const createdWithinWindow = (
+  value: string | null | undefined,
+  nowMs: number,
+  windowMs: number,
+): boolean => {
+  const parsed = Date.parse(String(value ?? ""));
+  return Number.isFinite(parsed) && parsed >= nowMs - windowMs;
+};
+
+const pressureToneForRatio = (ratio: number): "normal" | "watch" | "limited" =>
+  ratio >= 1 ? "limited" : ratio >= 0.75 ? "watch" : "normal";
+
+const buildStagePlayMailLoopWorkBudget = (input: {
+  view: StagePlayLiveSourceMailView;
+  limit: number;
+  activePreset: Record<string, any> | null;
+  mailItems: Array<Record<string, any>>;
+  processedMailPackets: Array<Record<string, any>>;
+  microReasonerRuns: Array<Record<string, any>>;
+  wakeRequests: Array<Record<string, any>>;
+  wakeResults: Array<Record<string, any>>;
+  budgetStates: Array<Record<string, any>>;
+  now?: string;
+}): Record<string, unknown> => {
+  const now = input.now ?? new Date().toISOString();
+  const nowMs = Date.parse(now);
+  const oneMinuteMs = 60_000;
+  const safeNowMs = Number.isFinite(nowMs) ? nowMs : Date.now();
+  const promptedRoles = Array.isArray(input.activePreset?.promptedRoles)
+    ? input.activePreset.promptedRoles.map((role: unknown) => String(role)).filter(Boolean)
+    : [];
+  const rolesPerPacket = promptedRoles.length || readPositiveIntegerEnv("STAGE_PLAY_MAIL_LOOP_DEFAULT_ROLES_PER_PACKET", 5);
+  const mailPerMinute = input.mailItems.filter((mail) =>
+    createdWithinWindow(String(mail.createdAt ?? ""), safeNowMs, oneMinuteMs)
+  ).length;
+  const packetsPerMinute = input.processedMailPackets.filter((packet) =>
+    createdWithinWindow(String(packet.createdAt ?? ""), safeNowMs, oneMinuteMs)
+  ).length;
+  const reasonerRunsPerMinute = input.microReasonerRuns.filter((run) =>
+    createdWithinWindow(String(run.completedAt ?? run.startedAt ?? ""), safeNowMs, oneMinuteMs)
+  ).length;
+  const queuedWakeCount = input.wakeRequests.filter((wake) =>
+    wake.status === "queued" || wake.status === "waiting_for_ui_handoff"
+  ).length;
+  const runningWakeCount = input.wakeRequests.filter((wake) => wake.status === "running").length;
+  const deferredWakeCount = input.wakeRequests.filter((wake) => wake.status === "deferred_for_pressure").length;
+  const activeAskWakeCount = input.wakeRequests.filter((wake) =>
+    wake.status === "running" ||
+    Boolean(wake.askTurnId) ||
+    wake.askLaunchStatus === "launched"
+  ).length;
+  const activePacketCount = input.processedMailPackets.filter((packet) =>
+    packet.resolutionState === "ask_decision_needed" ||
+    packet.resolutionState === "voice_candidate_prepared" ||
+    packet.recommendedNext === "request_voice_callout" ||
+    packet.arbiter?.wakeAsk === true
+  ).length;
+  const maxVisiblePackets = input.view === "operator" ? 8 : Math.max(8, input.limit);
+  const maxActivePackets = readPositiveIntegerEnv("STAGE_PLAY_MAIL_LOOP_MAX_ACTIVE_PACKETS", 2);
+  const maxQueuedPackets = readPositiveIntegerEnv("STAGE_PLAY_MAIL_LOOP_MAX_QUEUED_PACKETS", 12);
+  const maxReasonerRunsPerMinute = readPositiveIntegerEnv("STAGE_PLAY_MAIL_LOOP_MAX_REASONER_RUNS_PER_MINUTE", 60);
+  const maxConcurrentReasonerRuns = readPositiveIntegerEnv("STAGE_PLAY_MAIL_LOOP_MAX_CONCURRENT_REASONERS", 2);
+  const maxActiveAskWakes = readPositiveIntegerEnv("STAGE_PLAY_MAIL_LOOP_MAX_ACTIVE_ASK_WAKES", 1);
+  const estimatedDeckCallsPerMinute = packetsPerMinute * rolesPerPacket;
+  const queueLoad = maxQueuedPackets > 0 ? (queuedWakeCount + deferredWakeCount) / maxQueuedPackets : 0;
+  const packetLoad = maxActivePackets > 0 ? activePacketCount / maxActivePackets : 0;
+  const reasonerLoad = maxReasonerRunsPerMinute > 0 ? reasonerRunsPerMinute / maxReasonerRunsPerMinute : 0;
+  const estimatedReasonerLoad = maxReasonerRunsPerMinute > 0 ? estimatedDeckCallsPerMinute / maxReasonerRunsPerMinute : 0;
+  const askLoad = maxActiveAskWakes > 0 ? activeAskWakeCount / maxActiveAskWakes : 0;
+  const pressureRatio = Math.max(queueLoad, packetLoad, reasonerLoad, estimatedReasonerLoad, askLoad);
+  const pressureLevel = pressureToneForRatio(pressureRatio);
+  const pressureReasons = uniqueStrings([
+    queueLoad >= 1 ? "wake_queue_over_budget" : queueLoad >= 0.75 ? "wake_queue_near_budget" : null,
+    packetLoad >= 1 ? "active_packets_over_budget" : packetLoad >= 0.75 ? "active_packets_near_budget" : null,
+    reasonerLoad >= 1 ? "reasoner_runs_over_budget" : reasonerLoad >= 0.75 ? "reasoner_runs_near_budget" : null,
+    estimatedReasonerLoad >= 1 ? "estimated_deck_calls_over_budget" : estimatedReasonerLoad >= 0.75 ? "estimated_deck_calls_near_budget" : null,
+    askLoad >= 1 ? "ask_wake_lane_full" : null,
+    deferredWakeCount > 0 ? "deferred_wakes_present" : null,
+  ]);
+  return {
+    schema: "stage_play_mail_loop_work_budget/v1",
+    now,
+    selectedDeck: input.activePreset ? {
+      presetId: input.activePreset.presetId ?? null,
+      title: input.activePreset.title ?? null,
+      domain: input.activePreset.domain ?? null,
+      outputPolicy: input.activePreset.outputPolicy ?? null,
+      promptedRoles,
+      roleCount: rolesPerPacket,
+    } : null,
+    limits: {
+      maxVisiblePackets,
+      maxActivePackets,
+      maxQueuedPackets,
+      maxReasonerRolesPerPacket: rolesPerPacket,
+      maxConcurrentReasonerRuns,
+      maxReasonerRunsPerMinute,
+      maxActiveAskWakes,
+      dropPolicy: "keep_latest_per_source",
+    },
+    usage: {
+      retainedMailCount: input.mailItems.length,
+      processedPacketCount: input.processedMailPackets.length,
+      activePacketCount,
+      mailPerMinute,
+      packetsPerMinute,
+      rolesPerPacket,
+      estimatedDeckCallsPerMinute,
+      reasonerRunsPerMinute,
+      visibleReasonerRuns: input.microReasonerRuns.length,
+      queuedWakeCount,
+      runningWakeCount,
+      deferredWakeCount,
+      activeAskWakeCount,
+      completedWakeResults: input.wakeResults.filter((result) => result.status === "completed").length,
+      budgetStateCount: input.budgetStates.length,
+    },
+    pressure: {
+      level: pressureLevel,
+      ratio: Math.round(pressureRatio * 100) / 100,
+      reasons: pressureReasons,
+      queueLoad: Math.round(queueLoad * 100) / 100,
+      packetLoad: Math.round(packetLoad * 100) / 100,
+      reasonerLoad: Math.round(reasonerLoad * 100) / 100,
+      estimatedReasonerLoad: Math.round(estimatedReasonerLoad * 100) / 100,
+      askLoad: Math.round(askLoad * 100) / 100,
+    },
+    allowedNextAction:
+      pressureLevel === "limited"
+        ? "defer_background_work"
+        : pressureLevel === "watch"
+          ? "prefer_latest_packet"
+          : "continue",
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_evidence",
+    raw_content_included: false,
+  };
+};
+
 const readInterpretationPayload = (
   value: unknown,
   fallbackSource?: Record<string, unknown>,
@@ -1092,15 +1240,16 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       sourceId: sourceId ?? mailItems.find((item) => item.sourceKind === "visual_frame")?.sourceId ?? null,
     });
     const activeMicroReasonerSourceId = sourceId ?? mailItems.at(-1)?.sourceId ?? null;
-    const microReasonerPromptPresets = includeConfig
+    const includePresetDirectory = includeConfig || operator;
+    const microReasonerPromptPresets = includePresetDirectory
       ? listStagePlayMicroReasonerPromptPresets({
           sourceId: activeMicroReasonerSourceId,
           includePresets: true,
           active: true,
-          limit: operator ? 2 : 100,
+          limit: operator ? 20 : 100,
         })
       : [];
-    const activeMicroReasonerPromptPreset = includeConfig
+    const activeMicroReasonerPromptPreset = includePresetDirectory
       ? getActiveStagePlayMicroReasonerPromptPresetForSource({
           sourceId: activeMicroReasonerSourceId,
         })
@@ -1152,6 +1301,23 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
     const responseWakeResults = operator
       ? selectStagePlayOperatorWakeResults(wakeResults, responseWakeRequestIds)
       : wakeResults;
+    const budgetStates = listLiveSourceBudgetStates({
+      threadId,
+      roomId,
+      environmentId,
+      limit: operator ? 4 : overview ? 8 : 20,
+    });
+    const mailLoopWorkBudget = buildStagePlayMailLoopWorkBudget({
+      view,
+      limit,
+      activePreset: activeMicroReasonerPromptPreset,
+      mailItems,
+      processedMailPackets,
+      microReasonerRuns,
+      wakeRequests,
+      wakeResults,
+      budgetStates,
+    });
     return res.json({
       ok: true,
       schema: "stage_play_live_source_mail_list_response/v1",
@@ -1185,6 +1351,8 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       narrativeStates,
       wakeRequests: overview ? responseWakeRequests.map(compactStagePlayWakeForOverview) : responseWakeRequests,
       wakeResults: overview ? responseWakeResults.map(compactStagePlayWakeResultForOverview) : responseWakeResults,
+      budgetStates,
+      mailLoopWorkBudget,
       assistant_answer: false,
       terminal_eligible: false,
       context_role: "tool_evidence",
