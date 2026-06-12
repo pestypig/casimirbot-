@@ -29,6 +29,11 @@ const SOURCE_CLOSURE_LITERATURE_REFS = [
   "fewster_thompson_2023_stationary_worldline_qei",
 ];
 
+const TENSOR_COMPONENTS =
+  NHM2_TENSOR_COMPONENTS as readonly Nhm2TensorComponent[];
+const REQUIRED_REGIONS =
+  NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS as readonly Nhm2RegionalSourceClosureRegionId[];
+
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value != null && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -44,7 +49,10 @@ const asBoolean = (value: unknown): boolean | null =>
   typeof value === "boolean" ? value : null;
 
 const getNested = (value: unknown, path: string[]): unknown =>
-  path.reduce<unknown>((cursor, part) => asRecord(cursor)?.[part], value);
+  path.reduce<unknown>(
+    (cursor: unknown, part: string) => asRecord(cursor)?.[part],
+    value,
+  );
 
 const readJson = (path: string): unknown => JSON.parse(readFileSync(path, "utf8"));
 
@@ -75,7 +83,7 @@ const normalizeTensor = (value: unknown): Nhm2RegionalTensor => {
   const record = asRecord(value);
   const tensor: Nhm2RegionalTensor = {};
   if (record == null) return tensor;
-  for (const component of NHM2_TENSOR_COMPONENTS) {
+  for (const component of TENSOR_COMPONENTS) {
     if (component in record) tensor[component] = asNumber(record[component]);
   }
   return tensor;
@@ -83,7 +91,7 @@ const normalizeTensor = (value: unknown): Nhm2RegionalTensor => {
 
 const componentSet = (tensor: Nhm2RegionalTensor): Set<Nhm2TensorComponent> =>
   new Set(
-    NHM2_TENSOR_COMPONENTS.filter((component) => tensor[component] != null),
+    TENSOR_COMPONENTS.filter((component: Nhm2TensorComponent) => tensor[component] != null),
   );
 
 const inferAuthorityMode = (
@@ -99,7 +107,7 @@ const inferAuthorityMode = (
     return "proxy";
   }
   const components = componentSet(tensor);
-  if (NHM2_TENSOR_COMPONENTS.every((component) => components.has(component))) {
+  if (TENSOR_COMPONENTS.every((component: Nhm2TensorComponent) => components.has(component))) {
     return "full_tensor";
   }
   const symmetricSet: Nhm2TensorComponent[] = [
@@ -190,7 +198,7 @@ const residualForComponents = (
   const record = asRecord(residuals);
   const normalized: Nhm2RegionalSourceClosureEvidenceRegion["residuals"]["componentResiduals"] = {};
   if (record == null) return normalized;
-  for (const component of NHM2_TENSOR_COMPONENTS) {
+  for (const component of TENSOR_COMPONENTS) {
     const entry = asRecord(record[component]);
     if (entry == null) continue;
     normalized[component] = {
@@ -232,7 +240,7 @@ const computeResiduals = (
     Math.max(
       0,
       ...Object.values(componentResiduals)
-        .map((entry) => entry?.absResidual)
+        .map((entry: { absResidual: number | null } | undefined) => entry?.absResidual)
         .filter((entry): entry is number => entry != null),
     );
   const relLInf =
@@ -240,7 +248,7 @@ const computeResiduals = (
     Math.max(
       0,
       ...Object.values(componentResiduals)
-        .map((entry) => entry?.relResidual)
+        .map((entry: { relResidual: number | null } | undefined) => entry?.relResidual)
         .filter((entry): entry is number => entry != null),
     );
   const toleranceRelLInf = asNumber(residualNorms?.toleranceRelLInf);
@@ -297,6 +305,7 @@ const makeGlobalRegion = (
   const metric = normalizeTensor(asRecord(tensors?.metricRequired));
   const tile = tileCounterpartRegion?.tensor ?? normalizeTensor(asRecord(tensors?.tileEffective));
   const metricMeta = {
+    tensorRef: asString(tensorRefs?.metricRequired),
     chartRef: asString(metricAccounting?.chartRef) ?? "comoving_cartesian",
     unitsRef: asString(metricAccounting?.unitsRef) ?? "J/m^3",
     aggregationMode: normalizeAggregationMode(metricAccounting?.aggregationMode),
@@ -306,6 +315,7 @@ const makeGlobalRegion = (
     evidenceText: JSON.stringify({ metricAccounting, tensorRef: tensorRefs?.metricRequired }),
   };
   const legacyTileMeta = {
+    tensorRef: asString(tensorRefs?.tileEffective),
     chartRef: asString(tileAccounting?.chartRef) ?? "comoving_cartesian",
     unitsRef: asString(tileAccounting?.unitsRef) ?? "J/m^3",
     aggregationMode: normalizeAggregationMode(tileAccounting?.aggregationMode),
@@ -571,7 +581,7 @@ export const publishRegionalSourceClosureEvidence = (args: {
     }
   }
 
-  const regions = NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS.map((regionId) =>
+  const regions = REQUIRED_REGIONS.map((regionId: Nhm2RegionalSourceClosureRegionId) =>
     regionId === "global"
       ? makeGlobalRegion(sourceClosure, tileRegionMap.get(regionId) ?? null)
       : makeRegionalRegion(
