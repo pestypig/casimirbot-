@@ -1,3 +1,5 @@
+import { DOC_FILE_METADATA } from "@/lib/docs/docMetadata.generated";
+
 type DocModuleLoader = () => Promise<string>;
 
 export type DocManifestEntry = {
@@ -8,8 +10,10 @@ export type DocManifestEntry = {
   folderLabel: string;
   subjectLabel: string;
   catalogDate: string | null;
-  catalogDateSource: "path" | "title" | null;
-  isLatest: boolean;
+  catalogDateSource: "mtime" | "path" | "title" | null;
+  fileMtimeIso: string | null;
+  fileMtimeMs: number | null;
+  sizeBytes: number | null;
   title: string;
   searchText: string;
   loader: DocModuleLoader;
@@ -52,7 +56,8 @@ const manifest: DocManifestEntry[] = Object.entries(docModules).map(([key, loade
   const folderLabel = folderChain.length ? folderChain.join(" / ") : "root";
   const fileName = segments.at(-1) ?? relative;
   const title = formatDocTitle(fileName);
-  const catalogDate = inferDocCatalogDate(title, relative);
+  const fileMetadata = DOC_FILE_METADATA[relative];
+  const catalogDate = inferDocCatalogDate(title, relative, fileMetadata?.mtimeIso);
   const searchText = `${title} ${relative}`.toLowerCase();
 
   return {
@@ -64,7 +69,9 @@ const manifest: DocManifestEntry[] = Object.entries(docModules).map(([key, loade
     subjectLabel: inferDocSubjectLabel(title, relative, folderChain),
     catalogDate: catalogDate?.date ?? null,
     catalogDateSource: catalogDate?.source ?? null,
-    isLatest: /\blatest\b/i.test(`${title} ${relative}`),
+    fileMtimeIso: fileMetadata?.mtimeIso ?? null,
+    fileMtimeMs: fileMetadata?.mtimeMs ?? null,
+    sizeBytes: fileMetadata?.sizeBytes ?? null,
     title,
     searchText,
     loader,
@@ -134,8 +141,6 @@ function buildDocSearchHaystack(entry: DocManifestEntry): string {
 }
 
 export function compareDocCatalogEntries(a: DocManifestEntry, b: DocManifestEntry): number {
-  const latestDelta = Number(b.isLatest) - Number(a.isLatest);
-  if (latestDelta !== 0) return latestDelta;
   const dateDelta = docCatalogTimestamp(b) - docCatalogTimestamp(a);
   if (dateDelta !== 0) return dateDelta;
   return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
@@ -150,12 +155,20 @@ export function docCatalogTimestamp(entry: Pick<DocManifestEntry, "catalogDate">
 function inferDocCatalogDate(
   title: string,
   relativePath: string,
-): { date: string; source: "path" | "title" } | null {
+  fileMtimeIso?: string,
+): { date: string; source: "mtime" | "path" | "title" } | null {
+  const mtimeDate = readIsoDatePrefix(fileMtimeIso);
+  if (mtimeDate) return { date: mtimeDate, source: "mtime" };
   const pathDate = readLastIsoDate(relativePath);
   if (pathDate) return { date: pathDate, source: "path" };
   const titleDate = readLastIsoDate(title);
   if (titleDate) return { date: titleDate, source: "title" };
   return null;
+}
+
+function readIsoDatePrefix(value?: string): string | null {
+  const match = value?.match(/^(\d{4}-\d{2}-\d{2})T/);
+  return match?.[1] ?? null;
 }
 
 function readLastIsoDate(value: string): string | null {

@@ -8,6 +8,15 @@ export type VisualSourceCaptureFrameHistoryItem = {
   captured_at: string;
   preview_data_url: string;
   preview_hash: string | null;
+  source_kind?: "full_frame" | "image_lens_crop" | "action_replay" | null;
+  crop_only?: boolean;
+  crop_bbox_px?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null;
+  crop_region_id?: string | null;
   summary: string;
   visual_observer_profile_id?: string | null;
   visual_observer_profile_title?: string | null;

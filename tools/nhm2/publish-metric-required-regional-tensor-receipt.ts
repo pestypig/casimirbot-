@@ -12,6 +12,12 @@ import {
 } from "../../shared/contracts/nhm2-metric-required-regional-tensor-receipt.v1";
 import { isNhm2ReferenceRunArtifact } from "../../shared/contracts/nhm2-reference-run.v1";
 import {
+  isNhm2SameChartFullTensorArtifact,
+  type Nhm2SameChartFullTensorArtifactV1,
+  type Nhm2SameChartFullTensorComponentId,
+  type Nhm2SameChartFullTensorComponentV1,
+} from "../../shared/contracts/nhm2-same-chart-full-tensor.v1";
+import {
   NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS,
   NHM2_TENSOR_COMPONENTS,
   type Nhm2RegionalSourceClosureRegionId,
@@ -53,6 +59,20 @@ const parseArgs = (argv: string[]): Record<string, string | boolean> => {
     }
   }
   return parsed;
+};
+
+export type Nhm2MetricRequiredRegionalFullTensorRegionSource = {
+  regionId: Nhm2RegionalSourceClosureRegionId;
+  sameChartFullTensor: Nhm2SameChartFullTensorArtifactV1;
+  artifactRef?: string | null;
+  tensorRef?: string | null;
+  regionMaskRef?: string | null;
+  aggregationMode?: "mean" | "integral" | "unknown" | null;
+  normalizationBasis?: "sample_count" | "volume" | "unknown" | null;
+  sampleCount?: number | null;
+  unitsRef?: "J/m^3" | string | null;
+  blockers?: string[] | null;
+  warnings?: string[] | null;
 };
 
 const getNested = (value: unknown, path: string[]): unknown =>
@@ -127,6 +147,114 @@ const componentStatusFromTensor = (
     status[component] = "missing";
   }
   return status;
+};
+
+const SAME_CHART_COMPONENT_TO_TENSOR_COMPONENT = {
+  T00: "T00",
+  T0x: "T01",
+  T0y: "T02",
+  T0z: "T03",
+  Txx: "T11",
+  Txy: "T12",
+  Txz: "T13",
+  Tyy: "T22",
+  Tyz: "T23",
+  Tzz: "T33",
+} as const satisfies Record<Nhm2SameChartFullTensorComponentId, Nhm2TensorComponent>;
+
+const isCompleteSameChartStatus = (
+  component: Nhm2SameChartFullTensorComponentV1,
+): boolean =>
+  component.status === "computed" || component.status === "derived_same_chart";
+
+const tensorFromSameChartFullTensor = (
+  artifact: Nhm2SameChartFullTensorArtifactV1,
+): Nhm2RegionalTensor => {
+  const tensor: Nhm2RegionalTensor = {};
+  for (const component of artifact.components) {
+    if (!isCompleteSameChartStatus(component) || component.valueSI == null) continue;
+    tensor[SAME_CHART_COMPONENT_TO_TENSOR_COMPONENT[component.componentId]] =
+      component.valueSI;
+  }
+  return tensor;
+};
+
+const derivationModeFromSameChartFullTensor = (
+  artifact: Nhm2SameChartFullTensorArtifactV1,
+): Nhm2MetricRequiredRegionalTensorReceiptRegionV1["derivationMode"] => {
+  if (
+    artifact.components.some(
+      (component) => component.provenance.source === "einstein_tensor_geometry_fd4_v1",
+    )
+  ) {
+    return "einstein_tensor_geometry_fd4_v1";
+  }
+  if (
+    artifact.components.some(
+      (component) => component.provenance.source === "adm_projection",
+    )
+  ) {
+    return "adm_projection";
+  }
+  return "source_closure_existing_metric_required";
+};
+
+const blockersFromSameChartFullTensor = (
+  artifact: Nhm2SameChartFullTensorArtifactV1,
+  sourceBlockers: string[] = [],
+): string[] => {
+  const blockers = new Set<string>();
+  for (const blocker of sourceBlockers) blockers.add(blocker);
+  if (!artifact.completeness.fullTensorComplete) {
+    blockers.add("same_chart_full_tensor_incomplete");
+  }
+  for (const component of artifact.components) {
+    if (isCompleteSameChartStatus(component)) continue;
+    blockers.add(`same_chart_component_missing:${component.componentId}`);
+    for (const blocker of component.blockers) blockers.add(blocker);
+  }
+  return Array.from(blockers);
+};
+
+const buildRegionFromSameChartFullTensor = (
+  source: Nhm2MetricRequiredRegionalFullTensorRegionSource,
+): Nhm2MetricRequiredRegionalTensorReceiptRegionV1 => {
+  const tensor = tensorFromSameChartFullTensor(source.sameChartFullTensor);
+  const authority = inferNhm2MetricRequiredRegionalTensorAuthorityMode(tensor);
+  const missingComponentIds = missingNhm2MetricRequiredRegionalTensorComponents(tensor);
+  const hasTensor = Object.values(tensor).some((value) => value != null);
+  const artifactRef = asString(source.artifactRef);
+  const tensorRef =
+    asString(source.tensorRef) ??
+    (artifactRef == null
+      ? `nhm2_same_chart_full_tensor:${source.regionId}`
+      : `${artifactRef}#${source.regionId}`);
+  return {
+    regionId: source.regionId,
+    status: !hasTensor ? "missing" : missingComponentIds.length > 0 ? "partial" : "computed",
+    tensor,
+    tensorAuthorityMode: authority,
+    componentStatus: componentStatusFromTensor(tensor, missingComponentIds),
+    missingComponentIds,
+    chartRef: source.sameChartFullTensor.chartId,
+    basisRef: "same_basis",
+    unitsRef: asString(source.unitsRef) ?? "J/m^3",
+    regionMaskRef: asString(source.regionMaskRef),
+    aggregationMode: normalizeAggregationMode(source.aggregationMode),
+    normalizationBasis: normalizeNormalizationBasis(source.normalizationBasis),
+    sampleCount: asNumber(source.sampleCount),
+    tensorRef,
+    derivationMode: derivationModeFromSameChartFullTensor(source.sameChartFullTensor),
+    blockers: blockersFromSameChartFullTensor(
+      source.sameChartFullTensor,
+      stringList(source.blockers),
+    ),
+    warnings: [
+      "metric_required_full_tensor_source_consumed",
+      "component_units_are_declared_per_same_chart_component",
+      ...stringList(source.warnings),
+    ],
+  };
 };
 
 const sourceClosureRegions = (
@@ -224,6 +352,8 @@ export const buildMetricRequiredRegionalTensorReceiptFromSourceClosure = (args: 
   referenceRun: unknown;
   sourceClosure: unknown;
   sourceClosureRef: string;
+  fullTensorRegionSources?: Nhm2MetricRequiredRegionalFullTensorRegionSource[] | null;
+  fullTensorSourceRef?: string | null;
 }): Nhm2MetricRequiredRegionalTensorReceiptV1 => {
   if (!isNhm2ReferenceRunArtifact(args.referenceRun)) {
     throw new Error("reference run must be nhm2_reference_run/v1");
@@ -233,8 +363,19 @@ export const buildMetricRequiredRegionalTensorReceiptFromSourceClosure = (args: 
   const tensors = asRecord(sourceClosure.tensors);
   const tensorRefs = asRecord(sourceClosure.tensorRefs);
   const regionMap = sourceClosureRegions(sourceClosure);
+  const fullTensorRegionMap = new Map<
+    Nhm2RegionalSourceClosureRegionId,
+    Nhm2MetricRequiredRegionalFullTensorRegionSource
+  >();
+  for (const source of args.fullTensorRegionSources ?? []) {
+    fullTensorRegionMap.set(source.regionId, source);
+  }
 
   const regions = NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS.map((regionId) => {
+    const fullTensorRegionSource = fullTensorRegionMap.get(regionId);
+    if (fullTensorRegionSource != null) {
+      return buildRegionFromSameChartFullTensor(fullTensorRegionSource);
+    }
     if (regionId === "global") {
       const globalAccounting = asRecord(sourceClosure.globalAccounting);
       const metricAccounting =
@@ -265,8 +406,55 @@ export const buildMetricRequiredRegionalTensorReceiptFromSourceClosure = (args: 
     selectedProfileId: args.referenceRun.selectedFamily.selectedProfileId,
     chartId: "comoving_cartesian",
     metricFamily: "nhm2_shift_lapse",
-    sourceArtifactRefs: [args.sourceClosureRef],
+    sourceArtifactRefs: [
+      args.sourceClosureRef,
+      ...(asString(args.fullTensorSourceRef) == null
+        ? []
+        : [asString(args.fullTensorSourceRef) as string]),
+    ],
     regions,
+  });
+};
+
+const isRegionId = (value: unknown): value is Nhm2RegionalSourceClosureRegionId =>
+  NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS.includes(
+    value as Nhm2RegionalSourceClosureRegionId,
+  );
+
+const readFullTensorRegionSources = (
+  manifest: unknown,
+): Nhm2MetricRequiredRegionalFullTensorRegionSource[] => {
+  const record = asRecord(manifest);
+  const regionEntries = Array.isArray(record?.regions) ? record.regions : null;
+  if (regionEntries == null) {
+    throw new Error("metric-required full tensor source must contain regions[]");
+  }
+  return regionEntries.map((entry, index) => {
+    const region = asRecord(entry);
+    const regionId = region?.regionId;
+    const sameChartFullTensor =
+      region?.sameChartFullTensor ?? region?.artifact ?? region?.tensorArtifact;
+    if (!isRegionId(regionId)) {
+      throw new Error(`metric-required full tensor source regions[${index}] has invalid regionId`);
+    }
+    if (!isNhm2SameChartFullTensorArtifact(sameChartFullTensor)) {
+      throw new Error(
+        `metric-required full tensor source regions[${index}] must include nhm2_same_chart_full_tensor/v1`,
+      );
+    }
+    return {
+      regionId,
+      sameChartFullTensor,
+      artifactRef: asString(region.artifactRef),
+      tensorRef: asString(region.tensorRef),
+      regionMaskRef: asString(region.regionMaskRef),
+      aggregationMode: normalizeAggregationMode(region.aggregationMode),
+      normalizationBasis: normalizeNormalizationBasis(region.normalizationBasis),
+      sampleCount: asNumber(region.sampleCount),
+      unitsRef: asString(region.unitsRef),
+      blockers: stringList(region.blockers),
+      warnings: stringList(region.warnings),
+    };
   });
 };
 
@@ -274,22 +462,31 @@ export const publishMetricRequiredRegionalTensorReceipt = (args: {
   repoRoot: string;
   referenceRunPath: string;
   sourceClosurePath: string;
+  metricRequiredFullTensorSourcePath?: string | null;
   outPath: string;
   auditOnly?: boolean;
 }): Nhm2MetricRequiredRegionalTensorReceiptV1 => {
   if (
     !args.auditOnly &&
     (pathUsesLatestAlias(args.referenceRunPath) ||
-      pathUsesLatestAlias(args.sourceClosurePath))
+      pathUsesLatestAlias(args.sourceClosurePath) ||
+      pathUsesLatestAlias(args.metricRequiredFullTensorSourcePath))
   ) {
     throw new Error("latest aliases are forbidden unless --audit-only is passed");
   }
   const referenceRun = readJson(resolvePath(args.repoRoot, args.referenceRunPath));
   const sourceClosure = readJson(resolvePath(args.repoRoot, args.sourceClosurePath));
+  const fullTensorSource =
+    args.metricRequiredFullTensorSourcePath == null
+      ? null
+      : readJson(resolvePath(args.repoRoot, args.metricRequiredFullTensorSourcePath));
   const artifact = buildMetricRequiredRegionalTensorReceiptFromSourceClosure({
     referenceRun,
     sourceClosure,
     sourceClosureRef: args.sourceClosurePath,
+    fullTensorRegionSources:
+      fullTensorSource == null ? null : readFullTensorRegionSources(fullTensorSource),
+    fullTensorSourceRef: args.metricRequiredFullTensorSourcePath,
   });
   if (!isNhm2MetricRequiredRegionalTensorReceipt(artifact)) {
     throw new Error("internal error: produced invalid metric-required regional tensor receipt");
@@ -312,6 +509,9 @@ const main = (): void => {
     repoRoot: process.cwd(),
     referenceRunPath,
     sourceClosurePath,
+    metricRequiredFullTensorSourcePath: asString(
+      args["metric-required-full-tensor-source"],
+    ),
     outPath,
     auditOnly: args["audit-only"] === true,
   });

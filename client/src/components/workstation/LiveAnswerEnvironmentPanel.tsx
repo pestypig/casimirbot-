@@ -10,6 +10,7 @@ import { buildDocEquationContextAskPrompt } from "@/lib/docs/docEquationContextE
 import { launchHelixAskPrompt } from "@/lib/helix/ask-prompt-launch";
 import type { DocEquationContextArtifactV1 } from "@shared/contracts/doc-equation-context.v1";
 import type { WorkstationLiveSource, WorkstationLiveSourceEvent, LiveSourceWindowSummary } from "@shared/helix-workstation-live-source";
+import type { HelixLiveSourceChunk } from "@shared/helix-live-source-chunk";
 import type { LiveAnswerEnvironmentDelta, LiveAnswerLineState } from "@shared/helix-live-answer-environment";
 import type {
   LiveCommentaryCadence,
@@ -68,6 +69,24 @@ import { postAudioTranscriptLiveSourceDescriptor } from "@/lib/helix/liveSourceD
 
 type LiveEnvironmentTab = "present_state" | "navigation_evidence" | "worker_lanes" | "line_checks" | "interpreted_log" | "clarification" | "live_cognition" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
 type VisualCaptureRoute = "live_answer" | "image_lens" | "audio_transcript";
+type AudioTranscriptCaptureStatus = "idle" | "requesting_permission" | "listening" | "transcribing" | "error";
+const VISUAL_CAPTURE_ROUTE_STORAGE_KEY = "helix.liveAnswer.visualCaptureRoutes.v1";
+const VISUAL_CAPTURE_ROUTE_VALUES: VisualCaptureRoute[] = ["live_answer", "image_lens", "audio_transcript"];
+const AUDIO_TRANSCRIPT_DEFAULT_CHUNK_MS = 10_000;
+const AUDIO_TRANSCRIPT_HISTORY_LIMIT = 20;
+
+function readStoredVisualCaptureRoutes(): VisualCaptureRoute[] {
+  if (typeof window === "undefined") return ["live_answer"];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(VISUAL_CAPTURE_ROUTE_STORAGE_KEY) ?? "null");
+    if (!Array.isArray(parsed)) return ["live_answer"];
+    const routes = parsed.filter((value: unknown): value is VisualCaptureRoute =>
+      typeof value === "string" && VISUAL_CAPTURE_ROUTE_VALUES.includes(value as VisualCaptureRoute));
+    return routes.length ? routes : ["live_answer"];
+  } catch {
+    return ["live_answer"];
+  }
+}
 type ClientCapabilityActionRead = {
   action_request_id: string;
   capability: string;
@@ -313,6 +332,23 @@ type VisualFrameReplayResult = {
   summary: string;
 };
 
+type AudioTranscriptHistoryItem = {
+  history_id: string;
+  source_id: string;
+  event_id: string | null;
+  chunk_id: string | null;
+  analysis_job_id: string | null;
+  transcript: string;
+  compact_summary: string | null;
+  evidence_refs: string[];
+  chunk_index: number | null;
+  duration_ms: number | null;
+  from_ts: string | null;
+  to_ts: string | null;
+  captured_at: string;
+  source_label: string;
+};
+
 type VisualObserverProfileListRead = {
   profiles?: StagePlayVisualObserverProfileV1[];
   activeProfile?: StagePlayVisualObserverProfileV1 | null;
@@ -383,6 +419,48 @@ const formatTime = (value?: string | null): string => {
   if (!value) return "never";
   const ts = Date.parse(value);
   return Number.isFinite(ts) ? new Date(ts).toLocaleTimeString() : value;
+};
+
+const readRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+
+const readStringList = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    : [];
+
+const pruneAudioTranscriptHistory = (items: AudioTranscriptHistoryItem[]): AudioTranscriptHistoryItem[] => {
+  const deduped = new Map<string, AudioTranscriptHistoryItem>();
+  const eventToPrimaryKey = new Map<string, string>();
+  for (const item of items) {
+    const primaryKey = item.chunk_id ?? item.event_id ?? item.history_id;
+    if (item.event_id) {
+      const existingPrimaryKey = eventToPrimaryKey.get(item.event_id);
+      if (existingPrimaryKey && existingPrimaryKey !== primaryKey) {
+        const existing = deduped.get(existingPrimaryKey);
+        if (item.chunk_id || !existing?.chunk_id) {
+          deduped.delete(existingPrimaryKey);
+        } else {
+          continue;
+        }
+      }
+      eventToPrimaryKey.set(item.event_id, primaryKey);
+    }
+    const sameTranscriptKey = `${item.source_id}:${item.captured_at}:${item.transcript.trim().toLowerCase()}`;
+    const duplicate = Array.from(deduped.entries()).find(([, current]) =>
+      `${current.source_id}:${current.captured_at}:${current.transcript.trim().toLowerCase()}` === sameTranscriptKey);
+    if (duplicate && (item.chunk_id || !duplicate[1].chunk_id)) {
+      deduped.delete(duplicate[0]);
+    } else if (duplicate) {
+      continue;
+    }
+    deduped.set(primaryKey, item);
+  }
+  return Array.from(deduped.values())
+    .sort((left, right) => Date.parse(left.captured_at) - Date.parse(right.captured_at))
+    .slice(-AUDIO_TRANSCRIPT_HISTORY_LIMIT);
 };
 
 const defaultWorldEventEndpoint = (): string => {
@@ -616,7 +694,13 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [selectedVisualFrameHistoryId, setSelectedVisualFrameHistoryId] = useState<string | null>(null);
   const [visualFrameReplayRunning, setVisualFrameReplayRunning] = useState(false);
   const [visualFrameReplayResult, setVisualFrameReplayResult] = useState<VisualFrameReplayResult | null>(null);
-  const [visualCaptureRoutes, setVisualCaptureRoutes] = useState<VisualCaptureRoute[]>(["live_answer"]);
+  const [visualCaptureRoutes, setVisualCaptureRoutes] = useState<VisualCaptureRoute[]>(() => readStoredVisualCaptureRoutes());
+  const [audioTranscriptHistory, setAudioTranscriptHistory] = useState<AudioTranscriptHistoryItem[]>([]);
+  const [selectedAudioTranscriptHistoryId, setSelectedAudioTranscriptHistoryId] = useState<string | null>(null);
+  const [audioTranscriptSourceId, setAudioTranscriptSourceId] = useState<string | null>(null);
+  const [audioTranscriptChunkMs, setAudioTranscriptChunkMs] = useState<number>(AUDIO_TRANSCRIPT_DEFAULT_CHUNK_MS);
+  const [audioTranscriptStatus, setAudioTranscriptStatus] = useState<AudioTranscriptCaptureStatus>("idle");
+  const [audioTranscriptStatusDetail, setAudioTranscriptStatusDetail] = useState<string>("Audio transcript is not running.");
   const visualReplayJobsInFlightRef = React.useRef<Set<string>>(new Set());
   const audioTranscriptSessionRef = React.useRef<DisplayAudioSituationSession | null>(null);
   const audioTranscriptSourceIdRef = React.useRef<string | null>(null);
@@ -709,6 +793,41 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     () => windows.filter((window: LiveSourceWindowSummary) => sourceIds.size === 0 || sourceIds.has(window.source_id) || window.environment_id === environment?.environment_id),
     [environment?.environment_id, sourceIds, windows],
   );
+  const serverAudioTranscriptHistory = useMemo<AudioTranscriptHistoryItem[]>(() => {
+    return relevantEvents
+      .filter((event: WorkstationLiveSourceEvent) => event.kind === "browser_audio_transcript" || event.event_type === "transcript_chunk")
+      .map((event: WorkstationLiveSourceEvent): AudioTranscriptHistoryItem | null => {
+        const payload = readRecord(event.payload);
+        const transcript = typeof payload?.transcript === "string" ? payload.transcript.trim() : "";
+        if (!transcript) return null;
+        return {
+          history_id: `audio_event:${event.event_id}`,
+          source_id: event.source_id,
+          event_id: event.event_id,
+          chunk_id: null,
+          analysis_job_id: null,
+          transcript,
+          compact_summary: transcript ? `Transcript chunk: ${transcript.slice(0, 160)}` : null,
+          evidence_refs: event.evidence_refs ?? [],
+          chunk_index: typeof event.tick_index === "number" ? event.tick_index : null,
+          duration_ms: null,
+          from_ts: null,
+          to_ts: event.ts,
+          captured_at: event.ts,
+          source_label: "Live Source event",
+        };
+      })
+      .filter((item): item is AudioTranscriptHistoryItem => Boolean(item))
+      .slice(-AUDIO_TRANSCRIPT_HISTORY_LIMIT);
+  }, [relevantEvents]);
+  const mergedAudioTranscriptHistory = useMemo<AudioTranscriptHistoryItem[]>(
+    () => pruneAudioTranscriptHistory([...serverAudioTranscriptHistory, ...audioTranscriptHistory]),
+    [audioTranscriptHistory, serverAudioTranscriptHistory],
+  );
+  const activeAudioTranscriptSourceId =
+    audioTranscriptSourceId ??
+    audioTranscriptSourceIdRef.current ??
+    null;
   const canStartSourceMonitor = sourceSignal.status === "live" && Boolean(sourceSignal.source);
   const liveCardLineStateByKey = useMemo(() => {
     const entries = presentStateCard?.line_states ?? [];
@@ -844,6 +963,15 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const routeImageLens = visualCaptureRoutes.includes("image_lens");
   const routeAudioTranscript = visualCaptureRoutes.includes("audio_transcript");
   const selectedRouteCount = visualCaptureRoutes.length;
+  const currentVisualShareStream = activeVisualSourceId
+    ? getActiveVisualFrameStream(activeVisualSourceId) ?? getLatestActiveVisualFrameStream(threadId)?.stream ?? null
+    : getLatestActiveVisualFrameStream(threadId)?.stream ?? null;
+  const currentVisualShareHasAudio = Boolean(currentVisualShareStream && currentVisualShareStream.getAudioTracks().length > 0);
+  const audioRouteNeedsFreshShare = routeAudioTranscript && Boolean(currentVisualShareStream) && !currentVisualShareHasAudio;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(VISUAL_CAPTURE_ROUTE_STORAGE_KEY, JSON.stringify(visualCaptureRoutes));
+  }, [visualCaptureRoutes]);
   const visualCaptureStatus =
     visualEvidenceHealth?.status ??
     visualLatest?.active_source?.status ??
@@ -859,12 +987,46 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const selectedVisualFrameHistoryIndex = selectedVisualFrameHistory
     ? visualFrameHistory.findIndex((item: VisualSourceCaptureFrameHistoryItem) => item.history_id === selectedVisualFrameHistory.history_id)
     : -1;
+  const selectedAudioTranscript =
+    mergedAudioTranscriptHistory.find((item: AudioTranscriptHistoryItem) => item.history_id === selectedAudioTranscriptHistoryId) ??
+    mergedAudioTranscriptHistory.at(-1) ??
+    null;
+  const selectedAudioTranscriptIndex = selectedAudioTranscript
+    ? mergedAudioTranscriptHistory.findIndex((item: AudioTranscriptHistoryItem) => item.history_id === selectedAudioTranscript.history_id)
+    : -1;
   const selectVisualFrameHistoryByOffset = (offset: number): void => {
     if (!visualFrameHistory.length) return;
     const baseIndex = selectedVisualFrameHistoryIndex >= 0 ? selectedVisualFrameHistoryIndex : visualFrameHistory.length - 1;
     const nextIndex = Math.max(0, Math.min(visualFrameHistory.length - 1, baseIndex + offset));
     setSelectedVisualFrameHistoryId(visualFrameHistory[nextIndex]?.history_id ?? null);
   };
+  const selectAudioTranscriptByOffset = (offset: number): void => {
+    if (!mergedAudioTranscriptHistory.length) return;
+    const baseIndex = selectedAudioTranscriptIndex >= 0 ? selectedAudioTranscriptIndex : mergedAudioTranscriptHistory.length - 1;
+    const nextIndex = Math.max(0, Math.min(mergedAudioTranscriptHistory.length - 1, baseIndex + offset));
+    setSelectedAudioTranscriptHistoryId(mergedAudioTranscriptHistory[nextIndex]?.history_id ?? null);
+  };
+  useEffect(() => {
+    if (!selectedVisualFrameHistory || mergedAudioTranscriptHistory.length === 0) return;
+    const visualCapturedMs = Date.parse(selectedVisualFrameHistory.captured_at);
+    if (!Number.isFinite(visualCapturedMs)) return;
+    const toleranceMs = Math.max(audioTranscriptChunkMs, AUDIO_TRANSCRIPT_DEFAULT_CHUNK_MS) * 2;
+    const ranked = mergedAudioTranscriptHistory
+      .map((item: AudioTranscriptHistoryItem) => {
+        const fromMs = item.from_ts ? Date.parse(item.from_ts) : NaN;
+        const toMs = item.to_ts ? Date.parse(item.to_ts) : Date.parse(item.captured_at);
+        const capturedMs = Date.parse(item.captured_at);
+        const overlaps = Number.isFinite(fromMs) && Number.isFinite(toMs) && fromMs <= visualCapturedMs && visualCapturedMs <= toMs;
+        const anchorMs = Number.isFinite(toMs) ? toMs : capturedMs;
+        const distanceMs = overlaps ? 0 : Math.abs(anchorMs - visualCapturedMs);
+        return { item, distanceMs };
+      })
+      .sort((left, right) => left.distanceMs - right.distanceMs);
+    const best = ranked[0];
+    if (best && best.distanceMs <= toleranceMs && best.item.history_id !== selectedAudioTranscriptHistoryId) {
+      setSelectedAudioTranscriptHistoryId(best.item.history_id);
+    }
+  }, [audioTranscriptChunkMs, mergedAudioTranscriptHistory, selectedAudioTranscriptHistoryId, selectedVisualFrameHistory]);
   const visualReplayFramesForRequest = (request: HelixVisualFrameActionReplayRequest): VisualSourceCaptureFrameHistoryItem[] => {
     const fromMs = request.from_ts ? Date.parse(request.from_ts) : null;
     const toMs = request.to_ts ? Date.parse(request.to_ts) : null;
@@ -1500,7 +1662,19 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     const sourceId = audioTranscriptSourceIdRef.current ?? `audio_transcript:${threadId}`;
     audioTranscriptSessionRef.current?.stop();
     audioTranscriptSessionRef.current = null;
+    const audioTrackCount = input.stream.getAudioTracks().length;
+    if (audioTrackCount === 0) {
+      audioTranscriptSourceIdRef.current = null;
+      setAudioTranscriptSourceId(null);
+      setAudioTranscriptStatus("error");
+      setAudioTranscriptStatusDetail("The browser share stream has no audio track. Start selected live sources with Audio transcript checked, choose a Chrome tab, and enable tab audio in the share dialog.");
+      throw new Error("display_audio_track_missing");
+    }
     audioTranscriptSourceIdRef.current = sourceId;
+    setAudioTranscriptSourceId(sourceId);
+    setAudioTranscriptChunkMs(input.chunkMs);
+    setAudioTranscriptStatus("requesting_permission");
+    setAudioTranscriptStatusDetail(`Display audio route requested with ${audioTrackCount} audio track${audioTrackCount === 1 ? "" : "s"}.`);
     await postJson("/api/agi/situation/audio-source/permission-granted", {
       source_id: sourceId,
       thread_id: threadId,
@@ -1527,8 +1701,14 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       chunkMs: input.chunkMs,
       onEvent: () => undefined,
       onTranscriptChunk: async (chunk: DisplayAudioTranscriptChunk) => {
+        setAudioTranscriptStatus("transcribing");
+        setAudioTranscriptStatusDetail(`Received audio chunk ${chunk.chunkIndex + 1}; posting transcript to Live Source.`);
         const transcript = chunk.event.text?.trim() ?? "";
-        if (!transcript) return;
+        if (!transcript) {
+          setAudioTranscriptStatus("listening");
+          setAudioTranscriptStatusDetail("Audio chunk arrived, but no transcript text was produced yet.");
+          return;
+        }
         const response = await postJson("/api/agi/situation/audio-source/transcript-chunk", {
           source_id: sourceId,
           thread_id: threadId,
@@ -1546,11 +1726,35 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           to_ts: chunk.toTs,
           ts: chunk.toTs,
         });
+        const liveSourceEvent = readRecord(response?.live_source_event);
+        const liveSourceChunk = readRecord(response?.live_source_chunk) as HelixLiveSourceChunk | null;
+        const liveSourceAnalysisJob = readRecord(response?.live_source_analysis_job);
         const latestObservationRefs = [
           response?.live_source_event?.event_id,
           response?.live_source_chunk?.chunk_id,
           response?.live_source_analysis_job?.job_id,
         ].filter((ref): ref is string => typeof ref === "string" && ref.trim().length > 0);
+        setAudioTranscriptHistory((current: AudioTranscriptHistoryItem[]) => pruneAudioTranscriptHistory([
+          ...current,
+          {
+            history_id: `audio_chunk:${liveSourceChunk?.chunk_id ?? liveSourceEvent?.event_id ?? chunk.captureSessionId}:${chunk.chunkIndex}`,
+            source_id: sourceId,
+            event_id: typeof liveSourceEvent?.event_id === "string" ? liveSourceEvent.event_id : null,
+            chunk_id: liveSourceChunk?.chunk_id ?? null,
+            analysis_job_id: typeof liveSourceAnalysisJob?.job_id === "string" ? liveSourceAnalysisJob.job_id : null,
+            transcript,
+            compact_summary: liveSourceChunk?.compact_summary ?? `Transcript chunk: ${transcript.slice(0, 160)}`,
+            evidence_refs: readStringList(liveSourceChunk?.evidence_refs).length
+              ? readStringList(liveSourceChunk?.evidence_refs)
+              : chunk.event.evidence_refs,
+            chunk_index: chunk.chunkIndex,
+            duration_ms: liveSourceChunk?.duration_ms ?? chunk.durationMs,
+            from_ts: chunk.fromTs,
+            to_ts: chunk.toTs,
+            captured_at: chunk.toTs,
+            source_label: "Live Source audio chunk",
+          },
+        ]));
         await postAudioTranscriptLiveSourceDescriptor({
           postJson,
           sourceId,
@@ -1561,13 +1765,20 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           stream: input.stream,
           latestObservationRefs,
         });
+        setAudioTranscriptStatus("listening");
+        setAudioTranscriptStatusDetail(`Latest transcript chunk recorded for ${sourceId}.`);
       },
       onError: (error: Error) => {
+        setAudioTranscriptStatus("error");
+        setAudioTranscriptStatusDetail(error.message || "audio_transcript_capture_failed");
         setLastActionStatus(error.message || "audio_transcript_capture_failed");
       },
       onStop: () => {
         if (!sessionCaptureId || audioTranscriptSessionRef.current?.captureSessionId === sessionCaptureId) {
           audioTranscriptSessionRef.current = null;
+          setAudioTranscriptSourceId(null);
+          setAudioTranscriptStatus("idle");
+          setAudioTranscriptStatusDetail("Audio transcript is not running.");
         }
         void postJson("/api/agi/situation/audio-source/stop", {
           source_id: sourceId,
@@ -1588,6 +1799,8 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     });
     sessionCaptureId = session.captureSessionId;
     audioTranscriptSessionRef.current = session;
+    setAudioTranscriptStatus("listening");
+    setAudioTranscriptStatusDetail(`Listening for shared tab audio; transcript chunks post every ${Math.round(input.chunkMs / 1000)}s.`);
     return sourceId;
   };
 
@@ -1609,7 +1822,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         : await requestDisplayStream({ includeAudio: routeAudioTranscript });
       ownsStream = stream !== existingStream;
       const scheduledCadenceMs = source ? await readScheduledVisualCadenceMs(source.source_id) : null;
-      const sharedCadenceMs = scheduledCadenceMs ?? visualProducerState?.cadence_ms ?? 10_000;
+      const alignedVisualCadenceMs = routeLiveAnswerVisual
+        ? scheduledCadenceMs ?? visualProducerState?.cadence_ms ?? null
+        : null;
+      const sharedCadenceMs = alignedVisualCadenceMs ?? AUDIO_TRANSCRIPT_DEFAULT_CHUNK_MS;
       const statusParts: string[] = [];
 
       if (routeAudioTranscript) {
@@ -1659,8 +1875,14 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       setLastActionStatus(`Screen share routed: ${statusParts.join(" | ")}`);
       await refresh();
     } catch (error) {
+      if (routeAudioTranscript && error instanceof Error && error.message === "display_audio_track_missing") {
+        setLastActionStatus("Audio transcript could not start because the shared stream did not include tab audio.");
+      }
       if (ownsStream) stream?.getTracks().forEach((track: MediaStreamTrack) => track.stop());
-      setLastActionStatus(error instanceof Error ? error.message : "screen_share_route_failed");
+      setLastActionStatus((current) =>
+        current && error instanceof Error && error.message === "display_audio_track_missing"
+          ? current
+          : error instanceof Error ? error.message : "screen_share_route_failed");
     }
   };
 
@@ -1769,7 +1991,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
 
   const stopVisualSharing = async () => {
     const sourceId = activeVisualSourceId;
-    const audioSourceId = audioTranscriptSourceIdRef.current;
+    const audioSourceId = activeAudioTranscriptSourceId;
     if (!sourceId && !audioSourceId) {
       setLastActionStatus("No visual or audio transcript source is registered.");
       return;
@@ -1784,6 +2006,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         ts: new Date().toISOString(),
       }).catch(() => null);
       audioTranscriptSourceIdRef.current = null;
+      setAudioTranscriptSourceId(null);
     }
     if (!sourceId) {
       setLastActionStatus("Stopped audio transcript sharing.");
@@ -2403,6 +2626,14 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                 <p className="max-h-20 overflow-y-auto pr-1 text-[11px] leading-5 text-slate-300">
                   {selectedVisualFrameHistory.summary}
                 </p>
+                {selectedVisualFrameHistory.crop_only ? (
+                  <p className="mt-1 rounded border border-cyan-300/20 bg-cyan-950/20 px-2 py-1 text-[10px] leading-4 text-cyan-100">
+                    Image Lens crop-only frame. Analysis prompt is bounded to the submitted crop pixels
+                    {selectedVisualFrameHistory.crop_bbox_px
+                      ? ` (${selectedVisualFrameHistory.crop_bbox_px.x}, ${selectedVisualFrameHistory.crop_bbox_px.y}, ${selectedVisualFrameHistory.crop_bbox_px.width}x${selectedVisualFrameHistory.crop_bbox_px.height}px).`
+                      : "."}
+                  </p>
+                ) : null}
                 <div className="mt-2 grid gap-x-3 gap-y-1 text-[10px] md:grid-cols-2">
                   <div className="min-w-0">
                     <span className="uppercase text-slate-500">Frame</span>{" "}
@@ -2415,6 +2646,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                   <div className="min-w-0">
                     <span className="uppercase text-slate-500">Shade</span>{" "}
                     <span className="break-all font-mono text-slate-300">{selectedVisualFrameHistory.visual_observer_profile_title ?? "generic"}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <span className="uppercase text-slate-500">Scope</span>{" "}
+                    <span className="break-all font-mono text-slate-300">{selectedVisualFrameHistory.crop_only ? "image_lens_crop" : selectedVisualFrameHistory.source_kind ?? "full_frame"}</span>
                   </div>
                   <div className="min-w-0">
                     <span className="uppercase text-slate-500">Prompt hash</span>{" "}
@@ -2451,6 +2686,128 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                   }`}
                 >
                   <img src={item.preview_data_url} alt="" className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <div className="mt-3 rounded border border-teal-300/20 bg-teal-950/10 p-2" data-testid="audio-transcript-review">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <p className="text-[11px] font-semibold text-teal-100">Earbud outputs</p>
+              <p className="mt-0.5 text-[10px] text-slate-500">
+                Audio transcript chunks, capped at {AUDIO_TRANSCRIPT_HISTORY_LIMIT}.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-1 text-[10px]">
+              <button
+                type="button"
+                aria-label="Review previous audio transcript chunk"
+                onClick={() => selectAudioTranscriptByOffset(-1)}
+                disabled={selectedAudioTranscriptIndex <= 0}
+                className="rounded border border-white/10 px-2 py-1 text-[11px] text-slate-200 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Prev
+              </button>
+              <span className="min-w-14 text-center text-[10px] text-slate-500">
+                {selectedAudioTranscriptIndex >= 0 ? `${selectedAudioTranscriptIndex + 1}/${mergedAudioTranscriptHistory.length}` : "0/0"}
+              </span>
+              <button
+                type="button"
+                aria-label="Review next audio transcript chunk"
+                onClick={() => selectAudioTranscriptByOffset(1)}
+                disabled={!mergedAudioTranscriptHistory.length || selectedAudioTranscriptIndex >= mergedAudioTranscriptHistory.length - 1}
+                className="rounded border border-white/10 px-2 py-1 text-[11px] text-slate-200 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+              </button>
+              <span className="rounded border border-teal-300/20 px-2 py-1 text-teal-100">
+                Chunk traffic {Math.round(audioTranscriptChunkMs / 1000)}s
+              </span>
+              <span className={`rounded border px-2 py-1 ${
+                audioTranscriptStatus === "listening" || audioTranscriptStatus === "transcribing"
+                  ? "border-emerald-300/30 text-emerald-100"
+                  : audioTranscriptStatus === "requesting_permission"
+                    ? "border-amber-300/30 text-amber-100"
+                    : audioTranscriptStatus === "error"
+                      ? "border-rose-300/30 text-rose-100"
+                      : "border-white/10 text-slate-400"
+              }`}>
+                {audioTranscriptStatus}
+              </span>
+            </div>
+          </div>
+          <p className={`mt-2 rounded border px-2 py-1 text-[10px] leading-4 ${
+            audioTranscriptStatus === "error"
+              ? "border-rose-300/20 bg-rose-950/10 text-rose-100"
+              : "border-white/10 bg-black/20 text-slate-400"
+          }`}>
+            {audioTranscriptStatusDetail}
+          </p>
+          {audioRouteNeedsFreshShare ? (
+            <p className="mt-2 rounded border border-amber-300/20 bg-amber-950/10 px-2 py-1 text-[10px] leading-4 text-amber-100">
+              Current visual share has no audio track; starting selected live sources will request a fresh browser share.
+            </p>
+          ) : null}
+          {selectedAudioTranscript ? (
+            <div className="mt-2 rounded border border-white/10 bg-black/20 p-2">
+              <p className="max-h-24 overflow-y-auto pr-1 text-[11px] leading-5 text-slate-200">
+                {selectedAudioTranscript.transcript}
+              </p>
+              <div className="mt-2 grid gap-x-3 gap-y-1 text-[10px] md:grid-cols-2">
+                <div className="min-w-0">
+                  <span className="uppercase text-slate-500">Source</span>{" "}
+                  <span className="break-all font-mono text-slate-300">{selectedAudioTranscript.source_id}</span>
+                </div>
+                <div className="min-w-0">
+                  <span className="uppercase text-slate-500">Chunk</span>{" "}
+                  <span className="break-all font-mono text-slate-300">{selectedAudioTranscript.chunk_id ?? selectedAudioTranscript.event_id ?? "pending"}</span>
+                </div>
+                <div className="min-w-0">
+                  <span className="uppercase text-slate-500">Evidence</span>{" "}
+                  <span className="break-all font-mono text-slate-300">{selectedAudioTranscript.evidence_refs.at(0) ?? "none"}</span>
+                </div>
+                <div className="min-w-0">
+                  <span className="uppercase text-slate-500">Analyzer</span>{" "}
+                  <span className="break-all font-mono text-slate-300">{selectedAudioTranscript.analysis_job_id ?? "transcript_intent"}</span>
+                </div>
+                <div className="min-w-0">
+                  <span className="uppercase text-slate-500">Duration</span>{" "}
+                  <span className="font-mono text-slate-300">
+                    {selectedAudioTranscript.duration_ms !== null ? `${Math.round(selectedAudioTranscript.duration_ms / 1000)}s` : "unknown"}
+                  </span>
+                </div>
+                <div className="min-w-0">
+                  <span className="uppercase text-slate-500">Captured</span>{" "}
+                  <span className="font-mono text-slate-300">{formatTime(selectedAudioTranscript.captured_at)}</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-2 text-[11px] text-slate-500">
+              Transcript chunks will appear here after the shared tab produces audio.
+            </p>
+          )}
+          {mergedAudioTranscriptHistory.length ? (
+            <div className="mt-2 grid gap-1.5 md:grid-cols-2" aria-label="Recent audio transcript chunks">
+              {mergedAudioTranscriptHistory.slice(-4).reverse().map((item: AudioTranscriptHistoryItem) => (
+                <button
+                  key={item.history_id}
+                  type="button"
+                  aria-label={`Review audio transcript chunk ${mergedAudioTranscriptHistory.findIndex((entry: AudioTranscriptHistoryItem) => entry.history_id === item.history_id) + 1}`}
+                  onClick={() => setSelectedAudioTranscriptHistoryId(item.history_id)}
+                  className={`min-w-0 rounded border bg-slate-950/70 px-2 py-1.5 text-left ${
+                    item.history_id === selectedAudioTranscript?.history_id
+                      ? "border-teal-300/70"
+                      : "border-white/10 hover:border-white/30"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-[10px] font-semibold text-teal-100">{item.source_label}</span>
+                    <span className="shrink-0 font-mono text-[10px] text-slate-500">{formatTime(item.captured_at)}</span>
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-300">{item.transcript}</p>
+                  <p className="mt-1 truncate font-mono text-[10px] text-slate-600">{item.chunk_id ?? item.event_id ?? "pending"}</p>
                 </button>
               ))}
             </div>
@@ -2552,7 +2909,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             className="rounded border border-sky-300/30 px-2 py-1 text-[11px] text-sky-100 hover:bg-sky-400/10 disabled:cursor-not-allowed disabled:opacity-45"
           >
             {routeAudioTranscript || routeImageLens
-              ? "Start selected live sources"
+              ? audioRouteNeedsFreshShare ? "Restart selected live sources" : "Start selected live sources"
               : visualLatest?.source ? "Grant visual capture + first frame" : "Register + first frame"}
           </button>
           <button
@@ -2587,7 +2944,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           <button
             type="button"
             onClick={() => void stopVisualSharing()}
-            disabled={!visualProducerState?.stream_active && !audioTranscriptSourceIdRef.current}
+            disabled={!visualProducerState?.stream_active && !activeAudioTranscriptSourceId}
             className="rounded border border-rose-300/30 px-2 py-1 text-[11px] text-rose-100 hover:bg-rose-400/10 disabled:cursor-not-allowed disabled:opacity-45"
           >
             Stop sharing

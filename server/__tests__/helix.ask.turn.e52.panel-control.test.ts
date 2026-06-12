@@ -1095,7 +1095,7 @@ describe("helix ask E52 panel control terminal contract", () => {
     }
   }, 60000);
 
-  it("advances docs open workflow when the model repeats a completed docs search", async () => {
+  it("keeps hard docs open workflow inside docs tools and repairs repeated docs steps", async () => {
     const previousFlag = process.env.HELIX_AGENT_STEP_DECISION_LLM;
     const previousResponse = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
     const previousResponseIndex = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
@@ -1116,18 +1116,22 @@ describe("helix ask E52 panel control terminal contract", () => {
       },
       {
         next_step: "next_action",
-        chosen_capability: "docs-viewer.search_docs",
-        reason: "Incorrectly repeat the same search after results already exist.",
-        args: { query: "Helix Ask console debug", limit: 5 },
-        expected_artifacts: ["doc_search_results"],
+        chosen_capability: "repo-code.search_concept",
+        reason: "Incorrectly try repo search even though the hard source target is local docs.",
+        args: { query: "Helix Ask console debug" },
+        expected_artifacts: ["repo_code_evidence_observation"],
         confidence: 0.7,
       },
       {
         next_step: "next_action",
-        chosen_capability: "docs-viewer.open_doc_by_path",
-        reason: "Open the selected Helix Ask console debug document path.",
-        args: { path: "/docs/architecture/helix-ask-reasoning-theater-spec.v1.md" },
-        expected_artifacts: ["doc_open_receipt"],
+        chosen_capability: "docs-viewer.validate_doc_candidates",
+        reason: "Incorrectly repeat validation after the selected candidate already exists.",
+        args: {
+          query: "Helix Ask console debug",
+          selected_path: "/docs/architecture/helix-ask-reasoning-theater-spec.v1.md",
+          path: "/docs/architecture/helix-ask-reasoning-theater-spec.v1.md",
+        },
+        expected_artifacts: ["doc_candidate_validation"],
         confidence: 0.94,
       },
       {
@@ -1153,8 +1157,18 @@ describe("helix ask E52 panel control terminal contract", () => {
 
       const actions = actionsOf(response.body);
       expect(actions.filter((action) => action?.panel_id === "docs-viewer" && action?.action_id === "search_docs")).toHaveLength(1);
-      expect(actions.some((action) => action?.panel_id === "docs-viewer" && action?.action_id === "validate_doc_candidates")).toBe(true);
-      expect(actions.some((action) => action?.panel_id === "docs-viewer" && action?.action_id === "open_doc_by_path")).toBe(true);
+      expect(actions.filter((action) => action?.panel_id === "docs-viewer" && action?.action_id === "validate_doc_candidates")).toHaveLength(1);
+      expect(actions.filter((action) => action?.panel_id === "docs-viewer" && action?.action_id === "open_doc_by_path")).toHaveLength(1);
+      const artifactLedger = response.body?.current_turn_artifact_ledger ?? [];
+      const artifactLedgerKinds = artifactLedger.map((artifact: any) => artifact?.kind);
+      expect(artifactLedgerKinds).not.toContain("repo_code_evidence_observation");
+      expect(
+        artifactLedger.some(
+          (artifact: any) =>
+            artifact?.kind === "runtime_tool_call" &&
+            artifact?.payload?.capability_key === "repo-code.search_concept",
+        ),
+      ).toBe(false);
       expect(response.body?.terminal_artifact_kind).toBe("doc_open_receipt");
       expect(response.body?.final_answer_source).toBe("doc_open_receipt");
       expect(response.body?.line_tool_request_count).toBe(3);
@@ -1180,6 +1194,30 @@ describe("helix ask E52 panel control terminal contract", () => {
       const debugExport = await request(app).get(debugExportRef).expect(200);
       expect(debugExport.body?.payload?.route_authority_audit?.route_authority_ok).toBe(true);
       expect(debugExport.body?.payload?.loop_parity_trace?.route_authority_ok).toBe(true);
+      expect(debugExport.body?.payload?.loop_parity_trace?.unexpected_tool_calls).toEqual([]);
+      expect(debugExport.body?.payload?.loop_parity_trace?.short_circuit_risk_flags ?? []).not.toContain("tool_called_without_admission");
+      expect(debugExport.body?.payload?.loop_parity_trace?.actual_tool_calls?.map((call: any) => call.tool_id)).toEqual([
+        "docs-viewer.search_docs",
+        "docs-viewer.validate_doc_candidates",
+        "docs-viewer.open_doc_by_path",
+      ]);
+      expect(debugExport.body?.payload?.loop_parity_trace?.tool_results_returned_to_turn).toBe(true);
+      expect(debugExport.body?.payload?.loop_parity_trace?.observations_created).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ source_kind: "doc_search_results" }),
+          expect.objectContaining({ source_kind: "doc_candidate_validation" }),
+          expect.objectContaining({ source_kind: "doc_open_receipt" }),
+        ]),
+      );
+      expect(debugExport.body?.payload?.model_turn_fidelity_audit).toMatchObject({
+        artifact_id: "model_turn_fidelity_audit",
+        schema: "helix.model_turn_fidelity_audit.v1",
+        model_visible_tool_families: expect.arrayContaining(["docs_viewer"]),
+        terminal: expect.objectContaining({
+          final_used_observed_artifact: true,
+        }),
+        parity_status: "safe_policy_repair",
+      });
       expect(debugExport.body?.payload?.ask_turn_solver_trace?.route_authority_ok).toBe(true);
       expect(debugExport.body?.payload?.ask_turn_solver_trace?.completed_solver_path).toBe(true);
       expect(response.body?.goal_satisfaction_evaluation?.required_actions).toEqual(
@@ -1193,6 +1231,11 @@ describe("helix ask E52 panel control terminal contract", () => {
         iteration.chosen_capability === "docs-viewer.validate_doc_candidates" &&
         iteration.decision_source === "deterministic_policy_fallback"
       )).toBe(true);
+      expect((response.body?.agent_runtime_loop?.iterations ?? []).some((iteration: any) =>
+        iteration.chosen_capability === "docs-viewer.open_doc_by_path" &&
+        iteration.decision_source === "deterministic_policy_fallback"
+      )).toBe(true);
+      expect(response.body?.agent_runtime_loop?.stop_reason).not.toBe("budget_exhausted");
     } finally {
       if (previousFlag === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;
       else process.env.HELIX_AGENT_STEP_DECISION_LLM = previousFlag;

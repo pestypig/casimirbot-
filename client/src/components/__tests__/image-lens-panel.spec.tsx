@@ -146,6 +146,15 @@ describe("ImageLensPanel", () => {
       expect(producer?.frame_history).toHaveLength(1);
       expect(producer?.frame_history?.[0]?.summary).toBe("Analyzed crop frame summary.");
       expect(producer?.frame_history?.[0]?.evidence_id).toBe("visual_evidence:crop");
+      expect(producer?.frame_history?.[0]?.source_kind).toBe("image_lens_crop");
+      expect(producer?.frame_history?.[0]?.crop_only).toBe(true);
+      expect(producer?.frame_history?.[0]?.crop_bbox_px).toEqual({ x: 10, y: 10, width: 50, height: 40 });
+      const analyzeCall = vi.mocked(fetch).mock.calls.find(([url]) => String(url).includes("/api/agi/situation/visual-frame/analyze"));
+      const analyzeBody = JSON.parse(String(analyzeCall?.[1]?.body ?? "{}"));
+      expect(analyzeBody.image_data_url).toBe("data:image/png;base64,iVBORw0KGgo=");
+      expect(analyzeBody.prompt).toMatch(/only the pixels visible inside this Image Lens crop/i);
+      expect(analyzeBody.crop_only).toBe(true);
+      expect(analyzeBody.crop_bbox_px).toEqual({ x: 10, y: 10, width: 50, height: 40 });
       expect(liveEvents[0]?.detail.entry.tool).toBe("image-lens.visual_frame");
       expect(liveEvents[0]?.detail.entry.meta.terminal_eligible).toBe(false);
       expect(imageLensEvents[0]?.detail).toEqual({

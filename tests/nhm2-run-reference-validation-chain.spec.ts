@@ -85,6 +85,8 @@ describe("NHM2 reference validation chain planner", () => {
       "regional-source-component-model": "fixtures/nhm2/regional-source-components.json",
       "regional-source-full-tensor-template":
         "fixtures/nhm2/regional-full-tensor-template.json",
+      "metric-required-full-tensor-source":
+        "fixtures/nhm2/metric-required-full-tensor-source.json",
     });
     const scripts = plan.map((command) => command.script);
     const regionalModel = findCommand(
@@ -155,6 +157,10 @@ describe("NHM2 reference validation chain planner", () => {
     expect(metricReceipt.args).toContain("artifacts/reference/nhm2-reference-run.json");
     expect(metricReceipt.args).toContain("--source-closure");
     expect(metricReceipt.args).toContain("artifacts/reference/nhm2-source-closure.json");
+    expect(metricReceipt.args).toContain("--metric-required-full-tensor-source");
+    expect(metricReceipt.args).toContain(
+      "fixtures/nhm2/metric-required-full-tensor-source.json",
+    );
     expect(metricReceipt.args).toContain(
       "artifacts/research/full-solve/reference/run-1/nhm2-metric-required-regional-tensor-receipt.json",
     );
@@ -238,6 +244,62 @@ describe("NHM2 reference validation chain planner", () => {
     expect(admission.args).toContain(
       "artifacts/research/full-solve/reference/run-1/nhm2-reference-run-validation.json",
     );
+  });
+
+  it("generates metric-required full tensor source from a runtime artifact before publishing the metric receipt", () => {
+    const plan = planReferenceValidationChain({
+      ...baseArgs(),
+      "generate-metric-required-full-tensor-source": true,
+      "metric-runtime-artifact": "artifacts/reference/nhm2-runtime-artifact.json",
+    });
+    const scripts = plan.map((command) => command.script);
+    const generatedSource = findCommand(
+      plan,
+      "nhm2:publish-metric-required-full-tensor-source",
+    );
+    const metricReceipt = findCommand(
+      plan,
+      "nhm2:publish-metric-required-regional-tensor-receipt",
+    );
+
+    expect(scripts.indexOf("nhm2:publish-metric-required-full-tensor-source")).toBeLessThan(
+      scripts.indexOf("nhm2:publish-metric-required-regional-tensor-receipt"),
+    );
+    expect(generatedSource.args).toEqual([
+      "--reference-run",
+      "artifacts/reference/nhm2-reference-run.json",
+      "--runtime-artifact",
+      "artifacts/reference/nhm2-runtime-artifact.json",
+      "--source-closure",
+      "artifacts/reference/nhm2-source-closure.json",
+      "--out",
+      "artifacts/research/full-solve/reference/run-1/nhm2-metric-required-regional-full-tensor-source.json",
+    ]);
+    expect(metricReceipt.args).toContain("--metric-required-full-tensor-source");
+    expect(metricReceipt.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-metric-required-regional-full-tensor-source.json",
+    );
+  });
+
+  it("rejects ambiguous generated and prebuilt metric-required full tensor source inputs", () => {
+    expect(() =>
+      planReferenceValidationChain({
+        ...baseArgs(),
+        "metric-required-full-tensor-source":
+          "artifacts/reference/nhm2-metric-required-regional-full-tensor-source.json",
+        "generate-metric-required-full-tensor-source": true,
+        "metric-runtime-artifact": "artifacts/reference/nhm2-runtime-artifact.json",
+      }),
+    ).toThrow(/mutually exclusive/);
+  });
+
+  it("requires a runtime artifact when generating metric-required full tensor source", () => {
+    expect(() =>
+      planReferenceValidationChain({
+        ...baseArgs(),
+        "generate-metric-required-full-tensor-source": true,
+      }),
+    ).toThrow(/requires --metric-runtime-artifact/);
   });
 
   it("builds a layered full-tensor audit when both a candidate and source tensor model are available", () => {

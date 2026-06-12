@@ -4,6 +4,7 @@ import { arbitrateAskSourceTarget } from "../services/helix-ask/ask-source-targe
 import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
 import { buildHelixCapabilityItinerary } from "../services/helix-ask/capability-itinerary";
 import { buildToolUseRestatement } from "../services/helix-ask/internet-search-intent";
+import { __testHelixRuntimeToolCallValidation } from "../routes/agi.plan";
 
 const turnId = "ask:test-docs-search-admission";
 const threadId = "thread:test-docs-search-admission";
@@ -82,5 +83,57 @@ describe("Helix Ask docs-search admission", () => {
       expect(sourceTargetIntent.target_source).not.toBe("docs_viewer");
       expect(admission.admitted_tool_families).not.toContain("docs_viewer");
     }
+  });
+
+  it("rejects repo-code runtime calls under hard docs-viewer admission", () => {
+    const sourceTargetIntent = arbitrateAskSourceTarget({
+      turnId,
+      threadId,
+      promptText: prompt,
+    });
+    const admission = buildToolCallAdmissionDecision({
+      turnId,
+      promptText: prompt,
+      sourceTargetIntent,
+    });
+    const availableCapabilities = {
+      capabilities: [
+        {
+          capability_key: "repo-code.search_concept",
+          requires_action: true,
+          availability: "available",
+          goal_fit: "forbidden",
+        },
+        {
+          capability_key: "docs-viewer.search_docs",
+          requires_action: true,
+          availability: "available",
+          goal_fit: "primary",
+        },
+      ],
+    } as any;
+
+    const rejectedRepoCall = __testHelixRuntimeToolCallValidation.validateHelixRuntimeToolCall({
+      availableCapabilities,
+      toolCallAdmissionDecision: admission,
+      call: {
+        schema: "helix.runtime_tool_call.v1",
+        turn_id: turnId,
+        call_id: "call:repo-search",
+        capability_key: "repo-code.search_concept",
+        args: { query: "Helix Ask console debug" },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+
+    expect(rejectedRepoCall.validation.valid).toBe(false);
+    expect(rejectedRepoCall.validation.errors).toEqual(
+      expect.arrayContaining([
+        "forbidden_capability_for_goal",
+        "runtime_capability_not_admitted_by_tool_policy:repo-code.search_concept:repo_code|runtime_evidence",
+        "runtime_tool_forbidden_by_tool_policy:repo-code.search_concept",
+      ]),
+    );
   });
 });

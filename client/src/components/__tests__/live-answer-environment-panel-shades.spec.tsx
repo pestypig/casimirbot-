@@ -133,15 +133,47 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain("Audio transcript");
     expect(source).toContain("Start selected live sources");
     expect(source).toContain("visualCaptureRoutes");
+    expect(source).toContain("VISUAL_CAPTURE_ROUTE_STORAGE_KEY");
+    expect(source).toContain("readStoredVisualCaptureRoutes");
+    expect(source).toContain("window.localStorage.setItem(VISUAL_CAPTURE_ROUTE_STORAGE_KEY");
     expect(source).toContain("toggleVisualCaptureRoute");
     expect(source).toContain("routeVisualCaptureToImageLensWithStream");
     expect(source).toContain("startAudioTranscriptRoute");
     expect(source).toContain("/api/agi/situation/audio-source/permission-granted");
     expect(source).toContain("/api/agi/situation/audio-source/transcript-chunk");
     expect(source).toContain("postAudioTranscriptLiveSourceDescriptor");
+    expect(source).toContain("AUDIO_TRANSCRIPT_DEFAULT_CHUNK_MS = 10_000");
+    expect(source).toContain('data-testid="audio-transcript-review"');
+    expect(source).toContain("Earbud outputs");
+    expect(source).toContain("audioTranscriptHistory");
+    expect(source).toContain("pruneAudioTranscriptHistory");
+    expect(source).toContain("Transcript chunks will appear here");
+    expect(source).toContain("Chunk traffic {Math.round(audioTranscriptChunkMs / 1000)}s");
+    expect(source).toContain("audioTranscriptStatus");
+    expect(source).toContain("display_audio_track_missing");
+    expect(source).toContain("audioRouteNeedsFreshShare");
+    expect(source).toContain("Restart selected live sources");
+    expect(source).toContain("Current visual share has no audio track");
+    expect(source).toContain("selectedAudioTranscriptHistoryId");
+    expect(source).toContain("selectAudioTranscriptByOffset");
+    expect(source).toContain("Review previous audio transcript chunk");
+    expect(source).toContain("Review next audio transcript chunk");
+    expect(source).toContain("Review audio transcript chunk");
+    expect(source).toContain("eventToPrimaryKey");
+    expect(source).toContain("selectedVisualFrameHistory.captured_at");
     expect(source).toContain("setImageLensLiveSource");
     expect(source).toContain("Raw frames will not be summarized until a crop is sent");
     expect(source).toContain('window.dispatchEvent(new CustomEvent("open-helix-panel", { detail: { id: "image-lens" } }))');
+  });
+
+  it("labels Image Lens crop frames as bounded crop-only evidence in the carousel", () => {
+    const source = panelSource();
+
+    expect(source).toContain("selectedVisualFrameHistory.crop_only");
+    expect(source).toContain("Image Lens crop-only frame");
+    expect(source).toContain("submitted crop pixels");
+    expect(source).toContain("selectedVisualFrameHistory.crop_bbox_px");
+    expect(source).toContain("image_lens_crop");
   });
 
   it("adds a separate action replay section for re-lensing captured frames", () => {

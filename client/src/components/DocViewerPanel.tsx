@@ -967,14 +967,14 @@ function groupBySubject(entries: DocManifestEntry[]): GroupedDocs[] {
 
 function groupRecencyScore(entries: DocManifestEntry[]): number {
   return entries.reduce((score, entry) => {
-    const latestBoost = entry.isLatest ? 9_000_000_000_000_000 : 0;
-    return Math.max(score, latestBoost + docCatalogTimestamp(entry));
+    return Math.max(score, docCatalogTimestamp(entry));
   }, 0);
 }
 
 function formatDocCatalogDate(entry: DocManifestEntry): string | null {
-  if (entry.isLatest) return entry.catalogDate ? `Latest / ${entry.catalogDate}` : "Latest";
-  return entry.catalogDate;
+  if (!entry.catalogDate) return null;
+  if (entry.catalogDateSource === "mtime") return `Edited ${entry.catalogDate}`;
+  return `Dated ${entry.catalogDate}`;
 }
 
 function markdownToSpeechText(markdown: string): string {

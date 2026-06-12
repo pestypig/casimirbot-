@@ -218,7 +218,33 @@ const collectObservationsCreated = (payload: RecordLike): HelixLoopParityTrace["
   }
   const ledger = Array.isArray(payload.current_turn_artifact_ledger) ? payload.current_turn_artifact_ledger : [];
   for (const artifact of ledger) {
-    const artifactPayload = readRecord(readRecord(artifact)?.payload);
+    const artifactRecord = readRecord(artifact);
+    const artifactPayload = readRecord(artifactRecord?.payload);
+    const artifactKind =
+      readString(artifactRecord?.kind) ||
+      readString(artifactPayload?.kind) ||
+      readString(artifactPayload?.artifactId) ||
+      readString(artifactPayload?.artifact_id);
+    const artifactSchema = readString(artifactPayload?.schema) || readString(artifactPayload?.schemaVersion);
+    const artifactText = [artifactKind, artifactSchema].filter(Boolean).join(" ");
+    const observationLike =
+      /observation|receipt|search_results|candidate_validation|open_receipt|latest_doc_selection|active_doc_path/i.test(artifactText);
+    if (observationLike) {
+      const ref =
+        readString(artifactRecord?.artifact_id) ||
+        readString(artifactPayload?.artifact_id) ||
+        readString(artifactPayload?.observation_id) ||
+        readString(artifactPayload?.receipt_id) ||
+        readString(artifactPayload?.call_id) ||
+        readString(artifactPayload?.path) ||
+        artifactKind;
+      addObservation(
+        ref,
+        artifactKind || "artifact_observation",
+        readString(artifactPayload?.source_id) || readString(artifactPayload?.call_id) || "current_turn",
+        "artifact_ledger",
+      );
+    }
     for (const ref of readStringArray(artifactPayload?.latest_observation_refs)) {
       addObservation(ref, readString(artifactPayload?.source_kind) || "unknown", readString(artifactPayload?.source_id) || "unknown", "artifact_ledger");
     }
@@ -227,6 +253,25 @@ const collectObservationsCreated = (payload: RecordLike): HelixLoopParityTrace["
     }
   }
   return Array.from(observations.values());
+};
+
+const toolResultsReturnedToTurn = (payload: RecordLike, actualToolCalls: HelixLoopParityTrace["actual_tool_calls"], observationsCreated: HelixLoopParityTrace["observations_created"]): boolean => {
+  if (actualToolCalls.length === 0) return true;
+  if (observationsCreated.length > 0) return true;
+  if (readRecord(payload.workspace_action_receipt) || readRecord(payload.live_pipeline_turn_receipt) || readRecord(payload.live_source_pipeline_receipt)) return true;
+  const ledger = Array.isArray(payload.current_turn_artifact_ledger) ? payload.current_turn_artifact_ledger : [];
+  return ledger
+    .map((entry) => readRecord(entry))
+    .some((entry) => {
+      const payloadRecord = readRecord(entry?.payload);
+      const kindText = [
+        readString(entry?.kind),
+        readString(payloadRecord?.kind),
+        readString(payloadRecord?.schema),
+        readString(payloadRecord?.schemaVersion),
+      ].filter(Boolean).join(" ");
+      return /runtime_tool_observation|agent_step_observation_packet|receipt|search_results|candidate_validation|open_receipt/i.test(kindText);
+    });
 };
 
 const collectRejectedEvidence = (payload: RecordLike, selectionRejected: HelixLoopParityTrace["evidence_rejected_for_answer"]): HelixLoopParityTrace["evidence_rejected_for_answer"] => {
@@ -364,7 +409,7 @@ export function buildLoopParityTrace(input: {
     observations_created: observationsCreated,
     evidence_selected_for_answer: evidence.selected,
     evidence_rejected_for_answer: evidenceRejectedForAnswer,
-    tool_results_returned_to_turn: actualToolCalls.length === 0 || Boolean(readRecord(payload.workspace_action_receipt) || readRecord(payload.live_pipeline_turn_receipt) || readRecord(payload.live_source_pipeline_receipt)),
+    tool_results_returned_to_turn: toolResultsReturnedToTurn(payload, actualToolCalls, observationsCreated),
     post_observation_finalizer_ran: postObservationFinalizerRan,
     followup_reasoning_ran: Array.isArray(payload.current_turn_artifact_ledger) && payload.current_turn_artifact_ledger.some((artifact) => readRecord(artifact)?.kind === "reasoning_context")
       ? true

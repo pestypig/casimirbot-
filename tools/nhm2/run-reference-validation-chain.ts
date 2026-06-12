@@ -111,6 +111,13 @@ export const planReferenceValidationChain = (
     args,
     "regional-source-full-tensor-template",
   );
+  const metricRequiredFullTensorSource = asOptionalString(
+    args,
+    "metric-required-full-tensor-source",
+  );
+  const generateMetricRequiredFullTensorSource =
+    args["generate-metric-required-full-tensor-source"] === true;
+  const metricRuntimeArtifact = asOptionalString(args, "metric-runtime-artifact");
   const layeredWallSourceCandidateRowId = asOptionalString(
     args,
     "layered-wall-source-candidate-row-id",
@@ -133,6 +140,11 @@ export const planReferenceValidationChain = (
   const conservation = inputConservation ?? (sourceInput == null ? null : generatedConservation);
   const sourceIndependenceAudit = `${outRoot}/nhm2-tile-counterpart-source-independence.md`;
   const sourceAuthority = `${outRoot}/nhm2-source-side-same-basis-tensor-authority.json`;
+  const generatedMetricRequiredFullTensorSource =
+    `${outRoot}/nhm2-metric-required-regional-full-tensor-source.json`;
+  const effectiveMetricRequiredFullTensorSource =
+    metricRequiredFullTensorSource ??
+    (generateMetricRequiredFullTensorSource ? generatedMetricRequiredFullTensorSource : null);
   const metricRequiredRegionalTensorReceipt =
     `${outRoot}/nhm2-metric-required-regional-tensor-receipt.json`;
   const regionalEvidence = `${outRoot}/nhm2-regional-source-closure-evidence.json`;
@@ -178,6 +190,16 @@ export const planReferenceValidationChain = (
   if (regionalMaterialSourceTensorModelInput != null && regionalSourceComponentModel != null) {
     throw new Error(
       "--regional-material-source-tensor-model and --regional-source-component-model are mutually exclusive",
+    );
+  }
+  if (metricRequiredFullTensorSource != null && generateMetricRequiredFullTensorSource) {
+    throw new Error(
+      "--metric-required-full-tensor-source and --generate-metric-required-full-tensor-source are mutually exclusive",
+    );
+  }
+  if (generateMetricRequiredFullTensorSource && metricRuntimeArtifact == null) {
+    throw new Error(
+      "--generate-metric-required-full-tensor-source requires --metric-runtime-artifact",
     );
   }
   if (inputConservation != null && sourceInput != null) {
@@ -371,11 +393,27 @@ export const planReferenceValidationChain = (
     sourceAuthority,
     ...auditOnly,
   ]));
+  if (generateMetricRequiredFullTensorSource) {
+    commands.push(command("nhm2:publish-metric-required-full-tensor-source", [
+      "--reference-run",
+      referenceRun,
+      "--runtime-artifact",
+      metricRuntimeArtifact as string,
+      "--source-closure",
+      sourceClosure,
+      "--out",
+      generatedMetricRequiredFullTensorSource,
+      ...auditOnly,
+    ]));
+  }
   commands.push(command("nhm2:publish-metric-required-regional-tensor-receipt", [
     "--reference-run",
     referenceRun,
     "--source-closure",
     sourceClosure,
+    ...(effectiveMetricRequiredFullTensorSource == null
+      ? []
+      : ["--metric-required-full-tensor-source", effectiveMetricRequiredFullTensorSource]),
     "--out",
     metricRequiredRegionalTensorReceipt,
     ...auditOnly,

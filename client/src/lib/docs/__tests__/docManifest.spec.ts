@@ -10,7 +10,12 @@ function makeEntry(
   id: string,
   title: string,
   relativePath: string,
-  overrides: Partial<Pick<DocManifestEntry, "subjectLabel" | "catalogDate" | "catalogDateSource" | "isLatest">> = {},
+  overrides: Partial<
+    Pick<
+      DocManifestEntry,
+      "subjectLabel" | "catalogDate" | "catalogDateSource" | "fileMtimeIso" | "fileMtimeMs" | "sizeBytes"
+    >
+  > = {},
 ): DocManifestEntry {
   return {
     id,
@@ -21,7 +26,9 @@ function makeEntry(
     subjectLabel: overrides.subjectLabel ?? "General Reference",
     catalogDate: overrides.catalogDate ?? null,
     catalogDateSource: overrides.catalogDateSource ?? null,
-    isLatest: overrides.isLatest ?? /\blatest\b/i.test(`${title} ${relativePath}`),
+    fileMtimeIso: overrides.fileMtimeIso ?? null,
+    fileMtimeMs: overrides.fileMtimeMs ?? null,
+    sizeBytes: overrides.sizeBytes ?? null,
     title,
     searchText: `${title} ${relativePath}`.toLowerCase(),
     loader: async () => "",
@@ -73,7 +80,7 @@ describe("filterDocManifestEntries", () => {
     expect(matches.map((entry) => entry.id)).toEqual(["title", "path-only"]);
   });
 
-  it("catalogs real docs with subject and filename date metadata", () => {
+  it("catalogs real docs with subject and filesystem edit metadata", () => {
     const entry = DOC_MANIFEST.find(
       (candidate) =>
         candidate.relativePath === "docs/audits/research/ownership-maturity-utility-deep-research-2026-02-25.md",
@@ -81,25 +88,29 @@ describe("filterDocManifestEntries", () => {
 
     expect(entry).toMatchObject({
       subjectLabel: "Research and Development Logs",
-      catalogDate: "2026-02-25",
-      catalogDateSource: "path",
+      catalogDateSource: "mtime",
     });
+    expect(entry?.catalogDate).toMatch(/^20\d{2}-\d{2}-\d{2}$/);
+    expect(entry?.fileMtimeIso).toContain("T");
   });
 
-  it("sorts latest docs above older dated snapshots within catalog groups", () => {
+  it("sorts filesystem-edited docs above title-latest snapshots when mtime is newer", () => {
     const sorted = [
-      makeEntry("older", "Warp Conceptual Guide 2026 03 19", "docs/audits/research/warp-guide-2026-03-19.md", {
+      makeEntry("title-latest", "Warp Conceptual Guide Latest", "docs/audits/research/warp-guide-latest.md", {
         subjectLabel: "Warp Mechanics",
         catalogDate: "2026-03-19",
         catalogDateSource: "path",
       }),
-      makeEntry("latest", "Warp Conceptual Guide Latest", "docs/audits/research/warp-guide-latest.md", {
+      makeEntry("edited", "Warp Conceptual Guide 2026 05 02", "docs/audits/research/warp-guide-2026-05-02.md", {
         subjectLabel: "Warp Mechanics",
-        isLatest: true,
+        catalogDate: "2026-06-12",
+        catalogDateSource: "mtime",
+        fileMtimeIso: "2026-06-12T12:00:00.000Z",
+        fileMtimeMs: Date.parse("2026-06-12T12:00:00.000Z"),
       }),
     ].sort(compareDocCatalogEntries);
 
-    expect(sorted.map((entry) => entry.id)).toEqual(["latest", "older"]);
+    expect(sorted.map((entry) => entry.id)).toEqual(["edited", "title-latest"]);
   });
 
   it("finds the real NHM2 theory directory from the generated docs manifest", () => {

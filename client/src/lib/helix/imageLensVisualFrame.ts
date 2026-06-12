@@ -9,6 +9,9 @@ import {
 
 type PostJson = (path: string, body: Record<string, unknown>) => Promise<Record<string, unknown>>;
 
+export const IMAGE_LENS_CROP_ONLY_PROMPT =
+  "Describe only the pixels visible inside this Image Lens crop. Do not infer, summarize, or mention objects, UI, text, or scene context outside the submitted crop region. If context appears cut off, say it is cut off. Keep the answer compact and factual.";
+
 export type SubmitImageLensCropFrameInput = {
   postJson: PostJson;
   receipt: DocumentImageRegionReceiptV1;
@@ -61,8 +64,13 @@ export async function submitImageLensCropFrame(input: SubmitImageLensCropFrameIn
     capture_mode: "manual",
     image_data_url: input.imageDataUrl,
     mime_type: input.imageDataUrl.slice(0, 32).includes("image/png") ? "image/png" : "image/jpeg",
+    prompt: IMAGE_LENS_CROP_ONLY_PROMPT,
     objective: input.objective ?? "Image Lens crop frame for Live Answer visual-source analysis.",
     related_event_refs: [input.receipt.crop.regionId],
+    source_surface: "image_lens_crop",
+    crop_only: true,
+    crop_region_id: input.receipt.crop.regionId,
+    crop_bbox_px: input.receipt.crop.bboxPx,
   });
 
   const evidence = readRecord(analysis.evidence);
@@ -83,6 +91,10 @@ export async function submitImageLensCropFrame(input: SubmitImageLensCropFrameIn
     captured_at: frameAt,
     preview_data_url: input.imageDataUrl,
     preview_hash: input.receipt.crop.imageHash,
+    source_kind: "image_lens_crop",
+    crop_only: true,
+    crop_bbox_px: input.receipt.crop.bboxPx,
+    crop_region_id: input.receipt.crop.regionId,
     summary,
     visual_observer_profile_id: readString(evidence?.visual_observer_profile_id),
     visual_observer_profile_title: readString(evidence?.visual_observer_profile_title),
