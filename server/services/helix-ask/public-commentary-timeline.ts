@@ -8,6 +8,10 @@ import {
 } from "@shared/helix-agent-commentary";
 import { interpretHelixAskPrompt } from "./prompt-interpretation";
 import {
+  contextualToolSuppressionBlocksFamily,
+  detectContextualToolAdmissionSuppression,
+} from "./contextual-tool-admission";
+import {
   buildCalculatorCompoundCommentaryRows,
   buildToolReceiptCommentaryRows,
   buildWorkstationFamilyCommentaryRows,
@@ -82,7 +86,10 @@ const turnStartText = (input: {
   promptInterpretation?: RecordLike | null;
   compoundPromptContract?: RecordLike | null;
 }): string => {
-  if (/\b(?:scientific\s+calculator|calculator|compute|calculate|solve|evaluate)\b/i.test(input.prompt)) {
+  const contextualSuppression = detectContextualToolAdmissionSuppression(input.prompt);
+  const calculatorMentionIsContext =
+    contextualToolSuppressionBlocksFamily(contextualSuppression, "scientific_calculator");
+  if (!calculatorMentionIsContext && /\b(?:scientific\s+calculator|calculator|compute|calculate|solve|evaluate)\b/i.test(input.prompt)) {
     if (/\b(?:photon|joules?|ev|electronvolts?|energy|wavelength|frequency)\b/i.test(input.prompt)) {
       return "I'm treating this as a calculator-backed physics problem with numeric receipts and an explanation.";
     }

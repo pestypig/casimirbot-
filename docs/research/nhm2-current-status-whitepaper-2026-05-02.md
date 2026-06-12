@@ -408,6 +408,16 @@ residual = |requiredMultiplier - closureProduct| / requiredMultiplier
 
 Every row keeps `physicalPassAllowed = false`. A scalar layering row cannot substitute for a non-proxy same-basis wall tensor, material receipts, conservation, observer-robust energy-condition checks, or a QEI worldline dossier.
 
+The layered wall-source candidate turns one selected sweep row into a pass-path audit:
+
+```text
+nhm2_layered_wall_source_candidate/v1
+```
+
+The first selected row is the `447`-layer fixed-control-volume case. It can record scalar wall-`T00` arithmetic as `pass_1pct`, but it still carries both fixed-volume and expanded-volume residuals. Its pass path remains intentionally asymmetric: scalar wall `T00` may be true while same-basis tensor authority, material receipt, conservation, QEI dossier, and observer-robust gates remain false or evidence-dependent. `fullSolvePassEligible` is locked to `false` so the candidate cannot be mistaken for a physical source-closure pass.
+
+The companion tensor adapter is also deliberately narrow. It can emit the selected candidate into the existing `nhm2_tile_effective_full_tensor_source/v1` surface, but only as a wall `T00` proxy when that is all the source model supplies. Missing `T0i`, off-diagonal `Tij`, regional masks, and other required regions remain explicit blockers. This makes the next failure mode inspectable: either the 447-layer lead grows into a material-receipted same-basis full tensor, or it stops at scalar wall magnitude.
+
 This producer changes the progression but not the claim tier. The previous frozen ledger's first source-side blocker was:
 
 ```text
@@ -963,6 +973,8 @@ npm run nhm2:audit-tile-counterpart-source-independence
 npm run nhm2:build-tile-local-source-elements
 npm run nhm2:aggregate-tile-local-source-counterpart
 npm run nhm2:build-wall-source-layering-sweep
+npm run nhm2:build-layered-wall-source-candidate
+npm run nhm2:build-layered-wall-source-tensor-candidate
 npm run nhm2:publish-source-side-same-basis-authority
 npm run nhm2:source-closure-pass-readiness
 ```
@@ -976,6 +988,8 @@ publish conservation diagnostics
 build tile-local source elements from the frozen cavity contract
 aggregate tile-local source elements into regional tile-effective counterpart
 build diagnostic wall-source layering sweep
+select layered wall-source candidate
+emit honest wall T00-only tensor candidate when no full tensor source exists
 publish tile-effective counterpart
 publish source-side same-basis authority receipt
 publish regional source-closure evidence
@@ -1015,6 +1029,7 @@ This command does not recompute physics and does not produce a full-solve pass. 
 | `Delta T_mu_nu^(R)=T_required^(R)-T_tile_effective^(R)` | red-team divergence surface | identifies where source-to-geometry closure must be proven | requires same-basis regional counterpart tensor |
 | `R_wall_T00 = T00_wall_required - T00_wall_available` | wall-region source residual | front-door wall closure badge / audit row | global residual cannot override wall failure |
 | `sourceMultiplier = N_layer f_pack f_orient C_material q_mult d_mult` | wall-source layering scalar sweep | explores whether layer count / packing / orientation / material / duty / metric relief can approach wall `T00` arithmetic margins | scalar lead only; no physical pass without tensor, material, conservation, observer, and QEI gates |
+| `nhm2_layered_wall_source_candidate/v1` | selected source-stack pass-path audit | records whether a sweep row survives scalar, tensor, material, conservation, QEI, and observer gates | `fullSolvePassEligible=false`; selected row is not a physical source proof |
 | `nhm2_tile_effective_full_tensor_source/v1` | source-side tensor candidate contract | separates source-side tensor authority from metric echo | not source closure by itself |
 | `nhm2_source_side_same_basis_tensor_authority/v1` | source-side authority receipt | decides whether tile/material tensor evidence is same-chart, same-basis, regional, non-proxy, and non-metric-echo before wall closure can promote | runtime reference only; no scalar calculator payload |
 | `nhm2_tile_counterpart_conservation/v1` | conservation diagnostic surface | records divT / continuity / momentum residual status | not physical realizability by itself |

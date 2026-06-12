@@ -17696,8 +17696,22 @@ export function HelixAskPill({
   const debugCopyInFlightRef = useRef(false);
   const askReplyListRef = useRef<HTMLDivElement | null>(null);
   const askReplyListBottomRef = useRef<HTMLDivElement | null>(null);
+  const activeTurnStreamPanelRef = useRef<HTMLDivElement | null>(null);
   const askReplyListPinnedToBottomRef = useRef(true);
   const askReplyListAutoScrollTimerRef = useRef<number | null>(null);
+  const [activeTurnStreamDomDebug, setActiveTurnStreamDomDebug] = useState<{
+    activeStreamMounted: boolean;
+    activeStreamAfterCompletedReplies: boolean | null;
+    activeStreamBeforeBottom: boolean | null;
+    bottomDistancePx: number | null;
+    activeTurnScrollToken: string | null;
+  }>({
+    activeStreamMounted: false,
+    activeStreamAfterCompletedReplies: null,
+    activeStreamBeforeBottom: null,
+    bottomDistancePx: null,
+    activeTurnScrollToken: null,
+  });
   const [askExtensionOpenByReply, setAskExtensionOpenByReply] = useState<Record<string, boolean>>(
     {},
   );
@@ -30595,6 +30609,8 @@ export function HelixAskPill({
     if (!userSettings.showHelixAskConsoleDebug) return null;
     const activeTurnId = activeAskTurnIdRef.current;
     const activeStartedAtMs = activeAskStartedAtMsRef.current;
+    const debugActiveLiveEvents = askBusy && activeTurnId ? activeAskLiveEvents : [];
+    const debugActiveRows = askBusy && activeTurnId ? visibleActiveTurnStreamRows : [];
     return {
       schema: "helix.ask.console_assembly_debug.v1",
       askBusy,
@@ -30603,11 +30619,13 @@ export function HelixAskPill({
       activeStartedAtMs,
       activeQuestion: askActiveQuestion,
       totalLiveEventCount: askLiveEvents.length,
-      activeLiveEventCount: activeAskLiveEvents.length,
-      activeRowCount: visibleActiveTurnStreamRows.length,
+      retainedLiveEventCount: activeAskLiveEvents.length,
+      activeLiveEventCount: debugActiveLiveEvents.length,
+      activeRowCount: debugActiveRows.length,
       replyCount: chronologicalAskRepliesForTranscript.length,
       latestReplyId: latestAskReply?.id ?? latestAskReplyId,
       streamIngress: helixAskConsoleStreamIngressDebugRef.current,
+      activeStreamDom: activeTurnStreamDomDebug,
       renderOrder: [
         ...chronologicalAskRepliesForTranscript.map((reply, index) => ({
           kind: "completed_reply",
@@ -30629,7 +30647,7 @@ export function HelixAskPill({
           : []),
       ],
       filteredLiveEvents: askLiveEvents.length - activeAskLiveEvents.length,
-      activeRows: visibleActiveTurnStreamRows.map((row, index) => ({
+      activeRows: debugActiveRows.map((row, index) => ({
         index,
         key: row.key,
         source: row.source,
@@ -30640,6 +30658,7 @@ export function HelixAskPill({
     };
   }, [
     activeAskLiveEvents,
+    activeTurnStreamDomDebug,
     askActiveQuestion,
     askBusy,
     askLiveEvents,
@@ -30719,6 +30738,42 @@ export function HelixAskPill({
   const activeTurnStreamScrollToken = activeTurnStreamTail
     ? `${visibleActiveTurnStreamRows.length}:${activeTurnStreamTail.key}:${activeTurnStreamTail.text}:${activeTurnStreamTail.status}`
     : `${visibleActiveTurnStreamRows.length}:idle`;
+  useEffect(() => {
+    if (!userSettings.showHelixAskConsoleDebug) return;
+    const list = askReplyListRef.current;
+    const activeStream = activeTurnStreamPanelRef.current;
+    const bottom = askReplyListBottomRef.current;
+    const activeStreamMounted = Boolean(activeStream);
+    const listChildren = list ? Array.from(list.children) : [];
+    const activeStreamIndex = activeStream ? listChildren.indexOf(activeStream) : -1;
+    const bottomIndex = bottom ? listChildren.indexOf(bottom) : -1;
+    let latestCompletedReplyIndex = -1;
+    for (let index = 0; index < listChildren.length; index += 1) {
+      const child = listChildren[index];
+      if (child !== activeStream && child !== bottom) latestCompletedReplyIndex = index;
+    }
+    const activeStreamAfterCompletedReplies =
+      activeStream && list ? activeStreamIndex > latestCompletedReplyIndex : null;
+    const activeStreamBeforeBottom =
+      activeStream && bottom && list ? activeStreamIndex >= 0 && bottomIndex >= 0 && activeStreamIndex < bottomIndex : null;
+    const bottomDistancePx = list ? Math.max(0, list.scrollHeight - list.scrollTop - list.clientHeight) : null;
+    const next = {
+      activeStreamMounted,
+      activeStreamAfterCompletedReplies,
+      activeStreamBeforeBottom,
+      bottomDistancePx,
+      activeTurnScrollToken: activeTurnStreamScrollToken,
+    };
+    setActiveTurnStreamDomDebug((prev) =>
+      prev.activeStreamMounted === next.activeStreamMounted &&
+      prev.activeStreamAfterCompletedReplies === next.activeStreamAfterCompletedReplies &&
+      prev.activeStreamBeforeBottom === next.activeStreamBeforeBottom &&
+      prev.bottomDistancePx === next.bottomDistancePx &&
+      prev.activeTurnScrollToken === next.activeTurnScrollToken
+        ? prev
+        : next,
+    );
+  }, [activeTurnStreamScrollToken, askBusy, userSettings.showHelixAskConsoleDebug, visibleActiveTurnStreamRows.length]);
   const handleAskReplyListScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
     const element = event.currentTarget;
     const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
@@ -34600,11 +34655,19 @@ export function HelixAskPill({
 
   const activeTurnStreamPanel = visibleActiveTurnStreamRows.length > 0 ? (
     <div
+      ref={activeTurnStreamPanelRef}
       className="relative px-1 py-1 text-xs text-slate-100"
       aria-label="Active turn stream"
       data-testid="helix-ask-active-turn-stream"
       data-turn-stream-lines={visibleActiveTurnStreamRows.length}
+      data-active-row-count={visibleActiveTurnStreamRows.length}
+      data-active-turn-id={activeAskTurnIdRef.current ?? undefined}
+      data-active-trace-id={askLiveTraceId ?? undefined}
+      data-render-placement="after_completed_replies"
     >
+      {userSettings.showHelixAskConsoleDebug ? (
+        <p className="mb-2 text-[10px] uppercase tracking-[0.2em] text-cyan-200">Active turn stream</p>
+      ) : null}
       <div className="relative space-y-3 before:absolute before:left-[0.72rem] before:top-2 before:h-[calc(100%-1rem)] before:w-px before:bg-slate-600/45">
         {visibleActiveTurnStreamRows.map((row, index) => {
           const isQuestionRow = row.source === "question";
@@ -34618,9 +34681,15 @@ export function HelixAskPill({
               className={`relative flex items-start gap-3 border-l pl-7 ${rowClass} ${
                 isLatestActiveRow ? "helix-ask-turn-line-enter" : ""
               }`}
-              data-testid={isLatestActiveRow ? "helix-ask-active-turn-latest-line" : undefined}
+              data-testid="helix-ask-active-turn-stream-row"
+              data-active-latest-line={isLatestActiveRow ? "true" : undefined}
               data-stream-row-source={row.source}
             >
+              {isLatestActiveRow ? (
+                <span className="sr-only" data-testid="helix-ask-active-turn-latest-line">
+                  Latest active turn line
+                </span>
+              ) : null}
               <span
                 className={`absolute left-0 top-1.5 h-3 w-3 rounded-full border-2 shadow-[0_0_0_3px_rgba(2,6,23,0.9)] ${dotClass}`}
                 aria-hidden

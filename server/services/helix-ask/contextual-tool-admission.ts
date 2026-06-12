@@ -15,6 +15,7 @@ export type HelixContextualToolAdmissionSuppression = {
 
 export type HelixContextualToolSuppressionFamily =
   | "docs_viewer"
+  | "scientific_calculator"
   | "scholarly_research"
   | "internet_search"
   | "theory_locator"
@@ -26,6 +27,9 @@ export type HelixContextualToolSuppressionFamily =
 const DOCS_VIEWER_CUE_RE = /\bdocs?\s+viewer\b|\bdocuments?\s+viewer\b|\bdocs?\s+panel\b|\bdocuments?\s+panel\b/i;
 const DOCS_VIEWER_ACTION_RE = /\b(?:open|open\s+up|show|view|pull\s+up|bring\s+up|switch\s+to|go\s+to|navigate\s+to|load)\b[\s\S]{0,100}(?:the\s+|a\s+)?(?:docs?\s+viewer|documents?\s+viewer|docs?\s+panel|documents?\s+panel|docs?)\b/i;
 const DOCS_VIEWER_EXPLANATION_RE = /\b(?:just\s+)?(?:explain|describe|tell\s+me|what\s+is|what\s+are|what(?:'s|\s+is)?|what\s+does)\b[\s\S]{0,120}\b(?:docs?\s+viewer|documents?\s+viewer|docs?\s+panel|documents?\s+panel)\b[\s\S]{0,80}\b(?:for|mean|do|does|is|are|used\s+for|purpose)\b/i;
+const SCIENTIFIC_CALCULATOR_CUE_RE = /\b(?:scientific\s+calculator|calculator|calculate|compute|solve|evaluate|equation|expression)\b/i;
+const SCIENTIFIC_CALCULATOR_ACTION_RE = /\b(?:open|open\s+up|show|view|pull\s+up|bring\s+up|switch\s+to|go\s+to|navigate\s+to|load|use|run|call|calculate|compute|solve|evaluate)\b[\s\S]{0,100}\b(?:scientific\s+calculator|calculator|equation|expression)\b|\b(?:calculate|compute|solve|evaluate)\b[\s\S]{0,120}(?:\d|[=+\-*/^()]|\\frac|\\sqrt)/i;
+const SCIENTIFIC_CALCULATOR_EXPLANATION_RE = /\b(?:just\s+)?(?:explain|describe|tell\s+me|what\s+is|what\s+are|what(?:'s|\s+is)?|what\s+does|what\s+tool\s+would\s+you\s+use)\b[\s\S]{0,140}\b(?:scientific\s+calculator|calculator|calculate|compute|solve|evaluate)\b[\s\S]{0,100}\b(?:for|mean|do|does|is|are|used\s+for|purpose|would\s+use|should\s+use)\b/i;
 const SCHOLARLY_CUE_RE = /\b(?:doi|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|citations?|references?|bibliograph(?:y|ies)|bibtex|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|page\s+images?|figures?|tables?|equations?)\b|\b10\.\d{4,9}\/[-._;()/:A-Z0-9]+\b/i;
 const SCHOLARLY_ACTION_RE = /\b(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|pull|query|get|resolve|repair|collect|cite|cross-?check)\b/i;
 const SCHOLARLY_ACTION_WITH_CUE_RE = /\b(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|pull|query|get|resolve|repair|collect|cite|cross-?check)\b[\s\S]{0,140}\b(?:doi|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|citations?|references?|bibliograph(?:y|ies)|bibtex|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|page\s+images?|figures?|tables?|equations?)\b|\b(?:doi|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall|citations?|references?|bibliograph(?:y|ies)|bibtex|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|page\s+images?|figures?|tables?|equations?)\b[\s\S]{0,140}\b(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|pull|query|get|resolve|repair|collect|cite|cross-?check)\b/i;
@@ -61,6 +65,7 @@ export function contextualToolSuppressionBlocksFamily(
   if (!suppression) return false;
   const cue = suppression.verb_or_cue;
   if (family === "docs_viewer") return /docs_viewer|docs-viewer/i.test(cue);
+  if (family === "scientific_calculator") return /scientific[_-]calculator|calculator/i.test(cue);
   if (family === "scholarly_research") return /scholarly|doi|arxiv|paper|citation|research/i.test(cue);
   if (family === "internet_search") return /internet|web|search|browse|google|bing/i.test(cue);
   if (family === "theory_locator") return /theory|locator|badge|graph|reflection/i.test(cue);
@@ -76,6 +81,7 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
     !prompt ||
     (
       !DOCS_VIEWER_CUE_RE.test(prompt) &&
+      !SCIENTIFIC_CALCULATOR_CUE_RE.test(prompt) &&
       !SCHOLARLY_CUE_RE.test(prompt) &&
       !INTERNET_SEARCH_CUE_RE.test(prompt) &&
       !MUTATING_WRITE_NEGATION_RE.test(prompt)
@@ -90,6 +96,15 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       suppression_reason: "quoted_tool_command",
       verb_or_cue: "docs_viewer.open",
       text: quoted,
+    };
+  }
+  const quotedCalculator = prompt.match(/["'`][^"'`]*(?:open|show|view|pull\s+up|bring\s+up|use|run|call|calculate|compute|solve|evaluate)[^"'`]*(?:scientific\s+calculator|calculator|equation|expression)[^"'`]*["'`]/i)?.[0];
+  if (quotedCalculator) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: "quoted_tool_command",
+      verb_or_cue: "scientific_calculator.open",
+      text: quotedCalculator,
     };
   }
   const quotedScholarly = prompt.match(/["'`][^"'`]*(?:do\s+research|research|find|search|look\s*up|lookup|retrieve|fetch|query|cite|read)[^"'`]*(?:doi|arxiv|crossref|openalex|semantic\s+scholar|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)[^"'`]*["'`]/i)?.[0];
@@ -129,6 +144,15 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       text: negated,
     };
   }
+  const negatedCalculator = prompt.match(/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to)\b[\s\S]{0,120}(?:open|open\s+up|show|view|pull\s+up|bring\s+up|switch\s+to|go\s+to|navigate\s+to|load|use|run|call|calculate|compute|solve|evaluate)\b[\s\S]{0,120}(?:scientific\s+calculator|calculator|equation|expression)\b|\b(?:earlier|previously|last\s+turn|before)\b[\s\S]{0,120}(?:open|opened|use|used|run|ran|call|called|calculate|computed|solve|solved|evaluate|evaluated)\b[\s\S]{0,120}(?:scientific\s+calculator|calculator|equation|expression)\b[\s\S]{0,120}\b(?:do\s+not|don't|dont|not\s+now|no\s+need\s+to)\b/i)?.[0];
+  if (negatedCalculator) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: "negated_tool_instruction",
+      verb_or_cue: "scientific_calculator.open",
+      text: negatedCalculator,
+    };
+  }
   const negatedMutatingWrite = prompt.match(MUTATING_WRITE_NEGATION_RE)?.[0];
   if (negatedMutatingWrite) {
     return {
@@ -166,6 +190,15 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       text: hypothetical,
     };
   }
+  const hypotheticalCalculator = prompt.match(/\b(?:if|when|before|after|would|could|might|hypothetically|may\s+ask|next\s+time|later)\b[\s\S]{0,140}(?:open|opened|show|view|use|run|call|calculate|compute|solve|evaluate)\b[\s\S]{0,120}(?:scientific\s+calculator|calculator|equation|expression)\b[\s\S]{0,160}\b(?:not\s+now|not\s+yet|but\s+not\s+now|without\s+doing\s+it\s+now)?/i)?.[0];
+  if (hypotheticalCalculator) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: "hypothetical_tool_reference",
+      verb_or_cue: "scientific_calculator.open",
+      text: hypotheticalCalculator,
+    };
+  }
   const hypotheticalScholarly = prompt.match(/\b(?:if|when|before|after|would|could|might|hypothetically)\b[\s\S]{0,120}(?:do\s+research|research|find|search|searched|look\s*up|looked\s+up|lookup|retrieve|retrieved|fetch|fetched|query|queried|get|resolve|collect|cite|read)\b[\s\S]{0,160}(?:doi|arxiv|crossref|openalex|semantic\s+scholar|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)\b/i)?.[0];
   if (hypotheticalScholarly) {
     return {
@@ -194,6 +227,15 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       text: historical,
     };
   }
+  const historicalCalculator = prompt.match(/\b(?:I|we|you)\s+(?:already\s+|previously\s+|earlier\s+)?(?:opened?|used|ran|called|calculated|computed|solved|evaluated)\b[\s\S]{0,120}(?:scientific\s+calculator|calculator|equation|expression)\b|\b(?:earlier|previously|last\s+turn|before)\b[\s\S]{0,120}(?:opened?|showed|viewed|used|ran|called|calculated|computed|solved|evaluated)\b[\s\S]{0,120}(?:scientific\s+calculator|calculator|equation|expression)\b/i)?.[0];
+  if (historicalCalculator) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: "historical_tool_reference",
+      verb_or_cue: "scientific_calculator.open",
+      text: historicalCalculator,
+    };
+  }
   const historicalScholarly = prompt.match(/\b(?:I|we|you)\s+(?:already\s+|previously\s+|earlier\s+)?(?:looked\s+up|searched|researched|queried|retrieved|fetched|read)\b[\s\S]{0,140}(?:doi|arxiv|crossref|openalex|semantic\s+scholar|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)\b|\b(?:earlier|previously|last\s+turn|before)\b[\s\S]{0,120}(?:looked\s+up|searched|researched|queried|retrieved|fetched|read)\b[\s\S]{0,140}(?:doi|arxiv|crossref|openalex|semantic\s+scholar|citations?|references?|journals?|research\s+papers?|pdfs?|full[-\s]?text|paper\s+text|figures?|tables?|equations?)\b/i)?.[0];
   if (historicalScholarly) {
     return {
@@ -219,6 +261,14 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       suppression_reason: "explanatory_only",
       verb_or_cue: "docs_viewer.open",
       text: prompt.match(DOCS_VIEWER_EXPLANATION_RE)?.[0] ?? "docs viewer explanation request",
+    };
+  }
+  if (SCIENTIFIC_CALCULATOR_EXPLANATION_RE.test(prompt) && !SCIENTIFIC_CALCULATOR_ACTION_RE.test(prompt)) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: "explanatory_only",
+      verb_or_cue: "scientific_calculator.open",
+      text: prompt.match(SCIENTIFIC_CALCULATOR_EXPLANATION_RE)?.[0] ?? "scientific calculator explanation request",
     };
   }
   if (SCHOLARLY_EXPLANATION_RE.test(prompt) && !SCHOLARLY_ACTION_WITH_CUE_RE.test(prompt)) {

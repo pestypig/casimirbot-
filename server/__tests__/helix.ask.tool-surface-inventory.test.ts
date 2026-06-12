@@ -76,4 +76,20 @@ describe("Helix Ask tool surface inventory", () => {
     expect(packet.generation_reason).toContain("negated_tool_instruction");
     expect(packet.omitted.some((entry) => entry.reason === "contextual_tool_reference_suppressed")).toBe(true);
   });
+
+  it("suppresses executable tools for contextual calculator references", () => {
+    const packet = buildHelixToolSurfacePacket({
+      turnId: "turn-negated-calculator-open",
+      prompt: 'Earlier I said "open calculator"; do not do that now. Explain why no tool should run.',
+      activePanels: ["scientific-calculator"],
+      focusedPanelId: "scientific-calculator",
+      explicitAttachmentAvailable: false,
+      explicitToolIntent: false,
+      maxEntries: 20,
+    });
+
+    expect(packet.entries).toEqual([]);
+    expect(packet.generation_reason).toMatch(/quoted_tool_command|negated_tool_instruction|historical_tool_reference/);
+    expect(packet.omitted.some((entry) => entry.reason === "contextual_tool_reference_suppressed")).toBe(true);
+  });
 });

@@ -108,6 +108,44 @@ describe("Helix Ask negated/contextual tool admission", () => {
     expect(admission.tool_admission_suppressed).toBeUndefined();
   });
 
+  it("suppresses quoted and negated calculator mentions before tool admission", () => {
+    const prompts = [
+      'Earlier I said "open calculator"; do not do that now. Explain why no tool should run.',
+      "Do not open the calculator; just explain what the calculator is for.",
+      "What tool would you use to open calculator? Explain without opening it.",
+    ];
+
+    for (const promptText of prompts) {
+      const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+      const admission = buildToolCallAdmissionDecision({ turnId, sourceTargetIntent, promptText });
+      const plan = buildCapabilityPlan({
+        turnId,
+        promptText,
+        sourceTargetIntent,
+        toolCallAdmissionDecision: admission,
+        canonicalGoalFrame: canonicalGoal,
+      });
+
+      expect(sourceTargetIntent).toMatchObject({
+        target_source: "model_only",
+        allow_no_tool_direct: true,
+      });
+      expect(admission).toMatchObject({
+        source_target: "model_only",
+        required: false,
+        admitted_tool_families: ["model_only"],
+        tool_admission_suppressed: true,
+      });
+      expect(plan).toMatchObject({
+        source_target: "model_only",
+        requested_action: "suppressed_contextual_tool_reference",
+        tool_admission_suppressed: true,
+      });
+      expect(plan.capability_family).not.toBe("calculator");
+      expect(plan.capability_family).not.toBe("workstation_action");
+    }
+  });
+
   it("scopes 'do not write files' to mutation while admitting research plus locator observations", () => {
     const promptText =
       "Do not write files. Use scholarly papers and citations to research microtubule coherence, then place it on the theory badge graph with scale bands and uncertainty mode.";

@@ -1399,6 +1399,14 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("renderPlacement: \"after_completed_replies\"");
     expect(source.indexOf("chronologicalAskReplies.map")).toBeLessThan(source.indexOf("{activeTurnStreamPanel}"));
     expect(source.indexOf("{activeTurnStreamPanel}")).toBeLessThan(source.indexOf("data-testid=\"helix-ask-reply-list-bottom\""));
+    expect(source).toContain('data-testid="helix-ask-active-turn-stream"');
+    expect(source).toContain('data-testid="helix-ask-active-turn-stream-row"');
+    expect(source).toContain('data-testid="helix-ask-active-turn-latest-line"');
+    expect(source).toContain('data-render-placement="after_completed_replies"');
+    expect(source).toContain("activeStreamDom");
+    expect(source).toContain("activeStreamMounted");
+    expect(source).toContain("activeStreamBeforeBottom");
+    expect(source).toContain("retainedLiveEventCount");
     expect(source).toContain('aria-label="Turn stream"');
     expect(source).not.toContain(">Turn stream<");
     expect(source).toContain("data-turn-stream-lines");

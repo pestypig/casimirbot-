@@ -106,6 +106,7 @@ const contextualForbiddenToolFamilies = (
   if (!suppression) return [];
   return [
     contextualToolSuppressionBlocksFamily(suppression, "docs_viewer") ? "docs_viewer" : "",
+    contextualToolSuppressionBlocksFamily(suppression, "scientific_calculator") ? "scientific_calculator" : "",
     contextualToolSuppressionBlocksFamily(suppression, "scholarly_research") ? "scholarly_research" : "",
     contextualToolSuppressionBlocksFamily(suppression, "internet_search") ? "internet_search" : "",
     contextualToolSuppressionBlocksFamily(suppression, "theory_locator") ? "theory_locator" : "",
