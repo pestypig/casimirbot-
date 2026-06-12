@@ -14,6 +14,10 @@ import {
   type TheoryContextReflectionV1,
 } from "../contracts/theory-context-reflection.v1";
 import type { TheoryBadgeGraphV1, TheoryBadgeV1 } from "../contracts/theory-badge-graph.v1";
+import {
+  buildTheoryContextScientificMethodReflectionV1,
+  type TheoryContextScientificMethodReflectionV1,
+} from "../contracts/theory-context-scientific-method-reflection.v1";
 import { buildProbabilityTerrainV1 } from "../probability-terrain";
 import { buildHelixPhysicsAtlasV1 } from "./physics-atlas-blocks";
 import { resolvePhysicsAtlasLens } from "./physics-atlas-lens";
@@ -377,6 +381,10 @@ function recommendedActions(args: {
   return actions;
 }
 
+function sanitizeId(value: string): string {
+  return normalizeKey(value).slice(0, 80) || "item";
+}
+
 function summaryText(args: {
   domains: Array<{ title: string }>;
   exactMatches: TheoryContextReflectionMatchV1[];
@@ -654,6 +662,229 @@ function buildResolution(args: {
   };
 }
 
+function badgeTitleMap(graph: TheoryBadgeGraphV1): Map<string, string> {
+  return new Map(graph.badges.map((badge) => [badge.id, badge.title]));
+}
+
+function firstSentence(value: string): string {
+  return value.split(/[.!?]\s+/)[0]?.trim() || value.trim();
+}
+
+function scientificMethodHypotheses(args: {
+  badges: Map<string, TheoryBadgeV1>;
+  roleByBadgeId: Record<string, TheoryContextReflectionResolutionRole>;
+  rankedBadgeIdsByRole: Record<TheoryContextReflectionResolutionRole, string[]>;
+}): TheoryContextScientificMethodReflectionV1["hypothesisCandidates"] {
+  const promptCenter = args.rankedBadgeIdsByRole.prompt_center.slice(0, 5);
+  const theoryExtension = unique([
+    ...args.rankedBadgeIdsByRole.first_principles_path,
+    ...args.rankedBadgeIdsByRole.observable_path,
+    ...args.rankedBadgeIdsByRole.consequence_context,
+  ]).slice(0, 5);
+  const analogies = args.rankedBadgeIdsByRole.analogy_context.slice(0, 3);
+  const candidates = [
+    ...promptCenter.map((badgeId) => ({ badgeId, role: "prompt_center" as const })),
+    ...theoryExtension.map((badgeId) => ({ badgeId, role: "theory_extension" as const })),
+    ...analogies.map((badgeId) => ({ badgeId, role: "analogy_context" as const })),
+  ];
+
+  return candidates.map(({ badgeId, role }) => {
+    const badge = args.badges.get(badgeId);
+    const boundaryLike = badge ? hasClaimBoundaryShape(badge) : args.roleByBadgeId[badgeId] === "claim_boundary";
+    return {
+      hypothesisId: `hypothesis:${sanitizeId(badgeId)}`,
+      badgeIds: [badgeId],
+      summary: badge
+        ? firstSentence(badge.plainMeaning)
+        : `Candidate context for ${badgeId}.`,
+      status: boundaryLike ? "blocked_by_boundary" : role === "analogy_context" ? "needs_evidence" : "candidate",
+      role,
+    };
+  });
+}
+
+function scientificObservableRequirements(args: {
+  badges: Map<string, TheoryBadgeV1>;
+  selectedBadgeIds: string[];
+}): TheoryContextScientificMethodReflectionV1["observableRequirements"] {
+  return args.selectedBadgeIds.slice(0, 10).map((badgeId) => {
+    const badge = args.badges.get(badgeId);
+    const observable = badge && hasObservableShape(badge)
+      ? `Admit calibrated observable evidence for ${badge.title}.`
+      : `Name the observable, receipt, table, or literature evidence needed for ${badge?.title ?? badgeId}.`;
+    const proxyOnly = Boolean(badge?.calculatorPayloads.length);
+    return {
+      requirementId: `observable:${sanitizeId(badgeId)}`,
+      badgeIds: [badgeId],
+      requiredObservable: observable,
+      whyNeeded: "Scientific-method reflection requires an observable or explicit missing-evidence boundary before synthesis.",
+      status: badge && hasObservableShape(badge)
+        ? "available_in_graph"
+        : proxyOnly
+          ? "proxy_only"
+          : "missing_evidence",
+    };
+  });
+}
+
+function scientificCalculatorProxies(args: {
+  badges: Map<string, TheoryBadgeV1>;
+  matches: TheoryBadgeLookupMatch[];
+}): TheoryContextScientificMethodReflectionV1["calculatorProxyCandidates"] {
+  return args.matches
+    .filter((match) => match.calculatorPayloadIds.length > 0)
+    .slice(0, 8)
+    .map((match) => {
+      const badge = args.badges.get(match.badgeId);
+      return {
+        badgeId: match.badgeId,
+        payloadIds: match.calculatorPayloadIds,
+        proxyBoundary: badge?.claimBoundary.diagnosticOnly
+          ? "Calculator payload is diagnostic evidence only and does not solve or validate the claim."
+          : "Calculator payload requires route/product authority before use.",
+      };
+    });
+}
+
+function scientificFalsificationChecks(args: {
+  badges: Map<string, TheoryBadgeV1>;
+  selectedBadgeIds: string[];
+  claimBoundaries: string[];
+}): TheoryContextScientificMethodReflectionV1["falsificationChecks"] {
+  const checks = args.selectedBadgeIds.slice(0, 8).map((badgeId) => {
+    const badge = args.badges.get(badgeId);
+    const missingEvidence = badge && hasObservableShape(badge)
+      ? ["calibration", "uncertainty budget", "independent observable check"]
+      : ["admitted observable evidence", "model validity range", "claim-boundary review"];
+    return {
+      checkId: `falsifier:${sanitizeId(badgeId)}`,
+      badgeIds: [badgeId],
+      check: `Ask what observation would contradict or downgrade ${badge?.title ?? badgeId}.`,
+      missingEvidence,
+    };
+  });
+
+  if (args.claimBoundaries.length > 0) {
+    checks.push({
+      checkId: "falsifier:claim_boundary_overpromotion",
+      badgeIds: [],
+      check: "Reject any terminal draft that promotes diagnostic/proxy evidence into proof.",
+      missingEvidence: ["terminal authority proof packet", "route-product contract", "accepted evidence refs"],
+    });
+  }
+
+  return checks;
+}
+
+function buildScientificMethodReflection(args: {
+  graph: TheoryBadgeGraphV1;
+  reflectionId: string;
+  generatedAt?: string;
+  prompt: string;
+  inferredDomains: Array<{ title: string }>;
+  resolution: TheoryContextReflectionResolutionV1;
+  locatedMatches: TheoryBadgeLookupMatch[];
+  traceTargetIds: string[];
+  claimBoundaries: string[];
+}): TheoryContextScientificMethodReflectionV1 {
+  const badges = badgeById(args.graph);
+  const selectedBadgeIds = unique([
+    ...args.resolution.rankedBadgeIdsByRole.prompt_center,
+    ...args.resolution.rankedBadgeIdsByRole.first_principles_path,
+    ...args.resolution.rankedBadgeIdsByRole.observable_path,
+    ...args.resolution.rankedBadgeIdsByRole.claim_boundary,
+    ...args.traceTargetIds,
+  ]).slice(0, 16);
+  const titles = badgeTitleMap(args.graph);
+  const firstPrinciplesAnchors = unique([
+    ...args.resolution.rankedBadgeIdsByRole.first_principles_path,
+    ...selectedBadgeIds.filter((badgeId) => {
+      const badge = badges.get(badgeId);
+      return Boolean(badge && (badge.level === "first_principle" || badge.level === "law"));
+    }),
+  ]).slice(0, 8);
+  const theoryExtensionPath = unique([
+    ...firstPrinciplesAnchors,
+    ...args.resolution.rankedBadgeIdsByRole.prompt_center,
+    ...args.resolution.rankedBadgeIdsByRole.observable_path,
+    ...args.resolution.rankedBadgeIdsByRole.consequence_context,
+  ]).slice(0, 16);
+  const calculatorProxyCandidates = scientificCalculatorProxies({
+    badges,
+    matches: args.locatedMatches,
+  });
+  const claimBoundaryBadgeIds = args.resolution.rankedBadgeIdsByRole.claim_boundary;
+  const claimBoundaries = unique([
+    ...args.claimBoundaries,
+    ...claimBoundaryBadgeIds.map((badgeId) => `${badgeId}: ${titles.get(badgeId) ?? "claim boundary"}`),
+  ]).slice(0, 16);
+  const proceduralNextSteps: TheoryContextScientificMethodReflectionV1["proceduralNextSteps"] = [
+    {
+      stepId: "step:inspect_badge_path",
+      label: "Inspect the first-principles to observable badge path.",
+      actionKind: "inspect_badge_path",
+      badgeIds: theoryExtensionPath.slice(0, 8),
+      solves: false,
+    },
+  ];
+
+  if (calculatorProxyCandidates.length > 0) {
+    proceduralNextSteps.push({
+      stepId: "step:load_proxy_payloads",
+      label: "Load scalar proxy payloads only as diagnostic calculator context.",
+      actionKind: "load_proxy",
+      badgeIds: calculatorProxyCandidates.map((proxy) => proxy.badgeId).slice(0, 6),
+      solves: false,
+    });
+  }
+  if (claimBoundaries.length > 0) {
+    proceduralNextSteps.push({
+      stepId: "step:stop_at_claim_boundary",
+      label: "Stop at the claim boundary unless new evidence satisfies the route contract.",
+      actionKind: "stop_at_boundary",
+      badgeIds: claimBoundaryBadgeIds.slice(0, 6),
+      solves: false,
+    });
+  }
+
+  return buildTheoryContextScientificMethodReflectionV1({
+    generatedAt: args.generatedAt,
+    graphId: args.graph.graphId,
+    reflectionId: args.reflectionId,
+    prompt: args.prompt,
+    observationTarget: {
+      promptCenterBadgeIds: args.resolution.rankedBadgeIdsByRole.prompt_center.slice(0, 8),
+      targetDomainTitles: args.inferredDomains.map((domain) => domain.title).slice(0, 5),
+      resolutionMode: args.resolution.mode,
+    },
+    hypothesisCandidates: scientificMethodHypotheses({
+      badges,
+      roleByBadgeId: args.resolution.roleByBadgeId,
+      rankedBadgeIdsByRole: args.resolution.rankedBadgeIdsByRole,
+    }),
+    firstPrinciplesAnchors,
+    theoryExtensionPath,
+    observableRequirements: scientificObservableRequirements({
+      badges,
+      selectedBadgeIds,
+    }),
+    calculatorProxyCandidates,
+    falsificationChecks: scientificFalsificationChecks({
+      badges,
+      selectedBadgeIds,
+      claimBoundaries,
+    }),
+    uncertaintyBoundaries: unique([
+      "Report uncertainty as evidence resolution, not as answer authority.",
+      ...selectedBadgeIds
+        .filter((badgeId) => /uncertainty|proxy|boundary|measurement/i.test(badgeId))
+        .map((badgeId) => `${badgeId}: uncertainty/proxy boundary`),
+    ]).slice(0, 12),
+    claimBoundaries,
+    proceduralNextSteps,
+  });
+}
+
 function resolutionSortWeight(args: {
   badge: TheoryBadgeV1;
   match: TheoryBadgeLookupMatch;
@@ -854,6 +1085,20 @@ export function buildTheoryContextReflection(
     softRegionBadgeIds.length >= 2 &&
     (confidenceMode === "soft_locator" || exactLookupMatches.some(hasDirectMatchReason));
   const claimBoundaries = claimBoundaryNotes(locatedMatches, trace.claimBoundaryNotes);
+  const reflectionId = args.reflectionId ?? `theory-context-reflection:${Date.now().toString(36)}:${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+  const scientificMethod = buildScientificMethodReflection({
+    graph: args.graph,
+    reflectionId,
+    generatedAt: args.generatedAt,
+    prompt: args.prompt,
+    inferredDomains,
+    resolution,
+    locatedMatches,
+    traceTargetIds,
+    claimBoundaries,
+  });
 
   // Resolve atlas lenses after scoring so future callers can compare the reflected
   // domain with the map lens; the receipt itself stays graph-location focused.
@@ -867,7 +1112,7 @@ export function buildTheoryContextReflection(
 
   return buildTheoryContextReflectionV1({
     generatedAt: args.generatedAt,
-    reflectionId: args.reflectionId,
+    reflectionId,
     graphId: args.graph.graphId,
     input: {
       prompt: args.prompt,
@@ -904,6 +1149,7 @@ export function buildTheoryContextReflection(
         : null,
     },
     resolution,
+    scientificMethod,
     evidenceForAsk: {
       summary: summaryText({
         domains: inferredDomains,

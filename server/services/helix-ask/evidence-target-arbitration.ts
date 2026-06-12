@@ -92,6 +92,18 @@ const hasExplicitExternalResearchCommand = (prompt: string): boolean =>
     /\b(?:with|using)\s+(?:citations?|sources?|scholarly\s+sources|external\s+sources)\b/i.test(prompt)
   );
 
+const hasExplicitLocalDocsPathSummary = (prompt: string): boolean =>
+  /\b(?:summari[sz]e|summary|overview|takeaways?|explain|describe|gist)\b/i.test(prompt) &&
+  /(?:^|[\s"'(])(?:\/docs\/|docs[\\/])\S+/i.test(prompt);
+
+const hasLocalDocsTopicSummary = (prompt: string): boolean =>
+  /\b(?:summari[sz]e|summary|overview|takeaways?|explain|describe|gist)\b/i.test(prompt) &&
+  (
+    /\bdocs?\s+about\b/i.test(prompt) ||
+    /\bfrom\s+(?:our\s+|local\s+|the\s+)?docs?\b/i.test(prompt) ||
+    /\binclude\s+(?:the\s+)?paths?\b/i.test(prompt)
+  );
+
 const makeCandidate = (input: {
   candidateId: string;
   targetSource: HelixAskSourceTarget;
@@ -227,6 +239,35 @@ export function buildAskEvidenceTargetArbitration(input: {
       isStagePlayJobPlanningPrompt(prompt) ||
       (isStagePlayReflectionPrompt(prompt) && hasStagePlayOperationalCue(prompt))
     );
+
+  if (hasExplicitLocalDocsPathSummary(prompt)) {
+    promptIntentCandidates.push("local_docs_path_summary");
+    candidates.push(makeCandidate({
+      candidateId: "docs_viewer.local_docs_path_summary",
+      targetSource: "docs_viewer",
+      targetKind: "docs_viewer",
+      strength: "hard",
+      score: 0.98,
+      reasonCodes: ["explicit_local_docs_path_summary", "local_docs_path_suppresses_freshness_search"],
+      requestedOutputs: ["file_path", "tool_call_eligibility"],
+      capabilityKeys: ["docs-viewer.summarize_doc"],
+      terminalProductConstraints: ["doc_summary", "typed_failure", "request_user_input"],
+    }));
+  }
+  if (hasLocalDocsTopicSummary(prompt)) {
+    promptIntentCandidates.push("local_docs_topic_summary");
+    candidates.push(makeCandidate({
+      candidateId: "docs_viewer.local_docs_topic_summary",
+      targetSource: "docs_viewer",
+      targetKind: "docs_viewer",
+      strength: "hard",
+      score: 0.94,
+      reasonCodes: ["local_docs_topic_summary", "local_docs_scope_suppresses_freshness_search"],
+      requestedOutputs: ["file_path", "tool_call_eligibility"],
+      capabilityKeys: ["docs-viewer.search_docs", "docs-viewer.summarize_doc"],
+      terminalProductConstraints: ["doc_summary", "typed_failure", "request_user_input"],
+    }));
+  }
 
   if (contextualSuppression) {
     promptIntentCandidates.push("contextual_tool_reference");

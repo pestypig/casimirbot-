@@ -37,7 +37,9 @@ export type ToolUseRestatementV1 = {
 };
 
 const hasLocalWorkspaceScopeCue = (promptText: string): boolean =>
-  /\b(?:docs?\s+viewer|documents?\s+viewer|current\s+(?:doc|document)|active\s+(?:doc|document)|repo|repository|codebase|working\s+tree|workspace|local\s+files?|our\s+docs?|from\s+(?:our|local|the)\s+docs?)\b/i.test(promptText);
+  /\b(?:docs?\s+viewer|documents?\s+viewer|current\s+(?:doc|document)|active\s+(?:doc|document)|repo|repository|codebase|working\s+tree|workspace|local\s+files?|our\s+docs?|from\s+(?:our|local|the\s+)?docs?)\b/i.test(promptText) ||
+  /\b(?:summari[sz]e|summary|overview|takeaways?|explain|describe|gist)\b[\s\S]{0,80}\bdocs?\s+about\b/i.test(promptText) ||
+  /(?:^|[\s"'(])(?:\/docs\/|docs[\\/])\S+/i.test(promptText);
 
 const hasLocalObservationScopeCue = (promptText: string): boolean =>
   /\b(?:screen\s+capture|screenshot|screen|visual|frame|capture|camera|live\s+(?:source|environment|answer|card|pipeline)|current\s+(?:screen|visual|frame|capture|live\s+source|live\s+environment)|what\s+is\s+happening\s+right\s+now\s+in\s+the\s+screen)\b/i.test(promptText);

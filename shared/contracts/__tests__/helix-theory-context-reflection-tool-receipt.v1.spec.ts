@@ -174,6 +174,9 @@ describe("helix theory context reflection tool receipt v1", () => {
     expect(receipt.authority.context_role).toBe("tool_evidence");
     expect(receipt.authority.ask_context_policy).toBe("evidence_only");
     expect(receipt.reflectionV1.terminal_eligible).toBe(false);
+    expect(receipt.reflectionV1.scientificMethod.terminal_eligible).toBe(false);
+    expect(receipt.reflectionV1.scientificMethod.context_role).toBe("tool_evidence");
+    expect(receipt.reflectionV1.scientificMethod.reflectionId).toBe(receipt.reflectionV1.reflectionId);
     expect(receipt.explanationPlanV1?.terminal_eligible ?? false).toBe(false);
     expect(validateHelixTheoryContextReflectionToolReceiptV1(receipt)).toEqual([]);
     expect(isHelixTheoryContextReflectionToolReceiptV1(receipt)).toBe(true);

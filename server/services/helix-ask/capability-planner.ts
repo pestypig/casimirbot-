@@ -158,6 +158,12 @@ const requestedActionFor = (
 ): string => {
   const prompt = normalize(promptText);
   if (family === "docs") {
+    if (/\b(?:summari[sz]e|summary|overview|takeaways?|gist|describe|explain)\b/.test(prompt)) {
+      if (/(?:^|[\s"'(])(?:\/docs\/|docs[\\/])\S+/.test(prompt) || /\b(?:current|active|this|that)\s+(?:doc|document|paper)\b/.test(prompt)) {
+        return "docs-viewer.summarize_doc";
+      }
+      return "docs-viewer.search_docs";
+    }
     if (/\b(?:open|pull up|bring up|show)\b/.test(prompt)) return "open_or_validate_document";
     if (/\b(?:read|locate|find)\b/.test(prompt)) return "locate_or_read_document";
     return "retrieve_document_evidence";

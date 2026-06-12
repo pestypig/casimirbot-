@@ -83,6 +83,8 @@ describe("NHM2 reference validation chain planner", () => {
       "observer-robust-energy-conditions":
         "artifacts/reference/nhm2-observer-robust-energy-conditions.json",
       "regional-source-component-model": "fixtures/nhm2/regional-source-components.json",
+      "regional-source-full-tensor-template":
+        "fixtures/nhm2/regional-full-tensor-template.json",
     });
     const scripts = plan.map((command) => command.script);
     const regionalModel = findCommand(
@@ -126,6 +128,12 @@ describe("NHM2 reference validation chain planner", () => {
       scripts.indexOf("nhm2:build-regional-source-tensor-targets"),
     );
     expect(scripts.indexOf("nhm2:build-regional-source-tensor-targets")).toBeLessThan(
+      scripts.indexOf("nhm2:build-regional-source-tensor-candidate"),
+    );
+    expect(scripts.indexOf("nhm2:build-regional-source-tensor-candidate")).toBeLessThan(
+      scripts.indexOf("nhm2:build-regional-source-tensor-quality-control"),
+    );
+    expect(scripts.indexOf("nhm2:build-regional-source-tensor-quality-control")).toBeLessThan(
       scripts.indexOf("nhm2:source-closure-pass-readiness"),
     );
     expect(targets.args).toContain("--regional-source-closure-evidence");
@@ -134,6 +142,41 @@ describe("NHM2 reference validation chain planner", () => {
     );
     expect(targets.args).toContain(
       "artifacts/research/full-solve/reference/run-1/nhm2-regional-source-tensor-targets.json",
+    );
+
+    const candidate = findCommand(plan, "nhm2:build-regional-source-tensor-candidate");
+    expect(candidate.args).toContain("--regional-source-tensor-targets");
+    expect(candidate.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-regional-source-tensor-targets.json",
+    );
+    expect(candidate.args).toContain("--material-receipt");
+    expect(candidate.args).toContain("artifacts/reference/casimir-material-receipt.json");
+    expect(candidate.args).toContain("--full-tensor-template");
+    expect(candidate.args).toContain("fixtures/nhm2/regional-full-tensor-template.json");
+    expect(candidate.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-regional-source-tensor-candidate.json",
+    );
+
+    const qualityControl = findCommand(
+      plan,
+      "nhm2:build-regional-source-tensor-quality-control",
+    );
+    expect(qualityControl.args).toContain("--regional-source-tensor-targets");
+    expect(qualityControl.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-regional-source-tensor-targets.json",
+    );
+    expect(qualityControl.args).toContain("--regional-source-tensor-candidate");
+    expect(qualityControl.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-regional-source-tensor-candidate.json",
+    );
+    expect(qualityControl.args).toContain("--regional-material-source-tensor-model");
+    expect(qualityControl.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-regional-material-source-tensor-model.json",
+    );
+    expect(qualityControl.args).toContain("--material-receipt");
+    expect(qualityControl.args).toContain("artifacts/reference/casimir-material-receipt.json");
+    expect(qualityControl.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-regional-source-tensor-quality-control.json",
     );
 
     const passPathHarness = findCommand(

@@ -190,6 +190,30 @@ const hasSatisfiedDocOpenReceipt = (payload: RecordLike, terminalArtifactKind: s
   });
 };
 
+const hasSatisfiedDocSummary = (payload: RecordLike, terminalArtifactKind: string | null): boolean => {
+  if (terminalArtifactKind !== "doc_summary") return false;
+  const goalSatisfaction = readRecord(payload.goal_satisfaction_evaluation);
+  if (
+    readString(goalSatisfaction?.satisfaction) !== "satisfied" ||
+    readString(goalSatisfaction?.next_decision) !== "allow_terminal"
+  ) {
+    return false;
+  }
+  const terminalContract = readRecord(goalSatisfaction?.terminal_contract);
+  const requiredTerminalKinds = readStringArray(terminalContract?.required_terminal_kinds);
+  if (requiredTerminalKinds.length > 0 && !requiredTerminalKinds.includes("doc_summary")) return false;
+  return readArray(payload.current_turn_artifact_ledger).some((entry) => {
+    const artifact = readRecord(entry);
+    if (readString(artifact?.kind) !== "doc_summary") return false;
+    const artifactPayload = readRecord(artifact?.payload);
+    return Boolean(
+      readString(artifactPayload?.text) ||
+        readString(artifactPayload?.summary) ||
+        readString(artifactPayload?.answer_text),
+    );
+  });
+};
+
 const hasMaterializedScholarlyResearchAnswer = (payload: RecordLike, terminalArtifactKind: string | null): boolean => {
   if (terminalArtifactKind !== "scholarly_research_answer") return false;
   if (readString(payload.final_answer_source) !== "final_answer_draft") return false;
@@ -457,6 +481,7 @@ const isCapabilityLifecycleComplete = (payload: RecordLike, terminalArtifactKind
   if (hasSatisfiedWorkstationToolEvaluation(payload, terminalArtifactKind)) return true;
   if (hasSatisfiedLivePipelineReceipt(payload, terminalArtifactKind)) return true;
   if (hasSatisfiedDocOpenReceipt(payload, terminalArtifactKind)) return true;
+  if (hasSatisfiedDocSummary(payload, terminalArtifactKind)) return true;
   const plan = readRecord(payload.capability_plan);
   const result = readRecord(payload.capability_result);
   const ledger = readRecord(payload.capability_lifecycle_ledger);

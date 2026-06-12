@@ -153,6 +153,35 @@ const collectRepoEvidenceRefs = (input: {
     .filter(Boolean);
 };
 
+const collectDocsViewerEvidenceRefs = (input: {
+  payload: RecordLike;
+  terminalArtifactKind: string;
+  finalAnswerSource: string;
+}): string[] => {
+  const terminalUsesDocsEvidence =
+    /doc_summary|doc_location|doc_open_receipt|active_doc/i.test(input.terminalArtifactKind) ||
+    /doc_summary|doc_location|doc_open_receipt|active_doc/i.test(input.finalAnswerSource);
+  if (!terminalUsesDocsEvidence) return [];
+  const ledger = Array.isArray(input.payload.current_turn_artifact_ledger)
+    ? input.payload.current_turn_artifact_ledger
+    : [];
+  return ledger
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry))
+    .filter((entry) => {
+      const kind = readString(entry.kind);
+      return (
+        kind === "doc_summary" ||
+        kind === "doc_search_results" ||
+        kind === "doc_open_receipt" ||
+        kind === "active_doc_path" ||
+        kind === "doc_context"
+      );
+    })
+    .map((entry) => readString(entry.artifact_id))
+    .filter(Boolean);
+};
+
 const collectScholarlyResearchEvidenceRefs = (input: {
   payload: RecordLike;
   terminalArtifactKind: string;
@@ -349,6 +378,11 @@ export function buildEvidenceReentryGate(input: {
       finalAnswerSource: input.finalAnswerSource,
     }),
     ...collectRepoEvidenceRefs({
+      payload: input.payload,
+      terminalArtifactKind: input.terminalArtifactKind,
+      finalAnswerSource: input.finalAnswerSource,
+    }),
+    ...collectDocsViewerEvidenceRefs({
       payload: input.payload,
       terminalArtifactKind: input.terminalArtifactKind,
       finalAnswerSource: input.finalAnswerSource,

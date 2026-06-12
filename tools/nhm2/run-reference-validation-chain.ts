@@ -107,6 +107,10 @@ export const planReferenceValidationChain = (
     args,
     "regional-source-component-model",
   );
+  const regionalSourceFullTensorTemplate = asOptionalString(
+    args,
+    "regional-source-full-tensor-template",
+  );
   const layeredWallSourceCandidateRowId = asOptionalString(
     args,
     "layered-wall-source-candidate-row-id",
@@ -132,6 +136,10 @@ export const planReferenceValidationChain = (
   const regionalEvidence = `${outRoot}/nhm2-regional-source-closure-evidence.json`;
   const regionalSourceTensorTargets =
     `${outRoot}/nhm2-regional-source-tensor-targets.json`;
+  const regionalSourceTensorCandidate =
+    `${outRoot}/nhm2-regional-source-tensor-candidate.json`;
+  const regionalSourceTensorQualityControl =
+    `${outRoot}/nhm2-regional-source-tensor-quality-control.json`;
   const sourceClosurePassReadiness = `${outRoot}/nhm2-source-closure-pass-readiness.json`;
   const sourceClosurePassReadinessReport = `${outRoot}/nhm2-source-closure-pass-readiness.md`;
   const coupledClosurePassCandidate =
@@ -377,6 +385,32 @@ export const planReferenceValidationChain = (
     regionalEvidence,
     "--out",
     regionalSourceTensorTargets,
+  ]));
+  commands.push(command("nhm2:build-regional-source-tensor-candidate", [
+    "--regional-source-tensor-targets",
+    regionalSourceTensorTargets,
+    ...(regionalSourceFullTensorTemplate == null
+      ? []
+      : ["--full-tensor-template", regionalSourceFullTensorTemplate]),
+    ...(casimirMaterialReceipt == null
+      ? []
+      : ["--material-receipt", casimirMaterialReceipt]),
+    "--out",
+    regionalSourceTensorCandidate,
+  ]));
+  commands.push(command("nhm2:build-regional-source-tensor-quality-control", [
+    "--regional-source-tensor-targets",
+    regionalSourceTensorTargets,
+    "--regional-source-tensor-candidate",
+    regionalSourceTensorCandidate,
+    ...(regionalMaterialSourceTensorModel == null
+      ? []
+      : ["--regional-material-source-tensor-model", regionalMaterialSourceTensorModel]),
+    ...(casimirMaterialReceipt == null
+      ? []
+      : ["--material-receipt", casimirMaterialReceipt]),
+    "--out",
+    regionalSourceTensorQualityControl,
   ]));
   commands.push(command("nhm2:source-closure-pass-readiness", [
     "--regional-evidence",

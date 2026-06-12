@@ -632,6 +632,23 @@ const findLiveEnvironmentBindingDiagnosisTerminal = (
   };
 };
 
+const findGoalSatisfyingDocumentArtifact = (
+  payload: Record<string, unknown>,
+  artifacts: ArtifactLike[],
+): { artifact: ArtifactLike; kind: "doc_summary"; text: string; ref: string | null } | null => {
+  const goal = readRecord(payload.canonical_goal_frame);
+  if (readString(goal?.required_terminal_kind) !== "doc_summary") return null;
+  if (!routeContractAllowsTerminalKind(payload, "doc_summary")) return null;
+  for (let index = artifacts.length - 1; index >= 0; index -= 1) {
+    const artifact = artifacts[index];
+    if (!artifact || artifactKind(artifact) !== "doc_summary") continue;
+    const text = artifactText(artifact);
+    if (!text || isStaleWorkspaceFailureText(text)) continue;
+    return { artifact, kind: "doc_summary", text, ref: artifactId(artifact) };
+  }
+  return null;
+};
+
 const quarantineStaleRequestUserInput = (payload: Record<string, unknown>): void => {
   const staleRequest =
     readRecord(payload.request_user_input) ??
@@ -880,7 +897,9 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const deterministicReceiptFallbackDraft = selectedDraft
     ? null
     : findDeterministicReceiptFallbackDraftAfterRequiredObservation(artifacts);
-  const selectedGoalArtifact = findGoalSatisfyingVisualSituationArtifact(input.payload, artifacts);
+  const selectedGoalArtifact =
+    findGoalSatisfyingDocumentArtifact(input.payload, artifacts) ??
+    findGoalSatisfyingVisualSituationArtifact(input.payload, artifacts);
   const selectedLiveEnvironmentBindingDiagnosis = findLiveEnvironmentBindingDiagnosisTerminal(input.payload);
   const latestRequiredObservationSequence = selectedDraft?.latestObservationSequence ??
     artifacts.reduce((latest, artifact, index) => isAcceptedObservationPacket(artifact) ? index : latest, -1);

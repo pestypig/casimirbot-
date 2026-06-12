@@ -1,4 +1,9 @@
 import type { TheoryBiomeBand } from "./theory-biome-layout.v1";
+import {
+  emptyTheoryContextScientificMethodReflectionV1,
+  isTheoryContextScientificMethodReflectionV1,
+  type TheoryContextScientificMethodReflectionV1,
+} from "./theory-context-scientific-method-reflection.v1";
 
 export const THEORY_CONTEXT_REFLECTION_ARTIFACT_ID = "theory_context_reflection" as const;
 export const THEORY_CONTEXT_REFLECTION_SCHEMA_VERSION = "theory_context_reflection/v1" as const;
@@ -158,6 +163,7 @@ export type TheoryContextReflectionV1 = {
   inferredDomains: TheoryContextReflectionDomainV1[];
   overlay: TheoryContextReflectionOverlayV1;
   resolution?: TheoryContextReflectionResolutionV1;
+  scientificMethod: TheoryContextScientificMethodReflectionV1;
   evidenceForAsk: {
     summary: string;
     claimBoundaries: string[];
@@ -179,6 +185,7 @@ type BuildTheoryContextReflectionInput = Omit<
   | "generatedAt"
   | "reflectionId"
   | "resolution"
+  | "scientificMethod"
   | "assistant_answer"
   | "raw_content_included"
   | "terminal_eligible"
@@ -190,6 +197,7 @@ type BuildTheoryContextReflectionInput = Omit<
   generatedAt?: string;
   reflectionId?: string;
   resolution?: TheoryContextReflectionResolutionV1;
+  scientificMethod?: TheoryContextScientificMethodReflectionV1;
 };
 
 const FORBIDDEN_THEORY_CONTEXT_REFLECTION_PATTERNS = [
@@ -468,11 +476,13 @@ function validateEvidenceForAsk(value: unknown, issues: string[]): void {
 export function buildTheoryContextReflectionV1(
   input: BuildTheoryContextReflectionInput,
 ): TheoryContextReflectionV1 {
+  const generatedAt = input.generatedAt ?? new Date().toISOString();
+  const reflectionId = input.reflectionId ?? newReflectionId();
   return {
     artifactId: THEORY_CONTEXT_REFLECTION_ARTIFACT_ID,
     schemaVersion: THEORY_CONTEXT_REFLECTION_SCHEMA_VERSION,
-    generatedAt: input.generatedAt ?? new Date().toISOString(),
-    reflectionId: input.reflectionId ?? newReflectionId(),
+    generatedAt,
+    reflectionId,
     graphId: input.graphId,
     input: input.input,
     exactMatches: input.exactMatches,
@@ -480,6 +490,12 @@ export function buildTheoryContextReflectionV1(
     inferredDomains: input.inferredDomains,
     overlay: input.overlay,
     resolution: input.resolution ?? emptyResolution(),
+    scientificMethod: input.scientificMethod ?? emptyTheoryContextScientificMethodReflectionV1({
+      generatedAt,
+      graphId: input.graphId,
+      reflectionId,
+      prompt: input.input.prompt,
+    }),
     evidenceForAsk: input.evidenceForAsk,
     assistant_answer: false,
     raw_content_included: false,
@@ -534,6 +550,16 @@ export function validateTheoryContextReflectionV1(value: unknown): string[] {
   }
   validateOverlay(value.overlay, issues);
   validateResolution(value.resolution, issues);
+  if (!isTheoryContextScientificMethodReflectionV1(value.scientificMethod)) {
+    issues.push("scientificMethod must be a valid theory_context_scientific_method_reflection/v1 artifact");
+  } else if (isRecord(value.scientificMethod)) {
+    if (value.scientificMethod.graphId !== value.graphId) {
+      issues.push("scientificMethod.graphId must match graphId");
+    }
+    if (value.scientificMethod.reflectionId !== value.reflectionId) {
+      issues.push("scientificMethod.reflectionId must match reflectionId");
+    }
+  }
   validateEvidenceForAsk(value.evidenceForAsk, issues);
 
   if (value.assistant_answer !== false) issues.push("assistant_answer must be false");

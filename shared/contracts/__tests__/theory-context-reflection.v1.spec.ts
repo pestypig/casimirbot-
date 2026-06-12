@@ -124,6 +124,11 @@ describe("theory context reflection v1", () => {
     expect(reflection.context_role).toBe("tool_evidence");
     expect(reflection.ask_context_policy).toBe("evidence_only");
     expect(reflection.deterministic_content_role).toBe("observation_not_assistant_answer");
+    expect(reflection.scientificMethod.artifactId).toBe("theory_context_scientific_method_reflection");
+    expect(reflection.scientificMethod.reflectionId).toBe(reflection.reflectionId);
+    expect(reflection.scientificMethod.graphId).toBe(reflection.graphId);
+    expect(reflection.scientificMethod.terminal_eligible).toBe(false);
+    expect(reflection.scientificMethod.proceduralNextSteps.every((step) => step.solves === false)).toBe(true);
     expect(reflection.overlay.suggestedBiomeChunkIds).toEqual(["7:2"]);
     expect(reflection.overlay.suggestedSemanticChunkIds).toEqual([
       "warp_gr_nhm2:human_engineering:diagnostic:claim_medium",
@@ -164,6 +169,36 @@ describe("theory context reflection v1", () => {
 
     expect(validateTheoryContextReflectionV1(reflection)).toContain(
       "deterministic_content_role must be observation_not_assistant_answer",
+    );
+  });
+
+  it("rejects scientific-method reflections that do not belong to the parent reflection", () => {
+    const reflection = baseReflection();
+    const invalid = {
+      ...reflection,
+      scientificMethod: {
+        ...reflection.scientificMethod,
+        reflectionId: "reflection:other",
+      },
+    };
+
+    expect(validateTheoryContextReflectionV1(invalid)).toContain(
+      "scientificMethod.reflectionId must match reflectionId",
+    );
+  });
+
+  it("rejects nested scientific-method terminal authority", () => {
+    const reflection = baseReflection();
+    const invalid = {
+      ...reflection,
+      scientificMethod: {
+        ...reflection.scientificMethod,
+        terminal_eligible: true,
+      },
+    };
+
+    expect(validateTheoryContextReflectionV1(invalid)).toContain(
+      "scientificMethod must be a valid theory_context_scientific_method_reflection/v1 artifact",
     );
   });
 

@@ -301,6 +301,17 @@ describe("theory context reflector", () => {
         "matter.time_crystal.noisy_synchrony_margin_context",
       ]),
     );
+    expect(reflection.scientificMethod.observationTarget.resolutionMode).toBe("path");
+    expect(reflection.scientificMethod.hypothesisCandidates.length).toBeGreaterThan(0);
+    expect(reflection.scientificMethod.calculatorProxyCandidates.map((proxy) => proxy.badgeId)).toEqual(
+      expect.arrayContaining([
+        "matter.collective.polariton_reservoir_lifetime_context",
+        "matter.time_crystal.noisy_synchrony_margin_context",
+      ]),
+    );
+    expect(reflection.scientificMethod.falsificationChecks.length).toBeGreaterThan(0);
+    expect(reflection.scientificMethod.proceduralNextSteps.every((step) => step.solves === false)).toBe(true);
+    expect(reflection.scientificMethod.terminal_eligible).toBe(false);
     expect(reflection.evidenceForAsk.claimBoundaries.join(" ")).toMatch(/diagnostic-only|promotion not allowed/i);
     expect(reflection.evidenceForAsk.recommendedNextActions.some(
       (action) => action.actionId === "theory-badge-graph.load_payloads_to_calculator",
