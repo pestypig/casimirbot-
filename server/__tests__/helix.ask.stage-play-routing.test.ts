@@ -469,6 +469,74 @@ describe("Helix Ask Stage Play routing", () => {
       ]));
   }, 60_000);
 
+  it("executes MicroDeck preset drafts without processed-mail tools and projects the selected tool", async () => {
+    startVisualSnapshotSource({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      source_surface: "browser_tab",
+      capture_mode: "interval",
+      status: "active",
+    });
+
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Draft a MicroDeck preset for a visual automation scenario that chooses between preparing a tool call, appending a wake-bound Ask contract, or asking the operator for confirmation.",
+        sessionId: `${threadId}:microdeck-draft`,
+        debug: true,
+      })
+      .expect(200);
+
+    const iterations = Array.isArray(response.body?.agent_runtime_loop?.iterations)
+      ? response.body.agent_runtime_loop.iterations
+      : [];
+    const executedCapabilities = iterations.flatMap((iteration: any) => [
+      iteration?.chosen_capability,
+      iteration?.executed_action_key,
+      iteration?.tool_observation?.tool_name,
+    ]).filter(Boolean);
+    const responseText = JSON.stringify(response.body);
+    const routeDebug = JSON.stringify({
+      selectedTool: response.body?.selected_tool,
+      selectedCapability: response.body?.selected_capability,
+      lifecycle: response.body?.tool_lifecycle_trace,
+      phase: response.body?.live_source_turn_phase_resolution,
+      mandatory: response.body?.mandatory_next_tool,
+      iterations: iterations.map((iteration: any) => ({
+        chosen_capability: iteration?.chosen_capability,
+        executed_action_key: iteration?.executed_action_key,
+        observation_role: iteration?.observation_role,
+        tool_name: iteration?.tool_observation?.tool_name,
+      })),
+      answer: response.body?.answer,
+    }, null, 2);
+
+    expect(response.body?.live_source_turn_phase_resolution, routeDebug).toMatchObject({
+      phase: "query_micro_reasoner_deck",
+      allowedTools: ["live_env.draft_micro_reasoner_preset"],
+      fallbackTools: [],
+      requiredEvidence: ["stage_play_micro_reasoner_prompt_preset_draft"],
+      completionEvidence: ["stage_play_micro_reasoner_prompt_preset_draft"],
+    });
+    expect(response.body?.mandatory_next_tool, routeDebug).toMatchObject({
+      tool_name: "live_env.draft_micro_reasoner_preset",
+      allowed_tools: ["live_env.draft_micro_reasoner_preset"],
+      terminal_forbidden: true,
+    });
+    expect(executedCapabilities, routeDebug).toContain("live_env.draft_micro_reasoner_preset");
+    expect(executedCapabilities, routeDebug).not.toContain("live_env.read_processed_live_source_mail");
+    expect(executedCapabilities, routeDebug).not.toContain("live_env.process_live_source_mail");
+    expect(responseText, routeDebug).toContain("stage_play_micro_reasoner_prompt_preset_draft/v1");
+    expect(response.body?.selected_tool, routeDebug).toBe("live_env.draft_micro_reasoner_preset");
+    expect(response.body?.selected_tool, routeDebug).toBe(response.body?.selected_capability);
+    expect(response.body?.tool_lifecycle_trace, routeDebug).toMatchObject({
+      requested_capability: "live_env.draft_micro_reasoner_preset",
+      admitted_capability: "live_env.draft_micro_reasoner_preset",
+      executed_capability: "live_env.draft_micro_reasoner_preset",
+    });
+  }, 60_000);
+
   it("executes MicroDeck prompt routing as a delegation observation without processed-mail tools", async () => {
     process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
     process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([

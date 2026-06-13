@@ -86,8 +86,10 @@ const LIVE_PIPELINE_RECEIPT_GOAL_KINDS = new Set([
 ]);
 
 const MICRODECK_QUERY_CAPABILITY = "live_env.query_micro_reasoner_presets";
+const MICRODECK_DRAFT_CAPABILITY = "live_env.draft_micro_reasoner_preset";
 const MICRODECK_PROMPT_ROUTER_CAPABILITY = "live_env.route_micro_reasoner_prompt";
 const MICRODECK_QUERY_OBSERVATION_SCHEMA = "stage_play_micro_reasoner_prompt_preset_query_result/v1";
+const MICRODECK_DRAFT_OBSERVATION_SCHEMA = "stage_play_micro_reasoner_prompt_preset_draft/v1";
 const MICRODECK_PROMPT_DELEGATION_OBSERVATION_SCHEMA = "stage_play_micro_reasoner_prompt_delegation_result/v1";
 
 const readRecord = (value: unknown): Record<string, unknown> | null =>
@@ -153,6 +155,9 @@ const artifactKindMatchesCapability = (
   const microDeckPromptDelegationObservation =
     observationSchema === MICRODECK_PROMPT_DELEGATION_OBSERVATION_SCHEMA ||
     /stage_play_micro_reasoner_prompt_delegation_result\/v1/i.test(joined);
+  const microDeckPresetDraftObservation =
+    observationSchema === MICRODECK_DRAFT_OBSERVATION_SCHEMA ||
+    /stage_play_micro_reasoner_prompt_preset_draft\/v1/i.test(joined);
 
   if (capability === MICRODECK_QUERY_CAPABILITY) {
     return (
@@ -166,7 +171,13 @@ const artifactKindMatchesCapability = (
       /live_env\.route_micro_reasoner_prompt|stage_play_micro_reasoner_prompt_delegation_result\/v1/i.test(joined)
     );
   }
-  if ((microDeckPresetQueryObservation || microDeckPromptDelegationObservation) && capability.startsWith("live_env.")) return false;
+  if (capability === MICRODECK_DRAFT_CAPABILITY) {
+    return (
+      microDeckPresetDraftObservation &&
+      /live_env\.draft_micro_reasoner_preset|stage_play_micro_reasoner_prompt_preset_draft\/v1/i.test(joined)
+    );
+  }
+  if ((microDeckPresetQueryObservation || microDeckPromptDelegationObservation || microDeckPresetDraftObservation) && capability.startsWith("live_env.")) return false;
   if (capability === "repo-code.search_concept") return /repo_code_evidence_observation|helix\.repo_code_evidence_observation\.v1|repo_search/i.test(joined);
   if (capability === "scholarly-research.lookup_papers") return /scholarly_research_observation|helix\.scholarly_research_observation\.v1|scholarly_research/i.test(joined);
   if (capability === "scholarly-research.fetch_full_text") return /scholarly_full_text_observation|helix\.scholarly_full_text_observation\.v1|scholarly_research/i.test(joined);
@@ -278,6 +289,9 @@ const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): 
   }
   if (/stage_play_micro_reasoner_prompt_delegation_result\/v1/i.test(joined)) {
     return MICRODECK_PROMPT_ROUTER_CAPABILITY;
+  }
+  if (/stage_play_micro_reasoner_prompt_preset_draft\/v1/i.test(joined)) {
+    return MICRODECK_DRAFT_CAPABILITY;
   }
   if (/repo_code_evidence_observation|helix\.repo_code_evidence_observation\.v1|repo_search/i.test(joined)) {
     return "repo-code.search_concept";
@@ -481,9 +495,32 @@ const hasMicroDeckQueryObservation = (payload: Record<string, unknown>): boolean
   );
 };
 
+const hasMicroDeckDraftObservation = (payload: Record<string, unknown>): boolean => {
+  const loop = readRecord(payload.agent_runtime_loop);
+  if (readArray(loop?.iterations).some((iteration) => {
+    const record = readRecord(iteration);
+    const toolObservation = readRecord(record?.tool_observation);
+    return Boolean(toolObservation && artifactKindMatchesCapability(MICRODECK_DRAFT_CAPABILITY, toolObservation));
+  })) {
+    return true;
+  }
+  return readArray(payload.current_turn_artifact_ledger).some((artifact) =>
+    artifactKindMatchesCapability(MICRODECK_DRAFT_CAPABILITY, readRecord(artifact)),
+  );
+};
+
 const isMicroDeckObservationBackedRoute = (payload: Record<string, unknown>): boolean =>
   selectedCapabilityMatches(payload, MICRODECK_QUERY_CAPABILITY) ||
-  hasMicroDeckQueryObservation(payload);
+  selectedCapabilityMatches(payload, MICRODECK_DRAFT_CAPABILITY) ||
+  hasMicroDeckQueryObservation(payload) ||
+  hasMicroDeckDraftObservation(payload);
+
+const selectedMicroDeckCapability = (payload: Record<string, unknown>): string => {
+  if (selectedCapabilityMatches(payload, MICRODECK_DRAFT_CAPABILITY) || hasMicroDeckDraftObservation(payload)) {
+    return MICRODECK_DRAFT_CAPABILITY;
+  }
+  return MICRODECK_QUERY_CAPABILITY;
+};
 
 const artifactLinkedToIteration = (
   artifact: Record<string, unknown> | null,
@@ -929,11 +966,12 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
   const liveEnvironmentBindingDiagnosisAllowed = liveEnvironmentBindingDiagnosisTerminalAllowed(payload);
   const stagePlayReceiptTerminal = stagePlayReceiptSelectedAsTerminal(payload);
   const microDeckObservationBackedRoute = isMicroDeckObservationBackedRoute(payload);
+  const microDeckCapability = selectedMicroDeckCapability(payload);
   const checks = {
     agent_runtime_loop: hasAgentRuntimeLoopDecisionChain(payload),
     agent_step_decision: Boolean(readRecord(payload.agent_step_decision)) || hasAgentRuntimeLoopDecisionChain(payload),
-    runtime_tool_call: !microDeckObservationBackedRoute || hasRuntimeToolCallForSelectedCapability(payload, MICRODECK_QUERY_CAPABILITY),
-    microdeck_selected_capability: !microDeckObservationBackedRoute || selectedCapabilityMatches(payload, MICRODECK_QUERY_CAPABILITY),
+    runtime_tool_call: !microDeckObservationBackedRoute || hasRuntimeToolCallForSelectedCapability(payload, microDeckCapability),
+    microdeck_selected_capability: !microDeckObservationBackedRoute || selectedCapabilityMatches(payload, microDeckCapability),
     selected_capability_observation: hasSelectedCapabilityObservation(payload),
     post_observation_model_decision: hasPostObservationModelDecision(payload),
     goal_satisfaction_allows_terminal: goalSatisfactionAllowsTerminal(payload),

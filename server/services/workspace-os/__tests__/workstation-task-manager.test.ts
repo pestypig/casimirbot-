@@ -1,7 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import express from "express";
 import request from "supertest";
 import { workspaceOsRouter } from "../../../routes/workspace-os";
+import {
+  clearHelixWorkstationBrowserPerformanceDiagnosticsForTest,
+  recordHelixWorkstationBrowserPerformanceSample,
+  recordHelixWorkstationCommandReceipt,
+} from "../browser-performance-status";
 import {
   buildHelixWorkstationTaskManagerSnapshot,
   type HelixWorkstationTaskManagerReaders,
@@ -119,6 +124,10 @@ const runtimeReaders = (): Pick<
 });
 
 describe("Workspace OS task manager", () => {
+  beforeEach(() => {
+    clearHelixWorkstationBrowserPerformanceDiagnosticsForTest();
+  });
+
   it("builds a read-only sorted runtime snapshot without leaking task ids", async () => {
     const snapshot = await buildHelixWorkstationTaskManagerSnapshot(
       { thread_id: "task-manager:test", room_id: "room:test" },
@@ -184,6 +193,71 @@ describe("Workspace OS task manager", () => {
     expect(JSON.stringify(snapshot)).not.toContain("VERY_SECRET_RUNTIME_TOKEN");
   });
 
+  it("folds sanitized browser responsiveness and command receipts into the snapshot", async () => {
+    recordHelixWorkstationBrowserPerformanceSample({
+      schema_version: "helix.workstation_browser_performance.v1",
+      sampled_at: "2026-06-12T11:59:59.000Z",
+      window_ms: 60000,
+      fps: 28,
+      average_frame_ms: 32,
+      p95_frame_ms: 88,
+      worst_frame_ms: 160,
+      long_frame_count: 12,
+      long_frame_ratio: 0.2,
+      long_task_count: 3,
+      long_task_total_ms: 180,
+      dom_node_count: 2500,
+      open_panel_count: 2,
+      focused_panel_id: "stage-play-badge-graph",
+      visibility_state: "visible",
+      advisory_pressure: "degraded",
+      interaction_event_count: 24,
+      input_delay_p95_ms: 12,
+      input_to_next_frame_p95_ms: 96,
+      click_to_next_frame_p95_ms: 105,
+      scroll_jank_count: 5,
+      drag_jank_count: 2,
+      active_interaction_kind: "scroll",
+      active_panel_id: "stage-play-badge-graph",
+      responsiveness_pressure: "degraded",
+    }, new Date("2026-06-12T11:59:59.000Z"));
+    recordHelixWorkstationCommandReceipt({
+      command_id: "stage-play.copy_mail_loop_unified_trace",
+      command_family: "clipboard",
+      stage: "clipboard_write_succeeded",
+      status: "succeeded",
+      panel_id: "stage-play-badge-graph",
+      latency_ms: 42,
+    }, new Date("2026-06-12T11:59:59.500Z"));
+
+    const snapshot = await buildHelixWorkstationTaskManagerSnapshot(
+      { thread_id: "task-manager:test" },
+      runtimeReaders(),
+    );
+
+    expect(snapshot.processes.find((process) => process.process_id === "browser.interaction_loop")).toMatchObject({
+      status: "degraded",
+      diagnostics: expect.objectContaining({
+        input_to_next_frame_p95_ms: 96,
+        active_interaction_kind: "scroll",
+      }),
+    });
+    expect(snapshot.processes.find((process) => process.process_id === "workstation.command_reliability")).toMatchObject({
+      status: "idle",
+      diagnostics: expect.objectContaining({
+        recent_receipt_count: 1,
+        failed_receipt_count: 0,
+      }),
+    });
+    expect(snapshot.summary).toMatchObject({
+      browser_sample_included: true,
+      ui_responsiveness_pressure: "degraded",
+      ui_input_to_next_frame_p95_ms: 96,
+      command_recent_receipt_count: 1,
+      command_failed_receipt_count: 0,
+    });
+  });
+
   it("serves sanitized route JSON", async () => {
     const response = await request(buildApp())
       .get("/api/workspace-os/task-manager?thread_id=task-manager%3Atest")
@@ -197,5 +271,51 @@ describe("Workspace OS task manager", () => {
     });
     expect(Array.isArray(response.body.processes)).toBe(true);
   });
-});
 
+  it("accepts sanitized browser sample and command receipt routes", async () => {
+    await request(buildApp())
+      .post("/api/workspace-os/browser-performance/sample")
+      .send({
+        schema_version: "helix.workstation_browser_performance.v1",
+        sampled_at: new Date().toISOString(),
+        window_ms: 60000,
+        fps: 30,
+        average_frame_ms: 30,
+        p95_frame_ms: 60,
+        worst_frame_ms: 90,
+        long_frame_count: 2,
+        long_frame_ratio: 0.1,
+        long_task_count: 1,
+        long_task_total_ms: 55,
+        dom_node_count: 2000,
+        open_panel_count: 2,
+        focused_panel_id: "stage-play-badge-graph",
+        visibility_state: "visible",
+        advisory_pressure: "degraded",
+        input_to_next_frame_p95_ms: 84,
+        responsiveness_pressure: "degraded",
+      })
+      .expect(202);
+
+    await request(buildApp())
+      .post("/api/workspace-os/command-reliability/receipt")
+      .send({
+        command_id: "stage-play.copy_mail_loop_unified_trace",
+        command_family: "clipboard",
+        stage: "clipboard_write_failed",
+        status: "failed",
+        failure_reason: "token=VERY_SECRET_COMMAND_TOKEN_SHOULD_NOT_LEAK_1234567890",
+      })
+      .expect(202);
+
+    const taskManager = await request(buildApp())
+      .get("/api/workspace-os/task-manager?thread_id=task-manager%3Atest")
+      .expect(200);
+
+    const serialized = JSON.stringify(taskManager.body);
+    expect(taskManager.body.summary.browser_sample_included).toBe(true);
+    expect(taskManager.body.summary.command_failed_receipt_count).toBe(1);
+    expect(taskManager.body.authority.raw_content_included).toBe(false);
+    expect(serialized).not.toContain("VERY_SECRET_COMMAND_TOKEN");
+  });
+});

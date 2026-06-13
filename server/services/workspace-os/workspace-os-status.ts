@@ -430,6 +430,28 @@ export async function buildHelixWorkspaceOsStatus(
   }));
 
   capabilities.push(makeRecord({
+    capability_id: "workstation.browser_responsiveness",
+    surface: "screen",
+    mode: "diagnostic",
+    status: "available",
+    label: "Browser responsiveness diagnostics",
+    source: "workspace_os_browser_performance_endpoint",
+    last_verified_at: generatedAt,
+    fallbacks: ["workstation.task_manager", "browser.visual_capture"],
+    evidence_refs: [HELIX_WORKSTATION_TASK_MANAGER_SCHEMA],
+    diagnostics: {
+      sample_endpoint: "/api/workspace-os/browser-performance/sample",
+      status_endpoint: "/api/workspace-os/browser-performance/status",
+      command_receipt_endpoint: "/api/workspace-os/command-reliability/receipt",
+      command_status_endpoint: "/api/workspace-os/command-reliability/status",
+      exposes_raw_dom_text: false,
+      exposes_screenshots: false,
+      exposes_clipboard_contents: false,
+      executes_task_control: false,
+    },
+  }));
+
+  capabilities.push(makeRecord({
     capability_id: "workstation.storage_map",
     surface: "filesystem",
     mode: "read_only",

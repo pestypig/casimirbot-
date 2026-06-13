@@ -26,13 +26,22 @@ describe("Warp / GR / NHM2 map", () => {
         "nhm2.closure.wall_t00_source_residual",
         "nhm2.tensor.full_authority_gate",
         "nhm2.tensor.same_chart_full_tensor",
+        "nhm2.regional_atlas.available",
+        "nhm2.regional_atlas.partition_of_unity",
+        "nhm2.regional_atlas.transition_supports",
+        "nhm2.regional_atlas.derivative_support",
+        "nhm2.regional_atlas.consumer_congruence",
         "nhm2.source.same_basis_tensor_authority",
         "nhm2.qei.worldline_dossier",
         "nhm2.natario.curvature_invariants",
         "nhm2.natario.invariant_audit",
         "nhm2.energy_condition.observer_robust_gate",
+        "nhm2.regional_atlas.claim_boundary",
       ]),
     );
+    for (const ref of path?.calculatorPayloadRefs ?? []) {
+      expect(ref.badgeId.startsWith("nhm2.regional_atlas.")).toBe(false);
+    }
     expect(path?.claimBoundaryBadgeIds).toContain("nhm2.claim_boundary.diagnostic_only");
   });
 });

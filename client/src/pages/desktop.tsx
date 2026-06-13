@@ -34,6 +34,7 @@ import { emitHelixWorkstationProceduralStep } from "@/lib/workstation/procedural
 import { startWorkstationClipboardCapture } from "@/lib/workstation/workstationClipboard";
 import { startWorkstationTimelineCapture } from "@/lib/workstation/workstationTimelineCapture";
 import { startProcessGraphCapture } from "@/lib/workstation/processGraph/startProcessGraphCapture";
+import { startWorkstationPerformanceSampler } from "@/lib/workstation/performance/startWorkstationPerformanceSampler";
 import {
   createWorkstationActionTraceId,
   emitWorkstationActionLiveEvent,
@@ -45,6 +46,7 @@ import {
   parseWorkstationViewStateFromUrl,
   type WorkstationViewState,
 } from "@/lib/workstation/workstationDeepLink";
+import { useProfileStorageSync } from "@/lib/workstation/profileStorageSync";
 
 const LAYOUT_COLLECTION_KEYS = ["panels", "windows", "openPanels", "items", "children", "columns", "stack", "slots"];
 const MAX_LAYOUT_DEPTH = 5;
@@ -115,6 +117,7 @@ export default function DesktopPage({
 }: {
   layoutVariant?: "desktop" | "mobile";
 }) {
+  useProfileStorageSync();
   const { windows, registerFromManifest, open } = useDesktopStore();
   const workstationMode = useWorkstationLayoutStore((state) => state.mode);
   const { userSettings, updateSettings } = useHelixStartSettings();
@@ -255,6 +258,7 @@ export default function DesktopPage({
     const stopClipboardCapture = startWorkstationClipboardCapture();
     const stopTimelineCapture = startWorkstationTimelineCapture();
     const stopProcessGraphCapture = startProcessGraphCapture();
+    const stopPerformanceSampler = startWorkstationPerformanceSampler();
     const handleWorkstationAction = (event: Event) => {
       const detail = (event as CustomEvent<unknown>)?.detail;
       const actions = coerceHelixWorkstationActions(detail);
@@ -658,6 +662,7 @@ export default function DesktopPage({
       stopClipboardCapture();
       stopTimelineCapture();
       stopProcessGraphCapture();
+      stopPerformanceSampler();
     };
   }, [applyWorkstationViewState, openPanelUniversal, openSettings, workstationEnabled]);
 

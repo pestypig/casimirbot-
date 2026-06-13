@@ -5,6 +5,7 @@ export type HelixWorkspaceMemoryArtifactType =
   | "workstation_note"
   | "helix_chat_session"
   | "helix_chat_layout"
+  | "workstation_layout"
   | "workstation_session_draft"
   | "workstation_panel_scroll";
 

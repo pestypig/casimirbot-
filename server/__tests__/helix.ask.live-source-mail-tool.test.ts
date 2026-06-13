@@ -178,6 +178,13 @@ describe("live-source mail live environment tools", () => {
         can_run_automatically: true,
       }),
       expect.objectContaining({
+        tool_id: "live_env.draft_micro_reasoner_preset",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
         tool_id: "live_env.route_micro_reasoner_prompt",
         family: "live_env",
         creates_assistant_answer: false,
@@ -316,6 +323,85 @@ describe("live-source mail live environment tools", () => {
     expect(observation.evidence_refs).toEqual(
       expect.arrayContaining([sourceId]),
     );
+  });
+
+  it("drafts a MicroDeck setup from a scenario without creating or applying the preset", () => {
+    const before = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_micro_reasoner_presets",
+      thread_id: threadId,
+      args: {
+        source_id: sourceId,
+        include_presets: true,
+        limit: 100,
+      },
+    });
+    const beforeCustomCount = (before.observation as any).presets
+      .filter((preset: any) => String(preset.presetId).includes(":custom:"))
+      .length;
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.draft_micro_reasoner_preset",
+      thread_id: threadId,
+      args: {
+        source_id: sourceId,
+        scenario_text: "Use the visual source to choose whether to prepare a tool call, append a wake-bound Ask contract, or ask the operator for confirmation.",
+        candidate_prompts: [
+          "Prepare the next tool call if the visual summary has enough evidence.",
+          "Append a concise wake-bound context contract for Helix Ask.",
+          "Ask the operator one confirmation question when the evidence is ambiguous.",
+        ],
+        wake_contract_prompt: "Only append this contract when the MicroDeck result is wake-bound for Ask handoff.",
+        wake_contract_title: "Operator Wake Contract",
+      },
+    });
+
+    expect(observation).toMatchObject({
+      schema: "helix.live_environment_tool_observation.v1",
+      tool_name: "live_env.draft_micro_reasoner_preset",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(observation.observation).toMatchObject({
+      artifactId: "stage_play_micro_reasoner_prompt_preset_draft",
+      schema: "stage_play_micro_reasoner_prompt_preset_draft/v1",
+      schemaVersion: "stage_play_micro_reasoner_prompt_preset_draft/v1",
+      confirmationRequired: true,
+      createToolCall: {
+        toolName: "live_env.create_micro_reasoner_preset",
+        args: {
+          source_ids: [sourceId],
+          candidate_prompts: expect.any(Array),
+          wake_prompt_contract: {
+            title: "Operator Wake Contract",
+            attachOnlyWhenWakeBound: true,
+          },
+        },
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "micro_reasoner_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect((observation.observation as any).draft.candidatePrompts).toHaveLength(3);
+    expect(observation.producedRefs).toEqual([(observation.observation as any).draftId]);
+
+    const after = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_micro_reasoner_presets",
+      thread_id: threadId,
+      args: {
+        source_id: sourceId,
+        include_presets: true,
+        limit: 100,
+      },
+    });
+    const afterCustomCount = (after.observation as any).presets
+      .filter((preset: any) => String(preset.presetId).includes(":custom:"))
+      .length;
+    expect(afterCustomCount).toBe(beforeCustomCount);
   });
 
   it("creates and routes a MicroDeck prompt delegation preset from up to three prompts", () => {

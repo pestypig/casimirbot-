@@ -41,6 +41,7 @@ import {
 import { maybePostSituationRoomSetupExecutionReceipt } from "@/lib/workstation/setupExecutionReceiptPost";
 import { isUserLaunchPanel } from "@/lib/workstation/launchPanelPolicy";
 import { startProcessGraphCapture } from "@/lib/workstation/processGraph/startProcessGraphCapture";
+import { startWorkstationPerformanceSampler } from "@/lib/workstation/performance/startWorkstationPerformanceSampler";
 
 const LONG_PRESS_MS = 650;
 const MAX_WARN_STACK = 4;
@@ -144,7 +145,12 @@ export default function MobileStartPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    return startProcessGraphCapture();
+    const stopProcessGraphCapture = startProcessGraphCapture();
+    const stopPerformanceSampler = startWorkstationPerformanceSampler();
+    return () => {
+      stopProcessGraphCapture();
+      stopPerformanceSampler();
+    };
   }, []);
 
   const openAppViewer = useCallback(() => {

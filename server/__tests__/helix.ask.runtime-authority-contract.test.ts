@@ -314,6 +314,142 @@ describe("helix ask runtime authority contract", () => {
     expect(report.blocking_reasons).not.toContain("selected_capability_observation_missing");
   });
 
+  it("treats MicroDeck preset drafts as the selected read-only setup observation", () => {
+    const payload = {
+      canonical_goal_frame: { goal_kind: "live_environment_review", required_terminal_kind: "model_synthesized_answer" },
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      source_target_intent: {
+        target_source: "live_source_mailbox",
+        target_kind: "live_source",
+      },
+      goal_satisfaction_evaluation: {
+        canonical_goal_kind: "live_environment_review",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "agent-step-microdeck-draft",
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+            next_step: "answer",
+            chosen_capability: "live_env.draft_micro_reasoner_preset",
+            executed_action_key: "live_env.draft_micro_reasoner_preset",
+            tool_observation: {
+              schema: "helix.live_environment_tool_observation.v1",
+              observation_id: "live_env_tool_observation:microdeck-draft",
+              tool_name: "live_env.draft_micro_reasoner_preset",
+              ok: true,
+              summary: "Drafted MicroDeck preset from Generic Live Source Deck.",
+              observation: {
+                schema: "stage_play_micro_reasoner_prompt_preset_draft/v1",
+                artifactId: "stage_play_micro_reasoner_prompt_preset_draft",
+                draftId: "stage_play_micro_reasoner_prompt_preset_draft:test",
+                confirmationRequired: true,
+                createToolCall: {
+                  toolName: "live_env.create_micro_reasoner_preset",
+                  args: {},
+                },
+                assistant_answer: false,
+                terminal_eligible: false,
+                raw_content_included: false,
+                context_role: "micro_reasoner_evidence",
+              },
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "runtime-tool-call-microdeck-draft",
+          kind: "runtime_tool_call",
+          payload: {
+            schema: "helix.runtime_tool_call.v1",
+            call_id: "runtime-call-microdeck-draft",
+            capability_key: "live_env.draft_micro_reasoner_preset",
+            args: {},
+          },
+        },
+      ],
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        server_authoritative: true,
+        terminal_artifact_kind: "model_synthesized_answer",
+        final_answer_source: "final_answer_draft",
+      },
+    };
+
+    expect(isSourceCapabilityDiagnosticTurn(payload)).toBe(true);
+    expect(hasRuntimeToolCallForSelectedCapability(payload, "live_env.draft_micro_reasoner_preset")).toBe(true);
+    expect(hasSelectedCapabilityObservation(payload)).toBe(true);
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
+    expect(report.eligible).toBe(true);
+    expect(report.checks).toMatchObject({
+      runtime_tool_call: true,
+      microdeck_selected_capability: true,
+      selected_capability_observation: true,
+      post_observation_model_decision: true,
+      goal_satisfaction_allows_terminal: true,
+    });
+  });
+
+  it("fails closed for MicroDeck draft summaries when the draft observation is missing", () => {
+    const payload = {
+      canonical_goal_frame: { goal_kind: "live_environment_review", required_terminal_kind: "model_synthesized_answer" },
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      source_target_intent: {
+        target_source: "live_source_mailbox",
+        target_kind: "live_source",
+      },
+      goal_satisfaction_evaluation: {
+        canonical_goal_kind: "live_environment_review",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "agent-step-microdeck-draft",
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+            next_step: "answer",
+            chosen_capability: "live_env.draft_micro_reasoner_preset",
+            executed_action_key: "live_env.draft_micro_reasoner_preset",
+            observed_artifact_refs: [],
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "runtime-tool-call-microdeck-draft",
+          kind: "runtime_tool_call",
+          payload: {
+            schema: "helix.runtime_tool_call.v1",
+            call_id: "runtime-call-microdeck-draft",
+            capability_key: "live_env.draft_micro_reasoner_preset",
+            args: {},
+          },
+        },
+      ],
+    };
+
+    expect(hasRuntimeToolCallForSelectedCapability(payload, "live_env.draft_micro_reasoner_preset")).toBe(true);
+    expect(hasSelectedCapabilityObservation(payload)).toBe(false);
+
+    const report = evaluateTerminalBoundaryEligibility(payload);
+    expect(report.eligible).toBe(false);
+    expect(report.checks.runtime_tool_call).toBe(true);
+    expect(report.checks.microdeck_selected_capability).toBe(true);
+    expect(report.checks.selected_capability_observation).toBe(false);
+    expect(report.blocking_reasons).toContain("selected_capability_observation_missing");
+  });
+
   it("blocks MicroDeck summaries when an observation appears without a runtime tool call", () => {
     const payload = {
       canonical_goal_frame: { goal_kind: "live_environment_review", required_terminal_kind: "model_synthesized_answer" },
@@ -506,6 +642,38 @@ describe("helix ask runtime authority contract", () => {
       authority: "evidence_only",
       mutating: false,
       requiredObservationKinds: ["stage_play_micro_reasoner_prompt_preset_query_result"],
+      allowedTerminalKinds: ["model_synthesized_answer"],
+      requiredReentry: true,
+      requiresGoalSatisfaction: true,
+    });
+  });
+
+  it("contracts MicroDeck draft prompts as observation-backed model summaries", () => {
+    const contract = buildRouteProductContract({
+      turnId: "turn-microdeck-draft-contract",
+      promptText: "Draft a MicroDeck preset for a visual automation scenario using the closest base preset.",
+      sourceTargetIntent: {
+        target_source: "live_source_mailbox",
+        target_kind: "live_source",
+      },
+    });
+    const toolContract = resolveToolFamilyContract({
+      toolName: "live_env.draft_micro_reasoner_preset",
+    });
+
+    expect(contract).toMatchObject({
+      schema: "helix.route_product_contract.v1",
+      source_target: "live_source_mailbox",
+      precedence_reason: "microdeck_draft_requires_tool_observation_then_model_synthesis",
+    });
+    expect(contract.allowed_terminal_artifact_kinds).toContain("model_synthesized_answer");
+    expect(contract.allowed_terminal_artifact_kinds).not.toContain("live_environment_tool_observation");
+    expect(contract.side_artifact_kinds_allowed).toContain("stage_play_micro_reasoner_prompt_preset_draft");
+    expect(toolContract).toMatchObject({
+      toolName: "live_env.draft_micro_reasoner_preset",
+      authority: "evidence_only",
+      mutating: false,
+      requiredObservationKinds: ["stage_play_micro_reasoner_prompt_preset_draft"],
       allowedTerminalKinds: ["model_synthesized_answer"],
       requiredReentry: true,
       requiresGoalSatisfaction: true,

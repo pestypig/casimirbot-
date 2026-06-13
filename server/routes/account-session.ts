@@ -14,6 +14,10 @@ import {
   createProfileIngressToken,
   revokeProfileIngressToken,
 } from "../services/helix-account/profile-ingress-store";
+import {
+  readProfileStorageSnapshot,
+  writeProfileStorageSnapshot,
+} from "../services/helix-account/profile-storage-store";
 
 export const accountSessionRouter = Router();
 
@@ -47,6 +51,41 @@ accountSessionRouter.post("/session/password-sign-in", (req, res) => {
 accountSessionRouter.post("/session/sign-out", (req, res) => {
   clearHelixSessionCookie(res);
   res.json(signOutAccountSession(readHelixSessionCookie(req.headers.cookie)));
+});
+
+accountSessionRouter.get("/profile-storage/snapshot", (req, res) => {
+  const status = getAccountSessionStatus(readHelixSessionCookie(req.headers.cookie));
+  const profileId = status.session?.profile.profile_id;
+  if (!profileId) {
+    return res.status(401).json({
+      ok: false,
+      error: "profile_session_required",
+      message: "A profile session is required before profile storage can be loaded.",
+      raw_profile_content_included: false,
+    });
+  }
+  return res.status(200).json(readProfileStorageSnapshot(profileId));
+});
+
+accountSessionRouter.post("/profile-storage/snapshot", (req, res) => {
+  const status = getAccountSessionStatus(readHelixSessionCookie(req.headers.cookie));
+  const profileId = status.session?.profile.profile_id;
+  if (!profileId) {
+    return res.status(401).json({
+      ok: false,
+      error: "profile_session_required",
+      message: "A profile session is required before profile storage can be saved.",
+      raw_profile_content_included: false,
+    });
+  }
+  const receipt = writeProfileStorageSnapshot({
+    profile_id: profileId,
+    snapshot: {
+      entries: Array.isArray(req.body?.entries) ? req.body.entries : [],
+      artifacts: Array.isArray(req.body?.artifacts) ? req.body.artifacts : [],
+    },
+  });
+  return res.status(receipt.ok ? 200 : 413).json(receipt);
 });
 
 accountSessionRouter.post("/profile-ingress/token", (req, res) => {

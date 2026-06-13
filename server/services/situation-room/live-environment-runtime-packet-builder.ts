@@ -34,6 +34,7 @@ const LIVE_ENV_TOOLS: Array<{
   { tool_id: "live_env.read_processed_live_source_mail", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.query_micro_reasoner_prompts", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.query_micro_reasoner_presets", requires_user_confirmation: false, can_run_automatically: true },
+  { tool_id: "live_env.draft_micro_reasoner_preset", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.route_micro_reasoner_prompt", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.apply_micro_reasoner_preset", requires_user_confirmation: true, can_run_automatically: false },
   { tool_id: "live_env.create_micro_reasoner_preset", requires_user_confirmation: true, can_run_automatically: false },

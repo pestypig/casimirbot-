@@ -62,6 +62,7 @@ import {
   STAGE_PLAY_LIVE_SOURCE_MAIL_REFRESH_EVENT,
   type StagePlayLiveSourceMailRefreshEventDetail,
 } from "@/lib/helix/liveSourceMailRefreshEvent";
+import { recordWorkstationCommandLifecycle } from "@/lib/workstation/performance/workstationCommandReceipts";
 
 const STAGE_PLAY_PANEL_THREAD_ID = "helix-ask:desktop";
 const STAGE_PLAY_MAILBOX_QUERY_KEY = [
@@ -1531,13 +1532,28 @@ function hasStagePlayDataFlowTray(badge: StagePlayBadgeV1): boolean {
 
 function copyStagePlayRefs(refs: string[]): void {
   if (refs.length === 0) return;
-  void navigator.clipboard?.writeText(refs.join("\n")).catch(() => undefined);
+  void copyStagePlayText(refs.join("\n"), "stage-play.copy_data_flow_refs");
 }
 
-function copyStagePlayText(value: string): void {
+async function copyStagePlayText(value: string, commandId = "stage-play.copy_text"): Promise<boolean> {
   const text = String(value ?? "").trim();
-  if (!text) return;
-  void navigator.clipboard?.writeText(text).catch(() => undefined);
+  if (!text) return false;
+  if (!navigator.clipboard?.writeText) return false;
+  try {
+    await recordWorkstationCommandLifecycle(
+      {
+        command_id: commandId,
+        command_family: "clipboard",
+        panel_id: "stage-play-badge-graph",
+        success_stage: "clipboard_write_succeeded",
+        failure_stage: "clipboard_write_failed",
+      },
+      () => navigator.clipboard.writeText(text),
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function CopyStagePlayRefsButton({ refs, label = "Copy refs" }: { refs: string[]; label?: string }) {
@@ -5895,20 +5911,20 @@ function StagePlayMailLoopLiveOverview({
     debugCopyResetTimerRef.current = window.setTimeout(() => setDebugCopyState("idle"), 1800);
   };
   const handleCopyUnifiedTrace = () => {
-    copyStagePlayText(JSON.stringify(unifiedTrace, null, 2));
-    markDebugCopied("trace");
+    void copyStagePlayText(JSON.stringify(unifiedTrace, null, 2), "stage-play.copy_mail_loop_unified_trace")
+      .then((copied) => { if (copied) markDebugCopied("trace"); });
   };
   const handleCopyPacketTrace = () => {
-    copyStagePlayText(JSON.stringify(selectedPacketTrace, null, 2));
-    markDebugCopied("packet");
+    void copyStagePlayText(JSON.stringify(selectedPacketTrace, null, 2), "stage-play.copy_mail_loop_packet_trace")
+      .then((copied) => { if (copied) markDebugCopied("packet"); });
   };
   const handleCopyWakeTrace = () => {
-    copyStagePlayText(JSON.stringify(selectedWakeTrace, null, 2));
-    markDebugCopied("wake");
+    void copyStagePlayText(JSON.stringify(selectedWakeTrace, null, 2), "stage-play.copy_mail_loop_wake_trace")
+      .then((copied) => { if (copied) markDebugCopied("wake"); });
   };
   const handleCopyAskDebugTrace = () => {
-    copyStagePlayText(JSON.stringify(selectedAskDebugTrace, null, 2));
-    markDebugCopied("ask");
+    void copyStagePlayText(JSON.stringify(selectedAskDebugTrace, null, 2), "stage-play.copy_mail_loop_ask_debug")
+      .then((copied) => { if (copied) markDebugCopied("ask"); });
   };
   const handleCopyFullMailbox = async () => {
     const fullMailbox = await fetchStagePlayLiveSourceMail({
@@ -5917,13 +5933,13 @@ function StagePlayMailLoopLiveOverview({
       view: "full",
       limit: 50,
     }).catch(() => mailbox ?? null);
-    copyStagePlayText(JSON.stringify({
+    const copied = await copyStagePlayText(JSON.stringify({
       schema: "helix.stage_play.mail_loop_full_mailbox_capture.v1",
       exportedAt: new Date().toISOString(),
       graphId: graph.graphId,
       mailbox: fullMailbox,
-    }, null, 2));
-    markDebugCopied("full");
+    }, null, 2), "stage-play.copy_mail_loop_full_state");
+    if (copied) markDebugCopied("full");
   };
 
   useEffect(() => () => {

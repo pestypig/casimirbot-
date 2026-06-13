@@ -38,7 +38,7 @@ describe("Workspace OS storage status", () => {
     )).toBe(true);
     expect(status.records.find((record) => record.artifact_id === "profile.server")).toMatchObject({
       quota_bytes: 1048576,
-      missing_reason: "no_existing_profile_storage_size_accessor",
+      missing_reason: "profile_storage_snapshot_missing",
       diagnostics: expect.objectContaining({
         raw_profile_content_included: false,
       }),

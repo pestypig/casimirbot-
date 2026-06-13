@@ -225,6 +225,17 @@ describe("Workspace OS status", () => {
         executes_task_control: false,
       }),
     });
+    expect(status.capabilities.find((entry) => entry.capability_id === "workstation.browser_responsiveness")).toMatchObject({
+      status: "available",
+      surface: "screen",
+      mode: "diagnostic",
+      diagnostics: expect.objectContaining({
+        status_endpoint: "/api/workspace-os/browser-performance/status",
+        command_status_endpoint: "/api/workspace-os/command-reliability/status",
+        exposes_clipboard_contents: false,
+        executes_task_control: false,
+      }),
+    });
     expect(status.capabilities.find((entry) => entry.capability_id === "workstation.storage_map")).toMatchObject({
       status: "available",
       surface: "filesystem",

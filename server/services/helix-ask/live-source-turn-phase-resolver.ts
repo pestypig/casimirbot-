@@ -437,11 +437,11 @@ const hasVisualObserverProfileCue = (prompt: string): boolean =>
   /\b(?:make|have)\b[\s\S]{0,120}\b(?:visual\s+capture|observer|vision|image\s+model)\b[\s\S]{0,120}\b(?:focus|look\s+for|watch)\b[\s\S]{0,120}\b(?:hud|hotbar|mobs?|health|hunger|fire|damage|minecraft|ui)\b/i.test(prompt);
 
 const hasContextualMicroReasonerDeckCue = (prompt: string): boolean =>
-  /["'`][^"'`]*(?:live_env\.query_micro_reasoner_presets|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)[^"'`]*["'`]/i.test(prompt) ||
-  /\b(?:if|in\s+the\s+future|future|later|eventually|hypothetically|tomorrow|next\s+time|would|could|might)\b[\s\S]{0,140}\b(?:live_env\.query_micro_reasoner_presets|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
-  /\b(?:previously|earlier|last\s+time|before|already|historically|was|were|had)\b[\s\S]{0,140}\b(?:ran|run|used|queried|viewed|inspected|showed|listed|checked|read|called)?\b[\s\S]{0,120}\b(?:live_env\.query_micro_reasoner_presets|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
-  /\b(?:screen|page|button|label|ui|text|menu|dropdown)\b[\s\S]{0,90}\b(?:says|shows|reads|contains|labeled|labelled|called|named)\b[\s\S]{0,120}\b(?:live_env\.query_micro_reasoner_presets|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
-  /\b(?:do\s+not|don't|dont|without|not\s+asking\s+to|for\s+now)\b[\s\S]{0,140}\b(?:run|execute|use|query|view|inspect|show|list|check|read)?\b[\s\S]{0,120}\b(?:live_env\.query_micro_reasoner_presets|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt);
+  /["'`][^"'`]*(?:live_env\.(?:query_micro_reasoner_presets|draft_micro_reasoner_preset)|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)[^"'`]*["'`]/i.test(prompt) ||
+  /\b(?:if|in\s+the\s+future|future|later|eventually|hypothetically|tomorrow|next\s+time|would|could|might)\b[\s\S]{0,140}\b(?:live_env\.(?:query_micro_reasoner_presets|draft_micro_reasoner_preset)|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
+  /\b(?:previously|earlier|last\s+time|before|already|historically|was|were|had)\b[\s\S]{0,140}\b(?:ran|run|used|queried|viewed|inspected|showed|listed|checked|read|called|drafted|designed|recommended)?\b[\s\S]{0,120}\b(?:live_env\.(?:query_micro_reasoner_presets|draft_micro_reasoner_preset)|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
+  /\b(?:screen|page|button|label|ui|text|menu|dropdown)\b[\s\S]{0,90}\b(?:says|shows|reads|contains|labeled|labelled|called|named)\b[\s\S]{0,120}\b(?:live_env\.(?:query_micro_reasoner_presets|draft_micro_reasoner_preset)|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
+  /\b(?:do\s+not|don't|dont|without|not\s+asking\s+to|for\s+now)\b[\s\S]{0,140}\b(?:run|execute|use|query|view|inspect|show|list|check|read|draft|design|recommend|set\s+up|setup)?\b[\s\S]{0,120}\b(?:live_env\.(?:query_micro_reasoner_presets|draft_micro_reasoner_preset)|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt);
 
 const hasMicroReasonerDeckQueryCue = (prompt: string): boolean => {
   if (hasContextualMicroReasonerDeckCue(prompt)) return false;
@@ -449,6 +449,15 @@ const hasMicroReasonerDeckQueryCue = (prompt: string): boolean => {
     /\blive_env\.query_micro_reasoner_presets\b/i.test(prompt) ||
     /\b(?:query|view|inspect|show|list|get|check|read)\b[\s\S]{0,120}\b(?:micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|micro[-\s]?reasoner\s+(?:preset|prompt|deck)s?|prompt\s+(?:preset|deck)s?|active\s+(?:micro[-\s]?deck|preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
     /\b(?:micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|micro[-\s]?reasoner\s+(?:preset|prompt|deck)s?|prompt\s+(?:preset|deck)s?|source\s+deck\s+assembly)\b[\s\S]{0,120}\b(?:query|view|inspect|show|list|get|check|read|active|assembled|enabled|using)\b/i.test(prompt)
+  );
+};
+
+const hasMicroReasonerDeckDraftCue = (prompt: string): boolean => {
+  if (hasContextualMicroReasonerDeckCue(prompt)) return false;
+  return (
+    /\blive_env\.draft_micro_reasoner_preset\b/i.test(prompt) ||
+    /\b(?:draft|design|recommend|propose|plan|set\s+up|setup|configure|arrange|build)\b[\s\S]{0,140}\b(?:micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
+    /\b(?:micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b[\s\S]{0,140}\b(?:draft|design|recommend|propose|plan|set\s+up|setup|configure|arrange|build|closest\s+preset)\b/i.test(prompt)
   );
 };
 
@@ -771,13 +780,29 @@ export const resolveLiveSourceTurnPhase = (
 
   if (
     !contextualMicroReasonerDeckCue &&
-    (hasMicroReasonerDeckQueryCue(prompt) || selectedCapability === "live_env.query_micro_reasoner_presets")
+    (
+      hasMicroReasonerDeckQueryCue(prompt) ||
+      hasMicroReasonerDeckDraftCue(prompt) ||
+      selectedCapability === "live_env.query_micro_reasoner_presets" ||
+      selectedCapability === "live_env.draft_micro_reasoner_preset"
+    )
   ) {
+    const draftRequested =
+      hasMicroReasonerDeckDraftCue(prompt) ||
+      selectedCapability === "live_env.draft_micro_reasoner_preset";
+    const microDeckTool = draftRequested
+      ? "live_env.draft_micro_reasoner_preset"
+      : "live_env.query_micro_reasoner_presets";
+    const microDeckEvidence = draftRequested
+      ? "stage_play_micro_reasoner_prompt_preset_draft"
+      : "stage_play_micro_reasoner_prompt_preset_query_result";
     return makeResolution({
       phase: "query_micro_reasoner_deck",
-      reason: "Prompt asks to query the MicroDeck preset/prompt assembly; read MicroDeck evidence without entering the processed-mail flow.",
+      reason: draftRequested
+        ? "Prompt asks to draft a MicroDeck preset from a scenario; produce read-only MicroDeck setup evidence without entering the processed-mail flow."
+        : "Prompt asks to query the MicroDeck preset/prompt assembly; read MicroDeck evidence without entering the processed-mail flow.",
       canonicalGoal: "live_source_status",
-      allowedTools: ["live_env.query_micro_reasoner_presets"],
+      allowedTools: [microDeckTool],
       fallbackTools: [],
       forbiddenTools: [
         "live_env.read_processed_live_source_mail",
@@ -786,11 +811,13 @@ export const resolveLiveSourceTurnPhase = (
         "live_env.record_live_source_mail_decision",
         "live_env.request_interim_voice_callout",
       ],
-      requiredEvidence: ["stage_play_micro_reasoner_prompt_preset_query_result"],
-      completionEvidence: ["stage_play_micro_reasoner_prompt_preset_query_result"],
+      requiredEvidence: [microDeckEvidence],
+      completionEvidence: [microDeckEvidence],
       nextPhase: "terminal_checkpoint",
       locked: true,
-      lockReason: "MicroDeck inspection is a read-only source-prompt query, not mailbox processing.",
+      lockReason: draftRequested
+        ? "MicroDeck setup drafting is a read-only source-prompt planning query, not mailbox processing or preset mutation."
+        : "MicroDeck inspection is a read-only source-prompt query, not mailbox processing.",
       evidenceRefs,
     });
   }

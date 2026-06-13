@@ -11,6 +11,7 @@ describe("Helix Ask native image turn client path", () => {
     expect(source).not.toContain('fetch("/api/agi/situation/visual-frame/analyze"');
     expect(source).not.toContain("analyzeAskImageAttachment");
     expect(source).not.toContain("analyzing image...");
+    expect(source).toContain("runImageAttachmentLensRun");
     expect(source).toContain("image_base64: nativeImageBase64");
     expect(source).toContain('raw_image_scope: "turn_input_only"');
     expect(source).toContain("image ready");

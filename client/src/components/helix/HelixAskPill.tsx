@@ -58,6 +58,11 @@ import {
   type HelixAskRouteMetadata,
   type PendingHelixAskPrompt,
 } from "@/lib/helix/ask-prompt-launch";
+import {
+  runImageAttachmentLensRun,
+  type ImageAttachmentLensRunAttachment,
+} from "@/lib/helix/imageAttachmentLensRun";
+import type { ImageAttachmentLensRunV1 } from "@shared/contracts/image-attachment-lens-run.v1";
 import { shouldUseIsolatedZenGraphAskTurn } from "@/lib/helix/zenGraphAskRouting";
 import { publishZenGraphCurrentAnswerFromDebugExport } from "@/store/useZenGraphCurrentAnswerStore";
 import {
@@ -5854,6 +5859,7 @@ type RunAskOptions = {
   visualCapability?: Record<string, unknown>;
   visualEvidence?: Record<string, unknown>;
   imageAttachment?: HelixAskImageAttachment;
+  imageAttachmentLensRun?: ImageAttachmentLensRunV1 | null;
 };
 
 type AskContextChooserState = {
@@ -31488,6 +31494,47 @@ export function HelixAskPill({
           : []),
       ];
       const runAskTurnId = pendingWorkstationUserInputRef.current?.turn_id ?? `ask:${crypto.randomUUID()}`;
+      let imageAttachmentLensRunForTurn = options?.imageAttachmentLensRun ?? null;
+      if (!imageAttachmentLensRunForTurn && nativeImageAttachment && nativeImageCommitCheck?.can_submit) {
+        try {
+          imageAttachmentLensRunForTurn = await runImageAttachmentLensRun({
+            prompt: trimmed,
+            attachment: nativeImageAttachment as ImageAttachmentLensRunAttachment,
+            threadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID,
+            turnId: runAskTurnId,
+            traceId: runAskTurnId,
+          });
+        } catch (error) {
+          imageAttachmentLensRunForTurn = {
+            contractVersion: "image_attachment_lens_run/v1",
+            generatedAt: new Date().toISOString(),
+            threadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID,
+            attachmentId: nativeImageAttachment.id,
+            sourceId: null,
+            sourceImageRef: null,
+            admission: {
+              admitted: true,
+              reason: "image_attachment_lens_run_exception",
+              promptRequiresVisualInspection: true,
+              autoOpenedImageLens: false,
+            },
+            broadObservation: {
+              requested: true,
+              frameHistoryId: null,
+              evidenceId: null,
+              summary: null,
+              status: "blocked",
+            },
+            focusRegions: [],
+            blockers: [error instanceof Error ? error.message : String(error)],
+            claimBoundary: {
+              observationOnly: true,
+              notAnswerAuthority: true,
+              requiresSolverReentry: true,
+            },
+          };
+        }
+      }
       const explicitPanelCommand = /^\s*\/open\b/i.test(trimmed);
       const bypassWorkstationDispatch = options?.bypassWorkstationDispatch === true;
       const suppressWorkstationPayloadActions = options?.suppressWorkstationPayloadActions === true;
@@ -32449,6 +32496,7 @@ export function HelixAskPill({
               ui_turn_contract_source: HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG ? "ask_turn" : "legacy_local",
               ui_local_fast_path_suppressed: unifiedAskTurnOwnsManualDispatch,
               ui_visual_attachment_submitted: Boolean(visualEvidenceForTurn || nativeImageAttachment),
+              ui_image_attachment_lens_run: imageAttachmentLensRunForTurn,
               ui_turn_input_items: turnInputItemsForTurn,
               ui_turn_input_item_count: turnInputItemsForTurn.length,
               ui_action_envelope_panel_id:

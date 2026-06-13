@@ -25,7 +25,7 @@ export type StagePlayMicroReasonerPromptToolActivityV1 = {
   schemaVersion: "stage_play_micro_reasoner_prompt_tool_activity/v1";
   activityId: string;
   toolName: string;
-  action: "query" | "apply" | "create" | "update" | "test" | "route";
+  action: "query" | "apply" | "create" | "update" | "test" | "route" | "draft";
   status: "running" | "completed" | "failed";
   summary: string;
   sourceIds: string[];

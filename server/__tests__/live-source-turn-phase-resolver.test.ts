@@ -425,6 +425,32 @@ describe("resolveLiveSourceTurnPhase", () => {
     }
   });
 
+  it("locks MicroDeck setup drafting to the read-only draft tool without processed-mail fallback", () => {
+    const phase = resolveLiveSourceTurnPhase({
+      prompt: "Draft a MicroDeck preset for a visual automation scenario that chooses between three candidate prompts.",
+      selectedTargetSource: "live_source_mailbox",
+      selectedCapability: "live_env.read_processed_live_source_mail",
+    });
+
+    expect(phase.phase).toBe("query_micro_reasoner_deck");
+    expect(phase.canonicalGoal).toBe("live_source_status");
+    expect(phase.allowedTools).toEqual(["live_env.draft_micro_reasoner_preset"]);
+    expect(phase.fallbackTools).toEqual([]);
+    expect(phase.requiredEvidence).toEqual(["stage_play_micro_reasoner_prompt_preset_draft"]);
+    expect(phase.completionEvidence).toEqual(["stage_play_micro_reasoner_prompt_preset_draft"]);
+    expect(phase.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.read_live_source_mail",
+    ]));
+    expect(phase.phaseLock).toMatchObject({
+      locked: true,
+      reason: "MicroDeck setup drafting is a read-only source-prompt planning query, not mailbox processing or preset mutation.",
+    });
+    expect(isLockedExecutableLiveSourcePhase(phase)).toBe(true);
+    expect(mandatoryToolForPhase(phase)).toBe("live_env.draft_micro_reasoner_preset");
+  });
+
   it("does not execute MicroDeck query from quoted, negated, future, historical, or screen-visible mentions", () => {
     for (const prompt of [
       "Do not query the MicroDeck right now; explain what it is for.",
@@ -444,6 +470,27 @@ describe("resolveLiveSourceTurnPhase", () => {
 
       expect(phase.phase).not.toBe("query_micro_reasoner_deck");
       expect(phase.allowedTools).not.toContain("live_env.query_micro_reasoner_presets");
+    }
+  });
+
+  it("does not execute MicroDeck draft from quoted, negated, future, historical, or screen-visible mentions", () => {
+    for (const prompt of [
+      "Do not draft a MicroDeck right now; explain the idea first.",
+      "Later we might design a micro-reasoner deck for this.",
+      "If we draft the MicroDeck preset tomorrow, what inputs should we collect?",
+      "Earlier we recommended a MicroDeck setup during the smoke test.",
+      "The UI button says Draft MicroDeck preset.",
+      "The operator said \"draft a MicroDeck preset\" in the old transcript.",
+      "The phrase `live_env.draft_micro_reasoner_preset` is shown in the docs.",
+    ]) {
+      const phase = resolveLiveSourceTurnPhase({
+        prompt,
+        selectedTargetSource: "live_source_mailbox",
+        selectedCapability: "live_env.draft_micro_reasoner_preset",
+      });
+
+      expect(phase.phase).not.toBe("query_micro_reasoner_deck");
+      expect(phase.allowedTools).not.toContain("live_env.draft_micro_reasoner_preset");
     }
   });
 

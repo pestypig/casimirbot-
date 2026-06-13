@@ -8,8 +8,14 @@ import {
   type HelixWorkstationTaskManagerProcess,
   type HelixWorkstationTaskManagerProcessStatus,
   type HelixWorkstationTaskManagerSnapshot,
+  type HelixWorkstationBrowserPerformanceSample,
+  type HelixWorkstationCommandReliabilityStatus,
 } from "@shared/helix-workstation-task-manager";
 import { runtimeMemoryGovernor } from "../runtime/runtime-memory-governor";
+import {
+  getHelixWorkstationCommandReliabilityStatus,
+  getLatestHelixWorkstationBrowserPerformanceSample,
+} from "./browser-performance-status";
 
 const REDACTED = "[redacted]";
 
@@ -47,12 +53,16 @@ type RuntimeTaskSnapshot = ReturnType<typeof runtimeMemoryGovernor.getRuntimeTas
 export type HelixWorkstationTaskManagerReaders = {
   getRuntimeMemorySnapshot: typeof runtimeMemoryGovernor.getRuntimeMemorySnapshot;
   getRuntimeTaskSnapshot: typeof runtimeMemoryGovernor.getRuntimeTaskSnapshot;
+  getBrowserPerformanceSample: (now?: Date) => HelixWorkstationBrowserPerformanceSample | null;
+  getCommandReliabilityStatus: (now?: Date) => HelixWorkstationCommandReliabilityStatus;
   now: () => Date;
 };
 
 const DEFAULT_READERS: HelixWorkstationTaskManagerReaders = {
   getRuntimeMemorySnapshot: runtimeMemoryGovernor.getRuntimeMemorySnapshot,
   getRuntimeTaskSnapshot: runtimeMemoryGovernor.getRuntimeTaskSnapshot,
+  getBrowserPerformanceSample: getLatestHelixWorkstationBrowserPerformanceSample,
+  getCommandReliabilityStatus: getHelixWorkstationCommandReliabilityStatus,
   now: () => new Date(),
 };
 
@@ -223,6 +233,119 @@ const buildErrorProcess = (error: unknown, generatedAt: string): HelixWorkstatio
     },
   });
 
+const buildBrowserFrameProcess = (
+  sample: HelixWorkstationBrowserPerformanceSample,
+): HelixWorkstationTaskManagerProcess =>
+  withHelixWorkstationTaskManagerAuthority({
+    process_id: "browser.frame_loop",
+    label: "UI frame loop",
+    kind: "browser_frame_loop",
+    status: sample.visibility_state === "hidden"
+      ? "hidden"
+      : sample.advisory_pressure === "blocked"
+        ? "blocked"
+        : sample.advisory_pressure === "degraded"
+          ? "degraded"
+          : sample.advisory_pressure === "normal"
+            ? "active"
+            : "unknown",
+    source: "browser_frame_sampler",
+    updated_at: sample.sampled_at,
+    memory: {
+      source: "browser_frame_sampler",
+      approximate: true,
+      observed: false,
+      estimate_mib: null,
+      pressure: sample.advisory_pressure,
+    },
+    diagnostics: {
+      fps: sample.fps,
+      average_frame_ms: sample.average_frame_ms,
+      p95_frame_ms: sample.p95_frame_ms,
+      worst_frame_ms: sample.worst_frame_ms,
+      long_frame_count: sample.long_frame_count,
+      long_frame_ratio: sample.long_frame_ratio,
+      long_task_count: sample.long_task_count,
+      long_task_total_ms: sample.long_task_total_ms,
+      dom_node_count: sample.dom_node_count,
+      open_panel_count: sample.open_panel_count,
+      focused_panel_id: sample.focused_panel_id,
+      visibility_state: sample.visibility_state,
+    },
+  });
+
+const buildBrowserInteractionProcess = (
+  sample: HelixWorkstationBrowserPerformanceSample,
+): HelixWorkstationTaskManagerProcess =>
+  withHelixWorkstationTaskManagerAuthority({
+    process_id: "browser.interaction_loop",
+    label: "UI responsiveness",
+    kind: "browser_interaction_loop",
+    status: sample.visibility_state === "hidden"
+      ? "hidden"
+      : sample.responsiveness_pressure === "blocked"
+        ? "blocked"
+        : sample.responsiveness_pressure === "degraded"
+          ? "degraded"
+          : sample.responsiveness_pressure === "normal"
+            ? "active"
+            : "unknown",
+    source: "browser_interaction_sampler",
+    updated_at: sample.sampled_at,
+    memory: {
+      source: "browser_interaction_sampler",
+      approximate: true,
+      observed: false,
+      estimate_mib: null,
+      pressure: sample.responsiveness_pressure ?? "unknown",
+    },
+    diagnostics: {
+      interaction_event_count: sample.interaction_event_count ?? 0,
+      input_delay_p95_ms: sample.input_delay_p95_ms ?? null,
+      input_to_next_frame_p95_ms: sample.input_to_next_frame_p95_ms ?? null,
+      click_to_next_frame_p95_ms: sample.click_to_next_frame_p95_ms ?? null,
+      scroll_jank_count: sample.scroll_jank_count ?? 0,
+      drag_jank_count: sample.drag_jank_count ?? 0,
+      active_interaction_kind: sample.active_interaction_kind ?? null,
+      active_panel_id: sample.active_panel_id ?? null,
+      focused_panel_id: sample.focused_panel_id,
+    },
+  });
+
+const buildCommandReliabilityProcess = (
+  status: HelixWorkstationCommandReliabilityStatus,
+  generatedAt: string,
+): HelixWorkstationTaskManagerProcess | null => {
+  if (status.summary.recent_receipt_count === 0) return null;
+  return withHelixWorkstationTaskManagerAuthority({
+    process_id: "workstation.command_reliability",
+    label: "Command reliability",
+    kind: "workstation_command_reliability",
+    status: status.summary.failed_receipt_count > 0
+      ? "degraded"
+      : status.summary.in_flight_receipt_count > 0
+        ? "active"
+        : "idle",
+    source: "workstation_command_receipts",
+    updated_at: generatedAt,
+    memory: {
+      source: "workstation_command_receipts",
+      approximate: true,
+      observed: false,
+      estimate_mib: null,
+      pressure: status.summary.failed_receipt_count > 0 ? "degraded" : "normal",
+    },
+    diagnostics: {
+      recent_receipt_count: status.summary.recent_receipt_count,
+      failed_receipt_count: status.summary.failed_receipt_count,
+      in_flight_receipt_count: status.summary.in_flight_receipt_count,
+      succeeded_receipt_count: status.summary.succeeded_receipt_count,
+      last_command_id: status.summary.last_command_id,
+      p95_latency_ms: status.summary.p95_latency_ms,
+    },
+  });
+};
+
 export async function buildHelixWorkstationTaskManagerSnapshot(
   input: {
     thread_id?: string | null;
@@ -235,8 +358,11 @@ export async function buildHelixWorkstationTaskManagerSnapshot(
     ...readerOverrides,
   };
   const generatedAt = readers.now().toISOString();
+  const generatedAtDate = new Date(generatedAt);
   const processes: HelixWorkstationTaskManagerProcess[] = [];
   let pressureLevel: string | null = null;
+  let browserPerformance: HelixWorkstationBrowserPerformanceSample | null = null;
+  let commandReliability: HelixWorkstationCommandReliabilityStatus | null = null;
 
   try {
     const memorySnapshot = readers.getRuntimeMemorySnapshot();
@@ -249,6 +375,58 @@ export async function buildHelixWorkstationTaskManagerSnapshot(
     processes.push(buildErrorProcess(error, generatedAt));
   }
 
+  try {
+    browserPerformance = readers.getBrowserPerformanceSample(generatedAtDate);
+    if (browserPerformance) {
+      processes.push(buildBrowserFrameProcess(browserPerformance));
+      processes.push(buildBrowserInteractionProcess(browserPerformance));
+    }
+  } catch (error) {
+    processes.push(withHelixWorkstationTaskManagerAuthority({
+      process_id: "workspace_os.task_manager.browser_reader_error",
+      label: "Browser responsiveness reader",
+      kind: "workspace_os",
+      status: "degraded",
+      source: "workspace_os_task_manager",
+      updated_at: generatedAt,
+      memory: {
+        source: "unknown",
+        approximate: true,
+        observed: false,
+        estimate_mib: null,
+        pressure: "unknown",
+      },
+      diagnostics: {
+        failure_reason: cleanString(error instanceof Error ? error.message : String(error)) ?? "browser_performance_reader_failed",
+      },
+    }));
+  }
+
+  try {
+    commandReliability = readers.getCommandReliabilityStatus(generatedAtDate);
+    const commandProcess = buildCommandReliabilityProcess(commandReliability, generatedAt);
+    if (commandProcess) processes.push(commandProcess);
+  } catch (error) {
+    processes.push(withHelixWorkstationTaskManagerAuthority({
+      process_id: "workspace_os.task_manager.command_reader_error",
+      label: "Command receipt reader",
+      kind: "workspace_os",
+      status: "degraded",
+      source: "workspace_os_task_manager",
+      updated_at: generatedAt,
+      memory: {
+        source: "unknown",
+        approximate: true,
+        observed: false,
+        estimate_mib: null,
+        pressure: "unknown",
+      },
+      diagnostics: {
+        failure_reason: cleanString(error instanceof Error ? error.message : String(error)) ?? "command_receipt_reader_failed",
+      },
+    }));
+  }
+
   const sorted = sortHelixWorkstationTaskManagerProcesses(processes);
   return {
     schema_version: HELIX_WORKSTATION_TASK_MANAGER_SCHEMA,
@@ -256,7 +434,7 @@ export async function buildHelixWorkstationTaskManagerSnapshot(
     thread_id: input.thread_id ?? null,
     room_id: input.room_id ?? null,
     processes: sorted,
-    summary: summarizeHelixWorkstationTaskManager(sorted, pressureLevel),
+    summary: summarizeHelixWorkstationTaskManager(sorted, pressureLevel, browserPerformance, commandReliability),
     authority: buildHelixWorkstationTaskManagerAuthority(),
   };
 }
@@ -267,4 +445,3 @@ export async function getHelixWorkstationTaskManagerSnapshot(input: {
 }): Promise<HelixWorkstationTaskManagerSnapshot> {
   return buildHelixWorkstationTaskManagerSnapshot(input);
 }
-

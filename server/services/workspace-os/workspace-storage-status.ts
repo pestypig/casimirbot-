@@ -7,6 +7,7 @@ import {
   type HelixWorkspaceStorageRecord,
   type HelixWorkspaceStorageStatus,
 } from "@shared/helix-workspace-storage-status";
+import { getProfileStorageUsage } from "../helix-account/profile-storage-store";
 
 const parseBytes = (value: unknown): number | null => {
   if (typeof value !== "string") return null;
@@ -46,6 +47,7 @@ export async function buildHelixWorkspaceStorageStatus(
   input: {
     thread_id?: string | null;
     room_id?: string | null;
+    profile_id?: string | null;
   },
   readerOverrides: Partial<HelixWorkspaceStorageReaders> = {},
 ): Promise<HelixWorkspaceStorageStatus> {
@@ -67,6 +69,7 @@ export async function buildHelixWorkspaceStorageStatus(
     "WORKSPACE_PROFILE_STORAGE_QUOTA_BYTES",
     "WORKSPACE_USER_STORAGE_QUOTA_BYTES",
   );
+  const profileUsage = getProfileStorageUsage(input.profile_id);
   const appStorageQuota = configuredQuota(
     readers.env,
     "WORKSPACE_APP_STORAGE_QUOTA_BYTES",
@@ -132,17 +135,22 @@ export async function buildHelixWorkspaceStorageStatus(
       status: "unknown",
       path_ref: "profile://current",
       storage_key: null,
-      profile_id: null,
+      profile_id: profileUsage.profile_id,
       chat_session_id: null,
-      size_bytes: null,
-      quota_bytes: profileQuota,
-      usage_ratio: null,
+      size_bytes: profileUsage.size_bytes,
+      quota_bytes: profileQuota ?? profileUsage.quota_bytes,
+      usage_ratio: (profileQuota ?? profileUsage.quota_bytes) > 0
+        ? profileUsage.size_bytes / (profileQuota ?? profileUsage.quota_bytes)
+        : null,
       approximate: true,
-      observed: false,
+      observed: true,
       updated_at: generatedAt,
-      missing_reason: "no_existing_profile_storage_size_accessor",
+      missing_reason: profileUsage.snapshot_count === 0 ? "profile_storage_snapshot_missing" : null,
       diagnostics: {
         raw_profile_content_included: false,
+        local_profile_snapshot_count: profileUsage.snapshot_count,
+        local_profile_path_ref: profileUsage.path_ref,
+        latest_snapshot_at: profileUsage.updated_at ?? "none",
         quota_source: profileQuota == null ? "not_configured" : "environment",
       },
     }),
@@ -187,6 +195,7 @@ export async function buildHelixWorkspaceStorageStatus(
 export async function getHelixWorkspaceStorageStatus(input: {
   thread_id?: string | null;
   room_id?: string | null;
+  profile_id?: string | null;
 }): Promise<HelixWorkspaceStorageStatus> {
   return buildHelixWorkspaceStorageStatus(input);
 }

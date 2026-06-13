@@ -11,6 +11,8 @@ describe("Helix Ask attachment commit guard", () => {
     expect(source).toContain("validateHelixAskImageAttachmentForSubmit");
     expect(source).toContain("image needs reattach");
     expect(source).toContain("Image attachment is stale. Reattach the image before sending.");
+    expect(source).toContain("runImageAttachmentLensRun");
+    expect(source).toContain("ui_image_attachment_lens_run");
     expect(source).toContain("nativeImageCommitCheck?.can_submit && nativeImageBase64");
     expect(source).toContain("raw_image_scope: \"turn_input_only\"");
   });
@@ -20,8 +22,8 @@ describe("Helix Ask attachment commit guard", () => {
 
     expect(source).toContain("submittedImageCommitCheck");
     expect(source).toContain("submittedImageAttachment && !submittedImageCommitCheck?.can_submit");
-    expect(source).toContain("HELIX_ASK_VISUAL_PROMPT_PATTERN.test(first)");
-    expect(source).toContain("No image attachment is available for this turn.");
+    expect(source).toContain("isHelixAskVisualPrompt(first)");
+    expect(source).toContain("No usable visual evidence is available for this turn.");
   });
 
   it("preserves server-authoritative proof recall and workstation terminals over evidence-gate fallback text", () => {

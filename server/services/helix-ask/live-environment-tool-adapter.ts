@@ -21,6 +21,8 @@ import type {
   StagePlayLiveSourceMailItemV1,
   StagePlayMicroReasonerPromptDelegationCandidateV1,
   StagePlayMicroReasonerPromptDelegationResultV1,
+  StagePlayMicroReasonerPromptPresetDraftV1,
+  StagePlayMicroReasonerPromptPresetV1,
   StagePlayMicroReasonerWakePromptContractV1,
   StagePlayMicroReasonerRoleV1,
   StagePlayMicroReasonerRunV1,
@@ -28,6 +30,7 @@ import type {
   StagePlayLiveSourceWatchJobPolicyV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import {
+  STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_DRAFT_SCHEMA,
   STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import {
@@ -1124,6 +1127,216 @@ const routeMicroReasonerPromptCandidates = (input: {
       : null,
     evidenceRefs: input.evidenceRefs,
     createdAt,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+    context_role: "micro_reasoner_evidence",
+    ask_context_policy: "evidence_only",
+  };
+};
+
+const scenarioTextFromDraftArgs = (args: Record<string, unknown>): string =>
+  readString(args.scenario_text) ??
+  readString(args.scenarioText) ??
+  readString(args.scenario) ??
+  readString(args.user_goal) ??
+  readString(args.userGoal) ??
+  readString(args.objective) ??
+  readString(args.description) ??
+  readString(args.summary) ??
+  "";
+
+const presetTextForDraftScoring = (preset: StagePlayMicroReasonerPromptPresetV1): string =>
+  [
+    preset.title,
+    preset.description,
+    preset.domain,
+    preset.outputPolicy,
+    preset.deckRunPlan,
+    preset.sourceKinds.join(" "),
+    preset.promptedRoles.join(" "),
+    preset.delegationRouter?.candidates.map((candidate) => `${candidate.title} ${candidate.promptText}`).join(" "),
+    preset.wakePromptContract?.title,
+    preset.wakePromptContract?.promptText,
+  ].filter(Boolean).join("\n");
+
+const draftScorePreset = (scenarioText: string, preset: StagePlayMicroReasonerPromptPresetV1): {
+  score: number;
+  overlap: string[];
+} => {
+  const scenarioTokens = delegationTokens(scenarioText);
+  const presetTokens = delegationTokens(presetTextForDraftScoring(preset));
+  const overlap = Array.from(scenarioTokens).filter((token) => presetTokens.has(token));
+  const denominator = Math.max(1, Math.min(Math.max(4, scenarioTokens.size), Math.max(4, presetTokens.size)));
+  const score = Math.max(0, Math.min(1, overlap.length / denominator));
+  return { score, overlap };
+};
+
+const synthesizeDraftCandidatePrompts = (
+  scenarioText: string,
+): StagePlayMicroReasonerPromptDelegationCandidateV1[] => {
+  const clippedScenario = clipText(scenarioText, 220) || "the incoming live-source observation";
+  return [
+    {
+      candidateId: "candidate_a",
+      title: "Prepare Action Candidate",
+      promptText: `Evaluate whether ${clippedScenario} contains enough evidence to prepare the next tool/action candidate. Return the candidate action, needed inputs, confidence, and blockers.`,
+    },
+    {
+      candidateId: "candidate_b",
+      title: "Append Wake Context",
+      promptText: `Summarize the relevant live-source evidence for ${clippedScenario} as a concise wake-bound context pack. Include observed facts, uncertainty, and why the agent should consider it now.`,
+    },
+    {
+      candidateId: "candidate_c",
+      title: "Ask For Confirmation",
+      promptText: `Determine whether ${clippedScenario} is too ambiguous or risky for automation. If so, draft the smallest confirmation question and list the missing evidence.`,
+    },
+  ];
+};
+
+const makeDraftTitle = (scenarioText: string, basePreset: StagePlayMicroReasonerPromptPresetV1): string => {
+  const explicit = clipText(scenarioText, 52)
+    .replace(/^(?:i\s+want|can\s+you|please|set\s+up|setup|create|draft)\s+/i, "")
+    .trim();
+  const base = explicit || basePreset.title.replace(/\s+Deck$/i, "");
+  return `${base} MicroDeck Draft`;
+};
+
+const draftMicroReasonerPresetFromScenario = (input: {
+  args: Record<string, unknown>;
+  sourceIds: string[];
+  presetId?: string | null;
+  basePresetId?: string | null;
+  now: string;
+}): StagePlayMicroReasonerPromptPresetDraftV1 => {
+  const scenarioText = scenarioTextFromDraftArgs(input.args);
+  const presets = listStagePlayMicroReasonerPromptPresets({
+    includePresets: true,
+    active: true,
+    limit: 100,
+  });
+  const requestedBasePresetId = input.basePresetId ?? input.presetId ?? null;
+  const requestedBasePreset = requestedBasePresetId
+    ? presets.find((preset) => preset.presetId === requestedBasePresetId) ?? null
+    : null;
+  const scored = presets
+    .map((preset) => {
+      const scoring = draftScorePreset(scenarioText, preset);
+      return { preset, score: requestedBasePreset?.presetId === preset.presetId ? 1 : scoring.score, overlap: scoring.overlap };
+    })
+    .sort((left, right) => right.score - left.score);
+  const recommended = requestedBasePreset
+    ? { preset: requestedBasePreset, score: 1, overlap: ["operator_requested_base_preset"] }
+    : scored[0] ?? {
+        preset: getActiveStagePlayMicroReasonerPromptPresetForSource({}) as StagePlayMicroReasonerPromptPresetV1,
+        score: 0,
+        overlap: [],
+      };
+  const basePreset = recommended.preset;
+  const suppliedCandidates = delegationCandidatesFromArgs(input.args);
+  const candidatePrompts =
+    suppliedCandidates.length > 0
+      ? suppliedCandidates
+      : basePreset.delegationRouter?.candidates?.length
+        ? basePreset.delegationRouter.candidates.slice(0, 3)
+        : synthesizeDraftCandidatePrompts(scenarioText);
+  const confidenceThreshold = Math.max(0, Math.min(1, readNumber(
+    input.args.confidence_threshold ?? input.args.confidenceThreshold,
+    basePreset.delegationRouter?.confidenceThreshold ?? 0.45,
+  )));
+  const escalationMode =
+    readString(input.args.escalation_mode) === "suggest_only" ||
+    readString(input.args.escalationMode) === "suggest_only"
+      ? "suggest_only"
+      : readString(input.args.escalation_mode) === "handoff_to_helix_ask" ||
+        readString(input.args.escalationMode) === "handoff_to_helix_ask"
+        ? "handoff_to_helix_ask"
+        : readString(input.args.escalation_mode) === "handoff_only_if_confident" ||
+          readString(input.args.escalationMode) === "handoff_only_if_confident"
+          ? "handoff_only_if_confident"
+          : basePreset.delegationRouter?.escalationMode ?? "handoff_only_if_confident";
+  const allowNone = typeof input.args.allow_none === "boolean"
+    ? input.args.allow_none
+    : typeof input.args.allowNone === "boolean"
+      ? input.args.allowNone
+      : basePreset.delegationRouter?.allowNone ?? true;
+  const wakePromptContract = wakePromptContractFromArgs(input.args) ?? basePreset.wakePromptContract ?? null;
+  const title = readString(input.args.title) ?? makeDraftTitle(scenarioText, basePreset);
+  const description =
+    readString(input.args.description) ??
+    `Draft custom MicroDeck from ${basePreset.title} for: ${clipText(scenarioText, 180) || "the supplied automation scenario"}.`;
+  const missingInformation = [
+    scenarioText ? null : "scenario_text",
+    candidatePrompts.length > 0 ? null : "candidate_prompts",
+    input.sourceIds.length > 0 ? null : "source_ids",
+  ].filter((entry): entry is string => Boolean(entry));
+  const confidence = recommended.score;
+  const confidenceLabel: StagePlayMicroReasonerPromptPresetDraftV1["confidenceLabel"] =
+    confidence >= 0.7 ? "high" : confidence >= 0.35 ? "medium" : "low";
+  const createArgs = {
+    base_preset_id: basePreset.presetId,
+    title,
+    description,
+    source_ids: input.sourceIds,
+    candidate_prompts: candidatePrompts,
+    confidence_threshold: confidenceThreshold,
+    escalation_mode: escalationMode,
+    allow_none: allowNone,
+    ...(wakePromptContract ? { wake_prompt_contract: wakePromptContract } : {}),
+  };
+  const draftId = `stage_play_micro_reasoner_prompt_preset_draft:${hashShort([
+    scenarioText,
+    basePreset.presetId,
+    candidatePrompts.map((candidate) => candidate.promptText),
+    input.sourceIds,
+    input.now,
+  ])}`;
+  return {
+    artifactId: "stage_play_micro_reasoner_prompt_preset_draft",
+    schema: STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_DRAFT_SCHEMA,
+    schemaVersion: STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_DRAFT_SCHEMA,
+    draftId,
+    scenarioText,
+    recommendedBasePresetId: basePreset.presetId,
+    recommendedBasePresetTitle: basePreset.title,
+    confidence,
+    confidenceLabel,
+    reason: recommended.overlap.length > 0
+      ? `Recommended ${basePreset.title} from scenario overlap: ${recommended.overlap.slice(0, 8).join(", ")}.`
+      : `Recommended ${basePreset.title} as the safest generic MicroDeck base.`,
+    alternatives: scored
+      .filter((entry) => entry.preset.presetId !== basePreset.presetId)
+      .slice(0, 3)
+      .map((entry) => ({
+        presetId: entry.preset.presetId,
+        title: entry.preset.title,
+        score: entry.score,
+        reason: entry.overlap.length > 0
+          ? `Matched ${entry.overlap.slice(0, 6).join(", ")}.`
+          : "No strong lexical overlap with the scenario.",
+      })),
+    draft: {
+      title,
+      description,
+      basePresetId: basePreset.presetId,
+      sourceKinds: basePreset.sourceKinds,
+      candidatePrompts,
+      confidenceThreshold,
+      escalationMode,
+      allowNone,
+      wakePromptContract,
+    },
+    missingInformation,
+    confirmationRequired: true,
+    createToolCall: {
+      toolName: "live_env.create_micro_reasoner_preset",
+      args: createArgs,
+    },
+    applyAfterCreateSuggested: input.sourceIds.length > 0,
+    sourceIds: input.sourceIds,
+    evidenceRefs: uniqueStrings([draftId, basePreset.presetId, ...input.sourceIds]),
+    createdAt: input.now,
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,
@@ -2722,6 +2935,7 @@ export function executeLiveEnvironmentTool(
 
   if (
     input.tool_name === "live_env.query_micro_reasoner_presets" ||
+    input.tool_name === "live_env.draft_micro_reasoner_preset" ||
     input.tool_name === "live_env.apply_micro_reasoner_preset" ||
     input.tool_name === "live_env.create_micro_reasoner_preset"
   ) {
@@ -2736,6 +2950,8 @@ export function executeLiveEnvironmentTool(
     const activityAction =
       input.tool_name === "live_env.apply_micro_reasoner_preset"
         ? "apply"
+        : input.tool_name === "live_env.draft_micro_reasoner_preset"
+          ? "draft"
         : input.tool_name === "live_env.create_micro_reasoner_preset"
           ? "create"
           : "query";
@@ -2761,6 +2977,40 @@ export function executeLiveEnvironmentTool(
       updatedAt: now,
       evidenceRefs: uniqueStrings([presetId, basePresetId, ...sourceIds]),
     });
+
+    if (input.tool_name === "live_env.draft_micro_reasoner_preset") {
+      const draft = draftMicroReasonerPresetFromScenario({
+        args,
+        sourceIds,
+        presetId,
+        basePresetId,
+        now,
+      });
+      const summary = `Drafted MicroDeck preset from ${draft.recommendedBasePresetTitle}.`;
+      recordStagePlayMicroReasonerPromptToolActivity({
+        activityId,
+        toolName: input.tool_name,
+        action: "draft",
+        status: "completed",
+        summary,
+        sourceIds,
+        presetId: draft.recommendedBasePresetId,
+        promptId: null,
+        createdAt: now,
+        updatedAt: new Date().toISOString(),
+        evidenceRefs: uniqueStrings([draft.draftId, draft.recommendedBasePresetId, ...sourceIds]),
+      });
+      return makeObservation({
+        threadId: input.thread_id,
+        environmentId: environment?.environment_id ?? input.environment_id,
+        toolName: input.tool_name,
+        ok: true,
+        summary,
+        observation: draft,
+        evidenceRefs: uniqueStrings([draft.draftId, draft.recommendedBasePresetId, ...draft.evidenceRefs, activityId]),
+        producedRefs: [draft.draftId],
+      });
+    }
 
     if (input.tool_name === "live_env.apply_micro_reasoner_preset") {
       if (!presetId || sourceIds.length === 0) {

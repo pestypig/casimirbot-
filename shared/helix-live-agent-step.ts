@@ -27,6 +27,7 @@ export type HelixLiveEnvironmentToolName =
   | "live_env.read_processed_live_source_mail"
   | "live_env.query_micro_reasoner_prompts"
   | "live_env.query_micro_reasoner_presets"
+  | "live_env.draft_micro_reasoner_preset"
   | "live_env.route_micro_reasoner_prompt"
   | "live_env.apply_micro_reasoner_preset"
   | "live_env.create_micro_reasoner_preset"

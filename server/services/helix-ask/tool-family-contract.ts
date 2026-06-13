@@ -216,6 +216,17 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
     aliases: ["microdeck", "micro_reasoner_presets", "stage_play_micro_reasoner_prompt_preset_query_result/v1"],
   }),
   contract({
+    toolName: "live_env.draft_micro_reasoner_preset",
+    toolFamily: "live_source_mail",
+    authority: "evidence_only",
+    mutating: false,
+    requiredObservationKinds: ["stage_play_micro_reasoner_prompt_preset_draft"],
+    allowedTerminalKinds: [...evidenceOnlyTerminalKinds],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+    aliases: ["microdeck_draft", "micro_reasoner_preset_draft", "stage_play_micro_reasoner_prompt_preset_draft/v1"],
+  }),
+  contract({
     toolName: "live_env.route_micro_reasoner_prompt",
     toolFamily: "live_source_mail",
     authority: "evidence_only",

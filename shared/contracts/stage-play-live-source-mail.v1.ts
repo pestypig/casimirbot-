@@ -15,6 +15,8 @@ export const STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA = "stage_play_micro_
 export const STAGE_PLAY_MICRO_REASONER_RUN_SCHEMA = "stage_play_micro_reasoner_run/v1" as const;
 export const STAGE_PLAY_MICRO_REASONER_PROMPT_DELEGATION_RESULT_SCHEMA =
   "stage_play_micro_reasoner_prompt_delegation_result/v1" as const;
+export const STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_DRAFT_SCHEMA =
+  "stage_play_micro_reasoner_prompt_preset_draft/v1" as const;
 export const STAGE_PLAY_PROCESSED_MAIL_PACKET_SCHEMA = "stage_play_processed_mail_packet/v1" as const;
 export const LIVE_SOURCE_CAUSAL_TRACE_SCHEMA = "live_source_causal_trace/v1" as const;
 export const LIVE_SOURCE_TURN_PHASE_RESOLUTION_SCHEMA = "live_source_turn_phase_resolution/v1" as const;
@@ -502,6 +504,61 @@ export type StagePlayMicroReasonerPromptDelegationResultV1 = {
     wakePromptContract?: StagePlayMicroReasonerWakePromptContractV1 | null;
     appendedPrompt?: string | null;
   } | null;
+  evidenceRefs: string[];
+  createdAt: string;
+  assistant_answer: false;
+  terminal_eligible: false;
+  raw_content_included: false;
+  context_role: "micro_reasoner_evidence";
+  ask_context_policy: "evidence_only";
+};
+
+export type StagePlayMicroReasonerPromptPresetDraftV1 = {
+  artifactId: "stage_play_micro_reasoner_prompt_preset_draft";
+  schema: typeof STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_DRAFT_SCHEMA;
+  schemaVersion: typeof STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_DRAFT_SCHEMA;
+  draftId: string;
+  scenarioText: string;
+  recommendedBasePresetId: string;
+  recommendedBasePresetTitle: string;
+  confidence: number;
+  confidenceLabel: "low" | "medium" | "high";
+  reason: string;
+  alternatives: Array<{
+    presetId: string;
+    title: string;
+    score: number;
+    reason: string;
+  }>;
+  draft: {
+    title: string;
+    description: string;
+    basePresetId: string;
+    sourceKinds: StagePlayLiveSourceMailItemV1["sourceKind"][];
+    candidatePrompts: StagePlayMicroReasonerPromptDelegationCandidateV1[];
+    confidenceThreshold: number;
+    escalationMode: StagePlayMicroReasonerPromptDelegationRouterV1["escalationMode"];
+    allowNone: boolean;
+    wakePromptContract?: StagePlayMicroReasonerWakePromptContractV1 | null;
+  };
+  missingInformation: string[];
+  confirmationRequired: true;
+  createToolCall: {
+    toolName: "live_env.create_micro_reasoner_preset";
+    args: {
+      base_preset_id: string;
+      title: string;
+      description: string;
+      source_ids: string[];
+      candidate_prompts: StagePlayMicroReasonerPromptDelegationCandidateV1[];
+      confidence_threshold: number;
+      escalation_mode: StagePlayMicroReasonerPromptDelegationRouterV1["escalationMode"];
+      allow_none: boolean;
+      wake_prompt_contract?: StagePlayMicroReasonerWakePromptContractV1 | null;
+    };
+  };
+  applyAfterCreateSuggested: boolean;
+  sourceIds: string[];
   evidenceRefs: string[];
   createdAt: string;
   assistant_answer: false;
