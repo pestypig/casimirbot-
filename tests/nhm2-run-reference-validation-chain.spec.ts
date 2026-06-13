@@ -133,6 +133,9 @@ describe("NHM2 reference validation chain planner", () => {
 
     const targets = findCommand(plan, "nhm2:build-regional-source-tensor-targets");
     expect(scripts.indexOf("nhm2:publish-regional-source-closure-evidence")).toBeLessThan(
+      scripts.indexOf("nhm2:build-regional-full-tensor-residual"),
+    );
+    expect(scripts.indexOf("nhm2:build-regional-full-tensor-residual")).toBeLessThan(
       scripts.indexOf("nhm2:build-regional-source-tensor-targets"),
     );
     expect(
@@ -225,6 +228,10 @@ describe("NHM2 reference validation chain planner", () => {
     );
     expect(passPathHarness.args).toContain("--source-side-authority");
     expect(passPathHarness.args).toContain("--regional-source-closure-evidence");
+    expect(passPathHarness.args).toContain("--regional-full-tensor-residual");
+    expect(passPathHarness.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-regional-full-tensor-residual.json",
+    );
     expect(passPathHarness.args).toContain("--source-closure-pass-readiness");
     expect(passPathHarness.args).toContain("--qei-worldline-dossier");
     expect(passPathHarness.args).toContain("--observer-robust-energy-conditions");
@@ -516,6 +523,11 @@ describe("NHM2 reference validation chain planner", () => {
       plan,
       "nhm2:publish-regional-source-closure-evidence",
     );
+    const fullTensorResidual = findCommand(
+      plan,
+      "nhm2:build-regional-full-tensor-residual",
+    );
+    const covariant = findCommand(plan, "nhm2:build-covariant-conservation-diagnostic");
     const coupled = findCommand(plan, "nhm2:build-coupled-closure-pass-candidate");
     const harness = findCommand(plan, "nhm2:build-regional-tensor-pass-path-harness");
     const admission = findCommand(plan, "nhm2:build-full-solve-claim-admission");
@@ -536,10 +548,32 @@ describe("NHM2 reference validation chain planner", () => {
       "--out",
       atlasPath,
     ]);
-    for (const planned of [kernel, conservation, regionalEvidence, coupled, harness, admission]) {
+    expect(scripts.indexOf("nhm2:publish-tile-counterpart-conservation")).toBeLessThan(
+      scripts.indexOf("nhm2:build-covariant-conservation-diagnostic"),
+    );
+    expect(scripts.indexOf("nhm2:publish-regional-source-closure-evidence")).toBeLessThan(
+      scripts.indexOf("nhm2:build-regional-full-tensor-residual"),
+    );
+    for (const planned of [kernel, conservation, regionalEvidence, covariant, coupled, harness, admission]) {
       expect(planned.args).toContain("--regional-support-atlas");
       expect(planned.args).toContain(atlasPath);
     }
+    expect(fullTensorResidual.args).toContain("--regional-source-closure-evidence");
+    expect(fullTensorResidual.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-regional-source-closure-evidence.json",
+    );
+    expect(covariant.args).toContain("--reduced-order-conservation");
+    expect(covariant.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-tile-counterpart-conservation.json",
+    );
+    expect(harness.args).toContain("--regional-full-tensor-residual");
+    expect(harness.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-regional-full-tensor-residual.json",
+    );
+    expect(harness.args).toContain("--covariant-conservation-diagnostic");
+    expect(harness.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-covariant-conservation-diagnostic.json",
+    );
   });
 
   it("rejects transition-kernel generation without generated source input", () => {
