@@ -27,7 +27,7 @@ import type {
   Nhm2RegionalTensor,
 } from "../../shared/contracts/nhm2-regional-source-closure-evidence.v1";
 import {
-  fullTensorSourceHasFullAuthority,
+  fullTensorSourceRegionHasSamplingAuthority,
   isNhm2TileEffectiveFullTensorSourceArtifact,
   type Nhm2TileEffectiveFullTensorSourceArtifact,
 } from "../../shared/contracts/nhm2-tile-effective-full-tensor-source.v1";
@@ -110,10 +110,7 @@ const t00FromTensor = (tensor: Nhm2RegionalTensor): number | null =>
 const regionHasAuthority = (
   region: Nhm2TileEffectiveFullTensorSourceArtifact["regions"][number] | null | undefined,
 ): boolean =>
-  region != null &&
-  region.status === "pass" &&
-  region.provenance.notDerivedFromMetricRequiredTensor === true &&
-  fullTensorSourceHasFullAuthority(region.tensor, region.tensorAuthorityMode);
+  fullTensorSourceRegionHasSamplingAuthority(region);
 
 const sampledDensityForRegion = (
   regionId: Nhm2QeiWorldlineRegionId,

@@ -746,6 +746,12 @@ export const planReferenceValidationChain = (
               asOptionalString(args, "qei-renormalization-convention-ref") as string,
             ]
       ),
+      ...(args["qei-stationary-worldline-assumption"] === undefined
+        ? []
+        : [
+            "--stationary-worldline-assumption",
+            String(args["qei-stationary-worldline-assumption"]),
+          ]),
       ...auditOnly,
     ]));
   }

@@ -82,4 +82,37 @@ describe("NHM2 latest reference validation chain wrapper", () => {
     expect(commandArgs).toContain("--regional-source-full-tensor-template");
     expect(commandArgs).toContain("--metric-required-full-tensor-source");
   });
+
+  it("forwards QEI bound, tau, and applicability inputs to the full-solve chain", () => {
+    const commandArgs = buildReferenceValidationChainLatestCommandArgs(
+      {
+        "qei-bound-model-kind": "fewster_thompson_stationary",
+        "qei-bound-si": "0",
+        "qei-bound-provenance-ref": "fewster_thompson_2023_stationary_worldline_qei",
+        "qei-tau-seconds": "5e-11",
+        "qei-tau-source-ref": "declared:qei:tau",
+        "qei-duty-cycle": "0.12",
+        "qei-duty-cycle-source-ref": "nhm2_reference_run:duty_cycle",
+        "qei-modulation-seconds": "6.666666666666667e-11",
+        "qei-modulation-source-ref": "nhm2_reference_run:modulation_frequency_15GHz",
+        "qei-sampling-kind": "lorentzian",
+        "qei-sampling-normalized": true,
+        "qei-qft-state-ref": "declared:qft_state:stationary_reduced_order",
+        "qei-renormalization-convention-ref":
+          "declared:renormalization:normal_ordered_reduced_order",
+        "qei-stationary-worldline-assumption": true,
+      },
+      resolvedInputs(),
+    );
+
+    expect(commandArgs).toContain("--qei-bound-model-kind");
+    expect(commandArgs).toContain("fewster_thompson_stationary");
+    expect(commandArgs).toContain("--qei-bound-si");
+    expect(commandArgs).toContain("0");
+    expect(commandArgs).toContain("--qei-tau-seconds");
+    expect(commandArgs).toContain("5e-11");
+    expect(commandArgs).toContain("--qei-sampling-normalized");
+    expect(commandArgs).toContain("--qei-renormalization-convention-ref");
+    expect(commandArgs).toContain("--qei-stationary-worldline-assumption");
+  });
 });

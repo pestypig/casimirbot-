@@ -178,6 +178,9 @@ export const buildNhm2QeiBoundReceipt = (
     input.provenance.renormalizationConventionRef == null
       ? "qei_renormalization_ref_missing"
       : null,
+    input.applicability.stationaryWorldlineAssumption
+      ? null
+      : "stationary_worldline_assumption_missing",
     input.boundModelKind === "declared_reduced_order"
       ? "qei_bound_model_not_physical_qft_receipt"
       : null,

@@ -216,6 +216,27 @@ const source = (tensorFactory: (rho: number) => Nhm2RegionalTensor = fullTensor)
     literatureRefs: [],
   });
 
+const reviewedButAuthoritativeSource = () => {
+  const artifact = source();
+  return {
+    ...artifact,
+    overallState: "review" as const,
+    claimEffect: "diagnostic_only" as const,
+    regions: artifact.regions.map((region) => ({
+      ...region,
+      status: "review" as const,
+      blockers: ["qei_dossier_not_pass", "conservation_unknown"],
+    })),
+    reasonCodes: [
+      ...artifact.reasonCodes,
+      ...NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS.flatMap((regionId) => [
+        `${regionId}:qei_dossier_not_pass`,
+        `${regionId}:conservation_unknown`,
+      ]),
+    ],
+  };
+};
+
 describe("atlas-bound QEI and observer builders", () => {
   it("emits wall and transition QEI worldlines while blocking missing bound provenance", () => {
     const dir = mkdtempSync(join(tmpdir(), "nhm2-qei-"));
@@ -360,6 +381,25 @@ describe("atlas-bound QEI and observer builders", () => {
       receipt.worldlineSamples.find((sample) => sample.regionId === "hull_wall_transition")
         ?.blockers,
     ).toContain("transition_samples_must_not_use_adjacent_region_averages");
+  });
+
+  it("uses reviewed source tensors for QEI sampling when component authority is intact", () => {
+    const dir = mkdtempSync(join(tmpdir(), "nhm2-qei-sampling-"));
+    const atlasPath = writeJson(dir, "atlas.json", atlas());
+    const sourcePath = writeJson(dir, "source.json", reviewedButAuthoritativeSource());
+
+    const receipt = buildQeiWorldlineSamplingReceipt({
+      repoRoot: dir,
+      regionalSupportAtlasPath: atlasPath,
+      sourceFullTensorPath: sourcePath,
+      outPath: "sampling.json",
+      auditOnly: true,
+    });
+
+    const wall = receipt.worldlineSamples.find((sample) => sample.regionId === "wall");
+    expect(wall?.sampledRho.status).toBe("computed");
+    expect(wall?.sampledRho.valueSI).toBe(10);
+    expect(wall?.blockers).not.toContain("wall:source_full_tensor_authority_not_pass");
   });
 
   it("plans QEI wall and transition worldlines from atlas and transition kernel metadata", () => {

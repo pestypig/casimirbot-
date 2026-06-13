@@ -17,6 +17,7 @@ import {
   type Nhm2RegionalSupportFunctionAtlasV1,
 } from "../../shared/contracts/nhm2-regional-support-function-atlas.v1";
 import {
+  fullTensorSourceHasRequiredSamplingAuthority,
   isNhm2TileEffectiveFullTensorSourceArtifact,
   type Nhm2TileEffectiveFullTensorSourceArtifact,
 } from "../../shared/contracts/nhm2-tile-effective-full-tensor-source.v1";
@@ -242,7 +243,7 @@ export const buildQeiBoundReceipt = (args: {
     ...(atlas.eligibility.atlasEligibleForClosureHarness
       ? []
       : ["qei_atlas_not_eligible"]),
-    ...(source.overallState === "pass"
+    ...(fullTensorSourceHasRequiredSamplingAuthority(source)
       ? []
       : ["source_full_tensor_authority_not_pass"]),
   ];

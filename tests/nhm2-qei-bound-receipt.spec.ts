@@ -187,6 +187,27 @@ const source = () =>
     literatureRefs: [],
   });
 
+const reviewedButAuthoritativeSource = () => {
+  const artifact = source();
+  return {
+    ...artifact,
+    overallState: "review" as const,
+    claimEffect: "diagnostic_only" as const,
+    regions: artifact.regions.map((region) => ({
+      ...region,
+      status: "review" as const,
+      blockers: ["qei_dossier_not_pass", "conservation_unknown"],
+    })),
+    reasonCodes: [
+      ...artifact.reasonCodes,
+      ...NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS.flatMap((regionId) => [
+        `${regionId}:qei_dossier_not_pass`,
+        `${regionId}:conservation_unknown`,
+      ]),
+    ],
+  };
+};
+
 describe("nhm2_qei_bound_receipt/v1", () => {
   it("records explicit blockers when bound and tau evidence are missing", () => {
     const dir = mkdtempSync(join(tmpdir(), "nhm2-qei-bound-"));
@@ -211,6 +232,24 @@ describe("nhm2_qei_bound_receipt/v1", () => {
     expect(receipt.blockers).toContain("qei_qft_state_ref_missing");
     expect(receipt.blockers).toContain("qei_renormalization_ref_missing");
     expect(isNhm2QeiBoundReceipt(receipt)).toBe(true);
+  });
+
+  it("does not mask missing bound evidence behind reviewed source authority", () => {
+    const dir = mkdtempSync(join(tmpdir(), "nhm2-qei-bound-"));
+    const atlasPath = writeJson(dir, "atlas.json", atlas());
+    const sourcePath = writeJson(dir, "source.json", reviewedButAuthoritativeSource());
+
+    const receipt = buildQeiBoundReceipt({
+      repoRoot: dir,
+      regionalSupportAtlasPath: atlasPath,
+      sourceFullTensorPath: sourcePath,
+      outPath: "receipt.json",
+      auditOnly: true,
+    });
+
+    expect(receipt.blockers).not.toContain("source_full_tensor_authority_not_pass");
+    expect(receipt.blockers).toContain("qei_bound_missing");
+    expect(receipt.blockers).toContain("sampling_tau_missing");
   });
 
   it("keeps numeric tau and bound evidence in review without provenance refs", () => {

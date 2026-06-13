@@ -808,6 +808,7 @@ describe("NHM2 reference validation chain planner", () => {
       "qei-sampling-normalized": "true",
       "qei-qft-state-ref": "qft-state.json",
       "qei-renormalization-convention-ref": "renormalization.json",
+      "qei-stationary-worldline-assumption": true,
       "qei-explicit-worldline-samples":
         "artifacts/reference/qei-explicit-worldline-samples.json",
     });
@@ -843,6 +844,8 @@ describe("NHM2 reference validation chain planner", () => {
       "qft-state.json",
       "--renormalization-convention-ref",
       "renormalization.json",
+      "--stationary-worldline-assumption",
+      "true",
     ]));
     expect(qeiSampling.args).toEqual(expect.arrayContaining([
       "--explicit-worldline-samples",

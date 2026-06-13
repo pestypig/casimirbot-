@@ -191,6 +191,33 @@ export const fullTensorSourceHasFullAuthority = (
   return false;
 };
 
+export const fullTensorSourceRegionHasSamplingAuthority = (
+  region: Nhm2TileEffectiveFullTensorSourceArtifact["regions"][number] | null | undefined,
+): boolean =>
+  region != null &&
+  region.status !== "missing" &&
+  region.status !== "fail" &&
+  region.provenance.derivationMode !== "metric_echo" &&
+  region.provenance.derivationMode !== "unknown" &&
+  region.provenance.notDerivedFromMetricRequiredTensor === true &&
+  fullTensorSourceHasFullAuthority(region.tensor, region.tensorAuthorityMode) &&
+  region.regionMaskRef != null &&
+  region.aggregationMode !== "unknown" &&
+  region.normalizationBasis !== "unknown" &&
+  region.sampleCount != null;
+
+export const fullTensorSourceHasRequiredSamplingAuthority = (
+  source: Nhm2TileEffectiveFullTensorSourceArtifact,
+): boolean => {
+  if (!source.sourceModel.sourceSideOnly) return false;
+  if (!source.sourceModel.notDerivedFromMetricRequiredTensor) return false;
+  if (source.sourceModel.metricRequiredInputRefs.length > 0) return false;
+  const regions = new Map(source.regions.map((region) => [region.regionId, region]));
+  return NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS.every((regionId) =>
+    fullTensorSourceRegionHasSamplingAuthority(regions.get(regionId)),
+  );
+};
+
 export const deriveFullTensorSourceRegionBlockers = (
   region: Nhm2TileEffectiveFullTensorSourceArtifact["regions"][number],
 ): string[] => {

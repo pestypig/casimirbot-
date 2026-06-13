@@ -648,6 +648,66 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(second.body?.resolved_turn_summary?.resolved_route_label).toBe("pending_task_frame / request_user_input");
   }, 60000);
 
+  it("persists streamed pending triangle frames so follow-up slot fills cannot route as simple chat", async () => {
+    const app = createApp();
+    const sessionId = `e52-calculator-triangle-stream-carryover-${Date.now()}`;
+    const firstResponse = await request(app)
+      .post("/api/agi/ask/turn/stream")
+      .set("Accept", "text/event-stream")
+      .send({
+        question:
+          "If the longest side of a triangle is 9 inches and 1/8 inches, what are the other two sides of the triangle? How long is that? And make an equation for that and solve it with the calculator",
+        mode: "read",
+        debug: true,
+        sessionId,
+      })
+      .expect(200);
+    const first = readStreamFinal(firstResponse.text);
+
+    expect(first?.pending_server_request?.unresolved_task_frame).toMatchObject({
+      kind: "math_geometry_triangle",
+      status: "missing_slots",
+      known_slots: {
+        longest_side: {
+          expression: "73/8",
+          unit: "in",
+        },
+      },
+    });
+
+    const secondResponse = await request(app)
+      .post("/api/agi/ask/turn/stream")
+      .set("Accept", "text/event-stream")
+      .send({
+        question: "The other two sides are equal in length.",
+        mode: "read",
+        debug: true,
+        sessionId,
+      })
+      .expect(200);
+    const second = readStreamFinal(secondResponse.text);
+
+    expect(second?.route_reason_code).toBe("pending_task_frame / request_user_input");
+    expect(second?.final_answer_source).toBe("pending_server_request");
+    expect(second?.conversation_memory_selector?.allowed_use).toBe("pending_request_resolution");
+    expect(second?.pending_task_frame_resolution).toMatchObject({
+      matched: true,
+      action: "request_user_input",
+      updated_frame: {
+        kind: "math_geometry_triangle",
+        known_slots: {
+          equal_other_sides: true,
+          longest_side: {
+            expression: "73/8",
+            unit: "in",
+          },
+        },
+      },
+    });
+    expect(String(second?.selected_final_answer ?? "")).toContain("equal-side constraint");
+    expect(String(second?.selected_final_answer ?? "")).not.toMatch(/classified as an isosceles triangle/i);
+  }, 60000);
+
   it("does not let keyed planning solve exact-triangle prompts with only a longest side", async () => {
     const previousFlag = process.env.HELIX_AGENT_STEP_DECISION_LLM;
     const previousPlannerResponse = process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;
