@@ -561,6 +561,26 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(response.body?.terminal_error_code).not.toBe("terminal_consistency_violation");
   }, 60000);
 
+  it("keeps explicit current debug export requests on the debug evidence lane", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Inspect the current Helix Ask console debug export for this turn and tell me what it says.",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-current-debug-export-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("debug_diagnosis");
+    expect(response.body?.canonical_goal_frame?.required_terminal_kind).toBe("debug_evidence_diagnosis");
+    expect(response.body?.debug_evidence_requirement_source).toBe("explicit_current_runtime_debug");
+    expect(response.body?.debug_evidence_requirement_suppressed).toBe(false);
+    expect(response.body?.terminal_artifact_kind).toBe("typed_failure");
+    expect(response.body?.terminal_error_code).toBe("debug_evidence_missing");
+  }, 60000);
+
   it("exposes every workstation panel tool in the model-visible capability manifest", async () => {
     const app = createApp();
     const response = await request(app)
@@ -1633,6 +1653,122 @@ describe("helix ask E52 panel control terminal contract", () => {
       expect(["model_driven_parity", "model_driven_docs_continuation"]).toContain(
         payload?.model_turn_fidelity_audit?.parity_status,
       );
+    } finally {
+      if (previousFlag === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;
+      else process.env.HELIX_AGENT_STEP_DECISION_LLM = previousFlag;
+      if (previousResponse === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = previousResponse;
+      if (previousResponseIndex === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = previousResponseIndex;
+    }
+  }, 60000);
+
+  it("treats debug export evidence as a docs topic after doc_summary terminal readiness", async () => {
+    const app = createApp();
+    const previousFlag = process.env.HELIX_AGENT_STEP_DECISION_LLM;
+    const previousResponse = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+    const previousResponseIndex = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+    process.env.HELIX_AGENT_STEP_DECISION_LLM = "1";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
+      {
+        next_step: "next_action",
+        chosen_capability: "docs-viewer.search_docs",
+        reason: "Search docs for the best matching Helix Ask console debug document.",
+        args: { query: "Helix Ask console debug export evidence" },
+        expected_artifacts: ["doc_search_results"],
+        confidence: 0.95,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "docs-viewer.validate_doc_candidates",
+        reason: "Validate the best matching document candidate.",
+        args: {
+          query: "Helix Ask console debug export evidence",
+          selected_path: "/docs/audits/research/helix-ask-codex-parity-model-turn-fidelity-audit-2026-06-12.md",
+        },
+        expected_artifacts: ["doc_candidate_validation", "active_doc_path"],
+        confidence: 0.95,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "docs-viewer.open_doc_by_path",
+        reason: "Open the validated document before summarizing.",
+        args: {
+          path: "/docs/audits/research/helix-ask-codex-parity-model-turn-fidelity-audit-2026-06-12.md",
+        },
+        expected_artifacts: ["doc_open_receipt", "active_doc_path"],
+        confidence: 0.96,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "docs-viewer.summarize_doc",
+        reason: "Summarize what the document says about debug export evidence.",
+        args: {
+          path: "/docs/audits/research/helix-ask-codex-parity-model-turn-fidelity-audit-2026-06-12.md",
+          query: "debug export evidence",
+        },
+        expected_artifacts: ["doc_summary"],
+        confidence: 0.97,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "docs-viewer.search_docs",
+        reason: "This repeated post-summary search should not run once doc_summary is terminal-ready.",
+        args: { query: "debug evidence" },
+        expected_artifacts: ["doc_search_results"],
+        confidence: 0.2,
+      },
+    ]);
+
+    try {
+      const response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question:
+            "Search docs for Helix Ask console debug, open the best matching document, and summarize what it says about debug export evidence. Tell me the document path you used.",
+          mode: "read",
+          debug: true,
+          sessionId: `e52-doc-summary-debug-topic-${Date.now()}`,
+        })
+        .expect(200);
+
+      expect(response.body?.terminal_error_code ?? null).toBeNull();
+      expect(response.body?.terminal_artifact_kind).toBe("doc_summary");
+      expect(response.body?.final_answer_source).not.toBe("typed_failure");
+      expect(response.body?.debug_evidence_requirement_source).toBe("docs_topic_phrase");
+      expect(response.body?.debug_evidence_requirement_suppressed).toBe(true);
+      expect(response.body?.debug_evidence_requirement_suppression_reason).toBe(
+        "debug_evidence_phrase_is_docs_topic_after_doc_summary_terminal_ready",
+      );
+      expect(response.body?.docs_continuation_contract).toMatchObject({
+        current_docs_phase: "terminal_ready",
+      });
+      expect(response.body?.goal_satisfaction_evaluation?.satisfaction).toBe("satisfied");
+      const runtimeCapabilities = response.body?.agent_runtime_loop?.iterations
+        ?.map((iteration: any) => iteration.chosen_capability)
+        ?.filter((capability: string | null) => capability?.startsWith("docs-viewer.")) ?? [];
+      expect(runtimeCapabilities).toEqual([
+        "docs-viewer.search_docs",
+        "docs-viewer.validate_doc_candidates",
+        "docs-viewer.open_doc_by_path",
+        "docs-viewer.summarize_doc",
+      ]);
+      expect(String(response.body?.selected_final_answer ?? "")).toContain(
+        "/docs/audits/research/helix-ask-codex-parity-model-turn-fidelity-audit-2026-06-12.md",
+      );
+
+      const debugExportRef = response.body?.debug_export_ref?.endpoint;
+      expect(debugExportRef).toBeTruthy();
+      const debugExport = await request(app).get(debugExportRef).expect(200);
+      const payload = debugExport.body?.payload;
+      expect(payload?.debug_evidence_requirement_source).toBe("docs_topic_phrase");
+      expect(payload?.debug_evidence_requirement_suppressed).toBe(true);
+      expect(payload?.debug_evidence_requirement_policy).toMatchObject({
+        schema: "helix.debug_evidence_requirement_policy.v1",
+        requirement_source: "docs_topic_phrase",
+        suppressed: true,
+      });
     } finally {
       if (previousFlag === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;
       else process.env.HELIX_AGENT_STEP_DECISION_LLM = previousFlag;

@@ -15,6 +15,10 @@ import {
   type Nhm2RegionalSourceTransitionKernelV1,
 } from "../../shared/contracts/nhm2-regional-source-transition-kernel.v1";
 import {
+  getNhm2RegionalSupportFunctionAtlasHash,
+  isNhm2RegionalSupportFunctionAtlas,
+} from "../../shared/contracts/nhm2-regional-support-function-atlas.v1";
+import {
   isNhm2TileEffectiveFullTensorSourceArtifact,
   type Nhm2TileEffectiveFullTensorSourceArtifact,
 } from "../../shared/contracts/nhm2-tile-effective-full-tensor-source.v1";
@@ -124,6 +128,7 @@ export const buildRegionalSourceTransitionKernel = (args: {
   repoRoot: string;
   tileFullTensorSourcePath: string;
   outPath: string;
+  regionalSupportAtlasPath?: string | null;
   toleranceLInf?: number | null;
   maxSmoothingWeight?: number | null;
   safetyMargin?: number | null;
@@ -136,6 +141,13 @@ export const buildRegionalSourceTransitionKernel = (args: {
   const source = readJson(resolvePath(args.repoRoot, args.tileFullTensorSourcePath));
   if (!isNhm2TileEffectiveFullTensorSourceArtifact(source)) {
     throw new Error("tile source must be nhm2_tile_effective_full_tensor_source/v1");
+  }
+  const atlas =
+    args.regionalSupportAtlasPath == null
+      ? null
+      : readJson(resolvePath(args.repoRoot, args.regionalSupportAtlasPath));
+  if (atlas != null && !isNhm2RegionalSupportFunctionAtlas(atlas)) {
+    throw new Error("regional support atlas must be nhm2_regional_support_function_atlas/v1");
   }
 
   const regions = new Map(source.regions.map((region) => [region.regionId, region]));
@@ -211,6 +223,12 @@ export const buildRegionalSourceTransitionKernel = (args: {
     chartId: "comoving_cartesian",
     unitsRef: "dimensionless_normalized_tensor_jump",
     sourceTensorRef: args.tileFullTensorSourcePath,
+    ...(args.regionalSupportAtlasPath == null
+      ? {}
+      : {
+          atlasRef: args.regionalSupportAtlasPath,
+          atlasHash: getNhm2RegionalSupportFunctionAtlasHash(atlas),
+        }),
     targetToleranceLInf: toleranceLInf,
     maxAllowedSmoothingWeight: maxSmoothingWeight,
     interfaces,
@@ -235,6 +253,7 @@ const main = (): void => {
     repoRoot: process.cwd(),
     tileFullTensorSourcePath,
     outPath,
+    regionalSupportAtlasPath: asString(argv["regional-support-atlas"]),
     toleranceLInf: asNumber(argv.tolerance),
     maxSmoothingWeight: asNumber(argv["max-smoothing"]),
     safetyMargin: asNumber(argv["safety-margin"]),

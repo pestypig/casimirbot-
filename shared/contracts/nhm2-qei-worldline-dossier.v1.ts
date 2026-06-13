@@ -84,6 +84,8 @@ export type Nhm2QeiWorldlineDossierV1 = {
   generatedAt: string;
   laneId: string;
   selectedProfileId: string;
+  atlasRef?: string | null;
+  atlasHash?: string | null;
   worldlines: Nhm2QeiWorldlineDossierWorldlineV1[];
   summary: {
     hasWallWorldline: boolean;
@@ -110,6 +112,8 @@ export type BuildNhm2QeiWorldlineDossierInput = {
   generatedAt?: string | null;
   laneId?: string | null;
   selectedProfileId?: string | null;
+  atlasRef?: string | null;
+  atlasHash?: string | null;
   worldlines?: PartialWorldlineInput[] | null;
 };
 
@@ -317,6 +321,8 @@ export const buildNhm2QeiWorldlineDossier = (
     generatedAt: asText(input.generatedAt) ?? new Date(0).toISOString(),
     laneId: asText(input.laneId) ?? "nhm2_shift_lapse",
     selectedProfileId: asText(input.selectedProfileId) ?? "runtime",
+    ...(asText(input.atlasRef) == null ? {} : { atlasRef: asText(input.atlasRef) }),
+    ...(asText(input.atlasHash) == null ? {} : { atlasHash: asText(input.atlasHash) }),
     worldlines,
     summary: summarizeWorldlines(worldlines),
     literatureRefs: ["ford_roman_1996_quantum_inequality"],
@@ -456,6 +462,8 @@ export const isNhm2QeiWorldlineDossier = (
     asText(record.generatedAt) != null &&
     asText(record.laneId) != null &&
     asText(record.selectedProfileId) != null &&
+    (record.atlasRef === undefined || record.atlasRef === null || asText(record.atlasRef) != null) &&
+    (record.atlasHash === undefined || record.atlasHash === null || asText(record.atlasHash) != null) &&
     Array.isArray(record.worldlines) &&
     record.worldlines.every((entry) => {
       const worldline = asRecord(entry);

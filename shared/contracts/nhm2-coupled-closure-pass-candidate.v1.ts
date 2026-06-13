@@ -2,6 +2,11 @@ import type { CasimirMaterialReceiptV1 } from "./casimir-material-receipt.v1";
 import type { Nhm2ObserverRobustEnergyConditionArtifactV1 } from "./nhm2-observer-robust-energy-conditions.v1";
 import type { Nhm2QeiWorldlineDossierV1 } from "./nhm2-qei-worldline-dossier.v1";
 import type { Nhm2RegionalSourceClosureEvidenceArtifact } from "./nhm2-regional-source-closure-evidence.v1";
+import {
+  getNhm2AtlasConsumerHash,
+  getNhm2RegionalSupportFunctionAtlasHash,
+  type Nhm2RegionalSupportFunctionAtlasV1,
+} from "./nhm2-regional-support-function-atlas.v1";
 import type { Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 } from "./nhm2-source-side-same-basis-tensor-authority.v1";
 import type { Nhm2TileCounterpartConservationArtifact } from "./nhm2-tile-counterpart-conservation.v1";
 
@@ -9,6 +14,7 @@ export const NHM2_COUPLED_CLOSURE_PASS_CANDIDATE_CONTRACT_VERSION =
   "nhm2_coupled_closure_pass_candidate/v1";
 
 export const NHM2_COUPLED_CLOSURE_GATE_IDS = [
+  "regional_support_function_atlas",
   "regional_source_tensor_authority",
   "source_closure_readiness",
   "regional_residuals",
@@ -41,6 +47,7 @@ export type Nhm2CoupledClosureGateV1 = {
 };
 
 export type Nhm2CoupledClosurePassCandidateArtifactRefsV1 = {
+  regionalSupportFunctionAtlas: string | null;
   regionalMaterialSourceTensorModel: string | null;
   tileLocalSourceElements: string | null;
   tileEffectiveCounterpart: string | null;
@@ -59,6 +66,8 @@ export type Nhm2CoupledClosurePassCandidateArtifactV1 = {
   laneId: string;
   selectedProfileId: string;
   runId: string;
+  atlasRef?: string | null;
+  atlasHash?: string | null;
   artifactRefs: Nhm2CoupledClosurePassCandidateArtifactRefsV1;
   gates: Nhm2CoupledClosureGateV1[];
   summary: {
@@ -72,6 +81,7 @@ export type Nhm2CoupledClosurePassCandidateArtifactV1 = {
     qeiDossierPass: boolean;
     observerRobustPass: boolean;
     materialReceipted: boolean;
+    atlasConsumerCongruencePass: boolean;
     firstBlocker: string;
     blockerCount: number;
   };
@@ -105,6 +115,7 @@ export type BuildNhm2CoupledClosurePassCandidateInput = {
   selectedProfileId?: string | null;
   runId?: string | null;
   artifactRefs?: Partial<Nhm2CoupledClosurePassCandidateArtifactRefsV1> | null;
+  regionalSupportFunctionAtlas?: Nhm2RegionalSupportFunctionAtlasV1 | null;
   sourceAuthority?: Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 | null;
   sourceClosurePassReadiness?: Nhm2SourceClosurePassReadinessLikeV1 | null;
   regionalEvidence?: Nhm2RegionalSourceClosureEvidenceArtifact | null;
@@ -143,6 +154,47 @@ const gate = (input: {
   warnings: uniqueText(input.warnings ?? []),
   primaryMetric: asText(input.primaryMetric),
 });
+
+const atlasGate = (
+  atlas: Nhm2RegionalSupportFunctionAtlasV1 | null | undefined,
+  input: BuildNhm2CoupledClosurePassCandidateInput,
+): Nhm2CoupledClosureGateV1 => {
+  if (atlas == null) {
+    return gate({
+      gateId: "regional_support_function_atlas",
+      status: "missing",
+      blockers: ["regional_support_function_atlas_missing"],
+    });
+  }
+  const atlasHash = getNhm2RegionalSupportFunctionAtlasHash(atlas);
+  const consumers: Array<[string, unknown]> = [
+    ["regional_source_closure_evidence", input.regionalEvidence],
+    ["tile_counterpart_conservation", input.conservation],
+    ["qei_worldline_dossier", input.qeiWorldlineDossier],
+    ["observer_robust_energy_conditions", input.observerRobustEnergyConditions],
+  ];
+  const blockers = uniqueText([
+    atlas.eligibility.atlasEligibleForClosureHarness
+      ? null
+      : "regional_support_function_atlas_not_eligible",
+    ...consumers.flatMap(([label, artifact]) => {
+      if (artifact == null) return [];
+      const consumerHash = getNhm2AtlasConsumerHash(artifact);
+      if (consumerHash == null) return [`${label}:atlas_hash_missing`];
+      return consumerHash === atlasHash ? [] : [`${label}:atlas_hash_mismatch`];
+    }),
+  ]);
+  return gate({
+    gateId: "regional_support_function_atlas",
+    status: blockers.length === 0 ? "pass" : "review",
+    blockers,
+    warnings:
+      atlas.derivativeSupport.covariantDerivativeSupportAvailable
+        ? []
+        : ["atlas_covariant_derivative_support_not_available"],
+    primaryMetric: `atlasHash=${atlasHash ?? "missing"}`,
+  });
+};
 
 const sourceAuthorityGate = (
   artifact: Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 | null | undefined,
@@ -374,6 +426,7 @@ const materialReceiptGate = (
 const defaultRefs = (
   refs: Partial<Nhm2CoupledClosurePassCandidateArtifactRefsV1> | null | undefined,
 ): Nhm2CoupledClosurePassCandidateArtifactRefsV1 => ({
+  regionalSupportFunctionAtlas: refs?.regionalSupportFunctionAtlas ?? null,
   regionalMaterialSourceTensorModel: refs?.regionalMaterialSourceTensorModel ?? null,
   tileLocalSourceElements: refs?.tileLocalSourceElements ?? null,
   tileEffectiveCounterpart: refs?.tileEffectiveCounterpart ?? null,
@@ -409,6 +462,7 @@ export const buildNhm2CoupledClosurePassCandidate = (
   input: BuildNhm2CoupledClosurePassCandidateInput,
 ): Nhm2CoupledClosurePassCandidateArtifactV1 => {
   const gates = [
+    atlasGate(input.regionalSupportFunctionAtlas, input),
     sourceAuthorityGate(input.sourceAuthority),
     sourceClosureGate(input.sourceClosurePassReadiness),
     regionalResidualsGate(input.regionalEvidence),
@@ -431,6 +485,14 @@ export const buildNhm2CoupledClosurePassCandidate = (
     selectedProfileId:
       asText(input.selectedProfileId) ?? firstIdentity(input, "selectedProfileId") ?? "unknown",
     runId: asText(input.runId) ?? firstIdentity(input, "runId") ?? "unknown",
+    ...(input.regionalSupportFunctionAtlas == null
+      ? {}
+      : {
+          atlasRef: input.artifactRefs?.regionalSupportFunctionAtlas ?? null,
+          atlasHash: getNhm2RegionalSupportFunctionAtlasHash(
+            input.regionalSupportFunctionAtlas,
+          ),
+        }),
     artifactRefs: defaultRefs(input.artifactRefs),
     gates,
     summary: {
@@ -457,6 +519,9 @@ export const buildNhm2CoupledClosurePassCandidate = (
         observer.eulerianOnly === false &&
         observer.anyViolation === false,
       materialReceipted: input.casimirMaterialReceipt?.status === "material_receipted",
+      atlasConsumerCongruencePass:
+        gates.find((entry) => entry.gateId === "regional_support_function_atlas")
+          ?.pass === true,
       firstBlocker: firstNonPass?.blockers[0] ?? firstNonPass?.gateId ?? "none",
       blockerCount,
     },
@@ -513,7 +578,10 @@ export const isNhm2CoupledClosurePassCandidateArtifact = (
     asText(record.laneId) == null ||
     asText(record.selectedProfileId) == null ||
     asText(record.runId) == null ||
+    !(record.atlasRef === undefined || isNullableText(record.atlasRef)) ||
+    !(record.atlasHash === undefined || isNullableText(record.atlasHash)) ||
     refs == null ||
+    !isNullableText(refs.regionalSupportFunctionAtlas) ||
     !isNullableText(refs.regionalMaterialSourceTensorModel) ||
     !isNullableText(refs.tileLocalSourceElements) ||
     !isNullableText(refs.tileEffectiveCounterpart) ||
@@ -537,6 +605,7 @@ export const isNhm2CoupledClosurePassCandidateArtifact = (
     typeof summary.qeiDossierPass !== "boolean" ||
     typeof summary.observerRobustPass !== "boolean" ||
     typeof summary.materialReceipted !== "boolean" ||
+    typeof summary.atlasConsumerCongruencePass !== "boolean" ||
     asText(summary.firstBlocker) == null ||
     typeof summary.blockerCount !== "number" ||
     !Number.isFinite(summary.blockerCount) ||

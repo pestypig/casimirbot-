@@ -29,6 +29,7 @@ export type Nhm2ReferenceRunValidationAdmissionLike = {
 };
 
 export type Nhm2FullSolveClaimAdmissionArtifactRefsV1 = {
+  regionalSupportFunctionAtlas: string | null;
   coupledClosurePassCandidate: string | null;
   blockerLedger: string | null;
   fullLoopAudit: string | null;
@@ -160,6 +161,7 @@ const ledgerCertificateGreen = (
 const defaultArtifactRefs = (
   refs: Partial<Nhm2FullSolveClaimAdmissionArtifactRefsV1> | null | undefined,
 ): Nhm2FullSolveClaimAdmissionArtifactRefsV1 => ({
+  regionalSupportFunctionAtlas: refs?.regionalSupportFunctionAtlas ?? null,
   coupledClosurePassCandidate: refs?.coupledClosurePassCandidate ?? null,
   blockerLedger: refs?.blockerLedger ?? null,
   fullLoopAudit: refs?.fullLoopAudit ?? null,
@@ -268,9 +270,13 @@ const isArtifactRefs = (
   const record = asRecord(value);
   return (
     record != null &&
-    ["coupledClosurePassCandidate", "blockerLedger", "fullLoopAudit", "referenceRunValidation"].every(
-      (key) => record[key] === null || typeof record[key] === "string",
-    )
+    [
+      "regionalSupportFunctionAtlas",
+      "coupledClosurePassCandidate",
+      "blockerLedger",
+      "fullLoopAudit",
+      "referenceRunValidation",
+    ].every((key) => record[key] === null || typeof record[key] === "string")
   );
 };
 

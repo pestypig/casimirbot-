@@ -86,6 +86,9 @@ export const planReferenceValidationChain = (
   const inputTransitionKernel = asOptionalString(args, "regional-source-transition-kernel");
   const buildRegionalSourceTransitionKernel =
     args["build-regional-source-transition-kernel"] === true;
+  const inputRegionalSupportAtlas = asOptionalString(args, "regional-support-atlas");
+  const buildRegionalSupportAtlas =
+    args["build-regional-support-function-atlas"] === true;
   const inputTileLocalSourceElements = asOptionalString(args, "tile-local-source-elements");
   const buildTileLocalSourceElements = args["build-tile-local-source-elements"] === true;
   const casimirMaterialReceipt = asOptionalString(args, "casimir-material-receipt");
@@ -154,6 +157,11 @@ export const planReferenceValidationChain = (
   const sourceTensor = `${outRoot}/nhm2-tile-effective-full-tensor-source.json`;
   const generatedConservation = `${outRoot}/nhm2-tile-counterpart-conservation.json`;
   const generatedTransitionKernel = `${outRoot}/nhm2-regional-source-transition-kernel.json`;
+  const generatedRegionalSupportAtlas =
+    `${outRoot}/nhm2-regional-support-function-atlas.json`;
+  const regionalSupportAtlas =
+    inputRegionalSupportAtlas ??
+    (buildRegionalSupportAtlas ? generatedRegionalSupportAtlas : null);
   const conservation = inputConservation ?? (sourceInput == null ? null : generatedConservation);
   const transitionKernel =
     inputTransitionKernel ??
@@ -245,6 +253,11 @@ export const planReferenceValidationChain = (
       "--regional-source-transition-kernel and --build-regional-source-transition-kernel are mutually exclusive",
     );
   }
+  if (inputRegionalSupportAtlas != null && buildRegionalSupportAtlas) {
+    throw new Error(
+      "--regional-support-atlas and --build-regional-support-function-atlas are mutually exclusive",
+    );
+  }
   if ((inputTransitionKernel != null || buildRegionalSourceTransitionKernel) && sourceInput == null) {
     throw new Error(
       "regional source transition kernels require --source-input so the frozen chain can regenerate tile full-tensor source and conservation artifacts",
@@ -309,10 +322,23 @@ export const planReferenceValidationChain = (
       sourceTensor,
       ...auditOnly,
     ]));
+    if (buildRegionalSupportAtlas) {
+      commands.push(command("nhm2:build-regional-support-function-atlas", [
+        "--reference-run",
+        referenceRun,
+        "--tile-full-tensor-source",
+        sourceTensor,
+        "--out",
+        generatedRegionalSupportAtlas,
+      ]));
+    }
     if (buildRegionalSourceTransitionKernel) {
       commands.push(command("nhm2:build-regional-source-transition-kernel", [
         "--tile-full-tensor-source",
         sourceTensor,
+        ...(regionalSupportAtlas == null
+          ? []
+          : ["--regional-support-atlas", regionalSupportAtlas]),
         "--out",
         generatedTransitionKernel,
         ...auditOnly,
@@ -324,6 +350,9 @@ export const planReferenceValidationChain = (
       "--tile-full-tensor-source",
       sourceTensor,
       ...(transitionKernel == null ? [] : ["--transition-kernel", transitionKernel]),
+      ...(regionalSupportAtlas == null
+        ? []
+        : ["--regional-support-atlas", regionalSupportAtlas]),
       "--out",
       generatedConservation,
       ...auditOnly,
@@ -333,6 +362,15 @@ export const planReferenceValidationChain = (
       sourceTensor,
       "--out",
       sourceIndependenceAudit,
+    ]));
+  }
+
+  if (sourceInput == null && buildRegionalSupportAtlas) {
+    commands.push(command("nhm2:build-regional-support-function-atlas", [
+      "--reference-run",
+      referenceRun,
+      "--out",
+      generatedRegionalSupportAtlas,
     ]));
   }
 
@@ -497,6 +535,9 @@ export const planReferenceValidationChain = (
     tileCounterpart,
     "--metric-required-regional-tensor-receipt",
     metricRequiredRegionalTensorReceipt,
+    ...(regionalSupportAtlas == null
+      ? []
+      : ["--regional-support-atlas", regionalSupportAtlas]),
     "--out",
     regionalEvidence,
     ...auditOnly,
@@ -544,6 +585,9 @@ export const planReferenceValidationChain = (
     sourceClosurePassReadinessReport,
   ]));
   commands.push(command("nhm2:build-coupled-closure-pass-candidate", [
+    ...(regionalSupportAtlas == null
+      ? []
+      : ["--regional-support-atlas", regionalSupportAtlas]),
     "--tile-effective-counterpart",
     tileCounterpart,
     ...(regionalMaterialSourceTensorModel == null
@@ -572,6 +616,9 @@ export const planReferenceValidationChain = (
     coupledClosurePassCandidate,
   ]));
   commands.push(command("nhm2:build-regional-tensor-pass-path-harness", [
+    ...(regionalSupportAtlas == null
+      ? []
+      : ["--regional-support-atlas", regionalSupportAtlas]),
     ...(regionalMaterialSourceTensorModel == null
       ? []
       : ["--regional-material-source-tensor-model", regionalMaterialSourceTensorModel]),
@@ -659,6 +706,9 @@ export const planReferenceValidationChain = (
     ...auditOnly,
   ]));
   commands.push(command("nhm2:build-full-solve-claim-admission", [
+    ...(regionalSupportAtlas == null
+      ? []
+      : ["--regional-support-atlas", regionalSupportAtlas]),
     "--coupled-closure-pass-candidate",
     coupledClosurePassCandidate,
     "--blocker-ledger",

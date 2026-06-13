@@ -501,6 +501,47 @@ describe("NHM2 reference validation chain planner", () => {
     );
   });
 
+  it("generates a regional support-function atlas and passes it to closure consumers", () => {
+    const plan = planReferenceValidationChain({
+      ...baseArgs(),
+      "source-input": "fixtures/nhm2/source-input.json",
+      "build-regional-support-function-atlas": true,
+      "build-regional-source-transition-kernel": true,
+    });
+    const scripts = plan.map((command) => command.script);
+    const atlas = findCommand(plan, "nhm2:build-regional-support-function-atlas");
+    const kernel = findCommand(plan, "nhm2:build-regional-source-transition-kernel");
+    const conservation = findCommand(plan, "nhm2:publish-tile-counterpart-conservation");
+    const regionalEvidence = findCommand(
+      plan,
+      "nhm2:publish-regional-source-closure-evidence",
+    );
+    const coupled = findCommand(plan, "nhm2:build-coupled-closure-pass-candidate");
+    const harness = findCommand(plan, "nhm2:build-regional-tensor-pass-path-harness");
+    const admission = findCommand(plan, "nhm2:build-full-solve-claim-admission");
+    const atlasPath =
+      "artifacts/research/full-solve/reference/run-1/nhm2-regional-support-function-atlas.json";
+
+    expect(scripts.indexOf("nhm2:publish-tile-effective-full-tensor-source")).toBeLessThan(
+      scripts.indexOf("nhm2:build-regional-support-function-atlas"),
+    );
+    expect(scripts.indexOf("nhm2:build-regional-support-function-atlas")).toBeLessThan(
+      scripts.indexOf("nhm2:build-regional-source-transition-kernel"),
+    );
+    expect(atlas.args).toEqual([
+      "--reference-run",
+      "artifacts/reference/nhm2-reference-run.json",
+      "--tile-full-tensor-source",
+      "artifacts/research/full-solve/reference/run-1/nhm2-tile-effective-full-tensor-source.json",
+      "--out",
+      atlasPath,
+    ]);
+    for (const planned of [kernel, conservation, regionalEvidence, coupled, harness, admission]) {
+      expect(planned.args).toContain("--regional-support-atlas");
+      expect(planned.args).toContain(atlasPath);
+    }
+  });
+
   it("rejects transition-kernel generation without generated source input", () => {
     expect(() =>
       planReferenceValidationChain({

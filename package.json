@@ -227,6 +227,7 @@
     "nhm2:build-regional-source-tensor-targets": "tsx tools/nhm2/build-regional-source-tensor-targets.ts",
     "nhm2:build-regional-source-tensor-candidate": "tsx tools/nhm2/build-regional-source-tensor-candidate.ts",
     "nhm2:build-regional-source-tensor-quality-control": "tsx tools/nhm2/build-regional-source-tensor-quality-control.ts",
+    "nhm2:build-regional-support-function-atlas": "tsx tools/nhm2/build-regional-support-function-atlas.ts",
     "nhm2:build-layered-wall-full-tensor-source-audit": "tsx tools/nhm2/build-layered-wall-full-tensor-source-audit.ts",
     "nhm2:build-layered-wall-source-tensor-candidate": "tsx tools/nhm2/build-layered-wall-source-tensor-candidate.ts",
     "nhm2:source-closure-pass-readiness": "tsx tools/nhm2/source-closure-pass-readiness.ts",

@@ -103,6 +103,7 @@ const readOptionalRecord = (
 export const runNhm2FullSolveClaimAdmission = (args: {
   repoRoot: string;
   outPath: string;
+  regionalSupportAtlasPath?: string | null;
   coupledClosurePassCandidatePath?: string | null;
   blockerLedgerPath?: string | null;
   fullLoopAuditPath?: string | null;
@@ -135,6 +136,7 @@ export const runNhm2FullSolveClaimAdmission = (args: {
 
   const artifact = buildNhm2FullSolveClaimAdmission({
     artifactRefs: {
+      regionalSupportFunctionAtlas: args.regionalSupportAtlasPath ?? null,
       coupledClosurePassCandidate: args.coupledClosurePassCandidatePath ?? null,
       blockerLedger: args.blockerLedgerPath ?? null,
       fullLoopAudit: args.fullLoopAuditPath ?? null,
@@ -163,6 +165,7 @@ if (normalize(process.argv[1] ?? "") === normalize(fileURLToPath(import.meta.url
   const artifact = runNhm2FullSolveClaimAdmission({
     repoRoot: process.cwd(),
     outPath,
+    regionalSupportAtlasPath: asString(args["regional-support-atlas"]),
     coupledClosurePassCandidatePath: asString(args["coupled-closure-pass-candidate"]),
     blockerLedgerPath: asString(args["blocker-ledger"]),
     fullLoopAuditPath: asString(args["full-loop-audit"]),

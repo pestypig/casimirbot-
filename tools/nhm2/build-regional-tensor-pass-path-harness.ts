@@ -28,6 +28,10 @@ import {
   type Nhm2RegionalMaterialSourceTensorModelV1,
 } from "../../shared/contracts/nhm2-regional-material-source-tensor-model.v1";
 import {
+  isNhm2RegionalSupportFunctionAtlas,
+  type Nhm2RegionalSupportFunctionAtlasV1,
+} from "../../shared/contracts/nhm2-regional-support-function-atlas.v1";
+import {
   isNhm2RegionalSourceClosureEvidenceArtifact,
   type Nhm2RegionalSourceClosureEvidenceArtifact,
 } from "../../shared/contracts/nhm2-regional-source-closure-evidence.v1";
@@ -91,6 +95,7 @@ const readOptional = <T>(
 export const runNhm2RegionalTensorPassPathHarness = (args: {
   repoRoot: string;
   outPath: string;
+  regionalSupportAtlasPath?: string | null;
   regionalMaterialSourceTensorModelPath?: string | null;
   sourceSideAuthorityPath?: string | null;
   regionalSourceClosureEvidencePath?: string | null;
@@ -101,6 +106,13 @@ export const runNhm2RegionalTensorPassPathHarness = (args: {
   casimirMaterialReceiptPath?: string | null;
   coupledClosurePassCandidatePath?: string | null;
 }): Nhm2RegionalTensorPassPathHarnessArtifactV1 => {
+  const regionalSupportFunctionAtlas =
+    readOptional<Nhm2RegionalSupportFunctionAtlasV1>(
+      args.repoRoot,
+      args.regionalSupportAtlasPath ?? null,
+      isNhm2RegionalSupportFunctionAtlas,
+      "regional support-function atlas",
+    );
   const regionalMaterialSourceTensorModel =
     readOptional<Nhm2RegionalMaterialSourceTensorModelV1>(
       args.repoRoot,
@@ -164,6 +176,7 @@ export const runNhm2RegionalTensorPassPathHarness = (args: {
 
   const artifact = buildNhm2RegionalTensorPassPathHarness({
     artifactRefs: {
+      regionalSupportFunctionAtlas: args.regionalSupportAtlasPath ?? null,
       regionalMaterialSourceTensorModel:
         args.regionalMaterialSourceTensorModelPath ?? null,
       sourceSideSameBasisTensorAuthority: args.sourceSideAuthorityPath ?? null,
@@ -176,6 +189,7 @@ export const runNhm2RegionalTensorPassPathHarness = (args: {
       casimirMaterialReceipt: args.casimirMaterialReceiptPath ?? null,
       coupledClosurePassCandidate: args.coupledClosurePassCandidatePath ?? null,
     },
+    regionalSupportFunctionAtlas,
     regionalMaterialSourceTensorModel,
     sourceSideSameBasisTensorAuthority,
     regionalSourceClosureEvidence,
@@ -206,6 +220,7 @@ if (normalize(process.argv[1] ?? "") === normalize(fileURLToPath(import.meta.url
   const artifact = runNhm2RegionalTensorPassPathHarness({
     repoRoot: process.cwd(),
     outPath,
+    regionalSupportAtlasPath: asString(args["regional-support-atlas"]),
     regionalMaterialSourceTensorModelPath: asString(
       args["regional-material-source-tensor-model"],
     ),

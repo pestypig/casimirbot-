@@ -22,6 +22,7 @@ const coupled = (passCandidate: boolean): Nhm2CoupledClosurePassCandidateArtifac
   selectedProfileId: "stage1_centerline_alpha_0p995_v1",
   runId: "claim-admission-test",
   artifactRefs: {
+    regionalSupportFunctionAtlas: null,
     regionalMaterialSourceTensorModel: null,
     tileLocalSourceElements: null,
     tileEffectiveCounterpart: null,
@@ -56,6 +57,7 @@ const coupled = (passCandidate: boolean): Nhm2CoupledClosurePassCandidateArtifac
     qeiDossierPass: passCandidate,
     observerRobustPass: passCandidate,
     materialReceipted: passCandidate,
+    atlasConsumerCongruencePass: passCandidate,
     firstBlocker: passCandidate ? "none" : "regional_residuals:wall_residual_exceeded",
     blockerCount: passCandidate ? 0 : 1,
   },

@@ -64,6 +64,8 @@ export type Nhm2ObserverRobustEnergyConditionArtifactV1 = {
   laneId: string;
   selectedProfileId: string;
   tensorRef: string;
+  atlasRef?: string | null;
+  atlasHash?: string | null;
   observerFamilies: Nhm2ObserverRobustEnergyConditionFamilyV1[];
   summary: {
     eulerianOnly: boolean;
@@ -100,6 +102,8 @@ export type BuildNhm2ObserverRobustEnergyConditionArtifactInput = {
   laneId?: string | null;
   selectedProfileId?: string | null;
   tensorRef?: string | null;
+  atlasRef?: string | null;
+  atlasHash?: string | null;
   observerFamilies?:
     | Nhm2ObserverRobustEnergyConditionFamilyInput[]
     | null;
@@ -355,6 +359,8 @@ export const buildNhm2ObserverRobustEnergyConditionArtifact = (
     laneId: asText(input.laneId) ?? "nhm2_shift_lapse",
     selectedProfileId: asText(input.selectedProfileId) ?? "unknown",
     tensorRef: asText(input.tensorRef) ?? "missing",
+    ...(asText(input.atlasRef) == null ? {} : { atlasRef: asText(input.atlasRef) }),
+    ...(asText(input.atlasHash) == null ? {} : { atlasHash: asText(input.atlasHash) }),
     observerFamilies,
     summary: summarizeFamilies(observerFamilies),
     literatureRefs: [
@@ -549,6 +555,8 @@ export const isNhm2ObserverRobustEnergyConditionArtifact = (
     asText(record.laneId) != null &&
     asText(record.selectedProfileId) != null &&
     asText(record.tensorRef) != null &&
+    (record.atlasRef === undefined || record.atlasRef === null || asText(record.atlasRef) != null) &&
+    (record.atlasHash === undefined || record.atlasHash === null || asText(record.atlasHash) != null) &&
     Array.isArray(record.observerFamilies) &&
     record.observerFamilies.every((entry) => isFamily(entry)) &&
     typeof summary.eulerianOnly === "boolean" &&

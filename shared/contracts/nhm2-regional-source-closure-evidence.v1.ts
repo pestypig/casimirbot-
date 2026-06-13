@@ -109,6 +109,8 @@ export type Nhm2RegionalSourceClosureEvidenceArtifact = {
   expectedProfileId: string;
   profileMatch: boolean;
   laneId: "nhm2_shift_lapse";
+  atlasRef?: string | null;
+  atlasHash?: string | null;
   overallState: "pass" | "review" | "fail";
   claimEffect:
     | "diagnostic_only"
@@ -457,6 +459,8 @@ export const isNhm2RegionalSourceClosureEvidenceArtifact = (
     record.profileMatch !== true ||
     record.selectedProfileId !== record.expectedProfileId ||
     record.laneId !== "nhm2_shift_lapse" ||
+    !(record.atlasRef === undefined || isNullableText(record.atlasRef)) ||
+    !(record.atlasHash === undefined || isNullableText(record.atlasHash)) ||
     (record.overallState !== "pass" &&
       record.overallState !== "review" &&
       record.overallState !== "fail") ||

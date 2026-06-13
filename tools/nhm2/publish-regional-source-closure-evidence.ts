@@ -25,6 +25,10 @@ import {
   type Nhm2TileEffectiveCounterpartArtifact,
   type Nhm2TileEffectiveCounterpartRegion,
 } from "../../shared/contracts/nhm2-tile-effective-counterpart.v1";
+import {
+  getNhm2RegionalSupportFunctionAtlasHash,
+  isNhm2RegionalSupportFunctionAtlas,
+} from "../../shared/contracts/nhm2-regional-support-function-atlas.v1";
 
 const SOURCE_CLOSURE_LITERATURE_REFS = [
   "natario_2001_zero_expansion",
@@ -589,6 +593,7 @@ export const publishRegionalSourceClosureEvidence = (args: {
   outPath: string;
   tileEffectiveCounterpartPath?: string | null;
   metricRequiredRegionalTensorReceiptPath?: string | null;
+  regionalSupportAtlasPath?: string | null;
   auditOnly?: boolean;
 }): Nhm2RegionalSourceClosureEvidenceArtifact => {
   if (
@@ -596,7 +601,8 @@ export const publishRegionalSourceClosureEvidence = (args: {
     (pathUsesLatestAlias(args.referenceRunPath) ||
       pathUsesLatestAlias(args.sourceClosurePath) ||
       pathUsesLatestAlias(args.tileEffectiveCounterpartPath ?? "") ||
-      pathUsesLatestAlias(args.metricRequiredRegionalTensorReceiptPath ?? ""))
+      pathUsesLatestAlias(args.metricRequiredRegionalTensorReceiptPath ?? "") ||
+      pathUsesLatestAlias(args.regionalSupportAtlasPath ?? ""))
   ) {
     throw new Error("latest aliases are forbidden unless --audit-only is passed");
   }
@@ -641,6 +647,13 @@ export const publishRegionalSourceClosureEvidence = (args: {
       "metric-required regional tensor receipt must be nhm2_metric_required_regional_tensor_receipt/v1",
     );
   }
+  const atlas =
+    args.regionalSupportAtlasPath == null
+      ? null
+      : readJson(resolvePath(args.repoRoot, args.regionalSupportAtlasPath));
+  if (atlas != null && !isNhm2RegionalSupportFunctionAtlas(atlas)) {
+    throw new Error("regional support atlas must be nhm2_regional_support_function_atlas/v1");
+  }
   const metricReceiptRegionMap = new Map<
     string,
     Nhm2MetricRequiredRegionalTensorReceiptRegionV1
@@ -682,6 +695,12 @@ export const publishRegionalSourceClosureEvidence = (args: {
     selectedProfileId: referenceRun.selectedFamily.selectedProfileId,
     expectedProfileId: referenceRun.selectedFamily.expectedProfileId,
     laneId: "nhm2_shift_lapse",
+    ...(args.regionalSupportAtlasPath == null
+      ? {}
+      : {
+          atlasRef: args.regionalSupportAtlasPath,
+          atlasHash: getNhm2RegionalSupportFunctionAtlasHash(atlas),
+        }),
     regions,
     literatureRefs: SOURCE_CLOSURE_LITERATURE_REFS,
   });
@@ -711,6 +730,7 @@ const main = (): void => {
     metricRequiredRegionalTensorReceiptPath: asString(
       args["metric-required-regional-tensor-receipt"],
     ),
+    regionalSupportAtlasPath: asString(args["regional-support-atlas"]),
     outPath,
     auditOnly: args["audit-only"] === true,
   });

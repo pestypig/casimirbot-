@@ -12,6 +12,7 @@ import {
   type Nhm2RegionalSourceClosureEvidenceRegion,
   type Nhm2RegionalSourceClosureRegionId,
 } from "../shared/contracts/nhm2-regional-source-closure-evidence.v1";
+import { buildNhm2RegionalSupportFunctionAtlas } from "../shared/contracts/nhm2-regional-support-function-atlas.v1";
 import { buildNhm2SourceSideSameBasisTensorAuthorityArtifact } from "../shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1";
 import {
   buildNhm2TileCounterpartConservationArtifact,
@@ -25,6 +26,113 @@ import { assessNhm2SourceClosurePassReadiness } from "../tools/nhm2/source-closu
 
 const profile = "stage1_centerline_alpha_0p995_v1";
 const regions = ["global", "hull", "wall", "exterior_shell"] as const;
+const atlasRef = "atlas.json";
+const atlasHash = "atlas-test-hash";
+
+const atlasRegion = (
+  regionId:
+    | "global"
+    | "hull"
+    | "wall"
+    | "exterior_shell"
+    | "hull_wall_transition"
+    | "wall_exterior_transition",
+) => ({
+  regionId,
+  semanticRole:
+    regionId === "global"
+      ? "global_region" as const
+      : regionId.includes("transition")
+        ? "transition_region" as const
+        : "closure_region" as const,
+  maskRef: `mask.${regionId}`,
+  supportFunctionRef: `support.${regionId}`,
+  sampleCount: 64,
+  supportStats: {
+    minWeight: 0,
+    maxWeight: 1,
+    meanWeight: regionId.includes("transition") ? 0.5 : 1,
+    nonzeroFraction: 1,
+  },
+  aggregationPolicy: {
+    weighting: "support_weighted" as const,
+    normalization: "sum_weights" as const,
+    includeTransitionSamples: !regionId.includes("transition"),
+  },
+});
+
+const atlas = () =>
+  buildNhm2RegionalSupportFunctionAtlas({
+    runIdentity: {
+      runId: "coupled-run",
+      profileId: profile,
+      chartId: "comoving_cartesian",
+      metricRef: "metric.json",
+      sourceModelRef: "tile.json",
+      gridRef: "grid.json",
+      samplePlanRef: "sample-plan.json",
+      createdAt: "2026-06-12T00:00:00.000Z",
+    },
+    basisAndUnits: {
+      tensorBasis: "chart",
+      coordinateSystem: "comoving_cartesian",
+      lengthUnit: "m",
+      energyDensityUnit: "J/m^3",
+      stressEnergyConvention: "T_mu_nu_same_chart",
+      signatureConvention: "(-,+,+,+)",
+    },
+    regions: {
+      global: atlasRegion("global"),
+      hull: atlasRegion("hull"),
+      wall: atlasRegion("wall"),
+      exterior_shell: atlasRegion("exterior_shell"),
+      hull_wall_transition: atlasRegion("hull_wall_transition"),
+      wall_exterior_transition: atlasRegion("wall_exterior_transition"),
+    },
+    transitionKernels: [
+      {
+        kernelId: "kernel:hull_wall",
+        fromRegion: "hull",
+        toRegion: "wall",
+        supportRegion: "hull_wall_transition",
+        kernelKind: "smootherstep_c2",
+        smoothnessClass: "C2",
+        widthMeters: 1,
+        derivativeTermsAvailable: false,
+      },
+      {
+        kernelId: "kernel:wall_exterior",
+        fromRegion: "wall",
+        toRegion: "exterior_shell",
+        supportRegion: "wall_exterior_transition",
+        kernelKind: "smootherstep_c2",
+        smoothnessClass: "C2",
+        widthMeters: 1,
+        derivativeTermsAvailable: false,
+      },
+    ],
+    partitionOfUnity: {
+      appliesTo: [...regions],
+      sumWeightsMean: 1,
+      sumWeightsMaxAbsError: 0,
+      negativeWeightMin: 0,
+      overlapPolicy: "partition_of_unity",
+      status: "pass",
+    },
+    derivativeSupport: {
+      partialMuWAvailable: false,
+      covariantDerivativeSupportAvailable: false,
+      derivativeBasis: "chart",
+      transitionDerivativeTermsRequired: true,
+    },
+    provenance: {
+      generatedFrom: ["reference.json"],
+      inputHashes: { "reference.json": "hash" },
+      atlasHash,
+      targetEchoForbidden: true,
+      targetDerivedFieldsUsed: false,
+    },
+  });
 
 const tensor = (value: number) => ({
   T00: -value,
@@ -178,6 +286,8 @@ const regionalEvidence = (relLInf = 0) =>
     selectedProfileId: profile,
     expectedProfileId: profile,
     laneId: "nhm2_shift_lapse",
+    atlasRef,
+    atlasHash,
     regions: regions.map((regionId) => regionalRegion(regionId, relLInf)),
     literatureRefs: ["natario_2001_zero_expansion"],
   });
@@ -214,6 +324,8 @@ const conservation = (
     chartRef: "comoving_cartesian",
     derivativeStencil: "fd4",
     unitsRef: "J/m^3",
+    atlasRef,
+    atlasHash,
     regions: regions.map((regionId) => ({
       regionId,
       status: state,
@@ -230,6 +342,8 @@ const qeiWorldlineDossier = () =>
   buildNhm2QeiWorldlineDossier({
     generatedAt: "2026-06-12T00:00:00.000Z",
     selectedProfileId: profile,
+    atlasRef,
+    atlasHash,
     worldlines: [
       {
         worldlineId: "wall:1",
@@ -268,6 +382,8 @@ const robustObserver = () =>
     generatedAt: "2026-06-12T00:00:00.000Z",
     selectedProfileId: profile,
     tensorRef: "tile.json#full",
+    atlasRef,
+    atlasHash,
     observerFamilies: [
       {
         familyId: "boosted_timelike_grid",
@@ -287,6 +403,8 @@ const eulerianOnlyObserver = () =>
     generatedAt: "2026-06-12T00:00:00.000Z",
     selectedProfileId: profile,
     tensorRef: "tile.json#full",
+    atlasRef,
+    atlasHash,
     observerFamilies: [
       {
         familyId: "eulerian",
@@ -304,6 +422,7 @@ const eulerianOnlyObserver = () =>
 const allPassingArtifact = () =>
   buildNhm2CoupledClosurePassCandidate({
     artifactRefs: {
+      regionalSupportFunctionAtlas: atlasRef,
       sourceSideSameBasisTensorAuthority: "authority.json",
       regionalSourceClosureEvidence: "regional.json",
       sourceClosurePassReadiness: "readiness.json",
@@ -312,6 +431,7 @@ const allPassingArtifact = () =>
       observerRobustEnergyConditions: "observer.json",
       casimirMaterialReceipt: "material.json",
     },
+    regionalSupportFunctionAtlas: atlas(),
     sourceAuthority: sourceAuthority(),
     sourceClosurePassReadiness: readiness(),
     regionalEvidence: regionalEvidence(),
@@ -330,7 +450,7 @@ describe("NHM2 coupled closure pass-candidate artifact", () => {
     expect(isNhm2CoupledClosurePassCandidateArtifact(artifact)).toBe(true);
     expect(artifact.summary.allRequiredRegionsAuthoritative).toBe(true);
     expect(artifact.summary.passCandidate).toBe(false);
-    expect(artifact.summary.firstBlocker).toBe("source_closure_pass_readiness_missing");
+    expect(artifact.summary.firstBlocker).toBe("regional_support_function_atlas_missing");
   });
 
   it("does not pass from wall/source readiness alone", () => {
@@ -345,6 +465,7 @@ describe("NHM2 coupled closure pass-candidate artifact", () => {
 
   it("blocks on missing or failing conservation even when source closure passes", () => {
     const missingConservation = buildNhm2CoupledClosurePassCandidate({
+      regionalSupportFunctionAtlas: atlas(),
       sourceAuthority: sourceAuthority(),
       sourceClosurePassReadiness: readiness(),
       regionalEvidence: regionalEvidence(),
@@ -353,6 +474,7 @@ describe("NHM2 coupled closure pass-candidate artifact", () => {
       casimirMaterialReceipt: materialReceipt(),
     });
     const failingConservation = buildNhm2CoupledClosurePassCandidate({
+      regionalSupportFunctionAtlas: atlas(),
       sourceAuthority: sourceAuthority(),
       sourceClosurePassReadiness: readiness(),
       regionalEvidence: regionalEvidence(),
@@ -370,6 +492,7 @@ describe("NHM2 coupled closure pass-candidate artifact", () => {
 
   it("does not count Eulerian-only energy evidence as observer robust", () => {
     const artifact = buildNhm2CoupledClosurePassCandidate({
+      regionalSupportFunctionAtlas: atlas(),
       sourceAuthority: sourceAuthority(),
       sourceClosurePassReadiness: readiness(),
       regionalEvidence: regionalEvidence(),
@@ -387,6 +510,7 @@ describe("NHM2 coupled closure pass-candidate artifact", () => {
   it("does not let scalar or old QEI evidence substitute for the worldline dossier", () => {
     const scalarQeiMargin = 1;
     const artifact = buildNhm2CoupledClosurePassCandidate({
+      regionalSupportFunctionAtlas: atlas(),
       sourceAuthority: sourceAuthority(),
       sourceClosurePassReadiness: readiness(),
       regionalEvidence: regionalEvidence(),
@@ -410,5 +534,27 @@ describe("NHM2 coupled closure pass-candidate artifact", () => {
     expect(artifact.summary.blockerCount).toBe(0);
     expect(artifact.claimBoundary.physicalViabilityClaimAllowed).toBe(false);
     expect(artifact.claimBoundary.transportClaimAllowed).toBe(false);
+  });
+
+  it("blocks diagnostic pass when a consumer carries a stale atlas hash", () => {
+    const staleQei = { ...qeiWorldlineDossier(), atlasHash: "stale-atlas-hash" };
+    const artifact = buildNhm2CoupledClosurePassCandidate({
+      regionalSupportFunctionAtlas: atlas(),
+      sourceAuthority: sourceAuthority(),
+      sourceClosurePassReadiness: readiness(),
+      regionalEvidence: regionalEvidence(),
+      conservation: conservation(),
+      qeiWorldlineDossier: staleQei,
+      observerRobustEnergyConditions: robustObserver(),
+      casimirMaterialReceipt: materialReceipt(),
+    });
+    const atlasGate = artifact.gates.find(
+      (gate) => gate.gateId === "regional_support_function_atlas",
+    );
+
+    expect(artifact.summary.passCandidate).toBe(false);
+    expect(artifact.summary.atlasConsumerCongruencePass).toBe(false);
+    expect(atlasGate?.status).toBe("review");
+    expect(atlasGate?.blockers).toContain("qei_worldline_dossier:atlas_hash_mismatch");
   });
 });

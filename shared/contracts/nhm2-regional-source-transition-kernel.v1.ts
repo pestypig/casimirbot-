@@ -45,6 +45,8 @@ export type Nhm2RegionalSourceTransitionKernelV1 = {
   chartId: "comoving_cartesian" | string;
   unitsRef: "dimensionless_normalized_tensor_jump" | string;
   sourceTensorRef: string;
+  atlasRef?: string | null;
+  atlasHash?: string | null;
   targetToleranceLInf: number;
   maxAllowedSmoothingWeight: number;
   interfaces: Nhm2RegionalSourceTransitionInterfaceV1[];
@@ -76,6 +78,11 @@ const isText = (value: unknown): value is string =>
 
 const isNullableText = (value: unknown): value is string | null =>
   value === null || isText(value);
+
+const isOptionalNullableText = (
+  value: unknown,
+): value is string | null | undefined =>
+  value === undefined || value === null || isText(value);
 
 const isNullableNumber = (value: unknown): value is number | null =>
   value === null || (typeof value === "number" && Number.isFinite(value));
@@ -234,6 +241,8 @@ export const isNhm2RegionalSourceTransitionKernel = (
     isText(record.chartId) &&
     isText(record.unitsRef) &&
     isText(record.sourceTensorRef) &&
+    isOptionalNullableText(record.atlasRef) &&
+    isOptionalNullableText(record.atlasHash) &&
     typeof record.targetToleranceLInf === "number" &&
     Number.isFinite(record.targetToleranceLInf) &&
     typeof record.maxAllowedSmoothingWeight === "number" &&

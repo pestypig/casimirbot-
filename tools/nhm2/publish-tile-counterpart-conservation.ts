@@ -15,6 +15,10 @@ import {
   type Nhm2RegionalSourceTransitionKernelV1,
 } from "../../shared/contracts/nhm2-regional-source-transition-kernel.v1";
 import {
+  getNhm2RegionalSupportFunctionAtlasHash,
+  isNhm2RegionalSupportFunctionAtlas,
+} from "../../shared/contracts/nhm2-regional-support-function-atlas.v1";
+import {
   buildNhm2TileCounterpartConservationArtifact,
   type Nhm2TileCounterpartConservationArtifact,
 } from "../../shared/contracts/nhm2-tile-counterpart-conservation.v1";
@@ -296,13 +300,19 @@ export const publishTileCounterpartConservation = (args: {
   referenceRunPath: string;
   tileFullTensorSourcePath: string;
   transitionKernelPath?: string | null;
+  regionalSupportAtlasPath?: string | null;
   outPath: string;
   toleranceLInf?: number | null;
   auditOnly?: boolean;
 }): Nhm2TileCounterpartConservationArtifact => {
   if (
     !args.auditOnly &&
-    [args.referenceRunPath, args.tileFullTensorSourcePath, args.transitionKernelPath].some(pathUsesLatestAlias)
+    [
+      args.referenceRunPath,
+      args.tileFullTensorSourcePath,
+      args.transitionKernelPath,
+      args.regionalSupportAtlasPath,
+    ].some(pathUsesLatestAlias)
   ) {
     throw new Error("latest aliases are forbidden unless --audit-only is passed");
   }
@@ -324,6 +334,22 @@ export const publishTileCounterpartConservation = (args: {
     !isNhm2RegionalSourceTransitionKernel(transitionKernel)
   ) {
     throw new Error("transition kernel must be nhm2_regional_source_transition_kernel/v1");
+  }
+  const atlas =
+    args.regionalSupportAtlasPath == null
+      ? null
+      : readJson(resolvePath(args.repoRoot, args.regionalSupportAtlasPath));
+  if (atlas != null && !isNhm2RegionalSupportFunctionAtlas(atlas)) {
+    throw new Error("regional support atlas must be nhm2_regional_support_function_atlas/v1");
+  }
+  const atlasHash = getNhm2RegionalSupportFunctionAtlasHash(atlas);
+  if (
+    atlasHash != null &&
+    transitionKernel != null &&
+    transitionKernel.atlasHash != null &&
+    transitionKernel.atlasHash !== atlasHash
+  ) {
+    throw new Error("transition kernel atlasHash does not match regional support atlas");
   }
   const transition =
     transitionKernel == null
@@ -360,6 +386,12 @@ export const publishTileCounterpartConservation = (args: {
         ? "regional_jump_linf_v1"
         : "regional_jump_linf_with_transition_kernel_v1",
     unitsRef: "dimensionless_normalized_tensor_jump",
+    ...(args.regionalSupportAtlasPath == null
+      ? {}
+      : {
+          atlasRef: args.regionalSupportAtlasPath,
+          atlasHash,
+        }),
     regions,
   });
   const outPath = resolvePath(args.repoRoot, args.outPath);
@@ -383,6 +415,7 @@ const main = (): void => {
     referenceRunPath,
     tileFullTensorSourcePath: sourcePath,
     transitionKernelPath,
+    regionalSupportAtlasPath: asString(args["regional-support-atlas"]),
     outPath,
     toleranceLInf,
     auditOnly: args["audit-only"] === true,

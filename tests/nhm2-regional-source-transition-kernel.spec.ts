@@ -11,6 +11,7 @@ import {
 } from "../shared/contracts/nhm2-regional-source-transition-kernel.v1";
 import { buildNhm2TileEffectiveFullTensorSourceArtifact } from "../shared/contracts/nhm2-tile-effective-full-tensor-source.v1";
 import { buildRegionalSourceTransitionKernel } from "../tools/nhm2/build-regional-source-transition-kernel";
+import { buildRegionalSupportFunctionAtlas } from "../tools/nhm2/build-regional-support-function-atlas";
 import { publishTileCounterpartConservation } from "../tools/nhm2/publish-tile-counterpart-conservation";
 
 const profile = "stage1_centerline_alpha_0p995_v1";
@@ -143,6 +144,12 @@ const withTemp = (fn: (root: string) => void) => {
   try {
     writeFileSync(join(root, "reference.json"), JSON.stringify(referenceRun()), "utf8");
     writeFileSync(join(root, "source.json"), JSON.stringify(sourceArtifact()), "utf8");
+    buildRegionalSupportFunctionAtlas({
+      repoRoot: root,
+      referenceRunPath: "reference.json",
+      tileFullTensorSourcePath: "source.json",
+      outPath: "atlas.json",
+    });
     fn(root);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -155,6 +162,7 @@ describe("nhm2 regional source transition kernel", () => {
       const kernel = buildRegionalSourceTransitionKernel({
         repoRoot: root,
         tileFullTensorSourcePath: "source.json",
+        regionalSupportAtlasPath: "atlas.json",
         outPath: "kernel.json",
       });
       const hullWall = kernel.interfaces.find((entry) => entry.interfaceId === "hull_wall");
@@ -168,6 +176,8 @@ describe("nhm2 regional source transition kernel", () => {
       expect(hullWall?.dominantComponentId).toBe("T00");
       expect(hullWall?.smoothingWeight).toBeGreaterThan(0);
       expect(kernel.sourceTensorRef).toBe("source.json");
+      expect(kernel.atlasRef).toBe("atlas.json");
+      expect(kernel.atlasHash).toMatch(/^[a-f0-9]{64}$/);
       expect(kernel.claimBoundary.metricEchoForbidden).toBe(true);
     }));
 
@@ -182,6 +192,7 @@ describe("nhm2 regional source transition kernel", () => {
       const kernel = buildRegionalSourceTransitionKernel({
         repoRoot: root,
         tileFullTensorSourcePath: "source.json",
+        regionalSupportAtlasPath: "atlas.json",
         outPath: "kernel.json",
       });
       const withKernel = publishTileCounterpartConservation({
@@ -189,6 +200,7 @@ describe("nhm2 regional source transition kernel", () => {
         referenceRunPath: "reference.json",
         tileFullTensorSourcePath: "source.json",
         transitionKernelPath: "kernel.json",
+        regionalSupportAtlasPath: "atlas.json",
         outPath: "conservation.smoothed.json",
       });
       const hull = withKernel.regions.find((entry) => entry.regionId === "hull");
@@ -201,9 +213,37 @@ describe("nhm2 regional source transition kernel", () => {
       expect(hull?.preTransitionResidualLInf).toBeGreaterThan(0.1);
       expect(hull?.postTransitionResidualLInf).toBeLessThanOrEqual(0.1);
       expect(hull?.transitionKernelRef).toBe("kernel.json");
+      expect(withKernel.atlasRef).toBe("atlas.json");
+      expect(withKernel.atlasHash).toBe(kernel.atlasHash);
       expect(hull?.transitionSmoothingWeight).toBeGreaterThan(0);
       expect(withKernel.claimEffect).toBe("conservation_candidate");
       expect(withKernel.promotionAllowed).toBe(false);
       expect(kernel.claimBoundary.diagnosticOnly).toBe(true);
+    }));
+
+  it("rejects a transition kernel built from a stale atlas hash", () =>
+    withTemp((root) => {
+      const kernel = buildRegionalSourceTransitionKernel({
+        repoRoot: root,
+        tileFullTensorSourcePath: "source.json",
+        regionalSupportAtlasPath: "atlas.json",
+        outPath: "kernel.json",
+      });
+      writeFileSync(
+        join(root, "kernel.json"),
+        JSON.stringify({ ...kernel, atlasHash: "stale-atlas-hash" }),
+        "utf8",
+      );
+
+      expect(() =>
+        publishTileCounterpartConservation({
+          repoRoot: root,
+          referenceRunPath: "reference.json",
+          tileFullTensorSourcePath: "source.json",
+          transitionKernelPath: "kernel.json",
+          regionalSupportAtlasPath: "atlas.json",
+          outPath: "conservation.smoothed.json",
+        }),
+      ).toThrow(/atlasHash does not match/);
     }));
 });

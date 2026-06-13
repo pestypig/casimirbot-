@@ -21,6 +21,8 @@ export type Nhm2TileCounterpartConservationArtifact = {
   chartRef: "comoving_cartesian" | string;
   derivativeStencil: string;
   unitsRef: string;
+  atlasRef?: string | null;
+  atlasHash?: string | null;
   overallState: "pass" | "review" | "fail" | "missing";
   regions: Array<{
     regionId: Nhm2RegionalSourceClosureRegionId;
@@ -214,6 +216,8 @@ export const isNhm2TileCounterpartConservationArtifact = (
     isText(record.chartRef) &&
     isText(record.derivativeStencil) &&
     isText(record.unitsRef) &&
+    isOptionalNullableText(record.atlasRef) &&
+    isOptionalNullableText(record.atlasHash) &&
     isStatus(record.overallState) &&
     Array.isArray(record.regions) &&
     record.regions.every(isRegion) &&
