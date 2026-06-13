@@ -3,6 +3,10 @@ import express from "express";
 import request from "supertest";
 import { workspaceOsRouter } from "../../../routes/workspace-os";
 import { buildHelixWorkspaceStorageStatus } from "../workspace-storage-status";
+import {
+  __resetHelixRollingSessionContextStoreForTest,
+  buildHelixRollingSessionContextPacket,
+} from "../../helix-ask/rolling-session-context";
 
 const buildApp = () => {
   const app = express();
@@ -11,6 +15,50 @@ const buildApp = () => {
 };
 
 describe("Workspace OS storage status", () => {
+  it("reports the Ask active context page file as diagnostic storage", async () => {
+    __resetHelixRollingSessionContextStoreForTest();
+    buildHelixRollingSessionContextPacket({
+      threadId: "storage:test",
+      currentTurnId: "turn-context",
+      sessionId: "storage:test",
+      promptText: "Continue the pending geometry task.",
+      modelContextWindowTokens: 4096,
+    });
+
+    const status = await buildHelixWorkspaceStorageStatus(
+      { thread_id: "storage:test", room_id: "room:test" },
+      {
+        now: () => new Date("2026-06-12T12:00:00.000Z"),
+        env: {},
+      },
+    );
+    const contextRecord = status.records.find(
+      (record) => record.artifact_id === "helix.ask.active_context_page_file",
+    );
+
+    expect(contextRecord).toMatchObject({
+      label: "Ask Active Context",
+      artifact_type: "active_context_page_file",
+      storage_backend: "helix_ask_runtime",
+      owner_scope: "thread",
+      observed: true,
+      approximate: true,
+      diagnostics: expect.objectContaining({
+        raw_context_included: false,
+        raw_history_excluded: true,
+        meter_schema: "helix.context_fidelity_meter.v1",
+        active_context_total_tokens: expect.any(Number),
+        model_context_window_tokens: 4096,
+        handoff_state: "idle",
+      }),
+    });
+    expect(contextRecord?.authority).toMatchObject({
+      assistant_answer: false,
+      raw_content_included: false,
+      terminal_eligible: false,
+    });
+  });
+
   it("reports read-only storage planes without raw content", async () => {
     const status = await buildHelixWorkspaceStorageStatus(
       { thread_id: "storage:test", room_id: "room:test" },

@@ -6,6 +6,43 @@ export type HelixRollingSessionCompactionMode =
   | "recommended"
   | "required";
 
+export type HelixContextFidelityCompactionMode =
+  | "none"
+  | "eligible"
+  | "active"
+  | "forced";
+
+export type HelixContextFidelityHandoffState =
+  | "idle"
+  | "pause_recommended"
+  | "pause_required"
+  | "compacting";
+
+export type HelixContextFidelityMeter = {
+  schema: "helix.context_fidelity_meter.v1";
+  model_context_window_tokens: number;
+  active_context_total_tokens: number;
+  usage_ratio: number;
+  auto_compact_token_limit: number;
+  compact_warning_ratio: number;
+  compaction_mode: HelixContextFidelityCompactionMode;
+  retained_turn_ids: string[];
+  compacted_turn_ids: string[];
+  pending_user_inputs_count: number;
+  unresolved_task_frames_count: number;
+  model_visible_context_included: boolean;
+  model_visible_context_token_estimate: number;
+  raw_history_excluded: boolean;
+  handoff_state: {
+    state: HelixContextFidelityHandoffState;
+    chat_turns_paused: boolean;
+    reason: string;
+  };
+  assistant_answer: false;
+  terminal_eligible: false;
+  raw_content_included: false;
+};
+
 export type HelixRollingSessionContextPacket = {
   schema: typeof HELIX_ROLLING_SESSION_CONTEXT_PACKET_SCHEMA;
 
@@ -31,6 +68,7 @@ export type HelixRollingSessionContextPacket = {
   compaction_mode: HelixRollingSessionCompactionMode;
   compaction_reason: string;
   full_context_window_limit_reached: boolean;
+  context_fidelity_meter: HelixContextFidelityMeter;
 
   retained_turn_ids: string[];
   compacted_turn_ids: string[];

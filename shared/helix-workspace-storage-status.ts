@@ -15,12 +15,14 @@ export const HELIX_WORKSPACE_STORAGE_STATUS_SCHEMA =
 
 export type HelixWorkspaceStorageBackend =
   | HelixWorkspaceMemoryStorageBackend
+  | "helix_ask_runtime"
   | "replit_app_storage"
   | "browser_estimate"
   | "unknown";
 
 export type HelixWorkspaceStorageOwnerScope =
   | HelixWorkspaceMemoryOwnerScope
+  | "thread"
   | "app"
   | "workspace"
   | "unknown";
@@ -39,6 +41,7 @@ export type HelixWorkspaceStorageRecordStatus =
 
 export type HelixWorkspaceStorageArtifactType =
   | HelixWorkspaceMemoryArtifactType
+  | "active_context_page_file"
   | "browser_storage_key"
   | "profile_storage"
   | "app_storage"

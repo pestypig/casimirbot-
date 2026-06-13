@@ -8,6 +8,7 @@ import {
   type HelixWorkspaceStorageStatus,
 } from "@shared/helix-workspace-storage-status";
 import { getProfileStorageUsage } from "../helix-account/profile-storage-store";
+import { getLatestHelixRollingSessionContextPacket } from "../helix-ask/rolling-session-context";
 
 const parseBytes = (value: unknown): number | null => {
   if (typeof value !== "string") return null;
@@ -70,6 +71,11 @@ export async function buildHelixWorkspaceStorageStatus(
     "WORKSPACE_USER_STORAGE_QUOTA_BYTES",
   );
   const profileUsage = getProfileStorageUsage(input.profile_id);
+  const activeContextPacket = getLatestHelixRollingSessionContextPacket({
+    threadId: input.thread_id,
+    sessionId: input.thread_id,
+  });
+  const activeContextMeter = activeContextPacket?.context_fidelity_meter ?? null;
   const appStorageQuota = configuredQuota(
     readers.env,
     "WORKSPACE_APP_STORAGE_QUOTA_BYTES",
@@ -77,6 +83,49 @@ export async function buildHelixWorkspaceStorageStatus(
   );
 
   const records: HelixWorkspaceStorageRecord[] = [
+    makeRecord({
+      artifact_id: "helix.ask.active_context_page_file",
+      label: "Ask Active Context",
+      artifact_type: "active_context_page_file",
+      owner_scope: "thread",
+      storage_backend: "helix_ask_runtime",
+      sync_status: "not_applicable",
+      status: activeContextMeter ? "available" : "unknown",
+      path_ref: "helix-ask://active-context/page-file",
+      storage_key: null,
+      profile_id: null,
+      chat_session_id: activeContextPacket?.session_id ?? input.thread_id ?? null,
+      size_bytes: activeContextMeter
+        ? Math.max(0, Math.round(activeContextMeter.active_context_total_tokens * 4))
+        : null,
+      quota_bytes: activeContextMeter
+        ? Math.max(0, Math.round(activeContextMeter.model_context_window_tokens * 4))
+        : null,
+      usage_ratio: activeContextMeter?.usage_ratio ?? null,
+      approximate: true,
+      observed: Boolean(activeContextMeter),
+      updated_at: generatedAt,
+      missing_reason: activeContextMeter ? null : "rolling_session_context_packet_not_observed_yet",
+      diagnostics: {
+        raw_context_included: false,
+        raw_history_excluded: activeContextMeter?.raw_history_excluded ?? true,
+        meter_schema: activeContextMeter?.schema ?? "helix.context_fidelity_meter.v1",
+        model_context_window_tokens: activeContextMeter?.model_context_window_tokens ?? 0,
+        active_context_total_tokens: activeContextMeter?.active_context_total_tokens ?? 0,
+        usage_ratio: activeContextMeter?.usage_ratio ?? 0,
+        auto_compact_token_limit: activeContextMeter?.auto_compact_token_limit ?? 0,
+        compact_warning_ratio: activeContextMeter?.compact_warning_ratio ?? 0,
+        compaction_mode: activeContextMeter?.compaction_mode ?? "none",
+        handoff_state: activeContextMeter?.handoff_state.state ?? "idle",
+        chat_turns_paused: activeContextMeter?.handoff_state.chat_turns_paused ?? false,
+        retained_turn_count: activeContextMeter?.retained_turn_ids.length ?? 0,
+        compacted_turn_count: activeContextMeter?.compacted_turn_ids.length ?? 0,
+        pending_user_inputs_count: activeContextMeter?.pending_user_inputs_count ?? 0,
+        unresolved_task_frames_count: activeContextMeter?.unresolved_task_frames_count ?? 0,
+        model_visible_context_included: activeContextMeter?.model_visible_context_included ?? false,
+        model_visible_context_token_estimate: activeContextMeter?.model_visible_context_token_estimate ?? 0,
+      },
+    }),
     makeRecord({
       artifact_id: "browser.localStorage",
       label: "Browser localStorage",

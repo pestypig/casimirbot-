@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import crypto from "node:crypto";
-import { buildHelixRollingSessionContextPacket } from "../services/helix-ask/rolling-session-context";
+import {
+  __resetHelixRollingSessionContextStoreForTest,
+  buildHelixRollingSessionContextPacket,
+  getLatestHelixRollingSessionContextPacket,
+} from "../services/helix-ask/rolling-session-context";
 import { appendHelixThreadCompletedItemLifecycle } from "../services/helix-ask/runtime/request-context";
 import {
   __resetHelixThreadLedgerStore,
@@ -62,6 +66,7 @@ const completeTurn = (args: {
 describe("Helix Ask rolling session context packet", () => {
   beforeEach(() => {
     __resetHelixThreadLedgerStore();
+    __resetHelixRollingSessionContextStoreForTest();
     threadId = `thread-rolling-context-test-${crypto.randomUUID()}`;
     sessionId = `session-rolling-context-test-${crypto.randomUUID()}`;
   });
@@ -92,6 +97,23 @@ describe("Helix Ask rolling session context packet", () => {
     expect(packet.estimated_tokens.prior_thread_turns).toBeGreaterThan(0);
     expect(packet.retained_turn_ids).toEqual(["turn-1"]);
     expect(packet.model_visible_summary).toContain("docs viewer");
+    expect(packet.context_fidelity_meter).toMatchObject({
+      schema: "helix.context_fidelity_meter.v1",
+      compaction_mode: "none",
+      raw_history_excluded: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      terminal_eligible: false,
+    });
+    expect(packet.context_fidelity_meter.active_context_total_tokens).toBe(
+      packet.estimated_tokens.active_context_total,
+    );
+    expect(getLatestHelixRollingSessionContextPacket({ threadId })).toMatchObject({
+      current_turn_id: "turn-2",
+      context_fidelity_meter: {
+        schema: "helix.context_fidelity_meter.v1",
+      },
+    });
   });
 
   it("compacts older turns into a summary while retaining recent turns", () => {
@@ -116,6 +138,8 @@ describe("Helix Ask rolling session context packet", () => {
     expect(packet.retained_turn_ids).toEqual(["turn-8", "turn-9", "turn-10"]);
     expect(packet.compacted_turn_ids).toContain("turn-1");
     expect(packet.compacted_context_summary).toContain("turn turn-1");
+    expect(packet.context_fidelity_meter.compaction_mode).not.toBe("none");
+    expect(packet.context_fidelity_meter.handoff_state.state).not.toBe("idle");
     expect(JSON.stringify(packet)).not.toContain("raw_content_included\":true");
   });
 
@@ -130,6 +154,7 @@ describe("Helix Ask rolling session context packet", () => {
 
     expect(packet.compaction_mode).toBe("none");
     expect(packet.retained_turn_ids).toEqual([]);
+    expect(packet.context_fidelity_meter.handoff_state.chat_turns_paused).toBe(false);
     expect(packet.missing_or_uncertain[0]).toMatch(/no active thread/i);
   });
 });

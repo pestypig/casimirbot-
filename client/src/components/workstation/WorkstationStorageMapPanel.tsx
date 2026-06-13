@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Database, HardDrive, Layers, RefreshCw, Server } from "lucide-react";
+import { Activity, Database, HardDrive, Layers, RefreshCw, Server } from "lucide-react";
 import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
 import { buildBrowserWorkspaceStorageStatus } from "@/lib/workstation/workspaceStorageScanner";
 import { HELIX_WORKSPACE_MEMORY_REGISTRY_SCHEMA } from "@shared/helix-workspace-memory-registry";
@@ -36,6 +36,8 @@ const backendLabel = (value: string): string => value.replace(/_/g, " ");
 
 const backendClass = (backend: string): string => {
   switch (backend) {
+    case "helix_ask_runtime":
+      return "border-sky-200/40 bg-sky-500/25 text-sky-50";
     case "localStorage":
       return "border-cyan-200/40 bg-cyan-500/25 text-cyan-50";
     case "sessionStorage":
@@ -106,6 +108,40 @@ const splitTreemap = (
 
 const usableRecords = (records: readonly HelixWorkspaceStorageRecord[]): HelixWorkspaceStorageRecord[] =>
   sortHelixWorkspaceStorageRecords(records).filter((record) => record.size_bytes != null && record.size_bytes > 0);
+
+const readDiagnosticNumber = (
+  diagnostics: HelixWorkspaceStorageRecord["diagnostics"] | undefined,
+  key: string,
+): number | null => {
+  const value = diagnostics?.[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+};
+
+const readDiagnosticString = (
+  diagnostics: HelixWorkspaceStorageRecord["diagnostics"] | undefined,
+  key: string,
+): string | null => {
+  const value = diagnostics?.[key];
+  return typeof value === "string" && value.trim() ? value : null;
+};
+
+const readDiagnosticBoolean = (
+  diagnostics: HelixWorkspaceStorageRecord["diagnostics"] | undefined,
+  key: string,
+): boolean | null => {
+  const value = diagnostics?.[key];
+  return typeof value === "boolean" ? value : null;
+};
+
+const formatTokens = (value: number | null | undefined): string => {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "unknown";
+  return new Intl.NumberFormat("en-US").format(Math.max(0, Math.round(value)));
+};
+
+const formatPercent = (ratio: number | null | undefined): string => {
+  if (typeof ratio !== "number" || !Number.isFinite(ratio)) return "unknown";
+  return `${Math.round(ratio * 1000) / 10}%`;
+};
 
 export default function WorkstationStorageMapPanel() {
   const registryArtifacts = useWorkspaceMemoryRegistryStore((state) => state.artifacts);
@@ -179,6 +215,19 @@ export default function WorkstationStorageMapPanel() {
   const treemapRecords = React.useMemo(() => usableRecords(storageStatus.records).slice(0, 80), [storageStatus.records]);
   const rects = React.useMemo(() => splitTreemap(treemapRecords, 0, 0, 1000, 520), [treemapRecords]);
   const selected = storageStatus.records.find((record) => record.artifact_id === selectedId) ?? storageStatus.records[0] ?? null;
+  const activeContextRecord = storageStatus.records.find(
+    (record) => record.artifact_id === "helix.ask.active_context_page_file",
+  ) ?? null;
+  const activeContextDiagnostics = activeContextRecord?.diagnostics;
+  const activeContextTokens = readDiagnosticNumber(activeContextDiagnostics, "active_context_total_tokens");
+  const activeContextWindow = readDiagnosticNumber(activeContextDiagnostics, "model_context_window_tokens");
+  const activeContextRatio = readDiagnosticNumber(activeContextDiagnostics, "usage_ratio");
+  const activeContextCompaction = readDiagnosticString(activeContextDiagnostics, "compaction_mode") ?? "none";
+  const activeContextHandoff = readDiagnosticString(activeContextDiagnostics, "handoff_state") ?? "idle";
+  const activeContextPaused = readDiagnosticBoolean(activeContextDiagnostics, "chat_turns_paused") ?? false;
+  const activeContextPendingInputs = readDiagnosticNumber(activeContextDiagnostics, "pending_user_inputs_count") ?? 0;
+  const activeContextUnresolvedFrames = readDiagnosticNumber(activeContextDiagnostics, "unresolved_task_frames_count") ?? 0;
+  const activeContextModelVisible = readDiagnosticBoolean(activeContextDiagnostics, "model_visible_context_included") ?? false;
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-slate-950 text-slate-100">
@@ -221,6 +270,43 @@ export default function WorkstationStorageMapPanel() {
       {error ? (
         <div className="border-b border-amber-300/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">{error}</div>
       ) : null}
+
+      <div className="border-b border-white/10 bg-slate-950 px-3 py-2 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 font-semibold text-slate-100">
+            <Activity className="h-4 w-4 text-sky-200" />
+            Ask Active Context
+          </div>
+          <div className={`rounded border px-2 py-0.5 text-[10px] uppercase ${activeContextPaused ? "border-amber-300/40 bg-amber-500/10 text-amber-100" : "border-slate-500/30 bg-slate-900 text-slate-300"}`}>
+            {activeContextPaused ? "chat paused" : activeContextHandoff}
+          </div>
+        </div>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <div className="text-slate-500">Context tokens</div>
+            <div className="font-semibold text-slate-100">
+              {formatTokens(activeContextTokens)} / {formatTokens(activeContextWindow)}
+            </div>
+          </div>
+          <div>
+            <div className="text-slate-500">Usage</div>
+            <div className="font-semibold text-slate-100">{formatPercent(activeContextRatio)}</div>
+          </div>
+          <div>
+            <div className="text-slate-500">Compaction</div>
+            <div className="font-semibold text-slate-100">{backendLabel(activeContextCompaction)}</div>
+          </div>
+          <div>
+            <div className="text-slate-500">Pending frames</div>
+            <div className="font-semibold text-slate-100">
+              {activeContextPendingInputs} inputs / {activeContextUnresolvedFrames} frames
+            </div>
+          </div>
+        </div>
+        <div className="mt-1 text-[11px] text-slate-500">
+          Model-visible context: {activeContextModelVisible ? "yes" : "no"} - raw history excluded
+        </div>
+      </div>
 
       <div className="grid min-h-0 flex-1 grid-rows-[minmax(240px,1fr)_240px] lg:grid-cols-[minmax(420px,1fr)_360px] lg:grid-rows-1">
         <div className="relative min-h-0 overflow-hidden border-b border-white/10 bg-slate-900 lg:border-b-0 lg:border-r">

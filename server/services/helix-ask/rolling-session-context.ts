@@ -1,6 +1,7 @@
 import {
   HELIX_ROLLING_SESSION_CONTEXT_PACKET_SCHEMA,
   type HelixRollingSessionContextPacket,
+  type HelixContextFidelityMeter,
   type HelixRollingSessionCompactionMode,
 } from "../../../shared/helix-rolling-session-context";
 import type { HelixConversationMemoryPacket } from "../../../shared/helix-conversation-memory-packet";
@@ -35,6 +36,9 @@ const estimateTokens = (value: unknown): number => {
   return Math.max(0, Math.ceil(text.length / 4));
 };
 
+const latestRollingSessionContextByThread = new Map<string, HelixRollingSessionContextPacket>();
+const latestRollingSessionContextBySession = new Map<string, HelixRollingSessionContextPacket>();
+
 const textLimit = (): number =>
   clampNumber(readNumber(process.env.HELIX_ASK_ROLLING_CONTEXT_TEXT_CHARS, 520), 160, 1600);
 
@@ -43,6 +47,9 @@ const summaryLimit = (): number =>
 
 const autoCompactRatio = (): number =>
   Math.max(0.25, Math.min(0.95, readNumber(process.env.HELIX_ASK_ROLLING_CONTEXT_COMPACT_RATIO, 0.8)));
+
+const compactWarningRatio = (): number =>
+  Math.max(0.1, Math.min(0.95, readNumber(process.env.HELIX_ASK_CONTEXT_WARNING_RATIO, 0.7)));
 
 const maxRetainedTurns = (override?: number): number =>
   clampNumber(override ?? readNumber(process.env.HELIX_ASK_ROLLING_CONTEXT_MAX_RETAINED_TURNS, 6), 1, 16);
@@ -80,6 +87,86 @@ const summarizeTurns = (turns: HelixThreadTurn[], limit: number): string => {
   return clip(lines.join("\n"), limit);
 };
 
+const buildContextFidelityMeter = (args: {
+  contextWindow: number;
+  autoCompactTokenLimit: number;
+  activeContextTotal: number;
+  compactionMode: HelixRollingSessionCompactionMode;
+  retainedTurnIds: string[];
+  compactedTurnIds: string[];
+  pendingUserInputsCount: number;
+  unresolvedTaskFramesCount: number;
+  modelVisibleContextIncluded: boolean;
+  modelVisibleContextTokenEstimate: number;
+  reason: string;
+}): HelixContextFidelityMeter => {
+  const usageRatio =
+    args.contextWindow > 0
+      ? Math.round((args.activeContextTotal / args.contextWindow) * 1000) / 1000
+      : 0;
+  const mode =
+    args.compactionMode === "required"
+      ? "forced"
+      : args.compactionMode === "recommended"
+        ? "eligible"
+        : "none";
+  const handoffState =
+    args.compactionMode === "required"
+      ? "pause_required"
+      : args.compactionMode === "recommended"
+        ? "pause_recommended"
+        : "idle";
+  return {
+    schema: "helix.context_fidelity_meter.v1",
+    model_context_window_tokens: args.contextWindow,
+    active_context_total_tokens: args.activeContextTotal,
+    usage_ratio: usageRatio,
+    auto_compact_token_limit: args.autoCompactTokenLimit,
+    compact_warning_ratio: compactWarningRatio(),
+    compaction_mode: mode,
+    retained_turn_ids: args.retainedTurnIds,
+    compacted_turn_ids: args.compactedTurnIds,
+    pending_user_inputs_count: args.pendingUserInputsCount,
+    unresolved_task_frames_count: args.unresolvedTaskFramesCount,
+    model_visible_context_included: args.modelVisibleContextIncluded,
+    model_visible_context_token_estimate: args.modelVisibleContextTokenEstimate,
+    raw_history_excluded: true,
+    handoff_state: {
+      state: handoffState,
+      chat_turns_paused: handoffState === "pause_required" || handoffState === "compacting",
+      reason: args.reason,
+    },
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+};
+
+const rememberRollingSessionContextPacket = (packet: HelixRollingSessionContextPacket): void => {
+  if (packet.thread_id) latestRollingSessionContextByThread.set(packet.thread_id, packet);
+  if (packet.session_id) latestRollingSessionContextBySession.set(packet.session_id, packet);
+};
+
+export const getLatestHelixRollingSessionContextPacket = (args?: {
+  threadId?: string | null;
+  sessionId?: string | null;
+}): HelixRollingSessionContextPacket | null => {
+  const threadId = normalizeText(args?.threadId);
+  const sessionId = normalizeText(args?.sessionId);
+  if (threadId && latestRollingSessionContextByThread.has(threadId)) {
+    return latestRollingSessionContextByThread.get(threadId) ?? null;
+  }
+  if (sessionId && latestRollingSessionContextBySession.has(sessionId)) {
+    return latestRollingSessionContextBySession.get(sessionId) ?? null;
+  }
+  return Array.from(latestRollingSessionContextByThread.values()).at(-1) ?? null;
+};
+
+export const __resetHelixRollingSessionContextStoreForTest = (): void => {
+  latestRollingSessionContextByThread.clear();
+  latestRollingSessionContextBySession.clear();
+};
+
 const emptyPacket = (args: {
   threadId: string;
   currentTurnId: string;
@@ -90,7 +177,7 @@ const emptyPacket = (args: {
 }): HelixRollingSessionContextPacket => {
   const promptTokens = estimateTokens(args.promptText);
   const autoLimit = Math.floor(args.modelContextWindowTokens * autoCompactRatio());
-  return {
+  const packet: HelixRollingSessionContextPacket = {
     schema: HELIX_ROLLING_SESSION_CONTEXT_PACKET_SCHEMA,
     thread_id: args.threadId,
     current_turn_id: args.currentTurnId,
@@ -110,6 +197,19 @@ const emptyPacket = (args: {
     compaction_mode: "none",
     compaction_reason: args.reason,
     full_context_window_limit_reached: false,
+    context_fidelity_meter: buildContextFidelityMeter({
+      contextWindow: args.modelContextWindowTokens,
+      autoCompactTokenLimit: autoLimit,
+      activeContextTotal: promptTokens,
+      compactionMode: "none",
+      retainedTurnIds: [],
+      compactedTurnIds: [],
+      pendingUserInputsCount: 0,
+      unresolvedTaskFramesCount: 0,
+      modelVisibleContextIncluded: false,
+      modelVisibleContextTokenEstimate: promptTokens,
+      reason: args.reason,
+    }),
     retained_turn_ids: [],
     compacted_turn_ids: [],
     dropped_turn_ids: [],
@@ -121,6 +221,8 @@ const emptyPacket = (args: {
     assistant_answer: false,
     raw_content_included: false,
   };
+  rememberRollingSessionContextPacket(packet);
+  return packet;
 };
 
 export function buildHelixRollingSessionContextPacket(
@@ -185,8 +287,22 @@ export function buildHelixRollingSessionContextPacket(
     ].filter(Boolean).join("\n\n"),
     summaryLimit() * 2,
   );
+  const modelVisibleContextTokens = estimateTokens(modelVisibleSummary) + memoryTokens + promptTokens;
+  const contextFidelityMeter = buildContextFidelityMeter({
+    contextWindow,
+    autoCompactTokenLimit: autoLimit,
+    activeContextTotal,
+    compactionMode,
+    retainedTurnIds: retainedTurns.map((turn) => turn.turn_id),
+    compactedTurnIds: compactedTurns.map((turn) => turn.turn_id),
+    pendingUserInputsCount: input.conversationMemoryPacket?.pending_user_inputs.length ?? 0,
+    unresolvedTaskFramesCount: input.conversationMemoryPacket?.unresolved_task_frames.length ?? 0,
+    modelVisibleContextIncluded: Boolean(modelVisibleSummary || input.conversationMemoryPacket),
+    modelVisibleContextTokenEstimate: modelVisibleContextTokens,
+    reason: compactionReason,
+  });
 
-  return {
+  const packet: HelixRollingSessionContextPacket = {
     schema: HELIX_ROLLING_SESSION_CONTEXT_PACKET_SCHEMA,
     thread_id: threadId,
     current_turn_id: currentTurnId,
@@ -206,6 +322,7 @@ export function buildHelixRollingSessionContextPacket(
     compaction_mode: compactionMode,
     compaction_reason: compactionReason,
     full_context_window_limit_reached: fullLimitReached,
+    context_fidelity_meter: contextFidelityMeter,
     retained_turn_ids: retainedTurns.map((turn) => turn.turn_id),
     compacted_turn_ids: compactedTurns.map((turn) => turn.turn_id),
     dropped_turn_ids: [],
@@ -217,6 +334,8 @@ export function buildHelixRollingSessionContextPacket(
     assistant_answer: false,
     raw_content_included: false,
   };
+  rememberRollingSessionContextPacket(packet);
+  return packet;
 }
 
 export function renderHelixRollingSessionContextForModel(
@@ -248,6 +367,7 @@ export function buildHelixRollingSessionContextDebug(
     compacted_turn_ids: packet.compacted_turn_ids,
     dropped_turn_ids: packet.dropped_turn_ids,
     estimated_tokens: packet.estimated_tokens,
+    context_fidelity_meter: packet.context_fidelity_meter,
     model_context_window_tokens: packet.model_context_window_tokens,
     auto_compact_token_limit: packet.auto_compact_token_limit,
     compaction_mode: packet.compaction_mode,
