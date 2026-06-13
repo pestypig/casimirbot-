@@ -23,7 +23,10 @@ import {
   isNhm2TileEffectiveFullTensorSourceArtifact,
   type Nhm2TileEffectiveFullTensorSourceArtifact,
 } from "../../shared/contracts/nhm2-tile-effective-full-tensor-source.v1";
-import { isNhm2TileCounterpartConservationArtifact } from "../../shared/contracts/nhm2-tile-counterpart-conservation.v1";
+import {
+  isNhm2TileCounterpartConservationArtifact,
+  type Nhm2TileCounterpartConservationArtifact,
+} from "../../shared/contracts/nhm2-tile-counterpart-conservation.v1";
 
 const TILE_COUNTERPART_LITERATURE_REFS = [
   "natario_2001_zero_expansion",
@@ -71,6 +74,42 @@ const parseArgs = (argv: string[]): Record<string, string | boolean> => {
   }
   return parsed;
 };
+
+type ConservationStatus = "pass" | "review" | "fail" | "missing" | "unknown";
+
+const conservationBlocker = (status: ConservationStatus): string | null => {
+  if (status === "pass") return null;
+  return status === "review" || status === "fail"
+    ? "conservation_not_pass"
+    : "conservation_unknown";
+};
+
+const maxFinite = (values: Array<number | null>): number | null => {
+  const finiteValues = values.filter(
+    (value): value is number => typeof value === "number" && Number.isFinite(value),
+  );
+  return finiteValues.length > 0 ? Math.max(...finiteValues) : null;
+};
+
+const summarizeConservationDiagnostics = (
+  conservation: Nhm2TileCounterpartConservationArtifact | null,
+): Nhm2TileEffectiveCounterpartArtifact["conservationDiagnostics"] => ({
+  divTStatus:
+    conservation?.overallState === "pass" ||
+    conservation?.overallState === "review" ||
+    conservation?.overallState === "fail"
+      ? conservation.overallState
+      : "unknown",
+  divTResidualLInf: maxFinite(
+    conservation?.regions.map((region) => region.divTResidualLInf) ?? [],
+  ),
+  continuityResidualLInf: maxFinite(
+    conservation?.regions.map((region) => region.continuityResidualLInf) ?? [],
+  ),
+  momentumResidualLInf: maxFinite(
+    conservation?.regions.map((region) => region.momentumResidualLInf) ?? [],
+  ),
+});
 
 const normalizeTensor = (value: unknown): Nhm2RegionalTensor => {
   const record = asRecord(value);
@@ -312,7 +351,8 @@ const makeRegionFromFullTensorSource = (
   if (!sourceSide) blockers.push("metric_required_derivation_not_allowed");
   if (!fullAuthority) blockers.push("full_tensor_authority_missing");
   if (qeiStatus !== "PASS") blockers.push("qei_not_promotion_safe");
-  if (conservationStatus !== "pass") blockers.push("conservation_unknown");
+  const conservationGateBlocker = conservationBlocker(conservationStatus);
+  if (conservationGateBlocker != null) blockers.push(conservationGateBlocker);
   const comparisonRole =
     sourceSide && fullAuthority
       ? "tile_effective_counterpart"
@@ -405,6 +445,15 @@ export const publishTileEffectiveCounterpart = (args: {
   const conservationArtifact = isNhm2TileCounterpartConservationArtifact(conservation)
     ? conservation
     : null;
+  const conservationRegionMap = new Map(
+    conservationArtifact?.regions.map((region) => [region.regionId, region]) ?? [],
+  );
+  const conservationStatusForRegion = (
+    regionId: Nhm2RegionalSourceClosureRegionId,
+  ): ConservationStatus => {
+    if (args.conservationPath == null || conservationArtifact == null) return "unknown";
+    return conservationRegionMap.get(regionId)?.status ?? "unknown";
+  };
   const sourceRegionMap = new Map(
     sourceArtifact?.regions.map((region) => [region.regionId, region]) ?? [],
   );
@@ -439,12 +488,7 @@ export const publishTileEffectiveCounterpart = (args: {
     dutyCycleStatus:
       qei?.dutyCyclePass == null ? "unknown" : qei.dutyCyclePass ? "pass" : "fail",
     lightCrossingConsistencyStatus: qei?.lightCrossingConsistencyStatus ?? "unknown",
-    conservationDiagnostics: {
-      divTStatus: "unknown",
-      divTResidualLInf: null,
-      continuityResidualLInf: null,
-      momentumResidualLInf: null,
-    },
+    conservationDiagnostics: summarizeConservationDiagnostics(conservationArtifact),
     regions: NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS.map((regionId) =>
       sourceArtifact == null
         ? makeRegion(regionId, regionMap.get(regionId) ?? null, sourceClosure)
@@ -453,7 +497,7 @@ export const publishTileEffectiveCounterpart = (args: {
             sourceRegionMap.get(regionId) ?? null,
             sourceArtifact,
             qei?.qeiApplicabilityStatus ?? "UNKNOWN",
-            conservationArtifact?.overallState ?? "unknown",
+            conservationStatusForRegion(regionId),
           ),
     ),
     literatureRefs: TILE_COUNTERPART_LITERATURE_REFS,

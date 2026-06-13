@@ -1,6 +1,8 @@
 import {
+  NHM2_TENSOR_COMPONENTS,
   NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS,
   type Nhm2RegionalSourceClosureRegionId,
+  type Nhm2TensorComponent,
 } from "./nhm2-regional-source-closure-evidence.v1";
 
 export const NHM2_TILE_COUNTERPART_CONSERVATION_ARTIFACT_ID =
@@ -28,6 +30,14 @@ export type Nhm2TileCounterpartConservationArtifact = {
     momentumResidualLInf: number | null;
     toleranceLInf: number | null;
     sampleCount: number | null;
+    diagnosticMode?:
+      | "regional_jump_linf_v1"
+      | "not_computed_validation_hardening_placeholder";
+    neighborRegionIds?: Nhm2RegionalSourceClosureRegionId[];
+    transitionLayerResidualLInf?: number | null;
+    dominantComponentId?: Nhm2TensorComponent | null;
+    maxHotspotRef?: string | null;
+    warnings?: string[];
     blockers: string[];
   }>;
   claimEffect: "diagnostic_only" | "conservation_candidate" | "blocked";
@@ -56,6 +66,42 @@ const isRegionId = (value: unknown): value is Nhm2RegionalSourceClosureRegionId 
 
 const isStatus = (value: unknown): value is "pass" | "review" | "fail" | "missing" =>
   value === "pass" || value === "review" || value === "fail" || value === "missing";
+
+const isOptionalDiagnosticMode = (
+  value: unknown,
+): value is
+  | "regional_jump_linf_v1"
+  | "not_computed_validation_hardening_placeholder"
+  | undefined =>
+  value === undefined ||
+  value === "regional_jump_linf_v1" ||
+  value === "not_computed_validation_hardening_placeholder";
+
+const isOptionalRegionIds = (
+  value: unknown,
+): value is Nhm2RegionalSourceClosureRegionId[] | undefined =>
+  value === undefined ||
+  (Array.isArray(value) && value.every(isRegionId));
+
+const isOptionalNullableNumber = (
+  value: unknown,
+): value is number | null | undefined =>
+  value === undefined || isNullableNumber(value);
+
+const isOptionalTensorComponent = (
+  value: unknown,
+): value is Nhm2TensorComponent | null | undefined =>
+  value === undefined ||
+  value === null ||
+  NHM2_TENSOR_COMPONENTS.includes(value as Nhm2TensorComponent);
+
+const isOptionalNullableText = (
+  value: unknown,
+): value is string | null | undefined =>
+  value === undefined || value === null || isText(value);
+
+const isOptionalTextArray = (value: unknown): value is string[] | undefined =>
+  value === undefined || (Array.isArray(value) && value.every(isText));
 
 const deriveRegionBlockers = (
   region: Nhm2TileCounterpartConservationArtifact["regions"][number],
@@ -130,6 +176,12 @@ const isRegion = (
     isNullableNumber(record.momentumResidualLInf) &&
     isNullableNumber(record.toleranceLInf) &&
     isNullableNumber(record.sampleCount) &&
+    isOptionalDiagnosticMode(record.diagnosticMode) &&
+    isOptionalRegionIds(record.neighborRegionIds) &&
+    isOptionalNullableNumber(record.transitionLayerResidualLInf) &&
+    isOptionalTensorComponent(record.dominantComponentId) &&
+    isOptionalNullableText(record.maxHotspotRef) &&
+    isOptionalTextArray(record.warnings) &&
     Array.isArray(record.blockers) &&
     record.blockers.every(isText)
   );

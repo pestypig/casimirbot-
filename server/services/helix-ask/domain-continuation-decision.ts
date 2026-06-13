@@ -21,10 +21,33 @@ export type HelixDomainContinuationDecision = {
   goal_kind: string;
   decision: "none" | "continue" | "retry" | "typed_failure" | "request_user_input";
   reason: string;
+  docs_continuation_contract?: HelixDocsContinuationContract;
   recommended_capability_hint?: HelixDomainContinuationCapabilityHint;
   expected_artifacts?: string[];
   typed_failure_code?: string;
   repair_candidate?: Record<string, unknown>;
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
+export type HelixDocsContinuationContract = {
+  schema: "helix.docs_continuation_contract.v1";
+  current_docs_phase:
+    | "search_required"
+    | "candidate_validation_required"
+    | "open_validated_doc_required"
+    | "summary_required"
+    | "terminal_ready"
+    | "blocked";
+  prior_observation_kind: string | null;
+  prior_observation_refs: string[];
+  required_next_capability: string | null;
+  forbidden_repeated_capabilities: string[];
+  expected_next_artifact: string | null;
+  expected_next_artifacts: string[];
+  done_condition: string;
+  terminal_block_reason_if_missing: string | null;
+  model_visible_instruction: string;
   assistant_answer: false;
   raw_content_included: false;
 };
@@ -108,6 +131,38 @@ const findArtifactPayload = (
   return null;
 };
 
+const artifactRefsForKinds = (payload: Record<string, unknown>, kinds: string[]): string[] =>
+  getLedger(payload)
+    .filter((artifact) => kinds.includes(String(artifact.kind ?? "")))
+    .map((artifact) => readString(artifact.artifact_id) ?? readString(artifact.id))
+    .filter((ref): ref is string => Boolean(ref));
+
+const docsContract = (args: {
+  phase: HelixDocsContinuationContract["current_docs_phase"];
+  priorKind: string | null;
+  priorRefs: string[];
+  requiredCapability: string | null;
+  forbiddenRepeatedCapabilities?: string[];
+  expectedArtifacts?: string[];
+  doneCondition?: string;
+  terminalBlockReason?: string | null;
+  instruction: string;
+}): HelixDocsContinuationContract => ({
+  schema: "helix.docs_continuation_contract.v1",
+  current_docs_phase: args.phase,
+  prior_observation_kind: args.priorKind,
+  prior_observation_refs: args.priorRefs,
+  required_next_capability: args.requiredCapability,
+  forbidden_repeated_capabilities: args.forbiddenRepeatedCapabilities ?? [],
+  expected_next_artifact: args.expectedArtifacts?.[0] ?? null,
+  expected_next_artifacts: args.expectedArtifacts ?? [],
+  done_condition: args.doneCondition ?? "terminal answer is allowed only after doc_summary satisfies the goal",
+  terminal_block_reason_if_missing: args.terminalBlockReason ?? null,
+  model_visible_instruction: args.instruction,
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
 const hasAction = (payload: Record<string, unknown>, panelId: string, actionId: string): boolean => {
   const actionMatches = (value: unknown): boolean => {
     const record = asRecord(value);
@@ -157,11 +212,20 @@ const hasDocSearchCandidates = (payload: Record<string, unknown>): boolean => {
   return readArray(search?.matches).length > 0;
 };
 
+const firstDocSearchCandidatePath = (payload: Record<string, unknown>): string | null => {
+  const search = findArtifactPayload(payload, ["doc_search_results"]);
+  const firstMatch = readArray(search?.matches).map(asRecord).find(Boolean) ?? null;
+  return normalizePath(firstMatch?.path);
+};
+
 const readValidation = (payload: Record<string, unknown>): Record<string, unknown> | null =>
   findArtifactPayload(payload, ["doc_candidate_validation"]);
 
 const readOpenReceipt = (payload: Record<string, unknown>): Record<string, unknown> | null =>
   findArtifactPayload(payload, ["doc_open_receipt"]);
+
+const hasDocSummary = (payload: Record<string, unknown>): boolean =>
+  Boolean(findArtifactPayload(payload, ["doc_summary", "focused_doc_answer"]));
 
 const hasLocationResult = (payload: Record<string, unknown>): boolean => {
   const location = findArtifactPayload(payload, ["doc_location_result", "doc_location_matches", "doc_evidence_location"]);
@@ -190,6 +254,13 @@ const locateQuery = (payload: Record<string, unknown>, prompt: string): string |
   if (quoted) return quoted;
   const afterFind = prompt.match(/\b(?:find|where|locate)\b\s+(?:where\s+)?(.+?)(?:\s+in\s+the\b|\s+from\s+the\b|[?.!]|$)/i)?.[1]?.trim();
   return afterFind && afterFind.length > 2 ? afterFind : null;
+};
+
+const docSummaryFocusQuery = (prompt: string): string | null => {
+  if (/\bremaining\s+parity\s+gap\b/i.test(prompt)) return "remaining parity gap";
+  const afterSummarize = prompt.match(/\bsummari[sz]e\s+(?:the\s+)?(.+?)(?:\s+in\s+\d+\s+bullets?|\s+with\s+(?:the\s+)?(?:document\s+)?path|[?.!]|$)/i)?.[1]?.trim();
+  if (afterSummarize && afterSummarize.length > 2 && afterSummarize.length < 120) return afterSummarize;
+  return null;
 };
 
 const hasVisualSource = (payload: Record<string, unknown>): boolean => {
@@ -308,6 +379,133 @@ export const buildHelixDomainContinuationDecision = (input: DomainContinuationIn
       });
     }
     return continuation(input, goalKind, "none", "doc_open_best_has_no_bounded_continuation");
+  }
+
+  if (goalKind === "doc_summary") {
+    const validation = readValidation(input.payload);
+    const selectedPath = normalizePath(validation?.selected_path) ?? firstDocSearchCandidatePath(input.payload);
+    const selectedStatus = readString(validation?.selected_status);
+    const openReceipt = readOpenReceipt(input.payload);
+    const openedPath = normalizePath(openReceipt?.path) ?? normalizePath(openReceipt?.active_doc_path) ?? activeDocPath(input.payload);
+    const search = findArtifactPayload(input.payload, ["doc_search_results"]);
+    const query = readString(validation?.query) ?? readString(search?.query) ?? locateQuery(input.payload, input.prompt) ?? input.prompt;
+    const summaryQuery = docSummaryFocusQuery(input.prompt) ?? query;
+    const hasSummary = hasDocSummary(input.payload);
+
+    if (!hasDocSearchCandidates(input.payload) && !validation && !openedPath && !hasSummary) {
+      return continuation(input, goalKind, "continue", "doc_summary_requires_initial_docs_search", {
+        docs_continuation_contract: docsContract({
+          phase: "search_required",
+          priorKind: null,
+          priorRefs: [],
+          requiredCapability: "docs-viewer.search_docs",
+          expectedArtifacts: ["doc_search_results"],
+          terminalBlockReason: "doc_search_results missing",
+          instruction:
+            "You are in a docs_summary continuation workflow. No doc_search_results exist yet. Choose docs-viewer.search_docs and expect doc_search_results before validating, opening, summarizing, or answering.",
+        }),
+        recommended_capability_hint: capabilityHint(
+          action("docs-viewer", "search_docs", { query, limit: 5 }),
+          "doc_summary_requires_initial_docs_search",
+        ),
+        expected_artifacts: ["doc_search_results"],
+      });
+    }
+
+    if (hasDocSearchCandidates(input.payload) && !validation) {
+      return continuation(input, goalKind, "continue", "doc_summary_search_candidates_require_validation", {
+        docs_continuation_contract: docsContract({
+          phase: "candidate_validation_required",
+          priorKind: "doc_search_results",
+          priorRefs: artifactRefsForKinds(input.payload, ["doc_search_results"]),
+          requiredCapability: "docs-viewer.validate_doc_candidates",
+          forbiddenRepeatedCapabilities: ["docs-viewer.search_docs"],
+          expectedArtifacts: ["doc_candidate_validation"],
+          terminalBlockReason: "doc_candidate_validation missing",
+          instruction:
+            "You are in a docs_summary continuation workflow. The previous observation already satisfied doc_search_results. Do not call docs-viewer.search_docs again unless the prior search had no candidates or the query materially changed. Choose docs-viewer.validate_doc_candidates next and expect doc_candidate_validation.",
+        }),
+        recommended_capability_hint: capabilityHint(
+          action("docs-viewer", "validate_doc_candidates", { query, transcript: input.prompt, limit: 8 }),
+          "doc_summary_search_candidates_require_validation",
+        ),
+        expected_artifacts: ["doc_candidate_validation"],
+      });
+    }
+    if (selectedPath && (!openedPath || openedPath !== selectedPath)) {
+      return continuation(input, goalKind, "continue", "doc_summary_validated_candidate_requires_open", {
+        docs_continuation_contract: docsContract({
+          phase: "open_validated_doc_required",
+          priorKind: validation ? "doc_candidate_validation" : "doc_search_results",
+          priorRefs: artifactRefsForKinds(input.payload, ["doc_candidate_validation", "doc_search_results"]),
+          requiredCapability: "docs-viewer.open_doc_by_path",
+          forbiddenRepeatedCapabilities: ["docs-viewer.search_docs", "docs-viewer.validate_doc_candidates"],
+          expectedArtifacts: ["active_doc_path", "doc_open_receipt"],
+          terminalBlockReason: "active_doc_path/doc_open_receipt missing",
+          instruction:
+            "You are in a docs_summary continuation workflow. A selected document candidate exists. Do not repeat docs search or validation. Choose docs-viewer.open_doc_by_path for the selected path and expect active_doc_path plus doc_open_receipt.",
+        }),
+        recommended_capability_hint: capabilityHint(
+          action("docs-viewer", "open_doc_by_path", {
+            path: selectedPath,
+            query,
+            selection_reason: "validated_doc_summary_candidate",
+            candidate_validation_status: selectedStatus ?? "candidate_selected",
+          }),
+          "doc_summary_validated_candidate_requires_open",
+        ),
+        expected_artifacts: ["active_doc_path", "doc_open_receipt"],
+      });
+    }
+    if ((openedPath || selectedPath) && !hasSummary) {
+      return continuation(input, goalKind, "continue", "doc_summary_open_doc_requires_summary", {
+        docs_continuation_contract: docsContract({
+          phase: "summary_required",
+          priorKind: "active_doc_path",
+          priorRefs: artifactRefsForKinds(input.payload, ["active_doc_path", "doc_open_receipt", "active_doc_identity"]),
+          requiredCapability: "docs-viewer.summarize_doc",
+          forbiddenRepeatedCapabilities: ["docs-viewer.search_docs", "docs-viewer.validate_doc_candidates", "docs-viewer.open_doc_by_path"],
+          expectedArtifacts: ["doc_summary", "focused_doc_answer"],
+          terminalBlockReason: "doc_summary missing",
+          instruction:
+            "You are in a docs_summary continuation workflow. The document is open. Do not repeat search, validation, or open. Choose docs-viewer.summarize_doc next and expect doc_summary before terminal answer.",
+        }),
+        recommended_capability_hint: capabilityHint(
+          action("docs-viewer", "summarize_doc", {
+            path: openedPath ?? selectedPath,
+            query: summaryQuery,
+          }),
+          "doc_summary_open_doc_requires_summary",
+        ),
+        expected_artifacts: ["doc_summary", "focused_doc_answer"],
+      });
+    }
+    if (hasSummary) {
+      return continuation(input, goalKind, "none", "doc_summary_has_terminal_artifact", {
+        docs_continuation_contract: docsContract({
+          phase: "terminal_ready",
+          priorKind: "doc_summary",
+          priorRefs: artifactRefsForKinds(input.payload, ["doc_summary", "focused_doc_answer"]),
+          requiredCapability: null,
+          expectedArtifacts: [],
+          terminalBlockReason: null,
+          instruction:
+            "The docs_summary workflow has a doc_summary artifact. Terminal answer may be allowed if goal satisfaction and terminal authority pass.",
+        }),
+      });
+    }
+    return continuation(input, goalKind, "none", "doc_summary_has_no_bounded_continuation", {
+      docs_continuation_contract: docsContract({
+        phase: "blocked",
+        priorKind: null,
+        priorRefs: artifactRefsForKinds(input.payload, ["doc_search_results", "doc_candidate_validation", "active_doc_path", "doc_open_receipt"]),
+        requiredCapability: null,
+        expectedArtifacts: [],
+        terminalBlockReason: "docs_summary_continuation_state_unresolved",
+        instruction:
+          "The docs_summary workflow state is unresolved. Do not answer until doc_summary exists; ask for repair or fail closed if no admitted docs capability can advance.",
+      }),
+    });
   }
 
   if (goalKind === "doc_evidence_location" || goalKind === "doc_location_result" || goalKind === "doc_equation_location") {

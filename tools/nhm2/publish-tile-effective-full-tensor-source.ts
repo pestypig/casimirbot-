@@ -4,6 +4,10 @@ import { fileURLToPath } from "node:url";
 
 import { isNhm2ReferenceRunArtifact } from "../../shared/contracts/nhm2-reference-run.v1";
 import {
+  isNhm2RegionalMaterialSourceTensorModelArtifact,
+  type Nhm2RegionalMaterialSourceTensorModelV1,
+} from "../../shared/contracts/nhm2-regional-material-source-tensor-model.v1";
+import {
   NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS,
   NHM2_TENSOR_COMPONENTS,
   type Nhm2RegionalSourceClosureRegionId,
@@ -51,6 +55,7 @@ type SourceInputRegion = {
     | "diagonal_proxy"
     | "metric_echo"
     | "unknown";
+  blockers?: string[];
 };
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -74,6 +79,14 @@ const resolvePath = (repoRoot: string, path: string): string =>
 
 const pathUsesLatestAlias = (path: string | null | undefined): boolean =>
   path != null && /(^|[-/\\])latest(\.|[-/\\]|$)/i.test(path);
+
+const stringList = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.filter(
+        (entry): entry is string =>
+          typeof entry === "string" && entry.trim().length > 0,
+      )
+    : [];
 
 const parseArgs = (argv: string[]): Record<string, string | boolean> => {
   const parsed: Record<string, string | boolean> = {};
@@ -208,8 +221,91 @@ const normalizeRegion = (entry: unknown): SourceInputRegion | null => {
       record?.derivationMode === "metric_echo"
         ? record.derivationMode
         : "unknown",
+    blockers: stringList(record?.blockers),
   };
 };
+
+const aggregationFromRegionalModel = (
+  value: Nhm2RegionalMaterialSourceTensorModelV1["regions"][number]["aggregationMode"],
+): "mean" | "integral" | "unknown" =>
+  value === "direct_region_model" ||
+  value === "aggregate_from_regions" ||
+  value === "representative_sector_bin"
+    ? "mean"
+    : "unknown";
+
+const normalizationFromRegionalModel = (
+  value: Nhm2RegionalMaterialSourceTensorModelV1["regions"][number]["normalizationBasis"],
+): "sample_count" | "volume" | "unknown" =>
+  value === "sample_count" || value === "volume" ? value : "unknown";
+
+const sourceModelClassFromRegionalModel = (
+  model: Nhm2RegionalMaterialSourceTensorModelV1,
+): "cycle_averaged_tile_model" | "renormalized_qft_declared" | "unknown" => {
+  if (
+    model.modelKind === "lifshitz_regional_tensor" ||
+    model.modelKind === "measured_material_tensor"
+  ) {
+    return "renormalized_qft_declared";
+  }
+  if (model.modelKind === "declared_research_tensor") return "cycle_averaged_tile_model";
+  return "unknown";
+};
+
+const supportStatusFromRegionalModel = (
+  region: Nhm2RegionalMaterialSourceTensorModelV1["regions"][number],
+): "pass" | "review" | "fail" | "unknown" => {
+  if (region.status === "blocked" || region.status === "missing") return "fail";
+  if (region.status === "proxy") return "review";
+  return region.blockers.length === 0 ? "pass" : "review";
+};
+
+const sourceInputFromRegionalMaterialModel = (
+  model: Nhm2RegionalMaterialSourceTensorModelV1,
+  sourceInputPath: string,
+): Record<string, unknown> => ({
+  schemaVersion: "nhm2_tile_source_input/v1",
+  sourceModelId: "nhm2_regional_material_source_tensor_model",
+  sourceModelVersion: model.contractVersion,
+  sourceModelClass: sourceModelClassFromRegionalModel(model),
+  notDerivedFromMetricRequiredTensor: model.notDerivedFromMetricRequiredTensor,
+  metricRequiredInputRefs: [],
+  sourceChannels: {
+    regions: model.regions.map((region) => {
+      const supportStatus = supportStatusFromRegionalModel(region);
+      return {
+        regionId: region.regionId,
+        tensor: region.tensor,
+        symmetry:
+          region.tensorAuthorityMode === "symmetric_full_tensor" ? "symmetric" : "none",
+        chartRef: region.chartId,
+        unitsRef: region.units,
+        regionMaskRef: region.regionMaskRef,
+        aggregationMode: aggregationFromRegionalModel(region.aggregationMode),
+        normalizationBasis: normalizationFromRegionalModel(region.normalizationBasis),
+        sampleCount: region.sampleCount,
+        inputRefs: [
+          sourceInputPath,
+          model.sourceModelRef,
+          model.materialReceiptRef,
+          region.materialReceiptRef,
+          region.provenanceRef,
+        ].filter(
+          (entry): entry is string => typeof entry === "string" && entry.length > 0,
+        ),
+        preAggregationValueRefs: [region.provenanceRef],
+        supportKernelId: `regional_material_source_tensor_model.${region.regionId}`,
+        cycleAverageStatus: supportStatus,
+        dutyCycleStatus: supportStatus,
+        lightCrossingConsistencyStatus: "review",
+        producerModule: "tools/nhm2/build-regional-material-source-tensor-model.ts",
+        producerFunction: "buildRegionalMaterialSourceTensorModel",
+        derivationMode: "source_model_direct_full_tensor",
+        blockers: region.blockers,
+      };
+    }),
+  },
+});
 
 const missingRegion = (
   regionId: Nhm2RegionalSourceClosureRegionId,
@@ -269,9 +365,18 @@ export const publishTileEffectiveFullTensorSource = (args: {
   if (!isNhm2ReferenceRunArtifact(referenceRun)) {
     throw new Error("reference run must be a valid nhm2_reference_run/v1 artifact");
   }
-  const sourceInput = asRecord(readJson(resolvePath(args.repoRoot, args.sourceInputPath)));
+  const rawSourceInput = readJson(resolvePath(args.repoRoot, args.sourceInputPath));
+  const regionalMaterialModel = isNhm2RegionalMaterialSourceTensorModelArtifact(rawSourceInput)
+    ? rawSourceInput
+    : null;
+  const sourceInput =
+    regionalMaterialModel == null
+      ? asRecord(rawSourceInput)
+      : sourceInputFromRegionalMaterialModel(regionalMaterialModel, args.sourceInputPath);
   if (sourceInput == null || sourceInput.schemaVersion !== "nhm2_tile_source_input/v1") {
-    throw new Error("source input must be nhm2_tile_source_input/v1");
+    throw new Error(
+      "source input must be nhm2_tile_source_input/v1 or nhm2_regional_material_source_tensor_model/v1",
+    );
   }
 
   const qei =
@@ -286,6 +391,19 @@ export const publishTileEffectiveFullTensorSource = (args: {
   const conservationArtifact = isNhm2TileCounterpartConservationArtifact(conservation)
     ? conservation
     : null;
+  const conservationRegionMap = new Map(
+    conservationArtifact?.regions.map((region) => [region.regionId, region]) ?? [],
+  );
+  const conservationBlockerForRegion = (
+    regionId: Nhm2RegionalSourceClosureRegionId,
+  ): string | null => {
+    if (args.conservationPath == null || conservationArtifact == null) {
+      return "conservation_unknown";
+    }
+    const region = conservationRegionMap.get(regionId);
+    if (region == null || region.status === "missing") return "conservation_unknown";
+    return region.status === "pass" ? null : "conservation_not_pass";
+  };
 
   const sourceChannels = asRecord(sourceInput.sourceChannels);
   const sourceRegions = Array.isArray(sourceChannels?.regions)
@@ -310,16 +428,15 @@ export const publishTileEffectiveFullTensorSource = (args: {
       sourceRegion.derivationMode,
       sourceModelClass,
     );
-    const blockers: string[] = [];
+    const blockers: string[] = [...(sourceRegion.blockers ?? [])];
     if (!sourceSideOnly) blockers.push("source_model_not_source_side_only");
     if (!notDerivedFromMetricRequiredTensor) blockers.push("metric_required_derivation_not_allowed");
     if (metricRequiredInputRefs.length > 0) blockers.push("metric_required_input_refs_present");
     if (args.qeiDossierPath == null || qeiArtifact == null || qeiArtifact.qeiApplicabilityStatus !== "PASS") {
       blockers.push("qei_dossier_not_pass");
     }
-    if (args.conservationPath == null || conservationArtifact == null || conservationArtifact.overallState !== "pass") {
-      blockers.push("conservation_unknown");
-    }
+    const conservationBlocker = conservationBlockerForRegion(regionId);
+    if (conservationBlocker != null) blockers.push(conservationBlocker);
     if (!fullTensorSourceHasFullAuthority(sourceRegion.tensor, authority)) {
       blockers.push("full_tensor_components_missing");
     }

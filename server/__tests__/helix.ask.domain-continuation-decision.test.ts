@@ -61,6 +61,96 @@ describe("helix ask domain continuation decision", () => {
     );
   });
 
+  it("exposes docs-summary search-to-validation as a model-visible required-next contract", () => {
+    const decision = buildDecision(
+      "Open the Helix Ask Codex parity model turn fidelity audit doc and summarize the remaining parity gap.",
+      {
+        goal_satisfaction_evaluation: {
+          terminal_contract: { goal_kind: "doc_summary" },
+        },
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: "ask:test:doc_search_results",
+            kind: "doc_search_results",
+            payload: {
+              query: "Helix Ask Codex parity model turn fidelity audit",
+              matches: [{ path: "/docs/audits/research/helix-ask-codex-parity-model-turn-fidelity-audit-2026-06-12.md" }],
+            },
+          },
+        ],
+      },
+    );
+
+    expect(decision.decision).toBe("continue");
+    expect(decision.reason).toBe("doc_summary_search_candidates_require_validation");
+    expect(decision.docs_continuation_contract).toMatchObject({
+      schema: "helix.docs_continuation_contract.v1",
+      current_docs_phase: "candidate_validation_required",
+      prior_observation_kind: "doc_search_results",
+      required_next_capability: "docs-viewer.validate_doc_candidates",
+      forbidden_repeated_capabilities: ["docs-viewer.search_docs"],
+      expected_next_artifact: "doc_candidate_validation",
+      terminal_block_reason_if_missing: "doc_candidate_validation missing",
+    });
+    expect(decision.docs_continuation_contract?.model_visible_instruction).toContain("Do not call docs-viewer.search_docs again");
+  });
+
+  it("exposes docs-summary validation-to-open and open-to-summary phases", () => {
+    const path = "/docs/audits/research/helix-ask-codex-parity-model-turn-fidelity-audit-2026-06-12.md";
+    const openDecision = buildDecision("Summarize the remaining parity gap in the audit doc.", {
+      goal_satisfaction_evaluation: {
+        terminal_contract: { goal_kind: "doc_summary" },
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "ask:test:doc_candidate_validation",
+          kind: "doc_candidate_validation",
+          payload: {
+            query: "Helix Ask Codex parity model turn fidelity audit",
+            selected_status: "strong",
+            selected_path: path,
+          },
+        },
+      ],
+    });
+    expect(openDecision.docs_continuation_contract).toMatchObject({
+      current_docs_phase: "open_validated_doc_required",
+      required_next_capability: "docs-viewer.open_doc_by_path",
+      forbidden_repeated_capabilities: ["docs-viewer.search_docs", "docs-viewer.validate_doc_candidates"],
+      expected_next_artifact: "active_doc_path",
+    });
+
+    const summaryDecision = buildDecision("Summarize the remaining parity gap in the audit doc.", {
+      goal_satisfaction_evaluation: {
+        terminal_contract: { goal_kind: "doc_summary" },
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "ask:test:doc_candidate_validation",
+          kind: "doc_candidate_validation",
+          payload: {
+            selected_status: "strong",
+            selected_path: path,
+          },
+        },
+        {
+          artifact_id: "ask:test:doc_open_receipt",
+          kind: "doc_open_receipt",
+          payload: {
+            status: "opened",
+            path,
+          },
+        },
+      ],
+    });
+    expect(summaryDecision.docs_continuation_contract).toMatchObject({
+      current_docs_phase: "summary_required",
+      required_next_capability: "docs-viewer.summarize_doc",
+      forbidden_repeated_capabilities: ["docs-viewer.search_docs", "docs-viewer.validate_doc_candidates", "docs-viewer.open_doc_by_path"],
+      expected_next_artifact: "doc_summary",
+    });
+  });
+
   it("continues doc opening from strong validation to open_doc_by_path", () => {
     const decision = buildDecision("Open the NHM-2 white paper from the docs.", {
       goal_satisfaction_evaluation: {

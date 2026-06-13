@@ -1323,6 +1323,8 @@ describe("helix ask E52 panel control terminal contract", () => {
       const loopTrace = debugExport.body?.payload?.loop_parity_trace;
       expect(loopTrace?.actual_tool_calls?.map((call: any) => call.tool_id)).toEqual([
         "docs-viewer.search_docs",
+        "docs-viewer.validate_doc_candidates",
+        "docs-viewer.open_doc_by_path",
         "docs-viewer.summarize_doc",
       ]);
       expect(loopTrace?.rejected_tool_calls?.map((call: any) => call.tool_id) ?? []).not.toContain("docs-viewer.search_docs");
@@ -1370,14 +1372,27 @@ describe("helix ask E52 panel control terminal contract", () => {
       },
       {
         next_step: "next_action",
-        chosen_capability: "docs-viewer.summarize_doc",
-        reason: "Summarize the selected audit document around the remaining parity gap.",
-        args: {
-          path: "/docs/audits/research/helix-ask-codex-parity-model-turn-fidelity-audit-2026-06-12.md",
-          query: "remaining parity gap",
-        },
-        expected_artifacts: ["doc_summary"],
-        confidence: 0.95,
+        chosen_capability: "docs-viewer.search_docs",
+        reason: "Incorrectly repeat docs search after doc_search_results already selected candidate documents.",
+        args: { query: "Helix Ask Codex parity model turn fidelity audit", limit: 5 },
+        expected_artifacts: ["doc_search_results"],
+        confidence: 0.9,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "docs-viewer.search_docs",
+        reason: "Incorrectly repeat docs search after candidate validation should lead to opening the selected path.",
+        args: { query: "Helix Ask Codex parity model turn fidelity audit", limit: 5 },
+        expected_artifacts: ["doc_search_results"],
+        confidence: 0.88,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "docs-viewer.search_docs",
+        reason: "Incorrectly repeat docs search after the document was opened and summary is still missing.",
+        args: { query: "Helix Ask Codex parity model turn fidelity audit", limit: 5 },
+        expected_artifacts: ["doc_search_results"],
+        confidence: 0.86,
       },
       {
         next_step: "answer",
@@ -1437,14 +1452,187 @@ describe("helix ask E52 panel control terminal contract", () => {
       );
       expect(payload?.loop_parity_trace?.actual_tool_calls?.map((call: any) => call.tool_id)).toEqual([
         "docs-viewer.search_docs",
+        "docs-viewer.validate_doc_candidates",
+        "docs-viewer.open_doc_by_path",
         "docs-viewer.summarize_doc",
       ]);
+      expect(payload?.loop_parity_trace?.observations_created).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ source_kind: "doc_search_results" }),
+          expect.objectContaining({ source_kind: "doc_candidate_validation" }),
+          expect.objectContaining({ source_kind: "doc_open_receipt" }),
+          expect.objectContaining({ source_kind: "active_doc_path" }),
+        ]),
+      );
+      expect((payload?.current_turn_artifact_ledger ?? []).map((artifact: any) => artifact?.kind)).toContain("doc_summary");
       expect(payload?.loop_parity_trace?.unexpected_tool_calls).toEqual([]);
       expect(payload?.loop_parity_trace?.short_circuit_risk_flags ?? []).not.toContain("tool_called_without_admission");
       expect(payload?.model_turn_fidelity_audit?.model_visible_tool_families).toEqual(
         expect.arrayContaining(["docs_viewer"]),
       );
+      expect(payload?.model_turn_fidelity_audit?.authority?.policy_override_used).toBe(true);
       expect(payload?.model_turn_fidelity_audit?.parity_status).not.toBe("model_driven_parity");
+      expect((payload?.agent_runtime_loop?.iterations ?? []).some((iteration: any) =>
+        iteration.chosen_capability === "docs-viewer.validate_doc_candidates" &&
+        iteration.decision_source === "deterministic_policy_fallback"
+      )).toBe(true);
+      expect((payload?.agent_runtime_loop?.iterations ?? []).some((iteration: any) =>
+        iteration.chosen_capability === "docs-viewer.open_doc_by_path" &&
+        iteration.decision_source === "deterministic_policy_fallback"
+      )).toBe(true);
+      expect((payload?.agent_runtime_loop?.iterations ?? []).some((iteration: any) =>
+        iteration.chosen_capability === "docs-viewer.summarize_doc" &&
+        iteration.decision_source === "deterministic_policy_fallback"
+      )).toBe(true);
+    } finally {
+      if (previousFlag === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;
+      else process.env.HELIX_AGENT_STEP_DECISION_LLM = previousFlag;
+      if (previousResponse === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = previousResponse;
+      if (previousResponseIndex === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = previousResponseIndex;
+    }
+  }, 60000);
+
+  it("lets a model-followed docs summary continuation complete without policy repair", async () => {
+    const app = createApp();
+    const previousFlag = process.env.HELIX_AGENT_STEP_DECISION_LLM;
+    const previousResponse = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+    const previousResponseIndex = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+
+    process.env.HELIX_AGENT_STEP_DECISION_LLM = "1";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
+      {
+        next_step: "next_action",
+        chosen_capability: "docs-viewer.search_docs",
+        reason: "No doc_search_results exist yet, so search docs for the named audit document.",
+        args: { query: "Helix Ask Codex parity model turn fidelity audit", limit: 5 },
+        expected_artifacts: ["doc_search_results"],
+        commentary: {
+          turn_purpose: "Open and summarize the requested audit doc from local docs only.",
+          why_this_capability: "The docs workflow starts with local docs search.",
+          expected_artifacts: "doc_search_results",
+          what_would_make_this_done: "A doc_summary artifact exists and terminal authority accepts it.",
+          observation_summary: "No docs observation exists yet.",
+          next_step_reason: "Search first.",
+        },
+        confidence: 0.95,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "docs-viewer.validate_doc_candidates",
+        reason: "doc_search_results exist; the docs continuation contract requires candidate validation next.",
+        args: { query: "Helix Ask Codex parity model turn fidelity audit", limit: 8 },
+        expected_artifacts: ["doc_candidate_validation"],
+        commentary: {
+          turn_purpose: "Validate the best matching local docs candidate.",
+          why_this_capability: "The required next docs capability is validate_doc_candidates.",
+          expected_artifacts: "doc_candidate_validation",
+          what_would_make_this_done: "A selected candidate path is validated.",
+          observation_summary: "doc_search_results are present.",
+          next_step_reason: "Advance, do not repeat search.",
+        },
+        confidence: 0.96,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "docs-viewer.open_doc_by_path",
+        reason: "doc_candidate_validation selected a path; the next required capability is open_doc_by_path.",
+        args: {
+          path: "/docs/audits/research/helix-ask-codex-parity-model-turn-fidelity-audit-2026-06-12.md",
+          query: "Helix Ask Codex parity model turn fidelity audit",
+        },
+        expected_artifacts: ["active_doc_path", "doc_open_receipt"],
+        commentary: {
+          turn_purpose: "Open the validated document.",
+          why_this_capability: "The selected path must become active docs evidence.",
+          expected_artifacts: "active_doc_path, doc_open_receipt",
+          what_would_make_this_done: "The requested path is open.",
+          observation_summary: "doc_candidate_validation is present.",
+          next_step_reason: "Open the validated path.",
+        },
+        confidence: 0.96,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "docs-viewer.summarize_doc",
+        reason: "active_doc_path exists; the next required capability is summarize_doc.",
+        args: {
+          path: "/docs/audits/research/helix-ask-codex-parity-model-turn-fidelity-audit-2026-06-12.md",
+          query: "remaining parity gap",
+        },
+        expected_artifacts: ["doc_summary"],
+        commentary: {
+          turn_purpose: "Summarize the opened document around the requested focus.",
+          why_this_capability: "The open doc must produce a doc_summary artifact before terminal answer.",
+          expected_artifacts: "doc_summary",
+          what_would_make_this_done: "A scoped doc_summary exists.",
+          observation_summary: "active_doc_path is present.",
+          next_step_reason: "Summarize now.",
+        },
+        confidence: 0.97,
+      },
+      {
+        next_step: "answer",
+        chosen_capability: null,
+        reason: "The doc_summary artifact satisfies the requested three-bullet parity-gap answer.",
+        args: {},
+        expected_artifacts: ["doc_summary"],
+        commentary: {
+          turn_purpose: "Answer from the doc_summary artifact.",
+          why_this_capability: "No more tool call is needed.",
+          expected_artifacts: "doc_summary",
+          what_would_make_this_done: "Terminal authority accepts the doc_summary-backed final answer.",
+          observation_summary: "doc_summary is present.",
+          next_step_reason: "Answer from observed docs evidence.",
+        },
+        confidence: 0.98,
+      },
+    ]);
+
+    try {
+      const response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question:
+            "Open the Helix Ask Codex parity model turn fidelity audit doc. Use docs only. Do not use repo-code or internet search. After each document observation, choose the next required docs-viewer capability until you can answer from a doc summary artifact. Summarize the remaining parity gap in three bullets and include the document path.",
+          mode: "read",
+          debug: true,
+          sessionId: `e52-doc-summary-model-driven-continuation-${Date.now()}`,
+        })
+        .expect(200);
+
+      expect(response.body?.terminal_error_code ?? null).toBeNull();
+      expect(response.body?.terminal_artifact_kind).toBe("doc_summary");
+      expect(response.body?.goal_satisfaction_evaluation?.satisfaction).toBe("satisfied");
+      expect(actionsOf(response.body).map((action) => `${action?.panel_id}.${action?.action_id}`)).toEqual([
+        "docs-viewer.search_docs",
+        "docs-viewer.validate_doc_candidates",
+        "docs-viewer.open_doc_by_path",
+        "docs-viewer.summarize_doc",
+      ]);
+      expect(response.body?.agent_runtime_loop?.iterations?.filter((iteration: any) =>
+        String(iteration.chosen_capability ?? "").startsWith("docs-viewer.")
+      ).every((iteration: any) => iteration.decision_source === "llm")).toBe(true);
+
+      const debugExportRef = response.body?.debug_export_ref?.endpoint;
+      expect(debugExportRef).toBeTruthy();
+      const debugExport = await request(app).get(debugExportRef).expect(200);
+      const payload = debugExport.body?.payload;
+      expect(payload?.docs_continuation_contract).toMatchObject({
+        schema: "helix.docs_continuation_contract.v1",
+      });
+      expect(payload?.loop_parity_trace?.actual_tool_calls?.map((call: any) => call.tool_id)).toEqual([
+        "docs-viewer.search_docs",
+        "docs-viewer.validate_doc_candidates",
+        "docs-viewer.open_doc_by_path",
+        "docs-viewer.summarize_doc",
+      ]);
+      expect(payload?.model_turn_fidelity_audit?.authority?.policy_override_used).toBe(false);
+      expect(["model_driven_parity", "model_driven_docs_continuation"]).toContain(
+        payload?.model_turn_fidelity_audit?.parity_status,
+      );
     } finally {
       if (previousFlag === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;
       else process.env.HELIX_AGENT_STEP_DECISION_LLM = previousFlag;

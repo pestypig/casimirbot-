@@ -107,7 +107,8 @@ export const classifySourceToGeometryDivergence = (
   if (
     blockers.has("conservation_missing") ||
     blockers.has("conservation_failed") ||
-    blockers.has("conservation_unknown")
+    blockers.has("conservation_unknown") ||
+    blockers.has("conservation_not_pass")
   ) {
     return "conservation_missing_or_fail";
   }

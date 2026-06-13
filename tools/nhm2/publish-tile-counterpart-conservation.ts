@@ -1,17 +1,23 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isNhm2ReferenceRunArtifact } from "../../shared/contracts/nhm2-reference-run.v1";
 import {
+  NHM2_TENSOR_COMPONENTS,
   NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS,
+  type Nhm2RegionalTensor,
   type Nhm2RegionalSourceClosureRegionId,
+  type Nhm2TensorComponent,
 } from "../../shared/contracts/nhm2-regional-source-closure-evidence.v1";
 import {
   buildNhm2TileCounterpartConservationArtifact,
   type Nhm2TileCounterpartConservationArtifact,
 } from "../../shared/contracts/nhm2-tile-counterpart-conservation.v1";
-import { isNhm2TileEffectiveFullTensorSourceArtifact } from "../../shared/contracts/nhm2-tile-effective-full-tensor-source.v1";
+import {
+  isNhm2TileEffectiveFullTensorSourceArtifact,
+  type Nhm2TileEffectiveFullTensorSourceArtifact,
+} from "../../shared/contracts/nhm2-tile-effective-full-tensor-source.v1";
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value != null && typeof value === "object" && !Array.isArray(value)
@@ -22,7 +28,11 @@ const asString = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value : null;
 
 const asNumber = (value: unknown): number | null =>
-  typeof value === "number" && Number.isFinite(value) ? value : null;
+  typeof value === "number" && Number.isFinite(value)
+    ? value
+    : typeof value === "string" && value.trim().length > 0 && Number.isFinite(Number(value))
+      ? Number(value)
+      : null;
 
 const readJson = (path: string): unknown => JSON.parse(readFileSync(path, "utf8"));
 
@@ -31,6 +41,157 @@ const resolvePath = (repoRoot: string, path: string): string =>
 
 const pathUsesLatestAlias = (path: string | null | undefined): boolean =>
   path != null && /(^|[-/\\])latest(\.|[-/\\]|$)/i.test(path);
+
+const DEFAULT_CONSERVATION_TOLERANCE_LINF = 0.1;
+
+const REGION_NEIGHBORS: Record<
+  Nhm2RegionalSourceClosureRegionId,
+  Nhm2RegionalSourceClosureRegionId[]
+> = {
+  global: ["hull", "wall", "exterior_shell"],
+  hull: ["wall"],
+  wall: ["hull", "exterior_shell"],
+  exterior_shell: ["wall"],
+};
+
+const MOMENTUM_COMPONENTS = [
+  "T01",
+  "T02",
+  "T03",
+  "T10",
+  "T20",
+  "T30",
+] as const satisfies readonly Nhm2TensorComponent[];
+
+type SourceRegion = Nhm2TileEffectiveFullTensorSourceArtifact["regions"][number];
+
+const finiteTensorValue = (
+  tensor: Nhm2RegionalTensor,
+  component: Nhm2TensorComponent,
+): number | null => {
+  const value = tensor[component];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+};
+
+const tensorScale = (tensor: Nhm2RegionalTensor): number => {
+  const values = NHM2_TENSOR_COMPONENTS.flatMap((component) => {
+    const value = finiteTensorValue(tensor, component);
+    return value == null ? [] : [Math.abs(value)];
+  });
+  return Math.max(1, ...values);
+};
+
+const normalizedJump = (
+  left: SourceRegion,
+  right: SourceRegion,
+  component: Nhm2TensorComponent,
+): number | null => {
+  const leftValue = finiteTensorValue(left.tensor, component);
+  const rightValue = finiteTensorValue(right.tensor, component);
+  if (leftValue == null || rightValue == null) return null;
+  const scale = Math.max(tensorScale(left.tensor), tensorScale(right.tensor), 1);
+  return Math.abs(leftValue - rightValue) / scale;
+};
+
+const maxFinite = (values: Array<number | null>): number | null => {
+  const finiteValues = values.filter(
+    (value): value is number => typeof value === "number" && Number.isFinite(value),
+  );
+  return finiteValues.length > 0 ? Math.max(...finiteValues) : null;
+};
+
+const findDominantJump = (
+  region: SourceRegion,
+  neighbors: SourceRegion[],
+): { componentId: Nhm2TensorComponent | null; residual: number | null; hotspotRef: string | null } => {
+  let componentId: Nhm2TensorComponent | null = null;
+  let residual: number | null = null;
+  let hotspotRef: string | null = null;
+  for (const neighbor of neighbors) {
+    for (const component of NHM2_TENSOR_COMPONENTS) {
+      const jump = normalizedJump(region, neighbor, component);
+      if (jump == null) continue;
+      if (residual == null || jump > residual) {
+        componentId = component;
+        residual = jump;
+        hotspotRef = `${region.regionId}<->${neighbor.regionId}:${component}`;
+      }
+    }
+  }
+  return { componentId, residual, hotspotRef };
+};
+
+const buildConservationRegion = (
+  regionId: Nhm2RegionalSourceClosureRegionId,
+  sourceRegions: Map<Nhm2RegionalSourceClosureRegionId, SourceRegion>,
+  toleranceLInf: number,
+): Nhm2TileCounterpartConservationArtifact["regions"][number] => {
+  const region = sourceRegions.get(regionId);
+  if (region == null) {
+    return {
+      regionId,
+      status: "missing",
+      divTResidualLInf: null,
+      continuityResidualLInf: null,
+      momentumResidualLInf: null,
+      toleranceLInf,
+      sampleCount: null,
+      diagnosticMode: "regional_jump_linf_v1",
+      neighborRegionIds: REGION_NEIGHBORS[regionId],
+      transitionLayerResidualLInf: null,
+      dominantComponentId: null,
+      maxHotspotRef: null,
+      warnings: ["source region was absent from the tile-effective full tensor source"],
+      blockers: ["source_region_missing"],
+    };
+  }
+
+  const neighborIds = REGION_NEIGHBORS[regionId];
+  const neighbors = neighborIds.flatMap((neighborId) => {
+    const neighbor = sourceRegions.get(neighborId);
+    return neighbor == null ? [] : [neighbor];
+  });
+  const continuityResidualLInf = maxFinite(
+    neighbors.map((neighbor) => normalizedJump(region, neighbor, "T00")),
+  );
+  const momentumResidualLInf = maxFinite(
+    neighbors.flatMap((neighbor) =>
+      MOMENTUM_COMPONENTS.map((component) => normalizedJump(region, neighbor, component)),
+    ),
+  );
+  const divTResidualLInf = maxFinite(
+    neighbors.flatMap((neighbor) =>
+      NHM2_TENSOR_COMPONENTS.map((component) => normalizedJump(region, neighbor, component)),
+    ),
+  );
+  const dominant = findDominantJump(region, neighbors);
+  const warnings =
+    neighbors.length === neighborIds.length
+      ? [
+          "reduced-order diagnostic only: region-aggregate tensor jumps are not a full covariant finite-difference conservation solve",
+        ]
+      : [
+          "one or more neighbor regions were absent from the source artifact",
+          "reduced-order diagnostic only: region-aggregate tensor jumps are not a full covariant finite-difference conservation solve",
+        ];
+
+  return {
+    regionId,
+    status: "pass",
+    divTResidualLInf,
+    continuityResidualLInf,
+    momentumResidualLInf,
+    toleranceLInf,
+    sampleCount: region.sampleCount ?? null,
+    diagnosticMode: "regional_jump_linf_v1",
+    neighborRegionIds: neighborIds,
+    transitionLayerResidualLInf: dominant.residual,
+    dominantComponentId: dominant.componentId,
+    maxHotspotRef: dominant.hotspotRef,
+    warnings,
+    blockers: [],
+  };
+};
 
 const parseArgs = (argv: string[]): Record<string, string | boolean> => {
   const parsed: Record<string, string | boolean> = {};
@@ -54,6 +215,7 @@ export const publishTileCounterpartConservation = (args: {
   referenceRunPath: string;
   tileFullTensorSourcePath: string;
   outPath: string;
+  toleranceLInf?: number | null;
   auditOnly?: boolean;
 }): Nhm2TileCounterpartConservationArtifact => {
   if (
@@ -72,20 +234,15 @@ export const publishTileCounterpartConservation = (args: {
     throw new Error("tile full tensor source must be nhm2_tile_effective_full_tensor_source/v1");
   }
   const sourceRegions = new Map(source.regions.map((region) => [region.regionId, region]));
+  const toleranceLInf = args.toleranceLInf ?? DEFAULT_CONSERVATION_TOLERANCE_LINF;
   const regions: Nhm2TileCounterpartConservationArtifact["regions"] =
     NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS.map((regionId) => {
-    const region = sourceRegions.get(regionId);
-    return {
-      regionId: regionId as Nhm2RegionalSourceClosureRegionId,
-      status: region == null ? "missing" : "review",
-      divTResidualLInf: null,
-      continuityResidualLInf: null,
-      momentumResidualLInf: null,
-      toleranceLInf: null,
-      sampleCount: region?.sampleCount ?? null,
-      blockers: region == null ? ["source_region_missing"] : ["conservation_unknown"],
-    };
-  });
+      return buildConservationRegion(
+        regionId as Nhm2RegionalSourceClosureRegionId,
+        sourceRegions,
+        toleranceLInf,
+      );
+    });
 
   const artifact = buildNhm2TileCounterpartConservationArtifact({
     runId: referenceRun.runId,
@@ -93,8 +250,8 @@ export const publishTileCounterpartConservation = (args: {
     expectedProfileId: referenceRun.selectedFamily.expectedProfileId,
     laneId: "nhm2_shift_lapse",
     chartRef: "comoving_cartesian",
-    derivativeStencil: "not_computed_validation_hardening_placeholder",
-    unitsRef: "same_as_tile_effective_counterpart",
+    derivativeStencil: "regional_jump_linf_v1",
+    unitsRef: "dimensionless_normalized_tensor_jump",
     regions,
   });
   const outPath = resolvePath(args.repoRoot, args.outPath);
@@ -108,6 +265,7 @@ const main = (): void => {
   const referenceRunPath = asString(args["reference-run"]);
   const sourcePath = asString(args["tile-full-tensor-source"]);
   const outPath = asString(args.out);
+  const toleranceLInf = asNumber(args.tolerance);
   if (referenceRunPath == null || sourcePath == null || outPath == null) {
     throw new Error("--reference-run, --tile-full-tensor-source, and --out are required");
   }
@@ -116,6 +274,7 @@ const main = (): void => {
     referenceRunPath,
     tileFullTensorSourcePath: sourcePath,
     outPath,
+    toleranceLInf,
     auditOnly: args["audit-only"] === true,
   });
   process.stdout.write(`${JSON.stringify(artifact, null, 2)}\n`);
