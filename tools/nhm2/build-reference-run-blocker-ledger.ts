@@ -13,7 +13,14 @@ import {
   isNhm2CoupledClosurePassCandidateArtifact,
   type Nhm2CoupledClosurePassCandidateArtifactV1,
 } from "../../shared/contracts/nhm2-coupled-closure-pass-candidate.v1";
-import { isNhm2QeiDossierArtifact } from "../../shared/contracts/nhm2-qei-dossier.v1";
+import {
+  isNhm2QeiDossierArtifact,
+  type Nhm2QeiDossierArtifact,
+} from "../../shared/contracts/nhm2-qei-dossier.v1";
+import {
+  isNhm2QeiWorldlineDossier,
+  type Nhm2QeiWorldlineDossierV1,
+} from "../../shared/contracts/nhm2-qei-worldline-dossier.v1";
 import { isNhm2ReferenceRunArtifact } from "../../shared/contracts/nhm2-reference-run.v1";
 import { isNhm2RegionalSourceClosureEvidenceArtifact } from "../../shared/contracts/nhm2-regional-source-closure-evidence.v1";
 import {
@@ -177,8 +184,9 @@ const normalizeBoundary = (
   return value;
 };
 
-const missingQeiFields = (qei: unknown): string[] => {
-  if (!isNhm2QeiDossierArtifact(qei)) return ["qei_dossier_missing"];
+type QeiLedgerArtifact = Nhm2QeiDossierArtifact | Nhm2QeiWorldlineDossierV1;
+
+const missingLegacyQeiFields = (qei: Nhm2QeiDossierArtifact): string[] => {
   const missing: string[] = [];
   if (qei.quantumStateAssumptions.length === 0) missing.push("quantumStateAssumptions");
   if (qei.renormalizationConvention == null) missing.push("renormalizationConvention");
@@ -194,6 +202,121 @@ const missingQeiFields = (qei: unknown): string[] => {
   }
   if (qei.literatureRefs.length === 0) missing.push("literatureRefs");
   return missing;
+};
+
+const worldlineQeiBlockerFields = (qei: Nhm2QeiWorldlineDossierV1): string[] => {
+  const missing: string[] = [];
+  if (!qei.summary.hasWallWorldline) missing.push("wallWorldline");
+  if (!qei.summary.dossierComplete) missing.push("dossierComplete");
+  if (qei.summary.allMarginsPass == null) missing.push("allMarginsPass");
+  if (qei.summary.allMarginsPass === false) missing.push("qeiMarginPass");
+  if (qei.summary.anyProxy) missing.push("proxyEvidence");
+  for (const worldline of qei.worldlines) {
+    const prefix = worldline.worldlineId;
+    if (worldline.samplingFunction.tauSeconds == null) {
+      missing.push(`${prefix}.samplingFunction.tauSeconds`);
+    }
+    if (!worldline.samplingFunction.normalized) {
+      missing.push(`${prefix}.samplingFunction.normalized`);
+    }
+    if (worldline.sampledRho.status !== "computed") {
+      missing.push(`${prefix}.sampledRho.${worldline.sampledRho.status}`);
+    }
+    if (worldline.sampledRho.valueSI == null) {
+      missing.push(`${prefix}.sampledRho.valueSI`);
+    }
+    if (worldline.sampledRho.provenanceRef == null) {
+      missing.push(`${prefix}.sampledRho.provenanceRef`);
+    }
+    if (worldline.bound.status === "missing") {
+      missing.push(`${prefix}.bound.missing`);
+    }
+    if (worldline.bound.status === "proxy") {
+      missing.push(`${prefix}.bound.proxy`);
+    }
+    if (worldline.bound.valueSI == null) {
+      missing.push(`${prefix}.bound.valueSI`);
+    }
+    if (worldline.bound.provenanceRef == null) {
+      missing.push(`${prefix}.bound.provenanceRef`);
+    }
+    if (worldline.margin.pass !== true) {
+      missing.push(
+        worldline.margin.pass === false
+          ? `${prefix}.margin.fail`
+          : `${prefix}.margin.status`,
+      );
+    }
+    if (worldline.consistency.tauVsDuty !== "pass") {
+      missing.push(`${prefix}.tauVsDuty.${worldline.consistency.tauVsDuty}`);
+    }
+    if (worldline.consistency.tauVsLightCrossing !== "pass") {
+      missing.push(
+        `${prefix}.tauVsLightCrossing.${worldline.consistency.tauVsLightCrossing}`,
+      );
+    }
+    if (worldline.consistency.tauVsModulation !== "pass") {
+      missing.push(`${prefix}.tauVsModulation.${worldline.consistency.tauVsModulation}`);
+    }
+    for (const blocker of worldline.blockers) {
+      missing.push(`${prefix}:${blocker}`);
+    }
+  }
+  return Array.from(new Set(missing));
+};
+
+const missingQeiFields = (qei: QeiLedgerArtifact | null): string[] => {
+  if (qei == null) return ["qei_dossier_missing"];
+  if (isNhm2QeiWorldlineDossier(qei)) return worldlineQeiBlockerFields(qei);
+  return missingLegacyQeiFields(qei);
+};
+
+const qeiLedgerStatus = (
+  qei: QeiLedgerArtifact | null,
+): Nhm2BlockerLedgerArtifact["qeiBlockers"]["status"] => {
+  if (qei == null) return "missing";
+  if (isNhm2QeiWorldlineDossier(qei)) {
+    if (
+      qei.summary.dossierComplete &&
+      qei.summary.hasWallWorldline &&
+      qei.summary.allMarginsPass === true &&
+      !qei.summary.anyProxy
+    ) {
+      return "pass";
+    }
+    if (
+      qei.summary.allMarginsPass === false ||
+      qei.worldlines.some((worldline) => worldline.margin.pass === false)
+    ) {
+      return "fail";
+    }
+    return "review";
+  }
+  return qei.status;
+};
+
+const qeiLedgerApplicability = (
+  qei: QeiLedgerArtifact | null,
+): Nhm2BlockerLedgerArtifact["qeiBlockers"]["qeiApplicabilityStatus"] => {
+  if (qei == null) return null;
+  if (isNhm2QeiWorldlineDossier(qei)) {
+    if (
+      qei.summary.dossierComplete &&
+      qei.summary.hasWallWorldline &&
+      qei.summary.allMarginsPass === true &&
+      !qei.summary.anyProxy
+    ) {
+      return "PASS";
+    }
+    if (
+      qei.summary.allMarginsPass === false ||
+      qei.worldlines.some((worldline) => worldline.margin.pass === false)
+    ) {
+      return "FAIL";
+    }
+    return "REVIEW";
+  }
+  return qei.qeiApplicabilityStatus;
 };
 
 const getNested = (value: unknown, path: string[]): unknown =>
@@ -451,6 +574,7 @@ export const buildReferenceRunBlockerLedger = (args: {
   sourceDivergenceReportPath?: string | null;
   tileProvenanceAuditPath?: string | null;
   qeiDossierPath?: string | null;
+  qeiWorldlineDossierPath?: string | null;
   sourceTensorArtifactPath?: string | null;
   tileLocalSourceElementsPath?: string | null;
   conservationArtifactPath?: string | null;
@@ -468,6 +592,7 @@ export const buildReferenceRunBlockerLedger = (args: {
     args.sourceDivergenceReportPath,
     args.tileProvenanceAuditPath,
     args.qeiDossierPath,
+    args.qeiWorldlineDossierPath,
     args.sourceTensorArtifactPath,
     args.tileLocalSourceElementsPath,
     args.conservationArtifactPath,
@@ -504,10 +629,16 @@ export const buildReferenceRunBlockerLedger = (args: {
   if (!isNhm2RegionalSourceClosureEvidenceArtifact(regionalEvidence)) {
     throw new Error("regional evidence must be nhm2_regional_source_closure_evidence/v1");
   }
-  const qei =
-    args.qeiDossierPath == null ? null : readJson(resolvePath(args.repoRoot, args.qeiDossierPath));
-  if (qei != null && !isNhm2QeiDossierArtifact(qei)) {
-    throw new Error("QEI dossier must be nhm2_qei_dossier/v1");
+  const qeiPath = args.qeiWorldlineDossierPath ?? args.qeiDossierPath ?? null;
+  const qei = qeiPath == null ? null : readJson(resolvePath(args.repoRoot, qeiPath));
+  if (
+    qei != null &&
+    !isNhm2QeiDossierArtifact(qei) &&
+    !isNhm2QeiWorldlineDossier(qei)
+  ) {
+    throw new Error(
+      "QEI dossier must be nhm2_qei_dossier/v1 or nhm2_qei_worldline_dossier/v1",
+    );
   }
   const literatureMap = readJson(resolvePath(args.repoRoot, args.literatureMapPath));
   if (!isLiteratureClaimMap(literatureMap)) {
@@ -600,12 +731,12 @@ export const buildReferenceRunBlockerLedger = (args: {
     sourceClosureReadinessGate(passReadinessArtifact),
     coupledClosureGate(coupledClosurePassCandidateArtifact),
   ];
-  const qeiArtifact = isNhm2QeiDossierArtifact(qei) ? qei : null;
+  const qeiArtifact: QeiLedgerArtifact | null =
+    isNhm2QeiDossierArtifact(qei) || isNhm2QeiWorldlineDossier(qei) ? qei : null;
   const qeiMissingFields = missingQeiFields(qeiArtifact);
   const qeiBlockers: Nhm2BlockerLedgerArtifact["qeiBlockers"] = {
-    status: qeiArtifact == null ? "missing" : qeiArtifact.status,
-    qeiApplicabilityStatus:
-      qeiArtifact == null ? null : qeiArtifact.qeiApplicabilityStatus,
+    status: qeiLedgerStatus(qeiArtifact),
+    qeiApplicabilityStatus: qeiLedgerApplicability(qeiArtifact),
     missingFields: qeiMissingFields,
   };
   const regionalBlockers = regionalEvidence.regions.map((region) => {
@@ -646,7 +777,7 @@ export const buildReferenceRunBlockerLedger = (args: {
     artifactRefs: {
       referenceRun: args.referenceRunPath,
       fullLoopAudit: args.fullLoopAuditPath,
-      qeiDossier: args.qeiDossierPath ?? null,
+      qeiDossier: qeiPath,
       tileEffectiveCounterpart: args.tileEffectiveCounterpartPath,
       regionalSourceClosureEvidence: args.regionalSourceClosureEvidencePath,
       sourceToGeometryDivergenceReport: args.sourceDivergenceReportPath ?? null,
@@ -759,6 +890,7 @@ if (normalize(process.argv[1] ?? "") === normalize(fileURLToPath(import.meta.url
     sourceDivergenceReportPath: asString(args["source-divergence-report"]),
     tileProvenanceAuditPath: asString(args["tile-provenance-audit"]),
     qeiDossierPath: asString(args["qei-dossier"]),
+    qeiWorldlineDossierPath: asString(args["qei-worldline-dossier"]),
     sourceTensorArtifactPath: asString(args["source-tensor-artifact"]),
     tileLocalSourceElementsPath: asString(args["tile-local-source-elements"]),
     conservationArtifactPath: asString(args.conservation),

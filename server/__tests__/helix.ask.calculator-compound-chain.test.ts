@@ -4,6 +4,7 @@ import {
   detectUnderdeterminedTrianglePrompt,
   draftUnitConversionCalculatorSubgoalsForPrompt,
   extractCalculatorNumericNormalizations,
+  normalizeCalculatorCompoundLengthPhrases,
   runCalculatorCompoundChain,
   runCalculatorModelAuthoredChain,
 } from "../services/helix-ask/calculator-compound-chain";
@@ -39,6 +40,33 @@ describe("Helix Ask calculator compound chain", () => {
       turnId: "turn:test",
     });
 
+    expect(detectUnderdeterminedTrianglePrompt(prompt)).toBe(true);
+    expect(hints.numeric_normalizations).toEqual([
+      expect.objectContaining({
+        raw_token: "9 1/8",
+        normalized_expression: "73/8",
+        decimal_value: 9.125,
+      }),
+    ]);
+    expect(hints.problem_interpretation).toMatchObject({
+      prompt_kind: "underdetermined_triangle",
+      determination_status: "underdetermined",
+      needs_more_information: true,
+      safe_to_calculate: false,
+      missing_constraints: expect.arrayContaining(["triangle_type", "angle", "another_side", "side_ratio"]),
+      clarifying_question: expect.stringContaining("triangle type"),
+    });
+  });
+
+  it("combines spoken same-unit fractional side lengths before triangle determination", () => {
+    const prompt =
+      "If the longest side of a triangle is 9 inches and 1/8 inches, what are the other two sides of the triangle? How long is that? And make an equation for that and solve it with the calculator";
+    const hints = buildCalculatorCandidateHints({
+      prompt,
+      turnId: "turn:test",
+    });
+
+    expect(normalizeCalculatorCompoundLengthPhrases("9 inches and 1/8 inches")).toBe("9 1/8 inches");
     expect(detectUnderdeterminedTrianglePrompt(prompt)).toBe(true);
     expect(hints.numeric_normalizations).toEqual([
       expect.objectContaining({

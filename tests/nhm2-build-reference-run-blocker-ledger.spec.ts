@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { buildNhm2QeiDossierArtifact } from "../shared/contracts/nhm2-qei-dossier.v1";
+import { buildNhm2QeiWorldlineDossier } from "../shared/contracts/nhm2-qei-worldline-dossier.v1";
 import { buildNhm2CoupledClosurePassCandidate } from "../shared/contracts/nhm2-coupled-closure-pass-candidate.v1";
 import { buildNhm2ReferenceRunArtifact } from "../shared/contracts/nhm2-reference-run.v1";
 import {
@@ -247,6 +248,87 @@ const qei = () =>
     literatureRefs: ["https://arxiv.org/abs/2301.01698"],
   });
 
+const qeiWorldline = () =>
+  buildNhm2QeiWorldlineDossier({
+    generatedAt: "2026-06-12T00:00:00.000Z",
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId: profile,
+    atlasRef: "atlas.json",
+    atlasHash: "atlas-hash",
+    worldlines: [
+      {
+        worldlineId: "qei:wall:atlas",
+        regionId: "wall",
+        chartId: "comoving_cartesian",
+        samplingFunction: {
+          kind: "gaussian",
+          tauSeconds: 1e-6,
+          normalized: true,
+        },
+        sampledRho: {
+          valueSI: -1,
+          provenanceRef: "source:wall:T00",
+          status: "computed",
+        },
+        bound: {
+          valueSI: 0,
+          provenanceRef: "qei-bound-receipt.json",
+          status: "computed",
+        },
+        margin: {
+          valueSI: 1,
+          pass: true,
+        },
+        consistency: {
+          tauVsDuty: "pass",
+          tauVsLightCrossing: "pass",
+          tauVsModulation: "pass",
+        },
+        blockers: [],
+      },
+    ],
+  });
+
+const incompleteQeiWorldline = () =>
+  buildNhm2QeiWorldlineDossier({
+    generatedAt: "2026-06-12T00:00:00.000Z",
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId: profile,
+    atlasRef: "atlas.json",
+    atlasHash: "atlas-hash",
+    worldlines: [
+      {
+        worldlineId: "qei:wall:atlas",
+        regionId: "wall",
+        chartId: "comoving_cartesian",
+        samplingFunction: {
+          kind: "gaussian",
+          tauSeconds: null,
+          normalized: false,
+        },
+        sampledRho: {
+          valueSI: -1,
+          provenanceRef: "source:wall:T00",
+          status: "computed",
+        },
+        bound: {
+          valueSI: null,
+          status: "missing",
+        },
+        margin: {
+          valueSI: null,
+          pass: null,
+        },
+        consistency: {
+          tauVsDuty: "missing",
+          tauVsLightCrossing: "missing",
+          tauVsModulation: "missing",
+        },
+        blockers: ["qei_bound_missing", "qei_bound_provenance_missing"],
+      },
+    ],
+  });
+
 const literatureMap = () => ({
   schemaVersion: "nhm2_literature_claim_map/v1",
   claimPolicy: {
@@ -281,6 +363,12 @@ const withTemp = (fn: (root: string) => void) => {
       "utf8",
     );
     writeFileSync(join(root, "qei.json"), JSON.stringify(qei()), "utf8");
+    writeFileSync(join(root, "qei-worldline.json"), JSON.stringify(qeiWorldline()), "utf8");
+    writeFileSync(
+      join(root, "qei-worldline-incomplete.json"),
+      JSON.stringify(incompleteQeiWorldline()),
+      "utf8",
+    );
     writeFileSync(join(root, "literature.json"), JSON.stringify(literatureMap()), "utf8");
     fn(root);
   } finally {
@@ -428,5 +516,58 @@ describe("build reference-run blocker ledger", () => {
         )?.state,
       ).not.toBe("pass");
       expect(ledger.claimLock.physicalMechanismClaimAllowed).toBe(false);
+    }));
+
+  it("accepts a QEI worldline dossier as canonical ledger evidence", () =>
+    withTemp((root) => {
+      const ledger = buildReferenceRunBlockerLedger({
+        repoRoot: root,
+        referenceRunPath: "reference.json",
+        fullLoopAuditPath: "full-loop.json",
+        validationPath: "validation.json",
+        tileEffectiveCounterpartPath: "tile.json",
+        regionalSourceClosureEvidencePath: "regional.json",
+        sourceSideAuthorityPath: "source-authority.json",
+        sourceClosurePassReadinessPath: "readiness.json",
+        qeiWorldlineDossierPath: "qei-worldline.json",
+        literatureMapPath: "literature.json",
+        outPath: "ledger.json",
+      });
+
+      expect(ledger.artifactRefs.qeiDossier).toBe("qei-worldline.json");
+      expect(ledger.qeiBlockers.status).toBe("pass");
+      expect(ledger.qeiBlockers.qeiApplicabilityStatus).toBe("PASS");
+      expect(ledger.qeiBlockers.missingFields).toEqual([]);
+    }));
+
+  it("reports concrete QEI worldline blockers instead of legacy missing paperwork", () =>
+    withTemp((root) => {
+      const ledger = buildReferenceRunBlockerLedger({
+        repoRoot: root,
+        referenceRunPath: "reference.json",
+        fullLoopAuditPath: "full-loop.json",
+        validationPath: "validation.json",
+        tileEffectiveCounterpartPath: "tile.json",
+        regionalSourceClosureEvidencePath: "regional.json",
+        sourceSideAuthorityPath: "source-authority.json",
+        sourceClosurePassReadinessPath: "readiness.json",
+        qeiWorldlineDossierPath: "qei-worldline-incomplete.json",
+        literatureMapPath: "literature.json",
+        outPath: "ledger.json",
+      });
+
+      expect(ledger.qeiBlockers.status).toBe("review");
+      expect(ledger.qeiBlockers.qeiApplicabilityStatus).toBe("REVIEW");
+      expect(ledger.qeiBlockers.missingFields).not.toContain("qei_dossier_missing");
+      expect(ledger.qeiBlockers.missingFields).toContain("dossierComplete");
+      expect(ledger.qeiBlockers.missingFields).toContain(
+        "qei:wall:atlas.bound.missing",
+      );
+      expect(ledger.qeiBlockers.missingFields).toContain(
+        "qei:wall:atlas.samplingFunction.tauSeconds",
+      );
+      expect(ledger.qeiBlockers.missingFields).toContain(
+        "qei:wall:atlas:qei_bound_provenance_missing",
+      );
     }));
 });

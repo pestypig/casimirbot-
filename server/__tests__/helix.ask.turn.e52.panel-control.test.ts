@@ -563,6 +563,34 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(runtimeCapabilities).not.toContain("scientific-calculator.solve_expression");
   }, 60000);
 
+  it("does not turn spoken same-unit longest-side triangle prompts into calculator tool calls", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          "If the longest side of a triangle is 9 inches and 1/8 inches, what are the other two sides of the triangle? How long is that? And make an equation for that and solve it with the calculator",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-calculator-underdetermined-spoken-triangle-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).not.toBe("calculator_solve");
+    expect(response.body?.canonical_goal_frame?.classifier_reasons).toEqual(
+      expect.arrayContaining(["underspecified_calculator_prompt"]),
+    );
+    expect(String(response.body?.selected_final_answer ?? "")).toContain("triangle type");
+    expect(String(response.body?.selected_final_answer ?? "")).toContain("side ratio");
+    expect(response.body?.pending_server_request?.required_fields).toEqual(
+      expect.arrayContaining(["triangle_type", "angle", "another_side", "side_ratio"]),
+    );
+    expect(findAction(response.body, "scientific-calculator", "solve_expression")).toBeFalsy();
+    const runtimeCapabilities =
+      response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration.chosen_capability) ?? [];
+    expect(runtimeCapabilities).not.toContain("scientific-calculator.solve_expression");
+  }, 60000);
+
   it("does not let keyed planning solve exact-triangle prompts with only a longest side", async () => {
     const previousFlag = process.env.HELIX_AGENT_STEP_DECISION_LLM;
     const previousPlannerResponse = process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;

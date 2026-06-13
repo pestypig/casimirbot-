@@ -9,6 +9,10 @@ import {
 } from "../../shared/contracts/nhm2-reference-run.v1";
 import { isNhm2QeiDossierArtifact } from "../../shared/contracts/nhm2-qei-dossier.v1";
 import {
+  isNhm2QeiWorldlineDossier,
+  type Nhm2QeiWorldlineDossierV1,
+} from "../../shared/contracts/nhm2-qei-worldline-dossier.v1";
+import {
   isNhm2RegionalSourceClosureEvidenceArtifact,
 } from "../../shared/contracts/nhm2-regional-source-closure-evidence.v1";
 import {
@@ -449,6 +453,9 @@ export const evaluateLiteratureClaimMap = (
 export const evaluateQeiDossier = (
   qeiDossier: unknown | null,
 ): Nhm2ReferenceRunValidationGate => {
+  if (isNhm2QeiWorldlineDossier(qeiDossier)) {
+    return evaluateQeiWorldlineDossier(qeiDossier);
+  }
   if (!isNhm2QeiDossierArtifact(qeiDossier)) {
     return gate("GATE_QEI_DOSSIER_PRESENT", "review", ["qei_dossier_missing"]);
   }
@@ -508,6 +515,81 @@ export const evaluateQeiDossier = (
 
   const state: Nhm2ReferenceRunValidationState =
     reasons.size === 0 ? "pass" : qeiDossier.status === "fail" ? "fail" : "review";
+  return gate("GATE_QEI_DOSSIER_PRESENT", state, Array.from(reasons));
+};
+
+const evaluateQeiWorldlineDossier = (
+  qeiDossier: Nhm2QeiWorldlineDossierV1,
+): Nhm2ReferenceRunValidationGate => {
+  const reasons = new Set<string>();
+  if (!qeiDossier.summary.hasWallWorldline) {
+    reasons.add("qei_wall_worldline_missing");
+  }
+  if (!qeiDossier.summary.dossierComplete) {
+    reasons.add("qei_worldline_dossier_incomplete");
+  }
+  if (qeiDossier.summary.allMarginsPass === false) {
+    reasons.add("qei_margin_failed");
+  }
+  if (qeiDossier.summary.allMarginsPass == null) {
+    reasons.add("qei_margin_status_missing");
+  }
+  if (qeiDossier.summary.anyProxy) {
+    reasons.add("qei_proxy_evidence_present");
+  }
+  for (const worldline of qeiDossier.worldlines) {
+    const prefix = `qei_worldline:${worldline.worldlineId}`;
+    if (worldline.samplingFunction.tauSeconds == null) {
+      reasons.add(`${prefix}:sampling_tau_missing`);
+    }
+    if (!worldline.samplingFunction.normalized) {
+      reasons.add(`${prefix}:sampling_function_not_normalized`);
+    }
+    if (worldline.sampledRho.status !== "computed") {
+      reasons.add(`${prefix}:sampled_rho_${worldline.sampledRho.status}`);
+    }
+    if (worldline.sampledRho.valueSI == null) {
+      reasons.add(`${prefix}:sampled_rho_value_missing`);
+    }
+    if (worldline.sampledRho.provenanceRef == null) {
+      reasons.add(`${prefix}:sampled_rho_provenance_missing`);
+    }
+    if (worldline.bound.status === "missing") {
+      reasons.add(`${prefix}:qei_bound_missing`);
+    }
+    if (worldline.bound.status === "proxy") {
+      reasons.add(`${prefix}:qei_bound_proxy`);
+    }
+    if (worldline.bound.valueSI == null) {
+      reasons.add(`${prefix}:qei_bound_value_missing`);
+    }
+    if (worldline.bound.provenanceRef == null) {
+      reasons.add(`${prefix}:qei_bound_provenance_missing`);
+    }
+    if (worldline.margin.pass !== true) {
+      reasons.add(
+        worldline.margin.pass === false
+          ? `${prefix}:qei_margin_failed`
+          : `${prefix}:qei_margin_status_missing`,
+      );
+    }
+    for (const [field, status] of Object.entries(worldline.consistency)) {
+      if (status !== "pass") {
+        reasons.add(`${prefix}:${field}_${status}`);
+      }
+    }
+    for (const blocker of worldline.blockers) {
+      reasons.add(`${prefix}:${blocker}`);
+    }
+  }
+
+  const state: Nhm2ReferenceRunValidationState =
+    reasons.size === 0
+      ? "pass"
+      : qeiDossier.summary.allMarginsPass === false ||
+          qeiDossier.worldlines.some((worldline) => worldline.margin.pass === false)
+        ? "fail"
+        : "review";
   return gate("GATE_QEI_DOSSIER_PRESENT", state, Array.from(reasons));
 };
 
@@ -994,12 +1076,15 @@ const main = (): void => {
   const regionalEvidencePath = asString(args["regional-evidence"]);
   const tileCounterpartPath = asString(args["tile-effective-counterpart"]);
   const qeiDossierPath = asString(args["qei-dossier"]);
+  const qeiWorldlineDossierPath = asString(args["qei-worldline-dossier"]);
   const validation = validateNhm2ReferenceRun({
     referenceRun,
     repoRoot,
     literatureClaimMap: readJsonIfExists(literaturePath),
     qeiDossier:
-      qeiDossierPath == null
+      qeiWorldlineDossierPath != null
+        ? readJsonIfExists(resolveRepoPath(repoRoot, qeiWorldlineDossierPath))
+        : qeiDossierPath == null
         ? null
         : readJsonIfExists(resolveRepoPath(repoRoot, qeiDossierPath)),
     regionalSourceClosureEvidence:

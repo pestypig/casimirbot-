@@ -6,6 +6,7 @@ import {
   type Nhm2ReferenceRunArtifact,
 } from "../shared/contracts/nhm2-reference-run.v1";
 import { buildNhm2QeiDossierArtifact } from "../shared/contracts/nhm2-qei-dossier.v1";
+import { buildNhm2QeiWorldlineDossier } from "../shared/contracts/nhm2-qei-worldline-dossier.v1";
 import {
   buildNhm2RegionalSourceClosureEvidenceArtifact,
   type Nhm2RegionalSourceClosureEvidenceRegion,
@@ -450,6 +451,61 @@ describe("nhm2 reference run contract", () => {
     );
     expect(qeiGate?.state).toBe("review");
     expect(qeiGate?.reasonCodes).toContain("qei_dossier_missing");
+  });
+
+  it("accepts a complete QEI worldline dossier for the reference QEI gate", () => {
+    const validation = validateNhm2ReferenceRun({
+      referenceRun: makeReferenceRun(),
+      fullLoopAudit: passFullLoop,
+      observerAudit: passObserver,
+      sourceClosure: passSourceClosure,
+      regionalSourceClosureEvidence: passingRegionalEvidence(),
+      tileEffectiveCounterpart: passingTileCounterpart(),
+      literatureClaimMap: validLiteratureMap,
+      qeiDossier: buildNhm2QeiWorldlineDossier({
+        generatedAt: "2026-06-12T00:00:00.000Z",
+        laneId: "nhm2_shift_lapse",
+        selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+        worldlines: [
+          {
+            worldlineId: "qei:wall:atlas",
+            regionId: "wall",
+            chartId: "comoving_cartesian",
+            samplingFunction: {
+              kind: "gaussian",
+              tauSeconds: 1e-6,
+              normalized: true,
+            },
+            sampledRho: {
+              valueSI: -1,
+              provenanceRef: "source:wall:T00",
+              status: "computed",
+            },
+            bound: {
+              valueSI: 0,
+              provenanceRef: "qei-bound-receipt.json",
+              status: "computed",
+            },
+            margin: {
+              valueSI: 1,
+              pass: true,
+            },
+            consistency: {
+              tauVsDuty: "pass",
+              tauVsLightCrossing: "pass",
+              tauVsModulation: "pass",
+            },
+            blockers: [],
+          },
+        ],
+      }),
+    });
+
+    const qeiGate = validation.gates.find(
+      (entry) => entry.gateId === "GATE_QEI_DOSSIER_PRESENT",
+    );
+    expect(qeiGate?.state).toBe("pass");
+    expect(qeiGate?.reasonCodes).toEqual([]);
   });
 
   it("QEI-shaped paperwork still blocks promotion when required evidence is incomplete", () => {

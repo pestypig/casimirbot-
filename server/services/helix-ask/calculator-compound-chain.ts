@@ -213,9 +213,51 @@ const unitSetup = (input: {
 };
 
 const numberPattern = "[-+]?\\d+(?:\\.\\d+)?(?:e[-+]?\\d+)?";
+const lengthUnitTokenPattern =
+  "(?:in\\.?|inch|inches|ft\\.?|foot|feet|cm|centimeter|centimeters|centimetre|centimetres|m|meter|meters|metre|metres)";
+
+const normalizeLengthUnitToken = (unit: string | null | undefined): string | null => {
+  const normalized = String(unit ?? "").trim().toLowerCase().replace(/\.$/, "");
+  if (!normalized) return null;
+  if (normalized === "in" || normalized === "inch" || normalized === "inches") return "in";
+  if (normalized === "ft" || normalized === "foot" || normalized === "feet") return "ft";
+  if (normalized === "cm" || normalized === "centimeter" || normalized === "centimeters" || normalized === "centimetre" || normalized === "centimetres") return "cm";
+  if (normalized === "m" || normalized === "meter" || normalized === "meters" || normalized === "metre" || normalized === "metres") return "m";
+  return null;
+};
+
+export const normalizeCalculatorCompoundLengthPhrases = (value: string): string => {
+  const sameUnitFractionPattern = new RegExp(
+    `\\b(\\d+)\\s*(${lengthUnitTokenPattern})\\s+(?:and|plus|\\+)\\s+(\\d+)\\s*/\\s*(\\d+)\\s*(${lengthUnitTokenPattern})\\b`,
+    "gi",
+  );
+  const sharedUnitFractionPattern = new RegExp(
+    `\\b(\\d+)\\s+(?:and|plus|\\+)\\s+(\\d+)\\s*/\\s*(\\d+)\\s*(${lengthUnitTokenPattern})\\b`,
+    "gi",
+  );
+  const adjacentSameUnitFractionPattern = new RegExp(
+    `\\b(\\d+)\\s*(${lengthUnitTokenPattern})\\s+(\\d+)\\s*/\\s*(\\d+)\\s*(${lengthUnitTokenPattern})\\b`,
+    "gi",
+  );
+
+  return value
+    .replace(sameUnitFractionPattern, (match, whole, firstUnit, numerator, denominator, secondUnit) => {
+      const firstNormalizedUnit = normalizeLengthUnitToken(firstUnit);
+      const secondNormalizedUnit = normalizeLengthUnitToken(secondUnit);
+      if (!firstNormalizedUnit || firstNormalizedUnit !== secondNormalizedUnit) return match;
+      return `${whole} ${numerator}/${denominator} ${firstUnit}`;
+    })
+    .replace(sharedUnitFractionPattern, (_match, whole, numerator, denominator, unit) => `${whole} ${numerator}/${denominator} ${unit}`)
+    .replace(adjacentSameUnitFractionPattern, (match, whole, firstUnit, numerator, denominator, secondUnit) => {
+      const firstNormalizedUnit = normalizeLengthUnitToken(firstUnit);
+      const secondNormalizedUnit = normalizeLengthUnitToken(secondUnit);
+      if (!firstNormalizedUnit || firstNormalizedUnit !== secondNormalizedUnit) return match;
+      return `${whole} ${numerator}/${denominator} ${firstUnit}`;
+    });
+};
 
 export const normalizeCalculatorMixedNumberLiterals = (value: string): string =>
-  value.replace(/(^|[^\w./])(\d+)\s+(\d+)\s*\/\s*(\d+)(?=$|[^\w./])/g, (match, prefix, whole, numerator, denominator) => {
+  normalizeCalculatorCompoundLengthPhrases(value).replace(/(^|[^\w./])(\d+)\s+(\d+)\s*\/\s*(\d+)(?=$|[^\w./])/g, (match, prefix, whole, numerator, denominator) => {
     const wholeValue = Number(whole);
     const numeratorValue = Number(numerator);
     const denominatorValue = Number(denominator);
@@ -232,7 +274,8 @@ export const normalizeCalculatorMixedNumberLiterals = (value: string): string =>
 
 export const extractCalculatorNumericNormalizations = (prompt: string): CalculatorNumericNormalization[] => {
   const normalizations: CalculatorNumericNormalization[] = [];
-  prompt.replace(/(^|[^\w./])(\d+)\s+(\d+)\s*\/\s*(\d+)(?=$|[^\w./])/g, (match, _prefix, whole, numerator, denominator) => {
+  const normalizedPrompt = normalizeCalculatorCompoundLengthPhrases(prompt);
+  normalizedPrompt.replace(/(^|[^\w./])(\d+)\s+(\d+)\s*\/\s*(\d+)(?=$|[^\w./])/g, (match, _prefix, whole, numerator, denominator) => {
     const wholeValue = Number(whole);
     const numeratorValue = Number(numerator);
     const denominatorValue = Number(denominator);
@@ -258,7 +301,7 @@ export const extractCalculatorNumericNormalizations = (prompt: string): Calculat
 };
 
 export const detectUnderdeterminedTrianglePrompt = (prompt: string): boolean => {
-  const normalized = normalizePrompt(prompt);
+  const normalized = normalizePrompt(normalizeCalculatorCompoundLengthPhrases(prompt));
   if (!/\btriangles?\b/i.test(normalized)) return false;
   if (!/\b(?:longest\s+side|largest\s+side)\b/i.test(normalized)) return false;
   const asksForMissingGeometry =
@@ -267,21 +310,11 @@ export const detectUnderdeterminedTrianglePrompt = (prompt: string): boolean => 
     /\btriangles?\b[\s\S]{0,80}\b(?:solve|calculate|compute|find|determine|evaluate)\b/i.test(normalized);
   if (!asksForMissingGeometry) return false;
   const sideMeasureMatches = normalized.match(
-    new RegExp(`\\b(?:${numberPattern}|\\d+\\s+\\d+\\s*/\\s*\\d+)\\s*(?:inches?|in\\.?|feet|ft\\.?|cm|centimeters?|metres?|meters?|m)\\b`, "gi"),
+    new RegExp(`\\b(?:${numberPattern}|\\d+\\s+\\d+\\s*/\\s*\\d+|\\d+\\s*/\\s*\\d+)\\s*${lengthUnitTokenPattern}\\b`, "gi"),
   ) ?? [];
   const hasDeterminingConstraint =
     /\b(?:equilateral|isosceles|right\s+triangle|right-?angled|perimeter|area|angle|angles|one\s+leg|another\s+side|second\s+side|base|height|altitude|ratio|similar\s+triangle)\b/i.test(normalized);
   return sideMeasureMatches.length <= 1 && !hasDeterminingConstraint;
-};
-
-const normalizeLengthUnitToken = (unit: string | null | undefined): string | null => {
-  const normalized = String(unit ?? "").trim().toLowerCase().replace(/\.$/, "");
-  if (!normalized) return null;
-  if (normalized === "in" || normalized === "inch" || normalized === "inches") return "in";
-  if (normalized === "ft" || normalized === "foot" || normalized === "feet") return "ft";
-  if (normalized === "cm" || normalized === "centimeter" || normalized === "centimeters" || normalized === "centimetre" || normalized === "centimetres") return "cm";
-  if (normalized === "m" || normalized === "meter" || normalized === "meters" || normalized === "metre" || normalized === "metres") return "m";
-  return null;
 };
 
 const lengthUnitFactorToMeters = (unit: string): number | null => {

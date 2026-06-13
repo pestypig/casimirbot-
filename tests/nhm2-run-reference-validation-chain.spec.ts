@@ -542,6 +542,8 @@ describe("NHM2 reference validation chain planner", () => {
     );
     const coupled = findCommand(plan, "nhm2:build-coupled-closure-pass-candidate");
     const harness = findCommand(plan, "nhm2:build-regional-tensor-pass-path-harness");
+    const validation = findCommand(plan, "nhm2:validate-reference-run");
+    const ledger = findCommand(plan, "nhm2:build-reference-run-blocker-ledger");
     const admission = findCommand(plan, "nhm2:build-full-solve-claim-admission");
     const atlasPath =
       "artifacts/research/full-solve/reference/run-1/nhm2-regional-support-function-atlas.json";
@@ -684,6 +686,14 @@ describe("NHM2 reference validation chain planner", () => {
     );
     expect(coupled.args).toContain("--qei-worldline-dossier");
     expect(coupled.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-qei-worldline-dossier.json",
+    );
+    expect(validation.args).toContain("--qei-worldline-dossier");
+    expect(validation.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-qei-worldline-dossier.json",
+    );
+    expect(ledger.args).toContain("--qei-worldline-dossier");
+    expect(ledger.args).toContain(
       "artifacts/research/full-solve/reference/run-1/nhm2-qei-worldline-dossier.json",
     );
     expect(coupled.args).toContain("--observer-robust-energy-conditions");

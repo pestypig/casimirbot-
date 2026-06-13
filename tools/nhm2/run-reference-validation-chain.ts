@@ -968,7 +968,11 @@ export const planReferenceValidationChain = (
       regionalEvidence,
       "--tile-effective-counterpart",
       tileCounterpart,
-      ...(qeiDossier == null ? [] : ["--qei-dossier", qeiDossier]),
+      ...(qeiWorldlineDossier == null
+        ? qeiDossier == null
+          ? []
+          : ["--qei-dossier", qeiDossier]
+        : ["--qei-worldline-dossier", qeiWorldlineDossier]),
       "--literature-map",
       literatureMap,
       "--out",
@@ -1002,7 +1006,11 @@ export const planReferenceValidationChain = (
     sourceClosurePassReadiness,
     "--coupled-closure-pass-candidate",
     coupledClosurePassCandidate,
-    ...(qeiDossier == null ? [] : ["--qei-dossier", qeiDossier]),
+    ...(qeiWorldlineDossier == null
+      ? qeiDossier == null
+        ? []
+        : ["--qei-dossier", qeiDossier]
+      : ["--qei-worldline-dossier", qeiWorldlineDossier]),
     "--literature-map",
     literatureMap,
     "--out",
