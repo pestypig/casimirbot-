@@ -927,6 +927,8 @@ export const planReferenceValidationChain = (
     ...(regionalMaterialSourceTensorModel == null
       ? []
       : ["--regional-material-source-tensor-model", regionalMaterialSourceTensorModel]),
+    "--source-component-authority-ledger",
+    sourceComponentAuthorityLedger,
     "--source-side-authority",
     sourceAuthority,
     "--regional-source-closure-evidence",

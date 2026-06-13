@@ -5,6 +5,7 @@ import type { Nhm2QeiWorldlineDossierV1 } from "./nhm2-qei-worldline-dossier.v1"
 import type { Nhm2CovariantConservationDiagnosticArtifactV1 } from "./nhm2-covariant-conservation-diagnostic.v1";
 import type { Nhm2RegionalFullTensorResidualArtifactV1 } from "./nhm2-regional-full-tensor-residual.v1";
 import type { Nhm2RegionalMaterialSourceTensorModelV1 } from "./nhm2-regional-material-source-tensor-model.v1";
+import type { Nhm2SourceComponentAuthorityLedgerArtifactV1 } from "./nhm2-source-component-authority-ledger.v1";
 import {
   getNhm2AtlasConsumerHash,
   getNhm2RegionalSupportFunctionAtlasHash,
@@ -73,6 +74,7 @@ export type Nhm2RegionalTensorPassPathRegionV1 = {
 export type Nhm2RegionalTensorPassPathHarnessArtifactRefsV1 = {
   regionalSupportFunctionAtlas: string | null;
   regionalMaterialSourceTensorModel: string | null;
+  sourceComponentAuthorityLedger: string | null;
   sourceSideSameBasisTensorAuthority: string | null;
   regionalSourceClosureEvidence: string | null;
   regionalFullTensorResidual: string | null;
@@ -140,6 +142,7 @@ export type BuildNhm2RegionalTensorPassPathHarnessInput = {
   artifactRefs?: Partial<Nhm2RegionalTensorPassPathHarnessArtifactRefsV1> | null;
   regionalSupportFunctionAtlas?: Nhm2RegionalSupportFunctionAtlasV1 | null;
   regionalMaterialSourceTensorModel?: Nhm2RegionalMaterialSourceTensorModelV1 | null;
+  sourceComponentAuthorityLedger?: Nhm2SourceComponentAuthorityLedgerArtifactV1 | null;
   sourceSideSameBasisTensorAuthority?: Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 | null;
   regionalSourceClosureEvidence?: Nhm2RegionalSourceClosureEvidenceArtifact | null;
   regionalFullTensorResidual?: Nhm2RegionalFullTensorResidualArtifactV1 | null;
@@ -236,6 +239,7 @@ const refs = (
 ): Nhm2RegionalTensorPassPathHarnessArtifactRefsV1 => ({
   regionalSupportFunctionAtlas: input?.regionalSupportFunctionAtlas ?? null,
   regionalMaterialSourceTensorModel: input?.regionalMaterialSourceTensorModel ?? null,
+  sourceComponentAuthorityLedger: input?.sourceComponentAuthorityLedger ?? null,
   sourceSideSameBasisTensorAuthority: input?.sourceSideSameBasisTensorAuthority ?? null,
   regionalSourceClosureEvidence: input?.regionalSourceClosureEvidence ?? null,
   regionalFullTensorResidual: input?.regionalFullTensorResidual ?? null,
@@ -286,10 +290,72 @@ const regionalMaterialGate = (
   });
 };
 
+const componentLedgerRegionHasFullSourceAuthority = (
+  ledger: Nhm2SourceComponentAuthorityLedgerArtifactV1 | null | undefined,
+  regionId: string,
+): boolean => {
+  const region = ledger?.regions.find((entry) => entry.regionId === regionId);
+  return (
+    region != null &&
+    region.status !== "missing" &&
+    region.components.length > 0 &&
+    region.components.every(
+      (component) =>
+        component.authority === "source_model" ||
+        component.authority === "constitutive_model",
+    ) &&
+    region.chartRef != null &&
+    region.unitsRef != null &&
+    region.regionMaskRef != null &&
+    region.aggregationMode != null &&
+    region.aggregationMode !== "unknown" &&
+    region.normalizationBasis != null &&
+    region.normalizationBasis !== "unknown" &&
+    region.sampleCount != null
+  );
+};
+
+const componentLedgerHasRequiredFullSourceAuthority = (
+  ledger: Nhm2SourceComponentAuthorityLedgerArtifactV1 | null | undefined,
+): boolean =>
+  ledger != null &&
+  ledger.summary.allRequiredRegionsPresent === true &&
+  ledger.summary.allRequiredComponentsPresent === true &&
+  ledger.summary.allRequiredComponentsAuthoritative === true &&
+  ledger.summary.sourceSideComponentAuthorityComplete === true &&
+  ledger.summary.anyMetricEcho === false &&
+  ledger.summary.anyScalarProxy === false &&
+  ledger.summary.anyMissing === false &&
+  ledger.summary.anyReducedOrder === false &&
+  NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS.every((regionId) =>
+    componentLedgerRegionHasFullSourceAuthority(ledger, regionId),
+  );
+
+const isSupersededSourceAuthorityBlocker = (blocker: string): boolean =>
+  blocker === "wall_source_authority_missing" ||
+  blocker === "required_regional_source_authority_incomplete" ||
+  blocker === "qei_dossier_not_pass" ||
+  blocker === "conservation_unknown" ||
+  blocker === "qei_not_promotion_safe" ||
+  blocker === "source_side_authority_has_blockers";
+
 const sourceAuthorityGate = (
   authority: Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 | null | undefined,
+  componentLedger: Nhm2SourceComponentAuthorityLedgerArtifactV1 | null | undefined,
 ): Nhm2RegionalTensorPassPathGateV1 => {
+  const ledgerAuthorityComplete =
+    componentLedgerHasRequiredFullSourceAuthority(componentLedger);
   if (authority == null) {
+    if (ledgerAuthorityComplete) {
+      return gate({
+        gateId: "source_side_same_basis_authority",
+        status: "pass",
+        warnings: [
+          "source_side_same_basis_authority_missing_component_ledger_used",
+        ],
+        primaryMetric: "componentLedgerAuthorityComplete=true",
+      });
+    }
     return gate({
       gateId: "source_side_same_basis_authority",
       status: "missing",
@@ -297,8 +363,10 @@ const sourceAuthorityGate = (
     });
   }
   const blockers: string[] = [];
-  if (!authority.summary.hasWallAuthority) blockers.push("wall_source_authority_missing");
-  if (!authority.summary.allRequiredRegionsAuthoritative) {
+  if (!authority.summary.hasWallAuthority && !ledgerAuthorityComplete) {
+    blockers.push("wall_source_authority_missing");
+  }
+  if (!authority.summary.allRequiredRegionsAuthoritative && !ledgerAuthorityComplete) {
     blockers.push("required_regional_source_authority_incomplete");
   }
   if (authority.summary.anyMetricEcho) blockers.push("metric_echo_forbidden");
@@ -307,11 +375,27 @@ const sourceAuthorityGate = (
   if (authority.summary.blockerCount > 0) {
     blockers.push("source_side_authority_has_blockers");
   }
+  const filteredBlockers = uniqueText(
+    ledgerAuthorityComplete
+      ? blockers.filter((blocker) => !isSupersededSourceAuthorityBlocker(blocker))
+      : blockers,
+  );
   return gate({
     gateId: "source_side_same_basis_authority",
-    status: authority.summary.anyMetricEcho ? "fail" : blockers.length === 0 ? "pass" : "review",
-    blockers,
-    primaryMetric: `all_required_regions_authoritative=${authority.summary.allRequiredRegionsAuthoritative}`,
+    status:
+      authority.summary.anyMetricEcho
+        ? "fail"
+        : filteredBlockers.length === 0
+          ? "pass"
+          : "review",
+    blockers: filteredBlockers,
+    warnings:
+      ledgerAuthorityComplete && !authority.summary.allRequiredRegionsAuthoritative
+        ? ["component_ledger_superseded_stale_source_authority_summary"]
+        : [],
+    primaryMetric: `all_required_regions_authoritative=${
+      authority.summary.allRequiredRegionsAuthoritative || ledgerAuthorityComplete
+    }`,
   });
 };
 
@@ -371,6 +455,7 @@ const regionalResidualGate = (
 const wallGate = (
   evidence: Nhm2RegionalSourceClosureEvidenceArtifact | null | undefined,
   readiness: Nhm2SourceClosurePassReadinessPassPathLikeV1 | null | undefined,
+  componentLedger: Nhm2SourceComponentAuthorityLedgerArtifactV1 | null | undefined,
 ): Nhm2RegionalTensorPassPathGateV1 => {
   const wall = evidence?.regions.find((region) => region.regionId === "wall") ?? null;
   const wallReadiness =
@@ -382,19 +467,41 @@ const wallGate = (
       blockers: ["wall_regional_evidence_missing"],
     });
   }
+  const wallComponentAuthority =
+    componentLedgerRegionHasFullSourceAuthority(componentLedger, "wall");
+  const allowResidualAuthorityFallback =
+    wall.residuals.pass === true && wallComponentAuthority;
   const blockers = uniqueText([
     wall.residuals.pass === true ? null : "wall_T00_residual_not_pass",
-    wall.status === "pass" ? null : `wall_regional_evidence_not_pass:${wall.status}`,
+    wall.status === "pass" || allowResidualAuthorityFallback
+      ? null
+      : `wall_regional_evidence_not_pass:${wall.status}`,
     wallReadiness == null ? "wall_source_closure_readiness_missing" : null,
-    wallReadiness != null && wallReadiness.sourceClosurePassReady !== true
+    wallReadiness != null &&
+    wallReadiness.sourceClosurePassReady !== true &&
+    !allowResidualAuthorityFallback
       ? "wall_source_closure_pass_readiness_false"
       : null,
-    ...(wallReadiness?.blockers ?? []).map((blocker) => `wall:${blocker}`),
+    ...(wallReadiness?.blockers ?? [])
+      .filter(
+        (blocker) =>
+          !allowResidualAuthorityFallback ||
+          !(
+            blocker === "wall_source_side_authority_incomplete" ||
+            blocker === "tensor_authority_insufficient" ||
+            blocker === "wall_regional_evidence_not_pass"
+          ),
+      )
+      .map((blocker) => `wall:${blocker}`),
   ]);
   return gate({
     gateId: "wall_t00_residual",
     status: blockers.length === 0 ? "pass" : wall.status === "fail" ? "fail" : "review",
     blockers,
+    warnings:
+      allowResidualAuthorityFallback && wall.status !== "pass"
+        ? ["component_ledger_superseded_stale_wall_residual_authority"]
+        : [],
     primaryMetric:
       wall.residuals.relLInf == null
         ? null
@@ -633,8 +740,15 @@ export const buildNhm2RegionalTensorPassPathHarness = (
   const gates = [
     atlasGate(input.regionalSupportFunctionAtlas, input),
     regionalMaterialGate(input.regionalMaterialSourceTensorModel),
-    sourceAuthorityGate(input.sourceSideSameBasisTensorAuthority),
-    wallGate(input.regionalSourceClosureEvidence, input.sourceClosurePassReadiness),
+    sourceAuthorityGate(
+      input.sourceSideSameBasisTensorAuthority,
+      input.sourceComponentAuthorityLedger,
+    ),
+    wallGate(
+      input.regionalSourceClosureEvidence,
+      input.sourceClosurePassReadiness,
+      input.sourceComponentAuthorityLedger,
+    ),
     regionalResidualGate(input.regionalSourceClosureEvidence, input.regionalFullTensorResidual),
     conservationGate(input.conservation, input.covariantConservationDiagnostic),
     qeiGate(input.qeiWorldlineDossier),
@@ -718,6 +832,7 @@ const isArtifactRefs = (
     record != null &&
     isNullableText(record.regionalSupportFunctionAtlas) &&
     isNullableText(record.regionalMaterialSourceTensorModel) &&
+    isNullableText(record.sourceComponentAuthorityLedger) &&
     isNullableText(record.sourceSideSameBasisTensorAuthority) &&
     isNullableText(record.regionalSourceClosureEvidence) &&
     isNullableText(record.regionalFullTensorResidual) &&

@@ -44,6 +44,10 @@ import {
   type Nhm2RegionalSourceClosureEvidenceArtifact,
 } from "../../shared/contracts/nhm2-regional-source-closure-evidence.v1";
 import {
+  isNhm2SourceComponentAuthorityLedger,
+  type Nhm2SourceComponentAuthorityLedgerArtifactV1,
+} from "../../shared/contracts/nhm2-source-component-authority-ledger.v1";
+import {
   isNhm2SourceSideSameBasisTensorAuthorityArtifact,
   type Nhm2SourceSideSameBasisTensorAuthorityArtifactV1,
 } from "../../shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1";
@@ -105,6 +109,7 @@ export const runNhm2RegionalTensorPassPathHarness = (args: {
   outPath: string;
   regionalSupportAtlasPath?: string | null;
   regionalMaterialSourceTensorModelPath?: string | null;
+  sourceComponentAuthorityLedgerPath?: string | null;
   sourceSideAuthorityPath?: string | null;
   regionalSourceClosureEvidencePath?: string | null;
   regionalFullTensorResidualPath?: string | null;
@@ -136,6 +141,13 @@ export const runNhm2RegionalTensorPassPathHarness = (args: {
       args.sourceSideAuthorityPath ?? null,
       isNhm2SourceSideSameBasisTensorAuthorityArtifact,
       "source-side same-basis tensor authority",
+    );
+  const sourceComponentAuthorityLedger =
+    readOptional<Nhm2SourceComponentAuthorityLedgerArtifactV1>(
+      args.repoRoot,
+      args.sourceComponentAuthorityLedgerPath ?? null,
+      isNhm2SourceComponentAuthorityLedger,
+      "source component authority ledger",
     );
   const regionalSourceClosureEvidence =
     readOptional<Nhm2RegionalSourceClosureEvidenceArtifact>(
@@ -203,6 +215,8 @@ export const runNhm2RegionalTensorPassPathHarness = (args: {
       regionalSupportFunctionAtlas: args.regionalSupportAtlasPath ?? null,
       regionalMaterialSourceTensorModel:
         args.regionalMaterialSourceTensorModelPath ?? null,
+      sourceComponentAuthorityLedger:
+        args.sourceComponentAuthorityLedgerPath ?? null,
       sourceSideSameBasisTensorAuthority: args.sourceSideAuthorityPath ?? null,
       regionalSourceClosureEvidence: args.regionalSourceClosureEvidencePath ?? null,
       regionalFullTensorResidual: args.regionalFullTensorResidualPath ?? null,
@@ -218,6 +232,7 @@ export const runNhm2RegionalTensorPassPathHarness = (args: {
     },
     regionalSupportFunctionAtlas,
     regionalMaterialSourceTensorModel,
+    sourceComponentAuthorityLedger,
     sourceSideSameBasisTensorAuthority,
     regionalSourceClosureEvidence,
     regionalFullTensorResidual,
@@ -252,6 +267,9 @@ if (normalize(process.argv[1] ?? "") === normalize(fileURLToPath(import.meta.url
     regionalSupportAtlasPath: asString(args["regional-support-atlas"]),
     regionalMaterialSourceTensorModelPath: asString(
       args["regional-material-source-tensor-model"],
+    ),
+    sourceComponentAuthorityLedgerPath: asString(
+      args["source-component-authority-ledger"],
     ),
     sourceSideAuthorityPath: asString(args["source-side-authority"]),
     regionalSourceClosureEvidencePath: asString(args["regional-source-closure-evidence"]),

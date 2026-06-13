@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import {
   buildHelixConversationMemoryPacket,
   detectHelixFollowupReferences,
+  resolveHelixPendingTaskFrameClarification,
   resolveConversationMemoryAdmission,
 } from "../services/helix-ask/conversation-memory-selector";
 import { __resetConversationHistoryStore } from "../services/helix-ask/conversation-history";
@@ -387,6 +388,128 @@ describe("Helix Ask conversation memory packet", () => {
     });
     expect(packet.resolved_references[0]).toMatchObject({
       refers_to_kind: "pending_user_input",
+    });
+  });
+
+  it("merges unresolved triangle frame slots across pending clarification chain", () => {
+    const baseFrame = {
+      id: "math_geometry_triangle:req-triangle",
+      kind: "math_geometry_triangle",
+      created_turn_id: "turn-1",
+      updated_turn_id: "turn-1",
+      status: "missing_slots",
+      original_user_request: "If the longest side of a triangle is 9 1/8 inches, what are the other two sides?",
+      known_slots: {
+        longest_side: {
+          raw: "9 1/8 inches",
+          expression: "73/8",
+          decimal: 9.125,
+          unit: "in",
+        },
+      },
+      missing_slots: ["triangle_type", "angle", "another_side", "perimeter", "area", "side_ratio"],
+      constraints: ["0 < a <= c", "0 < b <= c", "a + b > c"],
+      assumptions: [],
+      source_request_user_input_id: "req-triangle",
+      allowed_next_actions: ["ask_user", "merge_clarification", "route_calculator"],
+    };
+    completeTurn({
+      turnId: "turn-1",
+      user: baseFrame.original_user_request,
+      answer: "I need one more triangle constraint.",
+    });
+    appendHelixThreadServerRequestEvent({
+      thread_id: threadId,
+      route: "/ask",
+      event_type: "server_request_created",
+      turn_id: "turn-1",
+      session_id: sessionId,
+      turn_kind: "ask",
+      request_id: "req-triangle",
+      request_kind: "request_user_input",
+      item_status: "in_progress",
+      request_payload: {
+        schema: "helix.pending_server_request.v1",
+        prompt: "I need one more triangle constraint before calculating the other sides.",
+        user_goal_summary: baseFrame.original_user_request,
+        required_fields: baseFrame.missing_slots,
+        unresolved_task_frame: baseFrame,
+      },
+    });
+    completeTurn({
+      turnId: "turn-2",
+      user: "The other two sides are equal in length.",
+      answer: "I have the equal-side constraint. I still need one more determining constraint.",
+    });
+    appendHelixThreadServerRequestEvent({
+      thread_id: threadId,
+      route: "/ask",
+      event_type: "server_request_created",
+      turn_id: "turn-2",
+      session_id: sessionId,
+      turn_kind: "ask",
+      request_id: "req-triangle-equal",
+      request_kind: "request_user_input",
+      item_status: "in_progress",
+      request_payload: {
+        schema: "helix.pending_server_request.v1",
+        prompt: "I have the equal-side constraint. I still need one more determining constraint.",
+        user_goal_summary: baseFrame.original_user_request,
+        required_fields: ["angle", "another_side", "perimeter", "area"],
+        unresolved_task_frame: {
+          ...baseFrame,
+          updated_turn_id: "turn-2",
+          known_slots: {
+            equal_other_sides: true,
+          },
+          missing_slots: ["angle", "another_side", "perimeter", "area"],
+        },
+      },
+    });
+
+    const packet = buildHelixConversationMemoryPacket({
+      threadId,
+      currentTurnId: "turn-3",
+      sessionId,
+      promptText:
+        "The length from the middle of the triangle to the point of the other sides is 3/4 inches, now what is the length of the other two sides?",
+    });
+    const frame = packet.unresolved_task_frames[0];
+    expect(frame).toMatchObject({
+      kind: "math_geometry_triangle",
+      known_slots: {
+        equal_other_sides: true,
+        longest_side: {
+          expression: "73/8",
+          unit: "in",
+        },
+      },
+    });
+
+    const resolution = resolveHelixPendingTaskFrameClarification({
+      promptText:
+        "The length from the middle of the triangle to the point of the other sides is 3/4 inches, now what is the length of the other two sides?",
+      frames: packet.unresolved_task_frames,
+      turnId: "turn-3",
+    });
+    expect(resolution).toMatchObject({
+      matched: true,
+      action: "route_calculator",
+      updated_frame: {
+        status: "ready_to_solve",
+        known_slots: {
+          equal_other_sides: true,
+          longest_side: {
+            expression: "73/8",
+            unit: "in",
+          },
+          median_or_altitude_from_midpoint_to_opposite_vertex: {
+            expression: "3/4",
+          },
+        },
+      },
+      compiled_expression: "(((73/8)/2)^2+(3/4)^2)^(1/2)",
+      expected_unit: "in",
     });
   });
 });

@@ -455,6 +455,51 @@ const allPassingArtifact = () =>
     casimirMaterialReceipt: materialReceipt(),
   });
 
+const staleSourceAuthority = () => {
+  const artifact = sourceAuthority();
+  return {
+    ...artifact,
+    regions: artifact.regions.map((region) => ({
+      ...region,
+      status: "blocked" as const,
+      blockers: [
+        "qei_dossier_not_pass",
+        "conservation_unknown",
+        "qei_not_promotion_safe",
+      ],
+    })),
+    summary: {
+      ...artifact.summary,
+      hasWallAuthority: false,
+      allRequiredRegionsAuthoritative: false,
+      blockerCount: 12,
+    },
+  };
+};
+
+const staleReadinessAuthorityOnly = () => {
+  const artifact = readiness();
+  return {
+    ...artifact,
+    sourceClosurePassSignalAllowed: false,
+    firstRetirableBlocker: "wall_source_side_authority_incomplete",
+    preflightBlockers: [
+      "global_source_side_authority_incomplete",
+      "hull_source_side_authority_incomplete",
+      "wall_source_side_authority_incomplete",
+      "exterior_shell_source_side_authority_incomplete",
+    ],
+    regions: artifact.regions.map((region) => ({
+      ...region,
+      sourceAuthorityStatus: "blocked" as const,
+      sourceClosurePassReady: false,
+      blockers: [`${region.regionId}_source_side_authority_incomplete`],
+      nextRequiredEvidence:
+        "retire source-side authority blockers before interpreting residuals as closure",
+    })),
+  };
+};
+
 describe("NHM2 coupled closure pass-candidate artifact", () => {
   it("does not pass from regional tensor authority alone", () => {
     const artifact = buildNhm2CoupledClosurePassCandidate({
@@ -562,6 +607,60 @@ describe("NHM2 coupled closure pass-candidate artifact", () => {
         (gate) => gate.gateId === "source_component_authority_ledger",
       )?.blockers,
     ).toContain("source_component_authority_ledger_missing");
+  });
+
+  it("does not use stale source authority fallback without a complete component ledger", () => {
+    const artifact = buildNhm2CoupledClosurePassCandidate({
+      regionalSupportFunctionAtlas: atlas(),
+      sourceAuthority: staleSourceAuthority(),
+      sourceClosurePassReadiness: staleReadinessAuthorityOnly(),
+      regionalEvidence: regionalEvidence(),
+      conservation: conservation(),
+      qeiWorldlineDossier: qeiWorldlineDossier(),
+      observerRobustEnergyConditions: robustObserver(),
+      casimirMaterialReceipt: materialReceipt(),
+    });
+    const sourceGate = artifact.gates.find(
+      (gate) => gate.gateId === "regional_source_tensor_authority",
+    );
+
+    expect(artifact.summary.passCandidate).toBe(false);
+    expect(artifact.summary.wallAuthorityPresent).toBe(false);
+    expect(sourceGate?.status).toBe("review");
+    expect(sourceGate?.blockers).toContain("wall_source_authority_missing");
+  });
+
+  it("uses component authority to retire stale source authority and readiness blockers", () => {
+    const artifact = buildNhm2CoupledClosurePassCandidate({
+      regionalSupportFunctionAtlas: atlas(),
+      sourceAuthority: staleSourceAuthority(),
+      sourceComponentAuthorityLedger: sourceComponentAuthorityLedger(),
+      sourceClosurePassReadiness: staleReadinessAuthorityOnly(),
+      regionalEvidence: regionalEvidence(),
+      conservation: conservation(),
+      qeiWorldlineDossier: qeiWorldlineDossier(),
+      observerRobustEnergyConditions: robustObserver(),
+      casimirMaterialReceipt: materialReceipt(),
+    });
+    const sourceGate = artifact.gates.find(
+      (gate) => gate.gateId === "regional_source_tensor_authority",
+    );
+    const readinessGate = artifact.gates.find(
+      (gate) => gate.gateId === "source_closure_readiness",
+    );
+
+    expect(sourceGate?.status).toBe("pass");
+    expect(sourceGate?.warnings).toContain(
+      "component_ledger_superseded_stale_source_authority_summary",
+    );
+    expect(readinessGate?.status).toBe("pass");
+    expect(readinessGate?.warnings).toContain(
+      "component_ledger_superseded_stale_source_closure_readiness_authority",
+    );
+    expect(artifact.summary.wallAuthorityPresent).toBe(true);
+    expect(artifact.summary.sourceClosurePassSignalAllowed).toBe(true);
+    expect(artifact.summary.passCandidate).toBe(true);
+    expect(artifact.claimBoundary.physicalViabilityClaimAllowed).toBe(false);
   });
 
   it("allows a diagnostic pass candidate only when every coupled gate passes", () => {

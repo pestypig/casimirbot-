@@ -109,12 +109,44 @@ const uniqueTaskFrames = (
   values: HelixUnresolvedTaskFrame[],
   limit: number,
 ): HelixUnresolvedTaskFrame[] => {
-  const seen = new Set<string>();
-  const result: HelixUnresolvedTaskFrame[] = [];
+  const byKey = new Map<string, HelixUnresolvedTaskFrame>();
+  const order: string[] = [];
+  const chainKey = (frame: HelixUnresolvedTaskFrame): string =>
+    normalizeText(frame.source_request_user_input_id) ||
+    `${frame.kind}:${normalizeLower(frame.original_user_request)}` ||
+    frame.id;
+  const mergeFrame = (
+    prior: HelixUnresolvedTaskFrame,
+    next: HelixUnresolvedTaskFrame,
+  ): HelixUnresolvedTaskFrame => ({
+    ...prior,
+    ...next,
+    created_turn_id: prior.created_turn_id || next.created_turn_id,
+    known_slots: {
+      ...(prior.known_slots ?? {}),
+      ...(next.known_slots ?? {}),
+    },
+    constraints: unique([...(prior.constraints ?? []), ...(next.constraints ?? [])], 24),
+    assumptions: unique([...(prior.assumptions ?? []), ...(next.assumptions ?? [])], 24),
+    allowed_next_actions: allowedFrameActions(
+      unique([...(prior.allowed_next_actions ?? []), ...(next.allowed_next_actions ?? [])], 12),
+    ),
+  });
   for (const value of values) {
-    if (!value.id || seen.has(value.id)) continue;
-    seen.add(value.id);
-    result.push(value);
+    if (!value.id) continue;
+    const key = chainKey(value);
+    if (!byKey.has(key)) {
+      order.push(key);
+      byKey.set(key, value);
+      continue;
+    }
+    byKey.set(key, mergeFrame(byKey.get(key)!, value));
+  }
+  const result: HelixUnresolvedTaskFrame[] = [];
+  for (const key of order) {
+    const frame = byKey.get(key);
+    if (!frame) continue;
+    result.push(frame);
     if (result.length >= limit) break;
   }
   return result;
@@ -507,7 +539,7 @@ export function resolveHelixPendingTaskFrameClarification(input: {
     allowed_next_actions: readyToSolve ? ["route_calculator"] : ["ask_user", "merge_clarification", "route_calculator"],
   };
   if (readyToSolve && longestExpression && heightExpression) {
-    const expression = `sqrt(((${longestExpression})/2)^2+(${heightExpression})^2)`;
+    const expression = `(((${longestExpression})/2)^2+(${heightExpression})^2)^(1/2)`;
     return {
       matched: true,
       action: "route_calculator",

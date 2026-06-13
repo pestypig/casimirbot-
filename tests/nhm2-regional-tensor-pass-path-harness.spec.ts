@@ -18,6 +18,7 @@ import {
   type Nhm2RegionalTensor,
 } from "../shared/contracts/nhm2-regional-source-closure-evidence.v1";
 import type { Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 } from "../shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1";
+import type { Nhm2SourceComponentAuthorityLedgerArtifactV1 } from "../shared/contracts/nhm2-source-component-authority-ledger.v1";
 import type { Nhm2TileCounterpartConservationArtifact } from "../shared/contracts/nhm2-tile-counterpart-conservation.v1";
 import type { CasimirMaterialReceiptV1 } from "../shared/contracts/casimir-material-receipt.v1";
 import type { Nhm2QeiWorldlineDossierV1 } from "../shared/contracts/nhm2-qei-worldline-dossier.v1";
@@ -224,6 +225,115 @@ const sourceAuthority = (): Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 => 
     doesNotValidatePhysicalSource: true,
     metricEchoForbidden: true,
     wallT00ClosureRequiresWallAuthority: true,
+  },
+});
+
+const staleSourceAuthority = (): Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 => {
+  const artifact = sourceAuthority();
+  return {
+    ...artifact,
+    regions: artifact.regions.map((region) => ({
+      ...region,
+      status: "blocked",
+      blockers: [
+        "qei_dossier_not_pass",
+        "conservation_unknown",
+        "qei_not_promotion_safe",
+      ],
+    })),
+    summary: {
+      ...artifact.summary,
+      hasWallAuthority: false,
+      allRequiredRegionsAuthoritative: false,
+      blockerCount: 12,
+    },
+  };
+};
+
+const sourceComponentAuthorityLedger = (): Nhm2SourceComponentAuthorityLedgerArtifactV1 => ({
+  contractVersion: "nhm2_source_component_authority_ledger/v1",
+  generatedAt: "2026-06-12T00:00:00.000Z",
+  laneId: "nhm2_shift_lapse",
+  selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+  runId: "pass-path-test",
+  counterpartArtifactRef: "counterpart.json",
+  sourceTensorArtifactRef: "source.json",
+  atlasRef,
+  atlasHash,
+  regions: NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS.map((regionId) => ({
+    regionId,
+    status: "pass",
+    comparisonRole: "tile_effective_counterpart",
+    tensorAuthorityMode: "full_tensor",
+    chartRef: "comoving_cartesian",
+    unitsRef: "J/m^3",
+    regionMaskRef: `${regionId}-mask`,
+    aggregationMode: "mean",
+    normalizationBasis: "volume",
+    sampleCount: 8,
+    components: ([
+      "T00",
+      "T01",
+      "T02",
+      "T03",
+      "T11",
+      "T12",
+      "T13",
+      "T22",
+      "T23",
+      "T33",
+    ] as const).map((componentId) => ({
+      componentId,
+      valueSI: -10,
+      authority: "source_model" as const,
+      componentGroup:
+        componentId === "T00"
+          ? "energy_density" as const
+          : componentId === "T01" ||
+              componentId === "T02" ||
+              componentId === "T03"
+            ? "momentum_density" as const
+            : componentId === "T11" ||
+                componentId === "T22" ||
+                componentId === "T33"
+              ? "spatial_stress_diagonal" as const
+              : "spatial_stress_off_diagonal" as const,
+      receiptRef: "source.json",
+      provenance: {
+        counterpartRegionRef: `counterpart.json#${regionId}`,
+        derivationMode: "regional_material_source_tensor_model",
+        sourceModelId: "regional-component-model",
+        sourceModelVersion: "v1",
+        notDerivedFromMetricRequiredTensor: true,
+      },
+      blockers: [],
+    })),
+    blockers: [],
+  })),
+  summary: {
+    allRequiredRegionsPresent: true,
+    allRequiredComponentsPresent: true,
+    allRequiredComponentsAuthoritative: true,
+    allRequiredComponentsAdmissible: true,
+    sourceSideComponentAuthorityComplete: true,
+    hasWallFullTensorAuthority: true,
+    anyMetricEcho: false,
+    anyScalarProxy: false,
+    anyMissing: false,
+    anyReducedOrder: false,
+    missingComponentRefs: [],
+    proxyComponentRefs: [],
+    metricEchoComponentRefs: [],
+    reducedOrderComponentRefs: [],
+    firstBlocker: null,
+    blockerCount: 0,
+  },
+  claimBoundary: {
+    diagnosticOnly: true,
+    componentAuthorityDoesNotValidateMaterialSource: true,
+    metricEchoForbidden: true,
+    scalarProxyCannotProvideFullTensorAuthority: true,
+    missingComponentsCannotBeZeroFilled: true,
   },
 });
 
@@ -434,6 +544,7 @@ const coupled = (): Nhm2CoupledClosurePassCandidateArtifactV1 => ({
   artifactRefs: {
     regionalSupportFunctionAtlas: atlasRef,
     regionalMaterialSourceTensorModel: "regional-model.json",
+    sourceComponentAuthorityLedger: "component-ledger.json",
     tileLocalSourceElements: null,
     tileEffectiveCounterpart: "counterpart.json",
     sourceSideSameBasisTensorAuthority: "authority.json",
@@ -449,6 +560,7 @@ const coupled = (): Nhm2CoupledClosurePassCandidateArtifactV1 => ({
     passCandidate: true,
     sourceClosurePassSignalAllowed: true,
     allRequiredRegionsAuthoritative: true,
+    sourceComponentAuthorityComplete: true,
     wallAuthorityPresent: true,
     wallClosureReady: true,
     regionalResidualsPass: true,
@@ -472,6 +584,7 @@ const coupled = (): Nhm2CoupledClosurePassCandidateArtifactV1 => ({
 const allPassingInput = () => ({
   regionalSupportFunctionAtlas: atlas(),
   regionalMaterialSourceTensorModel: regionalModel(),
+  sourceComponentAuthorityLedger: sourceComponentAuthorityLedger(),
   sourceSideSameBasisTensorAuthority: sourceAuthority(),
   regionalSourceClosureEvidence: regionalEvidence(),
   sourceClosurePassReadiness: readiness(),
@@ -552,6 +665,23 @@ describe("nhm2_regional_tensor_pass_path_harness/v1", () => {
     expect(gate?.blockers).toContain("qei_worldline_dossier_incomplete");
     expect(gate?.blockers).toContain("wall-1:qei_bound_missing");
     expect(artifact.summary.qeiDossierPass).toBe(false);
+  });
+
+  it("uses component authority to retire stale source authority blockers", () => {
+    const artifact = buildNhm2RegionalTensorPassPathHarness({
+      ...allPassingInput(),
+      sourceSideSameBasisTensorAuthority: staleSourceAuthority(),
+    });
+    const gate = artifact.gates.find(
+      (entry) => entry.gateId === "source_side_same_basis_authority",
+    );
+
+    expect(gate?.status).toBe("pass");
+    expect(gate?.warnings).toContain(
+      "component_ledger_superseded_stale_source_authority_summary",
+    );
+    expect(gate?.blockers).not.toContain("wall_source_authority_missing");
+    expect(artifact.summary.numericalPassPathReady).toBe(true);
   });
 
   it("distinguishes scalar residual alignment from authority metadata blockers", () => {

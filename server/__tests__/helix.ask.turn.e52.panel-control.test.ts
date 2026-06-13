@@ -648,6 +648,77 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(second.body?.resolved_turn_summary?.resolved_route_label).toBe("pending_task_frame / request_user_input");
   }, 60000);
 
+  it("accumulates triangle follow-up slots across turns before routing the compiled calculator expression", async () => {
+    const app = createApp();
+    const sessionId = `e52-calculator-triangle-chain-carryover-${Date.now()}`;
+    const first = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          "If the longest side of a triangle is 9 inches and 1/8 inches, what are the other two sides of the triangle? How long is that? And make an equation for that and solve it with the calculator",
+        mode: "read",
+        debug: true,
+        sessionId,
+      })
+      .expect(200);
+
+    expect(first.body?.pending_server_request?.unresolved_task_frame).toMatchObject({
+      kind: "math_geometry_triangle",
+      status: "missing_slots",
+      known_slots: {
+        longest_side: {
+          expression: "73/8",
+          unit: "in",
+        },
+      },
+    });
+
+    const second = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "The other two sides are equal in length.",
+        mode: "read",
+        debug: true,
+        sessionId,
+      })
+      .expect(200);
+
+    expect(second.body?.pending_task_frame_resolution).toMatchObject({
+      matched: true,
+      action: "request_user_input",
+      updated_frame: {
+        known_slots: {
+          equal_other_sides: true,
+          longest_side: {
+            expression: "73/8",
+            unit: "in",
+          },
+        },
+      },
+    });
+
+    const third = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          "The length from the middle of the triangle to the point of the other sides is 3/4 inches, now what is the length of the other two sides?",
+        mode: "read",
+        debug: true,
+        sessionId,
+      })
+      .expect(200);
+
+    expect(third.body?.route_reason_code).toBe("dispatch:act");
+    expect(String(third.body?.raw_user_prompt ?? "")).not.toContain("Pending task frame carryover");
+    expect(findAction(third.body, "scientific-calculator", "solve_expression")).toMatchObject({
+      args: {
+        expression: "(((73/8)/2)^2+(3/4)^2)^(1/2)",
+      },
+    });
+    expect(String(third.body?.selected_final_answer ?? "")).toContain("4.62373293455");
+    expect(String(third.body?.selected_final_answer ?? "")).not.toMatch(/need more information|more details/i);
+  }, 60000);
+
   it("persists streamed pending triangle frames so follow-up slot fills cannot route as simple chat", async () => {
     const app = createApp();
     const sessionId = `e52-calculator-triangle-stream-carryover-${Date.now()}`;
