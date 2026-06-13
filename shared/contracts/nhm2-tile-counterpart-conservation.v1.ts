@@ -32,8 +32,13 @@ export type Nhm2TileCounterpartConservationArtifact = {
     sampleCount: number | null;
     diagnosticMode?:
       | "regional_jump_linf_v1"
+      | "regional_jump_linf_with_transition_kernel_v1"
       | "not_computed_validation_hardening_placeholder";
     neighborRegionIds?: Nhm2RegionalSourceClosureRegionId[];
+    transitionKernelRef?: string | null;
+    preTransitionResidualLInf?: number | null;
+    postTransitionResidualLInf?: number | null;
+    transitionSmoothingWeight?: number | null;
     transitionLayerResidualLInf?: number | null;
     dominantComponentId?: Nhm2TensorComponent | null;
     maxHotspotRef?: string | null;
@@ -71,10 +76,12 @@ const isOptionalDiagnosticMode = (
   value: unknown,
 ): value is
   | "regional_jump_linf_v1"
+  | "regional_jump_linf_with_transition_kernel_v1"
   | "not_computed_validation_hardening_placeholder"
   | undefined =>
   value === undefined ||
   value === "regional_jump_linf_v1" ||
+  value === "regional_jump_linf_with_transition_kernel_v1" ||
   value === "not_computed_validation_hardening_placeholder";
 
 const isOptionalRegionIds = (
@@ -178,6 +185,10 @@ const isRegion = (
     isNullableNumber(record.sampleCount) &&
     isOptionalDiagnosticMode(record.diagnosticMode) &&
     isOptionalRegionIds(record.neighborRegionIds) &&
+    isOptionalNullableText(record.transitionKernelRef) &&
+    isOptionalNullableNumber(record.preTransitionResidualLInf) &&
+    isOptionalNullableNumber(record.postTransitionResidualLInf) &&
+    isOptionalNullableNumber(record.transitionSmoothingWeight) &&
     isOptionalNullableNumber(record.transitionLayerResidualLInf) &&
     isOptionalTensorComponent(record.dominantComponentId) &&
     isOptionalNullableText(record.maxHotspotRef) &&

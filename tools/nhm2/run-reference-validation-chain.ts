@@ -83,6 +83,9 @@ export const planReferenceValidationChain = (
   );
   const sourceInput = asOptionalString(args, "source-input");
   const inputConservation = asOptionalString(args, "conservation");
+  const inputTransitionKernel = asOptionalString(args, "regional-source-transition-kernel");
+  const buildRegionalSourceTransitionKernel =
+    args["build-regional-source-transition-kernel"] === true;
   const inputTileLocalSourceElements = asOptionalString(args, "tile-local-source-elements");
   const buildTileLocalSourceElements = args["build-tile-local-source-elements"] === true;
   const casimirMaterialReceipt = asOptionalString(args, "casimir-material-receipt");
@@ -150,7 +153,11 @@ export const planReferenceValidationChain = (
     (buildTileLocalSourceElements ? generatedTileLocalSourceElements : null);
   const sourceTensor = `${outRoot}/nhm2-tile-effective-full-tensor-source.json`;
   const generatedConservation = `${outRoot}/nhm2-tile-counterpart-conservation.json`;
+  const generatedTransitionKernel = `${outRoot}/nhm2-regional-source-transition-kernel.json`;
   const conservation = inputConservation ?? (sourceInput == null ? null : generatedConservation);
+  const transitionKernel =
+    inputTransitionKernel ??
+    (buildRegionalSourceTransitionKernel ? generatedTransitionKernel : null);
   const sourceIndependenceAudit = `${outRoot}/nhm2-tile-counterpart-source-independence.md`;
   const sourceAuthority = `${outRoot}/nhm2-source-side-same-basis-tensor-authority.json`;
   const generatedMetricRequiredFullTensorSource =
@@ -233,6 +240,16 @@ export const planReferenceValidationChain = (
       "--conservation and --source-input are mutually exclusive; source-input generates conservation inside the frozen chain",
     );
   }
+  if (inputTransitionKernel != null && buildRegionalSourceTransitionKernel) {
+    throw new Error(
+      "--regional-source-transition-kernel and --build-regional-source-transition-kernel are mutually exclusive",
+    );
+  }
+  if ((inputTransitionKernel != null || buildRegionalSourceTransitionKernel) && sourceInput == null) {
+    throw new Error(
+      "regional source transition kernels require --source-input so the frozen chain can regenerate tile full-tensor source and conservation artifacts",
+    );
+  }
   if (regionalMaterialSourceTensorModel != null && wallMaterialSourceTensorModel != null) {
     throw new Error(
       "regional and wall material source tensor models are mutually exclusive; use the regional model to cover wall/hull/exterior together",
@@ -292,11 +309,21 @@ export const planReferenceValidationChain = (
       sourceTensor,
       ...auditOnly,
     ]));
+    if (buildRegionalSourceTransitionKernel) {
+      commands.push(command("nhm2:build-regional-source-transition-kernel", [
+        "--tile-full-tensor-source",
+        sourceTensor,
+        "--out",
+        generatedTransitionKernel,
+        ...auditOnly,
+      ]));
+    }
     commands.push(command("nhm2:publish-tile-counterpart-conservation", [
       "--reference-run",
       referenceRun,
       "--tile-full-tensor-source",
       sourceTensor,
+      ...(transitionKernel == null ? [] : ["--transition-kernel", transitionKernel]),
       "--out",
       generatedConservation,
       ...auditOnly,

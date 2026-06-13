@@ -472,4 +472,53 @@ describe("NHM2 reference validation chain planner", () => {
       }),
     ).toThrow(/mutually exclusive/);
   });
+
+  it("can generate a transition kernel before generated conservation", () => {
+    const plan = planReferenceValidationChain({
+      ...baseArgs(),
+      "source-input": "fixtures/nhm2/source-input.json",
+      "build-regional-source-transition-kernel": true,
+    });
+    const scripts = plan.map((command) => command.script);
+    const kernel = findCommand(plan, "nhm2:build-regional-source-transition-kernel");
+    const conservation = findCommand(plan, "nhm2:publish-tile-counterpart-conservation");
+
+    expect(scripts.indexOf("nhm2:publish-tile-effective-full-tensor-source")).toBeLessThan(
+      scripts.indexOf("nhm2:build-regional-source-transition-kernel"),
+    );
+    expect(scripts.indexOf("nhm2:build-regional-source-transition-kernel")).toBeLessThan(
+      scripts.indexOf("nhm2:publish-tile-counterpart-conservation"),
+    );
+    expect(kernel.args).toEqual([
+      "--tile-full-tensor-source",
+      "artifacts/research/full-solve/reference/run-1/nhm2-tile-effective-full-tensor-source.json",
+      "--out",
+      "artifacts/research/full-solve/reference/run-1/nhm2-regional-source-transition-kernel.json",
+    ]);
+    expect(conservation.args).toContain("--transition-kernel");
+    expect(conservation.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-regional-source-transition-kernel.json",
+    );
+  });
+
+  it("rejects transition-kernel generation without generated source input", () => {
+    expect(() =>
+      planReferenceValidationChain({
+        ...baseArgs(),
+        "build-regional-source-transition-kernel": true,
+      }),
+    ).toThrow(/require --source-input/);
+  });
+
+  it("rejects ambiguous generated and prebuilt transition kernels", () => {
+    expect(() =>
+      planReferenceValidationChain({
+        ...baseArgs(),
+        "source-input": "fixtures/nhm2/source-input.json",
+        "regional-source-transition-kernel":
+          "artifacts/reference/nhm2-regional-source-transition-kernel.json",
+        "build-regional-source-transition-kernel": true,
+      }),
+    ).toThrow(/mutually exclusive/);
+  });
 });

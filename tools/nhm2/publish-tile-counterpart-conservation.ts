@@ -11,6 +11,10 @@ import {
   type Nhm2TensorComponent,
 } from "../../shared/contracts/nhm2-regional-source-closure-evidence.v1";
 import {
+  isNhm2RegionalSourceTransitionKernel,
+  type Nhm2RegionalSourceTransitionKernelV1,
+} from "../../shared/contracts/nhm2-regional-source-transition-kernel.v1";
+import {
   buildNhm2TileCounterpartConservationArtifact,
   type Nhm2TileCounterpartConservationArtifact,
 } from "../../shared/contracts/nhm2-tile-counterpart-conservation.v1";
@@ -34,7 +38,8 @@ const asNumber = (value: unknown): number | null =>
       ? Number(value)
       : null;
 
-const readJson = (path: string): unknown => JSON.parse(readFileSync(path, "utf8"));
+const readJson = (path: string): unknown =>
+  JSON.parse(readFileSync(path, "utf8").replace(/^\uFEFF/, ""));
 
 const resolvePath = (repoRoot: string, path: string): string =>
   isAbsolute(path) ? path : join(repoRoot, path);
@@ -64,6 +69,11 @@ const MOMENTUM_COMPONENTS = [
 ] as const satisfies readonly Nhm2TensorComponent[];
 
 type SourceRegion = Nhm2TileEffectiveFullTensorSourceArtifact["regions"][number];
+type TransitionInterface = Nhm2RegionalSourceTransitionKernelV1["interfaces"][number];
+type TransitionContext = {
+  ref: string;
+  byPair: Map<string, TransitionInterface>;
+};
 
 const finiteTensorValue = (
   tensor: Nhm2RegionalTensor,
@@ -93,6 +103,43 @@ const normalizedJump = (
   return Math.abs(leftValue - rightValue) / scale;
 };
 
+const pairKey = (
+  leftRegionId: Nhm2RegionalSourceClosureRegionId,
+  rightRegionId: Nhm2RegionalSourceClosureRegionId,
+): string => [leftRegionId, rightRegionId].sort().join("|");
+
+const transitionFor = (
+  transition: TransitionContext | null,
+  leftRegionId: Nhm2RegionalSourceClosureRegionId,
+  rightRegionId: Nhm2RegionalSourceClosureRegionId,
+): TransitionInterface | null =>
+  transition?.byPair.get(pairKey(leftRegionId, rightRegionId)) ?? null;
+
+const transitionWeightFor = (
+  transition: TransitionContext | null,
+  leftRegionId: Nhm2RegionalSourceClosureRegionId,
+  rightRegionId: Nhm2RegionalSourceClosureRegionId,
+): number => {
+  const entry = transitionFor(transition, leftRegionId, rightRegionId);
+  return entry == null ? 0 : Math.min(1, Math.max(0, entry.smoothingWeight));
+};
+
+const adjustedJump = (
+  left: SourceRegion,
+  right: SourceRegion,
+  component: Nhm2TensorComponent,
+  transition: TransitionContext | null,
+): number | null => {
+  const raw = normalizedJump(left, right, component);
+  if (raw == null) return null;
+  const weight = transitionWeightFor(
+    transition,
+    left.regionId,
+    right.regionId,
+  );
+  return raw * (1 - weight);
+};
+
 const maxFinite = (values: Array<number | null>): number | null => {
   const finiteValues = values.filter(
     (value): value is number => typeof value === "number" && Number.isFinite(value),
@@ -103,13 +150,14 @@ const maxFinite = (values: Array<number | null>): number | null => {
 const findDominantJump = (
   region: SourceRegion,
   neighbors: SourceRegion[],
+  transition: TransitionContext | null,
 ): { componentId: Nhm2TensorComponent | null; residual: number | null; hotspotRef: string | null } => {
   let componentId: Nhm2TensorComponent | null = null;
   let residual: number | null = null;
   let hotspotRef: string | null = null;
   for (const neighbor of neighbors) {
     for (const component of NHM2_TENSOR_COMPONENTS) {
-      const jump = normalizedJump(region, neighbor, component);
+      const jump = adjustedJump(region, neighbor, component, transition);
       if (jump == null) continue;
       if (residual == null || jump > residual) {
         componentId = component;
@@ -125,6 +173,7 @@ const buildConservationRegion = (
   regionId: Nhm2RegionalSourceClosureRegionId,
   sourceRegions: Map<Nhm2RegionalSourceClosureRegionId, SourceRegion>,
   toleranceLInf: number,
+  transition: TransitionContext | null,
 ): Nhm2TileCounterpartConservationArtifact["regions"][number] => {
   const region = sourceRegions.get(regionId);
   if (region == null) {
@@ -136,8 +185,15 @@ const buildConservationRegion = (
       momentumResidualLInf: null,
       toleranceLInf,
       sampleCount: null,
-      diagnosticMode: "regional_jump_linf_v1",
+      diagnosticMode:
+        transition == null
+          ? "regional_jump_linf_v1"
+          : "regional_jump_linf_with_transition_kernel_v1",
       neighborRegionIds: REGION_NEIGHBORS[regionId],
+      transitionKernelRef: transition?.ref ?? null,
+      preTransitionResidualLInf: null,
+      postTransitionResidualLInf: null,
+      transitionSmoothingWeight: null,
       transitionLayerResidualLInf: null,
       dominantComponentId: null,
       maxHotspotRef: null,
@@ -151,25 +207,43 @@ const buildConservationRegion = (
     const neighbor = sourceRegions.get(neighborId);
     return neighbor == null ? [] : [neighbor];
   });
-  const continuityResidualLInf = maxFinite(
-    neighbors.map((neighbor) => normalizedJump(region, neighbor, "T00")),
-  );
-  const momentumResidualLInf = maxFinite(
-    neighbors.flatMap((neighbor) =>
-      MOMENTUM_COMPONENTS.map((component) => normalizedJump(region, neighbor, component)),
-    ),
-  );
-  const divTResidualLInf = maxFinite(
+  const preTransitionResidualLInf = maxFinite(
     neighbors.flatMap((neighbor) =>
       NHM2_TENSOR_COMPONENTS.map((component) => normalizedJump(region, neighbor, component)),
     ),
   );
-  const dominant = findDominantJump(region, neighbors);
+  const continuityResidualLInf = maxFinite(
+    neighbors.map((neighbor) => adjustedJump(region, neighbor, "T00", transition)),
+  );
+  const momentumResidualLInf = maxFinite(
+    neighbors.flatMap((neighbor) =>
+      MOMENTUM_COMPONENTS.map((component) =>
+        adjustedJump(region, neighbor, component, transition),
+      ),
+    ),
+  );
+  const divTResidualLInf = maxFinite(
+    neighbors.flatMap((neighbor) =>
+      NHM2_TENSOR_COMPONENTS.map((component) =>
+        adjustedJump(region, neighbor, component, transition),
+      ),
+    ),
+  );
+  const dominant = findDominantJump(region, neighbors, transition);
+  const transitionSmoothingWeight = maxFinite(
+    neighbors.map((neighbor) =>
+      transitionWeightFor(transition, region.regionId, neighbor.regionId),
+    ),
+  );
   const warnings =
     neighbors.length === neighborIds.length
-      ? [
-          "reduced-order diagnostic only: region-aggregate tensor jumps are not a full covariant finite-difference conservation solve",
-        ]
+      ? transition == null
+        ? [
+            "reduced-order diagnostic only: region-aggregate tensor jumps are not a full covariant finite-difference conservation solve",
+          ]
+        : [
+            "transition-kernel regularized diagnostic only: smoothed region-aggregate jumps are not a full covariant finite-difference conservation solve",
+          ]
       : [
           "one or more neighbor regions were absent from the source artifact",
           "reduced-order diagnostic only: region-aggregate tensor jumps are not a full covariant finite-difference conservation solve",
@@ -183,8 +257,15 @@ const buildConservationRegion = (
     momentumResidualLInf,
     toleranceLInf,
     sampleCount: region.sampleCount ?? null,
-    diagnosticMode: "regional_jump_linf_v1",
+    diagnosticMode:
+      transition == null
+        ? "regional_jump_linf_v1"
+        : "regional_jump_linf_with_transition_kernel_v1",
     neighborRegionIds: neighborIds,
+    transitionKernelRef: transition?.ref ?? null,
+    preTransitionResidualLInf,
+    postTransitionResidualLInf: divTResidualLInf,
+    transitionSmoothingWeight,
     transitionLayerResidualLInf: dominant.residual,
     dominantComponentId: dominant.componentId,
     maxHotspotRef: dominant.hotspotRef,
@@ -214,13 +295,14 @@ export const publishTileCounterpartConservation = (args: {
   repoRoot: string;
   referenceRunPath: string;
   tileFullTensorSourcePath: string;
+  transitionKernelPath?: string | null;
   outPath: string;
   toleranceLInf?: number | null;
   auditOnly?: boolean;
 }): Nhm2TileCounterpartConservationArtifact => {
   if (
     !args.auditOnly &&
-    [args.referenceRunPath, args.tileFullTensorSourcePath].some(pathUsesLatestAlias)
+    [args.referenceRunPath, args.tileFullTensorSourcePath, args.transitionKernelPath].some(pathUsesLatestAlias)
   ) {
     throw new Error("latest aliases are forbidden unless --audit-only is passed");
   }
@@ -233,6 +315,28 @@ export const publishTileCounterpartConservation = (args: {
   if (!isNhm2TileEffectiveFullTensorSourceArtifact(source)) {
     throw new Error("tile full tensor source must be nhm2_tile_effective_full_tensor_source/v1");
   }
+  const transitionKernel =
+    args.transitionKernelPath == null
+      ? null
+      : readJson(resolvePath(args.repoRoot, args.transitionKernelPath));
+  if (
+    transitionKernel != null &&
+    !isNhm2RegionalSourceTransitionKernel(transitionKernel)
+  ) {
+    throw new Error("transition kernel must be nhm2_regional_source_transition_kernel/v1");
+  }
+  const transition =
+    transitionKernel == null
+      ? null
+      : {
+          ref: args.transitionKernelPath as string,
+          byPair: new Map(
+            transitionKernel.interfaces.map((entry) => [
+              pairKey(entry.leftRegionId, entry.rightRegionId),
+              entry,
+            ]),
+          ),
+        };
   const sourceRegions = new Map(source.regions.map((region) => [region.regionId, region]));
   const toleranceLInf = args.toleranceLInf ?? DEFAULT_CONSERVATION_TOLERANCE_LINF;
   const regions: Nhm2TileCounterpartConservationArtifact["regions"] =
@@ -241,6 +345,7 @@ export const publishTileCounterpartConservation = (args: {
         regionId as Nhm2RegionalSourceClosureRegionId,
         sourceRegions,
         toleranceLInf,
+        transition,
       );
     });
 
@@ -250,7 +355,10 @@ export const publishTileCounterpartConservation = (args: {
     expectedProfileId: referenceRun.selectedFamily.expectedProfileId,
     laneId: "nhm2_shift_lapse",
     chartRef: "comoving_cartesian",
-    derivativeStencil: "regional_jump_linf_v1",
+    derivativeStencil:
+      transition == null
+        ? "regional_jump_linf_v1"
+        : "regional_jump_linf_with_transition_kernel_v1",
     unitsRef: "dimensionless_normalized_tensor_jump",
     regions,
   });
@@ -264,6 +372,7 @@ const main = (): void => {
   const args = parseArgs(process.argv.slice(2));
   const referenceRunPath = asString(args["reference-run"]);
   const sourcePath = asString(args["tile-full-tensor-source"]);
+  const transitionKernelPath = asString(args["transition-kernel"]);
   const outPath = asString(args.out);
   const toleranceLInf = asNumber(args.tolerance);
   if (referenceRunPath == null || sourcePath == null || outPath == null) {
@@ -273,6 +382,7 @@ const main = (): void => {
     repoRoot: process.cwd(),
     referenceRunPath,
     tileFullTensorSourcePath: sourcePath,
+    transitionKernelPath,
     outPath,
     toleranceLInf,
     auditOnly: args["audit-only"] === true,
