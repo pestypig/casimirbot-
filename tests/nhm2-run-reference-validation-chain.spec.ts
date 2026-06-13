@@ -529,6 +529,8 @@ describe("NHM2 reference validation chain planner", () => {
     );
     const covariant = findCommand(plan, "nhm2:build-covariant-conservation-diagnostic");
     const qeiBound = findCommand(plan, "nhm2:build-qei-bound-receipt");
+    const qeiPlan = findCommand(plan, "nhm2:build-qei-worldline-sample-plan");
+    const qeiSampling = findCommand(plan, "nhm2:build-qei-worldline-sampling-receipt");
     const qei = findCommand(plan, "nhm2:build-atlas-bound-qei-worldline-dossier");
     const observer = findCommand(
       plan,
@@ -561,6 +563,12 @@ describe("NHM2 reference validation chain planner", () => {
       scripts.indexOf("nhm2:build-qei-bound-receipt"),
     );
     expect(scripts.indexOf("nhm2:build-qei-bound-receipt")).toBeLessThan(
+      scripts.indexOf("nhm2:build-qei-worldline-sample-plan"),
+    );
+    expect(scripts.indexOf("nhm2:build-qei-worldline-sample-plan")).toBeLessThan(
+      scripts.indexOf("nhm2:build-qei-worldline-sampling-receipt"),
+    );
+    expect(scripts.indexOf("nhm2:build-qei-worldline-sampling-receipt")).toBeLessThan(
       scripts.indexOf("nhm2:build-atlas-bound-qei-worldline-dossier"),
     );
     expect(scripts.indexOf("nhm2:build-atlas-bound-qei-worldline-dossier")).toBeLessThan(
@@ -572,7 +580,20 @@ describe("NHM2 reference validation chain planner", () => {
     expect(scripts.indexOf("nhm2:publish-regional-source-closure-evidence")).toBeLessThan(
       scripts.indexOf("nhm2:build-regional-full-tensor-residual"),
     );
-    for (const planned of [kernel, conservation, regionalEvidence, covariant, qeiBound, qei, observer, coupled, harness, admission]) {
+    for (const planned of [
+      kernel,
+      conservation,
+      regionalEvidence,
+      covariant,
+      qeiBound,
+      qeiPlan,
+      qeiSampling,
+      qei,
+      observer,
+      coupled,
+      harness,
+      admission,
+    ]) {
       expect(planned.args).toContain("--regional-support-atlas");
       expect(planned.args).toContain(atlasPath);
     }
@@ -591,6 +612,28 @@ describe("NHM2 reference validation chain planner", () => {
     expect(qeiBound.args).toContain(
       "artifacts/research/full-solve/reference/run-1/nhm2-qei-bound-receipt.json",
     );
+    expect(qeiPlan.args).toContain("--source-full-tensor");
+    expect(qeiPlan.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-tile-effective-full-tensor-source.json",
+    );
+    expect(qeiPlan.args).toContain("--transition-kernel");
+    expect(qeiPlan.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-regional-source-transition-kernel.json",
+    );
+    expect(qeiPlan.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-qei-worldline-sample-plan.json",
+    );
+    expect(qeiSampling.args).toContain("--source-full-tensor");
+    expect(qeiSampling.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-tile-effective-full-tensor-source.json",
+    );
+    expect(qeiSampling.args).toContain("--qei-worldline-sample-plan");
+    expect(qeiSampling.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-qei-worldline-sample-plan.json",
+    );
+    expect(qeiSampling.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-qei-worldline-sampling-receipt.json",
+    );
     expect(qei.args).toContain("--source-full-tensor");
     expect(qei.args).toContain(
       "artifacts/research/full-solve/reference/run-1/nhm2-tile-effective-full-tensor-source.json",
@@ -598,6 +641,10 @@ describe("NHM2 reference validation chain planner", () => {
     expect(qei.args).toContain("--qei-bound-receipt");
     expect(qei.args).toContain(
       "artifacts/research/full-solve/reference/run-1/nhm2-qei-bound-receipt.json",
+    );
+    expect(qei.args).toContain("--qei-worldline-sampling-receipt");
+    expect(qei.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-qei-worldline-sampling-receipt.json",
     );
     expect(qei.args).toContain(
       "artifacts/research/full-solve/reference/run-1/nhm2-qei-worldline-dossier.json",
@@ -650,7 +697,44 @@ describe("NHM2 reference validation chain planner", () => {
     expect(qei.args).toContain("artifacts/reference/nhm2-qei-bound-receipt.json");
   });
 
-  it("forwards QEI receipt inputs to generated bound-receipt runs", () => {
+  it("passes explicit QEI sampling receipts through without regenerating one", () => {
+    const plan = planReferenceValidationChain({
+      ...baseArgs(),
+      "source-input": "fixtures/nhm2/source-input.json",
+      "build-regional-support-function-atlas": true,
+      "qei-worldline-sampling-receipt":
+        "artifacts/reference/nhm2-qei-worldline-sampling-receipt.json",
+    });
+    const scripts = plan.map((command) => command.script);
+    const qei = findCommand(plan, "nhm2:build-atlas-bound-qei-worldline-dossier");
+
+    expect(scripts).not.toContain("nhm2:build-qei-worldline-sampling-receipt");
+    expect(qei.args).toContain("--qei-worldline-sampling-receipt");
+    expect(qei.args).toContain(
+      "artifacts/reference/nhm2-qei-worldline-sampling-receipt.json",
+    );
+  });
+
+  it("passes explicit QEI sample plans through to sampling receipts without regenerating one", () => {
+    const plan = planReferenceValidationChain({
+      ...baseArgs(),
+      "source-input": "fixtures/nhm2/source-input.json",
+      "build-regional-support-function-atlas": true,
+      "build-regional-source-transition-kernel": true,
+      "qei-worldline-sample-plan":
+        "artifacts/reference/nhm2-qei-worldline-sample-plan.json",
+    });
+    const scripts = plan.map((command) => command.script);
+    const qeiSampling = findCommand(plan, "nhm2:build-qei-worldline-sampling-receipt");
+
+    expect(scripts).not.toContain("nhm2:build-qei-worldline-sample-plan");
+    expect(qeiSampling.args).toContain("--qei-worldline-sample-plan");
+    expect(qeiSampling.args).toContain(
+      "artifacts/reference/nhm2-qei-worldline-sample-plan.json",
+    );
+  });
+
+  it("forwards QEI receipt inputs to generated bound and sampling receipt runs", () => {
     const plan = planReferenceValidationChain({
       ...baseArgs(),
       "source-input": "fixtures/nhm2/source-input.json",
@@ -669,8 +753,11 @@ describe("NHM2 reference validation chain planner", () => {
       "qei-sampling-normalized": "true",
       "qei-qft-state-ref": "qft-state.json",
       "qei-renormalization-convention-ref": "renormalization.json",
+      "qei-explicit-worldline-samples":
+        "artifacts/reference/qei-explicit-worldline-samples.json",
     });
     const qeiBound = findCommand(plan, "nhm2:build-qei-bound-receipt");
+    const qeiSampling = findCommand(plan, "nhm2:build-qei-worldline-sampling-receipt");
 
     expect(qeiBound.args).toEqual(expect.arrayContaining([
       "--bound-model-kind",
@@ -701,6 +788,10 @@ describe("NHM2 reference validation chain planner", () => {
       "qft-state.json",
       "--renormalization-convention-ref",
       "renormalization.json",
+    ]));
+    expect(qeiSampling.args).toEqual(expect.arrayContaining([
+      "--explicit-worldline-samples",
+      "artifacts/reference/qei-explicit-worldline-samples.json",
     ]));
   });
 

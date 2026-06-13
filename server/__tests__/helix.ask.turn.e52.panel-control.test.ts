@@ -551,6 +551,12 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(response.body?.canonical_goal_frame?.classifier_reasons).toEqual(
       expect.arrayContaining(["underspecified_calculator_prompt"]),
     );
+    expect(String(response.body?.selected_final_answer ?? "")).toContain("triangle type");
+    expect(String(response.body?.selected_final_answer ?? "")).toContain("side ratio");
+    expect(String(response.body?.selected_final_answer ?? "")).not.toContain("What numeric value should I use");
+    expect(response.body?.pending_server_request?.required_fields).toEqual(
+      expect.arrayContaining(["triangle_type", "angle", "another_side", "side_ratio"]),
+    );
     expect(findAction(response.body, "scientific-calculator", "solve_expression")).toBeFalsy();
     const runtimeCapabilities =
       response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration.chosen_capability) ?? [];
@@ -590,6 +596,8 @@ describe("helix ask E52 panel control terminal contract", () => {
       expect(response.body?.canonical_goal_frame?.classifier_reasons).toEqual(
         expect.arrayContaining(["underspecified_calculator_prompt"]),
       );
+      expect(String(response.body?.selected_final_answer ?? "")).toContain("triangle type");
+      expect(String(response.body?.selected_final_answer ?? "")).not.toContain("What numeric value should I use");
       expect(findAction(response.body, "scientific-calculator", "solve_expression")).toBeFalsy();
       const runtimeCapabilities =
         response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration.chosen_capability) ?? [];
@@ -600,6 +608,40 @@ describe("helix ask E52 panel control terminal contract", () => {
       if (previousPlannerResponse === undefined) delete process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;
       else process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE = previousPlannerResponse;
     }
+  }, 60000);
+
+  it("routes plain mixed-number inch-to-meter conversion through calculator receipts", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Convert 9 1/8 inches to meters.",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-calculator-unit-conversion-${Date.now()}`,
+      })
+      .expect(200);
+
+    const receipts = response.body?.calculator_subgoal_receipts ?? [];
+    expect(receipts).toHaveLength(1);
+    expect(receipts[0]).toMatchObject({
+      subgoal_id: "unit_conversion_length",
+      expression_box_input: "(73/8)*0.0254",
+      result_text: "0.231775",
+      result_unit: "m",
+    });
+    expect(findAction(response.body, "scientific-calculator", "solve_expression")).toBeTruthy();
+    expect(response.body?.calculator_candidate_hints?.problem_interpretation).toMatchObject({
+      prompt_kind: "unit_conversion",
+      safe_to_calculate: true,
+    });
+    expect(response.body?.calculator_planner_result).toMatchObject({
+      authority: "deterministic_unit_conversion_compiler",
+      accepted_plan_kind: "deterministic_unit_conversion_compiler",
+      deterministic_unit_conversion_subgoal_count: 1,
+    });
+    expect(response.body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(String(response.body?.selected_final_answer ?? "")).toContain("0.231775 m");
   }, 60000);
 
   it("does not let keyed calculator planning convert same-unit triangle geometry from inches to meters", async () => {

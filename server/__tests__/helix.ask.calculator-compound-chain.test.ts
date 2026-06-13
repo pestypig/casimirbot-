@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCalculatorCandidateHints,
   detectUnderdeterminedTrianglePrompt,
+  draftUnitConversionCalculatorSubgoalsForPrompt,
   extractCalculatorNumericNormalizations,
   runCalculatorCompoundChain,
   runCalculatorModelAuthoredChain,
@@ -48,8 +49,11 @@ describe("Helix Ask calculator compound chain", () => {
     ]);
     expect(hints.problem_interpretation).toMatchObject({
       prompt_kind: "underdetermined_triangle",
+      determination_status: "underdetermined",
       needs_more_information: true,
       safe_to_calculate: false,
+      missing_constraints: expect.arrayContaining(["triangle_type", "angle", "another_side", "side_ratio"]),
+      clarifying_question: expect.stringContaining("triangle type"),
     });
   });
 
@@ -63,8 +67,57 @@ describe("Helix Ask calculator compound chain", () => {
     expect(detectUnderdeterminedTrianglePrompt(prompt)).toBe(true);
     expect(hints.problem_interpretation).toMatchObject({
       prompt_kind: "underdetermined_triangle",
+      determination_status: "underdetermined",
       needs_more_information: true,
       safe_to_calculate: false,
+      clarifying_question: expect.stringContaining("perimeter/area"),
+    });
+  });
+
+  it("compiles explicit mixed-number inch-to-meter conversions into calculator subgoals", () => {
+    const prompt = "Convert 9 1/8 inches to meters.";
+    const hints = buildCalculatorCandidateHints({
+      prompt,
+      turnId: "turn:test",
+    });
+    const subgoals = draftUnitConversionCalculatorSubgoalsForPrompt(prompt);
+
+    expect(hints.problem_interpretation).toMatchObject({
+      prompt_kind: "unit_conversion",
+      determination_status: "needs_unit_conversion",
+      safe_to_calculate: true,
+      givens: ["length = 73/8 in"],
+      unknowns: ["length in m"],
+    });
+    expect(subgoals).toEqual([
+      expect.objectContaining({
+        id: "unit_conversion_length",
+        expression: "(73/8)*0.0254",
+        expected_quantity: "length",
+        expected_unit: "m",
+        equation: "in_to_m",
+      }),
+    ]);
+
+    const chain = runCalculatorModelAuthoredChain({
+      prompt,
+      threadId: "thread:test",
+      turnId: "turn:test",
+      subgoals,
+      deterministic: true,
+      modelInvoked: false,
+    });
+
+    expect(chain).not.toBeNull();
+    expect(chain?.receipts[0]).toMatchObject({
+      expression: "(73/8)*0.0254",
+      result_text: "0.231775",
+      result_unit: "m",
+      result_quantity: "length",
+    });
+    expect(chain?.evaluation).toMatchObject({
+      deterministic: true,
+      model_invoked: false,
     });
   });
 

@@ -15,6 +15,10 @@ import {
   type Nhm2QeiBoundReceiptV1,
 } from "../../shared/contracts/nhm2-qei-bound-receipt.v1";
 import {
+  isNhm2QeiWorldlineSamplingReceipt,
+  type Nhm2QeiWorldlineSampleV1,
+} from "../../shared/contracts/nhm2-qei-worldline-sampling-receipt.v1";
+import {
   isNhm2RegionalSupportFunctionAtlas,
   type Nhm2RegionalSupportFunctionAtlasV1,
 } from "../../shared/contracts/nhm2-regional-support-function-atlas.v1";
@@ -38,6 +42,11 @@ type QeiBoundReceipt = {
   dutyCycle: number | null;
   lightCrossingSeconds: number | null;
   modulationSeconds: number | null;
+  blockers: string[];
+};
+
+type QeiWorldlineSamplingReceipt = {
+  samples: Map<Nhm2QeiWorldlineRegionId, Nhm2QeiWorldlineSampleV1>;
   blockers: string[];
 };
 
@@ -90,11 +99,6 @@ const readRequired = <T>(
 const pathUsesLatestAlias = (path: string | null | undefined): boolean =>
   path != null && /(^|[-/\\])latest(\.|[-/\\]|$)/i.test(path);
 
-const transitionSourceRegions = (
-  regionId: "hull_wall_transition" | "wall_exterior_transition",
-): [Nhm2RegionalSourceClosureRegionId, Nhm2RegionalSourceClosureRegionId] =>
-  regionId === "hull_wall_transition" ? ["hull", "wall"] : ["wall", "exterior_shell"];
-
 const sourceRegionMap = (
   source: Nhm2TileEffectiveFullTensorSourceArtifact,
 ): Map<Nhm2RegionalSourceClosureRegionId, Nhm2TileEffectiveFullTensorSourceArtifact["regions"][number]> =>
@@ -114,12 +118,25 @@ const regionHasAuthority = (
 const sampledDensityForRegion = (
   regionId: Nhm2QeiWorldlineRegionId,
   source: Nhm2TileEffectiveFullTensorSourceArtifact,
+  samplingReceipt: QeiWorldlineSamplingReceipt,
 ): {
   valueSI: number | null;
   provenanceRef: string | null;
   status: "computed" | "proxy" | "missing";
   blockers: string[];
 } => {
+  const sample = samplingReceipt.samples.get(regionId);
+  if (sample != null) {
+    return {
+      valueSI: sample.sampledRho.valueSI,
+      provenanceRef: sample.sampledRho.provenanceRef ?? null,
+      status: sample.sampledRho.status,
+      blockers: [
+        ...sample.blockers,
+        ...samplingReceipt.blockers,
+      ],
+    };
+  }
   const regions = sourceRegionMap(source);
   if (regionId === "hull" || regionId === "wall" || regionId === "exterior_shell") {
     const region = regions.get(regionId);
@@ -140,24 +157,14 @@ const sampledDensityForRegion = (
   }
 
   if (regionId === "hull_wall_transition" || regionId === "wall_exterior_transition") {
-    const [fromRegionId, toRegionId] = transitionSourceRegions(regionId);
-    const from = regions.get(fromRegionId);
-    const to = regions.get(toRegionId);
-    const fromT00 = from == null ? null : t00FromTensor(from.tensor);
-    const toT00 = to == null ? null : t00FromTensor(to.tensor);
-    const value = fromT00 == null || toT00 == null ? null : (fromT00 + toT00) / 2;
-    const authority = regionHasAuthority(from) && regionHasAuthority(to);
     return {
-      valueSI: value,
-      provenanceRef:
-        value == null
-          ? null
-          : `${source.artifactId}:${fromRegionId}-${toRegionId}:transition:T00`,
-      status: value == null ? "missing" : authority ? "computed" : "proxy",
+      valueSI: null,
+      provenanceRef: null,
+      status: "missing",
       blockers: [
-        "transition_worldline_reduced_order_interpolation",
-        ...(value == null ? [`${regionId}:sampled_rho_missing`] : []),
-        ...(!authority ? [`${regionId}:source_full_tensor_authority_not_pass`] : []),
+        "qei_worldline_sampling_receipt_missing",
+        "transition_worldline_source_sample_missing",
+        "transition_samples_must_not_use_adjacent_region_averages",
       ],
     };
   }
@@ -167,6 +174,40 @@ const sampledDensityForRegion = (
     provenanceRef: null,
     status: "missing",
     blockers: [`${regionId}:unsupported_qei_region`],
+  };
+};
+
+const readSamplingReceipt = (
+  repoRoot: string,
+  path: string | null,
+  atlasHash: string,
+  source: Nhm2TileEffectiveFullTensorSourceArtifact,
+  sourceFullTensorPath: string,
+): QeiWorldlineSamplingReceipt => {
+  if (path == null || !existsSync(resolvePath(repoRoot, path))) {
+    return { samples: new Map(), blockers: [] };
+  }
+  const record = readJson(resolvePath(repoRoot, path));
+  if (!isNhm2QeiWorldlineSamplingReceipt(record)) {
+    return {
+      samples: new Map(),
+      blockers: ["qei_worldline_sampling_receipt_invalid_contract"],
+    };
+  }
+  const sourceTensorRefs = new Set([source.artifactId, sourceFullTensorPath]);
+  const blockers = [
+    ...record.blockers,
+    ...(record.atlasHash === atlasHash
+      ? []
+      : ["qei_worldline_sampling_receipt_atlas_hash_mismatch"]),
+    ...(sourceTensorRefs.has(record.tensorRef)
+      ? []
+      : ["qei_worldline_sampling_receipt_tensor_ref_mismatch"]),
+    ...(record.status === "pass" ? [] : [`qei_worldline_sampling_receipt_${record.status}`]),
+  ];
+  return {
+    samples: new Map(record.worldlineSamples.map((sample) => [sample.regionId, sample])),
+    blockers,
   };
 };
 
@@ -318,6 +359,7 @@ export const buildAtlasBoundQeiWorldlineDossier = (args: {
   sourceFullTensorPath: string;
   outPath: string;
   qeiBoundReceiptPath?: string | null;
+  qeiWorldlineSamplingReceiptPath?: string | null;
   qeiBoundSI?: number | null;
   tauSeconds?: number | null;
   dutyCycle?: number | null;
@@ -331,6 +373,7 @@ export const buildAtlasBoundQeiWorldlineDossier = (args: {
     args.regionalSupportAtlasPath,
     args.sourceFullTensorPath,
     args.qeiBoundReceiptPath,
+    args.qeiWorldlineSamplingReceiptPath,
   ];
   if (!args.auditOnly && paths.some(pathUsesLatestAlias)) {
     throw new Error("latest aliases are forbidden unless --audit-only is passed");
@@ -356,13 +399,20 @@ export const buildAtlasBoundQeiWorldlineDossier = (args: {
     source,
     args.sourceFullTensorPath,
   );
+  const samplingReceipt = readSamplingReceipt(
+    args.repoRoot,
+    args.qeiWorldlineSamplingReceiptPath ?? null,
+    atlas.provenance.atlasHash,
+    source,
+    args.sourceFullTensorPath,
+  );
   const regions: Nhm2QeiWorldlineRegionId[] = [
     "wall",
     "hull_wall_transition",
     "wall_exterior_transition",
   ];
   const worldlines = regions.map((regionId) => {
-    const density = sampledDensityForRegion(regionId, source);
+    const density = sampledDensityForRegion(regionId, source, samplingReceipt);
     const lightCrossing =
       bound.lightCrossingSeconds ??
       args.lightCrossingSeconds ??
@@ -450,6 +500,7 @@ const main = (): void => {
     sourceFullTensorPath,
     outPath,
     qeiBoundReceiptPath: asString(raw["qei-bound-receipt"]),
+    qeiWorldlineSamplingReceiptPath: asString(raw["qei-worldline-sampling-receipt"]),
     qeiBoundSI: asNumber(raw["qei-bound-si"]),
     tauSeconds: asNumber(raw["tau-seconds"]),
     dutyCycle: asNumber(raw["duty-cycle"]),

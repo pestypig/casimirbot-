@@ -78,6 +78,14 @@ export const planReferenceValidationChain = (
   const qeiDossier = asOptionalString(args, "qei-dossier");
   const inputQeiWorldlineDossier = asOptionalString(args, "qei-worldline-dossier");
   const inputQeiBoundReceipt = asOptionalString(args, "qei-bound-receipt");
+  const inputQeiWorldlineSamplePlan = asOptionalString(
+    args,
+    "qei-worldline-sample-plan",
+  );
+  const inputQeiWorldlineSamplingReceipt = asOptionalString(
+    args,
+    "qei-worldline-sampling-receipt",
+  );
   const inputObserverRobustEnergyConditions = asOptionalString(
     args,
     "observer-robust-energy-conditions",
@@ -195,7 +203,19 @@ export const planReferenceValidationChain = (
     generatedQeiWorldlineDossier == null
       ? null
       : `${outRoot}/nhm2-qei-bound-receipt.json`;
+  const generatedQeiWorldlineSamplingReceipt =
+    generatedQeiWorldlineDossier == null
+      ? null
+      : `${outRoot}/nhm2-qei-worldline-sampling-receipt.json`;
+  const generatedQeiWorldlineSamplePlan =
+    generatedQeiWorldlineDossier == null || transitionKernel == null
+      ? null
+      : `${outRoot}/nhm2-qei-worldline-sample-plan.json`;
   const qeiBoundReceipt = inputQeiBoundReceipt ?? generatedQeiBoundReceipt;
+  const qeiWorldlineSamplePlan =
+    inputQeiWorldlineSamplePlan ?? generatedQeiWorldlineSamplePlan;
+  const qeiWorldlineSamplingReceipt =
+    inputQeiWorldlineSamplingReceipt ?? generatedQeiWorldlineSamplingReceipt;
   const qeiWorldlineDossier =
     inputQeiWorldlineDossier ?? generatedQeiWorldlineDossier;
   const generatedObserverRobustEnergyConditions =
@@ -715,6 +735,48 @@ export const planReferenceValidationChain = (
       ...auditOnly,
     ]));
   }
+  if (
+    generatedQeiWorldlineSamplePlan != null &&
+    inputQeiWorldlineSamplePlan == null &&
+    inputQeiWorldlineSamplingReceipt == null &&
+    inputQeiWorldlineDossier == null
+  ) {
+    commands.push(command("nhm2:build-qei-worldline-sample-plan", [
+      "--regional-support-atlas",
+      regionalSupportAtlas as string,
+      "--source-full-tensor",
+      sourceTensor,
+      "--transition-kernel",
+      transitionKernel as string,
+      "--out",
+      generatedQeiWorldlineSamplePlan,
+      ...auditOnly,
+    ]));
+  }
+  if (
+    generatedQeiWorldlineSamplingReceipt != null &&
+    inputQeiWorldlineSamplingReceipt == null &&
+    inputQeiWorldlineDossier == null
+  ) {
+    commands.push(command("nhm2:build-qei-worldline-sampling-receipt", [
+      "--regional-support-atlas",
+      regionalSupportAtlas as string,
+      "--source-full-tensor",
+      sourceTensor,
+      ...(qeiWorldlineSamplePlan == null
+        ? []
+        : ["--qei-worldline-sample-plan", qeiWorldlineSamplePlan]),
+      ...(asOptionalString(args, "qei-explicit-worldline-samples") == null
+        ? []
+        : [
+            "--explicit-worldline-samples",
+            asOptionalString(args, "qei-explicit-worldline-samples") as string,
+          ]),
+      "--out",
+      generatedQeiWorldlineSamplingReceipt,
+      ...auditOnly,
+    ]));
+  }
   if (generatedQeiWorldlineDossier != null && inputQeiWorldlineDossier == null) {
     commands.push(command("nhm2:build-atlas-bound-qei-worldline-dossier", [
       "--regional-support-atlas",
@@ -722,6 +784,9 @@ export const planReferenceValidationChain = (
       "--source-full-tensor",
       sourceTensor,
       ...(qeiBoundReceipt == null ? [] : ["--qei-bound-receipt", qeiBoundReceipt]),
+      ...(qeiWorldlineSamplingReceipt == null
+        ? []
+        : ["--qei-worldline-sampling-receipt", qeiWorldlineSamplingReceipt]),
       "--out",
       generatedQeiWorldlineDossier,
       ...auditOnly,

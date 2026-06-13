@@ -2,7 +2,7 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import TheoryBadgeGraphPanel from "../panels/TheoryBadgeGraphPanel";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { useTheoryBadgeGraphPanelStore } from "@/store/useTheoryBadgeGraphPanelStore";
@@ -52,30 +52,45 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
   });
 
   it("zooms the achievement map with floating controls and plus/minus keys", async () => {
-    renderPanel();
+    const animationFrameSpy = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback: FrameRequestCallback) => {
+        callback(performance.now() + 400);
+        return 1;
+      });
+    const cancelAnimationFrameSpy = vi
+      .spyOn(window, "cancelAnimationFrame")
+      .mockImplementation(() => undefined);
 
-    const scrollport = await screen.findByTestId("theory-achievement-map-scrollport");
-    const initialZoom = Number(scrollport.getAttribute("data-zoom-level"));
+    try {
+      renderPanel();
 
-    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+      const scrollport = await screen.findByTestId("theory-achievement-map-scrollport");
+      const initialZoom = Number(scrollport.getAttribute("data-zoom-level"));
 
-    await waitFor(() => {
-      expect(Number(scrollport.getAttribute("data-zoom-level"))).toBeGreaterThan(initialZoom);
-    });
+      fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
 
-    const zoomedIn = Number(scrollport.getAttribute("data-zoom-level"));
-    fireEvent.keyDown(window, { key: "-", code: "Minus" });
+      await waitFor(() => {
+        expect(Number(scrollport.getAttribute("data-zoom-level"))).toBeGreaterThan(initialZoom);
+      });
 
-    await waitFor(() => {
-      expect(Number(scrollport.getAttribute("data-zoom-level"))).toBeLessThan(zoomedIn);
-    });
+      const zoomedIn = Number(scrollport.getAttribute("data-zoom-level"));
+      fireEvent.keyDown(window, { key: "-", code: "Minus" });
 
-    const zoomedOut = Number(scrollport.getAttribute("data-zoom-level"));
-    fireEvent.keyDown(window, { key: "+", code: "Equal" });
+      await waitFor(() => {
+        expect(Number(scrollport.getAttribute("data-zoom-level"))).toBeLessThan(zoomedIn);
+      });
 
-    await waitFor(() => {
-      expect(Number(scrollport.getAttribute("data-zoom-level"))).toBeGreaterThan(zoomedOut);
-    });
+      const zoomedOut = Number(scrollport.getAttribute("data-zoom-level"));
+      fireEvent.keyDown(window, { key: "+", code: "Equal" });
+
+      await waitFor(() => {
+        expect(Number(scrollport.getAttribute("data-zoom-level"))).toBeGreaterThan(zoomedOut);
+      });
+    } finally {
+      animationFrameSpy.mockRestore();
+      cancelAnimationFrameSpy.mockRestore();
+    }
   });
 
   it("keeps reflection receipts as backend memory with a live answer rail block", async () => {

@@ -33,7 +33,7 @@ const EXPLAIN_WORDS = /\b(?:explain|break\s+down|walk\s+me\s+through|what\s+does
 const DOC_WORDS = /\b(?:doc|document|paper|this\s+doc|this\s+document|this\s+paper)\b/i;
 const READ_ALOUD_WORDS =
   /\b(?:read(?:\s+it)?(?:\s+out\s+loud|\s+aloud)?|out\s+loud|aloud|narrate|voice)\b/i;
-const CALCULATOR_WORDS = /\b(?:calculator|equation|latex|formula|solve|evaluate|compute)\b/i;
+const CALCULATOR_WORDS = /\b(?:calculator|equation|latex|formula|solve|evaluate|compute|convert|conversion)\b|(?:\b(?:inches?|in\.?|feet|ft\.?|cm|centimeters?|centimetres?)\b[\s\S]{0,40}\b(?:to|in|as)\s+(?:meters?|metres?|m|cm|centimeters?|centimetres?|inches?|in\.?|feet|ft\.?)\b)/i;
 const CALCULATOR_OPEN_WORDS = /\b(?:open|show|launch)\b[\s\S]*\b(?:calculator)\b/i;
 const CALCULATOR_STEP_WORDS = /\b(?:step|steps|step-by-step|work)\b/i;
 const CLIPBOARD_WORDS = /\b(?:clipboard|paste)\b/i;
@@ -42,7 +42,7 @@ const RESULT_WORDS = /\b(?:result|answer|output)\b/i;
 const DEBUG_LOG_WORDS = /\b(?:debug|event\s+log|logs?|trace)\b/i;
 
 const WORKSTATION_INTENT_WORDS =
-  /\b(open|show|launch|read|paper|doc|docs|documentation|panel|tab|job|run|execute|settings|workspace|workstation|close|shut|dismiss|remove|rid|next|previous|prev|reopen|summarize|summary|tldr|tl;dr|explain|section|calculator|equation|latex|solve|evaluate|compute|clipboard|paste|copy|result|answer|output|debug|log|trace)\b/i;
+  /\b(open|show|launch|read|paper|doc|docs|documentation|panel|tab|job|run|execute|settings|workspace|workstation|close|shut|dismiss|remove|rid|next|previous|prev|reopen|summarize|summary|tldr|tl;dr|explain|section|calculator|equation|latex|solve|evaluate|compute|convert|conversion|clipboard|paste|copy|result|answer|output|debug|log|trace)\b/i;
 const CLOSE_VERB_WORDS = /\b(?:close|shut|dismiss|remove|x\s*out|get\s+rid\s+of)\b/i;
 const PANEL_TARGET_WORDS =
   /\b(?:tab|tabs|panel|panels|doc|docs|document|documents|paper|papers|window|windows)\b/i;
@@ -111,7 +111,7 @@ export function inferDeterministicWorkstationIntentDecision(prompt: string): Wor
       reason: "deterministic_intent_frame:calculator_copy_result",
     };
   }
-  if (CALCULATOR_WORDS.test(normalized) && /\b(?:solve|evaluate|compute|calculate)\b/.test(normalized)) {
+  if (CALCULATOR_WORDS.test(normalized) && /\b(?:solve|evaluate|compute|calculate|convert|conversion)\b/.test(normalized)) {
     const latex = extractCalculatorExpressionArg(trimmed) ?? extractCalculatorExpressionArg(normalized);
     return {
       intent: CALCULATOR_STEP_WORDS.test(normalized) ? "calculator_solve_steps" : "calculator_solve",

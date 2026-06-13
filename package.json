@@ -209,6 +209,8 @@
     "nhm2:publish-regional-source-closure-evidence": "tsx tools/nhm2/publish-regional-source-closure-evidence.ts",
     "nhm2:build-regional-full-tensor-residual": "tsx tools/nhm2/build-regional-full-tensor-residual.ts",
     "nhm2:build-qei-bound-receipt": "tsx tools/nhm2/build-qei-bound-receipt.ts",
+    "nhm2:build-qei-worldline-sample-plan": "tsx tools/nhm2/build-qei-worldline-sample-plan.ts",
+    "nhm2:build-qei-worldline-sampling-receipt": "tsx tools/nhm2/build-qei-worldline-sampling-receipt.ts",
     "nhm2:build-atlas-bound-qei-worldline-dossier": "tsx tools/nhm2/build-atlas-bound-qei-worldline-dossier.ts",
     "nhm2:build-atlas-bound-observer-robust-energy-conditions": "tsx tools/nhm2/build-atlas-bound-observer-robust-energy-conditions.ts",
     "nhm2:publish-metric-required-regional-tensor-receipt": "tsx tools/nhm2/publish-metric-required-regional-tensor-receipt.ts",

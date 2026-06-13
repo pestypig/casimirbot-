@@ -76,13 +76,22 @@ export type CalculatorNumericNormalization = {
 export type CalculatorProblemInterpretation = {
   schema: "helix.calculator_problem_interpretation.v1";
   turn_id: string;
-  prompt_kind: "underdetermined_triangle" | "calculator_candidate";
+  prompt_kind: "underdetermined_triangle" | "unit_conversion" | "calculator_candidate";
+  determination_status:
+    | "fully_determined"
+    | "underdetermined"
+    | "overdetermined_or_contradictory"
+    | "ambiguous_target"
+    | "needs_unit_conversion"
+    | "pure_expression";
   needs_more_information: boolean;
   safe_to_calculate: boolean;
   reason: string | null;
   givens: string[];
   unknowns: string[];
   constraints: string[];
+  missing_constraints: string[];
+  clarifying_question: string | null;
   normalized_quantities: CalculatorNumericNormalization[];
   assistant_answer: false;
   raw_content_included: false;
@@ -265,22 +274,120 @@ export const detectUnderdeterminedTrianglePrompt = (prompt: string): boolean => 
   return sideMeasureMatches.length <= 1 && !hasDeterminingConstraint;
 };
 
+const normalizeLengthUnitToken = (unit: string | null | undefined): string | null => {
+  const normalized = String(unit ?? "").trim().toLowerCase().replace(/\.$/, "");
+  if (!normalized) return null;
+  if (normalized === "in" || normalized === "inch" || normalized === "inches") return "in";
+  if (normalized === "ft" || normalized === "foot" || normalized === "feet") return "ft";
+  if (normalized === "cm" || normalized === "centimeter" || normalized === "centimeters" || normalized === "centimetre" || normalized === "centimetres") return "cm";
+  if (normalized === "m" || normalized === "meter" || normalized === "meters" || normalized === "metre" || normalized === "metres") return "m";
+  return null;
+};
+
+const lengthUnitFactorToMeters = (unit: string): number | null => {
+  if (unit === "m") return 1;
+  if (unit === "cm") return 0.01;
+  if (unit === "ft") return 0.3048;
+  if (unit === "in") return 0.0254;
+  return null;
+};
+
+const lengthUnitLabel = (unit: string): string => {
+  if (unit === "m") return "meters";
+  if (unit === "cm") return "centimeters";
+  if (unit === "ft") return "feet";
+  if (unit === "in") return "inches";
+  return unit;
+};
+
+const explicitLengthConversionTargetPattern =
+  "(?:m|meters?|metres?|cm|centimeters?|centimetres?|in\\.?|inches?|ft\\.?|feet|foot)";
+
+const explicitLengthConversionQuantityPattern =
+  "(?:\\d+\\s+\\d+\\s*/\\s*\\d+|\\d+\\s*/\\s*\\d+|[-+]?\\d+(?:\\.\\d+)?(?:e[-+]?\\d+)?)";
+
+type DetectedLengthUnitConversion = {
+  rawQuantity: string;
+  quantityExpression: string;
+  fromUnit: string;
+  toUnit: string;
+  factor: number;
+  expression: string;
+};
+
+const detectLengthUnitConversionPrompt = (prompt: string): DetectedLengthUnitConversion | null => {
+  const normalized = normalizePrompt(prompt);
+  const patterns = [
+    new RegExp(`\\bconvert\\s+(${explicitLengthConversionQuantityPattern})\\s*(${explicitLengthConversionTargetPattern})\\s+(?:to|into|as|in)\\s+(${explicitLengthConversionTargetPattern})\\b`, "i"),
+    new RegExp(`\\bwhat\\s+is\\s+(${explicitLengthConversionQuantityPattern})\\s*(${explicitLengthConversionTargetPattern})\\s+(?:as|in)\\s+(${explicitLengthConversionTargetPattern})\\b`, "i"),
+    new RegExp(`\\b(${explicitLengthConversionQuantityPattern})\\s*(${explicitLengthConversionTargetPattern})\\s+(?:to|into|as|in)\\s+(${explicitLengthConversionTargetPattern})\\b`, "i"),
+  ];
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern);
+    if (!match) continue;
+    const rawQuantity = String(match[1] ?? "").trim();
+    const fromUnit = normalizeLengthUnitToken(match[2]);
+    const toUnit = normalizeLengthUnitToken(match[3]);
+    if (!rawQuantity || !fromUnit || !toUnit || fromUnit === toUnit) continue;
+    const fromFactor = lengthUnitFactorToMeters(fromUnit);
+    const toFactor = lengthUnitFactorToMeters(toUnit);
+    if (!fromFactor || !toFactor) continue;
+    const quantityExpression = normalizeCalculatorMixedNumberLiterals(rawQuantity).replace(/\s+/g, "");
+    const factor = fromFactor / toFactor;
+    const factorExpression = formatNumber(factor);
+    const expression = factor === 1 ? quantityExpression : `(${quantityExpression})*${factorExpression}`;
+    return {
+      rawQuantity,
+      quantityExpression,
+      fromUnit,
+      toUnit,
+      factor,
+      expression,
+    };
+  }
+  return null;
+};
+
 const buildCalculatorProblemInterpretation = (input: {
   prompt: string;
   turnId: string;
   numericNormalizations: CalculatorNumericNormalization[];
 }): CalculatorProblemInterpretation => {
+  const conversion = detectLengthUnitConversionPrompt(input.prompt);
+  if (conversion) {
+    return {
+      schema: "helix.calculator_problem_interpretation.v1",
+      turn_id: input.turnId,
+      prompt_kind: "unit_conversion",
+      determination_status: "needs_unit_conversion",
+      needs_more_information: false,
+      safe_to_calculate: true,
+      reason: `The prompt explicitly asks to convert a length from ${conversion.fromUnit} to ${conversion.toUnit}.`,
+      givens: [`length = ${conversion.quantityExpression} ${conversion.fromUnit}`],
+      unknowns: [`length in ${conversion.toUnit}`],
+      constraints: [`exact conversion factor: 1 ${conversion.fromUnit} = ${formatNumber(conversion.factor)} ${conversion.toUnit}`],
+      missing_constraints: [],
+      clarifying_question: null,
+      normalized_quantities: input.numericNormalizations,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
   if (detectUnderdeterminedTrianglePrompt(input.prompt)) {
     return {
       schema: "helix.calculator_problem_interpretation.v1",
       turn_id: input.turnId,
       prompt_kind: "underdetermined_triangle",
+      determination_status: "underdetermined",
       needs_more_information: true,
       safe_to_calculate: false,
       reason: "The prompt gives only the longest side of a triangle, which does not determine the other two side lengths.",
       givens: ["longest side length"],
       unknowns: ["other two side lengths"],
       constraints: ["0 < a <= c", "0 < b <= c", "a + b > c"],
+      missing_constraints: ["triangle_type", "angle", "another_side", "perimeter", "area", "side_ratio"],
+      clarifying_question:
+        "I need one more triangle constraint before calculating the other sides: triangle type, an angle, another side, perimeter/area, or a side ratio.",
       normalized_quantities: input.numericNormalizations,
       assistant_answer: false,
       raw_content_included: false,
@@ -290,12 +397,15 @@ const buildCalculatorProblemInterpretation = (input: {
     schema: "helix.calculator_problem_interpretation.v1",
     turn_id: input.turnId,
     prompt_kind: "calculator_candidate",
+    determination_status: "fully_determined",
     needs_more_information: false,
     safe_to_calculate: true,
     reason: null,
     givens: [],
     unknowns: [],
     constraints: [],
+    missing_constraints: [],
+    clarifying_question: null,
     normalized_quantities: input.numericNormalizations,
     assistant_answer: false,
     raw_content_included: false,
@@ -1470,6 +1580,31 @@ const buildFallbackGenericSubgoals = (prompt: string): CalculatorModelAuthoredSu
   return subgoals.slice(0, 5);
 };
 
+export function draftUnitConversionCalculatorSubgoalsForPrompt(prompt: string): CalculatorModelAuthoredSubgoal[] {
+  const conversion = detectLengthUnitConversionPrompt(prompt);
+  if (!conversion) return [];
+  const fromLabel = lengthUnitLabel(conversion.fromUnit);
+  const toLabel = lengthUnitLabel(conversion.toUnit);
+  return [{
+    id: "unit_conversion_length",
+    label: `Convert ${fromLabel} to ${toLabel}`,
+    expression: conversion.expression,
+    expected_quantity: "length",
+    expected_unit: conversion.toUnit,
+    equation: `${conversion.fromUnit}_to_${conversion.toUnit}`,
+    assumptions: [`Exact length conversion factor: 1 ${conversion.fromUnit} = ${formatNumber(conversion.factor)} ${conversion.toUnit}.`],
+    variables: [
+      {
+        symbol: "length",
+        value: conversion.quantityExpression,
+        unit: conversion.fromUnit,
+        meaning: `source length from "${conversion.rawQuantity} ${conversion.fromUnit}"`,
+      },
+    ],
+    interpretation: `Explicit unit conversion from ${conversion.fromUnit} to ${conversion.toUnit}; the calculator expression applies the exact factor to the normalized quantity.`,
+  }];
+}
+
 const coerceModelSubgoalsToDrafts = (subgoals: CalculatorModelAuthoredSubgoal[]): DraftSubgoal[] => {
   return subgoals.slice(0, 5).flatMap((subgoal: CalculatorModelAuthoredSubgoal, index: number) => {
     const expression = normalizePrompt(String(subgoal.expression ?? ""));
@@ -1658,6 +1793,10 @@ export function runCalculatorModelAuthoredChain(input: {
   turnId: string;
   threadId: string;
   subgoals: CalculatorModelAuthoredSubgoal[];
+  deterministic?: boolean;
+  modelInvoked?: boolean;
+  evaluationSubgoal?: string;
+  observationKind?: string;
 }): CalculatorCompoundChainResult | null {
   const requestedExpressionCount = input.subgoals
     .slice(0, 5)
@@ -1687,16 +1826,16 @@ export function runCalculatorModelAuthoredChain(input: {
     thread_id: input.threadId,
     turn_id: input.turnId,
     goal: input.prompt,
-    subgoal: "Run a model-authored calculator plan and validate every required numeric subgoal.",
+    subgoal: input.evaluationSubgoal ?? "Run a model-authored calculator plan and validate every required numeric subgoal.",
     tool_receipt_ids: evidenceRefs,
     supports_goal: true,
-    summary: `model_authored_calculator_chain satisfied ${validations.length} calculator subgoals with validated results.`,
+    summary: `${input.deterministic ? "deterministic_compiled_calculator_chain" : "model_authored_calculator_chain"} satisfied ${validations.length} calculator subgoals with validated results.`,
     evidence_refs: evidenceRefs,
     calculator_setup: plan.subgoals[plan.subgoals.length - 1]?.setup ?? null,
     calculator_compound_plan: plan,
     calculator_result_validations: validations,
-    deterministic: false,
-    model_invoked: true,
+    deterministic: input.deterministic ?? false,
+    model_invoked: input.modelInvoked ?? true,
     created_at: new Date().toISOString(),
   };
   const actionSteps = plan.subgoals.map((subgoal: HelixCalculatorCompoundSubgoal) => ({
@@ -1741,7 +1880,7 @@ export function runCalculatorModelAuthoredChain(input: {
         schema: "helix.tool_observation_continuation.v1",
         turn_id: input.turnId,
         source_tool: "scientific-calculator.solve_expression",
-        observation_kind: "calculator_model_authored_results",
+        observation_kind: input.observationKind ?? "calculator_model_authored_results",
         evidence_refs: evidenceRefs,
         continuation_required: true,
         continuation_reason: "The calculator subgoals produced intermediate observations that must be synthesized into the final answer.",
