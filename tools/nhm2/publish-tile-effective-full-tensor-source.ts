@@ -269,7 +269,7 @@ const sourceInputFromRegionalMaterialModel = (
   sourceModelVersion: model.contractVersion,
   sourceModelClass: sourceModelClassFromRegionalModel(model),
   notDerivedFromMetricRequiredTensor: model.notDerivedFromMetricRequiredTensor,
-  metricRequiredInputRefs: [],
+  metricRequiredInputRefs: model.metricRequiredInputRefs,
   sourceChannels: {
     regions: model.regions.map((region) => {
       const supportStatus = supportStatusFromRegionalModel(region);

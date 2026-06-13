@@ -349,6 +349,8 @@ const missingRegion = (
 
 const normalizeRegion = (
   region: Nhm2RegionalMaterialSourceTensorRegionV1,
+  modelKind: Nhm2RegionalMaterialSourceTensorModelKind,
+  materialReceiptTier: Nhm2RegionalMaterialReceiptTier,
 ): Nhm2RegionalMaterialSourceTensorRegionV1 => {
   const tensorAuthorityMode =
     region.tensorAuthorityMode === "unknown"
@@ -359,6 +361,21 @@ const normalizeRegion = (
       ? region.missingComponentIds
       : missingNhm2RegionalMaterialSourceTensorComponents(region.tensor);
   const blockers = new Set(region.blockers);
+  const componentAuthority = Object.fromEntries(
+    NHM2_TENSOR_COMPONENTS.map((component) => [
+      component,
+      componentAuthorityFor({
+        component,
+        tensor: region.tensor,
+        explicitAuthority: region.componentAuthority[component],
+        tensorAuthorityMode,
+        modelKind,
+        materialReceiptTier,
+        materialReceiptStatus: region.materialReceiptStatus,
+        status: region.status,
+      }),
+    ]),
+  ) as Partial<Record<Nhm2TensorComponent, Nhm2RegionalMaterialSourceComponentAuthority>>;
   if (tensorAuthorityMode !== "full_tensor" && tensorAuthorityMode !== "symmetric_full_tensor") {
     blockers.add("regional_full_tensor_authority_missing");
   }
@@ -366,11 +383,21 @@ const normalizeRegion = (
     blockers.add("regional_full_tensor_components_missing");
   }
   if (region.regionMaskRef == null) blockers.add("region_mask_ref_missing");
-  if (region.materialReceiptStatus !== "material_receipted") {
+  if (
+    region.materialReceiptStatus !== "material_receipted" &&
+    materialReceiptTier !== "declared_model_receipt"
+  ) {
     blockers.add("material_receipt_missing_or_not_receipted");
+  }
+  for (const [component, authority] of Object.entries(componentAuthority)) {
+    const blocker = componentAuthorityBlocker(authority);
+    if (blocker != null && blocker !== "component_authority_reduced_order_declared") {
+      blockers.add(`${component}:${blocker}`);
+    }
   }
   return {
     ...region,
+    componentAuthority,
     tensorAuthorityMode,
     missingComponentIds,
     blockers: Array.from(blockers),
@@ -382,7 +409,7 @@ export const buildNhm2RegionalMaterialSourceTensorModelArtifact = (
 ): Nhm2RegionalMaterialSourceTensorModelV1 => {
   const byRegion = new Map<Nhm2RegionalSourceClosureRegionId, Nhm2RegionalMaterialSourceTensorRegionV1>();
   for (const region of input.regions) {
-    byRegion.set(region.regionId, normalizeRegion(region));
+    byRegion.set(region.regionId, normalizeRegion(region, input.modelKind, input.materialReceiptTier));
   }
   for (const regionId of NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS) {
     if (!byRegion.has(regionId)) byRegion.set(regionId, missingRegion(regionId));
@@ -406,9 +433,30 @@ export const buildNhm2RegionalMaterialSourceTensorModelArtifact = (
     region.blockers.length === 0 &&
     region.status !== "missing" &&
     region.status !== "blocked";
+  const componentRefs = (
+    authority: Nhm2RegionalMaterialSourceComponentAuthority,
+  ): string[] =>
+    regions.flatMap((region) =>
+      NHM2_TENSOR_COMPONENTS.filter(
+        (component) => region.componentAuthority[component] === authority,
+      ).map((component) => `${region.regionId}:${component}`),
+    );
+  const reducedOrderComponentRefs = componentRefs("reduced_order_declared");
+  const inadmissibleComponentRefs = [
+    ...componentRefs("scalar_proxy"),
+    ...componentRefs("metric_echo"),
+    ...componentRefs("missing"),
+  ];
+  const allComponentAuthorities = regions.flatMap((region) =>
+    NHM2_TENSOR_COMPONENTS.map((component) => region.componentAuthority[component] ?? "missing"),
+  );
   return {
     contractVersion: NHM2_REGIONAL_MATERIAL_SOURCE_TENSOR_MODEL_CONTRACT_VERSION,
     ...input,
+    sourceSideOnly: true,
+    metricRequiredInputRefs: input.metricRequiredInputRefs ?? [],
+    targetEchoForbidden: true,
+    targetDerivedFieldsUsed: false,
     regions,
     summary: {
       hasWallAuthority: authorityRegion(byRegion.get("wall") ?? missingRegion("wall")),
@@ -417,8 +465,19 @@ export const buildNhm2RegionalMaterialSourceTensorModelArtifact = (
       allRequiredRegionsMaterialReceipted: regions.every(
         (region) => region.materialReceiptStatus === "material_receipted",
       ),
+      allRequiredRegionsComponentAuthoritative: allComponentAuthorities.every(
+        (authority) => authoritativeComponentAuthorities.has(authority),
+      ),
+      allRequiredRegionsComponentAdmissible: allComponentAuthorities.every(
+        (authority) => admissibleComponentAuthorities.has(authority),
+      ),
+      anyMetricEchoComponent: componentRefs("metric_echo").length > 0,
+      anyScalarProxyComponent: componentRefs("scalar_proxy").length > 0,
+      anyMissingComponent: componentRefs("missing").length > 0,
       missingRegionIds,
       proxyRegionIds,
+      reducedOrderComponentRefs,
+      inadmissibleComponentRefs,
       blockerCount: regions.reduce((sum, region) => sum + region.blockers.length, 0),
     },
     claimBoundary: {
@@ -427,6 +486,8 @@ export const buildNhm2RegionalMaterialSourceTensorModelArtifact = (
       globalCannotBeCopiedFromWallWithoutAggregationReceipt: true,
       metricEchoForbidden: true,
       missingRegionsAreBlockers: true,
+      declaredModelReceiptIsQcOnly: true,
+      materialReceiptTierDoesNotAllowTransportClaim: true,
     },
   };
 };
@@ -448,6 +509,9 @@ const isRegion = (
   const componentStatus = isRecord(record?.componentStatus)
     ? record?.componentStatus
     : null;
+  const componentAuthority = isRecord(record?.componentAuthority)
+    ? record?.componentAuthority
+    : null;
   return (
     record != null &&
     isRegionId(record.regionId) &&
@@ -456,6 +520,10 @@ const isRegion = (
     componentStatus != null &&
     Object.entries(componentStatus).every(
       ([key, entry]) => isTensorComponent(key) && isComponentStatus(entry),
+    ) &&
+    componentAuthority != null &&
+    Object.entries(componentAuthority).every(
+      ([key, entry]) => isTensorComponent(key) && isComponentAuthority(entry),
     ) &&
     isTensorAuthorityMode(record.tensorAuthorityMode) &&
     Array.isArray(record.missingComponentIds) &&
@@ -496,8 +564,14 @@ export const isNhm2RegionalMaterialSourceTensorModelArtifact = (
     isText(record.chartId) &&
     isModelKind(record.modelKind) &&
     isNullableText(record.materialReceiptRef) &&
+    isMaterialReceiptTier(record.materialReceiptTier) &&
     isNullableText(record.sourceModelRef) &&
+    record.sourceSideOnly === true &&
     record.notDerivedFromMetricRequiredTensor === true &&
+    Array.isArray(record.metricRequiredInputRefs) &&
+    record.metricRequiredInputRefs.every(isText) &&
+    record.targetEchoForbidden === true &&
+    record.targetDerivedFieldsUsed === false &&
     Array.isArray(record.regions) &&
     record.regions.every(isRegion) &&
     summary != null &&
@@ -505,16 +579,27 @@ export const isNhm2RegionalMaterialSourceTensorModelArtifact = (
     typeof summary.allRequiredRegionsPresent === "boolean" &&
     typeof summary.allRequiredRegionsFullTensor === "boolean" &&
     typeof summary.allRequiredRegionsMaterialReceipted === "boolean" &&
+    typeof summary.allRequiredRegionsComponentAuthoritative === "boolean" &&
+    typeof summary.allRequiredRegionsComponentAdmissible === "boolean" &&
+    typeof summary.anyMetricEchoComponent === "boolean" &&
+    typeof summary.anyScalarProxyComponent === "boolean" &&
+    typeof summary.anyMissingComponent === "boolean" &&
     Array.isArray(summary.missingRegionIds) &&
     summary.missingRegionIds.every(isRegionId) &&
     Array.isArray(summary.proxyRegionIds) &&
     summary.proxyRegionIds.every(isRegionId) &&
+    Array.isArray(summary.reducedOrderComponentRefs) &&
+    summary.reducedOrderComponentRefs.every(isText) &&
+    Array.isArray(summary.inadmissibleComponentRefs) &&
+    summary.inadmissibleComponentRefs.every(isText) &&
     typeof summary.blockerCount === "number" &&
     Number.isFinite(summary.blockerCount) &&
     claimBoundary?.diagnosticOnly === true &&
     claimBoundary?.sourceTensorModelDoesNotValidatePhysicalSource === true &&
     claimBoundary?.globalCannotBeCopiedFromWallWithoutAggregationReceipt === true &&
     claimBoundary?.metricEchoForbidden === true &&
-    claimBoundary?.missingRegionsAreBlockers === true
+    claimBoundary?.missingRegionsAreBlockers === true &&
+    claimBoundary?.declaredModelReceiptIsQcOnly === true &&
+    claimBoundary?.materialReceiptTierDoesNotAllowTransportClaim === true
   );
 };

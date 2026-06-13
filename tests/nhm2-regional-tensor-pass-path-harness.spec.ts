@@ -144,14 +144,22 @@ const regionalModel = (
     chartId: "comoving_cartesian",
     modelKind: "declared_research_tensor",
     materialReceiptRef: "casimir-material-receipt.json",
+    materialReceiptTier: "declared_model_receipt",
     sourceModelRef: "regional-component-model.json",
+    sourceSideOnly: true,
     notDerivedFromMetricRequiredTensor: true,
+    metricRequiredInputRefs: [],
+    targetEchoForbidden: true,
+    targetDerivedFieldsUsed: false,
     regions: regionIds.map((regionId) => ({
       regionId,
       status: "material_receipted",
       tensor: tensor(-10),
       componentStatus: Object.fromEntries(
         NHM2_TENSOR_COMPONENTS.map((component) => [component, "material_receipted"]),
+      ),
+      componentAuthority: Object.fromEntries(
+        NHM2_TENSOR_COMPONENTS.map((component) => [component, "source_model"]),
       ),
       tensorAuthorityMode: "full_tensor",
       missingComponentIds: [],

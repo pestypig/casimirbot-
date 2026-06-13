@@ -11,6 +11,8 @@ import {
   isNhm2RegionalMaterialSourceTensorModelArtifact,
   inferNhm2RegionalMaterialSourceTensorAuthorityMode,
   missingNhm2RegionalMaterialSourceTensorComponents,
+  type Nhm2RegionalMaterialReceiptTier,
+  type Nhm2RegionalMaterialSourceComponentAuthority,
   type Nhm2RegionalMaterialSourceTensorModelKind,
   type Nhm2RegionalMaterialSourceTensorModelV1,
   type Nhm2RegionalMaterialSourceTensorRegionV1,
@@ -122,6 +124,33 @@ const normalizeModelKind = (
   return "missing";
 };
 
+const normalizeMaterialReceiptTier = (
+  value: unknown,
+  receipt: CasimirMaterialReceiptV1 | null,
+  modelKind: Nhm2RegionalMaterialSourceTensorModelKind,
+): Nhm2RegionalMaterialReceiptTier => {
+  const text = asString(value);
+  if (
+    text === "none" ||
+    text === "declared_model_receipt" ||
+    text === "simulated_material_receipt" ||
+    text === "lifshitz_material_receipt" ||
+    text === "measured_material_receipt"
+  ) {
+    return text;
+  }
+  if (receipt?.status === "material_receipted") {
+    if (receipt.material.modelKind === "measured_dielectric") {
+      return "measured_material_receipt";
+    }
+    if (receipt.material.modelKind === "lifshitz") {
+      return "lifshitz_material_receipt";
+    }
+    return "simulated_material_receipt";
+  }
+  return modelKind === "declared_research_tensor" ? "declared_model_receipt" : "none";
+};
+
 const regionEntries = (
   value: unknown,
 ): Map<Nhm2RegionalSourceClosureRegionId, unknown> => {
@@ -151,6 +180,38 @@ const componentStatusFromTensor = (
       status === "material_receipted" ? "material_receipted" : "computed",
     ]),
   ) as Nhm2RegionalMaterialSourceTensorRegionV1["componentStatus"];
+
+const normalizeComponentAuthority = (
+  value: unknown,
+): Nhm2RegionalMaterialSourceComponentAuthority | null => {
+  const text = asString(value);
+  if (
+    text === "source_model" ||
+    text === "constitutive_model" ||
+    text === "reduced_order_declared" ||
+    text === "scalar_proxy" ||
+    text === "metric_echo" ||
+    text === "missing"
+  ) {
+    return text;
+  }
+  return null;
+};
+
+const componentAuthorityFromRecord = (
+  value: unknown,
+): Nhm2RegionalMaterialSourceTensorRegionV1["componentAuthority"] => {
+  const record = asRecord(value);
+  if (record == null) return {};
+  return Object.fromEntries(
+    Object.entries(record)
+      .filter(([component]) => isTensorComponent(component))
+      .map(([component, authority]) => [
+        component,
+        normalizeComponentAuthority(authority) ?? "missing",
+      ]),
+  ) as Nhm2RegionalMaterialSourceTensorRegionV1["componentAuthority"];
+};
 
 const normalizeRegion = (args: {
   regionId: Nhm2RegionalSourceClosureRegionId;
@@ -193,6 +254,7 @@ const normalizeRegion = (args: {
         : status,
     tensor,
     componentStatus: componentStatusFromTensor(tensor, status),
+    componentAuthority: componentAuthorityFromRecord(record?.componentAuthority),
     tensorAuthorityMode,
     missingComponentIds,
     chartId: asString(record?.chartId) ?? args.defaultChartId,
@@ -246,6 +308,16 @@ export const buildRegionalMaterialSourceTensorModel = (args: {
     throw new Error("regional material source tensor model must not reference metric-required tensors");
   }
   const model = asRecord(args.componentModel);
+  if (model?.sourceSideOnly === false) {
+    throw new Error("regional material source tensor model must be source-side only");
+  }
+  if (model?.targetDerivedFieldsUsed === true) {
+    throw new Error("regional material source tensor model must not use target-derived fields");
+  }
+  const metricRequiredInputRefs = stringList(model?.metricRequiredInputRefs);
+  if (metricRequiredInputRefs.length > 0) {
+    throw new Error("regional material source tensor model must not list metric-required input refs");
+  }
   const receipt = isCasimirMaterialReceipt(args.materialReceipt)
     ? args.materialReceipt
     : null;
@@ -258,7 +330,13 @@ export const buildRegionalMaterialSourceTensorModel = (args: {
     model?.materialReceiptStatus === "blocked" ||
     model?.materialReceiptStatus === "missing"
       ? model.materialReceiptStatus
-      : "missing");
+        : "missing");
+  const modelKind = normalizeModelKind(model?.modelKind, receipt);
+  const materialReceiptTier = normalizeMaterialReceiptTier(
+    model?.materialReceiptTier,
+    receipt,
+    modelKind,
+  );
   const entries = regionEntries(model?.regions);
   const regions = [...entries.entries()].map(([regionId, value]) =>
     normalizeRegion({
@@ -275,10 +353,15 @@ export const buildRegionalMaterialSourceTensorModel = (args: {
     laneId: "nhm2_shift_lapse",
     selectedProfileId: asString(model?.selectedProfileId) ?? "stage1_centerline_alpha_0p995_v1",
     chartId: asString(model?.chartId) ?? "comoving_cartesian",
-    modelKind: normalizeModelKind(model?.modelKind, receipt),
+    modelKind,
     materialReceiptRef,
+    materialReceiptTier,
     sourceModelRef: args.sourceModelRef ?? asString(model?.sourceModelRef) ?? null,
+    sourceSideOnly: true,
     notDerivedFromMetricRequiredTensor: true,
+    metricRequiredInputRefs: [],
+    targetEchoForbidden: true,
+    targetDerivedFieldsUsed: false,
     regions,
   });
 };
