@@ -352,6 +352,7 @@ describe("pipeline ts/qi autoscale integration", () => {
 
     const snapshot = await calculateEnergyPipeline(state);
     const artifact = (snapshot as any).nhm2ObserverAudit;
+    const sourceClosure = (snapshot as any).nhm2SourceClosure;
 
     expect(artifact).toBeTruthy();
     expect((snapshot as any).natario?.nhm2ObserverAudit).toEqual(artifact);
@@ -376,6 +377,25 @@ describe("pipeline ts/qi autoscale integration", () => {
       "same_chart_metric_tensor_projection",
     ]).toContain(artifact.tensors.tileEffective.model.pressureModel);
     expect(typeof artifact.tensors.tileEffective.typeI.fraction).toBe("number");
+    const wallRegion = sourceClosure?.regionComparisons?.regions?.find(
+      (region: any) => region.regionId === "wall",
+    );
+    expect(wallRegion?.metricRequiredSameChartFullTensor?.contractVersion).toBe(
+      "nhm2_same_chart_full_tensor/v1",
+    );
+    expect(
+      wallRegion?.metricRequiredSameChartFullTensor?.completeness?.fullTensorComplete,
+    ).toBe(false);
+    expect(
+      wallRegion?.metricRequiredSameChartFullTensor?.components?.find(
+        (component: any) => component.componentId === "T0x",
+      )?.status,
+    ).toBe("missing");
+    expect(
+      wallRegion?.metricRequiredSameChartFullTensor?.components?.find(
+        (component: any) => component.componentId === "T0x",
+      )?.valueSI,
+    ).toBeNull();
   });
 
   it("applies the selected NHM2 shift-lapse profile on the metric T00 lane and keeps tile observer lanes profile-consistent", async () => {

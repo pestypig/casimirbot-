@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { getHelixWorkspaceOsStatus } from "../services/workspace-os/workspace-os-status";
+import { getHelixWorkspaceStorageStatus } from "../services/workspace-os/workspace-storage-status";
 import { getHelixWorkstationTaskManagerSnapshot } from "../services/workspace-os/workstation-task-manager";
 
 export const workspaceOsRouter = Router();
@@ -21,6 +22,14 @@ workspaceOsRouter.get("/status", async (req: Request, res: Response) => {
 
 workspaceOsRouter.get("/task-manager", async (req: Request, res: Response) => {
   const status = await getHelixWorkstationTaskManagerSnapshot({
+    thread_id: queryString(req.query.thread_id),
+    room_id: queryString(req.query.room_id),
+  });
+  return res.status(200).json(status);
+});
+
+workspaceOsRouter.get("/storage/status", async (req: Request, res: Response) => {
+  const status = await getHelixWorkspaceStorageStatus({
     thread_id: queryString(req.query.thread_id),
     room_id: queryString(req.query.room_id),
   });

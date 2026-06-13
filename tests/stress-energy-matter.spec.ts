@@ -168,8 +168,11 @@ describe("stress-energy matter modeling", () => {
     expect(hull?.sampleCount).toBe(24);
     expect(wall?.sampleCount).toBe(24);
     expect(result.global.diagonalTensor).not.toBeNull();
+    expect(result.global.fullTensor).not.toBeNull();
     expect(hull?.diagonalTensor).not.toBeNull();
+    expect(hull?.fullTensor).not.toBeNull();
     expect(wall?.diagonalTensor).not.toBeNull();
+    expect(wall?.fullTensor).not.toBeNull();
 
     const relDiff = (a: number, b: number) =>
       Math.abs(a - b) / Math.max(Math.abs(a), Math.abs(b), 1);
@@ -188,6 +191,13 @@ describe("stress-energy matter modeling", () => {
     ).toBeLessThan(1e-12);
     expect(result.global.diagonalTensor?.T11).toBeCloseTo(
       -(result.global.diagonalTensor?.T00 ?? 0),
+    );
+    expect(Number.isFinite(result.global.fullTensor?.T01)).toBe(true);
+    expect(Number.isFinite(result.global.fullTensor?.T12)).toBe(true);
+    expect(result.global.fullTensor?.T10).toBe(result.global.fullTensor?.T01);
+    expect(result.global.fullTensor?.T21).toBe(result.global.fullTensor?.T12);
+    expect(result.global.fullTensor?.modelTermRoute).toBe(
+      "adm_quasi_stationary_recovery_v1",
     );
     expect(result.grid.spacing).toEqual([1, 1, 1]);
   });

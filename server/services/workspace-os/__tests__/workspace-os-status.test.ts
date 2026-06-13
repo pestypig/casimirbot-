@@ -225,6 +225,22 @@ describe("Workspace OS status", () => {
         executes_task_control: false,
       }),
     });
+    expect(status.capabilities.find((entry) => entry.capability_id === "workstation.storage_map")).toMatchObject({
+      status: "available",
+      surface: "filesystem",
+      mode: "read_only",
+      authority: {
+        assistant_answer: false,
+        raw_content_included: false,
+        terminal_eligible: false,
+      },
+      diagnostics: expect.objectContaining({
+        endpoint: "/api/workspace-os/storage/status",
+        scans_local_machine_filesystem: false,
+        exposes_raw_storage_values: false,
+        executes_cleanup: false,
+      }),
+    });
     expect(status.runtime).toMatchObject({
       memory_pressure: "normal",
       active_task_count: 0,

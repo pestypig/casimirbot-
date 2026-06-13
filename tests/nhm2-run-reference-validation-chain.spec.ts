@@ -10,6 +10,12 @@ const baseArgs = () => ({
   "run-id": "run-1",
 });
 
+const baseArgsWithoutSourceClosure = () => {
+  const args: Record<string, string> = { ...baseArgs() };
+  delete args["source-closure"];
+  return args;
+};
+
 const findCommand = (
   plan: ReturnType<typeof planReferenceValidationChain>,
   script: string,
@@ -281,6 +287,62 @@ describe("NHM2 reference validation chain planner", () => {
     );
   });
 
+  it("freezes current runtime source closure before generating metric-required full tensor source", () => {
+    const plan = planReferenceValidationChain({
+      ...baseArgsWithoutSourceClosure(),
+      "generate-current-runtime-source-closure": true,
+      "generate-metric-required-full-tensor-source": true,
+    });
+    const scripts = plan.map((command) => command.script);
+    const currentRuntime = findCommand(plan, "nhm2:publish-current-runtime-source-closure");
+    const generatedSource = findCommand(
+      plan,
+      "nhm2:publish-metric-required-full-tensor-source",
+    );
+    const metricReceipt = findCommand(
+      plan,
+      "nhm2:publish-metric-required-regional-tensor-receipt",
+    );
+
+    expect(scripts[0]).toBe("nhm2:publish-current-runtime-source-closure");
+    expect(scripts.indexOf("nhm2:publish-current-runtime-source-closure")).toBeLessThan(
+      scripts.indexOf("nhm2:publish-metric-required-full-tensor-source"),
+    );
+    expect(scripts.indexOf("nhm2:publish-metric-required-full-tensor-source")).toBeLessThan(
+      scripts.indexOf("nhm2:publish-metric-required-regional-tensor-receipt"),
+    );
+    expect(currentRuntime.args).toEqual([
+      "--out-root",
+      "artifacts/research/full-solve/reference/run-1",
+      "--runtime-out",
+      "artifacts/research/full-solve/reference/run-1/nhm2-runtime-current.json",
+      "--source-closure-out",
+      "artifacts/research/full-solve/reference/run-1/nhm2-source-closure-current.json",
+      "--coverage-out",
+      "artifacts/research/full-solve/reference/run-1/nhm2-regional-full-tensor-coverage.json",
+      "--selected-profile-id",
+      "stage1_centerline_alpha_0p995_v1",
+      "--run-id",
+      "run-1",
+    ]);
+    expect(generatedSource.args).toEqual([
+      "--reference-run",
+      "artifacts/reference/nhm2-reference-run.json",
+      "--runtime-artifact",
+      "artifacts/research/full-solve/reference/run-1/nhm2-runtime-current.json",
+      "--source-closure",
+      "artifacts/research/full-solve/reference/run-1/nhm2-source-closure-current.json",
+      "--out",
+      "artifacts/research/full-solve/reference/run-1/nhm2-metric-required-regional-full-tensor-source.json",
+    ]);
+    expect(metricReceipt.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-source-closure-current.json",
+    );
+    expect(metricReceipt.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-metric-required-regional-full-tensor-source.json",
+    );
+  });
+
   it("rejects ambiguous generated and prebuilt metric-required full tensor source inputs", () => {
     expect(() =>
       planReferenceValidationChain({
@@ -300,6 +362,22 @@ describe("NHM2 reference validation chain planner", () => {
         "generate-metric-required-full-tensor-source": true,
       }),
     ).toThrow(/requires --metric-runtime-artifact/);
+  });
+
+  it("rejects ambiguous current runtime generation inputs", () => {
+    expect(() =>
+      planReferenceValidationChain({
+        ...baseArgs(),
+        "generate-current-runtime-source-closure": true,
+      }),
+    ).toThrow(/--source-closure and --generate-current-runtime-source-closure/);
+    expect(() =>
+      planReferenceValidationChain({
+        ...baseArgsWithoutSourceClosure(),
+        "generate-current-runtime-source-closure": true,
+        "metric-runtime-artifact": "artifacts/reference/nhm2-runtime-artifact.json",
+      }),
+    ).toThrow(/--metric-runtime-artifact and --generate-current-runtime-source-closure/);
   });
 
   it("builds a layered full-tensor audit when both a candidate and source tensor model are available", () => {

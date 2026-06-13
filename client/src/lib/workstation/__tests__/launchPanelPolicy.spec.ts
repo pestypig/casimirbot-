@@ -25,6 +25,7 @@ describe("launchPanelPolicy", () => {
     expect(isUserLaunchPanel("workstation-clipboard-history")).toBe(true);
     expect(isUserLaunchPanel("workstation-workflow-timeline")).toBe(true);
     expect(isUserLaunchPanel("workstation-task-manager")).toBe(true);
+    expect(isUserLaunchPanel("workstation-storage-map")).toBe(true);
     expect(isUserLaunchPanel("scientific-calculator")).toBe(true);
   });
 

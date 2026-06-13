@@ -17,6 +17,10 @@ import {
   getProfileIngressUsage,
   listProfileIngressTokens,
 } from "./profile-ingress-store";
+import {
+  resolveLocalPasswordProfileAuthConfig,
+  verifyLocalPasswordProfileCredentials,
+} from "./local-password-profile-auth";
 
 let activeSession: HelixAccountSession | null = null;
 const sessionsById = new Map<string, HelixAccountSession>();
@@ -106,7 +110,11 @@ export function getAccountSessionStatus(sessionId?: string | null): HelixAccount
       credential_collection_allowed_in_agents: false,
       raw_password_stored: false,
       discord_bot_password_collection_allowed: false,
-      recommended_flow: "web_auth_or_oauth_link",
+      recommended_flow: resolveLocalPasswordProfileAuthConfig().enabled
+        ? "dev_local_password_profile"
+        : "web_auth_or_oauth_link",
+      local_password_profile_available: resolveLocalPasswordProfileAuthConfig().enabled,
+      local_password_profile_dev_default: resolveLocalPasswordProfileAuthConfig().dev_default,
     },
   };
 }
@@ -163,6 +171,67 @@ export function signInLocalAccountSession(input: {
     error: null,
     raw_password_stored: false,
     credential_collection_allowed_in_agents: false,
+    auth_method: "local_dev_profile",
+  };
+}
+
+export function signInLocalPasswordAccountSession(input: {
+  username?: string | null;
+  password?: string | null;
+}): HelixAccountSessionReceipt {
+  const verification = verifyLocalPasswordProfileCredentials({
+    username: input.username,
+    password: input.password,
+  });
+  if (!verification.ok) {
+    return {
+      schema: HELIX_ACCOUNT_SESSION_RECEIPT_SCHEMA,
+      ok: false,
+      session: null,
+      message:
+        verification.error === "local_password_profile_disabled"
+          ? "Local password profile sign-in is disabled."
+          : verification.error === "local_password_profile_misconfigured"
+            ? "Local password profile sign-in is misconfigured."
+            : "Local profile username or password is incorrect.",
+      error: verification.error,
+      raw_password_stored: false,
+      credential_collection_allowed_in_agents: false,
+      auth_method: "local_password_profile",
+    };
+  }
+  const now = nowIso();
+  const session: HelixAccountSession = {
+    schema: HELIX_ACCOUNT_SESSION_SCHEMA,
+    session_id: `account_session:${crypto.randomUUID()}`,
+    profile: {
+      profile_id: verification.config.profile_id,
+      display_name: verification.config.display_name,
+      email: verification.config.email,
+      auth_mode: "local_password_profile",
+      provider: "local",
+      provider_subject: verification.config.username,
+      picture_url: null,
+      created_at: now,
+      updated_at: now,
+    },
+    status: "active",
+    memory_scope: "profile",
+    created_at: now,
+    updated_at: now,
+  };
+  rememberSession(session);
+  return {
+    schema: HELIX_ACCOUNT_SESSION_RECEIPT_SCHEMA,
+    ok: true,
+    session,
+    message: verification.config.dev_default
+      ? "Signed in with the development local admin profile. Configure HELIX_LOCAL_PROFILE_PASSWORD_HASH before using this outside localhost."
+      : "Signed in with local password profile.",
+    error: null,
+    raw_password_stored: false,
+    credential_collection_allowed_in_agents: false,
+    auth_method: "local_password_profile",
   };
 }
 
@@ -215,6 +284,7 @@ export function signInWebAccountSession(input: {
     error: null,
     raw_password_stored: false,
     credential_collection_allowed_in_agents: false,
+    auth_method: "web_auth",
   };
 }
 
@@ -235,6 +305,7 @@ export function signOutAccountSession(sessionId?: string | null): HelixAccountSe
     error: null,
     raw_password_stored: false,
     credential_collection_allowed_in_agents: false,
+    auth_method: previous?.profile.auth_mode ?? null,
   };
 }
 

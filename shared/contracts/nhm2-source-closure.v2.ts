@@ -25,6 +25,10 @@ import {
   NHM2_SOURCE_SIDE_SAME_BASIS_FULL_TENSOR_COMPONENTS,
   type Nhm2SourceSideSameBasisTensorAuthorityStatus,
 } from "./nhm2-source-side-same-basis-tensor-authority.v1";
+import {
+  isNhm2SameChartFullTensorArtifact,
+  type Nhm2SameChartFullTensorArtifactV1,
+} from "./nhm2-same-chart-full-tensor.v1";
 
 export const NHM2_SOURCE_CLOSURE_V2_SCHEMA_VERSION = "nhm2_source_closure/v2";
 
@@ -314,6 +318,7 @@ export type Nhm2SourceClosureV2RegionComparisonInput = {
   metricTensorRef?: string | null;
   tileTensorRef?: string | null;
   metricRequiredTensor?: Nhm2SourceClosureTensorInput | null;
+  metricRequiredSameChartFullTensor?: Nhm2SameChartFullTensorArtifactV1 | null;
   tileEffectiveTensor?: Nhm2SourceClosureTensorInput | null;
   sampleCount?: number | null;
   metricAccounting?: Nhm2SourceClosureV2RegionAccounting | null;
@@ -351,6 +356,7 @@ export type Nhm2SourceClosureV2RegionComparison = {
   metricTensorRef: string | null;
   tileTensorRef: string | null;
   metricRequiredTensor: Nhm2SourceClosureTensor;
+  metricRequiredSameChartFullTensor: Nhm2SameChartFullTensorArtifactV1 | null;
   tileEffectiveTensor: Nhm2SourceClosureTensor;
   sampleCount: number | null;
   metricAccounting: Nhm2SourceClosureV2RegionAccounting | null;
@@ -2037,6 +2043,11 @@ const buildRegionComparison = (args: {
     args.input.metricRequiredTensor,
   );
   const tileTensor = normalizeNhm2SourceClosureTensor(args.input.tileEffectiveTensor);
+  const metricRequiredSameChartFullTensor = isNhm2SameChartFullTensorArtifact(
+    args.input.metricRequiredSameChartFullTensor,
+  )
+    ? args.input.metricRequiredSameChartFullTensor
+    : null;
   const metricMissing = !tensorHasAnyComponent(metricTensor);
   const tileMissing = !tensorHasAnyComponent(tileTensor);
   const metricMissingComponents = missingComponents(metricTensor);
@@ -2213,6 +2224,7 @@ const buildRegionComparison = (args: {
       metricTensorRef: toRepoPath(args.input.metricTensorRef),
       tileTensorRef: toRepoPath(args.input.tileTensorRef),
       metricRequiredTensor: metricTensor,
+      metricRequiredSameChartFullTensor,
       tileEffectiveTensor: tileTensor,
       sampleCount: resolvedSampleCount,
       metricAccounting,
@@ -2591,7 +2603,10 @@ export const isNhm2SourceClosureV2Artifact = (
         typeof entry.regionId === "string" &&
         NHM2_SOURCE_CLOSURE_REGION_BASIS_STATUS_VALUES.includes(
           basisStatus as Nhm2SourceClosureRegionBasisStatus,
-        )
+        ) &&
+        (entry.metricRequiredSameChartFullTensor === undefined ||
+          entry.metricRequiredSameChartFullTensor === null ||
+          isNhm2SameChartFullTensorArtifact(entry.metricRequiredSameChartFullTensor))
       );
     })
   );

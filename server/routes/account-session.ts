@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   getAccountSessionStatus,
   signInLocalAccountSession,
+  signInLocalPasswordAccountSession,
   signOutAccountSession,
 } from "../services/helix-account/account-session-store";
 import {
@@ -30,6 +31,17 @@ accountSessionRouter.post("/session/sign-in", (req, res) => {
     setHelixSessionCookie(res, receipt.session.session_id);
   }
   res.status(receipt.ok ? 200 : 400).json(receipt);
+});
+
+accountSessionRouter.post("/session/password-sign-in", (req, res) => {
+  const receipt = signInLocalPasswordAccountSession({
+    username: typeof req.body?.username === "string" ? req.body.username : null,
+    password: typeof req.body?.password === "string" ? req.body.password : null,
+  });
+  if (receipt.session) {
+    setHelixSessionCookie(res, receipt.session.session_id);
+  }
+  res.status(receipt.ok ? 200 : 401).json(receipt);
 });
 
 accountSessionRouter.post("/session/sign-out", (req, res) => {

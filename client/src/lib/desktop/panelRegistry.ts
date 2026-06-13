@@ -338,6 +338,15 @@ const BASE_PANELS: PanelDefinition[] = [
     heavy: false,
   },
   {
+    id: "workstation-storage-map",
+    title: "Storage Map",
+    loader: load(() => import("@/components/workstation/WorkstationStorageMapPanel")),
+    defaultSize: { w: 1060, h: 720 },
+    defaultPosition: { x: 340, y: 210 },
+    keywords: ["storage", "saved memory", "disk", "quota", "localStorage", "sessionStorage", "profile memory"],
+    heavy: false,
+  },
+  {
     id: "casimir-tiles",
     title: "Casimir Tiles",
     loader: load(() => import("@/components/panels/CasimirTilesPanel")),

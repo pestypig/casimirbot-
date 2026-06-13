@@ -1372,6 +1372,7 @@ export type MetricStressEnergyTensorMean = {
     T33: number;
     isNullEnergyConditionSatisfied: boolean;
   } | null;
+  fullTensor: MetricStressTensor | null;
 };
 
 export type MetricStressEnergyTensorRegionMean = MetricStressEnergyTensorMean & {
@@ -1412,6 +1413,13 @@ export const calculateMetricStressEnergyTensorRegionMeansFromShiftField = (
   const betaX = new Float64Array(total);
   const betaY = new Float64Array(total);
   const betaZ = new Float64Array(total);
+  const kValid = new Uint8Array(total);
+  const kxx = new Float64Array(total);
+  const kyy = new Float64Array(total);
+  const kzz = new Float64Array(total);
+  const kxy = new Float64Array(total);
+  const kxz = new Float64Array(total);
+  const kyz = new Float64Array(total);
   const idxBase = (i: number, j: number, k: number) => i + nx * (j + ny * k);
 
   for (let k = 0; k < nz; k += 1) {
@@ -1435,29 +1443,61 @@ export const calculateMetricStressEnergyTensorRegionMeansFromShiftField = (
     }
   }
 
-  const sumGlobal = { count: 0, T00: 0, T11: 0, T22: 0, T33: 0 };
+  type MetricStressEnergyTensorBucket = {
+    count: number;
+    T00: number;
+    T11: number;
+    T22: number;
+    T33: number;
+    T01: number;
+    T02: number;
+    T03: number;
+    T12: number;
+    T13: number;
+    T23: number;
+  };
+  const createBucket = (): MetricStressEnergyTensorBucket => ({
+    count: 0,
+    T00: 0,
+    T11: 0,
+    T22: 0,
+    T33: 0,
+    T01: 0,
+    T02: 0,
+    T03: 0,
+    T12: 0,
+    T13: 0,
+    T23: 0,
+  });
+  const sumGlobal = createBucket();
   const regionSums = new Map<
     string,
-    { count: number; T00: number; T11: number; T22: number; T33: number }
+    MetricStressEnergyTensorBucket
   >();
 
   const accumulate = (
-    bucket: { count: number; T00: number; T11: number; T22: number; T33: number },
-    rhoEuler: number,
+    bucket: MetricStressEnergyTensorBucket,
+    stress: Pick<
+      MetricStressTensor,
+      "T00" | "T11" | "T22" | "T33" | "T01" | "T02" | "T03" | "T12" | "T13" | "T23"
+    >,
   ) => {
     bucket.count += 1;
-    bucket.T00 += rhoEuler;
-    bucket.T11 += -rhoEuler;
-    bucket.T22 += -rhoEuler;
-    bucket.T33 += -rhoEuler;
+    bucket.T00 += stress.T00;
+    bucket.T11 += stress.T11;
+    bucket.T22 += stress.T22;
+    bucket.T33 += stress.T33;
+    bucket.T01 += stress.T01;
+    bucket.T02 += stress.T02;
+    bucket.T03 += stress.T03;
+    bucket.T12 += stress.T12;
+    bucket.T13 += stress.T13;
+    bucket.T23 += stress.T23;
   };
 
   for (let k = 0; k < nz; k += 1) {
-    const z = bounds.min[2] + (k + 0.5) * dz;
     for (let j = 0; j < ny; j += 1) {
-      const y = bounds.min[1] + (j + 0.5) * dy;
       for (let i = 0; i < nx; i += 1) {
-        const x = bounds.min[0] + (i + 0.5) * dx;
         const id = idxBase(i, j, k);
         const ixp = i < nx - 1 ? idxBase(i + 1, j, k) : id;
         const ixm = i > 0 ? idxBase(i - 1, j, k) : id;
@@ -1501,6 +1541,62 @@ export const calculateMetricStressEnergyTensorRegionMeansFromShiftField = (
         const Kxy = 0.5 * (dBy_dx + dBx_dy);
         const Kxz = 0.5 * (dBz_dx + dBx_dz);
         const Kyz = 0.5 * (dBz_dy + dBy_dz);
+        kValid[id] = 1;
+        kxx[id] = Kxx;
+        kyy[id] = Kyy;
+        kzz[id] = Kzz;
+        kxy[id] = Kxy;
+        kxz[id] = Kxz;
+        kyz[id] = Kyz;
+      }
+    }
+  }
+
+  const traceAt = (id: number) => kxx[id] + kyy[id] + kzz[id];
+  const finiteDiff = (
+    values: Float64Array,
+    plus: number,
+    minus: number,
+    denom: number,
+  ) => (values[plus] - values[minus]) / denom;
+  const finiteDiffTrace = (plus: number, minus: number, denom: number) =>
+    (traceAt(plus) - traceAt(minus)) / denom;
+
+  for (let k = 0; k < nz; k += 1) {
+    const z = bounds.min[2] + (k + 0.5) * dz;
+    for (let j = 0; j < ny; j += 1) {
+      const y = bounds.min[1] + (j + 0.5) * dy;
+      for (let i = 0; i < nx; i += 1) {
+        const x = bounds.min[0] + (i + 0.5) * dx;
+        const id = idxBase(i, j, k);
+        if (kValid[id] !== 1) continue;
+
+        const ixp = i < nx - 1 ? idxBase(i + 1, j, k) : id;
+        const ixm = i > 0 ? idxBase(i - 1, j, k) : id;
+        const iDen = i > 0 && i < nx - 1 ? 2 * dx : Math.max(dx, 1e-9);
+        const jyp = j < ny - 1 ? idxBase(i, j + 1, k) : id;
+        const jym = j > 0 ? idxBase(i, j - 1, k) : id;
+        const jDen = j > 0 && j < ny - 1 ? 2 * dy : Math.max(dy, 1e-9);
+        const kzp = k < nz - 1 ? idxBase(i, j, k + 1) : id;
+        const kzm = k > 0 ? idxBase(i, j, k - 1) : id;
+        const kDen = k > 0 && k < nz - 1 ? 2 * dz : Math.max(dz, 1e-9);
+        if (
+          kValid[ixp] !== 1 ||
+          kValid[ixm] !== 1 ||
+          kValid[jyp] !== 1 ||
+          kValid[jym] !== 1 ||
+          kValid[kzp] !== 1 ||
+          kValid[kzm] !== 1
+        ) {
+          continue;
+        }
+
+        const Kxx = kxx[id];
+        const Kyy = kyy[id];
+        const Kzz = kzz[id];
+        const Kxy = kxy[id];
+        const Kxz = kxz[id];
+        const Kyz = kyz[id];
         const trace = Kxx + Kyy + Kzz;
         const kSquared =
           Kxx * Kxx +
@@ -1512,30 +1608,140 @@ export const calculateMetricStressEnergyTensorRegionMeansFromShiftField = (
           continue;
         }
         const rhoEuler = rhoGeom * GEOM_TO_SI_STRESS;
-        accumulate(sumGlobal, rhoEuler);
+        const K = [
+          [Kxx, Kxy, Kxz],
+          [Kxy, Kyy, Kyz],
+          [Kxz, Kyz, Kzz],
+        ];
+        const KK = [
+          [
+            K[0][0] * K[0][0] + K[0][1] * K[1][0] + K[0][2] * K[2][0],
+            K[0][0] * K[0][1] + K[0][1] * K[1][1] + K[0][2] * K[2][1],
+            K[0][0] * K[0][2] + K[0][1] * K[1][2] + K[0][2] * K[2][2],
+          ],
+          [
+            K[1][0] * K[0][0] + K[1][1] * K[1][0] + K[1][2] * K[2][0],
+            K[1][0] * K[0][1] + K[1][1] * K[1][1] + K[1][2] * K[2][1],
+            K[1][0] * K[0][2] + K[1][1] * K[1][2] + K[1][2] * K[2][2],
+          ],
+          [
+            K[2][0] * K[0][0] + K[2][1] * K[1][0] + K[2][2] * K[2][0],
+            K[2][0] * K[0][1] + K[2][1] * K[1][1] + K[2][2] * K[2][1],
+            K[2][0] * K[0][2] + K[2][1] * K[1][2] + K[2][2] * K[2][2],
+          ],
+        ];
+        const A = [
+          [
+            trace * K[0][0] - 2 * KK[0][0],
+            trace * K[0][1] - 2 * KK[0][1],
+            trace * K[0][2] - 2 * KK[0][2],
+          ],
+          [
+            trace * K[1][0] - 2 * KK[1][0],
+            trace * K[1][1] - 2 * KK[1][1],
+            trace * K[1][2] - 2 * KK[1][2],
+          ],
+          [
+            trace * K[2][0] - 2 * KK[2][0],
+            trace * K[2][1] - 2 * KK[2][1],
+            trace * K[2][2] - 2 * KK[2][2],
+          ],
+        ];
+        const atrace = A[0][0] + A[1][1] + A[2][2];
+        const Sgeom = [
+          [
+            A[0][0] * INV8PI + (rhoGeom - atrace * INV8PI),
+            A[0][1] * INV8PI,
+            A[0][2] * INV8PI,
+          ],
+          [
+            A[1][0] * INV8PI,
+            A[1][1] * INV8PI + (rhoGeom - atrace * INV8PI),
+            A[1][2] * INV8PI,
+          ],
+          [
+            A[2][0] * INV8PI,
+            A[2][1] * INV8PI,
+            A[2][2] * INV8PI + (rhoGeom - atrace * INV8PI),
+          ],
+        ];
+        const gradTrace = [
+          finiteDiffTrace(ixp, ixm, iDen),
+          finiteDiffTrace(jyp, jym, jDen),
+          finiteDiffTrace(kzp, kzm, kDen),
+        ];
+        const gradKx = [
+          [finiteDiff(kxx, ixp, ixm, iDen), finiteDiff(kxy, ixp, ixm, iDen), finiteDiff(kxz, ixp, ixm, iDen)],
+          [finiteDiff(kxx, jyp, jym, jDen), finiteDiff(kxy, jyp, jym, jDen), finiteDiff(kxz, jyp, jym, jDen)],
+          [finiteDiff(kxx, kzp, kzm, kDen), finiteDiff(kxy, kzp, kzm, kDen), finiteDiff(kxz, kzp, kzm, kDen)],
+        ];
+        const gradKy = [
+          [finiteDiff(kxy, ixp, ixm, iDen), finiteDiff(kyy, ixp, ixm, iDen), finiteDiff(kyz, ixp, ixm, iDen)],
+          [finiteDiff(kxy, jyp, jym, jDen), finiteDiff(kyy, jyp, jym, jDen), finiteDiff(kyz, jyp, jym, jDen)],
+          [finiteDiff(kxy, kzp, kzm, kDen), finiteDiff(kyy, kzp, kzm, kDen), finiteDiff(kyz, kzp, kzm, kDen)],
+        ];
+        const gradKz = [
+          [finiteDiff(kxz, ixp, ixm, iDen), finiteDiff(kyz, ixp, ixm, iDen), finiteDiff(kzz, ixp, ixm, iDen)],
+          [finiteDiff(kxz, jyp, jym, jDen), finiteDiff(kyz, jyp, jym, jDen), finiteDiff(kzz, jyp, jym, jDen)],
+          [finiteDiff(kxz, kzp, kzm, kDen), finiteDiff(kyz, kzp, kzm, kDen), finiteDiff(kzz, kzp, kzm, kDen)],
+        ];
+        const finiteFullTerms = [
+          Sgeom[0][1],
+          Sgeom[0][2],
+          Sgeom[1][2],
+          ...gradTrace,
+          ...gradKx.flat(),
+          ...gradKy.flat(),
+          ...gradKz.flat(),
+        ].every((value) => Number.isFinite(value));
+        if (!finiteFullTerms) continue;
+
+        const DjKji = [
+          gradKx[0][0] + gradKy[1][0] + gradKz[2][0],
+          gradKx[0][1] + gradKy[1][1] + gradKz[2][1],
+          gradKx[0][2] + gradKy[1][2] + gradKz[2][2],
+        ];
+        const Jgeom = [
+          (DjKji[0] - gradTrace[0]) * INV8PI,
+          (DjKji[1] - gradTrace[1]) * INV8PI,
+          (DjKji[2] - gradTrace[2]) * INV8PI,
+        ];
+        if (!Jgeom.every((value) => Number.isFinite(value))) continue;
+
+        const T01 = Jgeom[0] * GEOM_TO_SI_STRESS;
+        const T02 = Jgeom[1] * GEOM_TO_SI_STRESS;
+        const T03 = Jgeom[2] * GEOM_TO_SI_STRESS;
+        const T12 = Sgeom[0][1] * GEOM_TO_SI_STRESS;
+        const T13 = Sgeom[0][2] * GEOM_TO_SI_STRESS;
+        const T23 = Sgeom[1][2] * GEOM_TO_SI_STRESS;
+        const stress = {
+          T00: rhoEuler,
+          T11: -rhoEuler,
+          T22: -rhoEuler,
+          T33: -rhoEuler,
+          T01,
+          T02,
+          T03,
+          T12,
+          T13,
+          T23,
+        };
+        accumulate(sumGlobal, stress);
 
         const regionId = args.classifyRegion?.({
           position: [x, y, z],
           voxelIndex: [i, j, k],
         });
         if (regionId) {
-          const bucket =
-            regionSums.get(regionId) ??
-            { count: 0, T00: 0, T11: 0, T22: 0, T33: 0 };
-          accumulate(bucket, rhoEuler);
+          const bucket = regionSums.get(regionId) ?? createBucket();
+          accumulate(bucket, stress);
           regionSums.set(regionId, bucket);
         }
       }
     }
   }
 
-  const toMean = (bucket: {
-    count: number;
-    T00: number;
-    T11: number;
-    T22: number;
-    T33: number;
-  }): MetricStressEnergyTensorMean => ({
+  const toMean = (bucket: MetricStressEnergyTensorBucket): MetricStressEnergyTensorMean => ({
     sampleCount: bucket.count,
     diagonalTensor:
       bucket.count > 0
@@ -1545,6 +1751,31 @@ export const calculateMetricStressEnergyTensorRegionMeansFromShiftField = (
             T22: bucket.T22 / bucket.count,
             T33: bucket.T33 / bucket.count,
             isNullEnergyConditionSatisfied: false,
+          }
+        : null,
+    fullTensor:
+      bucket.count > 0
+        ? {
+            T00: bucket.T00 / bucket.count,
+            T11: bucket.T11 / bucket.count,
+            T22: bucket.T22 / bucket.count,
+            T33: bucket.T33 / bucket.count,
+            T01: bucket.T01 / bucket.count,
+            T10: bucket.T01 / bucket.count,
+            T02: bucket.T02 / bucket.count,
+            T20: bucket.T02 / bucket.count,
+            T03: bucket.T03 / bucket.count,
+            T30: bucket.T03 / bucket.count,
+            T12: bucket.T12 / bucket.count,
+            T21: bucket.T12 / bucket.count,
+            T13: bucket.T13 / bucket.count,
+            T31: bucket.T13 / bucket.count,
+            T23: bucket.T23 / bucket.count,
+            T32: bucket.T23 / bucket.count,
+            isNullEnergyConditionSatisfied: false,
+            modelTermRoute: ADM_MODEL_TERM_ROUTE_ID,
+            modelTermAdmission: "experimental_not_admitted",
+            researchBasisRef: ADM_MODEL_TERM_RESEARCH_BASIS_REF,
           }
         : null,
   });

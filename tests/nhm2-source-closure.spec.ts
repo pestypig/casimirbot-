@@ -15,6 +15,7 @@ import {
   buildNhm2SourceSideSameBasisTensorAuthorityArtifact,
   isNhm2SourceSideSameBasisTensorAuthorityArtifact,
 } from "../shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1";
+import { buildNhm2SameChartFullTensorArtifact } from "../shared/contracts/nhm2-same-chart-full-tensor.v1";
 import {
   buildNhm2WallSourceClosureArtifact,
   isNhm2WallSourceClosureArtifact,
@@ -419,6 +420,63 @@ describe("nhm2 source closure artifact v2", () => {
       expect(region.mismatchDiagnostics?.components.T00.signMatch).toBe(true);
       expect(region.mismatchDiagnostics?.diagonalSignStatus).toBe("match");
     }
+  });
+
+  it("preserves regional metric-required same-chart full tensor artifacts", () => {
+    const metricRequiredSameChartFullTensor =
+      buildNhm2SameChartFullTensorArtifact({
+        generatedAt: "2026-06-12T00:00:00.000Z",
+        laneId: "nhm2_shift_lapse",
+        selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+        chartId: "ship_comoving_cartesian",
+        metricFamily: "nhm2_shift_lapse",
+        routeId: "adm_quasi_stationary_recovery_v1",
+        source: "adm_projection",
+        artifactRef: "artifact://metric-wall.same-chart-full-tensor",
+        tensor: {
+          T00: -50,
+          T01: 1,
+          T02: 2,
+          T03: 3,
+          T11: 50,
+          T12: 4,
+          T13: 5,
+          T22: 50,
+          T23: 6,
+          T33: 50,
+        },
+      });
+
+    const artifact = buildNhm2SourceClosureArtifactV2({
+      metricTensorRef: "warp.metricStressEnergy",
+      tileEffectiveTensorRef: "warp.tileEffectiveStressEnergy",
+      metricRequiredTensor: { T00: -50, T11: 50, T22: 50, T33: 50 },
+      tileEffectiveTensor: { T00: -50, T11: 50, T22: 50, T33: 50 },
+      requiredRegionIds: ["wall"],
+      regionComparisons: [
+        {
+          regionId: "wall",
+          comparisonBasisStatus: "same_basis",
+          metricTensorRef: "artifact://metric-wall",
+          tileTensorRef: "artifact://tile-wall",
+          metricRequiredTensor: { T00: -50, T11: 50, T22: 50, T33: 50 },
+          metricRequiredSameChartFullTensor,
+          tileEffectiveTensor: { T00: -50, T11: 50, T22: 50, T33: 50 },
+          metricT00Diagnostics: makeT00Diagnostics(8, -50),
+          tileT00Diagnostics: makeT00Diagnostics(8, -50),
+        },
+      ],
+      toleranceRelLInf: 0.1,
+    });
+
+    const wall = artifact.regionComparisons.regions[0];
+    expect(wall.metricRequiredSameChartFullTensor).toEqual(
+      metricRequiredSameChartFullTensor,
+    );
+    expect(
+      wall.metricRequiredSameChartFullTensor?.completeness.fullTensorComplete,
+    ).toBe(true);
+    expect(isNhm2SourceClosureV2Artifact(artifact)).toBe(true);
   });
 
   it("fails when a same-basis required region exceeds tolerance", () => {

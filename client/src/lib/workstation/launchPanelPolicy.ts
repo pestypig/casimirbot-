@@ -8,6 +8,7 @@ const USER_LAUNCH_PANEL_IDS = new Set<string>([
   "workstation-clipboard-history",
   "workstation-workflow-timeline",
   "workstation-task-manager",
+  "workstation-storage-map",
   "agi-task-history",
   "scientific-calculator",
   "theory-badge-graph",

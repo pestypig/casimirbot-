@@ -20,6 +20,7 @@ const requiredActionKeys = [
   "situation-room-pipelines.open",
   "workstation-workflow-timeline.open",
   "workstation-task-manager.open",
+  "workstation-storage-map.open",
   "agi-essence-console.open",
   "agi-task-history.open",
   "scientific-calculator.open",

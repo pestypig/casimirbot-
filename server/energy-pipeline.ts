@@ -4348,6 +4348,14 @@ const collectNhm2SourceClosureRegionComparisons = (
   const voxelIndex = (x: number, y: number, z: number) =>
     x + brickBasis.dims[0] * (y + brickBasis.dims[1] * z);
   const warpState = ((state as any).warp ?? null) as Record<string, unknown> | null;
+  const adapter =
+    ((warpState?.metricAdapter ?? null) as WarpMetricAdapterSnapshot | null) ?? null;
+  const selectedProfileId =
+    asText((warpState?.lapseSummary as Record<string, unknown> | undefined)?.shiftLapseProfileId) ??
+    asText((adapter?.lapseSummary as Record<string, unknown> | undefined)?.shiftLapseProfileId) ??
+    asText((state.dynamicConfig as Record<string, unknown> | null | undefined)?.shiftLapseProfileId) ??
+    DEFAULT_WARP_SHIFT_LAPSE_PROFILE_ID;
+  const chartId = asText(adapter?.chart?.label) ?? "unknown";
   const casimirMaterialReceipt = state.casimirMaterialReceipt ?? null;
   const stressBrick = buildStressEnergyBrick({
     metricT00: toFiniteNumber((warpState as Record<string, unknown> | null)?.metricT00) ?? undefined,
@@ -4516,6 +4524,7 @@ const collectNhm2SourceClosureRegionComparisons = (
         T33: number;
         isNullEnergyConditionSatisfied: boolean;
       } | null;
+      fullTensor: Record<string, unknown> | null;
     }
   >();
 
@@ -4532,6 +4541,7 @@ const collectNhm2SourceClosureRegionComparisons = (
         metricRegionMap.set(region.regionId, {
           sampleCount: region.sampleCount,
           diagonalTensor: region.diagonalTensor,
+          fullTensor: (region.fullTensor as Record<string, unknown> | null | undefined) ?? null,
         });
       }
     }
@@ -4583,6 +4593,38 @@ const collectNhm2SourceClosureRegionComparisons = (
     evidenceStatus: args.evidenceStatus,
   });
 
+  const buildMetricRequiredSameChartFullTensor = (args: {
+    regionId: RequiredNhm2SourceClosureRegionId;
+    tensor: Record<string, unknown> | null;
+    artifactRef: string;
+    sampleCount: number | null;
+  }): Nhm2SameChartFullTensorArtifactV1 =>
+    buildNhm2SameChartFullTensorArtifact({
+      laneId: "nhm2_shift_lapse",
+      selectedProfileId,
+      chartId,
+      metricFamily: "nhm2_shift_lapse",
+      routeId: "adm_quasi_stationary_recovery_v1",
+      source: "adm_projection",
+      artifactRef: args.artifactRef,
+      tensor: args.tensor,
+      defaultAssumptions: [
+        "diagnostic-only regional metric-required same-chart tensor inventory",
+        "regional tensor components are averaged over the source-closure brick mask",
+        "component values are emitted from the shift-field ADM recovery, not copied from tile/source residual targets",
+        "source-closure residual semantics remain on the legacy diagonal comparison surface",
+        `regionId=${args.regionId}`,
+        `sampleCount=${args.sampleCount ?? "unknown"}`,
+        regionMaskNote,
+      ],
+      adm: {
+        alphaStatus: "missing",
+        betaStatus: args.tensor != null ? "computed" : "missing",
+        gammaStatus: args.tensor != null ? "derived_same_chart" : "missing",
+        extrinsicCurvatureStatus: args.tensor != null ? "derived_same_chart" : "missing",
+      },
+    });
+
   return REQUIRED_NHM2_SOURCE_CLOSURE_REGION_IDS.map((regionId) => {
     const metricRegionEntry = metricRegionMap.get(regionId);
     const tileRegionEntry = stressRegionMap.get(regionId);
@@ -4601,6 +4643,16 @@ const collectNhm2SourceClosureRegionComparisons = (
     const sampleCount = metricSampleCount ?? tileSampleCount ?? null;
     const metricRegionTensorRef = `${metricTensorRef}.region.${regionId}`;
     const tileRegionTensorRef = `gr.matter.stressEnergy.tensorSampledSummaries.${regionId}.nhm2_shift_lapse.diagonal_proxy`;
+    const metricRequiredSameChartFullTensor =
+      buildMetricRequiredSameChartFullTensor({
+        regionId,
+        tensor:
+          (metricRegionEntry?.fullTensor as Record<string, unknown> | null | undefined) ??
+          (metricRegionEntry?.diagonalTensor as Record<string, unknown> | null | undefined) ??
+          null,
+        artifactRef: `${metricRegionTensorRef}.sameChartFullTensor`,
+        sampleCount: metricSampleCount,
+      });
     const noteParts: string[] = [];
     const tileNote = asText(tileRegionEntry?.note);
     if (tileNote != null) {
@@ -4894,6 +4946,7 @@ const collectNhm2SourceClosureRegionComparisons = (
       metricTensorRef: metricRegionTensorRef,
       tileTensorRef: tileRegionTensorRef,
       metricRequiredTensor: metricRegionTensor,
+      metricRequiredSameChartFullTensor,
       tileEffectiveTensor: tileRegionTensor,
       sampleCount,
       metricAccounting,

@@ -13,7 +13,7 @@ export type HelixAccountSessionProfile = {
   profile_id: string;
   display_name: string;
   email?: string | null;
-  auth_mode: "web_auth" | "local_dev_profile";
+  auth_mode: "web_auth" | "local_dev_profile" | "local_password_profile";
   provider?: "google" | "local" | null;
   provider_subject?: string | null;
   picture_url?: string | null;
@@ -63,7 +63,9 @@ export type HelixAccountSessionStatus = {
     credential_collection_allowed_in_agents: false;
     raw_password_stored: false;
     discord_bot_password_collection_allowed: false;
-    recommended_flow: "web_auth_or_oauth_link";
+    recommended_flow: "web_auth_or_oauth_link" | "dev_local_password_profile";
+    local_password_profile_available?: boolean;
+    local_password_profile_dev_default?: boolean;
   };
 };
 
@@ -75,4 +77,5 @@ export type HelixAccountSessionReceipt = {
   error?: string | null;
   raw_password_stored: false;
   credential_collection_allowed_in_agents: false;
+  auth_method?: "web_auth" | "local_dev_profile" | "local_password_profile" | null;
 };

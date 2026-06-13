@@ -20,6 +20,9 @@ type UpsertWorkspaceMemoryArtifactInput = {
   profile_id?: string | null;
   chat_session_id?: string | null;
   title?: string | null;
+  path_ref?: string | null;
+  size_bytes?: number | null;
+  quota_bytes?: number | null;
   updated_at?: string;
 };
 
@@ -63,6 +66,13 @@ function normalizeArtifact(
     chat_session_id: input.chat_session_id?.trim() || null,
     title: input.title ?? null,
     storage_key: storageKey,
+    path_ref: input.path_ref?.trim() || null,
+    size_bytes: typeof input.size_bytes === "number" && Number.isFinite(input.size_bytes) && input.size_bytes >= 0
+      ? Math.round(input.size_bytes)
+      : null,
+    quota_bytes: typeof input.quota_bytes === "number" && Number.isFinite(input.quota_bytes) && input.quota_bytes >= 0
+      ? Math.round(input.quota_bytes)
+      : null,
     updated_at: input.updated_at ?? new Date().toISOString(),
   };
 }

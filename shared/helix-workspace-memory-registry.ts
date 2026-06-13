@@ -34,6 +34,9 @@ export type HelixWorkspaceMemoryArtifact = {
   chat_session_id: string | null;
   title: string | null;
   storage_key: string;
+  path_ref?: string | null;
+  size_bytes?: number | null;
+  quota_bytes?: number | null;
   updated_at: string;
 };
 

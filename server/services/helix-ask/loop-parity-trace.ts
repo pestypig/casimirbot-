@@ -32,6 +32,13 @@ export type HelixLoopParityTrace = {
     mutating: boolean;
     result_ref?: string;
   }>;
+  rejected_tool_calls: Array<{
+    tool_id: string;
+    family: string;
+    call_id: string;
+    reason: string;
+    result_ref?: string;
+  }>;
   unexpected_tool_calls: string[];
   observations_created: Array<{
     observation_id: string;
@@ -146,8 +153,45 @@ const pushToolCall = (
   });
 };
 
-const collectActualToolCalls = (payload: RecordLike, admittedToolFamilies: string[]): HelixLoopParityTrace["actual_tool_calls"] => {
+const isAdmissionDeniedValidation = (validation: RecordLike | null): boolean => {
+  if (!validation || validation.valid === true) return false;
+  const errors = readStringArray(validation.errors);
+  return errors.some((error) =>
+    /forbidden_capability_for_goal|runtime_capability_not_admitted_by_tool_policy|runtime_tool_forbidden_by_tool_policy|contextual_tool_reference_suppressed|capability_permission_denied|capability_not_available/i.test(error),
+  );
+};
+
+const collectRejectedToolCalls = (payload: RecordLike): HelixLoopParityTrace["rejected_tool_calls"] => {
+  const rejected = new Map<string, HelixLoopParityTrace["rejected_tool_calls"][number]>();
+  const ledger = Array.isArray(payload.current_turn_artifact_ledger) ? payload.current_turn_artifact_ledger : [];
+  for (const artifact of ledger) {
+    const artifactRecord = readRecord(artifact);
+    if (readString(artifactRecord?.kind) !== "runtime_tool_call_validation") continue;
+    const artifactPayload = readRecord(artifactRecord?.payload);
+    if (!isAdmissionDeniedValidation(artifactPayload)) continue;
+    const toolId = readString(artifactPayload?.capability_key);
+    const callId = readString(artifactPayload?.call_id) || toolId || readString(artifactRecord?.artifact_id);
+    if (!toolId || !callId) continue;
+    const reason = readStringArray(artifactPayload?.errors).join("; ") || "admission_denied";
+    rejected.set(`${callId}:${toolId}`, {
+      tool_id: toolId,
+      family: inferToolFamily(toolId),
+      call_id: callId,
+      reason,
+      result_ref: readString(artifactRecord?.artifact_id) || `${callId}:runtime_tool_call_validation`,
+    });
+  }
+  return Array.from(rejected.values());
+};
+
+const collectActualToolCalls = (
+  payload: RecordLike,
+  admittedToolFamilies: string[],
+  rejectedToolCalls: HelixLoopParityTrace["rejected_tool_calls"],
+): HelixLoopParityTrace["actual_tool_calls"] => {
   const admittedFamilies = new Set(admittedToolFamilies);
+  const rejectedCallIds = new Set(rejectedToolCalls.map((call) => call.call_id).filter(Boolean));
+  const rejectedToolIds = new Set(rejectedToolCalls.map((call) => call.tool_id).filter(Boolean));
   const calls = new Map<string, HelixLoopParityTrace["actual_tool_calls"][number]>();
   const workspaceReceipt = readRecord(payload.workspace_action_receipt);
   pushToolCall(calls, readString(workspaceReceipt?.action_id) || readString(workspaceReceipt?.action_key), admittedFamilies, readString(workspaceReceipt?.receipt_id));
@@ -160,6 +204,14 @@ const collectActualToolCalls = (payload: RecordLike, admittedToolFamilies: strin
   for (const artifact of ledger) {
     const artifactRecord = readRecord(artifact);
     const artifactPayload = readRecord(artifactRecord?.payload);
+    const callId = readString(artifactPayload?.call_id);
+    const capabilityKey = readString(artifactPayload?.capability_key);
+    if (
+      rejectedCallIds.has(callId) ||
+      (capabilityKey && rejectedToolIds.has(capabilityKey) && /runtime_tool_call|runtime_tool_call_validation|runtime_tool_observation/i.test(readString(artifactRecord?.kind)))
+    ) {
+      continue;
+    }
     const resultRef = readString(artifactRecord?.artifact_id) || readString(artifactPayload?.receipt_id);
     if (artifactRecord?.kind === "dynamic_tool_call") {
       for (const toolId of readStringArray(artifactPayload?.tool_ids)) {
@@ -329,7 +381,8 @@ export function buildLoopParityTrace(input: {
     : null;
   const admission = readRecord(payload.tool_call_admission_decision);
   const admittedToolFamilies = readStringArray(admission?.admitted_tool_families);
-  const actualToolCalls = collectActualToolCalls(payload, admittedToolFamilies);
+  const rejectedToolCalls = collectRejectedToolCalls(payload);
+  const actualToolCalls = collectActualToolCalls(payload, admittedToolFamilies, rejectedToolCalls);
   const unexpectedToolCalls = actualToolCalls.filter((call) => !call.admitted).map((call) => call.tool_id);
   const selection = readRecord(payload.situation_evidence_selection);
   const evidence = collectObservationRefs(selection);
@@ -405,6 +458,7 @@ export function buildLoopParityTrace(input: {
     helix_owned_touched: collectHelixOwnedTouched(payload),
     admitted_tool_families: admittedToolFamilies,
     actual_tool_calls: actualToolCalls,
+    rejected_tool_calls: rejectedToolCalls,
     unexpected_tool_calls: unexpectedToolCalls,
     observations_created: observationsCreated,
     evidence_selected_for_answer: evidence.selected,

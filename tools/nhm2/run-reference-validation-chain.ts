@@ -73,7 +73,7 @@ export const planReferenceValidationChain = (
   args: Record<string, string | boolean>,
 ): Nhm2ReferenceValidationChainCommand[] => {
   const referenceRun = required(args, "reference-run");
-  const sourceClosure = required(args, "source-closure");
+  const requestedSourceClosure = asOptionalString(args, "source-closure");
   const fullLoopAudit = required(args, "full-loop-audit");
   const qeiDossier = asOptionalString(args, "qei-dossier");
   const qeiWorldlineDossier = asOptionalString(args, "qei-worldline-dossier");
@@ -115,9 +115,14 @@ export const planReferenceValidationChain = (
     args,
     "metric-required-full-tensor-source",
   );
+  const generateCurrentRuntimeSourceClosure =
+    args["generate-current-runtime-source-closure"] === true;
+  const currentRuntimeProfileId =
+    asOptionalString(args, "current-runtime-profile-id") ??
+    "stage1_centerline_alpha_0p995_v1";
   const generateMetricRequiredFullTensorSource =
     args["generate-metric-required-full-tensor-source"] === true;
-  const metricRuntimeArtifact = asOptionalString(args, "metric-runtime-artifact");
+  const metricRuntimeArtifactInput = asOptionalString(args, "metric-runtime-artifact");
   const layeredWallSourceCandidateRowId = asOptionalString(
     args,
     "layered-wall-source-candidate-row-id",
@@ -130,6 +135,14 @@ export const planReferenceValidationChain = (
   const runId = required(args, "run-id");
   const auditOnly = args["audit-only"] === true ? ["--audit-only"] : [];
   const commands: Nhm2ReferenceValidationChainCommand[] = [];
+  const generatedCurrentRuntimeArtifact = `${outRoot}/nhm2-runtime-current.json`;
+  const generatedCurrentSourceClosure = `${outRoot}/nhm2-source-closure-current.json`;
+  const generatedCurrentRegionalFullTensorCoverage =
+    `${outRoot}/nhm2-regional-full-tensor-coverage.json`;
+  const sourceClosure = requestedSourceClosure ?? generatedCurrentSourceClosure;
+  const metricRuntimeArtifact =
+    metricRuntimeArtifactInput ??
+    (generateCurrentRuntimeSourceClosure ? generatedCurrentRuntimeArtifact : null);
   const tileCounterpart = `${outRoot}/nhm2-tile-effective-counterpart.json`;
   const generatedTileLocalSourceElements = `${outRoot}/nhm2-tile-local-source-elements.json`;
   const tileLocalSourceElements =
@@ -197,9 +210,22 @@ export const planReferenceValidationChain = (
       "--metric-required-full-tensor-source and --generate-metric-required-full-tensor-source are mutually exclusive",
     );
   }
+  if (generateCurrentRuntimeSourceClosure && requestedSourceClosure != null) {
+    throw new Error(
+      "--source-closure and --generate-current-runtime-source-closure are mutually exclusive",
+    );
+  }
+  if (generateCurrentRuntimeSourceClosure && metricRuntimeArtifactInput != null) {
+    throw new Error(
+      "--metric-runtime-artifact and --generate-current-runtime-source-closure are mutually exclusive",
+    );
+  }
+  if (!generateCurrentRuntimeSourceClosure && requestedSourceClosure == null) {
+    throw new Error("missing required --source-closure");
+  }
   if (generateMetricRequiredFullTensorSource && metricRuntimeArtifact == null) {
     throw new Error(
-      "--generate-metric-required-full-tensor-source requires --metric-runtime-artifact",
+      "--generate-metric-required-full-tensor-source requires --metric-runtime-artifact or --generate-current-runtime-source-closure",
     );
   }
   if (inputConservation != null && sourceInput != null) {
@@ -236,6 +262,23 @@ export const planReferenceValidationChain = (
     throw new Error(
       "--regional-material-source-tensor-model or --regional-source-component-model requires --build-tile-local-source-elements so the source tensor model is consumed",
     );
+  }
+
+  if (generateCurrentRuntimeSourceClosure) {
+    commands.push(command("nhm2:publish-current-runtime-source-closure", [
+      "--out-root",
+      outRoot,
+      "--runtime-out",
+      generatedCurrentRuntimeArtifact,
+      "--source-closure-out",
+      generatedCurrentSourceClosure,
+      "--coverage-out",
+      generatedCurrentRegionalFullTensorCoverage,
+      "--selected-profile-id",
+      currentRuntimeProfileId,
+      "--run-id",
+      runId,
+    ]));
   }
 
   if (sourceInput != null) {

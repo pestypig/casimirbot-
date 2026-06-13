@@ -35,6 +35,7 @@ import {
   type WorkstationShellCapabilityDefinition,
 } from "@shared/workstation-shell-capabilities";
 import { HELIX_WORKSTATION_TASK_MANAGER_SCHEMA } from "@shared/helix-workstation-task-manager";
+import { HELIX_WORKSPACE_STORAGE_STATUS_SCHEMA } from "@shared/helix-workspace-storage-status";
 import { listClientCapabilityActions } from "../client-capabilities/client-action-queue";
 import { listClientCapabilityAdoptions } from "../client-capabilities/client-adoption-store";
 import { readSituationSourceCapabilities } from "../situation-room/situation-source-capability-store";
@@ -425,6 +426,26 @@ export async function buildHelixWorkspaceOsStatus(
       exposes_raw_dom_text: false,
       executes_task_control: false,
       browser_panel_memory_is_approximate: true,
+    },
+  }));
+
+  capabilities.push(makeRecord({
+    capability_id: "workstation.storage_map",
+    surface: "filesystem",
+    mode: "read_only",
+    status: "available",
+    label: "Workstation Storage Map",
+    source: "workspace_os_storage_status_endpoint",
+    last_verified_at: generatedAt,
+    fallbacks: ["workstation.dynamic_actions", "workstation.task_manager"],
+    evidence_refs: [HELIX_WORKSPACE_STORAGE_STATUS_SCHEMA],
+    diagnostics: {
+      endpoint: "/api/workspace-os/storage/status",
+      scans_local_machine_filesystem: false,
+      exposes_raw_storage_values: false,
+      exposes_raw_file_contents: false,
+      executes_cleanup: false,
+      browser_storage_sizes_are_client_measured: true,
     },
   }));
 

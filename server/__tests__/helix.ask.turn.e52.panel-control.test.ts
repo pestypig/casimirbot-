@@ -1250,6 +1250,99 @@ describe("helix ask E52 panel control terminal contract", () => {
     }
   }, 60000);
 
+  it("keeps scoped docs summary inside docs tools and downgrades parity after rejected repo-code", async () => {
+    const app = createApp();
+    const previousFlag = process.env.HELIX_AGENT_STEP_DECISION_LLM;
+    const previousResponse = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+    const previousResponseIndex = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+
+    process.env.HELIX_AGENT_STEP_DECISION_LLM = "1";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
+      {
+        next_step: "next_action",
+        chosen_capability: "repo-code.search_concept",
+        reason: "Incorrectly try repo search even though the hard source target is docs summary.",
+        args: { query: "Helix Ask Codex parity model turn fidelity audit remaining parity gap" },
+        expected_artifacts: ["repo_code_evidence_observation"],
+        confidence: 0.7,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "docs-viewer.search_docs",
+        reason: "Search docs for the named audit document.",
+        args: { query: "Helix Ask Codex parity model turn fidelity audit", limit: 5 },
+        expected_artifacts: ["doc_search_results"],
+        confidence: 0.93,
+      },
+      {
+        next_step: "next_action",
+        chosen_capability: "docs-viewer.summarize_doc",
+        reason: "Summarize the selected audit document around the remaining parity gap.",
+        args: {
+          path: "/docs/audits/research/helix-ask-codex-parity-model-turn-fidelity-audit-2026-06-12.md",
+          query: "remaining parity gap",
+        },
+        expected_artifacts: ["doc_summary"],
+        confidence: 0.94,
+      },
+      {
+        next_step: "answer",
+        chosen_capability: null,
+        reason: "The scoped docs summary now satisfies the requested three-bullet parity-gap answer.",
+        args: {},
+        expected_artifacts: ["doc_summary"],
+        confidence: 0.98,
+      },
+    ]);
+
+    try {
+      const response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question: "Open the Helix Ask Codex parity model turn fidelity audit doc and summarize the remaining parity gap in three bullets.",
+          mode: "read",
+          debug: true,
+          sessionId: `e52-doc-summary-scope-repair-${Date.now()}`,
+        })
+        .expect(200);
+
+      const finalText = String(response.body?.selected_final_answer ?? response.body?.answer ?? "");
+      expect(finalText).toContain("remaining gap");
+      expect(finalText).toContain("model-visible");
+      expect(finalText).toContain("Policy repairs");
+      expect(finalText).toContain("Terminal answers");
+      expect((finalText.match(/^\s*-/gm) ?? [])).toHaveLength(3);
+      expect(finalText).not.toContain("Section anchor:");
+      expect(response.body?.terminal_artifact_kind).toBe("doc_summary");
+      expect(response.body?.goal_satisfaction_evaluation?.satisfaction).toBe("satisfied");
+
+      const debugExportRef = response.body?.debug_export_ref?.endpoint;
+      expect(debugExportRef).toBeTruthy();
+      const debugExport = await request(app).get(debugExportRef).expect(200);
+      const loopTrace = debugExport.body?.payload?.loop_parity_trace;
+      expect(loopTrace?.actual_tool_calls?.map((call: any) => call.tool_id)).toEqual([
+        "docs-viewer.search_docs",
+        "docs-viewer.summarize_doc",
+      ]);
+      expect(loopTrace?.rejected_tool_calls?.map((call: any) => call.tool_id) ?? []).not.toContain("docs-viewer.search_docs");
+      expect(loopTrace?.unexpected_tool_calls).toEqual([]);
+      expect(loopTrace?.short_circuit_risk_flags ?? []).not.toContain("tool_called_without_admission");
+      expect(["repaired_not_model_driven", "safe_policy_repair"]).toContain(
+        debugExport.body?.payload?.model_turn_fidelity_audit?.parity_status,
+      );
+      expect(debugExport.body?.payload?.model_turn_fidelity_audit?.parity_status).not.toBe("model_driven_parity");
+      expect(debugExport.body?.payload?.model_turn_fidelity_audit?.authority?.policy_override_used).toBe(true);
+    } finally {
+      if (previousFlag === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;
+      else process.env.HELIX_AGENT_STEP_DECISION_LLM = previousFlag;
+      if (previousResponse === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = previousResponse;
+      if (previousResponseIndex === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = previousResponseIndex;
+    }
+  }, 60000);
+
   it("keeps calculator prose args inside the runtime repair loop", async () => {
     const app = createApp();
     const previousFlag = process.env.HELIX_AGENT_STEP_DECISION_LLM;

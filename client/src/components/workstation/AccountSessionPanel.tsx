@@ -129,8 +129,9 @@ export default function AccountSessionPanel() {
   const [status, setStatus] = React.useState<HelixAccountSessionStatus>(emptyStatus);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [profileId, setProfileId] = React.useState("DatDamPig");
-  const [displayName, setDisplayName] = React.useState("DatDamPig");
+  const fallbackProfileId = "DatDamPig";
+  const [localUsername, setLocalUsername] = React.useState("admin");
+  const [localPassword, setLocalPassword] = React.useState("");
   const [ingressLabel, setIngressLabel] = React.useState("Profile ingress");
   const [newTokenValue, setNewTokenValue] = React.useState<string | null>(null);
   const [discordSessions, setDiscordSessions] = React.useState<DiscordSessionView[]>([]);
@@ -153,13 +154,13 @@ export default function AccountSessionPanel() {
       setStatus(nextStatus);
       setDiscordSessions(nextDiscordSessions);
       setCategorizationJobs(nextCategorizationJobs);
-      setProfileArchives(await fetchProfileArchives(nextStatus.session?.profile.profile_id ?? profileId));
+      setProfileArchives(await fetchProfileArchives(nextStatus.session?.profile.profile_id ?? fallbackProfileId));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load account session.");
     } finally {
       setLoading(false);
     }
-  }, [profileId]);
+  }, []);
 
   React.useEffect(() => {
     refresh();
@@ -171,19 +172,21 @@ export default function AccountSessionPanel() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/account/session/sign-in", {
+      const response = await fetch("/api/account/session/password-sign-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile_id: profileId, display_name: displayName }),
+        body: JSON.stringify({ username: localUsername, password: localPassword }),
       });
-      if (!response.ok) throw new Error(`sign-in ${response.status}`);
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.message ?? `sign-in ${response.status}`);
+      setLocalPassword("");
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start local session.");
+      setError(err instanceof Error ? err.message : "Failed to sign in to local profile.");
     } finally {
       setLoading(false);
     }
-  }, [displayName, profileId, refresh]);
+  }, [localPassword, localUsername, refresh]);
 
   const signOut = React.useCallback(async () => {
     setLoading(true);
@@ -307,31 +310,38 @@ export default function AccountSessionPanel() {
             ) : showLocalDevSignIn ? (
               <div className="mt-3 space-y-3">
                 <label className="block text-xs text-slate-300">
-                  Profile ID
+                  Local admin username
                   <input
-                    value={profileId}
-                    onChange={(event) => setProfileId(event.target.value)}
+                    value={localUsername}
+                    onChange={(event) => setLocalUsername(event.target.value)}
+                    autoComplete="username"
                     className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400"
                   />
                 </label>
                 <label className="block text-xs text-slate-300">
-                  Display name
+                  Password
                   <input
-                    value={displayName}
-                    onChange={(event) => setDisplayName(event.target.value)}
+                    type="password"
+                    value={localPassword}
+                    onChange={(event) => setLocalPassword(event.target.value)}
+                    autoComplete="current-password"
                     className="mt-1 w-full rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400"
                   />
                 </label>
                 <button
                   type="button"
                   onClick={signIn}
+                  disabled={!localUsername.trim() || !localPassword || loading}
                   className="inline-flex items-center gap-2 rounded border border-cyan-400/40 bg-cyan-500/15 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/25"
                 >
                   <LogIn className="h-3.5 w-3.5" />
-                  Start local session
+                  Sign in local admin
                 </button>
                 <p className="text-[11px] text-slate-500">
-                  Development-only local profile. Production sign-in uses Google below.
+                  Development-only password profile for local profile-storage experiments.
+                  {status.auth_boundary.local_password_profile_dev_default
+                    ? " Default credentials are admin/password until HELIX_LOCAL_PROFILE_PASSWORD_HASH is configured."
+                    : null}
                 </p>
                 <div className="border-t border-white/10 pt-3">
                   <p className="mb-2 text-xs text-slate-400">
