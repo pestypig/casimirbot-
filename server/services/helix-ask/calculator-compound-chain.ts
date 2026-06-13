@@ -44,6 +44,8 @@ export type CalculatorCandidateHints = {
   turn_id: string;
   prompt: string;
   authority: "hint_only";
+  numeric_normalizations: CalculatorNumericNormalization[];
+  problem_interpretation: CalculatorProblemInterpretation;
   constants: Array<{
     symbol: string;
     value: string;
@@ -58,6 +60,30 @@ export type CalculatorCandidateHints = {
     when_useful: string;
   }>;
   expression_rules: string[];
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
+export type CalculatorNumericNormalization = {
+  raw_token: string;
+  normalized_expression: string;
+  decimal_value: number;
+  notation: "mixed_number";
+  confidence: "high";
+  source: "deterministic_math_notation_normalizer";
+};
+
+export type CalculatorProblemInterpretation = {
+  schema: "helix.calculator_problem_interpretation.v1";
+  turn_id: string;
+  prompt_kind: "underdetermined_triangle" | "calculator_candidate";
+  needs_more_information: boolean;
+  safe_to_calculate: boolean;
+  reason: string | null;
+  givens: string[];
+  unknowns: string[];
+  constraints: string[];
+  normalized_quantities: CalculatorNumericNormalization[];
   assistant_answer: false;
   raw_content_included: false;
 };
@@ -178,6 +204,99 @@ const unitSetup = (input: {
 };
 
 const numberPattern = "[-+]?\\d+(?:\\.\\d+)?(?:e[-+]?\\d+)?";
+
+export const normalizeCalculatorMixedNumberLiterals = (value: string): string =>
+  value.replace(/(^|[^\w./])(\d+)\s+(\d+)\s*\/\s*(\d+)(?=$|[^\w./])/g, (match, prefix, whole, numerator, denominator) => {
+    const wholeValue = Number(whole);
+    const numeratorValue = Number(numerator);
+    const denominatorValue = Number(denominator);
+    if (
+      !Number.isSafeInteger(wholeValue) ||
+      !Number.isSafeInteger(numeratorValue) ||
+      !Number.isSafeInteger(denominatorValue) ||
+      denominatorValue === 0
+    ) {
+      return match;
+    }
+    return `${prefix}${wholeValue * denominatorValue + numeratorValue}/${denominatorValue}`;
+  });
+
+export const extractCalculatorNumericNormalizations = (prompt: string): CalculatorNumericNormalization[] => {
+  const normalizations: CalculatorNumericNormalization[] = [];
+  prompt.replace(/(^|[^\w./])(\d+)\s+(\d+)\s*\/\s*(\d+)(?=$|[^\w./])/g, (match, _prefix, whole, numerator, denominator) => {
+    const wholeValue = Number(whole);
+    const numeratorValue = Number(numerator);
+    const denominatorValue = Number(denominator);
+    if (
+      Number.isSafeInteger(wholeValue) &&
+      Number.isSafeInteger(numeratorValue) &&
+      Number.isSafeInteger(denominatorValue) &&
+      denominatorValue !== 0
+    ) {
+      const improperNumerator = wholeValue * denominatorValue + numeratorValue;
+      normalizations.push({
+        raw_token: `${whole} ${numerator}/${denominator}`,
+        normalized_expression: `${improperNumerator}/${denominatorValue}`,
+        decimal_value: improperNumerator / denominatorValue,
+        notation: "mixed_number",
+        confidence: "high",
+        source: "deterministic_math_notation_normalizer",
+      });
+    }
+    return match;
+  });
+  return normalizations;
+};
+
+export const detectUnderdeterminedTrianglePrompt = (prompt: string): boolean => {
+  const normalized = normalizePrompt(prompt);
+  if (!/\btriangles?\b/i.test(normalized)) return false;
+  if (!/\b(?:longest\s+side|largest\s+side)\b/i.test(normalized)) return false;
+  if (!/\b(?:other|remaining)\s+(?:two|2)\s+sides?\b|\bhow\s+long\s+are\s+the\s+other\b/i.test(normalized)) return false;
+  const sideMeasureMatches = normalized.match(
+    new RegExp(`\\b(?:${numberPattern}|\\d+\\s+\\d+\\s*/\\s*\\d+)\\s*(?:inches?|in\\.?|feet|ft\\.?|cm|centimeters?|metres?|meters?|m)\\b`, "gi"),
+  ) ?? [];
+  const hasDeterminingConstraint =
+    /\b(?:equilateral|perimeter|area|angle|angles|one\s+leg|another\s+side|second\s+side|base|height|altitude|ratio|similar\s+triangle)\b/i.test(normalized);
+  return sideMeasureMatches.length <= 1 && !hasDeterminingConstraint;
+};
+
+const buildCalculatorProblemInterpretation = (input: {
+  prompt: string;
+  turnId: string;
+  numericNormalizations: CalculatorNumericNormalization[];
+}): CalculatorProblemInterpretation => {
+  if (detectUnderdeterminedTrianglePrompt(input.prompt)) {
+    return {
+      schema: "helix.calculator_problem_interpretation.v1",
+      turn_id: input.turnId,
+      prompt_kind: "underdetermined_triangle",
+      needs_more_information: true,
+      safe_to_calculate: false,
+      reason: "The prompt gives only the longest side of a triangle, which does not determine the other two side lengths.",
+      givens: ["longest side length"],
+      unknowns: ["other two side lengths"],
+      constraints: ["0 < a <= c", "0 < b <= c", "a + b > c"],
+      normalized_quantities: input.numericNormalizations,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+  return {
+    schema: "helix.calculator_problem_interpretation.v1",
+    turn_id: input.turnId,
+    prompt_kind: "calculator_candidate",
+    needs_more_information: false,
+    safe_to_calculate: true,
+    reason: null,
+    givens: [],
+    unknowns: [],
+    constraints: [],
+    normalized_quantities: input.numericNormalizations,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
 
 const extractNumberNear = (prompt: string, units: string[]): number | null => {
   const unitPattern = units.map((unit: string) => unit.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
@@ -1095,11 +1214,18 @@ export function buildCalculatorCandidateHints(input: {
   prompt: string;
   turnId: string;
 }): CalculatorCandidateHints {
+  const numericNormalizations = extractCalculatorNumericNormalizations(input.prompt);
   return {
     schema: "helix.calculator_candidate_hints.v1",
     turn_id: input.turnId,
     prompt: input.prompt,
     authority: "hint_only",
+    numeric_normalizations: numericNormalizations,
+    problem_interpretation: buildCalculatorProblemInterpretation({
+      prompt: input.prompt,
+      turnId: input.turnId,
+      numericNormalizations,
+    }),
     constants: [
       { symbol: "c", value: "3e8", unit: "m/s", meaning: "speed of light approximation" },
       { symbol: "h", value: "6.62607015e-34", unit: "J*s", meaning: "Planck constant" },
@@ -1118,6 +1244,7 @@ export function buildCalculatorCandidateHints(input: {
     ],
     expression_rules: [
       "Return calculator-ready numeric expressions only; no prose or units inside expression.",
+      "Normalize mixed-number notation before tool assembly; for example, 9 1/8 must become 73/8, not 91/8.",
       "Use *, /, ^, parentheses, sqrt(), pi, and scientific notation.",
       "Convert input units to SI before writing the expression.",
       "Create one subgoal per meaningful numeric result.",
