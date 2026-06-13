@@ -103,6 +103,16 @@ const componentRegion = (tensor: Nhm2RegionalTensor) => ({
   basisRef: "same_basis",
 });
 
+const declaredRegion = (tensor: Nhm2RegionalTensor) => ({
+  tensor,
+  status: "computed",
+  aggregationMode: "direct_region_model",
+  normalizationBasis: "volume",
+  sampleCount: 8,
+  basisRef: "same_basis",
+  materialReceiptStatus: "missing",
+});
+
 describe("NHM2 regional material source tensor model", () => {
   it("can populate all required source-authority regions through tile-local aggregation", () => {
     const receipt = materialReceipt();
@@ -238,5 +248,87 @@ describe("NHM2 regional material source tensor model", () => {
         },
       }),
     ).toThrow(/metric-required tensors/);
+  });
+
+  it("admits declared regional full tensors for model QC without material credibility", () => {
+    const regionalModel = buildRegionalMaterialSourceTensorModel({
+      generatedAt,
+      componentModel: {
+        modelKind: "declared_research_tensor",
+        materialReceiptTier: "declared_model_receipt",
+        selectedProfileId: profile,
+        regions: {
+          global: declaredRegion(symmetricTensor(5.8e7)),
+          hull: declaredRegion(symmetricTensor(7.3e8)),
+          wall: declaredRegion(symmetricTensor(1.7e9)),
+          exterior_shell: declaredRegion(symmetricTensor(1.69e9)),
+        },
+      },
+    });
+    const wall = regionalModel.regions.find((region) => region.regionId === "wall");
+
+    expect(regionalModel.materialReceiptTier).toBe("declared_model_receipt");
+    expect(regionalModel.summary.allRequiredRegionsFullTensor).toBe(true);
+    expect(regionalModel.summary.allRequiredRegionsComponentAuthoritative).toBe(true);
+    expect(regionalModel.summary.allRequiredRegionsComponentAdmissible).toBe(true);
+    expect(regionalModel.summary.allRequiredRegionsMaterialReceipted).toBe(false);
+    expect(regionalModel.summary.inadmissibleComponentRefs).toEqual([]);
+    expect(wall?.componentAuthority.T01).toBe("source_model");
+    expect(wall?.blockers).toEqual([]);
+    expect(regionalModel.claimBoundary.declaredModelReceiptIsQcOnly).toBe(true);
+    expect(regionalModel.claimBoundary.materialReceiptTierDoesNotAllowTransportClaim).toBe(true);
+  });
+
+  it("marks missing momentum and off-diagonal source components as inadmissible", () => {
+    const regionalModel = buildRegionalMaterialSourceTensorModel({
+      generatedAt,
+      componentModel: {
+        modelKind: "declared_research_tensor",
+        materialReceiptTier: "declared_model_receipt",
+        selectedProfileId: profile,
+        regions: {
+          wall: declaredRegion({
+            T00: -1,
+            T11: 0.02,
+            T22: 0.02,
+            T33: 0.02,
+          }),
+        },
+      },
+    });
+    const wall = regionalModel.regions.find((region) => region.regionId === "wall");
+
+    expect(wall?.componentAuthority.T01).toBe("missing");
+    expect(wall?.componentAuthority.T12).toBe("missing");
+    expect(wall?.blockers).toContain("regional_full_tensor_authority_missing");
+    expect(wall?.blockers).toContain("T01:component_authority_missing");
+    expect(wall?.blockers).toContain("T12:component_authority_missing");
+    expect(regionalModel.summary.allRequiredRegionsComponentAdmissible).toBe(false);
+    expect(regionalModel.summary.inadmissibleComponentRefs).toContain("wall:T01");
+    expect(regionalModel.summary.inadmissibleComponentRefs).toContain("wall:T12");
+  });
+
+  it("rejects metric-echo component authority even when tensor values are present", () => {
+    const regionalModel = buildRegionalMaterialSourceTensorModel({
+      generatedAt,
+      componentModel: {
+        modelKind: "declared_research_tensor",
+        materialReceiptTier: "declared_model_receipt",
+        selectedProfileId: profile,
+        regions: {
+          wall: {
+            ...declaredRegion(symmetricTensor(1.7e9)),
+            componentAuthority: { T00: "metric_echo" },
+          },
+        },
+      },
+    });
+    const wall = regionalModel.regions.find((region) => region.regionId === "wall");
+
+    expect(wall?.componentAuthority.T00).toBe("metric_echo");
+    expect(wall?.blockers).toContain("T00:component_authority_metric_echo");
+    expect(regionalModel.summary.anyMetricEchoComponent).toBe(true);
+    expect(regionalModel.summary.allRequiredRegionsComponentAdmissible).toBe(false);
+    expect(regionalModel.summary.inadmissibleComponentRefs).toContain("wall:T00");
   });
 });
