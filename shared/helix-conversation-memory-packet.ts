@@ -17,6 +17,33 @@ export type HelixConversationMemoryReference = {
   reason: string;
 };
 
+export type HelixUnresolvedTaskFrame = {
+  id: string;
+  kind:
+    | "math_geometry_triangle"
+    | "calculator_problem"
+    | "code_debugging"
+    | "research_task"
+    | "general_clarification";
+  created_turn_id: string;
+  updated_turn_id: string;
+  status: "missing_slots" | "ready_to_solve" | "resolved" | "abandoned";
+  original_user_request: string;
+  known_slots: Record<string, unknown>;
+  missing_slots: string[];
+  constraints: string[];
+  assumptions: string[];
+  source_terminal_artifact_id?: string | null;
+  source_request_user_input_id?: string | null;
+  allowed_next_actions: Array<
+    | "ask_user"
+    | "merge_clarification"
+    | "route_calculator"
+    | "route_tool"
+    | "answer_directly"
+  >;
+};
+
 export type HelixConversationMemoryAllowedUse =
   | "pronoun_binding_only"
   | "conversational_continuity"
@@ -44,6 +71,7 @@ export type HelixConversationMemoryPacket = {
 
   open_failures: string[];
   pending_user_inputs: string[];
+  unresolved_task_frames: HelixUnresolvedTaskFrame[];
 
   latest_plan_summary?: string | null;
   latest_answer_summary?: string | null;

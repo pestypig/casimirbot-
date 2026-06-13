@@ -320,4 +320,73 @@ describe("Helix Ask conversation memory packet", () => {
     expect(packet.pending_user_inputs).toEqual(expect.arrayContaining(["Which file should I inspect?"]));
     expect(packet.allowed_use).toBe("pending_request_resolution");
   });
+
+  it("admits slot-fill text for unresolved triangle task frames", () => {
+    completeTurn({
+      turnId: "turn-1",
+      user: "If the longest side of a triangle is 9 1/8 inches, what are the other two sides?",
+      answer: "I need one more triangle constraint.",
+    });
+    appendHelixThreadServerRequestEvent({
+      thread_id: threadId,
+      route: "/ask",
+      event_type: "server_request_created",
+      turn_id: "turn-1",
+      session_id: sessionId,
+      turn_kind: "ask",
+      request_id: "req-triangle",
+      request_kind: "request_user_input",
+      item_status: "in_progress",
+      request_payload: {
+        schema: "helix.pending_server_request.v1",
+        prompt: "I need one more triangle constraint before calculating the other sides.",
+        user_goal_summary: "If the longest side of a triangle is 9 1/8 inches, what are the other two sides?",
+        required_fields: ["triangle_type", "angle", "another_side", "perimeter", "area", "side_ratio"],
+        unresolved_task_frame: {
+          id: "math_geometry_triangle:req-triangle",
+          kind: "math_geometry_triangle",
+          created_turn_id: "turn-1",
+          updated_turn_id: "turn-1",
+          status: "missing_slots",
+          original_user_request: "If the longest side of a triangle is 9 1/8 inches, what are the other two sides?",
+          known_slots: {
+            longest_side: {
+              raw: "9 1/8 inches",
+              expression: "73/8",
+              decimal: 9.125,
+              unit: "in",
+            },
+          },
+          missing_slots: ["triangle_type", "angle", "another_side", "perimeter", "area", "side_ratio"],
+          constraints: ["0 < a <= c", "0 < b <= c", "a + b > c"],
+          assumptions: [],
+          source_request_user_input_id: "req-triangle",
+          allowed_next_actions: ["ask_user", "merge_clarification", "route_calculator"],
+        },
+      },
+    });
+
+    const packet = buildHelixConversationMemoryPacket({
+      threadId,
+      currentTurnId: "turn-2",
+      sessionId,
+      promptText: "The other two sides are equal in length.",
+    });
+
+    expect(packet.allowed_use).toBe("pending_request_resolution");
+    expect(packet.allowed_reason).toMatch(/fill a slot/i);
+    expect(packet.unresolved_task_frames[0]).toMatchObject({
+      kind: "math_geometry_triangle",
+      status: "missing_slots",
+      known_slots: {
+        longest_side: {
+          expression: "73/8",
+          unit: "in",
+        },
+      },
+    });
+    expect(packet.resolved_references[0]).toMatchObject({
+      refers_to_kind: "pending_user_input",
+    });
+  });
 });

@@ -3,6 +3,7 @@ import {
   type HelixConversationMemoryAllowedUse,
   type HelixConversationMemoryPacket,
   type HelixConversationMemoryReference,
+  type HelixUnresolvedTaskFrame,
 } from "../../../shared/helix-conversation-memory-packet";
 import {
   buildConversationTurnsFromEvents,
@@ -53,6 +54,17 @@ export type HelixConversationMemoryAdmission = {
   allowed_use: HelixConversationMemoryAllowedUse;
 };
 
+export type HelixPendingTaskFrameClarificationResolution = {
+  matched: boolean;
+  action: "none" | "request_user_input" | "route_calculator";
+  reason: string;
+  frame: HelixUnresolvedTaskFrame | null;
+  updated_frame: HelixUnresolvedTaskFrame | null;
+  prompt: string | null;
+  compiled_expression?: string | null;
+  expected_unit?: string | null;
+};
+
 const readNumber = (value: string | undefined, fallback: number): number => {
   if (!value) return fallback;
   const parsed = Number(value);
@@ -88,6 +100,21 @@ const unique = (values: string[], limit: number): string[] => {
     if (!normalized || seen.has(normalized)) continue;
     seen.add(normalized);
     result.push(normalized);
+    if (result.length >= limit) break;
+  }
+  return result;
+};
+
+const uniqueTaskFrames = (
+  values: HelixUnresolvedTaskFrame[],
+  limit: number,
+): HelixUnresolvedTaskFrame[] => {
+  const seen = new Set<string>();
+  const result: HelixUnresolvedTaskFrame[] = [];
+  for (const value of values) {
+    if (!value.id || seen.has(value.id)) continue;
+    seen.add(value.id);
+    result.push(value);
     if (result.length >= limit) break;
   }
   return result;
@@ -255,6 +282,256 @@ const requestSummary = (request: HelixThreadServerRequest): string => {
   return clip(question || prompt || text || `${request.request_kind}:${request.request_id}`);
 };
 
+const readString = (value: unknown): string | null => normalizeText(value) || null;
+
+const readStringArray = (value: unknown, limit = 16): string[] => {
+  if (!Array.isArray(value)) return [];
+  return unique(value.map((entry) => normalizeText(entry)).filter(Boolean), limit);
+};
+
+const readRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const isTriangleMissingSlotSet = (slots: string[]): boolean => {
+  const set = new Set(slots.map((slot) => slot.toLowerCase()));
+  return set.has("triangle_type") || set.has("angle") || set.has("another_side") || set.has("side_ratio");
+};
+
+const inferTriangleKnownSlotsFromPayload = (
+  payload: Record<string, unknown>,
+): Record<string, unknown> => {
+  const explicitFrame = readRecord(payload.unresolved_task_frame);
+  const explicitKnown = readRecord(explicitFrame?.known_slots);
+  if (explicitKnown) return explicitKnown;
+
+  const interpretation = readRecord(payload.calculator_problem_interpretation);
+  const normalizedQuantities = Array.isArray(interpretation?.normalized_quantities)
+    ? interpretation.normalized_quantities
+    : [];
+  const firstQuantity = normalizedQuantities
+    .map((entry) => readRecord(entry))
+    .find((entry) => readString(entry?.normalized_expression) && readString(entry?.unit));
+  if (!firstQuantity) return {};
+  return {
+    longest_side: {
+      raw: readString(firstQuantity.raw_token) ?? readString(firstQuantity.raw),
+      expression: readString(firstQuantity.normalized_expression),
+      decimal: typeof firstQuantity.decimal_value === "number" ? firstQuantity.decimal_value : null,
+      unit: readString(firstQuantity.unit),
+    },
+  };
+};
+
+const allowedFrameActions = (
+  values: string[],
+): HelixUnresolvedTaskFrame["allowed_next_actions"] =>
+  values.filter((action): action is HelixUnresolvedTaskFrame["allowed_next_actions"][number] =>
+    action === "ask_user" ||
+    action === "merge_clarification" ||
+    action === "route_calculator" ||
+    action === "route_tool" ||
+    action === "answer_directly",
+  );
+
+const coerceUnresolvedTaskFrame = (
+  request: HelixThreadServerRequest,
+): HelixUnresolvedTaskFrame | null => {
+  const payload = readRecord(request.payload);
+  if (!payload) return null;
+  const explicit = readRecord(payload.unresolved_task_frame);
+  if (explicit) {
+    const kind = readString(explicit.kind);
+    const status = readString(explicit.status);
+    if (
+      kind === "math_geometry_triangle" ||
+      kind === "calculator_problem" ||
+      kind === "code_debugging" ||
+      kind === "research_task" ||
+      kind === "general_clarification"
+    ) {
+      return {
+        id: readString(explicit.id) ?? `frame:${request.request_id}`,
+        kind,
+        created_turn_id: readString(explicit.created_turn_id) ?? request.turn_id,
+        updated_turn_id: readString(explicit.updated_turn_id) ?? request.turn_id,
+        status:
+          status === "ready_to_solve" ||
+          status === "resolved" ||
+          status === "abandoned" ||
+          status === "missing_slots"
+            ? status
+            : "missing_slots",
+        original_user_request:
+          readString(explicit.original_user_request) ??
+          readString(payload.user_goal_summary) ??
+          requestSummary(request),
+        known_slots: readRecord(explicit.known_slots) ?? {},
+        missing_slots: readStringArray(explicit.missing_slots),
+        constraints: readStringArray(explicit.constraints),
+        assumptions: readStringArray(explicit.assumptions),
+        source_terminal_artifact_id: readString(explicit.source_terminal_artifact_id),
+        source_request_user_input_id: readString(explicit.source_request_user_input_id) ?? request.request_id,
+        allowed_next_actions: allowedFrameActions(readStringArray(explicit.allowed_next_actions)),
+      };
+    }
+  }
+
+  const requiredFields = readStringArray(payload.required_fields ?? payload.missing_requirement_ids);
+  const prompt = [
+    readString(payload.prompt),
+    readString(payload.question),
+    readString(payload.user_goal_summary),
+    requestSummary(request),
+  ].filter(Boolean).join(" ");
+  if (!isTriangleMissingSlotSet(requiredFields) && !/\btriangle\b/i.test(prompt)) return null;
+
+  return {
+    id: `math_geometry_triangle:${request.request_id}`,
+    kind: "math_geometry_triangle",
+    created_turn_id: request.turn_id,
+    updated_turn_id: request.turn_id,
+    status: "missing_slots",
+    original_user_request: readString(payload.user_goal_summary) ?? requestSummary(request),
+    known_slots: inferTriangleKnownSlotsFromPayload(payload),
+    missing_slots:
+      requiredFields.length > 0
+        ? requiredFields
+        : ["triangle_type", "angle", "another_side", "perimeter", "area", "side_ratio"],
+    constraints: readStringArray(payload.constraints),
+    assumptions: [],
+    source_terminal_artifact_id: readString(payload.terminal_artifact_id),
+    source_request_user_input_id: request.request_id,
+    allowed_next_actions: ["ask_user", "merge_clarification", "route_calculator"],
+  };
+};
+
+const detectPendingSlotFillCue = (promptText: string): boolean => {
+  const text = normalizeLower(promptText);
+  if (!text) return false;
+  return (
+    /\b(?:other\s+two\s+sides|two\s+sides|both\s+sides|sides)\s+(?:are|were|should\s+be)?\s*(?:equal|same|identical)\b/.test(text) ||
+    /\b(?:equal\s+sides|same\s+length|isosceles)\b/.test(text) ||
+    /\b(?:middle|midpoint|center|centre)\b[\s\S]{0,80}\b(?:point|vertex|opposite|other\s+sides)\b/.test(text) ||
+    /\b(?:height|altitude|median)\b[\s\S]{0,60}\b\d/.test(text)
+  );
+};
+
+const extractFractionalLengthExpression = (text: string): { expression: string; unit: string } | null => {
+  const match =
+    text.match(/\b(\d+)\s*\/\s*(\d+)\s*(inches?|inch|in|feet|foot|ft|cm|centimeters?|centimetres?|m|meters?|metres?)\b/i) ??
+    text.match(/\b(\d+(?:\.\d+)?)\s*(inches?|inch|in|feet|foot|ft|cm|centimeters?|centimetres?|m|meters?|metres?)\b/i);
+  if (!match) return null;
+  if (match.length >= 4) {
+    const numerator = Number(match[1]);
+    const denominator = Number(match[2]);
+    if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator === 0) return null;
+    return { expression: `${numerator}/${denominator}`, unit: normalizeText(match[3]).toLowerCase() };
+  }
+  return { expression: normalizeText(match[1]), unit: normalizeText(match[2]).toLowerCase() };
+};
+
+const readKnownSlotRecord = (
+  frame: HelixUnresolvedTaskFrame,
+  key: string,
+): Record<string, unknown> | null => readRecord(frame.known_slots?.[key]);
+
+const sideUnitFromFrame = (frame: HelixUnresolvedTaskFrame): string | null =>
+  readString(readKnownSlotRecord(frame, "longest_side")?.unit);
+
+export function resolveHelixPendingTaskFrameClarification(input: {
+  promptText: string;
+  frames: HelixUnresolvedTaskFrame[];
+  turnId: string;
+}): HelixPendingTaskFrameClarificationResolution {
+  const frame = input.frames.find((entry) => entry.kind === "math_geometry_triangle" && entry.status !== "resolved") ?? null;
+  if (!frame || !detectPendingSlotFillCue(input.promptText)) {
+    return {
+      matched: false,
+      action: "none",
+      reason: "no_pending_task_frame_slot_fill",
+      frame,
+      updated_frame: null,
+      prompt: null,
+      compiled_expression: null,
+      expected_unit: null,
+    };
+  }
+
+  const text = normalizeLower(input.promptText);
+  const knownSlots: Record<string, unknown> = { ...(frame.known_slots ?? {}) };
+  const missingSlots = new Set(frame.missing_slots);
+  if (
+    /\b(?:other\s+two\s+sides|two\s+sides|both\s+sides|sides)\s+(?:are|were|should\s+be)?\s*(?:equal|same|identical)\b/.test(text) ||
+    /\b(?:equal\s+sides|same\s+length|isosceles)\b/.test(text)
+  ) {
+    knownSlots.equal_other_sides = true;
+    missingSlots.delete("triangle_type");
+    missingSlots.delete("side_ratio");
+  }
+  const height = extractFractionalLengthExpression(input.promptText);
+  if (
+    height &&
+    (
+      /\b(?:middle|midpoint|center|centre)\b[\s\S]{0,80}\b(?:point|vertex|opposite|other\s+sides)\b/i.test(input.promptText) ||
+      /\b(?:height|altitude|median)\b/i.test(input.promptText)
+    )
+  ) {
+    knownSlots.median_or_altitude_from_midpoint_to_opposite_vertex = {
+      expression: height.expression,
+      unit: height.unit,
+      raw: input.promptText,
+    };
+    missingSlots.delete("angle");
+    missingSlots.delete("another_side");
+    missingSlots.delete("perimeter");
+    missingSlots.delete("area");
+  }
+
+  const longestSide = readKnownSlotRecord({ ...frame, known_slots: knownSlots }, "longest_side");
+  const longestExpression = readString(longestSide?.expression);
+  const heightSlot = readKnownSlotRecord({ ...frame, known_slots: knownSlots }, "median_or_altitude_from_midpoint_to_opposite_vertex");
+  const heightExpression = readString(heightSlot?.expression);
+  const expectedUnit = sideUnitFromFrame({ ...frame, known_slots: knownSlots }) ?? readString(heightSlot?.unit) ?? "in";
+  const readyToSolve =
+    knownSlots.equal_other_sides === true &&
+    Boolean(longestExpression) &&
+    Boolean(heightExpression);
+  const updatedFrame: HelixUnresolvedTaskFrame = {
+    ...frame,
+    updated_turn_id: input.turnId,
+    known_slots: knownSlots,
+    missing_slots: readyToSolve ? [] : Array.from(missingSlots),
+    status: readyToSolve ? "ready_to_solve" : "missing_slots",
+    allowed_next_actions: readyToSolve ? ["route_calculator"] : ["ask_user", "merge_clarification", "route_calculator"],
+  };
+  if (readyToSolve && longestExpression && heightExpression) {
+    const expression = `sqrt(((${longestExpression})/2)^2+(${heightExpression})^2)`;
+    return {
+      matched: true,
+      action: "route_calculator",
+      reason: "pending_triangle_frame_ready_to_solve",
+      frame,
+      updated_frame: updatedFrame,
+      prompt: `Use the scientific calculator to evaluate ${expression}. The result is each equal side of the prior isosceles triangle, in ${expectedUnit}.`,
+      compiled_expression: expression,
+      expected_unit: expectedUnit,
+    };
+  }
+  return {
+    matched: true,
+    action: "request_user_input",
+    reason: "pending_triangle_frame_still_missing_constraints",
+    frame,
+    updated_frame: updatedFrame,
+    prompt:
+      "I have the triangle carryover and the equal-side constraint. I still need one more determining constraint before calculating the side lengths: an angle, another side, perimeter/area, or a height/altitude/median.",
+    compiled_expression: null,
+    expected_unit: expectedUnit,
+  };
+}
+
 const buildEmptyPacket = (args: {
   threadId: string;
   currentTurnId: string;
@@ -275,6 +552,7 @@ const buildEmptyPacket = (args: {
   forbidden_or_stale_refs: [],
   open_failures: [],
   pending_user_inputs: [],
+  unresolved_task_frames: [],
   latest_plan_summary: null,
   latest_answer_summary: null,
   latest_failure_summary: null,
@@ -391,8 +669,26 @@ export function buildHelixConversationMemoryPacket(
     .map((turn) => clip(turn.fail_reason || turn.final_gate_outcome || `turn ${turn.turn_id} failed`, textLimit()));
   const latestFailure = failures.at(-1) ?? null;
   const pendingInputs = state.unresolved_requests.map(requestSummary).filter(Boolean).slice(0, maxTurns);
+  const unresolvedTaskFrames = uniqueTaskFrames(
+    state.unresolved_requests
+      .map(coerceUnresolvedTaskFrame)
+      .filter((frame): frame is HelixUnresolvedTaskFrame => Boolean(frame)),
+    maxTurns,
+  );
+  const pendingSlotFillCue =
+    unresolvedTaskFrames.length > 0 &&
+    detectPendingSlotFillCue(input.promptText) &&
+    !hasExplicitMemoryRejection(normalizeLower(input.promptText)) &&
+    !hasQuotedOrHypotheticalCue(normalizeLower(input.promptText));
+  const memoryAllowedForCurrentGoal = admission.allowed_for_current_goal || pendingSlotFillCue;
+  const memoryAllowedReason = pendingSlotFillCue
+    ? "Current prompt appears to fill a slot for an unresolved prior task frame."
+    : admission.allowed_reason;
   let allowedUse = admission.allowed_use;
   if (allowedUse === "conversational_continuity" && pendingInputs.length > 0 && followup.followup_kind === "pronoun") {
+    allowedUse = "pending_request_resolution";
+  }
+  if (pendingSlotFillCue) {
     allowedUse = "pending_request_resolution";
   }
 
@@ -434,8 +730,8 @@ export function buildHelixConversationMemoryPacket(
   const reusableEvidenceRefs = unique(evidenceRefs, maxRefs);
   const forbiddenOrStaleRefs = unique(staleRefs, maxRefs);
   const resolvedReferences: HelixConversationMemoryReference[] = [];
-  if (admission.allowed_for_current_goal && followup.is_followup && latestPrior) {
-    const phrase = followup.phrases[0] ?? "follow-up";
+  if (memoryAllowedForCurrentGoal && (followup.is_followup || pendingSlotFillCue) && latestPrior) {
+    const phrase = followup.phrases[0] ?? (pendingSlotFillCue ? "pending task slot fill" : "follow-up");
     const evidenceRef = reusableEvidenceRefs[0] ?? null;
     const latestAnswerItem = state.items
       .filter((item) => item.turn_id === latestPrior.turn_id && item.item_type === "answer")
@@ -472,8 +768,8 @@ export function buildHelixConversationMemoryPacket(
   if (usedLegacyFallback) {
     missingOrUncertain.push("Thread ledger had no useful prior turns; legacy conversation history fallback was used.");
   }
-  if (!admission.allowed_for_current_goal) {
-    missingOrUncertain.push(admission.allowed_reason);
+  if (!memoryAllowedForCurrentGoal) {
+    missingOrUncertain.push(memoryAllowedReason);
   }
   if (followup.followup_kind === "previous_evidence" && reusableEvidenceRefs.length === 0) {
     missingOrUncertain.push("No reusable prior evidence refs were admitted for the current goal.");
@@ -503,20 +799,21 @@ export function buildHelixConversationMemoryPacket(
     session_id: sessionId,
     memory_scope: "current_thread",
     selector_version: "v1",
-    recent_user_goals: admission.allowed_for_current_goal ? recentUserGoals : [],
-    recent_assistant_answers: admission.allowed_for_current_goal ? recentAssistantAnswers : [],
-    resolved_references: admission.allowed_for_current_goal ? resolvedReferences : [],
+    recent_user_goals: memoryAllowedForCurrentGoal ? recentUserGoals : [],
+    recent_assistant_answers: memoryAllowedForCurrentGoal ? recentAssistantAnswers : [],
+    resolved_references: memoryAllowedForCurrentGoal ? resolvedReferences : [],
     reusable_evidence_refs: reusableEvidenceRefs,
     forbidden_or_stale_refs: forbiddenOrStaleRefs,
     open_failures: unique(failures, maxTurns),
     pending_user_inputs: unique(pendingInputs, maxTurns),
+    unresolved_task_frames: unresolvedTaskFrames,
     latest_plan_summary: latestPlanSummary,
-    latest_answer_summary: admission.allowed_for_current_goal ? latestAnswerSummary : null,
+    latest_answer_summary: memoryAllowedForCurrentGoal ? latestAnswerSummary : null,
     latest_failure_summary: latestFailure,
-    continuity_summary: admission.allowed_for_current_goal ? continuitySummary : "",
+    continuity_summary: memoryAllowedForCurrentGoal ? continuitySummary : "",
     missing_or_uncertain: unique(missingOrUncertain, 8),
-    allowed_for_current_goal: admission.allowed_for_current_goal,
-    allowed_reason: admission.allowed_reason,
+    allowed_for_current_goal: memoryAllowedForCurrentGoal,
+    allowed_reason: memoryAllowedReason,
     allowed_use: allowedUse,
     terminal_eligible: false,
     assistant_answer: false,
@@ -541,6 +838,15 @@ export function buildHelixConversationMemoryDebug(packet: HelixConversationMemor
     reusable_evidence_refs: packet.reusable_evidence_refs,
     forbidden_or_stale_refs: packet.forbidden_or_stale_refs,
     followup_phrases: packet.resolved_references.map((entry) => entry.phrase),
+    pending_user_inputs_count: packet.pending_user_inputs.length,
+    unresolved_task_frames: packet.unresolved_task_frames.map((frame) => ({
+      id: frame.id,
+      kind: frame.kind,
+      status: frame.status,
+      missing_slots: frame.missing_slots,
+      known_slot_keys: Object.keys(frame.known_slots ?? {}),
+      allowed_next_actions: frame.allowed_next_actions,
+    })),
     allowed_for_current_goal: packet.allowed_for_current_goal,
     allowed_reason: packet.allowed_reason,
     allowed_use: packet.allowed_use,
@@ -571,6 +877,17 @@ export function renderHelixConversationMemoryForModel(
       : "",
     packet.open_failures.length > 0 ? `open failures: ${packet.open_failures.join("; ")}` : "",
     packet.pending_user_inputs.length > 0 ? `pending user inputs: ${packet.pending_user_inputs.join("; ")}` : "",
+    packet.unresolved_task_frames.length > 0
+      ? `unresolved task frames: ${packet.unresolved_task_frames
+          .map((frame) =>
+            [
+              `${frame.id} kind=${frame.kind} status=${frame.status}`,
+              `known=${Object.keys(frame.known_slots ?? {}).join(",") || "none"}`,
+              `missing=${frame.missing_slots.join(",") || "none"}`,
+            ].join(" "),
+          )
+          .join("; ")}`
+      : "",
     packet.missing_or_uncertain.length > 0
       ? `missing or uncertain: ${packet.missing_or_uncertain.join("; ")}`
       : "",
