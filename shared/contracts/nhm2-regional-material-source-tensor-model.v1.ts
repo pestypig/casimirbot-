@@ -24,12 +24,30 @@ export type Nhm2RegionalMaterialSourceTensorComponentStatus =
   | "missing"
   | "blocked";
 
+export type Nhm2RegionalMaterialSourceComponentAuthority =
+  | "source_model"
+  | "constitutive_model"
+  | "reduced_order_declared"
+  | "scalar_proxy"
+  | "metric_echo"
+  | "missing";
+
+export type Nhm2RegionalMaterialReceiptTier =
+  | "none"
+  | "declared_model_receipt"
+  | "simulated_material_receipt"
+  | "lifshitz_material_receipt"
+  | "measured_material_receipt";
+
 export type Nhm2RegionalMaterialSourceTensorRegionV1 = {
   regionId: Nhm2RegionalSourceClosureRegionId;
   status: "material_receipted" | "computed" | "proxy" | "missing" | "blocked";
   tensor: Nhm2RegionalTensor;
   componentStatus: Partial<
     Record<Nhm2TensorComponent, Nhm2RegionalMaterialSourceTensorComponentStatus>
+  >;
+  componentAuthority: Partial<
+    Record<Nhm2TensorComponent, Nhm2RegionalMaterialSourceComponentAuthority>
   >;
   tensorAuthorityMode: Nhm2TensorAuthorityMode;
   missingComponentIds: Nhm2TensorComponent[];
@@ -56,16 +74,28 @@ export type Nhm2RegionalMaterialSourceTensorModelV1 = {
   chartId: "comoving_cartesian" | string;
   modelKind: Nhm2RegionalMaterialSourceTensorModelKind;
   materialReceiptRef: string | null;
+  materialReceiptTier: Nhm2RegionalMaterialReceiptTier;
   sourceModelRef: string | null;
+  sourceSideOnly: true;
   notDerivedFromMetricRequiredTensor: true;
+  metricRequiredInputRefs: string[];
+  targetEchoForbidden: true;
+  targetDerivedFieldsUsed: false;
   regions: Nhm2RegionalMaterialSourceTensorRegionV1[];
   summary: {
     hasWallAuthority: boolean;
     allRequiredRegionsPresent: boolean;
     allRequiredRegionsFullTensor: boolean;
     allRequiredRegionsMaterialReceipted: boolean;
+    allRequiredRegionsComponentAuthoritative: boolean;
+    allRequiredRegionsComponentAdmissible: boolean;
+    anyMetricEchoComponent: boolean;
+    anyScalarProxyComponent: boolean;
+    anyMissingComponent: boolean;
     missingRegionIds: Nhm2RegionalSourceClosureRegionId[];
     proxyRegionIds: Nhm2RegionalSourceClosureRegionId[];
+    reducedOrderComponentRefs: string[];
+    inadmissibleComponentRefs: string[];
     blockerCount: number;
   };
   claimBoundary: {
@@ -74,13 +104,30 @@ export type Nhm2RegionalMaterialSourceTensorModelV1 = {
     globalCannotBeCopiedFromWallWithoutAggregationReceipt: true;
     metricEchoForbidden: true;
     missingRegionsAreBlockers: true;
+    declaredModelReceiptIsQcOnly: true;
+    materialReceiptTierDoesNotAllowTransportClaim: true;
   };
 };
 
 export type BuildNhm2RegionalMaterialSourceTensorModelInput = Omit<
   Nhm2RegionalMaterialSourceTensorModelV1,
-  "contractVersion" | "summary" | "claimBoundary"
->;
+  | "contractVersion"
+  | "summary"
+  | "claimBoundary"
+  | "sourceSideOnly"
+  | "metricRequiredInputRefs"
+  | "targetEchoForbidden"
+  | "targetDerivedFieldsUsed"
+> &
+  Partial<
+    Pick<
+      Nhm2RegionalMaterialSourceTensorModelV1,
+      | "sourceSideOnly"
+      | "metricRequiredInputRefs"
+      | "targetEchoForbidden"
+      | "targetDerivedFieldsUsed"
+    >
+  >;
 
 const SYMMETRIC_TENSOR_COMPONENTS = [
   "T00",
@@ -132,6 +179,25 @@ const isComponentStatus = (
   value === "missing" ||
   value === "blocked";
 
+const isComponentAuthority = (
+  value: unknown,
+): value is Nhm2RegionalMaterialSourceComponentAuthority =>
+  value === "source_model" ||
+  value === "constitutive_model" ||
+  value === "reduced_order_declared" ||
+  value === "scalar_proxy" ||
+  value === "metric_echo" ||
+  value === "missing";
+
+const isMaterialReceiptTier = (
+  value: unknown,
+): value is Nhm2RegionalMaterialReceiptTier =>
+  value === "none" ||
+  value === "declared_model_receipt" ||
+  value === "simulated_material_receipt" ||
+  value === "lifshitz_material_receipt" ||
+  value === "measured_material_receipt";
+
 const isRegionStatus = (
   value: unknown,
 ): value is Nhm2RegionalMaterialSourceTensorRegionV1["status"] =>
@@ -155,6 +221,17 @@ const isMaterialReceiptStatus = (
   value === "ideal_scalar_only" ||
   value === "blocked" ||
   value === "missing";
+
+const authoritativeComponentAuthorities = new Set<Nhm2RegionalMaterialSourceComponentAuthority>([
+  "source_model",
+  "constitutive_model",
+]);
+
+const admissibleComponentAuthorities = new Set<Nhm2RegionalMaterialSourceComponentAuthority>([
+  "source_model",
+  "constitutive_model",
+  "reduced_order_declared",
+]);
 
 export const inferNhm2RegionalMaterialSourceTensorAuthorityMode = (
   tensor: Nhm2RegionalTensor,
@@ -185,6 +262,64 @@ export const missingNhm2RegionalMaterialSourceTensorComponents = (
   return required.filter((component) => tensor[component] == null);
 };
 
+const componentAuthorityFor = (
+  args: {
+    component: Nhm2TensorComponent;
+    tensor: Nhm2RegionalTensor;
+    explicitAuthority?: Nhm2RegionalMaterialSourceComponentAuthority;
+    tensorAuthorityMode: Nhm2TensorAuthorityMode;
+    modelKind: Nhm2RegionalMaterialSourceTensorModelKind;
+    materialReceiptTier: Nhm2RegionalMaterialReceiptTier;
+    materialReceiptStatus: CasimirMaterialReceiptStatus | "missing";
+    status: Nhm2RegionalMaterialSourceTensorRegionV1["status"];
+  },
+): Nhm2RegionalMaterialSourceComponentAuthority => {
+  if (args.explicitAuthority != null) return args.explicitAuthority;
+  if (args.tensor[args.component] == null) return "missing";
+  if (args.status === "proxy" || args.tensorAuthorityMode === "proxy") {
+    return "scalar_proxy";
+  }
+  if (args.tensorAuthorityMode === "diagonal_reduced_order") {
+    return "reduced_order_declared";
+  }
+  if (
+    args.materialReceiptStatus === "material_receipted" &&
+    (args.materialReceiptTier === "lifshitz_material_receipt" ||
+      args.materialReceiptTier === "measured_material_receipt" ||
+      args.materialReceiptTier === "simulated_material_receipt")
+  ) {
+    return "constitutive_model";
+  }
+  if (args.modelKind === "declared_research_tensor") {
+    return "source_model";
+  }
+  if (
+    args.modelKind === "lifshitz_regional_tensor" ||
+    args.modelKind === "measured_material_tensor"
+  ) {
+    return "constitutive_model";
+  }
+  return "reduced_order_declared";
+};
+
+const componentAuthorityBlocker = (
+  authority: Nhm2RegionalMaterialSourceComponentAuthority,
+): string | null => {
+  switch (authority) {
+    case "source_model":
+    case "constitutive_model":
+      return null;
+    case "reduced_order_declared":
+      return "component_authority_reduced_order_declared";
+    case "scalar_proxy":
+      return "component_authority_scalar_proxy";
+    case "metric_echo":
+      return "component_authority_metric_echo";
+    case "missing":
+      return "component_authority_missing";
+  }
+};
+
 const missingRegion = (
   regionId: Nhm2RegionalSourceClosureRegionId,
 ): Nhm2RegionalMaterialSourceTensorRegionV1 => ({
@@ -192,6 +327,9 @@ const missingRegion = (
   status: "missing",
   tensor: {},
   componentStatus: {},
+  componentAuthority: Object.fromEntries(
+    NHM2_TENSOR_COMPONENTS.map((component) => [component, "missing"]),
+  ) as Partial<Record<Nhm2TensorComponent, Nhm2RegionalMaterialSourceComponentAuthority>>,
   tensorAuthorityMode: "unknown",
   missingComponentIds: [...NHM2_TENSOR_COMPONENTS],
   chartId: "comoving_cartesian",
