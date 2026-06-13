@@ -12,6 +12,7 @@ import {
   isNhm2QeiWorldlineSamplePlan,
   type Nhm2QeiWorldlineSamplePlanEntryV1,
 } from "../../shared/contracts/nhm2-qei-worldline-sample-plan.v1";
+import { isNhm2QeiPointwiseTransitionSourceSamples } from "../../shared/contracts/nhm2-qei-pointwise-transition-source-samples.v1";
 import type { Nhm2QeiWorldlineRegionId } from "../../shared/contracts/nhm2-qei-worldline-dossier.v1";
 import {
   isNhm2RegionalSupportFunctionAtlas,
@@ -35,6 +36,7 @@ type ExplicitSampleInput = {
   sourceTensorRef?: string | null;
   sampleLocationsRef?: string | null;
   supportFunctionRef?: string | null;
+  status?: "computed" | "proxy" | "missing";
 };
 
 type QeiWorldlineSamplePlan = {
@@ -220,12 +222,14 @@ const explicitSample = (
   sampledRho: {
     valueSI: sample.valueSI,
     ...(sample.provenanceRef == null ? {} : { provenanceRef: sample.provenanceRef }),
-    status: sample.valueSI == null ? "missing" : "computed",
+    status: sample.status ?? (sample.valueSI == null ? "missing" : "computed"),
   },
   sourceTensorRef: sample.sourceTensorRef ?? source.artifactId,
   blockers: [
     ...(sample.valueSI == null ? ["sampled_rho_missing"] : []),
     ...(sample.provenanceRef == null ? ["sampled_rho_provenance_missing"] : []),
+    ...(sample.status === "proxy" ? ["sampled_rho_proxy"] : []),
+    ...(sample.status === "missing" ? ["sampled_rho_missing"] : []),
   ],
   warnings: [],
 });
@@ -247,6 +251,23 @@ const parseExplicitSamples = (
           sourceTensorRef: sample.sourceTensorRef,
           supportFunctionRef: sample.supportFunctionRef,
           sampleLocationsRef: sample.sampleLocationsRef,
+          status: sample.sampledRho.status,
+        },
+      ]),
+    );
+  }
+  if (isNhm2QeiPointwiseTransitionSourceSamples(value)) {
+    return new Map(
+      value.samples.map((sample) => [
+        sample.regionId,
+        {
+          regionId: sample.regionId,
+          valueSI: sample.valueSI,
+          provenanceRef: sample.provenanceRef,
+          sourceTensorRef: sample.sourceTensorRef,
+          supportFunctionRef: sample.supportFunctionRef,
+          sampleLocationsRef: sample.sampleLocationsRef,
+          status: sample.status,
         },
       ]),
     );
@@ -279,6 +300,12 @@ const parseExplicitSamples = (
           sourceTensorRef: asString(sample?.sourceTensorRef),
           supportFunctionRef: asString(sample?.supportFunctionRef),
           sampleLocationsRef: asString(sample?.sampleLocationsRef),
+          status:
+            sample?.status === "computed" ||
+            sample?.status === "proxy" ||
+            sample?.status === "missing"
+              ? sample.status
+              : undefined,
         },
       ]];
     }),

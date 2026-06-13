@@ -15,6 +15,7 @@ import {
 import { buildNhm2TileEffectiveFullTensorSourceArtifact } from "../shared/contracts/nhm2-tile-effective-full-tensor-source.v1";
 import { buildAtlasBoundObserverRobustEnergyConditions } from "../tools/nhm2/build-atlas-bound-observer-robust-energy-conditions";
 import { buildAtlasBoundQeiWorldlineDossier } from "../tools/nhm2/build-atlas-bound-qei-worldline-dossier";
+import { buildQeiPointwiseTransitionSourceSamples } from "../tools/nhm2/build-qei-pointwise-transition-source-samples";
 import { buildQeiWorldlineSamplePlan } from "../tools/nhm2/build-qei-worldline-sample-plan";
 import { buildQeiWorldlineSamplingReceipt } from "../tools/nhm2/build-qei-worldline-sampling-receipt";
 import { buildRegionalSourceTransitionKernel } from "../tools/nhm2/build-regional-source-transition-kernel";
@@ -442,6 +443,67 @@ describe("atlas-bound QEI and observer builders", () => {
     );
     expect(transition?.blockers).toContain("pointwise_transition_source_tensor_missing");
     expect(transition?.blockers).toContain("transition_worldline_source_sample_missing");
+  });
+
+  it("builds pointwise transition source samples that complete the sampling receipt", () => {
+    const dir = mkdtempSync(join(tmpdir(), "nhm2-qei-pointwise-"));
+    const atlasPath = writeJson(dir, "atlas.json", atlas());
+    const sourcePath = writeJson(dir, "source.json", source());
+    buildRegionalSourceTransitionKernel({
+      repoRoot: dir,
+      tileFullTensorSourcePath: sourcePath,
+      regionalSupportAtlasPath: atlasPath,
+      outPath: "kernel.json",
+      auditOnly: true,
+    });
+    buildQeiWorldlineSamplePlan({
+      repoRoot: dir,
+      regionalSupportAtlasPath: atlasPath,
+      sourceFullTensorPath: sourcePath,
+      transitionKernelPath: "kernel.json",
+      outPath: "plan.json",
+      auditOnly: true,
+    });
+
+    const pointwise = buildQeiPointwiseTransitionSourceSamples({
+      repoRoot: dir,
+      qeiWorldlineSamplePlanPath: "plan.json",
+      sourceFullTensorPath: sourcePath,
+      transitionKernelPath: "kernel.json",
+      outPath: "pointwise.json",
+      auditOnly: true,
+    });
+
+    expect(pointwise.status).toBe("pass");
+    expect(pointwise.summary.samplingComplete).toBe(true);
+    expect(
+      pointwise.samples.find((sample) => sample.regionId === "hull_wall_transition")
+        ?.samplingModel,
+    ).toBe("transition_kernel_support_weighted_source_tensor");
+    expect(
+      pointwise.samples.find((sample) => sample.regionId === "hull_wall_transition")
+        ?.valueSI,
+    ).toBe(10);
+
+    const receipt = buildQeiWorldlineSamplingReceipt({
+      repoRoot: dir,
+      regionalSupportAtlasPath: atlasPath,
+      sourceFullTensorPath: sourcePath,
+      qeiWorldlineSamplePlanPath: "plan.json",
+      explicitWorldlineSamplesPath: "pointwise.json",
+      outPath: "sampling.json",
+      auditOnly: true,
+    });
+
+    expect(receipt.status).toBe("pass");
+    expect(receipt.summary.samplingComplete).toBe(true);
+    expect(
+      receipt.worldlineSamples.find((sample) => sample.regionId === "hull_wall_transition")
+        ?.sampledRho.provenanceRef,
+    ).toContain("transition_kernel_source_tensor:T00");
+    expect(
+      receipt.worldlineSamples.flatMap((sample) => sample.blockers),
+    ).not.toContain("pointwise_transition_source_tensor_missing");
   });
 
   it("uses explicit source-backed transition samples to complete the QEI dossier", () => {

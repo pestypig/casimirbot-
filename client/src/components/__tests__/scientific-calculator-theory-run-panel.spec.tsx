@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ScientificCalculatorPanel from "@/components/panels/ScientificCalculatorPanel";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { useTheoryCompoundRunStore } from "@/store/useTheoryCompoundRunStore";
+import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
 import { buildNhm2TheoryBadgeGraphV1 } from "@shared/theory/nhm2-theory-badges";
 import { buildTheoryCalculatorLoadout } from "@shared/theory/theory-calculator-loadout";
 import { buildTheoryCompoundRun } from "@shared/theory/theory-compound-run-builder";
@@ -174,6 +175,7 @@ describe("ScientificCalculatorPanel theory run workbench", () => {
     vi.stubGlobal("localStorage", localStorageStub);
     useTheoryCompoundRunStore.getState().clearTheoryRun();
     useScientificCalculatorStore.getState().clear({ source: "panel" });
+    useWorkstationSessionMemoryStore.getState().clearDraft("scientific-calculator:input");
   });
 
   afterEach(() => {
@@ -202,6 +204,32 @@ describe("ScientificCalculatorPanel theory run workbench", () => {
     expect(within(theorySection).getByRole("button", { name: "Solve Scalar Rows" })).toBeInTheDocument();
     expect(within(theorySection).getByRole("button", { name: "Build Runtime Traces" })).toBeInTheDocument();
     expect(within(theorySection).getByRole("button", { name: "Solve Available" })).toBeInTheDocument();
+  });
+
+  it("promotes the latest calculator workbench without duplicating theory work", async () => {
+    useTheoryCompoundRunStore.getState().loadTheoryRun(buildScalarTheoryRun());
+
+    render(<ScientificCalculatorPanel />);
+
+    const theorySection = await screen.findByTestId("scientific-calculator-theory-run-section");
+    const scalarSection = screen.getByTestId("scientific-calculator-scalar-section");
+    expect(theorySection).toHaveStyle({ order: "0" });
+    expect(scalarSection).toHaveStyle({ order: "1" });
+
+    act(() => {
+      useScientificCalculatorStore.getState().ingestLatex("z = 2", {
+        sourcePath: "agent://calculator",
+        source: "workstation_action",
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("z = 2")).toBeInTheDocument();
+      expect(scalarSection).toHaveStyle({ order: "0" });
+      expect(theorySection).toHaveStyle({ order: "1" });
+    });
+    expect(screen.getAllByTestId("scientific-calculator-theory-run-section")).toHaveLength(1);
+    expect(screen.getAllByTestId("scientific-calculator-scalar-section")).toHaveLength(1);
   });
 
   it("scrolls the selected theory run row into view", async () => {

@@ -65,6 +65,7 @@ $env:DISCORD_APPLICATION_ID=""
 $env:PORT="5050"
 $env:NODE_ENV="development"
 $env:ENABLE_AGI="1"
+$env:ENABLE_ESSENCE="1"
 $env:LLM_POLICY="http"
 $env:LLM_RUNTIME="http"
 $env:HULL_MODE="1"
@@ -386,6 +387,7 @@ Common controls:
 | Variable | Use |
 | --- | --- |
 | `ENABLE_AGI` | Enables AGI routes for Helix Ask and agentic workflows. |
+| `ENABLE_ESSENCE` | Enables Essence-linked AGI runtime behavior used by the AGI dev scripts. |
 | `ENABLE_AGI_AUTH` | Enables bearer-token requirements for AGI routes when configured. |
 | `AGI_TENANT_REQUIRED` | Requires tenant/customer isolation headers for AGI routes when configured. |
 | `ENABLE_REPO_TOOLS` | Exposes repo-safe helpers for read-only diffing and patch dry-runs. |

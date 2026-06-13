@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
 import { Button } from "@/components/ui/button";
@@ -227,10 +227,30 @@ export default function ScientificCalculatorPanel() {
     resolveInitialCalculatorInput(readDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY), currentLatex),
   );
   const [activeSection, setActiveSection] = useState<ScientificCalculatorWorkbenchSection>("scalar");
+  const [workbenchSectionOrder, setWorkbenchSectionOrder] = useState<ScientificCalculatorWorkbenchSection[]>(() =>
+    WORKBENCH_SECTIONS.map((section) => section.id),
+  );
   const lastStoredLatexRef = useRef(currentLatex);
   const lastTheoryRunIdRef = useRef<string | null>(null);
   const lastTheoryLoadoutIdRef = useRef<string | null>(null);
+  const skipNextScalarInputPromotionRef = useRef(false);
   const selectedTheoryRunRowElementRef = useRef<HTMLButtonElement | null>(null);
+
+  const promoteWorkbenchSection = useCallback((sectionId: ScientificCalculatorWorkbenchSection) => {
+    setActiveSection(sectionId);
+    setWorkbenchSectionOrder((current) => [
+      sectionId,
+      ...current.filter((candidate) => candidate !== sectionId),
+    ]);
+  }, []);
+
+  const workbenchSectionRank = useCallback(
+    (sectionId: ScientificCalculatorWorkbenchSection) => {
+      const index = workbenchSectionOrder.indexOf(sectionId);
+      return index === -1 ? WORKBENCH_SECTIONS.length : index;
+    },
+    [workbenchSectionOrder],
+  );
 
   useEffect(() => {
     if (isLiveRegisterSummary(readDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY))) {
@@ -243,25 +263,30 @@ export default function ScientificCalculatorPanel() {
     lastStoredLatexRef.current = currentLatex;
     const nextInput = normalizeCalculatorInputDraft(currentLatex);
     setInput(nextInput);
+    if (skipNextScalarInputPromotionRef.current) {
+      skipNextScalarInputPromotionRef.current = false;
+    } else {
+      promoteWorkbenchSection("scalar");
+    }
     if (nextInput) {
       rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, nextInput);
     } else {
       clearDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY);
     }
-  }, [clearDraft, currentLatex, rememberDraft]);
+  }, [clearDraft, currentLatex, promoteWorkbenchSection, rememberDraft]);
 
   useEffect(() => {
     const nextRunId = activeTheoryRun?.runId ?? null;
     if (!nextRunId) {
       lastTheoryRunIdRef.current = null;
-      if (!lastTheoryLoadout) setActiveSection("scalar");
+      if (!lastTheoryLoadout) promoteWorkbenchSection("scalar");
       return;
     }
     if (lastTheoryRunIdRef.current !== nextRunId) {
       lastTheoryRunIdRef.current = nextRunId;
-      setActiveSection("theory");
+      promoteWorkbenchSection("theory");
     }
-  }, [activeTheoryRun?.runId, lastTheoryLoadout]);
+  }, [activeTheoryRun?.runId, lastTheoryLoadout, promoteWorkbenchSection]);
 
   useEffect(() => {
     if (activeTheoryRun) return;
@@ -272,9 +297,9 @@ export default function ScientificCalculatorPanel() {
     }
     if (lastTheoryLoadoutIdRef.current !== nextLoadoutId) {
       lastTheoryLoadoutIdRef.current = nextLoadoutId;
-      setActiveSection("theory");
+      promoteWorkbenchSection("theory");
     }
-  }, [activeTheoryRun, lastTheoryLoadout?.loadoutId]);
+  }, [activeTheoryRun, lastTheoryLoadout?.loadoutId, promoteWorkbenchSection]);
 
   useEffect(() => {
     if (activeSection !== "theory" || !selectedTheoryRunRowId) return;
@@ -302,12 +327,13 @@ export default function ScientificCalculatorPanel() {
       }
       setInput(detail.latex);
       rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, detail.latex);
+      promoteWorkbenchSection("scalar");
     };
     window.addEventListener(SCIENTIFIC_CALCULATOR_MATH_PICKED_EVENT, onPicked as EventListener);
     return () => {
       window.removeEventListener(SCIENTIFIC_CALCULATOR_MATH_PICKED_EVENT, onPicked as EventListener);
     };
-  }, [ingestLatex, rememberDraft]);
+  }, [ingestLatex, promoteWorkbenchSection, rememberDraft]);
 
   const handlePasteClipboard = async () => {
     if (typeof navigator === "undefined" || !navigator.clipboard?.readText) return;
@@ -316,29 +342,37 @@ export default function ScientificCalculatorPanel() {
     ingestLatex(text, { sourcePath: "clipboard", anchor: null, source: "clipboard" });
     setInput(text);
     rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, text);
+    promoteWorkbenchSection("scalar");
   };
 
   const handleInputChange = (value: string) => {
     setInput(value);
     rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, value);
+    promoteWorkbenchSection("scalar");
   };
 
   const handleClear = () => {
     clear();
     clearDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY);
     setInput("");
+    promoteWorkbenchSection("scalar");
   };
 
   const solve = (withSteps: boolean) => {
     const result = runScientificSolve(input, withSteps);
     setSolveResult(result, { actionId: withSteps ? "solve_with_steps" : "solve_expression", source: "panel" });
+    promoteWorkbenchSection("scalar");
   };
 
   const handleLoadTheoryLoadoutItem = (index: number) => {
+    skipNextScalarInputPromotionRef.current = true;
     const item = loadTheoryLoadoutItem(index);
     if (item?.solveExpression) {
       setInput(item.solveExpression);
       rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, item.solveExpression);
+      promoteWorkbenchSection("theory");
+    } else {
+      skipNextScalarInputPromotionRef.current = false;
     }
   };
 
@@ -354,11 +388,12 @@ export default function ScientificCalculatorPanel() {
     });
     setInput(expression);
     rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, expression);
-    setActiveSection("scalar");
+    promoteWorkbenchSection("scalar");
   };
 
   const handleRunTheoryCompoundRun = (scope: TheoryCompoundRunSolveScope) => {
     if (!activeTheoryRun) return;
+    promoteWorkbenchSection(scope === "runtime_trace_only" ? "runtime" : "theory");
     setTheoryRunStatus("running");
     const solvedRun = runTheoryCompoundRunNow({
       run: activeTheoryRun,
@@ -379,6 +414,7 @@ export default function ScientificCalculatorPanel() {
     if (firstSolved?.solveExpression) {
       setInput(firstSolved.solveExpression);
       rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, firstSolved.solveExpression);
+      promoteWorkbenchSection("theory");
     }
   };
 
@@ -392,6 +428,7 @@ export default function ScientificCalculatorPanel() {
     if (firstSolved?.solveExpression) {
       setInput(firstSolved.solveExpression);
       rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, firstSolved.solveExpression);
+      promoteWorkbenchSection("runtime");
     }
   };
 
@@ -555,6 +592,8 @@ export default function ScientificCalculatorPanel() {
       stale: Boolean(activeTheoryLoadoutItem?.solveExpression && input.trim()),
     };
   }, [activeTheoryLoadoutItem, input, lastSetup?.subgoal]);
+  const showTheoryWorkbench = activeSection === "theory" || Boolean(activeTheoryRun || lastTheoryLoadout);
+  const showRuntimeWorkbench = activeSection === "runtime" || Boolean(activeRuntimeTrace || runtimeTheoryRunRows.length > 0);
 
   return (
     <div className="h-full w-full overflow-auto bg-slate-950/90 p-4 text-slate-100">
@@ -570,7 +609,7 @@ export default function ScientificCalculatorPanel() {
             type="button"
             size="sm"
             variant={activeSection === section.id ? "secondary" : "outline"}
-            onClick={() => setActiveSection(section.id)}
+            onClick={() => promoteWorkbenchSection(section.id)}
             role="tab"
             aria-selected={activeSection === section.id}
           >
@@ -579,8 +618,13 @@ export default function ScientificCalculatorPanel() {
         ))}
       </div>
 
-      {activeSection === "theory" ? (
-        <div className="mb-3 rounded-md border border-cyan-900/60 bg-cyan-950/20 p-3" data-testid="scientific-calculator-theory-run-section">
+      <div className="flex flex-col gap-3">
+      {showTheoryWorkbench ? (
+        <div
+          className="rounded-md border border-cyan-900/60 bg-cyan-950/20 p-3"
+          data-testid="scientific-calculator-theory-run-section"
+          style={{ order: workbenchSectionRank("theory") }}
+        >
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="text-[10px] uppercase tracking-wide text-cyan-300">Theory Run</div>
@@ -864,8 +908,12 @@ export default function ScientificCalculatorPanel() {
         </div>
       ) : null}
 
-      {activeSection === "runtime" ? (
-        <div className="mb-3 rounded-md border border-violet-900/60 bg-violet-950/20 p-3" data-testid="scientific-calculator-runtime-section">
+      {showRuntimeWorkbench ? (
+        <div
+          className="rounded-md border border-violet-900/60 bg-violet-950/20 p-3"
+          data-testid="scientific-calculator-runtime-section"
+          style={{ order: workbenchSectionRank("runtime") }}
+        >
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="text-[10px] uppercase tracking-wide text-violet-300">Tensor / Runtime Workbench</div>
@@ -944,7 +992,11 @@ export default function ScientificCalculatorPanel() {
         </div>
       ) : null}
 
-      <div className="space-y-3 rounded-md border border-slate-800 bg-slate-900/50 p-3">
+      <div
+        className="space-y-3 rounded-md border border-slate-800 bg-slate-900/50 p-3"
+        data-testid="scientific-calculator-scalar-section"
+        style={{ order: workbenchSectionRank("scalar") }}
+      >
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <div className="text-[10px] uppercase tracking-wide text-cyan-300">Scalar Workbench</div>
@@ -1093,6 +1145,7 @@ export default function ScientificCalculatorPanel() {
             Clear
           </Button>
         </div>
+      </div>
       </div>
 
       <ScientificCalculatorLiveSourceControls currentEquation={input} />

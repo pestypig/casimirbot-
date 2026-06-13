@@ -530,6 +530,10 @@ describe("NHM2 reference validation chain planner", () => {
     const covariant = findCommand(plan, "nhm2:build-covariant-conservation-diagnostic");
     const qeiBound = findCommand(plan, "nhm2:build-qei-bound-receipt");
     const qeiPlan = findCommand(plan, "nhm2:build-qei-worldline-sample-plan");
+    const qeiPointwise = findCommand(
+      plan,
+      "nhm2:build-qei-pointwise-transition-source-samples",
+    );
     const qeiSampling = findCommand(plan, "nhm2:build-qei-worldline-sampling-receipt");
     const qei = findCommand(plan, "nhm2:build-atlas-bound-qei-worldline-dossier");
     const observer = findCommand(
@@ -566,6 +570,9 @@ describe("NHM2 reference validation chain planner", () => {
       scripts.indexOf("nhm2:build-qei-worldline-sample-plan"),
     );
     expect(scripts.indexOf("nhm2:build-qei-worldline-sample-plan")).toBeLessThan(
+      scripts.indexOf("nhm2:build-qei-pointwise-transition-source-samples"),
+    );
+    expect(scripts.indexOf("nhm2:build-qei-pointwise-transition-source-samples")).toBeLessThan(
       scripts.indexOf("nhm2:build-qei-worldline-sampling-receipt"),
     );
     expect(scripts.indexOf("nhm2:build-qei-worldline-sampling-receipt")).toBeLessThan(
@@ -623,6 +630,21 @@ describe("NHM2 reference validation chain planner", () => {
     expect(qeiPlan.args).toContain(
       "artifacts/research/full-solve/reference/run-1/nhm2-qei-worldline-sample-plan.json",
     );
+    expect(qeiPointwise.args).toContain("--qei-worldline-sample-plan");
+    expect(qeiPointwise.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-qei-worldline-sample-plan.json",
+    );
+    expect(qeiPointwise.args).toContain("--source-full-tensor");
+    expect(qeiPointwise.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-tile-effective-full-tensor-source.json",
+    );
+    expect(qeiPointwise.args).toContain("--transition-kernel");
+    expect(qeiPointwise.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-regional-source-transition-kernel.json",
+    );
+    expect(qeiPointwise.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-qei-pointwise-transition-source-samples.json",
+    );
     expect(qeiSampling.args).toContain("--source-full-tensor");
     expect(qeiSampling.args).toContain(
       "artifacts/research/full-solve/reference/run-1/nhm2-tile-effective-full-tensor-source.json",
@@ -630,6 +652,10 @@ describe("NHM2 reference validation chain planner", () => {
     expect(qeiSampling.args).toContain("--qei-worldline-sample-plan");
     expect(qeiSampling.args).toContain(
       "artifacts/research/full-solve/reference/run-1/nhm2-qei-worldline-sample-plan.json",
+    );
+    expect(qeiSampling.args).toContain("--explicit-worldline-samples");
+    expect(qeiSampling.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-qei-pointwise-transition-source-samples.json",
     );
     expect(qeiSampling.args).toContain(
       "artifacts/research/full-solve/reference/run-1/nhm2-qei-worldline-sampling-receipt.json",
@@ -731,6 +757,25 @@ describe("NHM2 reference validation chain planner", () => {
     expect(qeiSampling.args).toContain("--qei-worldline-sample-plan");
     expect(qeiSampling.args).toContain(
       "artifacts/reference/nhm2-qei-worldline-sample-plan.json",
+    );
+  });
+
+  it("passes explicit QEI pointwise transition samples through to sampling receipts", () => {
+    const plan = planReferenceValidationChain({
+      ...baseArgs(),
+      "source-input": "fixtures/nhm2/source-input.json",
+      "build-regional-support-function-atlas": true,
+      "build-regional-source-transition-kernel": true,
+      "qei-pointwise-transition-source-samples":
+        "artifacts/reference/nhm2-qei-pointwise-transition-source-samples.json",
+    });
+    const scripts = plan.map((command) => command.script);
+    const qeiSampling = findCommand(plan, "nhm2:build-qei-worldline-sampling-receipt");
+
+    expect(scripts).not.toContain("nhm2:build-qei-pointwise-transition-source-samples");
+    expect(qeiSampling.args).toContain("--explicit-worldline-samples");
+    expect(qeiSampling.args).toContain(
+      "artifacts/reference/nhm2-qei-pointwise-transition-source-samples.json",
     );
   });
 

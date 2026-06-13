@@ -82,6 +82,10 @@ export const planReferenceValidationChain = (
     args,
     "qei-worldline-sample-plan",
   );
+  const inputQeiPointwiseTransitionSourceSamples = asOptionalString(
+    args,
+    "qei-pointwise-transition-source-samples",
+  );
   const inputQeiWorldlineSamplingReceipt = asOptionalString(
     args,
     "qei-worldline-sampling-receipt",
@@ -211,9 +215,19 @@ export const planReferenceValidationChain = (
     generatedQeiWorldlineDossier == null || transitionKernel == null
       ? null
       : `${outRoot}/nhm2-qei-worldline-sample-plan.json`;
+  const generatedQeiPointwiseTransitionSourceSamples =
+    generatedQeiWorldlineSamplePlan == null
+      ? null
+      : `${outRoot}/nhm2-qei-pointwise-transition-source-samples.json`;
   const qeiBoundReceipt = inputQeiBoundReceipt ?? generatedQeiBoundReceipt;
   const qeiWorldlineSamplePlan =
     inputQeiWorldlineSamplePlan ?? generatedQeiWorldlineSamplePlan;
+  const qeiPointwiseTransitionSourceSamples =
+    inputQeiPointwiseTransitionSourceSamples ??
+    generatedQeiPointwiseTransitionSourceSamples;
+  const qeiExplicitWorldlineSamples =
+    asOptionalString(args, "qei-explicit-worldline-samples") ??
+    qeiPointwiseTransitionSourceSamples;
   const qeiWorldlineSamplingReceipt =
     inputQeiWorldlineSamplingReceipt ?? generatedQeiWorldlineSamplingReceipt;
   const qeiWorldlineDossier =
@@ -754,6 +768,25 @@ export const planReferenceValidationChain = (
     ]));
   }
   if (
+    generatedQeiPointwiseTransitionSourceSamples != null &&
+    inputQeiPointwiseTransitionSourceSamples == null &&
+    asOptionalString(args, "qei-explicit-worldline-samples") == null &&
+    inputQeiWorldlineSamplingReceipt == null &&
+    inputQeiWorldlineDossier == null
+  ) {
+    commands.push(command("nhm2:build-qei-pointwise-transition-source-samples", [
+      "--qei-worldline-sample-plan",
+      qeiWorldlineSamplePlan as string,
+      "--source-full-tensor",
+      sourceTensor,
+      "--transition-kernel",
+      transitionKernel as string,
+      "--out",
+      generatedQeiPointwiseTransitionSourceSamples,
+      ...auditOnly,
+    ]));
+  }
+  if (
     generatedQeiWorldlineSamplingReceipt != null &&
     inputQeiWorldlineSamplingReceipt == null &&
     inputQeiWorldlineDossier == null
@@ -766,11 +799,11 @@ export const planReferenceValidationChain = (
       ...(qeiWorldlineSamplePlan == null
         ? []
         : ["--qei-worldline-sample-plan", qeiWorldlineSamplePlan]),
-      ...(asOptionalString(args, "qei-explicit-worldline-samples") == null
+      ...(qeiExplicitWorldlineSamples == null
         ? []
         : [
             "--explicit-worldline-samples",
-            asOptionalString(args, "qei-explicit-worldline-samples") as string,
+            qeiExplicitWorldlineSamples,
           ]),
       "--out",
       generatedQeiWorldlineSamplingReceipt,
