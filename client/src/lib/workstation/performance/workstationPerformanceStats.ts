@@ -57,7 +57,7 @@ export const summarizeWorkstationFrameDurations = (
   windowMs: number,
 ): WorkstationFrameSummary => {
   const cutoff = nowMs - Math.max(1, windowMs);
-  const recent = frames.filter((frame) => frame.ts >= cutoff && frame.frameMs >= 0);
+  const recent = frames.filter((frame: WorkstationFrameDurationSample) => frame.ts >= cutoff && frame.frameMs >= 0);
   if (recent.length === 0) {
     return {
       fps: null,
@@ -68,9 +68,9 @@ export const summarizeWorkstationFrameDurations = (
       long_frame_ratio: null,
     };
   }
-  const durations = recent.map((frame) => frame.frameMs);
-  const durationSum = durations.reduce((sum, value) => sum + value, 0);
-  const longFrameCount = durations.filter((value) => value >= 50).length;
+  const durations = recent.map((frame: WorkstationFrameDurationSample) => frame.frameMs);
+  const durationSum = durations.reduce((sum: number, value: number) => sum + value, 0);
+  const longFrameCount = durations.filter((value: number) => value >= 50).length;
   const coveredWindowMs = Math.max(1000, Math.min(windowMs, nowMs - recent[0].ts));
   return {
     fps: roundOne((recent.length / coveredWindowMs) * 1000),
@@ -88,10 +88,10 @@ export const summarizeWorkstationLongTasks = (
   windowMs: number,
 ): { long_task_count: number; long_task_total_ms: number } => {
   const cutoff = nowMs - Math.max(1, windowMs);
-  const recent = tasks.filter((task) => task.ts >= cutoff && task.durationMs >= 0);
+  const recent = tasks.filter((task: WorkstationLongTaskSample) => task.ts >= cutoff && task.durationMs >= 0);
   return {
     long_task_count: recent.length,
-    long_task_total_ms: roundOne(recent.reduce((sum, task) => sum + task.durationMs, 0)) ?? 0,
+    long_task_total_ms: roundOne(recent.reduce((sum: number, task: WorkstationLongTaskSample) => sum + task.durationMs, 0)) ?? 0,
   };
 };
 
@@ -101,29 +101,29 @@ export const summarizeWorkstationInteractions = (
   windowMs: number,
 ): WorkstationInteractionSummary => {
   const cutoff = nowMs - Math.max(1, windowMs);
-  const recent = interactions.filter((interaction) => interaction.ts >= cutoff);
+  const recent = interactions.filter((interaction: WorkstationInteractionSample) => interaction.ts >= cutoff);
   const inputDelays = recent
-    .map((interaction) => interaction.inputDelayMs)
-    .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0);
+    .map((interaction: WorkstationInteractionSample) => interaction.inputDelayMs)
+    .filter((value: number | null): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0);
   const nextFrameLatencies = recent
-    .map((interaction) => interaction.inputToNextFrameMs)
-    .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0);
+    .map((interaction: WorkstationInteractionSample) => interaction.inputToNextFrameMs)
+    .filter((value: number | null): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0);
   const clickNextFrameLatencies = recent
-    .filter((interaction) => interaction.kind === "click")
-    .map((interaction) => interaction.inputToNextFrameMs)
-    .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0);
+    .filter((interaction: WorkstationInteractionSample) => interaction.kind === "click")
+    .map((interaction: WorkstationInteractionSample) => interaction.inputToNextFrameMs)
+    .filter((value: number | null): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0);
   const latest = recent[recent.length - 1] ?? null;
   return {
     interaction_event_count: recent.length,
     input_delay_p95_ms: roundOne(percentile(inputDelays, 0.95)),
     input_to_next_frame_p95_ms: roundOne(percentile(nextFrameLatencies, 0.95)),
     click_to_next_frame_p95_ms: roundOne(percentile(clickNextFrameLatencies, 0.95)),
-    scroll_jank_count: recent.filter((interaction) =>
+    scroll_jank_count: recent.filter((interaction: WorkstationInteractionSample) =>
       interaction.kind === "scroll" &&
       typeof interaction.inputToNextFrameMs === "number" &&
       interaction.inputToNextFrameMs >= 80
     ).length,
-    drag_jank_count: recent.filter((interaction) =>
+    drag_jank_count: recent.filter((interaction: WorkstationInteractionSample) =>
       (interaction.kind === "panel_drag" || interaction.kind === "pointer") &&
       typeof interaction.inputToNextFrameMs === "number" &&
       interaction.inputToNextFrameMs >= 80

@@ -63,15 +63,17 @@ function startSamplerInstance(): () => void {
   const longTaskSamples: WorkstationLongTaskSample[] = [];
   let rafId: number | null = null;
   let lastFrameAtMs: number | null = null;
+  let lastFrameDurationMs: number | null = null;
   let lastInteractionSampleAtMs = 0;
   let stopped = false;
 
   const frameLoop = (frameAtMs: number) => {
     if (stopped) return;
     if (lastFrameAtMs !== null) {
+      lastFrameDurationMs = Math.max(0, frameAtMs - lastFrameAtMs);
       frameSamples.push({
         ts: frameAtMs,
-        frameMs: Math.max(0, frameAtMs - lastFrameAtMs),
+        frameMs: lastFrameDurationMs,
       });
       pruneSamples(frameSamples, frameAtMs);
     }
@@ -123,7 +125,7 @@ function startSamplerInstance(): () => void {
         ts: nowMs,
         kind,
         inputDelayMs,
-        inputToNextFrameMs: Math.max(0, frameAtMs - nowMs),
+        inputToNextFrameMs: Math.max(0, frameAtMs - nowMs, lastFrameDurationMs ?? 0),
       });
       pruneSamples(interactionSamples, performance.now());
     });

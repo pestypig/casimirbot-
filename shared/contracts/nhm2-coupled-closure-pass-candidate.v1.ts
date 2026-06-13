@@ -7,6 +7,7 @@ import {
   getNhm2RegionalSupportFunctionAtlasHash,
   type Nhm2RegionalSupportFunctionAtlasV1,
 } from "./nhm2-regional-support-function-atlas.v1";
+import type { Nhm2SourceComponentAuthorityLedgerArtifactV1 } from "./nhm2-source-component-authority-ledger.v1";
 import type { Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 } from "./nhm2-source-side-same-basis-tensor-authority.v1";
 import type { Nhm2TileCounterpartConservationArtifact } from "./nhm2-tile-counterpart-conservation.v1";
 
@@ -16,6 +17,7 @@ export const NHM2_COUPLED_CLOSURE_PASS_CANDIDATE_CONTRACT_VERSION =
 export const NHM2_COUPLED_CLOSURE_GATE_IDS = [
   "regional_support_function_atlas",
   "regional_source_tensor_authority",
+  "source_component_authority_ledger",
   "source_closure_readiness",
   "regional_residuals",
   "conservation",
@@ -51,6 +53,7 @@ export type Nhm2CoupledClosurePassCandidateArtifactRefsV1 = {
   regionalMaterialSourceTensorModel: string | null;
   tileLocalSourceElements: string | null;
   tileEffectiveCounterpart: string | null;
+  sourceComponentAuthorityLedger: string | null;
   sourceSideSameBasisTensorAuthority: string | null;
   regionalSourceClosureEvidence: string | null;
   sourceClosurePassReadiness: string | null;
@@ -74,6 +77,7 @@ export type Nhm2CoupledClosurePassCandidateArtifactV1 = {
     passCandidate: boolean;
     sourceClosurePassSignalAllowed: boolean;
     allRequiredRegionsAuthoritative: boolean;
+    sourceComponentAuthorityComplete: boolean;
     wallAuthorityPresent: boolean;
     wallClosureReady: boolean;
     regionalResidualsPass: boolean;
@@ -117,6 +121,7 @@ export type BuildNhm2CoupledClosurePassCandidateInput = {
   artifactRefs?: Partial<Nhm2CoupledClosurePassCandidateArtifactRefsV1> | null;
   regionalSupportFunctionAtlas?: Nhm2RegionalSupportFunctionAtlasV1 | null;
   sourceAuthority?: Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 | null;
+  sourceComponentAuthorityLedger?: Nhm2SourceComponentAuthorityLedgerArtifactV1 | null;
   sourceClosurePassReadiness?: Nhm2SourceClosurePassReadinessLikeV1 | null;
   regionalEvidence?: Nhm2RegionalSourceClosureEvidenceArtifact | null;
   conservation?: Nhm2TileCounterpartConservationArtifact | null;
@@ -230,6 +235,54 @@ const sourceAuthorityGate = (
         : "review",
     blockers,
     primaryMetric: `regions_authoritative=${artifact.summary.allRequiredRegionsAuthoritative}`,
+  });
+};
+
+const sourceComponentLedgerGate = (
+  artifact: Nhm2SourceComponentAuthorityLedgerArtifactV1 | null | undefined,
+): Nhm2CoupledClosureGateV1 => {
+  if (artifact == null) {
+    return gate({
+      gateId: "source_component_authority_ledger",
+      status: "missing",
+      blockers: ["source_component_authority_ledger_missing"],
+    });
+  }
+  const blockers = uniqueText([
+    artifact.summary.anyMetricEcho ? "source_component_metric_echo_detected" : null,
+    artifact.summary.anyScalarProxy ? "source_component_scalar_proxy_detected" : null,
+    artifact.summary.anyMissing ? "source_component_missing" : null,
+    artifact.summary.allRequiredRegionsPresent
+      ? null
+      : "source_component_required_region_missing",
+    artifact.summary.allRequiredComponentsAuthoritative
+      ? null
+      : "source_component_authority_not_complete",
+    ...artifact.summary.metricEchoComponentRefs.map(
+      (componentRef) => `${componentRef}:metric_echo`,
+    ),
+    ...artifact.summary.proxyComponentRefs.map(
+      (componentRef) => `${componentRef}:scalar_proxy`,
+    ),
+    ...artifact.summary.missingComponentRefs.map(
+      (componentRef) => `${componentRef}:missing`,
+    ),
+    ...artifact.summary.reducedOrderComponentRefs.map(
+      (componentRef) => `${componentRef}:reduced_order_declared`,
+    ),
+  ]);
+  return gate({
+    gateId: "source_component_authority_ledger",
+    status:
+      artifact.summary.anyMetricEcho ||
+      artifact.summary.anyScalarProxy ||
+      artifact.summary.anyMissing
+        ? "fail"
+        : artifact.summary.sourceSideComponentAuthorityComplete
+          ? "pass"
+          : "review",
+    blockers,
+    primaryMetric: `sourceSideComponentAuthorityComplete=${artifact.summary.sourceSideComponentAuthorityComplete}`,
   });
 };
 
@@ -430,6 +483,7 @@ const defaultRefs = (
   regionalMaterialSourceTensorModel: refs?.regionalMaterialSourceTensorModel ?? null,
   tileLocalSourceElements: refs?.tileLocalSourceElements ?? null,
   tileEffectiveCounterpart: refs?.tileEffectiveCounterpart ?? null,
+  sourceComponentAuthorityLedger: refs?.sourceComponentAuthorityLedger ?? null,
   sourceSideSameBasisTensorAuthority: refs?.sourceSideSameBasisTensorAuthority ?? null,
   regionalSourceClosureEvidence: refs?.regionalSourceClosureEvidence ?? null,
   sourceClosurePassReadiness: refs?.sourceClosurePassReadiness ?? null,
@@ -448,6 +502,7 @@ const firstIdentity = (
     input.sourceClosurePassReadiness,
     input.conservation,
     input.sourceAuthority,
+    input.sourceComponentAuthorityLedger,
     input.qeiWorldlineDossier,
     input.observerRobustEnergyConditions,
   ];
@@ -464,6 +519,7 @@ export const buildNhm2CoupledClosurePassCandidate = (
   const gates = [
     atlasGate(input.regionalSupportFunctionAtlas, input),
     sourceAuthorityGate(input.sourceAuthority),
+    sourceComponentLedgerGate(input.sourceComponentAuthorityLedger),
     sourceClosureGate(input.sourceClosurePassReadiness),
     regionalResidualsGate(input.regionalEvidence),
     conservationGate(input.conservation),
@@ -475,6 +531,7 @@ export const buildNhm2CoupledClosurePassCandidate = (
   const firstNonPass = gates.find((entry) => entry.status !== "pass");
   const passCandidate = gates.every((entry) => entry.pass);
   const sourceAuthority = input.sourceAuthority?.summary;
+  const sourceComponentAuthority = input.sourceComponentAuthorityLedger?.summary;
   const readiness = input.sourceClosurePassReadiness;
   const qei = input.qeiWorldlineDossier?.summary;
   const observer = input.observerRobustEnergyConditions?.summary;
@@ -501,6 +558,8 @@ export const buildNhm2CoupledClosurePassCandidate = (
         readiness?.sourceClosurePassSignalAllowed === true,
       allRequiredRegionsAuthoritative:
         sourceAuthority?.allRequiredRegionsAuthoritative === true,
+      sourceComponentAuthorityComplete:
+        sourceComponentAuthority?.sourceSideComponentAuthorityComplete === true,
       wallAuthorityPresent: sourceAuthority?.hasWallAuthority === true,
       wallClosureReady:
         readiness?.regions.find((region) => region.regionId === "wall")
@@ -585,6 +644,7 @@ export const isNhm2CoupledClosurePassCandidateArtifact = (
     !isNullableText(refs.regionalMaterialSourceTensorModel) ||
     !isNullableText(refs.tileLocalSourceElements) ||
     !isNullableText(refs.tileEffectiveCounterpart) ||
+    !isNullableText(refs.sourceComponentAuthorityLedger) ||
     !isNullableText(refs.sourceSideSameBasisTensorAuthority) ||
     !isNullableText(refs.regionalSourceClosureEvidence) ||
     !isNullableText(refs.sourceClosurePassReadiness) ||
@@ -598,6 +658,7 @@ export const isNhm2CoupledClosurePassCandidateArtifact = (
     typeof summary.passCandidate !== "boolean" ||
     typeof summary.sourceClosurePassSignalAllowed !== "boolean" ||
     typeof summary.allRequiredRegionsAuthoritative !== "boolean" ||
+    typeof summary.sourceComponentAuthorityComplete !== "boolean" ||
     typeof summary.wallAuthorityPresent !== "boolean" ||
     typeof summary.wallClosureReady !== "boolean" ||
     typeof summary.regionalResidualsPass !== "boolean" ||

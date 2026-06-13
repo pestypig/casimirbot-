@@ -63,6 +63,7 @@ import {
   type StagePlayLiveSourceMailRefreshEventDetail,
 } from "@/lib/helix/liveSourceMailRefreshEvent";
 import { recordWorkstationCommandLifecycle } from "@/lib/workstation/performance/workstationCommandReceipts";
+import { useWorkstationPerformanceStore } from "@/store/useWorkstationPerformanceStore";
 
 const STAGE_PLAY_PANEL_THREAD_ID = "helix-ask:desktop";
 const STAGE_PLAY_MAILBOX_QUERY_KEY = [
@@ -77,6 +78,32 @@ const STAGE_PLAY_TRANSCRIPT_QUERY_KEY = [
   STAGE_PLAY_PANEL_THREAD_ID,
 ] as const;
 const STAGE_PLAY_CUSTOM_MICRODECK_STORAGE_KEY = "stage-play-custom-microdeck-presets:v1";
+const STAGE_PLAY_OBSERVER_GRAPH_REFETCH_MS = {
+  normal: 5000,
+  degraded: 7500,
+  blocked: 10000,
+} as const;
+const STAGE_PLAY_OBSERVER_MAILBOX_REFETCH_MS = {
+  normal: 1000,
+  degraded: 2500,
+  blocked: 4000,
+} as const;
+const STAGE_PLAY_REFRESH_COALESCE_MS = {
+  normal: 120,
+  degraded: 650,
+  blocked: 1200,
+} as const;
+
+type StagePlayRenderPressure = keyof typeof STAGE_PLAY_OBSERVER_MAILBOX_REFETCH_MS;
+
+function maxStagePlayRenderPressure(input: {
+  advisory?: string | null;
+  responsiveness?: string | null;
+}): StagePlayRenderPressure {
+  if (input.advisory === "blocked" || input.responsiveness === "blocked") return "blocked";
+  if (input.advisory === "degraded" || input.responsiveness === "degraded") return "degraded";
+  return "normal";
+}
 
 const STAGE_PLAY_SOURCE_SETUP_DEFAULTS = {
   routeTo: "narrative_stage_play",
@@ -6963,6 +6990,7 @@ function StagePlayObserverMailLoopCanvas({
       <div
         className="grid items-start gap-6"
         style={{
+          contain: "layout paint style",
           minWidth: `${Math.max(13, nodes.length) * 244}px`,
           gridTemplateColumns: `repeat(${nodes.length}, 220px)`,
         }}
@@ -6971,6 +6999,11 @@ function StagePlayObserverMailLoopCanvas({
           <div
             key={node.id}
             className="relative"
+            style={{
+              contain: "layout paint style",
+              contentVisibility: "auto",
+              containIntrinsicSize: "220px 290px",
+            }}
             data-testid="stage-play-observer-mail-loop-node"
             title={`Refs: ${uniqueSorted([...node.inputRefs, ...node.outputRefs]).join(", ") || "none"}`}
           >
@@ -10040,8 +10073,18 @@ export default function StagePlayBadgeGraphPanel() {
   const previousGraphRef = useRef<StagePlayBadgeGraphV1 | null>(null);
   const graphDiffClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const removedGhostClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mailLoopRefreshTimerRef = useRef<number | null>(null);
   const draftNodeCountRef = useRef(0);
   const draftParameterCountRef = useRef(0);
+  const performanceSample = useWorkstationPerformanceStore((state: any) => state.latest);
+  const stagePlayRenderPressure = maxStagePlayRenderPressure({
+    advisory: performanceSample?.advisory_pressure ?? null,
+    responsiveness: performanceSample?.responsiveness_pressure ?? null,
+  });
+  const observerMailLoopActive = graphDisplayMode === "observer_mail_loop_v1";
+  const observerGraphRefetchMs = STAGE_PLAY_OBSERVER_GRAPH_REFETCH_MS[stagePlayRenderPressure];
+  const observerMailboxRefetchMs = STAGE_PLAY_OBSERVER_MAILBOX_REFETCH_MS[stagePlayRenderPressure];
+  const mailLoopRefreshCoalesceMs = STAGE_PLAY_REFRESH_COALESCE_MS[stagePlayRenderPressure];
   const activeEnvironment = useLiveAnswerEnvironmentStore((state) =>
     selectActiveLiveAnswerEnvironment(state, STAGE_PLAY_PANEL_THREAD_ID),
   );
@@ -10064,7 +10107,7 @@ export default function StagePlayBadgeGraphPanel() {
       environmentId,
     ],
     queryFn: () => fetchStagePlayBadgeGraph({ threadId, roomId, environmentId }),
-    refetchInterval: graphDisplayMode === "observer_mail_loop_v1" ? 5000 : 1000,
+    refetchInterval: observerMailLoopActive ? observerGraphRefetchMs : 1000,
   });
   const { data: graph, isLoading, error } = graphQuery;
   const mailboxQuery = useQuery<StagePlayLiveSourceMailListResponse>({
@@ -10075,7 +10118,7 @@ export default function StagePlayBadgeGraphPanel() {
       view: "operator",
       limit: 4,
     }),
-    refetchInterval: graphDisplayMode === "observer_mail_loop_v1" ? 1000 : false,
+    refetchInterval: observerMailLoopActive ? observerMailboxRefetchMs : false,
   });
   const mailbox = mailboxQuery.data ?? null;
   const transcriptQuery = useQuery<StagePlayLiveSourceMailTranscriptResponse>({
@@ -10084,7 +10127,7 @@ export default function StagePlayBadgeGraphPanel() {
       threadId: STAGE_PLAY_PANEL_THREAD_ID,
       mailboxThreadId: STAGE_PLAY_PANEL_THREAD_ID,
     }),
-    refetchInterval: graphDisplayMode === "observer_mail_loop_v1" ? 1000 : false,
+    refetchInterval: observerMailLoopActive ? observerMailboxRefetchMs : false,
   });
   const transcript = transcriptQuery.data ?? null;
   const rawSessionBufferQuery = useQuery<StagePlayRawSessionBufferListResponse>({
@@ -10142,36 +10185,46 @@ export default function StagePlayBadgeGraphPanel() {
     enabled: draftNodes.length > 0,
   });
 
+  function refetchMailLoopViews() {
+    void queryClient.invalidateQueries({ queryKey: STAGE_PLAY_MAILBOX_QUERY_KEY });
+    void queryClient.invalidateQueries({ queryKey: STAGE_PLAY_TRANSCRIPT_QUERY_KEY });
+    void mailboxQuery.refetch();
+    void transcriptQuery.refetch();
+  }
+
+  function scheduleMailLoopRefresh(delayMs: number = mailLoopRefreshCoalesceMs) {
+    if (mailLoopRefreshTimerRef.current !== null) return;
+    mailLoopRefreshTimerRef.current = window.setTimeout(() => {
+      mailLoopRefreshTimerRef.current = null;
+      refetchMailLoopViews();
+    }, delayMs);
+  }
+
   useEffect(() => {
     return () => {
       if (graphDiffClearTimerRef.current) clearTimeout(graphDiffClearTimerRef.current);
       if (removedGhostClearTimerRef.current) clearTimeout(removedGhostClearTimerRef.current);
+      if (mailLoopRefreshTimerRef.current !== null) window.clearTimeout(mailLoopRefreshTimerRef.current);
     };
   }, []);
 
   useEffect(() => {
     if (graphDisplayMode !== "observer_mail_loop_v1") return;
-    void queryClient.invalidateQueries({ queryKey: STAGE_PLAY_MAILBOX_QUERY_KEY });
-    void queryClient.invalidateQueries({ queryKey: STAGE_PLAY_TRANSCRIPT_QUERY_KEY });
-    void mailboxQuery.refetch();
-    void transcriptQuery.refetch();
-  }, [graphDisplayMode, mailboxQuery.refetch, queryClient, transcriptQuery.refetch]);
+    scheduleMailLoopRefresh(0);
+  }, [graphDisplayMode, observerMailboxRefetchMs]);
 
   useEffect(() => {
     const handleMailboxRefresh = (event: Event) => {
       const detail = (event as CustomEvent<StagePlayLiveSourceMailRefreshEventDetail>).detail;
       const mailboxThreadId = detail?.mailboxThreadId ?? detail?.threadId ?? STAGE_PLAY_PANEL_THREAD_ID;
       if (mailboxThreadId && mailboxThreadId !== STAGE_PLAY_PANEL_THREAD_ID) return;
-      void queryClient.invalidateQueries({ queryKey: STAGE_PLAY_MAILBOX_QUERY_KEY });
-      void queryClient.invalidateQueries({ queryKey: STAGE_PLAY_TRANSCRIPT_QUERY_KEY });
-      void mailboxQuery.refetch();
-      void transcriptQuery.refetch();
+      scheduleMailLoopRefresh();
     };
     window.addEventListener(STAGE_PLAY_LIVE_SOURCE_MAIL_REFRESH_EVENT, handleMailboxRefresh);
     return () => {
       window.removeEventListener(STAGE_PLAY_LIVE_SOURCE_MAIL_REFRESH_EVENT, handleMailboxRefresh);
     };
-  }, [mailboxQuery.refetch, queryClient, transcriptQuery.refetch]);
+  }, [mailLoopRefreshCoalesceMs, mailboxQuery.refetch, queryClient, transcriptQuery.refetch]);
 
   useEffect(() => {
     if (!graph) return;

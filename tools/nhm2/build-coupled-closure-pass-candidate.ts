@@ -28,6 +28,10 @@ import {
   type Nhm2RegionalSupportFunctionAtlasV1,
 } from "../../shared/contracts/nhm2-regional-support-function-atlas.v1";
 import {
+  isNhm2SourceComponentAuthorityLedger,
+  type Nhm2SourceComponentAuthorityLedgerArtifactV1,
+} from "../../shared/contracts/nhm2-source-component-authority-ledger.v1";
+import {
   isNhm2SourceSideSameBasisTensorAuthorityArtifact,
   type Nhm2SourceSideSameBasisTensorAuthorityArtifactV1,
 } from "../../shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1";
@@ -91,6 +95,7 @@ export const runNhm2CoupledClosurePassCandidate = (args: {
   regionalMaterialSourceTensorModelPath?: string | null;
   tileLocalSourceElementsPath?: string | null;
   tileEffectiveCounterpartPath?: string | null;
+  sourceComponentAuthorityLedgerPath?: string | null;
   sourceSideAuthorityPath?: string | null;
   regionalSourceClosureEvidencePath?: string | null;
   sourceClosurePassReadinessPath?: string | null;
@@ -111,6 +116,13 @@ export const runNhm2CoupledClosurePassCandidate = (args: {
     isNhm2SourceSideSameBasisTensorAuthorityArtifact,
     "source-side authority",
   );
+  const sourceComponentAuthorityLedger =
+    readOptional<Nhm2SourceComponentAuthorityLedgerArtifactV1>(
+      args.repoRoot,
+      args.sourceComponentAuthorityLedgerPath ?? null,
+      isNhm2SourceComponentAuthorityLedger,
+      "source component authority ledger",
+    );
   const sourceClosurePassReadiness = readOptional<Nhm2SourceClosurePassReadinessArtifact>(
     args.repoRoot,
     args.sourceClosurePassReadinessPath ?? null,
@@ -156,6 +168,8 @@ export const runNhm2CoupledClosurePassCandidate = (args: {
         args.regionalMaterialSourceTensorModelPath ?? null,
       tileLocalSourceElements: args.tileLocalSourceElementsPath ?? null,
       tileEffectiveCounterpart: args.tileEffectiveCounterpartPath ?? null,
+      sourceComponentAuthorityLedger:
+        args.sourceComponentAuthorityLedgerPath ?? null,
       sourceSideSameBasisTensorAuthority: args.sourceSideAuthorityPath ?? null,
       regionalSourceClosureEvidence: args.regionalSourceClosureEvidencePath ?? null,
       sourceClosurePassReadiness: args.sourceClosurePassReadinessPath ?? null,
@@ -167,6 +181,7 @@ export const runNhm2CoupledClosurePassCandidate = (args: {
     },
     regionalSupportFunctionAtlas,
     sourceAuthority,
+    sourceComponentAuthorityLedger,
     sourceClosurePassReadiness,
     regionalEvidence,
     conservation,
@@ -200,6 +215,9 @@ if (normalize(process.argv[1] ?? "") === normalize(fileURLToPath(import.meta.url
     ),
     tileLocalSourceElementsPath: asString(args["tile-local-source-elements"]),
     tileEffectiveCounterpartPath: asString(args["tile-effective-counterpart"]),
+    sourceComponentAuthorityLedgerPath: asString(
+      args["source-component-authority-ledger"],
+    ),
     sourceSideAuthorityPath: asString(args["source-side-authority"]),
     regionalSourceClosureEvidencePath: asString(args["regional-source-closure-evidence"]),
     sourceClosurePassReadinessPath: asString(args["source-closure-pass-readiness"]),

@@ -15,6 +15,20 @@ export type HelixTurnInputItem =
       raw_image_scope?: "turn_input_only" | null;
     }
   | {
+      type: "attachment";
+      attachment_id: string;
+      attachment_kind: "text" | "json" | "code" | "pdf" | "audio" | "image" | "unknown";
+      mime_type: string;
+      file_name?: string | null;
+      size_bytes?: number | null;
+      content_base64?: string | null;
+      content_sha256?: string | null;
+      preview?: string | null;
+      raw_content_included: boolean;
+      raw_content_scope?: "turn_input_only" | null;
+      assistant_answer: false;
+    }
+  | {
       type: "evidence_ref";
       evidence_id: string;
       evidence_kind:

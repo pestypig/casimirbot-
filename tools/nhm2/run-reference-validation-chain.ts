@@ -168,6 +168,10 @@ export const planReferenceValidationChain = (
     (buildRegionalSourceTransitionKernel ? generatedTransitionKernel : null);
   const sourceIndependenceAudit = `${outRoot}/nhm2-tile-counterpart-source-independence.md`;
   const sourceAuthority = `${outRoot}/nhm2-source-side-same-basis-tensor-authority.json`;
+  const sourceComponentAuthorityLedger =
+    `${outRoot}/nhm2-source-component-authority-ledger.json`;
+  const tileEffectiveFullTensorCounterpart =
+    `${outRoot}/nhm2-tile-effective-full-tensor-counterpart.json`;
   const generatedMetricRequiredFullTensorSource =
     `${outRoot}/nhm2-metric-required-regional-full-tensor-source.json`;
   const effectiveMetricRequiredFullTensorSource =
@@ -501,6 +505,15 @@ export const planReferenceValidationChain = (
     sourceAuthority,
     ...auditOnly,
   ]));
+  commands.push(command("nhm2:publish-source-component-authority-ledger", [
+    "--tile-effective-counterpart",
+    tileCounterpart,
+    ...(regionalSupportAtlas == null ? [] : ["--atlas-ref", regionalSupportAtlas]),
+    "--out",
+    sourceComponentAuthorityLedger,
+    "--full-tensor-counterpart-out",
+    tileEffectiveFullTensorCounterpart,
+  ]));
   if (generateMetricRequiredFullTensorSource) {
     commands.push(command("nhm2:publish-metric-required-full-tensor-source", [
       "--reference-run",
@@ -590,6 +603,8 @@ export const planReferenceValidationChain = (
       : ["--regional-support-atlas", regionalSupportAtlas]),
     "--tile-effective-counterpart",
     tileCounterpart,
+    "--source-component-authority-ledger",
+    sourceComponentAuthorityLedger,
     ...(regionalMaterialSourceTensorModel == null
       ? []
       : ["--regional-material-source-tensor-model", regionalMaterialSourceTensorModel]),

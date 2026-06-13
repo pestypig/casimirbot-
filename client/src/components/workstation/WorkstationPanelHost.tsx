@@ -17,7 +17,16 @@ export function WorkstationPanelHost({ panelId }: { panelId: string }) {
   }
 
   return (
-    <div className="h-full min-h-0 overflow-auto">
+    <div
+      className="h-full min-h-0 overflow-auto overscroll-contain"
+      data-workstation-panel-id={panelId}
+      data-workstation-panel-heavy={def.heavy ? "true" : "false"}
+      style={{
+        contain: "layout paint style",
+        contentVisibility: "auto",
+        containIntrinsicSize: def.heavy ? "960px 720px" : "760px 560px",
+      }}
+    >
       <Suspense fallback={<div className="p-4 text-sm text-slate-400">Loading {def.title}...</div>}>
         <LazyPanel />
       </Suspense>

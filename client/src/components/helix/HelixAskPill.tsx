@@ -11,7 +11,7 @@ import React, {
 } from "react";
 import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
-import { BrainCircuit, Bug, Copy, Image as ImageIcon, Mic, Plus, Radio, RotateCcw, Search, Square, Volume2, X } from "lucide-react";
+import { BrainCircuit, Bug, Copy, FileText, Image as ImageIcon, Mic, Plus, Radio, RotateCcw, Search, Square, Volume2, X } from "lucide-react";
 import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/panelRegistry";
 import {
   findBestDocForTopic,
@@ -5859,6 +5859,7 @@ type RunAskOptions = {
   visualCapability?: Record<string, unknown>;
   visualEvidence?: Record<string, unknown>;
   imageAttachment?: HelixAskImageAttachment;
+  attachments?: HelixAskAttachment[];
   imageAttachmentLensRun?: ImageAttachmentLensRunV1 | null;
 };
 
@@ -5872,6 +5873,7 @@ type AskContextChooserState = {
 };
 
 type HelixAskImageAttachment = {
+  kind: "image";
   id: string;
   fileName: string;
   mimeType: string;
@@ -5883,6 +5885,26 @@ type HelixAskImageAttachment = {
   status: "ready" | "error";
   error?: string | null;
 };
+
+type HelixAskTextAttachment = {
+  kind: "text";
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  contentBase64: string;
+  contentSha256: string;
+  preview: string;
+  status: "ready" | "error";
+  error?: string | null;
+};
+
+type HelixAskAttachment = HelixAskImageAttachment | HelixAskTextAttachment;
+
+const HELIX_ASK_MAX_ATTACHMENTS = 6;
+const HELIX_ASK_LARGE_PASTE_THRESHOLD_CHARS = 2400;
+const HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES = 128 * 1024;
+const HELIX_ASK_TEXT_ATTACHMENT_PREVIEW_CHARS = 1200;
 
 const HELIX_ASK_VISUAL_SURFACE_PROMPT_PATTERN =
   /\b(?:image|screenshot|screen\s*share|screen\s*sharing|screen|display|window|tab|picture|photo|attached|visual|visible|from this|from the image|hotbar|inventory|chest|container)\b/i;
@@ -5986,6 +6008,74 @@ function validateHelixAskImageAttachmentForSubmit(
     assistant_answer: false,
     raw_content_included: false,
   };
+}
+
+function validateHelixAskTextAttachmentForSubmit(
+  attachment: HelixAskTextAttachment | null | undefined,
+): HelixAttachmentCommitCheck | null {
+  if (!attachment) return null;
+  const hasPayload = typeof attachment.contentBase64 === "string" && attachment.contentBase64.trim().length > 0;
+  const tooLarge = typeof attachment.sizeBytes === "number" && attachment.sizeBytes > HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES;
+  const status: HelixAttachmentCommitCheck["status"] =
+    attachment.status === "error"
+      ? "missing_payload"
+      : tooLarge
+        ? "too_large"
+        : hasPayload
+          ? "ready"
+          : "stale_after_restart";
+  const canSubmit = status === "ready";
+  return {
+    schema: "helix.attachment_commit_check.v1",
+    attachment_id: attachment.id,
+    file_name: attachment.fileName,
+    mime_type: attachment.mimeType,
+    status,
+    can_submit: canSubmit,
+    turn_input_item_preview: hasPayload
+      ? {
+          type: "evidence_ref",
+          has_image_base64: false,
+          has_image_ref: false,
+          has_evidence_ref: false,
+          raw_image_scope: null,
+        }
+      : null,
+    reason: canSubmit
+      ? null
+      : status === "stale_after_restart"
+        ? "Text attachment is stale. Reattach or paste it again before sending."
+        : attachment.error ?? "Text attachment is not ready to submit.",
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+}
+
+function validateHelixAskAttachmentForSubmit(
+  attachment: HelixAskAttachment | null | undefined,
+): HelixAttachmentCommitCheck | null {
+  if (!attachment) return null;
+  return attachment.kind === "image"
+    ? validateHelixAskImageAttachmentForSubmit(attachment)
+    : validateHelixAskTextAttachmentForSubmit(attachment);
+}
+
+function base64FromText(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.byteLength; i += chunkSize) {
+    const sub = bytes.subarray(i, Math.min(i + chunkSize, bytes.byteLength));
+    binary += String.fromCharCode.apply(null, Array.from(sub));
+  }
+  return btoa(binary);
+}
+
+async function sha256TextHex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 function isMultilangConfidenceGateResponse(response: AskLocalResult): boolean {
@@ -17717,7 +17807,7 @@ export function HelixAskPill({
   const activeAskStartedAtMsRef = useRef<number | null>(null);
   const [askError, setAskError] = useState<string | null>(null);
   const [askStatus, setAskStatus] = useState<string | null>(null);
-  const [askImageAttachment, setAskImageAttachment] = useState<HelixAskImageAttachment | null>(null);
+  const [askAttachments, setAskAttachments] = useState<HelixAskAttachment[]>([]);
   const [askReplies, setAskReplies] = useState<HelixAskReply[]>([]);
   const [copiedReplyMasterDebugId, setCopiedReplyMasterDebugId] = useState<string | null>(null);
   const [debugExportDrawer, setDebugExportDrawer] = useState<DebugExportDrawerState>(null);
@@ -17763,7 +17853,7 @@ export function HelixAskPill({
   const [situationRoomState, setSituationRoomState] = useState<SituationRoomState>(() =>
     createSituationRoomState(situationRoomId),
   );
-  const askImageAttachmentRef = useRef<HelixAskImageAttachment | null>(null);
+  const askAttachmentsRef = useRef<HelixAskAttachment[]>([]);
   const [displayAudioStatus, setDisplayAudioStatus] = useState<
     "idle" | "requesting" | "active" | "transcribing" | "error"
   >("idle");
@@ -17863,64 +17953,123 @@ export function HelixAskPill({
   }, [liveSourceMailTranscriptRefreshSeq]);
   useEffect(() => {
     return () => {
-      if (askImageAttachment?.previewUrl) {
-        URL.revokeObjectURL(askImageAttachment.previewUrl);
+      for (const attachment of askAttachmentsRef.current) {
+        if (attachment.kind === "image" && attachment.previewUrl) {
+          URL.revokeObjectURL(attachment.previewUrl);
+        }
       }
     };
-  }, [askImageAttachment?.previewUrl]);
+  }, []);
   useEffect(() => {
-    askImageAttachmentRef.current = askImageAttachment;
-  }, [askImageAttachment]);
-  const clearAskImageAttachment = useCallback(() => {
-    setAskImageAttachment((current) => {
-      if (current?.previewUrl) {
-        URL.revokeObjectURL(current.previewUrl);
+    askAttachmentsRef.current = askAttachments;
+  }, [askAttachments]);
+  const clearAskAttachments = useCallback(() => {
+    setAskAttachments((current) => {
+      for (const attachment of current) {
+        if (attachment.kind === "image" && attachment.previewUrl) {
+          URL.revokeObjectURL(attachment.previewUrl);
+        }
       }
-      return null;
+      return [];
     });
-    askImageAttachmentRef.current = null;
+    askAttachmentsRef.current = [];
     if (askImageInputRef.current) {
       askImageInputRef.current.value = "";
     }
   }, []);
+  const removeAskAttachment = useCallback((attachmentId: string) => {
+    setAskAttachments((current) => {
+      const removed = current.find((attachment) => attachment.id === attachmentId);
+      if (removed?.kind === "image" && removed.previewUrl) {
+        URL.revokeObjectURL(removed.previewUrl);
+      }
+      const next = current.filter((attachment) => attachment.id !== attachmentId);
+      askAttachmentsRef.current = next;
+      return next;
+    });
+  }, []);
   const handleAskImageSelect = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.currentTarget.files?.[0] ?? null;
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setAskError("Please attach an image file.");
-      event.currentTarget.value = "";
-      return;
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      setAskError("Image attachments are limited to 8 MB for this Helix Ask path.");
-      event.currentTarget.value = "";
-      return;
-    }
+    const input = event.currentTarget;
+    const files = Array.from(input.files ?? []);
+    if (files.length === 0) return;
     try {
-      const imageBase64 = await base64FromFile(file);
-      const previewUrl = URL.createObjectURL(file);
-      const nextAttachment: HelixAskImageAttachment = {
-        id: crypto.randomUUID(),
-        fileName: file.name || "attached image",
-        mimeType: file.type || "image/png",
-        sizeBytes: file.size,
-        imageBase64,
-        previewUrl,
-        status: "ready",
-        error: null,
-      };
-      askImageAttachmentRef.current = nextAttachment;
-      setAskImageAttachment((current) => {
-        if (current?.previewUrl) {
-          URL.revokeObjectURL(current.previewUrl);
+      const currentCount = askAttachmentsRef.current.length;
+      const slots = Math.max(0, HELIX_ASK_MAX_ATTACHMENTS - currentCount);
+      if (slots <= 0) {
+        setAskError(`Helix Ask supports up to ${HELIX_ASK_MAX_ATTACHMENTS} attachments for one turn.`);
+        input.value = "";
+        return;
+      }
+      const selected = files.slice(0, slots);
+      const nextAttachments: HelixAskImageAttachment[] = [];
+      for (const file of selected) {
+        if (!file.type.startsWith("image/")) {
+          setAskError("Please attach image files for this upload path.");
+          continue;
         }
-        return nextAttachment;
-      });
-      setAskError(null);
+        if (file.size > 8 * 1024 * 1024) {
+          setAskError("Image attachments are limited to 8 MB for this Helix Ask path.");
+          continue;
+        }
+        const imageBase64 = await base64FromFile(file);
+        const previewUrl = URL.createObjectURL(file);
+        nextAttachments.push({
+          kind: "image",
+          id: crypto.randomUUID(),
+          fileName: file.name || "attached image",
+          mimeType: file.type || "image/png",
+          sizeBytes: file.size,
+          imageBase64,
+          previewUrl,
+          status: "ready",
+          error: null,
+        });
+      }
+      if (nextAttachments.length > 0) {
+        setAskAttachments((current) => {
+          const next = [...current, ...nextAttachments].slice(0, HELIX_ASK_MAX_ATTACHMENTS);
+          askAttachmentsRef.current = next;
+          return next;
+        });
+        setAskError(files.length > selected.length ? `Only ${slots} attachment slot${slots === 1 ? "" : "s"} remained.` : null);
+      }
+      input.value = "";
     } catch (error) {
       setAskError(error instanceof Error ? error.message : "Image attachment failed.");
-      event.currentTarget.value = "";
+      input.value = "";
     }
+  }, []);
+  const addTextPasteAttachment = useCallback(async (text: string) => {
+    const encoded = new TextEncoder().encode(text);
+    if (encoded.byteLength > HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES) {
+      setAskError("Pasted text attachments are limited to 128 KB for this Helix Ask path.");
+      return false;
+    }
+    if (askAttachmentsRef.current.length >= HELIX_ASK_MAX_ATTACHMENTS) {
+      setAskError(`Helix Ask supports up to ${HELIX_ASK_MAX_ATTACHMENTS} attachments for one turn.`);
+      return false;
+    }
+    const now = new Date();
+    const stamp = now.toISOString().replace(/[:.]/g, "-");
+    const attachment: HelixAskTextAttachment = {
+      kind: "text",
+      id: crypto.randomUUID(),
+      fileName: `pasted-text-${stamp}.txt`,
+      mimeType: "text/plain",
+      sizeBytes: encoded.byteLength,
+      contentBase64: base64FromText(text),
+      contentSha256: await sha256TextHex(text),
+      preview: text.trim().slice(0, HELIX_ASK_TEXT_ATTACHMENT_PREVIEW_CHARS),
+      status: "ready",
+      error: null,
+    };
+    setAskAttachments((current) => {
+      const next = [...current, attachment].slice(0, HELIX_ASK_MAX_ATTACHMENTS);
+      askAttachmentsRef.current = next;
+      return next;
+    });
+    setAskError(null);
+    return true;
   }, []);
   const [pendingWorkstationUserInput, setPendingWorkstationUserInput] =
     useState<PendingWorkstationUserInputRequest | null>(null);
@@ -22847,6 +22996,20 @@ export function HelixAskPill({
       voiceInputState,
     ],
   );
+
+  const handleAskPaste = useCallback((event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const text = event.clipboardData.getData("text/plain");
+    if (!text || text.length < HELIX_ASK_LARGE_PASTE_THRESHOLD_CHARS) return;
+    event.preventDefault();
+    const target = event.currentTarget;
+    const current = target.value.trim();
+    void addTextPasteAttachment(text).then((attached) => {
+      if (!attached) return;
+      syncAskDraftValue(current || "Use the attached pasted text.", {
+        target,
+      });
+    });
+  }, [addTextPasteAttachment, syncAskDraftValue]);
 
   const setVoiceWarning = useCallback((code: VoiceCaptureWarningCode, active: boolean) => {
     setVoiceCaptureWarnings((prev) => {
@@ -31424,52 +31587,106 @@ export function HelixAskPill({
         typeof visualEvidenceRecord?.summary === "string" && visualEvidenceRecord.summary.trim()
           ? visualEvidenceRecord.summary.trim()
           : null;
-      const nativeImageAttachment = options?.imageAttachment ?? null;
-      const nativeImageCommitCheck = validateHelixAskImageAttachmentForSubmit(nativeImageAttachment);
-      const nativeImageBase64 =
-        typeof nativeImageAttachment?.imageBase64 === "string" && nativeImageAttachment.imageBase64.trim()
-          ? nativeImageAttachment.imageBase64.trim()
+      const submittedAttachments =
+        Array.isArray(options?.attachments) && options.attachments.length > 0
+          ? options.attachments
+          : options?.imageAttachment
+            ? [options.imageAttachment]
+            : [];
+      const nativeImageAttachments = submittedAttachments.filter(
+        (attachment): attachment is HelixAskImageAttachment => attachment.kind === "image",
+      );
+      const attachmentContextPackForTurn =
+        submittedAttachments.length > 0
+          ? {
+              schema: "helix.attachment_context_pack.v1",
+              attachment_count: submittedAttachments.length,
+              attachments: submittedAttachments.map((attachment, index) => ({
+                attachment_id: attachment.id,
+                ordinal: index,
+                kind: attachment.kind,
+                file_name: attachment.fileName,
+                mime_type: attachment.mimeType,
+                size_bytes: attachment.sizeBytes,
+                content_sha256: attachment.kind === "text" ? attachment.contentSha256 : null,
+                preview: attachment.kind === "text" ? attachment.preview : null,
+                evidence_ref: attachment.kind === "image" ? attachment.evidenceRef ?? null : null,
+                image_ref: attachment.kind === "image" ? attachment.imageRef ?? null : null,
+                raw_content_included: false,
+                raw_image_included: false,
+                assistant_answer: false,
+              })),
+              raw_content_included: false,
+              raw_image_included: false,
+              assistant_answer: false,
+            }
           : null;
-      const nativeImageRef =
-        typeof nativeImageAttachment?.imageRef === "string" && nativeImageAttachment.imageRef.trim()
-          ? nativeImageAttachment.imageRef.trim()
-          : null;
-      const nativeEvidenceRef =
-        typeof nativeImageAttachment?.evidenceRef === "string" && nativeImageAttachment.evidenceRef.trim()
-          ? nativeImageAttachment.evidenceRef.trim()
-          : null;
-      const turnInputItemsForTurn: HelixTurnInputItem[] = [
-        { type: "text", text: trimmed, source: "user" },
-        ...(nativeImageAttachment && nativeImageCommitCheck?.can_submit && nativeImageBase64
-          ? [{
-              type: "image" as const,
+      const typedAttachmentItems: HelixTurnInputItem[] = submittedAttachments.flatMap((attachment) => {
+        const commitCheck = validateHelixAskAttachmentForSubmit(attachment);
+        if (!commitCheck?.can_submit) return [];
+        if (attachment.kind === "image") {
+          const nativeImageBase64 =
+            typeof attachment.imageBase64 === "string" && attachment.imageBase64.trim()
+              ? attachment.imageBase64.trim()
+              : null;
+          const nativeImageRef =
+            typeof attachment.imageRef === "string" && attachment.imageRef.trim()
+              ? attachment.imageRef.trim()
+              : null;
+          const nativeEvidenceRef =
+            typeof attachment.evidenceRef === "string" && attachment.evidenceRef.trim()
+              ? attachment.evidenceRef.trim()
+              : null;
+          const items: HelixTurnInputItem[] = [];
+          if (nativeImageBase64) {
+            items.push({
+              type: "image",
               image_base64: nativeImageBase64,
-              mime_type: nativeImageAttachment.mimeType,
-              file_name: nativeImageAttachment.fileName,
+              mime_type: attachment.mimeType,
+              file_name: attachment.fileName,
               raw_image_included: true,
-              raw_image_scope: "turn_input_only" as const,
-            }]
-          : []),
-        ...(nativeImageAttachment && nativeImageCommitCheck?.can_submit && !nativeImageBase64 && nativeImageRef
-          ? [{
-              type: "image" as const,
+              raw_image_scope: "turn_input_only",
+            });
+          } else if (nativeImageRef) {
+            items.push({
+              type: "image",
               image_ref: nativeImageRef,
-              mime_type: nativeImageAttachment.mimeType,
-              file_name: nativeImageAttachment.fileName,
+              mime_type: attachment.mimeType,
+              file_name: attachment.fileName,
               evidence_id: nativeEvidenceRef,
               raw_image_included: false,
-            }]
-          : []),
-        ...(nativeImageAttachment && nativeImageCommitCheck?.can_submit && nativeEvidenceRef
-          ? [{
-              type: "evidence_ref" as const,
+            });
+          }
+          if (nativeEvidenceRef) {
+            items.push({
+              type: "evidence_ref",
               evidence_id: nativeEvidenceRef,
-              evidence_kind: "visual_frame_evidence" as const,
+              evidence_kind: "visual_frame_evidence",
               compact_summary: null,
-              assistant_answer: false as const,
-              raw_content_included: false as const,
-            }]
-          : []),
+              assistant_answer: false,
+              raw_content_included: false,
+            });
+          }
+          return items;
+        }
+        return [{
+          type: "attachment" as const,
+          attachment_id: attachment.id,
+          attachment_kind: "text" as const,
+          mime_type: attachment.mimeType,
+          file_name: attachment.fileName,
+          size_bytes: attachment.sizeBytes,
+          content_base64: attachment.contentBase64,
+          content_sha256: attachment.contentSha256,
+          preview: attachment.preview,
+          raw_content_included: true,
+          raw_content_scope: "turn_input_only" as const,
+          assistant_answer: false as const,
+        }];
+      });
+      const turnInputItemsForTurn: HelixTurnInputItem[] = [
+        { type: "text", text: trimmed, source: "user" },
+        ...typedAttachmentItems,
         ...(visualEvidenceId
           ? [{
               type: "evidence_ref" as const,
@@ -31495,11 +31712,14 @@ export function HelixAskPill({
       ];
       const runAskTurnId = pendingWorkstationUserInputRef.current?.turn_id ?? `ask:${crypto.randomUUID()}`;
       let imageAttachmentLensRunForTurn = options?.imageAttachmentLensRun ?? null;
-      if (!imageAttachmentLensRunForTurn && nativeImageAttachment && nativeImageCommitCheck?.can_submit) {
+      const firstNativeImageAttachment = nativeImageAttachments.find(
+        (attachment) => validateHelixAskImageAttachmentForSubmit(attachment)?.can_submit,
+      ) ?? null;
+      if (!imageAttachmentLensRunForTurn && firstNativeImageAttachment) {
         try {
           imageAttachmentLensRunForTurn = await runImageAttachmentLensRun({
             prompt: trimmed,
-            attachment: nativeImageAttachment as ImageAttachmentLensRunAttachment,
+            attachment: firstNativeImageAttachment as ImageAttachmentLensRunAttachment,
             threadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID,
             turnId: runAskTurnId,
             traceId: runAskTurnId,
@@ -31509,7 +31729,7 @@ export function HelixAskPill({
             contractVersion: "image_attachment_lens_run/v1",
             generatedAt: new Date().toISOString(),
             threadId: HELIX_ASK_LIVE_SOURCE_MAIL_THREAD_ID,
-            attachmentId: nativeImageAttachment.id,
+            attachmentId: firstNativeImageAttachment.id,
             sourceId: null,
             sourceImageRef: null,
             admission: {
@@ -32239,8 +32459,16 @@ export function HelixAskPill({
             ? {
                 ...workspaceContextSnapshot,
                 visual_context_capability: ambientVisualCapability,
+                ...(attachmentContextPackForTurn
+                  ? { attachment_context_pack: attachmentContextPackForTurn }
+                  : {}),
               }
-            : workspaceContextSnapshot;
+            : attachmentContextPackForTurn
+              ? {
+                  ...workspaceContextSnapshot,
+                  attachment_context_pack: attachmentContextPackForTurn,
+                }
+              : workspaceContextSnapshot;
           const workspaceContextSnapshotForTurn = visualEvidenceForTurn
             ? {
                 ...workspaceContextWithAmbientVisualCapability,
@@ -32495,7 +32723,7 @@ export function HelixAskPill({
               ...responseDebugWithClientMode,
               ui_turn_contract_source: HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG ? "ask_turn" : "legacy_local",
               ui_local_fast_path_suppressed: unifiedAskTurnOwnsManualDispatch,
-              ui_visual_attachment_submitted: Boolean(visualEvidenceForTurn || nativeImageAttachment),
+              ui_visual_attachment_submitted: Boolean(visualEvidenceForTurn || submittedAttachments.length > 0),
               ui_image_attachment_lens_run: imageAttachmentLensRunForTurn,
               ui_turn_input_items: turnInputItemsForTurn,
               ui_turn_input_item_count: turnInputItemsForTurn.length,
@@ -33802,8 +34030,8 @@ export function HelixAskPill({
         }
         return;
       }
-      if (askBusy && askImageAttachment) {
-        setAskError("Wait for the current Helix Ask turn before sending an image attachment.");
+      if (askBusy && askAttachmentsRef.current.length > 0) {
+        setAskError("Wait for the current Helix Ask turn before sending attachments.");
         return;
       }
       if (askInputRef.current) {
@@ -33828,8 +34056,15 @@ export function HelixAskPill({
           return combined.slice(0, HELIX_ASK_QUEUE_LIMIT);
         });
       }
-      const submittedImageAttachment = askImageAttachmentRef.current ?? askImageAttachment;
-      const submittedImageCommitCheck = validateHelixAskImageAttachmentForSubmit(submittedImageAttachment);
+      const submittedAttachments = [...askAttachmentsRef.current];
+      const submittedAttachmentChecks = submittedAttachments.map((attachment) => ({
+        attachment,
+        check: validateHelixAskAttachmentForSubmit(attachment),
+      }));
+      const invalidSubmittedAttachment = submittedAttachmentChecks.find((entry) => !entry.check?.can_submit);
+      const submittedImageAttachments = submittedAttachments.filter(
+        (attachment): attachment is HelixAskImageAttachment => attachment.kind === "image",
+      );
       const expectsVisualInput = isHelixAskVisualPrompt(first);
       let submittedVisualEvidence = visualSituationEvidenceForTurn;
       let submittedVisualCapability: Record<string, unknown> | null = null;
@@ -33844,8 +34079,11 @@ export function HelixAskPill({
             : current,
         );
       }
-      if (submittedImageAttachment && !submittedImageCommitCheck?.can_submit) {
-        setAskError(submittedImageCommitCheck?.reason ?? "Image attachment is stale. Reattach the image before sending.");
+      if (invalidSubmittedAttachment) {
+        setAskError(
+          invalidSubmittedAttachment.check?.reason ??
+            "Attachment is stale. Reattach it before sending.",
+        );
         setAskStatus(null);
         if (askInputRef.current) {
           askInputRef.current.value = first;
@@ -33855,7 +34093,7 @@ export function HelixAskPill({
         return;
       }
       if (
-        !submittedImageAttachment &&
+        submittedImageAttachments.length === 0 &&
         expectsVisualInput &&
         (!submittedVisualEvidence || isDiagnosticVisualEvidence(submittedVisualEvidence))
       ) {
@@ -33939,7 +34177,7 @@ export function HelixAskPill({
           setAskStatus(null);
         }
       }
-      if (!submittedImageAttachment && expectsVisualInput && !submittedVisualEvidence && !submittedVisualCapability) {
+      if (submittedImageAttachments.length === 0 && expectsVisualInput && !submittedVisualEvidence && !submittedVisualCapability) {
         setAskError("No usable visual evidence is available for this turn. Capture and analyze a frame, then send again.");
         setAskStatus(null);
         if (askInputRef.current) {
@@ -33949,11 +34187,11 @@ export function HelixAskPill({
         askDraftRef.current = first;
         return;
       }
-      if (submittedImageAttachment) {
-        clearAskImageAttachment();
+      if (submittedAttachments.length > 0) {
+        clearAskAttachments();
       }
-      const runOptions: RunAskOptions | undefined = submittedImageAttachment
-        ? { imageAttachment: submittedImageAttachment }
+      const runOptions: RunAskOptions | undefined = submittedAttachments.length > 0
+        ? { attachments: submittedAttachments }
         : expectsVisualInput && submittedVisualEvidence && !isDiagnosticVisualEvidence(submittedVisualEvidence)
           ? { visualEvidence: submittedVisualEvidence }
           : submittedVisualCapability
@@ -33965,7 +34203,7 @@ export function HelixAskPill({
       addMessage,
       cancelMoodHint,
       cancelPendingWorkstationRequestForTurnTransition,
-      clearAskImageAttachment,
+      clearAskAttachments,
       clearMoodTimer,
       getHelixAskSessionId,
       getPanelDef,
@@ -33984,13 +34222,16 @@ export function HelixAskPill({
       updateMoodFromText,
       runAsk,
       askBusy,
-      askImageAttachment,
       visualSituationEvidenceForTurn,
     ],
   );
 
   const maxWidthClass = maxWidthClassName ?? "max-w-4xl";
-  const askImageAttachmentCommitCheck = validateHelixAskImageAttachmentForSubmit(askImageAttachment);
+  const askAttachmentCommitChecks = askAttachments.map((attachment) => ({
+    attachment,
+    check: validateHelixAskAttachmentForSubmit(attachment),
+  }));
+  const hasReadyAskAttachment = askAttachmentCommitChecks.some((entry) => entry.check?.can_submit);
   const inputPlaceholder = placeholder ?? "Ask anything about this system";
   const replyListClassNameResolved =
     replyListClassName ??
@@ -34905,6 +35146,7 @@ export function HelixAskPill({
                     ref={askImageInputRef}
                     type="file"
                     accept="image/*"
+                    multiple
                     className="hidden"
                     onChange={handleAskImageSelect}
                   />
@@ -34913,9 +35155,9 @@ export function HelixAskPill({
                     aria-label="Attach image"
                     title="Attach image"
                     className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
-                      askImageAttachmentCommitCheck?.can_submit
+                      hasReadyAskAttachment
                         ? "border-violet-300/50 bg-violet-400/15 text-violet-100 hover:bg-violet-400/20"
-                        : askImageAttachment
+                        : askAttachments.length > 0
                           ? "border-amber-300/45 bg-amber-400/12 text-amber-100 hover:bg-amber-400/20"
                           : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
                     }`}
@@ -34991,6 +35233,7 @@ export function HelixAskPill({
                 ref={askInputRef}
                 placeholder={currentPlaceholder}
                 rows={1}
+                onPaste={handleAskPaste}
                 onInput={(event) =>
                   syncAskDraftValue(event.currentTarget.value, {
                     target: event.currentTarget,
@@ -35004,43 +35247,53 @@ export function HelixAskPill({
                 }}
               />
           </div>
-            {askImageAttachment ? (
+            {askAttachments.length > 0 ? (
               <div className="-mt-1 px-4 pb-2 text-[10px] text-slate-300">
-                <div
-                  className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 ${
-                    askImageAttachmentCommitCheck?.can_submit
-                      ? "border-violet-300/25 bg-violet-950/20"
-                      : "border-amber-300/30 bg-amber-950/20"
-                  }`}
-                >
-                  <img
-                    src={askImageAttachment.previewUrl}
-                    alt=""
-                    className="h-9 w-9 rounded-md border border-white/10 object-cover"
-                  />
-                  <ImageIcon className="h-3.5 w-3.5 text-violet-200" aria-hidden />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[11px] text-violet-100">{askImageAttachment.fileName}</div>
+                <div className="flex flex-wrap gap-2">
+                  {askAttachmentCommitChecks.map(({ attachment, check }) => (
                     <div
-                      className={`text-[10px] ${
-                        askImageAttachmentCommitCheck?.can_submit ? "text-violet-200/70" : "text-amber-100/80"
+                      key={attachment.id}
+                      className={`flex min-w-0 max-w-[260px] items-center gap-2 rounded-lg border px-2 py-1.5 ${
+                        check?.can_submit
+                          ? "border-violet-300/25 bg-violet-950/20"
+                          : "border-amber-300/30 bg-amber-950/20"
                       }`}
                     >
-                      {askImageAttachment.status === "error"
-                          ? askImageAttachment.error ?? "image analysis failed"
-                          : askImageAttachmentCommitCheck?.can_submit
-                            ? "image ready"
-                            : "image needs reattach"}
+                      {attachment.kind === "image" ? (
+                        <img
+                          src={attachment.previewUrl}
+                          alt=""
+                          className="h-9 w-9 rounded-md border border-white/10 object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-black/25">
+                          <FileText className="h-4 w-4 text-cyan-100" aria-hidden />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[11px] text-violet-100">{attachment.fileName}</div>
+                        <div className={`text-[10px] ${check?.can_submit ? "text-violet-200/70" : "text-amber-100/80"}`}>
+                          {attachment.status === "error"
+                            ? attachment.error ?? "attachment failed"
+                            : check?.can_submit
+                              ? attachment.kind === "image"
+                                ? "image ready"
+                                : "text ready"
+                              : attachment.kind === "image"
+                                ? "image needs reattach"
+                                : "text needs reattach"}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        aria-label={`Remove ${attachment.fileName}`}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+                        onClick={() => removeAskAttachment(attachment.id)}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
                     </div>
-                  </div>
-                  <button
-                    type="button"
-                    aria-label="Remove attached image"
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
-                    onClick={clearAskImageAttachment}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+                  ))}
                 </div>
               </div>
             ) : null}

@@ -172,6 +172,55 @@ describe("helix ask turn input integrity audit", () => {
     });
   });
 
+  it("normalizes text attachments as typed turn inputs without retaining raw content", () => {
+    const contentBase64 = Buffer.from("Large pasted text that should stay out of user prompt text.").toString("base64");
+    const requestBody = {
+      question: "Use the attached pasted text.",
+      turn_input_items: [
+        { type: "text", text: "Use the attached pasted text.", source: "user" },
+        {
+          type: "attachment",
+          attachment_id: "paste:1",
+          attachment_kind: "text",
+          mime_type: "text/plain",
+          file_name: "pasted-text.txt",
+          size_bytes: 56,
+          content_base64: contentBase64,
+          preview: "Large pasted text that should stay out of user prompt text.",
+          raw_content_included: true,
+          raw_content_scope: "turn_input_only",
+          assistant_answer: false,
+        },
+      ],
+    };
+    const context = normalizeHelixTurnInputItems({
+      request: requestBody,
+      threadId: "test:turn-input-integrity:text-attachment",
+    });
+
+    expect(context.turn_input_items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "attachment",
+          attachment_id: "paste:1",
+          attachment_kind: "text",
+          file_name: "pasted-text.txt",
+          raw_content_included: false,
+          raw_content_scope: null,
+          content_sha256: expect.any(String),
+        }),
+      ]),
+    );
+    expect(JSON.stringify(context.turn_input_items)).not.toContain(contentBase64);
+    expect(
+      auditHelixTurnInputIntegrity({
+        userText: requestBody.question,
+        request: requestBody,
+        context,
+      }),
+    ).toEqual(expect.objectContaining({ ok: true, attachment_input_count: 1 }));
+  });
+
   it("allows live visual tool requests to reach the agent loop without committed image input", () => {
     const requestBody = {
       question: "What is visible on my screen right now?",

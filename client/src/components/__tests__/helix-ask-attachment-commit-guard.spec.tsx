@@ -13,17 +13,35 @@ describe("Helix Ask attachment commit guard", () => {
     expect(source).toContain("Image attachment is stale. Reattach the image before sending.");
     expect(source).toContain("runImageAttachmentLensRun");
     expect(source).toContain("ui_image_attachment_lens_run");
-    expect(source).toContain("nativeImageCommitCheck?.can_submit && nativeImageBase64");
+    expect(source).toContain("validateHelixAskAttachmentForSubmit");
+    expect(source).toContain("typedAttachmentItems");
     expect(source).toContain("raw_image_scope: \"turn_input_only\"");
   });
 
   it("blocks visual prompts with stale attachment state before posting the turn", () => {
     const source = fs.readFileSync(sourcePath, "utf8");
 
-    expect(source).toContain("submittedImageCommitCheck");
-    expect(source).toContain("submittedImageAttachment && !submittedImageCommitCheck?.can_submit");
+    expect(source).toContain("submittedAttachmentChecks");
+    expect(source).toContain("invalidSubmittedAttachment");
     expect(source).toContain("isHelixAskVisualPrompt(first)");
     expect(source).toContain("No usable visual evidence is available for this turn.");
+  });
+
+  it("supports multiple image chips and large-paste text attachment promotion", () => {
+    const source = fs.readFileSync(sourcePath, "utf8");
+
+    expect(source).toContain("const [askAttachments, setAskAttachments]");
+    expect(source).toContain("HELIX_ASK_MAX_ATTACHMENTS");
+    expect(source).toContain("const input = event.currentTarget");
+    expect(source).toContain("const files = Array.from(input.files ?? [])");
+    expect(source).toContain("input.value = \"\"");
+    expect(source).toContain("multiple");
+    expect(source).toContain("handleAskPaste");
+    expect(source).toContain("attachmentContextPackForTurn");
+    expect(source).toContain("attachment_context_pack");
+    expect(source).toContain("pasted-text-");
+    expect(source).toContain('type: "attachment" as const');
+    expect(source).toContain('raw_content_scope: "turn_input_only" as const');
   });
 
   it("preserves server-authoritative proof recall and workstation terminals over evidence-gate fallback text", () => {

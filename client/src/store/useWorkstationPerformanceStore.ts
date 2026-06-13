@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { StateCreator } from "zustand";
 import type { HelixWorkstationBrowserPerformanceSample } from "@shared/helix-workstation-task-manager";
 
 type WorkstationPerformanceState = {
@@ -8,10 +9,11 @@ type WorkstationPerformanceState = {
   reset: () => void;
 };
 
-export const useWorkstationPerformanceStore = create<WorkstationPerformanceState>()((set) => ({
+const createWorkstationPerformanceStore: StateCreator<WorkstationPerformanceState> = (set) => ({
   latest: null,
   updatedAtMs: null,
-  setLatest: (sample) => set({ latest: sample, updatedAtMs: Date.now() }),
+  setLatest: (sample: HelixWorkstationBrowserPerformanceSample) => set({ latest: sample, updatedAtMs: Date.now() }),
   reset: () => set({ latest: null, updatedAtMs: null }),
-}));
+});
 
+export const useWorkstationPerformanceStore = create<WorkstationPerformanceState>()(createWorkstationPerformanceStore);

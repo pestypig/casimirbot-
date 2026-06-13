@@ -9,7 +9,9 @@ export type HelixTurnInputIntegrityAuditViolationKind =
   | "visual_prompt_without_visual_input"
   | "stale_image_item"
   | "invalid_raw_image_scope"
-  | "missing_evidence_ref";
+  | "missing_evidence_ref"
+  | "missing_attachment_ref"
+  | "invalid_raw_content_scope";
 
 export type HelixTurnInputIntegrityAudit = {
   schema: "helix.turn_input_integrity_audit.v1";
@@ -20,6 +22,7 @@ export type HelixTurnInputIntegrityAudit = {
   }>;
   text_input_count: number;
   image_input_count: number;
+  attachment_input_count: number;
   evidence_ref_count: number;
   assistant_answer: false;
 };
@@ -57,6 +60,7 @@ export function auditHelixTurnInputIntegrity(input: {
   const items = Array.isArray(input.context.turn_input_items) ? input.context.turn_input_items : [];
   const textInputCount = items.filter((item) => item.type === "text").length;
   const imageInputCount = items.filter((item) => item.type === "image").length;
+  const attachmentInputCount = items.filter((item) => item.type === "attachment").length;
   const evidenceRefCount = items.filter((item) => item.type === "evidence_ref").length;
 
   const hasValidVisualInput = items.some((item) => {
@@ -112,6 +116,20 @@ export function auditHelixTurnInputIntegrity(input: {
         summary: "An evidence_ref turn input item was present without an evidence_id.",
       });
     }
+    if (item.type === "attachment") {
+      if (!readString(item.attachment_id)) {
+        violations.push({
+          kind: "missing_attachment_ref",
+          summary: "An attachment turn input item was present without an attachment_id.",
+        });
+      }
+      if (item.raw_content_included === true && item.raw_content_scope !== "turn_input_only") {
+        violations.push({
+          kind: "invalid_raw_content_scope",
+          summary: "Raw attachment content is only allowed with raw_content_scope=turn_input_only.",
+        });
+      }
+    }
   }
 
   return {
@@ -120,6 +138,7 @@ export function auditHelixTurnInputIntegrity(input: {
     violations,
     text_input_count: textInputCount,
     image_input_count: imageInputCount,
+    attachment_input_count: attachmentInputCount,
     evidence_ref_count: evidenceRefCount,
     assistant_answer: false,
   };

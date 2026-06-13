@@ -212,6 +212,7 @@
     "nhm2:publish-metric-required-full-tensor-source": "tsx tools/nhm2/publish-metric-required-full-tensor-source.ts",
     "nhm2:report-source-to-geometry-divergence": "tsx tools/nhm2/report-source-to-geometry-divergence.ts",
     "nhm2:publish-tile-effective-counterpart": "tsx tools/nhm2/publish-tile-effective-counterpart.ts",
+    "nhm2:publish-source-component-authority-ledger": "tsx tools/nhm2/publish-source-component-authority-ledger.ts",
     "nhm2:audit-tile-effective-counterpart-provenance": "tsx tools/nhm2/audit-tile-effective-counterpart-provenance.ts",
     "nhm2:publish-tile-effective-full-tensor-source": "tsx tools/nhm2/publish-tile-effective-full-tensor-source.ts",
     "nhm2:publish-tile-counterpart-conservation": "tsx tools/nhm2/publish-tile-counterpart-conservation.ts",

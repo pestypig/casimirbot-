@@ -13,6 +13,7 @@ import {
   type Nhm2RegionalSourceClosureRegionId,
 } from "../shared/contracts/nhm2-regional-source-closure-evidence.v1";
 import { buildNhm2RegionalSupportFunctionAtlas } from "../shared/contracts/nhm2-regional-support-function-atlas.v1";
+import { buildNhm2SourceComponentAuthorityLedger } from "../shared/contracts/nhm2-source-component-authority-ledger.v1";
 import { buildNhm2SourceSideSameBasisTensorAuthorityArtifact } from "../shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1";
 import {
   buildNhm2TileCounterpartConservationArtifact,
@@ -304,6 +305,17 @@ const sourceAuthority = () =>
     casimirMaterialReceipt: materialReceipt(),
   });
 
+const sourceComponentAuthorityLedger = () =>
+  buildNhm2SourceComponentAuthorityLedger({
+    generatedAt: "2026-06-12T00:00:00.000Z",
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId: profile,
+    runId: "coupled-run",
+    counterpartArtifactRef: "tile.json",
+    sourceTensorArtifactRef: "source-tensor.json",
+    counterpartArtifact: tileCounterpart(),
+  });
+
 const readiness = () =>
   assessNhm2SourceClosurePassReadiness({
     generatedAt: "2026-06-12T00:00:00.000Z",
@@ -424,6 +436,7 @@ const allPassingArtifact = () =>
     artifactRefs: {
       regionalSupportFunctionAtlas: atlasRef,
       sourceSideSameBasisTensorAuthority: "authority.json",
+      sourceComponentAuthorityLedger: "component-ledger.json",
       regionalSourceClosureEvidence: "regional.json",
       sourceClosurePassReadiness: "readiness.json",
       conservation: "conservation.json",
@@ -433,6 +446,7 @@ const allPassingArtifact = () =>
     },
     regionalSupportFunctionAtlas: atlas(),
     sourceAuthority: sourceAuthority(),
+    sourceComponentAuthorityLedger: sourceComponentAuthorityLedger(),
     sourceClosurePassReadiness: readiness(),
     regionalEvidence: regionalEvidence(),
     conservation: conservation(),
@@ -467,6 +481,7 @@ describe("NHM2 coupled closure pass-candidate artifact", () => {
     const missingConservation = buildNhm2CoupledClosurePassCandidate({
       regionalSupportFunctionAtlas: atlas(),
       sourceAuthority: sourceAuthority(),
+      sourceComponentAuthorityLedger: sourceComponentAuthorityLedger(),
       sourceClosurePassReadiness: readiness(),
       regionalEvidence: regionalEvidence(),
       qeiWorldlineDossier: qeiWorldlineDossier(),
@@ -476,6 +491,7 @@ describe("NHM2 coupled closure pass-candidate artifact", () => {
     const failingConservation = buildNhm2CoupledClosurePassCandidate({
       regionalSupportFunctionAtlas: atlas(),
       sourceAuthority: sourceAuthority(),
+      sourceComponentAuthorityLedger: sourceComponentAuthorityLedger(),
       sourceClosurePassReadiness: readiness(),
       regionalEvidence: regionalEvidence(),
       conservation: conservation("fail"),
@@ -494,6 +510,7 @@ describe("NHM2 coupled closure pass-candidate artifact", () => {
     const artifact = buildNhm2CoupledClosurePassCandidate({
       regionalSupportFunctionAtlas: atlas(),
       sourceAuthority: sourceAuthority(),
+      sourceComponentAuthorityLedger: sourceComponentAuthorityLedger(),
       sourceClosurePassReadiness: readiness(),
       regionalEvidence: regionalEvidence(),
       conservation: conservation(),
@@ -512,6 +529,7 @@ describe("NHM2 coupled closure pass-candidate artifact", () => {
     const artifact = buildNhm2CoupledClosurePassCandidate({
       regionalSupportFunctionAtlas: atlas(),
       sourceAuthority: sourceAuthority(),
+      sourceComponentAuthorityLedger: sourceComponentAuthorityLedger(),
       sourceClosurePassReadiness: readiness(),
       regionalEvidence: regionalEvidence(),
       conservation: conservation(),
@@ -523,6 +541,27 @@ describe("NHM2 coupled closure pass-candidate artifact", () => {
     expect(artifact.summary.qeiDossierPass).toBe(false);
     expect(artifact.summary.passCandidate).toBe(false);
     expect(artifact.gates.find((gate) => gate.gateId === "qei_worldline_dossier")?.status).toBe("missing");
+  });
+
+  it("does not pass without source component authority ledger", () => {
+    const artifact = buildNhm2CoupledClosurePassCandidate({
+      regionalSupportFunctionAtlas: atlas(),
+      sourceAuthority: sourceAuthority(),
+      sourceClosurePassReadiness: readiness(),
+      regionalEvidence: regionalEvidence(),
+      conservation: conservation(),
+      qeiWorldlineDossier: qeiWorldlineDossier(),
+      observerRobustEnergyConditions: robustObserver(),
+      casimirMaterialReceipt: materialReceipt(),
+    });
+
+    expect(artifact.summary.passCandidate).toBe(false);
+    expect(artifact.summary.sourceComponentAuthorityComplete).toBe(false);
+    expect(
+      artifact.gates.find(
+        (gate) => gate.gateId === "source_component_authority_ledger",
+      )?.blockers,
+    ).toContain("source_component_authority_ledger_missing");
   });
 
   it("allows a diagnostic pass candidate only when every coupled gate passes", () => {
@@ -541,6 +580,7 @@ describe("NHM2 coupled closure pass-candidate artifact", () => {
     const artifact = buildNhm2CoupledClosurePassCandidate({
       regionalSupportFunctionAtlas: atlas(),
       sourceAuthority: sourceAuthority(),
+      sourceComponentAuthorityLedger: sourceComponentAuthorityLedger(),
       sourceClosurePassReadiness: readiness(),
       regionalEvidence: regionalEvidence(),
       conservation: conservation(),
