@@ -531,22 +531,22 @@ const TaskManagerProcessRow = React.memo(function TaskManagerProcessRow({
   return (
     <tr className="border-b border-white/5 hover:bg-white/[0.03]">
       <td className="px-3 py-2">
-        <div className="truncate font-medium text-slate-100">{process.label}</div>
-        <div className="mt-0.5 truncate text-[10px] text-slate-500">{process.process_id}</div>
-      </td>
-      <td className="px-3 py-2 text-slate-300">{kindLabel(process.kind)}</td>
-      <td className="px-3 py-2">
-        <span className={`inline-flex rounded border px-1.5 py-0.5 text-[10px] uppercase ${statusClass(process.status)}`}>
-          {process.status}
-        </span>
-      </td>
-      <td className="px-3 py-2">
         <div className="font-semibold text-slate-100">{memoryDisplay(process)}</div>
         <div className="mt-0.5 text-[10px] text-slate-500">
           {process.memory.observed ? "observed" : process.memory.estimate_mib != null ? "estimated" : "unknown"}
           {process.memory.approximate ? " / approximate" : ""}
         </div>
       </td>
+      <td className="px-3 py-2">
+        <div className="truncate font-medium text-slate-100">{process.label}</div>
+        <div className="mt-0.5 truncate text-[10px] text-slate-500">{process.process_id}</div>
+      </td>
+      <td className="px-3 py-2">
+        <span className={`inline-flex rounded border px-1.5 py-0.5 text-[10px] uppercase ${statusClass(process.status)}`}>
+          {process.status}
+        </span>
+      </td>
+      <td className="px-3 py-2 text-slate-300">{kindLabel(process.kind)}</td>
       <td className="px-3 py-2">
         <div className="truncate text-slate-300">{process.memory.source.replace(/_/g, " ")}</div>
         <div className="mt-0.5 truncate text-[10px] text-slate-500">{signalDisplay(process)}</div>
@@ -699,10 +699,10 @@ export default function WorkstationTaskManagerPanel() {
         <table className="w-full min-w-[54rem] table-fixed text-left text-xs">
           <thead className="sticky top-0 z-10 border-b border-white/10 bg-slate-950/95 text-[11px] uppercase text-slate-500">
             <tr>
-              <th className="w-[19rem] px-3 py-2 font-medium">Name</th>
-              <th className="w-[10rem] px-3 py-2 font-medium">Kind</th>
-              <th className="w-[8rem] px-3 py-2 font-medium">Status</th>
               <th className="w-[8rem] px-3 py-2 font-medium">Memory</th>
+              <th className="w-[19rem] px-3 py-2 font-medium">Name</th>
+              <th className="w-[8rem] px-3 py-2 font-medium">Status</th>
+              <th className="w-[10rem] px-3 py-2 font-medium">Kind</th>
               <th className="w-[9rem] px-3 py-2 font-medium">Signal</th>
             </tr>
           </thead>

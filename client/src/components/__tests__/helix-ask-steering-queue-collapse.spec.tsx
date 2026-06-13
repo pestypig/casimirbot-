@@ -33,6 +33,8 @@ describe("HelixAskPill steering queue collapse", () => {
     expect(source).toContain("not Ask-ready");
     expect(source).toContain('label: status === "completed" ? "Processed finding handled" : "Micro-reasoner finding"');
     expect(source).toContain('statusForHelixProcessedFinding');
-    expect(source).toContain('label: status === "deferred" ? "Ask wake deferred"');
+    expect(source).toContain('isHelixQueuePacketBackedAskWake');
+    expect(source).toContain('label: rawStatus === "waiting_for_ui_handoff"');
+    expect(source).toContain('"Ask handoff deferred"');
   });
 });

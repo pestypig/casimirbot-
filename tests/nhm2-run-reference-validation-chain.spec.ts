@@ -528,6 +528,11 @@ describe("NHM2 reference validation chain planner", () => {
       "nhm2:build-regional-full-tensor-residual",
     );
     const covariant = findCommand(plan, "nhm2:build-covariant-conservation-diagnostic");
+    const qei = findCommand(plan, "nhm2:build-atlas-bound-qei-worldline-dossier");
+    const observer = findCommand(
+      plan,
+      "nhm2:build-atlas-bound-observer-robust-energy-conditions",
+    );
     const coupled = findCommand(plan, "nhm2:build-coupled-closure-pass-candidate");
     const harness = findCommand(plan, "nhm2:build-regional-tensor-pass-path-harness");
     const admission = findCommand(plan, "nhm2:build-full-solve-claim-admission");
@@ -551,10 +556,19 @@ describe("NHM2 reference validation chain planner", () => {
     expect(scripts.indexOf("nhm2:publish-tile-counterpart-conservation")).toBeLessThan(
       scripts.indexOf("nhm2:build-covariant-conservation-diagnostic"),
     );
+    expect(scripts.indexOf("nhm2:build-covariant-conservation-diagnostic")).toBeLessThan(
+      scripts.indexOf("nhm2:build-atlas-bound-qei-worldline-dossier"),
+    );
+    expect(scripts.indexOf("nhm2:build-atlas-bound-qei-worldline-dossier")).toBeLessThan(
+      scripts.indexOf("nhm2:build-atlas-bound-observer-robust-energy-conditions"),
+    );
+    expect(scripts.indexOf("nhm2:build-atlas-bound-observer-robust-energy-conditions")).toBeLessThan(
+      scripts.indexOf("nhm2:build-coupled-closure-pass-candidate"),
+    );
     expect(scripts.indexOf("nhm2:publish-regional-source-closure-evidence")).toBeLessThan(
       scripts.indexOf("nhm2:build-regional-full-tensor-residual"),
     );
-    for (const planned of [kernel, conservation, regionalEvidence, covariant, coupled, harness, admission]) {
+    for (const planned of [kernel, conservation, regionalEvidence, covariant, qei, observer, coupled, harness, admission]) {
       expect(planned.args).toContain("--regional-support-atlas");
       expect(planned.args).toContain(atlasPath);
     }
@@ -566,6 +580,28 @@ describe("NHM2 reference validation chain planner", () => {
     expect(covariant.args).toContain(
       "artifacts/research/full-solve/reference/run-1/nhm2-tile-counterpart-conservation.json",
     );
+    expect(qei.args).toContain("--source-full-tensor");
+    expect(qei.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-tile-effective-full-tensor-source.json",
+    );
+    expect(qei.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-qei-worldline-dossier.json",
+    );
+    expect(observer.args).toContain("--source-full-tensor");
+    expect(observer.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-tile-effective-full-tensor-source.json",
+    );
+    expect(observer.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-observer-robust-energy-conditions.json",
+    );
+    expect(coupled.args).toContain("--qei-worldline-dossier");
+    expect(coupled.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-qei-worldline-dossier.json",
+    );
+    expect(coupled.args).toContain("--observer-robust-energy-conditions");
+    expect(coupled.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-observer-robust-energy-conditions.json",
+    );
     expect(harness.args).toContain("--regional-full-tensor-residual");
     expect(harness.args).toContain(
       "artifacts/research/full-solve/reference/run-1/nhm2-regional-full-tensor-residual.json",
@@ -573,6 +609,14 @@ describe("NHM2 reference validation chain planner", () => {
     expect(harness.args).toContain("--covariant-conservation-diagnostic");
     expect(harness.args).toContain(
       "artifacts/research/full-solve/reference/run-1/nhm2-covariant-conservation-diagnostic.json",
+    );
+    expect(harness.args).toContain("--qei-worldline-dossier");
+    expect(harness.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-qei-worldline-dossier.json",
+    );
+    expect(harness.args).toContain("--observer-robust-energy-conditions");
+    expect(harness.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-observer-robust-energy-conditions.json",
     );
   });
 

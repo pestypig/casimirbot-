@@ -76,8 +76,8 @@ export const planReferenceValidationChain = (
   const requestedSourceClosure = asOptionalString(args, "source-closure");
   const fullLoopAudit = required(args, "full-loop-audit");
   const qeiDossier = asOptionalString(args, "qei-dossier");
-  const qeiWorldlineDossier = asOptionalString(args, "qei-worldline-dossier");
-  const observerRobustEnergyConditions = asOptionalString(
+  const inputQeiWorldlineDossier = asOptionalString(args, "qei-worldline-dossier");
+  const inputObserverRobustEnergyConditions = asOptionalString(
     args,
     "observer-robust-energy-conditions",
   );
@@ -186,6 +186,18 @@ export const planReferenceValidationChain = (
     regionalSupportAtlas == null || conservation == null
       ? null
       : `${outRoot}/nhm2-covariant-conservation-diagnostic.json`;
+  const generatedQeiWorldlineDossier =
+    regionalSupportAtlas == null || sourceInput == null
+      ? null
+      : `${outRoot}/nhm2-qei-worldline-dossier.json`;
+  const qeiWorldlineDossier =
+    inputQeiWorldlineDossier ?? generatedQeiWorldlineDossier;
+  const generatedObserverRobustEnergyConditions =
+    regionalSupportAtlas == null || sourceInput == null
+      ? null
+      : `${outRoot}/nhm2-observer-robust-energy-conditions.json`;
+  const observerRobustEnergyConditions =
+    inputObserverRobustEnergyConditions ?? generatedObserverRobustEnergyConditions;
   const regionalSourceTensorTargets =
     `${outRoot}/nhm2-regional-source-tensor-targets.json`;
   const regionalSourceTensorCandidate =
@@ -577,6 +589,31 @@ export const planReferenceValidationChain = (
       ...(sourceInput == null ? [] : ["--tensor-ref", sourceTensor]),
       "--out",
       covariantConservationDiagnostic,
+      ...auditOnly,
+    ]));
+  }
+  if (generatedQeiWorldlineDossier != null && inputQeiWorldlineDossier == null) {
+    commands.push(command("nhm2:build-atlas-bound-qei-worldline-dossier", [
+      "--regional-support-atlas",
+      regionalSupportAtlas as string,
+      "--source-full-tensor",
+      sourceTensor,
+      "--out",
+      generatedQeiWorldlineDossier,
+      ...auditOnly,
+    ]));
+  }
+  if (
+    generatedObserverRobustEnergyConditions != null &&
+    inputObserverRobustEnergyConditions == null
+  ) {
+    commands.push(command("nhm2:build-atlas-bound-observer-robust-energy-conditions", [
+      "--regional-support-atlas",
+      regionalSupportAtlas as string,
+      "--source-full-tensor",
+      sourceTensor,
+      "--out",
+      generatedObserverRobustEnergyConditions,
       ...auditOnly,
     ]));
   }

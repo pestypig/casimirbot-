@@ -225,8 +225,36 @@ function stripCalculatorProseTail(value: string): string {
     .trim();
 }
 
+function normalizeCalculatorMixedNumberLiterals(value: string): string {
+  return value.replace(/(^|[^\w./])(\d+)\s+(\d+)\s*\/\s*(\d+)(?=$|[^\w./])/g, (match, prefix, whole, numerator, denominator) => {
+    const wholeValue = Number(whole);
+    const numeratorValue = Number(numerator);
+    const denominatorValue = Number(denominator);
+    if (
+      !Number.isSafeInteger(wholeValue) ||
+      !Number.isSafeInteger(numeratorValue) ||
+      !Number.isSafeInteger(denominatorValue) ||
+      denominatorValue === 0
+    ) {
+      return match;
+    }
+    const improperNumerator = wholeValue * denominatorValue + numeratorValue;
+    return `${prefix}(${improperNumerator}/${denominatorValue})`;
+  });
+}
+
+function normalizeCalculatorArithmeticSpan(value: string): string {
+  let candidate = normalizeCalculatorMixedNumberLiterals(value)
+    .replace(/\s+/g, "")
+    .replace(/[.!?,"'`\]]+$/g, "");
+  while (candidate.endsWith(")") && !parensBalanced(candidate)) {
+    candidate = candidate.slice(0, -1);
+  }
+  return candidate;
+}
+
 function normalizeCalculatorActionLatex(value: string): string {
-  const cleaned = stripCalculatorProseTail(value);
+  const cleaned = normalizeCalculatorMixedNumberLiterals(stripCalculatorProseTail(value));
   const directiveTail = cleaned.match(/\b(?:solve|evaluate|compute|calculate|check|verify)\s+(.+)$/i)?.[1];
   const candidate = directiveTail ? stripCalculatorProseTail(directiveTail) : cleaned;
   const equation = candidate.match(/(?:[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?\s*\*\s*)?[A-Za-z_][A-Za-z0-9_]*(?:\s*\^\s*[-+]?\d+(?:\.\d+)?)?(?:\s*[+\-*/]\s*[-+()A-Za-z0-9_.*\/^\\\s]+)*\s*=\s*[-+()A-Za-z0-9_.*\/^\\\s]+/i)?.[0];
@@ -234,7 +262,7 @@ function normalizeCalculatorActionLatex(value: string): string {
   if (candidate.includes("=")) return candidate;
   const arithmeticMatches = candidate.match(/[()+\-*/^\d.eE\s]+/g) ?? [];
   for (const match of arithmeticMatches) {
-    const candidate = match.replace(/\s+/g, "").replace(/[.!?,"'`\]\)}]+$/g, "");
+    const candidate = normalizeCalculatorArithmeticSpan(match);
     if (!candidate || !/\d/.test(candidate) || !/[+\-*/^]/.test(candidate)) continue;
     if (!parensBalanced(candidate)) continue;
     if (/^[()+\-*/^\d.eE]+$/.test(candidate)) return candidate;

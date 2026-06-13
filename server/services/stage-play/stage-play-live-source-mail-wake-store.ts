@@ -282,6 +282,7 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
   deckRunPlan?: StagePlayLiveSourceMailWakeRequestV1["deckRunPlan"];
   packetIds?: string[];
   deckVerdict?: StagePlayLiveSourceMailWakeDeckVerdictV1 | null;
+  wakeIntent?: StagePlayLiveSourceMailWakeRequestV1["wakeIntent"];
   coalescible?: boolean;
   causalTraces?: Array<LiveSourceCausalTraceV1 | null | undefined>;
   now?: string;
@@ -295,6 +296,7 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
   const deckPresetTitle = input.deckPresetTitle ?? null;
   const deckRunPlan = input.deckRunPlan ?? null;
   const deckVerdict = normalizeWakeDeckVerdict(input.deckVerdict);
+  const wakeIntent = input.wakeIntent ?? (deckVerdict?.wakeAsk === true ? "ask_from_processed_packet" : "process_unread_mail");
   const reason = input.reason ?? "unread_mail";
   const deckCoalescingEligible =
     deckVerdict?.wakeAsk === true &&
@@ -434,6 +436,7 @@ export function queueStagePlayLiveSourceMailWakeRequest(input: {
     mailIds: boundedMailIds,
     sourceIds,
     reason,
+    wakeIntent,
     status: "queued",
     askTurnId: null,
     askLaunchId: null,
@@ -704,7 +707,7 @@ export function releaseStaleRunningStagePlayMailWakeRequests(input: {
 
 const updateWake = (
   wakeRequestId: string,
-  patch: Partial<Pick<StagePlayLiveSourceMailWakeRequestV1, "status" | "askTurnId" | "askLaunchId" | "askLaunchStatus" | "askLaunchStartedAt" | "askLaunchCompletedAt" | "askLaunchRouteMetadata" | "routeMetadata" | "decisionIds" | "attemptCount" | "lastAttemptAt" | "nextRetryAt" | "failureReason" | "expiresAt" | "supersededByWakeRequestId" | "supersededWakeIds" | "lifecycleStage" | "lifecycleReason" | "deckPresetId" | "deckPresetTitle" | "deckRunPlan" | "packetIds" | "deckVerdict" | "evidenceRefs" | "updatedAt">>,
+  patch: Partial<Pick<StagePlayLiveSourceMailWakeRequestV1, "status" | "askTurnId" | "askLaunchId" | "askLaunchStatus" | "askLaunchStartedAt" | "askLaunchCompletedAt" | "askLaunchRouteMetadata" | "routeMetadata" | "decisionIds" | "attemptCount" | "lastAttemptAt" | "nextRetryAt" | "failureReason" | "expiresAt" | "supersededByWakeRequestId" | "supersededWakeIds" | "lifecycleStage" | "lifecycleReason" | "wakeIntent" | "deckPresetId" | "deckPresetTitle" | "deckRunPlan" | "packetIds" | "deckVerdict" | "evidenceRefs" | "updatedAt">>,
 ): StagePlayLiveSourceMailWakeRequestV1 | null => {
   const existing = wakeById.get(wakeRequestId);
   if (!existing) return null;
@@ -718,6 +721,7 @@ const updateWake = (
     evidenceRefs: patch.evidenceRefs ? uniqueStrings(patch.evidenceRefs) : existing.evidenceRefs,
     lifecycleStage: patch.lifecycleStage ?? existing.lifecycleStage,
     lifecycleReason: patch.lifecycleReason ?? existing.lifecycleReason ?? null,
+    wakeIntent: patch.wakeIntent ?? existing.wakeIntent,
     updatedAt: patch.updatedAt ?? new Date().toISOString(),
   };
   wakeById.set(wakeRequestId, updated);
@@ -744,6 +748,7 @@ export const attachDeckTraceToWakeRequest = (input: {
     deckRunPlan: input.deckRunPlan ?? existing.deckRunPlan ?? null,
     packetIds: uniqueStrings([...(existing.packetIds ?? []), ...(input.packetIds ?? [])]),
     deckVerdict,
+    wakeIntent: deckVerdict?.wakeAsk === true ? "ask_from_processed_packet" : "process_unread_mail",
     lifecycleReason: deckVerdict
       ? `${deckPresetTitle ?? "Micro-reasoner deck"} selected ${deckVerdict.recommendedNext}: ${deckVerdict.reason}`
       : existing.lifecycleReason,
@@ -1284,6 +1289,7 @@ export function recordStagePlayMailWakeResult(input: {
   const packetIds = uniqueStrings([...(wake?.packetIds ?? []), ...evidenceRefs.filter((ref) => /^stage_play_processed_mail_packet:/i.test(ref))]);
   const supersededWakeIds = uniqueStrings(wake?.supersededWakeIds ?? []);
   const routeMetadata = wake?.routeMetadata ?? wake?.askLaunchRouteMetadata ?? null;
+  const wakeIntent = wake?.wakeIntent ?? (deckVerdict?.wakeAsk === true ? "ask_from_processed_packet" : "process_unread_mail");
   const selectedTargetSource =
     typeof routeMetadata?.sourceTarget === "string"
       ? routeMetadata.sourceTarget
@@ -1323,6 +1329,7 @@ export function recordStagePlayMailWakeResult(input: {
     },
     decisionReceiptId: decisionIds[0] ?? null,
     voiceReceiptId: voiceCheckpointRefs[0] ?? null,
+    wakeIntent,
     requiresVoiceCheckpoint,
     requiresVoiceCheckpointSource: voiceRequirement.source,
     wakeResultId,
@@ -1352,6 +1359,7 @@ export function recordStagePlayMailWakeResult(input: {
     askTurnId: effectiveAskTurnId,
     decisionIds,
     voiceCheckpointRefs,
+    wakeIntent,
     requiresVoiceCheckpoint,
     requiresVoiceCheckpointSource: voiceRequirement.source,
     budgetStateRef: existing?.budgetStateRef ?? null,

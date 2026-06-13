@@ -66,6 +66,7 @@ export type Nhm2ObserverRobustEnergyConditionArtifactV1 = {
   tensorRef: string;
   atlasRef?: string | null;
   atlasHash?: string | null;
+  sampleRegionCoverage?: Record<string, number>;
   observerFamilies: Nhm2ObserverRobustEnergyConditionFamilyV1[];
   summary: {
     eulerianOnly: boolean;
@@ -104,6 +105,7 @@ export type BuildNhm2ObserverRobustEnergyConditionArtifactInput = {
   tensorRef?: string | null;
   atlasRef?: string | null;
   atlasHash?: string | null;
+  sampleRegionCoverage?: Record<string, number> | null;
   observerFamilies?:
     | Nhm2ObserverRobustEnergyConditionFamilyInput[]
     | null;
@@ -361,6 +363,7 @@ export const buildNhm2ObserverRobustEnergyConditionArtifact = (
     tensorRef: asText(input.tensorRef) ?? "missing",
     ...(asText(input.atlasRef) == null ? {} : { atlasRef: asText(input.atlasRef) }),
     ...(asText(input.atlasHash) == null ? {} : { atlasHash: asText(input.atlasHash) }),
+    ...(input.sampleRegionCoverage == null ? {} : { sampleRegionCoverage: input.sampleRegionCoverage }),
     observerFamilies,
     summary: summarizeFamilies(observerFamilies),
     literatureRefs: [
@@ -557,6 +560,7 @@ export const isNhm2ObserverRobustEnergyConditionArtifact = (
     asText(record.tensorRef) != null &&
     (record.atlasRef === undefined || record.atlasRef === null || asText(record.atlasRef) != null) &&
     (record.atlasHash === undefined || record.atlasHash === null || asText(record.atlasHash) != null) &&
+    (record.sampleRegionCoverage === undefined || isNumberRecord(record.sampleRegionCoverage)) &&
     Array.isArray(record.observerFamilies) &&
     record.observerFamilies.every((entry) => isFamily(entry)) &&
     typeof summary.eulerianOnly === "boolean" &&

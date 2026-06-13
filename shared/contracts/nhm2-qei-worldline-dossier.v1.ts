@@ -7,6 +7,8 @@ export const NHM2_QEI_WORLDLINE_REGION_IDS = [
   "hull",
   "wall",
   "exterior_shell",
+  "hull_wall_transition",
+  "wall_exterior_transition",
   "centerline",
   "custom",
 ] as const;

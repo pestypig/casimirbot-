@@ -1575,7 +1575,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByText("Mailbox").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Interpreter Profile").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Comparator|profile lens over mail/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Wake Ask").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Ask Handoff").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Decision").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Steering").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Output / Wait").length).toBeGreaterThan(0);
@@ -1595,8 +1595,8 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByText(/Watch the active visual source/i)).toBeTruthy();
     expect(screen.getByText(/source:visual-tab \| active \| fresh/i)).toBeTruthy();
     expect(screen.getAllByText(/1 visual backlog/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/wake admission/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Wake admission").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/packet-backed wake admission/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Packet Ask handoff").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Deferred before Ask wake").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/1 raw visual backlog retained/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Next retry:/i).length).toBeGreaterThan(0);
@@ -1605,7 +1605,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.queryByText("14 badges")).toBeNull();
     expect(screen.queryByText("0 missing checks")).toBeNull();
     expect(screen.getByText(/latest Minecraft-like scene/i)).toBeTruthy();
-    expect(screen.getAllByText("Ask wake queue").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Packet Ask handoff").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/pressure deferred before Ask/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/runtime_memory_queue_deferrable/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText("record_interpretation").length).toBeGreaterThan(0);
@@ -2201,14 +2201,28 @@ describe("StagePlayBadgeGraphPanel", () => {
             mailIds: ["stage_play_live_source_mail:retained-ui"],
             sourceIds: ["source:visual-tab"],
             reason: "unread_mail",
+            wakeIntent: "ask_from_processed_packet",
             status: "queued",
             askTurnId: null,
             decisionIds: [],
+            packetIds: ["stage_play_processed_mail_packet:retained-ui"],
+            deckPresetId: "stage_play_micro_reasoner_prompt_preset:minecraft_minimal_operator:v1",
+            deckPresetTitle: "Minecraft Minimal Operator",
+            deckRunPlan: "minimal_prompted_arbiter",
+            deckVerdict: {
+              recommendedNext: "record_interpretation",
+              wakeAsk: true,
+              voiceCandidate: false,
+              reason: "Minimal operator selected a packet-backed Ask handoff.",
+            },
             attemptCount: 0,
             lastAttemptAt: null,
             nextRetryAt: null,
             failureReason: null,
-            evidenceRefs: ["stage_play_live_source_mail:retained-ui"],
+            evidenceRefs: [
+              "stage_play_live_source_mail:retained-ui",
+              "stage_play_processed_mail_packet:retained-ui",
+            ],
             queuedAt: "2026-06-02T00:01:04.000Z",
             updatedAt: "2026-06-02T00:01:04.000Z",
             assistant_answer: false,

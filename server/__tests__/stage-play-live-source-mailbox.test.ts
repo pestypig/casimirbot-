@@ -28,6 +28,7 @@ import { buildStagePlayLiveSourceMailContextPack } from "../services/stage-play/
 import { resetStagePlayLiveSourceMailboxThreadResolverForTest } from "../services/stage-play/stage-play-live-source-mailbox-thread-resolver";
 import { executeLiveEnvironmentTool } from "../services/helix-ask/live-environment-tool-adapter";
 import {
+  attachDeckTraceToWakeRequest,
   dismissStagePlayMailWakeRequest,
   listStagePlayLiveSourceMailWakeResults,
   listStagePlayLiveSourceMailWakeRequests,
@@ -1021,6 +1022,7 @@ describe("Stage Play live-source mailbox", () => {
     expect(wakeRequests).toHaveLength(1);
     expect(wakeRequests[0]).toMatchObject({
       status: "queued",
+      wakeIntent: "process_unread_mail",
       sourceIds: [sourceId],
       mailIds: [first.mailId, second.mailId, third.mailId],
     });
@@ -1032,6 +1034,55 @@ describe("Stage Play live-source mailbox", () => {
       "visual_evidence:batch-second",
       "visual_evidence:batch-third",
     ]));
+  });
+
+  it("promotes raw processing wakes to Ask handoff only after a packet-backed deck verdict", () => {
+    const wake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId,
+      roomId,
+      mailIds: ["stage_play_live_source_mail:packet-journey"],
+      sourceIds: [sourceId],
+      evidenceRefs: ["stage_play_live_source_mail:packet-journey"],
+      now: "2026-06-04T12:00:06.500Z",
+    });
+
+    expect(wake).toMatchObject({
+      reason: "unread_mail",
+      wakeIntent: "process_unread_mail",
+      packetIds: [],
+      deckVerdict: null,
+    });
+
+    const promoted = attachDeckTraceToWakeRequest({
+      wakeRequestId: wake?.wakeRequestId ?? "",
+      deckPresetId: "stage_play_micro_reasoner_prompt_preset:minecraft_minimal_operator:v1",
+      deckPresetTitle: "Minecraft Minimal Operator",
+      deckRunPlan: "minimal_prompted_arbiter",
+      packetIds: ["stage_play_processed_mail_packet:packet-journey"],
+      deckVerdict: {
+        recommendedNext: "request_voice_callout",
+        wakeAsk: true,
+        voiceCandidate: true,
+        reason: "Minimal operator saw a danger cue.",
+      },
+      evidenceRefs: [
+        "stage_play_processed_mail_packet:packet-journey",
+        "stage_play_micro_reasoner_run:packet-journey-arbiter",
+      ],
+      now: "2026-06-04T12:00:06.750Z",
+    });
+
+    expect(promoted).toMatchObject({
+      wakeIntent: "ask_from_processed_packet",
+      deckPresetTitle: "Minecraft Minimal Operator",
+      deckRunPlan: "minimal_prompted_arbiter",
+      packetIds: ["stage_play_processed_mail_packet:packet-journey"],
+      deckVerdict: {
+        recommendedNext: "request_voice_callout",
+        wakeAsk: true,
+        voiceCandidate: true,
+      },
+    });
   });
 
   it("keeps different live sources in separate wake batches", () => {

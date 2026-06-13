@@ -527,6 +527,33 @@ describe("nhm2_regional_tensor_pass_path_harness/v1", () => {
     );
   });
 
+  it("moves QEI blocker from missing artifact to concrete bound provenance failure", () => {
+    const incompleteQei = qeiWorldlineDossier();
+    incompleteQei.worldlines = incompleteQei.worldlines.map((worldline) => ({
+      ...worldline,
+      bound: { valueSI: null, status: "missing" },
+      margin: { valueSI: null, pass: null },
+      blockers: ["qei_bound_missing", "qei_bound_provenance_missing"],
+    }));
+    incompleteQei.summary = {
+      hasWallWorldline: true,
+      allMarginsPass: null,
+      anyProxy: false,
+      dossierComplete: false,
+    };
+    const artifact = buildNhm2RegionalTensorPassPathHarness({
+      ...allPassingInput(),
+      qeiWorldlineDossier: incompleteQei,
+    });
+    const gate = artifact.gates.find((entry) => entry.gateId === "qei_worldline_dossier");
+
+    expect(gate?.status).toBe("blocked");
+    expect(gate?.blockers).not.toContain("qei_worldline_dossier_missing");
+    expect(gate?.blockers).toContain("qei_worldline_dossier_incomplete");
+    expect(gate?.blockers).toContain("wall-1:qei_bound_missing");
+    expect(artifact.summary.qeiDossierPass).toBe(false);
+  });
+
   it("distinguishes scalar residual alignment from authority metadata blockers", () => {
     const evidence = regionalEvidence();
     evidence.overallState = "review";

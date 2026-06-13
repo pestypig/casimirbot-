@@ -1653,6 +1653,7 @@ function buildStagePlayMailLoopUnifiedTrace(input: {
       stage: "wake_request",
       artifactId: wake.wakeRequestId,
       status: wake.status,
+      wakeIntent: wake.wakeIntent ?? "process_unread_mail",
       lifecycleStage: wake.lifecycleStage ?? null,
       reason: wake.reason,
       failureReason: wake.failureReason ?? null,
@@ -1668,6 +1669,7 @@ function buildStagePlayMailLoopUnifiedTrace(input: {
       artifactId: result.wakeResultId,
       wakeRequestId: result.wakeRequestId,
       status: result.status,
+      wakeIntent: result.wakeIntent ?? null,
       lifecycleStage: result.lifecycleStage ?? null,
       failedReason: result.failedReason ?? null,
       skippedReason: result.skippedReason ?? null,
@@ -1877,6 +1879,7 @@ function buildStagePlayPacketScopedTrace(input: {
     wake: selectedWake ? {
       wakeRequestId: selectedWake.wakeRequestId,
       status: selectedWake.status,
+      wakeIntent: selectedWake.wakeIntent ?? "process_unread_mail",
       lifecycleStage: selectedWake.lifecycleStage ?? null,
       lifecycleReason: selectedWake.lifecycleReason ?? null,
       deckPresetId: selectedWake.deckPresetId ?? null,
@@ -1893,6 +1896,7 @@ function buildStagePlayPacketScopedTrace(input: {
     result: selectedWakeResult ? {
       wakeResultId: selectedWakeResult.wakeResultId,
       status: selectedWakeResult.status,
+      wakeIntent: selectedWakeResult.wakeIntent ?? null,
       lifecycleStage: selectedWakeResult.lifecycleStage ?? null,
       lifecycleReason: selectedWakeResult.lifecycleReason ?? null,
       askTurnId: selectedWakeResult.askTurnId ?? null,
@@ -2229,10 +2233,22 @@ const isStagePlayMailWakePressureResult = (
   result.status === "deferred_for_pressure" ||
   /(?:pressure|runtime_memory|503)/i.test(result.failedReason ?? "");
 
+const isStagePlayPacketBackedAskWakeRequest = (
+  wake: StagePlayLiveSourceMailWakeRequestV1,
+): boolean =>
+  wake.wakeIntent === "ask_from_processed_packet" ||
+  (
+    wake.deckVerdict?.wakeAsk === true &&
+    (wake.packetIds?.length ?? 0) > 0
+  ) ||
+  Boolean(wake.askTurnId);
+
 const isStagePlayMailWakeAskAttemptResult = (
   result: StagePlayLiveSourceMailWakeResultV1,
 ): boolean => {
+  if (result.wakeIntent === "process_unread_mail" && !result.askTurnId) return false;
   if (result.status === "skipped" && result.skippedReason === "ui_handoff_required") return false;
+  if (result.wakeIntent === "ask_from_processed_packet") return true;
   return result.status === "completed" ||
     result.status === "failed_terminal" ||
     result.status === "skipped" ||
@@ -3556,25 +3572,27 @@ function buildObserverMailLoopNodes(input: {
   const unreadCount = mailItems.filter((item) => item.status === "unread").length;
   const deliveredCount = mailItems.filter((item) => item.status === "delivered_to_ask").length;
   const visualBacklogCount = mailItems.filter((item) => item.sourceKind === "visual_frame" && item.status === "unread").length;
-  const retryWakeCount = wakeRequests.filter((wake) => wake.status === "failed_retryable").length;
-  const pressureWakeCount = wakeRequests.filter((wake) => wake.status === "deferred_for_pressure").length;
-  const askWakeRequestCount = wakeRequests.filter((wake) =>
+  const askWakeRequests = wakeRequests.filter(isStagePlayPacketBackedAskWakeRequest);
+  const processingWakeRequests = wakeRequests.filter((wake) => !isStagePlayPacketBackedAskWakeRequest(wake));
+  const retryWakeCount = askWakeRequests.filter((wake) => wake.status === "failed_retryable").length;
+  const pressureWakeCount = askWakeRequests.filter((wake) => wake.status === "deferred_for_pressure").length;
+  const askWakeRequestCount = askWakeRequests.filter((wake) =>
     wake.status === "queued" ||
     wake.status === "waiting_for_ui_handoff" ||
     wake.status === "running" ||
     wake.status === "failed_retryable" ||
     wake.status === "deferred_for_pressure"
   ).length;
-  const queuedWakeMailCount = wakeRequests
+  const queuedWakeMailCount = askWakeRequests
     .filter((wake) => wake.status === "queued" || wake.status === "waiting_for_ui_handoff")
     .reduce((total, wake) => total + wake.mailIds.length, 0);
-  const runningWakeMailCount = wakeRequests
+  const runningWakeMailCount = askWakeRequests
     .filter((wake) => wake.status === "running")
     .reduce((total, wake) => total + wake.mailIds.length, 0);
-  const retryWakeMailCount = wakeRequests
+  const retryWakeMailCount = askWakeRequests
     .filter((wake) => wake.status === "failed_retryable")
     .reduce((total, wake) => total + wake.mailIds.length, 0);
-  const pressureWakeMailCount = wakeRequests
+  const pressureWakeMailCount = askWakeRequests
     .filter((wake) => wake.status === "deferred_for_pressure")
     .reduce((total, wake) => total + wake.mailIds.length, 0);
   const wakeBacklogMailCount = queuedWakeMailCount + runningWakeMailCount + retryWakeMailCount + pressureWakeMailCount;
@@ -3585,8 +3603,8 @@ function buildObserverMailLoopNodes(input: {
     latestStagePlayMailDecision(decisions);
   const latestNarrativeState = latestStagePlayNarrativeStateForDecision(narrativeStates, latestDecision);
   const latestWake =
-    latestStagePlayMailWakeRequest(wakeRequests, visualMail?.mailId) ??
-    latestStagePlayMailWakeRequest(wakeRequests);
+    latestStagePlayMailWakeRequest(askWakeRequests, visualMail?.mailId) ??
+    latestStagePlayMailWakeRequest(askWakeRequests);
   const latestAskAttemptWakeResult =
     latestStagePlayMailWakeResult(wakeResults.filter(isStagePlayMailWakeAskAttemptResult), latestWake?.wakeRequestId ?? null) ??
     latestStagePlayMailWakeResult(wakeResults.filter(isStagePlayMailWakeAskAttemptResult));
@@ -3603,8 +3621,8 @@ function buildObserverMailLoopNodes(input: {
     latestStagePlayMailWakeResult(wakeResults.filter((result) => result.status === "completed" && isStagePlayMailWakeAskAttemptResult(result)));
   const latestCompletedWake = latestCompletedWakeResult
     ? wakeById.get(latestCompletedWakeResult.wakeRequestId) ?? null
-    : wakeRequests.filter((wake) => wake.status === "completed").sort((left, right) => left.updatedAt.localeCompare(right.updatedAt)).at(-1) ?? null;
-  const pendingWakeRequests = wakeRequests.filter((wake) =>
+    : askWakeRequests.filter((wake) => wake.status === "completed").sort((left, right) => left.updatedAt.localeCompare(right.updatedAt)).at(-1) ?? null;
+  const pendingWakeRequests = askWakeRequests.filter((wake) =>
     wake.status === "queued" ||
     wake.status === "waiting_for_ui_handoff" ||
     wake.status === "running" ||
@@ -3945,7 +3963,8 @@ function buildObserverMailLoopNodes(input: {
         : "no compact mail yet",
       statusChips: [
         visualBacklogCount > 0 ? `${visualBacklogCount} observer backlog` : "observer backlog clear",
-        askWakeRequestCount > 0 ? `${askWakeRequestCount} Ask wake request(s)` : "no Ask wake",
+        processingWakeRequests.length > 0 ? `${processingWakeRequests.length} processing trigger(s)` : null,
+        askWakeRequestCount > 0 ? `${askWakeRequestCount} packet Ask handoff(s)` : "no packet Ask handoff",
       ].filter((entry): entry is string => Boolean(entry)),
       payloadRows: [
         {
@@ -3959,8 +3978,8 @@ function buildObserverMailLoopNodes(input: {
           tone: visualBacklogCount > 0 ? "warn" : "default",
         },
         {
-          label: "Ask wake queue",
-          value: `${queuedWakeMailCount} queued mail | ${runningWakeMailCount} running | ${retryWakeMailCount} retry | ${pressureWakeMailCount} pressure-deferred`,
+          label: "Packet Ask handoff",
+          value: `${queuedWakeMailCount} queued packet mail | ${runningWakeMailCount} running | ${retryWakeMailCount} retry | ${pressureWakeMailCount} pressure-deferred`,
           tone: askWakeRequestCount > 0 ? "warn" : "default",
         },
         {
@@ -4318,14 +4337,14 @@ function buildObserverMailLoopNodes(input: {
       fallbackOutputPreview: latestProcessedPacket
         ? `${latestProcessedPacket.recommendedNext}; ${latestProcessedPacket.resolutionState}; ${latestProcessedPacket.observedFacts.slice(0, 2).join(" | ")}`
         : null,
-      edgeLabel: displayWake ? "Ask wake" : "decision needed",
-      edgeTone: displayWake ? "connected" : latestProcessedPacket ? "pending" : "blocked",
+      edgeLabel: displayWake ? "Ask handoff" : latestProcessedPacket?.arbiter?.wakeAsk ? "handoff pending" : "local packet",
+      edgeTone: displayWake ? "connected" : latestProcessedPacket?.arbiter?.wakeAsk ? "pending" : latestProcessedPacket ? "connected" : "blocked",
     }),
     {
       id: "observer_mail_loop:ask_wake",
-      title: "Wake Ask",
-      subtitle: "mail wake admission",
-      status: latestWakeLifecycleStage ?? latestWakeStatus ?? (unreadCount > 0 ? "queued pending" : "missing"),
+      title: "Ask Handoff",
+      subtitle: "packet-backed wake admission",
+      status: latestWakeLifecycleStage ?? latestWakeStatus ?? (latestProcessedPacket?.arbiter?.wakeAsk ? "handoff pending" : "not Ask-ready"),
       preview: manualCheckpointWithoutPolicy && unreadCount > 0
         ? `manual checkpoint completed; ${unreadCount} unread retained until a watch policy is configured`
         : pressureText
@@ -4402,16 +4421,16 @@ function buildObserverMailLoopNodes(input: {
         },
         {
           label: "Tool",
-          value: `live_env.read_live_source_mail${latestWakeAskTurnId ? ` -> ${latestWakeAskTurnId}` : ""}`,
+          value: `packet verdict -> Helix Ask${latestWakeAskTurnId ? ` -> ${latestWakeAskTurnId}` : ""}`,
           tone: latestWakeAskTurnId ? "good" : displayWake ? "warn" : "default",
         },
         {
-          label: "Wake",
+          label: "Handoff",
           value: manualCheckpointWithoutPolicy
             ? "watch policy missing; configure a standing job before automatic interpretation"
             : latestWakeStatus
             ? `${latestWakeStatus}${latestWakeFailureReason ? `; ${latestWakeFailureReason}` : ""}`
-            : unreadCount > 0 ? "unread mail waiting" : "no wake request",
+            : latestProcessedPacket?.arbiter?.wakeAsk ? "deck verdict is Ask-ready; waiting for handoff" : "no packet-backed Ask handoff",
           tone: manualCheckpointWithoutPolicy ||
             latestWakeStatus === "failed_retryable" || latestWakeStatus === "failed_terminal"
             ? "blocked"
@@ -4435,8 +4454,8 @@ function buildObserverMailLoopNodes(input: {
       },
       inputLabel: "Input",
       inputRefs: wakeInputRefs,
-      inputPreview: wakeInputRefs.length > 0 ? wakeInputRefs.join(", ") : "unread mail ids pending",
-      transformLabel: "unread mail -> Helix Ask wake turn",
+      inputPreview: wakeInputRefs.length > 0 ? wakeInputRefs.join(", ") : "packet/deck verdict pending",
+      transformLabel: "processed packet + deck verdict -> Helix Ask handoff",
       outputLabel: "Output",
       outputRefs: displayWake ? uniqueSorted([
         displayWake.wakeRequestId,
@@ -4462,8 +4481,8 @@ function buildObserverMailLoopNodes(input: {
               failureReason: latestWakeLifecycleReason ?? latestWakeFailureReason,
             })}; continuation ${continuationStateText}; ${continuationRetainedMailCount || unreadCount} unread retained${secondaryPressureText ? `; ${secondaryPressureText}` : ""}`
         : unreadCount > 0
-          ? "unread mail is waiting for wake admission"
-          : "no wake request yet",
+          ? "raw observer backlog remains a processing trigger, not Ask-ready"
+          : "no packet-backed Ask handoff yet",
     },
     {
       id: "observer_mail_loop:ask_decision",

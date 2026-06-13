@@ -11,6 +11,10 @@ export type StagePlayLiveSourceMailWakeReasonV1 =
   | "source_recovered"
   | "user_requested_watch";
 
+export type StagePlayLiveSourceMailWakeIntentV1 =
+  | "process_unread_mail"
+  | "ask_from_processed_packet";
+
 export type StagePlayLiveSourceMailWakeStatusV1 =
   | "queued"
   | "waiting_for_ui_handoff"
@@ -66,6 +70,7 @@ export type StagePlayLiveSourceMailWakeRequestV1 = {
   mailIds: string[];
   sourceIds: string[];
   reason: StagePlayLiveSourceMailWakeReasonV1;
+  wakeIntent?: StagePlayLiveSourceMailWakeIntentV1;
   status: StagePlayLiveSourceMailWakeStatusV1;
   askTurnId?: string | null;
   askLaunchId?: string | null;
@@ -119,6 +124,7 @@ export type StagePlayLiveSourceMailWakeResultV1 = {
   askTurnId?: string | null;
   decisionIds: string[];
   voiceCheckpointRefs: string[];
+  wakeIntent?: StagePlayLiveSourceMailWakeIntentV1;
   requiresVoiceCheckpoint?: boolean;
   requiresVoiceCheckpointSource?: string | null;
   budgetStateRef?: string | null;
@@ -138,6 +144,7 @@ export type StagePlayLiveSourceMailWakeResultV1 = {
     askTurnId?: string | null;
     askLaunchId?: string | null;
     askLaunchStatus?: StagePlayLiveSourceMailWakeAskLaunchStatusV1 | null;
+    wakeIntent?: StagePlayLiveSourceMailWakeIntentV1;
     routeMetadata?: Record<string, unknown> | null;
     selectedTargetSource?: string | null;
     selectedCapability?: string | null;

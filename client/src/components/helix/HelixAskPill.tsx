@@ -9297,6 +9297,7 @@ const statusForHelixProcessedFinding = (input: {
 }): HelixAskSteeringQueueStatus => {
   const packetMailIds = readHelixSteeringQueueRefs(input.packet.mailIds, input.packet.mail_ids);
   const matchingWake = input.wakeRequests
+    .filter(isHelixQueuePacketBackedAskWake)
     .filter((wake) => intersectsHelixQueueRefs(packetMailIds, wake.mailIds))
     .at(-1) ?? null;
   const wakeStatus = coerceText(matchingWake?.status).trim();
@@ -9310,6 +9311,15 @@ const statusForHelixProcessedFinding = (input: {
   if (matchingDecision) return "completed";
   const recommendedNext = coerceText(input.packet.recommendedNext ?? input.packet.recommended_next).trim();
   return recommendedNext && recommendedNext !== "wait_for_next_summary" ? "next" : "held";
+};
+
+const isHelixQueuePacketBackedAskWake = (wake: Record<string, unknown>): boolean => {
+  const wakeIntent = coerceText(wake.wakeIntent ?? wake.wake_intent).trim();
+  if (wakeIntent === "ask_from_processed_packet") return true;
+  if (coerceText(wake.askTurnId ?? wake.ask_turn_id).trim()) return true;
+  const packetIds = readHelixSteeringQueueRefs(wake.packetIds, wake.packet_ids);
+  const deckVerdict = readAgentLoopAuditRecord(wake.deckVerdict ?? wake.deck_verdict);
+  return packetIds.length > 0 && deckVerdict?.wakeAsk === true;
 };
 
 const toneForHelixSteeringQueueStatus = (status: HelixAskSteeringQueueStatus): HelixAskSteeringQueueTone => {
@@ -9461,7 +9471,7 @@ function buildHelixSteeringQueueMailboxItems(
     });
   }
 
-  wakeRequests.slice(-5).forEach((wake, index) => {
+  wakeRequests.filter(isHelixQueuePacketBackedAskWake).slice(-5).forEach((wake, index) => {
     const rawStatus = coerceText(wake.status).trim();
     const status: HelixAskSteeringQueueStatus =
       rawStatus === "running"
@@ -9478,10 +9488,10 @@ function buildHelixSteeringQueueMailboxItems(
     items.push({
       key: `wake:${coerceText(wake.wakeRequestId).trim() || index}:${rawStatus}`,
       label: rawStatus === "waiting_for_ui_handoff"
-        ? "Ask wake waiting for UI"
-        : status === "deferred" ? "Ask wake deferred" : status === "running" ? "Ask wake running" : status === "queued" ? "Ask wake queued" : "Ask wake completed",
+        ? "Ask handoff waiting for UI"
+        : status === "deferred" ? "Ask handoff deferred" : status === "running" ? "Ask handoff running" : status === "queued" ? "Ask handoff queued" : "Ask handoff completed",
       detail: [
-        mailIds.length > 0 ? `${mailIds.length} processed finding input${mailIds.length === 1 ? "" : "s"}` : null,
+        mailIds.length > 0 ? `${mailIds.length} packet-backed input${mailIds.length === 1 ? "" : "s"}` : null,
         coerceText(wake.failureReason ?? wake.reason).trim() || null,
         coerceText(wake.askTurnId).trim() ? `ask ${coerceText(wake.askTurnId).trim()}` : null,
       ].filter(Boolean).join(" | ") || "Backend wake queue item.",
