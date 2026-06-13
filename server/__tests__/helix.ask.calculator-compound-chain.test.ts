@@ -1,10 +1,58 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildCalculatorCandidateHints,
+  detectUnderdeterminedTrianglePrompt,
+  extractCalculatorNumericNormalizations,
   runCalculatorCompoundChain,
   runCalculatorModelAuthoredChain,
 } from "../services/helix-ask/calculator-compound-chain";
 
 describe("Helix Ask calculator compound chain", () => {
+  it("normalizes mixed-number notation in calculator candidate hints", () => {
+    const hints = buildCalculatorCandidateHints({
+      prompt: "Convert 9 1/8 inches to decimal inches.",
+      turnId: "turn:test",
+    });
+
+    expect(extractCalculatorNumericNormalizations("9 1/8 inches")).toEqual([
+      expect.objectContaining({
+        raw_token: "9 1/8",
+        normalized_expression: "73/8",
+        decimal_value: 9.125,
+      }),
+    ]);
+    expect(hints.numeric_normalizations).toEqual([
+      expect.objectContaining({
+        raw_token: "9 1/8",
+        normalized_expression: "73/8",
+      }),
+    ]);
+    expect(hints.expression_rules.join(" ")).toContain("9 1/8 must become 73/8");
+  });
+
+  it("marks longest-side-only triangle prompts as underdetermined", () => {
+    const prompt =
+      "if the longest side of a triangle is 9 1/8 inches long, how long are the other 2 sides? Can you write the equation and solve?";
+    const hints = buildCalculatorCandidateHints({
+      prompt,
+      turnId: "turn:test",
+    });
+
+    expect(detectUnderdeterminedTrianglePrompt(prompt)).toBe(true);
+    expect(hints.numeric_normalizations).toEqual([
+      expect.objectContaining({
+        raw_token: "9 1/8",
+        normalized_expression: "73/8",
+        decimal_value: 9.125,
+      }),
+    ]);
+    expect(hints.problem_interpretation).toMatchObject({
+      prompt_kind: "underdetermined_triangle",
+      needs_more_information: true,
+      safe_to_calculate: false,
+    });
+  });
+
   it("plans and validates wavelength, photon energy, and eV conversion from frequency", () => {
     const chain = runCalculatorCompoundChain({
       prompt: "Given light frequency 6e14 Hz, use the calculator to compute wavelength, photon energy in joules, and photon energy in eV. Explain the result.",

@@ -875,6 +875,51 @@ describe("panelActionAdapters", () => {
     expect(String(solve.artifact?.normalized_expression)).not.toContain("with the scientific calculator");
   });
 
+  it("normalizes mixed-number notation before scientific calculator workstation solves", () => {
+    const solve = executeHelixPanelAction(
+      {
+        panel_id: "scientific-calculator",
+        action_id: "solve_expression",
+        args: {
+          latex: "calculate 9 1/8 with the scientific calculator",
+        },
+      },
+      {
+        openPanel: () => undefined,
+        focusPanel: () => undefined,
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+
+    expect(solve.ok).toBe(true);
+    expect(useScientificCalculatorStore.getState().currentLatex).toBe("(73/8)");
+    expect(solve.artifact?.result_text).toBe("9.125");
+    expect(String(solve.artifact?.normalized_expression)).not.toBe("91/8");
+  });
+
+  it("does not treat explicit subtraction as mixed-number notation", () => {
+    const solve = executeHelixPanelAction(
+      {
+        panel_id: "scientific-calculator",
+        action_id: "solve_expression",
+        args: {
+          latex: "calculate 9 - 1/8 with the scientific calculator",
+        },
+      },
+      {
+        openPanel: () => undefined,
+        focusPanel: () => undefined,
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+
+    expect(solve.ok).toBe(true);
+    expect(useScientificCalculatorStore.getState().currentLatex).toBe("9-1/8");
+    expect(solve.artifact?.result_text).toBe("8.875");
+  });
+
   it("uses calculator setup expression instead of prompt prose for workstation solves", () => {
     const solve = executeHelixPanelAction(
       {

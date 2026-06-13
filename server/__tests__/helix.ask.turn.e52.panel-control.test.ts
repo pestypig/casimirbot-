@@ -534,6 +534,38 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(response.body?.ask_turn_solver_trace?.completed_solver_path).toBe(true);
   }, 60000);
 
+  it("does not turn underdetermined mixed-number triangle prompts into calculator tool calls", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          "if the longest side of a triangle is 9 1/8 inches long, how long are the other 2 sides? Can you write the equation and solve?",
+        mode: "read",
+        debug: true,
+        sessionId: `e52-calculator-underdetermined-triangle-${Date.now()}`,
+      })
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).not.toBe("calculator_solve");
+    expect(findAction(response.body, "scientific-calculator", "solve_expression")).toBeFalsy();
+    expect(response.body?.calculator_candidate_hints?.numeric_normalizations).toEqual([
+      expect.objectContaining({
+        raw_token: "9 1/8",
+        normalized_expression: "73/8",
+        decimal_value: 9.125,
+      }),
+    ]);
+    expect(response.body?.calculator_candidate_hints?.problem_interpretation).toMatchObject({
+      prompt_kind: "underdetermined_triangle",
+      needs_more_information: true,
+      safe_to_calculate: false,
+    });
+    const runtimeCapabilities =
+      response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration.chosen_capability) ?? [];
+    expect(runtimeCapabilities).not.toContain("scientific-calculator.solve_expression");
+  }, 60000);
+
   it("does not let calculator diagnostic prose become a calculator tool call", async () => {
     const app = createApp();
     const response = await request(app)
