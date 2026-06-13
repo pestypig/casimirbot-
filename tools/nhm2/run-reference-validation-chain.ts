@@ -640,14 +640,9 @@ export const planReferenceValidationChain = (
     sourceAuthority,
     "--regional-source-closure-evidence",
     regionalEvidence,
-    "--regional-full-tensor-residual",
-    regionalFullTensorResidual,
     "--source-closure-pass-readiness",
     sourceClosurePassReadiness,
     ...(conservation == null ? [] : ["--conservation", conservation]),
-    ...(covariantConservationDiagnostic == null
-      ? []
-      : ["--covariant-conservation-diagnostic", covariantConservationDiagnostic]),
     ...(qeiWorldlineDossier == null
       ? []
       : ["--qei-worldline-dossier", qeiWorldlineDossier]),
@@ -671,9 +666,14 @@ export const planReferenceValidationChain = (
     sourceAuthority,
     "--regional-source-closure-evidence",
     regionalEvidence,
+    "--regional-full-tensor-residual",
+    regionalFullTensorResidual,
     "--source-closure-pass-readiness",
     sourceClosurePassReadiness,
     ...(conservation == null ? [] : ["--conservation", conservation]),
+    ...(covariantConservationDiagnostic == null
+      ? []
+      : ["--covariant-conservation-diagnostic", covariantConservationDiagnostic]),
     ...(qeiWorldlineDossier == null
       ? []
       : ["--qei-worldline-dossier", qeiWorldlineDossier]),
