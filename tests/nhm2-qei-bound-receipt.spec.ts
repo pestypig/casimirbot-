@@ -204,12 +204,16 @@ describe("nhm2_qei_bound_receipt/v1", () => {
     expect(receipt.status).toBe("missing");
     expect(receipt.blockers).toContain("qei_bound_missing");
     expect(receipt.blockers).toContain("sampling_tau_missing");
-    expect(receipt.blockers).toContain("qei_qft_state_missing");
-    expect(receipt.blockers).toContain("qei_renormalization_convention_missing");
+    expect(receipt.blockers).toContain("qei_bound_provenance_ref_missing");
+    expect(receipt.blockers).toContain("qei_tau_source_ref_missing");
+    expect(receipt.blockers).toContain("qei_duty_source_ref_missing");
+    expect(receipt.blockers).toContain("qei_modulation_source_ref_missing");
+    expect(receipt.blockers).toContain("qei_qft_state_ref_missing");
+    expect(receipt.blockers).toContain("qei_renormalization_ref_missing");
     expect(isNhm2QeiBoundReceipt(receipt)).toBe(true);
   });
 
-  it("can pass the bound-receipt gate when tau, bound, and applicability refs are present", () => {
+  it("keeps numeric tau and bound evidence in review without provenance refs", () => {
     const dir = mkdtempSync(join(tmpdir(), "nhm2-qei-bound-"));
     const atlasPath = writeJson(dir, "atlas.json", atlas());
     const sourcePath = writeJson(dir, "source.json", source());
@@ -228,7 +232,42 @@ describe("nhm2_qei_bound_receipt/v1", () => {
       dutyCycle: 0.5,
       modulationSeconds: 1e-6,
       qftStateRef: "qft-state.json",
-      renormalizationRef: "renormalization.json",
+      renormalizationConventionRef: "renormalization.json",
+      stationaryWorldlineAssumption: true,
+      auditOnly: true,
+    });
+
+    expect(receipt.status).toBe("review");
+    expect(receipt.blockers).toContain("qei_tau_source_ref_missing");
+    expect(receipt.blockers).toContain("qei_duty_source_ref_missing");
+    expect(receipt.blockers).toContain("qei_modulation_source_ref_missing");
+    expect(receipt.blockers).not.toContain("qei_bound_provenance_ref_missing");
+    expect(receipt.blockers).not.toContain("qei_light_crossing_source_ref_missing");
+  });
+
+  it("can pass the bound-receipt gate when tau, bound, and applicability refs are present", () => {
+    const dir = mkdtempSync(join(tmpdir(), "nhm2-qei-bound-"));
+    const atlasPath = writeJson(dir, "atlas.json", atlas());
+    const sourcePath = writeJson(dir, "source.json", source());
+
+    const receipt = buildQeiBoundReceipt({
+      repoRoot: dir,
+      regionalSupportAtlasPath: atlasPath,
+      sourceFullTensorPath: sourcePath,
+      outPath: "receipt.json",
+      boundModelKind: "ford_roman_lorentzian",
+      boundSI: 0,
+      boundProvenanceRef: "ford_roman_1996_quantum_inequality",
+      tauSeconds: 1e-10,
+      tauSourceRef: "sampling-policy.json#tau",
+      samplingKind: "lorentzian",
+      samplingNormalized: true,
+      dutyCycle: 0.5,
+      dutyCycleSourceRef: "tile-duty.json#dutyCycle",
+      modulationSeconds: 1e-6,
+      modulationSourceRef: "drive-modulation.json#period",
+      qftStateRef: "qft-state.json",
+      renormalizationConventionRef: "renormalization.json",
       stationaryWorldlineAssumption: true,
       auditOnly: true,
     });
@@ -254,18 +293,22 @@ describe("nhm2_qei_bound_receipt/v1", () => {
       boundSI: 0,
       boundProvenanceRef: "declared-qei-bound.json",
       tauSeconds: 1e-10,
+      tauSourceRef: "sampling-policy.json#tau",
       samplingKind: "gaussian",
       samplingNormalized: true,
       dutyCycle: 0.5,
+      dutyCycleSourceRef: "tile-duty.json#dutyCycle",
       modulationSeconds: 1e-6,
+      modulationSourceRef: "drive-modulation.json#period",
       qftStateRef: "qft-state.json",
-      renormalizationRef: "renormalization.json",
+      renormalizationConventionRef: "renormalization.json",
       stationaryWorldlineAssumption: true,
       auditOnly: true,
     });
 
     expect(receipt.status).toBe("review");
     expect(receipt.bound.status).toBe("declared_reduced_order");
+    expect(receipt.blockers).toContain("qei_bound_model_not_physical_qft_receipt");
     expect(receipt.warnings).toContain("qei_bound_declared_reduced_order_only");
     expect(receipt.claimBoundary.qeiBoundReceiptDoesNotProvePhysicalViability).toBe(true);
   });

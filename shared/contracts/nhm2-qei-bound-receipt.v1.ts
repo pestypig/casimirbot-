@@ -64,6 +64,15 @@ export type Nhm2QeiBoundReceiptV1 = {
     lightCrossingSeconds: number | null;
     modulationSeconds: number | null;
   };
+  provenance: {
+    boundProvenanceRef: string | null;
+    qftStateRef: string | null;
+    renormalizationConventionRef: string | null;
+    tauSourceRef: string | null;
+    dutyCycleSourceRef: string | null;
+    modulationSourceRef: string | null;
+    lightCrossingSourceRef: string | null;
+  };
   applicability: {
     appliesToRegions: Nhm2QeiWorldlineRegionId[];
     stationaryWorldlineAssumption: boolean;
@@ -152,10 +161,26 @@ export const buildNhm2QeiBoundReceipt = (
     input.tauPolicy.tauVsModulation !== "pass"
       ? `tau_vs_modulation_${input.tauPolicy.tauVsModulation}`
       : null,
-    input.applicability.qftStateSpecified ? null : "qei_qft_state_missing",
-    input.applicability.renormalizationConventionSpecified
-      ? null
-      : "qei_renormalization_convention_missing",
+    input.provenance.boundProvenanceRef == null
+      ? "qei_bound_provenance_ref_missing"
+      : null,
+    input.provenance.tauSourceRef == null ? "qei_tau_source_ref_missing" : null,
+    input.provenance.dutyCycleSourceRef == null
+      ? "qei_duty_source_ref_missing"
+      : null,
+    input.provenance.modulationSourceRef == null
+      ? "qei_modulation_source_ref_missing"
+      : null,
+    input.provenance.lightCrossingSourceRef == null
+      ? "qei_light_crossing_source_ref_missing"
+      : null,
+    input.provenance.qftStateRef == null ? "qei_qft_state_ref_missing" : null,
+    input.provenance.renormalizationConventionRef == null
+      ? "qei_renormalization_ref_missing"
+      : null,
+    input.boundModelKind === "declared_reduced_order"
+      ? "qei_bound_model_not_physical_qft_receipt"
+      : null,
   ]);
   const warnings = uniqueStrings([
     ...(input.warnings ?? []),
@@ -211,6 +236,7 @@ export const isNhm2QeiBoundReceipt = (
     : null;
   const bound = isRecord(record?.bound) ? record?.bound : null;
   const tauPolicy = isRecord(record?.tauPolicy) ? record?.tauPolicy : null;
+  const provenance = isRecord(record?.provenance) ? record?.provenance : null;
   const applicability = isRecord(record?.applicability)
     ? record?.applicability
     : null;
@@ -247,6 +273,18 @@ export const isNhm2QeiBoundReceipt = (
     isFiniteOrNull(tauPolicy.dutyCycle) &&
     isFiniteOrNull(tauPolicy.lightCrossingSeconds) &&
     isFiniteOrNull(tauPolicy.modulationSeconds) &&
+    provenance != null &&
+    (provenance.boundProvenanceRef === null || isText(provenance.boundProvenanceRef)) &&
+    (provenance.qftStateRef === null || isText(provenance.qftStateRef)) &&
+    (provenance.renormalizationConventionRef === null ||
+      isText(provenance.renormalizationConventionRef)) &&
+    (provenance.tauSourceRef === null || isText(provenance.tauSourceRef)) &&
+    (provenance.dutyCycleSourceRef === null ||
+      isText(provenance.dutyCycleSourceRef)) &&
+    (provenance.modulationSourceRef === null ||
+      isText(provenance.modulationSourceRef)) &&
+    (provenance.lightCrossingSourceRef === null ||
+      isText(provenance.lightCrossingSourceRef)) &&
     applicability != null &&
     Array.isArray(applicability.appliesToRegions) &&
     applicability.appliesToRegions.every(isRegionId) &&

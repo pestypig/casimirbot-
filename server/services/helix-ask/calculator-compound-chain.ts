@@ -252,12 +252,16 @@ export const detectUnderdeterminedTrianglePrompt = (prompt: string): boolean => 
   const normalized = normalizePrompt(prompt);
   if (!/\btriangles?\b/i.test(normalized)) return false;
   if (!/\b(?:longest\s+side|largest\s+side)\b/i.test(normalized)) return false;
-  if (!/\b(?:other|remaining)\s+(?:two|2)\s+sides?\b|\bhow\s+long\s+are\s+the\s+other\b/i.test(normalized)) return false;
+  const asksForMissingGeometry =
+    /\b(?:other|remaining)\s+(?:two|2)\s+sides?\b|\bhow\s+long\s+are\s+the\s+other\b/i.test(normalized) ||
+    /\b(?:solve|calculate|compute|find|determine|evaluate)\b[\s\S]{0,80}\btriangles?\b/i.test(normalized) ||
+    /\btriangles?\b[\s\S]{0,80}\b(?:solve|calculate|compute|find|determine|evaluate)\b/i.test(normalized);
+  if (!asksForMissingGeometry) return false;
   const sideMeasureMatches = normalized.match(
     new RegExp(`\\b(?:${numberPattern}|\\d+\\s+\\d+\\s*/\\s*\\d+)\\s*(?:inches?|in\\.?|feet|ft\\.?|cm|centimeters?|metres?|meters?|m)\\b`, "gi"),
   ) ?? [];
   const hasDeterminingConstraint =
-    /\b(?:equilateral|perimeter|area|angle|angles|one\s+leg|another\s+side|second\s+side|base|height|altitude|ratio|similar\s+triangle)\b/i.test(normalized);
+    /\b(?:equilateral|isosceles|right\s+triangle|right-?angled|perimeter|area|angle|angles|one\s+leg|another\s+side|second\s+side|base|height|altitude|ratio|similar\s+triangle)\b/i.test(normalized);
   return sideMeasureMatches.length <= 1 && !hasDeterminingConstraint;
 };
 
@@ -1246,7 +1250,8 @@ export function buildCalculatorCandidateHints(input: {
       "Return calculator-ready numeric expressions only; no prose or units inside expression.",
       "Normalize mixed-number notation before tool assembly; for example, 9 1/8 must become 73/8, not 91/8.",
       "Use *, /, ^, parentheses, sqrt(), pi, and scientific notation.",
-      "Convert input units to SI before writing the expression.",
+      "Convert input units to SI before writing physics expressions.",
+      "For pure geometry relations, preserve the input length unit for same-unit outputs; do not convert inches to meters unless the user explicitly asks for a unit conversion.",
       "Create one subgoal per meaningful numeric result.",
       "Use depends_on only when a later expression uses an earlier result.",
     ],

@@ -192,13 +192,17 @@ export const buildQeiBoundReceipt = (args: {
   boundSI?: number | null;
   boundProvenanceRef?: string | null;
   tauSeconds?: number | null;
+  tauSourceRef?: string | null;
   samplingKind?: Nhm2QeiWorldlineSamplingFunctionKind | null;
   samplingNormalized?: boolean;
   dutyCycle?: number | null;
+  dutyCycleSourceRef?: string | null;
   lightCrossingSeconds?: number | null;
+  lightCrossingSourceRef?: string | null;
   modulationSeconds?: number | null;
+  modulationSourceRef?: string | null;
   qftStateRef?: string | null;
-  renormalizationRef?: string | null;
+  renormalizationConventionRef?: string | null;
   stationaryWorldlineAssumption?: boolean;
   appliesToRegions?: Nhm2QeiWorldlineRegionId[] | null;
   auditOnly?: boolean;
@@ -225,8 +229,15 @@ export const buildQeiBoundReceipt = (args: {
   );
   const regions = args.appliesToRegions ?? defaultRegions;
   const modelKind = args.boundModelKind ?? "missing";
+  const atlasLightCrossingSeconds =
+    args.lightCrossingSeconds == null ? lightCrossingFromAtlas(atlas, regions) : null;
   const lightCrossingSeconds =
-    args.lightCrossingSeconds ?? lightCrossingFromAtlas(atlas, regions);
+    args.lightCrossingSeconds ?? atlasLightCrossingSeconds;
+  const lightCrossingSourceRef =
+    args.lightCrossingSourceRef ??
+    (atlasLightCrossingSeconds == null
+      ? null
+      : `${args.regionalSupportAtlasPath}:support_light_crossing_min`);
   const blockers = [
     ...(atlas.eligibility.atlasEligibleForClosureHarness
       ? []
@@ -270,20 +281,24 @@ export const buildQeiBoundReceipt = (args: {
       lightCrossingSeconds,
       modulationSeconds: args.modulationSeconds ?? null,
     },
+    provenance: {
+      boundProvenanceRef: args.boundProvenanceRef ?? null,
+      qftStateRef: args.qftStateRef ?? null,
+      renormalizationConventionRef: args.renormalizationConventionRef ?? null,
+      tauSourceRef: args.tauSourceRef ?? null,
+      dutyCycleSourceRef: args.dutyCycleSourceRef ?? null,
+      modulationSourceRef: args.modulationSourceRef ?? null,
+      lightCrossingSourceRef,
+    },
     applicability: {
       appliesToRegions: regions,
       stationaryWorldlineAssumption: args.stationaryWorldlineAssumption === true,
       reducedOrderOnly: modelKind === "declared_reduced_order",
       qftStateSpecified: args.qftStateRef != null,
-      renormalizationConventionSpecified: args.renormalizationRef != null,
+      renormalizationConventionSpecified: args.renormalizationConventionRef != null,
     },
     blockers,
-    warnings: [
-      ...(args.qftStateRef == null ? [] : [`qft_state_ref:${args.qftStateRef}`]),
-      ...(args.renormalizationRef == null
-        ? []
-        : [`renormalization_ref:${args.renormalizationRef}`]),
-    ],
+    warnings: [],
   });
   const outPath = resolvePath(args.repoRoot, args.outPath);
   mkdirSync(dirname(outPath), { recursive: true });
@@ -308,13 +323,18 @@ const main = (): void => {
     boundSI: asNumber(raw["bound-si"]),
     boundProvenanceRef: asString(raw["bound-provenance-ref"]),
     tauSeconds: asNumber(raw["tau-seconds"]),
+    tauSourceRef: asString(raw["tau-source-ref"]),
     samplingKind: normalizeSamplingKind(raw["sampling-kind"]),
     samplingNormalized: asBoolean(raw["sampling-normalized"]),
     dutyCycle: asNumber(raw["duty-cycle"]),
+    dutyCycleSourceRef: asString(raw["duty-cycle-source-ref"]),
     lightCrossingSeconds: asNumber(raw["light-crossing-seconds"]),
+    lightCrossingSourceRef: asString(raw["light-crossing-source-ref"]),
     modulationSeconds: asNumber(raw["modulation-seconds"]),
+    modulationSourceRef: asString(raw["modulation-source-ref"]),
     qftStateRef: asString(raw["qft-state-ref"]),
-    renormalizationRef: asString(raw["renormalization-ref"]),
+    renormalizationConventionRef:
+      asString(raw["renormalization-convention-ref"]) ?? asString(raw["renormalization-ref"]),
     stationaryWorldlineAssumption: asBoolean(raw["stationary-worldline-assumption"]),
     appliesToRegions: regionsFromCli(asString(raw["applies-to-regions"])),
     auditOnly: raw["audit-only"] === true,

@@ -634,9 +634,38 @@ export const planReferenceValidationChain = (
           : ["--tau-seconds", asOptionalString(args, "qei-tau-seconds") as string]
       ),
       ...(
+        asOptionalString(args, "qei-tau-source-ref") == null
+          ? []
+          : ["--tau-source-ref", asOptionalString(args, "qei-tau-source-ref") as string]
+      ),
+      ...(
         asOptionalString(args, "qei-duty-cycle") == null
           ? []
           : ["--duty-cycle", asOptionalString(args, "qei-duty-cycle") as string]
+      ),
+      ...(
+        asOptionalString(args, "qei-duty-cycle-source-ref") == null
+          ? []
+          : [
+              "--duty-cycle-source-ref",
+              asOptionalString(args, "qei-duty-cycle-source-ref") as string,
+            ]
+      ),
+      ...(
+        asOptionalString(args, "qei-light-crossing-seconds") == null
+          ? []
+          : [
+              "--light-crossing-seconds",
+              asOptionalString(args, "qei-light-crossing-seconds") as string,
+            ]
+      ),
+      ...(
+        asOptionalString(args, "qei-light-crossing-source-ref") == null
+          ? []
+          : [
+              "--light-crossing-source-ref",
+              asOptionalString(args, "qei-light-crossing-source-ref") as string,
+            ]
       ),
       ...(
         asOptionalString(args, "qei-modulation-seconds") == null
@@ -644,6 +673,14 @@ export const planReferenceValidationChain = (
           : [
               "--modulation-seconds",
               asOptionalString(args, "qei-modulation-seconds") as string,
+            ]
+      ),
+      ...(
+        asOptionalString(args, "qei-modulation-source-ref") == null
+          ? []
+          : [
+              "--modulation-source-ref",
+              asOptionalString(args, "qei-modulation-source-ref") as string,
             ]
       ),
       ...(
@@ -665,6 +702,14 @@ export const planReferenceValidationChain = (
           : [
               "--renormalization-ref",
               asOptionalString(args, "qei-renormalization-ref") as string,
+            ]
+      ),
+      ...(
+        asOptionalString(args, "qei-renormalization-convention-ref") == null
+          ? []
+          : [
+              "--renormalization-convention-ref",
+              asOptionalString(args, "qei-renormalization-convention-ref") as string,
             ]
       ),
       ...auditOnly,

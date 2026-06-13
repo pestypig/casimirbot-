@@ -53,6 +53,21 @@ describe("Helix Ask calculator compound chain", () => {
     });
   });
 
+  it("marks exact-triangle solve prompts with only a longest side as underdetermined", () => {
+    const prompt = "Solve the exact triangle if the longest side is 9 1/8 in.";
+    const hints = buildCalculatorCandidateHints({
+      prompt,
+      turnId: "turn:test",
+    });
+
+    expect(detectUnderdeterminedTrianglePrompt(prompt)).toBe(true);
+    expect(hints.problem_interpretation).toMatchObject({
+      prompt_kind: "underdetermined_triangle",
+      needs_more_information: true,
+      safe_to_calculate: false,
+    });
+  });
+
   it("plans and validates wavelength, photon energy, and eV conversion from frequency", () => {
     const chain = runCalculatorCompoundChain({
       prompt: "Given light frequency 6e14 Hz, use the calculator to compute wavelength, photon energy in joules, and photon energy in eV. Explain the result.",

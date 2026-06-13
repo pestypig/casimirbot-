@@ -283,6 +283,15 @@ describe("atlas-bound QEI and observer builders", () => {
           lightCrossingSeconds: 1e-6,
           modulationSeconds: 1e-6,
         },
+        provenance: {
+          boundProvenanceRef: "ford_roman_1996_quantum_inequality",
+          qftStateRef: "qft-state.json",
+          renormalizationConventionRef: "renormalization.json",
+          tauSourceRef: "sampling-policy.json#tau",
+          dutyCycleSourceRef: "tile-duty.json#dutyCycle",
+          modulationSourceRef: "drive-modulation.json#period",
+          lightCrossingSourceRef: "atlas.json#lightCrossing",
+        },
         applicability: {
           appliesToRegions: ["wall", "hull_wall_transition", "wall_exterior_transition"],
           stationaryWorldlineAssumption: true,
@@ -356,6 +365,15 @@ describe("atlas-bound QEI and observer builders", () => {
           dutyCycle: 0.5,
           lightCrossingSeconds: 1e-6,
           modulationSeconds: 1e-6,
+        },
+        provenance: {
+          boundProvenanceRef: "ford_roman_1996_quantum_inequality",
+          qftStateRef: "qft-state.json",
+          renormalizationConventionRef: "renormalization.json",
+          tauSourceRef: "sampling-policy.json#tau",
+          dutyCycleSourceRef: "tile-duty.json#dutyCycle",
+          modulationSourceRef: "drive-modulation.json#period",
+          lightCrossingSourceRef: "atlas.json#lightCrossing",
         },
         applicability: {
           appliesToRegions: ["wall"],

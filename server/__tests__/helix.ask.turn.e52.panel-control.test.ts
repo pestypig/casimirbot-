@@ -557,6 +557,138 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(runtimeCapabilities).not.toContain("scientific-calculator.solve_expression");
   }, 60000);
 
+  it("does not let keyed planning solve exact-triangle prompts with only a longest side", async () => {
+    const previousFlag = process.env.HELIX_AGENT_STEP_DECISION_LLM;
+    const previousPlannerResponse = process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;
+    process.env.HELIX_AGENT_STEP_DECISION_LLM = "1";
+    process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE = JSON.stringify({
+      subgoals: [
+        {
+          id: "convert_longest_side",
+          label: "Convert longest side to meters",
+          expression: "(73/8)*0.0254",
+          expected_quantity: "length",
+          expected_unit: "m",
+          equation: "inches_to_meters",
+        },
+      ],
+    });
+
+    try {
+      const app = createApp();
+      const response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question: "Solve the exact triangle if the longest side is 9 1/8 in.",
+          mode: "read",
+          debug: true,
+          sessionId: `e52-calculator-exact-triangle-underdetermined-${Date.now()}`,
+        })
+        .expect(200);
+
+      expect(response.body?.canonical_goal_frame?.goal_kind).not.toBe("calculator_solve");
+      expect(response.body?.canonical_goal_frame?.classifier_reasons).toEqual(
+        expect.arrayContaining(["underspecified_calculator_prompt"]),
+      );
+      expect(findAction(response.body, "scientific-calculator", "solve_expression")).toBeFalsy();
+      const runtimeCapabilities =
+        response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration.chosen_capability) ?? [];
+      expect(runtimeCapabilities).not.toContain("scientific-calculator.solve_expression");
+    } finally {
+      if (previousFlag === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;
+      else process.env.HELIX_AGENT_STEP_DECISION_LLM = previousFlag;
+      if (previousPlannerResponse === undefined) delete process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;
+      else process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE = previousPlannerResponse;
+    }
+  }, 60000);
+
+  it("does not let keyed calculator planning convert same-unit triangle geometry from inches to meters", async () => {
+    const previousFlag = process.env.HELIX_AGENT_STEP_DECISION_LLM;
+    const previousPlannerResponse = process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;
+    const previousFinalAnswer = process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE;
+    const previousAgentResponse = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+    const previousAgentIndex = process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+    process.env.HELIX_AGENT_STEP_DECISION_LLM = "1";
+    process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE = JSON.stringify({
+      subgoals: [
+        {
+          id: "leg_length",
+          label: "Compute each leg of the isosceles right triangle",
+          expression: "sqrt((73/8)^2/2)",
+          expected_quantity: "length",
+          expected_unit: "m",
+          equation: "leg = hypotenuse / sqrt(2)",
+          variables: [
+            { symbol: "c", value: "73/8", unit: "m", meaning: "hypotenuse" },
+          ],
+        },
+      ],
+    });
+    process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE =
+      "Each leg is sqrt((73/8)^2/2) = 6.45234937833 in.";
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = JSON.stringify([
+      {
+        next_step: "next_action",
+        chosen_capability: "scientific-calculator.solve_expression",
+        reason: "Compute the same-unit triangle leg length.",
+        args: { latex: "sqrt((73/8)^2/2)", compound_subgoal_id: "leg_length" },
+        expected_artifacts: ["calculator_receipt", "calculator_subgoal_receipt", "calculator_plan_coverage"],
+        confidence: 0.95,
+      },
+      {
+        next_step: "answer",
+        chosen_capability: null,
+        reason: "The calculator receipt covers the constrained geometry result.",
+        args: {},
+        expected_artifacts: ["workstation_tool_evaluation"],
+        confidence: 0.96,
+      },
+    ]);
+    process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = "0";
+
+    try {
+      const app = createApp();
+      const response = await request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question:
+            "Use the scientific calculator to solve an isosceles right triangle where the longest side is 9 1/8 inches. How long is each leg?",
+          mode: "read",
+          debug: true,
+          sessionId: `e52-calculator-isosceles-right-inch-unit-${Date.now()}`,
+        })
+        .expect(200);
+
+      const receipts = response.body?.calculator_subgoal_receipts ?? [];
+      expect(receipts).toHaveLength(1);
+      expect(receipts[0]).toMatchObject({
+        subgoal_id: "leg_length",
+        expression_box_input: "sqrt((73/8)^2/2)",
+        result_unit: "in",
+      });
+      expect(receipts[0]?.calculator_setup).toMatchObject({
+        result_unit: "in",
+      });
+      expect(response.body?.calculator_plan_coverage).toMatchObject({
+        coverage: "complete",
+        missing_requirement_ids: [],
+      });
+      expect(String(response.body?.selected_final_answer ?? "")).toContain("6.45234937833 in");
+      expect(String(response.body?.selected_final_answer ?? "")).not.toContain("6.45234937833 m");
+    } finally {
+      if (previousFlag === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;
+      else process.env.HELIX_AGENT_STEP_DECISION_LLM = previousFlag;
+      if (previousPlannerResponse === undefined) delete process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE;
+      else process.env.HELIX_CALCULATOR_PLANNER_TEST_RESPONSE = previousPlannerResponse;
+      if (previousFinalAnswer === undefined) delete process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE;
+      else process.env.HELIX_CALCULATOR_FINAL_ANSWER_TEST_RESPONSE = previousFinalAnswer;
+      if (previousAgentResponse === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE = previousAgentResponse;
+      if (previousAgentIndex === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX;
+      else process.env.HELIX_AGENT_STEP_DECISION_TEST_RESPONSE_INDEX = previousAgentIndex;
+    }
+  }, 60000);
+
   it("does not let calculator diagnostic prose become a calculator tool call", async () => {
     const app = createApp();
     const response = await request(app)
