@@ -34,10 +34,10 @@ const openPanelSnapshot = (): { openPanelCount: number; focusedPanelId: string |
   const layout = useWorkstationLayoutStore.getState();
   const mobile = useMobileAppStore.getState();
   const panelIds = new Set<string>();
-  Object.values(layout.groups).forEach((group) => {
-    group.panelIds.forEach((panelId) => panelIds.add(panelId));
+  Object.values(layout.groups).forEach((group: { panelIds: string[] }) => {
+    group.panelIds.forEach((panelId: string) => panelIds.add(panelId));
   });
-  mobile.stack.forEach((entry) => panelIds.add(entry.panelId));
+  mobile.stack.forEach((entry: { panelId: string }) => panelIds.add(entry.panelId));
   const focusedPanelId =
     layout.groups[layout.activeGroupId]?.activePanelId ??
     mobile.activeId ??
@@ -87,7 +87,7 @@ function startSamplerInstance(): () => void {
   const longTaskObserver = PerformanceObserverCtor &&
     Array.isArray((PerformanceObserverCtor as typeof PerformanceObserver & { supportedEntryTypes?: string[] }).supportedEntryTypes) &&
     (PerformanceObserverCtor as typeof PerformanceObserver & { supportedEntryTypes?: string[] }).supportedEntryTypes?.includes("longtask")
-    ? new PerformanceObserverCtor((list) => {
+    ? new PerformanceObserverCtor((list: PerformanceObserverEntryList) => {
         const nowMs = performance.now();
         for (const entry of list.getEntries()) {
           longTaskSamples.push({
@@ -117,7 +117,7 @@ function startSamplerInstance(): () => void {
     if (kind === "pointer" && nowMs - lastInteractionSampleAtMs < INTERACTION_SAMPLE_THROTTLE_MS) return;
     lastInteractionSampleAtMs = nowMs;
     const inputDelayMs = Math.max(0, nowMs - eventTimestampMs(event, nowMs));
-    window.requestAnimationFrame((frameAtMs) => {
+    window.requestAnimationFrame((frameAtMs: number) => {
       if (stopped) return;
       interactionSamples.push({
         ts: nowMs,

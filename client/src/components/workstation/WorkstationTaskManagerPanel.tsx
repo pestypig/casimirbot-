@@ -67,7 +67,7 @@ const statusClass = (status: string): string => {
 };
 
 const kindLabel = (kind: string): string =>
-  kind.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  kind.replace(/_/g, " ").replace(/\b\w/g, (letter: string) => letter.toUpperCase());
 
 const memoryDisplay = (process: HelixWorkstationTaskManagerProcess): string => {
   const memory = process.memory;
@@ -269,7 +269,7 @@ const buildPanelProcesses = (
   source: "workstation_layout_store" | "mobile_app_store",
   performanceSample: HelixWorkstationBrowserPerformanceSample | null,
 ): HelixWorkstationTaskManagerProcess[] =>
-  Array.from(new Set(panelIds)).map((panelId) => {
+  Array.from(new Set(panelIds)).map((panelId: string) => {
     const def = getPanelDef(panelId);
     const isFocused = focusedPanelId === panelId;
     const estimateMiB = panelEstimateMiB(panelId);
@@ -316,20 +316,20 @@ const mergeProcesses = (
 };
 
 export default function WorkstationTaskManagerPanel() {
-  const layoutGroups = useWorkstationLayoutStore((state) => state.groups);
-  const activeGroupId = useWorkstationLayoutStore((state) => state.activeGroupId);
-  const mobileStack = useMobileAppStore((state) => state.stack);
-  const mobileActiveId = useMobileAppStore((state) => state.activeId);
-  const performanceSample = useWorkstationPerformanceStore((state) => state.latest);
+  const layoutGroups = useWorkstationLayoutStore((state: any) => state.groups);
+  const activeGroupId = useWorkstationLayoutStore((state: any) => state.activeGroupId);
+  const mobileStack = useMobileAppStore((state: any) => state.stack);
+  const mobileActiveId = useMobileAppStore((state: any) => state.activeId);
+  const performanceSample = useWorkstationPerformanceStore((state: any) => state.latest);
   const [serverSnapshot, setServerSnapshot] = React.useState<HelixWorkstationTaskManagerSnapshot | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   const browserProcesses = React.useMemo(() => {
-    const layoutPanelIds = Object.values(layoutGroups).flatMap((group) => group.panelIds);
+    const layoutPanelIds = Object.values(layoutGroups).flatMap((group: any) => group.panelIds);
     const focusedPanelId = layoutGroups[activeGroupId]?.activePanelId ?? null;
     const panelProcesses = buildPanelProcesses(layoutPanelIds, focusedPanelId, "workstation_layout_store", performanceSample);
-    const mobileProcesses = buildPanelProcesses(mobileStack.map((entry) => entry.panelId), mobileActiveId, "mobile_app_store", performanceSample);
+    const mobileProcesses = buildPanelProcesses(mobileStack.map((entry: any) => entry.panelId), mobileActiveId, "mobile_app_store", performanceSample);
     const browser = sampleBrowserMemory();
     const frameLoop = buildFrameLoopProcess(performanceSample);
     const interactionLoop = buildInteractionLoopProcess(performanceSample);
@@ -448,7 +448,7 @@ export default function WorkstationTaskManagerPanel() {
             </tr>
           </thead>
           <tbody>
-            {processes.map((process) => (
+            {processes.map((process: HelixWorkstationTaskManagerProcess) => (
               <tr key={process.process_id} className="border-b border-white/5 hover:bg-white/[0.03]">
                 <td className="px-3 py-2">
                   <div className="truncate font-medium text-slate-100">{process.label}</div>

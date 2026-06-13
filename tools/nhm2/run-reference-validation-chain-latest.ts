@@ -7,6 +7,11 @@ import { normalize } from "node:path";
 
 type CliArgs = Record<string, string | boolean>;
 type InputRefs = Record<string, string | null>;
+type ResolvedLatestInputs = {
+  runId: string;
+  outRoot: string;
+  inputRefs: InputRefs;
+};
 type AtlasManifestCandidate = {
   path: string;
   generatedAt: string;
@@ -150,7 +155,7 @@ const artifactSetPath = (referenceRun: any, artifactId: string): string | null =
   return typeof match?.path === "string" ? match.path : null;
 };
 
-const resolveInputs = (args: CliArgs): { runId: string; outRoot: string; inputRefs: InputRefs } => {
+const resolveInputs = (args: CliArgs): ResolvedLatestInputs => {
   const explicitReferenceRun = asString(args, "reference-run");
   const explicitSourceClosure = asString(args, "source-closure");
   const explicitFullLoopAudit = asString(args, "full-loop-audit");
@@ -158,6 +163,8 @@ const resolveInputs = (args: CliArgs): { runId: string; outRoot: string; inputRe
   const explicitRunId = asString(args, "run-id");
   const explicitLedger = asString(args, "ledger");
   const explicitRegionalSourceClosure = asString(args, "regional-source-closure-evidence");
+  const generateCurrentRuntimeSourceClosure =
+    args["generate-current-runtime-source-closure"] === true;
 
   const manifestPath = newestAtlasManifest();
   const manifest = manifestPath == null ? null : readJson(manifestPath);
@@ -174,10 +181,14 @@ const resolveInputs = (args: CliArgs): { runId: string; outRoot: string; inputRe
     explicitReferenceRun ?? ledger?.artifactRefs?.referenceRun ?? null,
   );
   const referenceRunJson = readJson(referenceRun);
-  const sourceClosure = ensureFile(
-    "source_closure",
-    explicitSourceClosure ?? artifactSetPath(referenceRunJson, "nhm2_source_closure"),
-  );
+  const sourceClosure = generateCurrentRuntimeSourceClosure
+    ? explicitSourceClosure == null
+      ? null
+      : ensureFile("source_closure", explicitSourceClosure)
+    : ensureFile(
+        "source_closure",
+        explicitSourceClosure ?? artifactSetPath(referenceRunJson, "nhm2_source_closure"),
+      );
   const fullLoopAudit = ensureFile(
     "full_loop_audit",
     explicitFullLoopAudit ?? ledger?.artifactRefs?.fullLoopAudit ?? artifactSetPath(referenceRunJson, "nhm2_full_loop"),
@@ -206,31 +217,28 @@ const resolveInputs = (args: CliArgs): { runId: string; outRoot: string; inputRe
   };
 };
 
-const runChain = async (args: CliArgs): Promise<number> => {
-  const resolved = resolveInputs(args);
-  const outputRoot = repoPath(resolved.outRoot);
-  const logsDir = path.join(outputRoot, "logs");
-  fs.mkdirSync(logsDir, { recursive: true });
-
-  const stdoutPath = path.join(logsDir, "reference-validation-chain.stdout.log");
-  const stderrPath = path.join(logsDir, "reference-validation-chain.stderr.log");
-  const invocationPath = path.join(outputRoot, "reference-validation-chain.invocation.json");
-  const stdout = fs.createWriteStream(stdoutPath, { flags: "w" });
-  const stderr = fs.createWriteStream(stderrPath, { flags: "w" });
-  const startedAt = new Date().toISOString();
-  const command = "npm";
+export const buildReferenceValidationChainLatestCommandArgs = (
+  args: CliArgs,
+  resolved: ResolvedLatestInputs,
+): string[] => {
   const forwardStringArg = (key: string): string[] => {
     const value = asString(args, key);
     return value == null ? [] : [`--${key}`, value];
   };
-  const commandArgs = [
+  const forwardBooleanArg = (key: string): string[] =>
+    args[key] === true ? [`--${key}`] : [];
+  const generateCurrentRuntimeSourceClosure =
+    args["generate-current-runtime-source-closure"] === true;
+
+  return [
     "run",
     "nhm2:run-reference-validation-chain",
     "--",
     "--reference-run",
     resolved.inputRefs.referenceRun!,
-    "--source-closure",
-    resolved.inputRefs.sourceClosure!,
+    ...(generateCurrentRuntimeSourceClosure
+      ? []
+      : ["--source-closure", resolved.inputRefs.sourceClosure!]),
     "--full-loop-audit",
     resolved.inputRefs.fullLoopAudit!,
     "--out-root",
@@ -244,21 +252,45 @@ const runChain = async (args: CliArgs): Promise<number> => {
     ...forwardStringArg("observer-robust-energy-conditions"),
     ...forwardStringArg("source-input"),
     ...forwardStringArg("conservation"),
+    ...forwardStringArg("regional-source-transition-kernel"),
+    ...forwardStringArg("regional-support-atlas"),
     ...forwardStringArg("tile-local-source-elements"),
-    ...(args["build-tile-local-source-elements"] === true
-      ? ["--build-tile-local-source-elements"]
-      : []),
+    ...forwardBooleanArg("build-tile-local-source-elements"),
+    ...forwardBooleanArg("build-regional-source-transition-kernel"),
+    ...forwardBooleanArg("build-regional-support-function-atlas"),
     ...forwardStringArg("casimir-material-receipt"),
     ...forwardStringArg("wall-material-source-tensor-model"),
     ...forwardStringArg("wall-source-component-model"),
     ...forwardStringArg("regional-material-source-tensor-model"),
     ...forwardStringArg("regional-source-component-model"),
+    ...forwardStringArg("regional-source-full-tensor-template"),
+    ...forwardStringArg("metric-required-full-tensor-source"),
+    ...forwardStringArg("metric-runtime-artifact"),
+    ...forwardStringArg("current-runtime-profile-id"),
+    ...forwardBooleanArg("generate-current-runtime-source-closure"),
+    ...forwardBooleanArg("generate-metric-required-full-tensor-source"),
     ...forwardStringArg("layered-wall-source-candidate"),
     ...forwardStringArg("layered-wall-source-candidate-row-id"),
     ...forwardStringArg("layered-wall-volume-mode"),
     ...forwardStringArg("literature-map"),
-    ...(args["audit-only"] === true ? ["--audit-only"] : []),
+    ...forwardBooleanArg("audit-only"),
   ];
+};
+
+const runChain = async (args: CliArgs): Promise<number> => {
+  const resolved = resolveInputs(args);
+  const outputRoot = repoPath(resolved.outRoot);
+  const logsDir = path.join(outputRoot, "logs");
+  fs.mkdirSync(logsDir, { recursive: true });
+
+  const stdoutPath = path.join(logsDir, "reference-validation-chain.stdout.log");
+  const stderrPath = path.join(logsDir, "reference-validation-chain.stderr.log");
+  const invocationPath = path.join(outputRoot, "reference-validation-chain.invocation.json");
+  const stdout = fs.createWriteStream(stdoutPath, { flags: "w" });
+  const stderr = fs.createWriteStream(stderrPath, { flags: "w" });
+  const startedAt = new Date().toISOString();
+  const command = "npm";
+  const commandArgs = buildReferenceValidationChainLatestCommandArgs(args, resolved);
 
   let exitCode: number | null = null;
   const child = spawn(command, commandArgs, {

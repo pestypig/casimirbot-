@@ -284,15 +284,15 @@ export const summarizeHelixWorkstationTaskManager = (
   commandReliability?: HelixWorkstationCommandReliabilityStatus | null,
 ): HelixWorkstationTaskManagerSummary => {
   const sorted = sortHelixWorkstationTaskManagerProcesses(processes);
-  const totalObserved = processes.reduce((sum, process) => {
+  const totalObserved = processes.reduce((sum: number, process: HelixWorkstationTaskManagerProcess) => {
     if (!process.memory.observed) return sum;
     return sum + (process.memory.used_mib ?? process.memory.rss_mib ?? process.memory.heap_used_mib ?? 0);
   }, 0);
   return {
     process_count: processes.length,
-    observed_process_count: processes.filter((process) => process.memory.observed).length,
-    estimated_process_count: processes.filter((process) => !process.memory.observed && process.memory.estimate_mib != null).length,
-    unknown_process_count: processes.filter((process) => !process.memory.observed && process.memory.estimate_mib == null).length,
+    observed_process_count: processes.filter((process: HelixWorkstationTaskManagerProcess) => process.memory.observed).length,
+    estimated_process_count: processes.filter((process: HelixWorkstationTaskManagerProcess) => !process.memory.observed && process.memory.estimate_mib != null).length,
+    unknown_process_count: processes.filter((process: HelixWorkstationTaskManagerProcess) => !process.memory.observed && process.memory.estimate_mib == null).length,
     total_observed_mib: roundMiB(totalObserved) ?? 0,
     highest_process_id: sorted[0]?.process_id ?? null,
     pressure_level: pressureLevel ?? null,
@@ -304,11 +304,11 @@ export const summarizeHelixWorkstationTaskManager = (
     ui_input_to_next_frame_p95_ms: browserPerformance?.input_to_next_frame_p95_ms ?? null,
     command_recent_receipt_count: commandReliability?.summary.recent_receipt_count ?? 0,
     command_failed_receipt_count: commandReliability?.summary.failed_receipt_count ?? 0,
-    browser_sample_included: processes.some((process) =>
+    browser_sample_included: processes.some((process: HelixWorkstationTaskManagerProcess) =>
       process.memory.source === "browser_performance_memory" ||
       process.memory.source === "browser_frame_sampler" ||
       process.memory.source === "browser_interaction_sampler"
     ),
-    server_sample_included: processes.some((process) => process.memory.source === "runtime_governor"),
+    server_sample_included: processes.some((process: HelixWorkstationTaskManagerProcess) => process.memory.source === "runtime_governor"),
   };
 };

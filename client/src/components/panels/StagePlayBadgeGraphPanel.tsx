@@ -4813,7 +4813,7 @@ function StagePlayMailLoopLiveOverview({
     state: "idle" | "saving" | "saved" | "failed";
     message: string;
   }>({ state: "idle", message: "" });
-  const debugCopyResetTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const debugCopyResetTimerRef = useRef<number | null>(null);
   const mailItems = mailbox?.mailItems ?? [];
   const packets = mailbox?.processedMailPackets ?? [];
   const runs = mailbox?.microReasonerRuns ?? [];

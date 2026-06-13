@@ -211,13 +211,13 @@ export const getHelixWorkstationCommandReliabilityStatus = (
   now = new Date(),
 ): HelixWorkstationCommandReliabilityStatus => {
   const cutoff = now.getTime() - RECEIPT_WINDOW_MS;
-  const receipts = commandReceipts.filter((receipt) => {
+  const receipts = commandReceipts.filter((receipt: HelixWorkstationCommandReceipt) => {
     const occurredAt = Date.parse(receipt.occurred_at);
     return Number.isFinite(occurredAt) && occurredAt >= cutoff;
   });
   const latencies = receipts
-    .map((receipt) => receipt.latency_ms)
-    .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0);
+    .map((receipt: HelixWorkstationCommandReceipt) => receipt.latency_ms)
+    .filter((value: number | null | undefined): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0);
   return {
     schema_version: HELIX_WORKSTATION_COMMAND_RELIABILITY_SCHEMA,
     generated_at: now.toISOString(),
@@ -225,9 +225,9 @@ export const getHelixWorkstationCommandReliabilityStatus = (
     receipts,
     summary: {
       recent_receipt_count: receipts.length,
-      failed_receipt_count: receipts.filter((receipt) => receipt.status === "failed").length,
-      in_flight_receipt_count: receipts.filter((receipt) => receipt.status === "in_flight").length,
-      succeeded_receipt_count: receipts.filter((receipt) => receipt.status === "succeeded").length,
+      failed_receipt_count: receipts.filter((receipt: HelixWorkstationCommandReceipt) => receipt.status === "failed").length,
+      in_flight_receipt_count: receipts.filter((receipt: HelixWorkstationCommandReceipt) => receipt.status === "in_flight").length,
+      succeeded_receipt_count: receipts.filter((receipt: HelixWorkstationCommandReceipt) => receipt.status === "succeeded").length,
       last_command_id: receipts[receipts.length - 1]?.command_id ?? null,
       p95_latency_ms: roundOne(percentile(latencies, 0.95)),
     },

@@ -116,7 +116,7 @@ export interface HelixWorkspaceOsStatus {
 }
 
 export const buildHelixWorkspaceOsAuthority = (
-  terminalIneligibleReason = HELIX_WORKSPACE_OS_AUTHORITY_REASON,
+  terminalIneligibleReason: string = HELIX_WORKSPACE_OS_AUTHORITY_REASON,
 ): HelixWorkspaceOsAuthority => ({
   assistant_answer: false,
   raw_content_included: false,
@@ -128,7 +128,7 @@ export const withHelixWorkspaceOsAuthority = <
   T extends Omit<HelixWorkspaceOsCapabilityRecord, "authority">,
 >(
   record: T,
-  terminalIneligibleReason = HELIX_WORKSPACE_OS_AUTHORITY_REASON,
+  terminalIneligibleReason: string = HELIX_WORKSPACE_OS_AUTHORITY_REASON,
 ): T & { authority: HelixWorkspaceOsAuthority } => ({
   ...record,
   authority: buildHelixWorkspaceOsAuthority(terminalIneligibleReason),

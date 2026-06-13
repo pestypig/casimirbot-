@@ -49,6 +49,23 @@ const pressureStatus = (pressure: unknown): HelixWorkstationTaskManagerProcessSt
 
 type RuntimeMemorySnapshot = ReturnType<typeof runtimeMemoryGovernor.getRuntimeMemorySnapshot>;
 type RuntimeTaskSnapshot = ReturnType<typeof runtimeMemoryGovernor.getRuntimeTaskSnapshot>;
+type RuntimeTaskClassEntry = {
+  taskClass: string;
+  priority: number;
+  deferrable: boolean;
+  pausable: boolean;
+  maxConcurrent: number;
+  burstLimit: number;
+  burstWindowMs: number;
+  burstUsed: number;
+  activeCount: number;
+  estimatedBurstMiB?: number | null;
+};
+type RuntimeTaskEntry = {
+  id: string;
+  taskClass: string;
+  admittedAtMs: number;
+};
 
 export type HelixWorkstationTaskManagerReaders = {
   getRuntimeMemorySnapshot: typeof runtimeMemoryGovernor.getRuntimeMemorySnapshot;
@@ -126,8 +143,8 @@ const buildTaskClassProcesses = (
     }
   }
 
-  return taskSnapshot.classes
-    .filter((taskClass) =>
+  return (taskSnapshot.classes as RuntimeTaskClassEntry[])
+    .filter((taskClass: RuntimeTaskClassEntry) =>
       taskClass.activeCount > 0 ||
       (pausedByClass.get(taskClass.taskClass) ?? 0) > 0 ||
       (queuedByClass.get(taskClass.taskClass) ?? 0) > 0 ||
@@ -135,7 +152,7 @@ const buildTaskClassProcesses = (
       typeof taskClass.estimatedBurstMiB === "number" ||
       taskClass.taskClass === "stage_play_refresh"
     )
-    .map((taskClass) => {
+    .map((taskClass: RuntimeTaskClassEntry) => {
       const pausedCount = pausedByClass.get(taskClass.taskClass) ?? 0;
       const queuedCount = queuedByClass.get(taskClass.taskClass) ?? 0;
       const rejectedCount = rejectedByClass.get(taskClass.taskClass) ?? 0;
@@ -185,9 +202,9 @@ const buildActiveTaskProcesses = (
   taskSnapshot: RuntimeTaskSnapshot,
   generatedAt: string,
 ): HelixWorkstationTaskManagerProcess[] => {
-  const budgetByClass = new Map(taskSnapshot.classes.map((taskClass) => [taskClass.taskClass, taskClass]));
+  const budgetByClass = new Map((taskSnapshot.classes as RuntimeTaskClassEntry[]).map((taskClass: RuntimeTaskClassEntry) => [taskClass.taskClass, taskClass]));
   const nowMs = Date.parse(generatedAt);
-  return taskSnapshot.activeTasks.map((task) => {
+  return (taskSnapshot.activeTasks as RuntimeTaskEntry[]).map((task: RuntimeTaskEntry) => {
     const budget = budgetByClass.get(task.taskClass);
     return withHelixWorkstationTaskManagerAuthority({
       process_id: `runtime.task.${hashShort(task.id)}`,
