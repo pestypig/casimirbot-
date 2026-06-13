@@ -233,6 +233,11 @@ const admissibleComponentAuthorities = new Set<Nhm2RegionalMaterialSourceCompone
   "reduced_order_declared",
 ]);
 
+const requiredComponentsForAuthorityMode = (
+  tensorAuthorityMode: Nhm2TensorAuthorityMode,
+): readonly Nhm2TensorComponent[] =>
+  tensorAuthorityMode === "full_tensor" ? NHM2_TENSOR_COMPONENTS : SYMMETRIC_TENSOR_COMPONENTS;
+
 export const inferNhm2RegionalMaterialSourceTensorAuthorityMode = (
   tensor: Nhm2RegionalTensor,
 ): Nhm2TensorAuthorityMode => {
@@ -361,8 +366,9 @@ const normalizeRegion = (
       ? region.missingComponentIds
       : missingNhm2RegionalMaterialSourceTensorComponents(region.tensor);
   const blockers = new Set(region.blockers);
+  const authorityComponents = requiredComponentsForAuthorityMode(tensorAuthorityMode);
   const componentAuthority = Object.fromEntries(
-    NHM2_TENSOR_COMPONENTS.map((component) => [
+    authorityComponents.map((component) => [
       component,
       componentAuthorityFor({
         component,
@@ -389,7 +395,8 @@ const normalizeRegion = (
   ) {
     blockers.add("material_receipt_missing_or_not_receipted");
   }
-  for (const [component, authority] of Object.entries(componentAuthority)) {
+  for (const component of authorityComponents) {
+    const authority = componentAuthority[component] ?? "missing";
     const blocker = componentAuthorityBlocker(authority);
     if (blocker != null && blocker !== "component_authority_reduced_order_declared") {
       blockers.add(`${component}:${blocker}`);
@@ -437,7 +444,7 @@ export const buildNhm2RegionalMaterialSourceTensorModelArtifact = (
     authority: Nhm2RegionalMaterialSourceComponentAuthority,
   ): string[] =>
     regions.flatMap((region) =>
-      NHM2_TENSOR_COMPONENTS.filter(
+      requiredComponentsForAuthorityMode(region.tensorAuthorityMode).filter(
         (component) => region.componentAuthority[component] === authority,
       ).map((component) => `${region.regionId}:${component}`),
     );
@@ -448,7 +455,9 @@ export const buildNhm2RegionalMaterialSourceTensorModelArtifact = (
     ...componentRefs("missing"),
   ];
   const allComponentAuthorities = regions.flatMap((region) =>
-    NHM2_TENSOR_COMPONENTS.map((component) => region.componentAuthority[component] ?? "missing"),
+    requiredComponentsForAuthorityMode(region.tensorAuthorityMode).map(
+      (component) => region.componentAuthority[component] ?? "missing",
+    ),
   );
   return {
     contractVersion: NHM2_REGIONAL_MATERIAL_SOURCE_TENSOR_MODEL_CONTRACT_VERSION,
