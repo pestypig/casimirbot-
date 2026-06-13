@@ -329,6 +329,47 @@ const buildBrowserInteractionProcess = (
     },
   });
 
+const buildBrowserSchedulerProcess = (
+  sample: HelixWorkstationBrowserPerformanceSample,
+): HelixWorkstationTaskManagerProcess => {
+  const mode = sample.scheduler_interaction_mode ?? "unknown";
+  const status: HelixWorkstationTaskManagerProcessStatus = mode === "idle"
+    ? "idle"
+    : mode === "blocked"
+      ? "blocked"
+      : mode === "unknown"
+        ? "unknown"
+        : "active";
+  return withHelixWorkstationTaskManagerAuthority({
+    process_id: "workstation.interaction_scheduler",
+    label: "Workstation interaction scheduler",
+    kind: "workstation_scheduler",
+    status,
+    source: "workstation_interaction_scheduler",
+    updated_at: sample.sampled_at,
+    memory: {
+      source: "workstation_scheduler",
+      approximate: true,
+      observed: false,
+      estimate_mib: null,
+      pressure: mode,
+    },
+    diagnostics: {
+      interaction_mode: mode,
+      pending_task_count: sample.scheduler_pending_task_count ?? 0,
+      pending_immediate_input_count: sample.scheduler_pending_immediate_input_count ?? 0,
+      pending_visual_frame_count: sample.scheduler_pending_visual_frame_count ?? 0,
+      pending_committed_layout_count: sample.scheduler_pending_committed_layout_count ?? 0,
+      pending_evidence_refresh_count: sample.scheduler_pending_evidence_refresh_count ?? 0,
+      pending_share_state_count: sample.scheduler_pending_share_state_count ?? 0,
+      pending_background_diagnostics_count: sample.scheduler_pending_background_diagnostics_count ?? 0,
+      deferred_task_count: sample.scheduler_deferred_task_count ?? 0,
+      last_deferred_at_ms: sample.scheduler_last_deferred_at_ms ?? null,
+      sampled_via: "browser_performance_status",
+    },
+  });
+};
+
 const buildCommandReliabilityProcess = (
   status: HelixWorkstationCommandReliabilityStatus,
   generatedAt: string,
@@ -397,6 +438,7 @@ export async function buildHelixWorkstationTaskManagerSnapshot(
     if (browserPerformance) {
       processes.push(buildBrowserFrameProcess(browserPerformance));
       processes.push(buildBrowserInteractionProcess(browserPerformance));
+      processes.push(buildBrowserSchedulerProcess(browserPerformance));
     }
   } catch (error) {
     processes.push(withHelixWorkstationTaskManagerAuthority({

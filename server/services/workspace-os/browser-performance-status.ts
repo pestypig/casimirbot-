@@ -11,6 +11,7 @@ import {
   type HelixWorkstationCommandReceiptStatus,
   type HelixWorkstationCommandReliabilityStatus,
   type HelixWorkstationInteractionKind,
+  type HelixWorkstationInteractionSchedulerMode,
   type HelixWorkstationUiFramePressure,
 } from "@shared/helix-workstation-task-manager";
 
@@ -96,6 +97,21 @@ const interactionKind = (value: unknown): HelixWorkstationInteractionKind | null
   return null;
 };
 
+const schedulerMode = (value: unknown): HelixWorkstationInteractionSchedulerMode => {
+  if (
+    value === "idle" ||
+    value === "scrolling" ||
+    value === "dragging" ||
+    value === "resizing" ||
+    value === "typing" ||
+    value === "blocked" ||
+    value === "unknown"
+  ) {
+    return value;
+  }
+  return "unknown";
+};
+
 const receiptStage = (value: unknown): HelixWorkstationCommandReceiptStage => {
   if (
     value === "interaction_received" ||
@@ -148,6 +164,16 @@ export const sanitizeHelixWorkstationBrowserPerformanceSample = (
     active_interaction_kind: interactionKind(record.active_interaction_kind),
     active_panel_id: record.active_panel_id == null ? null : sanitizeId(record.active_panel_id, "unknown"),
     responsiveness_pressure: pressure(record.responsiveness_pressure),
+    scheduler_interaction_mode: schedulerMode(record.scheduler_interaction_mode),
+    scheduler_pending_task_count: intNumber(record.scheduler_pending_task_count, 0, 100_000),
+    scheduler_deferred_task_count: intNumber(record.scheduler_deferred_task_count, 0, 1_000_000),
+    scheduler_pending_immediate_input_count: intNumber(record.scheduler_pending_immediate_input_count, 0, 100_000),
+    scheduler_pending_visual_frame_count: intNumber(record.scheduler_pending_visual_frame_count, 0, 100_000),
+    scheduler_pending_committed_layout_count: intNumber(record.scheduler_pending_committed_layout_count, 0, 100_000),
+    scheduler_pending_evidence_refresh_count: intNumber(record.scheduler_pending_evidence_refresh_count, 0, 100_000),
+    scheduler_pending_share_state_count: intNumber(record.scheduler_pending_share_state_count, 0, 100_000),
+    scheduler_pending_background_diagnostics_count: intNumber(record.scheduler_pending_background_diagnostics_count, 0, 100_000),
+    scheduler_last_deferred_at_ms: clampNumber(record.scheduler_last_deferred_at_ms, 0, 10_000_000_000),
   });
 };
 

@@ -27,13 +27,51 @@ type BrowserPerformanceMemory = {
 
 const BYTES_PER_MIB = 1024 * 1024;
 const POLL_INTERVAL_MS = 5000;
+const VISIBLE_UPDATE_INTERVAL_MS = 1500;
+const INTERACTION_UPDATE_INTERVAL_MS = 3500;
 let cachedBrowserDomNodeCount = 0;
+let cachedStagePlayPacketNodeCount: number | null = null;
+
+type TaskManagerInteractionState = Pick<
+  WorkstationInteractionState,
+  | "mode"
+  | "source"
+  | "activeSinceMs"
+  | "lastInteractionAtMs"
+  | "lastQuietAtMs"
+  | "pendingTaskCount"
+  | "pendingByPriority"
+  | "deferredTaskCount"
+  | "lastDeferredAtMs"
+>;
+type TaskManagerPerformanceState = ReturnType<typeof useWorkstationPerformanceStore.getState>;
+
+const snapshotInteractionState = (
+  state: WorkstationInteractionState,
+): TaskManagerInteractionState => ({
+  mode: state.mode,
+  source: state.source,
+  activeSinceMs: state.activeSinceMs,
+  lastInteractionAtMs: state.lastInteractionAtMs,
+  lastQuietAtMs: state.lastQuietAtMs,
+  pendingTaskCount: state.pendingTaskCount,
+  pendingByPriority: { ...state.pendingByPriority },
+  deferredTaskCount: state.deferredTaskCount,
+  lastDeferredAtMs: state.lastDeferredAtMs,
+});
 
 const readBrowserDomNodeCount = (): number => {
   if (typeof document === "undefined") return 0;
   if (isInteractionActive(500)) return cachedBrowserDomNodeCount;
   cachedBrowserDomNodeCount = document.getElementsByTagName("*").length;
   return cachedBrowserDomNodeCount;
+};
+
+const readStagePlayPacketNodeCount = (): number | null => {
+  if (typeof document === "undefined") return null;
+  if (isInteractionActive(500)) return cachedStagePlayPacketNodeCount;
+  cachedStagePlayPacketNodeCount = document.querySelectorAll('[data-testid*="stage-play"][data-testid*="packet"]').length;
+  return cachedStagePlayPacketNodeCount;
 };
 
 const formatMiB = (value: number | null | undefined): string => {
@@ -282,7 +320,7 @@ const buildInteractionLoopProcess = (
 };
 
 const buildSchedulerProcess = (
-  interaction: WorkstationInteractionState,
+  interaction: TaskManagerInteractionState,
 ): HelixWorkstationTaskManagerProcess =>
   withHelixWorkstationTaskManagerAuthority({
     process_id: "workstation.interaction_scheduler",
@@ -331,10 +369,9 @@ const buildPanelProcesses = (
     const isFocused = focusedPanelId === panelId;
     const estimateMiB = panelEstimateMiB(panelId);
     const renderStatus = panelRenderStatus(panelId, isFocused, estimateMiB, performanceSample);
-    const packetNodeCount =
-      panelId === "stage-play-badge-graph" && typeof document !== "undefined"
-        ? document.querySelectorAll('[data-testid*="stage-play"][data-testid*="packet"]').length
-        : null;
+    const packetNodeCount = panelId === "stage-play-badge-graph"
+      ? readStagePlayPacketNodeCount()
+      : null;
     return withHelixWorkstationTaskManagerAuthority({
       process_id: `panel.${panelId}`,
       label: def?.title ?? panelId,
@@ -372,13 +409,159 @@ const mergeProcesses = (
   return sortHelixWorkstationTaskManagerProcesses([...byId.values()]);
 };
 
+const budgetIntervalMs = (): number =>
+  isInteractionActive(500) ? INTERACTION_UPDATE_INTERVAL_MS : VISIBLE_UPDATE_INTERVAL_MS;
+
+const useBudgetedBrowserPerformanceSample = (): HelixWorkstationBrowserPerformanceSample | null => {
+  const [visibleSample, setVisibleSample] = React.useState<HelixWorkstationBrowserPerformanceSample | null>(() =>
+    useWorkstationPerformanceStore.getState().latest
+  );
+  const pendingSampleRef = React.useRef<HelixWorkstationBrowserPerformanceSample | null>(visibleSample);
+  const lastVisibleUpdateAtRef = React.useRef(visibleSample ? Date.now() : 0);
+  const timerRef = React.useRef<number | null>(null);
+
+  React.useEffect(() => {
+    const clearTimer = () => {
+      if (timerRef.current !== null) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+    const apply = () => {
+      timerRef.current = null;
+      lastVisibleUpdateAtRef.current = Date.now();
+      const nextSample = pendingSampleRef.current;
+      React.startTransition(() => {
+        setVisibleSample(nextSample);
+      });
+    };
+    const schedule = (nextSample: HelixWorkstationBrowserPerformanceSample | null) => {
+      pendingSampleRef.current = nextSample;
+      if (!nextSample) {
+        clearTimer();
+        apply();
+        return;
+      }
+      const now = Date.now();
+      const elapsedMs = now - lastVisibleUpdateAtRef.current;
+      const delayMs = Math.max(0, budgetIntervalMs() - elapsedMs);
+      if (delayMs === 0) {
+        clearTimer();
+        apply();
+        return;
+      }
+      if (timerRef.current !== null) return;
+      timerRef.current = window.setTimeout(apply, delayMs);
+    };
+
+    const unsubscribe = useWorkstationPerformanceStore.subscribe((state: TaskManagerPerformanceState) => {
+      schedule(state.latest);
+    });
+    return () => {
+      unsubscribe();
+      clearTimer();
+    };
+  }, []);
+
+  return visibleSample;
+};
+
+const useBudgetedInteractionState = (): TaskManagerInteractionState => {
+  const [visibleInteractionState, setVisibleInteractionState] = React.useState<TaskManagerInteractionState>(() =>
+    snapshotInteractionState(useWorkstationInteractionStore.getState())
+  );
+  const visibleInteractionRef = React.useRef<TaskManagerInteractionState>(visibleInteractionState);
+  const pendingInteractionRef = React.useRef<TaskManagerInteractionState>(visibleInteractionState);
+  const lastVisibleUpdateAtRef = React.useRef(Date.now());
+  const timerRef = React.useRef<number | null>(null);
+
+  React.useEffect(() => {
+    const clearTimer = () => {
+      if (timerRef.current !== null) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+    const apply = () => {
+      timerRef.current = null;
+      lastVisibleUpdateAtRef.current = Date.now();
+      const nextInteraction = pendingInteractionRef.current;
+      visibleInteractionRef.current = nextInteraction;
+      React.startTransition(() => {
+        setVisibleInteractionState(nextInteraction);
+      });
+    };
+    const schedule = (state: WorkstationInteractionState) => {
+      const nextInteraction = snapshotInteractionState(state);
+      pendingInteractionRef.current = nextInteraction;
+      const becameIdle = nextInteraction.mode === "idle" && visibleInteractionRef.current.mode !== "idle";
+      const becameBlocked = nextInteraction.mode === "blocked" && visibleInteractionRef.current.mode !== "blocked";
+      if (becameIdle || becameBlocked) {
+        clearTimer();
+        apply();
+        return;
+      }
+      const now = Date.now();
+      const elapsedMs = now - lastVisibleUpdateAtRef.current;
+      const delayMs = Math.max(0, budgetIntervalMs() - elapsedMs);
+      if (delayMs === 0) {
+        clearTimer();
+        apply();
+        return;
+      }
+      if (timerRef.current !== null) return;
+      timerRef.current = window.setTimeout(apply, delayMs);
+    };
+
+    const unsubscribe = useWorkstationInteractionStore.subscribe(schedule);
+    return () => {
+      unsubscribe();
+      clearTimer();
+    };
+  }, []);
+
+  return visibleInteractionState;
+};
+
+const TaskManagerProcessRow = React.memo(function TaskManagerProcessRow({
+  process,
+}: {
+  process: HelixWorkstationTaskManagerProcess;
+}) {
+  return (
+    <tr className="border-b border-white/5 hover:bg-white/[0.03]">
+      <td className="px-3 py-2">
+        <div className="truncate font-medium text-slate-100">{process.label}</div>
+        <div className="mt-0.5 truncate text-[10px] text-slate-500">{process.process_id}</div>
+      </td>
+      <td className="px-3 py-2 text-slate-300">{kindLabel(process.kind)}</td>
+      <td className="px-3 py-2">
+        <span className={`inline-flex rounded border px-1.5 py-0.5 text-[10px] uppercase ${statusClass(process.status)}`}>
+          {process.status}
+        </span>
+      </td>
+      <td className="px-3 py-2">
+        <div className="font-semibold text-slate-100">{memoryDisplay(process)}</div>
+        <div className="mt-0.5 text-[10px] text-slate-500">
+          {process.memory.observed ? "observed" : process.memory.estimate_mib != null ? "estimated" : "unknown"}
+          {process.memory.approximate ? " / approximate" : ""}
+        </div>
+      </td>
+      <td className="px-3 py-2">
+        <div className="truncate text-slate-300">{process.memory.source.replace(/_/g, " ")}</div>
+        <div className="mt-0.5 truncate text-[10px] text-slate-500">{signalDisplay(process)}</div>
+      </td>
+    </tr>
+  );
+});
+
 export default function WorkstationTaskManagerPanel() {
   const layoutGroups = useWorkstationLayoutStore((state: any) => state.groups);
   const activeGroupId = useWorkstationLayoutStore((state: any) => state.activeGroupId);
   const mobileStack = useMobileAppStore((state: any) => state.stack);
   const mobileActiveId = useMobileAppStore((state: any) => state.activeId);
-  const performanceSample = useWorkstationPerformanceStore((state: any) => state.latest);
-  const interactionState = useWorkstationInteractionStore((state: WorkstationInteractionState) => state);
+  const performanceSample = useBudgetedBrowserPerformanceSample();
+  const interactionState = useBudgetedInteractionState();
   const [serverSnapshot, setServerSnapshot] = React.useState<HelixWorkstationTaskManagerSnapshot | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -525,29 +708,7 @@ export default function WorkstationTaskManagerPanel() {
           </thead>
           <tbody>
             {processes.map((process: HelixWorkstationTaskManagerProcess) => (
-              <tr key={process.process_id} className="border-b border-white/5 hover:bg-white/[0.03]">
-                <td className="px-3 py-2">
-                  <div className="truncate font-medium text-slate-100">{process.label}</div>
-                  <div className="mt-0.5 truncate text-[10px] text-slate-500">{process.process_id}</div>
-                </td>
-                <td className="px-3 py-2 text-slate-300">{kindLabel(process.kind)}</td>
-                <td className="px-3 py-2">
-                  <span className={`inline-flex rounded border px-1.5 py-0.5 text-[10px] uppercase ${statusClass(process.status)}`}>
-                    {process.status}
-                  </span>
-                </td>
-                <td className="px-3 py-2">
-                  <div className="font-semibold text-slate-100">{memoryDisplay(process)}</div>
-                  <div className="mt-0.5 text-[10px] text-slate-500">
-                    {process.memory.observed ? "observed" : process.memory.estimate_mib != null ? "estimated" : "unknown"}
-                    {process.memory.approximate ? " / approximate" : ""}
-                  </div>
-                </td>
-                <td className="px-3 py-2">
-                  <div className="truncate text-slate-300">{process.memory.source.replace(/_/g, " ")}</div>
-                  <div className="mt-0.5 truncate text-[10px] text-slate-500">{signalDisplay(process)}</div>
-                </td>
-              </tr>
+              <TaskManagerProcessRow key={process.process_id} process={process} />
             ))}
             {processes.length === 0 ? (
               <tr>

@@ -78,6 +78,9 @@ describe("Helix Ask docs summary output coverage", () => {
       response.body?.job_ready_links?.some((link: any) => link?.label === "Open cited doc" && link?.args?.path === docPath),
     ).toBe(true);
     expect(
+      response.body?.job_ready_links?.some((link: any) => /^Open result \d+$/i.test(String(link?.label ?? ""))),
+    ).toBe(false);
+    expect(
       response.body?.job_ready_links?.some((link: any) => link?.label === "Open current doc" && link?.args?.path === docPath),
     ).toBe(false);
     expect(response.body?.debug?.doc_summary_terminal_promotion).toBeUndefined();
@@ -154,6 +157,12 @@ describe("Helix Ask docs summary output coverage", () => {
     const docLinks = (response.body?.job_ready_links ?? []).filter((link: any) => link?.panel_id === "docs-viewer");
     const docLinkPaths = docLinks.map((link: any) => String(link?.args?.path ?? link?.path ?? ""));
     expect(docLinks.some((link: any) => link?.label === "Open cited doc")).toBe(true);
+    expect(docLinks.some((link: any) => /^Open result \d+$/i.test(String(link?.label ?? "")))).toBe(false);
+    expect(
+      response.body?.job_ready_links_suppressed?.some(
+        (entry: any) => entry?.reason === "candidate_result_retired_after_cited_doc_selected",
+      ),
+    ).toBe(true);
     expect(new Set(docLinkPaths).size).toBe(docLinkPaths.length);
     expect(response.body?.debug?.doc_summary_terminal_promotion).toBeUndefined();
     if (response.body?.debug?.doc_summary_observation_candidate) {
@@ -205,6 +214,17 @@ describe("Helix Ask docs summary output coverage", () => {
       ),
     ).toBe(true);
     expect(answerText).toMatch(/debug|export|\/docs\//i);
+    expect(
+      response.body?.job_ready_links?.some((link: any) => link?.label === "Open cited doc" && /\/docs\//.test(String(link?.args?.path ?? ""))),
+    ).toBe(true);
+    expect(
+      response.body?.job_ready_links?.some((link: any) => /^Open result \d+$/i.test(String(link?.label ?? ""))),
+    ).toBe(false);
+    expect(
+      response.body?.job_ready_links_suppressed?.some(
+        (entry: any) => entry?.reason === "candidate_result_retired_after_cited_doc_selected",
+      ),
+    ).toBe(true);
   }, 60000);
 
   it("reconciles natural exact-path docs summaries from dispatch into docs terminal authority", async () => {

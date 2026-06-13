@@ -165,12 +165,23 @@ describe("helix workstation task manager contract", () => {
       active_interaction_kind: "scroll",
       active_panel_id: "workstation-task-manager",
       responsiveness_pressure: "degraded",
+      scheduler_interaction_mode: "scrolling",
+      scheduler_pending_task_count: 2,
+      scheduler_deferred_task_count: 4,
+      scheduler_pending_share_state_count: 1,
+      scheduler_pending_background_diagnostics_count: 1,
+      scheduler_last_deferred_at_ms: 12345,
     });
 
     expect(sample.authority).toMatchObject({
       assistant_answer: false,
       raw_content_included: false,
       terminal_eligible: false,
+    });
+    expect(sample).toMatchObject({
+      scheduler_interaction_mode: "scrolling",
+      scheduler_pending_task_count: 2,
+      scheduler_pending_share_state_count: 1,
     });
     expect(summarizeHelixWorkstationTaskManager([], "normal", sample)).toMatchObject({
       ui_fps: 42,

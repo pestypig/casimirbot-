@@ -220,6 +220,16 @@ describe("Workspace OS task manager", () => {
       active_interaction_kind: "scroll",
       active_panel_id: "stage-play-badge-graph",
       responsiveness_pressure: "degraded",
+      scheduler_interaction_mode: "scrolling",
+      scheduler_pending_task_count: 3,
+      scheduler_deferred_task_count: 8,
+      scheduler_pending_immediate_input_count: 0,
+      scheduler_pending_visual_frame_count: 0,
+      scheduler_pending_committed_layout_count: 0,
+      scheduler_pending_evidence_refresh_count: 1,
+      scheduler_pending_share_state_count: 1,
+      scheduler_pending_background_diagnostics_count: 1,
+      scheduler_last_deferred_at_ms: 123456,
     }, new Date("2026-06-12T11:59:59.000Z"));
     recordHelixWorkstationCommandReceipt({
       command_id: "stage-play.copy_mail_loop_unified_trace",
@@ -240,6 +250,17 @@ describe("Workspace OS task manager", () => {
       diagnostics: expect.objectContaining({
         input_to_next_frame_p95_ms: 96,
         active_interaction_kind: "scroll",
+      }),
+    });
+    expect(snapshot.processes.find((process) => process.process_id === "workstation.interaction_scheduler")).toMatchObject({
+      status: "active",
+      diagnostics: expect.objectContaining({
+        interaction_mode: "scrolling",
+        pending_task_count: 3,
+        pending_evidence_refresh_count: 1,
+        pending_share_state_count: 1,
+        pending_background_diagnostics_count: 1,
+        deferred_task_count: 8,
       }),
     });
     expect(snapshot.processes.find((process) => process.process_id === "workstation.command_reliability")).toMatchObject({
@@ -294,6 +315,10 @@ describe("Workspace OS task manager", () => {
         advisory_pressure: "degraded",
         input_to_next_frame_p95_ms: 84,
         responsiveness_pressure: "degraded",
+        scheduler_interaction_mode: "dragging",
+        scheduler_pending_task_count: 2,
+        scheduler_pending_share_state_count: 1,
+        scheduler_pending_background_diagnostics_count: 1,
       })
       .expect(202);
 
@@ -315,6 +340,10 @@ describe("Workspace OS task manager", () => {
     const serialized = JSON.stringify(taskManager.body);
     expect(taskManager.body.summary.browser_sample_included).toBe(true);
     expect(taskManager.body.summary.command_failed_receipt_count).toBe(1);
+    expect(taskManager.body.processes.some((process: any) =>
+      process.process_id === "workstation.interaction_scheduler" &&
+      process.diagnostics?.interaction_mode === "dragging"
+    )).toBe(true);
     expect(taskManager.body.authority.raw_content_included).toBe(false);
     expect(serialized).not.toContain("VERY_SECRET_COMMAND_TOKEN");
   });

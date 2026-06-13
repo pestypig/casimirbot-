@@ -77,6 +77,15 @@ export type HelixWorkstationInteractionKind =
   | "keyboard"
   | "unknown";
 
+export type HelixWorkstationInteractionSchedulerMode =
+  | "idle"
+  | "scrolling"
+  | "dragging"
+  | "resizing"
+  | "typing"
+  | "blocked"
+  | "unknown";
+
 export interface HelixWorkstationBrowserPerformanceSample {
   schema_version: "helix.workstation_browser_performance.v1";
   sampled_at: string;
@@ -103,6 +112,16 @@ export interface HelixWorkstationBrowserPerformanceSample {
   active_interaction_kind?: HelixWorkstationInteractionKind | null;
   active_panel_id?: string | null;
   responsiveness_pressure?: HelixWorkstationUiFramePressure;
+  scheduler_interaction_mode?: HelixWorkstationInteractionSchedulerMode;
+  scheduler_pending_task_count?: number;
+  scheduler_deferred_task_count?: number;
+  scheduler_pending_immediate_input_count?: number;
+  scheduler_pending_visual_frame_count?: number;
+  scheduler_pending_committed_layout_count?: number;
+  scheduler_pending_evidence_refresh_count?: number;
+  scheduler_pending_share_state_count?: number;
+  scheduler_pending_background_diagnostics_count?: number;
+  scheduler_last_deferred_at_ms?: number | null;
   authority: HelixWorkspaceOsAuthority;
 }
 

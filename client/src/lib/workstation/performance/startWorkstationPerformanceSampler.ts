@@ -6,6 +6,7 @@ import { useMobileAppStore } from "@/store/useMobileAppStore";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import { useWorkstationPerformanceStore } from "@/store/useWorkstationPerformanceStore";
 import {
+  getWorkstationInteractionSnapshot,
   isInteractionActive,
   markInteraction,
   runWhenQuiet,
@@ -178,6 +179,7 @@ function startSamplerInstance(): () => void {
     const interactionSummary = summarizeWorkstationInteractions(interactionSamples, nowMs, SAMPLE_WINDOW_MS);
     const longTaskSummary = summarizeWorkstationLongTasks(longTaskSamples, nowMs, SAMPLE_WINDOW_MS);
     const panelSnapshot = openPanelSnapshot();
+    const schedulerSnapshot = getWorkstationInteractionSnapshot();
     const pressure = classifyWorkstationUiFramePressure({
       fps: frameSummary.fps,
       p95FrameMs: frameSummary.p95_frame_ms,
@@ -219,6 +221,16 @@ function startSamplerInstance(): () => void {
       active_interaction_kind: interactionSummary.active_interaction_kind,
       active_panel_id: panelSnapshot.focusedPanelId,
       responsiveness_pressure: responsivenessPressure,
+      scheduler_interaction_mode: schedulerSnapshot.mode,
+      scheduler_pending_task_count: schedulerSnapshot.pendingTaskCount,
+      scheduler_deferred_task_count: schedulerSnapshot.deferredTaskCount,
+      scheduler_pending_immediate_input_count: schedulerSnapshot.pendingByPriority.immediate_input,
+      scheduler_pending_visual_frame_count: schedulerSnapshot.pendingByPriority.visual_frame,
+      scheduler_pending_committed_layout_count: schedulerSnapshot.pendingByPriority.committed_layout,
+      scheduler_pending_evidence_refresh_count: schedulerSnapshot.pendingByPriority.evidence_refresh,
+      scheduler_pending_share_state_count: schedulerSnapshot.pendingByPriority.share_state,
+      scheduler_pending_background_diagnostics_count: schedulerSnapshot.pendingByPriority.background_diagnostics,
+      scheduler_last_deferred_at_ms: schedulerSnapshot.lastDeferredAtMs,
     });
     useWorkstationPerformanceStore.getState().setLatest(sample);
     const postSample = async () => {

@@ -158,6 +158,10 @@ export function isInteractionActive(quietMs = 0): boolean {
 }
 
 export function getWorkstationInteractionSnapshot() {
+  const pendingByPriority = emptyPendingByPriority();
+  for (const task of pendingTasks.values()) {
+    pendingByPriority[task.priority] += 1;
+  }
   return {
     mode: currentMode,
     source: currentSource,
@@ -165,6 +169,7 @@ export function getWorkstationInteractionSnapshot() {
     lastInteractionAtMs,
     lastQuietAtMs,
     pendingTaskCount: pendingTasks.size,
+    pendingByPriority,
     deferredTaskCount,
     lastDeferredAtMs,
   };
