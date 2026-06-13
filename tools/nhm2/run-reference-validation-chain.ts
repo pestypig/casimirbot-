@@ -180,6 +180,12 @@ export const planReferenceValidationChain = (
   const metricRequiredRegionalTensorReceipt =
     `${outRoot}/nhm2-metric-required-regional-tensor-receipt.json`;
   const regionalEvidence = `${outRoot}/nhm2-regional-source-closure-evidence.json`;
+  const regionalFullTensorResidual =
+    `${outRoot}/nhm2-regional-full-tensor-residual.json`;
+  const covariantConservationDiagnostic =
+    regionalSupportAtlas == null || conservation == null
+      ? null
+      : `${outRoot}/nhm2-covariant-conservation-diagnostic.json`;
   const regionalSourceTensorTargets =
     `${outRoot}/nhm2-regional-source-tensor-targets.json`;
   const regionalSourceTensorCandidate =
@@ -555,6 +561,26 @@ export const planReferenceValidationChain = (
     regionalEvidence,
     ...auditOnly,
   ]));
+  commands.push(command("nhm2:build-regional-full-tensor-residual", [
+    "--regional-source-closure-evidence",
+    regionalEvidence,
+    "--out",
+    regionalFullTensorResidual,
+    ...auditOnly,
+  ]));
+  if (covariantConservationDiagnostic != null) {
+    commands.push(command("nhm2:build-covariant-conservation-diagnostic", [
+      "--regional-support-atlas",
+      regionalSupportAtlas as string,
+      "--reduced-order-conservation",
+      conservation as string,
+      "--tensor-ref",
+      sourceTensor,
+      "--out",
+      covariantConservationDiagnostic,
+      ...auditOnly,
+    ]));
+  }
   commands.push(command("nhm2:build-regional-source-tensor-targets", [
     "--regional-source-closure-evidence",
     regionalEvidence,
@@ -615,9 +641,14 @@ export const planReferenceValidationChain = (
     sourceAuthority,
     "--regional-source-closure-evidence",
     regionalEvidence,
+    "--regional-full-tensor-residual",
+    regionalFullTensorResidual,
     "--source-closure-pass-readiness",
     sourceClosurePassReadiness,
     ...(conservation == null ? [] : ["--conservation", conservation]),
+    ...(covariantConservationDiagnostic == null
+      ? []
+      : ["--covariant-conservation-diagnostic", covariantConservationDiagnostic]),
     ...(qeiWorldlineDossier == null
       ? []
       : ["--qei-worldline-dossier", qeiWorldlineDossier]),

@@ -36,6 +36,10 @@ import {
   getDocEquationActionEntryForLatex,
   getDocEquationTheoryActions,
 } from "@/lib/docs/docEquationActions";
+import {
+  markInteraction,
+  runWhenQuiet,
+} from "@/lib/workstation/performance/workstationInteractionScheduler";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
 
@@ -301,10 +305,19 @@ export function DocViewerPanel() {
   const handleContentScroll = React.useCallback(
     (event: React.UIEvent<HTMLDivElement>) => {
       const node = event.currentTarget;
-      rememberPanelScroll(docScrollMemoryKey, {
+      markInteraction("scrolling", "docs-viewer.content_scroll");
+      const scroll = {
         scrollTop: node.scrollTop,
         scrollHeight: node.scrollHeight,
         clientHeight: node.clientHeight,
+      };
+      runWhenQuiet(() => {
+        rememberPanelScroll(docScrollMemoryKey, scroll);
+      }, {
+        key: `workstation.scroll_memory:${docScrollMemoryKey}`,
+        priority: "share_state",
+        quietMs: 450,
+        timeoutMs: 1800,
       });
     },
     [docScrollMemoryKey, rememberPanelScroll],
@@ -742,10 +755,19 @@ function DirectoryRail({
     (event: React.UIEvent<HTMLDivElement>) => {
       if (!scrollMemoryKey) return;
       const node = event.currentTarget;
-      rememberPanelScroll(scrollMemoryKey, {
+      markInteraction("scrolling", "docs-viewer.directory_scroll");
+      const scroll = {
         scrollTop: node.scrollTop,
         scrollHeight: node.scrollHeight,
         clientHeight: node.clientHeight,
+      };
+      runWhenQuiet(() => {
+        rememberPanelScroll(scrollMemoryKey, scroll);
+      }, {
+        key: `workstation.scroll_memory:${scrollMemoryKey}`,
+        priority: "share_state",
+        quietMs: 450,
+        timeoutMs: 1800,
       });
     },
     [rememberPanelScroll, scrollMemoryKey],

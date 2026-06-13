@@ -1,9 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronRight, MessageSquarePlus } from "lucide-react";
 import { WorkstationStage } from "@/components/workstation/WorkstationStage";
 import { HelixAskDock } from "@/components/workstation/HelixAskDock";
 import { WorkstationResizeRail } from "@/components/workstation/WorkstationResizeRail";
-import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
+import {
+  WORKSTATION_DOCK_MAX_WIDTH,
+  WORKSTATION_DOCK_MIN_WIDTH,
+  useWorkstationLayoutStore,
+} from "@/store/useWorkstationLayoutStore";
 import { useAgiChatStore, type ChatSession } from "@/store/useAgiChatStore";
 import { useHelixAskWorkspaceSessionStore } from "@/store/useHelixAskWorkspaceSessionStore";
 import {
@@ -30,6 +34,9 @@ function titleFromSession(session?: ChatSession): string {
   return compact.length > 72 ? `${compact.slice(0, 69)}...` : compact;
 }
 
+const clampDockWidth = (value: number) =>
+  Math.max(WORKSTATION_DOCK_MIN_WIDTH, Math.min(WORKSTATION_DOCK_MAX_WIDTH, Math.round(value)));
+
 export function HelixWorkstationShell({
   onOpenPanel,
   layoutVariant = "desktop",
@@ -49,6 +56,8 @@ export function HelixWorkstationShell({
   const setActiveChat = useAgiChatStore((state) => state.setActive);
   const ensureContextSession = useAgiChatStore((state) => state.ensureContextSession);
   const [sessionListOpen, setSessionListOpen] = useState(false);
+  const [resizePreviewWidth, setResizePreviewWidth] = useState<number | null>(null);
+  const resizeStartWidthRef = useRef(chatDock.widthPx);
 
   const handleOpenConversation = useCallback(
     (_sessionId: string) => {
@@ -101,7 +110,7 @@ export function HelixWorkstationShell({
     setSessionListOpen(false);
   }, [activeSession?.id, captureLayoutSnapshot, newSession, saveLayoutSnapshot, setActiveChat]);
 
-  const visibleWidth = chatDock.collapsed ? 56 : chatDock.widthPx;
+  const visibleWidth = chatDock.collapsed ? 56 : resizePreviewWidth ?? chatDock.widthPx;
 
   if (layoutVariant === "mobile") {
     return (
@@ -218,9 +227,26 @@ export function HelixWorkstationShell({
       </div>
       <div className="col-start-2 row-start-2 h-full min-h-0">
         <WorkstationResizeRail
-          onResize={(deltaX) => {
+          onResizeStart={() => {
             if (chatDock.collapsed) return;
-            setChatDockWidth(chatDock.widthPx + deltaX);
+            resizeStartWidthRef.current = chatDock.widthPx;
+            setResizePreviewWidth(chatDock.widthPx);
+          }}
+          onResizePreview={(deltaX) => {
+            if (chatDock.collapsed) return;
+            setResizePreviewWidth(clampDockWidth(resizeStartWidthRef.current + deltaX));
+          }}
+          onResizeCommit={(deltaX) => {
+            if (chatDock.collapsed) {
+              setResizePreviewWidth(null);
+              return;
+            }
+            const nextWidth = clampDockWidth(resizeStartWidthRef.current + deltaX);
+            setResizePreviewWidth(null);
+            setChatDockWidth(nextWidth);
+          }}
+          onResizeCancel={() => {
+            setResizePreviewWidth(null);
           }}
         />
       </div>

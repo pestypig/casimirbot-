@@ -2,6 +2,8 @@ import type { CasimirMaterialReceiptV1 } from "./casimir-material-receipt.v1";
 import type { Nhm2CoupledClosurePassCandidateArtifactV1 } from "./nhm2-coupled-closure-pass-candidate.v1";
 import type { Nhm2ObserverRobustEnergyConditionArtifactV1 } from "./nhm2-observer-robust-energy-conditions.v1";
 import type { Nhm2QeiWorldlineDossierV1 } from "./nhm2-qei-worldline-dossier.v1";
+import type { Nhm2CovariantConservationDiagnosticArtifactV1 } from "./nhm2-covariant-conservation-diagnostic.v1";
+import type { Nhm2RegionalFullTensorResidualArtifactV1 } from "./nhm2-regional-full-tensor-residual.v1";
 import type { Nhm2RegionalMaterialSourceTensorModelV1 } from "./nhm2-regional-material-source-tensor-model.v1";
 import {
   getNhm2AtlasConsumerHash,
@@ -73,8 +75,10 @@ export type Nhm2RegionalTensorPassPathHarnessArtifactRefsV1 = {
   regionalMaterialSourceTensorModel: string | null;
   sourceSideSameBasisTensorAuthority: string | null;
   regionalSourceClosureEvidence: string | null;
+  regionalFullTensorResidual: string | null;
   sourceClosurePassReadiness: string | null;
   conservation: string | null;
+  covariantConservationDiagnostic: string | null;
   qeiWorldlineDossier: string | null;
   observerRobustEnergyConditions: string | null;
   casimirMaterialReceipt: string | null;
@@ -138,8 +142,10 @@ export type BuildNhm2RegionalTensorPassPathHarnessInput = {
   regionalMaterialSourceTensorModel?: Nhm2RegionalMaterialSourceTensorModelV1 | null;
   sourceSideSameBasisTensorAuthority?: Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 | null;
   regionalSourceClosureEvidence?: Nhm2RegionalSourceClosureEvidenceArtifact | null;
+  regionalFullTensorResidual?: Nhm2RegionalFullTensorResidualArtifactV1 | null;
   sourceClosurePassReadiness?: Nhm2SourceClosurePassReadinessPassPathLikeV1 | null;
   conservation?: Nhm2TileCounterpartConservationArtifact | null;
+  covariantConservationDiagnostic?: Nhm2CovariantConservationDiagnosticArtifactV1 | null;
   qeiWorldlineDossier?: Nhm2QeiWorldlineDossierV1 | null;
   observerRobustEnergyConditions?: Nhm2ObserverRobustEnergyConditionArtifactV1 | null;
   casimirMaterialReceipt?: CasimirMaterialReceiptV1 | null;
@@ -187,7 +193,9 @@ const atlasGate = (
   const atlasHash = getNhm2RegionalSupportFunctionAtlasHash(atlas);
   const consumers: Array<[string, unknown]> = [
     ["regional_source_closure_evidence", input.regionalSourceClosureEvidence],
+    ["regional_full_tensor_residual", input.regionalFullTensorResidual],
     ["tile_counterpart_conservation", input.conservation],
+    ["covariant_conservation_diagnostic", input.covariantConservationDiagnostic],
     ["qei_worldline_dossier", input.qeiWorldlineDossier],
     ["observer_robust_energy_conditions", input.observerRobustEnergyConditions],
     ["coupled_closure_pass_candidate", input.coupledClosurePassCandidate],
@@ -230,8 +238,10 @@ const refs = (
   regionalMaterialSourceTensorModel: input?.regionalMaterialSourceTensorModel ?? null,
   sourceSideSameBasisTensorAuthority: input?.sourceSideSameBasisTensorAuthority ?? null,
   regionalSourceClosureEvidence: input?.regionalSourceClosureEvidence ?? null,
+  regionalFullTensorResidual: input?.regionalFullTensorResidual ?? null,
   sourceClosurePassReadiness: input?.sourceClosurePassReadiness ?? null,
   conservation: input?.conservation ?? null,
+  covariantConservationDiagnostic: input?.covariantConservationDiagnostic ?? null,
   qeiWorldlineDossier: input?.qeiWorldlineDossier ?? null,
   observerRobustEnergyConditions: input?.observerRobustEnergyConditions ?? null,
   casimirMaterialReceipt: input?.casimirMaterialReceipt ?? null,
@@ -307,7 +317,30 @@ const sourceAuthorityGate = (
 
 const regionalResidualGate = (
   evidence: Nhm2RegionalSourceClosureEvidenceArtifact | null | undefined,
+  fullTensorResidual: Nhm2RegionalFullTensorResidualArtifactV1 | null | undefined,
 ): Nhm2RegionalTensorPassPathGateV1 => {
+  if (fullTensorResidual != null) {
+    const blockers = fullTensorResidual.regions.flatMap((region) =>
+      region.status === "pass"
+        ? []
+        : region.blockers.length > 0
+          ? region.blockers.map((blocker) => `${region.regionId}:${blocker}`)
+          : [`${region.regionId}:regional_full_tensor_residual_not_pass`],
+    );
+    return gate({
+      gateId: "regional_residuals",
+      status: fullTensorResidual.summary.fullTensorResidualsPass
+        ? "pass"
+        : fullTensorResidual.summary.allRequiredComponentsPresent
+          ? "fail"
+          : "missing",
+      blockers,
+      primaryMetric:
+        fullTensorResidual.summary.worstRelResidual == null
+          ? `fullTensorResidualsPass=${fullTensorResidual.summary.fullTensorResidualsPass}`
+          : `worst=${fullTensorResidual.summary.worstRegionId}:${fullTensorResidual.summary.worstComponentId}:${fullTensorResidual.summary.worstRelResidual}`,
+    });
+  }
   if (evidence == null) {
     return gate({
       gateId: "regional_residuals",
@@ -371,7 +404,27 @@ const wallGate = (
 
 const conservationGate = (
   conservation: Nhm2TileCounterpartConservationArtifact | null | undefined,
+  covariantConservation: Nhm2CovariantConservationDiagnosticArtifactV1 | null | undefined,
 ): Nhm2RegionalTensorPassPathGateV1 => {
+  if (covariantConservation != null) {
+    const blockers = covariantConservation.regions.flatMap((region) =>
+      region.status === "pass"
+        ? []
+        : region.blockers.length > 0
+          ? region.blockers.map((blocker) => `${region.regionId}:${blocker}`)
+          : [`${region.regionId}:covariant_conservation_not_pass`],
+    );
+    return gate({
+      gateId: "conservation",
+      status: covariantConservation.summary.covariantConservationPass
+        ? "pass"
+        : covariantConservation.summary.reducedOrderConservationPass
+          ? "review"
+          : "fail",
+      blockers,
+      primaryMetric: `covariantConservationPass=${covariantConservation.summary.covariantConservationPass}`,
+    });
+  }
   if (conservation == null) {
     return gate({
       gateId: "conservation",
@@ -582,8 +635,8 @@ export const buildNhm2RegionalTensorPassPathHarness = (
     regionalMaterialGate(input.regionalMaterialSourceTensorModel),
     sourceAuthorityGate(input.sourceSideSameBasisTensorAuthority),
     wallGate(input.regionalSourceClosureEvidence, input.sourceClosurePassReadiness),
-    regionalResidualGate(input.regionalSourceClosureEvidence),
-    conservationGate(input.conservation),
+    regionalResidualGate(input.regionalSourceClosureEvidence, input.regionalFullTensorResidual),
+    conservationGate(input.conservation, input.covariantConservationDiagnostic),
     qeiGate(input.qeiWorldlineDossier),
     observerGate(input.observerRobustEnergyConditions),
     materialGate(input.casimirMaterialReceipt),
@@ -667,8 +720,10 @@ const isArtifactRefs = (
     isNullableText(record.regionalMaterialSourceTensorModel) &&
     isNullableText(record.sourceSideSameBasisTensorAuthority) &&
     isNullableText(record.regionalSourceClosureEvidence) &&
+    isNullableText(record.regionalFullTensorResidual) &&
     isNullableText(record.sourceClosurePassReadiness) &&
     isNullableText(record.conservation) &&
+    isNullableText(record.covariantConservationDiagnostic) &&
     isNullableText(record.qeiWorldlineDossier) &&
     isNullableText(record.observerRobustEnergyConditions) &&
     isNullableText(record.casimirMaterialReceipt) &&

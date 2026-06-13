@@ -3343,6 +3343,8 @@ export async function runNextMailWakeRequest(input: {
       status: "completed",
       askTurnId: completed?.askTurnId ?? askTurnId,
       decisionIds: completed?.decisionIds ?? decisionIds,
+      requiresVoiceCheckpoint: voiceDecisionIds.length > 0,
+      requiresVoiceCheckpointSource: "recorded_decision",
       evidenceRefs: completed?.evidenceRefs ?? completionEvidenceRefs,
       createdAt: completionAt,
     });

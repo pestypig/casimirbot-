@@ -4,6 +4,8 @@ import {
   buildNhm2RegionalMaterialSourceTensorModelArtifact,
   type Nhm2RegionalMaterialSourceTensorModelV1,
 } from "../shared/contracts/nhm2-regional-material-source-tensor-model.v1";
+import { buildNhm2CovariantConservationDiagnostic } from "../shared/contracts/nhm2-covariant-conservation-diagnostic.v1";
+import { buildNhm2RegionalFullTensorResidual } from "../shared/contracts/nhm2-regional-full-tensor-residual.v1";
 import {
   buildNhm2RegionalTensorPassPathHarness,
   isNhm2RegionalTensorPassPathHarnessArtifact,
@@ -558,6 +560,55 @@ describe("nhm2_regional_tensor_pass_path_harness/v1", () => {
     expect(artifact.gates.every((gate) => gate.status === "pass")).toBe(true);
     expect(artifact.claimBoundary.numericalPassPathIsNotPhysicalViability).toBe(true);
     expect(isNhm2RegionalTensorPassPathHarnessArtifact(artifact)).toBe(true);
+  });
+
+  it("uses regional full-tensor residual artifacts instead of scalar residual summaries when present", () => {
+    const evidence = regionalEvidence();
+    evidence.regions = evidence.regions.map((region) =>
+      region.regionId === "wall"
+        ? {
+            ...region,
+            tileEffectiveCounterpart: {
+              ...region.tileEffectiveCounterpart,
+              tensor: { ...region.tileEffectiveCounterpart.tensor, T12: 3 },
+            },
+          }
+        : region,
+    );
+    const fullTensorResidual = buildNhm2RegionalFullTensorResidual({
+      regionalSourceClosureEvidence: evidence,
+    });
+    const artifact = buildNhm2RegionalTensorPassPathHarness({
+      ...allPassingInput(),
+      regionalSourceClosureEvidence: evidence,
+      regionalFullTensorResidual: fullTensorResidual,
+    });
+    const gate = artifact.gates.find((entry) => entry.gateId === "regional_residuals");
+
+    expect(gate?.status).toBe("fail");
+    expect(gate?.blockers.some((blocker) => blocker.includes("wall:T12"))).toBe(true);
+    expect(artifact.summary.regionalResidualsPass).toBe(false);
+  });
+
+  it("uses covariant conservation diagnostics when present", () => {
+    const input = allPassingInput();
+    const covariant = buildNhm2CovariantConservationDiagnostic({
+      atlas: input.regionalSupportFunctionAtlas,
+      atlasRef,
+      reducedOrderConservation: input.conservation,
+      reducedOrderConservationRef: "conservation.json",
+    });
+    const artifact = buildNhm2RegionalTensorPassPathHarness({
+      ...input,
+      covariantConservationDiagnostic: covariant,
+    });
+    const gate = artifact.gates.find((entry) => entry.gateId === "conservation");
+
+    expect(input.conservation.overallState).toBe("pass");
+    expect(covariant.summary.covariantConservationPass).toBe(false);
+    expect(gate?.status).toBe("review");
+    expect(gate?.blockers).toContain("global:partial_mu_support_derivatives_missing");
+    expect(artifact.summary.conservationPass).toBe(false);
   });
 
   it("blocks numerical readiness when the coupled candidate uses a stale atlas hash", () => {

@@ -1768,6 +1768,7 @@ describe("helix ask E52 panel control terminal contract", () => {
         schema: "helix.debug_evidence_requirement_policy.v1",
         requirement_source: "docs_topic_phrase",
         suppressed: true,
+        docs_terminal_ready: true,
       });
     } finally {
       if (previousFlag === undefined) delete process.env.HELIX_AGENT_STEP_DECISION_LLM;

@@ -90,6 +90,33 @@ const OPERATOR_DISMISSIBLE_WAKE_STATUSES = new Set<StagePlayLiveSourceMailWakeSt
 const decisionRequiresVoiceCheckpoint = (decision: StagePlayLiveSourceMailDecisionV1): boolean =>
   decision.decision === "request_voice_callout";
 
+const deckVerdictRequiresVoiceCheckpoint = (
+  verdict: StagePlayLiveSourceMailWakeDeckVerdictV1 | null | undefined,
+): boolean =>
+  verdict?.recommendedNext === "request_voice_callout" ||
+  verdict?.voiceCandidate === true;
+
+const wakeVoiceCheckpointRequirement = (input: {
+  explicit?: boolean;
+  explicitSource?: string | null;
+  deckVerdict?: StagePlayLiveSourceMailWakeDeckVerdictV1 | null;
+  wake?: StagePlayLiveSourceMailWakeRequestV1 | null;
+}): { required: boolean; source: string } => {
+  if (typeof input.explicit === "boolean") {
+    return {
+      required: input.explicit,
+      source: input.explicitSource?.trim() || "explicit_override",
+    };
+  }
+  if (input.wake?.lifecycleStage === "voice_pending") {
+    return { required: true, source: "recorded_decision" };
+  }
+  if (deckVerdictRequiresVoiceCheckpoint(input.deckVerdict)) {
+    return { required: true, source: "deck_voice_candidate" };
+  }
+  return { required: false, source: "not_required" };
+};
+
 const isVoiceCheckpointRef = (ref: string): boolean =>
   /(?:^|:)(?:stage_play_live_source_voice_delivery_receipt|helix_interim_voice_callout_receipt|live_source_interim_voice_callout_receipt|voice_hold_receipt|voice_block_receipt)/i.test(ref);
 
@@ -157,12 +184,12 @@ const resolveWakeLifecycleStage = (input: {
   const evidenceRefs = input.evidenceRefs ?? [];
   const voiceStage = voiceCheckpointLifecycleStage(evidenceRefs);
   if (voiceStage) return voiceStage;
+  if (input.requiresVoiceCheckpoint && (input.decisionIds?.length ?? 0) > 0) return "voice_pending";
   if (input.status === "waiting_for_ui_handoff") return "waiting_for_ui_handoff";
   if (input.status === "deferred_for_pressure") return "pressure_deferred";
   if (input.status === "expired_stale" || input.status === "expired_superseded") return "expired";
   if (input.status === "failed" || input.status === "failed_retryable" || input.status === "failed_terminal") return "failed";
   if (input.status === "completed" || input.status === "skipped") return "completed";
-  if (input.requiresVoiceCheckpoint && (input.decisionIds?.length ?? 0) > 0) return "voice_pending";
   if ((input.decisionIds?.length ?? 0) > 0) return "decision_recorded";
   if (input.askTurnId) return "ask_entered";
   return "queued";
@@ -1206,6 +1233,8 @@ export function recordStagePlayMailWakeResult(input: {
   status: StagePlayLiveSourceMailWakeResultV1["status"];
   askTurnId?: string | null;
   decisionIds?: string[];
+  requiresVoiceCheckpoint?: boolean;
+  requiresVoiceCheckpointSource?: string | null;
   skippedReason?: string | null;
   failedReason?: string | null;
   evidenceRefs?: string[];
@@ -1217,6 +1246,16 @@ export function recordStagePlayMailWakeResult(input: {
   const inputDecisionIds = uniqueStrings(input.decisionIds ?? []);
   const inputEvidenceRefs = uniqueStrings([input.wakeRequestId, effectiveAskTurnId, ...inputDecisionIds, ...(input.evidenceRefs ?? [])]);
   const existingVoiceCheckpointRefs = voiceCheckpointRefsFromEvidence(inputEvidenceRefs);
+  const deckVerdict = normalizeWakeDeckVerdict(wake?.deckVerdict);
+  const voiceRequirement = existingVoiceCheckpointRefs.length > 0 && typeof input.requiresVoiceCheckpoint !== "boolean"
+    ? { required: true, source: "voice_checkpoint_receipt" }
+    : wakeVoiceCheckpointRequirement({
+        explicit: input.requiresVoiceCheckpoint,
+        explicitSource: input.requiresVoiceCheckpointSource,
+        deckVerdict,
+        wake,
+      });
+  const requiresVoiceCheckpoint = voiceRequirement.required;
   let status = input.status;
   let failedReason = input.failedReason ?? null;
   if (status === "completed" && wakeHasAskLaunchContext(wake, effectiveAskTurnId)) {
@@ -1226,7 +1265,7 @@ export function recordStagePlayMailWakeResult(input: {
     } else if (inputDecisionIds.length === 0 && !input.skippedReason) {
       status = "failed_retryable";
       failedReason = failedReason ?? "missing_required_mailbox_decision_receipt";
-    } else if (wake?.lifecycleStage === "voice_pending" && existingVoiceCheckpointRefs.length === 0) {
+    } else if (requiresVoiceCheckpoint && existingVoiceCheckpointRefs.length === 0) {
       status = "failed_retryable";
       failedReason = failedReason ?? "missing_required_voice_receipt_or_hold";
     }
@@ -1244,7 +1283,6 @@ export function recordStagePlayMailWakeResult(input: {
   const voiceCheckpointRefs = voiceCheckpointRefsFromEvidence(evidenceRefs);
   const packetIds = uniqueStrings([...(wake?.packetIds ?? []), ...evidenceRefs.filter((ref) => /^stage_play_processed_mail_packet:/i.test(ref))]);
   const supersededWakeIds = uniqueStrings(wake?.supersededWakeIds ?? []);
-  const deckVerdict = normalizeWakeDeckVerdict(wake?.deckVerdict);
   const routeMetadata = wake?.routeMetadata ?? wake?.askLaunchRouteMetadata ?? null;
   const selectedTargetSource =
     typeof routeMetadata?.sourceTarget === "string"
@@ -1285,6 +1323,8 @@ export function recordStagePlayMailWakeResult(input: {
     },
     decisionReceiptId: decisionIds[0] ?? null,
     voiceReceiptId: voiceCheckpointRefs[0] ?? null,
+    requiresVoiceCheckpoint,
+    requiresVoiceCheckpointSource: voiceRequirement.source,
     wakeResultId,
     terminalKind: "stage_play_live_source_mail_wake_result",
     failureCode: failedReason,
@@ -1312,6 +1352,8 @@ export function recordStagePlayMailWakeResult(input: {
     askTurnId: effectiveAskTurnId,
     decisionIds,
     voiceCheckpointRefs,
+    requiresVoiceCheckpoint,
+    requiresVoiceCheckpointSource: voiceRequirement.source,
     budgetStateRef: existing?.budgetStateRef ?? null,
     skippedReason: input.skippedReason ?? null,
     failedReason,
@@ -1476,6 +1518,8 @@ export function reconcileStagePlayMailWakeRequestsWithDecisions(input: {
           status: "completed",
           askTurnId,
           decisionIds: decisions,
+          requiresVoiceCheckpoint: decisionsRequireVoiceCheckpoint(matchingDecisionRecords),
+          requiresVoiceCheckpointSource: "recorded_decision",
           evidenceRefs,
           createdAt: now,
         });
@@ -1611,6 +1655,8 @@ export function reconcileStagePlayMailWakeRequestFromAskTurn(input: {
           status: "completed",
           askTurnId: input.askTurnId ?? null,
           decisionIds,
+          requiresVoiceCheckpoint: input.requiresVoiceCheckpoint === true,
+          requiresVoiceCheckpointSource: "recorded_decision",
           evidenceRefs: uniqueStrings([
             ...evidenceRefs,
             "ui_bridge_ask_turn_reconciled",

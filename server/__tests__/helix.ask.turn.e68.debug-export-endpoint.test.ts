@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { planRouter } from "../routes/agi.plan";
 import { runtimeMemoryGovernor } from "../services/runtime/runtime-memory-governor";
 import {
+  listStagePlayLiveSourceMailWakeResults,
   markStagePlayMailWakeRetryable,
   queueStagePlayLiveSourceMailWakeRequest,
   recordStagePlayMailWakeResult,
@@ -156,6 +157,8 @@ describe("helix ask E68 debug export endpoint", () => {
       status: "completed",
       decision_ids: [decisionId],
       voice_checkpoint_refs: expect.arrayContaining([voiceReceiptRef]),
+      requires_voice_checkpoint: true,
+      requires_voice_checkpoint_source: "voice_checkpoint_receipt",
     });
     expect(payload?.selected_final_answer).toContain("The live-source mailbox wake completed");
     expect(payload?.final_answer_source).toBe("stage_play_mailbox_wake_result");
@@ -294,6 +297,80 @@ describe("helix ask E68 debug export endpoint", () => {
     expect(payload?.stage_play_wake_transaction).toEqual(
       payload?.stagePlayWakeTransaction,
     );
+  }, 60000);
+
+  it("does not terminalize a voice wake that has a decision but no voice checkpoint", async () => {
+    const app = createApp();
+    const turn = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "Open Scientific Calculator",
+        mode: "read",
+        debug: true,
+        sessionId: `e68-debug-export-missing-voice-${Date.now()}`,
+      })
+      .expect(200);
+
+    const turnId = turn.body?.turn_id;
+    expect(turnId).toBeTruthy();
+    const wake = queueStagePlayLiveSourceMailWakeRequest({
+      threadId: "helix-ask:desktop",
+      mailIds: [`stage_play_live_source_mail:e68-missing-voice-${Date.now()}`],
+      sourceIds: ["visual_source:e68-missing-voice"],
+      deckPresetId: "stage_play_micro_reasoner_prompt_preset:minecraft_minimal_operator:v1",
+      deckPresetTitle: "Minecraft Minimal Operator",
+      deckRunPlan: "minimal_prompted_arbiter",
+      packetIds: ["stage_play_processed_mail_packet:e68-missing-voice"],
+      deckVerdict: {
+        recommendedNext: "request_voice_callout",
+        wakeAsk: true,
+        voiceCandidate: true,
+        reason: "danger cue requires voice callout",
+      },
+      evidenceRefs: ["stage_play_processed_mail_packet:e68-missing-voice"],
+      now: "2026-06-04T12:08:00.000Z",
+    });
+    expect(wake).toBeTruthy();
+    const decisionId = `${turnId}:agent_step_decision:missing-voice`;
+    const wakeResult = recordStagePlayMailWakeResult({
+      wakeRequestId: wake!.wakeRequestId,
+      threadId: "helix-ask:desktop",
+      status: "completed",
+      askTurnId: turnId,
+      decisionIds: [decisionId],
+      evidenceRefs: ["stage_play_processed_mail_packet:e68-missing-voice"],
+      createdAt: "2026-06-04T12:08:01.000Z",
+    });
+
+    expect(wakeResult).toMatchObject({
+      status: "failed_retryable",
+      failedReason: "missing_required_voice_receipt_or_hold",
+      lifecycleStage: "failed",
+      voiceCheckpointRefs: [],
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+    expect(listStagePlayLiveSourceMailWakeResults({ threadId: "helix-ask:desktop" }).at(-1)).toMatchObject({
+      wakeResultId: wakeResult.wakeResultId,
+      status: "failed_retryable",
+    });
+
+    const debugExport = await request(app)
+      .get(`/api/agi/ask/turn/${encodeURIComponent(turnId)}/debug-export`)
+      .expect(200);
+    const payload = debugExport.body?.payload;
+
+    expect(payload?.mailbox_wake_result_projection).toMatchObject({
+      wake_result_id: wakeResult.wakeResultId,
+      wake_request_id: wake!.wakeRequestId,
+      status: "failed_retryable",
+      requires_voice_checkpoint: true,
+      requires_voice_checkpoint_source: "deck_voice_candidate",
+      voice_checkpoint_refs: [],
+    });
+    expect(payload?.selected_final_answer ?? "").not.toContain("The live-source mailbox wake completed");
+    expect(payload?.final_answer_source).not.toBe("stage_play_mailbox_wake_result");
+    expect(payload?.terminal_artifact_kind).not.toBe("stage_play_live_source_mail_wake_result");
   }, 60000);
 
   it("exports a wake transaction debug block for a missing Ask turn id launch", async () => {

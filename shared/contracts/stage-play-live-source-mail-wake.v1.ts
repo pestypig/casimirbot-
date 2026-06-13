@@ -119,6 +119,8 @@ export type StagePlayLiveSourceMailWakeResultV1 = {
   askTurnId?: string | null;
   decisionIds: string[];
   voiceCheckpointRefs: string[];
+  requiresVoiceCheckpoint?: boolean;
+  requiresVoiceCheckpointSource?: string | null;
   budgetStateRef?: string | null;
   skippedReason?: string | null;
   failedReason?: string | null;
@@ -150,6 +152,8 @@ export type StagePlayLiveSourceMailWakeResultV1 = {
     };
     decisionReceiptId?: string | null;
     voiceReceiptId?: string | null;
+    requiresVoiceCheckpoint?: boolean;
+    requiresVoiceCheckpointSource?: string | null;
     wakeResultId: string;
     terminalKind?: string | null;
     failureCode?: string | null;

@@ -6,6 +6,11 @@ import { useMobileAppStore } from "@/store/useMobileAppStore";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import { useWorkstationPerformanceStore } from "@/store/useWorkstationPerformanceStore";
 import {
+  isInteractionActive,
+  markInteraction,
+  runWhenQuiet,
+} from "./workstationInteractionScheduler";
+import {
   classifyWorkstationUiFramePressure,
   classifyWorkstationInteractionPressure,
   summarizeWorkstationFrameDurations,
@@ -22,6 +27,7 @@ const INTERACTION_SAMPLE_THROTTLE_MS = 50;
 
 let activeRefCount = 0;
 let activeStop: (() => void) | null = null;
+let lastDomNodeCount = 0;
 
 const visibilityState = (): HelixWorkstationBrowserPerformanceSample["visibility_state"] => {
   if (typeof document === "undefined") return "unknown";
@@ -66,6 +72,13 @@ function startSamplerInstance(): () => void {
   let lastFrameDurationMs: number | null = null;
   let lastInteractionSampleAtMs = 0;
   let stopped = false;
+
+  const readDomNodeCount = () => {
+    if (typeof document === "undefined") return 0;
+    if (isInteractionActive(500)) return lastDomNodeCount;
+    lastDomNodeCount = document.getElementsByTagName("*").length;
+    return lastDomNodeCount;
+  };
 
   const frameLoop = (frameAtMs: number) => {
     if (stopped) return;
@@ -132,13 +145,23 @@ function startSamplerInstance(): () => void {
   };
 
   const onClick = (event: Event) => recordInteraction(event, "click");
-  const onScroll = (event: Event) => recordInteraction(event, "scroll");
-  const onWheel = (event: Event) => recordInteraction(event, "scroll");
+  const onScroll = (event: Event) => {
+    markInteraction("scrolling", "browser.scroll");
+    recordInteraction(event, "scroll");
+  };
+  const onWheel = (event: Event) => {
+    markInteraction("scrolling", "browser.wheel");
+    recordInteraction(event, "scroll");
+  };
   const onPointerMove = (event: Event) => {
     const pointer = event as PointerEvent;
+    if (pointer.buttons) markInteraction("dragging", "browser.pointer_drag");
     recordInteraction(event, pointer.buttons ? "panel_drag" : "pointer");
   };
-  const onKeyDown = (event: Event) => recordInteraction(event, "keyboard");
+  const onKeyDown = (event: Event) => {
+    markInteraction("typing", "browser.keyboard");
+    recordInteraction(event, "keyboard");
+  };
 
   window.addEventListener("click", onClick, { capture: true, passive: true });
   window.addEventListener("scroll", onScroll, { capture: true, passive: true });
@@ -182,7 +205,7 @@ function startSamplerInstance(): () => void {
       long_frame_ratio: frameSummary.long_frame_ratio,
       long_task_count: longTaskSummary.long_task_count,
       long_task_total_ms: longTaskSummary.long_task_total_ms,
-      dom_node_count: typeof document !== "undefined" ? document.getElementsByTagName("*").length : 0,
+      dom_node_count: readDomNodeCount(),
       open_panel_count: panelSnapshot.openPanelCount,
       focused_panel_id: panelSnapshot.focusedPanelId,
       visibility_state: visibilityState(),
@@ -198,12 +221,24 @@ function startSamplerInstance(): () => void {
       responsiveness_pressure: responsivenessPressure,
     });
     useWorkstationPerformanceStore.getState().setLatest(sample);
-    void fetch("/api/workspace-os/browser-performance/sample", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(sample),
-      keepalive: true,
-    }).catch(() => undefined);
+    const postSample = async () => {
+      await fetch("/api/workspace-os/browser-performance/sample", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sample),
+        keepalive: true,
+      }).catch(() => undefined);
+    };
+    if (isInteractionActive(500)) {
+      runWhenQuiet(postSample, {
+        key: "workstation.browser_performance.publish",
+        priority: "background_diagnostics",
+        quietMs: 800,
+        timeoutMs: 3500,
+      });
+    } else {
+      void postSample();
+    }
   };
 
   const intervalId = window.setInterval(publish, PUBLISH_INTERVAL_MS);

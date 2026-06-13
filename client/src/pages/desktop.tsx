@@ -35,6 +35,7 @@ import { startWorkstationClipboardCapture } from "@/lib/workstation/workstationC
 import { startWorkstationTimelineCapture } from "@/lib/workstation/workstationTimelineCapture";
 import { startProcessGraphCapture } from "@/lib/workstation/processGraph/startProcessGraphCapture";
 import { startWorkstationPerformanceSampler } from "@/lib/workstation/performance/startWorkstationPerformanceSampler";
+import { runWhenQuiet } from "@/lib/workstation/performance/workstationInteractionScheduler";
 import {
   createWorkstationActionTraceId,
   emitWorkstationActionLiveEvent,
@@ -779,10 +780,21 @@ export default function DesktopPage({
         window.history.replaceState(window.history.state, "", nextUrl);
       }
     };
-    const unsubscribeLayout = useWorkstationLayoutStore.subscribe(syncUrl);
-    const unsubscribeDocs = useDocViewerStore.subscribe(syncUrl);
-    syncUrl();
+    let cancelScheduledSync: (() => void) | null = null;
+    const scheduleSyncUrl = () => {
+      cancelScheduledSync?.();
+      cancelScheduledSync = runWhenQuiet(syncUrl, {
+        key: "workstation.url_sync",
+        priority: "share_state",
+        quietMs: 700,
+        timeoutMs: 2500,
+      });
+    };
+    const unsubscribeLayout = useWorkstationLayoutStore.subscribe(scheduleSyncUrl);
+    const unsubscribeDocs = useDocViewerStore.subscribe(scheduleSyncUrl);
+    scheduleSyncUrl();
     return () => {
+      cancelScheduledSync?.();
       unsubscribeLayout();
       unsubscribeDocs();
     };

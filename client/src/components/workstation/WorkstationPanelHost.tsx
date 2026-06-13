@@ -1,5 +1,6 @@
 import React, { Suspense, useMemo } from "react";
 import { getPanelDef } from "@/lib/desktop/panelRegistry";
+import { markInteraction } from "@/lib/workstation/performance/workstationInteractionScheduler";
 
 export function WorkstationPanelHost({ panelId }: { panelId: string }) {
   const def = getPanelDef(panelId);
@@ -21,6 +22,11 @@ export function WorkstationPanelHost({ panelId }: { panelId: string }) {
       className="h-full min-h-0 overflow-auto overscroll-contain"
       data-workstation-panel-id={panelId}
       data-workstation-panel-heavy={def.heavy ? "true" : "false"}
+      onScrollCapture={() => markInteraction("scrolling", `panel:${panelId}:scroll`)}
+      onPointerMoveCapture={(event) => {
+        if (event.buttons) markInteraction("dragging", `panel:${panelId}:pointer`);
+      }}
+      onKeyDownCapture={() => markInteraction("typing", `panel:${panelId}:keyboard`)}
       style={{
         contain: "layout paint style",
         contentVisibility: "auto",

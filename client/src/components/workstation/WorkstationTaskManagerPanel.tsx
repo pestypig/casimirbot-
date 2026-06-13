@@ -2,8 +2,13 @@ import * as React from "react";
 import { Activity, Gauge, Monitor, RefreshCw, Server } from "lucide-react";
 import { getPanelDef } from "@/lib/desktop/panelRegistry";
 import { useMobileAppStore } from "@/store/useMobileAppStore";
+import { useWorkstationInteractionStore, type WorkstationInteractionState } from "@/store/useWorkstationInteractionStore";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import { useWorkstationPerformanceStore } from "@/store/useWorkstationPerformanceStore";
+import {
+  isInteractionActive,
+  runWhenQuiet,
+} from "@/lib/workstation/performance/workstationInteractionScheduler";
 import {
   sortHelixWorkstationTaskManagerProcesses,
   summarizeHelixWorkstationTaskManager,
@@ -22,6 +27,14 @@ type BrowserPerformanceMemory = {
 
 const BYTES_PER_MIB = 1024 * 1024;
 const POLL_INTERVAL_MS = 5000;
+let cachedBrowserDomNodeCount = 0;
+
+const readBrowserDomNodeCount = (): number => {
+  if (typeof document === "undefined") return 0;
+  if (isInteractionActive(500)) return cachedBrowserDomNodeCount;
+  cachedBrowserDomNodeCount = document.getElementsByTagName("*").length;
+  return cachedBrowserDomNodeCount;
+};
 
 const formatMiB = (value: number | null | undefined): string => {
   if (typeof value !== "number" || !Number.isFinite(value)) return "unknown";
@@ -98,6 +111,11 @@ const signalDisplay = (process: HelixWorkstationTaskManagerProcess): string => {
     const recent = typeof process.diagnostics?.recent_receipt_count === "number" ? process.diagnostics.recent_receipt_count : 0;
     return `${recent} receipts / ${failed} failed`;
   }
+  if (process.kind === "workstation_scheduler") {
+    const mode = typeof process.diagnostics?.interaction_mode === "string" ? process.diagnostics.interaction_mode : "unknown";
+    const pending = typeof process.diagnostics?.pending_task_count === "number" ? process.diagnostics.pending_task_count : 0;
+    return `${mode} / ${pending} queued`;
+  }
   if (process.panel_id && typeof process.diagnostics?.render_pressure === "string") {
     return process.diagnostics.render_pressure;
   }
@@ -124,7 +142,7 @@ const sampleBrowserMemory = (): HelixWorkstationTaskManagerProcess | null => {
       },
       diagnostics: {
         browser_memory_api_available: false,
-        dom_node_count: typeof document !== "undefined" ? document.getElementsByTagName("*").length : 0,
+        dom_node_count: readBrowserDomNodeCount(),
       },
     });
   }
@@ -147,7 +165,7 @@ const sampleBrowserMemory = (): HelixWorkstationTaskManagerProcess | null => {
     },
     diagnostics: {
       browser_memory_api_available: true,
-      dom_node_count: typeof document !== "undefined" ? document.getElementsByTagName("*").length : 0,
+      dom_node_count: readBrowserDomNodeCount(),
     },
   });
 };
@@ -263,6 +281,45 @@ const buildInteractionLoopProcess = (
   });
 };
 
+const buildSchedulerProcess = (
+  interaction: WorkstationInteractionState,
+): HelixWorkstationTaskManagerProcess =>
+  withHelixWorkstationTaskManagerAuthority({
+    process_id: "workstation.interaction_scheduler",
+    label: "Workstation interaction scheduler",
+    kind: "workstation_scheduler",
+    status: interaction.mode === "idle"
+      ? "idle"
+      : interaction.mode === "blocked"
+        ? "blocked"
+        : "active",
+    source: "workstation_interaction_scheduler",
+    updated_at: new Date().toISOString(),
+    memory: {
+      source: "workstation_scheduler",
+      approximate: true,
+      observed: false,
+      estimate_mib: null,
+      pressure: interaction.mode,
+    },
+    diagnostics: {
+      interaction_mode: interaction.mode,
+      interaction_source: interaction.source,
+      active_since_ms: interaction.activeSinceMs,
+      last_interaction_at_ms: interaction.lastInteractionAtMs,
+      last_quiet_at_ms: interaction.lastQuietAtMs,
+      pending_task_count: interaction.pendingTaskCount,
+      pending_immediate_input_count: interaction.pendingByPriority.immediate_input,
+      pending_visual_frame_count: interaction.pendingByPriority.visual_frame,
+      pending_committed_layout_count: interaction.pendingByPriority.committed_layout,
+      pending_evidence_refresh_count: interaction.pendingByPriority.evidence_refresh,
+      pending_share_state_count: interaction.pendingByPriority.share_state,
+      pending_background_diagnostics_count: interaction.pendingByPriority.background_diagnostics,
+      deferred_task_count: interaction.deferredTaskCount,
+      last_deferred_at_ms: interaction.lastDeferredAtMs,
+    },
+  });
+
 const buildPanelProcesses = (
   panelIds: readonly string[],
   focusedPanelId: string | null | undefined,
@@ -321,6 +378,7 @@ export default function WorkstationTaskManagerPanel() {
   const mobileStack = useMobileAppStore((state: any) => state.stack);
   const mobileActiveId = useMobileAppStore((state: any) => state.activeId);
   const performanceSample = useWorkstationPerformanceStore((state: any) => state.latest);
+  const interactionState = useWorkstationInteractionStore((state: WorkstationInteractionState) => state);
   const [serverSnapshot, setServerSnapshot] = React.useState<HelixWorkstationTaskManagerSnapshot | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -333,14 +391,16 @@ export default function WorkstationTaskManagerPanel() {
     const browser = sampleBrowserMemory();
     const frameLoop = buildFrameLoopProcess(performanceSample);
     const interactionLoop = buildInteractionLoopProcess(performanceSample);
+    const scheduler = buildSchedulerProcess(interactionState);
     return [
       ...(browser ? [browser] : []),
       ...(frameLoop ? [frameLoop] : []),
       ...(interactionLoop ? [interactionLoop] : []),
+      scheduler,
       ...panelProcesses,
       ...mobileProcesses,
     ];
-  }, [activeGroupId, layoutGroups, mobileActiveId, mobileStack, performanceSample]);
+  }, [activeGroupId, interactionState, layoutGroups, mobileActiveId, mobileStack, performanceSample]);
 
   const refreshServerSnapshot = React.useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -349,7 +409,9 @@ export default function WorkstationTaskManagerPanel() {
       const response = await fetch("/api/workspace-os/task-manager?thread_id=helix-ask%3Adesktop", { signal });
       if (!response.ok) throw new Error(`task-manager ${response.status}`);
       const body = await response.json() as HelixWorkstationTaskManagerSnapshot;
-      setServerSnapshot(body);
+      React.startTransition(() => {
+        setServerSnapshot(body);
+      });
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
         setError(err instanceof Error ? err.message : "Failed to load task manager snapshot.");
@@ -362,8 +424,20 @@ export default function WorkstationTaskManagerPanel() {
   React.useEffect(() => {
     const controller = new AbortController();
     void refreshServerSnapshot(controller.signal);
-    const timer = window.setInterval(() => {
+    const autoRefreshServerSnapshot = () => {
+      if (isInteractionActive(500)) {
+        runWhenQuiet(() => refreshServerSnapshot(), {
+          key: "workstation.task_manager.server_refresh",
+          priority: "evidence_refresh",
+          quietMs: 650,
+          timeoutMs: POLL_INTERVAL_MS,
+        });
+        return;
+      }
       void refreshServerSnapshot();
+    };
+    const timer = window.setInterval(() => {
+      autoRefreshServerSnapshot();
     }, POLL_INTERVAL_MS);
     return () => {
       controller.abort();
@@ -401,33 +475,35 @@ export default function WorkstationTaskManagerPanel() {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-px border-b border-white/10 bg-white/10 text-xs md:grid-cols-6">
-        <div className="bg-slate-950 px-3 py-2">
-          <div className="flex items-center gap-1.5 text-slate-400"><Gauge className="h-3.5 w-3.5" /> Pressure</div>
-          <div className="mt-1 font-semibold text-slate-100">{summary.pressure_level ?? "unknown"}</div>
-        </div>
-        <div className="bg-slate-950 px-3 py-2">
-          <div className="text-slate-400">UI FPS</div>
-          <div className="mt-1 font-semibold text-slate-100">{formatMetric(summary.ui_fps, "")}</div>
-        </div>
-        <div className="bg-slate-950 px-3 py-2">
-          <div className="text-slate-400">Responsiveness</div>
-          <div className="mt-1 font-semibold text-slate-100">
-            {summary.ui_responsiveness_pressure ?? "unknown"} / {formatMetric(summary.ui_input_to_next_frame_p95_ms, "ms")}
+      <div className="overflow-x-auto border-b border-white/10 bg-white/10">
+        <div className="grid min-w-[46rem] grid-cols-6 gap-px text-xs">
+          <div className="min-w-0 bg-slate-950 px-3 py-2">
+            <div className="flex items-center gap-1.5 text-slate-400"><Gauge className="h-3.5 w-3.5" /> Pressure</div>
+            <div className="mt-1 truncate font-semibold text-slate-100">{summary.pressure_level ?? "unknown"}</div>
           </div>
-        </div>
-        <div className="bg-slate-950 px-3 py-2">
-          <div className="flex items-center gap-1.5 text-slate-400"><Server className="h-3.5 w-3.5" /> Observed</div>
-          <div className="mt-1 font-semibold text-slate-100">{formatMiB(summary.total_observed_mib)}</div>
-        </div>
-        <div className="bg-slate-950 px-3 py-2">
-          <div className="flex items-center gap-1.5 text-slate-400"><Monitor className="h-3.5 w-3.5" /> Processes</div>
-          <div className="mt-1 font-semibold text-slate-100">{summary.process_count}</div>
-        </div>
-        <div className="bg-slate-950 px-3 py-2">
-          <div className="text-slate-400">Samples</div>
-          <div className="mt-1 font-semibold text-slate-100">
-            {summary.server_sample_included ? "server" : "no server"} / {summary.browser_sample_included ? "browser" : "no browser"}
+          <div className="min-w-0 bg-slate-950 px-3 py-2">
+            <div className="text-slate-400">UI FPS</div>
+            <div className="mt-1 truncate font-semibold text-slate-100">{formatMetric(summary.ui_fps, "")}</div>
+          </div>
+          <div className="min-w-0 bg-slate-950 px-3 py-2">
+            <div className="text-slate-400">Responsiveness</div>
+            <div className="mt-1 truncate font-semibold text-slate-100">
+              {summary.ui_responsiveness_pressure ?? "unknown"} / {formatMetric(summary.ui_input_to_next_frame_p95_ms, "ms")}
+            </div>
+          </div>
+          <div className="min-w-0 bg-slate-950 px-3 py-2">
+            <div className="flex items-center gap-1.5 text-slate-400"><Server className="h-3.5 w-3.5" /> Observed</div>
+            <div className="mt-1 truncate font-semibold text-slate-100">{formatMiB(summary.total_observed_mib)}</div>
+          </div>
+          <div className="min-w-0 bg-slate-950 px-3 py-2">
+            <div className="flex items-center gap-1.5 text-slate-400"><Monitor className="h-3.5 w-3.5" /> Processes</div>
+            <div className="mt-1 truncate font-semibold text-slate-100">{summary.process_count}</div>
+          </div>
+          <div className="min-w-0 bg-slate-950 px-3 py-2">
+            <div className="text-slate-400">Samples</div>
+            <div className="mt-1 truncate font-semibold text-slate-100">
+              {summary.server_sample_included ? "server" : "no server"} / {summary.browser_sample_included ? "browser" : "no browser"}
+            </div>
           </div>
         </div>
       </div>
@@ -437,14 +513,14 @@ export default function WorkstationTaskManagerPanel() {
       ) : null}
 
       <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full table-fixed text-left text-xs">
+        <table className="w-full min-w-[54rem] table-fixed text-left text-xs">
           <thead className="sticky top-0 z-10 border-b border-white/10 bg-slate-950/95 text-[11px] uppercase text-slate-500">
             <tr>
-              <th className="w-[34%] px-3 py-2 font-medium">Name</th>
-              <th className="w-[18%] px-3 py-2 font-medium">Kind</th>
-              <th className="w-[14%] px-3 py-2 font-medium">Status</th>
-              <th className="w-[16%] px-3 py-2 font-medium">Memory</th>
-              <th className="w-[18%] px-3 py-2 font-medium">Signal</th>
+              <th className="w-[19rem] px-3 py-2 font-medium">Name</th>
+              <th className="w-[10rem] px-3 py-2 font-medium">Kind</th>
+              <th className="w-[8rem] px-3 py-2 font-medium">Status</th>
+              <th className="w-[8rem] px-3 py-2 font-medium">Memory</th>
+              <th className="w-[9rem] px-3 py-2 font-medium">Signal</th>
             </tr>
           </thead>
           <tbody>

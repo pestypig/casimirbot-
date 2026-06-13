@@ -69,8 +69,8 @@ export type WorkstationLayoutState = {
 
 const STORAGE_KEY = "workstation-layout-v1";
 const PRIMARY_GROUP_ID = "group-primary";
-const DOCK_MIN_WIDTH = 320;
-const DOCK_MAX_WIDTH = 760;
+export const WORKSTATION_DOCK_MIN_WIDTH = 320;
+export const WORKSTATION_DOCK_MAX_WIDTH = 760;
 const DEFAULT_DOCK_WIDTH = 420;
 const MAX_RECENTLY_CLOSED_PANELS = 32;
 
@@ -134,7 +134,7 @@ export const useWorkstationLayoutStore = createWithEqualityFn<WorkstationLayoutS
         set((state) => ({
           chatDock: {
             ...state.chatDock,
-            widthPx: clamp(Math.round(widthPx), DOCK_MIN_WIDTH, DOCK_MAX_WIDTH),
+            widthPx: clamp(Math.round(widthPx), WORKSTATION_DOCK_MIN_WIDTH, WORKSTATION_DOCK_MAX_WIDTH),
           },
         })),
       toggleChatDock: () =>
@@ -308,7 +308,7 @@ export const useWorkstationLayoutStore = createWithEqualityFn<WorkstationLayoutS
             chatDock: {
               ...state.chatDock,
               ...snapshot.chatDock,
-              widthPx: clamp(Number(snapshot.chatDock.widthPx), DOCK_MIN_WIDTH, DOCK_MAX_WIDTH),
+              widthPx: clamp(Number(snapshot.chatDock.widthPx), WORKSTATION_DOCK_MIN_WIDTH, WORKSTATION_DOCK_MAX_WIDTH),
             },
             activeGroupId,
             groups,
@@ -359,8 +359,8 @@ export const useWorkstationLayoutStore = createWithEqualityFn<WorkstationLayoutS
             ...(source.chatDock ?? {}),
             widthPx: clamp(
               Number(source.chatDock?.widthPx ?? current.chatDock.widthPx),
-              DOCK_MIN_WIDTH,
-              DOCK_MAX_WIDTH,
+              WORKSTATION_DOCK_MIN_WIDTH,
+              WORKSTATION_DOCK_MAX_WIDTH,
             ),
           },
         };

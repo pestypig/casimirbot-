@@ -15,9 +15,17 @@ import {
   type Nhm2ObserverRobustEnergyConditionArtifactV1,
 } from "../../shared/contracts/nhm2-observer-robust-energy-conditions.v1";
 import {
+  isNhm2CovariantConservationDiagnostic,
+  type Nhm2CovariantConservationDiagnosticArtifactV1,
+} from "../../shared/contracts/nhm2-covariant-conservation-diagnostic.v1";
+import {
   isNhm2QeiWorldlineDossier,
   type Nhm2QeiWorldlineDossierV1,
 } from "../../shared/contracts/nhm2-qei-worldline-dossier.v1";
+import {
+  isNhm2RegionalFullTensorResidual,
+  type Nhm2RegionalFullTensorResidualArtifactV1,
+} from "../../shared/contracts/nhm2-regional-full-tensor-residual.v1";
 import {
   buildNhm2RegionalTensorPassPathHarness,
   isNhm2RegionalTensorPassPathHarnessArtifact,
@@ -99,8 +107,10 @@ export const runNhm2RegionalTensorPassPathHarness = (args: {
   regionalMaterialSourceTensorModelPath?: string | null;
   sourceSideAuthorityPath?: string | null;
   regionalSourceClosureEvidencePath?: string | null;
+  regionalFullTensorResidualPath?: string | null;
   sourceClosurePassReadinessPath?: string | null;
   conservationPath?: string | null;
+  covariantConservationDiagnosticPath?: string | null;
   qeiWorldlineDossierPath?: string | null;
   observerRobustEnergyConditionsPath?: string | null;
   casimirMaterialReceiptPath?: string | null;
@@ -134,6 +144,13 @@ export const runNhm2RegionalTensorPassPathHarness = (args: {
       isNhm2RegionalSourceClosureEvidenceArtifact,
       "regional source-closure evidence",
     );
+  const regionalFullTensorResidual =
+    readOptional<Nhm2RegionalFullTensorResidualArtifactV1>(
+      args.repoRoot,
+      args.regionalFullTensorResidualPath ?? null,
+      isNhm2RegionalFullTensorResidual,
+      "regional full tensor residual",
+    );
   const sourceClosurePassReadiness =
     readOptional<Nhm2SourceClosurePassReadinessArtifact>(
       args.repoRoot,
@@ -147,6 +164,13 @@ export const runNhm2RegionalTensorPassPathHarness = (args: {
     isNhm2TileCounterpartConservationArtifact,
     "tile-counterpart conservation",
   );
+  const covariantConservationDiagnostic =
+    readOptional<Nhm2CovariantConservationDiagnosticArtifactV1>(
+      args.repoRoot,
+      args.covariantConservationDiagnosticPath ?? null,
+      isNhm2CovariantConservationDiagnostic,
+      "covariant conservation diagnostic",
+    );
   const qeiWorldlineDossier = readOptional<Nhm2QeiWorldlineDossierV1>(
     args.repoRoot,
     args.qeiWorldlineDossierPath ?? null,
@@ -181,8 +205,11 @@ export const runNhm2RegionalTensorPassPathHarness = (args: {
         args.regionalMaterialSourceTensorModelPath ?? null,
       sourceSideSameBasisTensorAuthority: args.sourceSideAuthorityPath ?? null,
       regionalSourceClosureEvidence: args.regionalSourceClosureEvidencePath ?? null,
+      regionalFullTensorResidual: args.regionalFullTensorResidualPath ?? null,
       sourceClosurePassReadiness: args.sourceClosurePassReadinessPath ?? null,
       conservation: args.conservationPath ?? null,
+      covariantConservationDiagnostic:
+        args.covariantConservationDiagnosticPath ?? null,
       qeiWorldlineDossier: args.qeiWorldlineDossierPath ?? null,
       observerRobustEnergyConditions:
         args.observerRobustEnergyConditionsPath ?? null,
@@ -193,8 +220,10 @@ export const runNhm2RegionalTensorPassPathHarness = (args: {
     regionalMaterialSourceTensorModel,
     sourceSideSameBasisTensorAuthority,
     regionalSourceClosureEvidence,
+    regionalFullTensorResidual,
     sourceClosurePassReadiness,
     conservation,
+    covariantConservationDiagnostic,
     qeiWorldlineDossier,
     observerRobustEnergyConditions,
     casimirMaterialReceipt,
@@ -226,8 +255,12 @@ if (normalize(process.argv[1] ?? "") === normalize(fileURLToPath(import.meta.url
     ),
     sourceSideAuthorityPath: asString(args["source-side-authority"]),
     regionalSourceClosureEvidencePath: asString(args["regional-source-closure-evidence"]),
+    regionalFullTensorResidualPath: asString(args["regional-full-tensor-residual"]),
     sourceClosurePassReadinessPath: asString(args["source-closure-pass-readiness"]),
     conservationPath: asString(args.conservation),
+    covariantConservationDiagnosticPath: asString(
+      args["covariant-conservation-diagnostic"],
+    ),
     qeiWorldlineDossierPath: asString(args["qei-worldline-dossier"]),
     observerRobustEnergyConditionsPath: asString(
       args["observer-robust-energy-conditions"],
