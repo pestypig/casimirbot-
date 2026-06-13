@@ -297,6 +297,7 @@ const summarizeWorldlines = (
     worldlines.length > 0 &&
     worldlines.every(
       (worldline) =>
+        worldline.blockers.length === 0 &&
         worldline.sampledRho.status !== "missing" &&
         worldline.bound.status !== "missing" &&
         worldline.margin.pass === true &&

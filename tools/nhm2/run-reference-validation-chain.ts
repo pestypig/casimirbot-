@@ -77,6 +77,7 @@ export const planReferenceValidationChain = (
   const fullLoopAudit = required(args, "full-loop-audit");
   const qeiDossier = asOptionalString(args, "qei-dossier");
   const inputQeiWorldlineDossier = asOptionalString(args, "qei-worldline-dossier");
+  const inputQeiBoundReceipt = asOptionalString(args, "qei-bound-receipt");
   const inputObserverRobustEnergyConditions = asOptionalString(
     args,
     "observer-robust-energy-conditions",
@@ -190,6 +191,11 @@ export const planReferenceValidationChain = (
     regionalSupportAtlas == null || sourceInput == null
       ? null
       : `${outRoot}/nhm2-qei-worldline-dossier.json`;
+  const generatedQeiBoundReceipt =
+    generatedQeiWorldlineDossier == null
+      ? null
+      : `${outRoot}/nhm2-qei-bound-receipt.json`;
+  const qeiBoundReceipt = inputQeiBoundReceipt ?? generatedQeiBoundReceipt;
   const qeiWorldlineDossier =
     inputQeiWorldlineDossier ?? generatedQeiWorldlineDossier;
   const generatedObserverRobustEnergyConditions =
@@ -592,12 +598,85 @@ export const planReferenceValidationChain = (
       ...auditOnly,
     ]));
   }
+  if (
+    generatedQeiBoundReceipt != null &&
+    inputQeiBoundReceipt == null &&
+    inputQeiWorldlineDossier == null
+  ) {
+    commands.push(command("nhm2:build-qei-bound-receipt", [
+      "--regional-support-atlas",
+      regionalSupportAtlas as string,
+      "--source-full-tensor",
+      sourceTensor,
+      "--out",
+      generatedQeiBoundReceipt,
+      ...(
+        asOptionalString(args, "qei-bound-model-kind") == null
+          ? []
+          : ["--bound-model-kind", asOptionalString(args, "qei-bound-model-kind") as string]
+      ),
+      ...(
+        asOptionalString(args, "qei-bound-si") == null
+          ? []
+          : ["--bound-si", asOptionalString(args, "qei-bound-si") as string]
+      ),
+      ...(
+        asOptionalString(args, "qei-bound-provenance-ref") == null
+          ? []
+          : [
+              "--bound-provenance-ref",
+              asOptionalString(args, "qei-bound-provenance-ref") as string,
+            ]
+      ),
+      ...(
+        asOptionalString(args, "qei-tau-seconds") == null
+          ? []
+          : ["--tau-seconds", asOptionalString(args, "qei-tau-seconds") as string]
+      ),
+      ...(
+        asOptionalString(args, "qei-duty-cycle") == null
+          ? []
+          : ["--duty-cycle", asOptionalString(args, "qei-duty-cycle") as string]
+      ),
+      ...(
+        asOptionalString(args, "qei-modulation-seconds") == null
+          ? []
+          : [
+              "--modulation-seconds",
+              asOptionalString(args, "qei-modulation-seconds") as string,
+            ]
+      ),
+      ...(
+        asOptionalString(args, "qei-sampling-kind") == null
+          ? []
+          : ["--sampling-kind", asOptionalString(args, "qei-sampling-kind") as string]
+      ),
+      ...(args["qei-sampling-normalized"] === undefined
+        ? []
+        : ["--sampling-normalized", String(args["qei-sampling-normalized"])]),
+      ...(
+        asOptionalString(args, "qei-qft-state-ref") == null
+          ? []
+          : ["--qft-state-ref", asOptionalString(args, "qei-qft-state-ref") as string]
+      ),
+      ...(
+        asOptionalString(args, "qei-renormalization-ref") == null
+          ? []
+          : [
+              "--renormalization-ref",
+              asOptionalString(args, "qei-renormalization-ref") as string,
+            ]
+      ),
+      ...auditOnly,
+    ]));
+  }
   if (generatedQeiWorldlineDossier != null && inputQeiWorldlineDossier == null) {
     commands.push(command("nhm2:build-atlas-bound-qei-worldline-dossier", [
       "--regional-support-atlas",
       regionalSupportAtlas as string,
       "--source-full-tensor",
       sourceTensor,
+      ...(qeiBoundReceipt == null ? [] : ["--qei-bound-receipt", qeiBoundReceipt]),
       "--out",
       generatedQeiWorldlineDossier,
       ...auditOnly,

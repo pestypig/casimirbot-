@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { buildNhm2QeiBoundReceipt } from "../shared/contracts/nhm2-qei-bound-receipt.v1";
 import { buildNhm2RegionalSupportFunctionAtlas } from "../shared/contracts/nhm2-regional-support-function-atlas.v1";
 import {
   NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS,
@@ -243,6 +244,169 @@ describe("atlas-bound QEI and observer builders", () => {
     });
     expect(artifact.worldlines[0]?.blockers).toContain("qei_bound_missing");
     expect(artifact.worldlines[0]?.blockers).toContain("qei_bound_provenance_missing");
+    expect(artifact.worldlines[0]?.blockers).toContain("qei_bound_receipt_missing");
+  });
+
+  it("consumes a typed QEI bound receipt for atlas-bound wall worldlines", () => {
+    const dir = mkdtempSync(join(tmpdir(), "nhm2-qei-"));
+    const atlasArtifact = atlas();
+    const sourceArtifact = source();
+    const atlasPath = writeJson(dir, "atlas.json", atlasArtifact);
+    const sourcePath = writeJson(dir, "source.json", sourceArtifact);
+    const receiptPath = writeJson(
+      dir,
+      "receipt.json",
+      buildNhm2QeiBoundReceipt({
+        generatedAt: "2026-06-13T00:00:00.000Z",
+        laneId: "nhm2_shift_lapse",
+        selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+        atlasRef: atlasPath,
+        atlasHash: atlasArtifact.provenance.atlasHash,
+        tensorRef: sourceArtifact.artifactId,
+        boundModelKind: "ford_roman_lorentzian",
+        samplingFunction: {
+          kind: "lorentzian",
+          tauSeconds: 1e-10,
+          normalized: true,
+        },
+        bound: {
+          valueSI: 20,
+          unit: "J/m^3",
+          provenanceRef: "ford_roman_1996_quantum_inequality",
+          status: "literature_bound",
+        },
+        tauPolicy: {
+          tauVsDuty: "pass",
+          tauVsLightCrossing: "pass",
+          tauVsModulation: "pass",
+          dutyCycle: 0.5,
+          lightCrossingSeconds: 1e-6,
+          modulationSeconds: 1e-6,
+        },
+        applicability: {
+          appliesToRegions: ["wall", "hull_wall_transition", "wall_exterior_transition"],
+          stationaryWorldlineAssumption: true,
+          reducedOrderOnly: false,
+          qftStateSpecified: true,
+          renormalizationConventionSpecified: true,
+        },
+      }),
+    );
+
+    const artifact = buildAtlasBoundQeiWorldlineDossier({
+      repoRoot: dir,
+      regionalSupportAtlasPath: atlasPath,
+      sourceFullTensorPath: sourcePath,
+      qeiBoundReceiptPath: receiptPath,
+      outPath: "qei.json",
+      auditOnly: true,
+    });
+
+    const wall = artifact.worldlines.find((worldline) => worldline.regionId === "wall");
+    expect(wall?.samplingFunction).toMatchObject({
+      kind: "lorentzian",
+      tauSeconds: 1e-10,
+      normalized: true,
+    });
+    expect(wall?.bound).toMatchObject({
+      valueSI: 20,
+      status: "literature_bound",
+      provenanceRef: "ford_roman_1996_quantum_inequality",
+    });
+    expect(wall?.blockers).not.toContain("qei_bound_missing");
+    expect(wall?.blockers).not.toContain("qei_bound_receipt_missing");
+    expect(artifact.summary.dossierComplete).toBe(false);
+    expect(
+      artifact.worldlines.find((worldline) => worldline.regionId === "hull_wall_transition")
+        ?.blockers,
+    ).toContain("transition_worldline_reduced_order_interpolation");
+  });
+
+  it("marks stale QEI bound receipts as atlas-mismatched worldline blockers", () => {
+    const dir = mkdtempSync(join(tmpdir(), "nhm2-qei-"));
+    const sourceArtifact = source();
+    const atlasPath = writeJson(dir, "atlas.json", atlas());
+    const sourcePath = writeJson(dir, "source.json", sourceArtifact);
+    const receiptPath = writeJson(
+      dir,
+      "receipt.json",
+      buildNhm2QeiBoundReceipt({
+        generatedAt: "2026-06-13T00:00:00.000Z",
+        laneId: "nhm2_shift_lapse",
+        selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+        atlasRef: atlasPath,
+        atlasHash: "stale-atlas-hash",
+        tensorRef: sourceArtifact.artifactId,
+        boundModelKind: "ford_roman_lorentzian",
+        samplingFunction: {
+          kind: "lorentzian",
+          tauSeconds: 1e-10,
+          normalized: true,
+        },
+        bound: {
+          valueSI: 20,
+          unit: "J/m^3",
+          provenanceRef: "ford_roman_1996_quantum_inequality",
+          status: "literature_bound",
+        },
+        tauPolicy: {
+          tauVsDuty: "pass",
+          tauVsLightCrossing: "pass",
+          tauVsModulation: "pass",
+          dutyCycle: 0.5,
+          lightCrossingSeconds: 1e-6,
+          modulationSeconds: 1e-6,
+        },
+        applicability: {
+          appliesToRegions: ["wall"],
+          stationaryWorldlineAssumption: true,
+          reducedOrderOnly: false,
+          qftStateSpecified: true,
+          renormalizationConventionSpecified: true,
+        },
+      }),
+    );
+
+    const artifact = buildAtlasBoundQeiWorldlineDossier({
+      repoRoot: dir,
+      regionalSupportAtlasPath: atlasPath,
+      sourceFullTensorPath: sourcePath,
+      qeiBoundReceiptPath: receiptPath,
+      outPath: "qei.json",
+      auditOnly: true,
+    });
+
+    expect(artifact.worldlines[0]?.blockers).toContain(
+      "qei_bound_receipt_atlas_hash_mismatch",
+    );
+    expect(artifact.summary.dossierComplete).toBe(false);
+  });
+
+  it("does not let a direct QEI bound scalar complete the dossier outside audit-only mode", () => {
+    const dir = mkdtempSync(join(tmpdir(), "nhm2-qei-"));
+    const atlasPath = writeJson(dir, "atlas.json", atlas());
+    const sourcePath = writeJson(dir, "source.json", source());
+
+    const artifact = buildAtlasBoundQeiWorldlineDossier({
+      repoRoot: dir,
+      regionalSupportAtlasPath: atlasPath,
+      sourceFullTensorPath: sourcePath,
+      qeiBoundSI: 20,
+      tauSeconds: 1e-10,
+      dutyCycle: 0.5,
+      modulationSeconds: 1e-6,
+      samplingKind: "lorentzian",
+      samplingNormalized: true,
+      outPath: "qei.json",
+      auditOnly: false,
+    });
+
+    expect(artifact.worldlines[0]?.bound.status).toBe("proxy");
+    expect(artifact.worldlines[0]?.blockers).toContain(
+      "qei_bound_direct_scalar_not_receipted",
+    );
+    expect(artifact.summary.anyProxy).toBe(true);
+    expect(artifact.summary.dossierComplete).toBe(false);
   });
 
   it("does not treat diagonal-only source tensors as robust observer evidence", () => {

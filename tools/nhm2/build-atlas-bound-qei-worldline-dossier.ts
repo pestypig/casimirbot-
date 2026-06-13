@@ -6,8 +6,14 @@ import {
   buildNhm2QeiWorldlineDossier,
   type Nhm2QeiWorldlineDossierV1,
   type Nhm2QeiWorldlineDossierWorldlineV1,
+  type Nhm2QeiWorldlineBoundStatus,
   type Nhm2QeiWorldlineRegionId,
+  type Nhm2QeiWorldlineSamplingFunctionKind,
 } from "../../shared/contracts/nhm2-qei-worldline-dossier.v1";
+import {
+  isNhm2QeiBoundReceipt,
+  type Nhm2QeiBoundReceiptV1,
+} from "../../shared/contracts/nhm2-qei-bound-receipt.v1";
 import {
   isNhm2RegionalSupportFunctionAtlas,
   type Nhm2RegionalSupportFunctionAtlasV1,
@@ -25,15 +31,17 @@ import {
 type QeiBoundReceipt = {
   valueSI: number | null;
   provenanceRef: string | null;
-  status: "computed" | "literature_bound" | "proxy" | "missing";
+  status: Nhm2QeiWorldlineBoundStatus;
+  samplingKind: Nhm2QeiWorldlineSamplingFunctionKind | null;
+  tauSeconds: number | null;
+  samplingNormalized: boolean | null;
+  dutyCycle: number | null;
+  lightCrossingSeconds: number | null;
+  modulationSeconds: number | null;
+  blockers: string[];
 };
 
 const C = 299_792_458;
-
-const asRecord = (value: unknown): Record<string, unknown> | null =>
-  value != null && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
 
 const asString = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
@@ -166,40 +174,93 @@ const readBoundReceipt = (
   repoRoot: string,
   path: string | null,
   directValue: number | null,
+  auditOnly: boolean,
+  atlasHash: string,
+  source: Nhm2TileEffectiveFullTensorSourceArtifact,
+  sourceFullTensorPath: string,
 ): QeiBoundReceipt => {
   if (directValue != null) {
     return {
       valueSI: directValue,
       provenanceRef: "cli:qei-bound-si",
-      status: "literature_bound",
+      status: auditOnly ? "literature_bound" : "proxy",
+      samplingKind: null,
+      tauSeconds: null,
+      samplingNormalized: null,
+      dutyCycle: null,
+      lightCrossingSeconds: null,
+      modulationSeconds: null,
+      blockers: auditOnly
+        ? []
+        : ["qei_bound_receipt_missing", "qei_bound_direct_scalar_not_receipted"],
     };
   }
   if (path == null || !existsSync(resolvePath(repoRoot, path))) {
-    return { valueSI: null, provenanceRef: null, status: "missing" };
+    return {
+      valueSI: null,
+      provenanceRef: null,
+      status: "missing",
+      samplingKind: null,
+      tauSeconds: null,
+      samplingNormalized: null,
+      dutyCycle: null,
+      lightCrossingSeconds: null,
+      modulationSeconds: null,
+      blockers: ["qei_bound_receipt_missing"],
+    };
   }
-  const record = asRecord(readJson(resolvePath(repoRoot, path)));
-  const nestedBound = asRecord(record?.bound);
-  const value =
-    asNumber(record?.valueSI) ??
-    asNumber(record?.boundSI) ??
-    asNumber(record?.qeiBoundSI) ??
-    asNumber(record?.bound_Jm3) ??
-    asNumber(nestedBound?.valueSI);
-  const statusText = asString(record?.status) ?? asString(nestedBound?.status);
+  const record = readJson(resolvePath(repoRoot, path));
+  if (!isNhm2QeiBoundReceipt(record)) {
+    return {
+      valueSI: null,
+      provenanceRef: path,
+      status: "missing",
+      samplingKind: null,
+      tauSeconds: null,
+      samplingNormalized: null,
+      dutyCycle: null,
+      lightCrossingSeconds: null,
+      modulationSeconds: null,
+      blockers: ["qei_bound_receipt_invalid_contract"],
+    };
+  }
+  const receipt = record;
+  const sourceTensorRefs = new Set([source.artifactId, sourceFullTensorPath]);
+  const status = mapReceiptBoundStatus(receipt);
   return {
-    valueSI: value,
-    provenanceRef:
-      asString(record?.provenanceRef) ??
-      asString(record?.ref) ??
-      asString(nestedBound?.provenanceRef) ??
-      path,
-    status:
-      value == null
-        ? "missing"
-        : statusText === "computed" || statusText === "proxy"
-          ? statusText
-          : "literature_bound",
+    valueSI: receipt.bound.valueSI,
+    provenanceRef: receipt.bound.provenanceRef ?? path,
+    status,
+    samplingKind: receipt.samplingFunction.kind,
+    tauSeconds: receipt.samplingFunction.tauSeconds,
+    samplingNormalized: receipt.samplingFunction.normalized,
+    dutyCycle: receipt.tauPolicy.dutyCycle,
+    lightCrossingSeconds: receipt.tauPolicy.lightCrossingSeconds,
+    modulationSeconds: receipt.tauPolicy.modulationSeconds,
+    blockers: [
+      ...receipt.blockers,
+      ...(receipt.status === "pass" ? [] : [`qei_bound_receipt_${receipt.status}`]),
+      ...(receipt.atlasHash === atlasHash
+        ? []
+        : ["qei_bound_receipt_atlas_hash_mismatch"]),
+      ...(sourceTensorRefs.has(receipt.tensorRef)
+        ? []
+        : ["qei_bound_receipt_tensor_ref_mismatch"]),
+      ...(receipt.bound.status === "declared_reduced_order"
+        ? ["qei_bound_declared_reduced_order_only"]
+        : []),
+    ],
   };
+};
+
+const mapReceiptBoundStatus = (
+  receipt: Nhm2QeiBoundReceiptV1,
+): Nhm2QeiWorldlineBoundStatus => {
+  if (receipt.bound.status === "computed") return "computed";
+  if (receipt.bound.status === "literature_bound") return "literature_bound";
+  if (receipt.bound.status === "declared_reduced_order") return "proxy";
+  if (receipt.bound.status === "proxy") return "proxy";
+  return "missing";
 };
 
 const consistency = (args: {
@@ -290,6 +351,10 @@ export const buildAtlasBoundQeiWorldlineDossier = (args: {
     args.repoRoot,
     args.qeiBoundReceiptPath ?? null,
     args.qeiBoundSI ?? null,
+    args.auditOnly === true,
+    atlas.provenance.atlasHash,
+    source,
+    args.sourceFullTensorPath,
   );
   const regions: Nhm2QeiWorldlineRegionId[] = [
     "wall",
@@ -299,15 +364,25 @@ export const buildAtlasBoundQeiWorldlineDossier = (args: {
   const worldlines = regions.map((regionId) => {
     const density = sampledDensityForRegion(regionId, source);
     const lightCrossing =
-      args.lightCrossingSeconds ?? lightCrossingFromAtlas(atlas, regionId);
+      bound.lightCrossingSeconds ??
+      args.lightCrossingSeconds ??
+      lightCrossingFromAtlas(atlas, regionId);
+    const tauSeconds = bound.tauSeconds ?? args.tauSeconds ?? null;
+    const dutyCycle = bound.dutyCycle ?? args.dutyCycle ?? null;
+    const modulationSeconds =
+      bound.modulationSeconds ?? args.modulationSeconds ?? null;
+    const samplingKind = bound.samplingKind ?? args.samplingKind ?? "unknown";
+    const samplingNormalized =
+      bound.samplingNormalized ?? (args.samplingNormalized === true);
     const margin =
       density.valueSI == null || bound.valueSI == null
         ? null
         : bound.valueSI - density.valueSI;
     const blockers = [
       ...density.blockers,
-      ...(args.tauSeconds == null ? ["sampling_tau_missing"] : []),
-      ...(args.samplingNormalized === true
+      ...bound.blockers,
+      ...(tauSeconds == null ? ["sampling_tau_missing"] : []),
+      ...(samplingNormalized === true
         ? []
         : ["sampling_function_not_normalized"]),
       ...(bound.valueSI == null ? ["qei_bound_missing"] : []),
@@ -320,9 +395,9 @@ export const buildAtlasBoundQeiWorldlineDossier = (args: {
       regionId,
       chartId: atlas.runIdentity.chartId,
       samplingFunction: {
-        kind: args.samplingKind ?? "unknown",
-        tauSeconds: args.tauSeconds ?? null,
-        normalized: args.samplingNormalized === true,
+        kind: samplingKind,
+        tauSeconds,
+        normalized: samplingNormalized,
       },
       sampledRho: {
         valueSI: density.valueSI,
@@ -339,10 +414,10 @@ export const buildAtlasBoundQeiWorldlineDossier = (args: {
         pass: margin == null ? null : margin >= 0,
       },
       consistency: consistency({
-        tauSeconds: args.tauSeconds ?? null,
-        dutyCycle: args.dutyCycle ?? null,
+        tauSeconds,
+        dutyCycle,
         lightCrossingSeconds: lightCrossing,
-        modulationSeconds: args.modulationSeconds ?? null,
+        modulationSeconds,
       }),
       blockers,
     };

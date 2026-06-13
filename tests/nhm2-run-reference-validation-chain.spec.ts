@@ -528,6 +528,7 @@ describe("NHM2 reference validation chain planner", () => {
       "nhm2:build-regional-full-tensor-residual",
     );
     const covariant = findCommand(plan, "nhm2:build-covariant-conservation-diagnostic");
+    const qeiBound = findCommand(plan, "nhm2:build-qei-bound-receipt");
     const qei = findCommand(plan, "nhm2:build-atlas-bound-qei-worldline-dossier");
     const observer = findCommand(
       plan,
@@ -557,6 +558,9 @@ describe("NHM2 reference validation chain planner", () => {
       scripts.indexOf("nhm2:build-covariant-conservation-diagnostic"),
     );
     expect(scripts.indexOf("nhm2:build-covariant-conservation-diagnostic")).toBeLessThan(
+      scripts.indexOf("nhm2:build-qei-bound-receipt"),
+    );
+    expect(scripts.indexOf("nhm2:build-qei-bound-receipt")).toBeLessThan(
       scripts.indexOf("nhm2:build-atlas-bound-qei-worldline-dossier"),
     );
     expect(scripts.indexOf("nhm2:build-atlas-bound-qei-worldline-dossier")).toBeLessThan(
@@ -568,7 +572,7 @@ describe("NHM2 reference validation chain planner", () => {
     expect(scripts.indexOf("nhm2:publish-regional-source-closure-evidence")).toBeLessThan(
       scripts.indexOf("nhm2:build-regional-full-tensor-residual"),
     );
-    for (const planned of [kernel, conservation, regionalEvidence, covariant, qei, observer, coupled, harness, admission]) {
+    for (const planned of [kernel, conservation, regionalEvidence, covariant, qeiBound, qei, observer, coupled, harness, admission]) {
       expect(planned.args).toContain("--regional-support-atlas");
       expect(planned.args).toContain(atlasPath);
     }
@@ -580,9 +584,20 @@ describe("NHM2 reference validation chain planner", () => {
     expect(covariant.args).toContain(
       "artifacts/research/full-solve/reference/run-1/nhm2-tile-counterpart-conservation.json",
     );
+    expect(qeiBound.args).toContain("--source-full-tensor");
+    expect(qeiBound.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-tile-effective-full-tensor-source.json",
+    );
+    expect(qeiBound.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-qei-bound-receipt.json",
+    );
     expect(qei.args).toContain("--source-full-tensor");
     expect(qei.args).toContain(
       "artifacts/research/full-solve/reference/run-1/nhm2-tile-effective-full-tensor-source.json",
+    );
+    expect(qei.args).toContain("--qei-bound-receipt");
+    expect(qei.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-qei-bound-receipt.json",
     );
     expect(qei.args).toContain(
       "artifacts/research/full-solve/reference/run-1/nhm2-qei-worldline-dossier.json",
@@ -618,6 +633,63 @@ describe("NHM2 reference validation chain planner", () => {
     expect(harness.args).toContain(
       "artifacts/research/full-solve/reference/run-1/nhm2-observer-robust-energy-conditions.json",
     );
+  });
+
+  it("passes explicit QEI bound receipts through without regenerating one", () => {
+    const plan = planReferenceValidationChain({
+      ...baseArgs(),
+      "source-input": "fixtures/nhm2/source-input.json",
+      "build-regional-support-function-atlas": true,
+      "qei-bound-receipt": "artifacts/reference/nhm2-qei-bound-receipt.json",
+    });
+    const scripts = plan.map((command) => command.script);
+    const qei = findCommand(plan, "nhm2:build-atlas-bound-qei-worldline-dossier");
+
+    expect(scripts).not.toContain("nhm2:build-qei-bound-receipt");
+    expect(qei.args).toContain("--qei-bound-receipt");
+    expect(qei.args).toContain("artifacts/reference/nhm2-qei-bound-receipt.json");
+  });
+
+  it("forwards QEI receipt inputs to generated bound-receipt runs", () => {
+    const plan = planReferenceValidationChain({
+      ...baseArgs(),
+      "source-input": "fixtures/nhm2/source-input.json",
+      "build-regional-support-function-atlas": true,
+      "qei-bound-model-kind": "ford_roman_lorentzian",
+      "qei-bound-si": "0",
+      "qei-bound-provenance-ref": "ford_roman_1996_quantum_inequality",
+      "qei-tau-seconds": "1e-10",
+      "qei-duty-cycle": "0.5",
+      "qei-modulation-seconds": "1e-6",
+      "qei-sampling-kind": "lorentzian",
+      "qei-sampling-normalized": "true",
+      "qei-qft-state-ref": "qft-state.json",
+      "qei-renormalization-ref": "renormalization.json",
+    });
+    const qeiBound = findCommand(plan, "nhm2:build-qei-bound-receipt");
+
+    expect(qeiBound.args).toEqual(expect.arrayContaining([
+      "--bound-model-kind",
+      "ford_roman_lorentzian",
+      "--bound-si",
+      "0",
+      "--bound-provenance-ref",
+      "ford_roman_1996_quantum_inequality",
+      "--tau-seconds",
+      "1e-10",
+      "--duty-cycle",
+      "0.5",
+      "--modulation-seconds",
+      "1e-6",
+      "--sampling-kind",
+      "lorentzian",
+      "--sampling-normalized",
+      "true",
+      "--qft-state-ref",
+      "qft-state.json",
+      "--renormalization-ref",
+      "renormalization.json",
+    ]));
   });
 
   it("rejects transition-kernel generation without generated source input", () => {

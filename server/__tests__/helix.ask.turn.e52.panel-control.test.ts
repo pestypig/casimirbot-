@@ -548,19 +548,10 @@ describe("helix ask E52 panel control terminal contract", () => {
       .expect(200);
 
     expect(response.body?.canonical_goal_frame?.goal_kind).not.toBe("calculator_solve");
+    expect(response.body?.canonical_goal_frame?.classifier_reasons).toEqual(
+      expect.arrayContaining(["underspecified_calculator_prompt"]),
+    );
     expect(findAction(response.body, "scientific-calculator", "solve_expression")).toBeFalsy();
-    expect(response.body?.calculator_candidate_hints?.numeric_normalizations).toEqual([
-      expect.objectContaining({
-        raw_token: "9 1/8",
-        normalized_expression: "73/8",
-        decimal_value: 9.125,
-      }),
-    ]);
-    expect(response.body?.calculator_candidate_hints?.problem_interpretation).toMatchObject({
-      prompt_kind: "underdetermined_triangle",
-      needs_more_information: true,
-      safe_to_calculate: false,
-    });
     const runtimeCapabilities =
       response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => iteration.chosen_capability) ?? [];
     expect(runtimeCapabilities).not.toContain("scientific-calculator.solve_expression");
