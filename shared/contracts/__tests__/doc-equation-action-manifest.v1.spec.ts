@@ -52,6 +52,12 @@ describe("doc_equation_actions/v1", () => {
     const fullTensor = nhm2WhitepaperActions.entries.find(
       (entry) => entry.equationId === "nhm2-same-chart-full-tensor-ledger",
     );
+    const componentAuthority = nhm2WhitepaperActions.entries.find(
+      (entry) => entry.equationId === "nhm2-source-component-authority-ledger",
+    );
+    const passPath = nhm2WhitepaperActions.entries.find(
+      (entry) => entry.equationId === "nhm2-june-pass-path-smoke-chain",
+    );
     const materialReceipt = nhm2WhitepaperActions.entries.find(
       (entry) => entry.equationId === "casimir-material-receipt-ledger",
     );
@@ -61,6 +67,10 @@ describe("doc_equation_actions/v1", () => {
 
     expect(fullTensor?.actions.map((action) => action.kind)).toEqual(["artifact_backed_theory_run"]);
     expect(fullTensor?.actions[0]?.preferredBadgeId).toBe("nhm2.tensor.same_chart_full_tensor");
+    expect(componentAuthority?.actions.map((action) => action.kind)).toEqual(["artifact_backed_theory_run"]);
+    expect(componentAuthority?.actions[0]?.preferredBadgeId).toBe("nhm2.source.component_authority_ledger");
+    expect(passPath?.actions.map((action) => action.kind)).toEqual(["artifact_backed_theory_run"]);
+    expect(passPath?.actions[0]?.preferredBadgeId).toBe("nhm2.closure.regional_tensor_pass_path_harness");
     expect(materialReceipt?.actions.map((action) => action.kind)).toEqual(["artifact_backed_theory_run"]);
     expect(materialReceipt?.actions[0]?.preferredBadgeId).toBe("casimir.material.lifshitz_receipt");
     expect(wall?.actions.some((action) => action.calculatorPayloadRef?.payloadId === "wall_t00_source_residual_payload"))
@@ -75,6 +85,9 @@ describe("doc_equation_actions/v1", () => {
     const badgesById = new Map(graph.badges.map((badge) => [badge.id, badge]));
     const runtimeReferenceOnlyBadgeIds = new Set([
       "nhm2.tensor.same_chart_full_tensor",
+      "nhm2.source.component_authority_ledger",
+      "nhm2.closure.coupled_pass_candidate",
+      "nhm2.closure.regional_tensor_pass_path_harness",
       "nhm2.energy_condition.observer_robust_gate",
       "nhm2.qei.worldline_dossier",
       "casimir.material.lifshitz_receipt",

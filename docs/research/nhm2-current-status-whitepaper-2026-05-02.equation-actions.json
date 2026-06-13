@@ -1,7 +1,7 @@
 {
   "contractVersion": "doc_equation_actions/v1",
   "docPath": "docs/research/nhm2-current-status-whitepaper-2026-05-02.md",
-  "generatedAt": "2026-06-10T00:00:00.000Z",
+  "generatedAt": "2026-06-13T00:00:00.000Z",
   "entries": [
     {
       "equationId": "nhm2-adm-line-element",
@@ -190,6 +190,41 @@
       ]
     },
     {
+      "equationId": "nhm2-source-component-authority-ledger",
+      "label": "Source component authority ledger",
+      "sectionAnchor": "57-workstation-equation-anchors",
+      "latex": "\\mathrm{Ledger}_{source} =\\bigwedge_R(T_{00}\\land T_{0i}\\land T_{ii}\\land T_{ij,\\ i\\ne j})_{source}.",
+      "aliases": [
+        "nhm2_source_component_authority_ledger/v1",
+        "\\mathrm{Ledger}_{source}=\\bigwedge_R(T_{00}\\land T_{0i}\\land T_{ii}\\land T_{ij,\\ i\\ne j})_{source}"
+      ],
+      "actions": [
+        {
+          "actionId": "open-source-component-authority-ledger-artifact",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open source component authority ledger",
+          "badgeIds": [
+            "nhm2.tensor.tile_effective_counterpart",
+            "nhm2.source.component_authority_ledger",
+            "nhm2.source.same_basis_tensor_authority"
+          ],
+          "preferredBadgeId": "nhm2.source.component_authority_ledger",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.source_closure",
+          "openPanels": [
+            "theory-badge-graph",
+            "scientific-calculator"
+          ],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "Component authority is evidence admission, not material-source proof."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "A complete component ledger cannot override residual, conservation, QEI, observer, material, reproducibility, or claim gates."
+      ]
+    },
+    {
       "equationId": "nhm2-wall-t00-source-residual",
       "label": "Wall T00 source residual",
       "sectionAnchor": "57-workstation-equation-anchors",
@@ -319,6 +354,45 @@
       ],
       "claimBoundaryNotes": [
         "Missing wall worldline blocks QEI dossier completeness."
+      ]
+    },
+    {
+      "equationId": "nhm2-june-pass-path-smoke-chain",
+      "label": "June pass-path smoke-chain gates",
+      "sectionAnchor": "57-workstation-equation-anchors",
+      "latex": "\\mathrm{Ready}_{path} =source\\land R_{{\\rm wall},T00}\\land residuals\\land conservation\\land QEI\\land observer\\land material\\land coupled.",
+      "aliases": [
+        "nhm2_regional_tensor_pass_path_harness/v1",
+        "nhm2_coupled_closure_pass_candidate/v1",
+        "\\mathrm{Ready}_{path}=source\\land R_{{\\rm wall},T00}\\land residuals\\land conservation\\land QEI\\land observer\\land material\\land coupled"
+      ],
+      "actions": [
+        {
+          "actionId": "open-june-pass-path-runtime-artifacts",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open June pass-path runtime artifacts",
+          "badgeIds": [
+            "nhm2.source.component_authority_ledger",
+            "nhm2.closure.wall_t00_source_residual",
+            "nhm2.closure.coupled_pass_candidate",
+            "nhm2.closure.regional_tensor_pass_path_harness",
+            "nhm2.energy_condition.observer_robust_gate",
+            "nhm2.claim_boundary.diagnostic_only"
+          ],
+          "preferredBadgeId": "nhm2.closure.regional_tensor_pass_path_harness",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": [
+            "theory-badge-graph",
+            "scientific-calculator"
+          ],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "Wall T00 can be under reduced-order tolerance while coupled closure and pass-path readiness remain false."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Runtime pass-path artifacts are not calculator formulas and do not grant physical or transport claims."
       ]
     },
     {

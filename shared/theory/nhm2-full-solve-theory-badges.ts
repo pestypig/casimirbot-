@@ -14,6 +14,14 @@ const NHM2_PROOF_ANCHOR_INDEX =
   "docs/audits/research/warp-needle-hull-mark2-proof-anchor-index-latest.md";
 const NHM2_FULL_SOLVE_REFERENCE_CAPSULE =
   "docs/audits/research/warp-full-solve-reference-capsule-latest.md";
+const NHM2_QEI_RECEIPTED_SMOKE_ROOT =
+  "artifacts/research/full-solve/validation-chain/qei-worldline-receipted-smoke-v1";
+const NHM2_SOURCE_COMPONENT_AUTHORITY_LEDGER =
+  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-source-component-authority-ledger.json`;
+const NHM2_COUPLED_CLOSURE_PASS_CANDIDATE =
+  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-coupled-closure-pass-candidate.json`;
+const NHM2_REGIONAL_TENSOR_PASS_PATH_HARNESS =
+  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-regional-tensor-pass-path-harness.json`;
 
 const NHM2_FULL_SOLVE_BOUNDARY: TheoryBadgeClaimBoundaryV1 = {
   diagnosticOnly: true,
@@ -487,6 +495,65 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   nhm2FullSolveBadge({
+    id: "nhm2.source.component_authority_ledger",
+    title: "Source Component Authority Ledger",
+    plainMeaning:
+      "Records whether each regional source-side tensor component is present, admissible, non-proxy, and non-metric-echo.",
+    whyItMatters:
+      "It lets the theory graph distinguish evidence admission from physical material proof and prevents stale source-authority blockers from hiding the next gate.",
+    subjects: ["nhm2", "source_side", "component_authority", "full_tensor", "anti_proxy"],
+    level: "diagnostic_gate",
+    status: "diagnostic",
+    simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    equationFamilies: ["source_component_authority_ledger", "tile_effective_counterpart"],
+    tags: ["component_authority", "anti_proxy", "full_tensor", "metric_echo_forbidden", "runtime_artifact"],
+    equations: [
+      {
+        id: "source_component_authority_ledger_gate",
+        role: "gate",
+        displayLatex:
+          "\\mathrm{Ledger}_{source}=\\bigwedge_R(T_{00}\\land T_{0i}\\land T_{ii}\\land T_{ij,i\\ne j})_{source}",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: ["T00_R", "T0i_R", "Tii_R", "Tij_offdiag_R", "authority_R"],
+        outputSymbols: ["source_component_authority_status"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "The ledger is an evidence-admission surface, not a material realization proof.",
+      "A complete component ledger cannot override residual, conservation, QEI, observer, material, reproducibility, or claim gates.",
+      "The current smoke-chain ledger is local pinned evidence and still requires frozen reference-chain promotion review.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef(
+        "shared/contracts/nhm2-source-component-authority-ledger.v1.ts",
+        "nhm2-source-component-authority-ledger-contract",
+        "Typed component-level source authority contract.",
+      ),
+      artifactRef(
+        NHM2_SOURCE_COMPONENT_AUTHORITY_LEDGER,
+        "sha256:be165467299ebb898ced93106e9bf3d979b60c6624537294c5e74ea3b668ebfa",
+        "Pinned local smoke-chain ledger: complete source component authority is evidence admission only.",
+      ),
+      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "may-baseline-and-june-pass-path-delta", "June pass-path delta."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "source_side", "component_authority", "full_tensor", "anti_proxy"],
+      symbols: ["T00_R", "T0i_R", "Tii_R", "Tij_offdiag_R", "authority_R"],
+      unitSignatures: [],
+      repoPaths: [
+        "shared/contracts/nhm2-source-component-authority-ledger.v1.ts",
+        NHM2_SOURCE_COMPONENT_AUTHORITY_LEDGER,
+        NHM2_FULL_SOLVE_WHITEPAPER,
+      ],
+      equationFamilies: ["source_component_authority_ledger", "tile_effective_counterpart"],
+      simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
     id: "nhm2.source.wall_t00_trace",
     title: "Wall T00 Trace Blocker",
     plainMeaning:
@@ -608,6 +675,143 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       unitSignatures: ["L^-2"],
       repoPaths: [NHM2_FULL_SOLVE_WHITEPAPER, NHM2_OBSERVABLE_EQUATION_MAP],
       equationFamilies: ["same_basis_regional_closure", "tensor_residual"],
+      simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.closure.coupled_pass_candidate",
+    title: "Coupled Closure Pass Candidate",
+    plainMeaning:
+      "Synchronizes source authority, regional residuals, conservation, QEI dossier, observer robustness, and material receipt gates into one diagnostic candidate.",
+    whyItMatters:
+      "It is the runtime row that prevents a green-looking individual gate from being mistaken for full-solve closure.",
+    subjects: ["nhm2", "coupled_closure", "pass_candidate", "proof_stack", "artifact_governance"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    equationFamilies: ["coupled_closure_pass_candidate", "closure_stack"],
+    tags: ["coupled_closure", "passCandidate_false", "runtime_artifact", "blocks_promotion"],
+    equations: [
+      {
+        id: "coupled_closure_pass_candidate_gate",
+        role: "gate",
+        displayLatex:
+          "passCandidate=source\\land residuals\\land conservation\\land QEI\\land observer\\land material",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: ["source", "residuals", "conservation", "QEI", "observer", "material"],
+        outputSymbols: ["passCandidate"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "The current pinned smoke-chain coupled candidate is false.",
+      "A coupled candidate is a diagnostic synchronization gate and still cannot grant physical or transport claims.",
+      "Individual pass rows cannot override a failed coupled closure candidate.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef(
+        "shared/contracts/nhm2-coupled-closure-pass-candidate.v1.ts",
+        "nhm2-coupled-closure-pass-candidate-contract",
+        "Typed coupled closure pass-candidate contract.",
+      ),
+      artifactRef(
+        NHM2_COUPLED_CLOSURE_PASS_CANDIDATE,
+        "sha256:739ec5b9b887c42575ff8184bfe8e3d99e06c70e397abe233357d2e9aef040bc",
+        "Pinned local smoke-chain artifact: passCandidate=false.",
+      ),
+      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "may-baseline-and-june-pass-path-delta", "June pass-path delta."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "coupled_closure", "pass_candidate", "proof_stack", "artifact_governance"],
+      symbols: ["source", "residuals", "conservation", "QEI", "observer", "material", "passCandidate"],
+      unitSignatures: [],
+      repoPaths: [
+        "shared/contracts/nhm2-coupled-closure-pass-candidate.v1.ts",
+        NHM2_COUPLED_CLOSURE_PASS_CANDIDATE,
+        NHM2_FULL_SOLVE_WHITEPAPER,
+      ],
+      equationFamilies: ["coupled_closure_pass_candidate", "closure_stack"],
+      simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.closure.regional_tensor_pass_path_harness",
+    title: "Regional Tensor Pass-Path Harness",
+    plainMeaning:
+      "Reports whether the regional tensor closure path is numerically ready after source authority, wall T00, residual, conservation, QEI, observer, material, and coupled-candidate gates.",
+    whyItMatters:
+      "It is the graph row that answers what still has to pass numerically without converting smoke-chain progress into physical viability.",
+    subjects: ["nhm2", "regional_tensor", "pass_path", "numerical_readiness", "closure_stack"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    equationFamilies: ["regional_tensor_pass_path_harness", "closure_stack"],
+    tags: ["pass_path_harness", "numericalPassPathReady_false", "runtime_artifact", "blocks_promotion"],
+    equations: [
+      {
+        id: "regional_tensor_pass_path_harness_gate",
+        role: "gate",
+        displayLatex:
+          "ready=regionalTensors\\land R_{wall,T00}\\land residuals\\land conservation\\land QEI\\land observer\\land material\\land coupled",
+        computableExpression: null,
+        operatorKind: "gate_status",
+        inputSymbols: [
+          "regionalTensors",
+          "R_wall_T00",
+          "residuals",
+          "conservation",
+          "QEI",
+          "observer",
+          "material",
+          "coupled",
+        ],
+        outputSymbols: ["numericalPassPathReady"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "The current pinned smoke-chain harness has wall T00 under tolerance but numericalPassPathReady=false.",
+      "The harness is an artifact-backed scoreboard, not a calculator formula.",
+      "Physical and transport claims remain forbidden even if diagnostic readiness improves.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef(
+        "shared/contracts/nhm2-regional-tensor-pass-path-harness.v1.ts",
+        "nhm2-regional-tensor-pass-path-harness-contract",
+        "Typed numerical pass-path harness contract.",
+      ),
+      artifactRef(
+        NHM2_REGIONAL_TENSOR_PASS_PATH_HARNESS,
+        "sha256:b16bf1f9e0f288c7ba1dea2b800333292b4a6c16b119c4a8443d0805f0527b71",
+        "Pinned local smoke-chain artifact: numericalPassPathReady=false; wall.relLInf=0.08853034907135743.",
+      ),
+      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "may-baseline-and-june-pass-path-delta", "June pass-path delta."),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "regional_tensor", "pass_path", "numerical_readiness", "closure_stack"],
+      symbols: [
+        "regionalTensors",
+        "R_wall_T00",
+        "residuals",
+        "conservation",
+        "QEI",
+        "observer",
+        "material",
+        "coupled",
+        "numericalPassPathReady",
+      ],
+      unitSignatures: [],
+      repoPaths: [
+        "shared/contracts/nhm2-regional-tensor-pass-path-harness.v1.ts",
+        NHM2_REGIONAL_TENSOR_PASS_PATH_HARNESS,
+        NHM2_FULL_SOLVE_WHITEPAPER,
+      ],
+      equationFamilies: ["regional_tensor_pass_path_harness", "closure_stack"],
       simulationOwners: ["NHM2", "general_relativity", "casimir"],
     },
   }),
@@ -1613,12 +1817,36 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     claimBoundaryNote: "Counterpart evidence must still prove source-side independence and full component authority.",
   },
   {
+    id: "tile_counterpart_feeds_component_authority_ledger",
+    from: "nhm2.tensor.tile_effective_counterpart",
+    to: "nhm2.source.component_authority_ledger",
+    relation: "requires",
+    label: "The tile-effective counterpart supplies component rows for the source component authority ledger.",
+    claimBoundaryNote: "Component authority is evidence admission, not material realization.",
+  },
+  {
+    id: "component_authority_ledger_feeds_source_side_authority",
+    from: "nhm2.source.component_authority_ledger",
+    to: "nhm2.source.same_basis_tensor_authority",
+    relation: "requires",
+    label: "Component-level source authority can retire stale source-authority blockers only when the ledger is complete and non-proxy.",
+    claimBoundaryNote: "The ledger cannot override residual, conservation, QEI, observer, material, or claim gates.",
+  },
+  {
     id: "lifshitz_receipt_feeds_source_side_authority",
     from: "casimir.material.lifshitz_receipt",
     to: "nhm2.source.same_basis_tensor_authority",
     relation: "requires",
     label: "Material receipt evidence is required before Casimir source rows can support source-side tensor authority.",
     claimBoundaryNote: "Material receipts are diagnostics and do not validate a physical source by themselves.",
+  },
+  {
+    id: "component_authority_ledger_feeds_wall_t00_source_residual",
+    from: "nhm2.source.component_authority_ledger",
+    to: "nhm2.closure.wall_t00_source_residual",
+    relation: "requires",
+    label: "Wall T00 residual interpretation can use the component ledger to distinguish source evidence from stale authority summaries.",
+    claimBoundaryNote: "Wall T00 under tolerance is still narrower than wall closure.",
   },
   {
     id: "source_side_authority_feeds_wall_t00_source_residual",
@@ -1659,6 +1887,14 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "requires",
     label: "Same-basis regional residuals require the shared atlas hash used by source and metric tensor artifacts.",
     claimBoundaryNote: "Shared regional geometry does not make the residual pass.",
+  },
+  {
+    id: "component_authority_ledger_feeds_same_basis_closure",
+    from: "nhm2.source.component_authority_ledger",
+    to: "nhm2.closure.same_basis_regional_residual",
+    relation: "requires",
+    label: "Same-basis regional residuals need component-authorized source tensors before residuals can be interpreted.",
+    claimBoundaryNote: "Residual math remains diagnostic and does not prove the source mechanism.",
   },
   {
     id: "regional_atlas_derivative_support_feeds_conservation",
@@ -1731,6 +1967,78 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "requires",
     label: "The worldline sampling requirement must be collected into a reproducible QEI dossier.",
     claimBoundaryNote: "A scalar QEI row cannot replace dossier provenance.",
+  },
+  {
+    id: "source_component_authority_feeds_coupled_candidate",
+    from: "nhm2.source.component_authority_ledger",
+    to: "nhm2.closure.coupled_pass_candidate",
+    relation: "requires",
+    label: "The coupled closure candidate reads source component authority as one evidence-admission gate.",
+    claimBoundaryNote: "A complete component ledger cannot make the coupled candidate pass by itself.",
+  },
+  {
+    id: "source_side_authority_feeds_coupled_candidate",
+    from: "nhm2.source.same_basis_tensor_authority",
+    to: "nhm2.closure.coupled_pass_candidate",
+    relation: "requires",
+    label: "The coupled closure candidate requires source-side same-basis tensor authority.",
+    claimBoundaryNote: "Source authority is necessary but not sufficient for diagnostic closure.",
+  },
+  {
+    id: "same_basis_residual_feeds_coupled_candidate",
+    from: "nhm2.closure.same_basis_regional_residual",
+    to: "nhm2.closure.coupled_pass_candidate",
+    relation: "requires",
+    label: "Regional residuals feed the synchronized coupled closure candidate.",
+    claimBoundaryNote: "Residuals remain review-gated until basis and readiness metadata are synchronized.",
+  },
+  {
+    id: "conservation_feeds_coupled_candidate",
+    from: "physics.gr.stress_energy_conservation",
+    to: "nhm2.closure.coupled_pass_candidate",
+    relation: "requires",
+    label: "The coupled closure candidate requires conservation diagnostics for the source tensor path.",
+    claimBoundaryNote: "Reduced transition-kernel checks do not substitute for stricter covariant derivative support.",
+  },
+  {
+    id: "qei_dossier_feeds_coupled_candidate",
+    from: "nhm2.qei.worldline_dossier",
+    to: "nhm2.closure.coupled_pass_candidate",
+    relation: "requires",
+    label: "The coupled closure candidate requires a same-run QEI worldline dossier.",
+    claimBoundaryNote: "A smoke-chain QEI pass must remain tied to the same frozen tensor/profile/run.",
+  },
+  {
+    id: "observer_robust_gate_feeds_coupled_candidate",
+    from: "nhm2.energy_condition.observer_robust_gate",
+    to: "nhm2.closure.coupled_pass_candidate",
+    relation: "requires",
+    label: "The coupled closure candidate requires observer-robust energy-condition status.",
+    claimBoundaryNote: "Observer robustness is currently fail/incomplete in the pinned smoke chain.",
+  },
+  {
+    id: "material_receipt_feeds_coupled_candidate",
+    from: "casimir.material.lifshitz_receipt",
+    to: "nhm2.closure.coupled_pass_candidate",
+    relation: "requires",
+    label: "The coupled closure candidate requires material receipt evidence before source rows can be interpreted.",
+    claimBoundaryNote: "Declared material receipts do not establish physical material credibility.",
+  },
+  {
+    id: "coupled_candidate_feeds_regional_pass_path_harness",
+    from: "nhm2.closure.coupled_pass_candidate",
+    to: "nhm2.closure.regional_tensor_pass_path_harness",
+    relation: "requires",
+    label: "The regional pass-path harness consumes the coupled closure candidate as one readiness gate.",
+    claimBoundaryNote: "The current coupled candidate is false, so the pass-path harness remains blocked.",
+  },
+  {
+    id: "regional_pass_path_harness_blocks_diagnostic_boundary",
+    from: "nhm2.closure.regional_tensor_pass_path_harness",
+    to: "nhm2.claim_boundary.diagnostic_only",
+    relation: "blocks",
+    label: "The regional pass-path harness keeps NHM2 in diagnostic/reduced-order wording until all gates pass together.",
+    claimBoundaryNote: "Numerical pass-path readiness cannot grant physical or transport claims.",
   },
   {
     id: "natario_invariants_document_observer_authority",

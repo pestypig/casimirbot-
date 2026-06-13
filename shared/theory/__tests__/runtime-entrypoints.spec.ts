@@ -78,6 +78,15 @@ describe("theory runtime entrypoint registry", () => {
     const sourceAuthorityEntrypoints = findTheoryRuntimeEntrypointsForBadge(
       "nhm2.source.same_basis_tensor_authority",
     ).map((entrypoint) => entrypoint.runtimeId);
+    const componentAuthorityEntrypoints = findTheoryRuntimeEntrypointsForBadge(
+      "nhm2.source.component_authority_ledger",
+    ).map((entrypoint) => entrypoint.runtimeId);
+    const coupledCandidateEntrypoints = findTheoryRuntimeEntrypointsForBadge(
+      "nhm2.closure.coupled_pass_candidate",
+    ).map((entrypoint) => entrypoint.runtimeId);
+    const passPathHarnessEntrypoints = findTheoryRuntimeEntrypointsForBadge(
+      "nhm2.closure.regional_tensor_pass_path_harness",
+    ).map((entrypoint) => entrypoint.runtimeId);
     const observerRobustEntrypoints = findTheoryRuntimeEntrypointsForBadge(
       "nhm2.energy_condition.observer_robust_gate",
     ).map((entrypoint) => entrypoint.runtimeId);
@@ -96,6 +105,15 @@ describe("theory runtime entrypoint registry", () => {
     );
     expect(sourceAuthorityEntrypoints).toEqual(
       expect.arrayContaining(["physics.validate", "warp.full_solve.campaign", "nhm2.shift_lapse.alpha_sweep"]),
+    );
+    expect(componentAuthorityEntrypoints).toEqual(
+      expect.arrayContaining(["warp.full_solve.campaign", "nhm2.shift_lapse.alpha_sweep"]),
+    );
+    expect(coupledCandidateEntrypoints).toEqual(
+      expect.arrayContaining(["warp.full_solve.campaign", "nhm2.shift_lapse.alpha_sweep"]),
+    );
+    expect(passPathHarnessEntrypoints).toEqual(
+      expect.arrayContaining(["warp.full_solve.campaign", "nhm2.shift_lapse.alpha_sweep"]),
     );
     expect(observerRobustEntrypoints).toEqual(
       expect.arrayContaining(["physics.validate", "warp.full_solve.campaign", "nhm2.shift_lapse.alpha_sweep"]),
