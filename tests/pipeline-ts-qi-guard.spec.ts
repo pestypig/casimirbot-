@@ -380,22 +380,51 @@ describe("pipeline ts/qi autoscale integration", () => {
     const wallRegion = sourceClosure?.regionComparisons?.regions?.find(
       (region: any) => region.regionId === "wall",
     );
+    const globalRegion = sourceClosure?.regionComparisons?.regions?.find(
+      (region: any) => region.regionId === "global",
+    );
+    expect(
+      sourceClosure?.regionComparisons?.regions?.map((region: any) => region.regionId),
+    ).toEqual(["global", "hull", "wall", "exterior_shell"]);
+    expect(globalRegion?.sampleCount).toBeGreaterThan(0);
+    expect(globalRegion?.metricAccounting?.aggregationMode).toBe("mean");
+    expect(globalRegion?.metricAccounting?.normalizationBasis).toBe("sample_count");
+    expect(
+      globalRegion?.metricRequiredSameChartFullTensor?.completeness?.fullTensorComplete,
+    ).toBe(true);
+    expect(globalRegion?.metricT00Diagnostics?.trace?.regionMaskRef).toContain(
+      "global",
+    );
     expect(wallRegion?.metricRequiredSameChartFullTensor?.contractVersion).toBe(
       "nhm2_same_chart_full_tensor/v1",
     );
     expect(
       wallRegion?.metricRequiredSameChartFullTensor?.completeness?.fullTensorComplete,
-    ).toBe(false);
-    expect(
+    ).toBe(true);
+    const wallComponent = (componentId: string) =>
       wallRegion?.metricRequiredSameChartFullTensor?.components?.find(
-        (component: any) => component.componentId === "T0x",
-      )?.status,
-    ).toBe("missing");
-    expect(
-      wallRegion?.metricRequiredSameChartFullTensor?.components?.find(
-        (component: any) => component.componentId === "T0x",
-      )?.valueSI,
-    ).toBeNull();
+        (component: any) => component.componentId === componentId,
+      );
+    for (const componentId of [
+      "T00",
+      "T0x",
+      "T0y",
+      "T0z",
+      "Txx",
+      "Txy",
+      "Txz",
+      "Tyy",
+      "Tyz",
+      "Tzz",
+    ]) {
+      expect(wallComponent(componentId)?.status).toBe("derived_same_chart");
+      expect(Number.isFinite(wallComponent(componentId)?.valueSI)).toBe(true);
+    }
+    expect(wallRegion?.metricAccounting?.aggregationMode).toBe("mean");
+    expect(wallRegion?.metricAccounting?.normalizationBasis).toBe("sample_count");
+    expect(wallRegion?.metricT00Diagnostics?.trace?.regionMaskRef).toContain(
+      "wall",
+    );
   });
 
   it("applies the selected NHM2 shift-lapse profile on the metric T00 lane and keeps tile observer lanes profile-consistent", async () => {

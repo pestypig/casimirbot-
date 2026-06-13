@@ -13,7 +13,11 @@ import {
 } from "@shared/helix-scholarly-research-observation";
 import type { LiveSourceTurnPhaseResolutionV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import { detectRepoConcept } from "./repo-concept-detector";
-import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
+import {
+  contextualToolSuppressionBlocksFamily,
+  detectContextualToolAdmissionSuppression,
+  type HelixContextualToolAdmissionSuppression,
+} from "./contextual-tool-admission";
 import { buildToolUseRestatement, detectInternetSearchIntent } from "./internet-search-intent";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
 import {
@@ -358,6 +362,26 @@ const allowedFamilyByToolAdmission = (family: HelixCapabilityFamily, admittedFam
   return true;
 };
 
+const contextualSuppressionBlocksCapabilityFamily = (
+  suppression: HelixContextualToolAdmissionSuppression | null,
+  family: HelixCapabilityFamily,
+): boolean => {
+  if (!suppression) return false;
+  if (family === "docs") return contextualToolSuppressionBlocksFamily(suppression, "docs_viewer");
+  if (family === "repo_evidence") return contextualToolSuppressionBlocksFamily(suppression, "repo_code");
+  if (family === "internet_search") return contextualToolSuppressionBlocksFamily(suppression, "internet_search");
+  if (family === "scholarly_research") return contextualToolSuppressionBlocksFamily(suppression, "scholarly_research");
+  if (family === "workstation_action") return contextualToolSuppressionBlocksFamily(suppression, "workstation_action");
+  if (family === "visual_capture") return contextualToolSuppressionBlocksFamily(suppression, "situation_run");
+  if (family === "live_environment") return contextualToolSuppressionBlocksFamily(suppression, "live_environment");
+  if (family === "live_source") return contextualToolSuppressionBlocksFamily(suppression, "live_pipeline");
+  if (family === "workspace_directory") return contextualToolSuppressionBlocksFamily(suppression, "workspace_directory");
+  if (family === "workspace_diagnostic") return contextualToolSuppressionBlocksFamily(suppression, "workspace_diagnostic");
+  if (family === "process_graph") return contextualToolSuppressionBlocksFamily(suppression, "process_graph");
+  if (family === "debug_export") return true;
+  return false;
+};
+
 const admissionFor = (input: {
   family: HelixCapabilityFamily;
   mutating: boolean;
@@ -436,22 +460,21 @@ export const buildCapabilityPlan = (input: {
   const repoConceptDetection = detectRepoConcept(input.promptText);
   const requiresRepoConceptEvidence =
     !hardLiveSourceMailboxRoute &&
-    !contextualSuppression &&
+    !contextualToolSuppressionBlocksFamily(contextualSuppression, "repo_code") &&
     repoConceptDetection.require_repo_evidence === true;
   const requiresInternetEvidence =
     !hardLiveSourceMailboxRoute &&
-    !contextualSuppression &&
+    !contextualToolSuppressionBlocksFamily(contextualSuppression, "internet_search") &&
     !requiresRepoConceptEvidence &&
     toolUseRestatement.requiredToolFamilies.includes("internet_search");
   const requiresDocsViewerEvidence =
     !hardLiveSourceMailboxRoute &&
-    !contextualSuppression &&
+    !contextualToolSuppressionBlocksFamily(contextualSuppression, "docs_viewer") &&
     !requiresRepoConceptEvidence &&
     !requiresInternetEvidence &&
     toolUseRestatement.requiredToolFamilies.includes("docs_viewer");
   const sourceTarget =
     (hardLiveSourceMailboxRoute ? "live_source_mailbox" : "") ||
-    (contextualSuppression ? "model_only" : "") ||
     (requiresDocsViewerEvidence ? "docs_viewer" : "") ||
     (requiresInternetEvidence ? "internet_search" : "") ||
     (requiresRepoConceptEvidence ? "repo_code" : "") ||
@@ -459,6 +482,7 @@ export const buildCapabilityPlan = (input: {
     readString(sourceTargetIntent?.target_source) ||
     readString(routeProductContract?.source_target) ||
     readString(toolCallAdmissionDecision?.source_target) ||
+    (contextualSuppression ? "model_only" : "") ||
     "unknown";
   const targetKind = readString(sourceTargetIntent?.target_kind) || sourceTarget;
   const admittedFamilies = readStringArray(toolCallAdmissionDecision?.admitted_tool_families);
@@ -477,15 +501,21 @@ export const buildCapabilityPlan = (input: {
     ? "repo_evidence"
     : requiresInternetEvidence
       ? "internet_search"
-      : contextualSuppression
+      : contextualSuppression && sourceTarget === "model_only"
         ? "debug_export"
         : canonicalGoalKind === "panel_control" || canonicalGoalKind === "note_mutation"
           ? "workstation_action"
           : classifiedFamily;
+  const contextualSuppressionBlocksPlan =
+    Boolean(contextualSuppression) &&
+    (
+      sourceTarget === "model_only" ||
+      contextualSuppressionBlocksCapabilityFamily(contextualSuppression, family)
+    );
   const rules = instructionRules(instructionFrame);
   const plannedRequestedAction = hardLiveSourceMailboxRoute
     ? (mandatoryPhaseTool ?? firstAllowedPhaseTool) || "live_env.read_processed_live_source_mail"
-    : contextualSuppression
+    : contextualSuppressionBlocksPlan
       ? "suppressed_contextual_tool_reference"
     : family === "live_source" &&
       rules.includes("do_not_change_cadence_without_affirmative_operator_command")

@@ -170,6 +170,33 @@ const metadataFromSourceClosure = (
 ): RegionMetadata => {
   if (sourceClosure == null) return defaultRegionMetadata();
   if (regionId === "global") {
+    const region = sourceClosureRegions(sourceClosure).get("global") ?? null;
+    if (region != null) {
+      const diagnostics = asRecord(region.metricT00Diagnostics);
+      const trace = asRecord(diagnostics?.trace);
+      const accounting = asRecord(region.metricAccounting);
+      return {
+        regionMaskRef:
+          asString(trace?.regionMaskRef) ??
+          asString(accounting?.regionMaskRef) ??
+          null,
+        aggregationMode: knownAggregationMode(
+          trace?.aggregationMode,
+          diagnostics?.aggregationMode,
+          accounting?.aggregationMode,
+        ),
+        normalizationBasis: knownNormalizationBasis(
+          trace?.normalizationBasis,
+          diagnostics?.normalizationBasis,
+          accounting?.normalizationBasis,
+        ),
+        sampleCount: knownNumber(
+          trace?.sampleCount,
+          diagnostics?.sampleCount,
+          accounting?.sampleCount,
+        ),
+      };
+    }
     const globalAccounting = asRecord(sourceClosure.globalAccounting);
     const metricAccounting =
       asRecord(sourceClosure.metricAccounting) ?? asRecord(globalAccounting?.metric);

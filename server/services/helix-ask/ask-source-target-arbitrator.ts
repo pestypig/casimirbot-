@@ -21,7 +21,10 @@ import {
   isLiveSourceCadenceControlPrompt,
   isLiveSourceMailLoopPrompt,
 } from "./live-source-continuation-intent";
-import { detectContextualToolAdmissionSuppression } from "./contextual-tool-admission";
+import {
+  contextualToolSuppressionBlocksFamily,
+  detectContextualToolAdmissionSuppression,
+} from "./contextual-tool-admission";
 import {
   buildToolUseRestatement,
   detectInternetSearchIntent,
@@ -70,9 +73,13 @@ const matches = (prompt: string, cues: CueRule["cues"]): string[] =>
 const isExplicitModelOnlyPrompt = (prompt: string): boolean => {
   const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
   const mutatingWriteOnlySuppression = contextualSuppression?.verb_or_cue === "workstation.write_file";
+  const affirmativeDocsRequirement =
+    isAffirmativeDocsSourceRequirementPrompt(prompt) &&
+    !contextualToolSuppressionBlocksFamily(contextualSuppression, "docs_viewer");
   return (
     Boolean(contextualSuppression) &&
-    !(mutatingWriteOnlySuppression && isExplicitEvidenceSourceRequest(prompt))
+    !(mutatingWriteOnlySuppression && isExplicitEvidenceSourceRequest(prompt)) &&
+    !affirmativeDocsRequirement
   ) ||
     /\bwithout\s+(?:using|checking|looking\s+at|searching|consulting)\s+(?:the\s+)?(?:workspace|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(prompt) ||
     /\b(?:do\s+not|don'?t)\s+(?:use|look\s+at|check|search|consult)\s+(?:the\s+)?(?:workspace|docs?|documents?|papers?|screen|visual|sources?)\b/i.test(prompt) ||
@@ -137,7 +144,20 @@ const isDocsTopicSummaryPrompt = (prompt: string): boolean =>
   (
     /\bdocs?\s+about\b/i.test(prompt) ||
     /\bfrom\s+(?:our\s+|local\s+|the\s+)?docs?\b/i.test(prompt) ||
-    /\binclude\s+(?:the\s+)?paths?\b/i.test(prompt)
+    /\binclude\s+(?:the\s+)?paths?\b/i.test(prompt) ||
+    /\b(?:with|include)\s+(?:the\s+)?(?:document\s+)?paths?\b/i.test(prompt) ||
+    /\b(?:use|using|from)\s+(?:the\s+)?docs?\s+only\b/i.test(prompt) ||
+    /\bdocs?\s+only\b/i.test(prompt)
+  );
+
+const isAffirmativeDocsSourceRequirementPrompt = (prompt: string): boolean =>
+  isExplicitDocsPathSummaryPrompt(prompt) ||
+  isDocsTopicSummaryPrompt(prompt) ||
+  isDocsOpenAndSummarizePrompt(prompt) ||
+  (
+    /\b(?:open|find|search|show|load|summari[sz]e|summary|overview|takeaways?|explain|describe|gist)\b/i.test(prompt) &&
+    /\b(?:doc|docs|document|documents|audit|white\s*paper|paper)\b/i.test(prompt) &&
+    /\b(?:use|using|from)\s+(?:the\s+)?docs?\s+only\b/i.test(prompt)
   );
 
 const isAffirmativeDocsSearchPrompt = (prompt: string): boolean =>
@@ -1010,7 +1030,10 @@ export function arbitrateAskSourceTarget(input: {
       });
     }
   }
-  if (isDocsOpenAndSummarizePrompt(prompt)) {
+  if (
+    isDocsOpenAndSummarizePrompt(prompt) &&
+    !contextualToolSuppressionBlocksFamily(detectContextualToolAdmissionSuppression(prompt), "docs_viewer")
+  ) {
     return toSourceTargetIntent({
       turnId: input.turnId,
       threadId: input.threadId,

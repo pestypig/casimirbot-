@@ -112,6 +112,15 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       text: quoted,
     };
   }
+  const quotedDocsSearch = prompt.match(/["'`][^"'`]*(?:search|find|look\s+for|locate)[^"'`]*(?:docs?|documents?|papers?)[^"'`]*["'`]/i)?.[0];
+  if (quotedDocsSearch) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: "quoted_tool_command",
+      verb_or_cue: "docs_viewer.search_docs",
+      text: quotedDocsSearch,
+    };
+  }
   const quotedCalculator = prompt.match(/["'`][^"'`]*(?:open|show|view|pull\s+up|bring\s+up|use|run|call|calculate|compute|solve|evaluate)[^"'`]*(?:scientific\s+calculator|calculator|equation|expression)[^"'`]*["'`]/i)?.[0];
   if (quotedCalculator) {
     return {

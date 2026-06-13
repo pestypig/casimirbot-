@@ -51,6 +51,33 @@ describe("TheoryBadgeGraphPanel achievement map", () => {
     expect(screen.queryByTestId("discussion-zone-legend")).toBeNull();
   });
 
+  it("zooms the achievement map with floating controls and plus/minus keys", async () => {
+    renderPanel();
+
+    const scrollport = await screen.findByTestId("theory-achievement-map-scrollport");
+    const initialZoom = Number(scrollport.getAttribute("data-zoom-level"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+
+    await waitFor(() => {
+      expect(Number(scrollport.getAttribute("data-zoom-level"))).toBeGreaterThan(initialZoom);
+    });
+
+    const zoomedIn = Number(scrollport.getAttribute("data-zoom-level"));
+    fireEvent.keyDown(window, { key: "-", code: "Minus" });
+
+    await waitFor(() => {
+      expect(Number(scrollport.getAttribute("data-zoom-level"))).toBeLessThan(zoomedIn);
+    });
+
+    const zoomedOut = Number(scrollport.getAttribute("data-zoom-level"));
+    fireEvent.keyDown(window, { key: "+", code: "Equal" });
+
+    await waitFor(() => {
+      expect(Number(scrollport.getAttribute("data-zoom-level"))).toBeGreaterThan(zoomedOut);
+    });
+  });
+
   it("keeps reflection receipts as backend memory with a live answer rail block", async () => {
     const artifact = buildTheoryContextReflectionV1({
       generatedAt: "2026-05-31T00:00:00.000Z",

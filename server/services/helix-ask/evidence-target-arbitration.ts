@@ -101,7 +101,10 @@ const hasLocalDocsTopicSummary = (prompt: string): boolean =>
   (
     /\bdocs?\s+about\b/i.test(prompt) ||
     /\bfrom\s+(?:our\s+|local\s+|the\s+)?docs?\b/i.test(prompt) ||
-    /\binclude\s+(?:the\s+)?paths?\b/i.test(prompt)
+    /\binclude\s+(?:the\s+)?paths?\b/i.test(prompt) ||
+    /\b(?:with|include)\s+(?:the\s+)?(?:document\s+)?paths?\b/i.test(prompt) ||
+    /\b(?:use|using|from)\s+(?:the\s+)?docs?\s+only\b/i.test(prompt) ||
+    /\bdocs?\s+only\b/i.test(prompt)
   );
 
 const makeCandidate = (input: {

@@ -187,6 +187,7 @@ const STROBE_DUTY_WINDOW_MS_DEFAULT = 12_000;
 const STROBE_DUTY_STALE_MS = 20_000;
 const DEFAULT_NHM2_SOURCE_CLOSURE_REL_LINF_MAX = 0.1;
 const REQUIRED_NHM2_SOURCE_CLOSURE_REGION_IDS = [
+  "global",
   "hull",
   "wall",
   "exterior_shell",
@@ -4536,6 +4537,15 @@ const collectNhm2SourceClosureRegionComparisons = (
         classifyRegion: ({ voxelIndex: [x, y, z] }) => regionVoxelIds[voxelIndex(x, y, z)],
       });
 
+    metricRegionMap.set("global", {
+      sampleCount: metricRegionMeans.global.sampleCount,
+      diagonalTensor: metricRegionMeans.global.diagonalTensor,
+      fullTensor:
+        (metricRegionMeans.global.fullTensor as Record<string, unknown> | null | undefined) ??
+        null,
+    });
+    regionMaskCounts.set("global", brickBasis.dims[0] * brickBasis.dims[1] * brickBasis.dims[2]);
+
     for (const region of metricRegionMeans.regions) {
       if (isRequiredNhm2SourceClosureRegionId(region.regionId)) {
         metricRegionMap.set(region.regionId, {
@@ -4676,9 +4686,12 @@ const collectNhm2SourceClosureRegionComparisons = (
       sampleCount: metricSampleCount,
       maskVoxelCount,
       weightSum: null,
-      aggregationMode: "unknown",
-      normalizationBasis: null,
-      evidenceStatus: "unknown",
+      aggregationMode: metricSampleCount != null ? "mean" : "unknown",
+      normalizationBasis: metricSampleCount != null ? "sample_count" : null,
+      evidenceStatus:
+        metricSampleCount != null && metricRegionTensor.T00 != null
+          ? "inferred"
+          : "unknown",
       supportInclusionNote:
         "metric_required uses shift-field finite-difference derivatives on the brick grid; unweighted voxel mean; non-finite derivative cells are skipped.",
     });
@@ -17673,6 +17686,31 @@ export async function calculateEnergyPipeline(
 
     const warp = await warpBubbleModule.calculate(warpParams);
     const sanitizedWarp = sanitizeWarpResult(warp) as Record<string, unknown>;
+    const liveShiftVectorField =
+      warp && typeof warp === "object"
+        ? ((warp as Record<string, unknown>).shiftVectorField as
+            | Record<string, unknown>
+            | undefined)
+        : undefined;
+    const liveEvaluateShiftVector =
+      liveShiftVectorField != null &&
+      typeof liveShiftVectorField.evaluateShiftVector === "function"
+        ? liveShiftVectorField.evaluateShiftVector
+        : null;
+    const sanitizedShiftVectorField = sanitizedWarp.shiftVectorField as
+      | Record<string, unknown>
+      | undefined;
+    if (
+      liveEvaluateShiftVector != null &&
+      sanitizedShiftVectorField != null &&
+      typeof sanitizedShiftVectorField === "object"
+    ) {
+      Object.defineProperty(sanitizedShiftVectorField, "evaluateShiftVector", {
+        value: liveEvaluateShiftVector,
+        enumerable: false,
+        configurable: true,
+      });
+    }
     if (!sanitizedWarp.metricAdapter) {
       sanitizedWarp.metricAdapter = buildFallbackMetricAdapter(
         "metricAdapter missing from warp module result",

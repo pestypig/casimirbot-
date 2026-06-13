@@ -112,12 +112,12 @@ const sourceClosure = () => ({
     regionMaskRef: "metric.mask.global",
   },
   regionComparisons: {
-    regions: ["hull", "wall", "exterior_shell"].map((regionId) => ({
+    regions: ["global", "hull", "wall", "exterior_shell"].map((regionId) => ({
       regionId,
       metricAccounting: {
         aggregationMode: "mean",
         normalizationBasis: "sample_count",
-        sampleCount: 144,
+        sampleCount: regionId === "global" ? 512 : 144,
         regionMaskRef: `metric.mask.${regionId}`,
       },
       metricT00Diagnostics: {
@@ -125,7 +125,7 @@ const sourceClosure = () => ({
           regionMaskRef: `metric.mask.${regionId}`,
           aggregationMode: "mean",
           normalizationBasis: "sample_count",
-          sampleCount: 144,
+          sampleCount: regionId === "global" ? 512 : 144,
         },
       },
     })),
@@ -179,7 +179,7 @@ describe("NHM2 metric-required regional full tensor source", () => {
       expect(component(wall?.sameChartFullTensor as ReturnType<typeof sameChartFullTensor>, "T0x")?.status).toBe("blocked");
     }));
 
-  it("publishes region-specific same-chart tensor evidence with source-closure metadata", () =>
+  it("publishes required region-specific same-chart tensor evidence with source-closure metadata", () =>
     withTemp((root) => {
       writeFileSync(join(root, "reference.json"), JSON.stringify(referenceRun()), "utf8");
       writeFileSync(join(root, "source.json"), JSON.stringify(sourceClosure()), "utf8");
@@ -187,12 +187,10 @@ describe("NHM2 metric-required regional full tensor source", () => {
         join(root, "runtime.json"),
         JSON.stringify({
           regionComparisons: {
-            regions: [
-              {
-                regionId: "wall",
-                sameChartFullTensor: sameChartFullTensor(10),
-              },
-            ],
+            regions: ["global", "hull", "wall", "exterior_shell"].map((regionId, index) => ({
+              regionId,
+              sameChartFullTensor: sameChartFullTensor(10 + index),
+            })),
           },
         }),
         "utf8",
@@ -205,8 +203,24 @@ describe("NHM2 metric-required regional full tensor source", () => {
         sourceClosurePath: "source.json",
         outPath: "full-tensor-source.json",
       });
+      const global = artifact.regions.find((region) => region.regionId === "global");
       const wall = artifact.regions.find((region) => region.regionId === "wall");
 
+      expect(artifact.regions.map((region) => region.regionId)).toEqual([
+        "global",
+        "hull",
+        "wall",
+        "exterior_shell",
+      ]);
+      expect(artifact.summary.allRequiredRegionsPresent).toBe(true);
+      expect(artifact.summary.allRequiredRegionsFullTensor).toBe(true);
+      expect(artifact.summary.allAggregationMetadataKnown).toBe(true);
+      expect(artifact.summary.blockedRegionIds).toEqual([]);
+      expect(artifact.summary.missingRegionIds).toEqual([]);
+      expect(artifact.summary.firstBlocker).toBeNull();
+      expect(global?.status).toBe("computed");
+      expect(global?.regionMaskRef).toBe("metric.mask.global");
+      expect(global?.sampleCount).toBe(512);
       expect(wall?.status).toBe("computed");
       expect(wall?.regionMaskRef).toBe("metric.mask.wall");
       expect(wall?.aggregationMode).toBe("mean");

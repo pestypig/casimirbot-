@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   TheoryBadgeEquationV1,
   TheoryBadgeGraphV1,
@@ -104,6 +104,10 @@ const BAND_COLORS: Record<TheoryBiomeBand, string> = {
 
 const BIOME_BAND_WIDTH = THEORY_BIOME_LAYOUT_SPACING_CONTRACT_V1.scaleBandWidthPx;
 const BIOME_X_OFFSET = 92;
+const MAX_ZOOM = 1.8;
+const MIN_ZOOM_FLOOR = 0.18;
+const ZOOM_BURST_FACTOR = 1.22;
+const ZOOM_BURST_MS = 320;
 
 function chunkFill(chunk: TheoryBiomeChunkV1, seed: string): string {
   const base = BAND_COLORS[chunk.dominantScaleBand];
@@ -186,6 +190,20 @@ function edgeDashArray(edge: TheoryAchievementLayoutEdge): string | undefined {
   if (edge.scaleDistanceKind === "cross_scale") return "9 8";
   if (isContextEdge(edge)) return "5 7";
   return undefined;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function easeInOutCubic(value: number): number {
+  return value < 0.5 ? 4 * value * value * value : 1 - Math.pow(-2 * value + 2, 3) / 2;
+}
+
+function interactiveTextTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tagName = target.tagName.toLowerCase();
+  return tagName === "input" || tagName === "textarea" || tagName === "select" || target.isContentEditable;
 }
 
 function badgeClass(args: {
@@ -299,6 +317,10 @@ export default function TheoryAchievementMap({
 }: TheoryAchievementMapProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const restoredRef = useRef(false);
+  const zoomAnimationRef = useRef<number | null>(null);
+  const pendingZoomCenterRef = useRef<{ x: number; y: number } | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const layout = useMemo(() => layoutTheoryAchievementMap(graph), [graph]);
   const nodesById = useMemo(
     () => new Map<string, TheoryAchievementLayoutNode>(layout.nodes.map((node) => [node.badgeId, node])),
@@ -322,6 +344,68 @@ export default function TheoryAchievementMap({
     ? PHYSICS_ATLAS_BLOCKS.find((block: PhysicsAtlasBlockV1) => block.id === activeAtlasLensId) ?? null
     : null;
   const activeAtlasGlow = activeAtlasLensId ? ATLAS_GLOW_COLORS[activeAtlasLensId] : null;
+  const zoomBounds = useMemo(() => {
+    const fitZoom = viewportSize.width > 0 && viewportSize.height > 0
+      ? Math.min(1, viewportSize.width / layout.width, viewportSize.height / layout.height)
+      : MIN_ZOOM_FLOOR;
+    return {
+      min: clamp(fitZoom, MIN_ZOOM_FLOOR, 1),
+      max: MAX_ZOOM,
+    };
+  }, [layout.height, layout.width, viewportSize.height, viewportSize.width]);
+
+  const centerScrollOnGraphPoint = useCallback((center: { x: number; y: number }, nextZoom: number) => {
+    const element = viewportRef.current;
+    if (!element) return;
+    element.scrollLeft = Math.max(0, center.x * nextZoom - element.clientWidth / 2);
+    element.scrollTop = Math.max(0, center.y * nextZoom - element.clientHeight / 2);
+  }, []);
+
+  const graphCenterForViewport = useCallback(() => {
+    const element = viewportRef.current;
+    if (!element) return { x: layout.width / 2, y: layout.height / 2 };
+    return {
+      x: (element.scrollLeft + element.clientWidth / 2) / zoom,
+      y: (element.scrollTop + element.clientHeight / 2) / zoom,
+    };
+  }, [layout.height, layout.width, zoom]);
+
+  const animateZoomTo = useCallback(
+    (targetZoom: number) => {
+      const startZoom = zoom;
+      const nextZoom = Number(clamp(targetZoom, zoomBounds.min, zoomBounds.max).toFixed(4));
+      if (Math.abs(nextZoom - startZoom) < 0.001) return;
+      const center = graphCenterForViewport();
+      const startTime = performance.now();
+      if (zoomAnimationRef.current !== null) cancelAnimationFrame(zoomAnimationRef.current);
+
+      const step = (time: number) => {
+        const progress = clamp((time - startTime) / ZOOM_BURST_MS, 0, 1);
+        const eased = easeInOutCubic(progress);
+        const frameZoom = startZoom + (nextZoom - startZoom) * eased;
+        pendingZoomCenterRef.current = center;
+        setZoom(Number(frameZoom.toFixed(4)));
+        if (progress < 1) {
+          zoomAnimationRef.current = requestAnimationFrame(step);
+        } else {
+          pendingZoomCenterRef.current = center;
+          setZoom(nextZoom);
+          zoomAnimationRef.current = null;
+        }
+      };
+
+      zoomAnimationRef.current = requestAnimationFrame(step);
+    },
+    [graphCenterForViewport, zoom, zoomBounds.max, zoomBounds.min],
+  );
+
+  const zoomIn = useCallback(() => {
+    animateZoomTo(zoom * ZOOM_BURST_FACTOR);
+  }, [animateZoomTo, zoom]);
+
+  const zoomOut = useCallback(() => {
+    animateZoomTo(zoom / ZOOM_BURST_FACTOR);
+  }, [animateZoomTo, zoom]);
 
   useEffect(() => {
     const element = viewportRef.current;
@@ -331,281 +415,372 @@ export default function TheoryAchievementMap({
     restoredRef.current = true;
   }, [layout.height, layout.width, viewport.scrollLeft, viewport.scrollTop]);
 
+  useEffect(() => {
+    const element = viewportRef.current;
+    if (!element) return;
+    const updateSize = () => {
+      setViewportSize({
+        width: element.clientWidth,
+        height: element.clientHeight,
+      });
+    };
+    updateSize();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateSize);
+      return () => window.removeEventListener("resize", updateSize);
+    }
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const center = pendingZoomCenterRef.current;
+    if (!center) return;
+    centerScrollOnGraphPoint(center, zoom);
+  }, [centerScrollOnGraphPoint, zoom]);
+
+  useEffect(() => {
+    setZoom((current) => clamp(current, zoomBounds.min, zoomBounds.max));
+  }, [zoomBounds.max, zoomBounds.min]);
+
+  useEffect(() => {
+    return () => {
+      if (zoomAnimationRef.current !== null) cancelAnimationFrame(zoomAnimationRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey || interactiveTextTarget(event.target)) return;
+      if (event.key === "+" || event.key === "=" || event.code === "NumpadAdd") {
+        event.preventDefault();
+        zoomIn();
+      } else if (event.key === "-" || event.key === "_" || event.code === "NumpadSubtract") {
+        event.preventDefault();
+        zoomOut();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [zoomIn, zoomOut]);
+
   return (
-    <div
-      ref={viewportRef}
-      data-testid="theory-achievement-map-scrollport"
-      className="relative h-full min-h-0 w-full overflow-scroll border border-zinc-950 bg-zinc-900"
-      style={{ scrollbarGutter: "stable both-edges" }}
-      onScroll={(event: React.UIEvent<HTMLDivElement>) => {
-        const element = event.currentTarget;
-        onViewportChange({
-          scrollLeft: element.scrollLeft,
-          scrollTop: element.scrollTop,
-        });
-      }}
-    >
+    <div className="relative h-full min-h-0 w-full overflow-hidden border border-zinc-950 bg-zinc-900">
       <div
-        className="relative"
-        onClick={(event: React.MouseEvent<HTMLDivElement>) => {
-          if (event.target === event.currentTarget) onClearSelection();
-        }}
-        style={{
-          width: layout.width,
-          height: layout.height,
-          backgroundColor: "#111827",
+        ref={viewportRef}
+        data-testid="theory-achievement-map-scrollport"
+        data-zoom-level={zoom.toFixed(4)}
+        className="h-full min-h-0 w-full overflow-scroll"
+        style={{ scrollbarGutter: "stable both-edges" }}
+        onScroll={(event: React.UIEvent<HTMLDivElement>) => {
+          const element = event.currentTarget;
+          onViewportChange({
+            scrollLeft: element.scrollLeft,
+            scrollTop: element.scrollTop,
+          });
         }}
       >
-        {layout.biome ? (
-          <svg
-            className="pointer-events-none absolute inset-0"
-            data-testid="theory-biome-terrain"
-            width={layout.width}
-            height={layout.height}
+        <div
+          className="relative"
+          onClick={(event: React.MouseEvent<HTMLDivElement>) => {
+            if (event.target === event.currentTarget) onClearSelection();
+          }}
+          style={{
+            width: layout.width * zoom,
+            height: layout.height * zoom,
+          }}
+        >
+          <div
+            className="relative"
+            onClick={(event: React.MouseEvent<HTMLDivElement>) => {
+              if (event.target === event.currentTarget) onClearSelection();
+            }}
+            style={{
+              width: layout.width,
+              height: layout.height,
+              backgroundColor: "#111827",
+              transform: `scale(${zoom})`,
+              transformOrigin: "0 0",
+            }}
           >
+            {layout.biome ? (
+              <svg
+                className="pointer-events-none absolute inset-0"
+                data-testid="theory-biome-terrain"
+                width={layout.width}
+                height={layout.height}
+              >
+              <defs>
+                <linearGradient id="theory-biome-scale-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#1e293b" />
+                  <stop offset="15%" stopColor="#1d4ed8" />
+                  <stop offset="36%" stopColor="#166534" />
+                  <stop offset="55%" stopColor="#a16207" />
+                  <stop offset="75%" stopColor="#c2410c" />
+                  <stop offset="100%" stopColor="#581c87" />
+                </linearGradient>
+                <pattern id="theory-biome-grid" width="64" height="64" patternUnits="userSpaceOnUse">
+                  <path d="M 64 0 L 0 0 0 64" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+                </pattern>
+              </defs>
+              <rect width={layout.width} height={layout.height} fill="url(#theory-biome-scale-gradient)" opacity={0.24} />
+              {THEORY_BIOME_BAND_ORDER.map((band: TheoryBiomeBand, index: number) => {
+                const x = BIOME_X_OFFSET + index * BIOME_BAND_WIDTH;
+                return (
+                  <g key={band}>
+                    <rect
+                      x={x}
+                      y={0}
+                      width={BIOME_BAND_WIDTH}
+                      height={layout.height}
+                      fill={BAND_COLORS[band]}
+                      opacity={band === "claim_boundary" ? 0.48 : 0.32}
+                    />
+                    <line x1={x} x2={x} y1={0} y2={layout.height} stroke="rgba(255,255,255,0.09)" />
+                    <text
+                      x={x + 18}
+                      y={28}
+                      fill="rgba(241,245,249,0.78)"
+                      fontSize={12}
+                      fontWeight={800}
+                      letterSpacing={0}
+                    >
+                      {BAND_LABELS[band]}
+                    </text>
+                  </g>
+                );
+              })}
+              {layout.biome.chunks.map((chunk: TheoryBiomeChunkV1) => {
+                const width = chunk.bounds.x1 - chunk.bounds.x0;
+                const height = chunk.bounds.y1 - chunk.bounds.y0;
+                return (
+                  <g key={chunk.id}>
+                    <rect
+                      x={chunk.bounds.x0}
+                      y={chunk.bounds.y0}
+                      width={width}
+                      height={height}
+                      fill={chunkFill(chunk, layout.biome?.seed ?? "theory-biome")}
+                      stroke={chunk.averageClaimPressure > 0.7 ? "rgba(251,191,36,0.32)" : "rgba(255,255,255,0.07)"}
+                      strokeWidth={chunk.averageClaimPressure > 0.7 ? 2 : 1}
+                      strokeDasharray={chunk.averageClaimPressure > 0.7 ? "10 7" : undefined}
+                    />
+                    {chunk.badgeIds.length > 3 ? (
+                      <text
+                        x={chunk.bounds.x0 + 14}
+                        y={chunk.bounds.y0 + 26}
+                        fill="rgba(226,232,240,0.5)"
+                        fontSize={11}
+                        fontWeight={700}
+                        letterSpacing={0}
+                      >
+                        {chunk.dominantDomainKey} / {chunk.badgeIds.length}
+                      </text>
+                    ) : null}
+                  </g>
+                );
+              })}
+              <rect width={layout.width} height={layout.height} fill="url(#theory-biome-grid)" opacity={0.74} />
+              </svg>
+            ) : null}
+            <ProbabilityTerrainOverlay
+              terrain={probabilityTerrain}
+              nodes={layout.nodes.map((node: TheoryAchievementLayoutNode) => ({
+                id: node.badgeId,
+                x: node.x,
+                y: node.y,
+                width: 44,
+                height: 44,
+                renderChunkId: node.renderChunkId,
+                semanticChunkId: node.semanticChunkId,
+              }))}
+              chunks={
+                layout.biome?.chunks.map((chunk: TheoryBiomeChunkV1) => ({
+                  id: chunk.id,
+                  bounds: chunk.bounds,
+                })) ?? []
+              }
+              width={layout.width}
+              height={layout.height}
+              seed={layout.biome?.seed ?? graph.graphId}
+              testId="theory-probability-terrain-field"
+            />
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_24%,rgba(255,255,255,0.08),transparent_36%),radial-gradient(circle_at_50%_82%,rgba(0,0,0,0.48),transparent_42%)]" />
+            <svg className="pointer-events-none absolute inset-0" width={layout.width} height={layout.height}>
             <defs>
-              <linearGradient id="theory-biome-scale-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#1e293b" />
-                <stop offset="15%" stopColor="#1d4ed8" />
-                <stop offset="36%" stopColor="#166534" />
-                <stop offset="55%" stopColor="#a16207" />
-                <stop offset="75%" stopColor="#c2410c" />
-                <stop offset="100%" stopColor="#581c87" />
-              </linearGradient>
-              <pattern id="theory-biome-grid" width="64" height="64" patternUnits="userSpaceOnUse">
-                <path d="M 64 0 L 0 0 0 64" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
-              </pattern>
+              <marker id="theory-achievement-arrow" markerHeight="7" markerWidth="7" orient="auto" refX="6" refY="3.5">
+                <path d="M 0 0 L 7 3.5 L 0 7 z" fill="rgb(161 161 170)" />
+              </marker>
             </defs>
-            <rect width={layout.width} height={layout.height} fill="url(#theory-biome-scale-gradient)" opacity={0.24} />
-            {THEORY_BIOME_BAND_ORDER.map((band: TheoryBiomeBand, index: number) => {
-              const x = BIOME_X_OFFSET + index * BIOME_BAND_WIDTH;
+            {softRegions.map((region) => {
+              const geometry = softRegionGeometry(region, nodesById);
+              if (!geometry) return null;
+              const alpha = Math.max(0.12, Math.min(0.22, 0.12 + region.confidence * 0.1));
               return (
-                <g key={band}>
-                  <rect
-                    x={x}
-                    y={0}
-                    width={BIOME_BAND_WIDTH}
-                    height={layout.height}
-                    fill={BAND_COLORS[band]}
-                    opacity={band === "claim_boundary" ? 0.48 : 0.32}
+                <g
+                  key={region.id}
+                  data-testid="discussion-soft-region"
+                  aria-label="Discussion context zone, not proof"
+                >
+                  <title>Discussion context zone, not proof</title>
+                  <ellipse
+                    cx={geometry.cx}
+                    cy={geometry.cy}
+                    rx={geometry.rx}
+                    ry={geometry.ry}
+                    fill={`rgba(22, 163, 74, ${alpha})`}
+                    stroke="rgba(74, 222, 128, 0.45)"
+                    strokeWidth={2}
+                    strokeDasharray="10 8"
                   />
-                  <line x1={x} x2={x} y1={0} y2={layout.height} stroke="rgba(255,255,255,0.09)" />
                   <text
-                    x={x + 18}
-                    y={28}
-                    fill="rgba(241,245,249,0.78)"
+                    x={geometry.labelX}
+                    y={geometry.labelY}
+                    fill="rgba(187, 247, 208, 0.86)"
                     fontSize={12}
-                    fontWeight={800}
+                    fontWeight={700}
                     letterSpacing={0}
                   >
-                    {BAND_LABELS[band]}
+                    {region.label}
                   </text>
                 </g>
               );
             })}
-            {layout.biome.chunks.map((chunk: TheoryBiomeChunkV1) => {
-              const width = chunk.bounds.x1 - chunk.bounds.x0;
-              const height = chunk.bounds.y1 - chunk.bounds.y0;
-              return (
-                <g key={chunk.id}>
-                  <rect
-                    x={chunk.bounds.x0}
-                    y={chunk.bounds.y0}
-                    width={width}
-                    height={height}
-                    fill={chunkFill(chunk, layout.biome?.seed ?? "theory-biome")}
-                    stroke={chunk.averageClaimPressure > 0.7 ? "rgba(251,191,36,0.32)" : "rgba(255,255,255,0.07)"}
-                    strokeWidth={chunk.averageClaimPressure > 0.7 ? 2 : 1}
-                    strokeDasharray={chunk.averageClaimPressure > 0.7 ? "10 7" : undefined}
-                  />
-                  {chunk.badgeIds.length > 3 ? (
-                    <text
-                      x={chunk.bounds.x0 + 14}
-                      y={chunk.bounds.y0 + 26}
-                      fill="rgba(226,232,240,0.5)"
-                      fontSize={11}
-                      fontWeight={700}
-                      letterSpacing={0}
-                    >
-                      {chunk.dominantDomainKey} / {chunk.badgeIds.length}
-                    </text>
-                  ) : null}
-                </g>
-              );
-            })}
-            <rect width={layout.width} height={layout.height} fill="url(#theory-biome-grid)" opacity={0.74} />
-          </svg>
-        ) : null}
-        <ProbabilityTerrainOverlay
-          terrain={probabilityTerrain}
-          nodes={layout.nodes.map((node: TheoryAchievementLayoutNode) => ({
-            id: node.badgeId,
-            x: node.x,
-            y: node.y,
-            width: 44,
-            height: 44,
-            renderChunkId: node.renderChunkId,
-            semanticChunkId: node.semanticChunkId,
-          }))}
-          chunks={
-            layout.biome?.chunks.map((chunk: TheoryBiomeChunkV1) => ({
-              id: chunk.id,
-              bounds: chunk.bounds,
-            })) ?? []
-          }
-          width={layout.width}
-          height={layout.height}
-          seed={layout.biome?.seed ?? graph.graphId}
-          testId="theory-probability-terrain-field"
-        />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_24%,rgba(255,255,255,0.08),transparent_36%),radial-gradient(circle_at_50%_82%,rgba(0,0,0,0.48),transparent_42%)]" />
-        <svg className="pointer-events-none absolute inset-0" width={layout.width} height={layout.height}>
-          <defs>
-            <marker id="theory-achievement-arrow" markerHeight="7" markerWidth="7" orient="auto" refX="6" refY="3.5">
-              <path d="M 0 0 L 7 3.5 L 0 7 z" fill="rgb(161 161 170)" />
-            </marker>
-          </defs>
-          {softRegions.map((region) => {
-            const geometry = softRegionGeometry(region, nodesById);
-            if (!geometry) return null;
-            const alpha = Math.max(0.12, Math.min(0.22, 0.12 + region.confidence * 0.1));
-            return (
-              <g
-                key={region.id}
-                data-testid="discussion-soft-region"
-                aria-label="Discussion context zone, not proof"
-              >
-                <title>Discussion context zone, not proof</title>
-                <ellipse
-                  cx={geometry.cx}
-                  cy={geometry.cy}
-                  rx={geometry.rx}
-                  ry={geometry.ry}
-                  fill={`rgba(22, 163, 74, ${alpha})`}
-                  stroke="rgba(74, 222, 128, 0.45)"
-                  strokeWidth={2}
-                  strokeDasharray="10 8"
-                />
-                <text
-                  x={geometry.labelX}
-                  y={geometry.labelY}
-                  fill="rgba(187, 247, 208, 0.86)"
-                  fontSize={12}
-                  fontWeight={700}
-                  letterSpacing={0}
-                >
-                  {region.label}
-                </text>
-              </g>
+            {layout.edges.map((edge: TheoryAchievementLayoutEdge) => (
+              <path
+                key={edge.edgeId}
+                d={toPath(edge.points)}
+                className={edgeClass(edge, edgeHighlightSet, hasFocus)}
+                strokeWidth={edgeHighlightSet.has(edge.edgeId) ? 3 : 2}
+                strokeDasharray={edgeDashArray(edge)}
+                fill="none"
+                strokeLinecap="square"
+                strokeLinejoin="miter"
+                markerEnd={isContextEdge(edge) ? undefined : "url(#theory-achievement-arrow)"}
+              />
+            ))}
+            </svg>
+            {layout.nodes.map((node: TheoryAchievementLayoutNode) => {
+            const badge = badgesById.get(node.badgeId);
+            if (!badge) return null;
+            const expression = primaryExpression(badge);
+            const routeLabel = routeBadgeLabels[node.badgeId] ?? null;
+            const titleParts = [
+              badge.title,
+              expression,
+              routeLabel ? `${routeLabel.label}: ${routeLabel.title}` : null,
+            ].filter(Boolean);
+            const title = titleParts.join("\n");
+            const heat = heatByBadgeId[node.badgeId] ?? 0;
+            const ripple = rippleSet.has(node.badgeId);
+            const badgeBlockId = badgeAtlasBlockId(badge);
+            const foundation = badge.level === "first_principle" || badge.subjects.includes("constants");
+            const claimBoundary = badge.level === "claim_boundary";
+            const atlasHighlighted = highlightedSet.has(node.badgeId) && Boolean(activeAtlasGlow);
+            const plannedDomain = Boolean(
+              activeAtlasBlock?.status === "planned" && badgeBlockId === activeAtlasBlock.id,
             );
-          })}
-          {layout.edges.map((edge: TheoryAchievementLayoutEdge) => (
-            <path
-              key={edge.edgeId}
-              d={toPath(edge.points)}
-              className={edgeClass(edge, edgeHighlightSet, hasFocus)}
-              strokeWidth={edgeHighlightSet.has(edge.edgeId) ? 3 : 2}
-              strokeDasharray={edgeDashArray(edge)}
-              fill="none"
-              strokeLinecap="square"
-              strokeLinejoin="miter"
-              markerEnd={isContextEdge(edge) ? undefined : "url(#theory-achievement-arrow)"}
-            />
-          ))}
-        </svg>
-        {layout.nodes.map((node: TheoryAchievementLayoutNode) => {
-          const badge = badgesById.get(node.badgeId);
-          if (!badge) return null;
-          const expression = primaryExpression(badge);
-          const routeLabel = routeBadgeLabels[node.badgeId] ?? null;
-          const titleParts = [
-            badge.title,
-            expression,
-            routeLabel ? `${routeLabel.label}: ${routeLabel.title}` : null,
-          ].filter(Boolean);
-          const title = titleParts.join("\n");
-          const heat = heatByBadgeId[node.badgeId] ?? 0;
-          const ripple = rippleSet.has(node.badgeId);
-          const badgeBlockId = badgeAtlasBlockId(badge);
-          const foundation = badge.level === "first_principle" || badge.subjects.includes("constants");
-          const claimBoundary = badge.level === "claim_boundary";
-          const atlasHighlighted = highlightedSet.has(node.badgeId) && Boolean(activeAtlasGlow);
-          const plannedDomain = Boolean(
-            activeAtlasBlock?.status === "planned" && badgeBlockId === activeAtlasBlock.id,
-          );
-          const glowShadow = [
-            heat > 0
-              ? `0 0 ${Math.round(12 + heat * 18)}px rgba(34, 211, 238, ${Math.min(0.72, 0.22 + heat * 0.5)})`
-              : null,
-            atlasHighlighted && activeAtlasGlow ? `0 0 24px ${activeAtlasGlow}` : null,
-            foundation ? "0 0 14px rgba(226,232,240,0.22)" : null,
-          ]
-            .filter(Boolean)
-            .join(", ");
-          return (
-            <button
-              key={node.badgeId}
-              type="button"
-              className={badgeClass({
-                selected: selectedBadgeId === node.badgeId,
-                multiSelected: selectedSet.has(node.badgeId),
-                highlighted: highlightedSet.has(node.badgeId),
-                playback: playbackSet.has(node.badgeId),
-                solved: solvedSet.has(node.badgeId),
-                failed: failedSet.has(node.badgeId),
-                hasFocus,
-                loadable: badge.calculatorPayloads.length > 0,
-                foundation,
-                claimBoundary,
-                plannedDomain,
-                routeBlocked: routeLabel?.tone === "rose",
-                exactDiscussion: exactBadgeSet.has(node.badgeId),
-                likelyDiscussion: !exactBadgeSet.has(node.badgeId) && likelyBadgeSet.has(node.badgeId),
-              })}
-              data-discussion-match={
-                exactBadgeSet.has(node.badgeId)
-                  ? "exact"
-                  : likelyBadgeSet.has(node.badgeId)
-                    ? "likely"
-                    : undefined
-              }
-              style={{
-                left: node.x,
-                top: node.y,
-                boxShadow: glowShadow || undefined,
-              }}
-              title={title}
-              aria-label={badge.title}
-              onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
-                event.stopPropagation();
-                if (event.ctrlKey || event.metaKey || event.altKey) {
-                  onToggleBadgeSelection(node.badgeId);
-                } else {
-                  onSelectBadge(node.badgeId);
-                  const payload = badge.calculatorPayloads[0];
-                  if (payload) onLoadCalculatorPayload(node.badgeId, payload.id);
+            const glowShadow = [
+              heat > 0
+                ? `0 0 ${Math.round(12 + heat * 18)}px rgba(34, 211, 238, ${Math.min(0.72, 0.22 + heat * 0.5)})`
+                : null,
+              atlasHighlighted && activeAtlasGlow ? `0 0 24px ${activeAtlasGlow}` : null,
+              foundation ? "0 0 14px rgba(226,232,240,0.22)" : null,
+            ]
+              .filter(Boolean)
+              .join(", ");
+            return (
+              <button
+                key={node.badgeId}
+                type="button"
+                className={badgeClass({
+                  selected: selectedBadgeId === node.badgeId,
+                  multiSelected: selectedSet.has(node.badgeId),
+                  highlighted: highlightedSet.has(node.badgeId),
+                  playback: playbackSet.has(node.badgeId),
+                  solved: solvedSet.has(node.badgeId),
+                  failed: failedSet.has(node.badgeId),
+                  hasFocus,
+                  loadable: badge.calculatorPayloads.length > 0,
+                  foundation,
+                  claimBoundary,
+                  plannedDomain,
+                  routeBlocked: routeLabel?.tone === "rose",
+                  exactDiscussion: exactBadgeSet.has(node.badgeId),
+                  likelyDiscussion: !exactBadgeSet.has(node.badgeId) && likelyBadgeSet.has(node.badgeId),
+                })}
+                data-discussion-match={
+                  exactBadgeSet.has(node.badgeId)
+                    ? "exact"
+                    : likelyBadgeSet.has(node.badgeId)
+                      ? "likely"
+                      : undefined
                 }
-              }}
-              onDoubleClick={() => onRunPath(node.badgeId)}
-            >
-              <span className="flex h-7 w-7 items-center justify-center border border-zinc-700 bg-zinc-300 shadow-inner">
-                {badgeGlyph(badge)}
-              </span>
-              {badge.calculatorPayloads.length > 0 ? (
-                <span className="absolute -right-1 -top-1 h-3 w-3 border border-cyan-100 bg-cyan-400" />
-              ) : null}
-              {ripple ? (
-                <span className="pointer-events-none absolute -inset-2 border border-cyan-200/80" />
-              ) : null}
-              {foundation ? (
-                <span className="pointer-events-none absolute -inset-1 border border-zinc-100/30" />
-              ) : null}
-              {claimBoundary ? (
-                <span className="pointer-events-none absolute -inset-1.5 border-2 border-amber-300/80" />
-              ) : null}
-            </button>
-          );
-        })}
+                style={{
+                  left: node.x,
+                  top: node.y,
+                  boxShadow: glowShadow || undefined,
+                }}
+                title={title}
+                aria-label={badge.title}
+                onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
+                  event.stopPropagation();
+                  if (event.ctrlKey || event.metaKey || event.altKey) {
+                    onToggleBadgeSelection(node.badgeId);
+                  } else {
+                    onSelectBadge(node.badgeId);
+                    const payload = badge.calculatorPayloads[0];
+                    if (payload) onLoadCalculatorPayload(node.badgeId, payload.id);
+                  }
+                }}
+                onDoubleClick={() => onRunPath(node.badgeId)}
+              >
+                <span className="flex h-7 w-7 items-center justify-center border border-zinc-700 bg-zinc-300 shadow-inner">
+                  {badgeGlyph(badge)}
+                </span>
+                {badge.calculatorPayloads.length > 0 ? (
+                  <span className="absolute -right-1 -top-1 h-3 w-3 border border-cyan-100 bg-cyan-400" />
+                ) : null}
+                {ripple ? (
+                  <span className="pointer-events-none absolute -inset-2 border border-cyan-200/80" />
+                ) : null}
+                {foundation ? (
+                  <span className="pointer-events-none absolute -inset-1 border border-zinc-100/30" />
+                ) : null}
+                {claimBoundary ? (
+                  <span className="pointer-events-none absolute -inset-1.5 border-2 border-amber-300/80" />
+                ) : null}
+              </button>
+            );
+            })}
+          </div>
+        </div>
+      </div>
+      <div
+        className="pointer-events-auto absolute bottom-4 right-4 z-20 grid gap-2"
+        aria-label="Theory badge graph zoom controls"
+      >
+        <button
+          type="button"
+          aria-label="Zoom in"
+          title="Zoom in (+)"
+          onClick={zoomIn}
+          disabled={zoom >= zoomBounds.max - 0.001}
+          className="flex h-10 w-10 items-center justify-center border border-zinc-500 bg-zinc-950/90 text-2xl font-semibold leading-none text-zinc-100 shadow-lg transition hover:border-cyan-300 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          aria-label="Zoom out"
+          title="Zoom out (-)"
+          onClick={zoomOut}
+          disabled={zoom <= zoomBounds.min + 0.001}
+          className="flex h-10 w-10 items-center justify-center border border-zinc-500 bg-zinc-950/90 text-2xl font-semibold leading-none text-zinc-100 shadow-lg transition hover:border-cyan-300 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          -
+        </button>
       </div>
     </div>
   );

@@ -52,6 +52,12 @@ const lastRuntimeCapability = (loop: RecordLike | null): string | null => {
 const hasNegativeImageToolConstraint = (text: string): boolean =>
   /\b(?:do\s+not|don't|never|without)\b[\s\S]{0,90}\b(?:gpt[-\s]*image\s*2|gpt\s*image\s*2|image\s+generation|image\s+tool|image\s+model|generate\s+images?)\b/i.test(text);
 
+const hasNegativeRepoCodeToolConstraint = (text: string): boolean =>
+  /\b(?:do\s+not|don't|dont|never|without|no)\b[\s\S]{0,120}\b(?:repo[-\s]?code|repo\s+search|repository\s+code|code\s+search|source\s+code|repo)\b/i.test(text);
+
+const hasNegativeInternetSearchToolConstraint = (text: string): boolean =>
+  /\b(?:do\s+not|don't|dont|never|without|no)\b[\s\S]{0,120}\b(?:internet\s+search|web\s+search|internet|web|browse|browsing|google|bing|search\s+online|check\s+online)\b/i.test(text);
+
 const detectForbiddenTools = (promptText: string, negativeConstraints: string[]): {
   forbiddenTools: string[];
   forbiddenFamilies: string[];
@@ -64,6 +70,12 @@ const detectForbiddenTools = (promptText: string, negativeConstraints: string[])
       forbiddenTools.push("gpt-image-2");
     }
     forbiddenFamilies.push("image_generation");
+  }
+  if (hasNegativeRepoCodeToolConstraint(text)) {
+    forbiddenFamilies.push("repo_code");
+  }
+  if (hasNegativeInternetSearchToolConstraint(text)) {
+    forbiddenFamilies.push("internet_search");
   }
   return {
     forbiddenTools: unique(forbiddenTools),

@@ -131,7 +131,7 @@ export default function AccountSessionPanel() {
   const [error, setError] = React.useState<string | null>(null);
   const fallbackProfileId = "DatDamPig";
   const [localUsername, setLocalUsername] = React.useState("admin");
-  const [localPassword, setLocalPassword] = React.useState("");
+  const [localPassword, setLocalPassword] = React.useState("password");
   const [ingressLabel, setIngressLabel] = React.useState("Profile ingress");
   const [newTokenValue, setNewTokenValue] = React.useState<string | null>(null);
   const [discordSessions, setDiscordSessions] = React.useState<DiscordSessionView[]>([]);
@@ -310,7 +310,7 @@ export default function AccountSessionPanel() {
             ) : showLocalDevSignIn ? (
               <div className="mt-3 space-y-3">
                 <label className="block text-xs text-slate-300">
-                  Local admin username
+                  Username
                   <input
                     value={localUsername}
                     onChange={(event) => setLocalUsername(event.target.value)}
@@ -335,10 +335,10 @@ export default function AccountSessionPanel() {
                   className="inline-flex items-center gap-2 rounded border border-cyan-400/40 bg-cyan-500/15 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/25"
                 >
                   <LogIn className="h-3.5 w-3.5" />
-                  Sign in local admin
+                  Sign in
                 </button>
                 <p className="text-[11px] text-slate-500">
-                  Development-only password profile for local profile-storage experiments.
+                  Development-only profile sign-in for local profile-storage experiments.
                   {status.auth_boundary.local_password_profile_dev_default
                     ? " Default credentials are admin/password until HELIX_LOCAL_PROFILE_PASSWORD_HASH is configured."
                     : null}
