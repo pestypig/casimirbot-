@@ -102,6 +102,7 @@ export const planReferenceValidationChain = (
   const inputRegionalSupportAtlas = asOptionalString(args, "regional-support-atlas");
   const buildRegionalSupportAtlas =
     args["build-regional-support-function-atlas"] === true;
+  const supportDerivativeReceipt = asOptionalString(args, "support-derivative-receipt");
   const inputTileLocalSourceElements = asOptionalString(args, "tile-local-source-elements");
   const buildTileLocalSourceElements = args["build-tile-local-source-elements"] === true;
   const casimirMaterialReceipt = asOptionalString(args, "casimir-material-receipt");
@@ -320,6 +321,11 @@ export const planReferenceValidationChain = (
       "--regional-support-atlas and --build-regional-support-function-atlas are mutually exclusive",
     );
   }
+  if (supportDerivativeReceipt != null && !buildRegionalSupportAtlas) {
+    throw new Error(
+      "--support-derivative-receipt requires --build-regional-support-function-atlas so derivative support is hashed into the atlas",
+    );
+  }
   if ((inputTransitionKernel != null || buildRegionalSourceTransitionKernel) && sourceInput == null) {
     throw new Error(
       "regional source transition kernels require --source-input so the frozen chain can regenerate tile full-tensor source and conservation artifacts",
@@ -390,6 +396,9 @@ export const planReferenceValidationChain = (
         referenceRun,
         "--tile-full-tensor-source",
         sourceTensor,
+        ...(supportDerivativeReceipt == null
+          ? []
+          : ["--support-derivative-receipt", supportDerivativeReceipt]),
         "--out",
         generatedRegionalSupportAtlas,
       ]));
@@ -431,6 +440,9 @@ export const planReferenceValidationChain = (
     commands.push(command("nhm2:build-regional-support-function-atlas", [
       "--reference-run",
       referenceRun,
+      ...(supportDerivativeReceipt == null
+        ? []
+        : ["--support-derivative-receipt", supportDerivativeReceipt]),
       "--out",
       generatedRegionalSupportAtlas,
     ]));

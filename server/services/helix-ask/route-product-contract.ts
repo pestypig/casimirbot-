@@ -165,6 +165,7 @@ const normalizeSourceTarget = (
     sourceTarget === "workstation_panel" ||
     sourceTarget === "general_background" ||
     sourceTarget === "procedure_memory" ||
+    sourceTarget === "conversation_memory" ||
     sourceTarget === "world_event" ||
     sourceTarget === "workspace_action" ||
     sourceTarget === "model_only" ||
@@ -340,6 +341,32 @@ export function buildRouteProductContract(input: {
       forbiddenExtra: ["situation_context_pack_with_epoch_evidence", "visual_context_pack", "visual_frame_evidence", "live_card_projection", "no_tool_direct", "model_only_concept"],
       sideArtifactKindsAllowed: ["doc_equation_context", "doc_equation_context/v1"],
       precedenceReason: "docs_source_target_allows_only_document_terminal_products",
+    });
+  }
+
+  if (sourceTarget === "conversation_memory") {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget: "conversation_memory",
+      allowedCore: [],
+      allowedExtra: ["model_synthesized_answer", "request_user_input", "typed_failure"],
+      forbiddenExtra: [
+        "direct_answer_text",
+        "no_tool_direct",
+        "model_only_concept",
+        "client_projection",
+        "panel_generated_answer",
+        "workspace_action_receipt",
+        "live_pipeline_receipt",
+        "docs_viewer_receipt",
+      ],
+      precedenceReason: "conversation_memory_recall_requires_selected_memory_packet_before_terminal_answer",
+      sideArtifactKindsAllowed: [
+        "conversation_memory_packet",
+        "helix.conversation_memory_packet.v1",
+        "helix.pasted_text_attachment_resume_frame.v1",
+      ],
     });
   }
 

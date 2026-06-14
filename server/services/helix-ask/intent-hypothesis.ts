@@ -123,11 +123,14 @@ export function buildHelixIntentHypotheses(input: {
   const repoSpans = spanMatches(input.promptText, repoPatterns);
   const kinds: HelixIntentKind[] = [];
   const sourceTargetToolCommand = /^(?:calculator_stream|workspace_panel|workstation_state)$/i.test(sourceTarget);
+  const conversationMemoryRecall =
+    sourceTarget === "conversation_memory" ||
+    /conversation_memory_recall/i.test(input.selectedRoute ?? "");
 
-  if (promptInterpretation.content_question_detected) kinds.push("content_question");
+  if (conversationMemoryRecall || promptInterpretation.content_question_detected) kinds.push("content_question");
   if (promptInterpretation.executable_operator_commands.length > 0 || sourceTargetToolCommand) kinds.push("control_command");
   if (promptInterpretation.status_question_detected) kinds.push("status_question");
-  if (promptInterpretation.debug_or_history_question_detected || promptInterpretation.contextual_tool_mentions.length > 0) kinds.push("debug_diagnosis");
+  if (!conversationMemoryRecall && (promptInterpretation.debug_or_history_question_detected || promptInterpretation.contextual_tool_mentions.length > 0)) kinds.push("debug_diagnosis");
   if (promptInterpretation.implementation_question_detected) kinds.push("implementation_question");
   if (procedureSpans.length > 0) kinds.push("procedure_memory_question");
   if (repoSpans.length > 0) kinds.push("repo_evidence_question");

@@ -23,6 +23,7 @@ export type HelixRouteProductSourceTarget =
   | "workstation_panel"
   | "general_background"
   | "procedure_memory"
+  | "conversation_memory"
   | "world_event"
   | "workspace_action"
   | "model_only"

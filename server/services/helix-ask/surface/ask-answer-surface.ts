@@ -1,3 +1,5 @@
+import type { HelixAskLanguageContractV1 } from "../language-contract";
+
 type HelixAskSurfaceRequestMetadata = {
   source_language?: string | null;
   language_detected?: string | null;
@@ -8,6 +10,7 @@ type HelixAskSurfaceRequestMetadata = {
   response_language?: string | null;
   lang_schema_version?: string | null;
   thread_id?: string | null;
+  language_contract?: HelixAskLanguageContractV1;
 };
 
 type HelixAskSurfaceRequestData = {
@@ -17,6 +20,7 @@ type HelixAskSurfaceRequestData = {
   interpreterError?: string | null;
   sourceQuestion?: string | null;
   question?: string | null;
+  language_contract?: HelixAskLanguageContractV1;
 };
 
 type HelixAskSurfaceRollout = {
@@ -274,6 +278,10 @@ export const applyHelixAskSuccessSurface = (
   }
 
   if (args.includeMultilangMetadata) {
+    const languageContract = args.requestData.language_contract ?? args.requestMetadata.language_contract;
+    if (languageContract && typedPayload.language_contract === undefined) {
+      typedPayload.language_contract = languageContract;
+    }
     if (typedPayload.source_language === undefined && args.requestMetadata.source_language) {
       typedPayload.source_language = args.requestMetadata.source_language;
     }
@@ -375,6 +383,9 @@ export const applyHelixAskSuccessSurface = (
     if (requestMetadataRecord && requestMetadataRecord.thread_id === undefined) {
       requestMetadataRecord.thread_id = args.threadId;
     }
+    if (requestMetadataRecord && languageContract && requestMetadataRecord.language_contract === undefined) {
+      requestMetadataRecord.language_contract = languageContract;
+    }
     if (
       (args.requestMetadata.lang_schema_version ||
         args.requestMetadata.source_language ||
@@ -387,6 +398,10 @@ export const applyHelixAskSuccessSurface = (
 
   const typedDebug = coerceObjectRecord(typedPayload.debug);
   if (typedDebug && args.includeMultilangMetadata) {
+    const languageContract = args.requestData.language_contract ?? args.requestMetadata.language_contract;
+    if (languageContract && typedDebug.language_contract === undefined) {
+      typedDebug.language_contract = languageContract;
+    }
     typedDebug.multilang_rollout_stage = args.multilangRollout.stage;
     typedDebug.multilang_rollout_active = args.multilangRollout.active;
     typedDebug.multilang_rollout_shadow = args.multilangRollout.shadow;

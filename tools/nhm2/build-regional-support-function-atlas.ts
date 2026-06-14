@@ -5,6 +5,10 @@ import { fileURLToPath } from "node:url";
 
 import { isNhm2ReferenceRunArtifact } from "../../shared/contracts/nhm2-reference-run.v1";
 import {
+  isNhm2RegionalSupportDerivativeReceipt,
+  type Nhm2RegionalSupportDerivativeReceiptV1,
+} from "../../shared/contracts/nhm2-regional-support-derivative-receipt.v1";
+import {
   buildNhm2RegionalSupportFunctionAtlas,
   isNhm2RegionalSupportFunctionAtlas,
   type Nhm2RegionalSupportFunctionAtlasV1,
@@ -79,6 +83,32 @@ const sourceRegionById = (
     ]),
   );
 
+const derivativeKernelFor = (
+  receipt: Nhm2RegionalSupportDerivativeReceiptV1 | null,
+  kernelId: string,
+): Nhm2RegionalSupportDerivativeReceiptV1["transitionKernels"][number] | null =>
+  receipt?.transitionKernels.find((kernel) => kernel.kernelId === kernelId) ?? null;
+
+const derivativeTermsAvailableFor = (
+  receipt: Nhm2RegionalSupportDerivativeReceiptV1 | null,
+  kernelId: string,
+): boolean => {
+  const kernel = derivativeKernelFor(receipt, kernelId);
+  return (
+    receipt?.summary.derivativeSupportComplete === true &&
+    kernel?.derivativeTermsAvailable === true &&
+    kernel.blockers.length === 0
+  );
+};
+
+const derivativeRefFor = (
+  receipt: Nhm2RegionalSupportDerivativeReceiptV1 | null,
+  kernelId: string,
+): string | undefined => {
+  if (!derivativeTermsAvailableFor(receipt, kernelId)) return undefined;
+  return derivativeKernelFor(receipt, kernelId)?.derivativeRef ?? receipt?.derivativeRef ?? undefined;
+};
+
 const supportRegion = (
   regionId: Nhm2RegionalSupportFunctionRegionId,
   sourceRegions: Map<
@@ -123,6 +153,7 @@ export const buildRegionalSupportFunctionAtlas = (args: {
   gridRef?: string | null;
   samplePlanRef?: string | null;
   transitionWidthMeters?: number | null;
+  supportDerivativeReceiptPath?: string | null;
 }): Nhm2RegionalSupportFunctionAtlasV1 => {
   const referenceRunText = readText(args.repoRoot, args.referenceRunPath);
   const referenceRun = JSON.parse(referenceRunText) as unknown;
@@ -138,6 +169,26 @@ export const buildRegionalSupportFunctionAtlas = (args: {
   if (source != null && !isNhm2TileEffectiveFullTensorSourceArtifact(source)) {
     throw new Error("tile full tensor source must be nhm2_tile_effective_full_tensor_source/v1");
   }
+  const derivativeReceiptText =
+    args.supportDerivativeReceiptPath == null
+      ? null
+      : readText(args.repoRoot, args.supportDerivativeReceiptPath);
+  const derivativeReceipt =
+    derivativeReceiptText == null ? null : (JSON.parse(derivativeReceiptText) as unknown);
+  if (
+    derivativeReceipt != null &&
+    !isNhm2RegionalSupportDerivativeReceipt(derivativeReceipt)
+  ) {
+    throw new Error("support derivative receipt must be nhm2_regional_support_derivative_receipt/v1");
+  }
+  if (
+    derivativeReceipt != null &&
+    (derivativeReceipt.runId !== referenceRun.runId ||
+      derivativeReceipt.selectedProfileId !== referenceRun.selectedFamily.selectedProfileId ||
+      derivativeReceipt.chartId !== "comoving_cartesian")
+  ) {
+    throw new Error("support derivative receipt run/profile/chart identity must match the reference atlas");
+  }
   const sourceRegions = sourceRegionById(source);
   const width = Math.max(0, args.transitionWidthMeters ?? DEFAULT_TRANSITION_WIDTH_METERS);
   const inputHashes: Record<string, string> = {
@@ -146,7 +197,12 @@ export const buildRegionalSupportFunctionAtlas = (args: {
   if (sourceText != null && args.tileFullTensorSourcePath != null) {
     inputHashes[args.tileFullTensorSourcePath] = sha256(sourceText);
   }
+  if (derivativeReceiptText != null && args.supportDerivativeReceiptPath != null) {
+    inputHashes[args.supportDerivativeReceiptPath] = sha256(derivativeReceiptText);
+  }
   const generatedFrom = Object.keys(inputHashes);
+  const hullWallKernelId = "kernel:hull_wall:smootherstep_c2";
+  const wallExteriorKernelId = "kernel:wall_exterior:smootherstep_c2";
   const atlasWithoutHash = buildNhm2RegionalSupportFunctionAtlas({
     runIdentity: {
       runId: referenceRun.runId,
@@ -178,24 +234,36 @@ export const buildRegionalSupportFunctionAtlas = (args: {
     },
     transitionKernels: [
       {
-        kernelId: "kernel:hull_wall:smootherstep_c2",
+        kernelId: hullWallKernelId,
         fromRegion: "hull",
         toRegion: "wall",
         supportRegion: "hull_wall_transition",
         kernelKind: "smootherstep_c2",
         smoothnessClass: "C2",
         widthMeters: width,
-        derivativeTermsAvailable: false,
+        derivativeTermsAvailable: derivativeTermsAvailableFor(
+          derivativeReceipt,
+          hullWallKernelId,
+        ),
+        ...(derivativeRefFor(derivativeReceipt, hullWallKernelId) == null
+          ? {}
+          : { derivativeRef: derivativeRefFor(derivativeReceipt, hullWallKernelId) }),
       },
       {
-        kernelId: "kernel:wall_exterior:smootherstep_c2",
+        kernelId: wallExteriorKernelId,
         fromRegion: "wall",
         toRegion: "exterior_shell",
         supportRegion: "wall_exterior_transition",
         kernelKind: "smootherstep_c2",
         smoothnessClass: "C2",
         widthMeters: width,
-        derivativeTermsAvailable: false,
+        derivativeTermsAvailable: derivativeTermsAvailableFor(
+          derivativeReceipt,
+          wallExteriorKernelId,
+        ),
+        ...(derivativeRefFor(derivativeReceipt, wallExteriorKernelId) == null
+          ? {}
+          : { derivativeRef: derivativeRefFor(derivativeReceipt, wallExteriorKernelId) }),
       },
     ],
     partitionOfUnity: {
@@ -207,9 +275,13 @@ export const buildRegionalSupportFunctionAtlas = (args: {
       status: "pass",
     },
     derivativeSupport: {
-      partialMuWAvailable: false,
-      covariantDerivativeSupportAvailable: false,
+      partialMuWAvailable: derivativeReceipt?.partialMuWAvailable === true,
+      covariantDerivativeSupportAvailable:
+        derivativeReceipt?.covariantDerivativeSupportAvailable === true,
       derivativeBasis: "chart",
+      ...(derivativeReceipt?.derivativeRef == null
+        ? {}
+        : { derivativeRef: derivativeReceipt.derivativeRef }),
       transitionDerivativeTermsRequired: true,
     },
     provenance: {
@@ -257,6 +329,7 @@ const main = (): void => {
     gridRef: asString(args["grid-ref"]),
     samplePlanRef: asString(args["sample-plan-ref"]),
     transitionWidthMeters: asNumber(args["transition-width-meters"]),
+    supportDerivativeReceiptPath: asString(args["support-derivative-receipt"]),
     outPath,
   });
   process.stdout.write(`${JSON.stringify(artifact, null, 2)}\n`);

@@ -3,9 +3,14 @@ import crypto from "node:crypto";
 import {
   buildHelixConversationMemoryPacket,
   detectHelixFollowupReferences,
+  renderHelixConversationMemoryForModel,
+  resolveHelixContextResumeFrameRecallText,
   resolveHelixPendingTaskFrameClarification,
   resolveConversationMemoryAdmission,
 } from "../services/helix-ask/conversation-memory-selector";
+import { buildAskTurnSolverTrace } from "../services/helix-ask/ask-turn-solver";
+import { buildLoopParityTrace } from "../services/helix-ask/loop-parity-trace";
+import { buildRouteProductContract } from "../services/helix-ask/route-product-contract";
 import { __resetConversationHistoryStore } from "../services/helix-ask/conversation-history";
 import { appendHelixThreadCompletedItemLifecycle } from "../services/helix-ask/runtime/request-context";
 import {
@@ -121,6 +126,202 @@ describe("Helix Ask conversation memory packet", () => {
     expect(packet.allowed_reason).toMatch(/no active thread/i);
     expect(packet.recent_user_goals).toEqual([]);
     expect(packet.recent_assistant_answers).toEqual([]);
+  });
+
+  it("carries pending pasted-text compaction resume frames into model-visible memory", () => {
+    appendHelixThreadServerRequestEvent({
+      thread_id: threadId,
+      route: "/ask",
+      event_type: "server_request_created",
+      turn_id: "turn-pause",
+      session_id: sessionId,
+      trace_id: "turn-pause",
+      turn_kind: "ask",
+      request_id: "turn-pause:context_compaction:pause",
+      request_kind: "request_user_input",
+      item_status: "in_progress",
+      request_payload: {
+        schema: "helix.pending_server_request.v1",
+        request_id: "turn-pause:context_compaction:pause",
+        kind: "context_compaction_pause",
+        prompt: "Context is compacting before the next Ask turn.",
+        reason: "active_context_page_file_compaction",
+        resume_frame: {
+          schema: "helix.pasted_text_attachment_resume_frame.v1",
+          original_prompt: "Use the attached pasted text.",
+          attachment_artifact_refs: ["thread:pasted_text_attachment:sentinel"],
+          turn_input_items: [
+            { type: "text", text: "Use the attached pasted text.", source: "user" },
+            {
+              type: "attachment",
+              attachment_id: "pasted-text-sentinel",
+              attachment_kind: "text",
+              file_name: "pasted-text-sentinel.txt",
+              mime_type: "text/plain",
+              size_bytes: 1024,
+              preview: "HELIX_PASTED_TEXT_RESUME_SENTINEL\nThis is compacted pasted text.",
+              raw_content_included: true,
+              raw_content_scope: "turn_input_only",
+              assistant_answer: false,
+            },
+          ],
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+    });
+
+    const packet = buildHelixConversationMemoryPacket({
+      threadId,
+      currentTurnId: "turn-followup",
+      sessionId,
+      promptText: "In the pasted text from the previous turn, what sentinel marker appears?",
+    });
+
+    expect(packet.allowed_for_current_goal).toBe(true);
+    expect(packet.allowed_reason).toMatch(/context-compaction resume frame/i);
+    expect(packet.context_resume_frames).toHaveLength(1);
+    expect(packet.context_resume_frames[0]).toMatchObject({
+      schema: "helix.pasted_text_attachment_resume_frame.v1",
+      source_request_id: "turn-pause:context_compaction:pause",
+      attachment_artifact_refs: ["thread:pasted_text_attachment:sentinel"],
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
+    const rendered = renderHelixConversationMemoryForModel(packet);
+    expect(rendered).toContain("context resume frames:");
+    expect(rendered).toContain("HELIX_PASTED_TEXT_RESUME_SENTINEL");
+    expect(rendered).toContain("thread:pasted_text_attachment:sentinel");
+    expect(resolveHelixContextResumeFrameRecallText({
+      packet,
+      promptText: "In the pasted text from the previous turn, what exact sentinel marker line appears at the top?",
+    })).toBe("HELIX_PASTED_TEXT_RESUME_SENTINEL");
+  });
+
+  it("treats pasted-text resume recall as selected conversation-memory evidence, not runtime debug", () => {
+    const turnId = "turn-followup";
+    const evidenceRef = `${turnId}:conversation_memory_packet`;
+    const prompt = "In the pasted text from the previous turn, what exact sentinel marker line appears at the top?";
+    const sourceTargetIntent = {
+      schema: "helix.ask_source_target_intent.v1",
+      turn_id: turnId,
+      thread_id: threadId,
+      target_source: "conversation_memory",
+      target_kind: "conversation_memory",
+      strength: "hard",
+      explicit_cues: ["conversation_memory_recall"],
+      reasons: ["conversation_memory_recall_selected"],
+      requested_outputs: ["conversation_memory_answer"],
+      suppressed_routes: [],
+      precedence_reason: "conversation_memory_recall_selected",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+      confidence: 0.95,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const routeProductContract = buildRouteProductContract({
+      turnId,
+      threadId,
+      sourceTargetIntent,
+      promptText: prompt,
+    });
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      route_reason_code: "conversation_memory_recall",
+      route: "conversation_memory_recall / current_thread_prior_answer",
+      selected_final_answer: "HELIX_PASTED_TEXT_RESUME_SENTINEL",
+      final_answer_source: "conversation_memory_recall_answer",
+      terminal_artifact_kind: "model_synthesized_answer",
+      terminal_artifact_id: evidenceRef,
+      conversation_memory_evidence_ref: evidenceRef,
+      source_target_intent: sourceTargetIntent,
+      route_product_contract: routeProductContract,
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        turn_id: turnId,
+        goal_kind: "conversation_memory_recall",
+        required_terminal_kind: "model_synthesized_answer",
+        required_evidence: ["helix.conversation_memory_packet.v1"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      conversation_memory_packet: {
+        schema: "helix.conversation_memory_packet.v1",
+        packet_id: evidenceRef,
+        allowed_for_current_goal: true,
+        allowed_use: "reuse_prior_evidence_refs",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      selected_evidence_pack: {
+        schema: "helix.selected_evidence_pack.v1",
+        selected_evidence_ids: [evidenceRef],
+        selected_memory_refs: [evidenceRef],
+        conversation_memory_refs: [evidenceRef],
+        selected_validation_refs: [],
+        selected_tool_receipts: [],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      route_authority_audit: {
+        schema: "helix.route_authority_audit.v1",
+        route_authority_ok: true,
+      },
+      poison_audit: {
+        schema: "helix.ask_context_poison_audit.v1",
+        ok: true,
+      },
+      terminal_answer_authority: {
+        schema: "helix.terminal_answer_authority.v1",
+        server_authoritative: true,
+      },
+      terminal_artifact_selection_guard: {
+        schema: "helix.terminal_artifact_selection_guard.v1",
+        allowed: true,
+      },
+      product_authority_guard: {
+        schema: "helix.product_authority_guard.v1",
+        allowed: true,
+      },
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    };
+
+    const loopTrace = buildLoopParityTrace({
+      turnId,
+      promptText: prompt,
+      selectedRoute: "conversation_memory_recall / current_thread_prior_answer",
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "conversation_memory_recall_answer",
+      payload,
+    });
+    const solverTrace = buildAskTurnSolverTrace({
+      turnId,
+      promptText: prompt,
+      selectedRoute: "conversation_memory_recall / current_thread_prior_answer",
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "conversation_memory_recall_answer",
+      payload,
+      loopParityTrace: loopTrace,
+    });
+
+    expect(routeProductContract.source_target).toBe("conversation_memory");
+    expect(loopTrace.evidence_selected_for_answer).toContain(evidenceRef);
+    expect(solverTrace.selected_primary_intent).toBe("content_question");
+    expect(solverTrace.evidence_reentry_gate.completed).toBe(true);
+    expect(solverTrace.followup_reasoning_gate.completed).toBe(true);
+    expect(solverTrace.completed_solver_path).toBe(true);
   });
 
   it("blocks explicit rejection of previous context", () => {

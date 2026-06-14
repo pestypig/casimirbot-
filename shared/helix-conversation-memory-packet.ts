@@ -44,6 +44,20 @@ export type HelixUnresolvedTaskFrame = {
   >;
 };
 
+export type HelixContextResumeFrame = {
+  id: string;
+  schema: "helix.pasted_text_attachment_resume_frame.v1";
+  source_request_id: string;
+  source_turn_id: string;
+  original_prompt: string;
+  attachment_artifact_refs: string[];
+  attachment_previews: string[];
+  turn_input_item_count: number;
+  terminal_eligible: false;
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
 export type HelixConversationMemoryAllowedUse =
   | "pronoun_binding_only"
   | "conversational_continuity"
@@ -72,6 +86,7 @@ export type HelixConversationMemoryPacket = {
   open_failures: string[];
   pending_user_inputs: string[];
   unresolved_task_frames: HelixUnresolvedTaskFrame[];
+  context_resume_frames: HelixContextResumeFrame[];
 
   latest_plan_summary?: string | null;
   latest_answer_summary?: string | null;

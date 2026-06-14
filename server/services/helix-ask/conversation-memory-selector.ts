@@ -3,6 +3,7 @@ import {
   type HelixConversationMemoryAllowedUse,
   type HelixConversationMemoryPacket,
   type HelixConversationMemoryReference,
+  type HelixContextResumeFrame,
   type HelixUnresolvedTaskFrame,
 } from "../../../shared/helix-conversation-memory-packet";
 import {
@@ -439,6 +440,45 @@ const coerceUnresolvedTaskFrame = (
   };
 };
 
+const coerceContextResumeFrame = (
+  request: HelixThreadServerRequest,
+): HelixContextResumeFrame | null => {
+  const payload = readRecord(request.payload);
+  const resumeFrame = readRecord(payload?.resume_frame);
+  if (!resumeFrame || readString(resumeFrame.schema) !== "helix.pasted_text_attachment_resume_frame.v1") {
+    return null;
+  }
+  const turnInputItems = Array.isArray(resumeFrame.turn_input_items) ? resumeFrame.turn_input_items : [];
+  const attachmentPreviews = unique(
+    turnInputItems
+      .map((entry) => readRecord(entry))
+      .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+      .filter((entry) => readString(entry.type) === "attachment")
+      .map((entry) => (typeof entry.preview === "string" ? entry.preview.trim() : ""))
+      .filter((entry) => entry.length > 0),
+    6,
+  );
+  return {
+    id: `context_resume:${request.request_id}`,
+    schema: "helix.pasted_text_attachment_resume_frame.v1",
+    source_request_id: request.request_id,
+    source_turn_id: request.turn_id,
+    original_prompt: readString(resumeFrame.original_prompt) ?? requestSummary(request),
+    attachment_artifact_refs: readStringArray(resumeFrame.attachment_artifact_refs, 12),
+    attachment_previews: attachmentPreviews,
+    turn_input_item_count: turnInputItems.length,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const detectContextResumeCue = (promptText: string): boolean => {
+  const text = normalizeLower(promptText);
+  if (!text) return false;
+  return /\b(?:pasted\s+text|attached\s+text|attachment|previous\s+paste|last\s+paste|paste\s+from\s+the\s+previous|text\s+from\s+the\s+previous)\b/.test(text);
+};
+
 const detectPendingSlotFillCue = (promptText: string): boolean => {
   const text = normalizeLower(promptText);
   if (!text) return false;
@@ -585,6 +625,7 @@ const buildEmptyPacket = (args: {
   open_failures: [],
   pending_user_inputs: [],
   unresolved_task_frames: [],
+  context_resume_frames: [],
   latest_plan_summary: null,
   latest_answer_summary: null,
   latest_failure_summary: null,
@@ -707,14 +748,25 @@ export function buildHelixConversationMemoryPacket(
       .filter((frame): frame is HelixUnresolvedTaskFrame => Boolean(frame)),
     maxTurns,
   );
+  const contextResumeFrames = state.unresolved_requests
+    .map(coerceContextResumeFrame)
+    .filter((frame): frame is HelixContextResumeFrame => Boolean(frame))
+    .slice(0, maxTurns);
   const pendingSlotFillCue =
     unresolvedTaskFrames.length > 0 &&
     detectPendingSlotFillCue(input.promptText) &&
     !hasExplicitMemoryRejection(normalizeLower(input.promptText)) &&
     !hasQuotedOrHypotheticalCue(normalizeLower(input.promptText));
-  const memoryAllowedForCurrentGoal = admission.allowed_for_current_goal || pendingSlotFillCue;
+  const pendingContextResumeCue =
+    contextResumeFrames.length > 0 &&
+    detectContextResumeCue(input.promptText) &&
+    !hasExplicitMemoryRejection(normalizeLower(input.promptText)) &&
+    !hasQuotedOrHypotheticalCue(normalizeLower(input.promptText));
+  const memoryAllowedForCurrentGoal = admission.allowed_for_current_goal || pendingSlotFillCue || pendingContextResumeCue;
   const memoryAllowedReason = pendingSlotFillCue
     ? "Current prompt appears to fill a slot for an unresolved prior task frame."
+    : pendingContextResumeCue
+      ? "Current prompt references a pending context-compaction resume frame."
     : admission.allowed_reason;
   let allowedUse = admission.allowed_use;
   if (allowedUse === "conversational_continuity" && pendingInputs.length > 0 && followup.followup_kind === "pronoun") {
@@ -722,6 +774,9 @@ export function buildHelixConversationMemoryPacket(
   }
   if (pendingSlotFillCue) {
     allowedUse = "pending_request_resolution";
+  }
+  if (pendingContextResumeCue) {
+    allowedUse = "reuse_prior_evidence_refs";
   }
 
   const staleRefs: string[] = [];
@@ -819,6 +874,9 @@ export function buildHelixConversationMemoryPacket(
       latestAnswerSummary ? `latest answer: ${latestAnswerSummary}` : "",
       latestFailure ? `latest failure: ${latestFailure}` : "",
       pendingInputs.length > 0 ? `pending input: ${pendingInputs[0]}` : "",
+      contextResumeFrames.length > 0
+        ? `context resume frame: ${contextResumeFrames[0].attachment_artifact_refs.slice(0, 3).join(", ")}`
+        : "",
       reusableEvidenceRefs.length > 0 ? `reusable evidence refs: ${reusableEvidenceRefs.slice(0, 3).join(", ")}` : "",
     ].filter(Boolean).join(" | "),
     summaryLimit(),
@@ -839,6 +897,7 @@ export function buildHelixConversationMemoryPacket(
     open_failures: unique(failures, maxTurns),
     pending_user_inputs: unique(pendingInputs, maxTurns),
     unresolved_task_frames: unresolvedTaskFrames,
+    context_resume_frames: contextResumeFrames,
     latest_plan_summary: latestPlanSummary,
     latest_answer_summary: memoryAllowedForCurrentGoal ? latestAnswerSummary : null,
     latest_failure_summary: latestFailure,
@@ -878,6 +937,14 @@ export function buildHelixConversationMemoryDebug(packet: HelixConversationMemor
       missing_slots: frame.missing_slots,
       known_slot_keys: Object.keys(frame.known_slots ?? {}),
       allowed_next_actions: frame.allowed_next_actions,
+    })),
+    context_resume_frames: packet.context_resume_frames.map((frame) => ({
+      id: frame.id,
+      schema: frame.schema,
+      source_request_id: frame.source_request_id,
+      source_turn_id: frame.source_turn_id,
+      attachment_artifact_refs: frame.attachment_artifact_refs,
+      attachment_preview_count: frame.attachment_previews.length,
     })),
     allowed_for_current_goal: packet.allowed_for_current_goal,
     allowed_reason: packet.allowed_reason,
@@ -920,6 +987,21 @@ export function renderHelixConversationMemoryForModel(
           )
           .join("; ")}`
       : "",
+    packet.context_resume_frames.length > 0
+      ? `context resume frames: ${packet.context_resume_frames
+          .map((frame) =>
+            [
+              `${frame.id} schema=${frame.schema}`,
+              `source_turn=${frame.source_turn_id}`,
+              `original_prompt=${clip(frame.original_prompt, 180)}`,
+              `attachment_refs=${frame.attachment_artifact_refs.join(",") || "none"}`,
+              frame.attachment_previews.length > 0
+                ? `attachment_previews=${frame.attachment_previews.map((preview) => clip(preview, 260)).join(" | ")}`
+                : "attachment_previews=none",
+            ].join(" "),
+          )
+          .join("; ")}`
+      : "",
     packet.missing_or_uncertain.length > 0
       ? `missing or uncertain: ${packet.missing_or_uncertain.join("; ")}`
       : "",
@@ -927,4 +1009,27 @@ export function renderHelixConversationMemoryForModel(
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+export function resolveHelixContextResumeFrameRecallText(input: {
+  packet: HelixConversationMemoryPacket | null;
+  promptText: string;
+}): string | null {
+  const packet = input.packet;
+  if (!packet?.allowed_for_current_goal || packet.allowed_use !== "reuse_prior_evidence_refs") return null;
+  if (!detectContextResumeCue(input.promptText)) return null;
+  const prompt = normalizeLower(input.promptText);
+  const asksForExactMarker =
+    /\b(?:sentinel|marker|exact\s+line|marker\s+line|top\s+line|first\s+line)\b/.test(prompt);
+  if (!asksForExactMarker) return null;
+  for (const frame of packet.context_resume_frames) {
+    for (const preview of frame.attachment_previews) {
+      const firstLine = normalizeText(preview.split(/\r?\n/).find((line: string) => line.trim()) ?? "");
+      if (!firstLine) continue;
+      const markerToken = firstLine.match(/\b[A-Z][A-Z0-9]+(?:_[A-Z0-9]+){2,}\b/)?.[0] ?? null;
+      if (markerToken) return markerToken;
+      return firstLine;
+    }
+  }
+  return null;
 }

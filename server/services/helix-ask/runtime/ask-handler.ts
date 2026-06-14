@@ -27,6 +27,7 @@ import {
   type HelixThreadRouteContext,
 } from "./request-context";
 import { applyHelixAskSuccessSurface } from "../surface/ask-answer-surface";
+import { buildHelixAskLanguageContract, type HelixAskLanguageContractV1 } from "../language-contract";
 
 type HelixAskRuntimeRequest = Record<string, unknown> & {
   sessionId?: string | null;
@@ -51,6 +52,7 @@ type HelixAskRuntimeRequest = Record<string, unknown> & {
   multilangConfirm?: boolean;
   lang_schema_version?: string | null;
   interpreter_schema_version?: string | null;
+  language_contract?: HelixAskLanguageContractV1;
   dryRun?: boolean;
   mode?: string | null;
 };
@@ -68,6 +70,7 @@ type HelixAskRequestMetadata = {
   translated?: boolean;
   lang_schema_version?: string | null;
   response_language?: string | null;
+  language_contract?: HelixAskLanguageContractV1;
 };
 
 export type HelixAskRuntimeHandlerDeps = {
@@ -457,6 +460,45 @@ export const prepareHelixAskRouteRequest = async (args: {
       },
     };
   }
+  const languageContract = buildHelixAskLanguageContract({
+    inputModality: "typed",
+    sourceText: requestSourceSeed || requestQuestionSeed,
+    pivotText: requestQuestionSeed,
+    sourceLanguage: requestData.sourceLanguage ?? null,
+    languageDetected: requestData.languageDetected ?? null,
+    languageConfidence: requestData.languageConfidence ?? null,
+    responseLanguage: requestData.responseLanguage ?? null,
+    preferredResponseLanguage: requestData.preferredResponseLanguage ?? null,
+    codeMixed: requestData.codeMixed,
+    translated: requestData.translated,
+    normalizeLanguageTag: deps.normalizeLanguageTag,
+  });
+  const shouldAttachLanguageContract =
+    languageContract.explicit_language_instruction ||
+    languageContract.code_mixed ||
+    languageContract.response_language !== "en" ||
+    (languageContract.language_detected !== null && languageContract.language_detected !== "en");
+  if (shouldAttachLanguageContract) {
+    requestData.language_contract = languageContract;
+    if (!requestData.sourceLanguage?.trim() && languageContract.language_detected) {
+      requestData.sourceLanguage = languageContract.language_detected;
+    }
+    if (!requestData.languageDetected?.trim() && languageContract.language_detected) {
+      requestData.languageDetected = languageContract.language_detected;
+    }
+    if (typeof requestData.languageConfidence !== "number" && typeof languageContract.language_confidence === "number") {
+      requestData.languageConfidence = languageContract.language_confidence;
+    }
+    if (requestData.codeMixed === undefined) {
+      requestData.codeMixed = languageContract.code_mixed;
+    }
+    if (!requestData.responseLanguage?.trim() && !requestData.preferredResponseLanguage?.trim()) {
+      requestData.preferredResponseLanguage = languageContract.response_language;
+    }
+    if (!requestData.lang_schema_version?.trim()) {
+      requestData.lang_schema_version = deps.langSchemaVersion;
+    }
+  }
   return {
     ok: true,
     sessionId,
@@ -472,6 +514,9 @@ export const resolveHelixAskRouteContext = (args: {
 }): HelixAskRouteContextResult => {
   const { requestData, deps } = args;
   const requestMetadata = deps.buildRequestMetadata(requestData);
+  if (requestData.language_contract && !requestMetadata.language_contract) {
+    requestMetadata.language_contract = requestData.language_contract;
+  }
   const askTurnIdSeed =
     requestMetadata.turn_id ??
     resolveHelixAskConversationTurnId({
@@ -534,7 +579,8 @@ export const resolveHelixAskRouteContext = (args: {
       typeof requestData.languageConfidence === "number" ||
       typeof requestData.pivotConfidence === "number" ||
       requestData.translated === true ||
-      Boolean(requestData.interpreter)
+      Boolean(requestData.interpreter) ||
+      Boolean(requestData.language_contract)
   );
   return {
     ok: true,

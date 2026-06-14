@@ -97,6 +97,21 @@ const HARD_REPO_CODE_SPECS: RepoCodeIntentSpec[] = [
     pattern: /\b(?:why\s+did(?:n'?t| not)\s+(?:it|the\s+agent|helix)\s+(?:make|run|call|use)|can\s+(?:it|the\s+agent|helix)\s+make|able\s+to\s+make)\b[\s\S]{0,120}\b(?:tool\s+calls?|repo\s+grep|grep|right\s+calls?)\b/i,
     outputs: ["repo_code", "implementation_location", "route_trace", "tool_call_eligibility", "terminal_contract", "line_backed_source"],
   },
+  {
+    reason: "spanish_repo_code_evidence_intent",
+    pattern: /\b(?:busca|buscar|usa|usar|cita|citar|explica|d[oó]nde|encontrar|revisa)\b[\s\S]{0,180}\b(?:repo|repositorio|c[oó]digo|archivos?|rutas?|fuentes?|implementaci[oó]n|s[ií]mbolos?|m[oó]dulos?|contrato|l[ií]neas?)\b|\b(?:repo|repositorio|c[oó]digo|archivos?|rutas?|fuentes?|implementaci[oó]n|s[ií]mbolos?|m[oó]dulos?|contrato|l[ií]neas?)\b[\s\S]{0,180}\b(?:evidencia|cita|citar|fuentes?|l[ií]neas?|rutas?|archivos?|implementaci[oó]n)\b/i,
+    outputs: ["repo_code", "file_path", "line_backed_source", "implementation_location", "symbol_contract"],
+  },
+  {
+    reason: "chinese_repo_code_evidence_intent",
+    pattern: /(?:仓库|代码库|源码|代码|实现|模块|契约)[\s\S]{0,80}(?:证据|引用|文件|路径|行号|查找|搜索|列出|总结)|(?:证据|引用|文件|路径|行号|查找|搜索|列出|总结)[\s\S]{0,80}(?:仓库|代码库|源码|代码|实现|模块|契约)/u,
+    outputs: ["repo_code", "file_path", "line_backed_source", "implementation_location", "symbol_contract"],
+  },
+  {
+    reason: "mixed_language_repo_code_evidence_intent",
+    pattern: /\b(?:repo|code|source|implementation|file\s+paths?|evidence|cite)\b[\s\S]{0,160}(?:c[oó]digo|repositorio|archivos?|rutas?|fuentes?|evidencia|仓库|代码|源码|文件|路径|证据|引用|行号)|(?:c[oó]digo|repositorio|archivos?|rutas?|fuentes?|evidencia|仓库|代码|源码|文件|路径|证据|引用|行号)[\s\S]{0,160}\b(?:repo|code|source|implementation|file\s+paths?|evidence|cite)\b/iu,
+    outputs: ["repo_code", "file_path", "line_backed_source", "implementation_location"],
+  },
 ];
 
 export function detectRepoCodeEvidenceIntent(promptText: string): HelixRepoCodeEvidenceIntent {

@@ -247,6 +247,17 @@ const collectObservationRefs = (selection: RecordLike | null): { selected: strin
   return { selected, rejected };
 };
 
+const collectSelectedEvidencePackRefs = (payload: RecordLike): string[] => {
+  const pack = readRecord(payload.selected_evidence_pack);
+  return unique([
+    ...readStringArray(pack?.selected_evidence_ids),
+    ...readStringArray(pack?.selected_validation_refs),
+    ...readStringArray(pack?.selected_tool_receipts),
+    ...readStringArray(pack?.selected_memory_refs),
+    ...readStringArray(pack?.conversation_memory_refs),
+  ]);
+};
+
 const collectObservationsCreated = (payload: RecordLike): HelixLoopParityTrace["observations_created"] => {
   const observations = new Map<string, HelixLoopParityTrace["observations_created"][number]>();
   const addObservation = (ref: string, sourceKind = "unknown", sourceId = "unknown", provenance = "payload"): void => {
@@ -386,6 +397,7 @@ export function buildLoopParityTrace(input: {
   const unexpectedToolCalls = actualToolCalls.filter((call) => !call.admitted).map((call) => call.tool_id);
   const selection = readRecord(payload.situation_evidence_selection);
   const evidence = collectObservationRefs(selection);
+  const selectedEvidencePackRefs = collectSelectedEvidencePackRefs(payload);
   const evidenceRejectedForAnswer = collectRejectedEvidence(payload, evidence.rejected);
   const observationsCreated = collectObservationsCreated(payload);
   const terminalArtifactKind = readString(input.terminalArtifactKind) || "unknown";
@@ -461,7 +473,7 @@ export function buildLoopParityTrace(input: {
     rejected_tool_calls: rejectedToolCalls,
     unexpected_tool_calls: unexpectedToolCalls,
     observations_created: observationsCreated,
-    evidence_selected_for_answer: evidence.selected,
+    evidence_selected_for_answer: unique([...evidence.selected, ...selectedEvidencePackRefs]),
     evidence_rejected_for_answer: evidenceRejectedForAnswer,
     tool_results_returned_to_turn: toolResultsReturnedToTurn(payload, actualToolCalls, observationsCreated),
     post_observation_finalizer_ran: postObservationFinalizerRan,

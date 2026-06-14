@@ -862,6 +862,33 @@ describe("NHM2 reference validation chain planner", () => {
     ).toThrow(/require --source-input/);
   });
 
+  it("passes a support derivative receipt into generated regional atlases", () => {
+    const plan = planReferenceValidationChain({
+      ...baseArgs(),
+      "source-input": "fixtures/nhm2/source-input.json",
+      "build-regional-support-function-atlas": true,
+      "support-derivative-receipt":
+        "artifacts/reference/nhm2-regional-support-derivative-receipt.json",
+    });
+    const atlas = findCommand(plan, "nhm2:build-regional-support-function-atlas");
+
+    expect(atlas.args).toContain("--support-derivative-receipt");
+    expect(atlas.args).toContain(
+      "artifacts/reference/nhm2-regional-support-derivative-receipt.json",
+    );
+  });
+
+  it("rejects derivative receipts when a prebuilt atlas is supplied", () => {
+    expect(() =>
+      planReferenceValidationChain({
+        ...baseArgs(),
+        "regional-support-atlas": "artifacts/reference/nhm2-regional-support-function-atlas.json",
+        "support-derivative-receipt":
+          "artifacts/reference/nhm2-regional-support-derivative-receipt.json",
+      }),
+    ).toThrow(/support-derivative-receipt requires --build-regional-support-function-atlas/);
+  });
+
   it("rejects ambiguous generated and prebuilt transition kernels", () => {
     expect(() =>
       planReferenceValidationChain({

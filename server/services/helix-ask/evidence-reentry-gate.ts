@@ -133,6 +133,23 @@ const collectWorkspaceSourceEvidenceRefs = (input: {
   return [];
 };
 
+const collectConversationMemoryEvidenceRefs = (payload: RecordLike): string[] => {
+  const memoryPacket = readRecord(payload.conversation_memory_packet);
+  const goalFrame = readRecord(payload.canonical_goal_frame);
+  const routeText = [
+    readString(payload.route_reason_code),
+    readString(payload.route),
+    readString(goalFrame?.goal_kind),
+  ].join(" ");
+  if (!memoryPacket || !/conversation_memory_recall/i.test(routeText)) return [];
+  return unique([
+    readString(memoryPacket.packet_id),
+    readString(payload.conversation_memory_evidence_ref),
+    readString(payload.terminal_artifact_id),
+    `${readString(payload.turn_id) || "current_turn"}:conversation_memory_packet`,
+  ].filter(Boolean));
+};
+
 const collectRepoEvidenceRefs = (input: {
   payload: RecordLike;
   terminalArtifactKind: string;
@@ -377,6 +394,7 @@ export function buildEvidenceReentryGate(input: {
       terminalArtifactKind: input.terminalArtifactKind,
       finalAnswerSource: input.finalAnswerSource,
     }),
+    ...collectConversationMemoryEvidenceRefs(input.payload),
     ...collectRepoEvidenceRefs({
       payload: input.payload,
       terminalArtifactKind: input.terminalArtifactKind,

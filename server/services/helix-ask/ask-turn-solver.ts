@@ -363,6 +363,7 @@ const terminalAllowedByCanonicalOrCompliantConstraintPolicy = (input: {
 const sourceTargeted = new Set([
   "visual_capture",
   "procedure_memory",
+  "conversation_memory",
   "situation_epoch",
   "visual_scene_memory",
   "repo_code",
@@ -379,7 +380,7 @@ const sourceTargeted = new Set([
 ]);
 
 const sourceRequiresEvidence = (sourceTarget: string): boolean =>
-  /visual_capture|procedure_memory|situation_epoch|visual_scene_memory|repo_code|runtime_evidence|workspace_diagnostic|docs_viewer|active_doc|world_event|internet_search|scholarly_research/i.test(sourceTarget);
+  /visual_capture|procedure_memory|conversation_memory|situation_epoch|visual_scene_memory|repo_code|runtime_evidence|workspace_diagnostic|docs_viewer|active_doc|world_event|internet_search|scholarly_research/i.test(sourceTarget);
 
 const toolFamilyMutating = (family: string): boolean =>
   /live_pipeline|workspace_action|workstation_action|docs_viewer|process_graph|notes/i.test(family);

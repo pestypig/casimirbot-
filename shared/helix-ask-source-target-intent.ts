@@ -25,6 +25,7 @@ export type HelixAskSourceTarget =
   | "general_background"
   | "workspace_panel"
   | "procedure_memory"
+  | "conversation_memory"
   | "model_only"
   | "unknown";
 
@@ -73,6 +74,7 @@ export type HelixAskSourceTargetRequestedOutput =
   | "visual_scene_query_intent"
   | "selected_visual_scene_set"
   | "visual_scene_comparison_result"
+  | "conversation_memory_answer"
   | "typed_failure";
 
 export type HelixAskSourceTargetIntent = {

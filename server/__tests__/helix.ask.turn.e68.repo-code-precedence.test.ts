@@ -70,6 +70,40 @@ describe("helix ask repo/code intent precedence", () => {
     );
   });
 
+  it.each([
+    {
+      name: "Spanish hard repo evidence",
+      prompt:
+        "Busca en el repo cómo Helix Ask decide el idioma final. Usa evidencia del código y cita archivos y líneas.",
+      reason: "spanish_repo_code_evidence_intent",
+    },
+    {
+      name: "Chinese hard repo evidence",
+      prompt:
+        "请在代码仓库中查找 Helix Ask 如何决定最终回答语言。请引用文件和行号作为证据。",
+      reason: "chinese_repo_code_evidence_intent",
+    },
+    {
+      name: "Mixed Spanish explicit response language",
+      prompt:
+        "Explain Helix Ask final answer language, pero responde en español y usa evidencia del código.",
+      reasons: ["mixed_language_repo_code_evidence_intent", "spanish_repo_code_evidence_intent"],
+    },
+  ])("detects multilingual repo/code evidence prompts: $name", ({ prompt, reason, reasons }) => {
+    const intent = detectRepoCodeEvidenceIntent(prompt);
+
+    expect(intent.repoEvidenceRequested, prompt).toBe(true);
+    expect(intent.strength, prompt).toBe("hard");
+    if (reason) {
+      expect(intent.reasons, prompt).toContain(reason);
+    } else {
+      expect(intent.reasons.some((actual) => reasons?.includes(actual)), prompt).toBe(true);
+    }
+    expect(intent.requestedOutputs, prompt).toEqual(
+      expect.arrayContaining(["repo_code", "file_path", "line_backed_source"]),
+    );
+  });
+
   it("detects project-local agent loop prompts as hard repo/runtime evidence", () => {
     const intent = detectRepoCodeEvidenceIntent(
       "Starting from the top of the agentic turn-based system.",
@@ -157,6 +191,74 @@ describe("helix ask repo/code intent precedence", () => {
     expect(response.body?.retrieval_required_signal?.strength).toBe("hard");
     expect(response.body?.repo_claim_observation_gate).toBeTruthy();
     expect(response.body?.repo_claim_support).toBeTruthy();
+  }, 90000);
+
+  it.each([
+    {
+      name: "Spanish hard repo evidence",
+      question:
+        "Busca en el repo cómo Helix Ask decide el idioma final. Usa evidencia del código y cita archivos y líneas.",
+      expectedLanguage: "es",
+    },
+    {
+      name: "Chinese hard repo evidence",
+      question:
+        "请在代码仓库中查找 Helix Ask 如何决定最终回答语言。请引用文件和行号作为证据。",
+      expectedLanguage: "zh",
+    },
+    {
+      name: "Mixed Spanish explicit response language",
+      question:
+        "Explain Helix Ask final answer language, pero responde en español y usa evidencia del código.",
+      expectedLanguage: "es",
+    },
+    {
+      name: "Mixed Chinese English repo intent",
+      question:
+        "Explain Helix Ask final answer 语言选择 using repo code evidence and cite file paths.",
+      expectedLanguage: "en",
+      allowedTerminalKinds: ["repo_code_evidence_answer", "typed_failure"],
+    },
+  ])("routes multilingual repo evidence prompts through repo evidence: $name", async ({ question, expectedLanguage, allowedTerminalKinds }) => {
+    const app = createApp();
+    const response = await withRepoSynthesisResponse(
+      "Helix Ask decides response language through request metadata and the Ask language contract, then admits repo-code evidence before final synthesis. Sources: server/services/helix-ask/runtime/ask-handler.ts; server/services/helix-ask/language-contract.ts; server/services/helix-ask/repo-code-intent-detector.ts.",
+      () => request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question,
+          mode: "read",
+          debug: true,
+          sessionId: `multilang-repo-${Date.now()}`,
+        })
+        .expect(200),
+    );
+
+    expect(response.body?.language_contract).toBeTruthy();
+    expect(response.body?.language_contract?.response_language).toBe(expectedLanguage);
+    expect(response.body?.language_contract?.language_detected).not.toBeNull();
+    expect(response.body?.debug?.language_contract).toMatchObject({
+      schema: "helix.ask_language_contract.v1",
+      response_language: expectedLanguage,
+    });
+    expect(response.body?.request_metadata?.language_contract).toMatchObject({
+      schema: "helix.ask_language_contract.v1",
+      response_language: expectedLanguage,
+    });
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("repo_code_evidence_question");
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_source: "repo_code",
+      target_kind: "repo_code",
+      strength: "hard",
+      allow_no_tool_direct: false,
+    });
+    expect(response.body?.route_reason_code).not.toBe("conversation:simple");
+    expect(response.body?.final_answer_source).not.toBe("model_direct_answer");
+    expect(response.body?.final_answer_source).not.toBe("no_tool_direct");
+    expect(allowedTerminalKinds ?? ["repo_code_evidence_answer"]).toContain(response.body?.terminal_artifact_kind);
+    if (response.body?.terminal_artifact_kind === "repo_code_evidence_answer") {
+      expect(response.body?.repo_claim_observation_gate).toBeTruthy();
+    }
   }, 90000);
 
   it("routes source-target admission enforcement questions to repo evidence before visual deictic routing", async () => {

@@ -52,6 +52,7 @@ const hashShort = (value: unknown): string =>
 const sourceTargeted = new Set([
   "visual_capture",
   "procedure_memory",
+  "conversation_memory",
   "situation_epoch",
   "visual_scene_memory",
   "repo_code",

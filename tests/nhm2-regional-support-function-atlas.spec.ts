@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { buildNhm2ReferenceRunArtifact } from "../shared/contracts/nhm2-reference-run.v1";
+import { buildNhm2RegionalSupportDerivativeReceipt } from "../shared/contracts/nhm2-regional-support-derivative-receipt.v1";
 import {
   isNhm2RegionalSupportFunctionAtlas,
 } from "../shared/contracts/nhm2-regional-support-function-atlas.v1";
@@ -137,11 +138,62 @@ const sourceArtifact = () =>
     literatureRefs: ["fewster_thompson_2023_stationary_worldline_qei"],
   });
 
+const supportDerivativeReceipt = (
+  overrides: { runId?: string; selectedProfileId?: string; chartId?: string } = {},
+) =>
+  buildNhm2RegionalSupportDerivativeReceipt({
+    generatedAt: "2026-06-14T00:00:00.000Z",
+    runId: overrides.runId ?? "atlas-run",
+    selectedProfileId: overrides.selectedProfileId ?? profile,
+    chartId: overrides.chartId ?? "comoving_cartesian",
+    derivativeBasis: "chart",
+    derivativeRef: "derivative.supports.json",
+    partialMuWAvailable: true,
+    covariantDerivativeSupportAvailable: true,
+    transitionKernels: [
+      {
+        kernelId: "kernel:hull_wall:smootherstep_c2",
+        supportRegion: "hull_wall_transition",
+        derivativeTermsAvailable: true,
+        derivativeRef: "derivative.hull_wall.json",
+        partialDerivativeComponents: {
+          dt: true,
+          dx: true,
+          dy: true,
+          dz: true,
+        },
+        maxAbsPartialMuW: 1,
+        widthMeters: 1,
+        blockers: [],
+      },
+      {
+        kernelId: "kernel:wall_exterior:smootherstep_c2",
+        supportRegion: "wall_exterior_transition",
+        derivativeTermsAvailable: true,
+        derivativeRef: "derivative.wall_exterior.json",
+        partialDerivativeComponents: {
+          dt: true,
+          dx: true,
+          dy: true,
+          dz: true,
+        },
+        maxAbsPartialMuW: 1,
+        widthMeters: 1,
+        blockers: [],
+      },
+    ],
+  });
+
 const withTemp = (fn: (root: string) => void) => {
   const root = mkdtempSync(join(tmpdir(), "nhm2-support-atlas-"));
   try {
     writeFileSync(join(root, "reference.json"), JSON.stringify(referenceRun()), "utf8");
     writeFileSync(join(root, "source.json"), JSON.stringify(sourceArtifact()), "utf8");
+    writeFileSync(
+      join(root, "support-derivatives.json"),
+      JSON.stringify(supportDerivativeReceipt()),
+      "utf8",
+    );
     fn(root);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -171,10 +223,55 @@ describe("nhm2 regional support-function atlas", () => {
       ]);
       expect(atlas.regions.wall.sampleCount).toBe(24);
       expect(atlas.partitionOfUnity.status).toBe("pass");
+      expect(atlas.derivativeSupport.partialMuWAvailable).toBe(false);
+      expect(atlas.derivativeSupport.covariantDerivativeSupportAvailable).toBe(false);
+      expect(atlas.transitionKernels.every((kernel) => !kernel.derivativeTermsAvailable)).toBe(true);
       expect(atlas.provenance.atlasHash).toMatch(/^[a-f0-9]{64}$/);
       expect(atlas.provenance.targetEchoForbidden).toBe(true);
       expect(atlas.eligibility.atlasEligibleForClosureHarness).toBe(true);
       expect(atlas.claimBoundary.atlasDoesNotFitPhysicsNumbers).toBe(true);
       expect(atlas.claimBoundary.physicalTransportClaimAllowed).toBe(false);
+    }));
+
+  it("admits same-run support derivative receipts into the atlas hash and transition kernels", () =>
+    withTemp((root) => {
+      const atlas = buildRegionalSupportFunctionAtlas({
+        repoRoot: root,
+        referenceRunPath: "reference.json",
+        tileFullTensorSourcePath: "source.json",
+        supportDerivativeReceiptPath: "support-derivatives.json",
+        outPath: "atlas.json",
+      });
+
+      expect(isNhm2RegionalSupportFunctionAtlas(atlas)).toBe(true);
+      expect(atlas.derivativeSupport.partialMuWAvailable).toBe(true);
+      expect(atlas.derivativeSupport.covariantDerivativeSupportAvailable).toBe(true);
+      expect(atlas.derivativeSupport.derivativeRef).toBe("derivative.supports.json");
+      expect(atlas.transitionKernels.every((kernel) => kernel.derivativeTermsAvailable)).toBe(true);
+      expect(atlas.transitionKernels.map((kernel) => kernel.derivativeRef)).toEqual([
+        "derivative.hull_wall.json",
+        "derivative.wall_exterior.json",
+      ]);
+      expect(atlas.provenance.generatedFrom).toContain("support-derivatives.json");
+      expect(atlas.provenance.inputHashes["support-derivatives.json"]).toMatch(/^[a-f0-9]{64}$/);
+    }));
+
+  it("rejects derivative receipts from another run identity", () =>
+    withTemp((root) => {
+      writeFileSync(
+        join(root, "support-derivatives.mismatch.json"),
+        JSON.stringify(supportDerivativeReceipt({ runId: "other-run" })),
+        "utf8",
+      );
+
+      expect(() =>
+        buildRegionalSupportFunctionAtlas({
+          repoRoot: root,
+          referenceRunPath: "reference.json",
+          tileFullTensorSourcePath: "source.json",
+          supportDerivativeReceiptPath: "support-derivatives.mismatch.json",
+          outPath: "atlas.json",
+        }),
+      ).toThrow(/run\/profile\/chart identity/);
     }));
 });

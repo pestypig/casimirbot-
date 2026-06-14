@@ -994,6 +994,7 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     calculatorPayloads: [],
     sourceRefs: [
       artifactRef("shared/contracts/nhm2-regional-support-function-atlas.v1.ts", "derivativeSupport", "Atlas derivative-support receipt."),
+      artifactRef("shared/contracts/nhm2-regional-support-derivative-receipt.v1.ts", "nhm2-regional-support-derivative-receipt-contract", "Support-function partial derivative receipt consumed by the atlas generator."),
       artifactRef("shared/contracts/nhm2-tile-counterpart-conservation.v1.ts", "nhm2-tile-counterpart-conservation-contract", "Conservation consumer contract."),
     ],
     hintKeys: {
@@ -1002,6 +1003,7 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       unitSignatures: ["L^-1", "M L^-1 T^-2"],
       repoPaths: [
         "shared/contracts/nhm2-regional-support-function-atlas.v1.ts",
+        "shared/contracts/nhm2-regional-support-derivative-receipt.v1.ts",
         "shared/contracts/nhm2-tile-counterpart-conservation.v1.ts",
       ],
       equationFamilies: ["regional_support_function_atlas", "covariant_conservation"],
