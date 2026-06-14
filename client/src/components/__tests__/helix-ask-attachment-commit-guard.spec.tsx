@@ -43,8 +43,16 @@ describe("Helix Ask attachment commit guard", () => {
     expect(source).toContain("attachmentContextPackForTurn");
     expect(source).toContain("attachment_context_pack");
     expect(source).toContain("pasted-text-");
-    expect(source).toContain('type: "attachment" as const');
-    expect(source).toContain('raw_content_scope: "turn_input_only" as const');
+    expect(source).toContain("buildHelixAskTextAttachmentTurnInputItem");
+    expect(source).toContain('type: "attachment"');
+    expect(source).toContain('raw_content_scope: "turn_input_only"');
+    expect(source).toContain("promotedPastedTextTurnInputItems");
+    expect(source).toContain("turnInputItems: promotedPastedTextTurnInputItems");
+    expect(source).toContain("explicitTurnInputItemsForTurn");
+    expect(source).toContain("latestPastedTextAttachmentRef");
+    expect(source).toContain("hasSubmittedTextAttachment");
+    expect(source).toContain("Use the attached pasted text.");
+    expect(source).toContain("The pasted text attachment is not available for this turn.");
   });
 
   it("keeps pasted text attachment prompts out of the visual-input classifier", () => {

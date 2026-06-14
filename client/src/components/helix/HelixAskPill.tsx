@@ -5860,6 +5860,7 @@ type RunAskOptions = {
   visualEvidence?: Record<string, unknown>;
   imageAttachment?: HelixAskImageAttachment;
   attachments?: HelixAskAttachment[];
+  turnInputItems?: HelixTurnInputItem[];
   imageAttachmentLensRun?: ImageAttachmentLensRunV1 | null;
 };
 
@@ -6096,6 +6097,23 @@ async function buildHelixAskTextAttachmentFromText(text: string): Promise<HelixA
     preview: text.trim().slice(0, HELIX_ASK_TEXT_ATTACHMENT_PREVIEW_CHARS),
     status: "ready",
     error: null,
+  };
+}
+
+function buildHelixAskTextAttachmentTurnInputItem(attachment: HelixAskTextAttachment): HelixTurnInputItem {
+  return {
+    type: "attachment",
+    attachment_id: attachment.id,
+    attachment_kind: "text",
+    mime_type: attachment.mimeType,
+    file_name: attachment.fileName,
+    size_bytes: attachment.sizeBytes,
+    content_base64: attachment.contentBase64,
+    content_sha256: attachment.contentSha256,
+    preview: attachment.preview,
+    raw_content_included: true,
+    raw_content_scope: "turn_input_only",
+    assistant_answer: false,
   };
 }
 
@@ -17994,6 +18012,7 @@ export function HelixAskPill({
   useEffect(() => {
     askAttachmentsRef.current = askAttachments;
   }, [askAttachments]);
+  const latestPastedTextAttachmentRef = useRef<HelixAskTextAttachment | null>(null);
   const clearAskAttachments = useCallback(() => {
     setAskAttachments((current) => {
       for (const attachment of current) {
@@ -18004,6 +18023,7 @@ export function HelixAskPill({
       return [];
     });
     askAttachmentsRef.current = [];
+    latestPastedTextAttachmentRef.current = null;
     if (askImageInputRef.current) {
       askImageInputRef.current.value = "";
     }
@@ -18016,6 +18036,9 @@ export function HelixAskPill({
       }
       const next = current.filter((attachment) => attachment.id !== attachmentId);
       askAttachmentsRef.current = next;
+      if (latestPastedTextAttachmentRef.current?.id === attachmentId) {
+        latestPastedTextAttachmentRef.current = null;
+      }
       return next;
     });
   }, []);
@@ -18081,6 +18104,7 @@ export function HelixAskPill({
       return false;
     }
     const attachment = await buildHelixAskTextAttachmentFromText(text);
+    latestPastedTextAttachmentRef.current = attachment;
     setAskAttachments((current) => {
       const next = [...current, attachment].slice(0, HELIX_ASK_MAX_ATTACHMENTS);
       askAttachmentsRef.current = next;
@@ -31687,22 +31711,9 @@ export function HelixAskPill({
           }
           return items;
         }
-        return [{
-          type: "attachment" as const,
-          attachment_id: attachment.id,
-          attachment_kind: "text" as const,
-          mime_type: attachment.mimeType,
-          file_name: attachment.fileName,
-          size_bytes: attachment.sizeBytes,
-          content_base64: attachment.contentBase64,
-          content_sha256: attachment.contentSha256,
-          preview: attachment.preview,
-          raw_content_included: true,
-          raw_content_scope: "turn_input_only" as const,
-          assistant_answer: false as const,
-        }];
+        return [buildHelixAskTextAttachmentTurnInputItem(attachment)];
       });
-      const turnInputItemsForTurn: HelixTurnInputItem[] = [
+      const inferredTurnInputItemsForTurn: HelixTurnInputItem[] = [
         { type: "text", text: trimmed, source: "user" },
         ...typedAttachmentItems,
         ...(visualEvidenceId
@@ -31728,6 +31739,12 @@ export function HelixAskPill({
             }]
           : []),
       ];
+      const explicitTurnInputItemsForTurn =
+        Array.isArray(options?.turnInputItems) && options.turnInputItems.length > 0
+          ? options.turnInputItems
+          : null;
+      const turnInputItemsForTurn: HelixTurnInputItem[] =
+        explicitTurnInputItemsForTurn ?? inferredTurnInputItemsForTurn;
       const runAskTurnId = pendingWorkstationUserInputRef.current?.turn_id ?? `ask:${crypto.randomUUID()}`;
       let imageAttachmentLensRunForTurn = options?.imageAttachmentLensRun ?? null;
       const firstNativeImageAttachment = nativeImageAttachments.find(
@@ -34075,6 +34092,35 @@ export function HelixAskPill({
         });
       }
       let submittedAttachments = [...askAttachmentsRef.current];
+      let promotedPastedTextTurnInputItems: HelixTurnInputItem[] | null = null;
+      const hasSubmittedTextAttachment = submittedAttachments.some((attachment) => attachment.kind === "text");
+      const latestPastedTextAttachment = latestPastedTextAttachmentRef.current;
+      if (
+        !hasSubmittedTextAttachment &&
+        latestPastedTextAttachment?.status === "ready" &&
+        /^use the attached pasted text\.?$/i.test(first.trim())
+      ) {
+        submittedAttachments = [...submittedAttachments, latestPastedTextAttachment].slice(0, HELIX_ASK_MAX_ATTACHMENTS);
+        askAttachmentsRef.current = submittedAttachments;
+        setAskAttachments(submittedAttachments);
+        promotedPastedTextTurnInputItems = [
+          { type: "text", text: "Use the attached pasted text.", source: "user" },
+          buildHelixAskTextAttachmentTurnInputItem(latestPastedTextAttachment),
+        ];
+      }
+      if (
+        submittedAttachments.every((attachment) => attachment.kind !== "text") &&
+        /^use the attached pasted text\.?$/i.test(first.trim())
+      ) {
+        setAskError("The pasted text attachment is not available for this turn. Paste the text again and resend.");
+        setAskStatus(null);
+        if (askInputRef.current) {
+          askInputRef.current.value = "";
+          resizeTextarea();
+        }
+        askDraftRef.current = "";
+        return;
+      }
       const firstLooksLikeLargePastedText =
         first.length >= HELIX_ASK_LARGE_PASTE_THRESHOLD_CHARS &&
         submittedAttachments.every((attachment) => attachment.kind !== "text");
@@ -34105,6 +34151,10 @@ export function HelixAskPill({
         askAttachmentsRef.current = submittedAttachments;
         setAskAttachments(submittedAttachments);
         first = "Use the attached pasted text.";
+        promotedPastedTextTurnInputItems = [
+          { type: "text", text: "Use the attached pasted text.", source: "user" },
+          buildHelixAskTextAttachmentTurnInputItem(textAttachment),
+        ];
         setAskError(null);
       }
       const submittedAttachmentChecks = submittedAttachments.map((attachment) => ({
@@ -34241,7 +34291,12 @@ export function HelixAskPill({
         clearAskAttachments();
       }
       const runOptions: RunAskOptions | undefined = submittedAttachments.length > 0
-        ? { attachments: submittedAttachments }
+        ? {
+            attachments: submittedAttachments,
+            ...(promotedPastedTextTurnInputItems
+              ? { turnInputItems: promotedPastedTextTurnInputItems }
+              : {}),
+          }
         : expectsVisualInput && submittedVisualEvidence && !isDiagnosticVisualEvidence(submittedVisualEvidence)
           ? { visualEvidence: submittedVisualEvidence }
           : submittedVisualCapability
