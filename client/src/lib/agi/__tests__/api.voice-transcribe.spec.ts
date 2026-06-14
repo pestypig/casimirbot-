@@ -244,6 +244,58 @@ describe("askLocal capsule ids", () => {
     expect(payload.capsuleIds).toEqual(capsuleIds.slice(0, 12));
   });
 
+  it("routes typed turn input items through the Ask turn endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          ok: true,
+          text: "ok",
+          selected_final_answer: "ok",
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await askLocal(undefined, {
+      question: "Use the attached pasted text.",
+      turnInputItems: [
+        { type: "text", text: "Use the attached pasted text.", source: "user" },
+        {
+          type: "attachment",
+          attachment_id: "attachment:test",
+          attachment_kind: "text",
+          mime_type: "text/plain",
+          file_name: "pasted-text-test.txt",
+          size_bytes: 42,
+          content_base64: "cGF5bG9hZA==",
+          content_sha256: "hash-test",
+          preview: "payload",
+          raw_content_included: true,
+          raw_content_scope: "turn_input_only",
+          assistant_answer: false,
+        },
+      ],
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/agi/ask/turn");
+    const createRequest = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const payload = JSON.parse(String(createRequest.body)) as {
+      turn_input_items?: Array<Record<string, unknown>>;
+    };
+    expect(payload.turn_input_items).toHaveLength(2);
+    expect(payload.turn_input_items?.[1]).toMatchObject({
+      type: "attachment",
+      attachment_kind: "text",
+      content_sha256: "hash-test",
+      raw_content_scope: "turn_input_only",
+    });
+  });
+
   it("preserves full prompts when they contain a Question header", async () => {
     const fetchMock = vi
       .fn()

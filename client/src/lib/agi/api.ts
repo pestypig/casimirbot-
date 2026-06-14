@@ -2185,7 +2185,8 @@ const askLocalDirect = async (
   body: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<LocalAskResponse> => {
-  const endpoint = isHelixE814LaneParityEnabled() ? "/api/agi/ask/turn" : "/api/agi/ask";
+  const hasTurnInputItems = Array.isArray(body.turn_input_items) && body.turn_input_items.length > 0;
+  const endpoint = isHelixE814LaneParityEnabled() || hasTurnInputItems ? "/api/agi/ask/turn" : "/api/agi/ask";
   const payload = await asJson<unknown>(
     await fetch(endpoint, {
       method: "POST",
@@ -2413,6 +2414,7 @@ export async function askLocal(
     answerContract?: HelixAskAnswerContract;
     routeMetadata?: HelixAskRouteMetadata;
     route_metadata?: HelixAskRouteMetadata;
+    turnInputItems?: HelixTurnInputItem[];
     verify?: { mode?: "constraint-pack" | "agent-loop"; packId?: string };
     place?: HaloBankPlace;
     timestamp?: string | number;
@@ -2511,6 +2513,9 @@ export async function askLocal(
   if (options?.allowTools?.length) body.allowTools = options.allowTools;
   if (options?.requiredEvidence?.length) body.requiredEvidence = options.requiredEvidence;
   if (options?.answerContract) body.answer_contract = options.answerContract;
+  if (Array.isArray(options?.turnInputItems) && options.turnInputItems.length > 0) {
+    body.turn_input_items = options.turnInputItems;
+  }
   appendHelixAskRouteMetadataToBody(body, options?.routeMetadata ?? options?.route_metadata);
   if (options?.verify) body.verify = options.verify;
   if (options?.place) body.place = options.place;
@@ -2525,6 +2530,13 @@ export async function askLocal(
     body.dialogue_profile = options.dialogue_profile;
   }
   const signal = options?.signal;
+  const hasTurnInputItems = Array.isArray(body.turn_input_items) && body.turn_input_items.length > 0;
+  if (hasTurnInputItems) {
+    if (isNavigatorOffline()) {
+      await waitForOnline(signal);
+    }
+    return await askLocalDirect(body, signal);
+  }
   if (isHelixE814LaneParityEnabled()) {
     if (isNavigatorOffline()) {
       await waitForOnline(signal);

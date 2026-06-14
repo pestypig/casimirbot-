@@ -4,6 +4,7 @@ import {
   type HelixContextFidelityMeter,
   type HelixRollingSessionCompactionMode,
 } from "../../../shared/helix-rolling-session-context";
+import type { HelixTurnAttachmentArtifact } from "../../../shared/helix-multimodal-turn-context";
 import type { HelixConversationMemoryPacket } from "../../../shared/helix-conversation-memory-packet";
 import { resolveLocalContextTokens } from "../llm/local-runtime";
 import { buildHelixThreadState } from "../helix-thread/reducer";
@@ -14,6 +15,7 @@ export type BuildHelixRollingSessionContextPacketInput = {
   currentTurnId: string;
   sessionId?: string | null;
   promptText: string;
+  attachmentArtifacts?: HelixTurnAttachmentArtifact[] | null;
   conversationMemoryPacket?: HelixConversationMemoryPacket | null;
   modelContextWindowTokens?: number | null;
   maxRetainedTurns?: number;
@@ -172,10 +174,15 @@ const emptyPacket = (args: {
   currentTurnId: string;
   sessionId?: string | null;
   promptText: string;
+  attachmentArtifacts?: HelixTurnAttachmentArtifact[] | null;
   modelContextWindowTokens: number;
   reason: string;
 }): HelixRollingSessionContextPacket => {
   const promptTokens = estimateTokens(args.promptText);
+  const attachmentTokens = (args.attachmentArtifacts ?? []).reduce(
+    (sum, artifact) => sum + Math.max(0, artifact.estimated_tokens ?? 0),
+    0,
+  );
   const autoLimit = Math.floor(args.modelContextWindowTokens * autoCompactRatio());
   const packet: HelixRollingSessionContextPacket = {
     schema: HELIX_ROLLING_SESSION_CONTEXT_PACKET_SCHEMA,
@@ -192,7 +199,8 @@ const emptyPacket = (args: {
       retained_turns: 0,
       compacted_summary: 0,
       conversation_memory_packet: 0,
-      active_context_total: promptTokens,
+      current_turn_attachments: attachmentTokens,
+      active_context_total: promptTokens + attachmentTokens,
     },
     compaction_mode: "none",
     compaction_reason: args.reason,
@@ -200,14 +208,14 @@ const emptyPacket = (args: {
     context_fidelity_meter: buildContextFidelityMeter({
       contextWindow: args.modelContextWindowTokens,
       autoCompactTokenLimit: autoLimit,
-      activeContextTotal: promptTokens,
+      activeContextTotal: promptTokens + attachmentTokens,
       compactionMode: "none",
       retainedTurnIds: [],
       compactedTurnIds: [],
       pendingUserInputsCount: 0,
       unresolvedTaskFramesCount: 0,
       modelVisibleContextIncluded: false,
-      modelVisibleContextTokenEstimate: promptTokens,
+      modelVisibleContextTokenEstimate: promptTokens + attachmentTokens,
       reason: args.reason,
     }),
     retained_turn_ids: [],
@@ -242,6 +250,7 @@ export function buildHelixRollingSessionContextPacket(
       currentTurnId,
       sessionId,
       promptText: input.promptText,
+      attachmentArtifacts: input.attachmentArtifacts,
       modelContextWindowTokens: contextWindow,
       reason: "No active thread is available for rolling session context.",
     });
@@ -254,6 +263,11 @@ export function buildHelixRollingSessionContextPacket(
     .sort((a, b) => a.last_seq - b.last_seq);
 
   const promptTokens = estimateTokens(input.promptText);
+  const attachmentArtifacts = input.attachmentArtifacts ?? [];
+  const attachmentTokens = attachmentArtifacts.reduce(
+    (sum, artifact) => sum + Math.max(0, artifact.estimated_tokens ?? 0),
+    0,
+  );
   const memoryTokens = input.conversationMemoryPacket ? estimateTokens(input.conversationMemoryPacket) : 0;
   const priorTokens = priorTurns.reduce((sum, turn) => sum + estimateTokens(turnText(turn)), 0);
   const retainedTurns = priorTurns.slice(-maxRetainedTurns(input.maxRetainedTurns));
@@ -262,7 +276,7 @@ export function buildHelixRollingSessionContextPacket(
   const compactedSummary = summarizeTurns(compactedTurns, summaryLimit());
   const retainedTokens = estimateTokens(retainedSummary);
   const compactedTokens = estimateTokens(compactedSummary);
-  const activeContextTotal = promptTokens + memoryTokens + retainedTokens + compactedTokens;
+  const activeContextTotal = promptTokens + attachmentTokens + memoryTokens + retainedTokens + compactedTokens;
   const autoLimit = Math.max(1, Math.floor(contextWindow * autoCompactRatio()));
   const fullLimitReached = activeContextTotal >= contextWindow;
   const compactionMode: HelixRollingSessionCompactionMode =
@@ -279,6 +293,9 @@ export function buildHelixRollingSessionContextPacket(
         : "Rolling context fits current compact packet limits.";
   const modelVisibleSummary = clip(
     [
+      attachmentArtifacts.length > 0
+        ? `Current turn pasted-text attachments:\n${attachmentArtifacts.map((artifact) => artifact.model_visible_summary).join("\n\n")}`
+        : "",
       compactedSummary ? `Compacted prior turns:\n${compactedSummary}` : "",
       retainedSummary ? `Retained recent turns:\n${retainedSummary}` : "",
       input.conversationMemoryPacket?.continuity_summary
@@ -287,7 +304,7 @@ export function buildHelixRollingSessionContextPacket(
     ].filter(Boolean).join("\n\n"),
     summaryLimit() * 2,
   );
-  const modelVisibleContextTokens = estimateTokens(modelVisibleSummary) + memoryTokens + promptTokens;
+  const modelVisibleContextTokens = estimateTokens(modelVisibleSummary) + memoryTokens + promptTokens + attachmentTokens;
   const contextFidelityMeter = buildContextFidelityMeter({
     contextWindow,
     autoCompactTokenLimit: autoLimit,
@@ -317,6 +334,7 @@ export function buildHelixRollingSessionContextPacket(
       retained_turns: retainedTokens,
       compacted_summary: compactedTokens,
       conversation_memory_packet: memoryTokens,
+      current_turn_attachments: attachmentTokens,
       active_context_total: activeContextTotal,
     },
     compaction_mode: compactionMode,

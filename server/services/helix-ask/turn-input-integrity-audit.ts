@@ -11,6 +11,7 @@ export type HelixTurnInputIntegrityAuditViolationKind =
   | "invalid_raw_image_scope"
   | "missing_evidence_ref"
   | "missing_attachment_ref"
+  | "missing_pasted_text_attachment"
   | "invalid_raw_content_scope";
 
 export type HelixTurnInputIntegrityAudit = {
@@ -35,6 +36,9 @@ const ATTACHED_VISUAL_PATTERN =
 
 const COMMITTED_VISUAL_REFERENCE_PATTERN =
   /\b(?:this|that|the)\s+(?:image|screenshot|picture|photo|frame)\b/i;
+
+const ATTACHED_PASTED_TEXT_PATTERN =
+  /\b(?:attached|uploaded|included)\b[\s\S]{0,80}\b(?:pasted\s+text|paste|text\s+attachment|attached\s+text|file)\b|\b(?:pasted\s+text|paste|text\s+attachment|attached\s+text)\b[\s\S]{0,80}\b(?:attached|uploaded|included)\b/i;
 
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
@@ -62,6 +66,9 @@ export function auditHelixTurnInputIntegrity(input: {
   const imageInputCount = items.filter((item) => item.type === "image").length;
   const attachmentInputCount = items.filter((item) => item.type === "attachment").length;
   const evidenceRefCount = items.filter((item) => item.type === "evidence_ref").length;
+  const attachmentArtifacts = Array.isArray(input.context.attachment_artifacts)
+    ? input.context.attachment_artifacts
+    : [];
 
   const hasValidVisualInput = items.some((item) => {
     if (item.type === "image") {
@@ -86,6 +93,19 @@ export function auditHelixTurnInputIntegrity(input: {
     violations.push({
       kind: "visual_prompt_without_visual_input",
       summary: "The prompt refers to a committed visual input, but the turn has no valid image or visual evidence item.",
+    });
+  }
+  if (
+    ATTACHED_PASTED_TEXT_PATTERN.test(input.userText) &&
+    !attachmentArtifacts.some((artifact) =>
+      artifact.body_available === true &&
+      ["text", "json", "code"].includes(artifact.attachment_kind) &&
+      Boolean(readString(artifact.artifact_id))
+    )
+  ) {
+    violations.push({
+      kind: "missing_pasted_text_attachment",
+      summary: "The prompt refers to an attached pasted-text artifact, but the turn has no retrievable pasted-text attachment body.",
     });
   }
 
@@ -121,6 +141,17 @@ export function auditHelixTurnInputIntegrity(input: {
         violations.push({
           kind: "missing_attachment_ref",
           summary: "An attachment turn input item was present without an attachment_id.",
+        });
+      }
+      if (
+        (readString(item.attachment_kind) === "text" || /^text\//i.test(readString(item.mime_type) ?? "")) &&
+        item.raw_content_included === true &&
+        !readString(item.artifact_id) &&
+        !readString(item.content_base64)
+      ) {
+        violations.push({
+          kind: "missing_pasted_text_attachment",
+          summary: "A text attachment turn input item did not include a retrievable artifact reference or raw turn-scoped body.",
         });
       }
       if (item.raw_content_included === true && item.raw_content_scope !== "turn_input_only") {

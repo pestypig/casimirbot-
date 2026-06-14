@@ -5908,6 +5908,8 @@ const HELIX_ASK_TEXT_ATTACHMENT_PREVIEW_CHARS = 1200;
 
 const HELIX_ASK_VISUAL_SURFACE_PROMPT_PATTERN =
   /\b(?:image|screenshot|screen\s*share|screen\s*sharing|screen|display|window|tab|picture|photo|attached|visual|visible|from this|from the image|hotbar|inventory|chest|container)\b/i;
+const HELIX_ASK_TEXT_ATTACHMENT_PROMPT_PATTERN =
+  /\b(?:attached|pasted|uploaded)\s+text\b|\btext\s+attachment\b|\bpasted\s+text\s+attachment\b/i;
 const HELIX_ASK_AMBIGUOUS_LIVE_CONTEXT_PROMPT_PATTERN = /\blive\s+(?:source|answer)\b/i;
 const HELIX_ASK_WORKSTATION_LIVE_CONTEXT_PROMPT_PATTERN =
   /\b(?:(?:scientific\s+)?calculator|equation|prime|computation|workstation)\b[\s\S]{0,80}\blive\s+(?:source|stream|answer)\b|\blive\s+(?:source|stream|answer)\b[\s\S]{0,80}\b(?:(?:scientific\s+)?calculator|equation|prime|computation|workstation)\b/i;
@@ -5915,6 +5917,7 @@ const HELIX_ASK_WORKSTATION_LIVE_CONTEXT_PROMPT_PATTERN =
 const isHelixAskVisualPrompt = (value: string): boolean => {
   const normalized = value.trim();
   if (!normalized) return false;
+  if (HELIX_ASK_TEXT_ATTACHMENT_PROMPT_PATTERN.test(normalized)) return false;
   if (HELIX_ASK_VISUAL_SURFACE_PROMPT_PATTERN.test(normalized)) return true;
   if (!HELIX_ASK_AMBIGUOUS_LIVE_CONTEXT_PROMPT_PATTERN.test(normalized)) return false;
   return !HELIX_ASK_WORKSTATION_LIVE_CONTEXT_PROMPT_PATTERN.test(normalized);
@@ -6076,6 +6079,24 @@ async function sha256TextHex(value: string): Promise<string> {
   return Array.from(new Uint8Array(digest))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
+}
+
+async function buildHelixAskTextAttachmentFromText(text: string): Promise<HelixAskTextAttachment> {
+  const encoded = new TextEncoder().encode(text);
+  const now = new Date();
+  const stamp = now.toISOString().replace(/[:.]/g, "-");
+  return {
+    kind: "text",
+    id: crypto.randomUUID(),
+    fileName: `pasted-text-${stamp}.txt`,
+    mimeType: "text/plain",
+    sizeBytes: encoded.byteLength,
+    contentBase64: base64FromText(text),
+    contentSha256: await sha256TextHex(text),
+    preview: text.trim().slice(0, HELIX_ASK_TEXT_ATTACHMENT_PREVIEW_CHARS),
+    status: "ready",
+    error: null,
+  };
 }
 
 function isMultilangConfidenceGateResponse(response: AskLocalResult): boolean {
@@ -18059,20 +18080,7 @@ export function HelixAskPill({
       setAskError(`Helix Ask supports up to ${HELIX_ASK_MAX_ATTACHMENTS} attachments for one turn.`);
       return false;
     }
-    const now = new Date();
-    const stamp = now.toISOString().replace(/[:.]/g, "-");
-    const attachment: HelixAskTextAttachment = {
-      kind: "text",
-      id: crypto.randomUUID(),
-      fileName: `pasted-text-${stamp}.txt`,
-      mimeType: "text/plain",
-      sizeBytes: encoded.byteLength,
-      contentBase64: base64FromText(text),
-      contentSha256: await sha256TextHex(text),
-      preview: text.trim().slice(0, HELIX_ASK_TEXT_ATTACHMENT_PREVIEW_CHARS),
-      status: "ready",
-      error: null,
-    };
+    const attachment = await buildHelixAskTextAttachmentFromText(text);
     setAskAttachments((current) => {
       const next = [...current, attachment].slice(0, HELIX_ASK_MAX_ATTACHMENTS);
       askAttachmentsRef.current = next;
@@ -34058,7 +34066,7 @@ export function HelixAskPill({
         return;
       }
       const [firstRaw, ...restRaw] = normalizedEntries;
-      const first = firstRaw?.trim() || normalizedEntries[0] || entries[0];
+      let first = firstRaw?.trim() || normalizedEntries[0] || entries[0];
       const rest = restRaw.map((entry) => entry.trim()).filter(Boolean);
       if (rest.length > 0) {
         setAskQueue((prev) => {
@@ -34066,7 +34074,39 @@ export function HelixAskPill({
           return combined.slice(0, HELIX_ASK_QUEUE_LIMIT);
         });
       }
-      const submittedAttachments = [...askAttachmentsRef.current];
+      let submittedAttachments = [...askAttachmentsRef.current];
+      const firstLooksLikeLargePastedText =
+        first.length >= HELIX_ASK_LARGE_PASTE_THRESHOLD_CHARS &&
+        submittedAttachments.every((attachment) => attachment.kind !== "text");
+      if (firstLooksLikeLargePastedText) {
+        const encoded = new TextEncoder().encode(first);
+        if (encoded.byteLength > HELIX_ASK_TEXT_ATTACHMENT_MAX_BYTES) {
+          setAskError("Pasted text attachments are limited to 128 KB for this Helix Ask path.");
+          setAskStatus(null);
+          if (askInputRef.current) {
+            askInputRef.current.value = first;
+            resizeTextarea();
+          }
+          askDraftRef.current = first;
+          return;
+        }
+        if (submittedAttachments.length >= HELIX_ASK_MAX_ATTACHMENTS) {
+          setAskError(`Helix Ask supports up to ${HELIX_ASK_MAX_ATTACHMENTS} attachments for one turn.`);
+          setAskStatus(null);
+          if (askInputRef.current) {
+            askInputRef.current.value = first;
+            resizeTextarea();
+          }
+          askDraftRef.current = first;
+          return;
+        }
+        const textAttachment = await buildHelixAskTextAttachmentFromText(first);
+        submittedAttachments = [...submittedAttachments, textAttachment].slice(0, HELIX_ASK_MAX_ATTACHMENTS);
+        askAttachmentsRef.current = submittedAttachments;
+        setAskAttachments(submittedAttachments);
+        first = "Use the attached pasted text.";
+        setAskError(null);
+      }
       const submittedAttachmentChecks = submittedAttachments.map((attachment) => ({
         attachment,
         check: validateHelixAskAttachmentForSubmit(attachment),

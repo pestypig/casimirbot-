@@ -143,6 +143,46 @@ describe("Helix Ask rolling session context packet", () => {
     expect(JSON.stringify(packet)).not.toContain("raw_content_included\":true");
   });
 
+  it("counts current-turn pasted text attachments toward compaction admission", () => {
+    const largePaste = "checkpoint sentinel ".repeat(1200);
+    const packet = buildHelixRollingSessionContextPacket({
+      threadId,
+      currentTurnId: "turn-large-paste",
+      sessionId,
+      promptText: "Use the attached pasted text.",
+      modelContextWindowTokens: 2048,
+      attachmentArtifacts: [
+        {
+          schema: "helix.pasted_text_attachment_artifact.v1",
+          artifact_id: "artifact:pasted-text:1",
+          attachment_id: "paste:1",
+          attachment_kind: "text",
+          mime_type: "text/plain",
+          file_name: "pasted-text.txt",
+          size_bytes: Buffer.byteLength(largePaste, "utf8"),
+          char_count: largePaste.length,
+          estimated_tokens: Math.ceil(largePaste.length / 4),
+          content_sha256: "hash",
+          preview: largePaste.slice(0, 120),
+          tail_preview: largePaste.slice(-120),
+          body_ref: "helix-turn-attachment://artifact:pasted-text:1",
+          body_available: true,
+          model_visible_summary: `Pasted text attachment\nhead_preview=${largePaste.slice(0, 120)}\ntail_preview=${largePaste.slice(-120)}`,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      ],
+    });
+
+    expect(packet.estimated_tokens.current_turn_attachments).toBeGreaterThan(0);
+    expect(packet.estimated_tokens.active_context_total).toBeGreaterThan(packet.model_context_window_tokens);
+    expect(packet.compaction_mode).toBe("required");
+    expect(packet.context_fidelity_meter.handoff_state.state).toBe("pause_required");
+    expect(packet.model_visible_summary).toContain("Current turn pasted-text attachments");
+    expect(packet.model_visible_summary).toContain("tail_preview=");
+  });
+
   it("returns a blocked empty packet without an active thread", () => {
     const packet = buildHelixRollingSessionContextPacket({
       threadId: "",

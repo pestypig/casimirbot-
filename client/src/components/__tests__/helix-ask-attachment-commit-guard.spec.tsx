@@ -37,11 +37,22 @@ describe("Helix Ask attachment commit guard", () => {
     expect(source).toContain("input.value = \"\"");
     expect(source).toContain("multiple");
     expect(source).toContain("handleAskPaste");
+    expect(source).toContain("firstLooksLikeLargePastedText");
+    expect(source).toContain("buildHelixAskTextAttachmentFromText(first)");
+    expect(source).toContain('first = "Use the attached pasted text."');
     expect(source).toContain("attachmentContextPackForTurn");
     expect(source).toContain("attachment_context_pack");
     expect(source).toContain("pasted-text-");
     expect(source).toContain('type: "attachment" as const');
     expect(source).toContain('raw_content_scope: "turn_input_only" as const');
+  });
+
+  it("keeps pasted text attachment prompts out of the visual-input classifier", () => {
+    const source = fs.readFileSync(sourcePath, "utf8");
+
+    expect(source).toContain("HELIX_ASK_TEXT_ATTACHMENT_PROMPT_PATTERN");
+    expect(source).toContain("HELIX_ASK_TEXT_ATTACHMENT_PROMPT_PATTERN.test(normalized)");
+    expect(source).toContain("return false;");
   });
 
   it("preserves server-authoritative proof recall and workstation terminals over evidence-gate fallback text", () => {

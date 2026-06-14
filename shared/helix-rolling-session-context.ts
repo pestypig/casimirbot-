@@ -62,6 +62,7 @@ export type HelixRollingSessionContextPacket = {
     retained_turns: number;
     compacted_summary: number;
     conversation_memory_packet: number;
+    current_turn_attachments?: number;
     active_context_total: number;
   };
 

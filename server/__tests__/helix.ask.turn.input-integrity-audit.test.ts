@@ -3,7 +3,10 @@ import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { planRouter } from "../routes/agi.plan";
 import { auditHelixTurnInputIntegrity } from "../services/helix-ask/turn-input-integrity-audit";
-import { normalizeHelixTurnInputItems } from "../services/helix-ask/turn-input-item-normalizer";
+import {
+  getHelixTurnAttachmentArtifactBody,
+  normalizeHelixTurnInputItems,
+} from "../services/helix-ask/turn-input-item-normalizer";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -172,7 +175,7 @@ describe("helix ask turn input integrity audit", () => {
     });
   });
 
-  it("normalizes text attachments as typed turn inputs without retaining raw content", () => {
+  it("normalizes text attachments as typed turn inputs with retrievable pasted-text artifacts", () => {
     const contentBase64 = Buffer.from("Large pasted text that should stay out of user prompt text.").toString("base64");
     const requestBody = {
       question: "Use the attached pasted text.",
@@ -203,6 +206,7 @@ describe("helix ask turn input integrity audit", () => {
         expect.objectContaining({
           type: "attachment",
           attachment_id: "paste:1",
+          artifact_id: expect.stringContaining("pasted_text_attachment"),
           attachment_kind: "text",
           file_name: "pasted-text.txt",
           raw_content_included: false,
@@ -210,6 +214,19 @@ describe("helix ask turn input integrity audit", () => {
           content_sha256: expect.any(String),
         }),
       ]),
+    );
+    expect(context.attachment_artifacts).toEqual([
+      expect.objectContaining({
+        schema: "helix.pasted_text_attachment_artifact.v1",
+        attachment_id: "paste:1",
+        body_available: true,
+        body_ref: expect.stringContaining("helix-turn-attachment://"),
+        model_visible_summary: expect.stringContaining("Large pasted text"),
+        raw_content_included: false,
+      }),
+    ]);
+    expect(getHelixTurnAttachmentArtifactBody(context.attachment_artifacts?.[0]?.artifact_id)).toBe(
+      "Large pasted text that should stay out of user prompt text.",
     );
     expect(JSON.stringify(context.turn_input_items)).not.toContain(contentBase64);
     expect(
@@ -219,6 +236,72 @@ describe("helix ask turn input integrity audit", () => {
         context,
       }),
     ).toEqual(expect.objectContaining({ ok: true, attachment_input_count: 1 }));
+  });
+
+  it("fails closed when a prompt references attached pasted text without a pasted-text artifact", async () => {
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "test:turn-input-integrity:missing-paste",
+        question: "Use the attached pasted text.",
+        debug: true,
+      })
+      .expect(200);
+
+    expect(response.body.route_reason_code).toBe("turn_input_integrity_failed");
+    expect(response.body.final_answer_source).toBe("typed_failure");
+    expect(response.body.answer).toContain("attached pasted text");
+    expect(response.body.turn_input_integrity_audit.violations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "missing_pasted_text_attachment" }),
+      ]),
+    );
+  });
+
+  it("returns context compaction pause for oversized pasted-text attachments before direct answer", async () => {
+    const largePaste = [
+      "This is a large pasted-text checkpoint body.",
+      "The sentinel instruction is at the end.",
+      "filler ".repeat(12000),
+      "SENTINEL: resume after compaction and answer from this pasted text.",
+    ].join("\n");
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "test:turn-input-integrity:large-paste-pause",
+        turnId: "turn-large-paste-pause",
+        question: "Use the attached pasted text.",
+        debug: true,
+        turn_input_items: [
+          { type: "text", text: "Use the attached pasted text.", source: "user" },
+          {
+            type: "attachment",
+            attachment_id: "paste:large",
+            attachment_kind: "text",
+            mime_type: "text/plain",
+            file_name: "large-pasted-text.txt",
+            size_bytes: Buffer.byteLength(largePaste, "utf8"),
+            content_base64: Buffer.from(largePaste, "utf8").toString("base64"),
+            preview: largePaste.slice(0, 300),
+            raw_content_included: true,
+            raw_content_scope: "turn_input_only",
+            assistant_answer: false,
+          },
+        ],
+      })
+      .expect(200);
+
+    expect(response.body.dispatch_policy).toBe("context_compaction_pause");
+    expect(response.body.pending_server_request?.kind).toBe("context_compaction_pause");
+    expect(response.body.pending_server_request?.resume_frame).toMatchObject({
+      schema: "helix.pasted_text_attachment_resume_frame.v1",
+      original_prompt: "Use the attached pasted text.",
+      attachment_artifact_refs: [expect.stringContaining("pasted_text_attachment")],
+    });
+    expect(response.body.rolling_session_context_packet?.estimated_tokens?.current_turn_attachments).toBeGreaterThan(0);
+    expect(response.body.context_fidelity_meter?.handoff_state?.state).toBe("pause_required");
+    expect(response.body.final_answer_source).toBe("pending_server_request");
+    expect(response.body.final_answer_source).not.toBe("model_direct_answer");
   });
 
   it("allows live visual tool requests to reach the agent loop without committed image input", () => {

@@ -17,6 +17,7 @@ export type HelixTurnInputItem =
   | {
       type: "attachment";
       attachment_id: string;
+      artifact_id?: string | null;
       attachment_kind: "text" | "json" | "code" | "pdf" | "audio" | "image" | "unknown";
       mime_type: string;
       file_name?: string | null;
