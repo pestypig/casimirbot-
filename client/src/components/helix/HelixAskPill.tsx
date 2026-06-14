@@ -5911,6 +5911,10 @@ const HELIX_ASK_VISUAL_SURFACE_PROMPT_PATTERN =
   /\b(?:image|screenshot|screen\s*share|screen\s*sharing|screen|display|window|tab|picture|photo|attached|visual|visible|from this|from the image|hotbar|inventory|chest|container)\b/i;
 const HELIX_ASK_TEXT_ATTACHMENT_PROMPT_PATTERN =
   /\b(?:attached|pasted|uploaded)\s+text\b|\btext\s+attachment\b|\bpasted\s+text\s+attachment\b/i;
+const HELIX_ASK_PASTED_TEXT_RESUME_RECALL_PROMPT_PATTERN =
+  /\b(?:pasted\s+text|attached\s+text|text\s+attachment|previous\s+paste|last\s+paste|paste\s+from\s+the\s+previous|text\s+from\s+the\s+previous|pasted\s+text\s+from\s+the\s+previous)\b/i;
+const HELIX_ASK_CONTEXT_RESUME_RECALL_OUTPUT_PATTERN =
+  /\b(?:sentinel|marker|exact\s+(?:line|text|phrase|wording)|marker\s+line|top\s+line|first\s+line|appears?\s+at\s+the\s+top|answer\s+only)\b/i;
 const HELIX_ASK_AMBIGUOUS_LIVE_CONTEXT_PROMPT_PATTERN = /\blive\s+(?:source|answer)\b/i;
 const HELIX_ASK_WORKSTATION_LIVE_CONTEXT_PROMPT_PATTERN =
   /\b(?:(?:scientific\s+)?calculator|equation|prime|computation|workstation)\b[\s\S]{0,80}\blive\s+(?:source|stream|answer)\b|\blive\s+(?:source|stream|answer)\b[\s\S]{0,80}\b(?:(?:scientific\s+)?calculator|equation|prime|computation|workstation)\b/i;
@@ -5923,6 +5927,47 @@ const isHelixAskVisualPrompt = (value: string): boolean => {
   if (!HELIX_ASK_AMBIGUOUS_LIVE_CONTEXT_PROMPT_PATTERN.test(normalized)) return false;
   return !HELIX_ASK_WORKSTATION_LIVE_CONTEXT_PROMPT_PATTERN.test(normalized);
 };
+
+const isHelixAskPastedTextResumeRecallPrompt = (value: string): boolean => {
+  const normalized = value.trim();
+  if (!normalized) return false;
+  return (
+    HELIX_ASK_PASTED_TEXT_RESUME_RECALL_PROMPT_PATTERN.test(normalized) &&
+    HELIX_ASK_CONTEXT_RESUME_RECALL_OUTPUT_PATTERN.test(normalized)
+  );
+};
+
+function buildHelixAskPastedTextResumeRecallRouteMetadata(args: {
+  base?: HelixAskRouteMetadata;
+  turnId: string;
+  threadId: string;
+}): HelixAskRouteMetadata {
+  return {
+    ...(args.base ?? {}),
+    schema: "helix.ask.route_metadata.v1",
+    source: "conversation_memory_recall",
+    sourceTarget: "conversation_memory",
+    source_target_intent: {
+      schema: "helix.ask_source_target_intent.v1",
+      turn_id: args.turnId,
+      thread_id: args.threadId,
+      target_source: "conversation_memory",
+      target_kind: "conversation_memory",
+      strength: "hard",
+      explicit_cues: ["pasted_text_resume_recall"],
+      reasons: ["pasted_text_resume_recall_prompt"],
+      requested_outputs: ["conversation_memory_answer"],
+      suppressed_routes: ["conversation:simple", "model_only_concept", "workspace_diagnostic"],
+      precedence_reason: "pasted_text_resume_recall_selected",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+      confidence: 0.96,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+  };
+}
 
 const HELIX_ASK_REPO_CODE_EVIDENCE_PROMPT_PATTERN =
   /\b(?:repo(?:sitory)?|code|source\s+(?:file|path|tree)|file\s+paths?|line-backed|line\s+(?:number|numbers|source|sources)|cite\s+(?:exact\s+)?(?:file|path|source)|where\s+is\s+(?:that\s+)?(?:enforced|defined|declared|implemented|wired)|contract|schema|module|endpoint|route|symbol|export(?:s|ed)?|import(?:s|ed)?|requestedLaneSchema|server\/|client\/|shared\/|docs\/|[A-Za-z0-9_-]+\.(?:ts|tsx|js|jsx|md|json|py))\b/i;
@@ -31746,6 +31791,7 @@ export function HelixAskPill({
       const turnInputItemsForTurn: HelixTurnInputItem[] =
         explicitTurnInputItemsForTurn ?? inferredTurnInputItemsForTurn;
       const runAskTurnId = pendingWorkstationUserInputRef.current?.turn_id ?? `ask:${crypto.randomUUID()}`;
+      const backendOwnedPastedTextResumeRecall = isHelixAskPastedTextResumeRecallPrompt(trimmed);
       let imageAttachmentLensRunForTurn = options?.imageAttachmentLensRun ?? null;
       const firstNativeImageAttachment = nativeImageAttachments.find(
         (attachment) => validateHelixAskImageAttachmentForSubmit(attachment)?.can_submit,
@@ -31790,8 +31836,9 @@ export function HelixAskPill({
           };
         }
       }
-      const explicitPanelCommand = /^\s*\/open\b/i.test(trimmed);
-      const bypassWorkstationDispatch = options?.bypassWorkstationDispatch === true;
+      const explicitPanelCommand = !backendOwnedPastedTextResumeRecall && /^\s*\/open\b/i.test(trimmed);
+      const bypassWorkstationDispatch =
+        options?.bypassWorkstationDispatch === true || backendOwnedPastedTextResumeRecall;
       const suppressWorkstationPayloadActions = options?.suppressWorkstationPayloadActions === true;
       if (!bypassWorkstationDispatch) {
         cancelPendingWorkstationRequestForTurnTransition({
@@ -32324,6 +32371,13 @@ export function HelixAskPill({
       requestMoodHint(trimmed, { force: true });
       const sessionId = getHelixAskSessionId();
       const traceId = runAskTurnId;
+      const routeMetadataForTurn = backendOwnedPastedTextResumeRecall
+        ? buildHelixAskPastedTextResumeRecallRouteMetadata({
+            base: options?.routeMetadata,
+            turnId: runAskTurnId,
+            threadId: sessionId ?? runAskTurnId,
+          })
+        : options?.routeMetadata;
       resetHelixAskConsoleStreamIngressDebug({ turnId: runAskTurnId, traceId, startedAtMs });
       const voiceAutoSpeakArmedAtTurnStart = micArmStateRef.current === "on";
       const manualAttempt = manualDispatchHint
@@ -32547,7 +32601,7 @@ export function HelixAskPill({
               turnInputItems: turnInputItemsForTurn,
               capsuleIds: selectedCapsuleIds,
               answerContract: options?.answerContract,
-              routeMetadata: options?.routeMetadata,
+              routeMetadata: routeMetadataForTurn,
             };
             try {
               localResponse = await runAskTurnStream(askTurnPayload, (event) => {
@@ -32665,7 +32719,7 @@ export function HelixAskPill({
               turnInputItems: turnInputItemsForTurn,
               capsuleIds: selectedCapsuleIds,
               answerContract: options?.answerContract,
-              routeMetadata: options?.routeMetadata,
+              routeMetadata: routeMetadataForTurn,
             });
             localResponse = askResult.response;
             downgradedFromMode = askResult.downgradedFromMode;

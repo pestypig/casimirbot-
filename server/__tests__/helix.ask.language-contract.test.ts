@@ -16,7 +16,7 @@ describe("helix ask language contract", () => {
   it("detects simple Spanish typed prompts without forcing repo routing", () => {
     const contract = buildHelixAskLanguageContract({
       inputModality: "typed",
-      sourceText: "¿Puedes explicar la diferencia entre tiempo propio y tiempo coordenado?",
+      sourceText: "\u00bfPuedes explicar la diferencia entre tiempo propio y tiempo coordenado?",
       normalizeLanguageTag,
     });
 
@@ -29,6 +29,7 @@ describe("helix ask language contract", () => {
       code_mixed: false,
       translated: false,
     });
+    expect(contract.source_language).toBe("es");
     expect(contract.language_confidence).not.toBeNull();
     expect(contract.reason_codes).toContain("spanish_language_cues");
   });
@@ -37,13 +38,14 @@ describe("helix ask language contract", () => {
     const contract = buildHelixAskLanguageContract({
       inputModality: "typed",
       sourceText:
-        "Explain Helix Ask final answer language, pero responde en español y usa evidencia del código.",
+        "Explain Helix Ask final answer language, pero responde en espa\u00f1ol y usa evidencia del c\u00f3digo.",
       normalizeLanguageTag,
     });
 
     expect(contract.dominant_language).toBe("mixed");
     expect(contract.response_language).toBe("es");
     expect(contract.requested_response_language).toBe("es");
+    expect(contract.source_language).toBe("mixed");
     expect(contract.code_mixed).toBe(true);
     expect(contract.explicit_language_instruction).toBe(true);
     expect(contract.reason_codes).toEqual(
@@ -59,13 +61,13 @@ describe("helix ask language contract", () => {
     const contract = buildHelixAskLanguageContract({
       inputModality: "typed",
       sourceText:
-        "Explain Helix Ask final answer 语言选择 using repo code evidence and cite file paths.",
+        "Explain Helix Ask final answer \u8bed\u8a00\u9009\u62e9 using repo code evidence and cite file paths.",
       normalizeLanguageTag,
     });
 
     expect(contract.dominant_language).toBe("mixed");
     expect(contract.response_language).toBe("en");
-    expect(contract.language_detected).toBe("zh");
+    expect(contract.language_detected).toBe("mixed");
     expect(contract.code_mixed).toBe(true);
   });
 
@@ -73,7 +75,7 @@ describe("helix ask language contract", () => {
     const contract = buildHelixAskLanguageContract({
       inputModality: "typed",
       sourceText:
-        "请在代码仓库中查找 Helix Ask 如何决定最终回答语言。请引用文件和行号作为证据。",
+        "\u8bf7\u5728\u4ee3\u7801\u4ed3\u5e93\u4e2d\u67e5\u627e Helix Ask \u5982\u4f55\u51b3\u5b9a\u6700\u7ec8\u56de\u7b54\u8bed\u8a00\u3002\u8bf7\u5f15\u7528\u6587\u4ef6\u548c\u884c\u53f7\u4f5c\u4e3a\u8bc1\u636e\u3002",
       normalizeLanguageTag,
     });
 

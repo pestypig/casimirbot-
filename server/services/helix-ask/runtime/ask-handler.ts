@@ -471,33 +471,35 @@ export const prepareHelixAskRouteRequest = async (args: {
     preferredResponseLanguage: requestData.preferredResponseLanguage ?? null,
     codeMixed: requestData.codeMixed,
     translated: requestData.translated,
+    pivotConfidence: requestData.pivotConfidence,
     normalizeLanguageTag: deps.normalizeLanguageTag,
   });
-  const shouldAttachLanguageContract =
-    languageContract.explicit_language_instruction ||
-    languageContract.code_mixed ||
-    languageContract.response_language !== "en" ||
-    (languageContract.language_detected !== null && languageContract.language_detected !== "en");
-  if (shouldAttachLanguageContract) {
-    requestData.language_contract = languageContract;
-    if (!requestData.sourceLanguage?.trim() && languageContract.language_detected) {
-      requestData.sourceLanguage = languageContract.language_detected;
-    }
-    if (!requestData.languageDetected?.trim() && languageContract.language_detected) {
-      requestData.languageDetected = languageContract.language_detected;
-    }
-    if (typeof requestData.languageConfidence !== "number" && typeof languageContract.language_confidence === "number") {
-      requestData.languageConfidence = languageContract.language_confidence;
-    }
-    if (requestData.codeMixed === undefined) {
-      requestData.codeMixed = languageContract.code_mixed;
-    }
-    if (!requestData.responseLanguage?.trim() && !requestData.preferredResponseLanguage?.trim()) {
-      requestData.preferredResponseLanguage = languageContract.response_language;
-    }
-    if (!requestData.lang_schema_version?.trim()) {
-      requestData.lang_schema_version = deps.langSchemaVersion;
-    }
+  requestData.language_contract = languageContract;
+  if (
+    !requestData.sourceLanguage?.trim() &&
+    languageContract.source_language !== "mixed" &&
+    languageContract.source_language !== "unknown"
+  ) {
+    requestData.sourceLanguage = languageContract.source_language;
+  }
+  if (
+    !requestData.languageDetected?.trim() &&
+    languageContract.language_detected !== "mixed" &&
+    languageContract.language_detected !== "unknown"
+  ) {
+    requestData.languageDetected = languageContract.language_detected;
+  }
+  if (typeof requestData.languageConfidence !== "number" && typeof languageContract.language_confidence === "number") {
+    requestData.languageConfidence = languageContract.language_confidence;
+  }
+  if (requestData.codeMixed === undefined) {
+    requestData.codeMixed = languageContract.code_mixed;
+  }
+  if (!requestData.responseLanguage?.trim() && !requestData.preferredResponseLanguage?.trim()) {
+    requestData.responseLanguage = languageContract.response_language;
+  }
+  if (!requestData.lang_schema_version?.trim()) {
+    requestData.lang_schema_version = deps.langSchemaVersion;
   }
   return {
     ok: true,

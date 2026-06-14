@@ -26,6 +26,14 @@ export type RepoEvidenceRelevanceGate = {
   expected_path_hints: string[];
   selected_paths: string[];
   missing_expected_path_hints: string[];
+  prompt_facet: {
+    schema: "helix.repo_evidence_prompt_facet.v1";
+    applies: boolean;
+    facet: "final_answer_language_debug_contract" | null;
+    required_terms: string[];
+    preferred_paths: string[];
+  };
+  selected_prompt_facet_paths: string[];
   coverage: "strong" | "adequate" | "weak" | "none";
   violations: Array<
     | "exact_match_files_found_but_not_selected"
@@ -35,6 +43,7 @@ export type RepoEvidenceRelevanceGate = {
     | "codebase_anchor_ignored"
     | "selected_evidence_missing_concept_terms"
     | "docs_only_for_codebase_question"
+    | "prompt_facet_evidence_missing"
     | "single_role_only"
     | "missing_required_evidence_roles"
   >;
@@ -106,6 +115,67 @@ const evidenceRoleForPath = (selectedPath: string): RepoConceptEvidenceRole | nu
 const rolesForSelectedPaths = (selectedPaths: string[]): RepoConceptEvidenceRole[] =>
   unique(selectedPaths.map(evidenceRoleForPath).filter((entry): entry is RepoConceptEvidenceRole => Boolean(entry)));
 
+const LANGUAGE_DEBUG_FACET_QUERY_RE =
+  /\b(?:final answer language|response language|language contract|language_detected|source_language|code_mixed|debug export|debug payload|includeMultilangMetadata)\b|(?:idioma final|contrato de idioma|lenguaje de respuesta|depuraci[o\u00f3]n|exportaci[o\u00f3]n)|(?:\u6700\u7ec8\u56de\u7b54\u8bed\u8a00|\u56de\u7b54\u8bed\u8a00|\u8bed\u8a00\u9009\u62e9|\u8bed\u8a00\u5951\u7ea6|\u8c03\u8bd5|\u5bfc\u51fa)/iu;
+
+const LANGUAGE_DEBUG_FACET_TERMS = [
+  "response_language",
+  "language_detected",
+  "source_language",
+  "code_mixed",
+  "translated",
+  "languageContract",
+  "language_contract",
+  "includeMultilangMetadata",
+  "applyHelixAskSuccessSurface",
+  "inferLanguageFromScript",
+  "resolveHelixAskResponseLanguage",
+  "debug export",
+  "final answer",
+  "ask-answer-surface",
+  "ask-handler",
+  "language-contract",
+];
+
+const LANGUAGE_DEBUG_FACET_PATHS = [
+  "server/services/helix-ask/runtime/ask-handler.ts",
+  "server/services/helix-ask/surface/ask-answer-surface.ts",
+  "server/services/helix-ask/language-contract.ts",
+  "server/routes/agi.plan.ts",
+  "server/routes/voice.ts",
+  "docs/architecture/voice-service-contract.md",
+];
+
+const detectPromptFacet = (query: string) => {
+  const applies = LANGUAGE_DEBUG_FACET_QUERY_RE.test(query);
+  return {
+    schema: "helix.repo_evidence_prompt_facet.v1" as const,
+    applies,
+    facet: applies ? "final_answer_language_debug_contract" as const : null,
+    required_terms: applies ? LANGUAGE_DEBUG_FACET_TERMS : [],
+    preferred_paths: applies ? LANGUAGE_DEBUG_FACET_PATHS : [],
+  };
+};
+
+const selectedSpanMatchesPromptFacet = (
+  span: HelixRepoCodeEvidenceObservation["spans"][number],
+  promptFacet: ReturnType<typeof detectPromptFacet>,
+): boolean => {
+  if (!promptFacet.applies) return true;
+  const normalizedPath = normalizePath(span.path);
+  if (promptFacet.preferred_paths.some((pathHint) => normalizedPath.endsWith(normalizePath(pathHint)))) {
+    return true;
+  }
+  const haystack = [
+    normalizedPath,
+    span.excerpt,
+    span.raw_excerpt,
+    span.sanitized_excerpt,
+    span.reason,
+  ].filter(Boolean).join("\n").toLowerCase();
+  return promptFacet.required_terms.some((term) => haystack.includes(term.toLowerCase()));
+};
+
 export function evaluateRepoEvidenceRelevanceGate(input: {
   turnId: string;
   concept: string;
@@ -118,6 +188,13 @@ export function evaluateRepoEvidenceRelevanceGate(input: {
   const aliasEntry = findRepoConceptAliasEntry([input.concept, input.query].join(" "));
   const normalizedAliases = repoConceptAliasTerms(aliasEntry);
   const selectedPaths = unique(input.observation.spans.map((span) => normalizePath(span.path)).filter(Boolean));
+  const promptFacet = detectPromptFacet(input.query);
+  const selectedPromptFacetPaths = unique(
+    input.observation.spans
+      .filter((span) => selectedSpanMatchesPromptFacet(span, promptFacet))
+      .map((span) => normalizePath(span.path))
+      .filter(Boolean),
+  );
   const expectedPathHints = aliasEntry?.exact_path_hints ?? [];
   const existingHints = expectedPathHints.filter((hint) => pathHintExists(repoRoot, hint));
   const exactMatchFilesFound = existingHints.length > 0;
@@ -156,6 +233,9 @@ export function evaluateRepoEvidenceRelevanceGate(input: {
   if (selectedDocsOnly && /\b(?:codebase|repo|repository|source|implementation|helix ask|this app)\b/i.test(input.query)) {
     violations.push("docs_only_for_codebase_question");
   }
+  if (promptFacet.applies && selectedPaths.length > 0 && selectedPromptFacetPaths.length === 0) {
+    violations.push("prompt_facet_evidence_missing");
+  }
   const sourceTargetExactContract =
     input.sourceTargetExactContract ??
     (input.observation.source_target_exact_contract as Record<string, unknown> | undefined) ??
@@ -189,6 +269,8 @@ export function evaluateRepoEvidenceRelevanceGate(input: {
     expected_path_hints: expectedPathHints,
     selected_paths: selectedPaths,
     missing_expected_path_hints: missingExpectedPathHints,
+    prompt_facet: promptFacet,
+    selected_prompt_facet_paths: selectedPromptFacetPaths,
     coverage,
     violations: unique(violations),
     repair_required: !terminalAllowed,

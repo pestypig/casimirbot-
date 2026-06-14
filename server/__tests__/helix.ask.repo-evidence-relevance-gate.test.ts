@@ -121,4 +121,46 @@ describe("repo evidence relevance gate", () => {
     expect(["adequate", "strong"]).toContain(gate.coverage);
     expect(gate.weak_fuzzy_only).toBe(false);
   });
+
+  it("rejects off-topic selected evidence for final-answer language debug prompts", () => {
+    const gate = evaluateRepoEvidenceRelevanceGate({
+      turnId: "turn:repo-relevance",
+      concept: "Helix Ask",
+      query:
+        "Busca en el repo como Helix Ask decide el idioma final. Usa evidencia del codigo y cita archivos y lineas.",
+      observation: observationWithPaths("Helix Ask", [
+        "server/services/helix-ask/__tests__/civilization-bounds-roadmap-tool.test.ts",
+        "server/services/helix-ask/__tests__/fruition-tool.test.ts",
+      ]),
+    });
+
+    expect(gate.prompt_facet).toMatchObject({
+      applies: true,
+      facet: "final_answer_language_debug_contract",
+    });
+    expect(gate.terminal_allowed).toBe(false);
+    expect(gate.violations).toContain("prompt_facet_evidence_missing");
+    expect(gate.selected_prompt_facet_paths).toEqual([]);
+  });
+
+  it("allows final-answer language debug prompts when selected evidence hits Ask language files", () => {
+    const gate = evaluateRepoEvidenceRelevanceGate({
+      turnId: "turn:repo-relevance",
+      concept: "Helix Ask",
+      query:
+        "Explain Helix Ask final answer language, but use repo code evidence and debug export sources.",
+      observation: observationWithPaths("Helix Ask", [
+        "server/services/helix-ask/runtime/ask-handler.ts",
+        "server/services/helix-ask/surface/ask-answer-surface.ts",
+      ]),
+    });
+
+    expect(gate.prompt_facet.applies).toBe(true);
+    expect(gate.terminal_allowed).toBe(true);
+    expect(gate.violations).not.toContain("prompt_facet_evidence_missing");
+    expect(gate.selected_prompt_facet_paths).toEqual(expect.arrayContaining([
+      "server/services/helix-ask/runtime/ask-handler.ts",
+      "server/services/helix-ask/surface/ask-answer-surface.ts",
+    ]));
+  });
 });

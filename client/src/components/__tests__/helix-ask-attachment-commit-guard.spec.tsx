@@ -63,6 +63,22 @@ describe("Helix Ask attachment commit guard", () => {
     expect(source).toContain("return false;");
   });
 
+  it("routes pasted-text resume recall through backend conversation memory instead of local shortcuts", () => {
+    const source = fs.readFileSync(sourcePath, "utf8");
+
+    expect(source).toContain("HELIX_ASK_PASTED_TEXT_RESUME_RECALL_PROMPT_PATTERN");
+    expect(source).toContain("isHelixAskPastedTextResumeRecallPrompt(trimmed)");
+    expect(source).toContain("backendOwnedPastedTextResumeRecall");
+    expect(source).toContain("buildHelixAskPastedTextResumeRecallRouteMetadata");
+    expect(source).toContain('source: "conversation_memory_recall"');
+    expect(source).toContain('target_source: "conversation_memory"');
+    expect(source).toContain('must_enter_backend_ask: true');
+    expect(source).toContain('allow_client_shortcut: false');
+    expect(source).toContain('suppressed_routes: ["conversation:simple", "model_only_concept", "workspace_diagnostic"]');
+    expect(source).toContain("options?.bypassWorkstationDispatch === true || backendOwnedPastedTextResumeRecall");
+    expect(source).toContain("routeMetadata: routeMetadataForTurn");
+  });
+
   it("preserves server-authoritative proof recall and workstation terminals over evidence-gate fallback text", () => {
     const source = fs.readFileSync(sourcePath, "utf8");
 

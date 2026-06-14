@@ -402,6 +402,57 @@ export const applyHelixAskSuccessSurface = (
     if (languageContract && typedDebug.language_contract === undefined) {
       typedDebug.language_contract = languageContract;
     }
+    if (typedDebug.response_language === undefined) {
+      typedDebug.response_language =
+        args.requestMetadata.response_language ??
+        languageContract?.response_language ??
+        null;
+    }
+    if (typedDebug.source_language === undefined) {
+      typedDebug.source_language =
+        args.requestMetadata.source_language ??
+        languageContract?.source_language ??
+        languageContract?.dominant_language ??
+        null;
+    }
+    if (typedDebug.language_detected === undefined) {
+      typedDebug.language_detected =
+        args.requestMetadata.language_detected ??
+        languageContract?.language_detected ??
+        null;
+    }
+    if (typedDebug.language_confidence === undefined) {
+      typedDebug.language_confidence =
+        typeof args.requestMetadata.language_confidence === "number"
+          ? args.requestMetadata.language_confidence
+          : typeof languageContract?.language_confidence === "number"
+            ? languageContract.language_confidence
+            : null;
+    }
+    if (typedDebug.code_mixed === undefined) {
+      typedDebug.code_mixed =
+        typeof args.requestMetadata.code_mixed === "boolean"
+          ? args.requestMetadata.code_mixed
+          : typeof languageContract?.code_mixed === "boolean"
+            ? languageContract.code_mixed
+            : null;
+    }
+    if (typedDebug.translated === undefined) {
+      typedDebug.translated =
+        typeof args.requestMetadata.translated === "boolean"
+          ? args.requestMetadata.translated
+          : typeof languageContract?.translated === "boolean"
+            ? languageContract.translated
+            : null;
+    }
+    if (typedDebug.pivot_confidence === undefined) {
+      typedDebug.pivot_confidence =
+        typeof args.requestMetadata.pivot_confidence === "number"
+          ? args.requestMetadata.pivot_confidence
+          : typeof languageContract?.pivot_confidence === "number"
+            ? languageContract.pivot_confidence
+            : null;
+    }
     typedDebug.multilang_rollout_stage = args.multilangRollout.stage;
     typedDebug.multilang_rollout_active = args.multilangRollout.active;
     typedDebug.multilang_rollout_shadow = args.multilangRollout.shadow;
