@@ -1022,7 +1022,7 @@ export function resolveHelixContextResumeFrameRecallText(input: {
   const asksForExactMarker =
     /\b(?:sentinel|marker|exact\s+line|marker\s+line|top\s+line|first\s+line)\b/.test(prompt);
   if (!asksForExactMarker) return null;
-  for (const frame of packet.context_resume_frames) {
+  for (const frame of [...packet.context_resume_frames].reverse()) {
     for (const preview of frame.attachment_previews) {
       const firstLine = normalizeText(preview.split(/\r?\n/).find((line: string) => line.trim()) ?? "");
       if (!firstLine) continue;

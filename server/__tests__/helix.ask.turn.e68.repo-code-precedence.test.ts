@@ -261,6 +261,96 @@ describe("helix ask repo/code intent precedence", () => {
     }
   }, 90000);
 
+  it("exports language contract fields in the debug export for simple Spanish turns", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "\u00bfPuedes explicar la diferencia entre tiempo propio y tiempo coordenado?",
+        mode: "read",
+        debug: true,
+        sessionId: `simple-spanish-debug-${Date.now()}`,
+      })
+      .expect(200);
+
+    const debugExport = await request(app)
+      .get(`/api/agi/ask/turn/${encodeURIComponent(String(response.body?.turn_id))}/debug-export`)
+      .expect(200);
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("model_only_concept");
+    expect(debugExport.body?.payload?.language_contract).toMatchObject({
+      schema: "helix.ask_language_contract.v1",
+      response_language: "es",
+    });
+    expect(debugExport.body?.payload?.response_language).toBe("es");
+    expect(debugExport.body?.payload?.language_detected).toBe("es");
+    expect(debugExport.body?.payload?.code_mixed).toBe(false);
+  }, 60000);
+
+  it("preserves Chinese response language through repo evidence synthesis and debug export", async () => {
+    const app = createApp();
+    const question =
+      "\u8bf7\u5728\u4ee3\u7801\u4ed3\u5e93\u4e2d\u67e5\u627e Helix Ask \u5982\u4f55\u51b3\u5b9a\u6700\u7ec8\u56de\u7b54\u8bed\u8a00\u3002\u8bf7\u5f15\u7528\u6587\u4ef6\u548c\u884c\u53f7\u4f5c\u4e3a\u8bc1\u636e\u3002";
+    const response = await withRepoSynthesisResponse(
+      "\u6839\u636e repo \u8bc1\u636e\uff0cHelix Ask \u4f1a\u5728\u8bf7\u6c42\u5165\u53e3\u521b\u5efa\u8bed\u8a00\u5951\u7ea6\uff0c\u5e76\u5728 repo \u8bc1\u636e\u7efc\u5408\u9636\u6bb5\u7ee7\u7eed\u4f7f\u7528 response_language\u3002Sources: server/services/helix-ask/language-contract.ts; server/routes/agi.plan.ts.",
+      () => request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question,
+          mode: "read",
+          debug: true,
+          sessionId: `chinese-language-repo-${Date.now()}`,
+        })
+        .expect(200),
+    );
+
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("repo_code_evidence_question");
+    expect(response.body?.source_target_intent).toMatchObject({
+      target_kind: "repo_code",
+      strength: "hard",
+      allow_no_tool_direct: false,
+    });
+    expect(response.body?.final_answer_source).toBe("model_synthesis_from_repo_evidence");
+    expect(response.body?.terminal_artifact_kind).toBe("repo_code_evidence_answer");
+    expect(response.body?.debug?.response_language).toBe("zh");
+    expect(visibleAnswerText(response.body)).toMatch(/[\u3400-\u9fff]/);
+
+    const debugExport = await request(app)
+      .get(`/api/agi/ask/turn/${encodeURIComponent(String(response.body?.turn_id))}/debug-export`)
+      .expect(200);
+    expect(debugExport.body?.payload?.response_language).toBe("zh");
+    expect(debugExport.body?.payload?.language_contract).toMatchObject({
+      schema: "helix.ask_language_contract.v1",
+      response_language: "zh",
+    });
+  }, 90000);
+
+  it("keeps mixed Spanish repo debug export bounded and serializable", async () => {
+    const app = createApp();
+    const response = await withRepoSynthesisResponse(
+      "Helix Ask conserva el idioma final en espa\u00f1ol cuando la solicitud mixta lo pide de forma expl\u00edcita y la ruta de repo aporta evidencia. Sources: server/services/helix-ask/language-contract.ts; server/routes/agi.plan.ts.",
+      () => request(app)
+        .post("/api/agi/ask/turn")
+        .send({
+          question: "Explain Helix Ask final answer language, pero responde en espa\u00f1ol y usa evidencia del c\u00f3digo.",
+          mode: "read",
+          debug: true,
+          sessionId: `mixed-spanish-debug-${Date.now()}`,
+        })
+        .expect(200),
+    );
+
+    const debugExport = await request(app)
+      .get(`/api/agi/ask/turn/${encodeURIComponent(String(response.body?.turn_id))}/debug-export`)
+      .expect(200);
+    const debugJson = JSON.stringify(debugExport.body?.payload);
+
+    expect(() => JSON.stringify(debugExport.body?.payload)).not.toThrow();
+    expect(debugJson.length).toBeLessThan(750_000);
+    expect(debugExport.body?.payload?.response_language).toBe("es");
+    expect(response.body?.terminal_artifact_kind).toBe("repo_code_evidence_answer");
+  }, 90000);
+
   it("routes source-target admission enforcement questions to repo evidence before visual deictic routing", async () => {
     const app = createApp();
     const response = await request(app)
