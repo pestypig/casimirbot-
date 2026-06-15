@@ -7,6 +7,7 @@ type HelixAskWorkspaceSessionState = {
   layoutSnapshots: Record<string, WorkstationLayoutSnapshot>;
   saveLayoutSnapshot: (sessionId: string, snapshot: WorkstationLayoutSnapshot) => void;
   readLayoutSnapshot: (sessionId: string) => WorkstationLayoutSnapshot | null;
+  removeLayoutSnapshot: (sessionId: string) => void;
 };
 
 const STORAGE_KEY = "helix-ask-workspace-sessions-v1";
@@ -39,6 +40,17 @@ export const useHelixAskWorkspaceSessionStore = createWithEqualityFn<HelixAskWor
         const key = sessionId.trim();
         if (!key) return null;
         return get().layoutSnapshots[key] ?? null;
+      },
+      removeLayoutSnapshot: (sessionId) => {
+        const key = sessionId.trim();
+        if (!key) return;
+        useWorkspaceMemoryRegistryStore.getState().removeArtifact(`helix-chat-layout:${key}`);
+        set((state) => {
+          if (!state.layoutSnapshots[key]) return state;
+          const next = { ...state.layoutSnapshots };
+          delete next[key];
+          return { layoutSnapshots: next };
+        });
       },
     }),
     {

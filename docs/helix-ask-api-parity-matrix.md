@@ -84,17 +84,28 @@ not yet eligible to answer from capture evidence.
 
 ## Running Against A Live Server
 
-Start the normal development server with the test harness enabled:
+Use the operator's normal keyed localhost server with the test harness enabled.
+Do not start a new development server from an agent shell solely to test
+agent/LLM-backed behavior unless the user explicitly asks for that process. The
+agent shell may not have the provider keys, tenant headers, auth state, browser
+state, or workstation bindings needed to exercise the same model path as the
+user's normal session.
+
+Operator-started server example:
 
 ```powershell
 $env:ENABLE_HELIX_TEST_HARNESS="1"; npm run dev:agi:5050
 ```
 
-Then run:
+After the server is running, the agent may run:
 
 ```bash
 npm run helix:ask:api-parity
 ```
+
+If no suitable keyed server is already running, report live parity as blocked and
+ask the user to start the normal localhost server. Static and unit parity tests
+may still run without a live server when they do not require provider secrets.
 
 Useful environment variables:
 

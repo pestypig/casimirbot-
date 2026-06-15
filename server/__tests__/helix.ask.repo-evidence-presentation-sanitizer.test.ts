@@ -123,4 +123,71 @@ describe("repo evidence presentation sanitizer", () => {
     expect(gate.ok).toBe(false);
     expect(gate.violations).toContain("unsupported_repo_claim");
   });
+
+  it("rejects repo answers that violate the Chinese response language contract", () => {
+    const gate = evaluateRepoAnswerTextQualityGate({
+      turnId: "turn:repo-quality-language-zh",
+      answerRef: "answer:repo",
+      answerText:
+        "Helix Ask decides the final answer language through the request language contract and response_language metadata. Sources: server/services/helix-ask/language-contract.ts; server/routes/agi.plan.ts.",
+      payload: {
+        language_contract: {
+          schema: "helix.ask_language_contract.v1",
+          response_language: "zh",
+          language_detected: "zh",
+          code_mixed: false,
+        },
+        final_answer_draft: {
+          authority: "llm_post_observation_composer",
+          model_step_capability: "model.synthesize_from_repo_evidence",
+        },
+        repo_code_evidence_answer: {
+          model_authored: true,
+          model_step_capability: "model.synthesize_from_repo_evidence",
+          synthesis_attempt_ref: "turn:repo-quality-language-zh:repo_evidence_synthesis_attempt",
+          support_refs: [
+            "server/services/helix-ask/language-contract.ts:1",
+            "server/routes/agi.plan.ts:1",
+          ],
+        },
+      },
+    });
+
+    expect(gate.ok).toBe(false);
+    expect(gate.violations).toContain("response_language_contract_violated");
+    expect(gate.terminal_allowed).toBe(false);
+  });
+
+  it("allows repo answers that honor the Chinese response language contract", () => {
+    const gate = evaluateRepoAnswerTextQualityGate({
+      turnId: "turn:repo-quality-language-zh-ok",
+      answerRef: "answer:repo",
+      answerText:
+        "Helix Ask 会通过请求里的语言契约和 response_language 元数据决定最终回答语言，并在代码路径和标识符中保留英文原文。Sources: server/services/helix-ask/language-contract.ts; server/routes/agi.plan.ts.",
+      payload: {
+        language_contract: {
+          schema: "helix.ask_language_contract.v1",
+          response_language: "zh",
+          language_detected: "zh",
+          code_mixed: false,
+        },
+        final_answer_draft: {
+          authority: "llm_post_observation_composer",
+          model_step_capability: "model.synthesize_from_repo_evidence",
+        },
+        repo_code_evidence_answer: {
+          model_authored: true,
+          model_step_capability: "model.synthesize_from_repo_evidence",
+          synthesis_attempt_ref: "turn:repo-quality-language-zh-ok:repo_evidence_synthesis_attempt",
+          support_refs: [
+            "server/services/helix-ask/language-contract.ts:1",
+            "server/routes/agi.plan.ts:1",
+          ],
+        },
+      },
+    });
+
+    expect(gate.ok).toBe(true);
+    expect(gate.violations).not.toContain("response_language_contract_violated");
+  });
 });

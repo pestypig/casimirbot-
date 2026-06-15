@@ -334,6 +334,11 @@ npm run helix:ask:discipline
 npm run helix:ask:api-parity
 ```
 
+For live agent/LLM-path parity, use the operator's already-keyed localhost
+server. Agents should not start their own development server to prove model-path
+behavior unless explicitly asked; if no suitable server is running, ask the user
+to start the normal local server and then run the parity probe against it.
+
 ### Verification Layer
 
 Verification keeps research claims tied to source files, scripts, generated

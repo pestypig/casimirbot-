@@ -44,7 +44,8 @@ export type HelixRepoDocsSynthesisViolation =
   | "unsupported_exact_section_terms"
   | "shallow_broad_concept_answer"
   | "missing_broad_concept_coverage"
-  | "insufficient_evidence_role_coverage";
+  | "insufficient_evidence_role_coverage"
+  | "response_language_contract_violated";
 
 export type HelixRepoDocsAnswerCoveragePoint =
   | "identity"
@@ -648,6 +649,7 @@ export function classifyRepoDocsSynthesisAttemptStatus(input: {
   if (violations.has("renderer_hostile_text")) return "renderer_hostile";
   if (violations.has("unsupported_repo_claim")) return "unsupported_claims";
   if (violations.has("missing_support_refs")) return "missing_support_refs";
+  if (violations.has("response_language_contract_violated")) return "failed";
   if (
     violations.has("shallow_broad_concept_answer") ||
     violations.has("missing_broad_concept_coverage") ||
@@ -715,6 +717,9 @@ export function buildRepoDocsSynthesisRepairInstruction(input: {
   if (violations.has("wrong_model_step_identity") || violations.has("missing_model_synthesis")) {
     return `${prefix}${common}${evidenceSentence} The retry must be authored as the post-observation synthesis step for the repo/docs evidence.`;
   }
+  if (violations.has("response_language_contract_violated")) {
+    return `${prefix}${common}${evidenceSentence} The previous answer violated the response language contract. Rewrite the answer in the requested response language while preserving file paths, code identifiers, API names, and exact quoted source text unchanged.`;
+  }
   return `${prefix}${common}${evidenceSentence}`;
 }
 
@@ -748,6 +753,9 @@ export function repoDocsSynthesisTerminalErrorCode(input: {
   if (input.status === "missing_support_refs") return `repo_docs_synthesis_missing_support_refs${suffix}`;
   if (violations.has("wrong_model_step_identity") || violations.has("missing_model_synthesis")) {
     return `repo_docs_synthesis_wrong_model_step${suffix}`;
+  }
+  if (violations.has("response_language_contract_violated")) {
+    return `repo_docs_synthesis_response_language_contract_violated${suffix}`;
   }
   if (input.status === "empty") return `repo_docs_synthesis_empty${suffix}`;
   return `repo_docs_synthesis_quality_failed${suffix}`;

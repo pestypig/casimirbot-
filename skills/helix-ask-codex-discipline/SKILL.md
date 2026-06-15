@@ -118,6 +118,19 @@ When a local server is running with the test harness enabled, run:
 npm run helix:ask:api-parity
 ```
 
+## Local Server And Secrets Boundary
+Do not start a development server solely to test agent/LLM-backed Helix Ask
+behavior unless the user explicitly asks for that server process. Agent-path
+tests must run against the operator's already-configured local server, because
+the agent shell may not have the same provider keys, tenant headers, browser
+state, or workstation context as the user's normal localhost session.
+
+If no keyed local server is already running, stop before live agent parity and
+ask the user to start the normal localhost server with the needed environment.
+Then run `npm run helix:ask:api-parity` against `HELIX_ASK_BASE_URL`. Static,
+unit, build, and discipline checks that do not require provider secrets may
+still run in the agent shell.
+
 Report disabled or frontier scenarios separately. Do not count them as proof.
 
 ## Reference Files

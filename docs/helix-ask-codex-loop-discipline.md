@@ -133,6 +133,31 @@ When testing against a running local server, use the top-level API probe:
 npm run helix:ask:api-parity
 ```
 
+### Localhost Server And Secret Boundary
+
+Live agent/LLM-path parity must use the operator's already-configured localhost
+server. Do not start a new development server solely to validate agent behavior
+unless the user explicitly asks for that process.
+
+Reason: a server started from an agent shell may lack provider keys, tenant
+headers, auth state, browser/workstation bindings, or the exact environment that
+the operator uses when Helix Ask can reliably call model-backed steps. That
+creates false confidence: the route may be tested under a non-representative
+runtime, or the check may silently avoid the model path that the patch is meant
+to validate.
+
+Required behavior for future patches:
+
+1. Run static/unit/build checks that do not require secrets from the agent shell.
+2. For live agent parity, first check whether a suitable localhost server is
+   already running at `HELIX_ASK_BASE_URL`.
+3. If no suitable server is running, report that live agent parity is blocked and
+   ask the user to start the normal keyed local server.
+4. After the user-started server is available, run `npm run helix:ask:api-parity`
+   or the relevant live probe against that server.
+5. Do not treat a self-started, unkeyed, fallback, mock, or non-LLM server as
+   proof of agent-path correctness.
+
 Report disabled/frontier scenarios separately. Do not present a disabled
 scenario as proof of the current contract.
 

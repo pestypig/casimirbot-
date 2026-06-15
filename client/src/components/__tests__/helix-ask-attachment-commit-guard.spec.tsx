@@ -76,7 +76,32 @@ describe("Helix Ask attachment commit guard", () => {
     expect(source).toContain('allow_client_shortcut: false');
     expect(source).toContain('suppressed_routes: ["conversation:simple", "model_only_concept", "workspace_diagnostic"]');
     expect(source).toContain("options?.bypassWorkstationDispatch === true || backendOwnedPastedTextResumeRecall");
+    expect(source).toContain("!backendOwnedPastedTextResumeRecall && isSimpleConversationTurnCandidate(trimmed)");
+    expect(source).toContain("!backendOwnedPastedTextResumeRecall &&");
     expect(source).toContain("routeMetadata: routeMetadataForTurn");
+  });
+
+  it("preserves backend-owned recall metadata across queued Ask turns", () => {
+    const source = fs.readFileSync(sourcePath, "utf8");
+
+    expect(source).toContain("type QueuedAskTurn =");
+    expect(source).toContain("options?: RunAskOptions");
+    expect(source).toContain("const [askQueue, setAskQueue] = useState<QueuedAskTurn[]>([])");
+    expect(source).not.toContain("const [askQueue, setAskQueue] = useState<string[]>([])");
+    expect(source).toContain("function buildQueuedAskTurn");
+    expect(source).toContain("backendOwnedPastedTextResumeRecall");
+    expect(source).toContain("bypassWorkstationDispatch: true");
+    expect(source).toContain("forceReasoningDispatch: true");
+    expect(source).toContain("skipContextChooser: true");
+    expect(source).toContain("turnId: \"queued:pasted_text_resume_recall\"");
+    expect(source).toContain("void runAsk(next.question, next.capsuleIds");
+    expect(source).toContain("...(next.options ?? {})");
+    expect(source).toContain("buildQueuedAskTurn({");
+    expect(source).toContain("function isHelixAskContextCompactionPausePendingReply");
+    expect(source).toContain("context\\s+is\\s+compacting\\s+before\\s+the\\s+next\\s+ask\\s+turn");
+    expect(source).toContain("const compactionPausePending = isHelixAskContextCompactionPausePendingReply(latestAskReply)");
+    expect(source).toContain("const shouldQueueForAskHandoff = askBusy || compactionPausePending");
+    expect(source).toContain('reason: askBusy ? "busy" : "compaction_pause"');
   });
 
   it("preserves server-authoritative proof recall and workstation terminals over evidence-gate fallback text", () => {

@@ -5864,6 +5864,16 @@ type RunAskOptions = {
   imageAttachmentLensRun?: ImageAttachmentLensRunV1 | null;
 };
 
+type QueuedAskTurnReason = "busy" | "compaction_pause" | "retry" | "multi_prompt";
+
+type QueuedAskTurn = {
+  question: string;
+  capsuleIds?: string[];
+  options?: RunAskOptions;
+  queuedAtMs: number;
+  reason: QueuedAskTurnReason;
+};
+
 type AskContextChooserState = {
   id: string;
   question: string;
@@ -5966,6 +5976,36 @@ function buildHelixAskPastedTextResumeRecallRouteMetadata(args: {
       assistant_answer: false,
       raw_content_included: false,
     },
+  };
+}
+
+function buildQueuedAskTurn(args: {
+  question: string;
+  capsuleIds?: string[];
+  options?: RunAskOptions;
+  reason: QueuedAskTurnReason;
+}): QueuedAskTurn {
+  const question = args.question.trim();
+  const backendOwnedPastedTextResumeRecall = isHelixAskPastedTextResumeRecallPrompt(question);
+  const options = backendOwnedPastedTextResumeRecall
+    ? {
+        ...(args.options ?? {}),
+        bypassWorkstationDispatch: true,
+        forceReasoningDispatch: true,
+        skipContextChooser: true,
+        routeMetadata: buildHelixAskPastedTextResumeRecallRouteMetadata({
+          base: args.options?.routeMetadata,
+          turnId: "queued:pasted_text_resume_recall",
+          threadId: "queued:pasted_text_resume_recall",
+        }),
+      }
+    : args.options;
+  return {
+    question,
+    capsuleIds: args.capsuleIds,
+    options,
+    queuedAtMs: Date.now(),
+    reason: args.reason,
   };
 }
 
@@ -7037,6 +7077,30 @@ type HelixAskObjectiveTelemetryUsedSummary = {
   finalizeGateMode: string | null;
   finalizeGatePassed: boolean | null;
 };
+
+function isHelixAskContextCompactionPausePendingReply(reply: HelixAskReply | null | undefined): boolean {
+  if (!reply) return false;
+  const debug = readAgentLoopAuditRecord(reply.debug);
+  const agentLoop = readAgentLoopAuditRecord(debug?.agentLoop ?? debug?.agent_loop);
+  const contentText = reply.content ?? "";
+  const pendingCandidates = [
+    reply.pending_server_request,
+    debug?.pending_server_request,
+    debug?.pending_request,
+    agentLoop?.pending_request,
+    agentLoop?.pending_server_request,
+  ]
+    .map((value) => readAgentLoopAuditRecord(value))
+    .filter((value): value is Record<string, unknown> => Boolean(value));
+  const pendingText = pendingCandidates.map((value) => safeJsonStringify(value)).join("\n");
+  const replyText = `${contentText}\n${pendingText}`;
+  const hasCompactionPauseText = /\b(?:context_compaction|context\s+is\s+compacting|active\s+context\s+page\s+file|pasted_text_attachment_resume_frame)\b/i.test(
+    replyText,
+  );
+  if (!hasCompactionPauseText) return false;
+  if (pendingCandidates.length > 0) return true;
+  return /\bcontext\s+is\s+compacting\s+before\s+the\s+next\s+ask\s+turn\b/i.test(contentText);
+}
 
 type ContextCapsulePreview = {
   id: string;
@@ -15148,10 +15212,31 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
       backend_debug_response_status: status,
       ...extra,
     }, null, 2);
-  const backendRef = readAgentLoopAuditRecord(parsed.backend_debug_response_ref);
+  const activeTurnId = coerceText(parsed.active_turn_id).trim();
+  const parsedDebug = readAgentLoopAuditRecord(parsed.debug);
+  const refCandidates = [
+    readAgentLoopAuditRecord(parsed.backend_debug_response_ref),
+    readAgentLoopAuditRecord(parsed.debug_export_ref),
+    readAgentLoopAuditRecord(parsedDebug?.backend_debug_response_ref),
+    readAgentLoopAuditRecord(parsedDebug?.debug_export_ref),
+  ].filter((entry): entry is Record<string, unknown> =>
+    Boolean(entry && coerceText(entry.endpoint).trim().startsWith("/api/agi/ask/turn/")),
+  );
+  const activeTurnFallbackRef = activeTurnId.startsWith("ask:")
+    ? {
+        endpoint: `/api/agi/ask/turn/${encodeURIComponent(activeTurnId)}/debug-export`,
+        turn_id: activeTurnId,
+      }
+    : null;
+  const backendRef =
+    refCandidates.find((entry) => {
+      const candidateTurnId = coerceText(entry.turn_id).trim();
+      return activeTurnId && candidateTurnId === activeTurnId;
+    }) ??
+    refCandidates[0] ??
+    activeTurnFallbackRef;
   const endpoint = coerceText(backendRef?.endpoint).trim();
   const backendTurnId = coerceText(backendRef?.turn_id).trim();
-  const activeTurnId = coerceText(parsed.active_turn_id).trim();
   if (!endpoint || !endpoint.startsWith("/api/agi/ask/turn/")) {
     return projectionPayload("not_advertised", { backend_debug_response_ref: undefined });
   }
@@ -18192,7 +18277,7 @@ export function HelixAskPill({
   const askLiveDraftRef = useRef("");
   const askLiveDraftBufferRef = useRef("");
   const askLiveDraftFlushRef = useRef<number | null>(null);
-  const [askQueue, setAskQueue] = useState<string[]>([]);
+  const [askQueue, setAskQueue] = useState<QueuedAskTurn[]>([]);
   const [steeringQueueExpanded, setSteeringQueueExpanded] = useState<boolean>(false);
   const liveSourceMailAutoWakeKeyRef = useRef<string | null>(null);
   const [askContextChooser, setAskContextChooser] = useState<AskContextChooserState | null>(null);
@@ -32278,8 +32363,10 @@ export function HelixAskPill({
       const pinnedCapsuleCount = getPinnedContextCapsuleCount();
       const inferredMode = inferAskMode(trimmed);
       const repoCodeEvidencePrompt = isRepoCodeEvidencePrompt(trimmed);
-      const simpleConversationTurnLane = isSimpleConversationTurnCandidate(trimmed);
+      const simpleConversationTurnLane =
+        !backendOwnedPastedTextResumeRecall && isSimpleConversationTurnCandidate(trimmed);
       const simpleDirectPromptLane =
+        !backendOwnedPastedTextResumeRecall &&
         !repoCodeEvidencePrompt &&
         (docsViewerWorkstationLane ||
           simpleConversationTurnLane ||
@@ -33858,7 +33945,10 @@ export function HelixAskPill({
     if (askBusy || askQueue.length === 0) return;
     const next = askQueue[0];
     setAskQueue((prev) => prev.slice(1));
-    void runAsk(next, undefined, { skipContextChooser: true });
+    void runAsk(next.question, next.capsuleIds, {
+      ...(next.options ?? {}),
+      skipContextChooser: true,
+    });
   }, [askBusy, askQueue, runAsk]);
 
   const clearCommandConfirmAutoTimer = useCallback(() => {
@@ -33893,7 +33983,10 @@ export function HelixAskPill({
         const fallbackDraft = askDraftRef.current.trim();
         if (fallbackDraft) {
           if (askBusy) {
-            setAskQueue((prev) => [fallbackDraft, ...prev]);
+            setAskQueue((prev) => [
+              buildQueuedAskTurn({ question: fallbackDraft, reason: "busy" }),
+              ...prev,
+            ]);
           } else {
             void runAsk(fallbackDraft, undefined, { skipContextChooser: true });
           }
@@ -33919,7 +34012,10 @@ export function HelixAskPill({
       const lastQuestion = askReplies.find((entry) => entry.question?.trim())?.question?.trim() ?? "";
       if (lastQuestion) {
         if (askBusy) {
-          setAskQueue((prev) => [lastQuestion, ...prev]);
+          setAskQueue((prev) => [
+            buildQueuedAskTurn({ question: lastQuestion, reason: "retry" }),
+            ...prev,
+          ]);
         } else {
           void runAsk(lastQuestion, undefined, { skipContextChooser: true });
         }
@@ -34040,6 +34136,8 @@ export function HelixAskPill({
         return stripped || entry.trim();
       });
       const singleEntry = normalizedEntries.length === 1 ? normalizedEntries[0] : null;
+      const compactionPausePending = isHelixAskContextCompactionPausePendingReply(latestAskReply);
+      const shouldQueueForAskHandoff = askBusy || compactionPausePending;
       const submitTurnId = pendingWorkstationUserInputRef.current?.turn_id ?? `submit:${crypto.randomUUID()}`;
       if (singleEntry) {
         cancelPendingWorkstationRequestForTurnTransition({
@@ -34119,7 +34217,7 @@ export function HelixAskPill({
         }
         return;
       }
-      if (askBusy && askAttachmentsRef.current.length > 0) {
+      if (shouldQueueForAskHandoff && askAttachmentsRef.current.length > 0) {
         setAskError("Wait for the current Helix Ask turn before sending attachments.");
         return;
       }
@@ -34129,9 +34227,18 @@ export function HelixAskPill({
       }
       askDraftRef.current = "";
       setContextCapsuleDetectedId(null);
-      if (askBusy) {
+      if (shouldQueueForAskHandoff) {
         setAskQueue((prev) => {
-          const combined = [...prev, ...normalizedEntries];
+          const combined = [
+            ...prev,
+            ...normalizedEntries.map((entry) =>
+              buildQueuedAskTurn({
+                question: entry,
+                capsuleIds: selectedCapsuleIds,
+                reason: askBusy ? "busy" : "compaction_pause",
+              }),
+            ),
+          ];
           return combined.slice(0, HELIX_ASK_QUEUE_LIMIT);
         });
         return;
@@ -34141,7 +34248,16 @@ export function HelixAskPill({
       const rest = restRaw.map((entry) => entry.trim()).filter(Boolean);
       if (rest.length > 0) {
         setAskQueue((prev) => {
-          const combined = [...prev, ...rest];
+          const combined = [
+            ...prev,
+            ...rest.map((entry) =>
+              buildQueuedAskTurn({
+                question: entry,
+                capsuleIds: selectedCapsuleIds,
+                reason: "multi_prompt",
+              }),
+            ),
+          ];
           return combined.slice(0, HELIX_ASK_QUEUE_LIMIT);
         });
       }
@@ -34381,6 +34497,7 @@ export function HelixAskPill({
       updateMoodFromText,
       runAsk,
       askBusy,
+      latestAskReply,
       visualSituationEvidenceForTurn,
     ],
   );

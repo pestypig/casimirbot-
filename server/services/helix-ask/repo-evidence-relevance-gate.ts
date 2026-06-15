@@ -116,7 +116,7 @@ const rolesForSelectedPaths = (selectedPaths: string[]): RepoConceptEvidenceRole
   unique(selectedPaths.map(evidenceRoleForPath).filter((entry): entry is RepoConceptEvidenceRole => Boolean(entry)));
 
 const LANGUAGE_DEBUG_FACET_QUERY_RE =
-  /\b(?:final answer language|response language|language contract|language_detected|source_language|code_mixed|debug export|debug payload|includeMultilangMetadata)\b|(?:idioma final|contrato de idioma|lenguaje de respuesta|depuraci[o\u00f3]n|exportaci[o\u00f3]n)|(?:\u6700\u7ec8\u56de\u7b54\u8bed\u8a00|\u56de\u7b54\u8bed\u8a00|\u8bed\u8a00\u9009\u62e9|\u8bed\u8a00\u5951\u7ea6|\u8c03\u8bd5|\u5bfc\u51fa)/iu;
+  /\b(?:final answer(?:\s+language)?|response language|language contract|language[_ -]?detected|source[_ -]?language|code[_ -]?mixed|debug(?:\s+export|\s+payload)?|includeMultilangMetadata|terminal answer|synthesis)\b|(?:idioma\s+final|respuesta\s+final|contrato\s+de\s+idioma|lenguaje\s+de\s+respuesta|evidencia\s+del\s+c[o\u00f3]digo|archivos?\s+y\s+l[i\u00ed]neas?|depuraci[o\u00f3]n|exportaci[o\u00f3]n(?:\s+de\s+debug)?)|(?:\u6700\u7ec8\u56de\u7b54\u8bed\u8a00|\u6700\u7ec8\u56de\u7b54|\u56de\u7b54\u8bed\u8a00|\u8bed\u8a00\u9009\u62e9|\u8bed\u8a00\u5951\u7ea6|\u4ee3\u7801\u4ed3\u5e93|\u4ee3\u7801\u8bc1\u636e|\u5f15\u7528\u6587\u4ef6|\u884c\u53f7|\u8c03\u8bd5|\u5bfc\u51fa)/iu;
 
 const LANGUAGE_DEBUG_FACET_TERMS = [
   "response_language",
@@ -124,14 +124,21 @@ const LANGUAGE_DEBUG_FACET_TERMS = [
   "source_language",
   "code_mixed",
   "translated",
+  "pivot_confidence",
   "languageContract",
   "language_contract",
   "includeMultilangMetadata",
   "applyHelixAskSuccessSurface",
   "inferLanguageFromScript",
   "resolveHelixAskResponseLanguage",
+  "debug_export",
   "debug export",
   "final answer",
+  "terminal answer",
+  "terminal-materializer",
+  "model_synthesis_from_repo_evidence",
+  "repo_docs_synthesis_packet",
+  "synthesis",
   "ask-answer-surface",
   "ask-handler",
   "language-contract",
@@ -140,6 +147,13 @@ const LANGUAGE_DEBUG_FACET_TERMS = [
 const LANGUAGE_DEBUG_FACET_PATHS = [
   "server/services/helix-ask/runtime/ask-handler.ts",
   "server/services/helix-ask/surface/ask-answer-surface.ts",
+  "server/services/helix-ask/runtime/",
+  "server/services/helix-ask/surface/",
+  "server/services/helix-ask/final-answer-draft-terminal-materializer.ts",
+  "server/services/helix-ask/repo-answer-text-quality-gate.ts",
+  "server/services/helix-ask/repo-docs-synthesis-packet.ts",
+  "server/services/helix-ask/evidence-reentry-gate.ts",
+  "server/services/helix-ask/evidence-selection-policy.ts",
   "server/services/helix-ask/language-contract.ts",
   "server/routes/agi.plan.ts",
   "server/routes/voice.ts",
@@ -163,7 +177,10 @@ const selectedSpanMatchesPromptFacet = (
 ): boolean => {
   if (!promptFacet.applies) return true;
   const normalizedPath = normalizePath(span.path);
-  if (promptFacet.preferred_paths.some((pathHint) => normalizedPath.endsWith(normalizePath(pathHint)))) {
+  if (promptFacet.preferred_paths.some((pathHint) => {
+    const normalizedHint = normalizePath(pathHint);
+    return normalizedPath.endsWith(normalizedHint) || normalizedPath.startsWith(normalizedHint);
+  })) {
     return true;
   }
   const haystack = [

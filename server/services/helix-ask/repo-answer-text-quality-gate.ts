@@ -25,6 +25,7 @@ export type HelixRepoAnswerTextQualityGate = {
     | "shallow_broad_concept_answer"
     | "missing_broad_concept_coverage"
     | "insufficient_evidence_role_coverage"
+    | "response_language_contract_violated"
   >;
   repair_allowed: boolean;
   terminal_allowed: boolean;
@@ -104,6 +105,69 @@ const isFileListOnly = (text: string): boolean => {
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   if (lines.length < 2) return false;
   return lines.every((line) => /^[-*]?\s*(?:client|server|shared|docs|scripts|tools|packages|src)\//i.test(line));
+};
+
+const countMatches = (text: string, pattern: RegExp): number =>
+  Array.from(text.matchAll(pattern)).length;
+
+const countCjkChars = (text: string): number =>
+  countMatches(text, /[\u3400-\u9fff]/gu);
+
+const countLatinLetters = (text: string): number =>
+  countMatches(text, /[A-Za-z]/g);
+
+const looksMostlyChinese = (text: string): boolean => {
+  const cjk = countCjkChars(text);
+  if (cjk < 8) return false;
+  const latin = countLatinLetters(text);
+  return cjk >= Math.max(8, Math.floor(latin * 0.18));
+};
+
+const looksSpanishEnough = (text: string): boolean =>
+  /\b(?:el|la|los|las|un|una|de|del|que|con|para|seg[uú]n|respuesta|idioma|lenguaje|c[oó]digo|evidencia|archivo|l[ií]nea|fuente|muestra|usa|utiliza|decide|final)\b/i.test(text);
+
+const isMostlyCodeOrFileReferences = (text: string): boolean => {
+  const lines = text.split(/\r?\n/).filter((line) => line.trim());
+  if (lines.length === 0) return false;
+  const fileRefLines = lines.filter((line) =>
+    /\b(?:client|server|shared|docs|scripts|tools|packages|src)\/[^\s:]+(?::\d+)?\b/i.test(line) ||
+    /`[^`]*(?:client|server|shared|docs|scripts|tools|packages|src)\/[^`]+`/.test(line),
+  ).length;
+  return fileRefLines >= Math.max(2, Math.ceil(lines.length * 0.6));
+};
+
+const readLanguageContract = (payload: RecordLike): RecordLike | null => {
+  const debug = readRecord(payload.debug);
+  const requestMetadata = readRecord(payload.request_metadata);
+  const packet = readRecord(payload.repo_docs_synthesis_packet);
+  const candidates = [
+    payload.language_contract,
+    payload.languageContract,
+    payload.ask_language_contract,
+    debug?.language_contract,
+    requestMetadata?.language_contract,
+    packet?.language_contract,
+  ];
+  return candidates.map(readRecord).find((record) => readString(record?.schema) === "helix.ask_language_contract.v1") ?? null;
+};
+
+const responseLanguageViolations = (input: {
+  text: string;
+  payload: RecordLike;
+}): Array<"response_language_contract_violated"> => {
+  const contract = readLanguageContract(input.payload);
+  const responseLanguage = readString(contract?.response_language) || readString(input.payload.response_language);
+  if (responseLanguage === "zh" && !looksMostlyChinese(input.text)) {
+    return ["response_language_contract_violated"];
+  }
+  if (
+    responseLanguage === "es" &&
+    !looksSpanishEnough(input.text) &&
+    !isMostlyCodeOrFileReferences(input.text)
+  ) {
+    return ["response_language_contract_violated"];
+  }
+  return [];
 };
 
 const isPolicyClaimInversion = (text: string): boolean => {
@@ -256,6 +320,7 @@ export function evaluateRepoAnswerTextQualityGate(input: {
   if (isFileListOnly(text)) violations.push("file_list_only");
   if (isPolicyClaimInversion(text)) violations.push("policy_claim_inversion");
   if (hasRendererHostileText(text)) violations.push("renderer_hostile_text");
+  violations.push(...responseLanguageViolations({ text, payload: input.payload }));
   const supportRefs = collectSupportRefs(input.payload);
   if (supportRefs.length === 0) violations.push("missing_support_refs");
   violations.push(...exactSectionTermCoverage({ text, payload: input.payload }));

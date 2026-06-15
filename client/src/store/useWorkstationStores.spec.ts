@@ -274,6 +274,19 @@ describe("workstation stores", () => {
       content: "Newer saved chat",
     });
     const nonHelixChatId = chats.newSession("Account chat", "account-panel");
+    useAgiChatStore.setState((state) => ({
+      sessions: {
+        ...state.sessions,
+        [olderChatId]: {
+          ...state.sessions[olderChatId]!,
+          updatedAt: "2026-06-13T10:00:00.000Z",
+        },
+        [newerChatId]: {
+          ...state.sessions[newerChatId]!,
+          updatedAt: "2026-06-13T10:01:00.000Z",
+        },
+      },
+    }));
 
     const note = useWorkstationNotesStore.getState().createManualNote({ title: "Newest note artifact" });
     useWorkstationNotesStore.getState().updateNoteBody(note.id, "This note can be newer without selecting a chat.");
@@ -302,5 +315,20 @@ describe("workstation stores", () => {
     expect(state.chatDock.widthPx).toBe(560);
     expect(state.groups["group-primary"]?.panelIds).toEqual(["workstation-notes"]);
     expect(state.groups["group-primary"]?.activePanelId).toBe("workstation-notes");
+  });
+
+  it("removes workstation layout memory when a Helix Ask chat is deleted", () => {
+    const layout = useWorkstationLayoutStore.getState();
+    const snapshot = layout.captureLayoutSnapshot();
+    const workspaceSessions = useHelixAskWorkspaceSessionStore.getState();
+
+    workspaceSessions.saveLayoutSnapshot("chat-delete", snapshot);
+    expect(workspaceSessions.readLayoutSnapshot("chat-delete")).not.toBeNull();
+    expect(useWorkspaceMemoryRegistryStore.getState().artifacts["helix-chat-layout:chat-delete"]).toBeDefined();
+
+    workspaceSessions.removeLayoutSnapshot("chat-delete");
+
+    expect(useHelixAskWorkspaceSessionStore.getState().readLayoutSnapshot("chat-delete")).toBeNull();
+    expect(useWorkspaceMemoryRegistryStore.getState().artifacts["helix-chat-layout:chat-delete"]).toBeUndefined();
   });
 });

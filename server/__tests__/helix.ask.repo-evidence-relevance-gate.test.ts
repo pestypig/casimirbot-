@@ -143,6 +143,46 @@ describe("repo evidence relevance gate", () => {
     expect(gate.selected_prompt_facet_paths).toEqual([]);
   });
 
+  it("rejects off-topic selected evidence for mixed ES/EN final-answer language prompts", () => {
+    const gate = evaluateRepoEvidenceRelevanceGate({
+      turnId: "turn:repo-relevance",
+      concept: "Helix Ask",
+      query:
+        "Explain Helix Ask final answer language, pero responde en español y usa evidencia del código.",
+      observation: observationWithPath(
+        "Helix Ask",
+        "server/services/helix-ask/__tests__/civilization-bounds-roadmap-tool.test.ts",
+      ),
+    });
+
+    expect(gate.prompt_facet).toMatchObject({
+      applies: true,
+      facet: "final_answer_language_debug_contract",
+    });
+    expect(gate.terminal_allowed).toBe(false);
+    expect(gate.violations).toContain("prompt_facet_evidence_missing");
+  });
+
+  it("rejects off-topic selected evidence for Chinese final-answer language prompts", () => {
+    const gate = evaluateRepoEvidenceRelevanceGate({
+      turnId: "turn:repo-relevance",
+      concept: "Helix Ask",
+      query:
+        "请在代码仓库中查找 Helix Ask 如何决定最终回答语言。请引用文件和行号作为证据。",
+      observation: observationWithPath(
+        "Helix Ask",
+        "server/services/helix-ask/__tests__/fruition-tool.test.ts",
+      ),
+    });
+
+    expect(gate.prompt_facet).toMatchObject({
+      applies: true,
+      facet: "final_answer_language_debug_contract",
+    });
+    expect(gate.terminal_allowed).toBe(false);
+    expect(gate.violations).toContain("prompt_facet_evidence_missing");
+  });
+
   it("allows final-answer language debug prompts when selected evidence hits Ask language files", () => {
     const gate = evaluateRepoEvidenceRelevanceGate({
       turnId: "turn:repo-relevance",
@@ -161,6 +201,27 @@ describe("repo evidence relevance gate", () => {
     expect(gate.selected_prompt_facet_paths).toEqual(expect.arrayContaining([
       "server/services/helix-ask/runtime/ask-handler.ts",
       "server/services/helix-ask/surface/ask-answer-surface.ts",
+    ]));
+  });
+
+  it("allows final-answer language debug prompts when selected evidence hits terminal synthesis files", () => {
+    const gate = evaluateRepoEvidenceRelevanceGate({
+      turnId: "turn:repo-relevance",
+      concept: "Helix Ask",
+      query:
+        "请在代码仓库中查找 Helix Ask 如何决定最终回答语言。请引用文件和行号作为证据。",
+      observation: observationWithPaths("Helix Ask", [
+        "server/services/helix-ask/final-answer-draft-terminal-materializer.ts",
+        "server/services/helix-ask/repo-answer-text-quality-gate.ts",
+      ]),
+    });
+
+    expect(gate.prompt_facet.applies).toBe(true);
+    expect(gate.terminal_allowed).toBe(true);
+    expect(gate.violations).not.toContain("prompt_facet_evidence_missing");
+    expect(gate.selected_prompt_facet_paths).toEqual(expect.arrayContaining([
+      "server/services/helix-ask/final-answer-draft-terminal-materializer.ts",
+      "server/services/helix-ask/repo-answer-text-quality-gate.ts",
     ]));
   });
 });

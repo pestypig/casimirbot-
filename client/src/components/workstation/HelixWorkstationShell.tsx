@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ChevronRight, MessageSquarePlus } from "lucide-react";
+import { ArrowLeft, ChevronRight, MessageSquarePlus, Trash2 } from "lucide-react";
 import { WorkstationStage } from "@/components/workstation/WorkstationStage";
 import { HelixAskDock } from "@/components/workstation/HelixAskDock";
 import { WorkstationResizeRail } from "@/components/workstation/WorkstationResizeRail";
@@ -14,6 +14,7 @@ import {
   listHelixAskChatSessions,
   resolveActiveHelixAskSession,
 } from "@/lib/helix/helixAskChatSessions";
+import { deleteChatSession } from "@/lib/agi/api";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 import type { PanelDefinition } from "@/lib/desktop/panelRegistry";
 
@@ -50,10 +51,12 @@ export function HelixWorkstationShell({
   const applyLayoutSnapshot = useWorkstationLayoutStore((state) => state.applyLayoutSnapshot);
   const saveLayoutSnapshot = useHelixAskWorkspaceSessionStore((state) => state.saveLayoutSnapshot);
   const readLayoutSnapshot = useHelixAskWorkspaceSessionStore((state) => state.readLayoutSnapshot);
+  const removeLayoutSnapshot = useHelixAskWorkspaceSessionStore((state) => state.removeLayoutSnapshot);
   const sessions = useAgiChatStore((state) => state.sessions);
   const activeChatId = useAgiChatStore((state) => state.activeId);
   const newSession = useAgiChatStore((state) => state.newSession);
   const setActiveChat = useAgiChatStore((state) => state.setActive);
+  const deleteLocalSession = useAgiChatStore((state) => state.deleteSession);
   const ensureContextSession = useAgiChatStore((state) => state.ensureContextSession);
   const [sessionListOpen, setSessionListOpen] = useState(false);
   const [resizePreviewWidth, setResizePreviewWidth] = useState<number | null>(null);
@@ -110,6 +113,48 @@ export function HelixWorkstationShell({
     setSessionListOpen(false);
   }, [activeSession?.id, captureLayoutSnapshot, newSession, saveLayoutSnapshot, setActiveChat]);
 
+  const handleDeleteSession = useCallback(
+    (sessionId: string) => {
+      const target = sessions[sessionId];
+      if (!target) return;
+      const title = titleFromSession(target);
+      const confirmed =
+        typeof window === "undefined" ||
+        window.confirm(`Delete "${title}"? This removes the saved chat from this browser and from the synced chat store when available.`);
+      if (!confirmed) return;
+
+      const nextSession = helixSessions.find((session) => session.id !== sessionId) ?? null;
+      deleteLocalSession(sessionId);
+      removeLayoutSnapshot(sessionId);
+      void deleteChatSession(sessionId).catch((error) => {
+        console.warn("[HelixWorkstationShell] synced chat delete failed", error);
+      });
+
+      if (sessionId !== activeSession?.id) return;
+      if (nextSession) {
+        const snapshot = readLayoutSnapshot(nextSession.id);
+        if (snapshot) {
+          applyLayoutSnapshot(snapshot);
+        }
+        setActiveChat(nextSession.id);
+        return;
+      }
+      const id = newSession("New chat", `${HELIX_CHAT_CONTEXT_PREFIX}${crypto.randomUUID()}`);
+      setActiveChat(id);
+    },
+    [
+      activeSession?.id,
+      applyLayoutSnapshot,
+      deleteLocalSession,
+      helixSessions,
+      newSession,
+      readLayoutSnapshot,
+      removeLayoutSnapshot,
+      sessions,
+      setActiveChat,
+    ],
+  );
+
   const visibleWidth = chatDock.collapsed ? 56 : resizePreviewWidth ?? chatDock.widthPx;
 
   if (layoutVariant === "mobile") {
@@ -144,14 +189,27 @@ export function HelixWorkstationShell({
       }}
     >
       <div className="col-start-1 col-end-3 row-start-1 flex min-w-0 items-center gap-3 border-b border-white/10 bg-slate-950/72 px-3 backdrop-blur">
-        <button
-          type="button"
-          onClick={() => setSessionListOpen(true)}
-          aria-label="Open Helix Ask chats"
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/5 text-slate-100 hover:bg-white/10"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setSessionListOpen(true)}
+            aria-label="Open Helix Ask chats"
+            title="Open Helix Ask chats"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/5 text-slate-100 hover:bg-white/10"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => activeSession?.id && handleDeleteSession(activeSession.id)}
+            disabled={!activeSession?.id}
+            aria-label="Delete current Helix Ask chat"
+            title="Delete current Helix Ask chat"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-rose-300/25 bg-rose-500/10 text-rose-100 transition hover:border-rose-200/50 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-600"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-white">{activeTitle}</p>
           <p className="truncate text-[11px] uppercase tracking-[0.16em] text-slate-500">
@@ -210,6 +268,18 @@ export function HelixWorkstationShell({
                           className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
                         >
                           <ChevronRight className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDeleteSession(session.id);
+                          }}
+                          aria-label={`Delete ${titleFromSession(session)}`}
+                          title="Delete chat"
+                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-rose-300/20 bg-rose-500/10 text-rose-100 hover:border-rose-200/50 hover:bg-rose-500/20"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     );
