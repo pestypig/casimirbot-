@@ -308,6 +308,14 @@ type StagePlayMailWakePriority = "urgent_voice" | "ask_wake" | "local_observer";
 const isDeferrablePressureReason = (reason: string | null | undefined): boolean =>
   /(?:^|:)(?:runtime_memory_queue_deferrable|queue_deferrable)$/i.test(String(reason ?? ""));
 
+const recommendedNextNeedsDecisionWake = (
+  value: StagePlayLiveSourcePredictionValidationV1["recommendedNext"] | null | undefined,
+): boolean =>
+  value === "draft_text_answer" ||
+  value === "request_voice_callout" ||
+  value === "request_more_evidence" ||
+  value === "request_stage_play_checkpoint";
+
 const classifyWakePriority = (input: {
   processedPacket: StagePlayProcessedMailPacketV1;
   immersionState: StagePlayLiveSourceImmersionStateV1;
@@ -328,7 +336,10 @@ const classifyWakePriority = (input: {
         reason: "processed_packet_arbiter_request_voice_callout",
       };
     }
-    if (arbiter.wakeAsk === true || arbiter.recommendedNext !== "wait_for_next_summary") {
+    if (
+      recommendedNextNeedsDecisionWake(arbiter.recommendedNext) &&
+      (arbiter.wakeAsk === true || arbiter.recommendedNext !== "wait_for_next_summary")
+    ) {
       return {
         priority: "ask_wake",
         reason: arbiter.wakeAsk === true
@@ -338,7 +349,9 @@ const classifyWakePriority = (input: {
     }
     return {
       priority: "local_observer",
-      reason: "processed_packet_arbiter_wait_for_next_summary",
+      reason: arbiter.recommendedNext === "record_interpretation"
+        ? "processed_packet_arbiter_record_interpretation"
+        : "processed_packet_arbiter_wait_for_next_summary",
     };
   }
   if (
@@ -351,9 +364,7 @@ const classifyWakePriority = (input: {
       reason: "processed_packet_urgent_voice_candidate",
     };
   }
-  if (
-    packet.recommendedNext !== "wait_for_next_summary"
-  ) {
+  if (recommendedNextNeedsDecisionWake(packet.recommendedNext)) {
     return {
       priority: "ask_wake",
       reason: `processed_packet_${packet.recommendedNext}`,
@@ -370,7 +381,7 @@ const classifyWakePriority = (input: {
       reason: "prediction_validation_urgent_voice_candidate",
     };
   }
-  if (input.predictionValidation.recommendedNext !== "wait_for_next_summary") {
+  if (recommendedNextNeedsDecisionWake(input.predictionValidation.recommendedNext)) {
     return {
       priority: "ask_wake",
       reason: `prediction_validation_${input.predictionValidation.recommendedNext}`,
@@ -887,11 +898,11 @@ const salienceNeedsSlowAsk = (salience: StagePlayLiveSourceImmersionStateV1["sal
   salience.level === "urgent" || salience.voiceCandidate;
 
 const processedPacketNeedsSlowAsk = (packet: StagePlayProcessedMailPacketV1): boolean =>
-  packet.arbiter?.wakeAsk === true ||
-  packet.recommendedNext === "request_voice_callout" ||
-  packet.recommendedNext === "request_more_evidence" ||
-  packet.recommendedNext === "request_stage_play_checkpoint" ||
-  packet.recommendedNext === "draft_text_answer";
+  (
+    packet.arbiter?.wakeAsk === true &&
+    recommendedNextNeedsDecisionWake(packet.arbiter.recommendedNext)
+  ) ||
+  recommendedNextNeedsDecisionWake(packet.recommendedNext);
 
 const policyCriteriaNeedsSlowAsk = (input: {
   policy: StagePlayLiveSourceWatchJobPolicyV1 | null;
@@ -2827,16 +2838,20 @@ export async function runNextMailWakeRequest(input: {
   const taskNeedsSlowAsk = Boolean(activeTaskKindFromSnapshot(taskQueueSnapshot));
   if (!fastLayer.shouldRunSlowAsk && !taskNeedsSlowAsk) {
     const runningAttempt = markStagePlayMailWakeRunning(running.wakeRequestId, now) ?? running;
+    const localDecision = fastLayer.processedPacket.recommendedNext === "record_interpretation"
+      ? "record_interpretation"
+      : "wait_for_next_summary";
     const decision = recordLiveSourceMailDecisionForAsk({
       threadId: running.threadId,
       roomId: running.roomId ?? null,
       environmentId: running.environmentId ?? null,
       mailIds: running.mailIds,
-      decision: "wait_for_next_summary",
+      decision: localDecision,
       rationalePreview: [
         "Fast live-source layer updated immersion state and validated the prior prediction.",
         `Slow Ask was skipped because ${fastLayer.slowAskReason}.`,
         `Processed packet: ${fastLayer.processedPacket.packetId}.`,
+        `Packet recommendation: ${fastLayer.processedPacket.recommendedNext}.`,
         `Prediction validation: ${fastLayer.predictionValidation.result}; salience: ${fastLayer.immersionState.salience.level}.`,
       ].join(" "),
       nextLoopState: "armed_for_next_summary",
@@ -2845,11 +2860,13 @@ export async function runNextMailWakeRequest(input: {
       inferredMeaning: fastLayer.immersionState.changedFacts,
       mailCoverage: {
         readMailIds: running.mailIds,
-        interpretedMailIds: [],
+        interpretedMailIds: localDecision === "record_interpretation" ? running.mailIds : [],
         compressedMailIds: running.mailIds.length > 1 ? running.mailIds : [],
         skippedMailIds: [],
         mode: policy?.mailProcessingMode ?? (running.mailIds.length > 1 ? "micro_batch" : "latest_only"),
-        reason: "Fast layer updated immersion and prediction validation; slow Ask was not admitted for this non-salient batch.",
+        reason: localDecision === "record_interpretation"
+          ? "Fast layer recorded the packet interpretation locally; no decision wake was admitted."
+          : "Fast layer updated immersion and prediction validation; slow Ask was not admitted for this non-salient batch.",
       },
       evidenceRefs: uniqueStrings([
         ...evidenceRefs,
@@ -2882,14 +2899,20 @@ export async function runNextMailWakeRequest(input: {
         fastLayer.predictionValidation.validationId,
         fastLayer.processedPacket.packetId,
       ]),
-      skippedReason: "fast_layer_wait_for_next_summary",
+      skippedReason: localDecision === "record_interpretation"
+        ? "fast_layer_record_interpretation"
+        : "fast_layer_wait_for_next_summary",
       createdAt: now,
     });
     const budgetReceipt = recordWakeBudgetReceipt({
       wake: completed ?? runningAttempt,
       wakeResult,
       action: retainedMailCount > 0 ? "batched" : "processed",
-      reason: retainedMailCount > 0 ? "fast_layer_wait_batch_split" : "fast_layer_wait_for_next_summary",
+      reason: retainedMailCount > 0
+        ? "fast_layer_wait_batch_split"
+        : localDecision === "record_interpretation"
+          ? "fast_layer_record_interpretation"
+          : "fast_layer_wait_for_next_summary",
       processedMailCount: running.mailIds.length,
       retainedMailCount,
       evidenceRefs: wakeResult.evidenceRefs,

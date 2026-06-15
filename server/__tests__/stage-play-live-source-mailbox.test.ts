@@ -1708,7 +1708,7 @@ describe("Stage Play live-source mailbox", () => {
     expect(daylightRows.find((row) => row.title === "Wake requested")?.body).toContain("decision_selector selected record_interpretation");
     expect(daylightRows.find((row) => row.title === "Prediction check")?.body).toBe("No prior prediction.");
     expect(daylightRows.find((row) => row.title === "Immediate prediction")?.body).toContain("Likely next: gathering wood or scanning resources.");
-    expect(daylightRows.find((row) => row.title === "Agent decision")?.body).toContain("wait_for_next_summary");
+    expect(daylightRows.find((row) => row.title === "Agent decision")?.body).toContain("record_interpretation");
     expect(daylightRows.find((row) => row.title === "Loop state")?.body).toBe("Armed for the next live-source update.");
 
     const priorNarrative = recordStagePlayLiveSourceNarrativeState({

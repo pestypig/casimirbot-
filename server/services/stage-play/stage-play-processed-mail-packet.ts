@@ -263,6 +263,14 @@ const isRecommendedNext = (value: unknown): value is StagePlayLiveSourcePredicti
   value === "request_more_evidence" ||
   value === "request_stage_play_checkpoint";
 
+const recommendedNextNeedsAsk = (
+  value: StagePlayLiveSourcePredictionValidationRecommendedNextV1 | null | undefined,
+): boolean =>
+  value === "draft_text_answer" ||
+  value === "request_voice_callout" ||
+  value === "request_more_evidence" ||
+  value === "request_stage_play_checkpoint";
+
 const promptedOutputPreview = (role: StagePlayMicroReasonerRoleV1, json: Record<string, unknown> | null, fallback: string): string => {
   if (!json) return fallback;
   if (role === "claim_extractor") {
@@ -1903,7 +1911,7 @@ const applyPromptedMicroReasonerOutput = (input: {
         : packet.axioms,
       arbiter: {
         recommendedNext: next,
-        wakeAsk: readBooleanFromJson(json, "wakeAsk") ?? packet.arbiter?.wakeAsk ?? next !== "wait_for_next_summary",
+        wakeAsk: readBooleanFromJson(json, "wakeAsk") ?? packet.arbiter?.wakeAsk ?? recommendedNextNeedsAsk(next),
         reason: readStringFromJson(json, "reason") ?? packet.arbiter?.reason ?? "Prompted micro-reasoner arbiter selected the next mail-loop action.",
         confidence: readConfidence(json.confidence) ?? packet.arbiter?.confidence ?? "medium",
         selectedHypothesis: readStringFromJson(json, "selectedHypothesis") ?? packet.arbiter?.selectedHypothesis ?? null,

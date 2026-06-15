@@ -320,6 +320,7 @@ const classifyPressure = (
   limits: RuntimeAdmissionDecision["limits"],
 ): { level: RuntimePressureLevel; reason: RuntimeAdmissionDecision["reason"] } => {
   const hostFreeRatioMin = readPositiveNumberEnv("RUNTIME_MEMORY_HOST_FREE_RATIO_MIN", 0.08);
+  const hostFreeRatioSoftMin = readPositiveNumberEnv("RUNTIME_MEMORY_HOST_FREE_RATIO_SOFT_MIN", 0.18);
   if (host && host.freeRatio < hostFreeRatioMin) {
     return { level: "hard_pressure", reason: "host_memory_limit" };
   }
@@ -331,7 +332,8 @@ const classifyPressure = (
   }
   if (
     memory.heapUsedMiB >= limits.resumeHeapUsedMiB ||
-    memory.rssMiB >= limits.resumeRssMiB
+    memory.rssMiB >= limits.resumeRssMiB ||
+    (host && host.freeRatio < hostFreeRatioSoftMin)
   ) {
     return { level: "soft_pressure", reason: "ok" };
   }
@@ -681,11 +683,6 @@ export const admitRuntimeTask = (
     return makeDecision(input, "admit", true, "critical_bypass", pressure.level, memory, host, limits, lease);
   }
 
-  if (input.taskClass === "active_user_turn") {
-    const lease = buildLease(input.taskClass);
-    return makeDecision(input, "admit", true, "ok", pressure.level, memory, host, limits, lease);
-  }
-
   const capacityBlock = readCapacityBlock(input.taskClass);
   if (capacityBlock) {
     return makeDecision(
@@ -703,6 +700,37 @@ export const admitRuntimeTask = (
   if (pressure.level === "normal") {
     const lease = buildLease(input.taskClass);
     return makeDecision(input, "admit", true, "ok", pressure.level, memory, host, limits, lease);
+  }
+
+  if (input.taskClass === "active_user_turn" && pressure.level === "soft_pressure") {
+    const paused = pauseLowerPriorityTasks(input.taskClass, "runtime_memory_soft_pressure");
+    const recheckMemory = toMemorySnapshot(memoryReader());
+    const recheckHost = hostMemoryReader();
+    const recheckPressure = classifyPressure(recheckMemory, recheckHost, limits);
+    if (recheckPressure.level !== "hard_pressure") {
+      const lease = buildLease(input.taskClass);
+      return makeDecision(
+        input,
+        paused > 0 ? "pause_existing_background" : "admit",
+        true,
+        paused > 0 ? "background_paused" : "ok",
+        recheckPressure.level,
+        recheckMemory,
+        recheckHost,
+        limits,
+        lease,
+      );
+    }
+    return makeDecision(
+      input,
+      "reject_memory_pressure",
+      false,
+      recheckPressure.reason === "ok" ? "rss_limit" : recheckPressure.reason,
+      recheckPressure.level,
+      recheckMemory,
+      recheckHost,
+      limits,
+    );
   }
 
   if (stagePlayLocalPressureBypassAllowed(input, pressure)) {

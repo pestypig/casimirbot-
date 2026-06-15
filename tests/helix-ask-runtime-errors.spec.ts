@@ -2112,7 +2112,7 @@ describe("helix ask universal answer plan shadow", () => {
       __testHelixAskReliabilityGuards.isHelixAskHardForcedShortCircuitRule(
         "forcedAnswer:pre_intent_clarify_deictic",
       ),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       __testHelixAskReliabilityGuards.isHelixAskHardForcedShortCircuitRule(
         "forcedAnswer:simple_composition",
@@ -2127,7 +2127,7 @@ describe("helix ask universal answer plan shadow", () => {
       __testHelixAskReliabilityGuards.isHelixAskClarifyForcedShortCircuitRule(
         "forcedAnswer:pre_intent_clarify_deictic",
       ),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       __testHelixAskReliabilityGuards.isHelixAskHardForcedShortCircuitRule(
         "forcedAnswer:concept_short_definition",

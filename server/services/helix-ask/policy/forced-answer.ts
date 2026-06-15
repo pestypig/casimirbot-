@@ -34,7 +34,6 @@ export const isHelixAskHardForcedShortCircuitRule = (
   rule === "forcedAnswer:pre_intent_clarify_deictic" ||
   rule === "forcedAnswer:smalltalk_fast_path" ||
   rule === "forcedAnswer:simple_composition" ||
-  rule === "forcedAnswer:nhm2_block_grounding" ||
   rule === "forcedAnswer:math_solver" ||
   rule === "forcedAnswer:math_solver_warp_guard" ||
   rule === "forcedAnswer:constraint_report" ||
@@ -50,20 +49,14 @@ export const isHelixAskConceptForcedShortCircuitRule = (
 
 export const isHelixAskClarifyForcedShortCircuitRule = (
   rule: string | null | undefined,
-): boolean =>
-  rule === "forcedAnswer:pre_intent_clarify" ||
-  rule === "forcedAnswer:pre_intent_clarify_deictic";
+): boolean => rule === "forcedAnswer:pre_intent_clarify";
 
 export const isHelixAskResearchContractFailClosedForcedShortCircuitRule = (
   rule: string | null | undefined,
 ): boolean => rule === "forcedAnswer:research_contract_fail_closed";
 
 const isHelixAskSimpleForcedShortCircuitRule = (rule: string | null | undefined): boolean =>
-  rule === "forcedAnswer:simple_composition" || rule === "forcedAnswer:smalltalk_fast_path";
-
-const isHelixAskNhm2BlockGroundingForcedShortCircuitRule = (
-  rule: string | null | undefined,
-): boolean => rule === "forcedAnswer:nhm2_block_grounding";
+  rule === "forcedAnswer:simple_composition";
 
 const isHelixAskPipelineForcedShortCircuitRule = (rule: string | null | undefined): boolean =>
   rule === "forcedAnswer:helix_pipeline";
@@ -81,9 +74,6 @@ export const shouldFastPathFinalizeHelixAskForcedAnswer = (args: {
   if (!args.forcedAnswerIsHard) return false;
   const forcedRule = args.forcedRule ?? null;
   if (isHelixAskResearchContractFailClosedForcedShortCircuitRule(forcedRule)) {
-    return true;
-  }
-  if (forcedRule === "forcedAnswer:smalltalk_fast_path") {
     return true;
   }
   const normalizedFallback = String(args.fallbackAnswer ?? "").trim();
@@ -112,7 +102,6 @@ export const shouldPreserveHelixAskForcedAnswerAcrossComposer = (args: {
   (isHelixAskConceptForcedShortCircuitRule(args.forcedRule ?? null) ||
     isHelixAskClarifyForcedShortCircuitRule(args.forcedRule ?? null) ||
     isHelixAskResearchContractFailClosedForcedShortCircuitRule(args.forcedRule ?? null) ||
-    isHelixAskNhm2BlockGroundingForcedShortCircuitRule(args.forcedRule ?? null) ||
     isHelixAskSimpleForcedShortCircuitRule(args.forcedRule ?? null) ||
     isHelixAskPipelineForcedShortCircuitRule(args.forcedRule ?? null));
 
@@ -123,6 +112,5 @@ export const shouldPreserveHelixAskForcedAnswerAcrossFinalizer = (args: {
   args.forcedAnswerPinned &&
   (isHelixAskClarifyForcedShortCircuitRule(args.forcedRule ?? null) ||
     isHelixAskResearchContractFailClosedForcedShortCircuitRule(args.forcedRule ?? null) ||
-    isHelixAskNhm2BlockGroundingForcedShortCircuitRule(args.forcedRule ?? null) ||
     isHelixAskSimpleForcedShortCircuitRule(args.forcedRule ?? null) ||
     isHelixAskPipelineForcedShortCircuitRule(args.forcedRule ?? null));

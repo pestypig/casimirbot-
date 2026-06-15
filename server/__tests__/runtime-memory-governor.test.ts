@@ -29,6 +29,7 @@ describe("runtime memory governor", () => {
     delete process.env.RUNTIME_MEMORY_RESUME_HEAP_USED_MB;
     delete process.env.RUNTIME_MEMORY_RESUME_RSS_MB;
     delete process.env.RUNTIME_MEMORY_HOST_FREE_RATIO_MIN;
+    delete process.env.RUNTIME_MEMORY_HOST_FREE_RATIO_SOFT_MIN;
     delete process.env.VOICE_TRANSCRIBE_MEMORY_GUARD;
     delete process.env.VOICE_TRANSCRIBE_MAX_HEAP_USED_MB;
     delete process.env.VOICE_TRANSCRIBE_MAX_RSS_MB;
@@ -48,6 +49,8 @@ describe("runtime memory governor", () => {
     delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_BURST_WINDOW_MS;
     delete process.env.RUNTIME_TASK_ACTIVE_USER_TURN_MAX_HEAP_USED_MB;
     delete process.env.RUNTIME_TASK_ACTIVE_USER_TURN_MAX_RSS_MB;
+    delete process.env.RUNTIME_TASK_ACTIVE_USER_TURN_RESUME_HEAP_USED_MB;
+    delete process.env.RUNTIME_TASK_ACTIVE_USER_TURN_RESUME_RSS_MB;
     runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
       memoryReader: memoryReader({ heapUsed: 100 * mib, rss: 200 * mib }),
       hostMemoryReader: hostReader(),
@@ -61,6 +64,7 @@ describe("runtime memory governor", () => {
     delete process.env.RUNTIME_MEMORY_RESUME_HEAP_USED_MB;
     delete process.env.RUNTIME_MEMORY_RESUME_RSS_MB;
     delete process.env.RUNTIME_MEMORY_HOST_FREE_RATIO_MIN;
+    delete process.env.RUNTIME_MEMORY_HOST_FREE_RATIO_SOFT_MIN;
     delete process.env.VOICE_TRANSCRIBE_MEMORY_GUARD;
     delete process.env.VOICE_TRANSCRIBE_MAX_HEAP_USED_MB;
     delete process.env.VOICE_TRANSCRIBE_MAX_RSS_MB;
@@ -80,6 +84,8 @@ describe("runtime memory governor", () => {
     delete process.env.RUNTIME_TASK_STAGE_PLAY_REFRESH_BURST_WINDOW_MS;
     delete process.env.RUNTIME_TASK_ACTIVE_USER_TURN_MAX_HEAP_USED_MB;
     delete process.env.RUNTIME_TASK_ACTIVE_USER_TURN_MAX_RSS_MB;
+    delete process.env.RUNTIME_TASK_ACTIVE_USER_TURN_RESUME_HEAP_USED_MB;
+    delete process.env.RUNTIME_TASK_ACTIVE_USER_TURN_RESUME_RSS_MB;
     runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
   });
 
@@ -490,7 +496,7 @@ describe("runtime memory governor", () => {
     decision.lease?.release("completed");
   });
 
-  it("keeps active user turn memory headroom configurable through task env limits", () => {
+  it("rejects active user turns under configured hard memory pressure", () => {
     process.env.RUNTIME_TASK_ACTIVE_USER_TURN_MAX_HEAP_USED_MB = "600";
     process.env.RUNTIME_TASK_ACTIVE_USER_TURN_MAX_RSS_MB = "1000";
     runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
@@ -500,11 +506,44 @@ describe("runtime memory governor", () => {
 
     const decision = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "active_user_turn" });
 
-    expect(decision.admitted).toBe(true);
-    expect(decision.reason).toBe("ok");
+    expect(decision.admitted).toBe(false);
+    expect(decision.action).toBe("reject_memory_pressure");
+    expect(decision.reason).toBe("heap_used_limit");
     expect(decision.pressureLevel).toBe("hard_pressure");
     expect(decision.limits.maxHeapUsedMiB).toBe(600);
     expect(decision.limits.maxRssMiB).toBe(1000);
+  });
+
+  it("admits active user turns under soft pressure after preserving foreground workload", () => {
+    process.env.RUNTIME_TASK_ACTIVE_USER_TURN_MAX_HEAP_USED_MB = "1000";
+    process.env.RUNTIME_TASK_ACTIVE_USER_TURN_MAX_RSS_MB = "1500";
+    process.env.RUNTIME_TASK_ACTIVE_USER_TURN_RESUME_HEAP_USED_MB = "600";
+    process.env.RUNTIME_TASK_ACTIVE_USER_TURN_RESUME_RSS_MB = "900";
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+      memoryReader: memoryReader({ heapUsed: 700 * mib, rss: 1200 * mib }),
+      hostMemoryReader: hostReader(),
+    });
+
+    const decision = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "active_user_turn" });
+
+    expect(decision.admitted).toBe(true);
+    expect(decision.action).toBe("admit");
+    expect(decision.pressureLevel).toBe("soft_pressure");
+    decision.lease?.release("completed");
+  });
+
+  it("classifies low host free ratio as soft pressure before the hard host limit", () => {
+    process.env.RUNTIME_MEMORY_HOST_FREE_RATIO_SOFT_MIN = "0.18";
+    process.env.RUNTIME_MEMORY_HOST_FREE_RATIO_MIN = "0.14";
+    runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+      memoryReader: memoryReader({ heapUsed: 100 * mib, rss: 200 * mib }),
+      hostMemoryReader: hostReader(0.14),
+    });
+
+    const decision = runtimeMemoryGovernor.admitRuntimeTask({ taskClass: "active_user_turn" });
+
+    expect(decision.admitted).toBe(true);
+    expect(decision.pressureLevel).toBe("soft_pressure");
     decision.lease?.release("completed");
   });
 

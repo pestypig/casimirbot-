@@ -14,6 +14,7 @@ import {
 import { runtimeMemoryGovernor } from "../runtime/runtime-memory-governor";
 import { resolveLocalLlmRuntimeDiagnostics } from "../llm/local-runtime";
 import { getRuntimeArtifactStatuses } from "../llm/runtime-artifacts";
+import { getHelixAskTurnAdmissionSnapshot } from "../helix-ask/ask-turn-admission";
 import {
   getHelixWorkstationCommandReliabilityStatus,
   getLatestHelixWorkstationBrowserPerformanceSample,
@@ -461,6 +462,45 @@ const buildCommandReliabilityProcess = (
   });
 };
 
+const buildAskTurnAdmissionProcess = (
+  generatedAt: string,
+): HelixWorkstationTaskManagerProcess => {
+  const snapshot = getHelixAskTurnAdmissionSnapshot();
+  const status: HelixWorkstationTaskManagerProcessStatus =
+    snapshot.queued_turn_count > 0
+      ? "queued"
+      : snapshot.active_workloads > 0
+        ? "active"
+        : "idle";
+  return withHelixWorkstationTaskManagerAuthority({
+    process_id: "helix.ask_turn_admission",
+    label: "Helix Ask turn admission",
+    kind: "runtime_task_class",
+    status,
+    task_class: "active_user_turn",
+    source: "helix_ask_turn_admission",
+    updated_at: generatedAt,
+    memory: {
+      source: "runtime_governor_task_budget",
+      approximate: true,
+      observed: false,
+      estimate_mib: null,
+      pressure: status === "queued" ? "degraded" : "normal",
+    },
+    diagnostics: {
+      schema: snapshot.schema,
+      active_workloads: snapshot.active_workloads,
+      max_active_workloads: snapshot.max_active_workloads,
+      queued_turn_count: snapshot.queued_turn_count,
+      max_queue_depth: snapshot.max_queue_depth,
+      active_session_count: snapshot.active_sessions.length,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    },
+  });
+};
+
 export async function buildHelixWorkstationTaskManagerSnapshot(
   input: {
     thread_id?: string | null;
@@ -485,6 +525,7 @@ export async function buildHelixWorkstationTaskManagerSnapshot(
     pressureLevel = taskSnapshot.pressureLevel;
     processes.push(buildServerRuntimeProcess(memorySnapshot, taskSnapshot, generatedAt));
     processes.push(buildLocalAiRuntimeProcess(generatedAt));
+    processes.push(buildAskTurnAdmissionProcess(generatedAt));
     processes.push(...buildTaskClassProcesses(taskSnapshot, generatedAt));
     processes.push(...buildActiveTaskProcesses(taskSnapshot, generatedAt));
   } catch (error) {

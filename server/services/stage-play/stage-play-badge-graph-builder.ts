@@ -30,6 +30,7 @@ import {
   type StagePlayCheckpointFreshnessV1,
 } from "./stage-play-checkpoint-freshness";
 import {
+  listStagePlayPerturbationEvents,
   recordStagePlayPerturbationFromGraph,
 } from "./stage-play-perturbation-event-store";
 import type { StagePlayPerturbationEventV1 } from "@shared/contracts/stage-play-perturbation-event.v1";
@@ -48,6 +49,7 @@ export type BuildStagePlayGraphFromWorldInput = {
   objective?: string | null;
   now?: Date;
   askCheckpointReceipt?: StagePlayAskCheckpointReceiptV1 | null;
+  readOnly?: boolean;
 };
 
 export type StagePlayAskCheckpointReceiptV1 = {
@@ -1695,6 +1697,7 @@ export function buildStagePlayRecommendedActionAdmissionV1(
 export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorldInput): StagePlayBadgeGraphV1 {
   const now = input.now ?? new Date();
   const resolvedAt = now.toISOString();
+  const readOnly = input.readOnly === true;
   const roomId = input.roomId ?? null;
   const sourceWindow = resolveStagePlaySourceWindow({
     threadId: input.threadId,
@@ -1779,7 +1782,7 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
       checkpoint: checkpointCandidateFromReceipt(askCheckpointReceiptCandidate),
     });
     const askCheckpointReceipt = checkpointFreshness.fresh ? askCheckpointReceiptCandidate : null;
-    if (askCheckpointReceipt) {
+    if (askCheckpointReceipt && !readOnly) {
       completeStagePlayCheckpointRequestForGraph({
         graphId,
         checkpointRequestId: askCheckpointReceipt.checkpointRequestId,
@@ -1815,18 +1818,25 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
       edges: missingEdges,
       recommendedActions: [],
     });
-    const perturbationResult = recordStagePlayPerturbationFromGraph({
-      jobId,
-      graph: baseGraph,
-      now: resolvedAt,
-    });
-    recordStagePlayCheckpointRequestFromPerturbation({
-      jobId,
-      graph: baseGraph,
-      perturbation: perturbationResult.event,
-      objective: input.objective ?? baseGraph.description,
-      now: resolvedAt,
-    });
+    const perturbationResult = readOnly
+      ? {
+          event: null,
+          latestEvents: listStagePlayPerturbationEvents({ jobId, limit: 10 }),
+        }
+      : recordStagePlayPerturbationFromGraph({
+          jobId,
+          graph: baseGraph,
+          now: resolvedAt,
+        });
+    if (!readOnly) {
+      recordStagePlayCheckpointRequestFromPerturbation({
+        jobId,
+        graph: baseGraph,
+        perturbation: perturbationResult.event,
+        objective: input.objective ?? baseGraph.description,
+        now: resolvedAt,
+      });
+    }
     const checkpointRequests = prioritizeCheckpointRequestsForGraph(
       listStagePlayCheckpointRequests({ jobId, limit: 10 }),
       graphId,
@@ -2857,7 +2867,7 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     checkpoint: checkpointCandidateFromReceipt(askCheckpointReceiptCandidate),
   });
   const askCheckpointReceipt = checkpointFreshness.fresh ? askCheckpointReceiptCandidate : null;
-  if (askCheckpointReceipt) {
+  if (askCheckpointReceipt && !readOnly) {
     completeStagePlayCheckpointRequestForGraph({
       graphId,
       checkpointRequestId: askCheckpointReceipt.checkpointRequestId,
@@ -2895,18 +2905,25 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     edges,
     recommendedActions,
   });
-  const perturbationResult = recordStagePlayPerturbationFromGraph({
-    jobId,
-    graph: baseGraph,
-    now: resolvedAt,
-  });
-  recordStagePlayCheckpointRequestFromPerturbation({
-    jobId,
-    graph: baseGraph,
-    perturbation: perturbationResult.event,
-    objective: input.objective ?? baseGraph.description,
-    now: resolvedAt,
-  });
+  const perturbationResult = readOnly
+    ? {
+        event: null,
+        latestEvents: listStagePlayPerturbationEvents({ jobId, limit: 10 }),
+      }
+    : recordStagePlayPerturbationFromGraph({
+        jobId,
+        graph: baseGraph,
+        now: resolvedAt,
+      });
+  if (!readOnly) {
+    recordStagePlayCheckpointRequestFromPerturbation({
+      jobId,
+      graph: baseGraph,
+      perturbation: perturbationResult.event,
+      objective: input.objective ?? baseGraph.description,
+      now: resolvedAt,
+    });
+  }
   const checkpointRequests = prioritizeCheckpointRequestsForGraph(
     listStagePlayCheckpointRequests({ jobId, limit: 10 }),
     graphId,

@@ -9,7 +9,10 @@ import {
   createLiveAnswerEnvironment,
   resetLiveAnswerEnvironments,
 } from "../services/situation-room/live-answer-environment-store";
-import { resetStagePlayCheckpointQueueForTest } from "../services/stage-play/stage-play-checkpoint-queue";
+import {
+  listStagePlayCheckpointRequests,
+  resetStagePlayCheckpointQueueForTest,
+} from "../services/stage-play/stage-play-checkpoint-queue";
 import {
   resetLiveSourceChunkBufferForTest,
   upsertLiveSourceProducer,
@@ -96,7 +99,7 @@ describe("GET /api/helix/stage-play/graph", () => {
 
     const graphResponse = await request(app)
       .get("/api/helix/stage-play/graph")
-      .query({ threadId: "thread:queue-route" })
+      .query({ threadId: "thread:queue-route", recordSideEffects: "true" })
       .expect(200);
     const requestId = graphResponse.body.checkpointRequests[0]?.checkpointRequestId;
     const jobId = graphResponse.body.checkpointRequests[0]?.jobId;
@@ -134,6 +137,27 @@ describe("GET /api/helix/stage-play/graph", () => {
       context_role: "tool_evidence",
     });
     expect(runResponse.body.request.status).toBe("running");
+  });
+
+  it("keeps graph polling read-only unless side effects are explicitly requested", async () => {
+    const app = makeApp();
+    upsertLiveSourceProducer({
+      sourceId: "visual_source:read-only-route",
+      threadId: "thread:read-only-route",
+      modality: "visual_frame",
+      status: "active",
+      cadenceMs: 10000,
+      captureMode: "interval",
+      latestChunkId: "live_source_chunk:read-only-route",
+      now: "2026-06-03T12:00:00.000Z",
+    });
+
+    await request(app)
+      .get("/api/helix/stage-play/graph")
+      .query({ threadId: "thread:read-only-route" })
+      .expect(200);
+
+    expect(listStagePlayCheckpointRequests({ limit: 10 })).toEqual([]);
   });
 
   it("returns builder catalog and source-query artifacts for the panel", async () => {
@@ -668,6 +692,10 @@ describe("GET /api/helix/stage-play/live-source-mail", () => {
 
     const full = await request(app)
       .get("/api/helix/stage-play/live-source-mail")
+      .query({ threadId: "thread:mail-overview-route", view: "full" })
+      .expect(200);
+    const defaultView = await request(app)
+      .get("/api/helix/stage-play/live-source-mail")
       .query({ threadId: "thread:mail-overview-route" })
       .expect(200);
     const overview = await request(app)
@@ -676,6 +704,7 @@ describe("GET /api/helix/stage-play/live-source-mail", () => {
       .expect(200);
 
     expect(full.body.view).toBe("full");
+    expect(defaultView.body.view).toBe("overview");
     expect(overview.body.view).toBe("overview");
     expect(full.body.mailItems[0].summary.text.length).toBeGreaterThan(overview.body.mailItems[0].summary.text.length);
     expect(overview.body.mailItems[0].summary.text.length).toBeLessThanOrEqual(703);
@@ -685,6 +714,48 @@ describe("GET /api/helix/stage-play/live-source-mail", () => {
       context_role: "tool_evidence",
       raw_content_included: false,
     });
+  });
+});
+
+describe("GET /api/helix/stage-play/live-source-mail/transcript", () => {
+  it("returns compact transcript rows by default while preserving the full debug view", async () => {
+    const app = makeApp();
+    const longBody = "Minecraft gameplay observer transcript payload. ".repeat(120);
+    recordStagePlayLiveSourceMailTranscriptEntries({
+      threadId: "thread:mail-transcript-route",
+      wakeRequestId: "stage_play_live_source_mail_wake:transcript-route",
+      mailIds: ["stage_play_live_source_mail:transcript-route"],
+      sourceIds: ["visual_source:transcript-route"],
+      evidenceRefs: Array.from({ length: 40 }, (_, index) => `visual_evidence:transcript-route-${index}`),
+      rows: [
+        {
+          rowId: "stage_play_live_source_mail_transcript_row:transcript-route",
+          rowKind: "processed_mail_packet",
+          title: "Processed packet",
+          body: longBody,
+          source: {
+            artifactId: "stage_play_processed_mail_packet:transcript-route",
+            artifactKind: "processed_mail_packet",
+          },
+          evidenceRefs: Array.from({ length: 40 }, (_, index) => `stage_play_evidence_ref:transcript-route-${index}`),
+        },
+      ],
+    });
+
+    const compact = await request(app)
+      .get("/api/helix/stage-play/live-source-mail/transcript")
+      .query({ threadId: "thread:mail-transcript-route" })
+      .expect(200);
+    const full = await request(app)
+      .get("/api/helix/stage-play/live-source-mail/transcript")
+      .query({ threadId: "thread:mail-transcript-route", view: "full" })
+      .expect(200);
+
+    expect(compact.body.view).toBe("overview");
+    expect(full.body.view).toBe("full");
+    expect(compact.body.entries[0].row.body.length).toBeLessThan(full.body.entries[0].row.body.length);
+    expect(compact.body.entries[0].evidenceRefs.length).toBeLessThan(full.body.entries[0].evidenceRefs.length);
+    expect(compact.body.transcriptRows[0].body.length).toBeLessThanOrEqual(703);
   });
 });
 

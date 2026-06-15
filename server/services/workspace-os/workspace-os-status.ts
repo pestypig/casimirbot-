@@ -44,6 +44,7 @@ import { listEnvironmentSourceAvailabilities } from "../situation-room/environme
 import { runtimeMemoryGovernor } from "../runtime/runtime-memory-governor";
 import { resolveLocalLlmRuntimeDiagnostics } from "../llm/local-runtime";
 import { getRuntimeArtifactStatuses } from "../llm/runtime-artifacts";
+import { getHelixAskTurnAdmissionSnapshot } from "../helix-ask/ask-turn-admission";
 
 const DEFAULT_THREAD_ID = "helix-ask:desktop";
 const REDACTED = "[redacted]";
@@ -687,6 +688,7 @@ export async function buildHelixWorkspaceOsStatus(
   try {
     const memorySnapshot = readers.getRuntimeMemorySnapshot();
     const taskSnapshot = readers.getRuntimeTaskSnapshot();
+    const askAdmissionSnapshot = getHelixAskTurnAdmissionSnapshot();
     const recentDecisions: Array<{ action: string; admitted: boolean }> = Array.isArray(taskSnapshot.recentDecisions)
       ? taskSnapshot.recentDecisions
       : [];
@@ -723,6 +725,32 @@ export async function buildHelixWorkspaceOsStatus(
         registered_pausable_task_count: taskSnapshot.registeredPausableTasks.length,
         queued_recent_decision_count: queued,
         rejected_recent_decision_count: rejected,
+      },
+    }));
+    capabilities.push(makeRecord({
+      capability_id: "helix.ask_turn_admission",
+      surface: "runtime_memory",
+      mode: "diagnostic",
+      status: askAdmissionSnapshot.queued_turn_count > 0
+        ? "degraded"
+        : askAdmissionSnapshot.active_workloads >= askAdmissionSnapshot.max_active_workloads
+          ? "bound"
+          : "available",
+      label: "Helix Ask turn admission queue",
+      source: "helix_ask_turn_admission",
+      last_verified_at: generatedAt,
+      evidence_refs: [askAdmissionSnapshot.schema],
+      fallbacks: ["runtime.memory", "workstation.task_manager"],
+      diagnostics: {
+        active_workloads: askAdmissionSnapshot.active_workloads,
+        max_active_workloads: askAdmissionSnapshot.max_active_workloads,
+        queued_turn_count: askAdmissionSnapshot.queued_turn_count,
+        max_queue_depth: askAdmissionSnapshot.max_queue_depth,
+        active_session_count: askAdmissionSnapshot.active_sessions.length,
+        workspace_os_status_executes: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
       },
     }));
   } catch (error) {

@@ -457,7 +457,9 @@ const readLiveSourceMailView = (value: unknown): StagePlayLiveSourceMailView =>
     ? "operator"
     : readQueryString(value)?.toLowerCase() === "overview"
       ? "overview"
-      : "full";
+      : readQueryString(value)?.toLowerCase() === "full"
+        ? "full"
+        : "overview";
 
 const compactStagePlayRouteText = (value: unknown, max = 360): string => {
   const text = String(value ?? "").replace(/\s+/g, " ").trim();
@@ -567,6 +569,48 @@ const compactStagePlayWakeResultForOverview = <T extends Record<string, any>>(re
         phaseResolution: undefined,
       }
     : result.stagePlayWakeTransaction,
+  causalTrace: undefined,
+});
+
+const compactStagePlayTranscriptRowForOverview = <T extends Record<string, any>>(row: T): T => ({
+  ...row,
+  body: compactStagePlayRouteText(row.body, 700),
+  text: compactStagePlayRouteText(row.text, 700),
+  content: compactStagePlayRouteText(row.content, 700),
+  summary: compactStagePlayRouteText(row.summary, 500),
+  detail: compactStagePlayRouteText(row.detail, 500),
+  message: compactStagePlayRouteText(row.message, 500),
+  prompt: undefined,
+  rawPrompt: undefined,
+  raw_prompt: undefined,
+  rawOutput: undefined,
+  raw_output: undefined,
+  metadata: row.metadata && typeof row.metadata === "object"
+    ? {
+        ...row.metadata,
+        evidenceRefs: compactStagePlayRouteRefs(row.metadata.evidenceRefs, 12),
+        routeMetadata: undefined,
+        causalTrace: undefined,
+      }
+    : row.metadata,
+});
+
+const compactStagePlayTranscriptEntryForOverview = <T extends Record<string, any>>(entry: T): T => ({
+  ...entry,
+  row: entry.row && typeof entry.row === "object"
+    ? compactStagePlayTranscriptRowForOverview(entry.row)
+    : entry.row,
+  decisionIds: compactStagePlayRouteRefs(entry.decisionIds, 8),
+  mailIds: compactStagePlayRouteRefs(entry.mailIds, 12),
+  sourceIds: compactStagePlayRouteRefs(entry.sourceIds, 4),
+  packetIds: compactStagePlayRouteRefs(entry.packetIds, 8),
+  evidenceRefs: compactStagePlayRouteRefs(entry.evidenceRefs, 18),
+  deckVerdict: entry.deckVerdict && typeof entry.deckVerdict === "object"
+    ? {
+        ...entry.deckVerdict,
+        reason: compactStagePlayRouteText(entry.deckVerdict.reason, 240),
+      }
+    : entry.deckVerdict,
   causalTrace: undefined,
 });
 
@@ -867,12 +911,16 @@ helixStagePlayRouter.get("/graph", (req: Request, res: Response) => {
   res.setHeader("Cache-Control", "no-store");
 
   try {
+    const recordSideEffects =
+      readQueryBoolean(req.query.recordSideEffects) ||
+      readQueryBoolean(req.query.record_side_effects);
     const graph = buildStagePlayGraphFromWorld({
       threadId: readQueryString(req.query.threadId) ?? "stage-play-panel",
       roomId: readQueryString(req.query.roomId),
       environmentId: readQueryString(req.query.environmentId),
       sourceId: readQueryString(req.query.sourceId),
       objective: readQueryString(req.query.objective),
+      readOnly: !recordSideEffects,
     });
     const issues = validateStagePlayBadgeGraphV1(graph);
 
@@ -1976,7 +2024,12 @@ helixStagePlayRouter.get("/live-source-mail/transcript", (req: Request, res: Res
     const environmentId = readQueryString(req.query.environmentId) ?? readQueryString(req.query.environment_id);
     const wakeRequestId = readQueryString(req.query.wakeRequestId) ?? readQueryString(req.query.wake_request_id);
     const askTurnId = readQueryString(req.query.askTurnId) ?? readQueryString(req.query.ask_turn_id);
-    const limit = readOptionalNumber(req.query.limit) ?? 80;
+    const view = readLiveSourceMailView(req.query.view);
+    const overview = view !== "full";
+    const limit = Math.min(
+      Math.max(readOptionalNumber(req.query.limit) ?? (overview ? 24 : 80), 1),
+      overview ? 30 : 100,
+    );
     const entries: StagePlayLiveSourceMailTranscriptEntryV1[] = listStagePlayLiveSourceMailTranscriptEntries({
       threadId,
       roomId,
@@ -1985,22 +2038,26 @@ helixStagePlayRouter.get("/live-source-mail/transcript", (req: Request, res: Res
       askTurnId,
       limit,
     });
+    const responseEntries = overview
+      ? entries.map(compactStagePlayTranscriptEntryForOverview)
+      : entries;
     return res.json({
       ok: true,
       schema: "stage_play_live_source_mail_transcript_response/v1",
+      view,
       requestedThreadId,
       mailboxThreadId: threadId,
       mailboxThreadResolution,
       threadId,
       roomId,
       environmentId,
-      entries,
-      transcriptRows: entries.map((entry: StagePlayLiveSourceMailTranscriptEntryV1) => entry.row),
-      transcriptEntryIds: entries.map((entry: StagePlayLiveSourceMailTranscriptEntryV1) => entry.entryId),
+      entries: responseEntries,
+      transcriptRows: responseEntries.map((entry: StagePlayLiveSourceMailTranscriptEntryV1) => entry.row),
+      transcriptEntryIds: responseEntries.map((entry: StagePlayLiveSourceMailTranscriptEntryV1) => entry.entryId),
       evidenceRefs: uniqueStrings(entries.flatMap((entry: StagePlayLiveSourceMailTranscriptEntryV1) => [
         entry.entryId,
         ...entry.evidenceRefs,
-      ])),
+      ])).slice(0, overview ? 120 : 500),
       assistant_answer: false,
       terminal_eligible: false,
       context_role: "tool_evidence",
