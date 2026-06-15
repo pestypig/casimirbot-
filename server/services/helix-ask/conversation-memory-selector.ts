@@ -508,6 +508,114 @@ const detectContextResumeCue = (promptText: string): boolean => {
   return /\b(?:pasted\s+(?:text|memo|note|document)|attached\s+(?:text|memo|note|document)|copied\s+(?:text|memo|note|document)|(?:text|memo|note|document)\s+attachment|attachment|previous\s+(?:paste|memo|note|document)|last\s+(?:paste|memo|note|document)|(?:paste|memo|note|document|text)\s+from\s+the\s+previous|pasted\s+(?:text|memo|note|document)\s+from\s+the\s+previous)\b/.test(text);
 };
 
+const contextResumeFrameArtifactKey = (frame: HelixContextResumeFrame): string =>
+  frame.attachment_artifact_refs.length > 0
+    ? `refs:${frame.attachment_artifact_refs.join("\u001f")}`
+    : frame.pasted_attachment_sha256
+      ? `sha256:${frame.pasted_attachment_sha256}`
+      : frame.pasted_attachment_id
+        ? `attachment:${frame.pasted_attachment_id}`
+        : `frame:${frame.id}`;
+
+const contextResumeFrameFreshness = (frame: HelixContextResumeFrame): number =>
+  frame.installed_at_ms ?? frame.created_at_ms ?? 0;
+
+const compareContextResumeFrameFreshness = (
+  a: HelixContextResumeFrame,
+  b: HelixContextResumeFrame,
+): number => {
+  const byTime = contextResumeFrameFreshness(a) - contextResumeFrameFreshness(b);
+  if (byTime !== 0) return byTime;
+  return String(a.source_turn_id).localeCompare(String(b.source_turn_id));
+};
+
+const normalizeExplicitContextResumeFrame = (
+  frame: HelixContextResumeFrame,
+): HelixContextResumeFrame => ({
+  ...frame,
+  created_at_ms: readTimestampMs(frame.created_at_ms),
+  installed_at_ms: readTimestampMs(frame.installed_at_ms) ?? readTimestampMs(frame.created_at_ms),
+  status:
+    frame.status === "pending" || frame.status === "failed" || frame.status === "installed"
+      ? frame.status
+      : "installed",
+  supersedes_resume_frame_ids: Array.isArray(frame.supersedes_resume_frame_ids)
+    ? frame.supersedes_resume_frame_ids.map((entry) => normalizeText(entry)).filter(Boolean)
+    : [],
+});
+
+const selectContextResumeFrames = (input: {
+  frames: HelixContextResumeFrame[];
+  threadId: string;
+  sessionId?: string | null;
+  maxTurns: number;
+}): { frames: HelixContextResumeFrame[]; debug: HelixContextResumeFrameSelectionDebug } => {
+  const rejected: HelixContextResumeFrameSelectionDebug["rejected_context_resume_frames"] = [];
+  const candidateIds = input.frames.map((frame) => frame.id);
+  const validFrames = input.frames.filter((frame) => {
+    if (frame.thread_id && frame.thread_id !== input.threadId) {
+      rejected.push({
+        frame_id: frame.id,
+        source_turn_id: frame.source_turn_id,
+        status: frame.status ?? null,
+        reason: "thread_mismatch",
+      });
+      return false;
+    }
+    if (input.sessionId && frame.session_id && frame.session_id !== input.sessionId) {
+      rejected.push({
+        frame_id: frame.id,
+        source_turn_id: frame.source_turn_id,
+        status: frame.status ?? null,
+        reason: "session_mismatch",
+      });
+      return false;
+    }
+    return true;
+  });
+  const ordered = [...validFrames].sort(compareContextResumeFrameFreshness);
+  const freshest = ordered.at(-1) ?? null;
+  if (!freshest) {
+    return {
+      frames: [],
+      debug: {
+        selected_context_resume_frame_id: null,
+        selected_context_resume_source_turn_id: null,
+        selected_context_resume_reason: "no_current_thread_attachment_frame",
+        current_thread_id: input.threadId,
+        current_session_id: input.sessionId ?? null,
+        candidate_context_resume_frame_ids: candidateIds,
+        rejected_context_resume_frames: rejected,
+      },
+    };
+  }
+  const selectedKey = contextResumeFrameArtifactKey(freshest);
+  const selectedFrames = ordered
+    .filter((frame) => contextResumeFrameArtifactKey(frame) === selectedKey)
+    .slice(-input.maxTurns);
+  for (const frame of ordered) {
+    if (contextResumeFrameArtifactKey(frame) === selectedKey) continue;
+    rejected.push({
+      frame_id: frame.id,
+      source_turn_id: frame.source_turn_id,
+      status: frame.status ?? null,
+      reason: "superseded_by_newer_pasted_attachment",
+    });
+  }
+  return {
+    frames: selectedFrames,
+    debug: {
+      selected_context_resume_frame_id: freshest.id,
+      selected_context_resume_source_turn_id: freshest.source_turn_id,
+      selected_context_resume_reason: "freshest_installed_current_thread_frame",
+      current_thread_id: input.threadId,
+      current_session_id: input.sessionId ?? null,
+      candidate_context_resume_frame_ids: candidateIds,
+      rejected_context_resume_frames: rejected,
+    },
+  };
+};
+
 const detectPendingSlotFillCue = (promptText: string): boolean => {
   const text = normalizeLower(promptText);
   if (!text) return false;
@@ -655,6 +763,7 @@ const buildEmptyPacket = (args: {
   pending_user_inputs: [],
   unresolved_task_frames: [],
   context_resume_frames: [],
+  context_resume_frame_selection: null,
   latest_plan_summary: null,
   latest_answer_summary: null,
   latest_failure_summary: null,
@@ -780,16 +889,24 @@ export function buildHelixConversationMemoryPacket(
   const contextResumeFrames = state.unresolved_requests
     .map(coerceContextResumeFrame)
     .filter((frame): frame is HelixContextResumeFrame => Boolean(frame))
-    .slice(0, maxTurns);
+    .slice(-maxTurns);
   const explicitContextResumeFrames = Array.isArray(input.contextResumeFrames)
-    ? input.contextResumeFrames.filter((frame): frame is HelixContextResumeFrame =>
-        Boolean(frame && frame.schema === "helix.pasted_text_attachment_resume_frame.v1"),
-      )
+    ? input.contextResumeFrames
+        .filter((frame): frame is HelixContextResumeFrame =>
+          Boolean(frame && frame.schema === "helix.pasted_text_attachment_resume_frame.v1"),
+        )
+        .map(normalizeExplicitContextResumeFrame)
     : [];
-  const selectedContextResumeFrames = [
-    ...contextResumeFrames,
-    ...explicitContextResumeFrames,
-  ].slice(-maxTurns);
+  const contextResumeFrameSelection = selectContextResumeFrames({
+    frames: [
+      ...contextResumeFrames,
+      ...explicitContextResumeFrames,
+    ],
+    threadId,
+    sessionId,
+    maxTurns,
+  });
+  const selectedContextResumeFrames = contextResumeFrameSelection.frames;
   const pendingSlotFillCue =
     unresolvedTaskFrames.length > 0 &&
     detectPendingSlotFillCue(input.promptText) &&
@@ -936,6 +1053,7 @@ export function buildHelixConversationMemoryPacket(
     pending_user_inputs: unique(pendingInputs, maxTurns),
     unresolved_task_frames: unresolvedTaskFrames,
     context_resume_frames: selectedContextResumeFrames,
+    context_resume_frame_selection: contextResumeFrameSelection.debug,
     latest_plan_summary: latestPlanSummary,
     latest_answer_summary: memoryAllowedForCurrentGoal ? latestAnswerSummary : null,
     latest_failure_summary: latestFailure,
@@ -979,11 +1097,17 @@ export function buildHelixConversationMemoryDebug(packet: HelixConversationMemor
     context_resume_frames: packet.context_resume_frames.map((frame) => ({
       id: frame.id,
       schema: frame.schema,
+      thread_id: frame.thread_id ?? null,
+      session_id: frame.session_id ?? null,
       source_request_id: frame.source_request_id,
       source_turn_id: frame.source_turn_id,
+      created_at_ms: frame.created_at_ms ?? null,
+      installed_at_ms: frame.installed_at_ms ?? null,
+      status: frame.status ?? null,
       attachment_artifact_refs: frame.attachment_artifact_refs,
       attachment_preview_count: frame.attachment_previews.length,
     })),
+    context_resume_frame_selection: packet.context_resume_frame_selection ?? null,
     allowed_for_current_goal: packet.allowed_for_current_goal,
     allowed_reason: packet.allowed_reason,
     allowed_use: packet.allowed_use,
@@ -1039,6 +1163,9 @@ export function renderHelixConversationMemoryForModel(
             ].join(" "),
           )
           .join("; ")}`
+      : "",
+    packet.context_resume_frame_selection?.selected_context_resume_frame_id
+      ? `selected context resume frame: ${packet.context_resume_frame_selection.selected_context_resume_frame_id} reason=${packet.context_resume_frame_selection.selected_context_resume_reason}`
       : "",
     packet.missing_or_uncertain.length > 0
       ? `missing or uncertain: ${packet.missing_or_uncertain.join("; ")}`
