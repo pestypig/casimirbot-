@@ -438,6 +438,48 @@ const readStructuredStringArray = (record: Record<string, unknown>, key: string)
   }));
 };
 
+const readStructuredValueTexts = (record: Record<string, unknown>, key: string): string[] => {
+  const value = record[key];
+  if (typeof value === "string" && value.trim()) return [value.trim()];
+  if (Array.isArray(value)) {
+    return uniqueStrings(value.map((entry) => {
+      if (typeof entry === "string") return entry;
+      if (entry && typeof entry === "object") return JSON.stringify(entry);
+      return String(entry ?? "");
+    }));
+  }
+  if (value && typeof value === "object") return [JSON.stringify(value)];
+  return [];
+};
+
+const readNestedStringArray = (
+  record: Record<string, unknown>,
+  objectKey: string,
+  listKey: string,
+): string[] => {
+  const nested = readRecord(record[objectKey]);
+  if (!nested) return [];
+  return readStructuredStringArray(nested, listKey);
+};
+
+const readSalienceCandidateEntries = (
+  record: Record<string, unknown>,
+  key: "risks" | "opportunities",
+): string[] => {
+  const salience = readRecord(record.salience_candidates);
+  if (!salience) return [];
+  const values = salience[key];
+  if (!Array.isArray(values)) return [];
+  return uniqueStrings(values.map((entry) => {
+    if (typeof entry === "string") return entry;
+    const candidate = readRecord(entry);
+    if (!candidate) return String(entry ?? "");
+    const label = readStructuredString(candidate, "label") ?? "";
+    const evidence = readStructuredString(candidate, "evidence") ?? "";
+    return [label, evidence].filter(Boolean).join(": ");
+  }));
+};
+
 const structuredObserverFactsFor = (input: {
   mailItems: StagePlayLiveSourceMailItemV1[];
 }): {
@@ -471,35 +513,70 @@ const structuredObserverFactsFor = (input: {
   const watchNext: string[] = [];
 
   for (const { mailId, record } of records) {
-    for (const key of ["scene", "hud", "hotbar", "selected_item", "crosshair_target", "current_action"]) {
-      const value = readStructuredString(record, key);
-      if (value) observedFacts.push(`${mailId} ${key}: ${value}`);
+    for (const key of [
+      "scene",
+      "hud",
+      "hotbar",
+      "selected_item",
+      "crosshair_target",
+      "current_action",
+      "frame_overview",
+      "near_field",
+      "mid_field",
+      "far_field",
+      "visual_features",
+      "text_read",
+      "minecraft_objects",
+      "affordances",
+    ]) {
+      for (const value of readStructuredValueTexts(record, key)) {
+        observedFacts.push(`${mailId} ${key}: ${value}`);
+      }
     }
     for (const entity of readStructuredStringArray(record, "visible_entities")) {
       observedFacts.push(`${mailId} visible_entity: ${entity}`);
       objectTags.push(entity);
     }
+    for (const entity of readNestedStringArray(record, "minecraft_objects", "entities")) {
+      observedFacts.push(`${mailId} visible_entity: ${entity}`);
+      objectTags.push(entity);
+    }
+    for (const block of readNestedStringArray(record, "minecraft_objects", "blocks")) objectTags.push(block);
+    for (const item of readNestedStringArray(record, "minecraft_objects", "items")) objectTags.push(item);
+    for (const workstation of readNestedStringArray(record, "minecraft_objects", "workstations")) objectTags.push(workstation);
+    for (const container of readNestedStringArray(record, "minecraft_objects", "containers")) objectTags.push(container);
     for (const change of readStructuredStringArray(record, "changed_since_last_frame")) {
       changedFacts.push(`${mailId}: ${change}`);
+    }
+    for (const uncertainty of readStructuredStringArray(record, "uncertainty")) {
+      uncertainties.push(`${mailId}: ${uncertainty}`);
     }
     for (const risk of readStructuredStringArray(record, "risk_cues")) {
       riskMatches.push(risk);
     }
+    riskMatches.push(...readSalienceCandidateEntries(record, "risks"));
     for (const opportunity of readStructuredStringArray(record, "opportunity_cues")) {
       opportunityMatches.push(opportunity);
     }
+    opportunityMatches.push(...readSalienceCandidateEntries(record, "opportunities"));
     const prediction = readStructuredString(record, "next_10s_prediction");
     if (prediction) {
       inferredFacts.push(`${mailId} next_10s_prediction: ${prediction}`);
       watchNext.push(prediction);
     }
-    const scene = readStructuredString(record, "scene");
-    if (scene) sceneTags.push(...sceneTagsFor([scene]));
+    const sceneTexts = [
+      ...readStructuredValueTexts(record, "scene"),
+      ...readStructuredValueTexts(record, "frame_overview"),
+      ...readStructuredValueTexts(record, "near_field"),
+      ...readStructuredValueTexts(record, "mid_field"),
+      ...readStructuredValueTexts(record, "far_field"),
+    ];
+    if (sceneTexts.length > 0) sceneTags.push(...sceneTagsFor(sceneTexts));
     const action = readStructuredString(record, "current_action");
     if (action) activityTags.push(action);
-    for (const key of ["hud", "hotbar", "selected_item", "crosshair_target"]) {
-      const value = readStructuredString(record, key);
-      if (value && /\b(?:uncertain|not clear|unclear|not visible|unknown)\b/i.test(value)) {
+    for (const key of ["hud", "hotbar", "selected_item", "crosshair_target", "text_read", "minecraft_objects"]) {
+      for (const value of readStructuredValueTexts(record, key)) {
+        if (!/\b(?:uncertain|not clear|unclear|not visible|unknown|unreadable|ambiguous)\b/i.test(value)) continue;
         uncertainties.push(`${mailId} ${key}: ${value}`);
       }
     }
@@ -558,6 +635,12 @@ const recommendedNextFor = (input: {
 const evidenceMatching = (values: string[], pattern: RegExp, limit = 4): string[] =>
   values.filter((value) => pattern.test(value)).slice(0, limit);
 
+const minecraftImmediateHazardPattern =
+  /\b(?:on fire|fire damage|burning|damage|damaged|low health|hostile(?: mob)?|creeper|zombie|skeleton|combat|attack|lava)\b/i;
+
+const minecraftCaveExplorationPattern =
+  /\b(?:cave|underground|mining|mine|dark cave|ore|lava)\b/i;
+
 const estimateEffort = (input: {
   observedFacts: string[];
   inferredFacts: string[];
@@ -576,9 +659,9 @@ const estimateEffort = (input: {
   const text = facts.join("\n").toLowerCase();
   const matches = (pattern: RegExp) => evidenceMatching(facts, pattern);
   const effort =
-    /\b(?:fire|damage|low health|hostile|mob|creeper|zombie|skeleton|combat|recover|retreat)\b/i.test(text)
+    minecraftImmediateHazardPattern.test(text) || /\b(?:recover|retreat)\b/i.test(text)
       ? "combat_or_recovery"
-      : /\b(?:cave|underground|mining|mine|dark|ore|lava)\b/i.test(text)
+      : minecraftCaveExplorationPattern.test(text)
         ? "cave_exploration"
         : /\b(?:tree|forest|outdoor|surface|plains|sky|daylight|night)\b/i.test(text)
           ? "surface_exploration"
@@ -590,10 +673,10 @@ const estimateEffort = (input: {
           ? "building_or_crafting"
               : "unknown";
   const evidenceFor = matches(
-    effort === "combat_or_recovery" ? /\b(?:fire|damage|low health|hostile|mob|creeper|zombie|skeleton|combat|recover|retreat)\b/i :
+    effort === "combat_or_recovery" ? /\b(?:on fire|fire damage|burning|damage|damaged|low health|hostile(?: mob)?|creeper|zombie|skeleton|combat|attack|lava|recover|retreat)\b/i :
       effort === "inventory_management" ? /\b(?:chest|inventory|storage|sort|ui|menu)\b/i :
       effort === "building_or_crafting" ? /\b(?:craft|furnace|building|build|place block|workbench)\b/i :
-      effort === "cave_exploration" ? /\b(?:cave|underground|mining|mine|dark|ore|lava)\b/i :
+      effort === "cave_exploration" ? minecraftCaveExplorationPattern :
       effort === "surface_exploration" ? /\b(?:tree|forest|outdoor|surface|plains|sky|daylight|night)\b/i :
       /\b(?:travel|navigation|route|moving|walking|bridge|path)\b/i,
   );
@@ -633,9 +716,9 @@ const extractAxioms = (input: {
   const axioms = uniqueStrings([
     input.effort.currentEffort !== "unknown" ? `current effort: ${input.effort.currentEffort}` : null,
     /\b(?:base|interior|chest)\b/i.test(text) ? "location/interface: base or inventory context visible" : null,
-    /\b(?:cave|underground|dark|mining|lava)\b/i.test(text) ? "location: cave or underground exploration context" : null,
+    minecraftCaveExplorationPattern.test(text) ? "location: cave or underground exploration context" : null,
     /\b(?:outdoor|forest|surface|sky|tree)\b/i.test(text) ? "location: surface/outdoor context" : null,
-    /\b(?:fire|damage|low health|lava|hostile|mob|creeper|zombie|skeleton)\b/i.test(text) ? "hazard: immediate risk cue present" : null,
+    minecraftImmediateHazardPattern.test(text) ? "hazard: immediate risk cue present" : null,
     /\b(?:pickaxe|sword|torch|hotbar|selected_item|selected item)\b/i.test(text) ? "gear/interface: selected item or hotbar evidence present" : null,
     /\b(?:ore|diamond|resource)\b/i.test(text) ? "opportunity: resource cue present" : null,
   ]);
@@ -881,7 +964,7 @@ const buildProcessedMailEvidenceHandles = (input: {
         startTimeMs: frameReceipts[0]!.monotonicTimeMs,
         endTimeMs: frameReceipts.at(-1)!.monotonicTimeMs,
         strideMs: input.mailItems
-          .map((item) => item.hints.elapsedMsSincePrevious)
+          .map((item) => item.hints?.elapsedMsSincePrevious)
           .find((elapsed): elapsed is number => typeof elapsed === "number" && elapsed > 0) ?? null,
         keyFrameIds: frameReceipts.map((receipt) => receipt.receiptId),
         reasonCaptured: uniqueStrings([
@@ -902,7 +985,7 @@ const buildProcessedMailEvidenceHandles = (input: {
     },
     knownDeltas: uniqueStrings([
       ...input.changedFacts,
-      item.hints.deterministicChangeHint ? `mail hint: ${item.hints.deterministicChangeHint}` : null,
+      item.hints?.deterministicChangeHint ? `mail hint: ${item.hints.deterministicChangeHint}` : null,
     ]).slice(0, 6),
     evidenceRefs: uniqueStrings([
       item.mailId,

@@ -155,6 +155,38 @@ describe("extractStagePlayLiveSourceDelta", () => {
     ]));
   });
 
+  it("does not treat neutral torch, sword, cave, or decorative fire mentions as combat by themselves", () => {
+    const neutralSummary = JSON.stringify({
+      frame_overview: "The player is in a cave room with stone blocks, a torch, and a sword visible in the hotbar.",
+      hud: {
+        health_hearts: "full",
+        armor_icons: "not visible",
+        hunger_icons: "mostly full",
+        xp_level: "8",
+        selected_slot: "sword",
+      },
+      near_field: ["stone floor", "torch on wall"],
+      mid_field: ["cave passage", "decorative fire behind glass"],
+      salience_candidates: {
+        risks: [],
+        opportunities: [{ label: "route", evidence: "cave passage visible" }],
+        routine_context: ["navigation"],
+      },
+      uncertainty: ["armor not visible"],
+    });
+
+    const delta = extractStagePlayLiveSourceDelta({
+      latestMailItems: [mail("neutral", neutralSummary)],
+      priorImmersionState,
+      activeProfile: minecraftProfile,
+    });
+
+    expect(delta.currentActivity).toBe("mining_or_cave");
+    expect(delta.currentSceneFacts).not.toContain("combat, fire, damage, or hostile cue is visible");
+    expect(delta.salience.voiceCandidate).toBe(false);
+    expect(delta.salience.reasons.join("\n")).not.toMatch(/risk\/voice criteria matched/i);
+  });
+
   it("uses profile domain as a weak identity hint and detects outdoor exploration", () => {
     const delta = extractStagePlayLiveSourceDelta({
       latestMailItems: [

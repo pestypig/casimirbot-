@@ -44,6 +44,13 @@ const previewText = (text: string, limit = 220): string => {
   return normalized.length > limit ? `${normalized.slice(0, Math.max(0, limit - 3)).trimEnd()}...` : normalized;
 };
 
+const hazardMatchText = (text: string): string =>
+  text
+    .replace(/\bdecorative fire\b/g, " ")
+    .replace(/\bfurnace fire\b/g, " ")
+    .replace(/\bactive furnaces?\b/g, " ")
+    .replace(/\bfire behind glass\b/g, " ");
+
 const MINECRAFT_TERMS = [
   "minecraft",
   "block",
@@ -64,8 +71,23 @@ const MINECRAFT_TERMS = [
 const INVENTORY_TERMS = ["inventory", "chest", "hotbar", "item slot", "items", "stored items"];
 const INTERIOR_TERMS = ["interior", "base", "house", "building", "inside", "chest", "crafting table", "furnace", "bed"];
 const OUTDOOR_TERMS = ["tree", "trees", "grass", "forest", "outdoor", "outside", "sky", "night", "daylight", "mountain"];
-const COMBAT_TERMS = ["fire", "burning", "damage", "damaged", "hostile", "mob", "sword", "creeper", "zombie", "skeleton", "combat", "attack"];
-const CAVE_TERMS = ["cave", "stone", "underground", "mine", "mining", "ore", "lava", "torch", "dark", "rocky"];
+const COMBAT_TERMS = [
+  "on fire",
+  "fire damage",
+  "burning",
+  "damage",
+  "damaged",
+  "low health",
+  "hostile",
+  "hostile mob",
+  "creeper",
+  "zombie",
+  "skeleton",
+  "combat",
+  "attack",
+  "lava",
+];
+const CAVE_TERMS = ["cave", "stone", "underground", "mine", "mining", "ore", "rocky"];
 const BUILDING_TERMS = ["building", "crafting", "placing blocks", "construction", "structure"];
 const TRANSITION_TERMS = ["transition", "changed", "moved", "returns", "returned", "switches", "opens", "closes"];
 
@@ -140,7 +162,8 @@ const salienceFor = (input: {
   activeProfile?: StagePlayLiveSourceInterpreterProfileV1 | null;
 }): StagePlayLiveSourceImmersionStateV1["salience"] => {
   const reasons: string[] = [];
-  const riskMatches = matchingTerms(input.text, [
+  const riskText = hazardMatchText(input.text);
+  const riskMatches = matchingTerms(riskText, [
     ...COMBAT_TERMS,
     ...(input.activeProfile?.riskCriteria ?? []),
     ...(input.activeProfile?.voiceCalloutCriteria ?? []),
@@ -156,7 +179,7 @@ const salienceFor = (input: {
   return {
     level: urgent ? "urgent" : high ? "high" : medium ? "medium" : "low",
     reasons: uniqueStrings(reasons),
-    voiceCandidate: urgent || matchingTerms(input.text, input.activeProfile?.voiceCalloutCriteria ?? []).length > 0,
+    voiceCandidate: urgent || matchingTerms(riskText, input.activeProfile?.voiceCalloutCriteria ?? []).length > 0,
   };
 };
 
