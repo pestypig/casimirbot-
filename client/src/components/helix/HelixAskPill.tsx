@@ -249,6 +249,7 @@ import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 
 
 const HELIX_ASK_ANSWER_EXPANSION_STORAGE_KEY = "helix.ask.answerExpansion.v1";
+const HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY = "helix.ask.contextResumeFrame.v1";
 const HELIX_ASK_DURABLE_TRANSCRIPT_LIMIT = 80;
 const HELIX_ASK_PROGRESS_PLACEHOLDER_TEXT = "Reasoning in progress...";
 
@@ -6006,7 +6007,12 @@ function buildQueuedAskTurn(args: {
           threadId: "queued:pasted_text_resume_recall",
         }),
       }
-    : args.options;
+    : baseRouteMetadata
+      ? {
+          ...(args.options ?? {}),
+          routeMetadata: baseRouteMetadata,
+        }
+      : args.options;
   return {
     question,
     capsuleIds: args.capsuleIds,
@@ -7117,6 +7123,41 @@ function extractHelixAskContextCompactionResumeFrame(...values: unknown[]): Reco
     if (frame?.schema === "helix.pasted_text_attachment_resume_frame.v1") return frame;
   }
   return null;
+}
+
+function extractLatestHelixAskContextCompactionResumeFrameFromReplies(
+  replies: HelixAskReply[],
+): Record<string, unknown> | null {
+  for (let index = replies.length - 1; index >= 0; index -= 1) {
+    const reply = replies[index];
+    const frame = extractHelixAskContextCompactionResumeFrame(reply, reply?.debug, reply?.envelope);
+    if (frame) return frame;
+  }
+  return null;
+}
+
+function readStoredHelixAskContextCompactionResumeFrame(): Record<string, unknown> | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const record = parsed as Record<string, unknown>;
+    return record.schema === "helix.pasted_text_attachment_resume_frame.v1" ? record : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredHelixAskContextCompactionResumeFrame(frame: Record<string, unknown> | null): void {
+  if (typeof window === "undefined" || !frame) return;
+  if (frame.schema !== "helix.pasted_text_attachment_resume_frame.v1") return;
+  try {
+    window.sessionStorage.setItem(HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY, JSON.stringify(frame));
+  } catch {
+    // Session storage is a handoff cache only; Ask must continue to use server authority.
+  }
 }
 
 function isHelixAskContextCompactionPausePendingReply(reply: HelixAskReply | null | undefined): boolean {
@@ -18118,6 +18159,10 @@ export function HelixAskPill({
   const [askStatus, setAskStatus] = useState<string | null>(null);
   const [askAttachments, setAskAttachments] = useState<HelixAskAttachment[]>([]);
   const [askReplies, setAskReplies] = useState<HelixAskReply[]>([]);
+  const askRepliesRef = useRef<HelixAskReply[]>([]);
+  useEffect(() => {
+    askRepliesRef.current = askReplies;
+  }, [askReplies]);
   const [copiedReplyMasterDebugId, setCopiedReplyMasterDebugId] = useState<string | null>(null);
   const [debugExportDrawer, setDebugExportDrawer] = useState<DebugExportDrawerState>(null);
   const chronologicalAskRepliesForState = useMemo(
@@ -33548,11 +33593,13 @@ export function HelixAskPill({
             ].join("\n"),
           );
           if (responseIndicatesContextCompactionPause) {
-            latestContextCompactionResumeFrameRef.current = extractHelixAskContextCompactionResumeFrame(
+            const extractedContextCompactionResumeFrame = extractHelixAskContextCompactionResumeFrame(
               localResponseRecord,
               responseDebugForReply,
               responseEnvelope,
             );
+            latestContextCompactionResumeFrameRef.current = extractedContextCompactionResumeFrame;
+            writeStoredHelixAskContextCompactionResumeFrame(extractedContextCompactionResumeFrame);
             setContextCompactionPausePendingState(true);
           }
           const briefOnlyReply = shouldKeepHelixReplyInBriefLane(responseDebugForReply);
@@ -34295,11 +34342,24 @@ export function HelixAskPill({
         return stripped || entry.trim();
       });
       const singleEntry = normalizedEntries.length === 1 ? normalizedEntries[0] : null;
+      const asksForPastedTextResumeFrame = normalizedEntries.some((entry) =>
+        HELIX_ASK_PASTED_TEXT_RESUME_RECALL_PROMPT_PATTERN.test(entry.trim()),
+      );
       const compactionPausePending =
         contextCompactionPausePendingRef.current ||
         contextCompactionPausePending ||
         isHelixAskContextCompactionPausePendingReply(latestAskReply);
-      const shouldQueueForAskHandoff = askBusy || compactionPausePending;
+      const latestContextCompactionResumeFrameForSubmit = compactionPausePending
+        ? latestContextCompactionResumeFrameRef.current ??
+          extractHelixAskContextCompactionResumeFrame(latestAskReply, latestAskReply?.debug)
+        : asksForPastedTextResumeFrame
+          ? latestContextCompactionResumeFrameRef.current ??
+            extractLatestHelixAskContextCompactionResumeFrameFromReplies(askRepliesRef.current) ??
+            extractLatestHelixAskContextCompactionResumeFrameFromReplies(askReplies) ??
+            readStoredHelixAskContextCompactionResumeFrame()
+        : null;
+      const shouldQueueForAskHandoff =
+        askBusy || compactionPausePending || Boolean(asksForPastedTextResumeFrame && latestContextCompactionResumeFrameForSubmit);
       const submitTurnId = pendingWorkstationUserInputRef.current?.turn_id ?? `submit:${crypto.randomUUID()}`;
       if (singleEntry) {
         cancelPendingWorkstationRequestForTurnTransition({
@@ -34398,9 +34458,7 @@ export function HelixAskPill({
       askDraftRef.current = "";
       setContextCapsuleDetectedId(null);
       if (shouldQueueForAskHandoff) {
-        const contextResumeFrameForQueuedTurn = compactionPausePending
-          ? latestContextCompactionResumeFrameRef.current
-          : null;
+        const contextResumeFrameForQueuedTurn = latestContextCompactionResumeFrameForSubmit;
         setAskQueue((prev) => {
           const combined = [
             ...prev,
@@ -34408,7 +34466,7 @@ export function HelixAskPill({
               buildQueuedAskTurn({
                 question: entry,
                 capsuleIds: selectedCapsuleIds,
-                reason: askBusy ? "busy" : "compaction_pause",
+                reason: compactionPausePending ? "compaction_pause" : "busy",
                 contextResumeFrame: contextResumeFrameForQueuedTurn,
               }),
             ),
@@ -34671,6 +34729,7 @@ export function HelixAskPill({
       updateMoodFromText,
       runAsk,
       askBusy,
+      askReplies,
       contextCompactionPausePending,
       latestAskReply,
       visualSituationEvidenceForTurn,

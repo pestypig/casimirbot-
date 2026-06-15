@@ -1295,6 +1295,49 @@ describe("live-source mail live environment tools", () => {
       context_role: "tool_evidence",
     });
     expect(processPayload.packets[0].salience.voiceCandidate).toBe(true);
+    expect(processPayload.packets[0].evidenceHandles).toMatchObject({
+      sourceReceipts: expect.arrayContaining([
+        expect.objectContaining({
+          sourceId,
+          sourceKind: "visual_frame",
+        }),
+      ]),
+      frameReceipts: expect.arrayContaining([
+        expect.objectContaining({
+          sourceId,
+          sourceKind: "visual_frame",
+          parentMailId: expect.any(String),
+        }),
+      ]),
+      frameIntervals: expect.arrayContaining([
+        expect.objectContaining({
+          sourceId,
+          keyFrameIds: expect.any(Array),
+          reasonCaptured: expect.any(String),
+        }),
+      ]),
+      lensProducts: [],
+      situationSlices: expect.any(Array),
+    });
+    expect(processPayload.packets[0].actionPredictions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        actorId: sourceId,
+        basis: expect.arrayContaining(["goal_object"]),
+        frameIntervalRefs: expect.any(Array),
+        sourceSliceRefs: expect.any(Array),
+        recommendedNext: "request_voice_callout",
+      }),
+    ]));
+    expect(processPayload.packets[0].unresolvedLeads).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        neededSources: expect.arrayContaining([sourceId]),
+        suggestedFrameIntervals: expect.arrayContaining([
+          expect.objectContaining({
+            lensPresets: expect.arrayContaining(["raw_thumbnail", "motion_delta", "object_track", "occlusion_map"]),
+          }),
+        ]),
+      }),
+    ]));
     expect(processPayload.microReasonerRunRefs.length).toBeGreaterThanOrEqual(8);
     expect(processPayload.microReasonerRuns.map((run: any) => run.role)).toEqual(expect.arrayContaining([
       "decision_selector",
@@ -1480,6 +1523,19 @@ describe("live-source mail live environment tools", () => {
       voiceCandidate: true,
       confidence: "high",
     });
+    expect(packet.actionPredictions[0]).toMatchObject({
+      actorId: sourceId,
+      recommendedNext: "request_voice_callout",
+      basis: expect.arrayContaining(["goal_object", "recovery_pattern", "salience"]),
+      frameIntervalRefs: expect.any(Array),
+      sourceSliceRefs: expect.any(Array),
+    });
+    expect(packet.unresolvedLeads.map((lead: any) => lead.urgency)).toContain("high");
+    expect(packet.evidenceRefs).toEqual(expect.arrayContaining([
+      packet.actionPredictions[0].predictionId,
+      packet.evidenceHandles.frameIntervals[0].intervalId,
+      packet.unresolvedLeads[0].leadId,
+    ]));
     expect(packet.microReasonerRunRefs.length).toBeGreaterThanOrEqual(11);
     const processedRuns = (processObservation.observation as any).microReasonerRuns ?? [];
     expect(processedRuns.map((run: any) => run.role)).toEqual(expect.arrayContaining([

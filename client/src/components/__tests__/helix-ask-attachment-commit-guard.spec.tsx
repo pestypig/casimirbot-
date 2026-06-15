@@ -92,11 +92,25 @@ describe("Helix Ask attachment commit guard", () => {
     expect(source).toContain("const latestContextCompactionResumeFrameRef = useRef<Record<string, unknown> | null>(null)");
     expect(source).toContain("function extractHelixAskContextCompactionResumeFrame");
     expect(source).toContain("setContextCompactionPausePendingState(true)");
-    expect(source).toContain("latestContextCompactionResumeFrameRef.current = extractHelixAskContextCompactionResumeFrame");
+    expect(source).toContain("const extractedContextCompactionResumeFrame = extractHelixAskContextCompactionResumeFrame");
+    expect(source).toContain("latestContextCompactionResumeFrameRef.current = extractedContextCompactionResumeFrame");
+    expect(source).toContain("const latestContextCompactionResumeFrameForSubmit = compactionPausePending");
+    expect(source).toContain("extractHelixAskContextCompactionResumeFrame(latestAskReply, latestAskReply?.debug)");
+    expect(source).toContain("function extractLatestHelixAskContextCompactionResumeFrameFromReplies");
+    expect(source).toContain("const askRepliesRef = useRef<HelixAskReply[]>([])");
+    expect(source).toContain("askRepliesRef.current = askReplies");
+    expect(source).toContain("extractLatestHelixAskContextCompactionResumeFrameFromReplies(askRepliesRef.current)");
+    expect(source).toContain("extractLatestHelixAskContextCompactionResumeFrameFromReplies(askReplies)");
+    expect(source).toContain("HELIX_ASK_CONTEXT_RESUME_FRAME_STORAGE_KEY");
+    expect(source).toContain("writeStoredHelixAskContextCompactionResumeFrame(extractedContextCompactionResumeFrame)");
+    expect(source).toContain("readStoredHelixAskContextCompactionResumeFrame()");
+    expect(source).toContain("asksForPastedTextResumeFrame && latestContextCompactionResumeFrameForSubmit");
     expect(source).toContain("function buildQueuedAskTurn");
     expect(source).toContain("backendOwnedPastedTextResumeRecall");
     expect(source).toContain("context_resume_frame: args.contextResumeFrame");
     expect(source).toContain("contextResumeFrame: contextResumeFrameForQueuedTurn");
+    expect(source).toContain(": baseRouteMetadata");
+    expect(source).toContain("routeMetadata: baseRouteMetadata");
     expect(source).toContain("bypassWorkstationDispatch: true");
     expect(source).toContain("forceReasoningDispatch: true");
     expect(source).toContain("skipContextChooser: true");
@@ -109,14 +123,14 @@ describe("Helix Ask attachment commit guard", () => {
     expect(source).toContain("contextCompactionPausePendingRef.current ||");
     expect(source).toContain("contextCompactionPausePending ||");
     expect(source).toContain("isHelixAskContextCompactionPausePendingReply(latestAskReply)");
-    expect(source).toContain("const shouldQueueForAskHandoff = askBusy || compactionPausePending");
+    expect(source).toContain("askBusy || compactionPausePending || Boolean(asksForPastedTextResumeFrame && latestContextCompactionResumeFrameForSubmit)");
     expect(source).toContain("shouldReleaseConsumedPastedTextAttachmentForResume");
     expect(source).toContain("askAttachmentsRef.current.every((attachment) => attachment.kind === \"text\")");
     expect(source).toContain("normalizedEntries.every((entry) => isHelixAskPastedTextResumeRecallPrompt(entry))");
     expect(source).toContain("clearAskAttachments()");
     expect(source).toContain('if (next.reason !== "compaction_pause") return');
     expect(source).toContain("setContextCompactionPausePendingState(false)");
-    expect(source).toContain('reason: askBusy ? "busy" : "compaction_pause"');
+    expect(source).toContain('reason: compactionPausePending ? "compaction_pause" : "busy"');
   });
 
   it("preserves server-authoritative proof recall and workstation terminals over evidence-gate fallback text", () => {

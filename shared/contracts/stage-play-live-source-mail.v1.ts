@@ -656,6 +656,156 @@ export type StagePlayHypothesisArbiterV1 = {
   missingEvidence: string[];
 };
 
+export type StagePlaySourceReceiptHandleV1 = {
+  receiptId: string;
+  sourceId: string;
+  sourceKind: StagePlayLiveSourceMailSourceKindV1 | string;
+  mailId: string;
+  capturedAt: string;
+  monotonicTimeMs?: number | null;
+  evidenceRefs: string[];
+  frameRef?: string | null;
+  observationRef?: string | null;
+};
+
+export type StagePlayFrameReceiptHandleV1 = {
+  receiptId: string;
+  sourceId: string;
+  sourceKind: StagePlayLiveSourceMailSourceKindV1 | string;
+  capturedAt: string;
+  monotonicTimeMs: number;
+  frameIndex: number;
+  hash: string;
+  width?: number | null;
+  height?: number | null;
+  panelSessionId?: string | null;
+  liveAnswerSessionId?: string | null;
+  previousFrameId?: string | null;
+  nextFrameId?: string | null;
+  parentMailId: string;
+  evidenceRefs: string[];
+};
+
+export type StagePlayFrameIntervalReceiptV1 = {
+  intervalId: string;
+  sourceId: string;
+  sourceKind: StagePlayLiveSourceMailSourceKindV1 | string;
+  startFrameId: string;
+  endFrameId: string;
+  startTimeMs: number;
+  endTimeMs: number;
+  strideMs?: number | null;
+  keyFrameIds: string[];
+  reasonCaptured: string;
+  evidenceRefs: string[];
+};
+
+export type StagePlayImageLensProductV1 = {
+  lensReceiptId: string;
+  sourceFrameIds: string[];
+  lensPreset:
+    | "raw_thumbnail"
+    | "contrast_sweep"
+    | "motion_delta"
+    | "object_track"
+    | "semantic_mask"
+    | "ocr_pass"
+    | "affordance_map"
+    | "occlusion_map"
+    | "salience_heatmap"
+    | "crop_zoom"
+    | "belief_access_overlay"
+    | string;
+  parameters: Record<string, unknown>;
+  modelId?: string | null;
+  deterministic: boolean;
+  outputArtifactIds: string[];
+  derivedClaims: string[];
+  uncertainty: number;
+  rawFrameParentRefs: string[];
+};
+
+export type StagePlaySituationSliceV1 = {
+  sliceId: string;
+  timeMs: number;
+  sources: {
+    screen?: string | null;
+    browser?: string | null;
+    terminal?: string | null;
+    audio?: string | null;
+    game?: string | null;
+    tool?: string | null;
+    source?: string | null;
+  };
+  knownDeltas: string[];
+  evidenceRefs: string[];
+};
+
+export type StagePlayFrameIntervalRequestV1 = {
+  sourceId: string;
+  around: string;
+  beforeMs: number;
+  afterMs: number;
+  strideMs?: number | null;
+  lensPresets: StagePlayImageLensProductV1["lensPreset"][];
+};
+
+export type StagePlayEvidenceLeadV1 = {
+  leadId: string;
+  question: string;
+  whyItMatters: string;
+  affectedPredictionIds: string[];
+  neededSources: string[];
+  suggestedFrameIntervals: StagePlayFrameIntervalRequestV1[];
+  urgency: "low" | "medium" | "high";
+  evidenceRefs: string[];
+};
+
+export type StagePlayPursuedLeadResultV1 = {
+  leadId: string;
+  verdict: "supported" | "contradicted" | "underdetermined" | "not_pursued";
+  confidence: number;
+  correctedClaim?: string | null;
+  evidenceRefs: string[];
+  frameIntervalRefs: string[];
+  lensRefs: string[];
+};
+
+export type StagePlayActionPredictionBasisV1 =
+  | "surface_cue"
+  | "goal_object"
+  | "belief_state"
+  | "perceptual_access"
+  | "tool_affordance"
+  | "recovery_pattern"
+  | "prediction_validation"
+  | "salience";
+
+export type StagePlayGoalBasedActionPredictionV1 = {
+  predictionId: string;
+  actorId: string;
+  predictedAction: string;
+  basis: StagePlayActionPredictionBasisV1[];
+  worldStateClaims: string[];
+  actorBeliefClaims: string[];
+  decisiveUncertainties: string[];
+  frameIntervalRefs: string[];
+  lensRefs: string[];
+  sourceSliceRefs: string[];
+  confidence: number;
+  disconfirmers: string[];
+  recommendedNext: StagePlayLiveSourcePredictionValidationRecommendedNextV1;
+  evidenceRefs: string[];
+};
+
+export type StagePlayProcessedMailEvidenceHandlesV1 = {
+  sourceReceipts: StagePlaySourceReceiptHandleV1[];
+  frameReceipts: StagePlayFrameReceiptHandleV1[];
+  frameIntervals: StagePlayFrameIntervalReceiptV1[];
+  lensProducts: StagePlayImageLensProductV1[];
+  situationSlices: StagePlaySituationSliceV1[];
+};
+
 export type StagePlayProcessedMailPacketV1 = {
   artifactId: "stage_play_processed_mail_packet";
   schemaVersion: typeof STAGE_PLAY_PROCESSED_MAIL_PACKET_SCHEMA;
@@ -692,6 +842,10 @@ export type StagePlayProcessedMailPacketV1 = {
     voiceCandidate: boolean;
     calloutDraft?: string | null;
   };
+  evidenceHandles?: StagePlayProcessedMailEvidenceHandlesV1;
+  actionPredictions?: StagePlayGoalBasedActionPredictionV1[];
+  unresolvedLeads?: StagePlayEvidenceLeadV1[];
+  pursuedLeads?: StagePlayPursuedLeadResultV1[];
   effortEstimate?: StagePlayEffortEstimateV1 | null;
   axioms?: StagePlayAxiomFrameV1 | null;
   hypotheses?: StagePlaySceneBeatHypothesisV1[];

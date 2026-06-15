@@ -6,6 +6,8 @@ import {
   type LiveSourceCausalTraceV1,
   type StagePlayAxiomFrameV1,
   type StagePlayEffortEstimateV1,
+  type StagePlayEvidenceLeadV1,
+  type StagePlayGoalBasedActionPredictionV1,
   type StagePlayHypothesisArbiterV1,
   type StagePlayLiveSourceImmersionStateV1,
   type StagePlayLiveSourceMailItemV1,
@@ -15,6 +17,7 @@ import {
   type StagePlayMicroReasonerRoleV1,
   type StagePlayMicroReasonerPromptPresetV1,
   type StagePlayMicroReasonerRunV1,
+  type StagePlayProcessedMailEvidenceHandlesV1,
   type StagePlayProcessedMailPacketV1,
   type StagePlaySceneBeatHypothesisV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
@@ -800,6 +803,284 @@ const arbitrateHypotheses = (input: {
   };
 };
 
+const monotonicMsForMailItem = (item: StagePlayLiveSourceMailItemV1, firstCreatedMs: number): number => {
+  const createdMs = Date.parse(item.createdAt);
+  if (!Number.isFinite(createdMs) || !Number.isFinite(firstCreatedMs)) return 0;
+  return Math.max(0, createdMs - firstCreatedMs);
+};
+
+const buildProcessedMailEvidenceHandles = (input: {
+  sourceId: string;
+  mailItems: StagePlayLiveSourceMailItemV1[];
+  observedFacts: string[];
+  changedFacts: string[];
+  watchNext: string[];
+}): StagePlayProcessedMailEvidenceHandlesV1 => {
+  const firstCreatedMs = Date.parse(input.mailItems[0]?.createdAt ?? "");
+  const sourceReceipts = input.mailItems.map((item) => ({
+    receiptId: item.mailId,
+    sourceId: item.sourceId,
+    sourceKind: item.sourceKind,
+    mailId: item.mailId,
+    capturedAt: item.createdAt,
+    monotonicTimeMs: monotonicMsForMailItem(item, firstCreatedMs),
+    evidenceRefs: uniqueStrings([
+      item.mailId,
+      ...item.evidenceRefs,
+      item.sourceRefs.frameRef,
+      item.sourceRefs.evidenceRef,
+      item.sourceRefs.observationRef,
+    ]),
+    frameRef: item.sourceRefs.frameRef ?? null,
+    observationRef: item.sourceRefs.observationRef ?? null,
+  }));
+  const visualItems = input.mailItems.filter((item) => item.sourceRefs.frameRef || item.sourceKind === "visual_frame");
+  const frameReceipts = visualItems.map((item, index) => {
+    const receiptId = item.sourceRefs.frameRef ?? `frame:${item.mailId}`;
+    return {
+      receiptId,
+      sourceId: item.sourceId,
+      sourceKind: item.sourceKind,
+      capturedAt: item.createdAt,
+      monotonicTimeMs: monotonicMsForMailItem(item, firstCreatedMs),
+      frameIndex: index,
+      hash: hashShort([
+        item.sourceRefs.frameRef,
+        item.sourceRefs.evidenceRef,
+        item.summary.preview,
+        item.createdAt,
+      ]),
+      previousFrameId: index > 0
+        ? visualItems[index - 1]?.sourceRefs.frameRef ?? `frame:${visualItems[index - 1]?.mailId}`
+        : null,
+      nextFrameId: index < visualItems.length - 1
+        ? visualItems[index + 1]?.sourceRefs.frameRef ?? `frame:${visualItems[index + 1]?.mailId}`
+        : null,
+      parentMailId: item.mailId,
+      evidenceRefs: uniqueStrings([
+        item.mailId,
+        ...item.evidenceRefs,
+        item.sourceRefs.frameRef,
+        item.sourceRefs.evidenceRef,
+        item.sourceRefs.observationRef,
+      ]),
+    };
+  });
+  const frameIntervals = frameReceipts.length > 0
+    ? [{
+        intervalId: `stage_play_frame_interval:${hashShort([
+          input.sourceId,
+          frameReceipts[0]?.receiptId,
+          frameReceipts.at(-1)?.receiptId,
+          input.mailItems.map((item) => item.mailId),
+        ])}`,
+        sourceId: input.sourceId,
+        sourceKind: input.mailItems[0]?.sourceKind ?? "visual_frame",
+        startFrameId: frameReceipts[0]!.receiptId,
+        endFrameId: frameReceipts.at(-1)!.receiptId,
+        startTimeMs: frameReceipts[0]!.monotonicTimeMs,
+        endTimeMs: frameReceipts.at(-1)!.monotonicTimeMs,
+        strideMs: input.mailItems
+          .map((item) => item.hints.elapsedMsSincePrevious)
+          .find((elapsed): elapsed is number => typeof elapsed === "number" && elapsed > 0) ?? null,
+        keyFrameIds: frameReceipts.map((receipt) => receipt.receiptId),
+        reasonCaptured: uniqueStrings([
+          ...input.changedFacts,
+          ...input.watchNext.map((target) => `watch: ${target}`),
+        ]).slice(0, 3).join("; ") || "processed live-source visual mail interval",
+        evidenceRefs: uniqueStrings(frameReceipts.flatMap((receipt) => receipt.evidenceRefs)),
+      }]
+    : [];
+  const situationSlices = input.mailItems.map((item) => ({
+    sliceId: `stage_play_situation_slice:${hashShort([item.mailId, item.sourceId])}`,
+    timeMs: monotonicMsForMailItem(item, firstCreatedMs),
+    sources: {
+      screen: item.sourceKind === "visual_frame" ? item.sourceRefs.frameRef ?? item.mailId : null,
+      audio: item.sourceKind === "audio_transcript" ? item.mailId : null,
+      game: item.sourceKind === "minecraft_world_event" ? item.mailId : null,
+      source: item.mailId,
+    },
+    knownDeltas: uniqueStrings([
+      ...input.changedFacts,
+      item.hints.deterministicChangeHint ? `mail hint: ${item.hints.deterministicChangeHint}` : null,
+    ]).slice(0, 6),
+    evidenceRefs: uniqueStrings([
+      item.mailId,
+      ...item.evidenceRefs,
+      item.sourceRefs.frameRef,
+      item.sourceRefs.evidenceRef,
+      item.sourceRefs.observationRef,
+    ]),
+  }));
+  return {
+    sourceReceipts,
+    frameReceipts,
+    frameIntervals,
+    lensProducts: [],
+    situationSlices,
+  };
+};
+
+const predictionBasisFor = (input: {
+  effort: StagePlayEffortEstimateV1;
+  hypothesis: StagePlaySceneBeatHypothesisV1;
+  packetRecommendedNext: StagePlayLiveSourcePredictionValidationRecommendedNextV1;
+  validation: StagePlayLiveSourcePredictionValidationV1;
+  salienceLevel: StagePlayLiveSourceImmersionStateV1["salience"]["level"];
+}): StagePlayGoalBasedActionPredictionV1["basis"] => uniqueStrings([
+  input.hypothesis.label.includes("prior_prediction") || input.validation.result !== "no_prior_prediction"
+    ? "prediction_validation"
+    : null,
+  input.effort.currentEffort === "combat_or_recovery" ? "recovery_pattern" : null,
+  input.effort.currentEffort === "inventory_management" ? "tool_affordance" : null,
+  input.packetRecommendedNext === "request_voice_callout" || input.salienceLevel === "high" || input.salienceLevel === "urgent"
+    ? "salience"
+    : null,
+  input.hypothesis.label.includes("state_shift") ? "surface_cue" : null,
+  "goal_object",
+]) as StagePlayGoalBasedActionPredictionV1["basis"];
+
+const buildGoalBasedActionPredictions = (input: {
+  packetId: string;
+  sourceId: string;
+  mailIds: string[];
+  observedFacts: string[];
+  changedFacts: string[];
+  inferredFacts: string[];
+  uncertainties: string[];
+  visualEvidenceRefs: string[];
+  evidenceHandles: StagePlayProcessedMailEvidenceHandlesV1;
+  effortEstimate: StagePlayEffortEstimateV1;
+  hypotheses: StagePlaySceneBeatHypothesisV1[];
+  recommendedNext: StagePlayLiveSourcePredictionValidationRecommendedNextV1;
+  validation: StagePlayLiveSourcePredictionValidationV1;
+  salienceLevel: StagePlayLiveSourceImmersionStateV1["salience"]["level"];
+}): StagePlayGoalBasedActionPredictionV1[] => {
+  const frameIntervalRefs = input.evidenceHandles.frameIntervals.map((interval) => interval.intervalId);
+  const sourceSliceRefs = input.evidenceHandles.situationSlices.map((slice) => slice.sliceId);
+  return input.hypotheses.slice(0, 4).map((hypothesis) => ({
+    predictionId: `stage_play_action_prediction:${hashShort([
+      input.packetId,
+      hypothesis.label,
+      input.recommendedNext,
+    ])}`,
+    actorId: input.sourceId,
+    predictedAction: hypothesis.prediction,
+    basis: predictionBasisFor({
+      effort: input.effortEstimate,
+      hypothesis,
+      packetRecommendedNext: input.recommendedNext,
+      validation: input.validation,
+      salienceLevel: input.salienceLevel,
+    }),
+    worldStateClaims: uniqueStrings([
+      ...input.observedFacts,
+      ...input.changedFacts.map((fact) => `Changed: ${fact}`),
+    ]).slice(0, 8),
+    actorBeliefClaims: uniqueStrings([
+      `current effort: ${input.effortEstimate.currentEffort}`,
+      ...input.effortEstimate.nextLikelyEfforts.map((effort) => `possible next effort: ${effort}`),
+      ...input.inferredFacts.slice(0, 3),
+    ]).slice(0, 8),
+    decisiveUncertainties: uniqueStrings([
+      ...input.uncertainties,
+      ...input.effortEstimate.evidenceAgainst,
+    ]).slice(0, 8),
+    frameIntervalRefs,
+    lensRefs: input.evidenceHandles.lensProducts.map((product) => product.lensReceiptId),
+    sourceSliceRefs,
+    confidence: Math.max(0, Math.min(1, hypothesis.confidence)),
+    disconfirmers: hypothesis.whatWouldContradictIt,
+    recommendedNext: input.recommendedNext,
+    evidenceRefs: uniqueStrings([
+      input.packetId,
+      ...input.mailIds,
+      ...input.visualEvidenceRefs,
+      ...frameIntervalRefs,
+      ...sourceSliceRefs,
+    ]),
+  }));
+};
+
+const buildEvidenceLeads = (input: {
+  packetId: string;
+  sourceId: string;
+  actionPredictions: StagePlayGoalBasedActionPredictionV1[];
+  evidenceHandles: StagePlayProcessedMailEvidenceHandlesV1;
+  arbiter: StagePlayHypothesisArbiterV1;
+  predictionValidation: StagePlayLiveSourcePredictionValidationV1;
+  uncertainties: string[];
+  recommendedNext: StagePlayLiveSourcePredictionValidationRecommendedNextV1;
+}): StagePlayEvidenceLeadV1[] => {
+  const frameInterval = input.evidenceHandles.frameIntervals[0] ?? null;
+  const affectedPredictionIds = input.actionPredictions.map((prediction) => prediction.predictionId);
+  const baseRequest = {
+    sourceId: input.sourceId,
+    around: frameInterval?.reasonCaptured ?? "latest processed live-source packet",
+    beforeMs: 3000,
+    afterMs: 1500,
+    strideMs: frameInterval?.strideMs ?? 250,
+    lensPresets: ["raw_thumbnail", "motion_delta", "object_track", "occlusion_map"],
+  };
+  const leads: StagePlayEvidenceLeadV1[] = [];
+  if (
+    input.recommendedNext === "request_more_evidence" ||
+    input.predictionValidation.result === "contradicted" ||
+    input.predictionValidation.result === "partially_supported"
+  ) {
+    leads.push({
+      leadId: `stage_play_evidence_lead:${hashShort([input.packetId, "prediction_validation"])}`,
+      question: "Which frame interval explains why the prior prediction was not fully supported?",
+      whyItMatters: "Goal-based action prediction should repair contradicted or partially supported predictions before waking Ask.",
+      affectedPredictionIds,
+      neededSources: [input.sourceId],
+      suggestedFrameIntervals: [baseRequest],
+      urgency: input.predictionValidation.result === "contradicted" ? "high" : "medium",
+      evidenceRefs: uniqueStrings([
+        input.packetId,
+        input.predictionValidation.validationId,
+        frameInterval?.intervalId,
+      ]),
+    });
+  }
+  if (input.arbiter.missingEvidence.length > 0 || input.uncertainties.length > 0) {
+    leads.push({
+      leadId: `stage_play_evidence_lead:${hashShort([input.packetId, "missing_evidence"])}`,
+      question: `Can the synchronized frame/source history resolve ${uniqueStrings([
+        ...input.arbiter.missingEvidence,
+        ...input.uncertainties,
+      ]).slice(0, 2).join(" and ")}?`,
+      whyItMatters: "The first-pass packet has prediction-relevant uncertainty that should be checked against retrievable perceptual evidence.",
+      affectedPredictionIds,
+      neededSources: [input.sourceId],
+      suggestedFrameIntervals: [baseRequest],
+      urgency: input.recommendedNext === "request_voice_callout" ? "high" : "medium",
+      evidenceRefs: uniqueStrings([
+        input.packetId,
+        frameInterval?.intervalId,
+        ...input.arbiter.missingEvidence,
+      ]),
+    });
+  }
+  if (input.recommendedNext === "draft_text_answer" || input.recommendedNext === "request_voice_callout") {
+    leads.push({
+      leadId: `stage_play_evidence_lead:${hashShort([input.packetId, "pre_output_check"])}`,
+      question: "Do raw frames and source slices support the output-shaping prediction?",
+      whyItMatters: "User-facing text or voice should be grounded in raw/source receipts, with lens products only as support.",
+      affectedPredictionIds,
+      neededSources: [input.sourceId],
+      suggestedFrameIntervals: [baseRequest],
+      urgency: "high",
+      evidenceRefs: uniqueStrings([
+        input.packetId,
+        frameInterval?.intervalId,
+        ...input.actionPredictions.flatMap((prediction) => prediction.evidenceRefs),
+      ]),
+    });
+  }
+  return leads.slice(0, 4);
+};
+
 const makeRun = (input: {
   role: StagePlayMicroReasonerRunV1["role"];
   jobId: string;
@@ -1023,6 +1304,40 @@ export function buildStagePlayProcessedMailPacket(input: {
     comparison,
   }));
   const recommendedNext = arbiter.recommendedNext;
+  const watchNext = uniqueStrings([...delta.watchTargets, ...structured.watchNext]);
+  const evidenceHandles = timed("evidence_handle_assembly", () => buildProcessedMailEvidenceHandles({
+    sourceId,
+    mailItems: input.mailItems,
+    observedFacts,
+    changedFacts: uniqueStrings([...input.immersionState.changedFacts, ...structured.changedFacts]),
+    watchNext,
+  }));
+  const actionPredictions = timed("goal_action_prediction_assembly", () => buildGoalBasedActionPredictions({
+    packetId,
+    sourceId,
+    mailIds,
+    observedFacts,
+    changedFacts: uniqueStrings([...input.immersionState.changedFacts, ...structured.changedFacts]),
+    inferredFacts,
+    uncertainties: uniqueStrings([...input.immersionState.uncertainties, ...structured.uncertainties]),
+    visualEvidenceRefs,
+    evidenceHandles,
+    effortEstimate,
+    hypotheses,
+    recommendedNext,
+    validation: input.predictionValidation,
+    salienceLevel: input.immersionState.salience.level,
+  }));
+  const unresolvedLeads = timed("evidence_lead_extractor", () => buildEvidenceLeads({
+    packetId,
+    sourceId,
+    actionPredictions,
+    evidenceHandles,
+    arbiter,
+    predictionValidation: input.predictionValidation,
+    uncertainties: uniqueStrings([...input.immersionState.uncertainties, ...structured.uncertainties]),
+    recommendedNext,
+  }));
   const microReasonerRuns = timed("micro_reasoner_run_composition", () => [
     makeRun({
       role: "claim_extractor",
@@ -1323,12 +1638,16 @@ export function buildStagePlayProcessedMailPacket(input: {
       voiceCandidate: input.immersionState.salience.voiceCandidate,
       calloutDraft,
     },
+    evidenceHandles,
+    actionPredictions,
+    unresolvedLeads,
+    pursuedLeads: [],
     effortEstimate,
     axioms,
     hypotheses,
     arbiter,
     recommendedNext,
-    watchNext: uniqueStrings([...delta.watchTargets, ...structured.watchNext]),
+    watchNext,
     resolutionState: recommendedNext === "request_voice_callout"
       ? "voice_candidate_prepared"
       : "processed_packet_ready",
@@ -1342,6 +1661,12 @@ export function buildStagePlayProcessedMailPacket(input: {
       comparison?.comparisonId,
       input.activeProfile?.profileId,
       microReasonerDeck?.presetId,
+      ...evidenceHandles.sourceReceipts.map((receipt) => receipt.receiptId),
+      ...evidenceHandles.frameReceipts.map((receipt) => receipt.receiptId),
+      ...evidenceHandles.frameIntervals.map((interval) => interval.intervalId),
+      ...evidenceHandles.situationSlices.map((slice) => slice.sliceId),
+      ...actionPredictions.map((prediction) => prediction.predictionId),
+      ...unresolvedLeads.map((lead) => lead.leadId),
       ...microReasonerRuns.map((run) => run.runId),
     ]),
     causalTrace: input.causalTrace,
