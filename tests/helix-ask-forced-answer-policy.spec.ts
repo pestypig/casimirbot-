@@ -59,7 +59,7 @@ describe("helix ask forced answer policy", () => {
     );
     expect(
       isHelixAskHardForcedShortCircuitRule("forcedAnswer:pre_intent_microplanner_answer"),
-    ).toBe(true);
+    ).toBe(false);
     expect(isHelixAskHardForcedShortCircuitRule("forcedAnswer:smalltalk_fast_path")).toBe(true);
     expect(isHelixAskConceptForcedShortCircuitRule("forcedAnswer:concept")).toBe(true);
     expect(isHelixAskClarifyForcedShortCircuitRule("forcedAnswer:pre_intent_clarify")).toBe(
@@ -79,7 +79,7 @@ describe("helix ask forced answer policy", () => {
         forcedAnswerPinned: true,
         forcedRule: "forcedAnswer:pre_intent_microplanner_answer",
       }),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       shouldPreserveHelixAskForcedAnswerAcrossFinalizer({
         forcedAnswerPinned: true,
@@ -90,6 +90,21 @@ describe("helix ask forced answer policy", () => {
       shouldPreserveHelixAskForcedAnswerAcrossFinalizer({
         forcedAnswerPinned: true,
         forcedRule: "forcedAnswer:concept_short_definition",
+      }),
+    ).toBe(false);
+  });
+
+  it("does not allow pre-intent microplanner answers to bypass composer or finalizer", () => {
+    expect(
+      shouldPreserveHelixAskForcedAnswerAcrossComposer({
+        forcedAnswerPinned: true,
+        forcedRule: "forcedAnswer:pre_intent_microplanner_answer",
+      }),
+    ).toBe(false);
+    expect(
+      shouldPreserveHelixAskForcedAnswerAcrossFinalizer({
+        forcedAnswerPinned: true,
+        forcedRule: "forcedAnswer:pre_intent_microplanner_answer",
       }),
     ).toBe(false);
   });
