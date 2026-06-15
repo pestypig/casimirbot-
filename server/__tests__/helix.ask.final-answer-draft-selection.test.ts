@@ -374,6 +374,74 @@ describe("final_answer_draft terminal selection", () => {
     expect(JSON.stringify(payload.current_turn_artifact_ledger)).not.toContain("terminal_consistency_violation");
   });
 
+  it("localizes typed failure public mirrors from the Ask language contract", () => {
+    const turnId = "ask:test:localized-typed-failure";
+    const localizedFailure = "No pude producir una respuesta terminal para este turno.";
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      language_contract: {
+        schema: "helix.ask_language_contract.v1",
+        input_modality: "typed",
+        source_text:
+          "Explain Helix Ask final answer language, pero responde en espaÃ±ol y usa evidencia del cÃ³digo.",
+        source_language: "mixed",
+        dominant_language: "mixed",
+        requested_response_language: "es",
+        explicit_response_language: "es",
+        response_language: "es",
+        language_detected: "mixed",
+        language_confidence: 0.82,
+        code_mixed: true,
+        explicit_language_instruction: true,
+        pivot_language: null,
+        pivot_text: null,
+        pivot_confidence: null,
+        translated: false,
+        reason_codes: ["explicit_spanish_response_instruction", "mixed_prompt"],
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        turn_id: turnId,
+        terminal_kind: "failure",
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+        terminal_text_preview: "I could not produce a terminal answer for this turn.",
+        server_authoritative: true,
+        assistant_answer: false,
+      },
+      typed_failure: {
+        schema: "helix.typed_failure.v1",
+        error_code: "repo_evidence_relevance_failed",
+        text: "I could not produce a terminal answer for this turn.",
+        answer_text: "I could not produce a terminal answer for this turn.",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: turnId,
+        terminal_artifact_kind: "typed_failure",
+        concise_text: "I could not produce a terminal answer for this turn.",
+      },
+      debug: {},
+    };
+
+    expect(syncHelixTypedFailureAuthorityPublicMirrors(payload)).toBe(true);
+    expect(payload.selected_final_answer).toBe(localizedFailure);
+    expect(payload.answer).toBe(localizedFailure);
+    expect(payload.text).toBe(localizedFailure);
+    expect(payload.typed_failure).toMatchObject({
+      message: localizedFailure,
+      text: localizedFailure,
+      answer_text: localizedFailure,
+    });
+    expect(payload.terminal_presentation).toMatchObject({
+      concise_text: localizedFailure,
+    });
+    expect(payload.debug).toMatchObject({
+      selected_final_answer: localizedFailure,
+      answer: localizedFailure,
+    });
+  });
+
   it("materializes a supported repo draft into repo_code_evidence_answer", () => {
     const turnId = "ask:test:repo-draft-materialized";
     const draftText = "Helix Ask treats receipts as observations, while final answers must be model-authored synthesis selected by terminal authority.";

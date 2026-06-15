@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { evaluateRepoEvidenceRelevanceGate } from "../services/helix-ask/repo-evidence-relevance-gate";
+import { buildRepoDocsSynthesisPacket } from "../services/helix-ask/repo-docs-synthesis-packet";
 import {
   HELIX_REPO_CODE_EVIDENCE_OBSERVATION_SCHEMA,
   type HelixRepoCodeEvidenceObservation,
@@ -141,6 +142,9 @@ describe("repo evidence relevance gate", () => {
     expect(gate.terminal_allowed).toBe(false);
     expect(gate.violations).toContain("prompt_facet_evidence_missing");
     expect(gate.selected_prompt_facet_paths).toEqual([]);
+    expect(gate.required_facets).toEqual(["final_answer_language_debug_contract"]);
+    expect(gate.missing_facets).toEqual(["language_debug_evidence"]);
+    expect(gate.blocking_reasons).toContain("prompt_facet_evidence_missing");
   });
 
   it("rejects off-topic selected evidence for mixed ES/EN final-answer language prompts", () => {
@@ -161,6 +165,9 @@ describe("repo evidence relevance gate", () => {
     });
     expect(gate.terminal_allowed).toBe(false);
     expect(gate.violations).toContain("prompt_facet_evidence_missing");
+    expect(gate.required_facets).toEqual(["final_answer_language_debug_contract"]);
+    expect(gate.missing_facets).toEqual(["language_debug_evidence"]);
+    expect(gate.blocking_reasons).toContain("prompt_facet_evidence_missing");
   });
 
   it("rejects off-topic selected evidence for Chinese final-answer language prompts", () => {
@@ -181,6 +188,9 @@ describe("repo evidence relevance gate", () => {
     });
     expect(gate.terminal_allowed).toBe(false);
     expect(gate.violations).toContain("prompt_facet_evidence_missing");
+    expect(gate.required_facets).toEqual(["final_answer_language_debug_contract"]);
+    expect(gate.missing_facets).toEqual(["language_debug_evidence"]);
+    expect(gate.blocking_reasons).toContain("prompt_facet_evidence_missing");
   });
 
   it("allows final-answer language debug prompts when selected evidence hits Ask language files", () => {
@@ -198,6 +208,9 @@ describe("repo evidence relevance gate", () => {
     expect(gate.prompt_facet.applies).toBe(true);
     expect(gate.terminal_allowed).toBe(true);
     expect(gate.violations).not.toContain("prompt_facet_evidence_missing");
+    expect(gate.required_facets).toEqual(["final_answer_language_debug_contract"]);
+    expect(gate.missing_facets).toEqual([]);
+    expect(gate.blocking_reasons).not.toContain("prompt_facet_evidence_missing");
     expect(gate.selected_prompt_facet_paths).toEqual(expect.arrayContaining([
       "server/services/helix-ask/runtime/ask-handler.ts",
       "server/services/helix-ask/surface/ask-answer-surface.ts",
@@ -219,9 +232,35 @@ describe("repo evidence relevance gate", () => {
     expect(gate.prompt_facet.applies).toBe(true);
     expect(gate.terminal_allowed).toBe(true);
     expect(gate.violations).not.toContain("prompt_facet_evidence_missing");
+    expect(gate.required_facets).toEqual(["final_answer_language_debug_contract"]);
+    expect(gate.missing_facets).toEqual([]);
+    expect(gate.blocking_reasons).not.toContain("prompt_facet_evidence_missing");
     expect(gate.selected_prompt_facet_paths).toEqual(expect.arrayContaining([
       "server/services/helix-ask/final-answer-draft-terminal-materializer.ts",
       "server/services/helix-ask/repo-answer-text-quality-gate.ts",
     ]));
+  });
+
+  it("shapes compact repo synthesis evidence toward language/debug contract files", () => {
+    const packet = buildRepoDocsSynthesisPacket({
+      turnId: "turn:repo-relevance",
+      promptText:
+        "Explain Helix Ask final answer language, pero responde en espaÃ±ol y usa evidencia del cÃ³digo.",
+      routeFamily: "repo_evidence",
+      repoObservation: observationWithPaths("Helix Ask", [
+        "server/services/helix-ask/__tests__/civilization-bounds-roadmap-tool.test.ts",
+        "server/services/helix-ask/__tests__/fruition-tool.test.ts",
+      ]),
+      artifactLedger: [],
+      maxEvidenceItems: 6,
+    });
+
+    const selectedPaths = packet.compact_evidence.map((entry) => entry.path);
+    expect(selectedPaths.some((entry) =>
+      /language-contract|ask-handler|ask-answer-surface|repo-answer-text-quality-gate|agi\.plan\.ts/i.test(entry),
+    )).toBe(true);
+    expect(selectedPaths.some((entry) =>
+      /civilization|fruition|theory-ideology-bridge/i.test(entry),
+    )).toBe(false);
   });
 });

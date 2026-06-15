@@ -13,6 +13,10 @@ import {
   materializeFinalAnswerDraftTerminal,
 } from "./final-answer-draft-terminal-materializer";
 import { attachHelixCapabilityItineraryExecutionState } from "./capability-itinerary-execution";
+import {
+  buildHelixLocalizedTypedFailureTextForPayload,
+  isHelixGenericTypedFailureText,
+} from "./language-contract";
 
 type ArtifactLike = {
   artifact_id?: unknown;
@@ -51,13 +55,19 @@ export function syncHelixTypedFailureAuthorityPublicMirrors(
   const compoundCoverageGate = readRecord(payload.compound_prompt_coverage_gate);
   const compoundCoverageFailedClosed = readString(compoundCoverageGate?.decision) === "FAIL_CLOSED";
   const typedFailure = readRecord(payload.typed_failure);
-  const failureText =
+  const localizedFailureText = buildHelixLocalizedTypedFailureTextForPayload(payload);
+  const candidateFailureText =
     readString(authority?.terminal_text_preview) ??
     readString(typedFailure?.text) ??
     readString(typedFailure?.answer_text) ??
     readString(payload.terminal_failure_text) ??
     readString(payload.selected_final_answer) ??
-    "I could not complete this turn because terminal authority selected a typed failure.";
+    localizedFailureText;
+  const failureText = localizedFailureText !== "I could not produce a terminal answer for this turn."
+    ? localizedFailureText
+    : isHelixGenericTypedFailureText(candidateFailureText)
+    ? localizedFailureText
+    : candidateFailureText;
   const existingErrorCode = readString(typedFailure?.error_code) ?? readString(payload.terminal_error_code);
   const errorCode =
     compoundCoverageFailedClosed && (!existingErrorCode || existingErrorCode === "terminal_consistency_violation")

@@ -6,6 +6,10 @@ import {
   findRepoConceptAliasEntry,
   type RepoConceptEvidenceRole,
 } from "./repo-concept-alias-registry";
+import {
+  detectRepoEvidencePromptFacet,
+  repoEvidencePathOrTextMatchesPromptFacet,
+} from "./repo-evidence-relevance-gate";
 
 type ArtifactLike = {
   artifact_id?: unknown;
@@ -464,6 +468,53 @@ const spanRecordsFromObservation = (
     .filter((entry) => entry.excerpt || entry.path);
 };
 
+const readFacetSupplementEvidence = (input: {
+  promptText: string;
+  maxEvidenceItems: number;
+}): HelixRepoDocsSynthesisPacket["compact_evidence"] => {
+  const promptFacet = detectRepoEvidencePromptFacet(input.promptText);
+  if (!promptFacet.applies) return [];
+  const root = process.cwd();
+  const selected: HelixRepoDocsSynthesisPacket["compact_evidence"] = [];
+  const seen = new Set<string>();
+  for (const preferredPath of promptFacet.preferred_paths) {
+    if (selected.length >= input.maxEvidenceItems) break;
+    const relativePath = preferredPath.replace(/\\/g, "/").replace(/^\/+/, "");
+    if (!/^(?:server|client|shared|docs)\//.test(relativePath)) continue;
+    if (relativePath.endsWith("/")) continue;
+    const absolutePath = path.resolve(root, relativePath);
+    const relativeCheck = path.relative(root, absolutePath);
+    if (relativeCheck.startsWith("..") || path.isAbsolute(relativeCheck)) continue;
+    if (!fs.existsSync(absolutePath) || !fs.statSync(absolutePath).isFile()) continue;
+    let lines: string[];
+    try {
+      lines = fs.readFileSync(absolutePath, "utf8").split(/\r?\n/);
+    } catch {
+      continue;
+    }
+    const termIndex = lines.findIndex((line) =>
+      promptFacet.required_terms.some((term) => line.toLowerCase().includes(term.toLowerCase())),
+    );
+    if (termIndex < 0) continue;
+    const start = Math.max(0, termIndex - 5);
+    const end = Math.min(lines.length, termIndex + 8);
+    const excerpt = lines.slice(start, end).join("\n").trim();
+    if (!excerpt) continue;
+    const ref = `${relativePath}:${start + 1}-${end}`;
+    if (seen.has(ref)) continue;
+    seen.add(ref);
+    selected.push({
+      ref,
+      path: relativePath,
+      source_kind: relativePath.startsWith("docs/") ? "repo_doc" : "repo_code",
+      role: evidenceRoleForPath(relativePath, excerpt),
+      excerpt: excerpt.length > 1600 ? `${excerpt.slice(0, 1599).trim()}...` : excerpt,
+      why_relevant: "Language/debug response contract facet evidence selected before repo synthesis.",
+    });
+  }
+  return selected;
+};
+
 const observationRecordsFromArtifact = (artifact: ArtifactLike): RecordLike[] => {
   const payload = artifactPayload(artifact);
   if (!payload) return [];
@@ -495,7 +546,21 @@ export function buildRepoDocsSynthesisPacket(input: {
       if (!byRef.has(evidence.ref)) byRef.set(evidence.ref, evidence);
     }
   }
-  let compactEvidence = selectRoleDiverseEvidence(Array.from(byRef.values()), maxEvidenceItems);
+  for (const evidence of readFacetSupplementEvidence({
+    promptText: input.promptText,
+    maxEvidenceItems,
+  })) {
+    if (!byRef.has(evidence.ref)) byRef.set(evidence.ref, evidence);
+  }
+  const promptFacet = detectRepoEvidencePromptFacet(input.promptText);
+  const allEvidence = Array.from(byRef.values());
+  const facetEvidence = promptFacet.applies
+    ? allEvidence.filter((entry) => repoEvidencePathOrTextMatchesPromptFacet(entry, promptFacet))
+    : [];
+  let compactEvidence = selectRoleDiverseEvidence(
+    promptFacet.applies && facetEvidence.length > 0 ? facetEvidence : allEvidence,
+    maxEvidenceItems,
+  );
   compactEvidence = supplementExactSectionEvidence({
     promptText: input.promptText,
     evidence: compactEvidence,

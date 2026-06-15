@@ -3,12 +3,15 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   HELIX_ASK_TURN_CHECKPOINT_SCHEMA,
+  HELIX_ASK_TURN_JOURNAL_SCHEMA,
   HELIX_ASK_TURN_RECOVERY_SCHEMA,
   type HelixAskTurnCheckpointAuthority,
   type HelixAskTurnCheckpointRecord,
   type HelixAskTurnCheckpointStatus,
   type HelixAskTurnCheckpointTranscriptEvent,
   type HelixAskTurnCheckpointType,
+  type HelixAskTurnJournal,
+  type HelixAskTurnJournalSummary,
   type HelixAskTurnRecovery,
 } from "@shared/helix-ask-turn-checkpoint";
 
@@ -197,6 +200,7 @@ export function recordHelixAskTurnCheckpoint(input: {
 
 export function readHelixAskTurnCheckpointRecords(options?: {
   thread_id?: string | null;
+  session_id?: string | null;
   turn_id?: string | null;
   limit?: number | null;
 }): HelixAskTurnCheckpointRecord[] {
@@ -204,6 +208,7 @@ export function readHelixAskTurnCheckpointRecords(options?: {
   const checkpointPath = resolveCheckpointPath();
   if (!fs.existsSync(checkpointPath)) return [];
   const threadId = normalizeOptionalString(options?.thread_id);
+  const sessionId = normalizeOptionalString(options?.session_id);
   const turnId = normalizeOptionalString(options?.turn_id);
   const limit =
     options?.limit === null || options?.limit === undefined
@@ -218,6 +223,7 @@ export function readHelixAskTurnCheckpointRecords(options?: {
       const record = normalizeCheckpointRecord(JSON.parse(trimmed));
       if (!record) continue;
       if (threadId && record.thread_id !== threadId) continue;
+      if (sessionId && record.session_id !== sessionId) continue;
       if (turnId && record.turn_id !== turnId) continue;
       records.push(record);
     } catch {
@@ -232,13 +238,59 @@ export function readHelixAskTurnCheckpointRecords(options?: {
   return limit === null ? ordered : ordered.slice(-limit);
 }
 
+const groupRecordsByTurn = (
+  records: readonly HelixAskTurnCheckpointRecord[],
+): Map<string, HelixAskTurnCheckpointRecord[]> => {
+  const grouped = new Map<string, HelixAskTurnCheckpointRecord[]>();
+  for (const record of records) {
+    const group = grouped.get(record.turn_id) ?? [];
+    group.push(record);
+    grouped.set(record.turn_id, group);
+  }
+  return grouped;
+};
+
+const latestRecord = (
+  records: readonly HelixAskTurnCheckpointRecord[],
+): HelixAskTurnCheckpointRecord | null =>
+  records
+    .slice()
+    .sort(
+      (left, right) =>
+        left.recorded_at.localeCompare(right.recorded_at) ||
+        left.record_id.localeCompare(right.record_id),
+    )
+    .at(-1) ?? null;
+
+const latestTurnIdFromRecords = (
+  records: readonly HelixAskTurnCheckpointRecord[],
+): string | null => {
+  const grouped = groupRecordsByTurn(records);
+  let selected: HelixAskTurnCheckpointRecord | null = null;
+  for (const group of grouped.values()) {
+    const candidate = latestRecord(group);
+    if (!candidate) continue;
+    if (
+      !selected ||
+      selected.recorded_at.localeCompare(candidate.recorded_at) < 0 ||
+      (selected.recorded_at === candidate.recorded_at &&
+        selected.record_id.localeCompare(candidate.record_id) < 0)
+    ) {
+      selected = candidate;
+    }
+  }
+  return selected?.turn_id ?? null;
+};
+
 export function buildHelixAskTurnRecovery(input: {
   thread_id?: string | null;
+  session_id?: string | null;
   turn_id: string;
   limit?: number | null;
 }): HelixAskTurnRecovery {
   const records = readHelixAskTurnCheckpointRecords({
     thread_id: input.thread_id ?? null,
+    session_id: input.session_id ?? null,
     turn_id: input.turn_id,
     limit: input.limit ?? null,
   });
@@ -269,6 +321,88 @@ export function buildHelixAskTurnRecovery(input: {
     terminal_text_hash: terminal?.terminal_text_hash ?? null,
     terminal_artifact_kind: terminal?.terminal_artifact_kind ?? null,
     final_answer_source: terminal?.final_answer_source ?? null,
+    authority: CHECKPOINT_AUTHORITY,
+  };
+}
+
+export function buildLatestHelixAskTurnRecovery(input: {
+  thread_id?: string | null;
+  session_id?: string | null;
+  limit?: number | null;
+}): HelixAskTurnRecovery | null {
+  const records = readHelixAskTurnCheckpointRecords({
+    thread_id: input.thread_id ?? null,
+    session_id: input.session_id ?? null,
+    limit: null,
+  });
+  const turnId = latestTurnIdFromRecords(records);
+  if (!turnId) return null;
+  return buildHelixAskTurnRecovery({
+    thread_id: input.thread_id ?? null,
+    session_id: input.session_id ?? null,
+    turn_id: turnId,
+    limit: input.limit ?? null,
+  });
+}
+
+const buildJournalSummary = (
+  records: readonly HelixAskTurnCheckpointRecord[],
+): HelixAskTurnJournalSummary => {
+  const latest = latestRecord(records);
+  const grouped = groupRecordsByTurn(records);
+  return {
+    checkpoint_count: records.length,
+    transcript_event_count: records.filter((record) => record.checkpoint_type === "transcript_event").length,
+    terminal_payload_count: records.filter((record) => record.checkpoint_type === "terminal_payload").length,
+    completed_turn_count: records.filter((record) => record.checkpoint_type === "turn_completed").length,
+    failed_turn_count: records.filter((record) => record.checkpoint_type === "turn_failed").length,
+    interrupted_turn_count: records.filter((record) => record.checkpoint_type === "turn_interrupted").length,
+    latest_turn_id: latest?.turn_id ?? null,
+    latest_status: latest?.status ?? "unknown",
+    latest_checkpoint_at: latest?.recorded_at ?? null,
+    recoverable_turn_count: grouped.size,
+  };
+};
+
+export function buildHelixAskTurnJournal(input: {
+  thread_id?: string | null;
+  session_id?: string | null;
+  turn_id?: string | null;
+  limit?: number | null;
+}): HelixAskTurnJournal {
+  const requestedTurnId = normalizeOptionalString(input.turn_id);
+  const allMatchingRecords = readHelixAskTurnCheckpointRecords({
+    thread_id: input.thread_id ?? null,
+    session_id: input.session_id ?? null,
+    turn_id: requestedTurnId,
+    limit: null,
+  });
+  const selectedTurnId = requestedTurnId ?? latestTurnIdFromRecords(allMatchingRecords);
+  const selectedRecords = selectedTurnId
+    ? readHelixAskTurnCheckpointRecords({
+        thread_id: input.thread_id ?? null,
+        session_id: input.session_id ?? null,
+        turn_id: selectedTurnId,
+        limit: input.limit ?? null,
+      })
+    : [];
+  const recovery = selectedTurnId
+    ? buildHelixAskTurnRecovery({
+        thread_id: input.thread_id ?? null,
+        session_id: input.session_id ?? null,
+        turn_id: selectedTurnId,
+        limit: input.limit ?? null,
+      })
+    : null;
+  return {
+    schema: HELIX_ASK_TURN_JOURNAL_SCHEMA,
+    generated_at: new Date().toISOString(),
+    thread_id: normalizeOptionalString(input.thread_id),
+    session_id: normalizeOptionalString(input.session_id),
+    turn_id: selectedTurnId,
+    records: selectedRecords,
+    recovery,
+    summary: buildJournalSummary(requestedTurnId ? selectedRecords : allMatchingRecords),
     authority: CHECKPOINT_AUTHORITY,
   };
 }

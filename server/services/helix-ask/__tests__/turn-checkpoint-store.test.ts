@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  buildHelixAskTurnJournal,
   buildHelixAskTurnRecovery,
   getHelixAskTurnCheckpointPath,
   readHelixAskTurnCheckpointRecords,
@@ -137,5 +138,111 @@ describe("Helix Ask turn checkpoint store", () => {
       detail: "artifact contract satisfied",
     });
     expect(record.transcript_event).not.toHaveProperty("raw_content_included");
+  });
+
+  it("builds a latest-turn journal scoped by thread and session", () => {
+    recordHelixAskTurnCheckpoint({
+      thread_id: "thread-journal",
+      turn_id: "turn-old",
+      session_id: "session-a",
+      route: "/ask/turn",
+      checkpoint_type: "turn_started",
+      status: "running",
+      prompt_text: "Older prompt",
+      recorded_at: "2026-06-13T10:00:00.000Z",
+    });
+    recordHelixAskTurnCheckpoint({
+      thread_id: "thread-journal",
+      turn_id: "turn-old",
+      session_id: "session-a",
+      route: "/ask/turn",
+      checkpoint_type: "turn_completed",
+      status: "completed",
+      prompt_text: "Older prompt",
+      recorded_at: "2026-06-13T10:00:01.000Z",
+    });
+    recordHelixAskTurnCheckpoint({
+      thread_id: "thread-journal",
+      turn_id: "turn-new",
+      session_id: "session-a",
+      trace_id: "trace-new",
+      route: "/ask/turn/stream",
+      checkpoint_type: "turn_started",
+      status: "running",
+      prompt_text: "New prompt",
+      recorded_at: "2026-06-13T10:01:00.000Z",
+    });
+    recordHelixAskTurnCheckpoint({
+      thread_id: "thread-journal",
+      turn_id: "turn-new",
+      session_id: "session-a",
+      trace_id: "trace-new",
+      route: "/ask/turn/stream",
+      checkpoint_type: "transcript_event",
+      status: "checkpointed",
+      prompt_text: "New prompt",
+      transcript_event: {
+        id: "transcript:new",
+        at_ms: 1,
+        role: "agent",
+        type: "public_commentary",
+        text: "Running a status check.",
+      },
+      recorded_at: "2026-06-13T10:01:01.000Z",
+    });
+    recordHelixAskTurnCheckpoint({
+      thread_id: "thread-journal",
+      turn_id: "turn-other-session",
+      session_id: "session-b",
+      route: "/ask/turn",
+      checkpoint_type: "turn_started",
+      status: "running",
+      prompt_text: "Other session prompt",
+      recorded_at: "2026-06-13T10:02:00.000Z",
+    });
+
+    const journal = buildHelixAskTurnJournal({
+      thread_id: "thread-journal",
+      session_id: "session-a",
+    });
+
+    expect(journal.schema).toBe("helix.ask.turn_journal.v1");
+    expect(journal.turn_id).toBe("turn-new");
+    expect(journal.recovery?.recoverable).toBe(true);
+    expect(journal.recovery?.latest_visible_text).toBe("Running a status check.");
+    expect(journal.summary.latest_turn_id).toBe("turn-new");
+    expect(journal.summary.recoverable_turn_count).toBe(2);
+    expect(journal.records.map((record) => record.turn_id)).toEqual(["turn-new", "turn-new"]);
+    expect(journal.authority).toEqual({
+      assistant_answer: false,
+      raw_content_included: false,
+      terminal_eligible: false,
+      terminal_ineligible_reason: "ask_turn_checkpoint_is_recovery_context_only",
+    });
+  });
+
+  it("returns an empty non-terminal journal when no scoped checkpoints exist", () => {
+    recordHelixAskTurnCheckpoint({
+      thread_id: "thread-present",
+      turn_id: "turn-present",
+      session_id: "session-present",
+      route: "/ask/turn",
+      checkpoint_type: "turn_started",
+      status: "running",
+      prompt_text: "Visible prompt",
+    });
+
+    const journal = buildHelixAskTurnJournal({
+      thread_id: "thread-missing",
+      session_id: "session-missing",
+    });
+
+    expect(journal.schema).toBe("helix.ask.turn_journal.v1");
+    expect(journal.turn_id).toBeNull();
+    expect(journal.records).toEqual([]);
+    expect(journal.recovery).toBeNull();
+    expect(journal.summary.checkpoint_count).toBe(0);
+    expect(journal.authority.assistant_answer).toBe(false);
+    expect(journal.authority.terminal_eligible).toBe(false);
   });
 });

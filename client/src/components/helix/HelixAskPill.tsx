@@ -15318,14 +15318,14 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
       client_voice_playback_metrics: clientProjection.voice_playback_metrics,
       client_voice_calls: clientProjection.voice_calls,
     };
-    return JSON.stringify({
+    return boundHelixDebugExportTextForUi(JSON.stringify({
       ...mergedPayload,
       voice_playback_reconciliation: buildVoicePlaybackReconciliationDebug({
         activeTurnId: coerceText(mergedPayload.active_turn_id).trim() || null,
         selectedFinalAnswer: coerceText(mergedPayload.selected_final_answer).trim() || null,
         source: mergedPayload,
       }),
-    }, null, 2);
+    }, null, 2));
   } catch (error) {
     return projectionPayload("fetch_error", {
       backend_debug_response_ref: backendRef,
@@ -15334,8 +15334,99 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
   }
 }
 
+const HELIX_DEBUG_EXPORT_MAX_UI_CHARS = 750_000;
+
+function boundHelixDebugExportTextForUi(payload: string): string {
+  const trimmed = typeof payload === "string" ? payload.trim() : "";
+  if (!trimmed || trimmed.length <= HELIX_DEBUG_EXPORT_MAX_UI_CHARS) return payload;
+  try {
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+    const debug = readAgentLoopAuditRecord(parsed.debug);
+    const minimal: Record<string, unknown> = {};
+    [
+      "schema",
+      "exported_at_ms",
+      "active_turn_id",
+      "backend_turn_id",
+      "client_active_turn_id",
+      "active_prompt",
+      "active_prompt_hash",
+      "selected_final_answer",
+      "final_answer_source",
+      "terminal_artifact_kind",
+      "terminal_error_code",
+      "terminal_failure_text",
+      "language_contract",
+      "response_language",
+      "source_language",
+      "language_detected",
+      "language_confidence",
+      "code_mixed",
+      "pivot_confidence",
+      "translated",
+      "repo_evidence_relevance_gate",
+      "repo_answer_text_quality_gate",
+      "repo_docs_terminalization",
+      "repo_docs_synthesis_packet_summary",
+      "resolved_turn_summary",
+      "canonical_goal_frame",
+      "source_target_intent",
+      "terminal_answer_authority",
+      "terminal_presentation",
+      "typed_failure",
+      "debug_export_anti_determinism_audit",
+      "backend_debug_response_ref",
+      "debug_export_ref",
+      "debug_export_source",
+      "backend_debug_response_status",
+    ].forEach((key) => {
+      if (parsed[key] !== undefined) minimal[key] = parsed[key];
+    });
+    minimal.debug = {
+      schema: "helix.ask.debug_export_minimal_debug.v1",
+      language_contract: parsed.language_contract ?? debug?.language_contract ?? null,
+      response_language: parsed.response_language ?? debug?.response_language ?? null,
+      source_language: parsed.source_language ?? debug?.source_language ?? null,
+      language_detected: parsed.language_detected ?? debug?.language_detected ?? null,
+      language_confidence: parsed.language_confidence ?? debug?.language_confidence ?? null,
+      code_mixed: parsed.code_mixed ?? debug?.code_mixed ?? null,
+      pivot_confidence: parsed.pivot_confidence ?? debug?.pivot_confidence ?? null,
+      translated: parsed.translated ?? debug?.translated ?? null,
+      repo_evidence_relevance_gate: parsed.repo_evidence_relevance_gate ?? debug?.repo_evidence_relevance_gate ?? null,
+      final_answer_source: parsed.final_answer_source ?? debug?.final_answer_source ?? null,
+      terminal_artifact_kind: parsed.terminal_artifact_kind ?? debug?.terminal_artifact_kind ?? null,
+      terminal_error_code: parsed.terminal_error_code ?? debug?.terminal_error_code ?? null,
+    };
+    minimal.debug_export_size_control = {
+      schema: "helix.ask.debug_export_size_control.v1",
+      truncated: true,
+      truncation_reason: "debug_export_size_limit",
+      original_chars: trimmed.length,
+      max_chars: HELIX_DEBUG_EXPORT_MAX_UI_CHARS,
+      compacted: true,
+      final_compacted: true,
+      bounded_by: "client_copy_path",
+    };
+    const text = safeJsonStringify(minimal);
+    if (text.length <= HELIX_DEBUG_EXPORT_MAX_UI_CHARS) return text;
+    return safeJsonStringify({
+      schema: parsed.schema ?? "helix.ask.debug_export.v1",
+      active_turn_id: parsed.active_turn_id ?? null,
+      selected_final_answer: parsed.selected_final_answer ?? null,
+      final_answer_source: parsed.final_answer_source ?? null,
+      terminal_artifact_kind: parsed.terminal_artifact_kind ?? null,
+      language_contract: parsed.language_contract ?? debug?.language_contract ?? null,
+      response_language: parsed.response_language ?? debug?.response_language ?? null,
+      repo_evidence_relevance_gate: parsed.repo_evidence_relevance_gate ?? debug?.repo_evidence_relevance_gate ?? null,
+      debug_export_size_control: minimal.debug_export_size_control,
+    });
+  } catch {
+    return payload;
+  }
+}
+
 export async function copyDebugPayloadToClipboard(payload: string): Promise<DebugClipboardCopyResult> {
-  const json = typeof payload === "string" ? payload : "";
+  const json = boundHelixDebugExportTextForUi(typeof payload === "string" ? payload : "");
   const attemptedPayloadHash = hashDebugExportText(json);
   if (!json.trim()) {
     return {
@@ -20626,7 +20717,9 @@ export function HelixAskPill({
       setDebugExportDrawer(null);
       try {
         const localExportPayload = normalizeReplyMasterDebugPayload(reply, payload);
-        const exportPayload = await resolveAuthoritativeDebugExportPayload(localExportPayload);
+        const exportPayload = boundHelixDebugExportTextForUi(
+          await resolveAuthoritativeDebugExportPayload(localExportPayload),
+        );
         if (typeof window !== "undefined") {
           (window as unknown as { __HELIX_LAST_UNIFIED_DEBUG_COPY__?: string }).__HELIX_LAST_UNIFIED_DEBUG_COPY__ = exportPayload;
         }

@@ -89,13 +89,25 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
   ) return null;
   MUTATING_WRITE_NEGATION_RE.lastIndex = 0;
 
+  const quotedDocsCommand = prompt.match(/["'`][^"'`]*(?:open|show|view|pull\s+up|bring\s+up)[^"'`]*(?:docs?\s+viewer|documents?\s+viewer|docs?\s+panel|documents?\s+panel|docs?)[^"'`]*["'`]/i)?.[0];
+  if (quotedDocsCommand) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: "quoted_tool_command",
+      verb_or_cue: "docs_viewer.open",
+      text: quotedDocsCommand,
+    };
+  }
+
   const contextualDocsIdentifier = prompt.match(
     /\b(?:earlier|previously|last\s+turn|before|debug|screen|visible|mentioned|saw|quoted?)\b[\s\S]{0,160}\bdocs[-_. ]viewer(?:[-_. ][a-z][a-z0-9_]*)?\b[\s\S]{0,160}\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to|just\s+explain|explain|whether|should)\b|\bdocs[-_. ]viewer(?:[-_. ][a-z][a-z0-9_]*)?\b[\s\S]{0,160}\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to|just\s+explain|explain|whether|should)\b/i,
   )?.[0];
   if (contextualDocsIdentifier) {
+    const negatedDocsReference = /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to)\b[\s\S]{0,180}\bdocs[-_. ]viewer(?:[-_. ][a-z][a-z0-9_]*)?\b/i.test(prompt) ||
+      /\bdocs[-_. ]viewer(?:[-_. ][a-z][a-z0-9_]*)?\b[\s\S]{0,180}\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to)\b/i.test(prompt);
     return {
       tool_admission_suppressed: true,
-      suppression_reason: /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to)\b/i.test(contextualDocsIdentifier)
+      suppression_reason: negatedDocsReference
         ? "negated_tool_instruction"
         : "explanatory_only",
       verb_or_cue: "docs_viewer.search_docs",
@@ -103,15 +115,6 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
     };
   }
 
-  const quoted = prompt.match(/["'`][^"'`]*(?:open|show|view|pull\s+up|bring\s+up)[^"'`]*(?:docs?\s+viewer|documents?\s+viewer|docs?\s+panel|documents?\s+panel|docs?)[^"'`]*["'`]/i)?.[0];
-  if (quoted) {
-    return {
-      tool_admission_suppressed: true,
-      suppression_reason: "quoted_tool_command",
-      verb_or_cue: "docs_viewer.open",
-      text: quoted,
-    };
-  }
   const quotedDocsSearch = prompt.match(/["'`][^"'`]*(?:search|find|look\s+for|locate)[^"'`]*(?:docs?|documents?|papers?)[^"'`]*["'`]/i)?.[0];
   if (quotedDocsSearch) {
     return {

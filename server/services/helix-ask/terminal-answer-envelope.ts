@@ -5,6 +5,10 @@ import { evaluateTerminalBoundaryEligibility, type HelixRuntimeAuthorityBoundary
 import { evaluateRepoAnswerTextQualityGate } from "./repo-answer-text-quality-gate";
 import { applyPostToolAuthorityBridgeRepair } from "./post-tool-authority-bridge";
 import { evaluateVisibleAnswerPolicyFaithfulnessGate } from "./visible-answer-policy-faithfulness-gate";
+import {
+  buildHelixLocalizedTypedFailureTextForPayload,
+  isHelixGenericTypedFailureText,
+} from "./language-contract";
 import type { HelixTerminalAuthority } from "@shared/helix-turn-poison-guard";
 
 export type HelixTerminalAnswerEnvelope = {
@@ -201,9 +205,17 @@ const promoteRequestUserInputTerminal = (
 };
 
 const typedFailureText = (payload: Record<string, unknown>): string =>
-  readString(payload.terminal_failure_text) ??
-  readString(readRecord(payload.typed_failure)?.message) ??
-  "I could not produce a terminal answer for this turn.";
+  (() => {
+    const localizedFailureText = buildHelixLocalizedTypedFailureTextForPayload(payload);
+    const candidate =
+      readString(payload.terminal_failure_text) ??
+      readString(readRecord(payload.typed_failure)?.message) ??
+      localizedFailureText;
+    if (localizedFailureText !== "I could not produce a terminal answer for this turn.") {
+      return localizedFailureText;
+    }
+    return isHelixGenericTypedFailureText(candidate) ? localizedFailureText : candidate;
+  })();
 
 const isStaleRepoEvidenceTerminalText = (value: unknown): boolean => {
   const text = readString(value) ?? "";

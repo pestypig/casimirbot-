@@ -20,6 +20,75 @@ export type HelixAskLanguageContractV1 = {
   reason_codes: string[];
 };
 
+const readContractRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const readContractString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim() ? value.trim() : null;
+
+const normalizeHelixAskResponseLanguage = (value: unknown): HelixAskResponseLanguage | null => {
+  const text = readContractString(value)?.toLowerCase();
+  if (!text) return null;
+  if (text === "en" || text.startsWith("en-")) return "en";
+  if (text === "es" || text.startsWith("es-")) return "es";
+  if (text === "zh" || text.startsWith("zh-")) return "zh";
+  return null;
+};
+
+export const resolveHelixAskResponseLanguageFromPayload = (
+  payload: Record<string, unknown> | null | undefined,
+): HelixAskResponseLanguage | null => {
+  if (!payload) return null;
+  const debug = readContractRecord(payload.debug);
+  const candidates = [
+    readContractRecord(payload.language_contract),
+    readContractRecord(payload.ask_language_contract),
+    readContractRecord(payload.languageContract),
+    readContractRecord(payload.request_language_contract),
+    readContractRecord(payload.helix_language_contract),
+    readContractRecord(debug?.language_contract),
+    readContractRecord(readContractRecord(payload.request_metadata)?.language_contract),
+    readContractRecord(readContractRecord(payload.ask_turn_solver_trace)?.language_contract),
+    readContractRecord(readContractRecord(payload.ask_turn_preflight_context)?.language_contract),
+    readContractRecord(readContractRecord(payload.route_product_contract)?.language_contract),
+    readContractRecord(readContractRecord(payload.canonical_goal_frame)?.language_contract),
+  ];
+  for (const contract of candidates) {
+    const language = normalizeHelixAskResponseLanguage(contract?.response_language);
+    if (language) return language;
+  }
+  return (
+    normalizeHelixAskResponseLanguage(payload.response_language) ??
+    normalizeHelixAskResponseLanguage(debug?.response_language) ??
+    null
+  );
+};
+
+export const buildHelixLocalizedTypedFailureText = (
+  responseLanguage: HelixAskResponseLanguage | null | undefined,
+): string => {
+  if (responseLanguage === "es") {
+    return "No pude producir una respuesta terminal para este turno.";
+  }
+  if (responseLanguage === "zh") {
+    return "我无法为此轮生成可终止的回答。";
+  }
+  return "I could not produce a terminal answer for this turn.";
+};
+
+export const isHelixGenericTypedFailureText = (value: unknown): boolean => {
+  const text = readContractString(value);
+  if (!text) return false;
+  return /^(?:I could not produce a terminal answer for this turn\.?|I could not complete this turn because terminal authority selected a typed failure\.?|No pude producir una respuesta terminal para este turno\.?|我无法为此轮生成可终止的回答。)$/i.test(text);
+};
+
+export const buildHelixLocalizedTypedFailureTextForPayload = (
+  payload: Record<string, unknown> | null | undefined,
+): string =>
+  buildHelixLocalizedTypedFailureText(resolveHelixAskResponseLanguageFromPayload(payload));
+
 type BuildLanguageContractInput = {
   inputModality?: "typed" | "voice";
   sourceText: string;

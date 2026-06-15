@@ -50,6 +50,56 @@ const readString = (value: unknown): string | null =>
 const readBoolean = (value: unknown): boolean | null =>
   typeof value === "boolean" ? value : null;
 
+const HELIX_DEBUG_EXPORT_MAX_UI_CHARS = 750_000;
+
+const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: string): string => {
+  if (text.length <= HELIX_DEBUG_EXPORT_MAX_UI_CHARS) return text;
+  const debug = asRecord(payload.debug);
+  const minimal = {
+    schema: payload.schema ?? "helix.ask.debug_export.v1",
+    exported_at_ms: payload.exported_at_ms,
+    active_turn_id: payload.active_turn_id,
+    selected_final_answer: payload.selected_final_answer,
+    final_answer_source: payload.final_answer_source,
+    terminal_artifact_kind: payload.terminal_artifact_kind,
+    terminal_error_code: payload.terminal_error_code,
+    language_contract: payload.language_contract ?? debug?.language_contract ?? null,
+    response_language: payload.response_language ?? debug?.response_language ?? null,
+    source_language: payload.source_language ?? debug?.source_language ?? null,
+    language_detected: payload.language_detected ?? debug?.language_detected ?? null,
+    language_confidence: payload.language_confidence ?? debug?.language_confidence ?? null,
+    code_mixed: payload.code_mixed ?? debug?.code_mixed ?? null,
+    pivot_confidence: payload.pivot_confidence ?? debug?.pivot_confidence ?? null,
+    translated: payload.translated ?? debug?.translated ?? null,
+    repo_evidence_relevance_gate: payload.repo_evidence_relevance_gate ?? debug?.repo_evidence_relevance_gate ?? null,
+    terminal_answer_authority: payload.terminal_answer_authority ?? debug?.terminal_answer_authority ?? null,
+    terminal_presentation: payload.terminal_presentation ?? debug?.terminal_presentation ?? null,
+    debug: {
+      schema: "helix.ask.debug_export_minimal_debug.v1",
+      language_contract: payload.language_contract ?? debug?.language_contract ?? null,
+      response_language: payload.response_language ?? debug?.response_language ?? null,
+      source_language: payload.source_language ?? debug?.source_language ?? null,
+      language_detected: payload.language_detected ?? debug?.language_detected ?? null,
+      code_mixed: payload.code_mixed ?? debug?.code_mixed ?? null,
+      repo_evidence_relevance_gate: payload.repo_evidence_relevance_gate ?? debug?.repo_evidence_relevance_gate ?? null,
+      final_answer_source: payload.final_answer_source ?? debug?.final_answer_source ?? null,
+      terminal_artifact_kind: payload.terminal_artifact_kind ?? debug?.terminal_artifact_kind ?? null,
+      terminal_error_code: payload.terminal_error_code ?? debug?.terminal_error_code ?? null,
+    },
+    debug_export_size_control: {
+      schema: "helix.ask.debug_export_size_control.v1",
+      truncated: true,
+      truncation_reason: "debug_export_size_limit",
+      original_chars: text.length,
+      max_chars: HELIX_DEBUG_EXPORT_MAX_UI_CHARS,
+      compacted: true,
+      final_compacted: true,
+      bounded_by: "shared_debug_export_builder",
+    },
+  };
+  return JSON.stringify(minimal);
+};
+
 const buildVoicePlaybackReconciliationDebug = (input: {
   activeTurnId: string | null;
   selectedFinalAnswer: string | null;
@@ -748,9 +798,10 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     debugExport: envelopeWithoutHash,
     calculatorPanelState,
   });
-  return JSON.stringify({
+  const envelope = {
     ...envelopeWithoutHash,
     ui_debug_parity_harness: uiDebugParityHarness,
     payload_hash: hashDebugExportText(stableStringify(envelopeWithoutHash)),
-  });
+  };
+  return boundDebugExportEnvelopeText(envelope, JSON.stringify(envelope));
 }

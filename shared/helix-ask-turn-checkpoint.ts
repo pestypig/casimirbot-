@@ -4,6 +4,9 @@ export const HELIX_ASK_TURN_CHECKPOINT_SCHEMA =
 export const HELIX_ASK_TURN_RECOVERY_SCHEMA =
   "helix.ask.turn_recovery.v1" as const;
 
+export const HELIX_ASK_TURN_JOURNAL_SCHEMA =
+  "helix.ask.turn_journal.v1" as const;
+
 export type HelixAskTurnCheckpointType =
   | "turn_started"
   | "transcript_event"
@@ -82,5 +85,30 @@ export type HelixAskTurnRecovery = {
   terminal_text_hash?: string | null;
   terminal_artifact_kind?: string | null;
   final_answer_source?: string | null;
+  authority: HelixAskTurnCheckpointAuthority;
+};
+
+export type HelixAskTurnJournalSummary = {
+  checkpoint_count: number;
+  transcript_event_count: number;
+  terminal_payload_count: number;
+  completed_turn_count: number;
+  failed_turn_count: number;
+  interrupted_turn_count: number;
+  latest_turn_id: string | null;
+  latest_status: HelixAskTurnCheckpointStatus | "unknown";
+  latest_checkpoint_at?: string | null;
+  recoverable_turn_count: number;
+};
+
+export type HelixAskTurnJournal = {
+  schema: typeof HELIX_ASK_TURN_JOURNAL_SCHEMA;
+  generated_at: string;
+  thread_id?: string | null;
+  session_id?: string | null;
+  turn_id?: string | null;
+  records: HelixAskTurnCheckpointRecord[];
+  recovery: HelixAskTurnRecovery | null;
+  summary: HelixAskTurnJournalSummary;
   authority: HelixAskTurnCheckpointAuthority;
 };
