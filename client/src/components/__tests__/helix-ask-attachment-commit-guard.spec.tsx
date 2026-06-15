@@ -88,6 +88,8 @@ describe("Helix Ask attachment commit guard", () => {
     expect(source).toContain("options?: RunAskOptions");
     expect(source).toContain("const [askQueue, setAskQueue] = useState<QueuedAskTurn[]>([])");
     expect(source).not.toContain("const [askQueue, setAskQueue] = useState<string[]>([])");
+    expect(source).toContain("const contextCompactionPausePendingRef = useRef(false)");
+    expect(source).toContain("setContextCompactionPausePendingState(true)");
     expect(source).toContain("function buildQueuedAskTurn");
     expect(source).toContain("backendOwnedPastedTextResumeRecall");
     expect(source).toContain("bypassWorkstationDispatch: true");
@@ -99,8 +101,16 @@ describe("Helix Ask attachment commit guard", () => {
     expect(source).toContain("buildQueuedAskTurn({");
     expect(source).toContain("function isHelixAskContextCompactionPausePendingReply");
     expect(source).toContain("context\\s+is\\s+compacting\\s+before\\s+the\\s+next\\s+ask\\s+turn");
-    expect(source).toContain("const compactionPausePending = isHelixAskContextCompactionPausePendingReply(latestAskReply)");
+    expect(source).toContain("contextCompactionPausePendingRef.current ||");
+    expect(source).toContain("contextCompactionPausePending ||");
+    expect(source).toContain("isHelixAskContextCompactionPausePendingReply(latestAskReply)");
     expect(source).toContain("const shouldQueueForAskHandoff = askBusy || compactionPausePending");
+    expect(source).toContain("shouldReleaseConsumedPastedTextAttachmentForResume");
+    expect(source).toContain("askAttachmentsRef.current.every((attachment) => attachment.kind === \"text\")");
+    expect(source).toContain("normalizedEntries.every((entry) => isHelixAskPastedTextResumeRecallPrompt(entry))");
+    expect(source).toContain("clearAskAttachments()");
+    expect(source).toContain('if (next.reason !== "compaction_pause") return');
+    expect(source).toContain("setContextCompactionPausePendingState(false)");
     expect(source).toContain('reason: askBusy ? "busy" : "compaction_pause"');
   });
 

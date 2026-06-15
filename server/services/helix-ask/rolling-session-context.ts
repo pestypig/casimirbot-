@@ -161,7 +161,38 @@ export const getLatestHelixRollingSessionContextPacket = (args?: {
   if (sessionId && latestRollingSessionContextBySession.has(sessionId)) {
     return latestRollingSessionContextBySession.get(sessionId) ?? null;
   }
+  if (threadId || sessionId) {
+    return null;
+  }
   return Array.from(latestRollingSessionContextByThread.values()).at(-1) ?? null;
+};
+
+export const forgetHelixRollingSessionContextPacket = (args: {
+  threadId?: string | null;
+  sessionId?: string | null;
+}): void => {
+  const threadId = normalizeText(args.threadId);
+  const sessionId = normalizeText(args.sessionId);
+  if (!threadId && !sessionId) return;
+  if (threadId) latestRollingSessionContextByThread.delete(threadId);
+  if (sessionId) latestRollingSessionContextBySession.delete(sessionId);
+
+  for (const [key, packet] of latestRollingSessionContextByThread.entries()) {
+    if (
+      (threadId && packet.thread_id === threadId) ||
+      (sessionId && packet.session_id === sessionId)
+    ) {
+      latestRollingSessionContextByThread.delete(key);
+    }
+  }
+  for (const [key, packet] of latestRollingSessionContextBySession.entries()) {
+    if (
+      (threadId && packet.thread_id === threadId) ||
+      (sessionId && packet.session_id === sessionId)
+    ) {
+      latestRollingSessionContextBySession.delete(key);
+    }
+  }
 };
 
 export const __resetHelixRollingSessionContextStoreForTest = (): void => {

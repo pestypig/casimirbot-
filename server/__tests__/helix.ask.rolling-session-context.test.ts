@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import {
   __resetHelixRollingSessionContextStoreForTest,
   buildHelixRollingSessionContextPacket,
+  forgetHelixRollingSessionContextPacket,
   getLatestHelixRollingSessionContextPacket,
 } from "../services/helix-ask/rolling-session-context";
 import { appendHelixThreadCompletedItemLifecycle } from "../services/helix-ask/runtime/request-context";
@@ -196,5 +197,39 @@ describe("Helix Ask rolling session context packet", () => {
     expect(packet.retained_turn_ids).toEqual([]);
     expect(packet.context_fidelity_meter.handoff_state.chat_turns_paused).toBe(false);
     expect(packet.missing_or_uncertain[0]).toMatch(/no active thread/i);
+  });
+
+  it("does not fall back to an unrelated latest context when a scoped lookup misses", () => {
+    buildHelixRollingSessionContextPacket({
+      threadId,
+      currentTurnId: "turn-1",
+      sessionId,
+      promptText: "Track this context.",
+      modelContextWindowTokens: 4096,
+    });
+
+    expect(getLatestHelixRollingSessionContextPacket()).toMatchObject({
+      thread_id: threadId,
+      session_id: sessionId,
+    });
+    expect(getLatestHelixRollingSessionContextPacket({ threadId: "missing-thread" })).toBeNull();
+    expect(getLatestHelixRollingSessionContextPacket({ sessionId: "missing-session" })).toBeNull();
+  });
+
+  it("forgets rolling context packets by deleted chat session id", () => {
+    buildHelixRollingSessionContextPacket({
+      threadId,
+      currentTurnId: "turn-1",
+      sessionId,
+      promptText: "Track this context before deletion.",
+      modelContextWindowTokens: 4096,
+    });
+
+    expect(getLatestHelixRollingSessionContextPacket({ sessionId })).not.toBeNull();
+    forgetHelixRollingSessionContextPacket({ sessionId });
+
+    expect(getLatestHelixRollingSessionContextPacket({ threadId })).toBeNull();
+    expect(getLatestHelixRollingSessionContextPacket({ sessionId })).toBeNull();
+    expect(getLatestHelixRollingSessionContextPacket()).toBeNull();
   });
 });

@@ -10,6 +10,7 @@ import {
   upsertChatSession,
 } from "../db/chatSessions";
 import { renderChatSession } from "../services/agi/chat-render";
+import { forgetHelixRollingSessionContextPacket } from "../services/helix-ask/rolling-session-context";
 
 export const chatRouter = Router();
 
@@ -123,15 +124,28 @@ chatRouter.post("/chat/sessions", async (req, res) => {
 });
 
 chatRouter.delete("/chat/sessions/:id", async (req, res) => {
-  const ownerId = resolveOwnerId(req, "default");
-  if (!shouldAllowOwner(req, ownerId)) {
-    return res.status(403).json({ error: "forbidden" });
+  try {
+    const ownerId = resolveOwnerId(req, "default");
+    if (!shouldAllowOwner(req, ownerId)) {
+      return res.status(403).json({ error: "forbidden" });
+    }
+    forgetHelixRollingSessionContextPacket({
+      threadId: req.params.id,
+      sessionId: req.params.id,
+    });
+    const ok = await deleteChatSessionById(ownerId!, req.params.id);
+    if (!ok) {
+      return res.status(404).json({ error: "not_found" });
+    }
+    return res.json({ ok: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[agi.chat] delete session failed", {
+      sessionId: req.params.id,
+      message,
+    });
+    return res.status(500).json({ error: "delete_failed" });
   }
-  const ok = await deleteChatSessionById(ownerId!, req.params.id);
-  if (!ok) {
-    return res.status(404).json({ error: "not_found" });
-  }
-  res.json({ ok: true });
 });
 
 chatRouter.get("/chat/sessions/:id/render", async (req, res) => {

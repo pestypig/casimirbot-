@@ -7078,6 +7078,12 @@ type HelixAskObjectiveTelemetryUsedSummary = {
   finalizeGatePassed: boolean | null;
 };
 
+function isHelixAskContextCompactionPauseText(text: string | null | undefined): boolean {
+  return /\b(?:context_compaction|context\s+is\s+compacting|active\s+context\s+page\s+file|pasted_text_attachment_resume_frame)\b/i.test(
+    text ?? "",
+  );
+}
+
 function isHelixAskContextCompactionPausePendingReply(reply: HelixAskReply | null | undefined): boolean {
   if (!reply) return false;
   const debug = readAgentLoopAuditRecord(reply.debug);
@@ -7094,9 +7100,7 @@ function isHelixAskContextCompactionPausePendingReply(reply: HelixAskReply | nul
     .filter((value): value is Record<string, unknown> => Boolean(value));
   const pendingText = pendingCandidates.map((value) => safeJsonStringify(value)).join("\n");
   const replyText = `${contentText}\n${pendingText}`;
-  const hasCompactionPauseText = /\b(?:context_compaction|context\s+is\s+compacting|active\s+context\s+page\s+file|pasted_text_attachment_resume_frame)\b/i.test(
-    replyText,
-  );
+  const hasCompactionPauseText = isHelixAskContextCompactionPauseText(replyText);
   if (!hasCompactionPauseText) return false;
   if (pendingCandidates.length > 0) return true;
   return /\bcontext\s+is\s+compacting\s+before\s+the\s+next\s+ask\s+turn\b/i.test(contentText);
@@ -18278,6 +18282,12 @@ export function HelixAskPill({
   const askLiveDraftBufferRef = useRef("");
   const askLiveDraftFlushRef = useRef<number | null>(null);
   const [askQueue, setAskQueue] = useState<QueuedAskTurn[]>([]);
+  const [contextCompactionPausePending, setContextCompactionPausePending] = useState(false);
+  const contextCompactionPausePendingRef = useRef(false);
+  const setContextCompactionPausePendingState = useCallback((next: boolean) => {
+    contextCompactionPausePendingRef.current = next;
+    setContextCompactionPausePending(next);
+  }, []);
   const [steeringQueueExpanded, setSteeringQueueExpanded] = useState<boolean>(false);
   const liveSourceMailAutoWakeKeyRef = useRef<string | null>(null);
   const [askContextChooser, setAskContextChooser] = useState<AskContextChooserState | null>(null);
@@ -33401,6 +33411,16 @@ export function HelixAskPill({
                       },
                 }
               : responseDebugPayload;
+          const responseIndicatesContextCompactionPause = isHelixAskContextCompactionPauseText(
+            [
+              responseText,
+              responseDebugForReply ? safeJsonStringify(responseDebugForReply) : "",
+              responseEnvelope ? safeJsonStringify(responseEnvelope) : "",
+            ].join("\n"),
+          );
+          if (responseIndicatesContextCompactionPause) {
+            setContextCompactionPausePendingState(true);
+          }
           const briefOnlyReply = shouldKeepHelixReplyInBriefLane(responseDebugForReply);
           const liveEventsSnapshot = [...askLiveEventsRef.current];
           const convergenceSnapshot = buildConvergenceSnapshot({
@@ -33766,6 +33786,7 @@ export function HelixAskPill({
       setActive,
       replayHelixAskTurnTranscriptEventsToConsole,
       upsertContextCapsuleSessionLedger,
+      setContextCompactionPausePendingState,
       updateReasoningAttempt,
       updateHelixAskConsoleStreamIngressDebug,
       updateMoodFromText,
@@ -33944,12 +33965,16 @@ export function HelixAskPill({
   useEffect(() => {
     if (askBusy || askQueue.length === 0) return;
     const next = askQueue[0];
+    if (contextCompactionPausePendingRef.current || contextCompactionPausePending) {
+      if (next.reason !== "compaction_pause") return;
+      setContextCompactionPausePendingState(false);
+    }
     setAskQueue((prev) => prev.slice(1));
     void runAsk(next.question, next.capsuleIds, {
       ...(next.options ?? {}),
       skipContextChooser: true,
     });
-  }, [askBusy, askQueue, runAsk]);
+  }, [askBusy, askQueue, contextCompactionPausePending, runAsk, setContextCompactionPausePendingState]);
 
   const clearCommandConfirmAutoTimer = useCallback(() => {
     if (typeof window !== "undefined" && commandConfirmAutoTimerRef.current !== null) {
@@ -34136,7 +34161,10 @@ export function HelixAskPill({
         return stripped || entry.trim();
       });
       const singleEntry = normalizedEntries.length === 1 ? normalizedEntries[0] : null;
-      const compactionPausePending = isHelixAskContextCompactionPausePendingReply(latestAskReply);
+      const compactionPausePending =
+        contextCompactionPausePendingRef.current ||
+        contextCompactionPausePending ||
+        isHelixAskContextCompactionPausePendingReply(latestAskReply);
       const shouldQueueForAskHandoff = askBusy || compactionPausePending;
       const submitTurnId = pendingWorkstationUserInputRef.current?.turn_id ?? `submit:${crypto.randomUUID()}`;
       if (singleEntry) {
@@ -34217,9 +34245,17 @@ export function HelixAskPill({
         }
         return;
       }
-      if (shouldQueueForAskHandoff && askAttachmentsRef.current.length > 0) {
+      const shouldReleaseConsumedPastedTextAttachmentForResume =
+        compactionPausePending &&
+        askAttachmentsRef.current.length > 0 &&
+        askAttachmentsRef.current.every((attachment) => attachment.kind === "text") &&
+        normalizedEntries.every((entry) => isHelixAskPastedTextResumeRecallPrompt(entry));
+      if (shouldQueueForAskHandoff && askAttachmentsRef.current.length > 0 && !shouldReleaseConsumedPastedTextAttachmentForResume) {
         setAskError("Wait for the current Helix Ask turn before sending attachments.");
         return;
+      }
+      if (shouldReleaseConsumedPastedTextAttachmentForResume) {
+        clearAskAttachments();
       }
       if (askInputRef.current) {
         askInputRef.current.value = "";
@@ -34497,6 +34533,7 @@ export function HelixAskPill({
       updateMoodFromText,
       runAsk,
       askBusy,
+      contextCompactionPausePending,
       latestAskReply,
       visualSituationEvidenceForTurn,
     ],

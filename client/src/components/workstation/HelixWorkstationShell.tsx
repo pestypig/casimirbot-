@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ChevronRight, MessageSquarePlus, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronRight, MessageSquarePlus, Trash2 } from "lucide-react";
 import { WorkstationStage } from "@/components/workstation/WorkstationStage";
 import { HelixAskDock } from "@/components/workstation/HelixAskDock";
 import { WorkstationResizeRail } from "@/components/workstation/WorkstationResizeRail";
@@ -189,25 +189,15 @@ export function HelixWorkstationShell({
       }}
     >
       <div className="col-start-1 col-end-3 row-start-1 flex min-w-0 items-center gap-3 border-b border-white/10 bg-slate-950/72 px-3 backdrop-blur">
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 items-center">
           <button
             type="button"
-            onClick={() => setSessionListOpen(true)}
-            aria-label="Open Helix Ask chats"
-            title="Open Helix Ask chats"
+            onClick={() => setSessionListOpen((open) => !open)}
+            aria-label={sessionListOpen ? "Return to current Helix Ask chat" : "Open Helix Ask chats"}
+            title={sessionListOpen ? "Return to current Helix Ask chat" : "Open Helix Ask chats"}
             className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/5 text-slate-100 hover:bg-white/10"
           >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => activeSession?.id && handleDeleteSession(activeSession.id)}
-            disabled={!activeSession?.id}
-            aria-label="Delete current Helix Ask chat"
-            title="Delete current Helix Ask chat"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-rose-300/25 bg-rose-500/10 text-rose-100 transition hover:border-rose-200/50 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-600"
-          >
-            <Trash2 className="h-4 w-4" />
+            {sessionListOpen ? <ArrowRight className="h-4 w-4" /> : <ArrowLeft className="h-4 w-4" />}
           </button>
         </div>
         <div className="min-w-0">
