@@ -769,6 +769,7 @@ export function buildRouteProductContract(input: {
       sideArtifactKindsAllowed: [
         "stage_play_badge_graph",
         "stage_play_output_lane_projection",
+        "stage_play_live_source_mail_loop_reflection",
         "live_answer_environment_delta",
       ],
       precedenceReason: sourceTarget === "live_source_mailbox"

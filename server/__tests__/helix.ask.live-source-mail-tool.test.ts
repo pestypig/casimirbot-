@@ -164,6 +164,13 @@ describe("live-source mail live environment tools", () => {
         can_run_automatically: true,
       }),
       expect.objectContaining({
+        tool_id: "live_env.reflect_live_source_mail_loop",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
         tool_id: "live_env.query_micro_reasoner_prompts",
         family: "live_env",
         creates_assistant_answer: false,
@@ -1383,6 +1390,73 @@ describe("live-source mail live environment tools", () => {
     expect(readPayload.terminal_eligible).toBe(false);
   });
 
+  it("reflects live-source mail-loop causality as a read-only evidence packet", () => {
+    seedVisualSummaryText("Minecraft cave scene with low light and the player near fire damage.", "reflection");
+
+    const processObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.process_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        source_kind: "visual_frame",
+      },
+    });
+    const processPayload = processObservation.observation as any;
+
+    const reflectionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.reflect_live_source_mail_loop",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        source_kind: "visual_frame",
+        read_only: true,
+      },
+    });
+
+    const reflection = reflectionObservation.observation as any;
+    expect(reflectionObservation.summary).toContain("Reflected live-source mail-loop causality");
+    expect(reflection).toMatchObject({
+      artifactId: "stage_play_live_source_mail_loop_reflection",
+      schemaVersion: "stage_play_live_source_mail_loop_reflection/v1",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(reflection.inspectionWindow.processedPacketRefs).toEqual(expect.arrayContaining([
+      processPayload.packets[0].packetId,
+    ]));
+    expect(reflection.inspectionWindow.microReasonerRunRefs.length).toBeGreaterThan(0);
+    expect(reflection.inspectionWindow.currentStateRef).toMatch(/^stage_play_live_source_current_state:/);
+    expect(reflection.inspectionWindow.loopHealthRef).toMatch(/^stage_play_live_source_loop_health:/);
+    expect(reflection.inspectionWindow.stagePlayGraphRef).toMatch(/^stage_play_badge_graph:/);
+    expect(reflection.causalGraph).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        relation: "processed_into_packet",
+        toRef: processPayload.packets[0].packetId,
+      }),
+      expect.objectContaining({
+        relation: "reasoned_by_microdeck",
+      }),
+      expect.objectContaining({
+        relation: "eligible_for_terminal_context",
+        fromRef: processPayload.packets[0].packetId,
+      }),
+    ]));
+    expect(reflection.whatEnteredAnswerContext.join(" ")).toContain(processPayload.packets[0].packetId);
+    expect(reflection.causalTrace).toMatchObject({
+      producedRefs: expect.arrayContaining([reflection.reflectionId]),
+      evidenceRefs: expect.arrayContaining([processPayload.packets[0].packetId]),
+    });
+    expect(reflectionObservation.producedRefs).toContain(reflection.reflectionId);
+    expect(reflectionObservation.artifactRefs).toMatchObject({
+      processedPacketIds: expect.arrayContaining([processPayload.packets[0].packetId]),
+    });
+  });
+
   it("configures visual observer profiles and maps structured Minecraft observer output into processed packets", () => {
     const queryObservation = executeLiveEnvironmentTool({
       tool_name: "live_env.query_visual_observer_profiles",
@@ -1390,7 +1464,7 @@ describe("live-source mail live environment tools", () => {
       args: {},
     });
     const queryPayload = queryObservation.observation as any;
-    const minecraftProfile = queryPayload.profiles.find((profile: any) => profile.title === "Minecraft Gameplay Observer");
+    const minecraftProfile = queryPayload.profiles.find((profile: any) => profile.domain === "minecraft_gameplay");
     expect(minecraftProfile).toBeTruthy();
     expect(queryPayload.assistant_answer).toBe(false);
     expect(queryPayload.terminal_eligible).toBe(false);

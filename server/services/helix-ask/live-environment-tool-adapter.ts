@@ -4044,11 +4044,9 @@ export function executeLiveEnvironmentTool(
     ]);
     const activePolicyRefs = uniqueStrings([
       ...currentState.activeWatchJobs.map((job) => job.policyId),
-      currentState.quality.latestRefs.wakeRequestId,
     ]);
     const profileRefs = uniqueStrings([
       ...processedPackets.map((packet) => packet.profileRef ?? null),
-      quality.latestRefs.narrativeStateId,
     ]);
     const loopHealthRef = `stage_play_live_source_loop_health:${hashShort([
       quality.qualityId,
@@ -4067,9 +4065,9 @@ export function executeLiveEnvironmentTool(
       ...currentState.evidenceRefs,
       ...quality.evidenceRefs,
       ...processedPackets.flatMap((packet) => [packet.packetId, ...packet.evidenceRefs]),
-      ...microReasonerRuns.flatMap((run) => [run.runId, ...run.evidenceRefs]),
-      ...decisions.flatMap((decision) => [decision.decisionId, ...decision.evidenceRefs]),
-      ...latestMailItems.flatMap((item) => [item.mailId, ...item.evidenceRefs]),
+      ...microReasonerRuns.flatMap((run) => [run.runId, ...(run.evidenceRefs ?? [])]),
+      ...decisions.flatMap((decision) => [decision.decisionId, ...(decision.evidenceRefs ?? [])]),
+      ...latestMailItems.flatMap((item) => [item.mailId, ...(item.evidenceRefs ?? [])]),
       ...outputLaneProjection.evidenceRefs,
       ...collectStagePlayGraphSourceRefs(graph),
     ]);

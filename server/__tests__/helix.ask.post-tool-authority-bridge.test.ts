@@ -296,6 +296,109 @@ describe("Helix Ask post-tool authority bridge", () => {
     expect((payload.goal_satisfaction_evaluation as Record<string, unknown>).satisfaction).toBe("satisfied");
   });
 
+  it("repairs live-source mailbox reflection completion from the causal reflection artifact without requiring a voice receipt", () => {
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      active_prompt:
+        "Explain why the final answer feels disconnected from the processed mail loop and MicroDeck causality.",
+      selected_final_answer: "Terminal failed before causal reflection could answer.",
+      answer: "Terminal failed before causal reflection could answer.",
+      text: "Terminal failed before causal reflection could answer.",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "terminal_boundary_ineligible",
+      canonical_goal_frame: { goal_kind: "live_source_processed_mail_interpretation" },
+      source_target_intent: { target_source: "live_source_mailbox" },
+      phase_controller_trajectory: {
+        current_phase: "terminal_checkpoint",
+        canonical_goal: "processed_mail_interpretation",
+        mandatory_next_tool: null,
+      },
+      agent_step_decision: { chosen_capability: "live_env.reflect_live_source_mail_loop" },
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        satisfaction: "partially_satisfied",
+        next_decision: "fail_closed",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: `${turnId}:mail-loop-reflection`,
+          kind: "live_environment_tool_observation",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.live_environment_tool_observation.v1",
+            tool_name: "live_env.reflect_live_source_mail_loop",
+            observation: {
+              artifactId: "stage_play_live_source_mail_loop_reflection",
+              schemaVersion: "stage_play_live_source_mail_loop_reflection/v1",
+              reflectionId: "stage_play_live_source_mail_loop_reflection:test",
+              inspectionWindow: {
+                mailIds: ["stage_play_live_source_mail:test"],
+                processedPacketRefs: ["stage_play_processed_mail_packet:test"],
+                microReasonerRunRefs: ["stage_play_micro_reasoner_run:test"],
+                currentStateRef: "stage_play_live_source_current_state:test",
+                loopHealthRef: "stage_play_live_source_loop_health:test",
+                stagePlayGraphRef: "stage_play_badge_graph:test",
+                liveAnswerProjectionRefs: ["stage_play_output_lane_projection:test"],
+                decisionRefs: [],
+                voiceReceiptRefs: [],
+              },
+              causalGraph: [
+                {
+                  fromRef: "stage_play_live_source_mail:test",
+                  toRef: "stage_play_processed_mail_packet:test",
+                  relation: "processed_into_packet",
+                  note: "Mail was processed into packet evidence.",
+                },
+                {
+                  fromRef: "stage_play_processed_mail_packet:test",
+                  toRef: "stage_play_micro_reasoner_run:test",
+                  relation: "reasoned_by_microdeck",
+                  note: "The MicroDeck run interpreted the packet.",
+                },
+              ],
+              stageSummaries: {
+                processedMail: ["stage_play_processed_mail_packet:test: observed hazard changed"],
+                microDeck: ["decision_selector: completed; selected record_interpretation"],
+                terminalReadiness: ["Reflection has processed packet, MicroDeck, current-state, loop-health, and Stage Play graph refs for model re-entry."],
+              },
+              whatEnteredAnswerContext: [
+                "processed packet stage_play_processed_mail_packet:test: observed hazard changed",
+                "MicroDeck decision_selector run stage_play_micro_reasoner_run:test: selected record_interpretation",
+              ],
+              whatDidNotEnterAnswerContext: [],
+              missingEvidence: [],
+              limitations: ["The badge graph remains evidence-only."],
+              whatAskCanSafelySay: ["The final answer must synthesize from the reflection artifact, not from the badge graph alone."],
+              nextUsefulTool: null,
+              evidenceRefs: [
+                "stage_play_processed_mail_packet:test",
+                "stage_play_micro_reasoner_run:test",
+                "stage_play_badge_graph:test",
+              ],
+              assistant_answer: false,
+              terminal_eligible: false,
+              raw_content_included: false,
+              context_role: "tool_evidence",
+              ask_context_policy: "evidence_only",
+            },
+          },
+        },
+      ],
+    };
+
+    const bridge = applyPostToolAuthorityBridgeRepair({ turnId, payload });
+    expect(bridge.route_family).toBe("live_source_mailbox");
+    expect(bridge.reason).toBe("live_source_mail_loop_reflection_supports_synthesized_answer");
+    expect(bridge.observation_support_status).toBe("supports_answer");
+    expect(payload.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(String(payload.selected_final_answer)).toMatch(/live-source mail-loop reflection inspected 1 mail item/i);
+    expect(String(payload.selected_final_answer)).toMatch(/MicroDeck run/i);
+    expect(String(payload.selected_final_answer)).toMatch(/Stage Play graph evidence was included/i);
+    expect(String(payload.selected_final_answer)).not.toMatch(/voice receipt/i);
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect((payload.goal_satisfaction_evaluation as Record<string, unknown>).satisfaction).toBe("satisfied");
+  });
+
   it("keeps mailbox route precedence over generic voice delivery when a completed mailbox voice receipt exists", () => {
     const payload: Record<string, unknown> = {
       turn_id: turnId,

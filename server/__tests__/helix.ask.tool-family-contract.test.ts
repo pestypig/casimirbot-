@@ -48,6 +48,7 @@ describe("Helix Ask tool-family contract registry", () => {
   it("registers the required named tools and civilization receipts", () => {
     const required = [
       ["live_env.read_processed_live_source_mail", "live_source_mail", "evidence_only"],
+      ["live_env.reflect_live_source_mail_loop", "live_source_mail", "evidence_only"],
       ["live_env.process_live_source_mail", "live_source_mail", "evidence_only"],
       ["live_env.record_live_source_mail_decision", "live_source_decision", "control_receipt"],
       ["live_env.request_interim_voice_callout", "voice_delivery", "control_receipt"],

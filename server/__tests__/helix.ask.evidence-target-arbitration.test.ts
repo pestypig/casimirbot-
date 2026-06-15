@@ -160,6 +160,34 @@ describe("Helix Ask evidence target arbitration", () => {
     expect(arbitration.available_capabilities).toContain("live_env.reflect_stage_play_context");
   });
 
+  it("routes combined Stage Play badge graph and live mail loop causality to the composite mailbox reflection tool", () => {
+    const arbitration = arbitrate(
+      "Can you read the live mail loop as it is working, like inspect via a tool call of stage play badge graph?",
+    );
+
+    expect(arbitration).toMatchObject({
+      selected_candidate_id: "live_source_mailbox.mail_loop_reflection",
+      selected_target_source: "live_source_mailbox",
+      selected_target_kind: "live_source_mailbox",
+      must_enter_backend_ask: true,
+      allow_no_tool_direct: false,
+    });
+    expect(arbitration.reason_codes).toEqual(expect.arrayContaining([
+      "live_source_mail_loop_reflection_intent",
+      "stage_play_mail_loop_combined_causality",
+      "requires_live_source_mailbox_tool_observation",
+    ]));
+    expect(arbitration.available_capabilities).toEqual(expect.arrayContaining([
+      "live_env.reflect_live_source_mail_loop",
+      "live_env.reflect_stage_play_context",
+      "live_env.read_processed_live_source_mail",
+    ]));
+    expect(arbitration.terminal_product_constraints).toEqual(expect.arrayContaining([
+      "stage_play_live_source_mail_loop_reflection",
+      "model_synthesized_answer",
+    ]));
+  });
+
   it("suppresses Stage Play tools when the prompt says not to use Stage Play", () => {
     const arbitration = arbitrate("Do not use Stage Play; explain conceptually.");
 

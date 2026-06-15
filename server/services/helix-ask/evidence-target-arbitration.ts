@@ -24,6 +24,7 @@ import {
 } from "./stage-play-prompt-intent";
 import {
   isLiveSourceCadenceControlPrompt,
+  isLiveSourceMailLoopReflectionPrompt,
   isLiveSourceMailLoopPrompt,
 } from "./live-source-continuation-intent";
 
@@ -242,6 +243,7 @@ export function buildAskEvidenceTargetArbitration(input: {
       isStagePlayJobPlanningPrompt(prompt) ||
       (isStagePlayReflectionPrompt(prompt) && hasStagePlayOperationalCue(prompt))
     );
+  const mailLoopReflection = isLiveSourceMailLoopReflectionPrompt(prompt);
 
   if (hasExplicitLocalDocsPathSummary(prompt)) {
     promptIntentCandidates.push("local_docs_path_summary");
@@ -449,7 +451,45 @@ export function buildAskEvidenceTargetArbitration(input: {
     }));
   }
 
-  if (!suppressesLiveEnvironment && !stagePlayOperational && isLiveSourceMailLoopPrompt(prompt) && !isLiveSourceCadenceControlPrompt(prompt)) {
+  if (!suppressesLiveEnvironment && mailLoopReflection && !isLiveSourceCadenceControlPrompt(prompt)) {
+    promptIntentCandidates.push("live_source_mailbox_reflection");
+    candidates.push(makeCandidate({
+      candidateId: "live_source_mailbox.mail_loop_reflection",
+      targetSource: "live_source_mailbox",
+      targetKind: "live_source_mailbox",
+      strength: "hard",
+      score: 0.99,
+      reasonCodes: [
+        "live_source_mail_loop_reflection_intent",
+        stagePlayLexical ? "stage_play_mail_loop_combined_causality" : "mailbox_causality_reflection",
+        "requires_live_source_mailbox_tool_observation",
+      ],
+      requestedOutputs: [
+        "live_environment_tool_observation",
+        "stage_play_live_source_mail_loop_reflection",
+        "stage_play_processed_mail_packet",
+        "stage_play_badge_graph",
+        "typed_failure",
+      ],
+      capabilityKeys: [
+        "live_env.reflect_live_source_mail_loop",
+        "live_env.read_processed_live_source_mail",
+        "live_env.reflect_stage_play_context",
+        "live_env.summarize_live_source_current_state",
+        "live_env.query_live_source_loop_health",
+      ],
+      terminalProductConstraints: [
+        "live_environment_tool_observation",
+        "stage_play_live_source_mail_loop_reflection",
+        "stage_play_processed_mail_packet",
+        "stage_play_badge_graph",
+        "model_synthesized_answer",
+        "typed_failure",
+      ],
+    }));
+  }
+
+  if (!suppressesLiveEnvironment && !stagePlayOperational && !mailLoopReflection && isLiveSourceMailLoopPrompt(prompt) && !isLiveSourceCadenceControlPrompt(prompt)) {
     promptIntentCandidates.push("live_source_mailbox");
     candidates.push(makeCandidate({
       candidateId: "live_source_mailbox.mail_loop",
@@ -467,6 +507,7 @@ export function buildAskEvidenceTargetArbitration(input: {
       ],
       capabilityKeys: [
         "live_env.read_processed_live_source_mail",
+        "live_env.reflect_live_source_mail_loop",
         "live_env.process_live_source_mail",
         "live_env.read_live_source_mail",
         "live_env.record_live_source_mail_decision",

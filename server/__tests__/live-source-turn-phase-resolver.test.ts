@@ -36,6 +36,19 @@ describe("resolveLiveSourceTurnPhase", () => {
       "live_env.read_processed_live_source_mail",
       "live_env.process_live_source_mail",
     ]));
+    expect(LIVE_SOURCE_TURN_PHASE_TABLE.reflect_mail_loop).toMatchObject({
+      allowedTools: ["live_env.reflect_live_source_mail_loop"],
+      fallbackTools: [],
+      requiredEvidence: ["stage_play_live_source_mail_loop_reflection"],
+      completionEvidence: ["stage_play_live_source_mail_loop_reflection"],
+      next: "terminal_checkpoint",
+    });
+    expect(LIVE_SOURCE_TURN_PHASE_TABLE.reflect_mail_loop.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.record_live_source_mail_decision",
+      "live_env.request_interim_voice_callout",
+    ]));
     expect(LIVE_SOURCE_TURN_PHASE_TABLE.record_decision).toMatchObject({
       allowedTools: ["live_env.record_live_source_mail_decision"],
       completionEvidence: ["stage_play_live_source_mail_decision"],
@@ -136,6 +149,67 @@ describe("resolveLiveSourceTurnPhase", () => {
       reason: "Stage Play mail wake route metadata is authoritative, but decision routing requires materialized processed mailbox evidence.",
     });
     expect(mandatoryToolForPhase(phase)).toBe("live_env.read_processed_live_source_mail");
+  });
+
+  it("locks live mail loop causality prompts to read-only reflection before terminal synthesis", () => {
+    const phase = resolveLiveSourceTurnPhase({
+      prompt: "Can you read the live mail loop as it is working, like inspect via a tool call of stage play badge graph?",
+      selectedTargetSource: "live_source_mailbox",
+      selectedCapability: "live_env.reflect_live_source_mail_loop",
+    });
+
+    expect(phase).toMatchObject({
+      phase: "reflect_mail_loop",
+      canonicalGoal: "processed_mail_interpretation",
+      allowedTools: ["live_env.reflect_live_source_mail_loop"],
+      fallbackTools: [],
+      requiredEvidence: ["stage_play_live_source_mail_loop_reflection"],
+      completionEvidence: ["stage_play_live_source_mail_loop_reflection"],
+      nextPhase: "terminal_checkpoint",
+      phaseLock: {
+        locked: true,
+        reason: "Mail-loop reflection is read-only causal inspection; packet materialization must be explicit.",
+      },
+    });
+    expect(phase.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.record_live_source_mail_decision",
+      "live_env.request_interim_voice_callout",
+      "final_answer",
+    ]));
+    expect(mandatoryToolForPhase(phase)).toBe("live_env.reflect_live_source_mail_loop");
+  });
+
+  it("terminalizes after a mail-loop reflection receipt without forcing voice receipts", () => {
+    const phase = resolveLiveSourceTurnPhase({
+      prompt: "Explain why the final answer feels disconnected from the processed mail loop and MicroDeck causality.",
+      selectedTargetSource: "live_source_mailbox",
+      selectedCapability: "live_env.reflect_live_source_mail_loop",
+      latestToolReceipts: [{
+        toolName: "live_env.reflect_live_source_mail_loop",
+        observation: {
+          artifactId: "stage_play_live_source_mail_loop_reflection",
+          schemaVersion: "stage_play_live_source_mail_loop_reflection/v1",
+          reflectionId: "stage_play_live_source_mail_loop_reflection:test",
+        },
+      }],
+    });
+
+    expect(phase).toMatchObject({
+      phase: "terminal_checkpoint",
+      allowedTools: [],
+      requiredEvidence: ["stage_play_live_source_mail_loop_reflection"],
+      completionEvidence: ["model_synthesized_answer"],
+      phaseLock: {
+        locked: true,
+        reason: "Reflection turns terminalize from the evidence-only causal reflection packet after model re-entry.",
+      },
+    });
+    expect(phase.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.reflect_live_source_mail_loop",
+      "live_env.request_interim_voice_callout",
+    ]));
   });
 
   it("exposes mandatory tools only for locked executable live-source phases", () => {

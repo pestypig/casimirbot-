@@ -248,6 +248,27 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
     requiresGoalSatisfaction: true,
   }),
   contract({
+    toolName: "live_env.reflect_live_source_mail_loop",
+    toolFamily: "live_source_mail",
+    authority: "evidence_only",
+    mutating: false,
+    requiredObservationKinds: ["stage_play_live_source_mail_loop_reflection"],
+    allowedTerminalKinds: [...evidenceOnlyTerminalKinds],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+    aliases: [
+      "live_mail_loop",
+      "processed_mail_loop",
+      "mail_loop_causality",
+      "live_answer_retrieval",
+      "temporary_retrieval_network",
+      "synthetic_scene_retrieval",
+      "microdex",
+      "microdeck_loop",
+      "stage_play_live_source_mail_loop_reflection/v1",
+    ],
+  }),
+  contract({
     toolName: "live_env.process_live_source_mail",
     toolFamily: "live_source_mail",
     authority: "evidence_only",
@@ -427,7 +448,7 @@ const normalizeFamily = (value: unknown): ToolFamily | null => {
   if (/workspace[-.:]?directory|workspace-directory\.resolve|workspace[-.:]?directory[-.:]?resolution/.test(normalized)) return "workspace_directory";
   if (/docs?[-.:]?viewer|active[-.:]?doc|document/.test(normalized)) return "docs_viewer";
   if (/workstation|workspace[-.:]?action|workspace[-.:]?panel|panel-control|click-or-activate-control/.test(normalized)) return "workstation";
-  if (/live[-.:]?source[-.:]?mail|mailbox|read-processed-live-source-mail|process-live-source-mail/.test(normalized)) return "live_source_mail";
+  if (/live[-.:]?source[-.:]?mail|mailbox|read-processed-live-source-mail|process-live-source-mail|reflect-live-source-mail-loop|mail-loop-causality|processed-mail-loop/.test(normalized)) return "live_source_mail";
   if (/record-live-source-mail-decision|live[-.:]?source[-.:]?decision/.test(normalized)) return "live_source_decision";
   if (/voice[-.:]?delivery|voice[-.:]?output|request-interim-voice-callout|callout/.test(normalized)) return "voice_delivery";
   if (/zen[-.:]?graph|zengraph|reflect[-.:]?ideology[-.:]?context|procedural[-.:]?zen[-.:]?classification/.test(normalized)) return "zen_graph_reflection";

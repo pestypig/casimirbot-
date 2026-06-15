@@ -19,6 +19,7 @@ import {
   type HelixContextualToolAdmissionSuppression,
 } from "./contextual-tool-admission";
 import { buildToolUseRestatement, detectInternetSearchIntent } from "./internet-search-intent";
+import { isLiveSourceMailLoopReflectionPrompt } from "./live-source-continuation-intent";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
 import {
   HELIX_WORKSPACE_OS_STATUS_CAPABILITY,
@@ -183,6 +184,12 @@ const requestedActionFor = (
   if (family === "workspace_directory") return HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY;
   if (family === "live_environment") {
     if (sourceTarget === "live_source_mailbox") {
+      if (
+        isLiveSourceMailLoopReflectionPrompt(promptText) ||
+        /\b(?:why|causal|causality|retrieval\s+network|synthetic\s+scene|microdex|micro[-\s]?deck|processed\s+mail\s+loop|live\s+mail\s+loop|answer\s+context|what\s+entered|why\s+final\s+answer|badge\s+graph[\s\S]{0,80}mailbox|mailbox[\s\S]{0,80}badge\s+graph)\b/i.test(promptText)
+      ) {
+        return "reflect_live_source_mail_loop";
+      }
       if (/\b(?:source\s+quality|live\s+source\s+quality|fresh|stale|degraded|cadence|backlog|under\s+pressure)\b/.test(prompt)) {
         return "query_live_source_quality";
       }
@@ -229,6 +236,7 @@ const liveSourceToolForRequestedAction = (requestedAction: string): string => {
     requestedAction === "read_processed_live_source_mail" ||
     requestedAction === "process_live_source_mail" ||
     requestedAction === "read_live_source_mail" ||
+    requestedAction === "reflect_live_source_mail_loop" ||
     requestedAction === "record_live_source_mail_decision" ||
     requestedAction === "request_interim_voice_callout" ||
     requestedAction === "configure_interpreter_profile" ||

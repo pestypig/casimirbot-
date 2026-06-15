@@ -201,6 +201,9 @@ const artifactKindMatchesCapability = (
   if (capability === "helix_ask.reflect_stage_play_context") {
     return /stage_play_reflection_result|stage_play_badge_graph|stage_play_output_lane_projection|stage_play_job_plan|stage_play_checkpoint_request_result|stage_play_checkpoint_request|stage_play_checkpoint_queue|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation|reflect_stage_play_context|plan_stage_play_job|request_stage_play_checkpoint|describe_stage_builder|query_stage_sources|draft_stage_play_graph|validate_stage_play_graph|live_env\.reflect_stage_play_context|live_env\.plan_stage_play_job|live_env\.request_stage_play_checkpoint/i.test(joined);
   }
+  if (capability === "live_env.reflect_live_source_mail_loop") {
+    return /stage_play_live_source_mail_loop_reflection|reflect_live_source_mail_loop/i.test(joined);
+  }
   if (capability === "docs-viewer.open") return /workspace_action_receipt|docs-viewer|docs_viewer|open/i.test(joined);
   if (capability === "docs-viewer.identify_current_doc") return /active_doc_identity|active_doc_path|doc_summary/i.test(joined);
   if (capability === "docs-viewer.search_docs") return /doc_search_results|doc_candidate_validation|retrieval_context/i.test(joined);
@@ -314,6 +317,9 @@ const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): 
   }
   if (/helix_theory_ideology_bridge_tool_result|theory_ideology_bridge|bridge_theory_ideology_context/i.test(joined)) {
     return "helix_ask.bridge_theory_ideology_context";
+  }
+  if (/stage_play_live_source_mail_loop_reflection|reflect_live_source_mail_loop/i.test(joined)) {
+    return "live_env.reflect_live_source_mail_loop";
   }
   if (/stage_play_reflection_result|stage_play_badge_graph|stage_play_output_lane_projection|stage_play_job_plan|stage_play_checkpoint_request_result|stage_play_checkpoint_request|stage_play_checkpoint_queue|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation|reflect_stage_play_context|plan_stage_play_job|request_stage_play_checkpoint|describe_stage_builder|query_stage_sources|draft_stage_play_graph|validate_stage_play_graph/i.test(joined)) {
     return "helix_ask.reflect_stage_play_context";

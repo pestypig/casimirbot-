@@ -331,6 +331,61 @@ describe("Helix capability plan contract", () => {
     });
   });
 
+  it("plans the read-only live-source mail-loop reflection tool for mailbox causality prompts", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:mail-loop-reflection",
+      promptText:
+        "Explain why the final answer feels disconnected from the processed mail loop and MicroDeck causality.",
+      sourceTargetIntent: baseSourceTarget("live_source_mailbox", "live_source_mailbox"),
+      toolCallAdmissionDecision: toolAdmission("live_source_mailbox", ["live_environment"]),
+      canonicalGoalFrame: canonicalGoal("live_source_processed_mail_interpretation", "model_synthesized_answer"),
+      liveSourceTurnPhaseResolution: {
+        artifactId: "live_source_turn_phase_resolution",
+        schemaVersion: "live_source_turn_phase_resolution/v1",
+        phase: "reflect_mail_loop",
+        reason: "Reflect causal mailbox loop.",
+        canonicalGoal: "processed_mail_interpretation",
+        allowedTools: ["live_env.reflect_live_source_mail_loop"],
+        fallbackTools: [],
+        forbiddenTools: [
+          "live_env.read_processed_live_source_mail",
+          "live_env.process_live_source_mail",
+          "live_env.record_live_source_mail_decision",
+          "live_env.request_interim_voice_callout",
+          "final_answer",
+        ],
+        requiredEvidence: ["stage_play_live_source_mail_loop_reflection"],
+        completionEvidence: ["stage_play_live_source_mail_loop_reflection"],
+        nextPhase: "terminal_checkpoint",
+        phaseLock: {
+          locked: true,
+          reason: "Mail-loop reflection is read-only causal inspection.",
+        },
+        evidenceRefs: [],
+        assistant_answer: false,
+        terminal_eligible: false,
+        context_role: "tool_policy",
+      },
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "live_environment",
+      requested_action: "live_env.reflect_live_source_mail_loop",
+      selected_capability: "live_env.reflect_live_source_mail_loop",
+      mutating: false,
+      operator_command_required: false,
+      admission_status: "needs_evidence",
+      source_target: "live_source_mailbox",
+    });
+    expect(plan.phase_constraint).toMatchObject({
+      phase: "reflect_mail_loop",
+      allowed_tools: ["live_env.reflect_live_source_mail_loop"],
+      forbidden_tools: expect.arrayContaining(["live_env.process_live_source_mail"]),
+      selected_before_repair: "live_env.reflect_live_source_mail_loop",
+      selected_after_repair: "live_env.reflect_live_source_mail_loop",
+    });
+  });
+
   it("lets hard mailbox wake route metadata outrank internet and repo capability cues", () => {
     const plan = buildCapabilityPlan({
       turnId: "ask:mailbox-hard-route-search-bait",

@@ -3,6 +3,7 @@ import type {
   LiveSourceTurnPhaseV1,
   LiveSourceWakeRouteMetadataV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
+import { isLiveSourceMailLoopReflectionPrompt } from "./live-source-continuation-intent";
 
 type RecordLike = Record<string, unknown>;
 
@@ -80,6 +81,22 @@ export const LIVE_SOURCE_TURN_PHASE_TABLE: Record<LiveSourceTurnPhaseV1, LiveSou
     ],
     requiredEvidence: ["stage_play_micro_reasoner_prompt_preset_query_result"],
     completionEvidence: ["stage_play_micro_reasoner_prompt_preset_query_result"],
+    next: "terminal_checkpoint",
+    terminalAllowed: false,
+  },
+  reflect_mail_loop: {
+    allowedTools: ["live_env.reflect_live_source_mail_loop"],
+    fallbackTools: [],
+    forbiddenTools: [
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.read_live_source_mail",
+      "live_env.record_live_source_mail_decision",
+      "live_env.request_interim_voice_callout",
+      "final_answer",
+    ],
+    requiredEvidence: ["stage_play_live_source_mail_loop_reflection"],
+    completionEvidence: ["stage_play_live_source_mail_loop_reflection"],
     next: "terminal_checkpoint",
     terminalAllowed: false,
   },
@@ -403,6 +420,16 @@ const hasVoiceCalloutCompletionReceipt = (receipts: RecordLike[]): boolean =>
         "blocked_policy",
         "blocked_missing_text",
       ].includes(receiptStatus))
+    );
+  });
+
+const hasMailLoopReflectionReceipt = (receipts: RecordLike[]): boolean =>
+  receipts.some((receipt) => {
+    const observation = receiptObservation(receipt);
+    return (
+      receiptToolName(receipt) === "live_env.reflect_live_source_mail_loop" ||
+      readString(observation?.artifactId) === "stage_play_live_source_mail_loop_reflection" ||
+      readString(observation?.schemaVersion) === "stage_play_live_source_mail_loop_reflection/v1"
     );
   });
 
@@ -834,6 +861,56 @@ export const resolveLiveSourceTurnPhase = (
       lockReason: draftRequested
         ? "MicroDeck setup drafting is a read-only source-prompt planning query, not mailbox processing or preset mutation."
         : "MicroDeck inspection is a read-only source-prompt query, not mailbox processing.",
+      evidenceRefs,
+    });
+  }
+
+  if (
+    hasMailLoopReflectionReceipt(receipts) ||
+    selectedCapability === "live_env.reflect_live_source_mail_loop" ||
+    isLiveSourceMailLoopReflectionPrompt(prompt)
+  ) {
+    if (hasMailLoopReflectionReceipt(receipts)) {
+      return makeResolution({
+        phase: "terminal_checkpoint",
+        reason: "Live-source mail-loop reflection evidence exists; synthesize from the reflection artifact without reading, processing, deciding, or voice-calling again.",
+        canonicalGoal: "processed_mail_interpretation",
+        allowedTools: [],
+        forbiddenTools: [
+          "live_env.reflect_live_source_mail_loop",
+          "live_env.read_processed_live_source_mail",
+          "live_env.process_live_source_mail",
+          "live_env.read_live_source_mail",
+          "live_env.record_live_source_mail_decision",
+          "live_env.request_interim_voice_callout",
+        ],
+        requiredEvidence: ["stage_play_live_source_mail_loop_reflection"],
+        completionEvidence: ["model_synthesized_answer"],
+        nextPhase: null,
+        locked: true,
+        lockReason: "Reflection turns terminalize from the evidence-only causal reflection packet after model re-entry.",
+        evidenceRefs,
+      });
+    }
+    return makeResolution({
+      phase: "reflect_mail_loop",
+      reason: "Prompt asks to inspect live-source mail-loop causality across processed mail, MicroDeck runs, Stage Play graph projection, and answer context.",
+      canonicalGoal: "processed_mail_interpretation",
+      allowedTools: ["live_env.reflect_live_source_mail_loop"],
+      fallbackTools: [],
+      forbiddenTools: [
+        "live_env.read_processed_live_source_mail",
+        "live_env.process_live_source_mail",
+        "live_env.read_live_source_mail",
+        "live_env.record_live_source_mail_decision",
+        "live_env.request_interim_voice_callout",
+        "final_answer",
+      ],
+      requiredEvidence: ["stage_play_live_source_mail_loop_reflection"],
+      completionEvidence: ["stage_play_live_source_mail_loop_reflection"],
+      nextPhase: "terminal_checkpoint",
+      locked: true,
+      lockReason: "Mail-loop reflection is read-only causal inspection; packet materialization must be explicit.",
       evidenceRefs,
     });
   }

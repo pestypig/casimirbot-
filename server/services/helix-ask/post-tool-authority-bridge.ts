@@ -157,6 +157,28 @@ const collectLiveSourceProcessedPackets = (payload: RecordLike): RecordLike[] =>
     });
   });
 
+const collectLiveSourceMailLoopReflections = (payload: RecordLike): RecordLike[] =>
+  artifactLedger(payload).flatMap((artifact) => {
+    const directPayload = artifactPayload(artifact);
+    const observation = artifactObservation(artifact);
+    return [
+      directPayload,
+      observation,
+      readRecord(directPayload?.reflection),
+      readRecord(observation?.reflection),
+    ].map(readRecord).filter((entry): entry is RecordLike => {
+      if (!entry) return false;
+      const marker = [
+        readString(entry.artifactId),
+        readString(entry.artifact_id),
+        readString(entry.schema),
+        readString(entry.schemaVersion),
+        readString(entry.kind),
+      ].join(" ");
+      return /stage_play_live_source_mail_loop_reflection/i.test(marker);
+    });
+  });
+
 const latestLiveSourceMailDecision = (payload: RecordLike): RecordLike | null => {
   for (const artifact of [...artifactLedger(payload)].reverse()) {
     const haystack = [
@@ -254,6 +276,45 @@ const liveSourceMailboxSynthesisText = (payload: RecordLike): string => {
     requestedTool ? `The requested next tool was ${requestedTool}.` : "",
     receiptStatus ? `The voice phase has a receipt with status ${receiptStatus}, so another interim voice callout is not required before synthesis.` : "A voice, hold, or block receipt is present, so another interim voice callout is not required before synthesis.",
     evidence.length ? `Evidence used: ${evidence.join(" | ")}` : "",
+  ].filter(Boolean).join(" ");
+};
+
+const liveSourceMailLoopReflectionSynthesisText = (payload: RecordLike): string => {
+  const reflection = collectLiveSourceMailLoopReflections(payload).at(-1) ?? null;
+  if (!reflection) return "";
+  const inspectionWindow = readRecord(reflection.inspectionWindow ?? reflection.inspection_window);
+  const stageSummaries = readRecord(reflection.stageSummaries ?? reflection.stage_summaries);
+  const mailIds = readStringItems(inspectionWindow?.mailIds ?? inspectionWindow?.mail_ids);
+  const packetRefs = readStringItems(inspectionWindow?.processedPacketRefs ?? inspectionWindow?.processed_packet_refs);
+  const microRunRefs = readStringItems(inspectionWindow?.microReasonerRunRefs ?? inspectionWindow?.micro_reasoner_run_refs);
+  const decisionRefs = readStringItems(inspectionWindow?.decisionRefs ?? inspectionWindow?.decision_refs);
+  const graphRef = readString(inspectionWindow?.stagePlayGraphRef ?? inspectionWindow?.stage_play_graph_ref);
+  const currentStateRef = readString(inspectionWindow?.currentStateRef ?? inspectionWindow?.current_state_ref);
+  const loopHealthRef = readString(inspectionWindow?.loopHealthRef ?? inspectionWindow?.loop_health_ref);
+  const causalEdges = readArray(reflection.causalGraph ?? reflection.causal_graph).length;
+  const entered = readStringItems(reflection.whatEnteredAnswerContext ?? reflection.what_entered_answer_context).slice(0, 3);
+  const excluded = readStringItems(reflection.whatDidNotEnterAnswerContext ?? reflection.what_did_not_enter_answer_context).slice(0, 3);
+  const missing = readStringItems(reflection.missingEvidence ?? reflection.missing_evidence).slice(0, 4);
+  const safeSay = readStringItems(reflection.whatAskCanSafelySay ?? reflection.what_ask_can_safely_say).slice(0, 3);
+  const limitations = readStringItems(reflection.limitations).slice(0, 3);
+  const nextUsefulTool = readString(reflection.nextUsefulTool ?? reflection.next_useful_tool);
+  const processedSummary = readStringItems(stageSummaries?.processedMail ?? stageSummaries?.processed_mail).slice(0, 2);
+  const microDeckSummary = readStringItems(stageSummaries?.microDeck ?? stageSummaries?.micro_deck).slice(0, 2);
+  const readiness = readStringItems(stageSummaries?.terminalReadiness ?? stageSummaries?.terminal_readiness).slice(0, 2);
+
+  return [
+    `The live-source mail-loop reflection inspected ${mailIds.length} mail item(s), ${packetRefs.length} processed packet(s), ${microRunRefs.length} MicroDeck run(s), ${decisionRefs.length} decision receipt(s), and ${causalEdges} causal edge(s).`,
+    graphRef ? `Stage Play graph evidence was included as ${graphRef}.` : "No Stage Play graph ref was available in the reflection window.",
+    currentStateRef || loopHealthRef ? `State refs: ${[currentStateRef, loopHealthRef].filter(Boolean).join(", ")}.` : "",
+    processedSummary.length ? `Processed mail: ${processedSummary.map((entry) => clip(entry, 150)).join(" | ")}` : "",
+    microDeckSummary.length ? `MicroDeck: ${microDeckSummary.map((entry) => clip(entry, 150)).join(" | ")}` : "",
+    entered.length ? `Entered answer context: ${entered.map((entry) => clip(entry, 160)).join(" | ")}` : "No processed packet or MicroDeck evidence entered answer context yet.",
+    excluded.length ? `Excluded from answer context: ${excluded.map((entry) => clip(entry, 140)).join(" | ")}` : "",
+    safeSay.length ? `Safe to say: ${safeSay.map((entry) => clip(entry, 160)).join(" | ")}` : "",
+    missing.length ? `Missing evidence: ${missing.join(", ")}.` : "No missing reflection evidence was reported.",
+    limitations.length ? `Limitations: ${limitations.map((entry) => clip(entry, 140)).join(" | ")}` : "",
+    readiness.length ? `Terminal readiness: ${readiness.map((entry) => clip(entry, 160)).join(" | ")}` : "",
+    nextUsefulTool ? `Next useful tool: ${nextUsefulTool}.` : "",
   ].filter(Boolean).join(" ");
 };
 
@@ -413,7 +474,7 @@ const inferRouteFamily = (payload: RecordLike, capability: string): HelixPostToo
   const prompt = readString(payload.active_prompt) || readString(payload.prompt) || readString(payload.question);
   const toolChain = artifactLedger(payload).map((artifact) => artifactToolName(artifact)).filter(Boolean).join(" ");
   const haystack = `${sourceTarget} ${targetSource} ${goalKind} ${phaseGoal} ${capability} ${toolChain} ${readString(payload.route_reason_code)} ${readString(payload.route)} ${prompt}`;
-  if (/live_source_mailbox|live_source_processed_mail_interpretation|processed_mail_voice_decision|stage_play_processed_mail_packet|record_live_source_mail_decision|read_processed_live_source_mail/i.test(haystack)) return "live_source_mailbox";
+  if (/live_source_mailbox|live_source_processed_mail_interpretation|processed_mail_voice_decision|stage_play_processed_mail_packet|stage_play_live_source_mail_loop_reflection|record_live_source_mail_decision|read_processed_live_source_mail|reflect_live_source_mail_loop/i.test(haystack)) return "live_source_mailbox";
   if (/scholarly_research|scholarly-research|doi|arxiv|citation|journal/i.test(haystack)) return "scholarly_research";
   if (/internet_search|internet-search|search_web|google_custom_search|web_search/i.test(haystack)) return "internet_search";
   if (/calculator|scientific-calculator/i.test(haystack)) return "calculator";
@@ -431,9 +492,10 @@ export function buildPostToolAuthorityBridge(input: {
 }): HelixPostToolAuthorityBridge {
   const capability = selectedCapability(input.payload);
   const routeFamily = inferRouteFamily(input.payload, capability);
-  const toolObservationRefs = artifactRefs(input.payload, /agent_step_observation_packet|runtime_tool_observation|live_environment_tool_observation|workspace_action_receipt|calculator_receipt|scholarly_research_observation|scholarly_full_text_observation|internet_search_observation|dottie_|voice_delivery|workstation_tool_evaluation|stage_play_badge_graph|stage_play_job_plan|stage_play_checkpoint_request_result|stage_play_checkpoint_request|stage_play_checkpoint_queue|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation/);
+  const toolObservationRefs = artifactRefs(input.payload, /agent_step_observation_packet|runtime_tool_observation|live_environment_tool_observation|workspace_action_receipt|calculator_receipt|scholarly_research_observation|scholarly_full_text_observation|internet_search_observation|dottie_|voice_delivery|workstation_tool_evaluation|stage_play_badge_graph|stage_play_live_source_mail_loop_reflection|stage_play_job_plan|stage_play_checkpoint_request_result|stage_play_checkpoint_request|stage_play_checkpoint_queue|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation/);
   const answerDraftRefs = artifactRefs(input.payload, /final_answer_draft|direct_answer_text|repo_code_evidence_answer|scholarly_research_answer|internet_search_answer/);
-  const liveSourceSynthesis = liveSourceMailboxSynthesisText(input.payload);
+  const liveSourceReflectionSynthesis = liveSourceMailLoopReflectionSynthesisText(input.payload);
+  const liveSourceSynthesis = liveSourceReflectionSynthesis || liveSourceMailboxSynthesisText(input.payload);
   const calculatorSupport = evaluateCalculatorToolAnswerSupport({ turnId: input.turnId, payload: input.payload });
   if (calculatorSupport.supports_goal) {
     return {
@@ -466,7 +528,9 @@ export function buildPostToolAuthorityBridge(input: {
       required_terminal_kind: "model_synthesized_answer",
       terminal_repair_action: "materialize_model_synthesized_answer",
       pending_requirements: [],
-      reason: "live_source_mailbox_receipts_support_synthesized_answer",
+      reason: liveSourceReflectionSynthesis
+        ? "live_source_mail_loop_reflection_supports_synthesized_answer"
+        : "live_source_mailbox_receipts_support_synthesized_answer",
       assistant_answer: false,
       raw_content_included: false,
     };
@@ -644,7 +708,7 @@ export function applyPostToolAuthorityBridgeRepair(input: {
 
   if (bridge.observation_support_status === "supports_answer" && bridge.required_terminal_kind === "model_synthesized_answer") {
     const text =
-      (bridge.route_family === "live_source_mailbox" ? liveSourceMailboxSynthesisText(input.payload) : "") ||
+      (bridge.route_family === "live_source_mailbox" ? liveSourceMailLoopReflectionSynthesisText(input.payload) || liveSourceMailboxSynthesisText(input.payload) : "") ||
       finalDraftText(input.payload) ||
       (bridge.selected_capability === "live_env.request_interim_voice_callout" ? selectedVisibleAnswerText(input.payload) : "");
     if (text) {
