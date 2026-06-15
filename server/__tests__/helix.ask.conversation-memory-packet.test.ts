@@ -275,6 +275,101 @@ describe("Helix Ask conversation memory packet", () => {
     })).toBe("HELIX_MEMO_PATCH_BROWSER_RUN_20260615_D");
   });
 
+  it("prefers the newest current-thread pasted memo frame over a stale explicit frame", () => {
+    appendHelixThreadServerRequestEvent({
+      thread_id: threadId,
+      route: "/ask",
+      event_type: "server_request_created",
+      turn_id: "turn-pause-newer",
+      session_id: sessionId,
+      trace_id: "turn-pause-newer",
+      turn_kind: "ask",
+      request_id: "turn-pause-newer:context_compaction:pause",
+      request_kind: "request_user_input",
+      item_status: "in_progress",
+      ts: "2026-06-15T06:05:00.000Z",
+      request_payload: {
+        schema: "helix.pending_server_request.v1",
+        request_id: "turn-pause-newer:context_compaction:pause",
+        kind: "context_compaction_pause",
+        prompt: "Context is compacting before the next Ask turn.",
+        reason: "active_context_page_file_compaction",
+        resume_frame: {
+          schema: "helix.pasted_text_attachment_resume_frame.v1",
+          original_prompt: "Use the attached pasted memo.",
+          attachment_artifact_refs: ["thread:pasted_text_attachment:memo-marker-E"],
+          turn_input_items: [
+            { type: "text", text: "Use the attached pasted memo.", source: "user" },
+            {
+              type: "attachment",
+              attachment_id: "pasted-text-memo-E",
+              attachment_kind: "text",
+              file_name: "pasted-text-memo-E.txt",
+              mime_type: "text/plain",
+              size_bytes: 1024,
+              preview: "HELIX_MEMO_PATCH_BROWSER_RUN_20260615_E\nThis is newer compacted pasted memo content.",
+              raw_content_included: true,
+              raw_content_scope: "turn_input_only",
+              assistant_answer: false,
+            },
+          ],
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+    });
+
+    const packet = buildHelixConversationMemoryPacket({
+      threadId,
+      currentTurnId: "turn-followup-freshness",
+      sessionId,
+      promptText: "What exact marker appears in the attached pasted memo? Answer with only the marker.",
+      contextResumeFrames: [
+        {
+          id: "context_resume:stale-explicit-D",
+          schema: "helix.pasted_text_attachment_resume_frame.v1",
+          source_request_id: "turn-pause-older:context_compaction:pause",
+          source_turn_id: "turn-pause-older",
+          original_prompt: "Use the attached pasted memo.",
+          attachment_artifact_refs: ["thread:pasted_text_attachment:memo-marker-D"],
+          attachment_previews: [
+            "HELIX_MEMO_PATCH_BROWSER_RUN_20260615_D\nThis is older compacted pasted memo content.",
+          ],
+          turn_input_item_count: 2,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ],
+    });
+
+    expect(packet.allowed_for_current_goal).toBe(true);
+    expect(packet.allowed_use).toBe("reuse_prior_evidence_refs");
+    expect(packet.context_resume_frame_selection).toMatchObject({
+      selected_context_resume_frame_id: "context_resume:turn-pause-newer:context_compaction:pause",
+      selected_context_resume_reason: "freshest_installed_current_thread_frame",
+    });
+    expect(packet.context_resume_frame_selection?.rejected_context_resume_frames).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          frame_id: "context_resume:stale-explicit-D",
+          reason: "superseded_by_newer_pasted_attachment",
+        }),
+      ]),
+    );
+    expect(packet.context_resume_frames.map((frame) => frame.id)).toEqual([
+      "context_resume:turn-pause-newer:context_compaction:pause",
+    ]);
+    expect(resolveHelixContextResumeFrameRecallText({
+      packet,
+      promptText: "What exact marker appears in the attached pasted memo? Answer with only the marker.",
+    })).toBe("HELIX_MEMO_PATCH_BROWSER_RUN_20260615_E");
+  });
+
   it("prefers marker tokens across all resume frames before falling back to original prompt text", () => {
     const packet = buildHelixConversationMemoryPacket({
       threadId,
