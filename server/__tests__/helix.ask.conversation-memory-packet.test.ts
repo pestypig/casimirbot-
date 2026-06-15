@@ -204,6 +204,43 @@ describe("Helix Ask conversation memory packet", () => {
     })).toBe("HELIX_PASTED_TEXT_RESUME_SENTINEL");
   });
 
+  it("admits explicit pasted-text resume frames carried by the current recall turn", () => {
+    const packet = buildHelixConversationMemoryPacket({
+      threadId,
+      currentTurnId: "turn-followup-explicit",
+      sessionId,
+      promptText: "What exact sentinel token was in the attached pasted text? Answer with only the sentinel token.",
+      contextResumeFrames: [
+        {
+          id: "context_resume:explicit",
+          schema: "helix.pasted_text_attachment_resume_frame.v1",
+          source_request_id: "turn-pause:context_compaction:pause",
+          source_turn_id: "turn-pause",
+          original_prompt: "Use the attached pasted text.",
+          attachment_artifact_refs: ["thread:pasted_text_attachment:explicit-sentinel"],
+          attachment_previews: [
+            "HELIX_PASTED_TEXT_RESUME_SENTINEL_EXPLICIT\nThis is compacted pasted text.",
+          ],
+          turn_input_item_count: 2,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ],
+    });
+
+    expect(packet.allowed_for_current_goal).toBe(true);
+    expect(packet.allowed_use).toBe("reuse_prior_evidence_refs");
+    expect(packet.context_resume_frames).toHaveLength(1);
+    expect(packet.context_resume_frames[0].attachment_artifact_refs).toEqual([
+      "thread:pasted_text_attachment:explicit-sentinel",
+    ]);
+    expect(resolveHelixContextResumeFrameRecallText({
+      packet,
+      promptText: "What exact sentinel token was in the attached pasted text? Answer with only the sentinel token.",
+    })).toBe("HELIX_PASTED_TEXT_RESUME_SENTINEL_EXPLICIT");
+  });
+
   it("treats pasted-text resume recall as selected conversation-memory evidence, not runtime debug", () => {
     const turnId = "turn-followup";
     const evidenceRef = `${turnId}:conversation_memory_packet`;

@@ -42,6 +42,8 @@ export type HelixAskStagePlayMailboxWakeRouteMetadata = {
   mandatory_next_tool?: Record<string, unknown>;
   requiredToolFamily?: string | null;
   compact_context?: Record<string, unknown>;
+  context_resume_frame?: Record<string, unknown> | null;
+  contextResumeFrame?: Record<string, unknown> | null;
 };
 
 export type HelixAskGenericRouteMetadata = {
@@ -66,6 +68,8 @@ export type HelixAskGenericRouteMetadata = {
   mandatory_next_tool?: Record<string, unknown>;
   requiredToolFamily?: string | null;
   compact_context?: Record<string, unknown>;
+  context_resume_frame?: Record<string, unknown> | null;
+  contextResumeFrame?: Record<string, unknown> | null;
 };
 
 export type HelixAskRouteMetadata =

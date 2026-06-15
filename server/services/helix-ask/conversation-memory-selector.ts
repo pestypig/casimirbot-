@@ -29,6 +29,7 @@ export type BuildHelixConversationMemoryPacketInput = {
   sourceTarget?: string | null;
   routeReason?: string | null;
   allowsPriorArtifacts?: boolean | null;
+  contextResumeFrames?: HelixContextResumeFrame[];
   maxTurns?: number;
   maxAnswers?: number;
   maxRefs?: number;
@@ -752,13 +753,22 @@ export function buildHelixConversationMemoryPacket(
     .map(coerceContextResumeFrame)
     .filter((frame): frame is HelixContextResumeFrame => Boolean(frame))
     .slice(0, maxTurns);
+  const explicitContextResumeFrames = Array.isArray(input.contextResumeFrames)
+    ? input.contextResumeFrames.filter((frame): frame is HelixContextResumeFrame =>
+        Boolean(frame && frame.schema === "helix.pasted_text_attachment_resume_frame.v1"),
+      )
+    : [];
+  const selectedContextResumeFrames = [
+    ...contextResumeFrames,
+    ...explicitContextResumeFrames,
+  ].slice(-maxTurns);
   const pendingSlotFillCue =
     unresolvedTaskFrames.length > 0 &&
     detectPendingSlotFillCue(input.promptText) &&
     !hasExplicitMemoryRejection(normalizeLower(input.promptText)) &&
     !hasQuotedOrHypotheticalCue(normalizeLower(input.promptText));
   const pendingContextResumeCue =
-    contextResumeFrames.length > 0 &&
+    selectedContextResumeFrames.length > 0 &&
     detectContextResumeCue(input.promptText) &&
     !hasExplicitMemoryRejection(normalizeLower(input.promptText)) &&
     !hasQuotedOrHypotheticalCue(normalizeLower(input.promptText));
@@ -874,8 +884,8 @@ export function buildHelixConversationMemoryPacket(
       latestAnswerSummary ? `latest answer: ${latestAnswerSummary}` : "",
       latestFailure ? `latest failure: ${latestFailure}` : "",
       pendingInputs.length > 0 ? `pending input: ${pendingInputs[0]}` : "",
-      contextResumeFrames.length > 0
-        ? `context resume frame: ${contextResumeFrames[0].attachment_artifact_refs.slice(0, 3).join(", ")}`
+      selectedContextResumeFrames.length > 0
+        ? `context resume frame: ${selectedContextResumeFrames[0].attachment_artifact_refs.slice(0, 3).join(", ")}`
         : "",
       reusableEvidenceRefs.length > 0 ? `reusable evidence refs: ${reusableEvidenceRefs.slice(0, 3).join(", ")}` : "",
     ].filter(Boolean).join(" | "),
@@ -897,7 +907,7 @@ export function buildHelixConversationMemoryPacket(
     open_failures: unique(failures, maxTurns),
     pending_user_inputs: unique(pendingInputs, maxTurns),
     unresolved_task_frames: unresolvedTaskFrames,
-    context_resume_frames: contextResumeFrames,
+    context_resume_frames: selectedContextResumeFrames,
     latest_plan_summary: latestPlanSummary,
     latest_answer_summary: memoryAllowedForCurrentGoal ? latestAnswerSummary : null,
     latest_failure_summary: latestFailure,

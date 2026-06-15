@@ -5984,9 +5984,16 @@ function buildQueuedAskTurn(args: {
   capsuleIds?: string[];
   options?: RunAskOptions;
   reason: QueuedAskTurnReason;
+  contextResumeFrame?: Record<string, unknown> | null;
 }): QueuedAskTurn {
   const question = args.question.trim();
   const backendOwnedPastedTextResumeRecall = isHelixAskPastedTextResumeRecallPrompt(question);
+  const baseRouteMetadata = args.contextResumeFrame
+    ? {
+        ...(args.options?.routeMetadata ?? {}),
+        context_resume_frame: args.contextResumeFrame,
+      }
+    : args.options?.routeMetadata;
   const options = backendOwnedPastedTextResumeRecall
     ? {
         ...(args.options ?? {}),
@@ -5994,7 +6001,7 @@ function buildQueuedAskTurn(args: {
         forceReasoningDispatch: true,
         skipContextChooser: true,
         routeMetadata: buildHelixAskPastedTextResumeRecallRouteMetadata({
-          base: args.options?.routeMetadata,
+          base: baseRouteMetadata,
           turnId: "queued:pasted_text_resume_recall",
           threadId: "queued:pasted_text_resume_recall",
         }),
@@ -7082,6 +7089,34 @@ function isHelixAskContextCompactionPauseText(text: string | null | undefined): 
   return /\b(?:context_compaction|context\s+is\s+compacting|active\s+context\s+page\s+file|pasted_text_attachment_resume_frame)\b/i.test(
     text ?? "",
   );
+}
+
+function extractHelixAskContextCompactionResumeFrame(...values: unknown[]): Record<string, unknown> | null {
+  const asRecord = (value: unknown): Record<string, unknown> | null =>
+    value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  const candidates: unknown[] = [];
+  for (const value of values) {
+    const record = asRecord(value);
+    if (!record) continue;
+    candidates.push(record.resume_frame);
+    for (const key of ["pending_server_request", "pending_request"]) {
+      const pending = asRecord(record[key]);
+      if (pending) candidates.push(pending.resume_frame);
+    }
+    const debug = asRecord(record.debug);
+    if (debug) {
+      candidates.push(debug.resume_frame);
+      for (const key of ["pending_server_request", "pending_request"]) {
+        const pending = asRecord(debug[key]);
+        if (pending) candidates.push(pending.resume_frame);
+      }
+    }
+  }
+  for (const candidate of candidates) {
+    const frame = asRecord(candidate);
+    if (frame?.schema === "helix.pasted_text_attachment_resume_frame.v1") return frame;
+  }
+  return null;
 }
 
 function isHelixAskContextCompactionPausePendingReply(reply: HelixAskReply | null | undefined): boolean {
@@ -18284,6 +18319,7 @@ export function HelixAskPill({
   const [askQueue, setAskQueue] = useState<QueuedAskTurn[]>([]);
   const [contextCompactionPausePending, setContextCompactionPausePending] = useState(false);
   const contextCompactionPausePendingRef = useRef(false);
+  const latestContextCompactionResumeFrameRef = useRef<Record<string, unknown> | null>(null);
   const setContextCompactionPausePendingState = useCallback((next: boolean) => {
     contextCompactionPausePendingRef.current = next;
     setContextCompactionPausePending(next);
@@ -33419,6 +33455,11 @@ export function HelixAskPill({
             ].join("\n"),
           );
           if (responseIndicatesContextCompactionPause) {
+            latestContextCompactionResumeFrameRef.current = extractHelixAskContextCompactionResumeFrame(
+              localResponseRecord,
+              responseDebugForReply,
+              responseEnvelope,
+            );
             setContextCompactionPausePendingState(true);
           }
           const briefOnlyReply = shouldKeepHelixReplyInBriefLane(responseDebugForReply);
@@ -34264,6 +34305,9 @@ export function HelixAskPill({
       askDraftRef.current = "";
       setContextCapsuleDetectedId(null);
       if (shouldQueueForAskHandoff) {
+        const contextResumeFrameForQueuedTurn = compactionPausePending
+          ? latestContextCompactionResumeFrameRef.current
+          : null;
         setAskQueue((prev) => {
           const combined = [
             ...prev,
@@ -34272,6 +34316,7 @@ export function HelixAskPill({
                 question: entry,
                 capsuleIds: selectedCapsuleIds,
                 reason: askBusy ? "busy" : "compaction_pause",
+                contextResumeFrame: contextResumeFrameForQueuedTurn,
               }),
             ),
           ];

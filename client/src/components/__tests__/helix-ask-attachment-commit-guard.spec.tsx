@@ -89,9 +89,14 @@ describe("Helix Ask attachment commit guard", () => {
     expect(source).toContain("const [askQueue, setAskQueue] = useState<QueuedAskTurn[]>([])");
     expect(source).not.toContain("const [askQueue, setAskQueue] = useState<string[]>([])");
     expect(source).toContain("const contextCompactionPausePendingRef = useRef(false)");
+    expect(source).toContain("const latestContextCompactionResumeFrameRef = useRef<Record<string, unknown> | null>(null)");
+    expect(source).toContain("function extractHelixAskContextCompactionResumeFrame");
     expect(source).toContain("setContextCompactionPausePendingState(true)");
+    expect(source).toContain("latestContextCompactionResumeFrameRef.current = extractHelixAskContextCompactionResumeFrame");
     expect(source).toContain("function buildQueuedAskTurn");
     expect(source).toContain("backendOwnedPastedTextResumeRecall");
+    expect(source).toContain("context_resume_frame: args.contextResumeFrame");
+    expect(source).toContain("contextResumeFrame: contextResumeFrameForQueuedTurn");
     expect(source).toContain("bypassWorkstationDispatch: true");
     expect(source).toContain("forceReasoningDispatch: true");
     expect(source).toContain("skipContextChooser: true");
