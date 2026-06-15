@@ -80,6 +80,16 @@ const acquireSpawnSlot = async (): Promise<() => void> => {
   });
 };
 
+export function isUnsupportedStopFlagError(message: string, stopFlag?: string | null): boolean {
+  const normalized = message.trim();
+  if (!normalized || !/invalid argument|unknown argument|unrecognized option/i.test(normalized)) {
+    return false;
+  }
+  const flag = stopFlag?.trim();
+  if (flag && normalized.includes(flag)) return true;
+  return /\b(?:--stop|--reverse-prompt|-r)\b/.test(normalized);
+}
+
 const GenerateInput = z.object({
   prompt: z.string().min(1, "prompt required"),
   max_tokens: z.number().int().positive().max(8_192).optional(),
@@ -161,7 +171,7 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
   const startedAt = new Date(started).toISOString();
   const release = beginLlMJob();
   let releaseSpawn: (() => void) | null = null;
-  let stopFlag = DEFAULT_STOP_FLAG;
+  let stopFlag: string | null = DEFAULT_STOP_FLAG;
   const cleanupPromptFile = () => {
     if (!promptFilePath) return;
     try {
@@ -234,6 +244,11 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
   let lastSpawnError: unknown;
   let spawnDiagLogged = false;
   let triedStopFlagFallback = false;
+  let triedStoplessFallback = false;
+  const hasRequestedStopSequences = Boolean(
+    (Array.isArray(parsed.stop) && parsed.stop.filter(Boolean).length > 0) ||
+      (typeof parsed.stop === "string" && parsed.stop.trim()),
+  );
   const attempt = async (spawnArgs: string[]): Promise<boolean> => {
     try {
       timedOut = false;
@@ -287,16 +302,25 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
     const stopFlagFallback =
       stopFlag === "--stop" ? "--reverse-prompt" : "--stop";
     const stopFlagInvalid =
-      parsed.stop &&
+      hasRequestedStopSequences &&
+      stopFlag &&
       !triedStopFlagFallback &&
-      /invalid argument|unknown argument|unrecognized option/i.test(message) &&
-      message.includes(stopFlag);
+      isUnsupportedStopFlagError(message, stopFlag);
     if (stopFlagInvalid) {
       triedStopFlagFallback = true;
       stopFlag = stopFlagFallback;
       const retryArgs = buildSpawnArgs({ loraPath: loraPath, loraScale });
       if (await attempt(retryArgs)) {
         return await finalizeSuccess();
+      }
+      const retryError = lastSpawnError instanceof Error ? lastSpawnError.message : String(lastSpawnError ?? "");
+      if (!triedStoplessFallback && isUnsupportedStopFlagError(retryError, stopFlag)) {
+        triedStoplessFallback = true;
+        stopFlag = null;
+        const stoplessArgs = buildSpawnArgs({ loraPath: loraPath, loraScale });
+        if (await attempt(stoplessArgs)) {
+          return await finalizeSuccess();
+        }
       }
     }
     const isAccessViolation = /3221225477|0xC0000005/i.test(message);
@@ -821,7 +845,7 @@ function isCliNoiseLine(line: string): boolean {
   return isCliBannerLine(trimmed);
 }
 
-function buildArgs(
+export function buildArgs(
   baseArgs: string[],
   opts: {
     model: string;
@@ -832,7 +856,7 @@ function buildArgs(
     temperature: number;
     seed: number;
     stop?: unknown;
-    stopFlag?: string;
+    stopFlag?: string | null;
     loraPath?: string;
     loraScale?: number;
   },
@@ -880,12 +904,12 @@ function buildArgs(
       args.push("--lora-scale", String(opts.loraScale));
     }
   }
-  const stopFlag = opts.stopFlag?.trim() || "--stop";
-  if (Array.isArray(opts.stop)) {
+  const stopFlag = opts.stopFlag === null ? "" : opts.stopFlag?.trim() || "--stop";
+  if (stopFlag && Array.isArray(opts.stop)) {
     opts.stop.filter(Boolean).forEach((stop) => {
       args.push(stopFlag, String(stop));
     });
-  } else if (typeof opts.stop === "string" && opts.stop) {
+  } else if (stopFlag && typeof opts.stop === "string" && opts.stop) {
     args.push(stopFlag, opts.stop);
   }
   return args;

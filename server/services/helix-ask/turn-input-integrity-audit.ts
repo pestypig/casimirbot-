@@ -38,7 +38,7 @@ const COMMITTED_VISUAL_REFERENCE_PATTERN =
   /\b(?:this|that|the)\s+(?:image|screenshot|picture|photo|frame)\b/i;
 
 const ATTACHED_PASTED_TEXT_PATTERN =
-  /\b(?:attached|uploaded|included)\b[\s\S]{0,80}\b(?:pasted\s+text|paste|text\s+attachment|attached\s+text|file)\b|\b(?:pasted\s+text|paste|text\s+attachment|attached\s+text)\b[\s\S]{0,80}\b(?:attached|uploaded|included)\b/i;
+  /\b(?:attached|uploaded|included|copied)\b[\s\S]{0,80}\b(?:pasted\s+text|pasted\s+memo|pasted\s+note|pasted\s+document|paste|text\s+attachment|memo\s+attachment|note\s+attachment|document\s+attachment|attached\s+text|attached\s+memo|attached\s+note|attached\s+document|copied\s+text|copied\s+memo|file|memo|note|document)\b|\b(?:pasted\s+text|pasted\s+memo|pasted\s+note|pasted\s+document|paste|text\s+attachment|memo\s+attachment|note\s+attachment|document\s+attachment|attached\s+text|attached\s+memo|attached\s+note|attached\s+document|copied\s+text|copied\s+memo)\b[\s\S]{0,80}\b(?:attached|uploaded|included|copied)\b/i;
 
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;

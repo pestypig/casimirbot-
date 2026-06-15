@@ -51,6 +51,9 @@ describe("Helix Ask attachment commit guard", () => {
     expect(source).toContain("explicitTurnInputItemsForTurn");
     expect(source).toContain("latestPastedTextAttachmentRef");
     expect(source).toContain("hasSubmittedTextAttachment");
+    expect(source).toContain("isHelixAskUsePastedTextAttachmentPrompt(first)");
+    expect(source).toContain("HELIX_ASK_USE_PASTED_TEXT_ATTACHMENT_PROMPT_PATTERN");
+    expect(source).toContain("memo|note|document");
     expect(source).toContain("Use the attached pasted text.");
     expect(source).toContain("The pasted text attachment is not available for this turn.");
   });
@@ -60,6 +63,7 @@ describe("Helix Ask attachment commit guard", () => {
 
     expect(source).toContain("HELIX_ASK_TEXT_ATTACHMENT_PROMPT_PATTERN");
     expect(source).toContain("HELIX_ASK_TEXT_ATTACHMENT_PROMPT_PATTERN.test(normalized)");
+    expect(source).toContain("(?:text|memo|note|document)");
     expect(source).toContain("return false;");
   });
 
@@ -67,6 +71,8 @@ describe("Helix Ask attachment commit guard", () => {
     const source = fs.readFileSync(sourcePath, "utf8");
 
     expect(source).toContain("HELIX_ASK_PASTED_TEXT_RESUME_RECALL_PROMPT_PATTERN");
+    expect(source).toContain("pasted\\s+(?:text|memo|note|document)");
+    expect(source).toContain("who|when|where");
     expect(source).toContain("isHelixAskPastedTextResumeRecallPrompt(trimmed)");
     expect(source).toContain("backendOwnedPastedTextResumeRecall");
     expect(source).toContain("buildHelixAskPastedTextResumeRecallRouteMetadata");

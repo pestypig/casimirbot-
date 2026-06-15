@@ -77,6 +77,55 @@ describe("Helix Ask E63 terminal projection", () => {
     expect(text).not.toMatch(/^Search results:/);
   });
 
+  it("prefers localized selected typed failure text over stale authority presentation", () => {
+    const reply = {
+      id: "turn-e63-localized-typed-failure",
+      turn_id: "turn-e63-localized-typed-failure",
+      content:
+        "I could not complete this repo-grounded answer because repo evidence was retrieved, but no valid model-authored synthesis passed terminal authority.",
+      selected_final_answer: "No pude producir una respuesta terminal para este turno.",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "repo_evidence_synthesis_failed",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        server_authoritative: true,
+        terminal_text_preview:
+          "I could not complete this repo-grounded answer because repo evidence was retrieved, but no valid model-authored synthesis passed terminal authority.",
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+      },
+      terminal_presentation: {
+        concise_text:
+          "I could not complete this repo-grounded answer because repo evidence was retrieved, but no valid model-authored synthesis passed terminal authority.",
+      },
+      debug: {
+        language_contract: {
+          schema: "helix.ask_language_contract.v1",
+          response_language: "es",
+          language_detected: "mixed",
+          code_mixed: true,
+        },
+        selected_final_answer: "No pude producir una respuesta terminal para este turno.",
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+      },
+      resolved_turn_summary: {
+        final_status: "final_failure",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "repo_evidence_synthesis_failed",
+        resolved_route_label: "repo_code_evidence_question / typed_failure:repo_evidence_synthesis_failed",
+      },
+    };
+
+    const visible = buildVisibleResolvedTurn(reply as never);
+    const text = chooseVisibleFinalText(reply as never);
+
+    expect(visible.selected_final_answer).toBe("No pude producir una respuesta terminal para este turno.");
+    expect(text).toBe("No pude producir una respuesta terminal para este turno.");
+    expect(text).not.toContain("I could not complete this repo-grounded answer");
+  });
+
   it("uses a typed failure fallback when selected_final_answer is missing", () => {
     const reply = {
       id: "turn-e63-missing-selected",

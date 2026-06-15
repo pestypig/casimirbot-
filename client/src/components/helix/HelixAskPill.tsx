@@ -5921,11 +5921,11 @@ const HELIX_ASK_TEXT_ATTACHMENT_PREVIEW_CHARS = 1200;
 const HELIX_ASK_VISUAL_SURFACE_PROMPT_PATTERN =
   /\b(?:image|screenshot|screen\s*share|screen\s*sharing|screen|display|window|tab|picture|photo|attached|visual|visible|from this|from the image|hotbar|inventory|chest|container)\b/i;
 const HELIX_ASK_TEXT_ATTACHMENT_PROMPT_PATTERN =
-  /\b(?:attached|pasted|uploaded)\s+text\b|\btext\s+attachment\b|\bpasted\s+text\s+attachment\b/i;
+  /\b(?:attached|pasted|uploaded|included|copied)\s+(?:text|memo|note|document)\b|\b(?:text|memo|note|document)\s+attachment\b|\bpasted\s+(?:text|memo|note|document)\s+attachment\b/i;
 const HELIX_ASK_PASTED_TEXT_RESUME_RECALL_PROMPT_PATTERN =
-  /\b(?:pasted\s+text|attached\s+text|text\s+attachment|previous\s+paste|last\s+paste|paste\s+from\s+the\s+previous|text\s+from\s+the\s+previous|pasted\s+text\s+from\s+the\s+previous)\b/i;
+  /\b(?:pasted\s+(?:text|memo|note|document)|attached\s+(?:text|memo|note|document)|copied\s+(?:text|memo|note|document)|(?:text|memo|note|document)\s+attachment|previous\s+(?:paste|memo|note|document)|last\s+(?:paste|memo|note|document)|(?:paste|memo|note|document|text)\s+from\s+the\s+previous|pasted\s+(?:text|memo|note|document)\s+from\s+the\s+previous)\b/i;
 const HELIX_ASK_CONTEXT_RESUME_RECALL_OUTPUT_PATTERN =
-  /\b(?:sentinel|marker|exact\s+(?:line|text|phrase|wording)|marker\s+line|top\s+line|first\s+line|appears?\s+at\s+the\s+top|answer\s+only)\b/i;
+  /\b(?:sentinel|marker|exact\s+(?:line|text|phrase|wording)|marker\s+line|top\s+line|first\s+line|appears?\s+at\s+the\s+top|answer\s+only|what|which|who|when|where|summari[sz]e|extract|list|identify|tell\s+me|answer)\b/i;
 const HELIX_ASK_AMBIGUOUS_LIVE_CONTEXT_PROMPT_PATTERN = /\blive\s+(?:source|answer)\b/i;
 const HELIX_ASK_WORKSTATION_LIVE_CONTEXT_PROMPT_PATTERN =
   /\b(?:(?:scientific\s+)?calculator|equation|prime|computation|workstation)\b[\s\S]{0,80}\blive\s+(?:source|stream|answer)\b|\blive\s+(?:source|stream|answer)\b[\s\S]{0,80}\b(?:(?:scientific\s+)?calculator|equation|prime|computation|workstation)\b/i;
@@ -5947,6 +5947,12 @@ const isHelixAskPastedTextResumeRecallPrompt = (value: string): boolean => {
     HELIX_ASK_CONTEXT_RESUME_RECALL_OUTPUT_PATTERN.test(normalized)
   );
 };
+
+const HELIX_ASK_USE_PASTED_TEXT_ATTACHMENT_PROMPT_PATTERN =
+  /^\s*(?:use|read|analy[sz]e|summari[sz]e|review|extract\s+from|answer\s+(?:from|using)|treat\s+it\s+as)\s+(?:the\s+)?(?:attached|pasted|uploaded|included|copied)\s+(?:pasted\s+)?(?:text|memo|note|document)(?:[\s\S]{0,160})?\.?\s*$/i;
+
+const isHelixAskUsePastedTextAttachmentPrompt = (value: string): boolean =>
+  HELIX_ASK_USE_PASTED_TEXT_ATTACHMENT_PROMPT_PATTERN.test(value.trim());
 
 function buildHelixAskPastedTextResumeRecallRouteMetadata(args: {
   base?: HelixAskRouteMetadata;
@@ -7958,18 +7964,40 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
         ? "terminal_authority_missing"
         : null
     );
-  const finalAnswerSource =
+  const explicitFinalAnswerSource =
     coerceText(replyRecord?.final_answer_source).trim() ||
     coerceText(debugRecord?.final_answer_source).trim() ||
-    coerceText(terminalAuthorityRecord?.final_answer_source).trim() ||
+    coerceText(terminalAuthorityRecord?.final_answer_source).trim();
+  const finalAnswerSource =
+    explicitFinalAnswerSource ||
     (terminalErrorCode ? "typed_failure" : "unknown");
+  const explicitTypedFailureSignal =
+    explicitFinalAnswerSource === "typed_failure" ||
+    coerceText(summary?.terminal_artifact_kind).trim() === "typed_failure" ||
+    coerceText(replyRecord?.terminal_artifact_kind).trim() === "typed_failure" ||
+    coerceText(debugRecord?.terminal_artifact_kind).trim() === "typed_failure" ||
+    coerceText(terminalAuthorityRecord?.terminal_artifact_kind).trim() === "typed_failure";
   const isTypedFailure = finalAnswerSource === "typed_failure" || Boolean(terminalErrorCode);
   const liveFinalAnswer = readLatestAuthoritativeFinalLiveEventText(reply);
   const terminalResolution = resolveHelixVisibleTerminalCore(reply);
   const terminalAuthorityText = coerceText(terminalAuthorityRecord?.terminal_text_preview).trim();
+  const typedFailureRecord =
+    readAgentLoopAuditRecord(replyRecord?.typed_failure) ??
+    readAgentLoopAuditRecord(debugRecord?.typed_failure);
+  const selectedTypedFailureAnswer =
+    explicitTypedFailureSignal
+      ? (
+          coerceText(replyRecord?.selected_final_answer).trim() ||
+          coerceText(debugRecord?.selected_final_answer).trim() ||
+          coerceText(typedFailureRecord?.answer_text).trim() ||
+          coerceText(typedFailureRecord?.text).trim() ||
+          coerceText(replyRecord?.terminal_failure_text).trim() ||
+          coerceText(debugRecord?.terminal_failure_text).trim()
+        )
+      : "";
   const selectedFinalAnswerCandidate =
     isTypedFailure
-      ? terminalAuthorityText || terminalResolution.text || renderTypedFailureFallback(terminalErrorCode)
+      ? selectedTypedFailureAnswer || terminalAuthorityText || terminalResolution.text || renderTypedFailureFallback(terminalErrorCode)
       : terminalAuthorityTrusted && terminalAuthorityText
         ? terminalAuthorityText
         : "";
@@ -7998,6 +8026,8 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
   const selectedFinalAnswerRaw =
     canonicalSelectedFinalAnswer
       ? canonicalSelectedFinalAnswer
+      : isTypedFailure
+        ? selectedFinalAnswerCandidate
       : terminalResolution.text &&
     terminalResolution.source !== "legacy_shadow" &&
     terminalResolution.source !== "empty" &&
@@ -34500,7 +34530,7 @@ export function HelixAskPill({
       if (
         !hasSubmittedTextAttachment &&
         latestPastedTextAttachment?.status === "ready" &&
-        /^use the attached pasted text\.?$/i.test(first.trim())
+        isHelixAskUsePastedTextAttachmentPrompt(first)
       ) {
         submittedAttachments = [...submittedAttachments, latestPastedTextAttachment].slice(0, HELIX_ASK_MAX_ATTACHMENTS);
         askAttachmentsRef.current = submittedAttachments;
@@ -34512,7 +34542,7 @@ export function HelixAskPill({
       }
       if (
         submittedAttachments.every((attachment) => attachment.kind !== "text") &&
-        /^use the attached pasted text\.?$/i.test(first.trim())
+        isHelixAskUsePastedTextAttachmentPrompt(first)
       ) {
         setAskError("The pasted text attachment is not available for this turn. Paste the text again and resend.");
         setAskStatus(null);

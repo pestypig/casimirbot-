@@ -239,6 +239,46 @@ describe("helix ask turn input integrity audit", () => {
     ).toEqual(expect.objectContaining({ ok: true, attachment_input_count: 1 }));
   });
 
+  it("treats attached pasted memo phrasing as a pasted-text artifact reference", () => {
+    const contentBase64 = Buffer.from("Project memo body for source-admission coverage.").toString("base64");
+    const requestBody = {
+      question: "Use the attached pasted memo.",
+      turn_input_items: [
+        { type: "text", text: "Use the attached pasted memo.", source: "user" },
+        {
+          type: "attachment",
+          attachment_id: "memo:1",
+          attachment_kind: "text",
+          mime_type: "text/plain",
+          file_name: "project-memo.txt",
+          size_bytes: 48,
+          content_base64: contentBase64,
+          preview: "Project memo body for source-admission coverage.",
+          raw_content_included: true,
+          raw_content_scope: "turn_input_only",
+          assistant_answer: false,
+        },
+      ],
+    };
+    const context = normalizeHelixTurnInputItems({
+      request: requestBody,
+      threadId: "test:turn-input-integrity:memo-attachment",
+    });
+
+    expect(
+      auditHelixTurnInputIntegrity({
+        userText: requestBody.question,
+        request: requestBody,
+        context,
+      }),
+    ).toEqual(expect.objectContaining({ ok: true, attachment_input_count: 1 }));
+    expect(context.attachment_artifacts?.[0]).toMatchObject({
+      schema: "helix.pasted_text_attachment_artifact.v1",
+      attachment_kind: "text",
+      body_available: true,
+    });
+  });
+
   it("admits explicit conversation-memory resume route metadata before pasted-text integrity rejection", async () => {
     const sentinel = "HELIX_PASTED_TEXT_RESUME_SENTINEL_ENDPOINT";
     const response = await request(createApp())
@@ -540,6 +580,25 @@ describe("helix ask turn input integrity audit", () => {
     );
   });
 
+  it("fails closed when a prompt references an attached pasted memo without a pasted-text artifact", async () => {
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "test:turn-input-integrity:missing-pasted-memo",
+        question: "Use the attached pasted memo.",
+        debug: true,
+      })
+      .expect(200);
+
+    expect(response.body.route_reason_code).toBe("turn_input_integrity_failed");
+    expect(response.body.final_answer_source).toBe("typed_failure");
+    expect(response.body.turn_input_integrity_audit.violations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "missing_pasted_text_attachment" }),
+      ]),
+    );
+  });
+
   it("returns context compaction pause for oversized pasted-text attachments before direct answer", async () => {
     const largePaste = [
       "This is a large pasted-text checkpoint body.",
@@ -599,6 +658,52 @@ describe("helix ask turn input integrity audit", () => {
     expect(response.body.context_fidelity_meter?.handoff_state?.state).toBe("pause_required");
     expect(response.body.final_answer_source).toBe("pending_server_request");
     expect(response.body.final_answer_source).not.toBe("model_direct_answer");
+  });
+
+  it("returns context compaction pause for oversized pasted memo attachments before repo/code routing", async () => {
+    const largePaste = [
+      "PROJECT MEMO: Arclight Delta warehouse migration.",
+      "Rollout owner: Mira Ionescu.",
+      "Checkpoint: July 18, 2026.",
+      "filler ".repeat(12000),
+      "Tail memo confirmation: barcode relay passes 97% scan accuracy.",
+    ].join("\n");
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        sessionId: "test:turn-input-integrity:large-pasted-memo-pause",
+        turnId: "turn-large-pasted-memo-pause",
+        question: "Use the attached pasted memo.",
+        debug: true,
+        turn_input_items: [
+          { type: "text", text: "Use the attached pasted memo.", source: "user" },
+          {
+            type: "attachment",
+            attachment_id: "paste:memo-large",
+            attachment_kind: "text",
+            mime_type: "text/plain",
+            file_name: "large-pasted-memo.txt",
+            size_bytes: Buffer.byteLength(largePaste, "utf8"),
+            content_base64: Buffer.from(largePaste, "utf8").toString("base64"),
+            preview: largePaste.slice(0, 300),
+            raw_content_included: true,
+            raw_content_scope: "turn_input_only",
+            assistant_answer: false,
+          },
+        ],
+      })
+      .expect(200);
+
+    expect(response.body.dispatch_policy).toBe("context_compaction_pause");
+    expect(response.body.pending_server_request?.kind).toBe("context_compaction_pause");
+    expect(response.body.pending_server_request?.resume_frame).toMatchObject({
+      schema: "helix.pasted_text_attachment_resume_frame.v1",
+      original_prompt: "Use the attached pasted memo.",
+      attachment_artifact_refs: [expect.stringContaining("pasted_text_attachment")],
+    });
+    expect(response.body.route_reason_code).not.toBe("turn_input_integrity_failed");
+    expect(response.body.route_reason_code).not.toBe("route_authority_failed");
+    expect(response.body.final_answer_source).toBe("pending_server_request");
   });
 
   it("allows live visual tool requests to reach the agent loop without committed image input", () => {

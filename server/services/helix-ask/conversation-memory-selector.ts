@@ -477,7 +477,7 @@ const coerceContextResumeFrame = (
 const detectContextResumeCue = (promptText: string): boolean => {
   const text = normalizeLower(promptText);
   if (!text) return false;
-  return /\b(?:pasted\s+text|attached\s+text|attachment|previous\s+paste|last\s+paste|paste\s+from\s+the\s+previous|text\s+from\s+the\s+previous)\b/.test(text);
+  return /\b(?:pasted\s+(?:text|memo|note|document)|attached\s+(?:text|memo|note|document)|copied\s+(?:text|memo|note|document)|(?:text|memo|note|document)\s+attachment|attachment|previous\s+(?:paste|memo|note|document)|last\s+(?:paste|memo|note|document)|(?:paste|memo|note|document|text)\s+from\s+the\s+previous|pasted\s+(?:text|memo|note|document)\s+from\s+the\s+previous)\b/.test(text);
 };
 
 const detectPendingSlotFillCue = (promptText: string): boolean => {

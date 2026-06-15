@@ -241,6 +241,40 @@ describe("Helix Ask conversation memory packet", () => {
     })).toBe("HELIX_PASTED_TEXT_RESUME_SENTINEL_EXPLICIT");
   });
 
+  it("admits pasted memo resume recall phrasing from the compaction frame", () => {
+    const packet = buildHelixConversationMemoryPacket({
+      threadId,
+      currentTurnId: "turn-followup-explicit-memo",
+      sessionId,
+      promptText: "What exact marker appears in the attached pasted memo? Answer with only the marker.",
+      contextResumeFrames: [
+        {
+          id: "context_resume:explicit-memo",
+          schema: "helix.pasted_text_attachment_resume_frame.v1",
+          source_request_id: "turn-pause:context_compaction:pause",
+          source_turn_id: "turn-pause",
+          original_prompt: "Use the attached pasted memo.",
+          attachment_artifact_refs: ["thread:pasted_text_attachment:memo-marker"],
+          attachment_previews: [
+            "HELIX_MEMO_PATCH_BROWSER_RUN_20260615_D\nThis is compacted pasted memo content.",
+          ],
+          turn_input_item_count: 2,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ],
+    });
+
+    expect(packet.allowed_for_current_goal).toBe(true);
+    expect(packet.allowed_use).toBe("reuse_prior_evidence_refs");
+    expect(packet.context_resume_frames).toHaveLength(1);
+    expect(resolveHelixContextResumeFrameRecallText({
+      packet,
+      promptText: "What exact marker appears in the attached pasted memo? Answer with only the marker.",
+    })).toBe("HELIX_MEMO_PATCH_BROWSER_RUN_20260615_D");
+  });
+
   it("prefers marker tokens across all resume frames before falling back to original prompt text", () => {
     const packet = buildHelixConversationMemoryPacket({
       threadId,
