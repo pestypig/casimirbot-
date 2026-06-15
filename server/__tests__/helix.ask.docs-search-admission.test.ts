@@ -85,6 +85,21 @@ describe("Helix Ask docs-search admission", () => {
     }
   });
 
+  it("does not treat a Docs Viewer topic label as an active document command", () => {
+    const promptText =
+      "Docs Viewer: strongest dynamic surface for Helix Ask console evidence. Review this as an implementation claim, not the current document.";
+    const restatement = buildToolUseRestatement(promptText);
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, promptText, sourceTargetIntent });
+
+    expect(restatement.requiredToolFamilies).not.toContain("docs_viewer");
+    expect(sourceTargetIntent.target_source).not.toBe("docs_viewer");
+    expect(sourceTargetIntent.target_source).not.toBe("active_doc");
+    expect(sourceTargetIntent.requested_outputs).not.toContain("file_path");
+    expect(admission.admitted_tool_families).not.toContain("docs_viewer");
+    expect(admission.reason).not.toBe("docs_viewer_requires_document_tool_path");
+  });
+
   it("rejects repo-code runtime calls under hard docs-viewer admission", () => {
     const sourceTargetIntent = arbitrateAskSourceTarget({
       turnId,

@@ -186,12 +186,19 @@ const promoteRequestUserInputTerminal = (
   payload.final_status = "pending_input";
   payload.terminal_artifact_kind = "request_user_input";
   payload.final_answer_source = "request_user_input";
-  payload.selected_final_answer = text;
-  payload.assistant_answer = text;
-  payload.answer = text;
-  payload.text = text;
-  payload.finalAnswer = text;
-  payload.content = text;
+  payload.request_user_input_preview = {
+    schema: "helix.request_user_input_preview.v1",
+    turn_id: turnId,
+    prompt: text,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  delete payload.selected_final_answer;
+  payload.assistant_answer = false;
+  delete payload.answer;
+  delete payload.text;
+  delete payload.finalAnswer;
+  delete payload.content;
   payload.terminal_request_user_input_promotion = {
     schema: "helix.terminal_request_user_input_promotion.v1",
     turn_id: turnId,
@@ -392,6 +399,11 @@ const isNonAuthoritativeToolReceiptEnvelope = (envelope: HelixTerminalAnswerEnve
   envelope.terminal_artifact_kind === "tool_receipt" ||
   envelope.final_answer_source === "deterministic_receipt_fallback";
 
+const isRequestUserInputEnvelope = (envelope: HelixTerminalAnswerEnvelope): boolean =>
+  envelope.terminal_kind === "request_user_input" ||
+  envelope.terminal_artifact_kind === "request_user_input" ||
+  envelope.final_answer_source === "request_user_input";
+
 export function resolveTerminalAnswerEnvelope(
   payload: Record<string, unknown>,
   options: { threadId?: string | null; turnId?: string | null } = {},
@@ -495,7 +507,7 @@ export function resolveTerminalAnswerEnvelope(
 
 function upsertTerminalAnswerInArray(value: unknown, envelope: HelixTerminalAnswerEnvelope): unknown[] {
   const events = Array.isArray(value)
-    ? value.filter((event) => readRecord(event)?.type !== "terminal_answer")
+    ? value.filter((event) => !/^(?:terminal_answer|request_user_input)$/i.test(readString(readRecord(event)?.type) ?? ""))
     : [];
   const status =
     envelope.terminal_kind === "failure"
@@ -508,7 +520,7 @@ function upsertTerminalAnswerInArray(value: unknown, envelope: HelixTerminalAnsw
   return [
     ...events,
     {
-      type: "terminal_answer",
+      type: envelope.terminal_kind === "request_user_input" ? "request_user_input" : "terminal_answer",
       at_ms: Date.now(),
       text: envelope.terminal_text,
       status,
@@ -523,7 +535,7 @@ function upsertCurrentTurnEvents(value: unknown, envelope: HelixTerminalAnswerEn
     ...record,
     terminal_answer: {
       ...(readRecord(record.terminal_answer) ?? {}),
-      type: "terminal_answer",
+      type: envelope.terminal_kind === "request_user_input" ? "request_user_input" : "terminal_answer",
       text: envelope.terminal_text,
     },
   };
@@ -640,6 +652,7 @@ function clearStaleFailureFieldsForSuccessfulTerminal(
   envelope: HelixTerminalAnswerEnvelope,
 ): void {
   if (isNonAuthoritativeToolReceiptEnvelope(envelope)) return;
+  if (isRequestUserInputEnvelope(envelope)) return;
   if (envelope.terminal_kind === "failure" || envelope.final_answer_source === "typed_failure") return;
 
   delete payload.terminal_error_code;
@@ -689,6 +702,29 @@ function syncSuccessfulTerminalStatusMirrors(
     };
     return;
   }
+  if (isRequestUserInputEnvelope(envelope)) {
+    payload.ok = true;
+    payload.status = "pending_input";
+    payload.final_status = "pending_input";
+    payload.response_type = "pending_input";
+    const existingSummary = readRecord(payload.resolved_turn_summary);
+    const canonicalGoalFrame = readRecord(payload.canonical_goal_frame);
+    const resolvedRouteLabel = [
+      readString(canonicalGoalFrame?.goal_kind) ?? "terminal_answer",
+      "request_user_input",
+    ].join(" / ");
+    payload.resolved_turn_summary = {
+      ...(existingSummary ?? {}),
+      turn_id: envelope.turn_id,
+      final_status: "pending_input",
+      resolved_route_label: resolvedRouteLabel,
+      terminal_kind: "request_user_input",
+      terminal_artifact_kind: "request_user_input",
+      terminal_error_code: null,
+      pending_server_request_present: true,
+    };
+    return;
+  }
   if (envelope.terminal_kind === "failure" || envelope.final_answer_source === "typed_failure") return;
 
   payload.ok = true;
@@ -730,7 +766,7 @@ export function applyTerminalAnswerEnvelope(
   }
   const previewPayload = {
     ...payload,
-    selected_final_answer: envelope.terminal_text,
+    ...(isRequestUserInputEnvelope(envelope) ? {} : { selected_final_answer: envelope.terminal_text }),
     terminal_artifact_kind: envelope.terminal_artifact_kind,
     final_answer_source: envelope.final_answer_source,
     terminal_answer_envelope: envelope,
@@ -749,12 +785,44 @@ export function applyTerminalAnswerEnvelope(
 
   payload.turn_id = envelope.turn_id;
   payload.thread_id = envelope.thread_id;
-  payload.selected_final_answer = envelope.terminal_text;
-  payload.assistant_answer = isNonAuthoritativeToolReceiptEnvelope(envelope) ? false : envelope.terminal_text;
-  payload.answer = envelope.terminal_text;
-  payload.text = envelope.terminal_text;
-  payload.finalAnswer = envelope.terminal_text;
-  payload.content = envelope.terminal_text;
+  if (isRequestUserInputEnvelope(envelope)) {
+    const pendingRequest =
+      readRecord(payload.pending_server_request) ??
+      readRecord(payload.request_user_input) ??
+      readRecord(payload.pending_request) ??
+      {
+        schema: "helix.pending_server_request.v1",
+        request_kind: "request_user_input",
+        turn_id: envelope.turn_id,
+        prompt: envelope.terminal_text,
+        status: "pending",
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    payload.pending_server_request = pendingRequest;
+    payload.pending_request = pendingRequest;
+    payload.request_user_input = pendingRequest;
+    payload.request_user_input_preview = {
+      schema: "helix.request_user_input_preview.v1",
+      turn_id: envelope.turn_id,
+      prompt: envelope.terminal_text,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    delete payload.selected_final_answer;
+    payload.assistant_answer = false;
+    delete payload.answer;
+    delete payload.text;
+    delete payload.finalAnswer;
+    delete payload.content;
+  } else {
+    payload.selected_final_answer = envelope.terminal_text;
+    payload.assistant_answer = isNonAuthoritativeToolReceiptEnvelope(envelope) ? false : envelope.terminal_text;
+    payload.answer = envelope.terminal_text;
+    payload.text = envelope.terminal_text;
+    payload.finalAnswer = envelope.terminal_text;
+    payload.content = envelope.terminal_text;
+  }
   payload.terminal_artifact_kind = envelope.terminal_artifact_kind;
   payload.final_answer_source = envelope.final_answer_source;
   payload.terminal_answer_envelope = envelope;
@@ -793,7 +861,7 @@ export function applyTerminalAnswerEnvelope(
     terminal_artifact_kind: envelope.terminal_artifact_kind,
     concise_text: envelope.terminal_text,
     assistant_answer: false,
-    terminal_eligible: isNonAuthoritativeToolReceiptEnvelope(envelope) ? false : undefined,
+    terminal_eligible: isNonAuthoritativeToolReceiptEnvelope(envelope) || isRequestUserInputEnvelope(envelope) ? false : undefined,
     raw_content_included: false,
   };
 
@@ -808,7 +876,7 @@ export function applyTerminalAnswerEnvelope(
     route: readString(payload.route_reason_code) ?? readString(payload.route),
     authority_origin: envelope.authority_origin,
     server_authoritative: isNonAuthoritativeToolReceiptEnvelope(envelope) ? false : true,
-    terminal_eligible: isNonAuthoritativeToolReceiptEnvelope(envelope) ? false : undefined,
+    terminal_eligible: isNonAuthoritativeToolReceiptEnvelope(envelope) || isRequestUserInputEnvelope(envelope) ? false : undefined,
     assistant_answer: false,
   });
   payload.terminal_answer_authority = terminalAuthority;
@@ -834,11 +902,24 @@ export function applyTerminalAnswerEnvelope(
 
   const debug = readRecord(payload.debug);
   if (debug) {
-    debug.selected_final_answer = envelope.terminal_text;
-    debug.answer = envelope.terminal_text;
-    debug.text = envelope.terminal_text;
-    debug.finalAnswer = envelope.terminal_text;
-    debug.content = envelope.terminal_text;
+    if (isRequestUserInputEnvelope(envelope)) {
+      delete debug.selected_final_answer;
+      debug.assistant_answer = false;
+      delete debug.answer;
+      delete debug.text;
+      delete debug.finalAnswer;
+      delete debug.content;
+      debug.pending_server_request = payload.pending_server_request;
+      debug.pending_request = payload.pending_request;
+      debug.request_user_input = payload.request_user_input;
+      debug.request_user_input_preview = payload.request_user_input_preview;
+    } else {
+      debug.selected_final_answer = envelope.terminal_text;
+      debug.answer = envelope.terminal_text;
+      debug.text = envelope.terminal_text;
+      debug.finalAnswer = envelope.terminal_text;
+      debug.content = envelope.terminal_text;
+    }
     debug.terminal_artifact_kind = envelope.terminal_artifact_kind;
     debug.final_answer_source = envelope.final_answer_source;
     debug.terminal_presentation = payload.terminal_presentation;
@@ -850,13 +931,15 @@ export function applyTerminalAnswerEnvelope(
       !isNonAuthoritativeToolReceiptEnvelope(envelope)
     ) {
       debug.ok = true;
-      debug.status = "final_answer";
-      debug.final_status = "final_answer";
-      debug.response_type = "final_answer";
+      debug.status = isRequestUserInputEnvelope(envelope) ? "pending_input" : "final_answer";
+      debug.final_status = isRequestUserInputEnvelope(envelope) ? "pending_input" : "final_answer";
+      debug.response_type = isRequestUserInputEnvelope(envelope) ? "pending_input" : "final_answer";
       debug.resolved_turn_summary = payload.resolved_turn_summary;
-      delete debug.terminal_error_code;
-      delete debug.terminal_failure_text;
-      delete debug.typed_failure;
+      if (!isRequestUserInputEnvelope(envelope)) {
+        delete debug.terminal_error_code;
+        delete debug.terminal_failure_text;
+        delete debug.typed_failure;
+      }
     } else if (isNonAuthoritativeToolReceiptEnvelope(envelope)) {
       debug.ok = true;
       debug.status = "tool_receipt";

@@ -101,6 +101,25 @@ const isStructuredDocsViewerPrompt = (prompt: string): boolean => {
     (structuredPathCue && locateQueryCue && locationsListCue);
 };
 
+const isDocsViewerTopicLabelPrompt = (prompt: string): boolean => {
+  const match = prompt.match(/^\s*(?:docs?\s+viewer|documents?\s+viewer|docs[-_. ]viewer)\s*:\s*/i);
+  if (!match) return false;
+  const afterLabel = prompt.slice(match[0].length).trim();
+  if (!afterLabel) return false;
+  if (isStructuredDocsViewerPrompt(prompt)) return false;
+  if (isAffirmativeDocsSourceRequirementPrompt(prompt) || isAffirmativeDocsSearchPrompt(prompt)) return false;
+  if (isExplicitDocumentAcquisitionPrompt(prompt) || isDocsPanelOpenPrompt(prompt)) return false;
+  const activeDocCue = /\b(?:current|active|open|this|that)\s+(?:docs?|documents?|papers?)\b/i.test(afterLabel);
+  const negatedActiveDocCue =
+    /\b(?:not|isn't|is\s+not|without|rather\s+than)\b[\s\S]{0,80}\b(?:current|active|open|this|that)\s+(?:docs?|documents?|papers?)\b/i.test(afterLabel) ||
+    /\b(?:current|active|open|this|that)\s+(?:docs?|documents?|papers?)\b[\s\S]{0,80}\b(?:not|isn't|is\s+not|without)\b/i.test(afterLabel);
+  if (activeDocCue && !negatedActiveDocCue) return false;
+  if (/\b(?:open|search|find|locate|summari[sz]e|explain|describe|read|show|load)\b[\s\S]{0,100}\b(?:docs?|documents?|papers?|viewer|path|source)\b/i.test(afterLabel)) {
+    return false;
+  }
+  return true;
+};
+
 const isDeicticDocsIdentityPrompt = (prompt: string): boolean => {
   const explicitVisualCue = /\b(?:screen|visual|capture|frame|visible|screenshot)\b/i.test(prompt);
   if (explicitVisualCue) return false;
@@ -1113,6 +1132,23 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
+  if (isDocsViewerTopicLabelPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "unknown",
+      targetKind: "unknown",
+      strength: "none",
+      explicitCues: ["docs_viewer_topic_label"],
+      reasons: ["docs_viewer_topic_label_not_active_doc_command"],
+      requestedOutputs: [],
+      suppressedRoutes: ["active_doc_identity", "active_doc_summary", "doc_open_best"],
+      precedenceReason: "docs_viewer_topic_label_not_active_doc_command",
+      confidence: 0.72,
+      allowClientShortcut: true,
+      allowNoToolDirect: true,
+    });
+  }
   if (isExplicitProcessGraphPrompt(prompt)) {
     const processGraphRule = rules.find((rule: CueRule) => rule.target === "process_graph");
     if (processGraphRule) {
@@ -1327,6 +1363,9 @@ export function arbitrateAskSourceTarget(input: {
     }
   }
   for (const rule of rules) {
+    if (rule.target === "docs_viewer" && isDocsViewerTopicLabelPrompt(prompt)) {
+      continue;
+    }
     const explicitCues =
       rule.target === "live_pipeline"
         ? filterLivePipelineCues(prompt, matches(prompt, rule.cues))

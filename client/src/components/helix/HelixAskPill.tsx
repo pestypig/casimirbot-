@@ -8083,11 +8083,13 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
       ? liveFinalAnswer
       : selectedFinalAnswerCandidate;
   const selectedFinalAnswer =
-    renderDocOpenTerminalFromLocationText({
-      text: selectedFinalAnswerRaw,
-      goalKind: canonicalGoalKind,
-      terminalKind: terminalArtifactKind,
-    }) ?? selectedFinalAnswerRaw;
+    pendingPresent
+      ? ""
+      : renderDocOpenTerminalFromLocationText({
+        text: selectedFinalAnswerRaw,
+        goalKind: canonicalGoalKind,
+        terminalKind: terminalArtifactKind,
+      }) ?? selectedFinalAnswerRaw;
   const routeLabel =
     coerceText(summary?.resolved_route_label).trim() ||
     `${canonicalGoalKind} / ${finalAnswerSource}`;

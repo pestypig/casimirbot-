@@ -173,6 +173,45 @@ describe("Helix Ask E63 terminal projection", () => {
     expect(chooseVisibleFinalText(reply as never)).toBe("authoritative envelope answer");
   });
 
+  it("does not render request_user_input text as the visible final answer", () => {
+    const pendingText = "I need active_doc_path before I can run that multi-step request.";
+    const reply = {
+      id: "turn-e63-pending-input",
+      turn_id: "turn-e63-pending-input",
+      selected_final_answer: pendingText,
+      answer: pendingText,
+      text: pendingText,
+      final_answer_source: "request_user_input",
+      terminal_artifact_kind: "request_user_input",
+      pending_server_request: {
+        request_id: "request:active-doc",
+        prompt: pendingText,
+        status: "pending",
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        server_authoritative: true,
+        terminal_kind: "request_user_input",
+        terminal_artifact_kind: "request_user_input",
+        final_answer_source: "request_user_input",
+        terminal_text_preview: pendingText,
+      },
+      resolved_turn_summary: {
+        final_status: "pending_input",
+        terminal_artifact_kind: "request_user_input",
+        resolved_route_label: "docs_viewer_multi_step / request_user_input",
+        pending_server_request_present: true,
+      },
+    };
+
+    const visible = buildVisibleResolvedTurn(reply as never);
+
+    expect(visible.primary_terminal_label).toBe("pending_input");
+    expect(visible.pending_server_request_present).toBe(true);
+    expect(visible.selected_final_answer).toBe("");
+    expect(chooseVisibleFinalText(reply as never)).toBe("");
+  });
+
   it("keeps debug-exported doc open receipts authoritative in the visible UI", () => {
     const receiptText =
       "Opened document:\nDocument: NHM2 Current Status in `pestypig/casimirbot-` as Implemented Today\nPath: /docs/research/nhm2-current-status-whitepaper-2026-04-03.md\nReason: best matching document for the request";
