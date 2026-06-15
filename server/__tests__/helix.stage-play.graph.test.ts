@@ -780,6 +780,16 @@ describe("GET /api/helix/stage-play/live-source-mail/transcript", () => {
             artifactKind: "processed_mail_packet",
           },
           evidenceRefs: Array.from({ length: 40 }, (_, index) => `stage_play_evidence_ref:transcript-route-${index}`),
+          causalTrace: {
+            schemaVersion: "live_source_causal_trace/v1",
+            traceId: "live_source_causal_trace:transcript-route",
+            cycleId: "live_source_cycle:transcript-route",
+            parentRefs: Array.from({ length: 40 }, (_, index) => `parent:transcript-route-${index}`),
+            causedBy: ["stage_play_live_source_mail:transcript-route"],
+            producedRefs: ["stage_play_live_source_mail_transcript_row:transcript-route"],
+            sourceIds: ["visual_source:transcript-route"],
+            evidenceRefs: Array.from({ length: 40 }, (_, index) => `trace_evidence_ref:transcript-route-${index}`),
+          },
         },
       ],
     });
@@ -798,6 +808,8 @@ describe("GET /api/helix/stage-play/live-source-mail/transcript", () => {
     expect(compact.body.entries[0].row.body.length).toBeLessThan(full.body.entries[0].row.body.length);
     expect(compact.body.entries[0].evidenceRefs.length).toBeLessThan(full.body.entries[0].evidenceRefs.length);
     expect(compact.body.transcriptRows[0].body.length).toBeLessThanOrEqual(703);
+    expect(compact.body.transcriptRows[0].evidenceRefs.length).toBeLessThanOrEqual(12);
+    expect(compact.body.transcriptRows[0].causalTrace).toBeUndefined();
   });
 
   it("expires old hot transcript rows into compact interval receipts", async () => {
@@ -832,17 +844,17 @@ describe("GET /api/helix/stage-play/live-source-mail/transcript", () => {
 
     expect(response.body.retention).toMatchObject({
       schema: "stage_play_live_source_mail_transcript_retention/v1",
-      hotLimit: 180,
-      retainedEntryCount: 180,
-      compactedEntryCount: 6,
+      hotLimit: 96,
+      retainedEntryCount: 96,
+      compactedEntryCount: 90,
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
     });
-    expect(response.body.entries).toHaveLength(100);
+    expect(response.body.entries).toHaveLength(96);
     expect(response.body.compactionIntervals[0]).toMatchObject({
       artifactId: "stage_play_live_source_mail_transcript_compaction_interval",
-      compactedEntryCount: 6,
+      compactedEntryCount: 90,
       raw_content_included: false,
     });
     expect(JSON.stringify(response.body.compactionIntervals)).not.toContain("observer payload observer payload observer payload");

@@ -1,10 +1,11 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
 let chooseVisibleFinalText: typeof import("@/components/helix/HelixAskPill").chooseVisibleFinalText;
+let resolveHelixAskVisibleJobReadyLinks: typeof import("@/components/helix/HelixAskPill").resolveHelixAskVisibleJobReadyLinks;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = undefined;
-  ({ chooseVisibleFinalText } = await import("@/components/helix/HelixAskPill"));
+  ({ chooseVisibleFinalText, resolveHelixAskVisibleJobReadyLinks } = await import("@/components/helix/HelixAskPill"));
 });
 
 describe("Helix Ask E65 rendering invariants", () => {
@@ -28,5 +29,49 @@ describe("Helix Ask E65 rendering invariants", () => {
 
     expect(text).toContain("doc_evidence_location_unavailable");
     expect(text).not.toMatch(/^Locations:/);
+  });
+
+  it("suppresses stale note action buttons on typed failure turns", () => {
+    const reply = {
+      id: "turn-e65-note-link-typed-failure",
+      content: "Could not materialize the note action.",
+      selected_final_answer: "Could not materialize the note action.",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      debug: {
+        job_ready_links: [
+          {
+            label: "Open note: Stage Play Live-Source Findings",
+            panel_id: "workstation-notes",
+            action_id: "set_active_note",
+            args: { title: "Stage Play Live-Source Findings" },
+          },
+        ],
+      },
+    };
+
+    expect(resolveHelixAskVisibleJobReadyLinks(reply)).toEqual([]);
+  });
+
+  it("keeps complete note action buttons for successful terminal turns", () => {
+    const reply = {
+      id: "turn-e65-note-link-success",
+      content: "Updated the note.",
+      selected_final_answer: "Updated the note.",
+      final_answer_source: "final_answer_draft",
+      terminal_artifact_kind: "model_synthesized_answer",
+      debug: {
+        job_ready_links: [
+          {
+            label: "Open note: Stage Play Live-Source Findings",
+            panel_id: "workstation-notes",
+            action_id: "set_active_note",
+            args: { title: "Stage Play Live-Source Findings" },
+          },
+        ],
+      },
+    };
+
+    expect(resolveHelixAskVisibleJobReadyLinks(reply)).toHaveLength(1);
   });
 });

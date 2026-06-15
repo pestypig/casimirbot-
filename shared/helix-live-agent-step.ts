@@ -25,6 +25,7 @@ export type HelixLiveEnvironmentToolName =
   | "live_env.read_live_source_mail"
   | "live_env.process_live_source_mail"
   | "live_env.read_processed_live_source_mail"
+  | "live_env.reflect_live_source_mail_loop"
   | "live_env.query_micro_reasoner_prompts"
   | "live_env.query_micro_reasoner_presets"
   | "live_env.draft_micro_reasoner_preset"

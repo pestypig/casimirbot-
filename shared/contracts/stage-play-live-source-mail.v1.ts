@@ -18,6 +18,8 @@ export const STAGE_PLAY_MICRO_REASONER_PROMPT_DELEGATION_RESULT_SCHEMA =
 export const STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_DRAFT_SCHEMA =
   "stage_play_micro_reasoner_prompt_preset_draft/v1" as const;
 export const STAGE_PLAY_PROCESSED_MAIL_PACKET_SCHEMA = "stage_play_processed_mail_packet/v1" as const;
+export const STAGE_PLAY_LIVE_SOURCE_MAIL_LOOP_REFLECTION_SCHEMA =
+  "stage_play_live_source_mail_loop_reflection/v1" as const;
 export const LIVE_SOURCE_CAUSAL_TRACE_SCHEMA = "live_source_causal_trace/v1" as const;
 export const LIVE_SOURCE_TURN_PHASE_RESOLUTION_SCHEMA = "live_source_turn_phase_resolution/v1" as const;
 export const STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA =
@@ -83,6 +85,7 @@ export type LiveSourceTurnPhaseV1 =
   | "configure_watch_job"
   | "apply_visual_observer_profile"
   | "query_micro_reasoner_deck"
+  | "reflect_mail_loop"
   | "read_processed_mail"
   | "process_mail_fallback"
   | "record_decision"
@@ -150,6 +153,70 @@ export type LiveSourceCausalTraceV1 = {
   profileId?: string | null;
   askTurnId?: string | null;
   evidenceRefs: string[];
+};
+
+export type StagePlayLiveSourceMailLoopReflectionRelationV1 =
+  | "captured_as_mail"
+  | "processed_into_packet"
+  | "reasoned_by_microdeck"
+  | "validated_prediction"
+  | "updated_current_state"
+  | "projected_to_live_answer"
+  | "recorded_decision"
+  | "eligible_for_terminal_context"
+  | "excluded_from_answer_context";
+
+export type StagePlayLiveSourceMailLoopReflectionV1 = {
+  artifactId: "stage_play_live_source_mail_loop_reflection";
+  schemaVersion: typeof STAGE_PLAY_LIVE_SOURCE_MAIL_LOOP_REFLECTION_SCHEMA;
+  reflectionId: string;
+  threadId: string;
+  askThreadId?: string | null;
+  mailboxThreadId?: string | null;
+  roomId?: string | null;
+  environmentId?: string | null;
+  sourceIds: string[];
+  jobRefs: string[];
+  policyRefs: string[];
+  profileRefs: string[];
+  inspectionWindow: {
+    mailIds: string[];
+    processedPacketRefs: string[];
+    microReasonerRunRefs: string[];
+    currentStateRef?: string | null;
+    loopHealthRef?: string | null;
+    stagePlayGraphRef?: string | null;
+    liveAnswerProjectionRefs: string[];
+    decisionRefs: string[];
+    voiceReceiptRefs: string[];
+  };
+  causalGraph: Array<{
+    fromRef: string;
+    toRef: string;
+    relation: StagePlayLiveSourceMailLoopReflectionRelationV1;
+    note: string;
+  }>;
+  stageSummaries: {
+    sourceCapture: string[];
+    processedMail: string[];
+    microDeck: string[];
+    stagePlayProjection: string[];
+    liveAnswerReadiness: string[];
+    terminalReadiness: string[];
+  };
+  whatEnteredAnswerContext: string[];
+  whatDidNotEnterAnswerContext: string[];
+  missingEvidence: string[];
+  limitations: string[];
+  whatAskCanSafelySay: string[];
+  nextUsefulTool?: string | null;
+  evidenceRefs: string[];
+  causalTrace?: LiveSourceCausalTraceV1;
+  assistant_answer: false;
+  terminal_eligible: false;
+  raw_content_included: false;
+  context_role: "tool_evidence";
+  ask_context_policy: "evidence_only";
 };
 
 export type StagePlayLiveSourceMailItemV1 = {

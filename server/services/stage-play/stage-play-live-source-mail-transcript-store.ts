@@ -9,7 +9,7 @@ import { mergeLiveSourceCausalTraces } from "./stage-play-live-source-causal-tra
 
 const transcriptEntryById = new Map<string, StagePlayLiveSourceMailTranscriptEntryV1>();
 const transcriptCompactionIntervalsById = new Map<string, StagePlayLiveSourceMailTranscriptCompactionIntervalV1>();
-const MAX_TRANSCRIPT_ENTRIES_PER_THREAD = 180;
+const MAX_TRANSCRIPT_ENTRIES_PER_THREAD = 96;
 const MAX_TRANSCRIPT_COMPACTION_INTERVALS_PER_THREAD = 120;
 const TRANSCRIPT_COMPACTION_PREVIEW_COUNT = 5;
 

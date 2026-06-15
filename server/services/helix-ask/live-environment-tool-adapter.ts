@@ -26,10 +26,12 @@ import type {
   StagePlayMicroReasonerWakePromptContractV1,
   StagePlayMicroReasonerRoleV1,
   StagePlayMicroReasonerRunV1,
+  StagePlayLiveSourceMailLoopReflectionV1,
   StagePlayProcessedMailPacketV1,
   StagePlayLiveSourceWatchJobPolicyV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import {
+  STAGE_PLAY_LIVE_SOURCE_MAIL_LOOP_REFLECTION_SCHEMA,
   STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_DRAFT_SCHEMA,
   STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
@@ -3949,6 +3951,306 @@ export function executeLiveEnvironmentTool(
       },
       forceNormalizedRefs: true,
       transcriptRows,
+    });
+  }
+
+  if (input.tool_name === "live_env.reflect_live_source_mail_loop") {
+    const scope = resolveLiveSourceToolScope({
+      args,
+      threadId: input.thread_id,
+      effectiveThreadId,
+      roomId,
+      environmentThreadId: environment?.thread_id ?? null,
+      environmentId: environment?.environment_id ?? input.environment_id ?? null,
+      explicitSourceId,
+    });
+    const environmentId = environment?.environment_id ?? input.environment_id ?? null;
+    const expectedCadenceMs = readNumber(args.expected_cadence_ms ?? args.expectedCadenceMs, Number.NaN);
+    const currentState = summarizeStagePlayLiveSourceCurrentState({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      sourceId: scope.sourceId,
+      sourceKind: scope.sourceKind,
+      expectedCadenceMs: Number.isFinite(expectedCadenceMs) ? expectedCadenceMs : null,
+      limit: 8,
+    });
+    const quality = queryStagePlayLiveSourceQuality({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      sourceId: scope.sourceId,
+      sourceKind: scope.sourceKind,
+      expectedCadenceMs: Number.isFinite(expectedCadenceMs) ? expectedCadenceMs : null,
+    });
+    const mailIdsFromArgs = readStringArray(args.mail_ids ?? args.mailIds);
+    const latestMailItems = listStagePlayLiveSourceMailItems({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      sourceId: scope.sourceId,
+      sourceKind: scope.sourceKind,
+      limit: 24,
+    });
+    const windowMailIds = uniqueStrings([
+      ...mailIdsFromArgs,
+      ...currentState.latestMailItems.map((item) => item.mailId),
+      ...latestMailItems.slice(-8).map((item) => item.mailId),
+    ]);
+    const processedPackets = listStagePlayProcessedMailPackets({
+      sourceId: scope.sourceId,
+      limit: 50,
+    }).filter((packet) =>
+      windowMailIds.length === 0 ||
+      packet.mailIds.some((mailId) => windowMailIds.includes(mailId))
+    );
+    const processedPacketRefs = processedPackets.map((packet) => packet.packetId);
+    const processedMailIds = new Set(processedPackets.flatMap((packet) => packet.mailIds));
+    const missingMailCoverage = windowMailIds.filter((mailId) => !processedMailIds.has(mailId));
+    const microReasonerRunRefs = uniqueStrings(processedPackets.flatMap((packet) => packet.microReasonerRunRefs));
+    const microReasonerRuns = listStagePlayMicroReasonerRuns({
+      sourceId: scope.sourceId,
+      limit: 200,
+    }).filter((run) => microReasonerRunRefs.includes(run.runId));
+    const decisions = listStagePlayMailDecisions({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      limit: 20,
+    }).filter((decision) =>
+      processedPackets.length === 0 ||
+      decision.mailIds.some((mailId) => processedPackets.some((packet) => packet.mailIds.includes(mailId)))
+    );
+    const decisionRefs = decisions.map((decision) => decision.decisionId);
+    const graph = buildStagePlayBadgeGraphFromLiveWindow({
+      threadId: effectiveThreadId,
+      roomId,
+      environmentId,
+      sourceId: scope.sourceId,
+      objective: readString(args.objective),
+    });
+    const outputLaneProjection = buildStagePlayOutputLaneProjectionV1({
+      graph,
+      generatedAt: new Date().toISOString(),
+    });
+    const liveAnswerProjectionRefs = uniqueStrings([
+      outputLaneProjection.graphId,
+      ...outputLaneProjection.lanes.map((lane) => lane.lineKey),
+      environment?.environment_id,
+    ]);
+    const activeJobRefs = uniqueStrings([
+      ...currentState.activeWatchJobs.map((job) => job.jobId),
+      ...processedPackets.map((packet) => packet.jobId),
+    ]);
+    const activePolicyRefs = uniqueStrings([
+      ...currentState.activeWatchJobs.map((job) => job.policyId),
+      currentState.quality.latestRefs.wakeRequestId,
+    ]);
+    const profileRefs = uniqueStrings([
+      ...processedPackets.map((packet) => packet.profileRef ?? null),
+      quality.latestRefs.narrativeStateId,
+    ]);
+    const loopHealthRef = `stage_play_live_source_loop_health:${hashShort([
+      quality.qualityId,
+      currentState.currentStateId,
+      processedPacketRefs,
+      microReasonerRunRefs,
+    ])}`;
+    const evidenceRefs = uniqueStrings([
+      scope.mailboxThreadResolution.mailboxThreadId,
+      currentState.currentStateId,
+      quality.qualityId,
+      loopHealthRef,
+      graph.graphId,
+      outputLaneProjection.graphId,
+      environment?.environment_id,
+      ...currentState.evidenceRefs,
+      ...quality.evidenceRefs,
+      ...processedPackets.flatMap((packet) => [packet.packetId, ...packet.evidenceRefs]),
+      ...microReasonerRuns.flatMap((run) => [run.runId, ...run.evidenceRefs]),
+      ...decisions.flatMap((decision) => [decision.decisionId, ...decision.evidenceRefs]),
+      ...latestMailItems.flatMap((item) => [item.mailId, ...item.evidenceRefs]),
+      ...outputLaneProjection.evidenceRefs,
+      ...collectStagePlayGraphSourceRefs(graph),
+    ]);
+    const reflectionId = `stage_play_live_source_mail_loop_reflection:${hashShort([
+      scope.mailboxThreadResolution.mailboxThreadId,
+      currentState.currentStateId,
+      processedPacketRefs,
+      microReasonerRunRefs,
+      graph.graphId,
+    ])}`;
+    const causalGraph: StagePlayLiveSourceMailLoopReflectionV1["causalGraph"] = [
+      ...processedPackets.flatMap((packet) =>
+        packet.mailIds.map((mailId) => ({
+          fromRef: mailId,
+          toRef: packet.packetId,
+          relation: "processed_into_packet" as const,
+          note: "Compact live-source mail was represented by this processed packet.",
+        }))
+      ),
+      ...processedPackets.flatMap((packet) =>
+        packet.microReasonerRunRefs.map((runId) => ({
+          fromRef: packet.packetId,
+          toRef: runId,
+          relation: "reasoned_by_microdeck" as const,
+          note: "The packet retained this MicroDeck run as bounded evidence.",
+        }))
+      ),
+      ...processedPackets.map((packet) => ({
+        fromRef: packet.packetId,
+        toRef: currentState.currentStateId,
+        relation: "updated_current_state" as const,
+        note: "Processed packet facts are part of the current live-source state window.",
+      })),
+      {
+        fromRef: graph.graphId,
+        toRef: outputLaneProjection.graphId,
+        relation: "projected_to_live_answer" as const,
+        note: "Stage Play graph evidence was reduced into Live Interpretation projection lanes.",
+      },
+      ...decisions.flatMap((decision) =>
+        decision.mailIds.map((mailId) => ({
+          fromRef: mailId,
+          toRef: decision.decisionId,
+          relation: "recorded_decision" as const,
+          note: "A mailbox decision receipt was recorded for this mail window.",
+        }))
+      ),
+      ...processedPackets.map((packet) => ({
+        fromRef: packet.packetId,
+        toRef: reflectionId,
+        relation: "eligible_for_terminal_context" as const,
+        note: "The packet may support model synthesis only after this reflection re-enters the solver.",
+      })),
+      ...missingMailCoverage.map((mailId) => ({
+        fromRef: mailId,
+        toRef: reflectionId,
+        relation: "excluded_from_answer_context" as const,
+        note: "No processed packet currently covers this mail item in the inspected window.",
+      })),
+    ];
+    const missingEvidence = uniqueStrings([
+      ...(processedPackets.length === 0 ? ["stage_play_processed_mail_packet"] : []),
+      ...(microReasonerRuns.length === 0 ? ["stage_play_micro_reasoner_run"] : []),
+      ...missingMailCoverage.map((mailId) => `processed_packet_for:${mailId}`),
+    ]);
+    const whatEnteredAnswerContext = uniqueStrings([
+      ...processedPackets.slice(-3).map((packet) =>
+        `processed packet ${packet.packetId}: ${clipText([
+          ...packet.observedFacts.slice(0, 2),
+          ...packet.changedFacts.slice(0, 2),
+        ].join(" | "), 240)}`
+      ),
+      ...microReasonerRuns.slice(-4).map((run) =>
+        `MicroDeck ${run.role} run ${run.runId}: ${clipText(run.outputPreview, 180)}`
+      ),
+      ...currentState.whatAskCanSafelySay.slice(0, 4),
+    ]);
+    const reflection: StagePlayLiveSourceMailLoopReflectionV1 = {
+      artifactId: "stage_play_live_source_mail_loop_reflection",
+      schemaVersion: STAGE_PLAY_LIVE_SOURCE_MAIL_LOOP_REFLECTION_SCHEMA,
+      reflectionId,
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      askThreadId: input.thread_id,
+      mailboxThreadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      sourceIds: currentState.sourceIds,
+      jobRefs: activeJobRefs,
+      policyRefs: activePolicyRefs,
+      profileRefs,
+      inspectionWindow: {
+        mailIds: windowMailIds,
+        processedPacketRefs,
+        microReasonerRunRefs,
+        currentStateRef: currentState.currentStateId,
+        loopHealthRef,
+        stagePlayGraphRef: graph.graphId,
+        liveAnswerProjectionRefs,
+        decisionRefs,
+        voiceReceiptRefs: [],
+      },
+      causalGraph,
+      stageSummaries: {
+        sourceCapture: currentState.latestMailItems.length > 0
+          ? currentState.latestMailItems.slice(-4).map((item) => `${item.mailId}: ${clipText(item.preview, 180)}`)
+          : ["No compact live-source mail items are currently visible in the inspected window."],
+        processedMail: processedPackets.length > 0
+          ? processedPackets.slice(-4).map((packet) =>
+              `${packet.packetId}: ${packet.resolutionState}; next ${packet.recommendedNext}; salience ${packet.salience.level}`
+            )
+          : ["No processed packet currently covers the inspected mail window."],
+        microDeck: microReasonerRuns.length > 0
+          ? microReasonerRuns.slice(-6).map((run) =>
+              `${run.role}: ${run.status}; ${clipText(run.outputPreview, 180)}`
+            )
+          : ["No MicroDeck run refs are attached to the inspected processed packets."],
+        stagePlayProjection: [
+          `graph ${graph.graphId}`,
+          `projection lanes ${outputLaneProjection.lanes.length}`,
+          environment ? `live answer environment ${environment.environment_id}` : "no active live answer environment was resolved",
+        ],
+        liveAnswerReadiness: [
+          `source quality ${quality.quality}`,
+          `freshness ${quality.freshness}`,
+          `pending unread ${currentState.pending.unreadMailCount}`,
+          `next useful tool ${currentState.nextUsefulTool ?? "none"}`,
+        ],
+        terminalReadiness: missingEvidence.length === 0
+          ? ["Reflection has processed packet, MicroDeck, current-state, loop-health, and Stage Play graph refs for model re-entry."]
+          : [`Reflection is incomplete: missing ${missingEvidence.join(", ")}.`],
+      },
+      whatEnteredAnswerContext,
+      whatDidNotEnterAnswerContext: missingMailCoverage.length > 0
+        ? missingMailCoverage.map((mailId) => `${mailId}: no processed packet coverage in the inspected window`)
+        : [],
+      missingEvidence,
+      limitations: uniqueStrings([
+        ...currentState.limitations,
+        ...quality.limitations,
+        ...(missingMailCoverage.length > 0 ? ["Some live-source mail exists only as compact mail, not processed packet evidence."] : []),
+      ]),
+      whatAskCanSafelySay: currentState.whatAskCanSafelySay,
+      nextUsefulTool: missingEvidence.length > 0
+        ? "live_env.read_processed_live_source_mail"
+        : currentState.nextUsefulTool,
+      evidenceRefs,
+      causalTrace: mergeLiveSourceCausalTraces([
+        currentState.causalTrace,
+        quality.causalTrace,
+        ...processedPackets.map((packet) => packet.causalTrace),
+        ...microReasonerRuns.map((run) => run.causalTrace),
+        ...decisions.map((decision) => decision.causalTrace),
+      ], {
+        parentRefs: evidenceRefs,
+        producedRefs: [reflectionId],
+        sourceIds: currentState.sourceIds,
+        jobId: activeJobRefs.at(-1) ?? null,
+        policyId: activePolicyRefs.at(-1) ?? null,
+        profileId: profileRefs.at(-1) ?? null,
+        evidenceRefs,
+      }),
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    };
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId,
+      toolName: input.tool_name,
+      ok: true,
+      summary: `Reflected live-source mail-loop causality across ${processedPackets.length} packet(s), ${microReasonerRuns.length} MicroDeck run(s), and Stage Play graph ${graph.graphId}.`,
+      observation: reflection,
+      evidenceRefs,
+      producedRefs: [reflectionId],
+      artifactRefs: {
+        processedPacketIds: processedPacketRefs,
+        decisionIds: decisionRefs,
+      },
+      forceNormalizedRefs: true,
     });
   }
 

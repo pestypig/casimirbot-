@@ -591,6 +591,10 @@ const compactStagePlayTranscriptRowForOverview = <T extends Record<string, any>>
   raw_prompt: undefined,
   rawOutput: undefined,
   raw_output: undefined,
+  routeMetadata: undefined,
+  causalTrace: undefined,
+  evidenceRefs: compactStagePlayRouteRefs(row.evidenceRefs, 12),
+  packetIds: compactStagePlayRouteRefs(row.packetIds, 8),
   metadata: row.metadata && typeof row.metadata === "object"
     ? {
         ...row.metadata,
@@ -2065,8 +2069,8 @@ helixStagePlayRouter.get("/live-source-mail/transcript", (req: Request, res: Res
     const view = readLiveSourceMailView(req.query.view);
     const overview = view !== "full";
     const limit = Math.min(
-      Math.max(readOptionalNumber(req.query.limit) ?? (overview ? 24 : 80), 1),
-      overview ? 30 : 100,
+      Math.max(readOptionalNumber(req.query.limit) ?? (overview ? 16 : 80), 1),
+      overview ? 20 : 100,
     );
     const entries: StagePlayLiveSourceMailTranscriptEntryV1[] = listStagePlayLiveSourceMailTranscriptEntries({
       threadId,
@@ -2107,8 +2111,8 @@ helixStagePlayRouter.get("/live-source-mail/transcript", (req: Request, res: Res
       retention,
       evidenceRefs: uniqueStrings([
         ...entries.flatMap((entry: StagePlayLiveSourceMailTranscriptEntryV1) => [
-        entry.entryId,
-        ...entry.evidenceRefs,
+          entry.entryId,
+          ...entry.evidenceRefs,
         ]),
         ...retention.evidenceRefs,
       ]).slice(0, overview ? 120 : 500),
