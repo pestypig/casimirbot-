@@ -32,7 +32,6 @@ export const isHelixAskHardForcedShortCircuitRule = (
 ): boolean =>
   rule === "forcedAnswer:pre_intent_clarify" ||
   rule === "forcedAnswer:pre_intent_clarify_deictic" ||
-  rule === "forcedAnswer:pre_intent_microplanner_answer" ||
   rule === "forcedAnswer:smalltalk_fast_path" ||
   rule === "forcedAnswer:simple_composition" ||
   rule === "forcedAnswer:nhm2_block_grounding" ||
@@ -112,7 +111,6 @@ export const shouldPreserveHelixAskForcedAnswerAcrossComposer = (args: {
   args.forcedAnswerPinned &&
   (isHelixAskConceptForcedShortCircuitRule(args.forcedRule ?? null) ||
     isHelixAskClarifyForcedShortCircuitRule(args.forcedRule ?? null) ||
-    args.forcedRule === "forcedAnswer:pre_intent_microplanner_answer" ||
     isHelixAskResearchContractFailClosedForcedShortCircuitRule(args.forcedRule ?? null) ||
     isHelixAskNhm2BlockGroundingForcedShortCircuitRule(args.forcedRule ?? null) ||
     isHelixAskSimpleForcedShortCircuitRule(args.forcedRule ?? null) ||
@@ -124,7 +122,6 @@ export const shouldPreserveHelixAskForcedAnswerAcrossFinalizer = (args: {
 }): boolean =>
   args.forcedAnswerPinned &&
   (isHelixAskClarifyForcedShortCircuitRule(args.forcedRule ?? null) ||
-    args.forcedRule === "forcedAnswer:pre_intent_microplanner_answer" ||
     isHelixAskResearchContractFailClosedForcedShortCircuitRule(args.forcedRule ?? null) ||
     isHelixAskNhm2BlockGroundingForcedShortCircuitRule(args.forcedRule ?? null) ||
     isHelixAskSimpleForcedShortCircuitRule(args.forcedRule ?? null) ||
