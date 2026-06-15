@@ -146,6 +146,14 @@ type HeldStagePlayNode = StagePlayNodeBuilderType & {
   clientY: number;
 };
 
+type MicroDeckEvidenceWiringWidget = {
+  key: string;
+  label: string;
+  summary: string;
+  block: string;
+  disabledReason?: string | null;
+};
+
 type StagePlaySourceOption = {
   id: string;
   sourceId: string;
@@ -171,6 +179,118 @@ type StagePlayBuilderContextResponse = {
 };
 
 type StagePlayObserverSource = StagePlayBadgeGraphV1["sourceWindow"]["sources"][number];
+
+const evidenceHandleCountLabel = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? "" : "s"}`;
+
+const appendMicroDeckEvidenceWiring = (draft: string, block: string): string => {
+  const trimmedDraft = draft.trimEnd();
+  return trimmedDraft ? `${trimmedDraft}\n\n${block}` : block;
+};
+
+const buildMicroDeckEvidenceWiringWidgets = (
+  packet: StagePlayProcessedMailPacketV1 | null | undefined,
+  sourceId: string | null,
+): MicroDeckEvidenceWiringWidget[] => {
+  const handles = packet?.evidenceHandles;
+  const activeSourceId = sourceId ?? packet?.sourceId ?? "active live source";
+  const sourceKind = handles?.sourceReceipts.at(-1)?.sourceKind ?? handles?.frameReceipts.at(-1)?.sourceKind ?? "live_source";
+  const sourceReceiptCount = handles?.sourceReceipts.length ?? 0;
+  const frameReceiptCount = handles?.frameReceipts.length ?? 0;
+  const frameIntervalCount = handles?.frameIntervals.length ?? 0;
+  const lensProductCount = handles?.lensProducts.length ?? 0;
+  const situationSliceCount = handles?.situationSlices.length ?? 0;
+  const actionPredictionCount = packet?.actionPredictions?.length ?? 0;
+  const unresolvedLeadCount = packet?.unresolvedLeads?.length ?? 0;
+  const packetLine = `- Packet: ${packet?.packetId ?? "latest processed packet pending"}. Source: ${activeSourceId}. Source type: ${sourceKind}.`;
+  const countLine = `- Available refs: sourceReceipts=${sourceReceiptCount}, frameReceipts=${frameReceiptCount}, frameIntervals=${frameIntervalCount}, lensProducts=${lensProductCount}, situationSlices=${situationSliceCount}, actionPredictions=${actionPredictionCount}, unresolvedLeads=${unresolvedLeadCount}.`;
+  const disabledReason = packet ? null : "Waiting for a processed live-source packet.";
+  return [
+    {
+      key: "source_receipts",
+      label: "Source receipts",
+      summary: evidenceHandleCountLabel(sourceReceiptCount, "receipt"),
+      disabledReason,
+      block: [
+        "Evidence handle wiring: source receipt custody",
+        packetLine,
+        countLine,
+        "- Before using a live-source claim, bind the claim to packet.evidenceHandles.sourceReceipts and packet.evidenceRefs.",
+        "- Treat receipts as observations and custody handles, not conclusions or answer authority.",
+        "- If source kind or receipt custody is missing, request more evidence before selecting a terminal recommendation.",
+      ].join("\n"),
+    },
+    {
+      key: "frame_intervals",
+      label: "Frame intervals",
+      summary: evidenceHandleCountLabel(frameIntervalCount, "interval"),
+      disabledReason,
+      block: [
+        "Evidence handle wiring: frame interval pursuit",
+        packetLine,
+        countLine,
+        "- Use packet.evidenceHandles.frameIntervals before trusting movement, occlusion, salience, access, or visual-delta claims.",
+        "- Prefer key frame and interval receipts over compact summary text when a prediction depends on what changed on screen.",
+        "- If the interval is absent or underdetermined, emit request_more_evidence with a frame interval lead instead of strengthening the claim.",
+      ].join("\n"),
+    },
+    {
+      key: "lens_products",
+      label: "Lens products",
+      summary: evidenceHandleCountLabel(lensProductCount, "lens"),
+      disabledReason,
+      block: [
+        "Evidence handle wiring: derived lens guardrail",
+        packetLine,
+        countLine,
+        "- Raw frame and source receipts are canonical evidence; packet.evidenceHandles.lensProducts are derived support only.",
+        "- Use lens products to compare alternatives such as motion_delta, occlusion_map, object_track, salience_heatmap, or crop_zoom.",
+        "- Do not let a lens-derived claim stand without its rawFrameParentRefs, parameters, uncertainty, and evidence refs.",
+      ].join("\n"),
+    },
+    {
+      key: "situation_slices",
+      label: "Timeline slices",
+      summary: evidenceHandleCountLabel(situationSliceCount, "slice"),
+      disabledReason,
+      block: [
+        "Evidence handle wiring: synchronized situation timeline",
+        packetLine,
+        countLine,
+        "- Align screen, browser, terminal, audio, game, tool, and source receipts through packet.evidenceHandles.situationSlices before inferring causality.",
+        "- Compare same-time source slices when belief/access depends on whether the actor saw a change before acting.",
+        "- If source clocks or slice ordering are unclear, keep the prediction uncertain and request a synchronized slice.",
+      ].join("\n"),
+    },
+    {
+      key: "action_predictions",
+      label: "Action predictions",
+      summary: evidenceHandleCountLabel(actionPredictionCount, "prediction"),
+      disabledReason,
+      block: [
+        "Evidence handle wiring: goal-based action prediction",
+        packetLine,
+        countLine,
+        "- Use packet.actionPredictions as tentative hypotheses; verify their basis, disconfirmers, frameIntervalRefs, lensRefs, and sourceSliceRefs.",
+        "- Separate surface cues, goal-object reasoning, belief state, perceptual access, and tool affordance before selecting recommendedNext.",
+        "- If the prediction has decisive uncertainties, choose evidence pursuit or record_interpretation instead of overconfident Ask wake shaping.",
+      ].join("\n"),
+    },
+    {
+      key: "evidence_leads",
+      label: "Evidence leads",
+      summary: evidenceHandleCountLabel(unresolvedLeadCount, "lead"),
+      disabledReason,
+      block: [
+        "Evidence handle wiring: unresolved lead pursuit",
+        packetLine,
+        countLine,
+        "- Read packet.unresolvedLeads before finalizing the role output, especially when a lead affects actionPredictions.",
+        "- When a lead requests frame history or lens presets, preserve it as request_more_evidence or pursue_evidence_lead instead of collapsing it into a conclusion.",
+        "- Repair or downgrade predictions when pursuedLeads contradict the first-pass packet.",
+      ].join("\n"),
+    },
+  ];
+};
 
 type StagePlayObserverDraftAction =
   | "use_for_stage_play"
@@ -5329,6 +5449,18 @@ function StagePlayMailLoopLiveOverview({
     setMicroReasonerPromptDraft(selectedDeckPromptTemplate);
     setMicroDeckSaveStatus({ state: "idle", message: "" });
   }, [selectedDeckPromptTemplate, selectedDeckRow?.role]);
+  const microDeckEvidenceWiringWidgets = useMemo(
+    () => buildMicroDeckEvidenceWiringWidgets(latestPacket, microDeckSourceId),
+    [latestPacket, microDeckSourceId],
+  );
+  const handleAppendMicroDeckEvidenceWiring = (widget: MicroDeckEvidenceWiringWidget) => {
+    if (!selectedDeckRow?.prompt || widget.disabledReason) return;
+    setMicroReasonerPromptDraft((draft) => appendMicroDeckEvidenceWiring(draft, widget.block));
+    setMicroDeckSaveStatus({
+      state: "idle",
+      message: "Evidence handle wiring appended to the draft. Save As to attach it as a custom deck.",
+    });
+  };
   const askHandoffCount = wakeRequests.filter((wake) => wake.askTurnId || wake.status === "running").length;
   const queueRows: StagePlayFlowQueueRow[] = [
     {
@@ -6469,6 +6601,40 @@ function StagePlayMailLoopLiveOverview({
             </div>
             <div className="mt-3 rounded border border-slate-800 bg-slate-950/70 p-3">
               <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Prompt</div>
+              <div
+                className="mt-2 rounded border border-cyan-900/40 bg-cyan-950/10 p-2"
+                data-testid="stage-play-microdeck-evidence-wiring"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-[9px] font-semibold uppercase tracking-wide text-cyan-200">Evidence wiring</div>
+                  <div className="max-w-full truncate font-mono text-[9px] text-cyan-200/70">
+                    {latestPacket?.packetId ?? "packet pending"}
+                  </div>
+                </div>
+                <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                  {microDeckEvidenceWiringWidgets.map((widget) => {
+                    const disabled = !selectedDeckRow?.prompt || Boolean(widget.disabledReason);
+                    return (
+                      <button
+                        key={widget.key}
+                        type="button"
+                        onClick={() => handleAppendMicroDeckEvidenceWiring(widget)}
+                        disabled={disabled}
+                        className="flex min-h-[42px] items-center gap-2 rounded border border-cyan-900/50 bg-slate-950/70 px-2 py-1.5 text-left text-cyan-100 hover:border-cyan-400 hover:bg-cyan-950/30 disabled:cursor-not-allowed disabled:border-slate-800 disabled:text-slate-600 disabled:opacity-60"
+                        aria-label={`Append ${widget.label} evidence wiring`}
+                        title={widget.disabledReason ?? `Append ${widget.label} evidence wiring to the prompt draft`}
+                        data-testid={`stage-play-microdeck-evidence-widget-${widget.key}`}
+                      >
+                        <Link2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <span className="min-w-0">
+                          <span className="block truncate text-[10px] font-semibold">{widget.label}</span>
+                          <span className="block truncate font-mono text-[9px] text-cyan-200/65">{widget.summary}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               {selectedDeckRow?.prompt ? (
                 <textarea
                   value={microReasonerPromptDraft}
