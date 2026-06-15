@@ -34,7 +34,9 @@ import {
 } from "../../services/stage-play/stage-play-checkpoint-queue";
 import {
   configureStagePlayLiveSourceWatchJobPolicy,
+  getStagePlayLiveSourceMailboxRetentionStats,
   listStagePlayMailDecisions,
+  listStagePlayLiveSourceMailCompactionIntervals,
   listStagePlayLiveSourceJobStates,
   listStagePlayLiveSourceMailItems,
   listStagePlayLiveSourceWatchJobPolicies,
@@ -50,7 +52,11 @@ import {
   listStagePlayLiveSourceMailWakeResults,
   reconcileStagePlayMailWakeRequestsWithDecisions,
 } from "../../services/stage-play/stage-play-live-source-mail-wake-store";
-import { listStagePlayLiveSourceMailTranscriptEntries } from "../../services/stage-play/stage-play-live-source-mail-transcript-store";
+import {
+  getStagePlayLiveSourceMailTranscriptRetentionStats,
+  listStagePlayLiveSourceMailTranscriptCompactionIntervals,
+  listStagePlayLiveSourceMailTranscriptEntries,
+} from "../../services/stage-play/stage-play-live-source-mail-transcript-store";
 import {
   listStagePlayLiveSourceInterpreterProfileComparisons,
   listStagePlayLiveSourceInterpreterProfiles,
@@ -1356,6 +1362,30 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       environmentId,
       limit: operator ? 4 : overview ? 8 : 20,
     });
+    const mailCompactionIntervals = listStagePlayLiveSourceMailCompactionIntervals({
+      threadId,
+      roomId,
+      environmentId,
+      sourceId,
+      limit: operator ? 4 : overview ? 8 : 24,
+    });
+    const transcriptCompactionIntervals = listStagePlayLiveSourceMailTranscriptCompactionIntervals({
+      threadId,
+      roomId,
+      environmentId,
+      limit: operator ? 4 : overview ? 8 : 24,
+    });
+    const mailboxRetention = getStagePlayLiveSourceMailboxRetentionStats({
+      threadId,
+      roomId,
+      environmentId,
+      sourceId,
+    });
+    const transcriptRetention = getStagePlayLiveSourceMailTranscriptRetentionStats({
+      threadId,
+      roomId,
+      environmentId,
+    });
     const mailLoopWorkBudget = buildStagePlayMailLoopWorkBudget({
       view,
       limit,
@@ -1401,6 +1431,14 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       wakeRequests: overview ? responseWakeRequests.map(compactStagePlayWakeForOverview) : responseWakeRequests,
       wakeResults: overview ? responseWakeResults.map(compactStagePlayWakeResultForOverview) : responseWakeResults,
       budgetStates,
+      compactionIntervals: {
+        mail: mailCompactionIntervals,
+        transcript: transcriptCompactionIntervals,
+      },
+      retention: {
+        mailbox: mailboxRetention,
+        transcript: transcriptRetention,
+      },
       mailLoopWorkBudget,
       assistant_answer: false,
       terminal_eligible: false,
@@ -2041,6 +2079,17 @@ helixStagePlayRouter.get("/live-source-mail/transcript", (req: Request, res: Res
     const responseEntries = overview
       ? entries.map(compactStagePlayTranscriptEntryForOverview)
       : entries;
+    const compactionIntervals = listStagePlayLiveSourceMailTranscriptCompactionIntervals({
+      threadId,
+      roomId,
+      environmentId,
+      limit: overview ? 8 : 24,
+    });
+    const retention = getStagePlayLiveSourceMailTranscriptRetentionStats({
+      threadId,
+      roomId,
+      environmentId,
+    });
     return res.json({
       ok: true,
       schema: "stage_play_live_source_mail_transcript_response/v1",
@@ -2054,10 +2103,15 @@ helixStagePlayRouter.get("/live-source-mail/transcript", (req: Request, res: Res
       entries: responseEntries,
       transcriptRows: responseEntries.map((entry: StagePlayLiveSourceMailTranscriptEntryV1) => entry.row),
       transcriptEntryIds: responseEntries.map((entry: StagePlayLiveSourceMailTranscriptEntryV1) => entry.entryId),
-      evidenceRefs: uniqueStrings(entries.flatMap((entry: StagePlayLiveSourceMailTranscriptEntryV1) => [
+      compactionIntervals,
+      retention,
+      evidenceRefs: uniqueStrings([
+        ...entries.flatMap((entry: StagePlayLiveSourceMailTranscriptEntryV1) => [
         entry.entryId,
         ...entry.evidenceRefs,
-      ])).slice(0, overview ? 120 : 500),
+        ]),
+        ...retention.evidenceRefs,
+      ]).slice(0, overview ? 120 : 500),
       assistant_answer: false,
       terminal_eligible: false,
       context_role: "tool_evidence",

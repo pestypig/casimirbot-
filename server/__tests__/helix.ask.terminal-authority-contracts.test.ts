@@ -117,6 +117,65 @@ describe("Helix Ask terminal authority contracts", () => {
     allTerminalSurfacesEqual(payload);
   });
 
+  it("does not mint live-source processed mail summaries as typed-failure authority", () => {
+    const contentSummary =
+      "The processed visual mail shows stage_play_live_source_mail:hud: objective=collect samples; hotbar: selected=compass.";
+    const payload: Record<string, unknown> = {
+      turn_id: "ask:test:live-source-envelope",
+      thread_id: "thread:test",
+      ok: false,
+      response_type: "final_failure",
+      final_status: "final_failure",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "typed_failure",
+      terminal_failure_text: contentSummary,
+      selected_final_answer: contentSummary,
+      answer: contentSummary,
+      text: contentSummary,
+      finalAnswer: contentSummary,
+      content: contentSummary,
+      canonical_goal_frame: {
+        goal_kind: "live_source_processed_mail_interpretation",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      source_target_intent: {
+        target_source: "live_source_mailbox",
+        strength: "hard",
+        must_backend: true,
+      },
+      route_product_contract: {
+        source_target: "live_source_mailbox",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer"],
+      },
+      resolved_turn_summary: {
+        resolved_route_label: "live_source_processed_mail_interpretation / model_synthesized_answer",
+      },
+      typed_failure: {
+        schema: "helix.typed_failure.v1",
+        error_code: "typed_failure",
+        message: contentSummary,
+        text: contentSummary,
+        answer_text: contentSummary,
+      },
+    };
+
+    const envelope = resolveTerminalAnswerEnvelope(payload);
+    applyTerminalAnswerEnvelope(payload, envelope);
+
+    expect(envelope.terminal_artifact_kind).toBe("typed_failure");
+    expect(envelope.final_answer_source).toBe("typed_failure");
+    expect(envelope.terminal_kind).toBe("failure");
+    expect(envelope.terminal_text).toContain("no valid model-synthesized answer passed terminal authority");
+    expect(envelope.terminal_text).not.toBe(contentSummary);
+    expect(payload.terminal_error_code).toBe("post_tool_model_step_missing");
+    expect((payload.typed_failure as Record<string, unknown>).message).toBe(envelope.terminal_text);
+    expect((payload.terminal_answer_authority as Record<string, unknown>).terminal_text_preview).toBe(
+      envelope.terminal_text,
+    );
+    allTerminalSurfacesEqual(payload);
+  });
+
   it("clears stale failure metadata when a successful terminal becomes authoritative", () => {
     const payload: Record<string, unknown> = {
       turn_id: "ask:test:stale-failure-success",

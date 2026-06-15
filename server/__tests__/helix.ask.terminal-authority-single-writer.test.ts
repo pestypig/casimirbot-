@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { applyHelixTerminalAuthoritySingleWriter } from "../services/helix-ask/terminal-authority-single-writer";
+import {
+  applyHelixTerminalAuthoritySingleWriter,
+  syncHelixTypedFailureAuthorityPublicMirrors,
+} from "../services/helix-ask/terminal-authority-single-writer";
 
 const makePostToolObservation = (turnId: string) => ({
   artifact_id: `${turnId}:obs`,
@@ -17,6 +20,84 @@ const makePostToolObservation = (turnId: string) => ({
 });
 
 describe("Helix terminal authority single writer", () => {
+  it("does not mirror processed live-source mail summaries as typed-failure answers", () => {
+    const turnId = "ask:test:live-source-summary-typed-failure";
+    const contentSummary =
+      'The processed visual mail shows stage_play_live_source_mail:4bef8bfa294c18803d hud: {"health_hearts":"10"}; stage_play_live_source_mail:4bef8bfa294c18803d hotbar: {"selected_slot":"1"}.';
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      selected_final_answer: contentSummary,
+      terminal_failure_text: contentSummary,
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "typed_failure",
+      canonical_goal_frame: {
+        goal_kind: "live_source_processed_mail_interpretation",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      source_target_intent: {
+        target_source: "live_source_mailbox",
+        strength: "hard",
+        must_enter_backend_ask: true,
+      },
+      resolved_turn_summary: {
+        final_status: "final_failure",
+        resolved_route_label: "live_source_processed_mail_interpretation / model_synthesized_answer",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "typed_failure",
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        thread_id: "thread:test",
+        turn_id: turnId,
+        route: "dispatch:observe",
+        terminal_kind: "failure",
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        terminal_text_preview: contentSummary,
+        terminal_text_hash: "stale",
+        server_authoritative: true,
+      },
+      typed_failure: {
+        schema: "helix.typed_failure.v1",
+        error_code: "typed_failure",
+        message: contentSummary,
+        text: contentSummary,
+        answer_text: contentSummary,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+
+    expect(syncHelixTypedFailureAuthorityPublicMirrors(payload)).toBe(true);
+
+    expect(payload.terminal_error_code).toBe("post_tool_model_step_missing");
+    expect(payload.selected_final_answer).toBe(
+      "I could not complete this live-source mailbox turn because processed mail was observed, but no valid model-synthesized answer passed terminal authority.",
+    );
+    expect(payload.selected_final_answer).not.toBe(contentSummary);
+    expect(payload.typed_failure).toMatchObject({
+      error_code: "post_tool_model_step_missing",
+      message: payload.selected_final_answer,
+      text: payload.selected_final_answer,
+      answer_text: payload.selected_final_answer,
+    });
+    expect(payload.terminal_answer_authority).toMatchObject({
+      terminal_kind: "failure",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_text_preview: payload.selected_final_answer,
+    });
+    expect((payload.terminal_answer_authority as Record<string, unknown>).terminal_text_hash).not.toBe("stale");
+    expect(payload.resolved_turn_summary).toMatchObject({
+      final_status: "final_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "post_tool_model_step_missing",
+      final_answer_source: "typed_failure",
+    });
+  });
+
   it("selects a post-observation final draft over stale workspace failure mirrors", () => {
     const turnId = "ask:test:single-writer-open";
     const artifacts = [

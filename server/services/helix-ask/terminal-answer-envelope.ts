@@ -9,6 +9,7 @@ import {
   buildHelixLocalizedTypedFailureTextForPayload,
   isHelixGenericTypedFailureText,
 } from "./language-contract";
+import { liveSourceModelSynthesisMissingFailure } from "./live-source-terminal-failure-repair";
 import type { HelixTerminalAuthority } from "@shared/helix-turn-poison-guard";
 
 export type HelixTerminalAnswerEnvelope = {
@@ -207,10 +208,27 @@ const promoteRequestUserInputTerminal = (
 const typedFailureText = (payload: Record<string, unknown>): string =>
   (() => {
     const localizedFailureText = buildHelixLocalizedTypedFailureTextForPayload(payload);
+    const typedFailure = readRecord(payload.typed_failure);
     const candidate =
       readString(payload.terminal_failure_text) ??
-      readString(readRecord(payload.typed_failure)?.message) ??
+      readString(typedFailure?.message) ??
       localizedFailureText;
+    const liveSourceFailureRepair = liveSourceModelSynthesisMissingFailure(payload, candidate);
+    if (liveSourceFailureRepair) {
+      payload.terminal_error_code = liveSourceFailureRepair.code;
+      payload.terminal_failure_text = liveSourceFailureRepair.text;
+      payload.typed_failure = {
+        ...(typedFailure ?? {}),
+        schema: "helix.typed_failure.v1",
+        error_code: liveSourceFailureRepair.code,
+        message: liveSourceFailureRepair.text,
+        text: liveSourceFailureRepair.text,
+        answer_text: liveSourceFailureRepair.text,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+      return liveSourceFailureRepair.text;
+    }
     if (localizedFailureText !== "I could not produce a terminal answer for this turn.") {
       return localizedFailureText;
     }

@@ -59,7 +59,52 @@ const mailById = new Map<string, StagePlayLiveSourceMailItemV1>();
 const decisionsById = new Map<string, StagePlayLiveSourceMailDecisionV1>();
 const jobStateById = new Map<string, StagePlayLiveSourceJobStateV1>();
 const watchJobPolicyById = new Map<string, StagePlayLiveSourceWatchJobPolicyV1>();
-const MAX_MAIL_PER_THREAD = 250;
+const mailCompactionIntervalsById = new Map<string, StagePlayLiveSourceMailCompactionIntervalV1>();
+const MAX_MAIL_PER_THREAD = 80;
+const MAX_MAIL_COMPACTION_INTERVALS_PER_THREAD = 120;
+const MAIL_COMPACTION_PREVIEW_COUNT = 4;
+const MAX_MAIL_PER_COMPACTION_INTERVAL = 20;
+
+export type StagePlayLiveSourceMailCompactionIntervalV1 = {
+  artifactId: "stage_play_live_source_mail_compaction_interval";
+  schemaVersion: "stage_play_live_source_mail_compaction_interval/v1";
+  intervalId: string;
+  threadId: string;
+  roomId?: string | null;
+  environmentId?: string | null;
+  sourceIds: string[];
+  sourceKinds: string[];
+  startMailId: string;
+  endMailId: string;
+  startCreatedAt: string;
+  endCreatedAt: string;
+  compactedMailCount: number;
+  statusCounts: Partial<Record<StagePlayLiveSourceMailStatusV1, number>>;
+  summaryPreviews: string[];
+  evidenceRefs: string[];
+  createdAt: string;
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_evidence";
+  raw_content_included: false;
+};
+
+export type StagePlayLiveSourceMailboxRetentionStatsV1 = {
+  schema: "stage_play_live_source_mailbox_retention/v1";
+  threadId?: string | null;
+  hotLimit: number;
+  retainedMailCount: number;
+  compactedIntervalCount: number;
+  compactedMailCount: number;
+  oldestRetainedMailId?: string | null;
+  newestRetainedMailId?: string | null;
+  latestCompactionIntervalId?: string | null;
+  evidenceRefs: string[];
+  assistant_answer: false;
+  terminal_eligible: false;
+  context_role: "tool_evidence";
+  raw_content_included: false;
+};
 
 export type StagePlayLiveSourceMailEnqueuedEvent = {
   mail: StagePlayLiveSourceMailItemV1;
@@ -127,10 +172,111 @@ const listThreadMail = (threadId: string): StagePlayLiveSourceMailItemV1[] =>
     .filter((item) => item.threadId === threadId)
     .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
 
+const listThreadMailCompactionIntervals = (threadId: string): StagePlayLiveSourceMailCompactionIntervalV1[] =>
+  Array.from(mailCompactionIntervalsById.values())
+    .filter((interval) => interval.threadId === threadId)
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+
+const trimThreadMailCompactionIntervals = (threadId: string): void => {
+  const entries = listThreadMailCompactionIntervals(threadId);
+  if (entries.length <= MAX_MAIL_COMPACTION_INTERVALS_PER_THREAD) return;
+  for (const entry of entries.slice(0, entries.length - MAX_MAIL_COMPACTION_INTERVALS_PER_THREAD)) {
+    mailCompactionIntervalsById.delete(entry.intervalId);
+  }
+};
+
+const recordMailCompactionInterval = (
+  entries: StagePlayLiveSourceMailItemV1[],
+): StagePlayLiveSourceMailCompactionIntervalV1 | null => {
+  if (entries.length === 0) return null;
+  const first = entries[0];
+  const last = entries.at(-1) ?? first;
+  const latestInterval = listThreadMailCompactionIntervals(first.threadId).at(-1) ?? null;
+  if (
+    latestInterval &&
+    latestInterval.roomId === (first.roomId ?? null) &&
+    latestInterval.environmentId === (first.environmentId ?? null) &&
+    latestInterval.compactedMailCount + entries.length <= MAX_MAIL_PER_COMPACTION_INTERVAL
+  ) {
+    const statusCounts = entries.reduce<Partial<Record<StagePlayLiveSourceMailStatusV1, number>>>(
+      (counts, entry) => {
+        counts[entry.status] = (counts[entry.status] ?? 0) + 1;
+        return counts;
+      },
+      { ...latestInterval.statusCounts },
+    );
+    const merged: StagePlayLiveSourceMailCompactionIntervalV1 = {
+      ...latestInterval,
+      sourceIds: uniqueStrings([...latestInterval.sourceIds, ...entries.map((entry) => entry.sourceId)]),
+      sourceKinds: uniqueStrings([...latestInterval.sourceKinds, ...entries.map((entry) => entry.sourceKind)]),
+      endMailId: last.mailId,
+      endCreatedAt: last.createdAt,
+      compactedMailCount: latestInterval.compactedMailCount + entries.length,
+      statusCounts,
+      summaryPreviews: [
+        ...latestInterval.summaryPreviews,
+        ...entries.map((entry) => previewText(entry.summary.preview || entry.summary.text, 80)),
+      ].slice(-MAIL_COMPACTION_PREVIEW_COUNT),
+      evidenceRefs: uniqueStrings([
+        ...latestInterval.evidenceRefs,
+        ...entries.map((entry) => entry.mailId),
+        ...entries.flatMap((entry) => entry.evidenceRefs),
+      ]).slice(0, 80),
+      createdAt: last.updatedAt || last.createdAt,
+    };
+    mailCompactionIntervalsById.set(merged.intervalId, merged);
+    return merged;
+  }
+  const statusCounts = entries.reduce<Partial<Record<StagePlayLiveSourceMailStatusV1, number>>>((counts, entry) => {
+    counts[entry.status] = (counts[entry.status] ?? 0) + 1;
+    return counts;
+  }, {});
+  const evidenceRefs = uniqueStrings([
+    ...entries.map((entry) => entry.mailId),
+    ...entries.flatMap((entry) => entry.evidenceRefs),
+  ]).slice(0, 80);
+  const intervalId = `stage_play_live_source_mail_compaction_interval:${hashShort([
+    first.threadId,
+    first.mailId,
+    last.mailId,
+    entries.length,
+  ])}`;
+  const interval: StagePlayLiveSourceMailCompactionIntervalV1 = {
+    artifactId: "stage_play_live_source_mail_compaction_interval",
+    schemaVersion: "stage_play_live_source_mail_compaction_interval/v1",
+    intervalId,
+    threadId: first.threadId,
+    roomId: first.roomId ?? null,
+    environmentId: first.environmentId ?? null,
+    sourceIds: uniqueStrings(entries.map((entry) => entry.sourceId)),
+    sourceKinds: uniqueStrings(entries.map((entry) => entry.sourceKind)),
+    startMailId: first.mailId,
+    endMailId: last.mailId,
+    startCreatedAt: first.createdAt,
+    endCreatedAt: last.createdAt,
+    compactedMailCount: entries.length,
+    statusCounts,
+    summaryPreviews: entries
+      .slice(-MAIL_COMPACTION_PREVIEW_COUNT)
+      .map((entry) => previewText(entry.summary.preview || entry.summary.text, 80)),
+    evidenceRefs,
+    createdAt: last.updatedAt || last.createdAt,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_evidence",
+    raw_content_included: false,
+  };
+  mailCompactionIntervalsById.set(interval.intervalId, interval);
+  trimThreadMailCompactionIntervals(first.threadId);
+  return interval;
+};
+
 const trimThreadMail = (threadId: string): void => {
   const entries = listThreadMail(threadId);
   if (entries.length <= MAX_MAIL_PER_THREAD) return;
-  for (const entry of entries.slice(0, entries.length - MAX_MAIL_PER_THREAD)) {
+  const evicted = entries.slice(0, entries.length - MAX_MAIL_PER_THREAD);
+  recordMailCompactionInterval(evicted);
+  for (const entry of evicted) {
     mailById.delete(entry.mailId);
   }
 };
@@ -343,6 +489,68 @@ export function listStagePlayLiveSourceMailItems(input: {
     })
     .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
     .slice(-limit);
+}
+
+export function listStagePlayLiveSourceMailCompactionIntervals(input: {
+  threadId?: string | null;
+  roomId?: string | null;
+  environmentId?: string | null;
+  sourceId?: string | null;
+  limit?: number;
+} = {}): StagePlayLiveSourceMailCompactionIntervalV1[] {
+  const limit = Math.max(1, Math.min(input.limit ?? 20, 120));
+  return Array.from(mailCompactionIntervalsById.values())
+    .filter((interval) => {
+      if (input.threadId && interval.threadId !== input.threadId) return false;
+      if (input.roomId && interval.roomId !== input.roomId) return false;
+      if (input.environmentId && interval.environmentId !== input.environmentId) return false;
+      if (input.sourceId && !interval.sourceIds.includes(input.sourceId)) return false;
+      return true;
+    })
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+    .slice(-limit);
+}
+
+export function getStagePlayLiveSourceMailboxRetentionStats(input: {
+  threadId?: string | null;
+  roomId?: string | null;
+  environmentId?: string | null;
+  sourceId?: string | null;
+} = {}): StagePlayLiveSourceMailboxRetentionStatsV1 {
+  const retainedMail = listStagePlayLiveSourceMailItems({
+    threadId: input.threadId ?? null,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    sourceId: input.sourceId ?? null,
+    limit: MAX_MAIL_PER_THREAD,
+  });
+  const intervals = listStagePlayLiveSourceMailCompactionIntervals({
+    threadId: input.threadId ?? null,
+    roomId: input.roomId ?? null,
+    environmentId: input.environmentId ?? null,
+    sourceId: input.sourceId ?? null,
+    limit: MAX_MAIL_COMPACTION_INTERVALS_PER_THREAD,
+  });
+  return {
+    schema: "stage_play_live_source_mailbox_retention/v1",
+    threadId: input.threadId ?? null,
+    hotLimit: MAX_MAIL_PER_THREAD,
+    retainedMailCount: retainedMail.length,
+    compactedIntervalCount: intervals.length,
+    compactedMailCount: intervals.reduce((sum, interval) => sum + interval.compactedMailCount, 0),
+    oldestRetainedMailId: retainedMail[0]?.mailId ?? null,
+    newestRetainedMailId: retainedMail.at(-1)?.mailId ?? null,
+    latestCompactionIntervalId: intervals.at(-1)?.intervalId ?? null,
+    evidenceRefs: uniqueStrings([
+      retainedMail[0]?.mailId,
+      retainedMail.at(-1)?.mailId,
+      ...intervals.slice(-8).map((interval) => interval.intervalId),
+    ]),
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_evidence",
+    raw_content_included: false,
+  };
 }
 
 export function listUnreadStagePlayLiveSourceMailItems(input: {
@@ -807,6 +1015,7 @@ export function listStagePlayLiveSourceJobStates(input: {
 export function resetStagePlayLiveSourceMailboxForTest(): void {
   mailById.clear();
   decisionsById.clear();
+  mailCompactionIntervalsById.clear();
   resetStagePlayLiveSourceImmersionStateStoreForTest();
   resetStagePlayLiveSourceNarrativeStoreForTest();
   jobStateById.clear();

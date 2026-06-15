@@ -715,6 +715,48 @@ describe("GET /api/helix/stage-play/live-source-mail", () => {
       raw_content_included: false,
     });
   });
+
+  it("expires old hot mail into compact interval receipts", async () => {
+    const app = makeApp();
+    const threadId = "thread:mail-retention-route";
+    for (let index = 0; index < 86; index += 1) {
+      enqueueStagePlayLiveSourceMailItem({
+        threadId,
+        roomId: "room:mail-retention-route",
+        sourceId: "visual_source:mail-retention-route",
+        sourceKind: "visual_frame",
+        frameRef: `visual_frame:mail-retention-route-${index}`,
+        evidenceRef: `visual_evidence:mail-retention-route-${index}`,
+        summaryText: `Minecraft neutral spatial observer frame ${index}. ${"terrain and hotbar details ".repeat(30)}`,
+        createdAt: new Date(Date.UTC(2026, 5, 4, 12, 0, index)).toISOString(),
+      });
+    }
+
+    const response = await request(app)
+      .get("/api/helix/stage-play/live-source-mail")
+      .query({ threadId, view: "full", limit: 100 })
+      .expect(200);
+
+    expect(response.body.retention.mailbox).toMatchObject({
+      schema: "stage_play_live_source_mailbox_retention/v1",
+      hotLimit: 80,
+      retainedMailCount: 80,
+      compactedMailCount: 6,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(response.body.mailItems).toHaveLength(80);
+    expect(response.body.mailItems[0].summary.text).toContain("frame 6");
+    expect(response.body.compactionIntervals.mail[0]).toMatchObject({
+      artifactId: "stage_play_live_source_mail_compaction_interval",
+      compactedMailCount: 6,
+      startMailId: expect.stringMatching(/^stage_play_live_source_mail:/),
+      endMailId: expect.stringMatching(/^stage_play_live_source_mail:/),
+      raw_content_included: false,
+    });
+    expect(JSON.stringify(response.body.compactionIntervals.mail)).not.toContain("terrain and hotbar details terrain");
+  });
 });
 
 describe("GET /api/helix/stage-play/live-source-mail/transcript", () => {
@@ -756,6 +798,54 @@ describe("GET /api/helix/stage-play/live-source-mail/transcript", () => {
     expect(compact.body.entries[0].row.body.length).toBeLessThan(full.body.entries[0].row.body.length);
     expect(compact.body.entries[0].evidenceRefs.length).toBeLessThan(full.body.entries[0].evidenceRefs.length);
     expect(compact.body.transcriptRows[0].body.length).toBeLessThanOrEqual(703);
+  });
+
+  it("expires old hot transcript rows into compact interval receipts", async () => {
+    const app = makeApp();
+    const threadId = "thread:mail-transcript-retention-route";
+    recordStagePlayLiveSourceMailTranscriptEntries({
+      threadId,
+      wakeRequestId: "stage_play_live_source_mail_wake:transcript-retention-route",
+      mailIds: ["stage_play_live_source_mail:transcript-retention-route"],
+      sourceIds: ["visual_source:transcript-retention-route"],
+      rows: Array.from({ length: 186 }, (_, index) => ({
+        rowId: `stage_play_live_source_mail_transcript_row:retention-${index}`,
+        rowKind: index % 2 === 0 ? "processed_mail_packet" : "agent_decision",
+        title: `Transcript row ${index}`,
+        body: `Detailed Minecraft gameplay row ${index}. ${"observer payload ".repeat(80)}`,
+        source: {
+          artifactId: `stage_play_processed_mail_packet:retention-${index}`,
+          artifactKind: "processed_mail_packet",
+        },
+        evidenceRefs: [`stage_play_evidence_ref:retention-${index}`],
+        authority: "tool_evidence",
+        assistantAnswer: false,
+        terminalEligible: false,
+        createdAt: new Date(Date.UTC(2026, 5, 4, 12, 0, index)).toISOString(),
+      })),
+    });
+
+    const response = await request(app)
+      .get("/api/helix/stage-play/live-source-mail/transcript")
+      .query({ threadId, view: "full", limit: 200 })
+      .expect(200);
+
+    expect(response.body.retention).toMatchObject({
+      schema: "stage_play_live_source_mail_transcript_retention/v1",
+      hotLimit: 180,
+      retainedEntryCount: 180,
+      compactedEntryCount: 6,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(response.body.entries).toHaveLength(100);
+    expect(response.body.compactionIntervals[0]).toMatchObject({
+      artifactId: "stage_play_live_source_mail_transcript_compaction_interval",
+      compactedEntryCount: 6,
+      raw_content_included: false,
+    });
+    expect(JSON.stringify(response.body.compactionIntervals)).not.toContain("observer payload observer payload observer payload");
   });
 });
 

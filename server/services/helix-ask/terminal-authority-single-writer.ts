@@ -17,6 +17,8 @@ import {
   buildHelixLocalizedTypedFailureTextForPayload,
   isHelixGenericTypedFailureText,
 } from "./language-contract";
+import { liveSourceModelSynthesisMissingFailure } from "./live-source-terminal-failure-repair";
+import { hashHelixTerminalText } from "./turn-terminal-authority";
 
 type ArtifactLike = {
   artifact_id?: unknown;
@@ -63,18 +65,21 @@ export function syncHelixTypedFailureAuthorityPublicMirrors(
     readString(payload.terminal_failure_text) ??
     readString(payload.selected_final_answer) ??
     localizedFailureText;
-  const failureText = localizedFailureText !== "I could not produce a terminal answer for this turn."
+  const liveSourceFailureRepair = liveSourceModelSynthesisMissingFailure(payload, candidateFailureText);
+  const failureText = liveSourceFailureRepair?.text ?? (localizedFailureText !== "I could not produce a terminal answer for this turn."
     ? localizedFailureText
     : isHelixGenericTypedFailureText(candidateFailureText)
     ? localizedFailureText
-    : candidateFailureText;
+    : candidateFailureText);
   const existingErrorCode = readString(typedFailure?.error_code) ?? readString(payload.terminal_error_code);
   const errorCode =
-    compoundCoverageFailedClosed && (!existingErrorCode || existingErrorCode === "terminal_consistency_violation")
+    liveSourceFailureRepair?.code ?? (
+      compoundCoverageFailedClosed && (!existingErrorCode || existingErrorCode === "terminal_consistency_violation")
       ? "compound_prompt_coverage_incomplete"
       : existingErrorCode === "terminal_consistency_violation"
         ? "typed_failure"
-      : existingErrorCode ?? "typed_failure";
+      : existingErrorCode ?? "typed_failure"
+    );
 
   payload.ok = false;
   payload.response_type = "final_failure";
@@ -92,11 +97,20 @@ export function syncHelixTypedFailureAuthorityPublicMirrors(
     ...(typedFailure ?? {}),
     schema: "helix.typed_failure.v1",
     error_code: errorCode,
-    message: readString(typedFailure?.message) ?? failureText,
+    message: liveSourceFailureRepair ? failureText : readString(typedFailure?.message) ?? failureText,
     text: failureText,
     answer_text: failureText,
     assistant_answer: false,
     raw_content_included: false,
+  };
+  payload.terminal_answer_authority = {
+    ...(authority ?? {}),
+    terminal_kind: "failure",
+    final_answer_source: "typed_failure",
+    terminal_artifact_kind: "typed_failure",
+    terminal_text_preview: failureText,
+    terminal_text_hash: hashHelixTerminalText(failureText),
+    server_authoritative: authority?.server_authoritative !== false,
   };
 
   const resolvedTurnSummary = readRecord(payload.resolved_turn_summary);
