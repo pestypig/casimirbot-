@@ -241,6 +241,50 @@ describe("Helix Ask conversation memory packet", () => {
     })).toBe("HELIX_PASTED_TEXT_RESUME_SENTINEL_EXPLICIT");
   });
 
+  it("prefers marker tokens across all resume frames before falling back to original prompt text", () => {
+    const packet = buildHelixConversationMemoryPacket({
+      threadId,
+      currentTurnId: "turn-followup-multi-frame",
+      sessionId,
+      promptText: "What exact sentinel token was in the attached pasted text? Answer with only the sentinel token.",
+      contextResumeFrames: [
+        {
+          id: "context_resume:older",
+          schema: "helix.pasted_text_attachment_resume_frame.v1",
+          source_request_id: "turn-pause:context_compaction:pause",
+          source_turn_id: "turn-pause",
+          original_prompt: "Use the attached pasted text.",
+          attachment_artifact_refs: ["thread:pasted_text_attachment:older-sentinel"],
+          attachment_previews: [
+            "Use the attached pasted text. The exact sentinel token is: HELIX_PASTED_TEXT_RESUME_SENTINEL_LIVE_12345",
+          ],
+          turn_input_item_count: 2,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        {
+          id: "context_resume:newer-route-metadata",
+          schema: "helix.pasted_text_attachment_resume_frame.v1",
+          source_request_id: "turn-followup:route_metadata",
+          source_turn_id: "turn-followup",
+          original_prompt: "Use the attached pasted text.",
+          attachment_artifact_refs: ["thread:pasted_text_attachment:older-sentinel"],
+          attachment_previews: ["Use the attached pasted text."],
+          turn_input_item_count: 2,
+          terminal_eligible: false,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ],
+    });
+
+    expect(resolveHelixContextResumeFrameRecallText({
+      packet,
+      promptText: "What exact sentinel token was in the attached pasted text? Answer with only the sentinel token.",
+    })).toBe("HELIX_PASTED_TEXT_RESUME_SENTINEL_LIVE_12345");
+  });
+
   it("treats pasted-text resume recall as selected conversation-memory evidence, not runtime debug", () => {
     const turnId = "turn-followup";
     const evidenceRef = `${turnId}:conversation_memory_packet`;

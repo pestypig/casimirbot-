@@ -238,6 +238,56 @@ describe("helix ask turn input integrity audit", () => {
     ).toEqual(expect.objectContaining({ ok: true, attachment_input_count: 1 }));
   });
 
+  it("admits explicit conversation-memory resume route metadata before pasted-text integrity rejection", async () => {
+    const sentinel = "HELIX_PASTED_TEXT_RESUME_SENTINEL_ENDPOINT";
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        thread_id: "test:turn-input-integrity:explicit-resume-frame",
+        session_id: "test:turn-input-integrity:explicit-resume-frame",
+        turn_id: "turn-explicit-resume-frame",
+        question: "What exact sentinel token was in the attached pasted text? Answer with only the sentinel token.",
+        debug: true,
+        routeMetadata: {
+          schema: "helix.ask.route_metadata.v1",
+          source: "conversation_memory_recall",
+          sourceTarget: "conversation_memory",
+          context_resume_frame: {
+            schema: "helix.pasted_text_attachment_resume_frame.v1",
+            id: "context_resume:endpoint",
+            source_request_id: "turn-pause:context_compaction:pause",
+            source_turn_id: "turn-pause",
+            original_prompt: "Use the attached pasted text.",
+            attachment_artifact_refs: ["thread:pasted_text_attachment:endpoint-sentinel"],
+            attachment_previews: [`${sentinel}\nThis is compacted pasted text.`],
+            turn_input_item_count: 2,
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      })
+      .expect(200);
+
+    expect(response.body.route_reason_code).toBe("conversation_memory_recall");
+    expect(response.body.answer).toBe(sentinel);
+    expect(response.body.final_answer_source).toBe("conversation_memory_recall_answer");
+    expect(response.body.turn_input_integrity_audit).toEqual(
+      expect.objectContaining({
+        ok: true,
+        assistant_answer: false,
+      }),
+    );
+    expect(response.body.conversation_memory_packet?.context_resume_frames?.[0]).toMatchObject({
+      schema: "helix.pasted_text_attachment_resume_frame.v1",
+      attachment_artifact_refs: ["thread:pasted_text_attachment:endpoint-sentinel"],
+      attachment_previews: [`${sentinel}\nThis is compacted pasted text.`],
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
   it("fails closed when a prompt references attached pasted text without a pasted-text artifact", async () => {
     const response = await request(createApp())
       .post("/api/agi/ask/turn")

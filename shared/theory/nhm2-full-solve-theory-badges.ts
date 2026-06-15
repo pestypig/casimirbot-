@@ -22,6 +22,8 @@ const NHM2_COUPLED_CLOSURE_PASS_CANDIDATE =
   `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-coupled-closure-pass-candidate.json`;
 const NHM2_REGIONAL_TENSOR_PASS_PATH_HARNESS =
   `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-regional-tensor-pass-path-harness.json`;
+const NHM2_TRIP_CLOCKING_PROFILE_INDEX =
+  "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-trip-clocking-profile-index-latest.json";
 
 const NHM2_FULL_SOLVE_BOUNDARY: TheoryBadgeClaimBoundaryV1 = {
   diagnosticOnly: true,
@@ -1441,6 +1443,214 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   nhm2FullSolveBadge({
+    id: "nhm2.clock.twin_paradox_trip_clocking",
+    title: "Twin Paradox Trip Clocking Diagnostic",
+    plainMeaning:
+      "Computes one-way and mirrored round-trip ship-clock accumulation from the bounded NHM2 lapse schedule.",
+    whyItMatters:
+      "It gives readers a Twin Paradox clock comparison while keeping speed, route ETA, and physical viability claims blocked.",
+    subjects: ["nhm2", "clocking", "twin_paradox", "proper_time", "lapse"],
+    level: "derived_relation",
+    status: "diagnostic",
+    simulationOwners: ["NHM2"],
+    equationFamilies: ["trip_clocking_diagnostic", "centerline_clocking_target"],
+    tags: ["trip_clocking", "twin_paradox", "analogy_only", "claim_boundary"],
+    equations: [
+      {
+        id: "trip_clocking_one_way_tau",
+        role: "calculator_demo",
+        displayLatex: "\\tau=\\alpha_{centerline}T_{coordinate}",
+        computableExpression: "tau = alpha_centerline*T_coordinate",
+        operatorKind: "scalar_expression",
+        inputSymbols: ["alpha_centerline", "T_coordinate"],
+        outputSymbols: ["tau"],
+      },
+      {
+        id: "trip_clocking_saved_days",
+        role: "calculator_demo",
+        displayLatex:
+          "\\mathrm{savedDays}=(1-\\alpha_{centerline})T_{coordinate}/86400",
+        computableExpression:
+          "saved_days = (1-alpha_centerline)*T_coordinate/86400",
+        operatorKind: "scalar_expression",
+        inputSymbols: ["alpha_centerline", "T_coordinate"],
+        outputSymbols: ["saved_days"],
+      },
+      {
+        id: "trip_clocking_round_trip_saved_days",
+        role: "calculator_demo",
+        displayLatex:
+          "\\mathrm{roundTripSavedDays}=2\\,\\mathrm{savedDays}",
+        computableExpression: "round_trip_saved_days = 2*saved_days",
+        operatorKind: "scalar_expression",
+        inputSymbols: ["saved_days"],
+        outputSymbols: ["round_trip_saved_days"],
+      },
+      {
+        id: "trip_clocking_sr_beta_analogy",
+        role: "calculator_demo",
+        displayLatex:
+          "\\beta_{SR,analogy}=\\sqrt{1-\\alpha_{centerline}^{2}}",
+        computableExpression:
+          "beta_sr_analogy = sqrt(1-alpha_centerline^2)",
+        operatorKind: "scalar_expression",
+        inputSymbols: ["alpha_centerline"],
+        outputSymbols: ["beta_sr_analogy"],
+      },
+    ],
+    units: [
+      { symbol: "alpha_centerline", unit: null, quantity: "centerline_lapse", dimensionSignature: "1" },
+      { symbol: "T_coordinate", unit: "s", quantity: "coordinate_duration", dimensionSignature: "T" },
+      { symbol: "tau", unit: "s", quantity: "ship_proper_time", dimensionSignature: "T" },
+      { symbol: "saved_days", unit: "d", quantity: "ship_younger_by_days", dimensionSignature: "T" },
+      {
+        symbol: "beta_sr_analogy",
+        unit: null,
+        quantity: "sr_equivalent_beta_analogy_only",
+        dimensionSignature: "1",
+      },
+    ],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "This extends the centerline clocking target without replacing it.",
+      "The ordinary Twin Paradox comparison is used only as a clocking analogy.",
+      "The SR-equivalent beta is an analogy for the same clock ratio, not a ship speed.",
+      "Route ETA, max speed, propulsion, physical viability, and lower-alpha promotion remain blocked.",
+    ],
+    calculatorPayloads: [
+      payload({
+        id: "trip_clocking_tau_payload",
+        expression: "tau = alpha_centerline*T_coordinate",
+        displayLatex: "\\tau=\\alpha_{centerline}T_{coordinate}",
+        targetVariable: "tau",
+      }),
+      payload({
+        id: "trip_clocking_saved_days_payload",
+        expression: "saved_days = (1-alpha_centerline)*T_coordinate/86400",
+        displayLatex:
+          "\\mathrm{savedDays}=(1-\\alpha_{centerline})T_{coordinate}/86400",
+        targetVariable: "saved_days",
+      }),
+      payload({
+        id: "trip_clocking_round_trip_saved_days_payload",
+        expression: "round_trip_saved_days = 2*saved_days",
+        displayLatex: "\\mathrm{roundTripSavedDays}=2\\,\\mathrm{savedDays}",
+        targetVariable: "round_trip_saved_days",
+      }),
+      payload({
+        id: "trip_clocking_sr_beta_analogy_payload",
+        expression: "beta_sr_analogy = sqrt(1-alpha_centerline^2)",
+        displayLatex:
+          "\\beta_{SR,analogy}=\\sqrt{1-\\alpha_{centerline}^{2}}",
+        targetVariable: "beta_sr_analogy",
+      }),
+    ],
+    sourceRefs: [
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "twin-paradox-trip-clocking-interpretation",
+        "Twin Paradox clocking interpretation section.",
+      ),
+      artifactRef(
+        "shared/contracts/nhm2-trip-clocking-diagnostic.v1.ts",
+        "nhm2-trip-clocking-diagnostic-contract",
+        "Trip clocking diagnostic contract.",
+      ),
+      artifactRef(
+        NHM2_TRIP_CLOCKING_PROFILE_INDEX,
+        "nhm2-trip-clocking-profile-index-latest",
+        "Profile-scoped 0p995 / 0p7000 trip clocking index.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "clocking", "twin_paradox", "proper_time", "lapse"],
+      symbols: [
+        "alpha_centerline",
+        "T_coordinate",
+        "tau",
+        "saved_days",
+        "round_trip_saved_days",
+        "beta_sr_analogy",
+      ],
+      unitSignatures: ["1", "T"],
+      repoPaths: [
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "shared/contracts/nhm2-trip-clocking-diagnostic.v1.ts",
+        NHM2_TRIP_CLOCKING_PROFILE_INDEX,
+      ],
+      equationFamilies: ["trip_clocking_diagnostic", "centerline_clocking_target"],
+      simulationOwners: ["NHM2"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.clock.trip_clocking_profile_index",
+    title: "Trip Clocking Profile Index",
+    plainMeaning:
+      "Indexes coherent profile-scoped trip clocking diagnostics for the 0p995 anchor and 0p7000 frontier target.",
+    whyItMatters:
+      "It lets the theory graph display both profiles without treating latest aliases as cross-profile evidence.",
+    subjects: ["nhm2", "clocking", "profile_index", "proper_time", "artifact_governance"],
+    level: "diagnostic_gate",
+    status: "diagnostic",
+    simulationOwners: ["NHM2"],
+    equationFamilies: ["trip_clocking_profile_index", "artifact_governance"],
+    tags: ["trip_clocking", "profile_scoped", "latest_alias_boundary", "noncomputable_runtime_reference"],
+    equations: [
+      {
+        id: "trip_clocking_profile_index_gate",
+        role: "noncomputable_reference",
+        displayLatex:
+          "\\mathrm{index}=\\{\\mathrm{profileScopedDiagnostics}\\}\\;\\not\\Rightarrow\\;\\mathrm{routeCertification}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["profileScopedDiagnostics", "profileId", "artifactRefs"],
+        outputSymbols: ["tripClockingProfileIndex"],
+      },
+    ],
+    units: [
+      { symbol: "alpha_centerline", unit: null, quantity: "centerline_lapse", dimensionSignature: "1" },
+      { symbol: "shipProperYears", unit: "yr", quantity: "ship_proper_time", dimensionSignature: "T" },
+      { symbol: "shipYoungerByDays", unit: "d", quantity: "ship_clock_difference", dimensionSignature: "T" },
+    ],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "0p995 remains the canonical white-paper clocking anchor.",
+      "0p7000 can be displayed as a frontier clocking target without profile promotion.",
+      "Each row must come from its own coherent route-time, mission-estimator, and mission-comparison artifacts.",
+      "The profile index is artifact navigation and comparison context, not a calculator formula.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "twin-paradox-trip-clocking-interpretation",
+        "Whitepaper section that keeps trip clocking diagnostic-only.",
+      ),
+      artifactRef(
+        "shared/contracts/nhm2-trip-clocking-profile-index.v1.ts",
+        "nhm2-trip-clocking-profile-index-contract",
+        "Typed profile-scoped trip clocking index contract.",
+      ),
+      artifactRef(
+        NHM2_TRIP_CLOCKING_PROFILE_INDEX,
+        "nhm2-trip-clocking-profile-index-latest",
+        "Generated 0p995 / 0p7000 profile index artifact.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "clocking", "profile_index", "proper_time", "artifact_governance"],
+      symbols: ["profileScopedDiagnostics", "profileId", "alpha_centerline", "shipProperYears", "shipYoungerByDays"],
+      unitSignatures: ["1", "T"],
+      repoPaths: [
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "shared/contracts/nhm2-trip-clocking-profile-index.v1.ts",
+        NHM2_TRIP_CLOCKING_PROFILE_INDEX,
+      ],
+      equationFamilies: ["trip_clocking_profile_index", "artifact_governance"],
+      simulationOwners: ["NHM2"],
+    },
+  }),
+  nhm2FullSolveBadge({
     id: "nhm2.artifact.frozen_reference_run_provenance",
     title: "Frozen Reference-Run Provenance",
     plainMeaning: "Names the run, hash, grid, seed, ledger, and convergence evidence needed to interpret full-solve artifacts.",
@@ -2121,6 +2331,46 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "blocks",
     label: "Centerline clocking targets must not be promoted into route results.",
     claimBoundaryNote: "No speed, ETA, or full-loop pass claim is allowed.",
+  },
+  {
+    id: "centerline_clocking_feeds_twin_paradox_trip_clocking",
+    from: "nhm2.clock.centerline_tau_alpha_T",
+    to: "nhm2.clock.twin_paradox_trip_clocking",
+    relation: "specializes",
+    label:
+      "Twin Paradox trip clocking is a bounded reader-facing extension of the centerline tau=alpha T clocking target.",
+    claimBoundaryNote:
+      "The extension reports clock accumulation only; it does not certify speed or route ETA.",
+  },
+  {
+    id: "twin_paradox_trip_clocking_blocks_route_result_language",
+    from: "nhm2.clock.twin_paradox_trip_clocking",
+    to: "nhm2.claim_boundary.expected_clocking_not_route_result",
+    relation: "blocks",
+    label:
+      "Trip clocking must stay behind the expected-clocking-not-route-result claim boundary.",
+    claimBoundaryNote:
+      "SR beta analogy and coordinate schedule ratio cannot become speed claims.",
+  },
+  {
+    id: "twin_paradox_trip_clocking_documents_profile_index",
+    from: "nhm2.clock.twin_paradox_trip_clocking",
+    to: "nhm2.clock.trip_clocking_profile_index",
+    relation: "documents",
+    label:
+      "The profile index records profile-scoped trip clocking diagnostics behind the Twin Paradox clocking surface.",
+    claimBoundaryNote:
+      "Profile comparison cannot override per-profile coherence or route-result claim locks.",
+  },
+  {
+    id: "trip_clocking_profile_index_blocks_route_result_language",
+    from: "nhm2.clock.trip_clocking_profile_index",
+    to: "nhm2.claim_boundary.expected_clocking_not_route_result",
+    relation: "blocks",
+    label:
+      "The profile index keeps 0p995 and 0p7000 as diagnostic clocking rows rather than route-result rows.",
+    claimBoundaryNote:
+      "Multiple profile rows do not certify speed, route ETA, physical viability, or full-solve closure.",
   },
   {
     id: "qei_worldline_blocks_literature_boundary",

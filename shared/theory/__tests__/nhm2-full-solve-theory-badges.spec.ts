@@ -57,6 +57,8 @@ describe("NHM2 full-solve theory badges", () => {
     expect(ids).toContain("nhm2.natario.curvature_invariants");
     expect(ids).toContain("nhm2.natario.invariant_audit");
     expect(ids).toContain("nhm2.clock.centerline_tau_alpha_T");
+    expect(ids).toContain("nhm2.clock.twin_paradox_trip_clocking");
+    expect(ids).toContain("nhm2.clock.trip_clocking_profile_index");
     expect(ids).toContain("nhm2.artifact.frozen_reference_run_provenance");
   });
 
@@ -100,6 +102,16 @@ describe("NHM2 full-solve theory badges", () => {
           relation: "blocks",
         }),
         expect.objectContaining({
+          from: "nhm2.clock.centerline_tau_alpha_T",
+          to: "nhm2.clock.twin_paradox_trip_clocking",
+          relation: "specializes",
+        }),
+        expect.objectContaining({
+          from: "nhm2.clock.twin_paradox_trip_clocking",
+          to: "nhm2.claim_boundary.expected_clocking_not_route_result",
+          relation: "blocks",
+        }),
+        expect.objectContaining({
           from: "nhm2.qei.worldline_sampling_requirement",
           relation: "blocks",
         }),
@@ -133,6 +145,7 @@ describe("NHM2 full-solve theory badges", () => {
       "nhm2.energy_condition.observer_robust_gate",
       "nhm2.qei.worldline_dossier",
       "nhm2.natario.invariant_audit",
+      "nhm2.clock.trip_clocking_profile_index",
     ];
 
     for (const badgeId of nonScalarIds) {
@@ -154,6 +167,40 @@ describe("NHM2 full-solve theory badges", () => {
         }),
       ]),
     );
+    expect(badge?.claimBoundary.promotionAllowed).toBe(false);
+  });
+
+  it("keeps the trip clocking profile index noncomputable and profile-scoped", () => {
+    const badge = buildNhm2FullSolveTheoryBadgesV1().badges.find(
+      (candidate: TheoryBadgeV1) =>
+        candidate.id === "nhm2.clock.trip_clocking_profile_index",
+    );
+
+    expect(badge?.calculatorPayloads).toEqual([]);
+    expect(JSON.stringify(badge)).toMatch(/0p995/);
+    expect(JSON.stringify(badge)).toMatch(/0p7000/);
+    expect(JSON.stringify(badge)).toMatch(/profile-scoped|profile_scoped/i);
+    expect(badge?.claimBoundary.promotionAllowed).toBe(false);
+  });
+
+  it("keeps the Twin Paradox trip clocking badge calculator-loadable but analogy-only", () => {
+    const badge = buildNhm2FullSolveTheoryBadgesV1().badges.find(
+      (candidate: TheoryBadgeV1) =>
+        candidate.id === "nhm2.clock.twin_paradox_trip_clocking",
+    );
+
+    expect(badge?.calculatorPayloads.map((entry) => entry.expression)).toEqual(
+      expect.arrayContaining([
+        "tau = alpha_centerline*T_coordinate",
+        "saved_days = (1-alpha_centerline)*T_coordinate/86400",
+        "round_trip_saved_days = 2*saved_days",
+        "beta_sr_analogy = sqrt(1-alpha_centerline^2)",
+      ]),
+    );
+    expect(JSON.stringify(badge)).toMatch(/analogy/i);
+    expect(JSON.stringify(badge)).not.toMatch(/\bcertified speed\b/i);
+    expect(JSON.stringify(badge)).not.toMatch(/\btrue ETA\b/i);
+    expect(JSON.stringify(badge)).not.toMatch(/\bphysical warp trip\b/i);
     expect(badge?.claimBoundary.promotionAllowed).toBe(false);
   });
 
@@ -180,6 +227,8 @@ describe("NHM2 full-solve theory badges", () => {
         "nhm2.natario.curvature_invariants",
         "nhm2.natario.invariant_audit",
         "nhm2.energy_condition.observer_robust_gate",
+        "nhm2.clock.twin_paradox_trip_clocking",
+        "nhm2.clock.trip_clocking_profile_index",
         "nhm2.claim_boundary.diagonal_proxy_not_full_tensor",
       ]),
     );
@@ -320,6 +369,26 @@ describe("NHM2 full-solve theory badges", () => {
           from: "nhm2.energy_condition.observer_robust_gate",
           to: "nhm2.claim_boundary.diagnostic_only",
         }),
+        expect.objectContaining({
+          from: "nhm2.clock.centerline_tau_alpha_T",
+          to: "nhm2.clock.twin_paradox_trip_clocking",
+          relation: "specializes",
+        }),
+        expect.objectContaining({
+          from: "nhm2.clock.twin_paradox_trip_clocking",
+          to: "nhm2.claim_boundary.expected_clocking_not_route_result",
+          relation: "blocks",
+        }),
+        expect.objectContaining({
+          from: "nhm2.clock.twin_paradox_trip_clocking",
+          to: "nhm2.clock.trip_clocking_profile_index",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "nhm2.clock.trip_clocking_profile_index",
+          to: "nhm2.claim_boundary.expected_clocking_not_route_result",
+          relation: "blocks",
+        }),
       ]),
     );
   });
@@ -334,5 +403,8 @@ describe("NHM2 full-solve theory badges", () => {
     expect(text).not.toMatch(/\benergy conditions cleared\b/i);
     expect(text).not.toMatch(/\bsource closure solved\b/i);
     expect(text).not.toMatch(/\bexternal paper validates NHM2\b/i);
+    expect(text).not.toMatch(/\bcertified speed\b/i);
+    expect(text).not.toMatch(/\btrue ETA\b/i);
+    expect(text).not.toMatch(/\bphysical warp trip\b/i);
   });
 });

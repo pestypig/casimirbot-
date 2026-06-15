@@ -900,6 +900,79 @@ For `0p5000`, the calculation is:
 
 Expected clocking math says what a row should produce if the same schedule remains frozen and the centerline worldline remains flat at `d tau / dt = alpha`. Validation requires fresh artifacts: selected transport completion, profile coherence, mission coordinate invariance, proper/coordinate ratio closure, decomposition residual closure, lapse-tracked fraction, horizon margin, beta-over-alpha sanity, observer gates, source/provenance gates, and full-loop audit state.
 
+### 6.7 Twin Paradox trip clocking interpretation
+
+The ordinary Twin Paradox is a motion-based special-relativity clock comparison. One twin remains in the Earth frame, the other follows an outbound and return path, and the reunited clocks show less accumulated proper time along the traveler path. In the standard explanation, the traveler changes inertial frames, the simultaneity slice tilts at turnaround, and both twins agree at reunion that the traveler clock accumulated less proper time.
+
+NHM2 uses this only as a clocking analogy. The selected lapse-shift row is a 3+1 same-chart calculation in which the centerline clocking target is controlled by the lapse schedule:
+
+<!-- helix-doc-equation-action/v1 id=nhm2-trip-clocking-tau -->
+\[
+\tau = \alpha_{\rm centerline}T.
+\]
+
+This is not a rocket-velocity law. The shift is a chart-bound local transport descriptor, and the lapse clocking result does not certify ship speed, route ETA, propulsion, physical viability, or a route-map advantage.
+
+For the selected `stage1_centerline_alpha_0p995_v1` clocking anchor:
+
+\[
+T = 137755965.9171795\ {\rm s}
+\]
+
+and
+
+\[
+\alpha_{\rm centerline}=0.995.
+\]
+
+The one-way Alpha Centauri A diagnostic therefore reports:
+
+\[
+\tau = 0.995T = 137067186.0875936\ {\rm s},
+\]
+
+or about `4.365223 yr` coordinate time and `4.343397 yr` ship proper time. The ship clock is younger by:
+
+<!-- helix-doc-equation-action/v1 id=nhm2-trip-clocking-saved-days -->
+\[
+\frac{(1-0.995)T}{86400}\approx 7.971989\ {\rm days}.
+\]
+
+A mirrored round-trip diagnostic simply doubles the same bounded schedule:
+
+<!-- helix-doc-equation-action/v1 id=nhm2-trip-clocking-round-trip -->
+\[
+T_{\rm round}=2T,\qquad \tau_{\rm round}=2\tau,
+\]
+
+giving about `8.730446 yr` coordinate time, `8.686794 yr` ship proper time, and `15.943978 days` less ship-clock accumulation.
+
+It is sometimes useful for reader intuition to compute:
+
+<!-- helix-doc-equation-action/v1 id=nhm2-trip-clocking-sr-beta-analogy -->
+\[
+\beta_{\rm SR,analogy}=\sqrt{1-\alpha_{\rm centerline}^{2}}.
+\]
+
+For `alpha = 0.995`, this gives about `0.099875`. That number is an ordinary-SR clock-ratio analogy only. It is not a ship speed, not the NHM2 shift-vector magnitude, and not a route-dynamics claim. The trip-clocking diagnostic answers only: how much proper time the ship clock accumulates under the bounded lapse schedule.
+
+### 6.8 Profile-scoped trip clocking index
+
+The June trip-clocking patch keeps both the `0p995` anchor and the `0p7000` frontier target, but it separates them into profile-scoped diagnostics. The operative artifact is:
+
+```text
+artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-trip-clocking-profile-index-latest.json
+```
+
+The index points to one coherent route-time worldline, mission-time estimator, and mission-time comparison per profile. It does not allow `latest` aliases from different profiles to be mixed into a single row.
+
+| Profile | Role | One-way coordinate time | One-way ship proper time | Ship-clock difference | Claim status |
+| --- | --- | ---: | ---: | ---: | --- |
+| `stage1_centerline_alpha_0p995_v1` | canonical white-paper anchor | `4.365223 yr` | `4.343397 yr` | `7.971989 days` younger | diagnostic anchor |
+| `stage1_centerline_alpha_0p7000_v1` | frontier clocking target | `4.365223 yr` | `3.055656 yr` | `478.319326 days` younger | not promoted |
+
+This makes the UI and theory badge graph more useful: the calculator can still replay `tau = alpha_centerline T`, while the runtime badge can open the profile index to compare profile-scoped diagnostics. The index does not certify ship speed, route ETA, physical viability, full-solve closure, or lower-alpha promotion.
+
 ## 7. Stability, perturbation, and frontier search
 
 ### 7.1 Gate-admitted selected-profile behavior

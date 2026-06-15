@@ -391,6 +391,127 @@
       "claimBoundaryNotes": [
         "Natario zero-expansion status does not imply invariant audit pass."
       ]
+    },
+    {
+      "equationId": "nhm2-trip-clocking-tau",
+      "label": "Trip clocking proper time",
+      "aliases": [
+        "\\tau=\\alpha_{\\rm centerline}T",
+        "\\tau=\\alpha_{centerline}T_{coordinate}"
+      ],
+      "actions": [
+        {
+          "actionId": "load-trip-clocking-tau-calculator",
+          "kind": "calculator_ingest",
+          "label": "Load trip clocking tau",
+          "calculatorPayloadRef": {
+            "badgeId": "nhm2.clock.twin_paradox_trip_clocking",
+            "payloadId": "trip_clocking_tau_payload"
+          },
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": ["scientific-calculator"],
+          "claimBoundaryNote": "Trip clocking reports ship-clock accumulation only, not route speed or ETA."
+        },
+        {
+          "actionId": "open-trip-clocking-theory-path",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open trip clocking theory path",
+          "badgeIds": [
+            "nhm2.clock.centerline_tau_alpha_T",
+            "nhm2.clock.twin_paradox_trip_clocking",
+            "nhm2.claim_boundary.expected_clocking_not_route_result"
+          ],
+          "preferredBadgeId": "nhm2.clock.twin_paradox_trip_clocking",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "Trip clocking extends tau=alpha T while keeping route, speed, and viability claims blocked."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "The trip clocking tau row is a bounded lapse-schedule diagnostic, not a route result."
+      ]
+    },
+    {
+      "equationId": "nhm2-trip-clocking-saved-days",
+      "label": "Trip clocking saved days",
+      "aliases": [
+        "{\\rm savedDays}=(1-\\alpha_{\\rm centerline})T/86400",
+        "saved_days=(1-alpha_centerline)*T_coordinate/86400"
+      ],
+      "actions": [
+        {
+          "actionId": "load-trip-clocking-saved-days-calculator",
+          "kind": "calculator_ingest",
+          "label": "Load trip clocking saved days",
+          "calculatorPayloadRef": {
+            "badgeId": "nhm2.clock.twin_paradox_trip_clocking",
+            "payloadId": "trip_clocking_saved_days_payload"
+          },
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": ["scientific-calculator"],
+          "claimBoundaryNote": "Saved days are a ship-clock delta under the bounded lapse schedule, not travel-time certification."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Saved-days arithmetic cannot promote lower-alpha rows or certify route ETA."
+      ]
+    },
+    {
+      "equationId": "nhm2-trip-clocking-round-trip",
+      "label": "Mirrored round-trip clocking",
+      "aliases": [
+        "T_{\\rm round}=2T,\\tau_{\\rm round}=2\\tau",
+        "round_trip_saved_days=2*saved_days"
+      ],
+      "actions": [
+        {
+          "actionId": "load-trip-clocking-round-trip-calculator",
+          "kind": "calculator_ingest",
+          "label": "Load mirrored round-trip saved days",
+          "calculatorPayloadRef": {
+            "badgeId": "nhm2.clock.twin_paradox_trip_clocking",
+            "payloadId": "trip_clocking_round_trip_saved_days_payload"
+          },
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": ["scientific-calculator"],
+          "claimBoundaryNote": "The round-trip row mirrors the one-way schedule and is not a route-dynamics model."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Mirrored round-trip clocking assumes the same bounded one-way schedule twice."
+      ]
+    },
+    {
+      "equationId": "nhm2-trip-clocking-sr-beta-analogy",
+      "label": "SR beta clock-ratio analogy",
+      "aliases": [
+        "\\beta_{\\rm SR,analogy}=\\sqrt{1-\\alpha_{\\rm centerline}^{2}}",
+        "beta_sr_analogy=sqrt(1-alpha_centerline^2)"
+      ],
+      "actions": [
+        {
+          "actionId": "load-trip-clocking-sr-beta-analogy-calculator",
+          "kind": "calculator_ingest",
+          "label": "Load SR beta analogy",
+          "calculatorPayloadRef": {
+            "badgeId": "nhm2.clock.twin_paradox_trip_clocking",
+            "payloadId": "trip_clocking_sr_beta_analogy_payload"
+          },
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": ["scientific-calculator"],
+          "claimBoundaryNote": "The SR beta row is an analogy for the same clock ratio, not ship speed."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "SR beta analogy is not NHM2 shift magnitude, route speed, or transport certification."
+      ]
     }
   ]
 }

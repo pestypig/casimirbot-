@@ -1032,14 +1032,18 @@ export function resolveHelixContextResumeFrameRecallText(input: {
   const asksForExactMarker =
     /\b(?:sentinel|marker|exact\s+line|marker\s+line|top\s+line|first\s+line)\b/.test(prompt);
   if (!asksForExactMarker) return null;
+  let fallbackLine: string | null = null;
   for (const frame of [...packet.context_resume_frames].reverse()) {
     for (const preview of frame.attachment_previews) {
       const firstLine = normalizeText(preview.split(/\r?\n/).find((line: string) => line.trim()) ?? "");
       if (!firstLine) continue;
-      const markerToken = firstLine.match(/\b[A-Z][A-Z0-9]+(?:_[A-Z0-9]+){2,}\b/)?.[0] ?? null;
+      fallbackLine ??= firstLine;
+      const markerToken =
+        firstLine.match(/\b[A-Z][A-Z0-9]+(?:_[A-Za-z0-9]+){2,}\b/)?.[0] ??
+        firstLine.match(/\bsentinel\s+(?:token|marker)\s+(?:is|:)\s*([A-Za-z0-9_:-]+)\b/i)?.[1] ??
+        null;
       if (markerToken) return markerToken;
-      return firstLine;
     }
   }
-  return null;
+  return fallbackLine;
 }

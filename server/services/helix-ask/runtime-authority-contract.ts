@@ -209,6 +209,7 @@ const artifactKindMatchesCapability = (
   if (capability === "docs-viewer.summarize_doc") return /doc_summary/i.test(joined);
   if (capability === "docs-viewer.locate_in_doc") return /doc_location_result|doc_location_matches|doc_evidence_location|doc_equation_context|line_backed_locations/i.test(joined);
   if (capability === "docs-viewer.doc_equation_context") return /doc_equation_context|doc_equation_context\/v1/i.test(joined);
+  if (capability === "conversation-memory.recall") return /conversation_memory_packet|helix\.conversation_memory_packet\.v1|context_resume_frame/i.test(joined);
   if (capability.startsWith("scientific-calculator.")) return /calculator_receipt|calculator_result|workstation_tool_evaluation|tool_evaluation/i.test(joined);
   if (capability.startsWith("workstation-notes.")) return /note_update_receipt|workspace_action_receipt|note_/i.test(joined);
   if (capability.startsWith("live_env.")) return /live_environment_tool_observation|live_environment_agent_loop|interpreted_log|minecraft_navigation_state|source_capability|runtime_tool_observation|tool_observation/i.test(joined);
