@@ -40,6 +40,33 @@ import type {
 const threadId = "workspace-os:test-thread";
 const roomId = "workspace-os:test-room";
 
+const envKeys = [
+  "LLM_POLICY",
+  "LLM_RUNTIME",
+  "ENABLE_LLM_LOCAL_SPAWN",
+  "LLM_LOCAL_CMD",
+  "LLM_LOCAL_MODEL",
+  "LLM_LOCAL_MODEL_PATH",
+  "OPENAI_API_KEY",
+  "LLM_HTTP_BASE",
+  "LLM_HYDRATE_LOCAL_ARTIFACTS_IN_HTTP_MODE",
+] as const;
+const originalEnv = new Map<string, string | undefined>();
+for (const key of envKeys) {
+  originalEnv.set(key, process.env[key]);
+}
+
+const restoreEnv = () => {
+  for (const key of envKeys) {
+    const value = originalEnv.get(key);
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+};
+
 const buildApp = () => {
   const app = express();
   app.use("/api/workspace-os", workspaceOsRouter);
@@ -121,9 +148,15 @@ describe("Workspace OS status", () => {
     resetEnvironmentSourceRegistryForTest();
     resetEnvironmentSourceHeartbeatStoreForTest();
     runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
+    restoreEnv();
   });
 
   it("aggregates existing status systems without raw client content", async () => {
+    process.env.LLM_POLICY = "http";
+    process.env.ENABLE_LLM_LOCAL_SPAWN = "1";
+    process.env.LLM_LOCAL_CMD = "C:\\Users\\test\\secret\\llama-cli.exe";
+    process.env.OPENAI_API_KEY = "test-openai-key";
+
     const clipboardWrite = requestClientCapabilityAction({
       thread_id: threadId,
       capability: "clipboard_write",
@@ -225,6 +258,25 @@ describe("Workspace OS status", () => {
         executes_task_control: false,
       }),
     });
+    expect(status.capabilities.find((entry) => entry.capability_id === "runtime.local_ai")).toMatchObject({
+      status: "available",
+      surface: "runtime_memory",
+      mode: "diagnostic",
+      authority: {
+        assistant_answer: false,
+        raw_content_included: false,
+        terminal_eligible: false,
+      },
+      diagnostics: expect.objectContaining({
+        backend: "http",
+        http_runtime_locked: true,
+        local_execution_possible: false,
+        provider_called_by_status_read: false,
+        exposes_raw_model_path: false,
+        exposes_raw_command_path: false,
+        executes_model_call: false,
+      }),
+    });
     expect(status.capabilities.find((entry) => entry.capability_id === "workstation.browser_responsiveness")).toMatchObject({
       status: "available",
       surface: "screen",
@@ -257,6 +309,8 @@ describe("Workspace OS status", () => {
       active_task_count: 0,
     });
     expect(serialized).not.toContain("SECRET_CLIPBOARD_TEXT_SHOULD_NOT_LEAK");
+    expect(serialized).not.toContain("C:\\Users");
+    expect(serialized).not.toContain("test-openai-key");
   });
 
   it("represents workstation deep-link restore as diagnostic shell capability metadata", async () => {

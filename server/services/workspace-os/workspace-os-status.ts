@@ -42,6 +42,8 @@ import { readSituationSourceCapabilities } from "../situation-room/situation-sou
 import { listSourceBindingStatuses } from "../situation-room/source-binding-status-store";
 import { listEnvironmentSourceAvailabilities } from "../situation-room/environment-source-availability-projector";
 import { runtimeMemoryGovernor } from "../runtime/runtime-memory-governor";
+import { resolveLocalLlmRuntimeDiagnostics } from "../llm/local-runtime";
+import { getRuntimeArtifactStatuses } from "../llm/runtime-artifacts";
 
 const DEFAULT_THREAD_ID = "helix-ask:desktop";
 const REDACTED = "[redacted]";
@@ -470,6 +472,62 @@ export async function buildHelixWorkspaceOsStatus(
       browser_storage_sizes_are_client_measured: true,
     },
   }));
+
+  try {
+    const llmRuntime = resolveLocalLlmRuntimeDiagnostics();
+    const localArtifactStatuses = getRuntimeArtifactStatuses().filter((status) =>
+      status.label === "llama-cli" ||
+      status.label === "model" ||
+      status.label === "lora"
+    );
+    capabilities.push(makeRecord({
+      capability_id: "runtime.local_ai",
+      surface: "runtime_memory",
+      mode: "diagnostic",
+      status: llmRuntime.backend === "spawn"
+        ? "available"
+        : llmRuntime.backend === "http"
+          ? "available"
+          : llmRuntime.explicitLocal
+            ? "configured_missing"
+            : "unknown",
+      label: "Local AI runtime route",
+      source: "llm_runtime_policy",
+      last_verified_at: generatedAt,
+      missing_reason: llmRuntime.backend === "none" ? llmRuntime.reason : null,
+      next_required_action: llmRuntime.explicitLocal && llmRuntime.backend === "none"
+        ? "configure_local_spawn_or_http_provider"
+        : null,
+      fallbacks: ["api.helix", "runtime.memory"],
+      diagnostics: {
+        backend: llmRuntime.backend,
+        local_runtime_selected: llmRuntime.localRuntimeSelected,
+        http_runtime_locked: llmRuntime.httpRuntimeLocked,
+        explicit_local: llmRuntime.explicitLocal,
+        explicit_http: llmRuntime.explicitHttp,
+        http_configured: llmRuntime.httpConfigured,
+        local_spawn_enabled: llmRuntime.localSpawnEnabled,
+        local_cmd_configured: llmRuntime.localCmdConfigured,
+        local_model_configured: llmRuntime.localModelConfigured,
+        local_artifact_hydration_allowed: llmRuntime.localArtifactHydrationAllowed,
+        local_execution_possible: llmRuntime.localExecutionPossible,
+        provider_called_by_status_read: llmRuntime.providerCalledByStatusRead,
+        local_artifact_status_count: localArtifactStatuses.length,
+        local_artifact_integrity_states: Array.from(new Set(localArtifactStatuses.map((entry) => entry.provenance.integrityState))),
+        local_artifact_hydration_modes: Array.from(new Set(localArtifactStatuses.map((entry) => entry.provenance.hydrationMode))),
+        exposes_raw_model_path: false,
+        exposes_raw_command_path: false,
+        executes_model_call: false,
+      },
+    }));
+  } catch (error) {
+    capabilities.push(makeErrorRecord({
+      capability_id: "workspace_os.local_ai_runtime.error",
+      surface: "runtime_memory",
+      label: "Local AI runtime status reader",
+      error,
+    }));
+  }
 
   try {
     const actions = readers.listClientCapabilityActions({ threadId });

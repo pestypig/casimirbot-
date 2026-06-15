@@ -13,6 +13,7 @@ import {
 import {
   configureStagePlayLiveSourceWatchJobPolicy,
   enqueueStagePlayLiveSourceMailItem,
+  listStagePlayLiveSourceMailItems,
   resetStagePlayLiveSourceMailboxForTest,
 } from "../services/stage-play/stage-play-live-source-mailbox-store";
 import {
@@ -121,13 +122,14 @@ const seedVisualMail = (summary: string): void => {
   });
 };
 
-const askMailbox = async (question: string) => {
+const askMailbox = async (question: string, extraBody: Record<string, unknown> = {}) => {
   const response = await request(createApp())
     .post("/api/agi/ask/turn")
     .send({
       question,
       sessionId: threadId,
       debug: true,
+      ...extraBody,
     })
     .expect(200);
   const decisionArtifact = response.body?.current_turn_artifact_ledger?.filter((artifact: any) =>
@@ -956,6 +958,67 @@ describe.sequential("Helix Ask live-source mail interpretation routing", () => {
     expect(response.body?.tool_use_restatement?.requiredToolFamilies, debug).not.toContain("internet_search");
     expect(liveEnvironmentToolNames, debug).not.toContain("workspace_os.status");
     expect(liveEnvironmentToolNames, debug).not.toContain("internet-search.search_web");
+  }, 60_000);
+
+  it("materializes processed mailbox evidence before generic missing-args handling for stage_play_mail_wake metadata", async () => {
+    configureStagePlayLiveSourceWatchJobPolicy({
+      threadId,
+      roomId,
+      sourceId,
+      objective: "Watch the active visual source and wake Ask only for salient findings.",
+    });
+    seedVisualMail("The Minecraft player is in a dark area with low visibility and visible hotbar tools.");
+    const latestMail = listStagePlayLiveSourceMailItems({ threadId, roomId, sourceId, limit: 1 }).at(-1);
+    expect(latestMail?.mailId).toMatch(/^stage_play_live_source_mail:/);
+
+    const compactWakePrompt = [
+      "Review the latest Stage Play live-source mailbox finding.",
+      "Current effort: the latest live-source finding.",
+      "Micro-reasoner recommendation: review required.",
+      "Use the structured mailbox route metadata attached to this turn; keep the visible answer concise and evidence-bound.",
+    ].join("\n");
+
+    const { response, liveEnvironmentToolNames, debug } = await askMailbox(compactWakePrompt, {
+      routeMetadata: {
+        invocationKind: "stage_play_mail_wake",
+        wakeRequestId: "stage_play_live_source_mail_wake:metadata-regression",
+        mailboxThreadId: threadId,
+        sourceTarget: "live_source_mailbox",
+        requiredCanonicalGoal: "processed_mail_interpretation",
+        requiredPhase: "read_mailbox",
+        evidenceRefs: [latestMail!.mailId],
+        allowedCapabilities: [],
+        forbiddenCapabilities: [],
+      },
+    });
+
+    expect(response.body?.source_target_intent?.target_source, debug).toBe("live_source_mailbox");
+    expect(response.body?.canonical_goal_frame, debug).toMatchObject({
+      goal_kind: "live_source_processed_mail_interpretation",
+      classifier_reasons: expect.arrayContaining([
+        "stage_play_mail_wake_route_metadata",
+        "live_source_mailbox_intent",
+        "processed_mail_interpretation_goal",
+      ]),
+    });
+    expect(response.body?.planner_contract?.plan_items ?? [], debug).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "request_user_input",
+        }),
+      ]),
+    );
+    expect(response.body?.selected_final_answer, debug).not.toMatch(/The turn stopped before required artifacts were satisfied/i);
+    expect(response.body?.terminal_error_code, debug).not.toBe("missing_required_live_source_mailbox_observation");
+    expect(liveEnvironmentToolNames, debug).toContain("live_env.read_processed_live_source_mail");
+    expect(liveEnvironmentToolNames, debug).toContain("live_env.record_live_source_mail_decision");
+    expect(response.body?.goal_satisfaction_evaluation?.required_evidence ?? [], debug).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "doc_summary",
+        }),
+      ]),
+    );
   }, 60_000);
 
   it("requires a decision receipt when processed mail recommends interpretation", () => {

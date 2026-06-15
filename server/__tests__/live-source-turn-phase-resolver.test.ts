@@ -109,6 +109,35 @@ describe("resolveLiveSourceTurnPhase", () => {
     expect(mandatoryToolForPhase(phase)).toBe("live_env.record_live_source_mail_decision");
   });
 
+  it("forces processed-mail materialization before metadata voice decisions when no packet is attached", () => {
+    const phase = resolveLiveSourceTurnPhase({
+      prompt:
+        "Continuing live-source watch job compact Ask handoff. Micro-reasoner recommendation: request voice callout.",
+      selectedTargetSource: "live_source_mailbox",
+      routeMetadata: {
+        invocationKind: "stage_play_mail_wake",
+        wakeRequestId: "stage_play_live_source_mail_wake:metadata-needs-packet",
+        mailboxThreadId: "helix-ask:desktop",
+        sourceTarget: "live_source_mailbox",
+        requiredCanonicalGoal: "processed_mail_voice_decision",
+        requiredPhase: "record_decision",
+        evidenceRefs: ["stage_play_processed_mail_packet:metadata-needs-packet"],
+        allowedCapabilities: ["live_env.record_live_source_mail_decision"],
+        forbiddenCapabilities: ["workspace_os.status", "visual_capture_describe", "situation_context_pack"],
+      },
+    });
+
+    expect(phase.phase).toBe("read_processed_mail");
+    expect(phase.canonicalGoal).toBe("processed_mail_voice_decision");
+    expect(phase.allowedTools).toEqual(["live_env.read_processed_live_source_mail"]);
+    expect(phase.nextPhase).toBe("record_decision");
+    expect(phase.phaseLock).toMatchObject({
+      locked: true,
+      reason: "Stage Play mail wake route metadata is authoritative, but decision routing requires materialized processed mailbox evidence.",
+    });
+    expect(mandatoryToolForPhase(phase)).toBe("live_env.read_processed_live_source_mail");
+  });
+
   it("exposes mandatory tools only for locked executable live-source phases", () => {
     const executable = resolveLiveSourceTurnPhase({
       prompt: "Use the structured mailbox route metadata attached to this turn.",

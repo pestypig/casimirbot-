@@ -1,10 +1,10 @@
 import { type ToolHandler, type ToolSpecShape } from "@shared/skills";
 import { beginLlMJob } from "../services/hardware/gpu-scheduler";
-import { isHttpRuntimeLocked, isLocalRuntime } from "../services/llm/local-runtime";
+import { resolveLlmLocalBackend, type LocalLlmBackend } from "../services/llm/local-runtime";
+
+export { resolveLlmLocalBackend, type LocalLlmBackend };
 
 const DEFAULT_LLM_LOCAL_RPM = Math.max(1, Number(process.env.LLM_LOCAL_RPM ?? 60));
-
-export type LocalLlmBackend = "spawn" | "http" | "none";
 
 const attachLlmBridgeMeta = (
   payload: unknown,
@@ -23,40 +23,6 @@ const attachLlmBridgeMeta = (
     __llm_provider_called: meta.providerCalled,
     ...(meta.stub ? { __llm_stub: true } : {}),
   };
-};
-
-/**
- * Deterministic routing order for Helix Ask local tool bridge:
- * 1) explicit local mode (LLM_POLICY=local or local runtime) => spawn
- * 2) explicit HTTP mode (LLM_POLICY=http or runtime http/openai) => HTTP only (fail-closed if missing base)
- * 3) default preference: HTTP when configured
- * 4) no backend
- */
-export const resolveLlmLocalBackend = (): LocalLlmBackend => {
-  const runtime = (process.env.LLM_RUNTIME ?? "").trim().toLowerCase();
-  const policy = (process.env.LLM_POLICY ?? "").trim().toLowerCase();
-  const allowDefaultOpenAiBase =
-    String(process.env.LLM_HTTP_ALLOW_DEFAULT_OPENAI_BASE ?? "1").trim() !== "0";
-  const hasHttpBase = Boolean(process.env.LLM_HTTP_BASE?.trim());
-  const hasHttpKey = Boolean(process.env.OPENAI_API_KEY?.trim());
-  const hasHttp = hasHttpBase || (allowDefaultOpenAiBase && hasHttpKey);
-  const explicitLocal = policy === "local" || runtime === "local" || runtime === "llama.cpp" || runtime === "replit";
-  const explicitHttp = isHttpRuntimeLocked();
-  const spawnAvailable =
-    process.env.ENABLE_LLM_LOCAL_SPAWN === "1" ||
-    Boolean(process.env.LLM_LOCAL_CMD?.trim());
-
-  if (explicitLocal && spawnAvailable) {
-    return "spawn";
-  }
-  if (explicitHttp) {
-    return hasHttp ? "http" : "none";
-  }
-
-  if (hasHttp) {
-    return "http";
-  }
-  return "none";
 };
 
 export const llmLocalSpec: ToolSpecShape = {

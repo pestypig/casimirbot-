@@ -637,6 +637,22 @@ export const resolveLiveSourceTurnPhase = (
       routeMetadataPhase === "record_decision" ||
       routeMetadataCanonicalGoal === "processed_mail_voice_decision"
     ) {
+      if (!latestPacket) {
+        return makeResolution({
+          phase: "read_processed_mail",
+          reason: "Stage Play mail wake metadata requests a mailbox decision, but no processed packet is materialized in this turn yet; read processed mail first.",
+          canonicalGoal: routeMetadataCanonicalGoal ?? "processed_mail_voice_decision",
+          allowedTools: ["live_env.read_processed_live_source_mail"],
+          fallbackTools: ["live_env.process_live_source_mail"],
+          forbiddenTools: ["live_env.request_interim_voice_callout", "final_answer"],
+          requiredEvidence: ["stage_play_processed_mail_packet"],
+          completionEvidence: ["stage_play_processed_mail_packet"],
+          nextPhase: "record_decision",
+          locked: true,
+          lockReason: "Stage Play mail wake route metadata is authoritative, but decision routing requires materialized processed mailbox evidence.",
+          evidenceRefs,
+        });
+      }
       return makeResolution({
         phase: "record_decision",
         reason: "Stage Play mail wake metadata requires a live-source mailbox voice decision; prompt phrasing cannot downgrade this to read/process/status.",

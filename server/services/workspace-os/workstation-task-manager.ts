@@ -12,6 +12,8 @@ import {
   type HelixWorkstationCommandReliabilityStatus,
 } from "@shared/helix-workstation-task-manager";
 import { runtimeMemoryGovernor } from "../runtime/runtime-memory-governor";
+import { resolveLocalLlmRuntimeDiagnostics } from "../llm/local-runtime";
+import { getRuntimeArtifactStatuses } from "../llm/runtime-artifacts";
 import {
   getHelixWorkstationCommandReliabilityStatus,
   getLatestHelixWorkstationBrowserPerformanceSample,
@@ -250,6 +252,61 @@ const buildErrorProcess = (error: unknown, generatedAt: string): HelixWorkstatio
     },
   });
 
+const buildLocalAiRuntimeProcess = (generatedAt: string): HelixWorkstationTaskManagerProcess => {
+  const diagnostics = resolveLocalLlmRuntimeDiagnostics();
+  const artifactStatuses = getRuntimeArtifactStatuses();
+  const localArtifactStatuses = artifactStatuses.filter((status) =>
+    status.label === "llama-cli" ||
+    status.label === "model" ||
+    status.label === "lora"
+  );
+  const status: HelixWorkstationTaskManagerProcessStatus =
+    diagnostics.backend === "spawn"
+      ? "active"
+      : diagnostics.backend === "http"
+        ? "idle"
+        : diagnostics.explicitLocal
+          ? "blocked"
+          : "idle";
+
+  return withHelixWorkstationTaskManagerAuthority({
+    process_id: "runtime.local_ai",
+    label: "Local AI runtime",
+    kind: "workspace_os",
+    status,
+    source: "llm_runtime_policy",
+    updated_at: generatedAt,
+    memory: {
+      source: "workspace_os_status",
+      approximate: true,
+      observed: false,
+      estimate_mib: null,
+      pressure: status === "blocked" ? "blocked" : "normal",
+    },
+    diagnostics: {
+      backend: diagnostics.backend,
+      local_runtime_selected: diagnostics.localRuntimeSelected,
+      http_runtime_locked: diagnostics.httpRuntimeLocked,
+      explicit_local: diagnostics.explicitLocal,
+      explicit_http: diagnostics.explicitHttp,
+      http_configured: diagnostics.httpConfigured,
+      local_spawn_enabled: diagnostics.localSpawnEnabled,
+      local_cmd_configured: diagnostics.localCmdConfigured,
+      local_model_configured: diagnostics.localModelConfigured,
+      local_artifact_hydration_allowed: diagnostics.localArtifactHydrationAllowed,
+      local_execution_possible: diagnostics.localExecutionPossible,
+      provider_called_by_status_read: diagnostics.providerCalledByStatusRead,
+      local_artifact_status_count: localArtifactStatuses.length,
+      local_artifact_integrity_states: Array.from(new Set(localArtifactStatuses.map((entry) => entry.provenance.integrityState))),
+      local_artifact_hydration_modes: Array.from(new Set(localArtifactStatuses.map((entry) => entry.provenance.hydrationMode))),
+      reason: diagnostics.reason,
+      exposes_raw_model_path: false,
+      exposes_raw_command_path: false,
+      executes_model_call: false,
+    },
+  });
+};
+
 const buildBrowserFrameProcess = (
   sample: HelixWorkstationBrowserPerformanceSample,
 ): HelixWorkstationTaskManagerProcess =>
@@ -427,6 +484,7 @@ export async function buildHelixWorkstationTaskManagerSnapshot(
     const taskSnapshot = readers.getRuntimeTaskSnapshot();
     pressureLevel = taskSnapshot.pressureLevel;
     processes.push(buildServerRuntimeProcess(memorySnapshot, taskSnapshot, generatedAt));
+    processes.push(buildLocalAiRuntimeProcess(generatedAt));
     processes.push(...buildTaskClassProcesses(taskSnapshot, generatedAt));
     processes.push(...buildActiveTaskProcesses(taskSnapshot, generatedAt));
   } catch (error) {

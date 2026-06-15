@@ -8,6 +8,25 @@ type LocalRuntimeCaps = {
   claimTier: "diagnostic" | "reduced-order" | "certified";
 };
 
+export type LocalLlmBackend = "spawn" | "http" | "none";
+
+export type LocalLlmRuntimeDiagnostics = {
+  backend: LocalLlmBackend;
+  localRuntimeSelected: boolean;
+  httpRuntimeLocked: boolean;
+  explicitLocal: boolean;
+  explicitHttp: boolean;
+  httpConfigured: boolean;
+  defaultOpenAiBaseAllowed: boolean;
+  localSpawnEnabled: boolean;
+  localCmdConfigured: boolean;
+  localModelConfigured: boolean;
+  localArtifactHydrationAllowed: boolean;
+  localExecutionPossible: boolean;
+  providerCalledByStatusRead: false;
+  reason: string;
+};
+
 const LOCAL_CONTEXT_MIN = 2048;
 const LOCAL_CONTEXT_MAX = 8192;
 const DEFAULT_CONTEXT_TOKENS = 4096;
@@ -39,6 +58,7 @@ const normalizeLower = (value: string | undefined): string => (value ?? "").trim
 export const isHttpRuntimeLocked = (): boolean => {
   const policy = normalizeLower(process.env.LLM_POLICY);
   if (policy === "http") return true;
+  if (policy === "local") return false;
   const runtime = normalizeLower(process.env.LLM_RUNTIME);
   return runtime === "http" || runtime === "openai";
 };
@@ -52,6 +72,65 @@ export const isLocalRuntime = (): boolean => {
   if (runtime === "http" || runtime === "openai") return false;
   return false;
 };
+
+export const resolveLocalLlmRuntimeDiagnostics = (): LocalLlmRuntimeDiagnostics => {
+  const policy = normalizeLower(process.env.LLM_POLICY);
+  const runtime = normalizeLower(process.env.LLM_RUNTIME);
+  const defaultOpenAiBaseAllowed =
+    String(process.env.LLM_HTTP_ALLOW_DEFAULT_OPENAI_BASE ?? "1").trim() !== "0";
+  const httpConfigured =
+    Boolean(process.env.LLM_HTTP_BASE?.trim()) ||
+    (defaultOpenAiBaseAllowed && Boolean(process.env.OPENAI_API_KEY?.trim()));
+  const explicitLocal = isLocalRuntime();
+  const httpRuntimeLocked = isHttpRuntimeLocked();
+  const explicitHttp = httpRuntimeLocked;
+  const localSpawnEnabled = process.env.ENABLE_LLM_LOCAL_SPAWN === "1";
+  const localCmdConfigured = Boolean(process.env.LLM_LOCAL_CMD?.trim());
+  const localModelConfigured =
+    Boolean(process.env.LLM_LOCAL_MODEL_PATH?.trim()) ||
+    Boolean(process.env.LLM_LOCAL_MODEL?.trim());
+  const spawnAvailable = localSpawnEnabled || localCmdConfigured;
+  const backend: LocalLlmBackend =
+    explicitLocal && spawnAvailable
+      ? "spawn"
+      : httpRuntimeLocked
+        ? (httpConfigured ? "http" : "none")
+        : httpConfigured
+          ? "http"
+          : "none";
+  const localArtifactHydrationAllowed =
+    !httpRuntimeLocked || process.env.LLM_HYDRATE_LOCAL_ARTIFACTS_IN_HTTP_MODE === "1";
+  const reason =
+    backend === "spawn"
+      ? "explicit_local_runtime_with_spawn_available"
+      : backend === "http" && httpRuntimeLocked
+        ? "explicit_http_runtime_locked"
+        : backend === "http"
+          ? "http_provider_configured"
+          : explicitLocal
+            ? "local_runtime_selected_but_spawn_unavailable"
+            : "no_llm_backend_configured";
+
+  return {
+    backend,
+    localRuntimeSelected: isLocalRuntime(),
+    httpRuntimeLocked,
+    explicitLocal,
+    explicitHttp,
+    httpConfigured,
+    defaultOpenAiBaseAllowed,
+    localSpawnEnabled,
+    localCmdConfigured,
+    localModelConfigured,
+    localArtifactHydrationAllowed,
+    localExecutionPossible: backend === "spawn",
+    providerCalledByStatusRead: false,
+    reason,
+  };
+};
+
+export const resolveLlmLocalBackend = (): LocalLlmBackend =>
+  resolveLocalLlmRuntimeDiagnostics().backend;
 
 export const resolveLocalContextTokens = (): number => {
   const raw =
