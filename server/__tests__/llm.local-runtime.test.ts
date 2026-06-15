@@ -27,4 +27,10 @@ describe("llm local runtime policy lock", () => {
     expect(isLocalRuntime()).toBe(false);
     expect(isHttpRuntimeLocked()).toBe(true);
   });
+
+  it("does not treat local spawn availability as local runtime selection", () => {
+    process.env.ENABLE_LLM_LOCAL_SPAWN = "1";
+    expect(isLocalRuntime()).toBe(false);
+    expect(isHttpRuntimeLocked()).toBe(false);
+  });
 });

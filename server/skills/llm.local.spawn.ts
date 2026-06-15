@@ -245,10 +245,6 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
   let spawnDiagLogged = false;
   let triedStopFlagFallback = false;
   let triedStoplessFallback = false;
-  const hasRequestedStopSequences = Boolean(
-    (Array.isArray(parsed.stop) && parsed.stop.filter(Boolean).length > 0) ||
-      (typeof parsed.stop === "string" && parsed.stop.trim()),
-  );
   const attempt = async (spawnArgs: string[]): Promise<boolean> => {
     try {
       timedOut = false;
@@ -302,7 +298,6 @@ export const llmLocalSpawnHandler: ToolHandler = async (rawInput, ctx): Promise<
     const stopFlagFallback =
       stopFlag === "--stop" ? "--reverse-prompt" : "--stop";
     const stopFlagInvalid =
-      hasRequestedStopSequences &&
       stopFlag &&
       !triedStopFlagFallback &&
       isUnsupportedStopFlagError(message, stopFlag);
@@ -925,7 +920,15 @@ function sanitizeBaseArgs(baseArgs: string[]): string[] {
   }
   const sanitized: string[] = [];
   let skipNext = false;
-  const skipFlags = new Set(["--ctx-size", "-c", "--n-gpu-layers", "-ngl"]);
+  const skipFlags = new Set([
+    "--ctx-size",
+    "-c",
+    "--n-gpu-layers",
+    "-ngl",
+    "--stop",
+    "--reverse-prompt",
+    "-r",
+  ]);
   for (const token of baseArgs) {
     if (skipNext) {
       skipNext = false;
@@ -939,7 +942,10 @@ function sanitizeBaseArgs(baseArgs: string[]): string[] {
       token.startsWith("--ctx-size=") ||
       token.startsWith("-c=") ||
       token.startsWith("--n-gpu-layers=") ||
-      token.startsWith("-ngl=")
+      token.startsWith("-ngl=") ||
+      token.startsWith("--stop=") ||
+      token.startsWith("--reverse-prompt=") ||
+      token.startsWith("-r=")
     ) {
       continue;
     }

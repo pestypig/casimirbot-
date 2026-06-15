@@ -47,15 +47,40 @@ export type HelixUnresolvedTaskFrame = {
 export type HelixContextResumeFrame = {
   id: string;
   schema: "helix.pasted_text_attachment_resume_frame.v1";
+  thread_id?: string | null;
+  session_id?: string | null;
   source_request_id: string;
   source_turn_id: string;
+  source_message_id?: string | null;
   original_prompt: string;
+  pasted_attachment_id?: string | null;
+  pasted_attachment_sha256?: string | null;
+  context_compaction_job_id?: string | null;
+  created_at_ms?: number | null;
+  installed_at_ms?: number | null;
+  status?: "pending" | "installed" | "failed";
+  supersedes_resume_frame_ids?: string[];
   attachment_artifact_refs: string[];
   attachment_previews: string[];
   turn_input_item_count: number;
   terminal_eligible: false;
   assistant_answer: false;
   raw_content_included: false;
+};
+
+export type HelixContextResumeFrameSelectionDebug = {
+  selected_context_resume_frame_id?: string | null;
+  selected_context_resume_source_turn_id?: string | null;
+  selected_context_resume_reason: string;
+  current_thread_id?: string | null;
+  current_session_id?: string | null;
+  candidate_context_resume_frame_ids: string[];
+  rejected_context_resume_frames: Array<{
+    frame_id: string;
+    source_turn_id?: string | null;
+    status?: string | null;
+    reason: string;
+  }>;
 };
 
 export type HelixConversationMemoryAllowedUse =
@@ -87,6 +112,7 @@ export type HelixConversationMemoryPacket = {
   pending_user_inputs: string[];
   unresolved_task_frames: HelixUnresolvedTaskFrame[];
   context_resume_frames: HelixContextResumeFrame[];
+  context_resume_frame_selection?: HelixContextResumeFrameSelectionDebug | null;
 
   latest_plan_summary?: string | null;
   latest_answer_summary?: string | null;

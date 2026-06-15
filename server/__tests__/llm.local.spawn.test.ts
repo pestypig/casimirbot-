@@ -38,4 +38,38 @@ describe("llm.local.spawn", () => {
     expect(withoutStops).not.toContain("</s>");
     expect(withoutStops).not.toContain("<|end|>");
   });
+
+  it("strips stop sequences from base llama args so the adapter controls fallback", () => {
+    const args = buildArgs(
+      [
+        "--stop",
+        "</s>",
+        "--reverse-prompt",
+        "<|end|>",
+        "-r",
+        "DONE",
+        "--stop=LEGACY",
+        "--reverse-prompt=ALT",
+        "-r=SHORT",
+        "--ctx-size",
+        "4096",
+      ],
+      {
+        ...baseSpawnOptions,
+      },
+    );
+
+    expect(args).not.toContain("--stop");
+    expect(args).not.toContain("</s>");
+    expect(args).not.toContain("--reverse-prompt");
+    expect(args).not.toContain("<|end|>");
+    expect(args).not.toContain("-r");
+    expect(args).not.toContain("DONE");
+    expect(args).not.toContain("--stop=LEGACY");
+    expect(args).not.toContain("--reverse-prompt=ALT");
+    expect(args).not.toContain("-r=SHORT");
+    expect(args).not.toContain("4096");
+    expect(args).toContain("--ctx-size");
+    expect(args).toContain(String(baseSpawnOptions.contextTokens));
+  });
 });

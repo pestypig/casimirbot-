@@ -30,11 +30,23 @@ describe("llm.local bridge routing", () => {
     expect(resolveLlmLocalBackend()).toBe("http");
   });
 
+  it("prefers OpenAI HTTP when only an OpenAI API key and local spawn are configured", () => {
+    process.env.ENABLE_LLM_LOCAL_SPAWN = "1";
+    process.env.OPENAI_API_KEY = "test-key";
+    expect(resolveLlmLocalBackend()).toBe("http");
+  });
+
   it("respects explicit local runtime override when spawn is available", () => {
     process.env.LLM_RUNTIME = "local";
     process.env.ENABLE_LLM_LOCAL_SPAWN = "1";
     process.env.LLM_HTTP_BASE = "http://127.0.0.1:11434";
     expect(resolveLlmLocalBackend()).toBe("spawn");
+  });
+
+  it("does not select spawn from availability alone when HTTP is not configured", () => {
+    process.env.ENABLE_LLM_LOCAL_SPAWN = "1";
+    process.env.LLM_LOCAL_CMD = "./llama";
+    expect(resolveLlmLocalBackend()).toBe("none");
   });
 
   it("does not fall back to spawn when runtime is explicitly http and base is missing", () => {

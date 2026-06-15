@@ -50,7 +50,7 @@ export const isLocalRuntime = (): boolean => {
   const runtime = normalizeLower(process.env.LLM_RUNTIME);
   if (runtime === "local" || runtime === "llama.cpp" || runtime === "replit") return true;
   if (runtime === "http" || runtime === "openai") return false;
-  return process.env.ENABLE_LLM_LOCAL_SPAWN === "1";
+  return false;
 };
 
 export const resolveLocalContextTokens = (): number => {

@@ -4,6 +4,7 @@ import {
   type HelixConversationMemoryPacket,
   type HelixConversationMemoryReference,
   type HelixContextResumeFrame,
+  type HelixContextResumeFrameSelectionDebug,
   type HelixUnresolvedTaskFrame,
 } from "../../../shared/helix-conversation-memory-packet";
 import {
@@ -323,6 +324,14 @@ const readStringArray = (value: unknown, limit = 16): string[] => {
   return unique(value.map((entry) => normalizeText(entry)).filter(Boolean), limit);
 };
 
+const readTimestampMs = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) return Math.max(0, Math.floor(value));
+  const text = normalizeText(value);
+  if (!text) return null;
+  const parsed = Date.parse(text);
+  return Number.isFinite(parsed) ? Math.max(0, parsed) : null;
+};
+
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -462,9 +471,28 @@ const coerceContextResumeFrame = (
   return {
     id: `context_resume:${request.request_id}`,
     schema: "helix.pasted_text_attachment_resume_frame.v1",
+    thread_id: request.thread_id,
+    session_id: request.session_id ?? null,
     source_request_id: request.request_id,
-    source_turn_id: request.turn_id,
+    source_turn_id: readString(resumeFrame.source_turn_id) ?? request.turn_id,
+    source_message_id: readString(resumeFrame.source_message_id),
     original_prompt: readString(resumeFrame.original_prompt) ?? requestSummary(request),
+    pasted_attachment_id: readString(resumeFrame.pasted_attachment_id),
+    pasted_attachment_sha256:
+      readString(resumeFrame.pasted_attachment_sha256) ??
+      readString(resumeFrame.attachment_sha256) ??
+      readString(resumeFrame.sha256),
+    context_compaction_job_id: readString(resumeFrame.context_compaction_job_id),
+    created_at_ms: readTimestampMs(resumeFrame.created_at_ms) ?? readTimestampMs(request.created_at),
+    installed_at_ms:
+      readTimestampMs(resumeFrame.installed_at_ms) ??
+      readTimestampMs(resumeFrame.created_at_ms) ??
+      readTimestampMs(request.created_at),
+    status:
+      resumeFrame.status === "pending" || resumeFrame.status === "failed" || resumeFrame.status === "installed"
+        ? resumeFrame.status
+        : "installed",
+    supersedes_resume_frame_ids: readStringArray(resumeFrame.supersedes_resume_frame_ids),
     attachment_artifact_refs: readStringArray(resumeFrame.attachment_artifact_refs, 12),
     attachment_previews: attachmentPreviews,
     turn_input_item_count: turnInputItems.length,

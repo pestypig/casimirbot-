@@ -408,6 +408,100 @@ describe("helix ask turn input integrity audit", () => {
     });
   });
 
+  it("routes attached pasted memo marker follow-ups through selected conversation-memory evidence", async () => {
+    const marker = "HELIX_MEMO_PATCH_BROWSER_RUN_20260615_D";
+    const threadId = "test:turn-input-integrity:ledger-memo-resume-frame";
+    appendHelixThreadServerRequestEvent({
+      thread_id: threadId,
+      route: "/ask",
+      event_type: "server_request_created",
+      turn_id: "turn-pause-ledger-memo-resume-frame",
+      session_id: threadId,
+      trace_id: "turn-pause-ledger-memo-resume-frame",
+      turn_kind: "ask",
+      request_id: "turn-pause-ledger-memo-resume-frame:context_compaction:pause",
+      request_kind: "request_user_input",
+      item_status: "in_progress",
+      request_payload: {
+        schema: "helix.pending_server_request.v1",
+        request_id: "turn-pause-ledger-memo-resume-frame:context_compaction:pause",
+        kind: "context_compaction_pause",
+        prompt: "Context is compacting before the next Ask turn.",
+        reason: "active_context_page_file_compaction",
+        resume_frame: {
+          schema: "helix.pasted_text_attachment_resume_frame.v1",
+          original_prompt: "Use the attached pasted memo.",
+          attachment_artifact_refs: ["thread:pasted_text_attachment:memo-marker"],
+          turn_input_items: [
+            { type: "text", text: "Use the attached pasted memo.", source: "user" },
+            {
+              type: "attachment",
+              attachment_id: "pasted-memo-marker",
+              attachment_kind: "text",
+              file_name: "pasted-memo-marker.txt",
+              mime_type: "text/plain",
+              size_bytes: 1024,
+              preview: `${marker}\nThis is compacted pasted memo content.`,
+              raw_content_included: true,
+              raw_content_scope: "turn_input_only",
+              assistant_answer: false,
+            },
+          ],
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+    });
+
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        thread_id: threadId,
+        session_id: threadId,
+        turn_id: "turn-followup-ledger-memo-resume-frame",
+        question: "What exact marker appears in the attached pasted memo? Answer with only the marker.",
+        debug: true,
+      })
+      .expect(200);
+
+    expect(response.body.route_reason_code).toBe("conversation_memory_recall");
+    expect(response.body.answer).toBe(marker);
+    expect(response.body.final_answer_source).toBe("conversation_memory_recall_answer");
+    expect(response.body.source_target_intent).toMatchObject({
+      target_source: "conversation_memory",
+      target_kind: "conversation_memory",
+      strength: "hard",
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+    });
+    expect(response.body.selected_evidence_pack).toMatchObject({
+      selected_memory_refs: ["turn-followup-ledger-memo-resume-frame:conversation_memory_packet"],
+      conversation_memory_refs: ["turn-followup-ledger-memo-resume-frame:conversation_memory_packet"],
+      deterministic_content_role: "evidence_not_assistant_answer",
+    });
+    expect(response.body.conversation_memory_packet).toMatchObject({
+      allowed_for_current_goal: true,
+      allowed_use: "reuse_prior_evidence_refs",
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(response.body.conversation_memory_packet?.context_resume_frames?.[0]).toMatchObject({
+      schema: "helix.pasted_text_attachment_resume_frame.v1",
+      source_request_id: "turn-pause-ledger-memo-resume-frame:context_compaction:pause",
+      attachment_artifact_refs: ["thread:pasted_text_attachment:memo-marker"],
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(response.body.goal_satisfaction_evaluation?.next_decision).toBe("allow_terminal");
+    expect(response.body.terminal_answer_authority?.server_authoritative).toBe(true);
+  });
+
   it("admits stream conversation-memory resume intent without requiring an echoed frame", async () => {
     const sentinel = "HELIX_PASTED_TEXT_RESUME_SENTINEL_STREAM_LEDGER";
     const threadId = "test:turn-input-integrity:stream-ledger-resume-frame";

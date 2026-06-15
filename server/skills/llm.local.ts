@@ -30,8 +30,7 @@ const attachLlmBridgeMeta = (
  * 1) explicit local mode (LLM_POLICY=local or local runtime) => spawn
  * 2) explicit HTTP mode (LLM_POLICY=http or runtime http/openai) => HTTP only (fail-closed if missing base)
  * 3) default preference: HTTP when configured
- * 4) fallback to spawn runtime (explicit enable or local command)
- * 5) no backend
+ * 4) no backend
  */
 export const resolveLlmLocalBackend = (): LocalLlmBackend => {
   const runtime = (process.env.LLM_RUNTIME ?? "").trim().toLowerCase();
@@ -41,14 +40,13 @@ export const resolveLlmLocalBackend = (): LocalLlmBackend => {
   const hasHttpBase = Boolean(process.env.LLM_HTTP_BASE?.trim());
   const hasHttpKey = Boolean(process.env.OPENAI_API_KEY?.trim());
   const hasHttp = hasHttpBase || (allowDefaultOpenAiBase && hasHttpKey);
-  const useSpawn =
-    process.env.ENABLE_LLM_LOCAL_SPAWN === "1" ||
-    isLocalRuntime() ||
-    Boolean(process.env.LLM_LOCAL_CMD?.trim());
   const explicitLocal = policy === "local" || runtime === "local" || runtime === "llama.cpp" || runtime === "replit";
   const explicitHttp = isHttpRuntimeLocked();
+  const spawnAvailable =
+    process.env.ENABLE_LLM_LOCAL_SPAWN === "1" ||
+    Boolean(process.env.LLM_LOCAL_CMD?.trim());
 
-  if (explicitLocal && useSpawn) {
+  if (explicitLocal && spawnAvailable) {
     return "spawn";
   }
   if (explicitHttp) {
@@ -57,9 +55,6 @@ export const resolveLlmLocalBackend = (): LocalLlmBackend => {
 
   if (hasHttp) {
     return "http";
-  }
-  if (useSpawn) {
-    return "spawn";
   }
   return "none";
 };
