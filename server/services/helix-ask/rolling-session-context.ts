@@ -2,6 +2,7 @@ import {
   HELIX_ROLLING_SESSION_CONTEXT_PACKET_SCHEMA,
   type HelixRollingSessionContextPacket,
   type HelixContextFidelityMeter,
+  type HelixContextCompactionLifecycleItem,
   type HelixRollingSessionCompactionMode,
 } from "../../../shared/helix-rolling-session-context";
 import type { HelixTurnAttachmentArtifact } from "../../../shared/helix-multimodal-turn-context";
@@ -144,6 +145,38 @@ const buildContextFidelityMeter = (args: {
   };
 };
 
+const buildContextCompactionLifecycleItem = (args: {
+  contextWindow: number;
+  autoCompactTokenLimit: number;
+  activeContextTotal: number;
+  compactionMode: HelixRollingSessionCompactionMode;
+  reason: string;
+  replacementContextSummary: string;
+}): HelixContextCompactionLifecycleItem => ({
+  schema: "helix.context_compaction_lifecycle_item.v1",
+  item_type: "context_compaction",
+  trigger: "auto",
+  phase: "pre_turn",
+  status:
+    args.compactionMode === "required"
+      ? "paused_for_resume"
+      : args.compactionMode === "recommended"
+        ? "recommended"
+        : "not_required",
+  reason: args.reason,
+  model_context_window_tokens: args.contextWindow,
+  active_context_total_tokens: args.activeContextTotal,
+  auto_compact_token_limit: args.autoCompactTokenLimit,
+  replacement_context_summary: clip(args.replacementContextSummary, summaryLimit() * 2),
+  replacement_history_available: args.compactionMode !== "none" && Boolean(args.replacementContextSummary.trim()),
+  resume_frame_required: args.compactionMode === "required",
+  codex_parity_note:
+    "Codex parity shape: this is a non-terminal context-compaction lifecycle item; it is evidence for context handoff, not answer authority.",
+  assistant_answer: false,
+  terminal_eligible: false,
+  raw_content_included: false,
+});
+
 const rememberRollingSessionContextPacket = (packet: HelixRollingSessionContextPacket): void => {
   if (packet.thread_id) latestRollingSessionContextByThread.set(packet.thread_id, packet);
   if (packet.session_id) latestRollingSessionContextBySession.set(packet.session_id, packet);
@@ -249,6 +282,14 @@ const emptyPacket = (args: {
       modelVisibleContextTokenEstimate: promptTokens + attachmentTokens,
       reason: args.reason,
     }),
+    context_compaction_item: buildContextCompactionLifecycleItem({
+      contextWindow: args.modelContextWindowTokens,
+      autoCompactTokenLimit: autoLimit,
+      activeContextTotal: promptTokens + attachmentTokens,
+      compactionMode: "none",
+      reason: args.reason,
+      replacementContextSummary: "",
+    }),
     retained_turn_ids: [],
     compacted_turn_ids: [],
     dropped_turn_ids: [],
@@ -349,6 +390,14 @@ export function buildHelixRollingSessionContextPacket(
     modelVisibleContextTokenEstimate: modelVisibleContextTokens,
     reason: compactionReason,
   });
+  const contextCompactionItem = buildContextCompactionLifecycleItem({
+    contextWindow,
+    autoCompactTokenLimit: autoLimit,
+    activeContextTotal,
+    compactionMode,
+    reason: compactionReason,
+    replacementContextSummary: modelVisibleSummary,
+  });
 
   const packet: HelixRollingSessionContextPacket = {
     schema: HELIX_ROLLING_SESSION_CONTEXT_PACKET_SCHEMA,
@@ -372,6 +421,7 @@ export function buildHelixRollingSessionContextPacket(
     compaction_reason: compactionReason,
     full_context_window_limit_reached: fullLimitReached,
     context_fidelity_meter: contextFidelityMeter,
+    context_compaction_item: contextCompactionItem,
     retained_turn_ids: retainedTurns.map((turn) => turn.turn_id),
     compacted_turn_ids: compactedTurns.map((turn) => turn.turn_id),
     dropped_turn_ids: [],

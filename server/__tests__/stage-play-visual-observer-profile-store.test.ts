@@ -40,6 +40,30 @@ describe("stage play visual observer profile store", () => {
     expect(profile?.expectedSchema?.requiredFields).toContain("sunspot_proxy_assessment");
   });
 
+  it("seeds the Minecraft shade as neutral spatial evidence before salience candidates", () => {
+    const profiles = listStagePlayVisualObserverProfiles({
+      domain: "minecraft_gameplay",
+      includePresets: true,
+      limit: 25,
+    });
+    const profile = profiles.find((entry) => entry.profileId === "stage_play_visual_observer_profile:minecraft-gameplay:v1");
+
+    expect(profile).toBeDefined();
+    if (!profile) throw new Error("Minecraft gameplay profile was not seeded");
+    expect(profile.title).toBe("Minecraft Neutral Spatial Observer");
+    expect(profile.prompt).toContain("neutral visual evidence");
+    expect(profile.prompt).toContain("Do not lead with danger");
+    expect(profile.prompt).toContain("near_field");
+    expect(profile.prompt).toContain("mid_field");
+    expect(profile.prompt).toContain("far_field");
+    expect(profile.prompt).toContain("visual_features");
+    expect(profile.prompt).toContain("active furnaces, decorative fire, weather, weapons, or darkness are not automatically danger");
+    expect(profile.prompt.indexOf("near_field")).toBeLessThan(profile.prompt.indexOf("salience_candidates"));
+    expect(profile.expectedSchema?.requiredFields).toContain("frame_overview");
+    expect(profile.expectedSchema?.requiredFields).toContain("visual_features");
+    expect(profile.expectedSchema?.requiredFields).toContain("salience_candidates");
+  });
+
   it("does not treat global presets as source-applied active profiles before apply", () => {
     const active = getActiveStagePlayVisualObserverProfileForSource({
       sourceId: "visual_source:test",

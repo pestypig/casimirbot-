@@ -43,6 +43,25 @@ export type HelixContextFidelityMeter = {
   raw_content_included: false;
 };
 
+export type HelixContextCompactionLifecycleItem = {
+  schema: "helix.context_compaction_lifecycle_item.v1";
+  item_type: "context_compaction";
+  trigger: "auto";
+  phase: "pre_turn";
+  status: "not_required" | "recommended" | "paused_for_resume";
+  reason: string;
+  model_context_window_tokens: number;
+  active_context_total_tokens: number;
+  auto_compact_token_limit: number;
+  replacement_context_summary: string;
+  replacement_history_available: boolean;
+  resume_frame_required: boolean;
+  codex_parity_note: string;
+  assistant_answer: false;
+  terminal_eligible: false;
+  raw_content_included: false;
+};
+
 export type HelixRollingSessionContextPacket = {
   schema: typeof HELIX_ROLLING_SESSION_CONTEXT_PACKET_SCHEMA;
 
@@ -70,6 +89,7 @@ export type HelixRollingSessionContextPacket = {
   compaction_reason: string;
   full_context_window_limit_reached: boolean;
   context_fidelity_meter: HelixContextFidelityMeter;
+  context_compaction_item: HelixContextCompactionLifecycleItem;
 
   retained_turn_ids: string[];
   compacted_turn_ids: string[];

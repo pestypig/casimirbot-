@@ -106,6 +106,18 @@ describe("Helix Ask rolling session context packet", () => {
       raw_content_included: false,
       terminal_eligible: false,
     });
+    expect(packet.context_compaction_item).toMatchObject({
+      schema: "helix.context_compaction_lifecycle_item.v1",
+      item_type: "context_compaction",
+      trigger: "auto",
+      phase: "pre_turn",
+      status: "not_required",
+      replacement_history_available: false,
+      resume_frame_required: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      terminal_eligible: false,
+    });
     expect(packet.context_fidelity_meter.active_context_total_tokens).toBe(
       packet.estimated_tokens.active_context_total,
     );
@@ -141,6 +153,10 @@ describe("Helix Ask rolling session context packet", () => {
     expect(packet.compacted_context_summary).toContain("turn turn-1");
     expect(packet.context_fidelity_meter.compaction_mode).not.toBe("none");
     expect(packet.context_fidelity_meter.handoff_state.state).not.toBe("idle");
+    expect(packet.context_compaction_item.item_type).toBe("context_compaction");
+    expect(packet.context_compaction_item.status).not.toBe("not_required");
+    expect(packet.context_compaction_item.replacement_history_available).toBe(true);
+    expect(packet.context_compaction_item.replacement_context_summary).toContain("turn turn-1");
     expect(JSON.stringify(packet)).not.toContain("raw_content_included\":true");
   });
 
@@ -180,6 +196,16 @@ describe("Helix Ask rolling session context packet", () => {
     expect(packet.estimated_tokens.active_context_total).toBeGreaterThan(packet.model_context_window_tokens);
     expect(packet.compaction_mode).toBe("required");
     expect(packet.context_fidelity_meter.handoff_state.state).toBe("pause_required");
+    expect(packet.context_compaction_item).toMatchObject({
+      schema: "helix.context_compaction_lifecycle_item.v1",
+      item_type: "context_compaction",
+      status: "paused_for_resume",
+      replacement_history_available: true,
+      resume_frame_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
     expect(packet.model_visible_summary).toContain("Current turn pasted-text attachments");
     expect(packet.model_visible_summary).toContain("tail_preview=");
   });

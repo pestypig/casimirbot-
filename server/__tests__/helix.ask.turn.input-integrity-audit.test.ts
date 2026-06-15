@@ -368,6 +368,158 @@ describe("helix ask turn input integrity audit", () => {
     });
   });
 
+  it("admits stream conversation-memory resume intent without requiring an echoed frame", async () => {
+    const sentinel = "HELIX_PASTED_TEXT_RESUME_SENTINEL_STREAM_LEDGER";
+    const threadId = "test:turn-input-integrity:stream-ledger-resume-frame";
+    appendHelixThreadServerRequestEvent({
+      thread_id: threadId,
+      route: "/ask/turn",
+      event_type: "server_request_created",
+      turn_id: "turn-pause-stream-ledger-resume-frame",
+      session_id: threadId,
+      trace_id: "turn-pause-stream-ledger-resume-frame",
+      turn_kind: "ask",
+      request_id: "turn-pause-stream-ledger-resume-frame:context_compaction:pause",
+      request_kind: "request_user_input",
+      item_status: "in_progress",
+      request_payload: {
+        schema: "helix.pending_server_request.v1",
+        request_id: "turn-pause-stream-ledger-resume-frame:context_compaction:pause",
+        kind: "context_compaction_pause",
+        prompt: "Context is compacting before the next Ask turn.",
+        reason: "active_context_page_file_compaction",
+        resume_frame: {
+          schema: "helix.pasted_text_attachment_resume_frame.v1",
+          original_prompt: "Use the attached pasted text.",
+          attachment_artifact_refs: ["thread:pasted_text_attachment:stream-ledger-sentinel"],
+          turn_input_items: [
+            { type: "text", text: "Use the attached pasted text.", source: "user" },
+            {
+              type: "attachment",
+              attachment_id: "pasted-text-stream-ledger-sentinel",
+              attachment_kind: "text",
+              file_name: "pasted-text-stream-ledger-sentinel.txt",
+              mime_type: "text/plain",
+              size_bytes: 1024,
+              preview: `${sentinel}\nThis is compacted pasted text.`,
+              raw_content_included: true,
+              raw_content_scope: "turn_input_only",
+              assistant_answer: false,
+            },
+          ],
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+    });
+
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn/stream")
+      .set("Accept", "text/event-stream")
+      .send({
+        thread_id: threadId,
+        sessionId: threadId,
+        traceId: "turn-followup-stream-ledger-resume-frame",
+        turnId: "turn-followup-stream-ledger-resume-frame",
+        question: "What exact sentinel token was in the attached pasted text? Answer with only the sentinel token.",
+        debug: true,
+        routeMetadata: {
+          schema: "helix.ask.route_metadata.v1",
+          source: "conversation_memory_recall",
+          sourceTarget: "conversation_memory",
+        },
+      })
+      .expect(200);
+
+    expect(response.text).toContain("event: turn_final");
+    expect(response.text).toContain(sentinel);
+    expect(response.text).toContain("conversation_memory_recall_answer");
+    expect(response.text).not.toContain("turn_input_integrity_failed");
+    expect(response.text).not.toContain("bad_request");
+  });
+
+  it("resumes a real stream compaction pause from the server ledger without route metadata", async () => {
+    const sentinel = "HELIX_PASTED_TEXT_RESUME_SENTINEL_STREAM_REAL_FLOW";
+    const threadId = "test:turn-input-integrity:stream-real-flow-resume-frame";
+    const largePaste = [
+      "Use the attached pasted text. After compaction, answer follow-up questions from this pasted text only.",
+      `SENTINEL: ${sentinel}`,
+      "PROJECT: Stream compaction resume checkpoint.",
+      "filler ".repeat(12000),
+      `TAIL SENTINEL CONFIRMATION: ${sentinel}`,
+    ].join("\n");
+
+    const pause = await request(createApp())
+      .post("/api/agi/ask/turn/stream")
+      .set("Accept", "text/event-stream")
+      .send({
+        thread_id: threadId,
+        sessionId: threadId,
+        traceId: "turn-stream-real-flow-pause",
+        turnId: "turn-stream-real-flow-pause",
+        question: "Use the attached pasted text.",
+        debug: true,
+        turn_input_items: [
+          { type: "text", text: "Use the attached pasted text.", source: "user" },
+          {
+            type: "attachment",
+            attachment_id: "paste:stream-real-flow",
+            attachment_kind: "text",
+            mime_type: "text/plain",
+            file_name: "stream-real-flow-pasted-text.txt",
+            size_bytes: Buffer.byteLength(largePaste, "utf8"),
+            content_base64: Buffer.from(largePaste, "utf8").toString("base64"),
+            preview: largePaste.slice(0, 300),
+            raw_content_included: true,
+            raw_content_scope: "turn_input_only",
+            assistant_answer: false,
+          },
+        ],
+      })
+      .expect(200);
+
+    expect(pause.text).toContain("context_compaction_pause");
+    expect(pause.text).toContain("helix.context_compaction_lifecycle_item.v1");
+    expect(pause.text).toContain("helix.pasted_text_attachment_resume_frame.v1");
+
+    const followup = await request(createApp())
+      .post("/api/agi/ask/turn/stream")
+      .set("Accept", "text/event-stream")
+      .send({
+        thread_id: threadId,
+        sessionId: threadId,
+        traceId: "turn-stream-real-flow-followup",
+        turnId: "turn-stream-real-flow-followup",
+        question: "What exact sentinel token was in the attached pasted text? Answer with only the sentinel token.",
+        debug: true,
+      })
+      .expect(200);
+
+    const turnFinalLine = followup.text
+      .split("\n")
+      .find((line) => line.startsWith("data: ") && line.includes('"schema":"helix.ask.turn.response.v1"'));
+    expect(turnFinalLine).toBeTruthy();
+    const turnFinal = JSON.parse(String(turnFinalLine).replace(/^data: /, ""));
+
+    expect(followup.text).toContain("event: turn_final");
+    expect(followup.text).toContain(sentinel);
+    expect(followup.text).toContain("conversation_memory_recall_answer");
+    expect(turnFinal.content).toBe(sentinel);
+    expect(turnFinal.final_answer_source).toBe("conversation_memory_recall_answer");
+    expect(turnFinal.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(turnFinal.terminal_answer_envelope).toMatchObject({
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "conversation_memory_recall_answer",
+      terminal_text: sentinel,
+    });
+    expect(followup.text).not.toContain("turn_input_integrity_failed");
+    expect(followup.text).not.toContain("bad_request");
+  }, 20_000);
+
   it("fails closed when a prompt references attached pasted text without a pasted-text artifact", async () => {
     const response = await request(createApp())
       .post("/api/agi/ask/turn")
@@ -423,6 +575,21 @@ describe("helix ask turn input integrity audit", () => {
 
     expect(response.body.dispatch_policy).toBe("context_compaction_pause");
     expect(response.body.pending_server_request?.kind).toBe("context_compaction_pause");
+    expect(response.body.context_compaction_item).toMatchObject({
+      schema: "helix.context_compaction_lifecycle_item.v1",
+      item_type: "context_compaction",
+      status: "paused_for_resume",
+      replacement_history_available: true,
+      resume_frame_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(response.body.pending_server_request?.context_compaction_item).toMatchObject({
+      schema: "helix.context_compaction_lifecycle_item.v1",
+      item_type: "context_compaction",
+      status: "paused_for_resume",
+    });
     expect(response.body.pending_server_request?.resume_frame).toMatchObject({
       schema: "helix.pasted_text_attachment_resume_frame.v1",
       original_prompt: "Use the attached pasted text.",

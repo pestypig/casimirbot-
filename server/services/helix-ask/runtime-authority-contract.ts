@@ -943,6 +943,24 @@ export function goalSatisfactionAllowsTerminal(payload: Record<string, unknown>)
   return false;
 }
 
+const contextResumeFrameRecallTerminalAllowed = (payload: Record<string, unknown>): boolean => {
+  if (readString(payload.terminal_artifact_kind) !== "model_synthesized_answer") return false;
+  if (readString(payload.final_answer_source) !== "conversation_memory_recall_answer") return false;
+  const sourceTargetIntent = readRecord(payload.source_target_intent);
+  if (readString(sourceTargetIntent?.target_source) !== "conversation_memory") return false;
+  const packet = readRecord(payload.conversation_memory_packet);
+  const resumeFrames = readArray(packet?.context_resume_frames);
+  if (resumeFrames.length === 0) return false;
+  const evidenceReentry = readRecord(payload.evidence_reentry_proof);
+  if (readBoolean(evidenceReentry?.terminal_ready) !== true) return false;
+  const routeAuthority = readRecord(payload.route_authority_audit);
+  if (readBoolean(routeAuthority?.route_authority_ok) !== true) return false;
+  const terminalAuthority = readRecord(payload.terminal_answer_authority);
+  if (readString(terminalAuthority?.final_answer_source) !== "conversation_memory_recall_answer") return false;
+  if (readString(terminalAuthority?.terminal_artifact_kind) !== "model_synthesized_answer") return false;
+  return goalSatisfactionAllowsTerminal(payload);
+};
+
 export function hasCleanTypedFailure(payload: Record<string, unknown>): boolean {
   if (readString(payload.terminal_artifact_kind) !== "typed_failure" && readString(payload.final_answer_source) !== "typed_failure") return false;
   return Boolean(
@@ -966,6 +984,7 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
   const livePipelineReceiptAllowed = livePipelineReceiptTerminalAllowed(payload);
   const liveEnvironmentBindingDiagnosisAllowed = liveEnvironmentBindingDiagnosisTerminalAllowed(payload);
   const stagePlayReceiptTerminal = stagePlayReceiptSelectedAsTerminal(payload);
+  const contextResumeFrameRecallAllowed = contextResumeFrameRecallTerminalAllowed(payload);
   const microDeckObservationBackedRoute = isMicroDeckObservationBackedRoute(payload);
   const microDeckCapability = selectedMicroDeckCapability(payload);
   const checks = {
@@ -978,7 +997,12 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
     goal_satisfaction_allows_terminal: goalSatisfactionAllowsTerminal(payload),
     typed_failure_clean: hasCleanTypedFailure(payload),
   };
-  const requiresRuntimeLoop = sourceCapabilityDiagnosticTurn && terminalKind !== "typed_failure" && !livePipelineReceiptAllowed && !liveEnvironmentBindingDiagnosisAllowed;
+  const requiresRuntimeLoop =
+    sourceCapabilityDiagnosticTurn &&
+    terminalKind !== "typed_failure" &&
+    !livePipelineReceiptAllowed &&
+    !liveEnvironmentBindingDiagnosisAllowed &&
+    !contextResumeFrameRecallAllowed;
   const blockingReasons: string[] = [];
   if (runtimeBoundTurn) {
     if (stagePlayReceiptTerminal) blockingReasons.push("stage_play_receipt_terminal_without_model_review");
@@ -989,7 +1013,7 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
       if (!checks.agent_step_decision) blockingReasons.push("agent_step_decision_missing");
       if (!hasDirectAnswerDraft(payload)) blockingReasons.push("direct_answer_text_missing");
       if (!checks.post_observation_model_decision) blockingReasons.push("post_observation_model_decision_missing");
-    } else if (livePipelineReceiptAllowed || liveEnvironmentBindingDiagnosisAllowed) {
+    } else if (livePipelineReceiptAllowed || liveEnvironmentBindingDiagnosisAllowed || contextResumeFrameRecallAllowed) {
       // Control/status Live Pipeline receipts and binding diagnostics are terminal only by route-product contract.
       // The receipt/diagnosis and disclosure remain observations, not assistant answers or raw logs.
     } else {

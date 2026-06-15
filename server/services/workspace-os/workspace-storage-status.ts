@@ -76,6 +76,7 @@ export async function buildHelixWorkspaceStorageStatus(
     sessionId: input.thread_id,
   });
   const activeContextMeter = activeContextPacket?.context_fidelity_meter ?? null;
+  const activeContextCompactionItem = activeContextPacket?.context_compaction_item ?? null;
   const appStorageQuota = configuredQuota(
     readers.env,
     "WORKSPACE_APP_STORAGE_QUOTA_BYTES",
@@ -116,6 +117,11 @@ export async function buildHelixWorkspaceStorageStatus(
         auto_compact_token_limit: activeContextMeter?.auto_compact_token_limit ?? 0,
         compact_warning_ratio: activeContextMeter?.compact_warning_ratio ?? 0,
         compaction_mode: activeContextMeter?.compaction_mode ?? "none",
+        compaction_lifecycle_status: activeContextCompactionItem?.status ?? "not_required",
+        compaction_lifecycle_schema:
+          activeContextCompactionItem?.schema ?? "helix.context_compaction_lifecycle_item.v1",
+        replacement_history_available: activeContextCompactionItem?.replacement_history_available ?? false,
+        resume_frame_required: activeContextCompactionItem?.resume_frame_required ?? false,
         handoff_state: activeContextMeter?.handoff_state.state ?? "idle",
         chat_turns_paused: activeContextMeter?.handoff_state.chat_turns_paused ?? false,
         retained_turn_count: activeContextMeter?.retained_turn_ids.length ?? 0,
