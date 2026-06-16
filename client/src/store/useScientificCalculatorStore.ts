@@ -10,6 +10,8 @@ import type {
 
 const SCIENTIFIC_CALCULATOR_STORAGE_KEY = "scientific-calculator:v1";
 
+export type ScientificCalculatorWorkbenchTarget = "scalar" | "runtime" | "theory";
+
 export type ScientificCalculatorHistoryEntry = {
   id: string;
   latex: string;
@@ -51,6 +53,7 @@ export type ScientificCalculatorDebugEvent = {
   calculator_setup?: HelixCalculatorSetupContext | null;
   compound_run_id?: string | null;
   compound_subgoal_id?: string | null;
+  target_workbench?: ScientificCalculatorWorkbenchTarget;
 };
 
 type ScientificCalculatorState = {
@@ -72,6 +75,7 @@ type ScientificCalculatorState = {
       calculatorSetup?: HelixCalculatorSetupContext | null;
       compoundRunId?: string | null;
       compoundSubgoalId?: string | null;
+      targetWorkbench?: ScientificCalculatorWorkbenchTarget;
     },
   ) => ScientificCalculatorHistoryEntry;
   setSolveResult: (
@@ -82,6 +86,7 @@ type ScientificCalculatorState = {
       calculatorSetup?: HelixCalculatorSetupContext | null;
       compoundRunId?: string | null;
       compoundSubgoalId?: string | null;
+      targetWorkbench?: ScientificCalculatorWorkbenchTarget;
     },
   ) => void;
   setTheoryLoadout: (loadout: TheoryCalculatorLoadoutV1 | null) => void;
@@ -151,6 +156,7 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
           calculator_setup: entry.calculatorSetup,
           compound_run_id: meta?.compoundRunId ?? null,
           compound_subgoal_id: meta?.compoundSubgoalId ?? null,
+          target_workbench: meta?.targetWorkbench ?? (meta?.compoundRunId ? "theory" : "scalar"),
           message: trimmed ? "latex_ingested" : "empty_latex",
         });
         set((state) => ({
@@ -175,6 +181,7 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
           calculator_setup: meta?.calculatorSetup ?? null,
           compound_run_id: meta?.compoundRunId ?? null,
           compound_subgoal_id: meta?.compoundSubgoalId ?? null,
+          target_workbench: meta?.targetWorkbench ?? (meta?.compoundRunId ? "theory" : "scalar"),
           message: result.ok ? "solve_completed" : result.error ?? "solve_failed",
         });
         set((state) => ({
@@ -209,6 +216,7 @@ export const useScientificCalculatorStore = create<ScientificCalculatorState>()(
             calculator_setup: selectedItem.setupContext,
             compound_run_id: state.lastTheoryLoadout?.loadoutId ?? null,
             compound_subgoal_id: selectedItem.id,
+            target_workbench: "theory",
             message: "theory_loadout_item_loaded",
           });
           const entry: ScientificCalculatorHistoryEntry = {

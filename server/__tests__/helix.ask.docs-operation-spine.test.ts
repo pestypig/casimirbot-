@@ -370,6 +370,15 @@ describe("Helix Ask Docs operation spine", () => {
 
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("doc_evidence_synthesis");
     expect(response.body?.terminal_artifact_kind).not.toBe("doc_summary");
+    if (response.body?.doc_evidence_synthesis_answer) {
+      expect(response.body?.terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+      expect(response.body?.debug?.terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+      expect(response.body?.resolved_turn_summary?.terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+      expect(response.body?.repo_docs_terminalization).toMatchObject({
+        materialized_terminal_artifact_kind: "doc_evidence_synthesis_answer",
+        quality_gate_ok: true,
+      });
+    }
     if (response.body?.terminal_artifact_kind !== "doc_evidence_synthesis_answer") {
       const contract =
         response.body?.docs_continuation_contract ??

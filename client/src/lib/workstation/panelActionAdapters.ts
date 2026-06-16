@@ -5618,6 +5618,7 @@ export function executeHelixPanelAction(
           calculatorSetup: payload.setupContext ?? null,
           compoundRunId,
           compoundSubgoalId: `${badge.id}:${payload.id}`,
+          targetWorkbench: "scalar",
         });
         return {
           badge_id: badge.id,
@@ -5638,6 +5639,7 @@ export function executeHelixPanelAction(
           badge_id: badge.id,
           loaded_payloads: loadedPayloads,
           calculator_focused: true,
+          target_workbench: "scalar",
         },
         message: loadedPayloads.length > 0 ? undefined : "No calculator payloads matched the request.",
       };
@@ -5724,6 +5726,7 @@ export function executeHelixPanelAction(
             scalar_count: loadout.summary.scalarCount,
             context_count: loadout.summary.contextCount,
             claim_boundary_notes: loadout.claimBoundaryNotes,
+            target_workbench: "theory",
           },
         };
       }
@@ -5735,6 +5738,7 @@ export function executeHelixPanelAction(
       const solveScope = asNonEmptyString(args.solve_scope ?? args.solveScope) === "all_scalar_and_runtime"
         ? "all_scalar_and_runtime"
         : "all_scalar";
+      const targetWorkbench = solveScope === "all_scalar_and_runtime" ? "runtime" : "theory";
       const finalLoadout =
         actionId === "solve_calculator_loadout"
           ? solveTheoryCalculatorLoadoutNow(loadout, {
@@ -5759,6 +5763,7 @@ export function executeHelixPanelAction(
           failed_count: finalLoadout.summary.failedCount,
           claim_boundary_notes: finalLoadout.claimBoundaryNotes,
           calculator_focused: true,
+          target_workbench: targetWorkbench,
         },
       };
     }
@@ -5788,6 +5793,7 @@ export function executeHelixPanelAction(
           runtime_count: run.summary.runtimeCount,
           boundary_count: run.summary.boundaryCount,
           claim_boundary_notes: Array.from(new Set(run.rows.flatMap((row) => row.claimBoundaryNotes))),
+          target_workbench: "theory",
         },
       };
     }
@@ -5836,6 +5842,7 @@ export function executeHelixPanelAction(
           failed_count: finalRun.summary.failedCount,
           claim_boundary_notes: Array.from(new Set(finalRun.rows.flatMap((row) => row.claimBoundaryNotes))),
           calculator_focused: true,
+          target_workbench: "theory",
         },
       };
     }
@@ -5850,6 +5857,9 @@ export function executeHelixPanelAction(
           message: "theory-badge-graph.get_runtime_math_trace requires a recognized runtime family or badge.",
         };
       }
+      useTheoryCompoundRunStore.getState().setActiveRuntimeTrace(trace);
+      context.openPanel("scientific-calculator", undefined);
+      context.focusPanel("scientific-calculator", undefined);
       return {
         ok: true,
         panel_id: panelId,
@@ -5865,6 +5875,8 @@ export function executeHelixPanelAction(
           scalar_cut_count: trace.summary.scalarCutCount,
           claim_boundary_notes: trace.summary.claimBoundaryNotes,
           warnings: Array.from(new Set(trace.steps.flatMap((step) => step.warnings))),
+          calculator_focused: true,
+          target_workbench: "runtime",
         },
       };
     }
@@ -5885,6 +5897,7 @@ export function executeHelixPanelAction(
         source: "workstation_action",
         compoundRunId: asNonEmptyString(args.compound_run_id ?? args.compoundRunId ?? args.run_id ?? args.runId),
         compoundSubgoalId: scalarCut.anchor,
+        targetWorkbench: "scalar",
       });
       context.openPanel("scientific-calculator", undefined);
       context.focusPanel("scientific-calculator", undefined);
@@ -5898,6 +5911,7 @@ export function executeHelixPanelAction(
           source_path: scalarCut.sourcePath ?? "theory-runtime://scalar-cut",
           anchor: scalarCut.anchor,
           calculator_focused: true,
+          target_workbench: "scalar",
         },
       };
     }
@@ -5975,6 +5989,7 @@ export function executeHelixPanelAction(
     const calculatorSetup = asCalculatorSetupContext(args.calculator_setup ?? args.setup_context ?? args.setup);
     const compoundRunId = asNonEmptyString(args.compound_run_id ?? args.run_id ?? args.turn_id);
     const compoundSubgoalId = asNonEmptyString(args.compound_subgoal_id ?? args.subgoal_id);
+    const targetWorkbench = compoundRunId ? "theory" : "scalar";
 
     if (actionId === "ingest_latex") {
       const rawLatex = asNonEmptyString(args.latex ?? args.expression ?? args.text);
@@ -6073,6 +6088,7 @@ export function executeHelixPanelAction(
           calculatorSetup,
           compoundRunId,
           compoundSubgoalId,
+          targetWorkbench,
         });
       }
       const solveResult = runScientificSolve(latex, actionId === "solve_with_steps");
@@ -6082,6 +6098,7 @@ export function executeHelixPanelAction(
         calculatorSetup,
         compoundRunId,
         compoundSubgoalId,
+        targetWorkbench,
       });
       context.openPanel(panelId, undefined);
       context.focusPanel(panelId, undefined);
@@ -6118,6 +6135,7 @@ export function executeHelixPanelAction(
           sourceOfTruth: solveResult.trace.sourceOfTruth,
           capabilityClass: solveResult.trace.capabilityClass,
           warnings: solveResult.trace.warnings,
+          target_workbench: targetWorkbench,
           error: solveResult.error ?? null,
           debug_event: latestCalculatorState.debugEvents[0] ?? null,
           debug_log_tail: buildScientificCalculatorDebugSnapshot(latestCalculatorState.debugEvents, 8),

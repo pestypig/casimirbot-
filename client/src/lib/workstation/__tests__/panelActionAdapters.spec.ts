@@ -736,10 +736,12 @@ describe("panelActionAdapters", () => {
         sourceOfTruth: "scientific_calculator",
       }),
     );
+    expect(solve.artifact?.target_workbench).toBe("scalar");
     expect(solve.artifact?.debug_event).toEqual(
       expect.objectContaining({
         action_id: "solve_with_steps",
         source: "workstation_action",
+        target_workbench: "scalar",
       }),
     );
 
@@ -872,6 +874,7 @@ describe("panelActionAdapters", () => {
     expect(solve.artifact?.result_quantity).toBe("energy");
     expect(solve.artifact?.result_dimension_signature).toBe("L^2 M T^-2");
     expect(solve.artifact?.unit_system).toBe("SI");
+    expect(solve.artifact?.target_workbench).toBe("scalar");
     expect(String(solve.artifact?.normalized_expression)).not.toContain("with the scientific calculator");
   });
 

@@ -3,7 +3,8 @@ import { Archive, ChevronDown, Database, KeyRound, Languages, Link2, LogIn, LogO
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { getInterfaceLanguageOption, getInterfaceLanguageReadiness, INTERFACE_LANGUAGE_OPTIONS } from "@/lib/i18n/interfaceLanguage";
-import { useInterfaceText } from "@/lib/i18n/interfaceText";
+import { useInterfaceText, type InterfaceTextResolver } from "@/lib/i18n/interfaceText";
+import type { InterfaceMessageId } from "@/lib/i18n/messages/types";
 import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
 import type { HelixAccountLinkedAccount, HelixAccountSessionStatus } from "@shared/helix-account-session";
 import type { HelixProfileIngressTokenSummary } from "@shared/helix-profile-ingress";
@@ -97,6 +98,102 @@ const emptyStatus: HelixAccountSessionStatus = {
   },
 };
 
+type Translate = InterfaceTextResolver["t"];
+type DisplayMessageMap = Record<string, InterfaceMessageId>;
+
+const sessionStatusMessages = {
+  active: "account.display.sessionStatus.active",
+  signed_out: "account.display.sessionStatus.signedOut",
+} satisfies DisplayMessageMap;
+
+const memoryScopeMessages = {
+  profile: "account.display.memoryScope.profile",
+  session_only: "account.display.memoryScope.sessionOnly",
+} satisfies DisplayMessageMap;
+
+const authModeMessages = {
+  web_auth: "account.display.authMode.webAuth",
+  local_dev_profile: "account.display.authMode.localDevProfile",
+  local_password_profile: "account.display.authMode.localPasswordProfile",
+} satisfies DisplayMessageMap;
+
+const providerMessages = {
+  google: "account.display.provider.google",
+  local: "account.display.provider.local",
+  discord: "account.display.provider.discord",
+  minehut: "account.display.provider.minehut",
+  browser: "account.display.provider.browser",
+} satisfies DisplayMessageMap;
+
+const linkedStatusMessages = {
+  linked: "account.display.linkStatus.linked",
+  pending: "account.display.linkStatus.pending",
+  revoked: "account.display.linkStatus.revoked",
+} satisfies DisplayMessageMap;
+
+const authorityMessages = {
+  owner: "account.display.authority.owner",
+  commander: "account.display.authority.commander",
+  participant: "account.display.authority.participant",
+  viewer: "account.display.authority.viewer",
+} satisfies DisplayMessageMap;
+
+const artifactTypeMessages = {
+  workstation_note: "account.display.artifactType.workstationNote",
+  helix_chat_session: "account.display.artifactType.helixChatSession",
+  helix_chat_layout: "account.display.artifactType.helixChatLayout",
+  workstation_layout: "account.display.artifactType.workstationLayout",
+  workstation_session_draft: "account.display.artifactType.workstationSessionDraft",
+  workstation_panel_scroll: "account.display.artifactType.workstationPanelScroll",
+} satisfies DisplayMessageMap;
+
+const ownerScopeMessages = {
+  browser_guest: "account.display.ownerScope.browserGuest",
+  profile: "account.display.ownerScope.profile",
+  surface_session_only: "account.display.ownerScope.surfaceSessionOnly",
+} satisfies DisplayMessageMap;
+
+const storageBackendMessages = {
+  localStorage: "account.display.storageBackend.localStorage",
+  sessionStorage: "account.display.storageBackend.sessionStorage",
+  profile_server: "account.display.storageBackend.profileServer",
+} satisfies DisplayMessageMap;
+
+const syncStatusMessages = {
+  local_only: "account.display.syncStatus.localOnly",
+  profile_candidate: "account.display.syncStatus.profileCandidate",
+  profile_synced: "account.display.syncStatus.profileSynced",
+} satisfies DisplayMessageMap;
+
+const tokenStatusMessages = {
+  active: "account.display.tokenStatus.active",
+  revoked: "account.display.tokenStatus.revoked",
+} satisfies DisplayMessageMap;
+
+const jobStatusMessages = {
+  active: "account.display.jobStatus.active",
+  running: "account.display.jobStatus.running",
+  paused: "account.display.jobStatus.paused",
+  stopped: "account.display.jobStatus.stopped",
+  completed: "account.display.jobStatus.completed",
+  failed: "account.display.jobStatus.failed",
+} satisfies DisplayMessageMap;
+
+const sourceFamilyMessages = {
+  "helix-ask:desktop": "account.display.sourceFamily.helixAskDesktop",
+  helix_ask_desktop: "account.display.sourceFamily.helixAskDesktop",
+} satisfies DisplayMessageMap;
+
+function displayMappedValue(t: Translate, value: string | null | undefined, messages: DisplayMessageMap): string {
+  if (!value) return t("account.common.none");
+  const messageId = messages[value];
+  return messageId ? t(messageId) : value;
+}
+
+function displayBoolean(t: Translate, value: boolean): string {
+  return t(value ? "account.display.boolean.true" : "account.display.boolean.false");
+}
+
 async function fetchStatus(): Promise<HelixAccountSessionStatus> {
   const response = await fetch("/api/account/session");
   if (!response.ok) throw new Error(`status ${response.status}`);
@@ -132,7 +229,7 @@ export default function AccountSessionPanel() {
   const fallbackProfileId = "DatDamPig";
   const [localUsername, setLocalUsername] = React.useState("admin");
   const [localPassword, setLocalPassword] = React.useState("password");
-  const [ingressLabel, setIngressLabel] = React.useState("Profile ingress");
+  const [ingressLabel, setIngressLabel] = React.useState("");
   const [newTokenValue, setNewTokenValue] = React.useState<string | null>(null);
   const [discordSessions, setDiscordSessions] = React.useState<DiscordSessionView[]>([]);
   const [profileArchives, setProfileArchives] = React.useState<ProfileArchiveView[]>([]);
@@ -141,6 +238,9 @@ export default function AccountSessionPanel() {
   const memoryRegistrySnapshot = useWorkspaceMemoryRegistryStore((state) =>
     state.buildRegistrySnapshot(),
   );
+  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const interfaceText = useInterfaceText(interfaceLanguage.code);
+  const t = interfaceText.t;
 
   const refresh = React.useCallback(async () => {
     setLoading(true);
@@ -214,7 +314,10 @@ export default function AccountSessionPanel() {
       const response = await fetch("/api/account/profile-ingress/token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ label: ingressLabel, scopes: ["source_event", "live_environment_event"] }),
+        body: JSON.stringify({
+          label: ingressLabel.trim() || t("account.ingress.defaultLabel"),
+          scopes: ["source_event", "live_environment_event"],
+        }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body?.message ?? `profile-ingress ${response.status}`);
@@ -225,7 +328,7 @@ export default function AccountSessionPanel() {
     } finally {
       setLoading(false);
     }
-  }, [ingressLabel, refresh]);
+  }, [ingressLabel, refresh, t]);
 
   const revokeIngressToken = React.useCallback(
     async (tokenId: string) => {
@@ -249,9 +352,6 @@ export default function AccountSessionPanel() {
 
   const session = status.session;
   const usage = status.usage;
-  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
-  const interfaceText = useInterfaceText(interfaceLanguage.code);
-  const t = interfaceText.t;
   const showLocalDevSignIn = import.meta.env.DEV;
 
   return (
@@ -292,16 +392,18 @@ export default function AccountSessionPanel() {
                 {session.profile.email ? <p className="break-all text-xs text-slate-500">{session.profile.email}</p> : null}
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <span className="rounded bg-white/5 px-2 py-1">
-                    {t("account.session.statusValue", { status: session.status })}
+                    {t("account.session.statusValue", { status: displayMappedValue(t, session.status, sessionStatusMessages) })}
                   </span>
                   <span className="rounded bg-white/5 px-2 py-1">
-                    {t("account.session.memoryValue", { memory: session.memory_scope })}
+                    {t("account.session.memoryValue", { memory: displayMappedValue(t, session.memory_scope, memoryScopeMessages) })}
                   </span>
                   <span className="rounded bg-white/5 px-2 py-1">
-                    {t("account.session.authValue", { authMode: session.profile.auth_mode })}
+                    {t("account.session.authValue", { authMode: displayMappedValue(t, session.profile.auth_mode, authModeMessages) })}
                   </span>
                   <span className="rounded bg-white/5 px-2 py-1">
-                    {t("account.session.providerValue", { provider: session.profile.provider ?? "local" })}
+                    {t("account.session.providerValue", {
+                      provider: displayMappedValue(t, session.profile.provider ?? "local", providerMessages),
+                    })}
                   </span>
                   <span className="rounded bg-white/5 px-2 py-1">{t("account.session.agentPasswordsOff")}</span>
                 </div>
@@ -443,10 +545,10 @@ export default function AccountSessionPanel() {
                   key={`${account.provider}:${account.external_id}`}
                   className="grid gap-2 rounded border border-white/10 bg-slate-950/60 p-2 text-xs md:grid-cols-[120px_1fr_120px_120px]"
                 >
-                  <span className="font-medium text-slate-200">{account.provider}</span>
+                  <span className="font-medium text-slate-200">{displayMappedValue(t, account.provider, providerMessages)}</span>
                   <span className="break-all text-slate-400">{account.display_name || account.external_id}</span>
-                  <span className="text-slate-300">{account.status}</span>
-                  <span className="text-slate-300">{account.authority ?? "viewer"}</span>
+                  <span className="text-slate-300">{displayMappedValue(t, account.status, linkedStatusMessages)}</span>
+                  <span className="text-slate-300">{displayMappedValue(t, account.authority ?? "viewer", authorityMessages)}</span>
                 </div>
               ))
             )}
@@ -480,16 +582,18 @@ export default function AccountSessionPanel() {
                     <div className="truncate font-medium text-slate-200">
                       {artifact.title || artifact.artifact_id}
                     </div>
-                    <div className="mt-1 truncate text-slate-500">{artifact.artifact_type}</div>
+                    <div className="mt-1 truncate text-slate-500">
+                      {displayMappedValue(t, artifact.artifact_type, artifactTypeMessages)}
+                    </div>
                   </div>
                   <span className="rounded bg-white/5 px-2 py-1 text-slate-300">
-                    {artifact.owner_scope}
+                    {displayMappedValue(t, artifact.owner_scope, ownerScopeMessages)}
                   </span>
                   <span className="rounded bg-white/5 px-2 py-1 text-slate-300">
-                    {artifact.storage_backend}
+                    {displayMappedValue(t, artifact.storage_backend, storageBackendMessages)}
                   </span>
                   <span className="rounded bg-white/5 px-2 py-1 text-slate-300">
-                    {artifact.sync_status}
+                    {displayMappedValue(t, artifact.sync_status, syncStatusMessages)}
                   </span>
                 </div>
               ))
@@ -528,7 +632,7 @@ export default function AccountSessionPanel() {
                       </div>
                     </div>
                     <span className="rounded bg-white/5 px-2 py-1 text-center text-slate-300">
-                      {discordSession.status}
+                      {displayMappedValue(t, discordSession.status, sessionStatusMessages)}
                     </span>
                     <div className="text-slate-300">
                       <div>
@@ -575,13 +679,17 @@ export default function AccountSessionPanel() {
                     <p className="mt-2 line-clamp-2 text-slate-400">{archive.summary}</p>
                   </div>
                   <div className="space-y-1 text-slate-300">
-                    <div>{t("account.archives.sourceValue", { source: archive.source_family })}</div>
+                    <div>
+                      {t("account.archives.sourceValue", {
+                        source: displayMappedValue(t, archive.source_family, sourceFamilyMessages),
+                      })}
+                    </div>
                     <div>{t("account.archives.evidenceValue", { count: archive.evidence_index.length })}</div>
                     <div>{t("account.archives.patternsValue", { count: archive.learned_pattern_candidates.length })}</div>
                   </div>
                   <div className="space-y-1 text-slate-400">
-                    <div>{t("account.archives.rawLogsValue", { value: String(archive.raw_logs_included) })}</div>
-                    <div>{t("account.archives.assistantAnswerValue", { value: String(archive.assistant_answer) })}</div>
+                    <div>{t("account.archives.rawLogsValue", { value: displayBoolean(t, archive.raw_logs_included) })}</div>
+                    <div>{t("account.archives.assistantAnswerValue", { value: displayBoolean(t, archive.assistant_answer) })}</div>
                     <div>{archive.ended_at}</div>
                   </div>
                 </div>
@@ -611,9 +719,13 @@ export default function AccountSessionPanel() {
                     <div className="truncate font-medium text-slate-200">{job.objective}</div>
                     <div className="mt-1 truncate text-slate-500">{job.job_id}</div>
                     <div className="mt-2 flex flex-wrap gap-1 text-[10px] text-slate-300">
-                      <span className="rounded bg-white/5 px-2 py-1">{job.status}</span>
-                      <span className="rounded bg-white/5 px-2 py-1">{job.source_family}</span>
-                      <span className="rounded bg-white/5 px-2 py-1">{job.room_id ?? "no room"}</span>
+                      <span className="rounded bg-white/5 px-2 py-1">{displayMappedValue(t, job.status, jobStatusMessages)}</span>
+                      <span className="rounded bg-white/5 px-2 py-1">
+                        {displayMappedValue(t, job.source_family, sourceFamilyMessages)}
+                      </span>
+                      <span className="rounded bg-white/5 px-2 py-1">
+                        {job.room_id ?? t("account.display.room.none")}
+                      </span>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-1 text-slate-300">
@@ -623,8 +735,8 @@ export default function AccountSessionPanel() {
                     <span>{t("account.jobs.patternsValue", { count: job.counters.pattern_candidates })}</span>
                   </div>
                   <div className="space-y-1 text-slate-400">
-                    <div>{t("account.jobs.archiveOnStopValue", { value: String(job.policy.archive_on_stop) })}</div>
-                    <div>{t("account.jobs.rawLogsValue", { value: String(job.raw_logs_included) })}</div>
+                    <div>{t("account.jobs.archiveOnStopValue", { value: displayBoolean(t, job.policy.archive_on_stop) })}</div>
+                    <div>{t("account.jobs.rawLogsValue", { value: displayBoolean(t, job.raw_logs_included) })}</div>
                     <div>{job.last_event_ts ?? t("account.jobs.waitingForEvents")}</div>
                   </div>
                 </div>
@@ -647,7 +759,7 @@ export default function AccountSessionPanel() {
               onChange={(event) => setIngressLabel(event.target.value)}
               disabled={!session}
               className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400 disabled:opacity-50"
-              placeholder={t("account.ingress.tokenLabel")}
+              placeholder={t("account.ingress.defaultLabel")}
             />
             <button
               type="button"
@@ -681,7 +793,9 @@ export default function AccountSessionPanel() {
                 >
                   <div>
                     <div className="font-medium text-slate-200">{token.label}</div>
-                    <div className="mt-1 text-[10px] text-slate-500">{token.status}</div>
+                    <div className="mt-1 text-[10px] text-slate-500">
+                      {displayMappedValue(t, token.status, tokenStatusMessages)}
+                    </div>
                   </div>
                   <div className="min-w-0">
                     <div className="break-all text-slate-400">{token.public_ingress_url}</div>
@@ -711,17 +825,17 @@ export default function AccountSessionPanel() {
           <div className="mt-2 grid gap-2 md:grid-cols-3">
             <span className="rounded bg-white/5 px-2 py-1">
               {t("account.boundary.agentCredentialsValue", {
-                value: String(status.auth_boundary.credential_collection_allowed_in_agents),
+                value: displayBoolean(t, status.auth_boundary.credential_collection_allowed_in_agents),
               })}
             </span>
             <span className="rounded bg-white/5 px-2 py-1">
               {t("account.boundary.rawPasswordsValue", {
-                value: String(status.auth_boundary.raw_password_stored),
+                value: displayBoolean(t, status.auth_boundary.raw_password_stored),
               })}
             </span>
             <span className="rounded bg-white/5 px-2 py-1">
               {t("account.boundary.discordPasswordCollectionValue", {
-                value: String(status.auth_boundary.discord_bot_password_collection_allowed),
+                value: displayBoolean(t, status.auth_boundary.discord_bot_password_collection_allowed),
               })}
             </span>
           </div>

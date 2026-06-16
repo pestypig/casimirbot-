@@ -193,6 +193,56 @@ A normal final answer requires:
 - terminal artifact matches goal contract
 - runtime authority audit passes
 
+## Turn-Chain Fundamentals
+
+This is the working rule of thumb for Helix Ask agent behavior:
+
+```txt
+Routes choose procedures.
+Tools produce observations.
+Observations re-enter reasoning.
+Chosen steps are not progress until executed.
+Drafts are not terminal authority until materialized with support refs.
+Only the completed solver path may answer.
+The visible answer must project the same terminal artifact selected by terminal authority.
+```
+
+The practical consequence is that a source-backed or tool-backed turn is not
+complete when evidence exists. It is complete only when that evidence has
+re-entered reasoning, produced a support-backed terminal artifact, passed route
+and terminal authority, and then projected that same artifact as the single
+visible answer.
+
+The successful Docs evidence synthesis path is the reference pattern:
+
+```txt
+doc route selected
+-> docs-viewer observations
+-> post-tool model synthesis step
+-> final_answer_draft with doc support refs
+-> doc_evidence_synthesis_answer materialized
+-> terminal authority selects doc_evidence_synthesis_answer
+-> visible answer and debug mirrors show doc_evidence_synthesis_answer
+```
+
+The failure classes to watch for are:
+
+```txt
+route without admitted capability
+tool receipt treated as answer
+observation not re-entered into reasoning
+chosen next step recorded but not executed
+final_answer_draft missing support refs
+terminal artifact materialized but not selected
+terminal authority selected one artifact while UI/debug projected another
+```
+
+These failures are not fixed by weakening terminal authority. They are fixed by
+completing the chain or failing closed with a typed reason. Codex parity here
+means preserving item order and authority: tool output becomes structured input
+to the next model step, and the turn completes only after the terminal item is
+actually selected and projected.
+
 ## Shared Tool Family Boundary
 
 Every source-backed, capability-backed, or multi-step tool family must expose

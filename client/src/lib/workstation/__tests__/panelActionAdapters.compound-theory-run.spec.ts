@@ -70,6 +70,7 @@ describe("theory badge graph compound theory run actions", () => {
 
     expect(result.ok).toBe(true);
     expect(result.artifact?.kind).toBe("theory_compound_run");
+    expect(result.artifact?.target_workbench).toBe("theory");
     expect(isTheoryCompoundRunV1(result.artifact?.artifact_v1)).toBe(true);
     expect(useScientificCalculatorStore.getState().lastSolve).toBeNull();
     expect(useTheoryCompoundRunStore.getState().activeTheoryRun).toBeNull();
@@ -91,6 +92,7 @@ describe("theory badge graph compound theory run actions", () => {
 
     expect(result.ok).toBe(true);
     expect(result.artifact?.kind).toBe("theory_compound_run_loaded");
+    expect(result.artifact?.target_workbench).toBe("theory");
     expect(isTheoryCompoundRunV1(result.artifact?.artifact_v1)).toBe(true);
     expect(useTheoryCompoundRunStore.getState().activeTheoryRun?.targetBadgeIds).toEqual([
       "physics.gr.einstein_field_equation",
@@ -116,6 +118,7 @@ describe("theory badge graph compound theory run actions", () => {
     const run = result.artifact?.artifact_v1;
     expect(result.ok).toBe(true);
     expect(result.artifact?.kind).toBe("theory_compound_run_solved");
+    expect(result.artifact?.target_workbench).toBe("theory");
     expect(isTheoryCompoundRunV1(run)).toBe(true);
     if (isTheoryCompoundRunV1(run)) {
       expect(run.summary.solvedCount).toBeGreaterThan(0);
@@ -125,6 +128,7 @@ describe("theory badge graph compound theory run actions", () => {
   });
 
   it("returns static runtime math traces without invoking long backend execution", () => {
+    const context = actionContext();
     const result = executeHelixPanelAction(
       {
         panel_id: "theory-badge-graph",
@@ -134,12 +138,16 @@ describe("theory badge graph compound theory run actions", () => {
           runtime_family: "solar_spectrum",
         },
       },
-      actionContext(),
+      context,
     );
 
     expect(result.ok).toBe(true);
     expect(result.artifact?.kind).toBe("theory_runtime_math_trace");
+    expect(result.artifact?.target_workbench).toBe("runtime");
     expect(isTheoryRuntimeMathTraceV1(result.artifact?.artifact_v1)).toBe(true);
+    expect(useTheoryCompoundRunStore.getState().activeRuntimeTrace?.runtimeId).toBe(result.artifact?.runtime_id);
+    expect(context.openPanel).toHaveBeenCalledWith("scientific-calculator", undefined);
+    expect(context.focusPanel).toHaveBeenCalledWith("scientific-calculator", undefined);
     expect(JSON.stringify(result.artifact)).toMatch(/Static reference trace only; no backend runtime executed/);
   });
 
@@ -162,6 +170,8 @@ describe("theory badge graph compound theory run actions", () => {
 
     expect(result.ok).toBe(true);
     expect(result.artifact?.kind).toBe("theory_scalar_cut_loaded");
+    expect(result.artifact?.target_workbench).toBe("scalar");
     expect(useScientificCalculatorStore.getState().currentLatex).toBe("E = h*c/lambda");
+    expect(useScientificCalculatorStore.getState().debugEvents[0]?.target_workbench).toBe("scalar");
   });
 });

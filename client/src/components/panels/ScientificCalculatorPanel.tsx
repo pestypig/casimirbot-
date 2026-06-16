@@ -234,6 +234,7 @@ export default function ScientificCalculatorPanel() {
   const lastStoredLatexRef = useRef(currentLatex);
   const lastTheoryRunIdRef = useRef<string | null>(null);
   const lastTheoryLoadoutIdRef = useRef<string | null>(null);
+  const lastRuntimeTraceIdRef = useRef<string | null>(null);
   const lastStandaloneSolveDebugEventIdRef = useRef<string | null>(null);
   const skipNextScalarInputPromotionRef = useRef(false);
   const scalarSectionElementRef = useRef<HTMLDivElement | null>(null);
@@ -305,21 +306,39 @@ export default function ScientificCalculatorPanel() {
   }, [activeTheoryRun, lastTheoryLoadout?.loadoutId, promoteWorkbenchSection]);
 
   useEffect(() => {
+    if (activeTheoryRun) return;
+    const nextTraceId = activeRuntimeTrace?.traceId ?? null;
+    if (!nextTraceId) {
+      lastRuntimeTraceIdRef.current = null;
+      return;
+    }
+    if (lastRuntimeTraceIdRef.current !== nextTraceId) {
+      lastRuntimeTraceIdRef.current = nextTraceId;
+      promoteWorkbenchSection("runtime");
+    }
+  }, [activeRuntimeTrace?.traceId, activeTheoryRun, promoteWorkbenchSection]);
+
+  useEffect(() => {
     const latestEvent = debugEvents[0] ?? null;
+    const targetWorkbench = latestEvent?.target_workbench ?? null;
     if (
       !latestEvent ||
       latestEvent.id === lastStandaloneSolveDebugEventIdRef.current ||
-      (latestEvent.action_id !== "solve_expression" && latestEvent.action_id !== "solve_with_steps") ||
+      (targetWorkbench !== "scalar" &&
+        latestEvent.action_id !== "solve_expression" &&
+        latestEvent.action_id !== "solve_with_steps") ||
       latestEvent.source !== "workstation_action" ||
-      latestEvent.compound_run_id ||
+      (targetWorkbench !== "scalar" && latestEvent.compound_run_id) ||
       !latestEvent.input_latex?.trim()
     ) {
       return;
     }
     lastStandaloneSolveDebugEventIdRef.current = latestEvent.id;
     const nextInput = normalizeCalculatorInputDraft(latestEvent.input_latex);
-    clearTheoryRun();
-    setTheoryLoadout(null);
+    if (!latestEvent.compound_run_id) {
+      clearTheoryRun();
+      setTheoryLoadout(null);
+    }
     setInput(nextInput);
     if (nextInput) {
       rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, nextInput);

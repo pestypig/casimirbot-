@@ -51,6 +51,7 @@ export function solveTheoryCalculatorLoadoutNow(
       calculatorSetup: item.setupContext,
       compoundRunId: loadout.loadoutId,
       compoundSubgoalId: item.id,
+      targetWorkbench: "theory",
     });
     const result = runScientificSolve(item.solveExpression, true);
     scientificState.setSolveResult(result, {
@@ -59,6 +60,7 @@ export function solveTheoryCalculatorLoadoutNow(
       calculatorSetup: item.setupContext,
       compoundRunId: loadout.loadoutId,
       compoundSubgoalId: item.id,
+      targetWorkbench: "theory",
     });
     return {
       ...item,

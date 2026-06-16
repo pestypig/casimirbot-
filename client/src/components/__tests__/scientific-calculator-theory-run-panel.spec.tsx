@@ -207,8 +207,9 @@ describe("ScientificCalculatorPanel theory run workbench", () => {
     expect(within(theorySection).getByRole("button", { name: "Solve Available" })).toBeInTheDocument();
   });
 
-  it("promotes the latest calculator workbench without duplicating theory work", async () => {
-    useTheoryCompoundRunStore.getState().loadTheoryRun(buildScalarTheoryRun());
+  it("promotes compound scalar calculator work without duplicating theory work", async () => {
+    const run = buildScalarTheoryRun();
+    useTheoryCompoundRunStore.getState().loadTheoryRun(run);
 
     render(<ScientificCalculatorPanel />);
 
@@ -221,6 +222,8 @@ describe("ScientificCalculatorPanel theory run workbench", () => {
       useScientificCalculatorStore.getState().ingestLatex("z = 2", {
         sourcePath: "agent://calculator",
         source: "workstation_action",
+        compoundRunId: run.runId,
+        targetWorkbench: "scalar",
       });
     });
 
@@ -376,6 +379,22 @@ describe("ScientificCalculatorPanel theory run workbench", () => {
     expect(within(runtimeSection).getByText("Metric Input")).toBeInTheDocument();
     expect(within(runtimeSection).getByText("Christoffel Symbols")).toBeInTheDocument();
     expect(within(runtimeSection).getByText("Source residual")).toBeInTheDocument();
+  });
+
+  it("promotes a standalone runtime trace to the Tensor / Runtime Workbench", async () => {
+    const runtimeTrace = buildMixedTheoryRun().rows.find((row) => row.runtimeMathTraceV1)?.runtimeMathTraceV1;
+    expect(runtimeTrace).toBeTruthy();
+    if (!runtimeTrace) return;
+    useTheoryCompoundRunStore.getState().setActiveRuntimeTrace(runtimeTrace);
+
+    render(<ScientificCalculatorPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: "Tensor / Runtime Workbench" })).toHaveAttribute("aria-selected", "true");
+    });
+    const runtimeSection = await screen.findByTestId("scientific-calculator-runtime-section");
+    expect(runtimeSection).toHaveStyle({ order: "0" });
+    expect(within(runtimeSection).getByText(runtimeTrace.traceId)).toBeInTheDocument();
   });
 
   it("loads a runtime scalar cut into the scalar calculator input", async () => {
