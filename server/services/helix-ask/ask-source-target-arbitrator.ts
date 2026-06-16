@@ -775,6 +775,40 @@ export function arbitrateAskSourceTarget(input: {
       allowNoToolDirect: false,
     });
   }
+  if (isExplicitDocsPathComparePrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "docs_viewer",
+      targetKind: "docs_viewer",
+      strength: "hard",
+      explicitCues: ["explicit_docs_path_compare"],
+      reasons: ["explicit_docs_path_compare_source_target", "local_docs_path_suppresses_repo_code", "exact_docs_path_operation_precedes_live_source_mailbox"],
+      requestedOutputs: ["file_path", "tool_call_eligibility", "typed_failure"],
+      suppressedRoutes: ["repo_code_evidence_question", "internet_search_lookup", "scholarly_research_lookup", "live_source_mailbox", "situation_context_question", "visual_deictic", "visual_frame_evidence", "active_doc_identity", "model_only_concept", "no_tool_direct"],
+      precedenceReason: "explicit_docs_path_compare_source_target",
+      confidence: 0.99,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (isExplicitDocsPathLocateSynthesisPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "docs_viewer",
+      targetKind: "docs_viewer",
+      strength: "hard",
+      explicitCues: ["explicit_docs_path_locate_synthesis"],
+      reasons: ["explicit_docs_path_locate_synthesis_source_target", "local_docs_path_suppresses_repo_code", "exact_docs_path_operation_precedes_live_source_mailbox"],
+      requestedOutputs: ["file_path", "tool_call_eligibility", "typed_failure"],
+      suppressedRoutes: ["repo_code_evidence_question", "internet_search_lookup", "scholarly_research_lookup", "live_source_mailbox", "situation_context_question", "visual_deictic", "visual_frame_evidence", "active_doc_identity", "model_only_concept", "no_tool_direct"],
+      precedenceReason: "explicit_docs_path_locate_synthesis_source_target",
+      confidence: 0.99,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
   if (isLiveSourceMailLoopPrompt(prompt) && !isLiveSourceCadenceControlPrompt(prompt)) {
     return toSourceTargetIntent({
       turnId: input.turnId,

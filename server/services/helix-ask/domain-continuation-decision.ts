@@ -638,24 +638,33 @@ export const buildHelixDomainContinuationDecision = (input: DomainContinuationIn
     }
 
     if (coverage.sufficient) {
+      const evidenceRefs = artifactRefsForKinds(input.payload, [
+        "doc_summary",
+        "focused_doc_answer",
+        "doc_location_result",
+        "doc_location_matches",
+        "doc_evidence_location",
+      ]);
       return continuation(input, goalKind, "continue", "doc_evidence_synthesis_requires_model_synthesis", {
         docs_continuation_contract: docsContract({
           phase: "synthesis_required",
           priorKind: "doc_evidence_observations",
-          priorRefs: artifactRefsForKinds(input.payload, [
-            "doc_summary",
-            "focused_doc_answer",
-            "doc_location_result",
-            "doc_location_matches",
-            "doc_evidence_location",
-          ]),
-          requiredCapability: null,
+          priorRefs: evidenceRefs,
+          requiredCapability: "model.direct_answer",
           expectedArtifacts: ["final_answer_draft", "doc_evidence_synthesis_answer"],
           terminalBlockReason: "doc_evidence_synthesis_answer missing",
           doneCondition: "final_answer_draft with doc evidence refs is materialized as doc_evidence_synthesis_answer",
           instruction:
-            "Docs evidence is available. Re-enter the observations into model synthesis, produce a final_answer_draft with doc artifact refs, then materialize doc_evidence_synthesis_answer. Do not terminalize intermediate doc_summary or location artifacts.",
+            "Docs evidence is available. Choose model.direct_answer to synthesize from the cited doc artifacts, produce a final_answer_draft with doc artifact refs, then materialize doc_evidence_synthesis_answer. Do not terminalize intermediate doc_summary or location artifacts.",
         }),
+        recommended_capability_hint: capabilityHint(
+          action("model", "direct_answer", {
+            prompt: input.prompt,
+            evidence_refs: evidenceRefs,
+            required_terminal_kind: "doc_evidence_synthesis_answer",
+          }),
+          "doc_evidence_synthesis_requires_model_synthesis",
+        ),
         expected_artifacts: ["final_answer_draft", "doc_evidence_synthesis_answer"],
       });
     }

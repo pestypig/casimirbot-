@@ -65,6 +65,13 @@ export function isExplicitDocsPathLocatePrompt(prompt: string): boolean {
 }
 
 export function isExplicitDocsPathLocateSynthesisPrompt(prompt: string): boolean {
+  if (
+    /\bDocument path:\s*\/?docs\/[A-Za-z0-9_./-]+\.md\b/i.test(prompt) &&
+    /\bLocate query:\s*["'`]/i.test(prompt) &&
+    /^\s*summari[sz]e\b/i.test(prompt)
+  ) {
+    return false;
+  }
   return isExplicitDocsPathLocatePrompt(prompt) && DOC_SYNTHESIS_RE.test(prompt);
 }
 
