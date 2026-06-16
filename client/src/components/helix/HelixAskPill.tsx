@@ -6035,6 +6035,194 @@ function buildHelixAskPastedTextResumeRecallRouteMetadata(args: {
   };
 }
 
+type HelixAskHardBackendEntrypointFamily =
+  | "calculator"
+  | "docs_viewer"
+  | "repo_code"
+  | "workspace_diagnostic"
+  | "internet_search"
+  | "live_pipeline"
+  | "helix_ask"
+  | "visual_capture";
+
+const resolveHelixAskHardBackendEntrypointFamily = (
+  value: string,
+): {
+  family: HelixAskHardBackendEntrypointFamily;
+  sourceTarget: string;
+  targetKind: string;
+  requiredToolFamily: string;
+  selectedCapability: string | null;
+  explicitCue: string;
+  requestedOutputs: string[];
+} | null => {
+  const normalized = value.trim();
+  if (!normalized) return null;
+  if (/\b(?:scientific-calculator\.solve_expression|scientific-calculator\.solve_with_steps|scientific\s+calculator|calculator_receipt|calculator\s+tool)\b/i.test(normalized)) {
+    return {
+      family: "calculator",
+      sourceTarget: "calculator_stream",
+      targetKind: "calculator_stream",
+      requiredToolFamily: "calculator",
+      selectedCapability: /\bscientific-calculator\.solve_with_steps\b/i.test(normalized)
+        ? "scientific-calculator.solve_with_steps"
+        : "scientific-calculator.solve_expression",
+      explicitCue: "scientific_calculator_solve",
+      requestedOutputs: ["tool_call_eligibility", "calculator_receipt", "typed_failure"],
+    };
+  }
+  if (/\b(?:docs-viewer\.[a-z0-9_.-]+|docs\s+viewer)\b/i.test(normalized)) {
+    const capability = normalized.match(/\bdocs-viewer\.[a-z0-9_.-]+\b/i)?.[0] ?? null;
+    return {
+      family: "docs_viewer",
+      sourceTarget: "docs_viewer",
+      targetKind: "docs_viewer",
+      requiredToolFamily: "docs_viewer",
+      selectedCapability: capability,
+      explicitCue: "docs_viewer_tool_family",
+      requestedOutputs: ["tool_call_eligibility", "doc_evidence", "typed_failure"],
+    };
+  }
+  if (/\b(?:repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+)\b/i.test(normalized)) {
+    const capability = normalized.match(/\b(?:repo-code|repo_code)\.[a-z0-9_.-]+\b/i)?.[0]?.replace(/^repo_code\./i, "repo-code.") ?? null;
+    return {
+      family: "repo_code",
+      sourceTarget: "repo_code",
+      targetKind: "repo_code",
+      requiredToolFamily: "repo_code",
+      selectedCapability: capability,
+      explicitCue: "repo_code_tool_family",
+      requestedOutputs: ["tool_call_eligibility", "repo_code", "line_backed_source", "typed_failure"],
+    };
+  }
+  if (/\b(?:workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status)\b/i.test(normalized)) {
+    const rawCapability = normalized.match(/\b(?:workspace-directory|workspace_directory|workspace_os)\.[a-z0-9_.-]+\b/i)?.[0] ?? null;
+    return {
+      family: "workspace_diagnostic",
+      sourceTarget: "workspace_diagnostic",
+      targetKind: "workspace_diagnostic",
+      requiredToolFamily: rawCapability?.startsWith("workspace_os.") ? "workspace_os" : "workspace_directory",
+      selectedCapability: rawCapability?.replace(/^workspace_directory\./i, "workspace-directory.") ?? null,
+      explicitCue: "workspace_diagnostic_tool_family",
+      requestedOutputs: ["tool_call_eligibility", "workspace_observation", "typed_failure"],
+    };
+  }
+  if (/\b(?:internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool)\b/i.test(normalized)) {
+    const capability = normalized.match(/\binternet_search\.[a-z0-9_.-]+\b/i)?.[0] ?? "internet_search.web_research";
+    return {
+      family: "internet_search",
+      sourceTarget: "internet_search",
+      targetKind: "internet_search",
+      requiredToolFamily: "internet_search",
+      selectedCapability: capability,
+      explicitCue: "internet_search_tool_family",
+      requestedOutputs: ["tool_call_eligibility", "web_research_observation", "typed_failure"],
+    };
+  }
+  if (/\blive_env\.[a-z0-9_.-]+\b/i.test(normalized)) {
+    const capability = normalized.match(/\blive_env\.[a-z0-9_.-]+\b/i)?.[0] ?? null;
+    return {
+      family: "live_pipeline",
+      sourceTarget: "live_pipeline",
+      targetKind: "live_pipeline",
+      requiredToolFamily: "live_env",
+      selectedCapability: capability,
+      explicitCue: "live_env_tool_family",
+      requestedOutputs: ["tool_call_eligibility", "live_source_observation", "typed_failure"],
+    };
+  }
+  if (/\bhelix_ask\.[a-z0-9_.-]+\b/i.test(normalized)) {
+    const capability = normalized.match(/\bhelix_ask\.[a-z0-9_.-]+\b/i)?.[0] ?? null;
+    return {
+      family: "helix_ask",
+      sourceTarget: "procedure_memory",
+      targetKind: "procedure_memory",
+      requiredToolFamily: "helix_ask",
+      selectedCapability: capability,
+      explicitCue: "helix_ask_tool_family",
+      requestedOutputs: ["tool_call_eligibility", "procedure_observation", "typed_failure"],
+    };
+  }
+  if (/\b(?:image_lens|visual_capture)\b/i.test(normalized)) {
+    return {
+      family: "visual_capture",
+      sourceTarget: "visual_capture",
+      targetKind: "visual_capture",
+      requiredToolFamily: "visual_capture",
+      selectedCapability: /\bimage_lens\b/i.test(normalized) ? "image_lens.inspect" : "visual_capture.inspect",
+      explicitCue: "visual_capture_tool_family",
+      requestedOutputs: ["tool_call_eligibility", "visual_frame_evidence", "typed_failure"],
+    };
+  }
+  return null;
+};
+
+export function buildHelixAskHardBackendEntrypointRouteMetadata(args: {
+  question: string;
+  base?: HelixAskRouteMetadata;
+  turnId: string;
+  threadId: string;
+}): HelixAskRouteMetadata | null {
+  const family = resolveHelixAskHardBackendEntrypointFamily(args.question);
+  if (!family) return null;
+  const sourceTargetIntent = {
+    schema: "helix.ask_source_target_intent.v1",
+    turn_id: args.turnId,
+    thread_id: args.threadId,
+    target_source: family.sourceTarget,
+    target_kind: family.targetKind,
+    strength: "hard",
+    explicit_cues: [family.explicitCue],
+    reasons: ["hard_tool_family_prompt", `${family.family}_backend_entrypoint_required`],
+    requested_outputs: Array.from(new Set(family.requestedOutputs)),
+    suppressed_routes: [
+      "conversation:simple",
+      "durable_chat_session",
+      "client_projection",
+      "evidence_finalization_fallback",
+      "model_only_concept",
+      "no_tool_direct",
+    ],
+    precedence_reason: "hard_tool_family_backend_entrypoint_required",
+    must_enter_backend_ask: true,
+    allow_client_shortcut: false,
+    allow_no_tool_direct: false,
+    confidence: 0.97,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  const mandatoryNextTool = family.selectedCapability
+    ? {
+        schema: "helix.mandatory_next_tool.v1",
+        phase: "tool_observation",
+        tool_name: family.selectedCapability,
+        required_tool_family: family.requiredToolFamily,
+        selected_capability: family.selectedCapability,
+        terminal_forbidden: true,
+        reason: "hard tool-family prompt requires backend Ask capability observation before terminal authority",
+        missing_required_evidence: family.requestedOutputs.includes("calculator_receipt")
+          ? "calculator_receipt"
+          : "tool_observation",
+        blocking_reasons: ["backend_ask_entry_required", "tool_observation_required"],
+        canonical_goal: family.family,
+        assistant_answer: false,
+        raw_content_included: false,
+      }
+    : undefined;
+  return {
+    ...(args.base ?? {}),
+    schema: "helix.ask.route_metadata.v1",
+    source: "hard_tool_backend_entrypoint",
+    sourceTarget: family.sourceTarget,
+    requiredToolFamily: family.requiredToolFamily,
+    source_target_intent: {
+      ...(args.base?.source_target_intent ?? {}),
+      ...sourceTargetIntent,
+    },
+    ...(mandatoryNextTool ? { mandatory_next_tool: mandatoryNextTool } : {}),
+  };
+}
+
 function buildQueuedAskTurn(args: {
   question: string;
   capsuleIds?: string[];
@@ -7398,6 +7586,32 @@ function shouldSuppressGeneratedStagePlayMailWakeChatProjection(
   return false;
 }
 
+export const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE = "backend_ask_entry_required";
+export const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT =
+  "This prompt requires the backend Ask solver path before a final answer can be shown.";
+
+const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE =
+  /\b(?:scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\s+viewer|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image_lens|visual_capture)\b/i;
+
+export function requiresHelixAskBackendEntrypoint(question: string | null | undefined): boolean {
+  const normalized = coerceText(question).trim();
+  if (!normalized) return false;
+  return HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE.test(normalized);
+}
+
+export function shouldUseHelixAskBackendTurnEntrypoint(args: {
+  manualCanaryEnabled: boolean;
+  hardBackendEntrypointRequired: boolean;
+}): boolean {
+  return args.manualCanaryEnabled || args.hardBackendEntrypointRequired;
+}
+
+export function hasHelixAskBackendEntrypointTurnId(turnId: string | null | undefined): boolean {
+  const normalized = coerceText(turnId).trim();
+  if (!normalized) return false;
+  return /^ask[:/]/i.test(normalized) || /(?:^|:)ask:[0-9a-z-]+(?:$|:)/i.test(normalized);
+}
+
 export function buildHelixAskRepliesFromChatSession(session: ChatSession): HelixAskReply[] {
   const messages = [...(session.messages ?? [])].sort((left, right) => {
     const leftMs = parseChatMessageTimeMs(left);
@@ -7427,17 +7641,65 @@ export function buildHelixAskRepliesFromChatSession(session: ChatSession): Helix
     }
     const createdAtMs = parseChatMessageTimeMs(message) ?? parseChatMessageTimeMs(pendingUser ?? message) ?? Date.now();
     const turnId = message.traceId?.trim() || pendingUser?.traceId?.trim() || null;
+    const question = pendingUser?.content ?? "";
+    const askEntrypointRequired = requiresHelixAskBackendEntrypoint(question);
+    const askEntrypointObserved = false;
+    if (askEntrypointRequired && !askEntrypointObserved) {
+      replies.push({
+        id: buildHelixAskChatProjectionId(session, pendingUser, message),
+        createdAtMs,
+        content: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
+        question,
+        turn_id: turnId,
+        ok: false,
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
+        debug: {
+          durable_chat_projection: true,
+          ask_entrypoint_required: true,
+          ask_entrypoint_observed: false,
+          ask_entrypoint_failure_code: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
+          blocked_projection_kind: "durable_chat_session",
+          session_id: session.id,
+          user_message_id: pendingUser?.id ?? null,
+          assistant_message_id: message.id,
+          created_at_ms: createdAtMs,
+          turn_id: turnId,
+          selected_final_answer: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
+          final_answer_source: "typed_failure",
+          terminal_artifact_kind: "typed_failure",
+          terminal_error_code: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
+          typed_failure: {
+            schema: "helix.ask.typed_failure.v1",
+            code: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
+            message: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
+          },
+          resolved_turn_summary: {
+            final_status: "final_failure",
+            terminal_artifact_kind: "typed_failure",
+            terminal_error_code: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
+          },
+        } as HelixAskReply["debug"],
+      });
+      pendingUser = null;
+      continue;
+    }
     replies.push({
       id: buildHelixAskChatProjectionId(session, pendingUser, message),
       createdAtMs,
       content: answer,
-      question: pendingUser?.content ?? "",
+      question,
       turn_id: turnId,
       ok: true,
       final_answer_source: "durable_chat_session",
       terminal_artifact_kind: "chat_final_answer",
       debug: {
         durable_chat_projection: true,
+        ask_entrypoint_required: askEntrypointRequired,
+        ask_entrypoint_observed: askEntrypointObserved,
+        ask_entrypoint_failure_code: null,
+        blocked_projection_kind: null,
         session_id: session.id,
         user_message_id: pendingUser?.id ?? null,
         assistant_message_id: message.id,
@@ -14811,6 +15073,9 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
   const typedFailureText =
     coerceText(payload.terminal_failure_text).trim() ||
     coerceText(typedFailure?.message).trim() ||
+    (terminalErrorCode === HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE
+      ? HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT
+      : null) ||
     terminalAuthorityText ||
     renderTypedFailureFallback(terminalErrorCode);
   const selectedFinalAnswerCandidateRaw =
@@ -14929,6 +15194,50 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
   const canonicalActiveTurnId = coerceText(terminalAuthorityForDebug?.turn_id).trim() || activeTurnId;
   const clientActiveTurnId = reply.id && reply.id !== canonicalActiveTurnId ? reply.id : null;
   const activePrompt = reply.question ?? coerceText(payload.selectedDebugQuestion).trim() ?? "";
+  const backendDebugRefPresent = Boolean(
+    readAgentLoopAuditRecord(debug?.debug_export_ref) ?? readAgentLoopAuditRecord(payload.debug_export_ref),
+  );
+  const backendSolverArtifactPresent = Boolean(
+    payload.ask_turn_solver_trace ??
+      debug?.ask_turn_solver_trace ??
+      agentLoop?.ask_turn_solver_trace ??
+      payload.agent_runtime_loop ??
+      debug?.agent_runtime_loop ??
+      agentLoop?.agent_runtime_loop ??
+      payload.canonical_goal_frame ??
+      debug?.canonical_goal_frame ??
+      agentLoop?.canonical_goal_frame,
+  );
+  const askEntrypointRequired =
+    typeof agentLoop?.ask_entrypoint_required === "boolean"
+      ? agentLoop.ask_entrypoint_required
+      : typeof debug?.ask_entrypoint_required === "boolean"
+        ? debug.ask_entrypoint_required
+        : typeof payload.ask_entrypoint_required === "boolean"
+          ? payload.ask_entrypoint_required
+          : requiresHelixAskBackendEntrypoint(activePrompt);
+  const askEntrypointObserved =
+    typeof agentLoop?.ask_entrypoint_observed === "boolean"
+      ? agentLoop.ask_entrypoint_observed
+      : typeof debug?.ask_entrypoint_observed === "boolean"
+        ? debug.ask_entrypoint_observed
+        : typeof payload.ask_entrypoint_observed === "boolean"
+          ? payload.ask_entrypoint_observed
+          : askEntrypointRequired
+            ? backendDebugRefPresent || backendSolverArtifactPresent
+            : null;
+  const askEntrypointFailureCode =
+    coerceText(agentLoop?.ask_entrypoint_failure_code).trim() ||
+    coerceText(debug?.ask_entrypoint_failure_code).trim() ||
+    coerceText(payload.ask_entrypoint_failure_code).trim() ||
+    (askEntrypointRequired && askEntrypointObserved === false
+      ? HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE
+      : null);
+  const blockedProjectionKind =
+    coerceText(agentLoop?.blocked_projection_kind).trim() ||
+    coerceText(debug?.blocked_projection_kind).trim() ||
+    coerceText(payload.blocked_projection_kind).trim() ||
+    (askEntrypointRequired && askEntrypointObserved === false ? "client_projection" : null);
   const toolTraceDisclosureForDebug = buildCompactToolTraceDisclosure(actionEnvelopeForDebug, canonicalActiveTurnId);
   const voicePlaybackReconciliation = buildVoicePlaybackReconciliationDebug({
     activeTurnId: canonicalActiveTurnId,
@@ -14951,6 +15260,12 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     active_prompt_hash: stableHelixProjectionHash(activePrompt),
     selected_final_answer: selectedFinalAnswer,
     final_answer_source: clientProgressPlaceholderExport ? null : finalAnswerSource,
+    terminal_artifact_kind: terminalArtifactKind,
+    terminal_error_code: terminalErrorCode,
+    ask_entrypoint_required: askEntrypointRequired,
+    ask_entrypoint_observed: askEntrypointObserved,
+    ask_entrypoint_failure_code: askEntrypointFailureCode,
+    blocked_projection_kind: blockedProjectionKind,
     voice_playback_reconciliation: voicePlaybackReconciliation,
     situation_context_pack: situationContextPackForDebug,
     live_environment_turn_relevance: liveEnvironmentRelevanceForDebug,
@@ -32381,6 +32696,7 @@ export function HelixAskPill({
         explicitTurnInputItemsForTurn ?? inferredTurnInputItemsForTurn;
       const runAskTurnId = pendingWorkstationUserInputRef.current?.turn_id ?? `ask:${crypto.randomUUID()}`;
       const backendOwnedPastedTextResumeRecall = isHelixAskPastedTextResumeRecallPrompt(trimmed);
+      const hardBackendEntrypointRequired = requiresHelixAskBackendEntrypoint(trimmed);
       let imageAttachmentLensRunForTurn = options?.imageAttachmentLensRun ?? null;
       const firstNativeImageAttachment = nativeImageAttachments.find(
         (attachment) => validateHelixAskImageAttachmentForSubmit(attachment)?.can_submit,
@@ -32427,7 +32743,7 @@ export function HelixAskPill({
       }
       const explicitPanelCommand = !backendOwnedPastedTextResumeRecall && /^\s*\/open\b/i.test(trimmed);
       const bypassWorkstationDispatch =
-        options?.bypassWorkstationDispatch === true || backendOwnedPastedTextResumeRecall;
+        options?.bypassWorkstationDispatch === true || backendOwnedPastedTextResumeRecall || hardBackendEntrypointRequired;
       const suppressWorkstationPayloadActions = options?.suppressWorkstationPayloadActions === true;
       if (!bypassWorkstationDispatch) {
         cancelPendingWorkstationRequestForTurnTransition({
@@ -32567,6 +32883,7 @@ export function HelixAskPill({
       }
       const shouldOfferContextChooser =
         HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG &&
+        !hardBackendEntrypointRequired &&
         !options?.skipContextChooser &&
         !options?.contextMode &&
         preliminaryDispatchPlan.should_dispatch_reasoning;
@@ -32868,8 +33185,11 @@ export function HelixAskPill({
       const inferredMode = inferAskMode(trimmed);
       const repoCodeEvidencePrompt = isRepoCodeEvidencePrompt(trimmed);
       const simpleConversationTurnLane =
-        !backendOwnedPastedTextResumeRecall && isSimpleConversationTurnCandidate(trimmed);
+        !hardBackendEntrypointRequired &&
+        !backendOwnedPastedTextResumeRecall &&
+        isSimpleConversationTurnCandidate(trimmed);
       const simpleDirectPromptLane =
+        !hardBackendEntrypointRequired &&
         !backendOwnedPastedTextResumeRecall &&
         !repoCodeEvidencePrompt &&
         (docsViewerWorkstationLane ||
@@ -32894,6 +33214,7 @@ export function HelixAskPill({
           dispatchPolicy: frozenRunAskDispatchPolicy,
         }).reasoning_required === "hard";
       const manualDispatchHint =
+        hardBackendEntrypointRequired ||
         !HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG &&
         !simpleDirectPromptLane &&
         (options?.forceReasoningDispatch === true || trimmed.length > 0);
@@ -32962,13 +33283,25 @@ export function HelixAskPill({
       requestMoodHint(trimmed, { force: true });
       const sessionId = getHelixAskSessionId();
       const traceId = runAskTurnId;
+      const hardBackendEntrypointRouteMetadata = hardBackendEntrypointRequired
+        ? buildHelixAskHardBackendEntrypointRouteMetadata({
+            question: trimmed,
+            base: options?.routeMetadata,
+            turnId: runAskTurnId,
+            threadId: sessionId ?? runAskTurnId,
+          })
+        : null;
       const routeMetadataForTurn = backendOwnedPastedTextResumeRecall
         ? buildHelixAskPastedTextResumeRecallRouteMetadata({
             base: options?.routeMetadata,
             turnId: runAskTurnId,
             threadId: sessionId ?? runAskTurnId,
           })
-        : options?.routeMetadata;
+        : hardBackendEntrypointRouteMetadata ?? options?.routeMetadata;
+      const useBackendAskTurnEntrypoint = shouldUseHelixAskBackendTurnEntrypoint({
+        manualCanaryEnabled: HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG,
+        hardBackendEntrypointRequired,
+      });
       resetHelixAskConsoleStreamIngressDebug({ turnId: runAskTurnId, traceId, startedAtMs });
       const voiceAutoSpeakArmedAtTurnStart = micArmStateRef.current === "on";
       const manualAttempt = manualDispatchHint
@@ -33173,7 +33506,7 @@ export function HelixAskPill({
               : workspaceContextWithAmbientVisualCapability;
           let localResponse: AskLocalResult;
           let downgradedFromMode: AskLocalMode | undefined;
-          if (HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG) {
+          if (useBackendAskTurnEntrypoint) {
             const askTurnPayload = {
               sessionId: sessionId ?? undefined,
               traceId,
@@ -33184,7 +33517,7 @@ export function HelixAskPill({
               responseLanguage: preferredResponseLanguage,
               preferredResponseLanguage: preferredResponseLanguage,
               lang_schema_version: "helix.lang.v1",
-              debug: userSettings.showHelixAskDebug,
+              debug: userSettings.showHelixAskDebug || hardBackendEntrypointRequired,
               signal: controller.signal,
               mode: askModeForRequest,
               contextMode: reasoningContextModeForTurn,
@@ -33303,7 +33636,7 @@ export function HelixAskPill({
               responseLanguage: preferredResponseLanguage,
               preferredResponseLanguage: preferredResponseLanguage,
               lang_schema_version: "helix.lang.v1",
-              debug: userSettings.showHelixAskDebug,
+              debug: userSettings.showHelixAskDebug || hardBackendEntrypointRequired,
               signal: controller.signal,
               mode: askModeForRequest,
               workspaceContextSnapshot: reasoningContextModeForTurn === "isolated" ? undefined : workspaceContextSnapshotForTurn,
@@ -33320,7 +33653,7 @@ export function HelixAskPill({
             ? localResponse.turn_transcript_events
             : [];
           if (
-            HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG &&
+            useBackendAskTurnEntrypoint &&
             responseTranscriptEvents.length > 0 &&
             helixAskConsoleStreamIngressDebugRef.current.acceptedLiveEventCount === 0
           ) {
@@ -33393,7 +33726,7 @@ export function HelixAskPill({
             localResponse.action_envelope,
             actionEnvelopeRuntimeAuthority.audit,
           );
-          if (responseDebugWithClientMode || HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG) {
+          if (responseDebugWithClientMode || useBackendAskTurnEntrypoint) {
             responseDebugWithClientMode = attachHelixActionEnvelopeRuntimeAuthorityDebug(
               responseDebugWithClientMode,
               localResponse.action_envelope,
@@ -33401,7 +33734,7 @@ export function HelixAskPill({
             );
             responseDebugWithClientMode = {
               ...responseDebugWithClientMode,
-              ui_turn_contract_source: HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG ? "ask_turn" : "legacy_local",
+              ui_turn_contract_source: useBackendAskTurnEntrypoint ? "ask_turn" : "legacy_local",
               ui_local_fast_path_suppressed: unifiedAskTurnOwnsManualDispatch,
               ui_visual_attachment_submitted: Boolean(visualEvidenceForTurn || submittedAttachments.length > 0),
               ui_image_attachment_lens_run: imageAttachmentLensRunForTurn,
@@ -33767,6 +34100,18 @@ export function HelixAskPill({
             finalAnswerSource: finalAnswerSourceForVoice,
             hasPendingRequest: hasPendingRequestForTerminal,
           });
+          const askEntrypointRequiredForResponse = requiresHelixAskBackendEntrypoint(trimmed);
+          const askEntrypointObservedForResponse =
+            Boolean(
+              responseDebugPayload?.debug_export_ref ||
+                localResponseRecord.debug_export_ref ||
+                responseDebugPayload?.ask_turn_solver_trace ||
+                responseDebugPayload?.agent_runtime_loop ||
+                responseDebugPayload?.canonical_goal_frame ||
+                localResponseRecord.ask_turn_solver_trace ||
+                localResponseRecord.agent_runtime_loop ||
+                localResponseRecord.agent_loop_audit,
+            );
           if (evidenceGateDecision.blocked && !preserveAuthoritativeTerminal) {
             appendSyntheticLiveEvent(
               buildNeedsRetrievalPlanEvent({
@@ -33792,7 +34137,34 @@ export function HelixAskPill({
                 evidence_refs: evidenceGateDecision.evidence_refs,
               },
             });
-            responseText = evidenceGateDecision.safe_text ?? responseText;
+            if (askEntrypointRequiredForResponse && !askEntrypointObservedForResponse) {
+              responseText = HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT;
+              if (responseDebugPayload && typeof responseDebugPayload === "object") {
+                Object.assign(responseDebugPayload, {
+                  ask_entrypoint_required: true,
+                  ask_entrypoint_observed: false,
+                  ask_entrypoint_failure_code: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
+                  blocked_projection_kind: "evidence_finalization_fallback",
+                  selected_final_answer: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
+                  final_answer_source: "typed_failure",
+                  terminal_artifact_kind: "typed_failure",
+                  terminal_error_code: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
+                  typed_failure: {
+                    schema: "helix.ask.typed_failure.v1",
+                    code: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
+                    message: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
+                  },
+                  resolved_turn_summary: {
+                    ...(readAgentLoopAuditRecord(responseDebugPayload.resolved_turn_summary) ?? {}),
+                    final_status: "final_failure",
+                    terminal_artifact_kind: "typed_failure",
+                    terminal_error_code: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
+                  },
+                });
+              }
+            } else {
+              responseText = evidenceGateDecision.safe_text ?? responseText;
+            }
           }
           const responseSituationContextPackForDebug =
             localResponseForTerminal?.situation_context_pack ??

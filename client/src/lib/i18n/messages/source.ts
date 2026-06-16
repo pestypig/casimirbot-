@@ -1034,6 +1034,13 @@ export const interfaceSourceMessages = {
     context: "Narrator panel toolbar.",
     screenshotSurface: "workstation",
   },
+  "narrator.action.debugProbe": {
+    id: "narrator.action.debugProbe",
+    defaultMessage: "Publish narrator debug probe",
+    description: "Accessible label for publishing a narrator debug probe event.",
+    context: "Narrator panel toolbar.",
+    screenshotSurface: "workstation",
+  },
   "narrator.action.speak": {
     id: "narrator.action.speak",
     defaultMessage: "Speak narrator event",

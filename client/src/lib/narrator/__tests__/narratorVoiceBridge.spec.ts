@@ -31,9 +31,14 @@ describe("narrator voice bridge", () => {
       text: event.text,
       mode: "callout",
       chunkKind: "panel_narration",
+      traceId: "trace:1",
       turnKey: "turn:1",
       evidenceRefs: ["panel:receipt:1"],
       dedupe_key: "panel:narrator:1",
+      repoAttributed: false,
+      deterministic: true,
+      textCertainty: "unknown",
+      voiceCertainty: "unknown",
     });
   });
 

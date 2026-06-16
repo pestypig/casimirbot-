@@ -1037,12 +1037,16 @@ export type VoiceSpeakPayload = {
   turnKey?: string;
   evidenceRefs?: string[];
   repoAttributed?: boolean;
+  deterministic?: boolean;
+  textCertainty?: "unknown" | "hypothesis" | "reasoned" | "confirmed";
+  voiceCertainty?: "unknown" | "hypothesis" | "reasoned" | "confirmed";
   dedupe_key?: string;
 };
 
 export type VoiceSpeakJsonResponse = {
   ok?: boolean;
   suppressed?: boolean;
+  dryRun?: boolean;
   reason?: string;
   error?: string;
   message?: string;

@@ -1,3 +1,5 @@
+import { buildNarratorDebugSnapshot } from "@/lib/narrator/narratorDebug";
+
 export type DebugExportUiResult = {
   attempted_payload_hash: string;
   copied_payload_hash?: string;
@@ -50,6 +52,14 @@ const readString = (value: unknown): string | null =>
 const readBoolean = (value: unknown): boolean | null =>
   typeof value === "boolean" ? value : null;
 
+const HELIX_DEBUG_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE =
+  /\b(?:scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\s+viewer|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image_lens|visual_capture)\b/i;
+
+const requiresBackendEntrypointForDebugExport = (value: unknown): boolean => {
+  const text = readString(value);
+  return Boolean(text && HELIX_DEBUG_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE.test(text));
+};
+
 const HELIX_DEBUG_EXPORT_MAX_UI_CHARS = 750_000;
 
 const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: string): string => {
@@ -63,6 +73,10 @@ const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: st
     final_answer_source: payload.final_answer_source,
     terminal_artifact_kind: payload.terminal_artifact_kind,
     terminal_error_code: payload.terminal_error_code,
+    ask_entrypoint_required: payload.ask_entrypoint_required ?? debug?.ask_entrypoint_required ?? null,
+    ask_entrypoint_observed: payload.ask_entrypoint_observed ?? debug?.ask_entrypoint_observed ?? null,
+    ask_entrypoint_failure_code: payload.ask_entrypoint_failure_code ?? debug?.ask_entrypoint_failure_code ?? null,
+    blocked_projection_kind: payload.blocked_projection_kind ?? debug?.blocked_projection_kind ?? null,
     server_build_commit: payload.server_build_commit ?? debug?.server_build_commit ?? null,
     server_build_started_at_ms: payload.server_build_started_at_ms ?? debug?.server_build_started_at_ms ?? null,
     helix_docs_synthesis_bridge_version:
@@ -103,6 +117,10 @@ const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: st
       final_answer_source: payload.final_answer_source ?? debug?.final_answer_source ?? null,
       terminal_artifact_kind: payload.terminal_artifact_kind ?? debug?.terminal_artifact_kind ?? null,
       terminal_error_code: payload.terminal_error_code ?? debug?.terminal_error_code ?? null,
+      ask_entrypoint_required: payload.ask_entrypoint_required ?? debug?.ask_entrypoint_required ?? null,
+      ask_entrypoint_observed: payload.ask_entrypoint_observed ?? debug?.ask_entrypoint_observed ?? null,
+      ask_entrypoint_failure_code: payload.ask_entrypoint_failure_code ?? debug?.ask_entrypoint_failure_code ?? null,
+      blocked_projection_kind: payload.blocked_projection_kind ?? debug?.blocked_projection_kind ?? null,
     },
     debug_export_size_control: {
       schema: "helix.ask.debug_export_size_control.v1",
@@ -627,16 +645,56 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     readString(agentLoop?.terminal_error_code) ??
     readString(debug?.terminal_error_code) ??
     readString(payload.terminal_error_code);
+  const promptRequiresBackendEntrypoint = requiresBackendEntrypointForDebugExport(
+    readString(reply.question) ?? readString(payload.selectedDebugQuestion) ?? "",
+  );
+  const backendDebugRefPresent = Boolean(asRecord(debug?.debug_export_ref) ?? asRecord(payload.debug_export_ref));
+  const backendSolverArtifactPresent = Boolean(
+    payload.ask_turn_solver_trace ??
+      debug?.ask_turn_solver_trace ??
+      agentLoop?.ask_turn_solver_trace ??
+      payload.agent_runtime_loop ??
+      debug?.agent_runtime_loop ??
+      agentLoop?.agent_runtime_loop ??
+      payload.canonical_goal_frame ??
+      debug?.canonical_goal_frame ??
+      agentLoop?.canonical_goal_frame,
+  );
+  const askEntrypointRequired =
+    readBoolean(agentLoop?.ask_entrypoint_required) ??
+    readBoolean(debug?.ask_entrypoint_required) ??
+    readBoolean(payload.ask_entrypoint_required) ??
+    promptRequiresBackendEntrypoint;
+  const askEntrypointObserved =
+    readBoolean(agentLoop?.ask_entrypoint_observed) ??
+    readBoolean(debug?.ask_entrypoint_observed) ??
+    readBoolean(payload.ask_entrypoint_observed) ??
+    (askEntrypointRequired ? backendDebugRefPresent || backendSolverArtifactPresent : null);
+  const askEntrypointFailureCode =
+    readString(agentLoop?.ask_entrypoint_failure_code) ??
+    readString(debug?.ask_entrypoint_failure_code) ??
+    readString(payload.ask_entrypoint_failure_code) ??
+    (askEntrypointRequired && askEntrypointObserved === false ? "backend_ask_entry_required" : null);
+  const blockedProjectionKind =
+    readString(agentLoop?.blocked_projection_kind) ??
+    readString(debug?.blocked_projection_kind) ??
+    readString(payload.blocked_projection_kind) ??
+    (askEntrypointRequired && askEntrypointObserved === false ? "client_projection" : null);
+  const effectiveTerminalErrorCode = terminalErrorCode ?? askEntrypointFailureCode;
+  const effectiveTerminalArtifactKind =
+    terminalArtifactKind ?? (effectiveTerminalErrorCode ? "typed_failure" : null);
+  const effectiveFinalAnswerSource =
+    finalAnswerSource ?? (effectiveTerminalErrorCode ? "typed_failure" : null);
   const typedFailure = asRecord(payload.typed_failure ?? debug?.typed_failure ?? agentLoop?.typed_failure);
   const terminalAuthorityText = readString(terminalAuthority?.terminal_text_preview);
   const terminalIsTypedFailure =
-    terminalArtifactKind === "typed_failure" ||
-    finalAnswerSource === "typed_failure" ||
-    Boolean(terminalErrorCode);
+    effectiveTerminalArtifactKind === "typed_failure" ||
+    effectiveFinalAnswerSource === "typed_failure" ||
+    Boolean(effectiveTerminalErrorCode);
   const modelSynthesizedFinalDraft =
     !terminalIsTypedFailure &&
-    terminalArtifactKind === "model_synthesized_answer" &&
-    finalAnswerSource === "final_answer_draft";
+    effectiveTerminalArtifactKind === "model_synthesized_answer" &&
+    effectiveFinalAnswerSource === "final_answer_draft";
   const selectedFinalAnswer =
     modelSynthesizedFinalDraft
       ? readString(payload.selected_final_answer) ??
@@ -647,6 +705,9 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
       : terminalIsTypedFailure
       ? readString(payload.terminal_failure_text) ??
         readString(typedFailure?.message) ??
+        (effectiveTerminalErrorCode === "backend_ask_entry_required"
+          ? "This prompt requires the backend Ask solver path before a final answer can be shown."
+          : null) ??
         terminalAuthorityText
       : readString(terminalPresentation?.concise_text) ??
         readString(payload.selected_final_answer) ??
@@ -675,6 +736,9 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     source: payload,
     ledger,
   });
+  const narratorDebug =
+    asRecord(payload.client_narrator_debug ?? debug?.client_narrator_debug ?? payload.narrator_debug ?? debug?.narrator_debug) ??
+    buildNarratorDebugSnapshot({ activeTurnId: canonicalActiveTurnId });
   const envelopeWithoutHash = {
     schema: "helix.ask.debug_export.v1",
     exported_at_ms: Date.now(),
@@ -686,15 +750,22 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     active_prompt: readString(reply.question) ?? readString(payload.selectedDebugQuestion) ?? "",
     active_prompt_hash: hashDebugExportText(readString(reply.question) ?? readString(payload.selectedDebugQuestion) ?? ""),
     selected_final_answer: selectedFinalAnswer,
-    final_answer_source: finalAnswerSource,
+    final_answer_source: effectiveFinalAnswerSource,
+    terminal_artifact_kind: effectiveTerminalArtifactKind,
+    terminal_error_code: effectiveTerminalErrorCode,
+    ask_entrypoint_required: askEntrypointRequired,
+    ask_entrypoint_observed: askEntrypointObserved,
+    ask_entrypoint_failure_code: askEntrypointFailureCode,
+    blocked_projection_kind: blockedProjectionKind,
     voice_playback_reconciliation: voicePlaybackReconciliation,
     voice_steering_debug: voiceSteeringDebug,
+    narrator_debug: narratorDebug,
     resolved_turn_summary: {
       turn_id: canonicalActiveTurnId,
       final_status: "final_answer",
       resolved_route_label: "unknown",
-      terminal_artifact_kind: terminalArtifactKind,
-      terminal_error_code: terminalErrorCode,
+      terminal_artifact_kind: effectiveTerminalArtifactKind,
+      terminal_error_code: effectiveTerminalErrorCode,
       pending_server_request_present: Boolean(agentLoop?.pending_request),
     },
     solver_controller_summary: buildSolverControllerSummary(payload),

@@ -232,6 +232,24 @@ describe("panelActionAdapters", () => {
       terminal_eligible: false,
       panel_generated_answer: false,
     });
+
+    const probeResult = executeHelixPanelAction(
+      {
+        panel_id: "narrator",
+        action_id: "narrator.debug_auto_speak_probe",
+        args: { trace_id: "trace:narrator-probe" },
+      },
+      actionContext(),
+    );
+    expect(probeResult.ok).toBe(true);
+    expect(probeResult.artifact).toMatchObject({
+      kind: "narrator_debug_auto_speak_probe_receipt",
+      published: true,
+      trace_id: "trace:narrator-probe",
+      assistant_answer: false,
+      terminal_eligible: false,
+      panel_generated_answer: false,
+    });
   });
 
   it("sets interface language through the account-session workstation action", () => {

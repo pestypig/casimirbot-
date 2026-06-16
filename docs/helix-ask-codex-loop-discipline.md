@@ -103,28 +103,43 @@ quoted/screen-visible cue
 mixed intent prompt
 ```
 
-The prompt-solving benchmark is the default adversarial battery:
+Use the discipline checks as a routing aid, not as blanket ceremony. The cheap
+static classifier remains useful during edit loops:
 
 ```bash
-npm run helix:ask:discipline
+npm run helix:ask:discipline:quick
 ```
 
-This top-level guard verifies the ignored Codex runtime reference checkout,
-scans Helix Ask-sensitive changed files for poison/shortcut risks, runs the
-prompt-solving benchmark and API parity matrix, and builds the server. For fast
-edit-loop feedback, use `npm run helix:ask:discipline:quick`; for live-source
-identity or continuation changes, use `npm run helix:ask:discipline:full`.
+The quick guard verifies the ignored Codex runtime reference checkout when
+needed, scans Helix Ask-sensitive changed files for poison/shortcut risks, and
+prints inferred classifications. It is advisory unless it reports a hard static
+failure.
 
-The underlying adversarial benchmark remains:
+Do not run the full discipline guard as a universal handoff gate. It runs a
+fixed, expensive battery even when the changed files need a narrower check, and
+its per-file `required_tests` report is informational. Select verification by
+the contract changed.
+
+For prompt interpretation, lexical/tool cue, shortcut-like rule,
+mixed-intent, source admission, or tool-admission changes, run the adversarial
+prompt-solving benchmark:
 
 ```bash
 npx vitest run server/__tests__/helix.ask.prompt-solving-benchmark.test.ts --pool=forks
 ```
 
-For applicable patches, run the API parity matrix:
+For Ask API, route-product, loop-parity, terminal-authority, or presentation
+contract changes, run the API parity matrix:
 
 ```bash
 npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks
+```
+
+For live-source identity or continuation changes, run the full live-source
+discipline battery:
+
+```bash
+npm run helix:ask:discipline:full
 ```
 
 When testing against a running local server, use the top-level API probe:

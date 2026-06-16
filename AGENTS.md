@@ -16,12 +16,20 @@ This repo uses `WARP_AGENTS.md` for warp-physics constraints and required tests.
 Always read and follow those requirements when working on warp/GR features.
 For deterministic G4 debugging workflow, also follow `AGENT_PLAYBOOK.md`.
 
-## Required: Casimir verification gate for any patch
+## Casimir verification gate
 
-All agents must run this verification for every patch and report the PASS
-verdict plus certificate hash/integrity status in the response.
+Run Casimir verification when the patch touches warp/GR physics, adapter
+contracts, constraint packs, training-trace export/capture, certificate
+semantics, CI/release verification, or code that claims physical viability,
+proof maturity, or certified gate status. Report the PASS verdict plus
+certificate hash/integrity status when this gate applies.
 
-When you make any code/config change:
+For ordinary UI, copy, documentation, test-only, or non-physics application
+patches, prefer the relevant local unit/build checks instead of spending a
+server-backed Casimir verify run. Do not present skipped Casimir verification as
+proof of adapter or certificate integrity.
+
+When the gate applies:
 
 1) Propose the patch (diff) as usual.
 2) Run the verifier using the adapter endpoint.
@@ -105,10 +113,11 @@ Patch-time contract:
 - If present, use the ignored local Codex reference checkout at
   `external/openai-codex-compare` for grep/diff comparisons. Do not commit or
   mutate it as part of Helix Ask patches.
-- Run `npm run helix:ask:discipline:quick` during edit loops when touching
-  Helix Ask-sensitive surfaces. Before handoff, run
-  `npm run helix:ask:discipline`; use `npm run helix:ask:discipline:full` when
-  live-source identity or continuation behavior changed.
+- Use `npm run helix:ask:discipline:quick` as a cheap static classifier when
+  touching Helix Ask-sensitive surfaces. Do not treat the full discipline guard
+  as a universal handoff gate; run targeted tests for the contract actually
+  changed. Use `npm run helix:ask:discipline:full` only when live-source
+  identity or continuation behavior changed.
 - Lexical cues in user text are not execution. Contextual, negated, historical,
   future, quoted, or screen-visible tool/control words must not admit mutating
   tools unless the prompt is an affirmative operator command.
@@ -121,17 +130,26 @@ Patch-time contract:
 - Every shortcut-like rule must include adversarial tests for contextual,
   negated, future/conditional, historical, quoted/screen-visible, and mixed
   intent prompts.
-- For applicable Helix Ask changes, run the discipline guard, or at minimum the
-  prompt-solving benchmark plus the API parity test or live-server parity probe
-  and report any disabled/frontier scenarios separately:
-  `npm run helix:ask:discipline`
+- For applicable Helix Ask changes, choose the narrowest meaningful verification
+  path and report any disabled/frontier scenarios separately:
+  `npm run helix:ask:discipline:quick` for static changed-file classification
+  and shortcut-risk scanning;
   `npx vitest run server/__tests__/helix.ask.prompt-solving-benchmark.test.ts --pool=forks`
+  for prompt interpretation, lexical/tool cue, shortcut, mixed-intent, or
+  source-admission changes;
   `npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks`
-  or `npm run helix:ask:api-parity`.
+  for Ask API, route-product, loop-parity, and terminal-authority contract
+  changes;
+  `npm run helix:ask:api-parity` for parity against an already-running keyed
+  local server; and
+  `npm run helix:ask:discipline:full` for live-source identity or continuation
+  changes.
 
 Agent expectations for readiness loop:
 - Run contract battery + variety battery and report probability scorecard.
-- Treat Casimir verification as a hard gate for completion claims.
+- Treat Casimir verification as a hard gate for completion claims only when the
+  patch touches its verification scope: warp/GR, adapter, constraint-pack,
+  training-trace, certificate, CI/release, or proof-maturity surfaces.
 - Include prompt/output/verdict evidence for representative pass and fail cases.
 
 Mission-control expectations:

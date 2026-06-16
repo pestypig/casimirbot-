@@ -870,6 +870,32 @@ type VoiceSynthFetchFailure = {
   retryable: boolean;
 };
 
+type VoiceSpeakDebugEvent = {
+  schema: "helix.voice_speak_debug_event.v1";
+  observedAtMs: number;
+  breadcrumbId: string;
+  traceId: string | null;
+  missionId: string | null;
+  eventId: string | null;
+  utteranceId: string | null;
+  turnKey: string | null;
+  chunkKind: VoiceRequest["chunkKind"] | null;
+  narrator: boolean;
+  textHash: string;
+  textLength: number;
+  evidenceRefCount: number;
+  statusCode: number;
+  outcome: "audio_response" | "metadata_response" | "error_response";
+  provider: string | null;
+  cache: string | null;
+  contentType: string | null;
+  durationMs: number;
+  assistant_answer: false;
+  terminal_eligible: false;
+  raw_content_included: false;
+  output_authority: "voice_transport_observation";
+};
+
 const COOLDOWN_SECONDS: Record<VoicePriority, number> = {
   info: 60,
   warn: 30,
@@ -889,6 +915,8 @@ const missionWindow = new Map<string, number[]>();
 
 const missionBudgetWindow = new Map<string, number[]>();
 const tenantBudgetDaily = new Map<string, { day: string; count: number }>();
+const recentVoiceSpeakDebugEvents: VoiceSpeakDebugEvent[] = [];
+const MAX_RECENT_VOICE_SPEAK_DEBUG_EVENTS = 200;
 
 type VoiceSpeakCacheEntry = {
   expiresAtMs: number;
@@ -922,6 +950,70 @@ const createVoiceSpeakCacheKey = (payload: VoiceRequest, provider: string, voice
   hash.update("|");
   hash.update(payload.text);
   return hash.digest("hex");
+};
+
+const hashVoiceSpeakDebugText = (text: string): string =>
+  `sha256:${createHash("sha256").update(text).digest("hex")}`;
+
+const isNarratorVoiceChunk = (payload: VoiceRequest): boolean =>
+  payload.chunkKind === "narrator_read" ||
+  payload.chunkKind === "panel_narration" ||
+  /^narrator[:_-]/i.test(payload.eventId?.trim() ?? "") ||
+  /^narrator[:_-]/i.test(payload.utteranceId?.trim() ?? "");
+
+const recordVoiceSpeakDebugEvent = (event: VoiceSpeakDebugEvent): void => {
+  recentVoiceSpeakDebugEvents.push(event);
+  if (recentVoiceSpeakDebugEvents.length > MAX_RECENT_VOICE_SPEAK_DEBUG_EVENTS) {
+    recentVoiceSpeakDebugEvents.splice(
+      0,
+      recentVoiceSpeakDebugEvents.length - MAX_RECENT_VOICE_SPEAK_DEBUG_EVENTS,
+    );
+  }
+};
+
+const attachVoiceSpeakDebugRecorder = (
+  res: Response,
+  payload: VoiceRequest,
+  breadcrumbId: string,
+  startedAtMs: number,
+): void => {
+  res.once("finish", () => {
+    const contentType = String(res.getHeader("content-type") ?? "") || null;
+    const provider = String(res.getHeader("x-voice-provider") ?? "") || null;
+    const cache = String(res.getHeader("x-voice-cache") ?? "") || null;
+    const statusCode = res.statusCode;
+    const outcome: VoiceSpeakDebugEvent["outcome"] =
+      statusCode >= 400
+        ? "error_response"
+        : contentType?.startsWith("audio/")
+          ? "audio_response"
+          : "metadata_response";
+    recordVoiceSpeakDebugEvent({
+      schema: "helix.voice_speak_debug_event.v1",
+      observedAtMs: Date.now(),
+      breadcrumbId,
+      traceId: payload.traceId ?? null,
+      missionId: payload.missionId ?? null,
+      eventId: payload.eventId ?? null,
+      utteranceId: payload.utteranceId ?? null,
+      turnKey: payload.turnKey ?? null,
+      chunkKind: payload.chunkKind ?? null,
+      narrator: isNarratorVoiceChunk(payload),
+      textHash: hashVoiceSpeakDebugText(payload.text),
+      textLength: payload.text.length,
+      evidenceRefCount: payload.evidenceRefs?.length ?? 0,
+      statusCode,
+      outcome,
+      provider,
+      cache,
+      contentType,
+      durationMs: Math.max(0, Date.now() - startedAtMs),
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      output_authority: "voice_transport_observation",
+    });
+  });
 };
 
 const readVoiceSpeakChunkCache = (cacheKey: string, nowMs: number): VoiceSpeakCacheEntry | null => {
@@ -1098,7 +1190,7 @@ const recordBackendSuccess = (): void => {
 
 const setCors = (res: Response) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Tenant-Id, X-Customer-Id");
 };
 
@@ -1191,6 +1283,12 @@ const hasInterimVoiceReceiptAuthority = (payload: VoiceRequest): boolean => {
   const utteranceId = payload.utteranceId?.trim() ?? "";
   const traceId = payload.traceId?.trim() ?? "";
   const evidenceRefs = payload.evidenceRefs?.map((ref) => ref.trim()).filter(Boolean) ?? [];
+  const isNarratorReceipt =
+    (payload.chunkKind === "narrator_read" || payload.chunkKind === "panel_narration") &&
+    Boolean(eventId) &&
+    /^narrator[:_-]/i.test(utteranceId) &&
+    (utteranceId.includes(eventId) || evidenceRefs.some((ref) => ref === eventId || ref.includes(eventId)));
+  if (isNarratorReceipt) return true;
   const isInterimReceipt =
     /^helix_interim_voice_callout_receipt:/i.test(eventId) ||
     /^translation_obs:/i.test(eventId);
@@ -1973,6 +2071,40 @@ voiceRouter.options("/speaker-session/trust", (_req, res) => {
   res.status(200).end();
 });
 
+voiceRouter.options("/debug/recent", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+voiceRouter.get("/debug/recent", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  const limitValue = Number.parseInt(String(req.query.limit ?? "50"), 10);
+  const limit = Number.isFinite(limitValue) ? Math.min(200, Math.max(1, limitValue)) : 50;
+  const chunkKind = typeof req.query.chunkKind === "string" ? req.query.chunkKind.trim() : "";
+  const narratorQuery = String(req.query.narrator ?? req.query.narratorOnly ?? "").trim().toLowerCase();
+  const narratorOnly = narratorQuery === "1" || narratorQuery === "true";
+  const events = recentVoiceSpeakDebugEvents
+    .filter((event) => (!chunkKind ? true : event.chunkKind === chunkKind))
+    .filter((event) => (!narratorOnly ? true : event.narrator))
+    .slice(-limit)
+    .reverse();
+  return res.status(200).json({
+    schema: "helix.voice_speak_debug_recent.v1",
+    generatedAtMs: Date.now(),
+    count: events.length,
+    limit,
+    filters: {
+      chunkKind: chunkKind || null,
+      narratorOnly,
+    },
+    events,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  });
+});
+
 voiceRouter.get("/speaker-session/:sessionId", (req: Request, res: Response) => {
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
@@ -2580,6 +2712,7 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
   const payload = parsed.data;
   const traceId = payload.traceId?.trim() || undefined;
   const policyNowMs = resolvePolicyNowMs(payload);
+  attachVoiceSpeakDebugRecorder(res, payload, breadcrumbId, Date.now());
   writeVoiceLaneBreadcrumb("voice.speak.validated", {
     breadcrumbId,
     request: readVoiceLaneRequestSummary(payload),
@@ -3224,6 +3357,7 @@ const resetVoiceRouteState = () => {
   missionBudgetWindow.clear();
   tenantBudgetDaily.clear();
   voiceSpeakChunkCache.clear();
+  recentVoiceSpeakDebugEvents.splice(0, recentVoiceSpeakDebugEvents.length);
   sttBackendCooldownUntil.clear();
   resetSpeakerSessionRegistry();
   circuitBreaker.openedUntil = 0;

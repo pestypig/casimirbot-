@@ -1659,6 +1659,15 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
         returns_artifact: true,
       },
       {
+        id: "narrator.debug_auto_speak_probe",
+        title: "Narrator Auto-Speak Probe",
+        description: "Publish an evidence-only narrator probe event that is eligible for the existing voice stack.",
+        risk: "low",
+        aliases: ["test narrator voice", "debug narrator auto speak", "trigger narrator probe"],
+        optional_args: ["text", "trace_id"],
+        returns_artifact: true,
+      },
+      {
         id: "narrator.clear_feed",
         title: "Clear Narrator Feed",
         description: "Clear local narrator event history without changing source policies.",

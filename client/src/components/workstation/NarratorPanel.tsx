@@ -1,5 +1,5 @@
 import React from "react";
-import { Bell, Copy, Eye, EyeOff, Megaphone, Pause, RotateCcw, Trash2, Volume2 } from "lucide-react";
+import { Bell, Bug, Copy, Eye, EyeOff, Megaphone, Pause, RotateCcw, Trash2, Volume2 } from "lucide-react";
 import { speakVoice } from "@/lib/agi/api";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
@@ -54,6 +54,7 @@ export default function NarratorPanel() {
   const events = useNarratorStore((state) => state.events);
   const sourcePolicies = useNarratorStore((state) => state.sourcePolicies);
   const queueState = useNarratorStore((state) => state.queueState);
+  const publishEvent = useNarratorStore((state) => state.publishEvent);
   const setSourcePolicy = useNarratorStore((state) => state.setSourcePolicy);
   const markQueued = useNarratorStore((state) => state.markQueued);
   const markSpoken = useNarratorStore((state) => state.markSpoken);
@@ -61,6 +62,7 @@ export default function NarratorPanel() {
   const clearFeed = useNarratorStore((state) => state.clearFeed);
   const resetPolicies = useNarratorStore((state) => state.resetPolicies);
   const [speakingEventId, setSpeakingEventId] = React.useState<string | null>(null);
+  const autoSpeakAttemptedEventIdsRef = React.useRef<Set<string>>(new Set());
 
   const speakEvent = React.useCallback(async (event: NarratorEventV1) => {
     if (!event.speakable || event.sourceKind === "voice_receipt") return;
@@ -69,7 +71,13 @@ export default function NarratorPanel() {
     try {
       const payload = buildNarratorVoiceSpeakPayload({ event });
       const response = await speakVoice(payload);
-      if (response.kind === "json" && response.status >= 400) {
+      if (
+        response.kind === "json" &&
+        (response.status >= 400 ||
+          response.payload.ok === false ||
+          response.payload.suppressed === true ||
+          response.payload.dryRun === true)
+      ) {
         markFailed(event.eventId);
       } else {
         markSpoken(event.eventId);
@@ -80,6 +88,44 @@ export default function NarratorPanel() {
       setSpeakingEventId(null);
     }
   }, [markFailed, markQueued, markSpoken]);
+
+  React.useEffect(() => {
+    if (speakingEventId) return;
+    const nextEvent = [...events].reverse().find((event) => {
+      if (!event.speakable || event.sourceKind === "voice_receipt") return false;
+      if (autoSpeakAttemptedEventIdsRef.current.has(event.eventId)) return false;
+      const policy = sourcePolicies[event.sourceKind];
+      const status = queueState.deliveryStatusByEventId[event.eventId] ?? "visible";
+      return Boolean(
+        status === "visible" &&
+          policy?.enabled &&
+          (policy.deliveryMode === "auto_speak" || event.requestedDeliveryMode === "auto_speak"),
+      );
+    });
+    if (!nextEvent) return;
+    autoSpeakAttemptedEventIdsRef.current.add(nextEvent.eventId);
+    void speakEvent(nextEvent);
+  }, [events, queueState.deliveryStatusByEventId, sourcePolicies, speakEvent, speakingEventId]);
+
+  const publishDebugProbe = React.useCallback(() => {
+    const nowMs = Date.now();
+    publishEvent({
+      sourceKind: "workstation_panel",
+      sourceId: "panel:narrator:debug_probe",
+      sourceLabelMessageId: "narrator.source.workstationPanel",
+      text: "Narrator debug probe. This should route through the existing voice stack when auto-speak is eligible.",
+      authority: "panel_observation",
+      assistant_answer: false,
+      terminal_eligible: false,
+      certainty: "low",
+      evidenceRefs: ["narrator:debug_probe"],
+      traceId: `narrator:debug:${nowMs}`,
+      rawContentIncluded: false,
+      speakable: true,
+      requestedDeliveryMode: "auto_speak",
+      defaultDeliveryMode: "visible_only",
+    }, { voiceArmed: true, nowMs });
+  }, [publishEvent]);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-zinc-950 text-zinc-100">
@@ -92,6 +138,15 @@ export default function NarratorPanel() {
           </div>
         </div>
         <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={publishDebugProbe}
+            className="inline-flex h-8 w-8 items-center justify-center rounded border border-cyan-400/40 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/20"
+            title={t("narrator.action.debugProbe")}
+            aria-label={t("narrator.action.debugProbe")}
+          >
+            <Bug className="h-4 w-4" />
+          </button>
           <button
             type="button"
             onClick={resetPolicies}

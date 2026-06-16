@@ -9,18 +9,28 @@ export function narratorVoiceChunkKind(event: NarratorEventV1): NarratorVoiceChu
   return "narrator_read";
 }
 
+function narratorCertaintyToVoiceCertainty(
+  certainty: NarratorEventV1["certainty"],
+): NonNullable<VoiceSpeakPayload["textCertainty"]> {
+  if (certainty === "high") return "confirmed";
+  if (certainty === "medium") return "reasoned";
+  if (certainty === "low") return "hypothesis";
+  return "unknown";
+}
+
 export function buildNarratorVoiceSpeakPayload(input: {
   event: NarratorEventV1;
   text?: string;
   voiceProfileId?: string | null;
 }): VoiceSpeakPayload {
   const chunkKind = narratorVoiceChunkKind(input.event);
+  const voiceCertainty = narratorCertaintyToVoiceCertainty(input.event.certainty);
   return {
     text: input.text ?? input.event.text,
     mode: chunkKind === "final" ? "briefing" : "callout",
     priority: input.event.sourceKind === "final_answer" ? "info" : "info",
     voice_profile_id: input.voiceProfileId ?? undefined,
-    traceId: input.event.traceId,
+    traceId: input.event.traceId ?? input.event.turnKey ?? input.event.eventId,
     eventId: input.event.eventId,
     utteranceId: `narrator:${input.event.eventId}`,
     chunkIndex: 0,
@@ -29,5 +39,9 @@ export function buildNarratorVoiceSpeakPayload(input: {
     turnKey: input.event.turnKey,
     evidenceRefs: input.event.evidenceRefs,
     dedupe_key: input.event.dedupeKey,
+    repoAttributed: false,
+    deterministic: true,
+    textCertainty: voiceCertainty,
+    voiceCertainty,
   };
 }

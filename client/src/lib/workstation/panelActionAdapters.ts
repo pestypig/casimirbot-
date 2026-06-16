@@ -2281,6 +2281,51 @@ export function executeHelixPanelAction(
       };
     }
 
+    if (actionId === "narrator.debug_auto_speak_probe") {
+      const nowMs = Date.now();
+      const text =
+        asNonEmptyString(args.text) ??
+        "Narrator debug probe. This should route through the existing voice stack when auto-speak is eligible.";
+      const traceId = asNonEmptyString(args.trace_id ?? args.traceId) ?? `narrator:debug:${nowMs}`;
+      const event = narratorStore.publishEvent({
+        sourceKind: "workstation_panel",
+        sourceId: "panel:narrator:debug_probe",
+        sourceLabelMessageId: "narrator.source.workstationPanel",
+        text,
+        authority: "panel_observation",
+        assistant_answer: false,
+        terminal_eligible: false,
+        certainty: "low",
+        evidenceRefs: ["narrator:debug_probe"],
+        traceId,
+        rawContentIncluded: false,
+        speakable: true,
+        requestedDeliveryMode: "auto_speak",
+        defaultDeliveryMode: "visible_only",
+      }, { voiceArmed: true, nowMs });
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "narrator_debug_auto_speak_probe_receipt",
+          schema: "helix.narrator_debug_auto_speak_probe_receipt.v1",
+          event_id: event?.eventId ?? null,
+          published: Boolean(event),
+          source_kind: "workstation_panel",
+          source_id: "panel:narrator:debug_probe",
+          trace_id: traceId,
+          output_authority: "narrator_router_observation",
+          assistant_answer: false,
+          raw_content_included: false,
+          terminal_eligible: false,
+          panel_generated_answer: false,
+        },
+      };
+    }
+
     if (actionId === "narrator.clear_feed") {
       narratorStore.clearFeed();
       return {

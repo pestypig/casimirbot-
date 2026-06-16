@@ -16,6 +16,12 @@ keeping TTS engine implementation replaceable.
 
 Additional endpoint:
 - `POST /api/voice/transcribe` (multipart `audio` + optional `language`, `traceId`, `missionId`, `durationMs`)
+- `GET /api/voice/debug/recent?limit=<n>&narrator=true&chunkKind=panel_narration`
+  returns recent `/api/voice/speak` transport diagnostics for debugging playback
+  routing. The response is metadata-only: text hash, text length, trace/event
+  identifiers, chunk kind, outcome, provider/cache headers, and evidence counts.
+  It must not include raw spoken text, audio, API keys, or terminal-answer
+  authority.
 - Response shape for UI dictation:
   - `ok`, `text`, `language`, `duration_ms`, `segments`, `traceId`, `missionId`, `engine`
   - optional multilingual metadata: `source_text`, `source_language`, `translated`

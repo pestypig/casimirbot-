@@ -169,6 +169,59 @@ describe("voice routes normalization", () => {
     });
   });
 
+  it("records recent narrator speech diagnostics without raw spoken text", async () => {
+    process.env.VOICE_PROXY_DRY_RUN = "1";
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const app = await buildApp();
+    const eventId = "narrator:event:probe:1";
+    await request(app)
+      .post("/api/voice/speak")
+      .send({
+        text: "Narrator backend debug probe text.",
+        mode: "callout",
+        priority: "info",
+        format: "wav",
+        chunkKind: "panel_narration",
+        utteranceId: `narrator:${eventId}`,
+        eventId,
+        traceId: "trace:narrator-backend",
+        evidenceRefs: [eventId],
+        repoAttributed: false,
+      })
+      .expect(200);
+
+    const recent = await request(app)
+      .get("/api/voice/debug/recent")
+      .query({ narrator: "true", chunkKind: "panel_narration", limit: "5" })
+      .expect(200);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(recent.body).toMatchObject({
+      schema: "helix.voice_speak_debug_recent.v1",
+      count: 1,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(JSON.stringify(recent.body)).not.toContain("Narrator backend debug probe text.");
+    expect(recent.body.events[0]).toMatchObject({
+      schema: "helix.voice_speak_debug_event.v1",
+      traceId: "trace:narrator-backend",
+      eventId,
+      chunkKind: "panel_narration",
+      narrator: true,
+      outcome: "metadata_response",
+      statusCode: 200,
+      textHash: expect.stringMatching(/^sha256:/),
+      textLength: "Narrator backend debug probe text.".length,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+  });
+
   it("fails closed before transcription when the server is under memory pressure", async () => {
     process.env.VOICE_TRANSCRIBE_MAX_HEAP_USED_MB = "1";
 
