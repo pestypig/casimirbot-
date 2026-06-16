@@ -10,6 +10,7 @@ import {
   detectModelOnlyConceptSourceSignal,
   hasExplicitModelOnlyConceptScope,
 } from "./model-only-concept-source-guard";
+import { isExplicitDocsPathDocumentOperation } from "./docs-viewer-intent";
 
 export type HelixRepoCodeEvidenceIntent = {
   repoEvidenceRequested: boolean;
@@ -150,15 +151,11 @@ export function detectRepoCodeEvidenceIntent(promptText: string): HelixRepoCodeE
       projectEntity: null,
     };
   }
-  const looksLikeDocsViewerDocumentRequest =
-    /(?:^|\s)\/?docs\/[A-Za-z0-9_./-]+\.md\b/i.test(prompt) &&
-    /\b(?:docs?\s+viewer|from\s+docs?|summari[sz]e|summary|read|white\s*paper|paper|document|sections?)\b/i.test(prompt) &&
-    !/\b(?:repo|repository|codebase|source\s+code|implementation|where\s+in\s+(?:the\s+)?code|file\s+paths?\s+and\s+lines?)\b/i.test(prompt);
-  if (looksLikeDocsViewerDocumentRequest) {
+  if (isExplicitDocsPathDocumentOperation(prompt)) {
     return {
       repoEvidenceRequested: false,
       strength: "none",
-      reasons: ["docs_viewer_document_request_not_repo_code"],
+      reasons: ["docs_viewer_exact_doc_path_request_not_repo_code"],
       requestedOutputs: [],
       projectEntity: null,
     };

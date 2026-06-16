@@ -515,6 +515,7 @@ describe("resolveLiveSourceTurnPhase", () => {
       "Show the active MicroDeck prompts for this source.",
       "Inspect the micro-reasoner deck that is assembled for the live source.",
       "List the prompt presets in the source deck assembly.",
+      "Show the earbud translation presets for the audio transcript source.",
     ]) {
       const phase = resolveLiveSourceTurnPhase({
         prompt,
@@ -557,10 +558,13 @@ describe("resolveLiveSourceTurnPhase", () => {
   it("does not execute MicroDeck query from quoted, negated, future, historical, or screen-visible mentions", () => {
     for (const prompt of [
       "Do not query the MicroDeck right now; explain what it is for.",
+      "Do not query the earbud translation presets right now; explain what they are for.",
       "Later we might inspect the micro-reasoner deck.",
+      "If we inspect the audio translation deck tomorrow, what should we watch for?",
       "If we inspect the MicroDeck presets tomorrow, what should we watch for?",
       "Earlier we queried the MicroDeck preset assembly during the smoke test.",
       "The UI button says MicroDeck presets.",
+      "The UI button says Earbud MicroDeck.",
       "The current screen-visible label reads Query MicroDeck presets.",
       "The operator said \"query the MicroDeck presets\" in the old transcript.",
       "The phrase `live_env.query_micro_reasoner_presets` is shown in the docs.",
@@ -579,7 +583,9 @@ describe("resolveLiveSourceTurnPhase", () => {
   it("does not execute MicroDeck draft from quoted, negated, future, historical, or screen-visible mentions", () => {
     for (const prompt of [
       "Do not draft a MicroDeck right now; explain the idea first.",
+      "Do not draft an earbud translation preset right now; explain the idea first.",
       "Later we might design a micro-reasoner deck for this.",
+      "If we design an audio transcript deck tomorrow, what inputs should we collect?",
       "If we draft the MicroDeck preset tomorrow, what inputs should we collect?",
       "Earlier we recommended a MicroDeck setup during the smoke test.",
       "The UI button says Draft MicroDeck preset.",

@@ -55,6 +55,59 @@ describe("stage play micro-reasoner prompt presets", () => {
       .toBe("stage_play_micro_reasoner_prompt_preset:generic-live-source:v1");
   });
 
+  it("lists earbud MicroDeck presets for audio transcript sources without mixing visual presets", () => {
+    const presets = listStagePlayMicroReasonerPromptPresets({
+      sourceId: "audio_transcript:test",
+      sourceKind: "audio_transcript",
+      includePresets: true,
+    });
+    const presetIds = presets.map((preset) => preset.presetId);
+
+    expect(presetIds).toEqual(expect.arrayContaining([
+      "stage_play_micro_reasoner_prompt_preset:earbud-translate-english:v1",
+      "stage_play_micro_reasoner_prompt_preset:earbud-translate-spanish:v1",
+      "stage_play_micro_reasoner_prompt_preset:earbud-explain-plain-english:v1",
+    ]));
+    expect(presetIds).not.toContain("stage_play_micro_reasoner_prompt_preset:minecraft_minimal_operator:v1");
+    expect(getActiveStagePlayMicroReasonerPromptPresetForSource({
+      sourceId: "audio_transcript:test",
+      sourceKind: "audio_transcript",
+    })?.presetId).toBe("stage_play_micro_reasoner_prompt_preset:earbud-translate-english:v1");
+  });
+
+  it("applies an earbud translation deck only to audio transcript sources", () => {
+    const applied = applyStagePlayMicroReasonerPromptPreset({
+      presetId: "stage_play_micro_reasoner_prompt_preset:earbud-translate-spanish:v1",
+      sourceIds: ["audio_transcript:test"],
+      sourceKind: "audio_transcript",
+      now: "2026-06-04T12:00:00.000Z",
+    });
+    const activePreset = getActiveStagePlayMicroReasonerPromptPresetForSource({
+      sourceId: "audio_transcript:test",
+      sourceKind: "audio_transcript",
+    });
+    const prompts = listStagePlayActiveMicroReasonerPromptsForSource({
+      sourceId: "audio_transcript:test",
+      sourceKind: "audio_transcript",
+    });
+    const rejected = applyStagePlayMicroReasonerPromptPreset({
+      presetId: "stage_play_micro_reasoner_prompt_preset:earbud-translate-spanish:v1",
+      sourceIds: ["visual_source:test"],
+      sourceKind: "visual_frame",
+    });
+
+    expect(applied?.sourceIds).toContain("audio_transcript:test");
+    expect(activePreset).toMatchObject({
+      presetId: "stage_play_micro_reasoner_prompt_preset:earbud-translate-spanish:v1",
+      domain: "audio_translation",
+      outputPolicy: "earbud_translation",
+      promptedRoles: ["packet_composer"],
+    });
+    expect(prompts.find((prompt) => prompt.role === "packet_composer")?.promptId)
+      .toBe("stage_play_micro_reasoner_prompt:earbud-translate-spanish:packet_composer:v1");
+    expect(rejected).toBeNull();
+  });
+
   it("applies a source preset and resolves role prompts through the selected deck", () => {
     const applied = applyStagePlayMicroReasonerPromptPreset({
       presetId: "stage_play_micro_reasoner_prompt_preset:calculator-tool-call:v1",

@@ -6,6 +6,7 @@ import type {
   StagePlayMicroReasonerWakePromptContractV1,
   StagePlayMicroReasonerRunV1,
   StagePlayProcessedMailPacketV1,
+  StagePlayLiveSourceMailSourceKindV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import {
   STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA,
@@ -43,7 +44,7 @@ const defaultPromptIdForRole = (role: StagePlayMicroReasonerRoleV1): string =>
   `stage_play_micro_reasoner_prompt:${role}:v1`;
 
 const presetPromptIdForRole = (
-  preset: "calculator-tool-call" | "science-visual",
+  preset: "calculator-tool-call" | "science-visual" | "earbud-translate-english" | "earbud-translate-spanish" | "earbud-explain-plain-english",
   role: StagePlayMicroReasonerRoleV1,
 ): string => `stage_play_micro_reasoner_prompt:${preset}:${role}:v1`;
 
@@ -63,6 +64,25 @@ const DEFAULT_PROMPTED_MICRO_REASONER_ROLES: StagePlayMicroReasonerRoleV1[] = [
   "hypothesis_arbiter",
   "decision_selector",
 ];
+
+const DEFAULT_EARBUD_TRANSLATION_PRESET_ID =
+  "stage_play_micro_reasoner_prompt_preset:earbud-translate-english:v1";
+
+const inferSourceKindFromMicroReasonerSourceId = (
+  sourceId?: string | null,
+): StagePlayLiveSourceMailSourceKindV1 | null => {
+  const normalized = String(sourceId ?? "").toLowerCase();
+  if (!normalized) return null;
+  if (/audio|transcript|voice|earbud/.test(normalized)) return "audio_transcript";
+  if (/visual|frame|screen|capture|image/.test(normalized)) return "visual_frame";
+  if (/minecraft|world/.test(normalized)) return "minecraft_world_event";
+  return null;
+};
+
+const sourceKindMatchesPreset = (
+  preset: StagePlayMicroReasonerPromptPresetV1,
+  sourceKind?: StagePlayLiveSourceMailSourceKindV1 | string | null,
+): boolean => !sourceKind || preset.sourceKinds.includes(sourceKind as StagePlayLiveSourceMailSourceKindV1);
 
 const DEFAULT_MICRO_REASONER_PROMPTS: Array<Omit<StagePlayMicroReasonerPromptV1, "createdAt" | "updatedAt">> = [
   {
@@ -810,6 +830,135 @@ const PRESET_MICRO_REASONER_PROMPTS: Array<Omit<StagePlayMicroReasonerPromptV1, 
     terminal_eligible: false,
     context_role: "tool_policy",
   },
+  {
+    artifactId: "stage_play_micro_reasoner_prompt",
+    schemaVersion: STAGE_PLAY_MICRO_REASONER_PROMPT_SCHEMA,
+    promptId: presetPromptIdForRole("earbud-translate-english", "packet_composer"),
+    title: "Earbud Translate To English",
+    role: "packet_composer",
+    version: 1,
+    active: true,
+    template: [
+      "You are an earbud translation micro-reasoner for audio transcript mail.",
+      "",
+      "Input is transcript evidence from a live audio source. Produce a compact translation candidate for the operator.",
+      "",
+      "Rules:",
+      "- Translate meaning into English.",
+      "- Preserve names, numbers, technical terms, and uncertainty.",
+      "- Do not answer the user.",
+      "- Do not claim audio playback happened.",
+      "- Do not include raw audio.",
+      "- Return JSON only.",
+      "",
+      "Output:",
+      "{",
+      '  "targetLanguage": "English",',
+      '  "translatedText": string,',
+      '  "sourceLanguage": string | null,',
+      '  "confidence": "low" | "medium" | "high",',
+      '  "uncertainties": string[],',
+      '  "speakerIntent": string | null,',
+      '  "evidenceRefs": string[]',
+      "}",
+    ].join("\n"),
+    inputSchemaName: "StagePlayLiveSourceMailItemV1",
+    outputSchemaName: "EarbudTranslationOutputV1",
+    modelPreference: "small_fast_llm",
+    maxInputItems: 3,
+    maxOutputTokens: 360,
+    linkedNoteId: null,
+    presetIds: [DEFAULT_EARBUD_TRANSLATION_PRESET_ID],
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  },
+  {
+    artifactId: "stage_play_micro_reasoner_prompt",
+    schemaVersion: STAGE_PLAY_MICRO_REASONER_PROMPT_SCHEMA,
+    promptId: presetPromptIdForRole("earbud-translate-spanish", "packet_composer"),
+    title: "Earbud Translate To Spanish",
+    role: "packet_composer",
+    version: 1,
+    active: true,
+    template: [
+      "You are an earbud translation micro-reasoner for audio transcript mail.",
+      "",
+      "Input is transcript evidence from a live audio source. Produce a compact translation candidate for the operator.",
+      "",
+      "Rules:",
+      "- Translate meaning into Spanish.",
+      "- Preserve names, numbers, technical terms, and uncertainty.",
+      "- Do not answer the user.",
+      "- Do not claim audio playback happened.",
+      "- Do not include raw audio.",
+      "- Return JSON only.",
+      "",
+      "Output:",
+      "{",
+      '  "targetLanguage": "Spanish",',
+      '  "translatedText": string,',
+      '  "sourceLanguage": string | null,',
+      '  "confidence": "low" | "medium" | "high",',
+      '  "uncertainties": string[],',
+      '  "speakerIntent": string | null,',
+      '  "evidenceRefs": string[]',
+      "}",
+    ].join("\n"),
+    inputSchemaName: "StagePlayLiveSourceMailItemV1",
+    outputSchemaName: "EarbudTranslationOutputV1",
+    modelPreference: "small_fast_llm",
+    maxInputItems: 3,
+    maxOutputTokens: 360,
+    linkedNoteId: null,
+    presetIds: ["stage_play_micro_reasoner_prompt_preset:earbud-translate-spanish:v1"],
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  },
+  {
+    artifactId: "stage_play_micro_reasoner_prompt",
+    schemaVersion: STAGE_PLAY_MICRO_REASONER_PROMPT_SCHEMA,
+    promptId: presetPromptIdForRole("earbud-explain-plain-english", "packet_composer"),
+    title: "Earbud Explain In Plain English",
+    role: "packet_composer",
+    version: 1,
+    active: true,
+    template: [
+      "You are an earbud explanation micro-reasoner for audio transcript mail.",
+      "",
+      "Input is transcript evidence from a live audio source. Explain the meaning in plain English for the operator.",
+      "",
+      "Rules:",
+      "- Preserve the speaker's intent and uncertainty.",
+      "- Translate only when needed to explain the transcript.",
+      "- Do not answer the user.",
+      "- Do not claim audio playback happened.",
+      "- Do not include raw audio.",
+      "- Return JSON only.",
+      "",
+      "Output:",
+      "{",
+      '  "targetLanguage": "English",',
+      '  "translatedText": string,',
+      '  "sourceLanguage": string | null,',
+      '  "confidence": "low" | "medium" | "high",',
+      '  "uncertainties": string[],',
+      '  "speakerIntent": string | null,',
+      '  "evidenceRefs": string[]',
+      "}",
+    ].join("\n"),
+    inputSchemaName: "StagePlayLiveSourceMailItemV1",
+    outputSchemaName: "EarbudTranslationOutputV1",
+    modelPreference: "small_fast_llm",
+    maxInputItems: 3,
+    maxOutputTokens: 360,
+    linkedNoteId: null,
+    presetIds: ["stage_play_micro_reasoner_prompt_preset:earbud-explain-plain-english:v1"],
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  },
 ];
 
 const DEFAULT_WAKE_COALESCING_POLICY: StagePlayMicroReasonerPromptPresetV1["wakeCoalescingPolicy"] = {
@@ -882,6 +1031,69 @@ const DEFAULT_MICRO_REASONER_PROMPT_PRESETS: Array<Omit<StagePlayMicroReasonerPr
     deckRunPlan: "baseline_plus_prompted",
     wakeCoalescingPolicy: DEFAULT_WAKE_COALESCING_POLICY,
     outputPolicy: "watch_officer",
+    active: true,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  },
+  {
+    artifactId: "stage_play_micro_reasoner_prompt_preset",
+    schemaVersion: STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA,
+    presetId: DEFAULT_EARBUD_TRANSLATION_PRESET_ID,
+    title: "Earbud Translate To English",
+    description: "Audio-transcript MicroDeck that translates live audio chunks into compact English earbud output candidates.",
+    domain: "audio_translation",
+    sourceKinds: ["audio_transcript"],
+    sourceIds: [],
+    rolePromptIds: {
+      packet_composer: presetPromptIdForRole("earbud-translate-english", "packet_composer"),
+    },
+    promptedRoles: ["packet_composer"],
+    deckRunPlan: "baseline_plus_prompted",
+    wakeCoalescingPolicy: DEFAULT_WAKE_COALESCING_POLICY,
+    outputPolicy: "earbud_translation",
+    active: true,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  },
+  {
+    artifactId: "stage_play_micro_reasoner_prompt_preset",
+    schemaVersion: STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA,
+    presetId: "stage_play_micro_reasoner_prompt_preset:earbud-translate-spanish:v1",
+    title: "Earbud Translate To Spanish",
+    description: "Audio-transcript MicroDeck that translates live audio chunks into compact Spanish earbud output candidates.",
+    domain: "audio_translation",
+    sourceKinds: ["audio_transcript"],
+    sourceIds: [],
+    rolePromptIds: {
+      packet_composer: presetPromptIdForRole("earbud-translate-spanish", "packet_composer"),
+    },
+    promptedRoles: ["packet_composer"],
+    deckRunPlan: "baseline_plus_prompted",
+    wakeCoalescingPolicy: DEFAULT_WAKE_COALESCING_POLICY,
+    outputPolicy: "earbud_translation",
+    active: true,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  },
+  {
+    artifactId: "stage_play_micro_reasoner_prompt_preset",
+    schemaVersion: STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA,
+    presetId: "stage_play_micro_reasoner_prompt_preset:earbud-explain-plain-english:v1",
+    title: "Earbud Explain In Plain English",
+    description: "Audio-transcript MicroDeck that explains live audio chunks in compact plain-English earbud output candidates.",
+    domain: "audio_translation",
+    sourceKinds: ["audio_transcript"],
+    sourceIds: [],
+    rolePromptIds: {
+      packet_composer: presetPromptIdForRole("earbud-explain-plain-english", "packet_composer"),
+    },
+    promptedRoles: ["packet_composer"],
+    deckRunPlan: "baseline_plus_prompted",
+    wakeCoalescingPolicy: DEFAULT_WAKE_COALESCING_POLICY,
+    outputPolicy: "earbud_translation",
     active: true,
     assistant_answer: false,
     terminal_eligible: false,
@@ -1493,14 +1705,17 @@ export function getStagePlayMicroReasonerPromptPreset(
 
 export function listStagePlayMicroReasonerPromptPresets(input: {
   sourceId?: string | null;
+  sourceKind?: StagePlayLiveSourceMailSourceKindV1 | string | null;
   includePresets?: boolean;
   active?: boolean | null;
   limit?: number;
 } = {}): StagePlayMicroReasonerPromptPresetV1[] {
   ensureDefaultStagePlayMicroReasonerPromptPresets();
   const limit = Math.max(1, Math.min(input.limit ?? 100, 250));
+  const sourceKind = input.sourceKind ?? inferSourceKindFromMicroReasonerSourceId(input.sourceId);
   return Array.from(promptPresetsById.values())
     .filter((preset) => input.active == null || preset.active === input.active)
+    .filter((preset) => sourceKindMatchesPreset(preset, sourceKind))
     .filter((preset) =>
       !input.sourceId ||
       preset.sourceIds.includes(input.sourceId) ||
@@ -1513,21 +1728,27 @@ export function listStagePlayMicroReasonerPromptPresets(input: {
 
 export function getActiveStagePlayMicroReasonerPromptPresetForSource(input: {
   sourceId?: string | null;
+  sourceKind?: StagePlayLiveSourceMailSourceKindV1 | string | null;
   presetId?: string | null;
 } = {}): StagePlayMicroReasonerPromptPresetV1 | null {
   ensureDefaultStagePlayMicroReasonerPromptPresets();
+  const sourceKind = input.sourceKind ?? inferSourceKindFromMicroReasonerSourceId(input.sourceId);
   if (input.presetId) {
     const preset = getStagePlayMicroReasonerPromptPreset(input.presetId);
-    if (preset?.active) return preset;
+    if (preset?.active && sourceKindMatchesPreset(preset, sourceKind)) return preset;
   }
   if (input.sourceId) {
     const scoped = listStagePlayMicroReasonerPromptPresets({
       sourceId: input.sourceId,
+      sourceKind,
       active: true,
       includePresets: false,
       limit: 25,
     }).at(-1);
     if (scoped) return scoped;
+  }
+  if (sourceKind === "audio_transcript") {
+    return getStagePlayMicroReasonerPromptPreset(DEFAULT_EARBUD_TRANSLATION_PRESET_ID);
   }
   return getStagePlayMicroReasonerPromptPreset("stage_play_micro_reasoner_prompt_preset:generic-live-source:v1");
 }
@@ -1535,11 +1756,13 @@ export function getActiveStagePlayMicroReasonerPromptPresetForSource(input: {
 export function applyStagePlayMicroReasonerPromptPreset(input: {
   presetId: string;
   sourceIds: string[];
+  sourceKind?: StagePlayLiveSourceMailSourceKindV1 | string | null;
   now?: string;
 }): StagePlayMicroReasonerPromptPresetV1 | null {
   ensureDefaultStagePlayMicroReasonerPromptPresets();
   const preset = getStagePlayMicroReasonerPromptPreset(input.presetId);
   if (!preset) return null;
+  if (input.sourceKind && !sourceKindMatchesPreset(preset, input.sourceKind)) return null;
   const now = input.now ?? new Date().toISOString();
   const sourceIds = uniqueStrings([...preset.sourceIds, ...input.sourceIds]);
   const updated: StagePlayMicroReasonerPromptPresetV1 = {
@@ -1562,6 +1785,7 @@ export function getActiveStagePlayMicroReasonerPromptForRole(
   role: StagePlayMicroReasonerRoleV1,
   input: {
     sourceId?: string | null;
+    sourceKind?: StagePlayLiveSourceMailSourceKindV1 | string | null;
     presetId?: string | null;
   } = {},
 ): StagePlayMicroReasonerPromptV1 | null {
@@ -1578,6 +1802,7 @@ export function getActiveStagePlayMicroReasonerPromptForRole(
 
 export function listStagePlayActiveMicroReasonerPromptsForSource(input: {
   sourceId?: string | null;
+  sourceKind?: StagePlayLiveSourceMailSourceKindV1 | string | null;
   presetId?: string | null;
   roles?: StagePlayMicroReasonerRoleV1[];
   limit?: number;
@@ -1607,6 +1832,7 @@ export function listStagePlayActiveMicroReasonerPromptsForSource(input: {
 
 export function getStagePlayPromptedMicroReasonerRolesForSource(input: {
   sourceId?: string | null;
+  sourceKind?: StagePlayLiveSourceMailSourceKindV1 | string | null;
   presetId?: string | null;
 } = {}): StagePlayMicroReasonerRoleV1[] {
   return getActiveStagePlayMicroReasonerPromptPresetForSource(input)?.promptedRoles ?? DEFAULT_PROMPTED_MICRO_REASONER_ROLES;

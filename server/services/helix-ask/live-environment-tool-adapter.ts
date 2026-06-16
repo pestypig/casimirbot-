@@ -2947,6 +2947,7 @@ export function executeLiveEnvironmentTool(
       readString(args.source_id) ?? readString(args.sourceId) ?? explicitSourceId,
     ]);
     const sourceId = sourceIds[0] ?? explicitSourceId ?? null;
+    const sourceKind = readString(args.source_kind) ?? readString(args.sourceKind);
     const presetId = readString(args.preset_id) ?? readString(args.presetId);
     const basePresetId = readString(args.base_preset_id) ?? readString(args.basePresetId);
     const activityAction =
@@ -3051,10 +3052,11 @@ export function executeLiveEnvironmentTool(
           evidenceRefs: uniqueStrings([presetId, ...sourceIds, activityId]),
         });
       }
-      const preset = applyStagePlayMicroReasonerPromptPreset({ presetId, sourceIds });
+      const preset = applyStagePlayMicroReasonerPromptPreset({ presetId, sourceIds, sourceKind });
       const prompts = preset
         ? listStagePlayActiveMicroReasonerPromptsForSource({
             sourceId,
+            sourceKind,
             presetId: preset.presetId,
           })
         : [];
@@ -3331,16 +3333,19 @@ export function executeLiveEnvironmentTool(
 
     const presets = listStagePlayMicroReasonerPromptPresets({
       sourceId,
+      sourceKind,
       includePresets: args.include_presets !== false && args.includePresets !== false,
       active: true,
       limit: readNumber(args.limit, 100),
     });
     const activePreset = getActiveStagePlayMicroReasonerPromptPresetForSource({
       sourceId,
+      sourceKind,
       presetId,
     });
     const prompts = listStagePlayActiveMicroReasonerPromptsForSource({
       sourceId,
+      sourceKind,
       presetId: activePreset?.presetId ?? presetId,
     });
     const summary = `Found ${presets.length} MicroDeck preset(s) and ${prompts.length} prompt(s).`;
@@ -3377,6 +3382,8 @@ export function executeLiveEnvironmentTool(
         microReasonerPrompts: prompts,
         sourceId,
         source_id: sourceId,
+        sourceKind,
+        source_kind: sourceKind,
         sourceIds,
         source_ids: sourceIds,
         toolActivities: listStagePlayMicroReasonerPromptToolActivities({ sourceId, limit: 10 }),

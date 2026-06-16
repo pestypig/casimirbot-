@@ -506,6 +506,7 @@ export type StagePlayMicroReasonerPromptPresetV1 = {
     | "minecraft_gameplay"
     | "calculator_stream"
     | "science_visual"
+    | "audio_translation"
     | "browser_workflow"
     | "custom";
   sourceKinds: StagePlayLiveSourceMailItemV1["sourceKind"][];
@@ -517,7 +518,13 @@ export type StagePlayMicroReasonerPromptPresetV1 = {
   delegationRouter?: StagePlayMicroReasonerPromptDelegationRouterV1 | null;
   wakePromptContract?: StagePlayMicroReasonerWakePromptContractV1 | null;
   wakeCoalescingPolicy?: StagePlayMicroReasonerWakeCoalescingPolicyV1;
-  outputPolicy: "watch_officer" | "tool_call_candidate" | "voice_candidate" | "ask_prompt_delegation" | "record_only";
+  outputPolicy:
+    | "watch_officer"
+    | "tool_call_candidate"
+    | "voice_candidate"
+    | "ask_prompt_delegation"
+    | "earbud_translation"
+    | "record_only";
   active: boolean;
   createdAt: string;
   updatedAt: string;

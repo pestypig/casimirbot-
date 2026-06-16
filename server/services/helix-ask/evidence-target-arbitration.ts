@@ -27,6 +27,12 @@ import {
   isLiveSourceMailLoopReflectionPrompt,
   isLiveSourceMailLoopPrompt,
 } from "./live-source-continuation-intent";
+import {
+  isExplicitDocsPathComparePrompt,
+  isExplicitDocsPathDocumentOperation,
+  isExplicitDocsPathLocateSynthesisPrompt,
+  isExplicitDocsPathSummaryPrompt,
+} from "./docs-viewer-intent";
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
 
@@ -94,8 +100,7 @@ const hasExplicitExternalResearchCommand = (prompt: string): boolean =>
   );
 
 const hasExplicitLocalDocsPathSummary = (prompt: string): boolean =>
-  /\b(?:summari[sz]e|summary|overview|takeaways?|explain|describe|gist)\b/i.test(prompt) &&
-  /(?:^|[\s"'(])(?:\/docs\/|docs[\\/])\S+/i.test(prompt);
+  isExplicitDocsPathSummaryPrompt(prompt);
 
 const hasLocalDocsTopicSummary = (prompt: string): boolean =>
   /\b(?:summari[sz]e|summary|overview|takeaways?|explain|describe|gist)\b/i.test(prompt) &&
@@ -159,7 +164,10 @@ export function buildAskEvidenceTargetArbitration(input: {
   routeMetadata?: LiveSourceWakeRouteMetadataV1 | null;
 }): HelixAskEvidenceTargetArbitration {
   const prompt = input.promptText.trim();
-  if (readRouteMetadataSourceTarget(input.routeMetadata) === "live_source_mailbox") {
+  if (
+    readRouteMetadataSourceTarget(input.routeMetadata) === "live_source_mailbox" &&
+    !isExplicitDocsPathDocumentOperation(prompt)
+  ) {
     const candidate = makeCandidate({
       candidateId: "live_source_mailbox.stage_play_mail_wake_route_metadata",
       targetSource: "live_source_mailbox",
@@ -245,6 +253,34 @@ export function buildAskEvidenceTargetArbitration(input: {
     );
   const mailLoopReflection = isLiveSourceMailLoopReflectionPrompt(prompt);
 
+  if (isExplicitDocsPathComparePrompt(prompt)) {
+    promptIntentCandidates.push("local_docs_path_compare");
+    candidates.push(makeCandidate({
+      candidateId: "docs_viewer.local_docs_path_compare",
+      targetSource: "docs_viewer",
+      targetKind: "docs_viewer",
+      strength: "hard",
+      score: 0.99,
+      reasonCodes: ["explicit_local_docs_path_compare", "docs_path_operation_suppresses_repo_code"],
+      requestedOutputs: ["file_path", "tool_call_eligibility"],
+      capabilityKeys: ["docs-viewer.open_doc_by_path", "docs-viewer.summarize_doc"],
+      terminalProductConstraints: ["doc_evidence_synthesis", "doc_summary", "typed_failure", "request_user_input"],
+    }));
+  }
+  if (isExplicitDocsPathLocateSynthesisPrompt(prompt)) {
+    promptIntentCandidates.push("local_docs_path_locate_synthesis");
+    candidates.push(makeCandidate({
+      candidateId: "docs_viewer.local_docs_path_locate_synthesis",
+      targetSource: "docs_viewer",
+      targetKind: "docs_viewer",
+      strength: "hard",
+      score: 0.99,
+      reasonCodes: ["explicit_local_docs_path_locate_synthesis", "docs_path_operation_suppresses_repo_code"],
+      requestedOutputs: ["file_path", "tool_call_eligibility"],
+      capabilityKeys: ["docs-viewer.open_doc_by_path", "docs-viewer.locate_in_doc"],
+      terminalProductConstraints: ["doc_location_result", "doc_evidence_synthesis", "typed_failure", "request_user_input"],
+    }));
+  }
   if (hasExplicitLocalDocsPathSummary(prompt)) {
     promptIntentCandidates.push("local_docs_path_summary");
     candidates.push(makeCandidate({

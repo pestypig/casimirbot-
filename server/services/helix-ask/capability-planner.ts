@@ -27,6 +27,7 @@ import {
 } from "./workspace-os-status-intent";
 import { HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY } from "./workspace-directory-resolver";
 import { mandatoryToolForPhase } from "./live-source-turn-phase-resolver";
+import { isExplicitDocsPathDocumentOperation } from "./docs-viewer-intent";
 
 type RecordLike = Record<string, unknown>;
 
@@ -459,7 +460,8 @@ export const buildCapabilityPlan = (input: {
   const routeMetadata = readRecord(input.routeMetadata);
   const mandatoryPhaseTool = mandatoryToolForPhase(input.liveSourceTurnPhaseResolution as LiveSourceTurnPhaseResolutionV1 | null);
   const firstAllowedPhaseTool = firstAllowedToolForPhase(input.liveSourceTurnPhaseResolution);
-  const hardLiveSourceMailboxRoute = isHardLiveSourceMailboxRoute({
+  const explicitDocsPathOperation = isExplicitDocsPathDocumentOperation(input.promptText);
+  const hardLiveSourceMailboxRoute = !explicitDocsPathOperation && isHardLiveSourceMailboxRoute({
     routeMetadata,
     mandatoryPhaseTool,
   });
@@ -486,7 +488,7 @@ export const buildCapabilityPlan = (input: {
     (requiresDocsViewerEvidence ? "docs_viewer" : "") ||
     (requiresInternetEvidence ? "internet_search" : "") ||
     (requiresRepoConceptEvidence ? "repo_code" : "") ||
-    routeMetadataSourceTarget(routeMetadata) ||
+    (explicitDocsPathOperation ? "" : routeMetadataSourceTarget(routeMetadata)) ||
     readString(sourceTargetIntent?.target_source) ||
     readString(routeProductContract?.source_target) ||
     readString(toolCallAdmissionDecision?.source_target) ||

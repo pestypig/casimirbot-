@@ -1,3 +1,8 @@
+import {
+  DOCS_MD_PATH_CUE_RE,
+  QUOTED_DOCS_PATH_COMMAND_RE,
+} from "./docs-viewer-intent";
+
 export type HelixContextualToolAdmissionSuppressionReason =
   | "negated_tool_instruction"
   | "quoted_tool_command"
@@ -64,13 +69,13 @@ export function contextualToolSuppressionBlocksFamily(
 ): boolean {
   if (!suppression) return false;
   const cue = suppression.verb_or_cue;
-  if (family === "docs_viewer") return /docs_viewer|docs-viewer/i.test(cue);
+  if (family === "docs_viewer") return /docs_viewer|docs-viewer/i.test(cue) || DOCS_MD_PATH_CUE_RE.test(suppression.text);
   if (family === "scientific_calculator") return /scientific[_-]calculator|calculator/i.test(cue);
   if (family === "scholarly_research") return /scholarly|doi|arxiv|paper|citation|research/i.test(cue);
   if (family === "internet_search") return /internet|web|search|browse|google|bing/i.test(cue);
   if (family === "theory_locator") return /theory|locator|badge|graph|reflection/i.test(cue);
   if (family === "workstation_action" || family === "notes") return /workstation|workspace|note|write|file/i.test(cue);
-  if (family === "repo_code") return /repo|code/i.test(cue);
+  if (family === "repo_code") return /repo|code/i.test(cue) || DOCS_MD_PATH_CUE_RE.test(suppression.text);
   if (family === "live_environment") return /live|stage_play/i.test(cue);
   return false;
 }
@@ -81,6 +86,7 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
     !prompt ||
     (
       !DOCS_VIEWER_CUE_RE.test(prompt) &&
+      !DOCS_MD_PATH_CUE_RE.test(prompt) &&
       !SCIENTIFIC_CALCULATOR_CUE_RE.test(prompt) &&
       !SCHOLARLY_CUE_RE.test(prompt) &&
       !INTERNET_SEARCH_CUE_RE.test(prompt) &&
@@ -88,6 +94,16 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
     )
   ) return null;
   MUTATING_WRITE_NEGATION_RE.lastIndex = 0;
+
+  const quotedDocsPathCommand = prompt.match(QUOTED_DOCS_PATH_COMMAND_RE)?.[0];
+  if (quotedDocsPathCommand) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: "quoted_tool_command",
+      verb_or_cue: "docs_viewer.open",
+      text: quotedDocsPathCommand,
+    };
+  }
 
   const quotedDocsCommand = prompt.match(/["'`][^"'`]*(?:open|show|view|pull\s+up|bring\s+up)[^"'`]*(?:docs?\s+viewer|documents?\s+viewer|docs?\s+panel|documents?\s+panel|docs?)[^"'`]*["'`]/i)?.[0];
   if (quotedDocsCommand) {

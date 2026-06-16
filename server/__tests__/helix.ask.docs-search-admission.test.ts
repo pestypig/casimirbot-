@@ -6,6 +6,7 @@ import { arbitrateAskSourceTarget } from "../services/helix-ask/ask-source-targe
 import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
 import { buildHelixCapabilityItinerary } from "../services/helix-ask/capability-itinerary";
 import { buildToolUseRestatement } from "../services/helix-ask/internet-search-intent";
+import { detectRepoCodeEvidenceIntent } from "../services/helix-ask/repo-code-intent-detector";
 import { planRouter, __testHelixRuntimeToolCallValidation } from "../routes/agi.plan";
 
 const createApp = () => {
@@ -123,6 +124,95 @@ describe("Helix Ask docs-search admission", () => {
     expect(admission.admitted_tool_families).not.toContain("docs_viewer");
     expect(admission.reason).not.toBe("docs_viewer_requires_document_tool_path");
   });
+
+  it("routes exact two-doc markdown comparison to Docs Viewer instead of repo-code", () => {
+    const promptText =
+      "Compare docs/helix-ask-flow.md and docs/helix-ask-codex-loop-discipline.md in a two-column table of the main routing rules.";
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, promptText, sourceTargetIntent });
+    const repoIntent = detectRepoCodeEvidenceIntent(promptText);
+
+    expect(repoIntent).toMatchObject({
+      repoEvidenceRequested: false,
+      strength: "none",
+    });
+    expect(repoIntent.reasons).toContain("docs_viewer_exact_doc_path_request_not_repo_code");
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "docs_viewer",
+      strength: "hard",
+      precedence_reason: "explicit_docs_path_compare_source_target",
+      allow_no_tool_direct: false,
+    });
+    expect(sourceTargetIntent.reasons).toEqual(expect.arrayContaining(["local_docs_path_suppresses_repo_code"]));
+    expect(admission.admitted_tool_families).toContain("docs_viewer");
+    expect(admission.admitted_tool_families).not.toContain("repo_code");
+  });
+
+  it("routes exact markdown locate plus synthesis to Docs Viewer locate instead of repo-code", () => {
+    const promptText =
+      "In docs/helix-ask-codex-loop-discipline.md, locate Patch-Time Contract and turn the evidence into a short runbook.";
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, promptText, sourceTargetIntent });
+    const repoIntent = detectRepoCodeEvidenceIntent(promptText);
+
+    expect(repoIntent).toMatchObject({
+      repoEvidenceRequested: false,
+      strength: "none",
+    });
+    expect(sourceTargetIntent).toMatchObject({
+      target_source: "docs_viewer",
+      strength: "hard",
+      precedence_reason: "explicit_docs_path_locate_synthesis_source_target",
+      allow_no_tool_direct: false,
+    });
+    expect(sourceTargetIntent.requested_outputs).toEqual(expect.arrayContaining(["file_path", "tool_call_eligibility"]));
+    expect(admission.admitted_tool_families).toContain("docs_viewer");
+    expect(admission.admitted_tool_families).not.toContain("repo_code");
+  });
+
+  it("does not execute quoted bare docs-path commands as Docs Viewer or repo-code", () => {
+    const promptText =
+      '"Open docs/helix-ask-flow.md" is the command I typed earlier; explain whether that should run now.';
+    const restatement = buildToolUseRestatement(promptText);
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, promptText, sourceTargetIntent });
+    const repoIntent = detectRepoCodeEvidenceIntent(promptText);
+
+    expect(restatement.requiredToolFamilies).not.toContain("docs_viewer");
+    expect(repoIntent.repoEvidenceRequested).toBe(false);
+    expect(sourceTargetIntent.target_source).not.toBe("docs_viewer");
+    expect(sourceTargetIntent.target_source).not.toBe("repo_code");
+    expect(sourceTargetIntent.reasons).toEqual(expect.arrayContaining(["explicit_model_only_target"]));
+    expect(admission.admitted_tool_families).not.toContain("docs_viewer");
+    expect(admission.admitted_tool_families).not.toContain("repo_code");
+    expect(admission.tool_admission_suppressed).toBe(true);
+    expect(admission.suppression_reason).toBe("quoted_tool_command");
+  });
+
+  it("does not leave exact docs-path compare turns with a model-only canonical goal", async () => {
+    const app = createApp();
+    const promptText =
+      "Compare docs/helix-ask-flow.md and docs/helix-ask-codex-loop-discipline.md in a two-column table of the main routing rules.";
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        thread_id: threadId,
+        question: promptText,
+        debug: true,
+      })
+      .expect(200);
+
+    expect(response.body?.source_target_intent?.target_source).toBe("docs_viewer");
+    expect(response.body?.source_target_intent?.precedence_reason).toBe("explicit_docs_path_compare_source_target");
+    expect(response.body?.canonical_goal_frame?.goal_kind).toBe("doc_evidence_synthesis");
+    expect(response.body?.canonical_goal_frame?.answer_scope).toBe("current_turn_doc");
+    expect(response.body?.canonical_goal_frame?.required_terminal_kind).toBe("doc_evidence_synthesis_answer");
+    expect(response.body?.canonical_goal_frame?.classifier_reasons ?? []).toEqual(
+      expect.arrayContaining(["explicit_docs_path_compare_goal", "evidence_target_arbitration_selected_docs_viewer"]),
+    );
+    expect(response.body?.terminal_error_code).not.toBe("poison_clean_but_authority_failed");
+  }, 30000);
 
   it("does not turn a Docs Viewer capability-coverage claim into a doc-open Ask turn", async () => {
     const app = createApp();

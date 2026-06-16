@@ -725,6 +725,35 @@ gated terminal payload is answer authority. `/api/agi/ask/turn` must return an
 equivalent terminal payload for the same request class and must not crash or
 drop the dev server when the streamed route would emit a typed failure.
 
+### Console Transcript Uniformity
+
+The Helix console transcript is a turn-projection contract, not a separate
+agent loop. Future patches must keep these surfaces uniform for the same turn:
+
+```txt
+SSE turn_transcript_event rows
+final payload turn_transcript_events
+debug turn_transcript_events
+debug export transcript rows
+client visible console rows
+```
+
+If a streamed route emits meaningful non-terminal transcript rows before
+`turn_final`, those rows must re-enter the final payload and debug envelope.
+If a non-streamed or fast route has enough turn metadata to project public
+commentary, it must not collapse to only submitted question plus final answer.
+Reconstructed rows must be marked as reconstructed/debug projection and must
+carry `assistant_answer=false`; they are public progress observations, not
+answer authority.
+
+The console should treat submitted questions, public reasoning-progress rows,
+tool/procedure rows, typed failures, pending-input rows, and final answers as
+one chronological transcript. It should not prefer special rows in a way that
+hides progress rows or resurrects stale rows from a previous turn. When these
+surfaces disagree, classify it as `turn_stream_backend_mismatch`,
+`turn_non_streamed_route_dropped`, or `turn_terminal_event_missing` before
+debugging route correctness.
+
 Workspace context attachment is turn input, not ambient authority. The UI may
 offer an attach/isolated choice before a reasoning turn, but repo/code evidence
 prompts should default the timer to isolated execution unless the user explicitly

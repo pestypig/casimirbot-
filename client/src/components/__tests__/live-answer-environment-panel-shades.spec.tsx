@@ -145,6 +145,13 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain("AUDIO_TRANSCRIPT_DEFAULT_CHUNK_MS = 10_000");
     expect(source).toContain('data-testid="audio-transcript-review"');
     expect(source).toContain("Earbud outputs");
+    expect(source).toContain("Earbud MicroDeck");
+    expect(source).toContain('aria-label="Earbud micro-reasoner prompt preset"');
+    expect(source).toContain('aria-label="Apply selected earbud micro-reasoner prompt preset"');
+    expect(source).toContain("Apply earbud deck");
+    expect(source).toContain('sourceKind: "audio_transcript"');
+    expect(source).toContain("Future audio transcript chunks will use this prompt deck.");
+    expect(source).toContain("earbudMicroReasonerPromptPresets");
     expect(source).toContain("audioTranscriptHistory");
     expect(source).toContain("pruneAudioTranscriptHistory");
     expect(source).toContain("Transcript chunks will appear here");

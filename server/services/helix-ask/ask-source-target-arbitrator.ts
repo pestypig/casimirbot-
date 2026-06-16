@@ -45,6 +45,11 @@ import {
   isWorkspaceOsStatusPrompt,
   workspaceOsStatusReasonCodes,
 } from "./workspace-os-status-intent";
+import {
+  isExplicitDocsPathComparePrompt,
+  isExplicitDocsPathLocateSynthesisPrompt,
+  isExplicitDocsPathSummaryPrompt as isExplicitDocsMarkdownPathSummaryPrompt,
+} from "./docs-viewer-intent";
 
 export {
   isStagePlayCheckpointRequestPrompt,
@@ -160,8 +165,7 @@ const isDocsOpenAndSummarizePrompt = (prompt: string): boolean =>
   /\b(?:find|search|open|show|get|load|best|matching|relevant)\b/i.test(prompt);
 
 const isExplicitDocsPathSummaryPrompt = (prompt: string): boolean =>
-  /\b(?:summari[sz]e|summary|overview|takeaways?|explain|describe|gist)\b/i.test(prompt) &&
-  /(?:^|[\s"'(])(?:\/docs\/|docs[\\/])\S+/i.test(prompt);
+  isExplicitDocsMarkdownPathSummaryPrompt(prompt);
 
 const isDocsTopicSummaryPrompt = (prompt: string): boolean =>
   /\b(?:summari[sz]e|summary|overview|takeaways?|explain|describe|gist)\b/i.test(prompt) &&
@@ -911,6 +915,40 @@ export function arbitrateAskSourceTarget(input: {
   }
   const toolUseRestatement = buildToolUseRestatement(prompt);
   const internetSearchIntent = detectInternetSearchIntent(prompt);
+  if (isExplicitDocsPathComparePrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "docs_viewer",
+      targetKind: "docs_viewer",
+      strength: "hard",
+      explicitCues: ["explicit_docs_path_compare"],
+      reasons: ["explicit_docs_path_compare_source_target", "local_docs_path_suppresses_repo_code"],
+      requestedOutputs: ["file_path", "tool_call_eligibility", "typed_failure"],
+      suppressedRoutes: ["repo_code_evidence_question", "internet_search_lookup", "scholarly_research_lookup", "situation_context_question", "visual_deictic", "visual_frame_evidence", "active_doc_identity", "model_only_concept", "no_tool_direct"],
+      precedenceReason: "explicit_docs_path_compare_source_target",
+      confidence: 0.99,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (isExplicitDocsPathLocateSynthesisPrompt(prompt)) {
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "docs_viewer",
+      targetKind: "docs_viewer",
+      strength: "hard",
+      explicitCues: ["explicit_docs_path_locate_synthesis"],
+      reasons: ["explicit_docs_path_locate_synthesis_source_target", "local_docs_path_suppresses_repo_code"],
+      requestedOutputs: ["file_path", "tool_call_eligibility", "typed_failure"],
+      suppressedRoutes: ["repo_code_evidence_question", "internet_search_lookup", "scholarly_research_lookup", "situation_context_question", "visual_deictic", "visual_frame_evidence", "active_doc_identity", "model_only_concept", "no_tool_direct"],
+      precedenceReason: "explicit_docs_path_locate_synthesis_source_target",
+      confidence: 0.99,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
   if (isExplicitDocsPathSummaryPrompt(prompt)) {
     return toSourceTargetIntent({
       turnId: input.turnId,

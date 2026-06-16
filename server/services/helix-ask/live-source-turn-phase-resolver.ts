@@ -464,18 +464,18 @@ const hasVisualObserverProfileCue = (prompt: string): boolean =>
   /\b(?:make|have)\b[\s\S]{0,120}\b(?:visual\s+capture|observer|vision|image\s+model)\b[\s\S]{0,120}\b(?:focus|look\s+for|watch)\b[\s\S]{0,120}\b(?:hud|hotbar|mobs?|health|hunger|fire|damage|minecraft|ui)\b/i.test(prompt);
 
 const hasContextualMicroReasonerDeckCue = (prompt: string): boolean =>
-  /["'`][^"'`]*(?:live_env\.(?:query_micro_reasoner_presets|draft_micro_reasoner_preset)|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)[^"'`]*["'`]/i.test(prompt) ||
-  /\b(?:if|in\s+the\s+future|future|later|eventually|hypothetically|tomorrow|next\s+time|would|could|might)\b[\s\S]{0,140}\b(?:live_env\.(?:query_micro_reasoner_presets|draft_micro_reasoner_preset)|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
-  /\b(?:previously|earlier|last\s+time|before|already|historically|was|were|had)\b[\s\S]{0,140}\b(?:ran|run|used|queried|viewed|inspected|showed|listed|checked|read|called|drafted|designed|recommended)?\b[\s\S]{0,120}\b(?:live_env\.(?:query_micro_reasoner_presets|draft_micro_reasoner_preset)|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
-  /\b(?:screen|page|button|label|ui|text|menu|dropdown)\b[\s\S]{0,90}\b(?:says|shows|reads|contains|labeled|labelled|called|named)\b[\s\S]{0,120}\b(?:live_env\.(?:query_micro_reasoner_presets|draft_micro_reasoner_preset)|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
-  /\b(?:do\s+not|don't|dont|without|not\s+asking\s+to|for\s+now)\b[\s\S]{0,140}\b(?:run|execute|use|query|view|inspect|show|list|check|read|draft|design|recommend|set\s+up|setup)?\b[\s\S]{0,120}\b(?:live_env\.(?:query_micro_reasoner_presets|draft_micro_reasoner_preset)|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt);
+  /["'`][^"'`]*(?:live_env\.(?:query_micro_reasoner_presets|draft_micro_reasoner_preset)|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|earbud\s+(?:micro[-\s]?deck|preset|translation)|audio\s+(?:translation|transcript)\s+(?:deck|preset)|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)[^"'`]*["'`]/i.test(prompt) ||
+  /\b(?:if|in\s+the\s+future|future|later|eventually|hypothetically|tomorrow|next\s+time|would|could|might)\b[\s\S]{0,140}\b(?:live_env\.(?:query_micro_reasoner_presets|draft_micro_reasoner_preset)|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|earbud\s+(?:micro[-\s]?deck|preset|translation)|audio\s+(?:translation|transcript)\s+(?:deck|preset)|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
+  /\b(?:previously|earlier|last\s+time|before|already|historically|was|were|had)\b[\s\S]{0,140}\b(?:ran|run|used|queried|viewed|inspected|showed|listed|checked|read|called|drafted|designed|recommended)?\b[\s\S]{0,120}\b(?:live_env\.(?:query_micro_reasoner_presets|draft_micro_reasoner_preset)|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|earbud\s+(?:micro[-\s]?deck|preset|translation)|audio\s+(?:translation|transcript)\s+(?:deck|preset)|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
+  /\b(?:screen|page|button|label|ui|text|menu|dropdown)\b[\s\S]{0,90}\b(?:says|shows|reads|contains|labeled|labelled|called|named)\b[\s\S]{0,120}\b(?:live_env\.(?:query_micro_reasoner_presets|draft_micro_reasoner_preset)|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|earbud\s+(?:micro[-\s]?deck|preset|translation)|audio\s+(?:translation|transcript)\s+(?:deck|preset)|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
+  /\b(?:do\s+not|don't|dont|without|not\s+asking\s+to|for\s+now)\b[\s\S]{0,140}\b(?:run|execute|use|query|view|inspect|show|list|check|read|draft|design|recommend|set\s+up|setup)?\b[\s\S]{0,120}\b(?:live_env\.(?:query_micro_reasoner_presets|draft_micro_reasoner_preset)|micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|earbud\s+(?:micro[-\s]?deck|preset|translation)|audio\s+(?:translation|transcript)\s+(?:deck|preset)|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt);
 
 const hasMicroReasonerDeckQueryCue = (prompt: string): boolean => {
   if (hasContextualMicroReasonerDeckCue(prompt)) return false;
   return (
     /\blive_env\.query_micro_reasoner_presets\b/i.test(prompt) ||
-    /\b(?:query|view|inspect|show|list|get|check|read)\b[\s\S]{0,120}\b(?:micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|micro[-\s]?reasoner\s+(?:preset|prompt|deck)s?|prompt\s+(?:preset|deck)s?|active\s+(?:micro[-\s]?deck|preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
-    /\b(?:micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|micro[-\s]?reasoner\s+(?:preset|prompt|deck)s?|prompt\s+(?:preset|deck)s?|source\s+deck\s+assembly)\b[\s\S]{0,120}\b(?:query|view|inspect|show|list|get|check|read|active|assembled|enabled|using)\b/i.test(prompt)
+    /\b(?:query|view|inspect|show|list|get|check|read)\b[\s\S]{0,120}\b(?:micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|micro[-\s]?reasoner\s+(?:preset|prompt|deck)s?|earbud\s+(?:micro[-\s]?deck|preset|translation)|audio\s+(?:translation|transcript)\s+(?:deck|preset)|prompt\s+(?:preset|deck)s?|active\s+(?:micro[-\s]?deck|preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
+    /\b(?:micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|micro[-\s]?reasoner\s+(?:preset|prompt|deck)s?|earbud\s+(?:micro[-\s]?deck|preset|translation)|audio\s+(?:translation|transcript)\s+(?:deck|preset)|prompt\s+(?:preset|deck)s?|source\s+deck\s+assembly)\b[\s\S]{0,120}\b(?:query|view|inspect|show|list|get|check|read|active|assembled|enabled|using)\b/i.test(prompt)
   );
 };
 
@@ -483,8 +483,8 @@ const hasMicroReasonerDeckDraftCue = (prompt: string): boolean => {
   if (hasContextualMicroReasonerDeckCue(prompt)) return false;
   return (
     /\blive_env\.draft_micro_reasoner_preset\b/i.test(prompt) ||
-    /\b(?:draft|design|recommend|propose|plan|set\s+up|setup|configure|arrange|build)\b[\s\S]{0,140}\b(?:micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
-    /\b(?:micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b[\s\S]{0,140}\b(?:draft|design|recommend|propose|plan|set\s+up|setup|configure|arrange|build|closest\s+preset)\b/i.test(prompt)
+    /\b(?:draft|design|recommend|propose|plan|set\s+up|setup|configure|arrange|build)\b[\s\S]{0,140}\b(?:micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|earbud\s+(?:micro[-\s]?deck|preset|translation)|audio\s+(?:translation|transcript)\s+(?:deck|preset)|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b/i.test(prompt) ||
+    /\b(?:micro[-\s]?deck|micro[-\s]?reasoner(?:s)?|earbud\s+(?:micro[-\s]?deck|preset|translation)|audio\s+(?:translation|transcript)\s+(?:deck|preset)|prompt\s+(?:preset|deck)|source\s+deck\s+assembly)\b[\s\S]{0,140}\b(?:draft|design|recommend|propose|plan|set\s+up|setup|configure|arrange|build|closest\s+preset)\b/i.test(prompt)
   );
 };
 

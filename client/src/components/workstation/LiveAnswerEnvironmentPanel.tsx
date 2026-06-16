@@ -533,6 +533,7 @@ const preferredVisualShadeProfileId = (profiles: StagePlayVisualObserverProfileV
 };
 
 const microReasonerPresetCategory = (preset: StagePlayMicroReasonerPromptPresetV1): string => {
+  if (preset.domain === "audio_translation" || preset.outputPolicy === "earbud_translation") return "Earbuds";
   if (preset.domain === "minecraft_gameplay") return "Gaming";
   if (preset.domain === "calculator_stream") return "Tools";
   if (preset.domain === "science_visual") return "Science";
@@ -541,8 +542,11 @@ const microReasonerPresetCategory = (preset: StagePlayMicroReasonerPromptPresetV
   return "General";
 };
 
-const microReasonerPresetOptionLabel = (preset: StagePlayMicroReasonerPromptPresetV1): string =>
-  `${preset.title}${preset.sourceIds.length > 0 ? " (applied)" : ""}`;
+const microReasonerPresetOptionLabel = (
+  preset: StagePlayMicroReasonerPromptPresetV1,
+  sourceId?: string | null,
+): string =>
+  `${preset.title}${sourceId && preset.sourceIds.includes(sourceId) ? " (applied)" : ""}`;
 
 const preferredMicroReasonerPresetId = (
   presets: StagePlayMicroReasonerPromptPresetV1[],
@@ -689,6 +693,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [activeMicroReasonerPromptPreset, setActiveMicroReasonerPromptPreset] = useState<StagePlayMicroReasonerPromptPresetV1 | null>(null);
   const [microReasonerPrompts, setMicroReasonerPrompts] = useState<StagePlayMicroReasonerPromptV1[]>([]);
   const [selectedMicroReasonerPromptPresetId, setSelectedMicroReasonerPromptPresetId] = useState<string>("");
+  const [earbudMicroReasonerPromptPresets, setEarbudMicroReasonerPromptPresets] = useState<StagePlayMicroReasonerPromptPresetV1[]>([]);
+  const [activeEarbudMicroReasonerPromptPreset, setActiveEarbudMicroReasonerPromptPreset] = useState<StagePlayMicroReasonerPromptPresetV1 | null>(null);
+  const [earbudMicroReasonerPrompts, setEarbudMicroReasonerPrompts] = useState<StagePlayMicroReasonerPromptV1[]>([]);
+  const [selectedEarbudMicroReasonerPromptPresetId, setSelectedEarbudMicroReasonerPromptPresetId] = useState<string>("");
   const [visualShadePromptDraft, setVisualShadePromptDraft] = useState<string>("");
   const [visualShadePromptBaseProfileId, setVisualShadePromptBaseProfileId] = useState<string>("");
   const [selectedVisualFrameHistoryId, setSelectedVisualFrameHistoryId] = useState<string | null>(null);
@@ -948,6 +956,25 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       }))
       .sort((left, right) => left.category.localeCompare(right.category));
   }, [microReasonerPromptPresets]);
+  const selectedEarbudMicroReasonerPromptPreset = useMemo(
+    () => earbudMicroReasonerPromptPresets.find((preset: StagePlayMicroReasonerPromptPresetV1) => preset.presetId === selectedEarbudMicroReasonerPromptPresetId) ??
+      earbudMicroReasonerPromptPresets.find((preset: StagePlayMicroReasonerPromptPresetV1) => preset.presetId === preferredMicroReasonerPresetId(earbudMicroReasonerPromptPresets, activeEarbudMicroReasonerPromptPreset)) ??
+      null,
+    [activeEarbudMicroReasonerPromptPreset, earbudMicroReasonerPromptPresets, selectedEarbudMicroReasonerPromptPresetId],
+  );
+  const earbudMicroReasonerPresetGroups = useMemo(() => {
+    const groups = new Map<string, StagePlayMicroReasonerPromptPresetV1[]>();
+    for (const preset of earbudMicroReasonerPromptPresets) {
+      const category = microReasonerPresetCategory(preset);
+      groups.set(category, [...(groups.get(category) ?? []), preset]);
+    }
+    return Array.from(groups.entries())
+      .map(([category, presets]) => ({
+        category,
+        presets: presets.sort((left, right) => left.title.localeCompare(right.title)),
+      }))
+      .sort((left, right) => left.category.localeCompare(right.category));
+  }, [earbudMicroReasonerPromptPresets]);
   const visualProducerState = useVisualSourceCaptureStore((state: { producers: Record<string, VisualSourceCaptureState> }) => {
     const sourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id ?? null;
     if (sourceId) return state.producers[sourceId] ?? null;
@@ -1059,12 +1086,22 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       selectedMicroReasonerPromptPreset &&
       activeMicroReasonerPromptPreset.presetId === selectedMicroReasonerPromptPreset.presetId,
   );
+  const selectedEarbudMicroPresetApplied = Boolean(
+    activeEarbudMicroReasonerPromptPreset &&
+      selectedEarbudMicroReasonerPromptPreset &&
+      activeEarbudMicroReasonerPromptPreset.presetId === selectedEarbudMicroReasonerPromptPreset.presetId &&
+      activeAudioTranscriptSourceId &&
+      activeEarbudMicroReasonerPromptPreset.sourceIds.includes(activeAudioTranscriptSourceId),
+  );
   const visualShadeStatus = activeVisualObserverProfile
     ? `${activeVisualObserverProfile.title} active; ${activeVisualObserverProfile.outputMode}; hash ${activeVisualObserverProfile.promptHash}`
     : "Generic visual capture prompt is active until a shade is applied.";
   const microReasonerPresetStatus = activeMicroReasonerPromptPreset
     ? `${activeMicroReasonerPromptPreset.title} active; ${activeMicroReasonerPromptPreset.promptedRoles.length} prompted role${activeMicroReasonerPromptPreset.promptedRoles.length === 1 ? "" : "s"}; ${activeMicroReasonerPromptPreset.outputPolicy}`
     : "Generic MicroDeck prompt preset is active until a source preset is applied.";
+  const earbudMicroReasonerPresetStatus = activeEarbudMicroReasonerPromptPreset
+    ? `${activeEarbudMicroReasonerPromptPreset.title} ${activeAudioTranscriptSourceId && activeEarbudMicroReasonerPromptPreset.sourceIds.includes(activeAudioTranscriptSourceId) ? "applied" : "available"}; ${activeEarbudMicroReasonerPromptPreset.outputPolicy}`
+    : "Earbud translation presets are available after audio transcript routing loads.";
   const selectedMicroPromptPreview = useMemo(
     () => selectedMicroReasonerPromptPreset
       ? microReasonerPrompts
@@ -1075,6 +1112,17 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         .slice(0, 6)
       : [],
     [microReasonerPrompts, selectedMicroReasonerPromptPreset],
+  );
+  const selectedEarbudMicroPromptPreview = useMemo(
+    () => selectedEarbudMicroReasonerPromptPreset
+      ? earbudMicroReasonerPrompts
+        .filter((prompt: StagePlayMicroReasonerPromptV1) =>
+          selectedEarbudMicroReasonerPromptPreset.promptedRoles.includes(prompt.role) ||
+          Boolean(selectedEarbudMicroReasonerPromptPreset.rolePromptIds[prompt.role])
+        )
+        .slice(0, 3)
+      : [],
+    [earbudMicroReasonerPrompts, selectedEarbudMicroReasonerPromptPreset],
   );
   const visualShadePromptChanged = Boolean(
     visualShadePromptDraft.trim() &&
@@ -1237,7 +1285,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       setVisualObserverProfiles(Array.isArray(visualObserverProfileBody.profiles) ? visualObserverProfileBody.profiles : []);
       setActiveVisualObserverProfile(visualObserverProfileBody.activeProfile ?? visualObserverProfileBody.active_profile ?? null);
       const microReasonerPromptPresetBody: MicroReasonerPromptPresetListRead = await fetch(
-        `/api/helix/stage-play/micro-reasoner-prompt-preset?sourceId=${encodeURIComponent(visualSourceId)}&includePresets=true`,
+        `/api/helix/stage-play/micro-reasoner-prompt-preset?sourceId=${encodeURIComponent(visualSourceId)}&sourceKind=visual_frame&includePresets=true`,
       ).then((response) => response.ok ? response.json() : {}).catch(() => ({}));
       setMicroReasonerPromptPresets(Array.isArray(microReasonerPromptPresetBody.presets) ? microReasonerPromptPresetBody.presets : []);
       setActiveMicroReasonerPromptPreset(microReasonerPromptPresetBody.activePreset ?? microReasonerPromptPresetBody.active_preset ?? null);
@@ -1246,6 +1294,28 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           ? microReasonerPromptPresetBody.prompts
           : Array.isArray(microReasonerPromptPresetBody.microReasonerPrompts)
             ? microReasonerPromptPresetBody.microReasonerPrompts
+            : [],
+      );
+      const earbudMicroDeckSourceId =
+        audioTranscriptSourceIdRef.current ??
+        audioTranscriptSourceId ??
+        serverAudioTranscriptHistory.at(-1)?.source_id ??
+        `audio_transcript:${threadId}`;
+      const earbudPresetParams = new URLSearchParams({
+        sourceId: earbudMicroDeckSourceId,
+        sourceKind: "audio_transcript",
+        includePresets: "true",
+      });
+      const earbudMicroReasonerPromptPresetBody: MicroReasonerPromptPresetListRead = await fetch(
+        `/api/helix/stage-play/micro-reasoner-prompt-preset?${earbudPresetParams.toString()}`,
+      ).then((response) => response.ok ? response.json() : {}).catch(() => ({}));
+      setEarbudMicroReasonerPromptPresets(Array.isArray(earbudMicroReasonerPromptPresetBody.presets) ? earbudMicroReasonerPromptPresetBody.presets : []);
+      setActiveEarbudMicroReasonerPromptPreset(earbudMicroReasonerPromptPresetBody.activePreset ?? earbudMicroReasonerPromptPresetBody.active_preset ?? null);
+      setEarbudMicroReasonerPrompts(
+        Array.isArray(earbudMicroReasonerPromptPresetBody.prompts)
+          ? earbudMicroReasonerPromptPresetBody.prompts
+          : Array.isArray(earbudMicroReasonerPromptPresetBody.microReasonerPrompts)
+            ? earbudMicroReasonerPromptPresetBody.microReasonerPrompts
             : [],
       );
       setLastFetchError(null);
@@ -1282,6 +1352,15 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     const preferred = preferredMicroReasonerPresetId(microReasonerPromptPresets, activeMicroReasonerPromptPreset);
     if (preferred) setSelectedMicroReasonerPromptPresetId(preferred);
   }, [activeMicroReasonerPromptPreset, microReasonerPromptPresets, selectedMicroReasonerPromptPresetId]);
+
+  useEffect(() => {
+    const selectionStillAvailable = earbudMicroReasonerPromptPresets.some(
+      (preset: StagePlayMicroReasonerPromptPresetV1) => preset.presetId === selectedEarbudMicroReasonerPromptPresetId,
+    );
+    if (selectionStillAvailable) return;
+    const preferred = preferredMicroReasonerPresetId(earbudMicroReasonerPromptPresets, activeEarbudMicroReasonerPromptPreset);
+    if (preferred) setSelectedEarbudMicroReasonerPromptPresetId(preferred);
+  }, [activeEarbudMicroReasonerPromptPreset, earbudMicroReasonerPromptPresets, selectedEarbudMicroReasonerPromptPresetId]);
 
   useEffect(() => {
     if (!selectedVisualObserverProfile) return;
@@ -1919,12 +1998,35 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       const response = await postJson("/api/helix/stage-play/micro-reasoner-prompt-preset/apply", {
         presetId: preset.presetId,
         sourceIds: [source.source_id],
+        sourceKind: "visual_frame",
       });
       const applied = response?.preset as StagePlayMicroReasonerPromptPresetV1 | undefined;
       setLastActionStatus(`${applied?.title ?? preset.title} MicroDeck preset applied to ${source.source_id}. Future mail-loop packets will use this prompt deck.`);
       await refresh();
     } catch (error) {
       setLastActionStatus(error instanceof Error ? error.message : "micro_reasoner_prompt_preset_apply_failed");
+    }
+  };
+
+  const applyEarbudMicroReasonerPromptPreset = async (preset: StagePlayMicroReasonerPromptPresetV1 | null) => {
+    if (!preset) {
+      setLastActionStatus("Earbud MicroDeck preset is not available.");
+      return;
+    }
+    try {
+      const sourceId = activeAudioTranscriptSourceId ?? `audio_transcript:${threadId}`;
+      const response = await postJson("/api/helix/stage-play/micro-reasoner-prompt-preset/apply", {
+        presetId: preset.presetId,
+        sourceIds: [sourceId],
+        sourceKind: "audio_transcript",
+      });
+      const applied = response?.preset as StagePlayMicroReasonerPromptPresetV1 | undefined;
+      setAudioTranscriptSourceId(sourceId);
+      audioTranscriptSourceIdRef.current = sourceId;
+      setLastActionStatus(`${applied?.title ?? preset.title} earbud deck applied to ${sourceId}. Future audio transcript chunks will use this prompt deck.`);
+      await refresh();
+    } catch (error) {
+      setLastActionStatus(error instanceof Error ? error.message : "earbud_micro_reasoner_prompt_preset_apply_failed");
     }
   };
 
@@ -2744,6 +2846,73 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           }`}>
             {audioTranscriptStatusDetail}
           </p>
+          <div className="mt-2 rounded border border-cyan-300/15 bg-black/20 px-2 py-2">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase text-cyan-100">Earbud MicroDeck</p>
+                <p className="mt-0.5 truncate text-[11px] text-slate-300">
+                  {earbudMicroReasonerPresetStatus}
+                </p>
+                <p className="mt-0.5 truncate text-[10px] text-slate-500">
+                  Source: {activeAudioTranscriptSourceId ?? `audio_transcript:${threadId}`}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <label className="sr-only" htmlFor="earbud-micro-reasoner-preset-select">
+                  Earbud micro-reasoner prompt preset
+                </label>
+                <select
+                  id="earbud-micro-reasoner-preset-select"
+                  aria-label="Earbud micro-reasoner prompt preset"
+                  value={selectedEarbudMicroReasonerPromptPreset?.presetId ?? ""}
+                  onChange={(event) => setSelectedEarbudMicroReasonerPromptPresetId(event.currentTarget.value)}
+                  disabled={earbudMicroReasonerPromptPresets.length === 0}
+                  className="min-w-[16rem] rounded border border-cyan-300/30 bg-slate-950 px-2.5 py-1.5 text-[11px] font-semibold text-cyan-100 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {earbudMicroReasonerPresetGroups.length === 0 ? (
+                    <option value="">No earbud presets loaded</option>
+                  ) : (
+                    earbudMicroReasonerPresetGroups.map((group) => (
+                      <optgroup key={group.category} label={`${group.category} source`}>
+                        {group.presets.map((preset) => (
+                          <option key={preset.presetId} value={preset.presetId}>
+                            {microReasonerPresetOptionLabel(preset, activeAudioTranscriptSourceId ?? `audio_transcript:${threadId}`)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))
+                  )}
+                </select>
+                <button
+                  type="button"
+                  aria-label="Apply selected earbud micro-reasoner prompt preset"
+                  onClick={() => void applyEarbudMicroReasonerPromptPreset(selectedEarbudMicroReasonerPromptPreset)}
+                  disabled={!selectedEarbudMicroReasonerPromptPreset}
+                  className={`rounded border px-2.5 py-1.5 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-45 ${
+                    selectedEarbudMicroPresetApplied
+                      ? "border-emerald-300/40 bg-emerald-400/10 text-emerald-100"
+                      : "border-cyan-300/30 text-cyan-100 hover:bg-cyan-400/10"
+                  }`}
+                >
+                  {selectedEarbudMicroPresetApplied ? "Earbud deck applied" : "Apply earbud deck"}
+                </button>
+              </div>
+            </div>
+            {selectedEarbudMicroReasonerPromptPreset ? (
+              <div className="mt-2">
+                <p className="rounded border border-cyan-300/15 bg-black/20 px-2 py-1.5 text-[11px] text-cyan-100">
+                  {selectedEarbudMicroReasonerPromptPreset.description}
+                </p>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {selectedEarbudMicroPromptPreview.map((prompt: StagePlayMicroReasonerPromptV1) => (
+                    <span key={prompt.promptId} className="rounded border border-cyan-300/20 px-1.5 py-0.5 font-mono text-[10px] text-cyan-100">
+                      {prompt.role}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
           {audioRouteNeedsFreshShare ? (
             <p className="mt-2 rounded border border-amber-300/20 bg-amber-950/10 px-2 py-1 text-[10px] leading-4 text-amber-100">
               Current visual share has no audio track; starting selected live sources will request a fresh browser share.
@@ -3088,7 +3257,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                     <optgroup key={group.category} label={`${group.category} source`}>
                       {group.presets.map((preset) => (
                         <option key={preset.presetId} value={preset.presetId}>
-                          {microReasonerPresetOptionLabel(preset)}
+                          {microReasonerPresetOptionLabel(preset, activeVisualSourceId)}
                         </option>
                       ))}
                     </optgroup>

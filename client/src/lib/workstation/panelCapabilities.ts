@@ -1603,9 +1603,9 @@ export const WORKSTATION_V1_PANEL_CAPABILITIES: Record<string, WorkstationPanelC
       {
         id: "open",
         title: "Open Live Answer",
-        description: "Open and focus the Live Answer environment panel.",
+        description: "Open and focus the Live Answer environment panel, including visual capture and earbud audio transcript outputs.",
         risk: "low",
-        aliases: ["open live answer", "show live answer", "open visual capture"],
+        aliases: ["open live answer", "show live answer", "open visual capture", "show earbud outputs", "open audio transcript earbuds"],
       },
       {
         id: "image_lens.focus_regions",

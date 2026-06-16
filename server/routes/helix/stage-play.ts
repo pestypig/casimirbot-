@@ -1903,16 +1903,19 @@ helixStagePlayRouter.get("/micro-reasoner-prompt-preset", (req: Request, res: Re
   try {
     ensureDefaultStagePlayMicroReasonerPromptPresets();
     const sourceId = readQueryString(req.query.sourceId) ?? readQueryString(req.query.source_id);
+    const sourceKind = readQueryString(req.query.sourceKind) ?? readQueryString(req.query.source_kind);
     const presetId = readQueryString(req.query.presetId) ?? readQueryString(req.query.preset_id);
     const presets = listStagePlayMicroReasonerPromptPresets({
       sourceId,
+      sourceKind,
       includePresets: req.query.includePresets !== "false",
       active: true,
       limit: 100,
     });
-    const activePreset = getActiveStagePlayMicroReasonerPromptPresetForSource({ sourceId, presetId });
+    const activePreset = getActiveStagePlayMicroReasonerPromptPresetForSource({ sourceId, sourceKind, presetId });
     const prompts = listStagePlayActiveMicroReasonerPromptsForSource({
       sourceId,
+      sourceKind,
       presetId: activePreset?.presetId ?? presetId,
     });
     return res.json({
@@ -1956,6 +1959,7 @@ helixStagePlayRouter.post("/micro-reasoner-prompt-preset", (req: Request, res: R
       });
     }
     const sourceIds = readStringArray(body.sourceIds ?? body.source_ids);
+    const sourceKind = readQueryString(body.sourceKind) ?? readQueryString(body.source_kind);
     const result = recordStagePlayCustomMicroReasonerPromptPreset({
       title: readQueryString(body.title),
       description: readQueryString(body.description),
@@ -1975,6 +1979,7 @@ helixStagePlayRouter.post("/micro-reasoner-prompt-preset", (req: Request, res: R
     }
     const prompts = listStagePlayActiveMicroReasonerPromptsForSource({
       sourceId: sourceIds[0] ?? null,
+      sourceKind,
       presetId: result.preset.presetId,
     });
     return res.json({
@@ -2009,6 +2014,7 @@ helixStagePlayRouter.post("/micro-reasoner-prompt-preset/apply", (req: Request, 
     if (!body) return;
     const presetId = readQueryString(body.presetId) ?? readQueryString(body.preset_id);
     const sourceIds = readStringArray(body.sourceIds ?? body.source_ids);
+    const sourceKind = readQueryString(body.sourceKind) ?? readQueryString(body.source_kind);
     if (!presetId || sourceIds.length === 0) {
       return stagePlayJsonError(res, 400, {
         schema: "stage_play_micro_reasoner_prompt_preset_apply_response/v1",
@@ -2017,7 +2023,7 @@ helixStagePlayRouter.post("/micro-reasoner-prompt-preset/apply", (req: Request, 
         contextRole: "tool_evidence",
       });
     }
-    const preset = applyStagePlayMicroReasonerPromptPreset({ presetId, sourceIds });
+    const preset = applyStagePlayMicroReasonerPromptPreset({ presetId, sourceIds, sourceKind });
     if (!preset) {
       return stagePlayJsonError(res, 404, {
         schema: "stage_play_micro_reasoner_prompt_preset_apply_response/v1",
@@ -2028,6 +2034,7 @@ helixStagePlayRouter.post("/micro-reasoner-prompt-preset/apply", (req: Request, 
     }
     const prompts = listStagePlayActiveMicroReasonerPromptsForSource({
       sourceId: sourceIds[0] ?? null,
+      sourceKind,
       presetId: preset.presetId,
     });
     return res.json({
