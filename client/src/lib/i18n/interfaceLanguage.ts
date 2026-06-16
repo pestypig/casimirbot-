@@ -1,3 +1,6 @@
+import { hawMessages } from "@/lib/i18n/messages/haw";
+import { INTERFACE_MESSAGE_IDS } from "@/lib/i18n/messages/types";
+
 export type InterfaceLanguageCode = "en" | "haw";
 
 export type InterfaceLanguageTranslationMode = "source" | "procedural_catalog";
@@ -59,4 +62,12 @@ export function isInterfaceLanguageCode(value: unknown): value is InterfaceLangu
 export function getInterfaceLanguageOption(value: unknown): InterfaceLanguageOption {
   const code = normalizeInterfaceLanguageCode(value);
   return INTERFACE_LANGUAGE_OPTIONS.find((option) => option.code === code) ?? INTERFACE_LANGUAGE_OPTIONS[0];
+}
+
+export function getInterfaceLanguageReadiness(option: InterfaceLanguageOption): string {
+  if (option.translationMode === "source") return option.readiness;
+  if (option.code === "haw") {
+    return `${Object.keys(hawMessages).length}/${INTERFACE_MESSAGE_IDS.length} catalog strings`;
+  }
+  return option.readiness;
 }

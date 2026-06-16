@@ -506,6 +506,143 @@ describe("Helix Ask docs evidence synthesis answer", () => {
     });
   });
 
+  it("lets same-turn canonical docs synthesis goal authorize materialization without route product contract", () => {
+    const prompt =
+      "Compare docs/helix-ask-flow.md and docs/helix-ask-codex-loop-discipline.md. Give three differences in what each document is responsible for.";
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      active_prompt: prompt,
+      canonical_goal_frame: {
+        turn_id: turnId,
+        goal_kind: "doc_evidence_synthesis",
+        required_terminal_kind: "doc_evidence_synthesis_answer",
+      },
+    };
+    const finalDraft = {
+      artifact_id: "draft:canonical-contract",
+      turn_id: turnId,
+      kind: "final_answer_draft",
+      payload: {
+        schema: "helix.final_answer_draft.v1",
+        artifact_id: "draft:canonical-contract",
+        text: "Flow owns routing; discipline owns Codex parity boundaries.",
+        artifact_refs: ["doc-summary:flow", "doc-summary:discipline"],
+        support_refs: ["doc-summary:flow", "doc-summary:discipline"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+
+    const result = materializeFinalAnswerDraftTerminal({
+      turnId,
+      payload,
+      artifactLedger: [...docsEvidenceArtifacts, finalDraft],
+    });
+
+    expect(result?.ok).toBe(true);
+    expect(result?.materialized_terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+    expect(payload.docs_synthesis_debug).toMatchObject({
+      materializer_contract_allowed: true,
+      materializer_goal_kind: "doc_evidence_synthesis",
+      materializer_required_terminal_kind: "doc_evidence_synthesis_answer",
+    });
+  });
+
+  it("lets canonical docs synthesis goal override stale route product allowed kinds", () => {
+    const prompt =
+      "Compare docs/helix-ask-flow.md and docs/helix-ask-codex-loop-discipline.md. Give three differences in what each document is responsible for.";
+    const payload: Record<string, unknown> = synthesisPayload(prompt);
+    payload.route_product_contract = {
+      schema: "helix.route_product_contract.v1",
+      turn_id: turnId,
+      source_target: "docs_viewer",
+      allowed_terminal_artifact_kinds: ["typed_failure", "request_user_input"],
+      forbidden_terminal_artifact_kinds: ["doc_summary"],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const finalDraft = {
+      artifact_id: "draft:stale-contract",
+      turn_id: turnId,
+      kind: "final_answer_draft",
+      payload: {
+        schema: "helix.final_answer_draft.v1",
+        artifact_id: "draft:stale-contract",
+        text: "Flow owns routing; discipline owns runtime separation.",
+        artifact_refs: ["doc-summary:flow", "doc-summary:discipline"],
+        support_refs: ["doc-summary:flow", "doc-summary:discipline"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+
+    const result = materializeFinalAnswerDraftTerminal({
+      turnId,
+      payload,
+      artifactLedger: [...docsEvidenceArtifacts, finalDraft],
+      routeProductContract: payload.route_product_contract as Record<string, unknown>,
+    });
+
+    expect(result?.ok).toBe(true);
+    expect(result?.materialized_terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+    expect(payload.docs_synthesis_debug).toMatchObject({
+      materializer_contract_allowed: true,
+      materializer_goal_kind_source: "canonical_goal_frame.goal_kind",
+      materializer_required_terminal_kind_source: "canonical_goal_frame.required_terminal_kind",
+    });
+  });
+
+  it("keeps same-turn committed route forbid authoritative for docs synthesis terminals", () => {
+    const prompt =
+      "Compare docs/helix-ask-flow.md and docs/helix-ask-codex-loop-discipline.md. Give three differences.";
+    const payload: Record<string, unknown> = synthesisPayload(prompt);
+    const committedRoute = buildCommittedAskRoute({
+      turnId,
+      promptText: prompt,
+      selectedRoute: "docs_viewer.local_docs_path_compare",
+      payload,
+      promptInterpretation: interpretHelixAskPrompt(prompt),
+    });
+    payload.committed_ask_route = {
+      ...committedRoute,
+      canonical_goal: {
+        ...committedRoute.canonical_goal,
+        forbidden_terminal_artifact_kinds: [
+          ...committedRoute.canonical_goal.forbidden_terminal_artifact_kinds,
+          "doc_evidence_synthesis_answer",
+        ],
+      },
+    };
+    const finalDraft = {
+      artifact_id: "draft:committed-forbid",
+      turn_id: turnId,
+      kind: "final_answer_draft",
+      payload: {
+        schema: "helix.final_answer_draft.v1",
+        artifact_id: "draft:committed-forbid",
+        text: "This should not terminalize because the same-turn committed route forbids it.",
+        artifact_refs: ["doc-summary:flow", "doc-summary:discipline"],
+        support_refs: ["doc-summary:flow", "doc-summary:discipline"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+
+    const result = materializeFinalAnswerDraftTerminal({
+      turnId,
+      payload,
+      artifactLedger: [...docsEvidenceArtifacts, finalDraft],
+      routeProductContract: payload.route_product_contract as Record<string, unknown>,
+    });
+
+    expect(result?.ok).toBe(false);
+    expect(payload.doc_evidence_synthesis_answer).toBeUndefined();
+    expect(payload.docs_synthesis_debug).toMatchObject({
+      materializer_contract_allowed: false,
+      materializer_contract_disallow_reason: "same_turn_committed_route_forbids_doc_evidence_synthesis_answer",
+    });
+  });
+
   it("rejects doc_summary as the terminal product for a synthesis route", () => {
     const prompt =
       "Compare docs/helix-ask-flow.md and docs/helix-ask-codex-loop-discipline.md.";

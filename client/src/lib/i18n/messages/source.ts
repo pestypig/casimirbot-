@@ -1,4 +1,4 @@
-import type { InterfaceMessageMeta } from "@/lib/i18n/messages/catalogTypes";
+﻿import type { InterfaceMessageMeta } from "@/lib/i18n/messages/catalogTypes";
 
 export const interfaceSourceMessages = {
   "account.header.title": {
@@ -164,7 +164,7 @@ export const interfaceSourceMessages = {
   },
   "account.language.optionReadiness": {
     id: "account.language.optionReadiness",
-    defaultMessage: "{label} ({nativeLabel}) · {readiness}",
+    defaultMessage: "{label} ({nativeLabel}) - {readiness}",
     description: "Language selector option showing readiness honestly.",
     context: "Account panel language select option.",
     placeholders: { label: "string", nativeLabel: "string", readiness: "string" },
@@ -648,3 +648,4 @@ export const interfaceSourceMessages = {
 export type InterfaceMessageId = keyof typeof interfaceSourceMessages;
 
 export const INTERFACE_MESSAGE_IDS = Object.keys(interfaceSourceMessages) as InterfaceMessageId[];
+

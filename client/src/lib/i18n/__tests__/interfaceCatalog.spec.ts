@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it } from "vitest";
-import { INTERFACE_LANGUAGE_OPTIONS } from "@/lib/i18n/interfaceLanguage";
+import { getInterfaceLanguageReadiness, INTERFACE_LANGUAGE_OPTIONS } from "@/lib/i18n/interfaceLanguage";
 import { createInterfaceTextResolver } from "@/lib/i18n/interfaceText";
 import { enMessages } from "@/lib/i18n/messages/en";
 import { hawMessages } from "@/lib/i18n/messages/haw";
@@ -46,6 +46,9 @@ describe("interface catalog integrity", () => {
 
     expect(hawOption?.translationMode).toBe("procedural_catalog");
     expect(Object.keys(hawMessages).length).toBeLessThan(INTERFACE_MESSAGE_IDS.length);
+    expect(hawOption ? getInterfaceLanguageReadiness(hawOption) : "").toBe(
+      `${Object.keys(hawMessages).length}/${INTERFACE_MESSAGE_IDS.length} catalog strings`,
+    );
 
     for (const [id, message] of Object.entries(hawMessages)) {
       expect(sourceIds.has(id as InterfaceMessageId)).toBe(true);
@@ -54,23 +57,14 @@ describe("interface catalog integrity", () => {
     }
   });
 
-  it("emits a debug event when a partial target catalog falls back to English", () => {
+  it("does not emit fallback debug for unknown IDs without source fallback text", () => {
     setWorkstationDebugEnabled(true);
     clearWorkstationDebugEvents();
 
     const resolver = createInterfaceTextResolver("haw");
-    expect(resolver.t("account.header.title")).toBe("Account & Sessions");
+    expect(resolver.t("missing.id" as never)).toBe("missing.id");
 
-    expect(getWorkstationDebugSnapshot().events.at(-1)).toMatchObject({
-      channel: "interface_i18n",
-      action: "message.fallback_used",
-      detail: {
-        language: "haw",
-        message_id: "account.header.title",
-        fallback_language: "en",
-        source_surface: "account-session",
-      },
-    });
+    expect(getWorkstationDebugSnapshot().events).toHaveLength(0);
   });
 
   it("does not emit fallback debug for reviewed Hawaiian entries", () => {
@@ -79,6 +73,8 @@ describe("interface catalog integrity", () => {
 
     const resolver = createInterfaceTextResolver("haw");
     expect(resolver.t("account.language.title")).toBe("ʻŌlelo");
+    expect(resolver.t("account.header.title")).toBe("Moʻokāki a me nā kau");
+    expect(resolver.t("account.usage.threads")).toBe("Nā thread");
 
     expect(getWorkstationDebugSnapshot().events).toHaveLength(0);
   });

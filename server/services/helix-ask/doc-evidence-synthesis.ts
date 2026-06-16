@@ -45,6 +45,15 @@ export type DocEvidenceSynthesisCoverage = {
   raw_content_included: false;
 };
 
+type DocsSynthesisTerminalContractResolution = {
+  allowed: boolean;
+  goalKind: string | null;
+  goalKindSource: string | null;
+  requiredTerminalKind: string | null;
+  requiredTerminalKindSource: string | null;
+  disallowReason: string | null;
+};
+
 const readRecord = (value: unknown): RecordLike | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as RecordLike) : null;
 
@@ -81,6 +90,82 @@ const artifactText = (artifact: ArtifactLike): string | null => {
 
 const stringArray = (value: unknown): string[] =>
   readArray(value).map(readString).filter((entry): entry is string => Boolean(entry));
+
+const readSameTurnCommittedRoute = (payload: RecordLike, turnId: string): HelixCommittedAskRoute | null => {
+  const committed = readRecord(payload.committed_ask_route) as HelixCommittedAskRoute | null;
+  if (committed?.schema !== "helix.committed_ask_route.v1") return null;
+  if (readString(committed.turn_id) !== turnId) return null;
+  return committed;
+};
+
+const resolveDocsSynthesisTerminalContract = (input: {
+  turnId: string;
+  payload: RecordLike;
+  draftPayload?: RecordLike | null;
+}): DocsSynthesisTerminalContractResolution => {
+  const committedRoute = readSameTurnCommittedRoute(input.payload, input.turnId);
+  const canonicalGoal = readRecord(input.payload.canonical_goal_frame);
+  const committedGoal = committedRoute?.canonical_goal;
+  const committedForbidden = committedGoal?.forbidden_terminal_artifact_kinds ?? [];
+  if (committedForbidden.includes("doc_evidence_synthesis_answer")) {
+    return {
+      allowed: false,
+      goalKind: committedGoal?.goal_kind ?? null,
+      goalKindSource: "committed_ask_route.canonical_goal.goal_kind",
+      requiredTerminalKind: committedGoal?.required_terminal_kind ?? null,
+      requiredTerminalKindSource: "committed_ask_route.canonical_goal.required_terminal_kind",
+      disallowReason: "same_turn_committed_route_forbids_doc_evidence_synthesis_answer",
+    };
+  }
+  const candidates: Array<{
+    goalKind: string | null;
+    goalKindSource: string;
+    requiredTerminalKind: string | null;
+    requiredTerminalKindSource: string;
+  }> = [
+    {
+      goalKind: readString(committedGoal?.goal_kind),
+      goalKindSource: "committed_ask_route.canonical_goal.goal_kind",
+      requiredTerminalKind: readString(committedGoal?.required_terminal_kind),
+      requiredTerminalKindSource: "committed_ask_route.canonical_goal.required_terminal_kind",
+    },
+    {
+      goalKind: readString(canonicalGoal?.goal_kind),
+      goalKindSource: "canonical_goal_frame.goal_kind",
+      requiredTerminalKind: readString(canonicalGoal?.required_terminal_kind),
+      requiredTerminalKindSource: "canonical_goal_frame.required_terminal_kind",
+    },
+    {
+      goalKind: readString(input.draftPayload?.goal_kind),
+      goalKindSource: "final_answer_draft.goal_kind",
+      requiredTerminalKind: readString(input.draftPayload?.required_terminal_kind),
+      requiredTerminalKindSource: "final_answer_draft.required_terminal_kind",
+    },
+  ];
+  const selected = candidates.find((candidate) =>
+    candidate.goalKind === "doc_evidence_synthesis" &&
+    candidate.requiredTerminalKind === "doc_evidence_synthesis_answer",
+  );
+  if (selected) {
+    return {
+      allowed: true,
+      goalKind: selected.goalKind,
+      goalKindSource: selected.goalKindSource,
+      requiredTerminalKind: selected.requiredTerminalKind,
+      requiredTerminalKindSource: selected.requiredTerminalKindSource,
+      disallowReason: null,
+    };
+  }
+  const fallback = candidates.find((candidate) => candidate.goalKind || candidate.requiredTerminalKind);
+  return {
+    allowed: false,
+    goalKind: fallback?.goalKind ?? null,
+    goalKindSource: fallback?.goalKindSource ?? null,
+    requiredTerminalKind: fallback?.requiredTerminalKind ?? null,
+    requiredTerminalKindSource: fallback?.requiredTerminalKindSource ?? null,
+    disallowReason: "docs_synthesis_terminal_contract_not_found",
+  };
+};
 
 const artifactIdentity = (artifact: ArtifactLike, index: number): string =>
   artifactId(artifact) ??
@@ -476,21 +561,17 @@ export function materializeDocEvidenceSynthesisAnswer(input: {
     payload: input.payload,
     artifactLedger: input.artifactLedger,
   });
-  const committedRoute = readRecord(input.payload.committed_ask_route) as HelixCommittedAskRoute | null;
-  const goal = readRecord(input.payload.canonical_goal_frame);
+  const committedRoute = readSameTurnCommittedRoute(input.payload, input.turnId);
   const draftPayload = input.finalAnswerDraftRef
     ? artifactLedger
         .map((artifact) => readRecord(artifact.payload))
         .find((payload) => readString(payload?.artifact_id) === input.finalAnswerDraftRef)
     : readRecord(input.payload.final_answer_draft);
-  const goalKind =
-    committedRoute?.canonical_goal.goal_kind ??
-    readString(goal?.goal_kind) ??
-    readString(draftPayload?.goal_kind);
-  const requiredTerminalKind =
-    committedRoute?.canonical_goal.required_terminal_kind ??
-    readString(goal?.required_terminal_kind) ??
-    readString(draftPayload?.required_terminal_kind);
+  const terminalContract = resolveDocsSynthesisTerminalContract({
+    turnId: input.turnId,
+    payload: input.payload,
+    draftPayload,
+  });
   const rebuiltPlan = buildDocEvidenceSynthesisPlan({
     turnId: input.turnId,
     promptText: input.promptText,
@@ -524,7 +605,19 @@ export function materializeDocEvidenceSynthesisAnswer(input: {
     ]);
   }
   input.payload.doc_evidence_synthesis_coverage = coverage;
-  if (goalKind !== "doc_evidence_synthesis" || requiredTerminalKind !== "doc_evidence_synthesis_answer") {
+  input.payload.docs_synthesis_debug = {
+    ...(readRecord(input.payload.docs_synthesis_debug) ?? {}),
+    schema: "helix.docs_synthesis_debug.v1",
+    materializer_goal_kind: terminalContract.goalKind,
+    materializer_goal_kind_source: terminalContract.goalKindSource,
+    materializer_required_terminal_kind: terminalContract.requiredTerminalKind,
+    materializer_required_terminal_kind_source: terminalContract.requiredTerminalKindSource,
+    materializer_contract_allowed: terminalContract.allowed,
+    materializer_contract_disallow_reason: terminalContract.disallowReason,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  if (!terminalContract.allowed) {
     return { ok: false, coverage, blocked_reason: "route_contract_disallowed" };
   }
   if (!coverage.sufficient) {

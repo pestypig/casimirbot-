@@ -4,6 +4,8 @@ import React from "react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import AccountSessionPanel from "@/components/workstation/AccountSessionPanel";
+import { hawMessages } from "@/lib/i18n/messages/haw";
+import { INTERFACE_MESSAGE_IDS } from "@/lib/i18n/messages/types";
 
 vi.mock("@/components/auth/GoogleSignInButton", () => ({
   GoogleSignInButton: () => <button type="button">Google sign-in mock</button>,
@@ -75,10 +77,16 @@ describe("AccountSessionPanel interface language", () => {
     render(<AccountSessionPanel />);
 
     await waitFor(() => {
+      expect(screen.getByText("Moʻokāki a me nā kau")).toBeInTheDocument();
       expect(screen.getByText("ʻŌlelo")).toBeInTheDocument();
       expect(screen.getByText("ʻŌlelo no ke alo")).toBeInTheDocument();
     });
     expect(screen.getByRole("combobox")).toHaveValue("haw");
+    expect(
+      screen.getByRole("option", {
+        name: `Hawaiian (ʻŌlelo Hawaiʻi) - ${Object.keys(hawMessages).length}/${INTERFACE_MESSAGE_IDS.length} catalog strings`,
+      }),
+    ).toBeInTheDocument();
     expect(document.documentElement.lang).toBe("haw");
     expect(document.documentElement.dir).toBe("ltr");
   });

@@ -132,7 +132,7 @@ const errors = issues.filter((issue) => issue.level === "error");
 const summary = {
   ok: errors.length === 0,
   source_messages: total,
-  haw_reviewed_messages: hawReviewed,
+  haw_catalog_messages: hawReviewed,
   issues,
 };
 
