@@ -11,7 +11,7 @@ import {
 } from "./language-contract";
 import { liveSourceModelSynthesisMissingFailure } from "./live-source-terminal-failure-repair";
 import type { HelixTerminalAuthority } from "@shared/helix-turn-poison-guard";
-import { readCommittedAskRoute } from "./committed-ask-route";
+import { committedRouteAllowsTerminalKind, readCommittedAskRoute } from "./committed-ask-route";
 
 export type HelixTerminalAnswerEnvelope = {
   schema: "helix.terminal_answer_envelope.v1";
@@ -60,14 +60,6 @@ const readSourceTarget = (payload: Record<string, unknown>): string =>
 
 const readTerminalArtifactKind = (payload: Record<string, unknown>): string =>
   readString(payload.terminal_artifact_kind) ?? "typed_failure";
-
-const committedRouteAllowsTerminalKind = (payload: Record<string, unknown>, kind: string): boolean => {
-  const committedRoute = readCommittedAskRoute(payload);
-  if (!committedRoute || kind === "typed_failure" || kind === "request_user_input") return true;
-  if (committedRoute.canonical_goal.forbidden_terminal_artifact_kinds.includes(kind)) return false;
-  const allowed = committedRoute.canonical_goal.allowed_terminal_artifact_kinds;
-  return allowed.length === 0 || allowed.includes(kind);
-};
 
 const readFinalAnswerSource = (payload: Record<string, unknown>): string =>
   readString(payload.final_answer_source) ?? readTerminalArtifactKind(payload);
@@ -477,7 +469,11 @@ export function resolveTerminalAnswerEnvelope(
     terminalText = typedFailureText(payload);
     authorityOrigin = "typed_failure";
   }
-  if (!committedRouteAllowsTerminalKind(payload, terminalArtifactKind)) {
+  if (!committedRouteAllowsTerminalKind({
+    committedRoute: readCommittedAskRoute(payload),
+    terminalArtifactKind,
+    finalAnswerSource,
+  })) {
     payload.committed_route_terminal_rejection = {
       schema: "helix.committed_route_terminal_rejection.v1",
       turn_id: turnId,

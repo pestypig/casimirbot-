@@ -5,7 +5,11 @@ import {
   buildCapabilityBindingMismatchObservation,
   evaluateTerminalBoundaryEligibility,
 } from "./runtime-authority-contract";
-import { readCommittedAskRoute } from "./committed-ask-route";
+import {
+  committedRouteAllowsTerminalKind,
+  normalizeCommittedRouteTerminalKind,
+  readCommittedAskRoute,
+} from "./committed-ask-route";
 
 type RecordLike = Record<string, unknown>;
 
@@ -665,10 +669,10 @@ export function buildSolverControllerDecision(input: {
   const allowedTerminalKinds = Array.from(new Set([
     ...requiredTerminalKinds,
     ...readStringArray(terminalContract?.acceptable_fallbacks),
-  ]));
+  ].map(normalizeCommittedRouteTerminalKind)));
   const forbiddenTerminalKinds =
-    committedRoute?.canonical_goal.forbidden_terminal_artifact_kinds ??
-    readStringArray(terminalContract?.forbidden_terminal_kinds);
+    (committedRoute?.canonical_goal.forbidden_terminal_artifact_kinds ??
+    readStringArray(terminalContract?.forbidden_terminal_kinds)).map(normalizeCommittedRouteTerminalKind);
   const goalSatisfactionState = readString(goalSatisfaction?.satisfaction);
   const goalNextDecision = readString(goalSatisfaction?.next_decision);
   const terminalContractGoalKind = readString(terminalContract?.goal_kind);
@@ -798,17 +802,14 @@ export function buildSolverControllerDecision(input: {
     if (committedRoute?.compatibility.violations.some((violation) => /goal|terminal|capability|source/i.test(violation))) {
       pushUnique(blockingReasons, "committed_route_incompatible_goal");
     }
-    if (terminalArtifactKind && committedRoute?.canonical_goal.forbidden_terminal_artifact_kinds.includes(terminalArtifactKind)) {
-      pushUnique(blockingReasons, "committed_route_terminal_product_mismatch");
-    }
-    if (
-      terminalArtifactKind &&
-      committedRoute &&
-      committedRoute.canonical_goal.allowed_terminal_artifact_kinds.length > 0 &&
-      !committedRoute.canonical_goal.allowed_terminal_artifact_kinds.includes(terminalArtifactKind) &&
-      terminalArtifactKind !== "typed_failure" &&
-      terminalArtifactKind !== "request_user_input"
-    ) {
+    const committedRouteAllowsTerminal = committedRoute
+      ? committedRouteAllowsTerminalKind({
+        committedRoute,
+        terminalArtifactKind,
+        finalAnswerSource: readString(payload.final_answer_source),
+      })
+      : true;
+    if (terminalArtifactKind && committedRoute && !committedRouteAllowsTerminal) {
       pushUnique(blockingReasons, "committed_route_terminal_product_mismatch");
     }
     if (!goalSatisfaction) {
@@ -822,12 +823,12 @@ export function buildSolverControllerDecision(input: {
     if (
       terminalArtifactKind &&
       allowedTerminalKinds.length > 0 &&
-      !allowedTerminalKinds.includes(terminalArtifactKind) &&
+      !allowedTerminalKinds.includes(normalizeCommittedRouteTerminalKind(terminalArtifactKind)) &&
       !(modelOnlyAnswerCoverageSupersedesCompoundGate && terminalArtifactKind === "model_synthesized_answer")
     ) {
       pushUnique(blockingReasons, "terminal_kind_not_required");
     }
-    if (terminalArtifactKind && forbiddenTerminalKinds.includes(terminalArtifactKind)) {
+    if (terminalArtifactKind && forbiddenTerminalKinds.includes(normalizeCommittedRouteTerminalKind(terminalArtifactKind))) {
       pushUnique(blockingReasons, "terminal_kind_not_required");
     }
     if (!terminalEquivalence) {

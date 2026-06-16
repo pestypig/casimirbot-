@@ -6,6 +6,7 @@ import {
   inferFinalAnswerDraftRouteFamily,
   type FinalAnswerDraftQualityGate,
 } from "./final-answer-draft-quality-gate";
+import { materializeDocEvidenceSynthesisAnswer } from "./doc-evidence-synthesis";
 
 export type FinalAnswerDraftTerminalMaterializerResult = {
   schema: "helix.final_answer_draft_terminal_materializer_result.v1";
@@ -17,6 +18,7 @@ export type FinalAnswerDraftTerminalMaterializerResult = {
     | "model_synthesized_answer"
     | "repo_code_evidence_answer"
     | "compound_research_locator_answer"
+    | "doc_evidence_synthesis_answer"
     | "scholarly_research_answer"
     | "internet_search_answer"
     | "situation_room_live_job_setup_answer"
@@ -30,6 +32,9 @@ export type FinalAnswerDraftTerminalMaterializerResult = {
     | "repo_evidence_required_but_missing"
     | "repo_support_refs_missing"
     | "repo_quality_gate_failed"
+    | "doc_evidence_required_but_missing"
+    | "doc_evidence_coverage_missing"
+    | "doc_support_refs_missing"
     | "scholarly_evidence_required_but_missing"
     | "scholarly_support_refs_missing"
     | "internet_search_evidence_required_but_missing"
@@ -100,6 +105,11 @@ const isScholarlyResearchObservation = (artifact: ArtifactLike): boolean =>
 const isInternetSearchObservation = (artifact: ArtifactLike): boolean =>
   /internet_search_observation/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" "));
 
+const isDocsEvidenceObservation = (artifact: ArtifactLike): boolean =>
+  /\b(?:doc_summary|doc_location_result|doc_evidence_location|doc_location_matches|doc_equation_context|doc_equation_location|doc_calculator_evidence|agent_step_observation_packet)\b/i.test(
+    [artifactKind(artifact), artifactSchema(artifact), artifactId(artifact)].join(" "),
+  );
+
 const isCompleteCompoundResearchLocatorItinerary = (payload: Record<string, unknown>): boolean => {
   const itinerary = readRecord(payload.capability_itinerary);
   const executionState = readRecord(itinerary?.execution_state);
@@ -135,7 +145,9 @@ const contractAllows = (
   kind: string,
 ): boolean => {
   const allowed = allowedKinds(contract);
-  return allowed.length === 0 || allowed.includes(kind);
+  return allowed.length === 0 ||
+    allowed.includes(kind) ||
+    (kind === "doc_evidence_synthesis_answer" && allowed.includes("doc_evidence_synthesis"));
 };
 
 const materializedRef = (turnId: string, kind: string): string =>
@@ -471,6 +483,87 @@ export function materializeFinalAnswerDraftTerminal(input: {
       ok: true,
       materialized_terminal_artifact_ref: internetAnswerRef,
       materialized_terminal_artifact_kind: targetKind,
+      route_allowed_terminal_artifact_kinds: routeAllowed,
+      final_answer_draft_quality_gate: qualityGate,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+
+  if (routeFamily === "docs_source") {
+    if (!contractAllows(contract, "doc_evidence_synthesis_answer")) {
+      return {
+        schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+        turn_id: input.turnId,
+        final_answer_draft_ref: draft.ref,
+        ok: false,
+        blocked_reason: "route_contract_forbids_model_synthesized_answer",
+        route_allowed_terminal_artifact_kinds: routeAllowed,
+        final_answer_draft_quality_gate: qualityGate,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
+    if (!input.artifactLedger.some(isDocsEvidenceObservation)) {
+      return {
+        schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+        turn_id: input.turnId,
+        final_answer_draft_ref: draft.ref,
+        ok: false,
+        blocked_reason: "doc_evidence_required_but_missing",
+        route_allowed_terminal_artifact_kinds: routeAllowed,
+        final_answer_draft_quality_gate: qualityGate,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
+    const supportRefs = collectFinalAnswerDraftSupportRefs({
+      draftPayload,
+      artifactLedger: input.artifactLedger,
+    });
+    if (supportRefs.length === 0) {
+      return {
+        schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+        turn_id: input.turnId,
+        final_answer_draft_ref: draft.ref,
+        ok: false,
+        blocked_reason: "doc_support_refs_missing",
+        route_allowed_terminal_artifact_kinds: routeAllowed,
+        final_answer_draft_quality_gate: qualityGate,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
+    const materialized = materializeDocEvidenceSynthesisAnswer({
+      turnId: input.turnId,
+      promptText: readString(input.payload.active_prompt) ?? "",
+      payload: input.payload,
+      artifactLedger: input.artifactLedger,
+      answerText: draft.text,
+      finalAnswerDraftRef: draft.ref,
+    });
+    if (!materialized.ok || !materialized.answer) {
+      return {
+        schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+        turn_id: input.turnId,
+        final_answer_draft_ref: draft.ref,
+        ok: false,
+        blocked_reason: materialized.blocked_reason === "doc_evidence_coverage_missing"
+          ? "doc_evidence_coverage_missing"
+          : "unsupported_route_terminal_kind",
+        route_allowed_terminal_artifact_kinds: routeAllowed,
+        final_answer_draft_quality_gate: qualityGate,
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
+    return {
+      schema: "helix.final_answer_draft_terminal_materializer_result.v1",
+      turn_id: input.turnId,
+      final_answer_draft_ref: draft.ref,
+      ok: true,
+      materialized_terminal_artifact_ref: materialized.answer.artifact_id,
+      materialized_terminal_artifact_kind: "doc_evidence_synthesis_answer",
       route_allowed_terminal_artifact_kinds: routeAllowed,
       final_answer_draft_quality_gate: qualityGate,
       assistant_answer: false,

@@ -42,6 +42,8 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain('className="order-30 mt-3 rounded border border-white/10 bg-slate-950/60 p-3"');
     expect(source).toContain('className="mt-3 flex flex-wrap gap-1.5"');
     expect(source.indexOf("Route screen share to")).toBeLessThan(source.indexOf("Visual capture source"));
+    expect(source).toContain('data-testid="live-answer-microdeck-catalog"');
+    expect(source).toContain('className="order-4 mt-3 rounded border border-cyan-300/20 bg-cyan-950/10 px-2 py-2"');
     expect(source).toContain('className="order-5 mt-3 rounded border border-violet-300/20 bg-violet-950/10 px-2 py-2"');
     expect(source).toContain('className="order-6 mt-3 rounded border border-teal-300/20 bg-teal-950/10 p-2"');
     expect(source).toContain('className="order-7 mt-3 rounded border border-violet-300/20 bg-violet-950/10 p-2"');
@@ -83,12 +85,33 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
   it("surfaces source and preset loading state for inaccessible shades", () => {
     const source = panelSource();
 
-    expect(source).toContain('Source: {activeVisualSourceId ?? "will register on apply"}');
+    expect(source).toContain('Phase: capture prompt / Source: {activeVisualSourceId ?? "will register on apply"}');
     expect(source).toContain("Shade presets are still loading. Refresh shades if the server was just restarted.");
     expect(source).toContain("Refresh shades");
   });
 
-  it("exposes MicroDeck prompt presets beside visual shades", () => {
+  it("catalogs capture prompts and mail reasoning decks without merging runtime phases", () => {
+    const source = panelSource();
+
+    expect(source).toContain("LiveAnswerMicroDeckCatalogItem");
+    expect(source).toContain("LiveAnswerMicroDeckCatalogGroup");
+    expect(source).toContain("microDeckCatalogGroups");
+    expect(source).toContain("MicroDeck catalog");
+    expect(source).toContain("view model only");
+    expect(source).toContain("Visual Capture Decks");
+    expect(source).toContain("Visual Reasoning Decks");
+    expect(source).toContain("Audio Transcript Decks");
+    expect(source).toContain('phase: "capture_prompt"');
+    expect(source).toContain('phase: "mail_reasoning"');
+    expect(source).toContain("capture prompt");
+    expect(source).toContain("mail reasoning");
+    expect(source).toContain("selectMicroDeckCatalogItem");
+    expect(source).toContain("setSelectedVisualObserverProfileId(item.id)");
+    expect(source).toContain("setSelectedEarbudMicroReasonerPromptPresetId(item.id)");
+    expect(source).toContain("setSelectedMicroReasonerPromptPresetId(item.id)");
+  });
+
+  it("exposes MicroDeck prompt presets beside visual capture decks", () => {
     const source = panelSource();
 
     expect(source).toContain('aria-label="Micro-reasoner prompt preset"');
@@ -97,6 +120,7 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain("Future mail-loop packets will use this prompt deck.");
     expect(source).toContain("MicroDeck presets are still loading. Refresh deck if the server was just restarted.");
     expect(source).toContain("selectedMicroPromptPreview");
+    expect(source).toContain('Phase: mail reasoning / Source: {activeVisualSourceId ?? "will register on apply"}');
   });
 
   it("renders a local-only last-frame preview in the visual capture source panel", () => {
@@ -161,12 +185,13 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain("AUDIO_TRANSCRIPT_DEFAULT_CHUNK_MS = 10_000");
     expect(source).toContain('data-testid="audio-transcript-review"');
     expect(source).toContain("Earbud outputs");
-    expect(source).toContain("Earbud MicroDeck");
+    expect(source).toContain("Audio Transcript Decks");
     expect(source).toContain('aria-label="Earbud micro-reasoner prompt preset"');
     expect(source).toContain('aria-label="Apply selected earbud micro-reasoner prompt preset"');
     expect(source).toContain("Apply earbud deck");
     expect(source).toContain('sourceKind: "audio_transcript"');
     expect(source).toContain("Future audio transcript chunks will use this prompt deck.");
+    expect(source).toContain("Phase: mail reasoning / Source: {activeAudioTranscriptSourceId ?? `audio_transcript:${threadId}`}");
     expect(source).toContain("earbudMicroReasonerPromptPresets");
     expect(source).toContain("earbudMicroReasonerRuns");
     expect(source).toContain("/api/helix/stage-play/live-source-mail?");

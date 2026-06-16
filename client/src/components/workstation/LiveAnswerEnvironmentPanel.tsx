@@ -36,6 +36,7 @@ import type {
   StagePlayMicroReasonerRunV1,
   StagePlayMicroReasonerPromptPresetV1,
   StagePlayMicroReasonerPromptV1,
+  StagePlayLiveSourceMailSourceKindV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import type { StagePlayVisualObserverProfileV1 } from "@shared/contracts/stage-play-visual-observer-profile.v1";
 import type { HelixVisualFrameActionReplayRequest } from "@shared/helix-visual-frame-action-replay";
@@ -71,6 +72,35 @@ import { postAudioTranscriptLiveSourceDescriptor } from "@/lib/helix/liveSourceD
 type LiveEnvironmentTab = "present_state" | "navigation_evidence" | "worker_lanes" | "line_checks" | "interpreted_log" | "clarification" | "live_cognition" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
 type VisualCaptureRoute = "live_answer" | "image_lens" | "audio_transcript";
 type AudioTranscriptCaptureStatus = "idle" | "requesting_permission" | "listening" | "transcribing" | "error";
+type LiveAnswerMicroDeckCatalogPhase = "capture_prompt" | "mail_reasoning";
+type LiveAnswerMicroDeckCatalogItem =
+  | {
+      kind: "visual_observer_profile";
+      id: string;
+      title: string;
+      description: string;
+      groupTitle: "Visual Capture Decks";
+      phase: "capture_prompt";
+      sourceKind: "visual_frame";
+      applied: boolean;
+    }
+  | {
+      kind: "micro_reasoner_preset";
+      id: string;
+      title: string;
+      description: string;
+      groupTitle: "Visual Reasoning Decks" | "Audio Transcript Decks";
+      phase: "mail_reasoning";
+      sourceKind: StagePlayLiveSourceMailSourceKindV1;
+      outputPolicy: string;
+      applied: boolean;
+    };
+type LiveAnswerMicroDeckCatalogGroup = {
+  title: LiveAnswerMicroDeckCatalogItem["groupTitle"];
+  phase: LiveAnswerMicroDeckCatalogPhase;
+  sourceKind: StagePlayLiveSourceMailSourceKindV1;
+  items: LiveAnswerMicroDeckCatalogItem[];
+};
 const VISUAL_CAPTURE_ROUTE_STORAGE_KEY = "helix.liveAnswer.visualCaptureRoutes.v1";
 const VISUAL_CAPTURE_ROUTE_SYNC_EVENT = "helix:live-answer:visual-capture-routes";
 const VISUAL_CAPTURE_ROUTE_VALUES: VisualCaptureRoute[] = ["live_answer", "image_lens", "audio_transcript"];
@@ -589,6 +619,15 @@ const microReasonerPresetOptionLabel = (
 ): string =>
   `${preset.title}${sourceId && preset.sourceIds.includes(sourceId) ? " (applied)" : ""}`;
 
+const liveAnswerMicroDeckPhaseLabel = (phase: LiveAnswerMicroDeckCatalogPhase): string =>
+  phase === "capture_prompt" ? "capture prompt" : "mail reasoning";
+
+const liveAnswerMicroDeckSourceLabel = (sourceKind: StagePlayLiveSourceMailSourceKindV1): string => {
+  if (sourceKind === "visual_frame") return "visual_frame";
+  if (sourceKind === "audio_transcript") return "audio_transcript";
+  return sourceKind;
+};
+
 const preferredMicroReasonerPresetId = (
   presets: StagePlayMicroReasonerPromptPresetV1[],
   activePreset?: StagePlayMicroReasonerPromptPresetV1 | null,
@@ -1044,6 +1083,90 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       .at(0) ?? null;
   });
   const activeVisualSourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id ?? visualProducerState?.source_id ?? null;
+  const microDeckCatalogGroups = useMemo<LiveAnswerMicroDeckCatalogGroup[]>(() => {
+    const visualCaptureDecks: LiveAnswerMicroDeckCatalogItem[] = visualShadeProfiles.map((profile: StagePlayVisualObserverProfileV1) => ({
+      kind: "visual_observer_profile",
+      id: profile.profileId,
+      title: visualShadeOptionLabel(profile),
+      description: [
+        visualShadeSubjectCategory(profile),
+        profile.subject,
+        profile.outputMode,
+        `hash ${profile.promptHash}`,
+      ].filter(Boolean).join(" / "),
+      groupTitle: "Visual Capture Decks",
+      phase: "capture_prompt",
+      sourceKind: "visual_frame",
+      applied: activeVisualObserverProfile?.profileId === profile.profileId,
+    }));
+    const visualReasoningDecks: LiveAnswerMicroDeckCatalogItem[] = microReasonerPromptPresets.map((preset: StagePlayMicroReasonerPromptPresetV1) => ({
+      kind: "micro_reasoner_preset",
+      id: preset.presetId,
+      title: microReasonerPresetOptionLabel(preset, activeVisualSourceId),
+      description: preset.description,
+      groupTitle: "Visual Reasoning Decks",
+      phase: "mail_reasoning",
+      sourceKind: "visual_frame",
+      outputPolicy: preset.outputPolicy,
+      applied: activeMicroReasonerPromptPreset?.presetId === preset.presetId,
+    }));
+    const audioTranscriptDecks: LiveAnswerMicroDeckCatalogItem[] = earbudMicroReasonerPromptPresets.map((preset: StagePlayMicroReasonerPromptPresetV1) => ({
+      kind: "micro_reasoner_preset",
+      id: preset.presetId,
+      title: microReasonerPresetOptionLabel(preset, activeAudioTranscriptSourceId ?? `audio_transcript:${threadId}`),
+      description: preset.description,
+      groupTitle: "Audio Transcript Decks",
+      phase: "mail_reasoning",
+      sourceKind: "audio_transcript",
+      outputPolicy: preset.outputPolicy,
+      applied: Boolean(
+        activeEarbudMicroReasonerPromptPreset?.presetId === preset.presetId &&
+          activeAudioTranscriptSourceId &&
+          preset.sourceIds.includes(activeAudioTranscriptSourceId),
+      ),
+    }));
+    return [
+      {
+        title: "Visual Capture Decks",
+        phase: "capture_prompt",
+        sourceKind: "visual_frame",
+        items: visualCaptureDecks,
+      },
+      {
+        title: "Visual Reasoning Decks",
+        phase: "mail_reasoning",
+        sourceKind: "visual_frame",
+        items: visualReasoningDecks,
+      },
+      {
+        title: "Audio Transcript Decks",
+        phase: "mail_reasoning",
+        sourceKind: "audio_transcript",
+        items: audioTranscriptDecks,
+      },
+    ];
+  }, [
+    activeAudioTranscriptSourceId,
+    activeEarbudMicroReasonerPromptPreset?.presetId,
+    activeMicroReasonerPromptPreset?.presetId,
+    activeVisualObserverProfile?.profileId,
+    activeVisualSourceId,
+    earbudMicroReasonerPromptPresets,
+    microReasonerPromptPresets,
+    threadId,
+    visualShadeProfiles,
+  ]);
+  const selectMicroDeckCatalogItem = (item: LiveAnswerMicroDeckCatalogItem): void => {
+    if (item.kind === "visual_observer_profile") {
+      setSelectedVisualObserverProfileId(item.id);
+      return;
+    }
+    if (item.sourceKind === "audio_transcript") {
+      setSelectedEarbudMicroReasonerPromptPresetId(item.id);
+      return;
+    }
+    setSelectedMicroReasonerPromptPresetId(item.id);
+  };
   const routeLiveAnswerVisual = visualCaptureRoutes.includes("live_answer");
   const routeImageLens = visualCaptureRoutes.includes("image_lens");
   const routeAudioTranscript = visualCaptureRoutes.includes("audio_transcript");
@@ -3053,12 +3176,12 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           <div className="mt-2 rounded border border-cyan-300/15 bg-black/20 px-2 py-2">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase text-cyan-100">Earbud MicroDeck</p>
+                <p className="text-[10px] font-semibold uppercase text-cyan-100">Audio Transcript Decks</p>
                 <p className="mt-0.5 truncate text-[11px] text-slate-300">
                   {earbudMicroReasonerPresetStatus}
                 </p>
                 <p className="mt-0.5 truncate text-[10px] text-slate-500">
-                  Source: {activeAudioTranscriptSourceId ?? `audio_transcript:${threadId}`}
+                  Phase: mail reasoning / Source: {activeAudioTranscriptSourceId ?? `audio_transcript:${threadId}`}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
@@ -3288,15 +3411,86 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             </p>
           )}
         </div>
+        <div className="order-4 mt-3 rounded border border-cyan-300/20 bg-cyan-950/10 px-2 py-2" data-testid="live-answer-microdeck-catalog">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <p className="text-[10px] font-semibold uppercase text-cyan-100">MicroDeck catalog</p>
+              <p className="mt-0.5 text-[11px] text-slate-400">
+                Capture prompts and mail reasoning decks share one catalog while keeping their runtime phase explicit.
+              </p>
+            </div>
+            <span className="rounded border border-cyan-300/20 px-2 py-1 font-mono text-[10px] text-cyan-100">
+              view model only
+            </span>
+          </div>
+          <div className="mt-2 grid gap-2 lg:grid-cols-3">
+            {microDeckCatalogGroups.map((group: LiveAnswerMicroDeckCatalogGroup) => (
+              <div key={group.title} className="min-w-0 rounded border border-white/10 bg-black/20 p-2">
+                <div className="flex flex-wrap items-center justify-between gap-1">
+                  <p className="text-[10px] font-semibold uppercase text-slate-200">{group.title}</p>
+                  <div className="flex flex-wrap gap-1">
+                    <span className="rounded border border-cyan-300/20 px-1.5 py-0.5 font-mono text-[10px] text-cyan-100">
+                      {liveAnswerMicroDeckPhaseLabel(group.phase)}
+                    </span>
+                    <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">
+                      {liveAnswerMicroDeckSourceLabel(group.sourceKind)}
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-2 max-h-44 space-y-1 overflow-y-auto pr-1">
+                  {group.items.length === 0 ? (
+                    <p className="rounded border border-white/10 bg-slate-950/60 px-2 py-1.5 text-[11px] text-slate-500">
+                      No catalog items loaded.
+                    </p>
+                  ) : (
+                    group.items.map((item: LiveAnswerMicroDeckCatalogItem) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => selectMicroDeckCatalogItem(item)}
+                        className={`w-full rounded border px-2 py-1.5 text-left hover:bg-white/5 ${
+                          item.applied
+                            ? "border-emerald-300/35 bg-emerald-400/10"
+                            : "border-white/10 bg-slate-950/50"
+                        }`}
+                      >
+                        <span className="block truncate text-[11px] font-semibold text-slate-100">{item.title}</span>
+                        <span className="mt-0.5 flex flex-wrap gap-1">
+                          <span className="rounded border border-cyan-300/15 px-1.5 py-0.5 font-mono text-[10px] text-cyan-100">
+                            {liveAnswerMicroDeckPhaseLabel(item.phase)}
+                          </span>
+                          <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">
+                            {liveAnswerMicroDeckSourceLabel(item.sourceKind)}
+                          </span>
+                          {item.kind === "micro_reasoner_preset" ? (
+                            <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">
+                              {item.outputPolicy}
+                            </span>
+                          ) : null}
+                          {item.applied ? (
+                            <span className="rounded border border-emerald-300/20 px-1.5 py-0.5 text-[10px] text-emerald-100">
+                              applied
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="mt-1 line-clamp-2 text-[10px] leading-4 text-slate-500">{item.description}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
         <div className="order-5 mt-3 rounded border border-violet-300/20 bg-violet-950/10 px-2 py-2">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase text-violet-100">Shades</p>
+              <p className="text-[10px] font-semibold uppercase text-violet-100">Visual Capture Decks</p>
               <p className="mt-0.5 truncate text-[11px] text-slate-300">
                 {visualShadeStatus}
               </p>
               <p className="mt-0.5 truncate text-[10px] text-slate-500">
-                Source: {activeVisualSourceId ?? "will register on apply"}
+                Phase: capture prompt / Source: {activeVisualSourceId ?? "will register on apply"}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
@@ -3392,12 +3586,12 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         <div className="order-8 mt-3 rounded border border-cyan-300/20 bg-cyan-950/10 px-2 py-2">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase text-cyan-100">MicroDeck</p>
+              <p className="text-[10px] font-semibold uppercase text-cyan-100">Visual Reasoning Decks</p>
               <p className="mt-0.5 truncate text-[11px] text-slate-300">
                 {microReasonerPresetStatus}
               </p>
               <p className="mt-0.5 truncate text-[10px] text-slate-500">
-                Source: {activeVisualSourceId ?? "will register on apply"}
+                Phase: mail reasoning / Source: {activeVisualSourceId ?? "will register on apply"}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">

@@ -855,6 +855,9 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const scholarlyTerminalMaterialized =
     usableDraftMaterialization &&
     draftMaterialization.materialized_terminal_artifact_kind === "scholarly_research_answer";
+  const docsTerminalMaterialized =
+    usableDraftMaterialization &&
+    draftMaterialization.materialized_terminal_artifact_kind === "doc_evidence_synthesis_answer";
   const latestDraftForContinuation = findLatestFinalAnswerDraftCandidate(artifacts);
   const stagePlayTerminalMaterialized =
     usableDraftMaterialization &&
@@ -863,6 +866,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     rawSolverContinuationPending &&
     !(
       (repoTerminalMaterialized && goalAllowsTerminal) ||
+      (docsTerminalMaterialized && goalAllowsTerminal) ||
       (scholarlyTerminalMaterialized && goalAllowsTerminal) ||
       (stagePlayTerminalMaterialized && goalAllowsTerminal)
     );
@@ -884,6 +888,11 @@ export function applyHelixTerminalAuthoritySingleWriter(
     rejectedCandidates.push({
       kind: "typed_failure",
       reason: "stale_solver_continuation_superseded_by_repo_terminal",
+    });
+  } else if (rawSolverContinuationPending && docsTerminalMaterialized && goalAllowsTerminal) {
+    rejectedCandidates.push({
+      kind: "typed_failure",
+      reason: "stale_solver_continuation_superseded_by_docs_terminal",
     });
   } else if (rawSolverContinuationPending && scholarlyTerminalMaterialized && goalAllowsTerminal) {
     rejectedCandidates.push({
@@ -1156,6 +1165,10 @@ export function applyHelixTerminalAuthoritySingleWriter(
       selectedArtifactKind === "internet_search_answer"
         ? readRecord(input.payload.internet_search_answer)
         : null;
+    const materializedDocEvidenceSynthesisAnswer =
+      selectedArtifactKind === "doc_evidence_synthesis_answer"
+        ? readRecord(input.payload.doc_evidence_synthesis_answer)
+        : null;
     const materializedCompoundResearchLocatorAnswer =
       selectedArtifactKind === "compound_research_locator_answer"
         ? readRecord(input.payload.compound_research_locator_answer)
@@ -1163,6 +1176,8 @@ export function applyHelixTerminalAuthoritySingleWriter(
     const baseText =
       readString(materializedCompoundResearchLocatorAnswer?.answer_text) ??
       readString(materializedCompoundResearchLocatorAnswer?.text) ??
+      readString(materializedDocEvidenceSynthesisAnswer?.answer_text) ??
+      readString(materializedDocEvidenceSynthesisAnswer?.text) ??
       readString(materializedScholarlyAnswer?.answer_text) ??
       readString(materializedScholarlyAnswer?.text) ??
       readString(materializedInternetSearchAnswer?.answer_text) ??
@@ -1191,6 +1206,10 @@ export function applyHelixTerminalAuthoritySingleWriter(
     if (materializedInternetSearchAnswer) {
       materializedInternetSearchAnswer.text = text;
       materializedInternetSearchAnswer.answer_text = text;
+    }
+    if (materializedDocEvidenceSynthesisAnswer) {
+      materializedDocEvidenceSynthesisAnswer.text = text;
+      materializedDocEvidenceSynthesisAnswer.answer_text = text;
     }
     selectedSource = "final_answer_draft";
     input.payload.terminal_artifact_kind = selectedArtifactKind;
@@ -1313,6 +1332,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const draftText = latestDraftForIntegrity?.text ?? (selectedDraft ? artifactText(selectedDraft.artifact) : null);
   const selectedMaterializedAnswerText =
     readString(readRecord(input.payload.compound_research_locator_answer)?.answer_text) ??
+    readString(readRecord(input.payload.doc_evidence_synthesis_answer)?.answer_text) ??
     readString(readRecord(input.payload.scholarly_research_answer)?.answer_text) ??
     readString(readRecord(input.payload.internet_search_answer)?.answer_text) ??
     readString(readRecord(input.payload.repo_code_evidence_answer)?.answer_text);

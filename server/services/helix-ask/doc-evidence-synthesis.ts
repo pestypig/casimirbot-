@@ -1,0 +1,323 @@
+import type {
+  HelixDocEvidenceSynthesisAnswer,
+  HelixDocEvidenceSynthesisKind,
+} from "@shared/helix-doc-evidence-synthesis-answer";
+import type { HelixCommittedAskRoute } from "@shared/helix-committed-ask-route";
+import { extractUnquotedDocsMarkdownPaths } from "./docs-viewer-intent";
+
+type RecordLike = Record<string, unknown>;
+
+type ArtifactLike = {
+  artifact_id?: unknown;
+  kind?: unknown;
+  payload?: unknown;
+};
+
+export type DocEvidenceSynthesisPlan = {
+  schema: "helix.doc_evidence_synthesis_plan.v1";
+  turn_id: string;
+  synthesis_kind: HelixDocEvidenceSynthesisKind;
+  required_doc_paths: string[];
+  required_anchors: string[];
+  required_questions: string[];
+  required_observation_kinds: Array<
+    "doc_summary" |
+    "doc_location_result" |
+    "doc_evidence_location" |
+    "doc_equation_context"
+  >;
+  terminal_product: "doc_evidence_synthesis_answer";
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
+export type DocEvidenceSynthesisCoverage = {
+  schema: "helix.doc_evidence_synthesis_coverage.v1";
+  turn_id: string;
+  sufficient: boolean;
+  observed_doc_paths: string[];
+  observed_artifact_refs: string[];
+  missing_requirements: string[];
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
+const readRecord = (value: unknown): RecordLike | null =>
+  value && typeof value === "object" && !Array.isArray(value) ? (value as RecordLike) : null;
+
+const readString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim() ? value.trim() : null;
+
+const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
+
+const unique = (values: string[]): string[] => Array.from(new Set(values.filter(Boolean)));
+
+const normalizeDocsPath = (value: unknown): string | null => {
+  const text = readString(value);
+  if (!text) return null;
+  const cleaned = text.trim().replace(/^[('"`\s]+/, "").replace(/[)'".,;:!?]+$/g, "");
+  if (!/^(?:\/?docs\/|docs\\)/i.test(cleaned)) return null;
+  return cleaned.replace(/\\/g, "/").startsWith("/") ? cleaned.replace(/\\/g, "/") : `/${cleaned.replace(/\\/g, "/")}`;
+};
+
+const artifactPayload = (artifact: ArtifactLike): RecordLike | null => readRecord(artifact.payload);
+
+const artifactKind = (artifact: ArtifactLike): string =>
+  readString(artifact.kind) ?? readString(artifactPayload(artifact)?.kind) ?? "";
+
+const artifactSchema = (artifact: ArtifactLike): string =>
+  readString(artifactPayload(artifact)?.schema) ?? "";
+
+const artifactId = (artifact: ArtifactLike): string | null =>
+  readString(artifact.artifact_id) ?? readString(artifactPayload(artifact)?.artifact_id);
+
+const artifactText = (artifact: ArtifactLike): string | null => {
+  const payload = artifactPayload(artifact);
+  return readString(payload?.answer_text) ?? readString(payload?.text) ?? readString(payload?.summary);
+};
+
+const isDocsEvidenceArtifact = (artifact: ArtifactLike): boolean => {
+  const signature = [artifactKind(artifact), artifactSchema(artifact)].join(" ");
+  return /\b(?:doc_summary|doc_location_result|doc_evidence_location|doc_location_matches|doc_equation_context|doc_equation_location|doc_calculator_evidence|agent_step_observation_packet)\b/i.test(signature);
+};
+
+const pathsFromPayload = (payload: RecordLike | null): string[] => {
+  if (!payload) return [];
+  const direct = [
+    payload.path,
+    payload.source_path,
+    payload.active_doc_path,
+    payload.doc_path,
+    payload.document_path,
+  ].map(normalizeDocsPath).filter((entry): entry is string => Boolean(entry));
+  const fromMatches = readArray(payload.matches).flatMap((match) => {
+    const record = readRecord(match);
+    return normalizeDocsPath(record?.path) ?? normalizeDocsPath(record?.source_path) ?? [];
+  });
+  const fromSourceDocs = readArray(payload.source_docs).flatMap((doc) => {
+    const record = readRecord(doc);
+    return normalizeDocsPath(record?.path) ?? [];
+  });
+  return unique([...direct, ...fromMatches, ...fromSourceDocs]);
+};
+
+const anchorsFromPayload = (payload: RecordLike | null): string[] => {
+  if (!payload) return [];
+  const direct = [
+    payload.anchor,
+    payload.heading,
+    payload.section,
+    payload.section_anchor,
+    payload.title,
+  ].map(readString).filter((entry): entry is string => Boolean(entry));
+  const arrays = [
+    ...readArray(payload.anchors),
+    ...readArray(payload.cited_anchors),
+    ...readArray(payload.matches),
+    ...readArray(payload.snippets),
+  ].flatMap((entry) => {
+    const record = readRecord(entry);
+    if (!record) return readString(entry) ?? [];
+    return [
+      readString(record.anchor),
+      readString(record.heading),
+      readString(record.section),
+      readString(record.title),
+    ].filter((value): value is string => Boolean(value));
+  });
+  return unique([...direct, ...arrays]).slice(0, 12);
+};
+
+const lineStartFromPayload = (payload: RecordLike | null): number | null => {
+  const value = payload?.line_start ?? payload?.lineStart;
+  return typeof value === "number" ? value : null;
+};
+
+const lineEndFromPayload = (payload: RecordLike | null): number | null => {
+  const value = payload?.line_end ?? payload?.lineEnd;
+  return typeof value === "number" ? value : null;
+};
+
+export function buildDocEvidenceSynthesisPlan(input: {
+  turnId: string;
+  promptText: string;
+  committedAskRoute?: HelixCommittedAskRoute | null;
+}): DocEvidenceSynthesisPlan {
+  const prompt = input.promptText;
+  const paths = extractUnquotedDocsMarkdownPaths(prompt);
+  const synthesisKind: HelixDocEvidenceSynthesisKind =
+    /\b(?:compare|comparison|differences?|versus|vs\.?|two-column|table)\b/i.test(prompt)
+      ? "compare"
+      : /\b(?:runbook|playbook|checklist|steps?)\b/i.test(prompt)
+        ? "runbook_answer"
+        : /\b(?:locate|find|where|anchors?|sections?|cite)\b/i.test(prompt)
+          ? "locate_then_explain"
+          : paths.length > 1
+            ? "multi_doc_summary"
+            : "focused_explanation";
+  const requiredObservationKinds: DocEvidenceSynthesisPlan["required_observation_kinds"] =
+    synthesisKind === "compare" || synthesisKind === "multi_doc_summary"
+      ? ["doc_summary"]
+      : ["doc_location_result", "doc_evidence_location"];
+  const anchorMatches = Array.from(prompt.matchAll(/["']([^"']{3,100})["']/g))
+    .map((match) => match[1]?.trim())
+    .filter((entry): entry is string => Boolean(entry));
+  return {
+    schema: "helix.doc_evidence_synthesis_plan.v1",
+    turn_id: input.turnId,
+    synthesis_kind: synthesisKind,
+    required_doc_paths: paths,
+    required_anchors: unique(anchorMatches),
+    required_questions: [prompt],
+    required_observation_kinds: requiredObservationKinds,
+    terminal_product: "doc_evidence_synthesis_answer",
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+}
+
+export function collectDocEvidenceForSynthesis(input: {
+  artifactLedger: ArtifactLike[];
+}): ArtifactLike[] {
+  return input.artifactLedger.filter((artifact) => {
+    if (!isDocsEvidenceArtifact(artifact)) return false;
+    const text = artifactText(artifact);
+    const paths = pathsFromPayload(artifactPayload(artifact));
+    return Boolean(text || paths.length > 0 || anchorsFromPayload(artifactPayload(artifact)).length > 0);
+  });
+}
+
+export function evaluateDocEvidenceSynthesisCoverage(input: {
+  turnId: string;
+  plan: DocEvidenceSynthesisPlan;
+  evidenceArtifacts: ArtifactLike[];
+}): DocEvidenceSynthesisCoverage {
+  const observedRefs = input.evidenceArtifacts.map(artifactId).filter((entry): entry is string => Boolean(entry));
+  const observedPaths = unique(input.evidenceArtifacts.flatMap((artifact) => pathsFromPayload(artifactPayload(artifact))));
+  const missing: string[] = [];
+  if (input.evidenceArtifacts.length === 0) missing.push("doc_evidence_observation");
+  for (const path of input.plan.required_doc_paths) {
+    const normalized = normalizeDocsPath(path) ?? path;
+    if (!observedPaths.some((observed) => observed === normalized || observed.replace(/^\//, "") === normalized.replace(/^\//, ""))) {
+      missing.push(`doc_path:${normalized}`);
+    }
+  }
+  if (input.plan.synthesis_kind === "compare" && input.plan.required_doc_paths.length >= 2 && observedPaths.length < 2) {
+    missing.push("multi_doc_coverage");
+  }
+  return {
+    schema: "helix.doc_evidence_synthesis_coverage.v1",
+    turn_id: input.turnId,
+    sufficient: missing.length === 0,
+    observed_doc_paths: observedPaths,
+    observed_artifact_refs: observedRefs,
+    missing_requirements: unique(missing),
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+}
+
+export function buildDocEvidenceSynthesisAnswerCandidate(input: {
+  turnId: string;
+  plan: DocEvidenceSynthesisPlan;
+  answerText: string;
+  evidenceArtifacts: ArtifactLike[];
+  finalAnswerDraftRef?: string | null;
+}): HelixDocEvidenceSynthesisAnswer | null {
+  const answerText = input.answerText.trim();
+  if (!answerText) return null;
+  const evidenceByPath = new Map<string, { refs: Set<string>; anchors: Set<string>; title: string | null }>();
+  const citedAnchors: HelixDocEvidenceSynthesisAnswer["cited_anchors"] = [];
+  for (const artifact of input.evidenceArtifacts) {
+    const payload = artifactPayload(artifact);
+    const ref = artifactId(artifact) ?? `${input.turnId}:doc_evidence:${evidenceByPath.size}`;
+    const paths = pathsFromPayload(payload);
+    const anchors = anchorsFromPayload(payload);
+    const title = readString(payload?.source_title) ?? readString(payload?.title) ?? null;
+    for (const path of paths.length > 0 ? paths : ["unknown-doc"]) {
+      const entry = evidenceByPath.get(path) ?? { refs: new Set<string>(), anchors: new Set<string>(), title };
+      entry.refs.add(ref);
+      if (title && !entry.title) entry.title = title;
+      for (const anchor of anchors) entry.anchors.add(anchor);
+      evidenceByPath.set(path, entry);
+      for (const anchor of anchors) {
+        citedAnchors.push({
+          path,
+          anchor,
+          line_start: lineStartFromPayload(payload),
+          line_end: lineEndFromPayload(payload),
+          evidence_ref: ref,
+        });
+      }
+    }
+  }
+  const supportRefs = unique([
+    input.finalAnswerDraftRef ?? "",
+    ...Array.from(evidenceByPath.values()).flatMap((entry) => Array.from(entry.refs)),
+  ]);
+  return {
+    schema: "helix.doc_evidence_synthesis_answer.v1",
+    artifact_id: `${input.turnId}:doc_evidence_synthesis_answer:from_final_answer_draft`,
+    turn_id: input.turnId,
+    answer_text: answerText,
+    source_target: "docs_viewer",
+    goal_kind: "doc_evidence_synthesis",
+    terminal_artifact_kind: "doc_evidence_synthesis_answer",
+    source_docs: Array.from(evidenceByPath.entries()).map(([path, entry]) => ({
+      path,
+      title: entry.title,
+      evidence_refs: Array.from(entry.refs),
+      anchors: Array.from(entry.anchors),
+    })),
+    cited_anchors: citedAnchors.slice(0, 16),
+    synthesis_kind: input.plan.synthesis_kind,
+    missing_requirements: [],
+    support_refs: supportRefs,
+    terminal_eligible: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+}
+
+export function materializeDocEvidenceSynthesisAnswer(input: {
+  turnId: string;
+  promptText: string;
+  payload: RecordLike;
+  artifactLedger: ArtifactLike[];
+  answerText: string;
+  finalAnswerDraftRef?: string | null;
+}): { ok: boolean; answer?: HelixDocEvidenceSynthesisAnswer; coverage: DocEvidenceSynthesisCoverage; blocked_reason?: string } {
+  const committedRoute = readRecord(input.payload.committed_ask_route) as HelixCommittedAskRoute | null;
+  const goal = readRecord(input.payload.canonical_goal_frame);
+  const goalKind = committedRoute?.canonical_goal.goal_kind ?? readString(goal?.goal_kind);
+  const requiredTerminalKind = committedRoute?.canonical_goal.required_terminal_kind ?? readString(goal?.required_terminal_kind);
+  const plan = buildDocEvidenceSynthesisPlan({
+    turnId: input.turnId,
+    promptText: input.promptText,
+    committedAskRoute: committedRoute,
+  });
+  input.payload.doc_evidence_synthesis_plan = plan;
+  const evidenceArtifacts = collectDocEvidenceForSynthesis({ artifactLedger: input.artifactLedger });
+  const coverage = evaluateDocEvidenceSynthesisCoverage({
+    turnId: input.turnId,
+    plan,
+    evidenceArtifacts,
+  });
+  input.payload.doc_evidence_synthesis_coverage = coverage;
+  if (goalKind !== "doc_evidence_synthesis" || requiredTerminalKind !== "doc_evidence_synthesis_answer") {
+    return { ok: false, coverage, blocked_reason: "route_contract_disallowed" };
+  }
+  if (!coverage.sufficient) {
+    return { ok: false, coverage, blocked_reason: "doc_evidence_coverage_missing" };
+  }
+  const answer = buildDocEvidenceSynthesisAnswerCandidate({
+    turnId: input.turnId,
+    plan,
+    answerText: input.answerText,
+    evidenceArtifacts,
+    finalAnswerDraftRef: input.finalAnswerDraftRef,
+  });
+  if (!answer) return { ok: false, coverage, blocked_reason: "draft_empty" };
+  input.payload.doc_evidence_synthesis_answer = answer;
+  return { ok: true, answer, coverage };
+}

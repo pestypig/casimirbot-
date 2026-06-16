@@ -1,5 +1,6 @@
 export type HelixTerminalCandidateSource =
   | "final_answer_draft"
+  | "doc_evidence_synthesis_answer"
   | "repo_code_evidence_answer"
   | "compound_research_locator_answer"
   | "internet_search_answer"
@@ -63,6 +64,7 @@ export type HelixTerminalAuthoritySingleWriterRejectionReason =
   | "terminal_forbidden_by_phase_lock"
   | "solver_continuation_pending"
   | "stale_solver_continuation_superseded_by_repo_terminal"
+  | "stale_solver_continuation_superseded_by_docs_terminal"
   | "stale_solver_continuation_superseded_by_scholarly_terminal"
   | "stale_solver_continuation_superseded_by_stage_play_terminal";
 
@@ -98,6 +100,7 @@ export type HelixTerminalAuthoritySingleWriterResult = {
   selected_terminal_artifact_ref: string | null;
   selected_terminal_artifact_kind:
     | "model_synthesized_answer"
+    | "doc_evidence_synthesis_answer"
     | "repo_code_evidence_answer"
     | "compound_research_locator_answer"
     | "scholarly_research_answer"
@@ -116,6 +119,7 @@ export type HelixTerminalAuthoritySingleWriterResult = {
   assistant_answer: false;
   source:
     | "final_answer_draft"
+    | "doc_evidence_synthesis_answer"
     | "repo_code_evidence_answer"
     | "compound_research_locator_answer"
     | "scholarly_research_answer"

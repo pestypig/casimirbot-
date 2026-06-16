@@ -264,7 +264,7 @@ export function buildAskEvidenceTargetArbitration(input: {
       reasonCodes: ["explicit_local_docs_path_compare", "docs_path_operation_suppresses_repo_code"],
       requestedOutputs: ["file_path", "tool_call_eligibility"],
       capabilityKeys: ["docs-viewer.open_doc_by_path", "docs-viewer.summarize_doc"],
-      terminalProductConstraints: ["doc_evidence_synthesis", "doc_summary", "typed_failure", "request_user_input"],
+      terminalProductConstraints: ["doc_evidence_synthesis_answer", "doc_evidence_synthesis", "typed_failure", "request_user_input"],
     }));
   }
   if (isExplicitDocsPathLocateSynthesisPrompt(prompt)) {
@@ -278,7 +278,7 @@ export function buildAskEvidenceTargetArbitration(input: {
       reasonCodes: ["explicit_local_docs_path_locate_synthesis", "docs_path_operation_suppresses_repo_code"],
       requestedOutputs: ["file_path", "tool_call_eligibility"],
       capabilityKeys: ["docs-viewer.open_doc_by_path", "docs-viewer.locate_in_doc"],
-      terminalProductConstraints: ["doc_location_result", "doc_evidence_synthesis", "typed_failure", "request_user_input"],
+      terminalProductConstraints: ["doc_location_result", "doc_evidence_synthesis_answer", "doc_evidence_synthesis", "typed_failure", "request_user_input"],
     }));
   }
   if (hasExplicitLocalDocsPathSummary(prompt)) {

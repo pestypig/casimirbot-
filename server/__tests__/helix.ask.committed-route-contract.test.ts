@@ -4,6 +4,7 @@ import { buildAskTurnSolverTrace } from "../services/helix-ask/ask-turn-solver";
 import {
   assertCapabilityAllowedByCommittedRoute,
   buildCommittedAskRoute,
+  committedRouteAllowsTerminalKind,
 } from "../services/helix-ask/committed-ask-route";
 import { interpretHelixAskPrompt } from "../services/helix-ask/prompt-interpretation";
 import { resolveTerminalAnswerEnvelope } from "../services/helix-ask/terminal-answer-envelope";
@@ -207,6 +208,97 @@ describe("Helix Ask committed route contract", () => {
     expect(envelope.terminal_artifact_kind).toBe("typed_failure");
     expect(payload.committed_route_terminal_rejection).toMatchObject({
       reason: "committed_route_terminal_product_mismatch",
+    });
+  });
+
+  it("allows model-only answers for quoted docs-path explanations while keeping docs terminals forbidden", () => {
+    const prompt = '"Open docs/helix-ask-flow.md" is the command I typed earlier; explain whether that should run now.';
+    const promptInterpretation = interpretHelixAskPrompt(prompt);
+    const committedRoute = buildCommittedAskRoute({
+      turnId,
+      promptText: prompt,
+      selectedRoute: "conversation:simple",
+      promptInterpretation,
+      payload: {
+        turn_id: turnId,
+        source_target_intent: {
+          schema: "helix.ask_source_target_intent.v1",
+          turn_id: turnId,
+          thread_id: "thread:test",
+          target_source: "model_only",
+          target_kind: "general_background",
+          strength: "soft",
+          reasons: ["quoted_tool_command", "historical_tool_reference"],
+          allow_no_tool_direct: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        canonical_goal_frame: {
+          turn_id: turnId,
+          goal_kind: "model_only_concept",
+          required_terminal_kind: "direct_answer_text",
+        },
+        tool_call_admission_decision: {
+          admitted_tool_families: ["model_only"],
+          suppressed_tool_families: ["docs_viewer", "repo_code"],
+        },
+      },
+    });
+
+    expect(committedRoute.route.source_target).toBe("model_only");
+    expect(committedRoute.canonical_goal.goal_kind).toBe("model_only_concept");
+    expect(committedRoute.capability_policy.suppressed_tool_families).toEqual(
+      expect.arrayContaining(["docs_viewer", "repo_code"]),
+    );
+    expect(committedRoute.canonical_goal.allowed_terminal_artifact_kinds).toEqual(
+      expect.arrayContaining(["direct_answer_text", "model_synthesized_answer", "final_answer_draft"]),
+    );
+
+    expect(committedRouteAllowsTerminalKind({
+      committedRoute,
+      terminalArtifactKind: "direct_answer_text",
+      finalAnswerSource: "model_direct_answer",
+    })).toBe(true);
+    expect(committedRouteAllowsTerminalKind({
+      committedRoute,
+      terminalArtifactKind: "final_answer_draft",
+      finalAnswerSource: "final_answer_draft",
+    })).toBe(true);
+    expect(committedRouteAllowsTerminalKind({
+      committedRoute,
+      terminalArtifactKind: "doc_summary",
+      finalAnswerSource: "artifact_synthesis",
+    })).toBe(false);
+
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      committed_ask_route: committedRoute,
+      terminal_artifact_kind: "direct_answer_text",
+      final_answer_source: "model_direct_answer",
+      selected_final_answer: "No. That quoted path is historical text to analyze, not a Docs Viewer command.",
+    };
+
+    const envelope = resolveTerminalAnswerEnvelope(payload);
+
+    expect(envelope.terminal_artifact_kind).toBe("direct_answer_text");
+    expect(envelope.final_answer_source).toBe("model_direct_answer");
+    expect(envelope.terminal_text).toContain("not a Docs Viewer command");
+    expect(payload.committed_route_terminal_rejection).toBeUndefined();
+
+    const docsTerminalPayload: Record<string, unknown> = {
+      turn_id: turnId,
+      committed_ask_route: committedRoute,
+      terminal_artifact_kind: "doc_summary",
+      final_answer_source: "artifact_synthesis",
+      selected_final_answer: "Summary: Helix Ask Flow",
+    };
+
+    const rejectedEnvelope = resolveTerminalAnswerEnvelope(docsTerminalPayload);
+
+    expect(rejectedEnvelope.terminal_artifact_kind).toBe("typed_failure");
+    expect(docsTerminalPayload.committed_route_terminal_rejection).toMatchObject({
+      reason: "committed_route_terminal_product_mismatch",
+      rejected_terminal_artifact_kind: "doc_summary",
     });
   });
 });

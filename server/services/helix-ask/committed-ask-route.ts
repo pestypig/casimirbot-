@@ -28,6 +28,20 @@ const unique = (entries: string[]): string[] => Array.from(new Set(entries.filte
 const hashShort = (value: unknown): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16);
 
+const MODEL_ONLY_TERMINAL_ALIASES = new Set([
+  "direct_answer_text",
+  "model_synthesized_answer",
+  "final_answer_draft",
+]);
+
+export const normalizeCommittedRouteTerminalKind = (kind: string | null | undefined): string => {
+  const normalized = readString(kind).toLowerCase();
+  if (normalized === "model_direct_answer" || normalized === "model_only_concept") return "direct_answer_text";
+  if (normalized === "answer_draft") return "final_answer_draft";
+  if (normalized === "doc_evidence_synthesis") return "doc_evidence_synthesis_answer";
+  return normalized;
+};
+
 const sourceBackedTargets = new Set([
   "visual_capture",
   "procedure_memory",
@@ -188,8 +202,13 @@ export function buildCommittedAskRoute(input: {
   const route = readRouteSource(input.payload);
   const goal = readCanonicalGoal(input.payload);
   const routeContract = readRecord(input.payload.route_product_contract);
+  const modelOnlyTerminalAliases =
+    goal.goalKind === "model_only_concept" && goal.requiredTerminalKind === "direct_answer_text"
+      ? Array.from(MODEL_ONLY_TERMINAL_ALIASES)
+      : [];
   const allowedTerminalKinds = unique([
     ...readStringArray(routeContract?.allowed_terminal_artifact_kinds),
+    ...modelOnlyTerminalAliases,
     goal.requiredTerminalKind !== "unknown" ? goal.requiredTerminalKind : "",
   ]);
   const forbiddenTerminalKinds = readStringArray(routeContract?.forbidden_terminal_artifact_kinds);
@@ -375,6 +394,41 @@ export function assertCapabilityAllowedByCommittedRoute(input: {
     assistant_answer: false,
     raw_content_included: false,
   };
+}
+
+export function committedRouteAllowsTerminalKind(input: {
+  committedRoute: HelixCommittedAskRoute | null | undefined;
+  terminalArtifactKind: string | null | undefined;
+  finalAnswerSource?: string | null;
+}): boolean {
+  const route = input.committedRoute ?? null;
+  if (!route) return true;
+
+  const kind =
+    normalizeCommittedRouteTerminalKind(input.terminalArtifactKind) ||
+    normalizeCommittedRouteTerminalKind(input.finalAnswerSource);
+
+  if (!kind) return false;
+  if (kind === "typed_failure" || kind === "request_user_input") return true;
+
+  if (
+    route.canonical_goal.goal_kind === "model_only_concept" &&
+    route.canonical_goal.required_terminal_kind === "direct_answer_text"
+  ) {
+    return MODEL_ONLY_TERMINAL_ALIASES.has(kind);
+  }
+
+  if (
+    route.canonical_goal.forbidden_terminal_artifact_kinds
+      .map(normalizeCommittedRouteTerminalKind)
+      .includes(kind)
+  ) {
+    return false;
+  }
+
+  const allowed = route.canonical_goal.allowed_terminal_artifact_kinds
+    .map(normalizeCommittedRouteTerminalKind);
+  return allowed.length === 0 || allowed.includes(kind);
 }
 
 export function matchesCommittedAskRoute(
