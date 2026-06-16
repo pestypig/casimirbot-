@@ -99,28 +99,31 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain("MicroDeck catalog");
     expect(source).toContain("view model only");
     expect(source).toContain("Visual Capture Decks");
-    expect(source).toContain("Visual Reasoning Decks");
+    expect(source).toContain("Visual Mail Decks");
     expect(source).toContain("Audio Transcript Decks");
     expect(source).toContain('phase: "capture_prompt"');
     expect(source).toContain('phase: "mail_reasoning"');
     expect(source).toContain("capture prompt");
     expect(source).toContain("mail reasoning");
+    expect(source).toContain("sortLiveAnswerMicroDeckCatalogItems");
+    expect(source).toContain("if (left.applied !== right.applied) return left.applied ? -1 : 1");
     expect(source).toContain("selectMicroDeckCatalogItem");
     expect(source).toContain("setSelectedVisualObserverProfileId(item.id)");
     expect(source).toContain("setSelectedEarbudMicroReasonerPromptPresetId(item.id)");
     expect(source).toContain("setSelectedMicroReasonerPromptPresetId(item.id)");
   });
 
-  it("exposes MicroDeck prompt presets beside visual capture decks", () => {
+  it("mirrors visual mail deck status without duplicating Stage Play setup controls", () => {
     const source = panelSource();
 
-    expect(source).toContain('aria-label="Micro-reasoner prompt preset"');
-    expect(source).toContain('aria-label="Apply selected micro-reasoner prompt preset"');
     expect(source).toContain("/api/helix/stage-play/micro-reasoner-prompt-preset/apply");
     expect(source).toContain("Future mail-loop packets will use this prompt deck.");
     expect(source).toContain("MicroDeck presets are still loading. Refresh deck if the server was just restarted.");
-    expect(source).toContain("selectedMicroPromptPreview");
     expect(source).toContain('Phase: mail reasoning / Source: {activeVisualSourceId ?? "will register on apply"}');
+    expect(source).toContain("Full processed-mail MicroDeck setup and prompt preview belong in the Stage Play Badge Graph processed mail UI.");
+    expect(source).not.toContain('aria-label="Micro-reasoner prompt preset"');
+    expect(source).not.toContain('aria-label="Apply selected micro-reasoner prompt preset"');
+    expect(source).not.toContain("selectedMicroPromptPreview");
   });
 
   it("renders a local-only last-frame preview in the visual capture source panel", () => {

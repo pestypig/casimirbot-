@@ -164,6 +164,40 @@ describe("Helix Ask docs evidence synthesis answer", () => {
         raw_content_included: false,
       },
     };
+    payload.current_turn_artifact_ledger = [...docsEvidenceArtifacts, finalDraft];
+    payload.agent_step_decision = {
+      decision_id: "decision:docs-terminal-review",
+      decision_timing: "post_observation",
+      decision_authority: "model",
+      next_step: "answer",
+      chosen_capability: "model.direct_answer",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    payload.agent_runtime_loop = {
+      schema: "helix.agent_runtime_loop.v1",
+      iterations: [
+        {
+          decision_id: "decision:docs-summary",
+          decision_timing: "pre_observation",
+          decision_authority: "model",
+          next_step: "tool",
+          chosen_capability: "docs-viewer.summarize_doc",
+          observed_artifact_refs: ["doc-summary:flow", "doc-summary:discipline"],
+        },
+        {
+          decision_id: "decision:docs-terminal-review",
+          decision_timing: "post_observation",
+          decision_authority: "model",
+          next_step: "answer",
+          chosen_capability: "model.direct_answer",
+          observed_artifact_refs: ["draft:terminal"],
+          observation_role: "model_answer_draft",
+        },
+      ],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
 
     const result = applyHelixTerminalAuthoritySingleWriter({
       turnId,

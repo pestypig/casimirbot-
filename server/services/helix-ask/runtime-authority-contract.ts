@@ -1012,6 +1012,11 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
     const turnId = readString(payload.turn_id) ?? readString(readRecord(payload.canonical_goal_frame)?.turn_id) ?? "unknown";
     payload.post_tool_authority_bridge = buildPostToolAuthorityBridge({ turnId, payload }) as unknown as Record<string, unknown>;
   }
+  const committedRoute = readCommittedAskRoute(payload);
+  const committedModelOnlyDirectAnswerTurn =
+    committedRoute?.route.source_target === "model_only" &&
+    committedRoute.canonical_goal.goal_kind === "model_only_concept" &&
+    committedRoute.canonical_goal.required_terminal_kind === "direct_answer_text";
   const sourceCapabilityDiagnosticTurn = isSourceCapabilityDiagnosticTurn(payload);
   const modelDirectAnswerTurn = isModelDirectAnswerTurn(payload);
   const runtimeBoundTurn = sourceCapabilityDiagnosticTurn || modelDirectAnswerTurn;
@@ -1046,9 +1051,11 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
     if (terminalKind === "typed_failure") {
       if (!checks.typed_failure_clean) blockingReasons.push("typed_failure_missing_code");
     } else if (modelDirectAnswerTurn) {
-      if (!checks.agent_step_decision) blockingReasons.push("agent_step_decision_missing");
       if (!hasDirectAnswerDraft(payload)) blockingReasons.push("direct_answer_text_missing");
-      if (!checks.post_observation_model_decision) blockingReasons.push("post_observation_model_decision_missing");
+      if (!committedModelOnlyDirectAnswerTurn) {
+        if (!checks.agent_step_decision) blockingReasons.push("agent_step_decision_missing");
+        if (!checks.post_observation_model_decision) blockingReasons.push("post_observation_model_decision_missing");
+      }
     } else if (livePipelineReceiptAllowed || liveEnvironmentBindingDiagnosisAllowed || contextResumeFrameRecallAllowed) {
       // Control/status Live Pipeline receipts and binding diagnostics are terminal only by route-product contract.
       // The receipt/diagnosis and disclosure remain observations, not assistant answers or raw logs.

@@ -34,6 +34,21 @@ const MODEL_ONLY_TERMINAL_ALIASES = new Set([
   "final_answer_draft",
 ]);
 
+const MODEL_ONLY_FORBIDDEN_SOURCE_TERMINALS = [
+  "docs_viewer_receipt",
+  "doc_open_receipt",
+  "doc_summary",
+  "active_doc_identity",
+  "doc_location_result",
+  "doc_location_matches",
+  "doc_evidence_location",
+  "doc_evidence_synthesis",
+  "doc_evidence_synthesis_answer",
+  "repo_code_evidence_answer",
+];
+
+const DOCS_MARKDOWN_PATH_RE = /(?:^|[\s"'(])\/?docs\/[A-Za-z0-9_./-]+\.md\b/i;
+
 export const normalizeCommittedRouteTerminalKind = (kind: string | null | undefined): string => {
   const normalized = readString(kind).toLowerCase();
   if (normalized === "model_direct_answer" || normalized === "model_only_concept") return "direct_answer_text";
@@ -64,7 +79,7 @@ const sourceBackedTargets = new Set([
 ]);
 
 export const inferCommittedRouteToolFamily = (capabilityId: string): string => {
-  if (/docs-viewer|doc[_-]?viewer/i.test(capabilityId)) return "docs_viewer";
+  if (/docs[_-]?viewer|docs-viewer|doc[_-]?viewer/i.test(capabilityId)) return "docs_viewer";
   if (/scholarly[-_.]?research|lookup[_-]?papers|fetch[_-]?full[_-]?text|semantic[-_.]?scholar|openalex|pubmed|crossref/i.test(capabilityId)) return "scholarly_research";
   if (/internet[-_.]?search|web[-_.]?research|web\.search/i.test(capabilityId)) return "internet_search";
   if (/scientific[-_.]?calculator|calculator|calculate|compute|solve/i.test(capabilityId)) return "scientific_calculator";
@@ -171,7 +186,14 @@ const suppressedFamiliesFromPayload = (
   const fromContextualAudit = readStringArray(readRecord(payload.contextual_tool_audit)?.blocked_families);
   const fromSolverTrace = readStringArray(readRecord(readRecord(payload.ask_turn_solver_trace)?.contextual_tool_audit)?.blocked_families);
   const inferredFromPrompt = (promptInterpretation?.contextual_tool_mentions ?? [])
-    .map((mention) => inferCommittedRouteToolFamily(mention.verb_or_cue))
+    .flatMap((mention) => {
+      const family = inferCommittedRouteToolFamily(mention.verb_or_cue);
+      const families = family && family !== "unknown" ? [family] : [];
+      if (DOCS_MARKDOWN_PATH_RE.test(mention.text)) {
+        families.push("docs_viewer", "repo_code");
+      }
+      return families;
+    })
     .filter((family) => family && family !== "unknown");
   return unique([...fromAdmission, ...fromContextualAudit, ...fromSolverTrace, ...inferredFromPrompt]);
 };
@@ -200,18 +222,47 @@ export function buildCommittedAskRoute(input: {
   if (existing) return existing;
 
   const route = readRouteSource(input.payload);
-  const goal = readCanonicalGoal(input.payload);
   const routeContract = readRecord(input.payload.route_product_contract);
+  const rawGoal = readCanonicalGoal(input.payload);
+  const contextualSuppressionPresent =
+    (input.promptInterpretation?.contextual_tool_mentions?.length ?? 0) > 0 ||
+    (input.promptInterpretation?.negative_constraints?.length ?? 0) > 0;
+  const routeContractSourceTarget = readString(routeContract?.source_target);
+  const sourceContractForModelOnlyRoute =
+    route.sourceTarget === "model_only" &&
+    (
+      sourceBackedTargets.has(routeContractSourceTarget) ||
+      readStringArray(routeContract?.allowed_terminal_artifact_kinds).some((kind) =>
+        /^(?:doc_|docs_|active_doc|repo_code_|live_|visual_|calculator_|process_|note_)/i.test(kind),
+      )
+    );
+  const shouldUseModelOnlyGoal =
+    route.sourceTarget === "model_only" &&
+    (
+      contextualSuppressionPresent ||
+      sourceContractForModelOnlyRoute ||
+      /^(?:summarize_doc|doc_|docs_|active_doc|repo_code_)/i.test(rawGoal.goalKind)
+    );
+  const goal = shouldUseModelOnlyGoal
+    ? { goalKind: "model_only_concept", requiredTerminalKind: "direct_answer_text" }
+    : rawGoal;
   const modelOnlyTerminalAliases =
     goal.goalKind === "model_only_concept" && goal.requiredTerminalKind === "direct_answer_text"
       ? Array.from(MODEL_ONLY_TERMINAL_ALIASES)
       : [];
+  const rawAllowedTerminalKinds = readStringArray(routeContract?.allowed_terminal_artifact_kinds);
+  const rawForbiddenTerminalKinds = readStringArray(routeContract?.forbidden_terminal_artifact_kinds);
   const allowedTerminalKinds = unique([
-    ...readStringArray(routeContract?.allowed_terminal_artifact_kinds),
+    ...(shouldUseModelOnlyGoal ? [] : rawAllowedTerminalKinds),
     ...modelOnlyTerminalAliases,
     goal.requiredTerminalKind !== "unknown" ? goal.requiredTerminalKind : "",
   ]);
-  const forbiddenTerminalKinds = readStringArray(routeContract?.forbidden_terminal_artifact_kinds);
+  const forbiddenTerminalKinds = shouldUseModelOnlyGoal
+    ? unique([
+        ...rawForbiddenTerminalKinds.filter((kind) => !MODEL_ONLY_TERMINAL_ALIASES.has(normalizeCommittedRouteTerminalKind(kind))),
+        ...MODEL_ONLY_FORBIDDEN_SOURCE_TERMINALS,
+      ])
+    : rawForbiddenTerminalKinds;
   const suppressedFamilies = suppressedFamiliesFromPayload(input.payload, input.promptInterpretation);
   const allowedFamilies = allowedFamiliesFromPayload(input.payload, route.sourceTarget)
     .filter((family) => !suppressedFamilies.includes(family));

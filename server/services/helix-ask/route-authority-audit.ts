@@ -1,7 +1,12 @@
 import crypto from "node:crypto";
 import type { HelixAskSourceTargetIntent } from "@shared/helix-ask-source-target-intent";
+import {
+  HELIX_COMMITTED_ASK_ROUTE_SCHEMA,
+  type HelixCommittedAskRoute,
+} from "@shared/helix-committed-ask-route";
 import type { HelixRouteProductContract } from "@shared/helix-route-product-contract";
 import type { HelixToolCallAdmissionDecision } from "@shared/helix-tool-call-admission";
+import { committedRouteAllowsTerminalKind } from "./committed-ask-route";
 import type { HelixTerminalArtifactSelectionGuard } from "./terminal-artifact-selection-guard";
 import type { HelixProductAuthorityGuard } from "./product-authority-guard";
 
@@ -45,6 +50,9 @@ const readString = (value: unknown): string =>
 
 const readStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+
+const readRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 
 const hashShort = (value: unknown): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16);
@@ -110,10 +118,11 @@ const classifyViolations = (input: {
   const codes: HelixRouteAuthorityViolationCode[] = [];
   const visualContentPrompt = isVisualContentPrompt(input.promptText);
   const procedureMemoryPrompt = isProcedureMemoryPrompt(input.promptText);
+  const modelOnlySourceTarget = isModelOnlySourceTarget(sourceTarget, targetKind);
   const procedureMemoryAuthorityApplies =
     sourceTarget === "procedure_memory" ||
     targetKind === "situation_epoch" ||
-    (procedureMemoryPrompt && sourceTarget !== "live_environment" && sourceTarget !== "live_source_mailbox");
+    (procedureMemoryPrompt && !modelOnlySourceTarget && sourceTarget !== "live_environment" && sourceTarget !== "live_source_mailbox");
   const livePipelineProcedureReceipt =
     terminal === "live_pipeline_receipt" &&
     isLivePipelineProcedurePrompt(input.promptText, route);
@@ -153,13 +162,25 @@ export function auditRouteAuthority(input: {
   toolCallAdmissionDecision?: HelixToolCallAdmissionDecision | Record<string, unknown> | null;
   terminalArtifactSelectionGuard?: HelixTerminalArtifactSelectionGuard | Record<string, unknown> | null;
   productAuthorityGuard?: HelixProductAuthorityGuard | Record<string, unknown> | null;
+  committedAskRoute?: HelixCommittedAskRoute | Record<string, unknown> | null;
 }): HelixRouteAuthorityAudit {
   const sourceTargetRecord = input.sourceTargetIntent as Record<string, unknown> | null | undefined;
   const contract = input.routeProductContract as Record<string, unknown> | null | undefined;
   const selectionGuard = input.terminalArtifactSelectionGuard as Record<string, unknown> | null | undefined;
   const productGuard = input.productAuthorityGuard as Record<string, unknown> | null | undefined;
-  const sourceTarget = readString(sourceTargetRecord?.target_source) || readString(contract?.source_target) || "unknown";
-  const targetKind = readString(sourceTargetRecord?.target_kind) || sourceTarget;
+  const committedRouteRecord = readRecord(input.committedAskRoute);
+  const committedRoute =
+    committedRouteRecord?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA
+      ? (committedRouteRecord as unknown as HelixCommittedAskRoute)
+      : null;
+  const committedRouteSource = readRecord(committedRoute?.route);
+  const committedCanonicalGoal = readRecord(committedRoute?.canonical_goal);
+  const sourceTarget =
+    readString(committedRouteSource?.source_target) ||
+    readString(sourceTargetRecord?.target_source) ||
+    readString(contract?.source_target) ||
+    "unknown";
+  const targetKind = readString(committedRouteSource?.target_kind) || readString(sourceTargetRecord?.target_kind) || sourceTarget;
   const modelOnlySourceTarget = isModelOnlySourceTarget(sourceTarget, targetKind);
   const hardSourceTarget =
     !modelOnlySourceTarget &&
@@ -168,17 +189,35 @@ export function auditRouteAuthority(input: {
       sourceTargetRecord?.must_enter_backend_ask === true ||
       (sourceTargeted.has(sourceTarget) && sourceTarget !== "unknown")
     );
-  const routeProductContractMissing = !contract || readString(contract.schema) !== "helix.route_product_contract.v1";
+  const routeProductContractMissing =
+    !committedRoute && (!contract || readString(contract.schema) !== "helix.route_product_contract.v1");
   const terminalArtifactKind = readString(input.terminalArtifactKind) || "unknown";
   const finalAnswerSource = readString(input.finalAnswerSource) || "unknown";
-  const allowedTerminalArtifactKinds = readStringArray(contract?.allowed_terminal_artifact_kinds);
-  const forbiddenTerminalArtifactKinds = readStringArray(contract?.forbidden_terminal_artifact_kinds);
+  const allowedTerminalArtifactKinds =
+    readStringArray(committedCanonicalGoal?.allowed_terminal_artifact_kinds).length > 0
+      ? readStringArray(committedCanonicalGoal?.allowed_terminal_artifact_kinds)
+      : readStringArray(contract?.allowed_terminal_artifact_kinds);
+  const forbiddenTerminalArtifactKinds =
+    readStringArray(committedCanonicalGoal?.forbidden_terminal_artifact_kinds).length > 0
+      ? readStringArray(committedCanonicalGoal?.forbidden_terminal_artifact_kinds)
+      : readStringArray(contract?.forbidden_terminal_artifact_kinds);
   const livePipelineProcedureReceipt =
     terminalArtifactKind === "live_pipeline_receipt" &&
     isLivePipelineProcedurePrompt(input.promptText, input.selectedRoute);
   const terminalArtifactAllowed =
     livePipelineProcedureReceipt ||
     (
+      Boolean(committedRoute) &&
+      selectionGuard?.allowed !== false &&
+      productGuard?.allowed !== false &&
+      committedRouteAllowsTerminalKind({
+        committedRoute,
+        terminalArtifactKind,
+        finalAnswerSource,
+      })
+    ) ||
+    (
+      !committedRoute &&
       !(hardSourceTarget && routeProductContractMissing) &&
       selectionGuard?.allowed !== false &&
       productGuard?.allowed !== false &&
@@ -207,7 +246,7 @@ export function auditRouteAuthority(input: {
     selected_route: input.selectedRoute,
     terminal_artifact_kind: terminalArtifactKind,
     final_answer_source: finalAnswerSource,
-    route_product_precedence_reason: readString(contract?.precedence_reason),
+    route_product_precedence_reason: readString(committedRouteSource?.route_reason) || readString(contract?.precedence_reason),
     allowed_terminal_artifact_kinds: allowedTerminalArtifactKinds,
     forbidden_terminal_artifact_kinds: forbiddenTerminalArtifactKinds,
     terminal_artifact_allowed: terminalArtifactAllowed,

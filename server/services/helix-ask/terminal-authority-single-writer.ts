@@ -4,9 +4,14 @@ import type {
   TerminalAuthoritySingleWriterAuditRejectionReason,
 } from "@shared/helix-terminal-authority";
 import {
+  HELIX_COMMITTED_ASK_ROUTE_SCHEMA,
+  type HelixCommittedAskRoute,
+} from "@shared/helix-committed-ask-route";
+import {
   applyTerminalAnswerEnvelope,
   resolveTerminalAnswerEnvelope,
 } from "./terminal-answer-envelope";
+import { committedRouteAllowsTerminalKind } from "./committed-ask-route";
 import {
   findLatestFinalAnswerDraftCandidate,
   latestDirectAnswerSequence,
@@ -208,7 +213,11 @@ const isStagePlayPostObservationSynthesisText = (value: unknown): boolean =>
   );
 
 const routeContractAllowedTerminalKinds = (payload: Record<string, unknown>): string[] =>
-  readArray(readRecord(payload.route_product_contract)?.allowed_terminal_artifact_kinds)
+  readArray(
+    readRecord(payload.committed_ask_route)?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA
+      ? readRecord(readRecord(payload.committed_ask_route)?.canonical_goal)?.allowed_terminal_artifact_kinds
+      : readRecord(payload.route_product_contract)?.allowed_terminal_artifact_kinds,
+  )
     .map(readString)
     .filter((entry): entry is string => Boolean(entry));
 
@@ -216,6 +225,14 @@ const routeContractAllowsTerminalKind = (
   payload: Record<string, unknown>,
   kind: string,
 ): boolean => {
+  const committedRoute = readRecord(payload.committed_ask_route);
+  if (committedRoute?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA) {
+    return committedRouteAllowsTerminalKind({
+      committedRoute: committedRoute as unknown as HelixCommittedAskRoute,
+      terminalArtifactKind: kind,
+      finalAnswerSource: kind === "model_synthesized_answer" ? "final_answer_draft" : null,
+    });
+  }
   const allowed = routeContractAllowedTerminalKinds(payload);
   return allowed.length === 0 || allowed.includes(kind);
 };
@@ -348,6 +365,49 @@ const isAcceptedObservationPacket = (artifact: ArtifactLike): boolean => {
 const isFinalAnswerDraft = (artifact: ArtifactLike): boolean =>
   artifactKind(artifact) === "final_answer_draft" ||
   artifactSchema(artifact) === "helix.final_answer_draft.v1";
+
+const isDirectAnswerText = (artifact: ArtifactLike): boolean =>
+  artifactKind(artifact) === "direct_answer_text" ||
+  artifactSchema(artifact) === "helix.direct_answer_text.v1";
+
+const committedModelOnlyDirectAnswerRoute = (payload: Record<string, unknown>): boolean => {
+  const committedRoute = readRecord(payload.committed_ask_route);
+  if (committedRoute?.schema !== HELIX_COMMITTED_ASK_ROUTE_SCHEMA) return false;
+  const route = readRecord(committedRoute.route);
+  const goal = readRecord(committedRoute.canonical_goal);
+  return (
+    readString(route?.source_target) === "model_only" &&
+    readString(goal?.goal_kind) === "model_only_concept" &&
+    readString(goal?.required_terminal_kind) === "direct_answer_text"
+  );
+};
+
+const findLatestDirectAnswerTerminal = (
+  payload: Record<string, unknown>,
+  artifacts: ArtifactLike[],
+): { artifact: ArtifactLike; text: string; ref: string | null } | null => {
+  if (!committedModelOnlyDirectAnswerRoute(payload)) return null;
+  if (!routeContractAllowsTerminalKind(payload, "direct_answer_text")) return null;
+  for (let index = artifacts.length - 1; index >= 0; index -= 1) {
+    const artifact = artifacts[index];
+    if (!artifact || !isDirectAnswerText(artifact)) continue;
+    const text = artifactText(artifact);
+    if (!text || isStaleWorkspaceFailureText(text)) continue;
+    return { artifact, text, ref: artifactId(artifact) };
+  }
+  const directAnswer = readRecord(payload.direct_answer_text);
+  const text = readString(directAnswer?.answer_text) ?? readString(directAnswer?.text);
+  if (!text || isStaleWorkspaceFailureText(text)) return null;
+  return {
+    artifact: {
+      kind: "direct_answer_text",
+      artifact_id: readString(directAnswer?.artifact_id) ?? undefined,
+      payload: directAnswer,
+    },
+    text,
+    ref: readString(directAnswer?.artifact_id),
+  };
+};
 
 const finalAnswerDraftAuthority = (artifact: ArtifactLike): string | null =>
   readString(artifactPayload(artifact)?.authority);
@@ -849,6 +909,10 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const goalAllowsTerminal =
     readString(goalEvaluation?.satisfaction) === "satisfied" ||
     readString(goalEvaluation?.next_decision) === "allow_terminal";
+  const selectedDirectAnswerTerminal =
+    goalAllowsTerminal
+      ? findLatestDirectAnswerTerminal(input.payload, artifacts)
+      : null;
   const repoTerminalMaterialized =
     usableDraftMaterialization &&
     draftMaterialization.materialized_terminal_artifact_kind === "repo_code_evidence_answer";
@@ -1103,6 +1167,31 @@ export function applyHelixTerminalAuthoritySingleWriter(
     };
     selectedArtifactKind = "typed_failure";
     selectedSource = "typed_failure";
+  } else if (!solverContinuationPending && selectedDirectAnswerTerminal) {
+    selectedArtifactRef = selectedDirectAnswerTerminal.ref;
+    selectedArtifactKind = "direct_answer_text";
+    selectedSource = "direct_answer_text";
+    quarantineStaleRequestUserInput(input.payload);
+    input.payload.ok = true;
+    input.payload.response_type = "final_answer";
+    input.payload.final_status = "final_answer";
+    input.payload.terminal_artifact_kind = "direct_answer_text";
+    input.payload.final_answer_source = "model_direct_answer";
+    input.payload.selected_final_answer = selectedDirectAnswerTerminal.text;
+    input.payload.answer = selectedDirectAnswerTerminal.text;
+    input.payload.text = selectedDirectAnswerTerminal.text;
+    input.payload.assistant_answer = selectedDirectAnswerTerminal.text;
+    input.payload.terminal_artifact_id = selectedDirectAnswerTerminal.ref ?? undefined;
+    input.payload.terminal_presentation = {
+      ...(readRecord(input.payload.terminal_presentation) ?? {}),
+      schema: "helix.terminal_presentation.v1",
+      turn_id: input.turnId,
+      terminal_artifact_kind: "direct_answer_text",
+      concise_text: selectedDirectAnswerTerminal.text,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    delete input.payload.terminal_error_code;
   } else if (!solverContinuationPending && selectedLiveEnvironmentBindingDiagnosis) {
     selectedArtifactRef = selectedLiveEnvironmentBindingDiagnosis.ref;
     selectedArtifactKind = selectedLiveEnvironmentBindingDiagnosis.kind;

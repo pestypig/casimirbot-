@@ -28,6 +28,7 @@ export type HelixPostToolAuthorityBridge = {
     | "unknown";
   required_terminal_kind:
     | "model_synthesized_answer"
+    | "doc_evidence_synthesis_answer"
     | "repo_code_evidence_answer"
     | "scholarly_research_answer"
     | "internet_search_answer"
@@ -480,8 +481,13 @@ const inferRouteFamily = (payload: RecordLike, capability: string): HelixPostToo
   if (/calculator|scientific-calculator/i.test(haystack)) return "calculator";
   if (/voice_delivery|confirm_speak|read.+out loud|voice/i.test(haystack)) return "voice_delivery";
   if (/dottie|situation-room|minecraft|live_pipeline|stage_play_badge_graph|stage_play_job_plan|stage_play_checkpoint_request_result|stage_play_checkpoint_request|stage_play_checkpoint_queue|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation|reflect_stage_play_context|plan_stage_play_job|request_stage_play_checkpoint/i.test(haystack)) return "situation_room_setup";
+  if (
+    sourceTarget === "docs_viewer" ||
+    targetSource === "docs_viewer" ||
+    goalKind === "doc_evidence_synthesis" ||
+    /doc_evidence_synthesis_answer|docs-viewer|doc_open|docs_panel/i.test(haystack)
+  ) return "docs_panel";
   if (/repo|doc_summary|doc_evidence|search_docs/i.test(haystack)) return "repo_docs";
-  if (/docs-viewer|doc_open|docs_panel/i.test(haystack)) return "docs_panel";
   if (capability.includes(".")) return "workstation_panel";
   return "unknown";
 };
@@ -492,8 +498,8 @@ export function buildPostToolAuthorityBridge(input: {
 }): HelixPostToolAuthorityBridge {
   const capability = selectedCapability(input.payload);
   const routeFamily = inferRouteFamily(input.payload, capability);
-  const toolObservationRefs = artifactRefs(input.payload, /agent_step_observation_packet|runtime_tool_observation|live_environment_tool_observation|workspace_action_receipt|calculator_receipt|scholarly_research_observation|scholarly_full_text_observation|internet_search_observation|dottie_|voice_delivery|workstation_tool_evaluation|stage_play_badge_graph|stage_play_live_source_mail_loop_reflection|stage_play_job_plan|stage_play_checkpoint_request_result|stage_play_checkpoint_request|stage_play_checkpoint_queue|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation/);
-  const answerDraftRefs = artifactRefs(input.payload, /final_answer_draft|direct_answer_text|repo_code_evidence_answer|scholarly_research_answer|internet_search_answer/);
+  const toolObservationRefs = artifactRefs(input.payload, /agent_step_observation_packet|runtime_tool_observation|live_environment_tool_observation|workspace_action_receipt|calculator_receipt|doc_summary|doc_location_result|doc_evidence_location|doc_location_matches|doc_equation_context|doc_equation_location|doc_calculator_evidence|scholarly_research_observation|scholarly_full_text_observation|internet_search_observation|dottie_|voice_delivery|workstation_tool_evaluation|stage_play_badge_graph|stage_play_live_source_mail_loop_reflection|stage_play_job_plan|stage_play_checkpoint_request_result|stage_play_checkpoint_request|stage_play_checkpoint_queue|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation/);
+  const answerDraftRefs = artifactRefs(input.payload, /final_answer_draft|direct_answer_text|doc_evidence_synthesis_answer|repo_code_evidence_answer|scholarly_research_answer|internet_search_answer/);
   const liveSourceReflectionSynthesis = liveSourceMailLoopReflectionSynthesisText(input.payload);
   const liveSourceSynthesis = liveSourceReflectionSynthesis || liveSourceMailboxSynthesisText(input.payload);
   const calculatorSupport = evaluateCalculatorToolAnswerSupport({ turnId: input.turnId, payload: input.payload });
@@ -598,6 +604,38 @@ export function buildPostToolAuthorityBridge(input: {
         request_user_input_question: "I can prepare that voice output, but I need your confirmation before speaking. Should I speak it now?",
       }],
       reason: "voice_confirmation_required",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+  if (routeFamily === "docs_panel") {
+    const goalKind = readString(readRecord(input.payload.canonical_goal_frame)?.goal_kind);
+    const requiresDocsSynthesis = goalKind === "doc_evidence_synthesis";
+    const draftText = finalDraftText(input.payload);
+    const docSynthesisAnswer = readRecord(input.payload.doc_evidence_synthesis_answer);
+    const supportsAnswer = requiresDocsSynthesis
+      ? Boolean(toolObservationRefs.length > 0 && (draftText || docSynthesisAnswer))
+      : Boolean(toolObservationRefs.length > 0 && draftText);
+    return {
+      schema: HELIX_POST_TOOL_AUTHORITY_BRIDGE_SCHEMA,
+      turn_id: input.turnId,
+      applies: toolObservationRefs.length > 0 || answerDraftRefs.length > 0 || Boolean(docSynthesisAnswer),
+      selected_capability: capability || undefined,
+      tool_observation_refs: toolObservationRefs,
+      answer_draft_refs: answerDraftRefs,
+      observation_support_status: supportsAnswer ? "supports_answer" : toolObservationRefs.length > 0 ? "not_enough_information" : "not_applicable",
+      route_family: "docs_panel",
+      required_terminal_kind: requiresDocsSynthesis ? "doc_evidence_synthesis_answer" : "model_synthesized_answer",
+      terminal_repair_action: "none",
+      pending_requirements: supportsAnswer ? [] : [{
+        code: toolObservationRefs.length > 0 ? "missing_post_tool_answer_draft" : "missing_active_doc",
+        message: requiresDocsSynthesis
+          ? "Docs evidence is present, but no model-authored docs synthesis answer draft has been materialized."
+          : "No usable Docs Viewer observation was found for the current document goal.",
+      }],
+      reason: supportsAnswer
+        ? "docs_observation_and_answer_draft_support_goal"
+        : "docs_post_tool_support_incomplete",
       assistant_answer: false,
       raw_content_included: false,
     };

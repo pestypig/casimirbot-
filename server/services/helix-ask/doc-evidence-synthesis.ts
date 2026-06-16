@@ -148,13 +148,13 @@ export function buildDocEvidenceSynthesisPlan(input: {
   const synthesisKind: HelixDocEvidenceSynthesisKind =
     /\b(?:compare|comparison|differences?|versus|vs\.?|two-column|table)\b/i.test(prompt)
       ? "compare"
-      : /\b(?:runbook|playbook|checklist|steps?)\b/i.test(prompt)
-        ? "runbook_answer"
-        : /\b(?:locate|find|where|anchors?|sections?|cite)\b/i.test(prompt)
+      : /\b(?:locate|find|where|anchors?|sections?|cite)\b/i.test(prompt)
           ? "locate_then_explain"
-          : paths.length > 1
-            ? "multi_doc_summary"
-            : "focused_explanation";
+          : /\b(?:runbook|playbook|checklist|steps?\s+(?:to|for|through)|step-by-step)\b/i.test(prompt)
+            ? "runbook_answer"
+            : paths.length > 1
+              ? "multi_doc_summary"
+              : "focused_explanation";
   const requiredObservationKinds: DocEvidenceSynthesisPlan["required_observation_kinds"] =
     synthesisKind === "compare" || synthesisKind === "multi_doc_summary"
       ? ["doc_summary"]

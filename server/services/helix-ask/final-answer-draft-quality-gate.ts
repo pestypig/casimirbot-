@@ -59,6 +59,36 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
   payload?: Record<string, unknown> | null;
   artifactLedger?: ArtifactLike[] | null;
 }): FinalAnswerDraftRouteFamily => {
+  const committedRoute = readRecord(input.payload?.committed_ask_route);
+  const committedRouteSource = readRecord(committedRoute?.route);
+  const committedGoal = readRecord(committedRoute?.canonical_goal);
+  const committedSourceTarget = readString(committedRouteSource?.source_target);
+  const committedGoalKind = readString(committedGoal?.goal_kind);
+  if (committedSourceTarget === "model_only" || committedGoalKind === "model_only_concept") {
+    return "model_only";
+  }
+  if (committedSourceTarget === "repo_code" || committedSourceTarget === "runtime_evidence") {
+    return "repo_evidence";
+  }
+  if (committedSourceTarget === "scholarly_research") {
+    return "scholarly_research";
+  }
+  if (committedSourceTarget === "internet_search") {
+    return "internet_search";
+  }
+  if (committedSourceTarget === "docs_viewer" || committedSourceTarget === "active_doc") {
+    return "docs_source";
+  }
+  if (committedSourceTarget === "calculator_stream") {
+    return "calculator_tool";
+  }
+  if (committedSourceTarget === "workstation_panel" || committedSourceTarget === "workspace_action" || committedSourceTarget === "workstation_state") {
+    return "workstation_tool";
+  }
+  if (committedSourceTarget === "live_environment" || committedSourceTarget === "live_source_mailbox" || committedSourceTarget === "live_pipeline" || committedSourceTarget === "world_event") {
+    return "situation_room";
+  }
+
   const sourceTarget = readString(input.routeProductContract?.source_target);
   const goalKind =
     readString(readRecord(input.payload?.canonical_goal_frame)?.goal_kind) ??

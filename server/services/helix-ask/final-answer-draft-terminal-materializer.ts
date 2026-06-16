@@ -1,5 +1,10 @@
 import type { HelixRouteProductContract } from "@shared/helix-route-product-contract";
+import {
+  HELIX_COMMITTED_ASK_ROUTE_SCHEMA,
+  type HelixCommittedAskRoute,
+} from "@shared/helix-committed-ask-route";
 import { evaluateRepoAnswerTextQualityGate } from "./repo-answer-text-quality-gate";
+import { committedRouteAllowsTerminalKind } from "./committed-ask-route";
 import {
   collectFinalAnswerDraftSupportRefs,
   evaluateFinalAnswerDraftQualityGate,
@@ -140,10 +145,35 @@ const allowedKinds = (contract?: HelixRouteProductContract | Record<string, unkn
     .map(readString)
     .filter((entry): entry is string => Boolean(entry));
 
+const readCommittedRoute = (payload: Record<string, unknown>): HelixCommittedAskRoute | null => {
+  const committedRoute = readRecord(payload.committed_ask_route);
+  return committedRoute?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA
+    ? (committedRoute as unknown as HelixCommittedAskRoute)
+    : null;
+};
+
+const effectiveAllowedKinds = (
+  payload: Record<string, unknown>,
+  contract?: HelixRouteProductContract | Record<string, unknown> | null,
+): string[] => {
+  const committedRoute = readCommittedRoute(payload);
+  const committedAllowed = committedRoute?.canonical_goal.allowed_terminal_artifact_kinds ?? [];
+  return committedAllowed.length > 0 ? committedAllowed : allowedKinds(contract);
+};
+
 const contractAllows = (
+  payload: Record<string, unknown>,
   contract: HelixRouteProductContract | Record<string, unknown> | null | undefined,
   kind: string,
 ): boolean => {
+  const committedRoute = readCommittedRoute(payload);
+  if (committedRoute) {
+    return committedRouteAllowsTerminalKind({
+      committedRoute,
+      terminalArtifactKind: kind,
+      finalAnswerSource: kind === "model_synthesized_answer" ? "final_answer_draft" : null,
+    });
+  }
   const allowed = allowedKinds(contract);
   return allowed.length === 0 ||
     allowed.includes(kind) ||
@@ -166,7 +196,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
 
   const draftPayload = artifactPayload(draft.artifact);
   const contract = input.routeProductContract ?? readRecord(input.payload.route_product_contract);
-  const routeAllowed = allowedKinds(contract);
+  const routeAllowed = effectiveAllowedKinds(input.payload, contract);
   const qualityGate = evaluateFinalAnswerDraftQualityGate({
     turnId: input.turnId,
     finalAnswerDraftRef: draft.ref,
@@ -349,7 +379,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
     const targetKind = compoundResearchLocator
       ? "compound_research_locator_answer"
       : "scholarly_research_answer";
-    if (!contractAllows(contract, targetKind)) {
+    if (!contractAllows(input.payload, contract, targetKind)) {
       return {
         schema: "helix.final_answer_draft_terminal_materializer_result.v1",
         turn_id: input.turnId,
@@ -437,7 +467,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
     const targetKind = compoundResearchLocator
       ? "compound_research_locator_answer"
       : "internet_search_answer";
-    if (!contractAllows(contract, targetKind)) {
+    if (!contractAllows(input.payload, contract, targetKind)) {
       return {
         schema: "helix.final_answer_draft_terminal_materializer_result.v1",
         turn_id: input.turnId,
@@ -491,7 +521,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
   }
 
   if (routeFamily === "docs_source") {
-    if (!contractAllows(contract, "doc_evidence_synthesis_answer")) {
+    if (!contractAllows(input.payload, contract, "doc_evidence_synthesis_answer")) {
       return {
         schema: "helix.final_answer_draft_terminal_materializer_result.v1",
         turn_id: input.turnId,
@@ -585,7 +615,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
     };
   }
 
-  if (!contractAllows(contract, "model_synthesized_answer")) {
+  if (!contractAllows(input.payload, contract, "model_synthesized_answer")) {
     return {
       schema: "helix.final_answer_draft_terminal_materializer_result.v1",
       turn_id: input.turnId,
