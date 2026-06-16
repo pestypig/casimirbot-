@@ -183,6 +183,29 @@ const contractAllows = (
 const materializedRef = (turnId: string, kind: string): string =>
   `${turnId}:${kind}:from_final_answer_draft`;
 
+const persistDocEvidenceSynthesisAnswerArtifact = (input: {
+  turnId: string;
+  payload: Record<string, unknown>;
+  artifactLedger: ArtifactLike[];
+  answer: Record<string, unknown>;
+}): void => {
+  const artifactIdRef = readString(input.answer.artifact_id);
+  if (!artifactIdRef) return;
+  const alreadyPresent = input.artifactLedger.some((artifact) => artifactId(artifact) === artifactIdRef);
+  if (alreadyPresent) return;
+  const artifact: ArtifactLike & Record<string, unknown> = {
+    artifact_id: artifactIdRef,
+    turn_id: input.turnId,
+    producer_item_id: "doc_evidence_synthesis_materializer",
+    kind: "doc_evidence_synthesis_answer",
+    created_at_ms: Date.now(),
+    source_scope: "current_turn",
+    payload: input.answer,
+  };
+  input.artifactLedger.push(artifact);
+  input.payload.current_turn_artifact_ledger = input.artifactLedger;
+};
+
 export function materializeFinalAnswerDraftTerminal(input: {
   turnId: string;
   payload: Record<string, unknown>;
@@ -587,6 +610,12 @@ export function materializeFinalAnswerDraftTerminal(input: {
         raw_content_included: false,
       };
     }
+    persistDocEvidenceSynthesisAnswerArtifact({
+      turnId: input.turnId,
+      payload: input.payload,
+      artifactLedger: input.artifactLedger,
+      answer: materialized.answer as unknown as Record<string, unknown>,
+    });
     return {
       schema: "helix.final_answer_draft_terminal_materializer_result.v1",
       turn_id: input.turnId,

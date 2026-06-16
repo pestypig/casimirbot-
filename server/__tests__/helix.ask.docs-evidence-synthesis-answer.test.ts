@@ -131,6 +131,13 @@ describe("Helix Ask docs evidence synthesis answer", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+    expect(
+      (payload.current_turn_artifact_ledger as Array<{ kind?: string; artifact_id?: string }>).some(
+        (artifact) =>
+          artifact.kind === "doc_evidence_synthesis_answer" &&
+          artifact.artifact_id === materialized?.materialized_terminal_artifact_ref,
+      ),
+    ).toBe(true);
   });
 
   it("builds a model synthesis packet with doc evidence refs and requested output shape", () => {
