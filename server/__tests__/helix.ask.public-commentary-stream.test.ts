@@ -20,6 +20,9 @@ const photonCalculatorPrompt =
 const naturalCompoundCalculatorPrompt =
   "Use calculator compute frequency from 500 nm then energy J then eV";
 
+const docsViewerCapabilityPrompt =
+  "Docs Viewer: strongest dynamic surface. All 14 dynamic actions have some test evidence; core actions like open, locate_in_doc, summarize_doc, search_docs, and explain_paper are well represented.";
+
 const photonCalculatorPlannerFixture = {
   subgoals: [
     {
@@ -147,6 +150,42 @@ describe("helix ask public commentary stream", () => {
     expect(timeline.length).toBeGreaterThan(0);
     expect(timeline.some((event: any) => event?.text === commentary?.text)).toBe(true);
   });
+
+  it("carries streamed transcript rows into the final payload for Docs Viewer capability label turns", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn/stream")
+      .send({
+        question: docsViewerCapabilityPrompt,
+        mode: "read",
+        sessionId: `public-commentary-docs-label-stream-${Date.now()}`,
+        debug: true,
+      })
+      .expect(200);
+
+    const events = parseSseEvents(response.text ?? "");
+    const finalIndex = events.findIndex((event) => event.event === "turn_final");
+    const commentaryIndex = events.findIndex(
+      (event) => event.event === "turn_transcript_event" && event.data?.type === "public_commentary",
+    );
+    const finalPacket = events.findLast((event) => event.event === "turn_final")?.data;
+    const finalTranscriptRows = Array.isArray(finalPacket?.turn_transcript_events)
+      ? finalPacket.turn_transcript_events
+      : [];
+    const finalMeaningfulRows = finalTranscriptRows.filter(
+      (row: any) => !["question", "final_answer", "turn_completed"].includes(row?.type),
+    );
+    const finalTranscriptText = finalTranscriptRows.map((row: any) => row?.text).join("\n");
+
+    expect(commentaryIndex).toBeGreaterThanOrEqual(0);
+    expect(finalIndex).toBeGreaterThan(commentaryIndex);
+    expect(finalMeaningfulRows.length).toBeGreaterThan(0);
+    expect(finalMeaningfulRows.some((row: any) => row?.type === "public_commentary")).toBe(true);
+    expect(finalPacket?.debug?.turn_transcript_events?.length).toBe(finalTranscriptRows.length);
+    expect(finalTranscriptText).not.toMatch(
+      /turn_purpose|why_this_capability|expected_artifacts|observation_summary/i,
+    );
+  }, 20_000);
 
   it("streams compound calculator commentary across plan, receipt, validation, and synthesis", async () => {
     const app = createApp();
