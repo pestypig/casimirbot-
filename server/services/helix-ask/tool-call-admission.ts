@@ -50,6 +50,8 @@ const HARD_SOURCE_TARGETS = new Set([
   "workspace_panel",
   "workstation_panel",
   "workspace_action",
+  "calculator",
+  "calculator_solve",
   "calculator_stream",
 ]);
 
@@ -64,6 +66,9 @@ const sourceTargetToolFamilies = (
   if (sourceTarget === "repo_code") return ["repo_code"];
   if (sourceTarget === "live_environment" || sourceTarget === "live_source_mailbox") return ["live_environment"];
   if (sourceTarget === "active_note") return ["notes"];
+  if (sourceTarget === "calculator" || sourceTarget === "calculator_solve" || sourceTarget === "calculator_stream") {
+    return ["calculator", "workstation_action"];
+  }
   if (sourceTarget === "workspace_panel" || sourceTarget === "workstation_panel" || sourceTarget === "workspace_action") {
     const joined = [
       promptText,
@@ -100,13 +105,56 @@ const theoryLocatorRequested = (promptText: string): boolean => {
   return /\b(?:theory\s+badge\s+graph|theory\s+badges?|badge\s+graph|physics\s+graph|theory\s+graph|theory_context_reflection|reflect_theory_context|helix_ask\.reflect_theory_context|graph\s+placement|scale\s+bands?|semantic\s+chunks?|uncertainty\s+mode|locate\b[\s\S]{0,80}\b(?:theory|badge|graph)|place\b[\s\S]{0,80}\b(?:theory|badge|graph|claims?)|map\b[\s\S]{0,80}\b(?:theory|badge|graph)|where\s+(?:does|do)\b[\s\S]{0,100}\b(?:fit|land|map))\b/i.test(prompt);
 };
 
+const calculatorSolveRequested = (
+  promptText: string,
+  sourceTargetIntent?: HelixAskSourceTargetIntent | Record<string, unknown> | null,
+): boolean => {
+  const prompt = promptText.trim();
+  if (!prompt) return false;
+  const sourceTargetRecord = sourceTargetIntent as Record<string, unknown> | null | undefined;
+  const joined = [
+    prompt,
+    String(sourceTargetRecord?.target_source ?? ""),
+    String(sourceTargetRecord?.target_kind ?? ""),
+    ...(
+      Array.isArray(sourceTargetRecord?.explicit_cues)
+        ? sourceTargetRecord.explicit_cues as string[]
+        : []
+    ),
+    ...(
+      Array.isArray(sourceTargetRecord?.reasons)
+        ? sourceTargetRecord.reasons as string[]
+        : []
+    ),
+    ...(
+      Array.isArray(sourceTargetRecord?.requested_outputs)
+        ? sourceTargetRecord.requested_outputs as string[]
+        : []
+    ),
+  ].join(" ");
+  if (/\b(?:calculator_stream|calculator_solve|scientific_calculator_solve|scientific-calculator\.solve_expression|calculator_receipt)\b/i.test(joined)) {
+    return true;
+  }
+  if (/\b(?:scientific\s+calculator|calculator)\b[\s\S]{0,80}\b(?:solve|evaluate|calculate|compute)\b/i.test(prompt)) {
+    return true;
+  }
+  if (/\b(?:solve|evaluate|calculate|compute)\b[\s\S]{0,80}\b(?:scientific\s+calculator|calculator|expression|equation)\b/i.test(prompt)) {
+    return true;
+  }
+  if (/\b(?:solve|evaluate|calculate|compute)\b[\s\S]{0,120}(?:\d|[=+\-*/^()]|\\frac|\\sqrt|\bsqrt\s*\(|\bln\s*\(|\blog\s*\(|\bsin\s*\(|\bcos\s*\(|\btan\s*\()/i.test(prompt)) {
+    return true;
+  }
+  return false;
+};
+
 const contextualForbiddenToolFamilies = (
   suppression: ReturnType<typeof detectContextualToolAdmissionSuppression>,
 ): string[] => {
   if (!suppression) return [];
   return [
     contextualToolSuppressionBlocksFamily(suppression, "docs_viewer") ? "docs_viewer" : "",
-    contextualToolSuppressionBlocksFamily(suppression, "scientific_calculator") ? "scientific_calculator" : "",
+    contextualToolSuppressionBlocksFamily(suppression, "calculator") ||
+    contextualToolSuppressionBlocksFamily(suppression, "scientific_calculator") ? "calculator" : "",
     contextualToolSuppressionBlocksFamily(suppression, "scholarly_research") ? "scholarly_research" : "",
     contextualToolSuppressionBlocksFamily(suppression, "internet_search") ? "internet_search" : "",
     contextualToolSuppressionBlocksFamily(suppression, "theory_locator") ? "theory_locator" : "",
@@ -175,11 +223,16 @@ export function buildToolCallAdmissionDecision(input: {
   };
   const contextualSuppression = detectContextualToolAdmissionSuppression(promptText);
   const toolUseRestatement = buildToolUseRestatement(promptText);
+  const calculatorSolveIntent = calculatorSolveRequested(promptText, input.sourceTargetIntent);
   const effectiveSourceTarget =
     sourceTarget === "unknown" && toolUseRestatement.requiredToolFamilies.includes("docs_viewer")
       ? "docs_viewer"
       : sourceTarget === "unknown" && toolUseRestatement.requiredToolFamilies.includes("internet_search")
       ? "internet_search"
+      : sourceTarget === "unknown" && calculatorSolveIntent
+      ? "calculator_stream"
+      : sourceTarget === "calculator" || sourceTarget === "calculator_solve"
+      ? "calculator_stream"
       : sourceTarget;
   const contextualSuppressionBlocksSelectedTarget =
     Boolean(contextualSuppression) &&
@@ -363,7 +416,7 @@ export function buildToolCallAdmissionDecision(input: {
     reason = workspacePanelFamilies.includes("theory_locator")
       ? "theory_locator_requires_readonly_locator_path"
       : "workspace_panel_requires_workstation_action_path";
-  } else if (sourceTarget === "calculator_stream") {
+  } else if (effectiveSourceTarget === "calculator_stream") {
     admittedToolFamilies = ["calculator", "workstation_action"];
     extraForbiddenTerminalKinds = ["situation_context_pack", "visual_context_pack", "live_pipeline_receipt", "active_doc_identity", "doc_open_receipt", "doc_summary", "no_tool_direct", "model_only_concept", "direct_answer_text"];
     extraForbiddenRoutes = ["situation_context_question", "visual_deictic", "visual_frame_evidence", "active_doc_identity", "active_doc_summary", "doc_open_best", "model_only_concept", "no_tool_direct"];

@@ -104,7 +104,7 @@ const requestSchema = z.object({
   utteranceId: z.string().trim().max(200).optional(),
   chunkIndex: z.number().int().nonnegative().max(4096).optional(),
   chunkCount: z.number().int().positive().max(4096).optional(),
-  chunkKind: z.enum(["brief", "final", "tool_receipt", "manual_read_aloud", "translation_relay"]).optional(),
+  chunkKind: z.enum(["brief", "final", "tool_receipt", "manual_read_aloud", "translation_relay", "narrator_read", "panel_narration"]).optional(),
   turnKey: z.string().trim().max(200).optional(),
   textCertainty: z.enum(["unknown", "hypothesis", "reasoned", "confirmed"]).optional(),
   voiceCertainty: z.enum(["unknown", "hypothesis", "reasoned", "confirmed"]).optional(),
@@ -1180,7 +1180,10 @@ const hasDotTraceMetadata = (payload: VoiceRequest): boolean =>
   );
 
 const isInterimVoiceReceiptChunk = (payload: VoiceRequest): boolean =>
-  payload.chunkKind === "tool_receipt" || payload.chunkKind === "translation_relay";
+  payload.chunkKind === "tool_receipt" ||
+  payload.chunkKind === "translation_relay" ||
+  payload.chunkKind === "narrator_read" ||
+  payload.chunkKind === "panel_narration";
 
 const hasInterimVoiceReceiptAuthority = (payload: VoiceRequest): boolean => {
   if (!isInterimVoiceReceiptChunk(payload)) return false;

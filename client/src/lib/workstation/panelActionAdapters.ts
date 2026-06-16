@@ -42,6 +42,7 @@ import {
   setupSituationRoomFromPrompt,
 } from "@/lib/workstation/situationRoomSetupActions";
 import { useWorkstationClipboardStore } from "@/store/useWorkstationClipboardStore";
+import { useNarratorStore } from "@/store/useNarratorStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 import { useWorkstationProcessGraphStore } from "@/store/useWorkstationProcessGraphStore";
 import { renderWorkstationProcessGraphSvg } from "@/lib/workstation/processGraph/renderProcessGraphSvg";
@@ -156,6 +157,10 @@ import {
   type SituationRoomVoicePolicy,
 } from "@shared/situation-room-live-job-contract";
 import { recordDottieVoiceDebugClip } from "@/lib/helix/dottie-voice-debug-clips";
+import type {
+  NarratorDeliveryMode,
+  NarratorSourceKind,
+} from "@shared/contracts/narrator-event.v1";
 
 export type HelixPanelActionRequest = {
   panel_id: string;
@@ -187,6 +192,39 @@ function asNonEmptyString(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+const narratorSourceKinds = new Set<NarratorSourceKind>([
+  "final_answer",
+  "helix_console",
+  "voice_receipt",
+  "workstation_panel",
+  "live_answer",
+  "image_lens",
+  "situation_room",
+  "microdeck",
+  "hover_focus_inspector",
+]);
+
+const narratorDeliveryModes = new Set<NarratorDeliveryMode>([
+  "hidden",
+  "visible_only",
+  "confirm_to_speak",
+  "auto_speak",
+]);
+
+function asNarratorSourceKind(value: unknown): NarratorSourceKind | null {
+  const sourceKind = asNonEmptyString(value);
+  return sourceKind && narratorSourceKinds.has(sourceKind as NarratorSourceKind)
+    ? sourceKind as NarratorSourceKind
+    : null;
+}
+
+function asNarratorDeliveryMode(value: unknown): NarratorDeliveryMode | null {
+  const mode = asNonEmptyString(value);
+  return mode && narratorDeliveryModes.has(mode as NarratorDeliveryMode)
+    ? mode as NarratorDeliveryMode
+    : null;
 }
 
 function asTheoryContextReflectionSource(value: unknown): TheoryContextReflectionSource {
@@ -2166,6 +2204,99 @@ export function executeHelixPanelAction(
       action_id: actionId,
       artifact: buildWorkspaceActionReceipt(panelId, actionId),
     };
+  }
+
+  if (panelId === "narrator") {
+    const args = asRecord(request.args) ?? {};
+    const narratorStore = useNarratorStore.getState();
+
+    if (actionId === "narrator.set_source_policy") {
+      const sourceKind = asNarratorSourceKind(args.source_kind ?? args.sourceKind);
+      if (!sourceKind) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "narrator.set_source_policy requires a valid source_kind.",
+        };
+      }
+      const deliveryMode = asNarratorDeliveryMode(args.delivery_mode ?? args.deliveryMode);
+      const maxChars = asNumber(args.max_chars ?? args.maxChars);
+      const cooldownMs = asNumber(args.cooldown_ms ?? args.cooldownMs);
+      narratorStore.setSourcePolicy(sourceKind, {
+        ...(asBoolean(args.enabled) !== null ? { enabled: asBoolean(args.enabled) === true } : {}),
+        ...(deliveryMode ? { deliveryMode } : {}),
+        ...(maxChars !== null ? { maxChars: Math.max(1, Math.floor(maxChars)) } : {}),
+        ...(cooldownMs !== null ? { cooldownMs: Math.max(0, Math.floor(cooldownMs)) } : {}),
+      });
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "narrator_source_policy_receipt",
+          schema: "helix.narrator_source_policy_receipt.v1",
+          source_kind: sourceKind,
+          policy: useNarratorStore.getState().sourcePolicies[sourceKind],
+          assistant_answer: false,
+          raw_content_included: false,
+          terminal_eligible: false,
+          panel_generated_answer: false,
+        },
+      };
+    }
+
+    if (actionId === "narrator.confirm_speak_event") {
+      const eventId = asNonEmptyString(args.event_id ?? args.eventId);
+      const event = eventId ? narratorStore.events.find((entry) => entry.eventId === eventId) : null;
+      if (!eventId || !event) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "narrator.confirm_speak_event requires an existing event_id.",
+        };
+      }
+      narratorStore.markQueued(eventId);
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "narrator_confirm_speak_receipt",
+          schema: "helix.narrator_confirm_speak_receipt.v1",
+          event_id: eventId,
+          source_kind: event.sourceKind,
+          source_id: event.sourceId,
+          speakable: event.speakable,
+          output_authority: "operator_confirmed_narrator_event",
+          evidence_refs: event.evidenceRefs,
+          assistant_answer: false,
+          raw_content_included: false,
+          terminal_eligible: false,
+          panel_generated_answer: false,
+        },
+      };
+    }
+
+    if (actionId === "narrator.clear_feed") {
+      narratorStore.clearFeed();
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "narrator_clear_feed_receipt",
+          schema: "helix.narrator_clear_feed_receipt.v1",
+          assistant_answer: false,
+          raw_content_included: false,
+          terminal_eligible: false,
+          panel_generated_answer: false,
+        },
+      };
+    }
   }
 
   if (panelId === "workstation-process-graph") {

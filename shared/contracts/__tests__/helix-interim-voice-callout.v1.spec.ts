@@ -74,6 +74,23 @@ describe("helix interim voice callout contract", () => {
     })).toEqual([]);
   });
 
+  it("accepts narrator callout kinds as provisional evidence", () => {
+    expect(validateHelixInterimVoiceCalloutRequestV1({
+      ...request,
+      kind: "narrator_read",
+      voicePlaybackKind: "narrator_read",
+      text: "Narrator has a panel observation ready.",
+      maxChars: 220,
+    })).toEqual([]);
+    expect(validateHelixInterimVoiceCalloutRequestV1({
+      ...request,
+      kind: "panel_narration",
+      voicePlaybackKind: "panel_narration",
+      text: "The current panel control is an observation-only action.",
+      maxChars: 220,
+    })).toEqual([]);
+  });
+
   it("rejects out-of-range timing hints", () => {
     expect(validateHelixInterimVoiceCalloutRequestV1({
       ...request,

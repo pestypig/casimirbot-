@@ -25,6 +25,7 @@ export type PanelId =
   | "live-answer-environment"
   | "image-lens"
   | "document-image-lens"
+  | "narrator"
   | HelixPanelRef["id"];
 
 export type PanelTelemetryWindowSnapshot = {
@@ -305,6 +306,14 @@ const BASE_PANELS: PanelDefinition[] = [
     defaultSize: { w: 1180, h: 760 },
     defaultPosition: { x: 260, y: 150 },
     keywords: ["image", "crop", "visual source", "legacy", "document image lens"],
+  },
+  {
+    id: "narrator",
+    title: "Narrator",
+    loader: load(() => import("@/components/workstation/NarratorPanel")),
+    defaultSize: { w: 980, h: 680 },
+    defaultPosition: { x: 300, y: 170 },
+    keywords: ["narrator", "voice", "read aloud", "callout", "speech", "accessibility", "events"],
   },
   {
     id: "workstation-clipboard-history",

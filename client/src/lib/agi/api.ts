@@ -1033,7 +1033,7 @@ export type VoiceSpeakPayload = {
   utteranceId?: string;
   chunkIndex?: number;
   chunkCount?: number;
-  chunkKind?: "brief" | "final" | "tool_receipt" | "manual_read_aloud" | "translation_relay";
+  chunkKind?: "brief" | "final" | "tool_receipt" | "manual_read_aloud" | "translation_relay" | "narrator_read" | "panel_narration";
   turnKey?: string;
   evidenceRefs?: string[];
   repoAttributed?: boolean;

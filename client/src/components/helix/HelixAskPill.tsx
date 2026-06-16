@@ -2708,7 +2708,9 @@ type InterimVoiceCalloutKind =
   | "memory_pressure"
   | "clarifying_status"
   | "steering_ack"
-  | "translation_relay";
+  | "translation_relay"
+  | "narrator_read"
+  | "panel_narration";
 
 export type InterimVoiceCalloutPlaybackIntent = VoicePlaybackUtteranceIntent & {
   requestId: string;
@@ -2729,6 +2731,8 @@ const INTERIM_VOICE_CALLOUT_KINDS = new Set<InterimVoiceCalloutKind>([
   "clarifying_status",
   "steering_ack",
   "translation_relay",
+  "narrator_read",
+  "panel_narration",
 ]);
 
 const INTERIM_VOICE_CALLOUT_PLAYABLE_STATUSES = new Set([
@@ -2779,10 +2783,15 @@ const buildInterimVoiceReceiptPlaybackIntent = (
   const delivery = readInterimVoiceRecord(receipt.delivery);
   const utteranceId = readInterimVoiceString(delivery?.utteranceId) ?? readInterimVoiceString(delivery?.utterance_id);
   const receiptKey = utteranceId ?? receiptId;
+  const requestedPlaybackKind = readInterimVoiceString(request.voicePlaybackKind);
   const playbackKind =
-    readInterimVoiceString(request.voicePlaybackKind) === "translation_relay" || calloutKind === "translation_relay"
+    requestedPlaybackKind === "translation_relay" || calloutKind === "translation_relay"
       ? "translation_relay"
-      : "tool_receipt";
+      : requestedPlaybackKind === "narrator_read" || calloutKind === "narrator_read"
+        ? "narrator_read"
+        : requestedPlaybackKind === "panel_narration" || calloutKind === "panel_narration"
+          ? "panel_narration"
+          : "tool_receipt";
   return {
     kind: playbackKind,
     authority: "provisional",
@@ -2856,7 +2865,12 @@ function isManualVoicePlaybackUtterance(utterance: Pick<VoicePlaybackUtterance, 
 }
 
 function isInterimVoicePlaybackUtteranceKind(kind: VoicePlaybackUtteranceKind): boolean {
-  return kind === "tool_receipt" || kind === "translation_relay";
+  return (
+    kind === "tool_receipt" ||
+    kind === "translation_relay" ||
+    kind === "narrator_read" ||
+    kind === "panel_narration"
+  );
 }
 
 function canPlayVoiceUtteranceWithMicOff(
@@ -12122,6 +12136,11 @@ const HELIX_REASONING_ATTEMPT_HARD_TIMEOUT_MS = clampNumber(
   HELIX_REASONING_ATTEMPT_IDLE_TIMEOUT_MS,
   15 * 60_000,
 );
+
+export function parseHelixAskQueuedQuestionsInput(value: string): string[] {
+  const normalized = value.replace(/\r\n/g, "\n").trim();
+  return normalized ? [normalized] : [];
+}
 const HELIX_REASONING_ATTEMPT_TIMEOUT_MS = HELIX_REASONING_ATTEMPT_IDLE_TIMEOUT_MS;
 const HELIX_REASONING_TIMEOUT_RETRY_MAX_ATTEMPTS = clampNumber(
   readNumber((import.meta as any)?.env?.VITE_HELIX_REASONING_TIMEOUT_RETRY_MAX_ATTEMPTS, 1),
@@ -31772,11 +31791,7 @@ export function HelixAskPill({
   );
 
   const parseQueuedQuestions = useCallback((value: string): string[] => {
-    if (!value) return [];
-    return value
-      .split(/\r?\n+/)
-      .map((line) => line.trim())
-      .filter(Boolean);
+    return parseHelixAskQueuedQuestionsInput(value);
   }, []);
 
   const resolveReplyEvents = useCallback((reply: HelixAskReply): AskLiveEventEntry[] => {

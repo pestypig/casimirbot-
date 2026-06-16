@@ -66,7 +66,9 @@ const normalizeKind = (value: string | null | undefined): HelixInterimVoiceCallo
     value === "memory_pressure" ||
     value === "clarifying_status" ||
     value === "steering_ack" ||
-    value === "translation_relay"
+    value === "translation_relay" ||
+    value === "narrator_read" ||
+    value === "panel_narration"
   ) {
     return value;
   }
@@ -125,8 +127,12 @@ const normalizeSource = (value: string | null | undefined): HelixInterimVoiceCal
 const normalizePlaybackKind = (
   value: string | null | undefined,
   kind: HelixInterimVoiceCalloutKind,
-): HelixInterimVoicePlaybackKind =>
-  value === "translation_relay" || kind === "translation_relay" ? "translation_relay" : "tool_receipt";
+): HelixInterimVoicePlaybackKind => {
+  if (value === "translation_relay" || kind === "translation_relay") return "translation_relay";
+  if (value === "narrator_read" || kind === "narrator_read") return "narrator_read";
+  if (value === "panel_narration" || kind === "panel_narration") return "panel_narration";
+  return "tool_receipt";
+};
 
 const pruneRecent = <T extends { requestId?: string; receiptId?: string }>(map: Map<string, T>) => {
   while (map.size > RECENT_CALLOUT_LIMIT) {

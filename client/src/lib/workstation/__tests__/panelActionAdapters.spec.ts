@@ -8,6 +8,7 @@ import { useSituationRoomGraphStore } from "@/store/useSituationRoomGraphStore";
 import { useSituationRoomJobStore } from "@/store/useSituationRoomJobStore";
 import { useSituationRoomStore } from "@/store/useSituationRoomStore";
 import { useWorkstationClipboardStore } from "@/store/useWorkstationClipboardStore";
+import { useNarratorStore } from "@/store/useNarratorStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 import { useWorkstationProcessGraphStore } from "@/store/useWorkstationProcessGraphStore";
 import { useTheoryMapOverlayStore } from "@/store/useTheoryMapOverlayStore";
@@ -139,6 +140,8 @@ describe("panelActionAdapters", () => {
     useSituationRoomJobStore.getState().reset();
     useSituationRoomGraphStore.getState().reset();
     useWorkstationProcessGraphStore.getState().reset();
+    useNarratorStore.getState().clearFeed();
+    useNarratorStore.getState().resetPolicies();
   });
 
   it("returns receipt-shaped observations for panel open/focus/close actions", () => {
@@ -176,6 +179,58 @@ describe("panelActionAdapters", () => {
       panel_id: "docs-viewer",
       action_id: "close",
       state_observed: true,
+    });
+  });
+
+  it("routes narrator source policy and confirm-speak actions as non-answer receipts", () => {
+    const policyResult = executeHelixPanelAction(
+      {
+        panel_id: "narrator",
+        action_id: "narrator.set_source_policy",
+        args: {
+          source_kind: "image_lens",
+          delivery_mode: "visible_only",
+          enabled: true,
+        },
+      },
+      actionContext(),
+    );
+    expect(policyResult.ok).toBe(true);
+    expect(policyResult.artifact).toMatchObject({
+      kind: "narrator_source_policy_receipt",
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+
+    const event = useNarratorStore.getState().publishEvent({
+      sourceKind: "image_lens",
+      sourceId: "image-lens:event:adapter",
+      text: "Image Lens narrator event.",
+      authority: "live_observation",
+      assistant_answer: false,
+      terminal_eligible: false,
+      evidenceRefs: ["image-lens:event:adapter"],
+      rawContentIncluded: false,
+      speakable: true,
+      requestedDeliveryMode: "confirm_to_speak",
+      defaultDeliveryMode: "visible_only",
+    });
+    expect(event).not.toBeNull();
+
+    const confirmResult = executeHelixPanelAction(
+      {
+        panel_id: "narrator",
+        action_id: "narrator.confirm_speak_event",
+        args: { event_id: event?.eventId },
+      },
+      actionContext(),
+    );
+    expect(confirmResult.ok).toBe(true);
+    expect(confirmResult.artifact).toMatchObject({
+      kind: "narrator_confirm_speak_receipt",
+      assistant_answer: false,
+      terminal_eligible: false,
+      panel_generated_answer: false,
     });
   });
 

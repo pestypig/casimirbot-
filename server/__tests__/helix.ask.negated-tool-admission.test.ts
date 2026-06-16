@@ -310,11 +310,32 @@ describe("Helix Ask negated/contextual tool admission", () => {
     expect(admission.tool_admission_suppressed).toBeUndefined();
   });
 
+  it("admits affirmative scientific calculator solve requests through the calculator rail", () => {
+    const promptText =
+      "Call scientific-calculator.solve_expression with this exact expression: ((sqrt(81)+ln(e^3))*7-5^2)/2. Return the calculator result.";
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, sourceTargetIntent, promptText });
+
+    expect(admission).toMatchObject({
+      source_target: "calculator_stream",
+      required: true,
+      admitted_tool_families: expect.arrayContaining(["calculator", "workstation_action"]),
+      reason: "calculator_stream_requires_calculator_tool_path",
+    });
+    expect(admission.tool_admission_suppressed).toBeUndefined();
+    expect(admission.forbidden_tool_families ?? []).not.toEqual(
+      expect.arrayContaining(["calculator", "workstation_action"]),
+    );
+  });
+
   it("suppresses quoted and negated calculator mentions before tool admission", () => {
     const prompts = [
       'Earlier I said "open calculator"; do not do that now. Explain why no tool should run.',
       "Do not open the calculator; just explain what the calculator is for.",
       "What tool would you use to open calculator? Explain without opening it.",
+      "If I later call scientific-calculator.solve_expression, what should happen? Do not run it now.",
+      'The screen-visible text says "scientific-calculator.solve_expression"; explain what that label means without running it.',
+      "Earlier I called scientific-calculator.solve_expression; summarize why that historical tool name should not execute now.",
     ];
 
     for (const promptText of prompts) {

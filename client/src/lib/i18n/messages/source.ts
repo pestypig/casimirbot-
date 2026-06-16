@@ -992,6 +992,62 @@ export const interfaceSourceMessages = {
     placeholders: { value: "string" },
     screenshotSurface: "account-session",
   },
+  "narrator.panel.title": {
+    id: "narrator.panel.title",
+    defaultMessage: "Narrator",
+    description: "Main title for the Narrator output router panel.",
+    context: "Narrator panel header.",
+    screenshotSurface: "workstation",
+  },
+  "narrator.panel.subtitle": {
+    id: "narrator.panel.subtitle",
+    defaultMessage: "Governed output feed and voice routing.",
+    description: "Short description for the Narrator panel.",
+    context: "Narrator panel header.",
+    screenshotSurface: "workstation",
+  },
+  "narrator.section.sources": {
+    id: "narrator.section.sources",
+    defaultMessage: "Sources",
+    description: "Section label for narrator source policies.",
+    context: "Narrator panel source policy sidebar.",
+    screenshotSurface: "workstation",
+  },
+  "narrator.feed.empty": {
+    id: "narrator.feed.empty",
+    defaultMessage: "No narrator events yet.",
+    description: "Empty-state text for the narrator feed.",
+    context: "Narrator panel event feed.",
+    screenshotSurface: "workstation",
+  },
+  "narrator.action.resetPolicies": {
+    id: "narrator.action.resetPolicies",
+    defaultMessage: "Reset narrator policies",
+    description: "Accessible label for resetting narrator source policies.",
+    context: "Narrator panel toolbar.",
+    screenshotSurface: "workstation",
+  },
+  "narrator.action.clearFeed": {
+    id: "narrator.action.clearFeed",
+    defaultMessage: "Clear narrator feed",
+    description: "Accessible label for clearing narrator events.",
+    context: "Narrator panel toolbar.",
+    screenshotSurface: "workstation",
+  },
+  "narrator.action.speak": {
+    id: "narrator.action.speak",
+    defaultMessage: "Speak narrator event",
+    description: "Accessible label for speaking one narrator event.",
+    context: "Narrator panel event row action.",
+    screenshotSurface: "workstation",
+  },
+  "narrator.action.copy": {
+    id: "narrator.action.copy",
+    defaultMessage: "Copy narrator event",
+    description: "Accessible label for copying one narrator event.",
+    context: "Narrator panel event row action.",
+    screenshotSurface: "workstation",
+  },
 } as const satisfies Record<string, InterfaceMessageMeta>;
 
 export type InterfaceMessageId = keyof typeof interfaceSourceMessages;

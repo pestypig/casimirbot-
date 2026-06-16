@@ -5,6 +5,7 @@ const USER_LAUNCH_PANEL_IDS = new Set<string>([
   "situation-room-pipelines",
   "live-answer-environment",
   "image-lens",
+  "narrator",
   "workstation-clipboard-history",
   "workstation-workflow-timeline",
   "workstation-task-manager",

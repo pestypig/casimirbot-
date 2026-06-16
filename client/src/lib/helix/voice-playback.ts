@@ -1,4 +1,11 @@
-export type VoicePlaybackUtteranceKind = "brief" | "final" | "tool_receipt" | "manual_read_aloud" | "translation_relay";
+export type VoicePlaybackUtteranceKind =
+  | "brief"
+  | "final"
+  | "tool_receipt"
+  | "manual_read_aloud"
+  | "translation_relay"
+  | "narrator_read"
+  | "panel_narration";
 
 export type VoicePlaybackIntentAuthority =
   | "provisional"
@@ -259,7 +266,12 @@ export function applyLatestWinsVoiceQueue(input: {
   let supersededActiveReason: VoicePlaybackCancelReason | null = null;
   let pendingPreemptPolicy: VoicePreemptPolicy = "none";
 
-  if (input.incoming.kind === "tool_receipt" || input.incoming.kind === "translation_relay") {
+  if (
+    input.incoming.kind === "tool_receipt" ||
+    input.incoming.kind === "translation_relay" ||
+    input.incoming.kind === "narrator_read" ||
+    input.incoming.kind === "panel_narration"
+  ) {
     queue.push(input.incoming);
   } else if (input.incoming.kind === "brief") {
     queue = queue.filter((entry) => {
@@ -311,7 +323,12 @@ export function applyLatestWinsVoiceQueue(input: {
     pendingPreemptPolicy = pendingPreemptPolicy === "none" ? "pending_regen" : pendingPreemptPolicy;
   }
 
-  if (input.incoming.kind === "tool_receipt" || input.incoming.kind === "translation_relay") {
+  if (
+    input.incoming.kind === "tool_receipt" ||
+    input.incoming.kind === "translation_relay" ||
+    input.incoming.kind === "narrator_read" ||
+    input.incoming.kind === "panel_narration"
+  ) {
     // Interim tool receipts are chronological observations. They should not
     // erase earlier acks/statuses for the same turn.
   } else if (input.incoming.kind === "brief") {
