@@ -15,6 +15,12 @@ const DOC_LOCATE_RE =
 const DOC_SYNTHESIS_RE =
   /\b(?:runbook|playbook|steps?|checklist|testing|patch|give|answer|summari[sz]e|explain|describe)\b/i;
 
+const CURRENT_OPEN_DOC_SUMMARY_RE =
+  /\b(?:summari[sz]e|explain|describe|give\s+me\s+the\s+gist\s+of)\b[\s\S]{0,120}\b(?:(?:this|that|the)\s+)?(?:(?:currently\s+)?open|current|active)\s+(?:docs?\s+viewer\s+)?(?:doc|document|paper)\b/i;
+
+const CURRENT_OPEN_DOC_VIEWER_RE =
+  /\b(?:(?:currently\s+)?open|current|active)\s+(?:doc|document|paper)\b[\s\S]{0,120}\b(?:docs?\s+viewer|viewer)\b/i;
+
 export const DOCS_MD_PATH_CUE_RE =
   /(?:^|[\s"'(])\/?docs\/[A-Za-z0-9_./-]+\.md\b/i;
 
@@ -66,4 +72,10 @@ export function isExplicitDocsPathDocumentOperation(prompt: string): boolean {
   return isExplicitDocsPathSummaryPrompt(prompt) ||
     isExplicitDocsPathComparePrompt(prompt) ||
     isExplicitDocsPathLocatePrompt(prompt);
+}
+
+export function isCurrentOpenDocsViewerSummaryPrompt(prompt: string): boolean {
+  if (extractUnquotedDocsMarkdownPaths(prompt).length > 0) return false;
+  if (hasExplicitRepoCodeScope(prompt)) return false;
+  return CURRENT_OPEN_DOC_SUMMARY_RE.test(prompt) || CURRENT_OPEN_DOC_VIEWER_RE.test(prompt);
 }

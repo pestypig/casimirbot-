@@ -46,6 +46,7 @@ import {
   workspaceOsStatusReasonCodes,
 } from "./workspace-os-status-intent";
 import {
+  isCurrentOpenDocsViewerSummaryPrompt,
   isExplicitDocsPathComparePrompt,
   isExplicitDocsPathLocateSynthesisPrompt,
   isExplicitDocsPathSummaryPrompt as isExplicitDocsMarkdownPathSummaryPrompt,
@@ -962,6 +963,30 @@ export function arbitrateAskSourceTarget(input: {
       suppressedRoutes: ["internet_search_lookup", "scholarly_research_lookup", "situation_context_question", "visual_deictic", "visual_frame_evidence", "active_doc_identity", "model_only_concept", "no_tool_direct"],
       precedenceReason: "explicit_docs_path_summary_source_target",
       confidence: 0.98,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (isCurrentOpenDocsViewerSummaryPrompt(prompt)) {
+    const activeWorkspaceResolution = input.activeWorkspaceSourceResolution as Record<string, unknown> | null | undefined;
+    const sourceBound =
+      typeof activeWorkspaceResolution?.active_doc_path === "string" &&
+      activeWorkspaceResolution.active_doc_path.trim().length > 0;
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "active_doc",
+      targetKind: "active_doc",
+      strength: "hard",
+      explicitCues: ["active_docs_viewer_summary"],
+      reasons: [
+        "active_docs_viewer_summary_source_target",
+        sourceBound ? "active_doc_path_bound_from_workspace_snapshot" : "active_doc_path_required",
+      ],
+      requestedOutputs: ["file_path", "doc_summary", "typed_failure"],
+      suppressedRoutes: ["internet_search_lookup", "scholarly_research_lookup", "repo_code_evidence_question", "situation_context_question", "visual_deictic", "visual_frame_evidence", "model_only_concept", "no_tool_direct"],
+      precedenceReason: "active_docs_viewer_summary_source_target",
+      confidence: sourceBound ? 0.99 : 0.94,
       allowClientShortcut: false,
       allowNoToolDirect: false,
     });

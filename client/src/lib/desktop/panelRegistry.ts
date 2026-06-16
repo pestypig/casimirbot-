@@ -114,7 +114,7 @@ const BASE_PANELS: PanelDefinition[] = [
     loader: load(() => import("@/components/IdeologyPanel"), "IdeologyPanel"),
     defaultSize: { w: 960, h: 680 },
     defaultPosition: { x: 150, y: 130 },
-    pinned: true
+    startHidden: true
   },
   {
     id: "mission-ethos-source",

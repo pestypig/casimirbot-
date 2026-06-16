@@ -116,11 +116,7 @@ export async function executeWorkstationActionWithLedger(
   store.markStatus(execution.execution_id, "dispatched");
 
   try {
-    const handler = input.handler ?? (
-      panelId === "mission-ethos"
-        ? (await import("@/lib/workstation/ideologyPanelActions")).executeIdeologyPanelAction
-        : (await import("@/lib/workstation/panelActionAdapters")).executeHelixPanelActionAsync
-    );
+    const handler = input.handler ?? (await import("@/lib/workstation/panelActionAdapters")).executeHelixPanelActionAsync;
     const result = await handler(input.request, input.context);
     if (!result.ok) {
       store.failExecution(execution.execution_id, result.message ?? "Workstation action failed.");

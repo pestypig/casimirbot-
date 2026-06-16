@@ -29,7 +29,6 @@ export type WorkstationToolIntent =
   | "notes_create"
   | "notes_append"
   | "notes_store_large_text"
-  | "ideology_compare"
   | "dottie_observer"
   | "live_environment_create"
   | "minecraft_live_continuation"
@@ -1144,7 +1143,7 @@ function userExplicitlyRequestsFruitionPanel(prompt: string): boolean {
 }
 
 function hasZenGraphPromptCue(prompt: string): boolean {
-  return /\b(?:zen\s*(?:badge\s*)?graph|zen\s*batch\s*graph|zengraph|fruition\s+(?:calculator|solve|expression)|ideology\s+(?:tree|graph|map)|procedural\s+(?:zen|language|expression|action|classifier|classification)|inner[-\s]?practice|plot\s+(?:direct\s+observation|right\s+speech|two[-\s]?key)|wisdom\s+first\s+principles|right\s+speech|right\s+effort|middle\s+way|mindful\s+consumption|information\s+diet|identity[-\s]?view|non[-\s]?attachment|rumination|spiritual\s+friendship|equanimity|ignorance\s+is\s+bliss|moral\s+guilt|consideration\s+(?:debt|gap)|unconsidered\s+harm|affected\s+part(?:y|ies)|due\s+care|repair\s+readiness|two[-\s]?key\s+(?:review|approval)|direct\s+observation)\b/i.test(
+  return /\b(?:zen\s*(?:badge\s*)?graph|zen\s*batch\s*graph|zengraph|fruition\s+(?:calculator|solve|expression)|ideology\s+(?:tree|graph|map)|compare\s+(?:this\s+)?motive\s+to\s+(?:zen|ideology|mission\s+ethos)|procedural\s+(?:zen|language|expression|action|classifier|classification)|inner[-\s]?practice|plot\s+(?:direct\s+observation|right\s+speech|two[-\s]?key)|wisdom\s+first\s+principles|right\s+speech|right\s+effort|middle\s+way|mindful\s+consumption|information\s+diet|identity[-\s]?view|non[-\s]?attachment|rumination|spiritual\s+friendship|equanimity|ignorance\s+is\s+bliss|moral\s+guilt|consideration\s+(?:debt|gap)|unconsidered\s+harm|affected\s+part(?:y|ies)|due\s+care|repair\s+readiness|two[-\s]?key\s+(?:review|approval)|direct\s+observation)\b/i.test(
     prompt,
   );
 }
@@ -1683,7 +1682,7 @@ export function planWorkstationToolUse(
     const wantsVisibleZenGraph = userExplicitlyRequestsZenGraphPanel(normalized);
     const wantsFruitionPanel = userExplicitlyRequestsFruitionPanel(normalized) || /\bfruition\b/i.test(normalized);
     const steps: HelixWorkstationToolPlanStep[] = [
-      ...(wantsVisibleZenGraph ? [makeOpenStep("zen-badge-graph")] : []),
+      ...(wantsVisibleZenGraph ? [makeOpenStep("zen-graph")] : []),
       makeZenGraphReflectionAskToolStep(normalized),
       ...(wantsFruitionPanel ? [makeOpenStep("fruition-calculator", ["reflect_zen_graph_context"])] : []),
       {
@@ -2048,57 +2047,6 @@ export function planWorkstationToolUse(
       should_use_tool: true,
       reason: "Prompt asks for math verification/evaluation; calculator affordance should run before direct answer.",
       missing_required_args: latex ? [] : ["latex"],
-    };
-  }
-
-  if (isIdeologyComparePrompt(normalized)) {
-    const motive = extractIdeologyMotive(normalized);
-    const framework = /\b(?:mission\s+ethos|ethos|ideology)\b/i.test(normalized) && !/\bzen\b/i.test(normalized)
-      ? "mission_ethos"
-      : "zen";
-    pushScore({
-      affordance_id: "mission-ethos.compare_motive_to_zen",
-      panel_id: "mission-ethos",
-      action_id: "compare_motive_to_zen",
-      score: motive ? 0.91 : 0.62,
-      reason: motive ? "ideology comparison prompt includes a motive" : "ideology comparison prompt needs a motive",
-      required_args_missing: motive ? [] : ["motive"],
-    });
-    const toolPlan = buildToolPlan({
-      prompt: normalized,
-      intent: "ideology_compare",
-      missing: motive ? [] : ["motive"],
-      options,
-      steps: [
-        makeOpenStep("mission-ethos"),
-        {
-          step_id: "compare_motive_to_zen",
-          kind: "run_panel_action",
-          panel_id: "mission-ethos",
-          action_id: "compare_motive_to_zen",
-          args: motive ? { motive, framework } : { framework },
-          depends_on: ["open_mission_ethos"],
-          expected_receipt_kind: "ideology_motive_comparison_receipt",
-          expected_state_change: { store: "mission-ethos", proof_key: "evidence_refs" },
-          required: true,
-        },
-        {
-          step_id: "evaluate_ideology_comparison",
-          kind: "evaluate_result",
-          depends_on: ["compare_motive_to_zen"],
-          expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
-          required: true,
-        },
-      ],
-    });
-    return {
-      intent: "ideology_compare",
-      action: motive ? { panel_id: "mission-ethos", action_id: "compare_motive_to_zen", args: { motive, framework } } : null,
-      tool_plan: toolPlan,
-      scores,
-      should_use_tool: true,
-      reason: "Prompt asks for ideology/Zen comparison; mission-ethos affordance should run before final answer.",
-      missing_required_args: motive ? [] : ["motive"],
     };
   }
 

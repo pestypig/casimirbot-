@@ -215,12 +215,6 @@ function noteTitleFromPlan(plan: HelixWorkstationToolPlan): string {
   return typeof title === "string" && title.trim() ? title.trim() : "Untitled note";
 }
 
-function ideologyMotiveFromPlan(plan: HelixWorkstationToolPlan): string {
-  const compare = plan.steps.find((step: HelixWorkstationToolPlanStep) => step.panel_id === "mission-ethos" && step.action_id === "compare_motive_to_zen");
-  const motive = compare?.args?.motive;
-  return typeof motive === "string" && motive.trim() ? motive.trim() : "the provided motive";
-}
-
 function dottieTargetFromPlan(plan: HelixWorkstationToolPlan): string {
   const attach = plan.steps.find((step: HelixWorkstationToolPlanStep) => step.panel_id === "situation-room-pipelines" && step.action_id === "observer.attach");
   const target = attach?.args?.target_run_id ?? attach?.args?.target_turn_id;
@@ -619,12 +613,6 @@ export function synthesizeWorkstationToolAnswer(input: SynthesizeWorkstationAnsw
   }
   if (input.plan.intent === "notes_append" || input.plan.intent === "notes_store_large_text") {
     return "Stored the requested text in Workstation Notes. I will use note references instead of raw text injection by default.";
-  }
-  if (input.plan.intent === "ideology_compare") {
-    return [
-      `Ran the ideology comparison tool for: ${ideologyMotiveFromPlan(input.plan)}`,
-      "Use the Mission Ethos / Zen receipt as compact evidence, then synthesize the motive comparison from that evidence.",
-    ].join("\n");
   }
   if (input.plan.intent === "dottie_observer") {
     return [

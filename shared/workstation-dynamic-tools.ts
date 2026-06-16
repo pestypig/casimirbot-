@@ -230,47 +230,6 @@ const WORKSTATION_DYNAMIC_TOOL_ACTIONS_WITH_RETIRED: WorkstationDynamicToolActio
   { panel_id: "docs-viewer", action_id: "summarize_doc", required_args: [], optional_args: ["path", "anchor", "selected_text"], returns_artifact: true },
   { panel_id: "docs-viewer", action_id: "summarize_section", required_args: [], optional_args: ["path", "anchor", "selected_text"], returns_artifact: true },
   { panel_id: "docs-viewer", action_id: "explain_paper", required_args: [], optional_args: ["path", "anchor", "selected_text"], returns_artifact: true },
-  { panel_id: "mission-ethos", action_id: "open", required_args: [], optional_args: [] },
-  {
-    panel_id: "mission-ethos",
-    action_id: "open_node",
-    title: "Open Ideology Node",
-    description: "Open the Ideology & Zen panel at a specific framework node.",
-    aliases: ["open ideology node", "show zen node", "open mission ethos node"],
-    required_args: [],
-    optional_args: ["node_id", "slug"],
-    returns_artifact: true,
-  },
-  {
-    panel_id: "mission-ethos",
-    action_id: "search_nodes",
-    title: "Search Ideology Nodes",
-    description: "Search the ideology tree for compact framework nodes relevant to a query.",
-    aliases: ["search ideology", "search zen framework", "find ethos node"],
-    required_args: ["query"],
-    optional_args: ["limit"],
-    returns_artifact: true,
-  },
-  {
-    panel_id: "mission-ethos",
-    action_id: "build_context",
-    title: "Build Ideology Context",
-    description: "Build a compact ideology context pack from a node, slug, or query.",
-    aliases: ["build ideology context", "attach zen context", "use ethos framework"],
-    required_args: [],
-    optional_args: ["node_id", "slug", "query", "limit"],
-    returns_artifact: true,
-  },
-  {
-    panel_id: "mission-ethos",
-    action_id: "compare_motive_to_zen",
-    title: "Compare Motive To Zen",
-    description: "Retrieve compact ideology/Zen framework evidence for comparing a motive without making the framework an action authority.",
-    aliases: ["compare motive to zen", "evaluate motive with zen", "compare motives to ideology", "zen motive check"],
-    required_args: ["motive"],
-    optional_args: ["framework", "node_ids", "query", "active_pressures"],
-    returns_artifact: true,
-  },
   { panel_id: "workstation-notes", action_id: "open", required_args: [], optional_args: [] },
   { panel_id: "workstation-notes", action_id: "create_note", required_args: [], optional_args: ["title", "topic", "body", "note_id"], returns_artifact: true },
   { panel_id: "workstation-notes", action_id: "append_to_note", required_args: ["text"], optional_args: ["note_id", "title"], returns_artifact: true },
@@ -1114,17 +1073,6 @@ const WORKSPACE_ACTION_REGISTRY_WITH_RETIRED: WorkspaceActionRegistryEntry[] = [
     enabled: true,
   },
   {
-    action_key: "mission-ethos.open",
-    family: "console",
-    target_id: "mission-ethos",
-    action_id: "open",
-    label: "Ideology & Zen",
-    aliases: ["open ideology panel", "open ideology and zen", "show mission ethos", "open zen framework"],
-    terminal_receipt_required: true,
-    source: "shared_dynamic_tool_registry",
-    enabled: true,
-  },
-  {
     action_key: "workstation-clipboard-history.open",
     family: "clipboard",
     target_id: "workstation-clipboard-history",
@@ -1291,7 +1239,6 @@ export const WORKSPACE_ACTION_MANIFEST_VERSION = "e67.workspace-action-manifest.
 export const WORKSPACE_ACTION_VISIBLE_PANEL_IDS = [
   "docs-viewer",
   "workstation-notes",
-  "mission-ethos",
   "workstation-clipboard-history",
   "workstation-workflow-timeline",
   "workstation-process-graph",
@@ -1620,8 +1567,6 @@ export function resolveWorkstationToolTerminalArtifactKind(panelId: string, acti
   }
   if (panelId === "situation-room-pipelines" && actionId === "attach_job_to_helix_ask") return "situation_room_job_attachment";
   if (panelId === "situation-room-pipelines" && actionId === "save_job_as_note") return "workstation_note";
-  if (panelId === "mission-ethos" && actionId === "compare_motive_to_zen") return "ideology_motive_comparison_receipt";
-  if (panelId === "mission-ethos" && actionId !== "open") return "ideology_context_receipt";
   if (panelId === "workstation-notes" && ["create_note", "append_to_note", "rename_note", "delete_note"].includes(actionId)) {
     return "note_update_receipt";
   }
@@ -1667,7 +1612,6 @@ function resolveAffordanceFamily(panelId: string, actionId: string): HelixWorkst
   }
   if (panelId === "workstation-notes") return "notes";
   if (panelId === "docs-viewer") return "documents";
-  if (panelId === "mission-ethos") return "ideology";
   if (panelId === "workstation-clipboard-history") return "clipboard";
   if (panelId === "workstation-storage-map") return "storage";
   if (panelId === "workstation-workflow-timeline" || panelId === "workstation-process-graph" || panelId === "workstation-task-manager" || panelId === "agi-task-history") return "history";
@@ -1739,9 +1683,6 @@ function resolveExpectedStateChange(panelId: string, actionId: string): HelixWor
   }
   if (panelId === "workstation-notes") {
     return { store: "useWorkstationNotesStore", selector_hint: "notes/order/active_note_id", proof_key: "note_id" };
-  }
-  if (panelId === "mission-ethos") {
-    return { store: "IdeologyPanel/useIdeology", selector_hint: "selected node/context receipt", proof_key: "ideology_context_receipt" };
   }
   if (panelId.startsWith("situation-room")) {
     return { store: "situation-room-runtime", selector_hint: "receipt or active artifact", proof_key: "expected_receipt_kind" };

@@ -1,3 +1,10 @@
+import {
+  buildDocEvidenceSynthesisPlan,
+  collectDocEvidenceForSynthesis,
+  evaluateDocEvidenceSynthesisCoverage,
+} from "./doc-evidence-synthesis";
+import type { HelixCommittedAskRoute } from "@shared/helix-committed-ask-route";
+
 export type HelixDomainContinuationAction = {
   schema_version: "helix.workstation.action/v1";
   action: "run_panel_action";
@@ -37,6 +44,10 @@ export type HelixDocsContinuationContract = {
     | "candidate_validation_required"
     | "open_validated_doc_required"
     | "summary_required"
+    | "explicit_path_open_required"
+    | "multi_doc_summary_required"
+    | "location_required"
+    | "synthesis_required"
     | "terminal_ready"
     | "blocked";
   prior_observation_kind: string | null;
@@ -227,6 +238,9 @@ const readOpenReceipt = (payload: Record<string, unknown>): Record<string, unkno
 const hasDocSummary = (payload: Record<string, unknown>): boolean =>
   Boolean(findArtifactPayload(payload, ["doc_summary", "focused_doc_answer"]));
 
+const hasDocEvidenceSynthesisAnswer = (payload: Record<string, unknown>): boolean =>
+  Boolean(findArtifactPayload(payload, ["doc_evidence_synthesis_answer"]));
+
 const hasLocationResult = (payload: Record<string, unknown>): boolean => {
   const location = findArtifactPayload(payload, ["doc_location_result", "doc_location_matches", "doc_evidence_location"]);
   if (!location) return false;
@@ -242,6 +256,34 @@ const activeDocPath = (payload: Record<string, unknown>): string | null => {
     normalizePath(snapshot?.docContextPath) ??
     normalizePath(asRecord(payload.canonical_goal_frame)?.source_doc_path)
   );
+};
+
+const sameDocPath = (left: string, right: string): boolean =>
+  left.replace(/^\//, "") === right.replace(/^\//, "");
+
+const observedDocEvidencePaths = (payload: Record<string, unknown>): string[] => {
+  const evidenceArtifacts = collectDocEvidenceForSynthesis({
+    artifactLedger: getLedger(payload),
+  });
+  const paths = new Set<string>();
+  for (const artifact of evidenceArtifacts) {
+    const record = artifactPayload(artifact);
+    for (const key of ["path", "source_path", "active_doc_path", "doc_path", "document_path"]) {
+      const path = normalizePath(record?.[key]);
+      if (path) paths.add(path);
+    }
+    for (const match of readArray(record?.matches)) {
+      const matchRecord = asRecord(match);
+      const path = normalizePath(matchRecord?.path) ?? normalizePath(matchRecord?.source_path);
+      if (path) paths.add(path);
+    }
+    for (const doc of readArray(record?.source_docs)) {
+      const docRecord = asRecord(doc);
+      const path = normalizePath(docRecord?.path);
+      if (path) paths.add(path);
+    }
+  }
+  return Array.from(paths);
 };
 
 const locateQuery = (payload: Record<string, unknown>, prompt: string): string | null => {
@@ -505,6 +547,132 @@ export const buildHelixDomainContinuationDecision = (input: DomainContinuationIn
         instruction:
           "The docs_summary workflow state is unresolved. Do not answer until doc_summary exists; ask for repair or fail closed if no admitted docs capability can advance.",
       }),
+    });
+  }
+
+  if (goalKind === "doc_evidence_synthesis") {
+    const plan = buildDocEvidenceSynthesisPlan({
+      turnId: input.turnId,
+      promptText: input.prompt,
+      committedAskRoute: asRecord(input.payload.committed_ask_route) as HelixCommittedAskRoute | null,
+    });
+    const evidenceArtifacts = collectDocEvidenceForSynthesis({
+      artifactLedger: getLedger(input.payload),
+    });
+    const coverage = evaluateDocEvidenceSynthesisCoverage({
+      turnId: input.turnId,
+      plan,
+      evidenceArtifacts,
+    });
+    input.payload.doc_evidence_synthesis_plan = plan;
+    input.payload.doc_evidence_synthesis_coverage = coverage;
+
+    if (hasDocEvidenceSynthesisAnswer(input.payload)) {
+      return continuation(input, goalKind, "none", "doc_evidence_synthesis_has_terminal_artifact", {
+        docs_continuation_contract: docsContract({
+          phase: "terminal_ready",
+          priorKind: "doc_evidence_synthesis_answer",
+          priorRefs: artifactRefsForKinds(input.payload, ["doc_evidence_synthesis_answer"]),
+          requiredCapability: null,
+          expectedArtifacts: [],
+          terminalBlockReason: null,
+          doneCondition: "terminal answer is allowed only after doc_evidence_synthesis_answer satisfies the goal",
+          instruction:
+            "The docs evidence synthesis workflow has a doc_evidence_synthesis_answer artifact. Terminal answer may be allowed if goal satisfaction and terminal authority pass.",
+        }),
+      });
+    }
+
+    const observedPaths = observedDocEvidencePaths(input.payload);
+    const missingPath = plan.required_doc_paths.find((path) =>
+      !observedPaths.some((observed) => sameDocPath(observed, path)),
+    );
+
+    if ((plan.synthesis_kind === "compare" || plan.synthesis_kind === "multi_doc_summary") && missingPath) {
+      return continuation(input, goalKind, "continue", "doc_evidence_synthesis_requires_missing_doc_summary", {
+        docs_continuation_contract: docsContract({
+          phase: "multi_doc_summary_required",
+          priorKind: evidenceArtifacts.length > 0 ? "doc_summary" : null,
+          priorRefs: artifactRefsForKinds(input.payload, ["doc_summary", "focused_doc_answer"]),
+          requiredCapability: "docs-viewer.summarize_doc",
+          expectedArtifacts: ["doc_summary"],
+          terminalBlockReason: "doc_evidence_synthesis_answer missing",
+          doneCondition: "each requested document path has doc_summary evidence before synthesis",
+          instruction:
+            "You are in a docs evidence synthesis workflow. Summarize the next missing requested document path. Do not terminalize a single doc_summary; summaries are evidence for the final synthesis answer.",
+        }),
+        recommended_capability_hint: capabilityHint(
+          action("docs-viewer", "summarize_doc", {
+            path: missingPath,
+            query: input.prompt,
+          }),
+          "doc_evidence_synthesis_requires_missing_doc_summary",
+        ),
+        expected_artifacts: ["doc_summary"],
+      });
+    }
+
+    if ((plan.synthesis_kind === "locate_then_explain" || plan.synthesis_kind === "runbook_answer") && !hasLocationResult(input.payload)) {
+      const path = plan.required_doc_paths[0] ?? activeDocPath(input.payload);
+      const query = locateQuery(input.payload, input.prompt) ?? plan.required_anchors[0] ?? input.prompt;
+      if (path && query) {
+        return continuation(input, goalKind, "continue", "doc_evidence_synthesis_requires_location", {
+          docs_continuation_contract: docsContract({
+            phase: "location_required",
+            priorKind: null,
+            priorRefs: artifactRefsForKinds(input.payload, ["active_doc_path", "doc_open_receipt"]),
+            requiredCapability: "docs-viewer.locate_in_doc",
+            expectedArtifacts: ["doc_location_matches", "doc_location_result", "doc_evidence_location"],
+            terminalBlockReason: "doc_evidence_synthesis_answer missing",
+            doneCondition: "requested document location evidence exists before synthesis",
+            instruction:
+              "You are in a docs evidence synthesis workflow. Locate the requested section or snippet in the document. Do not terminalize doc_summary; location evidence must re-enter synthesis first.",
+          }),
+          recommended_capability_hint: capabilityHint(
+            action("docs-viewer", "locate_in_doc", { path, query, locate_strategy: "variant" }),
+            "doc_evidence_synthesis_requires_location",
+          ),
+          expected_artifacts: ["doc_location_matches", "doc_location_result", "doc_evidence_location"],
+        });
+      }
+    }
+
+    if (coverage.sufficient) {
+      return continuation(input, goalKind, "continue", "doc_evidence_synthesis_requires_model_synthesis", {
+        docs_continuation_contract: docsContract({
+          phase: "synthesis_required",
+          priorKind: "doc_evidence_observations",
+          priorRefs: artifactRefsForKinds(input.payload, [
+            "doc_summary",
+            "focused_doc_answer",
+            "doc_location_result",
+            "doc_location_matches",
+            "doc_evidence_location",
+          ]),
+          requiredCapability: null,
+          expectedArtifacts: ["final_answer_draft", "doc_evidence_synthesis_answer"],
+          terminalBlockReason: "doc_evidence_synthesis_answer missing",
+          doneCondition: "final_answer_draft with doc evidence refs is materialized as doc_evidence_synthesis_answer",
+          instruction:
+            "Docs evidence is available. Re-enter the observations into model synthesis, produce a final_answer_draft with doc artifact refs, then materialize doc_evidence_synthesis_answer. Do not terminalize intermediate doc_summary or location artifacts.",
+        }),
+        expected_artifacts: ["final_answer_draft", "doc_evidence_synthesis_answer"],
+      });
+    }
+
+    return continuation(input, goalKind, "continue", "doc_evidence_synthesis_coverage_missing", {
+      docs_continuation_contract: docsContract({
+        phase: "blocked",
+        priorKind: evidenceArtifacts.length > 0 ? "doc_evidence_observations" : null,
+        priorRefs: artifactRefsForKinds(input.payload, ["doc_summary", "doc_location_result", "doc_location_matches", "doc_evidence_location"]),
+        requiredCapability: null,
+        expectedArtifacts: ["doc_evidence_synthesis_answer"],
+        terminalBlockReason: coverage.missing_requirements.join(", ") || "doc_evidence_synthesis_answer missing",
+        doneCondition: "required doc evidence coverage is sufficient before synthesis",
+        instruction:
+          "The docs evidence synthesis workflow is missing required coverage. Continue with an admitted Docs evidence capability or fail closed; do not answer from partial evidence.",
+      }),
+      expected_artifacts: ["doc_evidence_synthesis_answer"],
     });
   }
 

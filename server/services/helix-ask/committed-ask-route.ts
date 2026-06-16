@@ -171,6 +171,13 @@ const readRouteSource = (payload: RecordLike): {
   };
 };
 
+const readWorkspaceActiveDocPath = (payload: RecordLike): string => {
+  const snapshot =
+    readRecord(payload.workspace_context_snapshot) ??
+    readRecord(readRecord(payload.ask_turn_preflight_context)?.workspace_snapshot);
+  return readString(snapshot?.activeDocPath) || readString(snapshot?.docContextPath);
+};
+
 const promptSuppressionMentions = (promptInterpretation?: HelixPromptInterpretation | null): HelixCommittedAskRoute["suppression"]["contextual_tool_mentions"] =>
   (promptInterpretation?.contextual_tool_mentions ?? []).map((mention) => ({
     text: mention.text,
@@ -305,6 +312,7 @@ export function buildCommittedAskRoute(input: {
       source_identity:
         readString(readRecord(input.payload.source_target_exact_contract)?.requested_source_identity) ||
         readString(readRecord(input.payload.active_doc_identity)?.active_doc_path) ||
+        readWorkspaceActiveDocPath(input.payload) ||
         null,
       route_reason: route.reason,
       stale_metadata_policy: "ignore_unless_matches_commit",

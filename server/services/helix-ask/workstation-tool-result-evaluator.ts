@@ -49,13 +49,6 @@ function mapIntentToCategorization(intent: HelixWorkstationToolPlan["intent"]): 
       produced_by: "workstation_note",
     };
   }
-  if (intent === "ideology_compare") {
-    return {
-      source_family: "ideology",
-      category: "motive_framework",
-      produced_by: "ideology",
-    };
-  }
   if (intent === "zen_graph_reflection") {
     return {
       source_family: "ideology",
@@ -126,8 +119,6 @@ export function evaluateWorkstationToolPlan(input: EvaluateWorkstationToolPlanIn
         ? "Create a workstation note and preserve the body outside raw Ask context."
       : input.plan.intent === "notes_append" || input.plan.intent === "notes_store_large_text"
         ? "Store text in workstation notes and keep compact references."
-      : input.plan.intent === "ideology_compare"
-        ? "Compare the motive against compact ideology/Zen framework evidence."
       : input.plan.intent === "zen_graph_reflection"
         ? "Reflect the prompt through ZenGraph and Fruition as evidence-only procedural state."
       : input.plan.intent === "dottie_observer"

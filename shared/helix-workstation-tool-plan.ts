@@ -7,7 +7,6 @@ export type HelixWorkstationToolPlanIntent =
   | "notes_create"
   | "notes_append"
   | "notes_store_large_text"
-  | "ideology_compare"
   | "dottie_observer"
   | "live_environment_create"
   | "minecraft_live_continuation"

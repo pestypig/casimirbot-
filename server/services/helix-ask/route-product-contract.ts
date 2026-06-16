@@ -7,6 +7,11 @@ import {
 import { isSceneEpochReplayPrompt } from "./scene-epoch-replay-intent";
 import { matchProcedureRecallPrompt } from "./procedure-memory-recall-router";
 import { hasUnknownSourceArtifactDiscoveryIntent } from "./tool-call-admission";
+import {
+  isCurrentOpenDocsViewerSummaryPrompt,
+  isExplicitDocsPathComparePrompt,
+  isExplicitDocsPathLocateSynthesisPrompt,
+} from "./docs-viewer-intent";
 
 export const CORE_TERMINAL_PRODUCTS = [
   "situation_context_pack",
@@ -29,6 +34,7 @@ export const CORE_TERMINAL_PRODUCTS = [
   "process_node_detail",
   "source_binding_status",
   "source_binding_repair_candidate",
+  "doc_evidence_synthesis_answer",
 ] as const;
 
 export const UNIVERSAL_TERMINAL_PRODUCTS = [
@@ -199,6 +205,7 @@ export const isStructuredDocsViewerPrompt = (promptText: string): boolean => {
 };
 
 const isActiveDocSummaryPrompt = (promptText: string): boolean =>
+  isCurrentOpenDocsViewerSummaryPrompt(promptText) ||
   /\b(?:summari[sz]e|explain|what\s+is|what's)\b[\s\S]{0,100}\b(?:this|current)\s+(?:NHM2\s+)?(?:doc|document|paper)\b/i.test(promptText) ||
   /\bcurrent\s+(?:NHM2\s+)?(?:doc|document|paper)\b[\s\S]{0,80}\b(?:summar|explain|about)\b/i.test(promptText);
 
@@ -328,6 +335,56 @@ export function buildRouteProductContract(input: {
       ],
       precedenceReason: "explicit_prior_ask_debug_summary_allows_read_only_debug_history_product",
       sideArtifactKindsAllowed: ["ask_debug_history_summary"],
+    });
+  }
+
+  if (sourceTarget === "docs_viewer" && isExplicitDocsPathComparePrompt(promptText)) {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget: "docs_viewer",
+      allowedCore: [],
+      allowedExtra: ["doc_evidence_synthesis_answer"],
+      forbiddenExtra: [
+        "doc_summary",
+        "direct_answer_text",
+        "model_only_concept",
+        "no_tool_direct",
+        "model_synthesized_answer",
+      ],
+      sideArtifactKindsAllowed: [
+        "doc_summary",
+        "doc_evidence_synthesis_plan",
+        "doc_evidence_synthesis_coverage",
+        "final_answer_draft",
+      ],
+      precedenceReason: "explicit_docs_path_compare_requires_doc_evidence_synthesis",
+    });
+  }
+
+  if (sourceTarget === "docs_viewer" && isExplicitDocsPathLocateSynthesisPrompt(promptText)) {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget: "docs_viewer",
+      allowedCore: [],
+      allowedExtra: ["doc_evidence_synthesis_answer"],
+      forbiddenExtra: [
+        "doc_summary",
+        "direct_answer_text",
+        "model_only_concept",
+        "no_tool_direct",
+        "model_synthesized_answer",
+      ],
+      sideArtifactKindsAllowed: [
+        "doc_location_result",
+        "doc_location_matches",
+        "doc_evidence_location",
+        "doc_evidence_synthesis_plan",
+        "doc_evidence_synthesis_coverage",
+        "final_answer_draft",
+      ],
+      precedenceReason: "explicit_docs_path_locate_synthesis_requires_doc_evidence_synthesis",
     });
   }
 
