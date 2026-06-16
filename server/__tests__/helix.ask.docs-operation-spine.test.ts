@@ -2,7 +2,7 @@ import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 
-import { planRouter } from "../routes/agi.plan";
+import { planRouter, __testHelixAgentStepDecisionHints } from "../routes/agi.plan";
 import { arbitrateAskSourceTarget } from "../services/helix-ask/ask-source-target-arbitrator";
 import { buildCommittedAskRoute } from "../services/helix-ask/committed-ask-route";
 import { buildHelixDomainContinuationDecision } from "../services/helix-ask/domain-continuation-decision";
@@ -91,9 +91,92 @@ describe("Helix Ask Docs operation spine", () => {
     expect(decision.docs_continuation_contract).toMatchObject({
       current_docs_phase: "multi_doc_summary_required",
       required_next_capability: "docs-viewer.summarize_doc",
+      required_action_args: {
+        path: "/docs/helix-ask-codex-loop-discipline.md",
+      },
       expected_next_artifact: "doc_summary",
     });
     expect(decision.recommended_capability_hint?.suggested_action).toMatchObject({
+      panel_id: "docs-viewer",
+      action_id: "summarize_doc",
+      args: {
+        path: "/docs/helix-ask-codex-loop-discipline.md",
+      },
+    });
+  });
+
+  it("builds the next multi-doc summary action with the missing document path", () => {
+    const prompt =
+      "Compare docs/helix-ask-flow.md and docs/helix-ask-codex-loop-discipline.md. Give three differences in what each document is responsible for.";
+    const existingSummary = {
+      artifact_id: "doc-summary:flow",
+      turn_id: turnId,
+      kind: "doc_summary",
+      payload: {
+        path: "/docs/helix-ask-flow.md",
+        answer_text: "Flow summary.",
+      },
+    };
+    const continuation = buildHelixDomainContinuationDecision({
+      turnId,
+      prompt,
+      payload: {
+        canonical_goal_frame: {
+          goal_kind: "doc_evidence_synthesis",
+          required_terminal_kind: "doc_evidence_synthesis_answer",
+        },
+        current_turn_artifact_ledger: [existingSummary],
+      },
+    });
+
+    const agentDecision = __testHelixAgentStepDecisionHints.buildHelixAgentStepDecisionArtifact({
+      turnId,
+      transcript: prompt,
+      canonicalGoalFrame: {
+        turn_id: turnId,
+        goal_kind: "doc_evidence_synthesis",
+        answer_scope: "current_turn_doc",
+        required_terminal_kind: "doc_evidence_synthesis_answer",
+        allows_workspace_context: true,
+        allows_prior_artifacts: false,
+        corpus_anchors: ["/docs/helix-ask-flow.md", "/docs/helix-ask-codex-loop-discipline.md"],
+        numeric_tokens: [],
+        concept_tokens: ["docs_path_compare"],
+        confidence: "high",
+        classifier_reasons: ["explicit_docs_path_compare_goal"],
+      } as any,
+      availableCapabilities: {
+        schema: "helix.available_capabilities.v1",
+        turn_id: turnId,
+        capabilities: [
+          {
+            capability_key: "docs-viewer.summarize_doc",
+            family: "docs_viewer",
+            goal_fit: "required",
+            availability: "available",
+            requires_action: true,
+            expected_artifacts: ["doc_summary"],
+            reason: "Docs continuation requires the next missing document summary.",
+          },
+        ],
+        recommended_capability_key: "docs-viewer.summarize_doc",
+        docs_continuation_contract: continuation.docs_continuation_contract,
+        assistant_answer: false,
+        raw_content_included: false,
+      } as any,
+      capabilityItinerary: null,
+      selectedAction: null,
+      workspaceSnapshot: null,
+      artifacts: [existingSummary] as any,
+      goalSatisfactionEvaluation: {
+        satisfaction: "unsatisfied",
+        next_decision: "continue",
+        observed_results: [],
+      } as any,
+    });
+
+    expect(agentDecision.chosen_capability).toBe("docs-viewer.summarize_doc");
+    expect(agentDecision.action).toMatchObject({
       panel_id: "docs-viewer",
       action_id: "summarize_doc",
       args: {

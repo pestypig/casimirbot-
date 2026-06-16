@@ -54,6 +54,7 @@ export type HelixDocsContinuationContract = {
   prior_observation_refs: string[];
   required_next_capability: string | null;
   forbidden_repeated_capabilities: string[];
+  required_action_args?: Record<string, unknown> | null;
   expected_next_artifact: string | null;
   expected_next_artifacts: string[];
   done_condition: string;
@@ -153,6 +154,7 @@ const docsContract = (args: {
   priorKind: string | null;
   priorRefs: string[];
   requiredCapability: string | null;
+  requiredActionArgs?: Record<string, unknown> | null;
   forbiddenRepeatedCapabilities?: string[];
   expectedArtifacts?: string[];
   doneCondition?: string;
@@ -165,6 +167,7 @@ const docsContract = (args: {
   prior_observation_refs: args.priorRefs,
   required_next_capability: args.requiredCapability,
   forbidden_repeated_capabilities: args.forbiddenRepeatedCapabilities ?? [],
+  required_action_args: args.requiredActionArgs ?? null,
   expected_next_artifact: args.expectedArtifacts?.[0] ?? null,
   expected_next_artifacts: args.expectedArtifacts ?? [],
   done_condition: args.doneCondition ?? "terminal answer is allowed only after doc_summary satisfies the goal",
@@ -595,6 +598,11 @@ export const buildHelixDomainContinuationDecision = (input: DomainContinuationIn
           priorKind: evidenceArtifacts.length > 0 ? "doc_summary" : null,
           priorRefs: artifactRefsForKinds(input.payload, ["doc_summary", "focused_doc_answer"]),
           requiredCapability: "docs-viewer.summarize_doc",
+          requiredActionArgs: {
+            path: missingPath,
+            query: input.prompt,
+            target_transcript: input.prompt,
+          },
           expectedArtifacts: ["doc_summary"],
           terminalBlockReason: "doc_evidence_synthesis_answer missing",
           doneCondition: "each requested document path has doc_summary evidence before synthesis",
@@ -622,6 +630,7 @@ export const buildHelixDomainContinuationDecision = (input: DomainContinuationIn
             priorKind: null,
             priorRefs: artifactRefsForKinds(input.payload, ["active_doc_path", "doc_open_receipt"]),
             requiredCapability: "docs-viewer.locate_in_doc",
+            requiredActionArgs: { path, query, locate_strategy: "variant" },
             expectedArtifacts: ["doc_location_matches", "doc_location_result", "doc_evidence_location"],
             terminalBlockReason: "doc_evidence_synthesis_answer missing",
             doneCondition: "requested document location evidence exists before synthesis",
@@ -651,6 +660,11 @@ export const buildHelixDomainContinuationDecision = (input: DomainContinuationIn
           priorKind: "doc_evidence_observations",
           priorRefs: evidenceRefs,
           requiredCapability: "model.direct_answer",
+          requiredActionArgs: {
+            prompt: input.prompt,
+            evidence_refs: evidenceRefs,
+            required_terminal_kind: "doc_evidence_synthesis_answer",
+          },
           expectedArtifacts: ["final_answer_draft", "doc_evidence_synthesis_answer"],
           terminalBlockReason: "doc_evidence_synthesis_answer missing",
           doneCondition: "final_answer_draft with doc evidence refs is materialized as doc_evidence_synthesis_answer",
