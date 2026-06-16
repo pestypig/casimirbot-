@@ -62,6 +62,135 @@ const requiresBackendEntrypointForDebugExport = (value: unknown): boolean => {
 
 const HELIX_DEBUG_EXPORT_MAX_UI_CHARS = 750_000;
 
+const clipDebugText = (value: string, limit = 240): string =>
+  value.length <= limit ? value : `${value.slice(0, limit)}...`;
+
+const summarizeDebugObservationForExport = (value: unknown): Record<string, unknown> | null => {
+  const record = asRecord(value);
+  if (!record) return null;
+  const payload = asRecord(record.payload);
+  const observation = asRecord(record.observation);
+  return {
+    artifact_id:
+      readString(record.artifact_id) ??
+      readString(record.observation_id) ??
+      readString(payload?.artifact_id) ??
+      null,
+    kind: readString(record.kind) ?? readString(payload?.kind) ?? null,
+    schema:
+      readString(record.schema) ??
+      readString(payload?.schema) ??
+      readString(observation?.schema) ??
+      null,
+    status: readString(record.status) ?? readString(payload?.status) ?? null,
+    ok:
+      typeof record.ok === "boolean"
+        ? record.ok
+        : typeof payload?.ok === "boolean"
+          ? payload.ok
+          : null,
+  };
+};
+
+const summarizeDebugArtifactsForExport = (value: unknown): Record<string, unknown>[] => {
+  const entries = Array.isArray(value) ? value : [];
+  return entries.slice(0, 40).map((entry, index) => {
+    const record = asRecord(entry) ?? {};
+    const payload = asRecord(record.payload);
+    const text = readString(payload?.text) ?? readString(payload?.answer_text) ?? readString(payload?.summary);
+    return {
+      artifact_id: readString(record.artifact_id) ?? `artifact:${index}`,
+      kind: readString(record.kind),
+      source_scope: readString(record.source_scope),
+      payload_schema: readString(payload?.schema),
+      tool_name: readString(record.tool_name) ?? readString(payload?.tool_name) ?? readString(payload?.toolName),
+      capability_key:
+        readString(record.capability_key) ??
+        readString(payload?.capability_key) ??
+        readString(payload?.chosen_capability),
+      status: readString(record.status) ?? readString(payload?.status),
+      ok:
+        typeof record.ok === "boolean"
+          ? record.ok
+          : typeof payload?.ok === "boolean"
+            ? payload.ok
+            : null,
+      supports_goal:
+        typeof payload?.supports_goal === "boolean"
+          ? payload.supports_goal
+          : readString(payload?.supports_goal),
+      expression: readString(payload?.expression) ?? readString(payload?.input),
+      result: readString(payload?.result) ?? readString(payload?.value) ?? readString(payload?.computed_result),
+      text_preview: text ? clipDebugText(text) : null,
+    };
+  });
+};
+
+const summarizeAgentRuntimeLoopForExport = (value: unknown): Record<string, unknown> | null => {
+  const record = asRecord(value);
+  if (!record) return null;
+  const iterations = Array.isArray(record.iterations) ? record.iterations : [];
+  return {
+    schema: readString(record.schema) ?? "helix.agent_runtime_loop.v1",
+    status: readString(record.status),
+    selected_capability: readString(record.selected_capability),
+    executed_tool_call_count:
+      typeof record.executed_tool_call_count === "number" ? record.executed_tool_call_count : null,
+    iteration_count: iterations.length,
+    iterations: iterations.slice(0, 16).map((entry, index) => {
+      const iteration = asRecord(entry) ?? {};
+      return {
+        iteration: typeof iteration.iteration === "number" ? iteration.iteration : index + 1,
+        decision_id: readString(iteration.decision_id),
+        chosen_capability: readString(iteration.chosen_capability),
+        executed_action_key: readString(iteration.executed_action_key),
+        next_step: readString(iteration.next_step),
+        decision_timing: readString(iteration.decision_timing),
+        decision_authority: readString(iteration.decision_authority),
+        observation_role: readString(iteration.observation_role),
+        observed_artifact_refs: Array.isArray(iteration.observed_artifact_refs)
+          ? iteration.observed_artifact_refs.slice(0, 8)
+          : Array.isArray(iteration.artifact_refs)
+            ? iteration.artifact_refs.slice(0, 8)
+            : [],
+        tool_observation: summarizeDebugObservationForExport(iteration.tool_observation),
+      };
+    }),
+  };
+};
+
+const copyRailCriticalDebugFields = (
+  target: Record<string, unknown>,
+  source: Record<string, unknown>,
+  debug: Record<string, unknown> | null,
+): void => {
+  const assign = (key: string, value: unknown): void => {
+    if (value !== undefined && value !== null) target[key] = value;
+  };
+  [
+    "terminal_answer_envelope",
+    "terminal_boundary_eligibility",
+    "terminal_projection_guard",
+    "terminal_authority_single_writer",
+    "tool_turn_chain_audit",
+    "tool_rail_failure_triage",
+    "tool_turn_chain_family_matrix",
+    "artifact_query_index",
+    "goal_satisfaction_evaluation",
+    "post_tool_authority_bridge",
+    "ask_turn_solver_trace",
+    "solver_controller_decision",
+    "solver_controller_summary",
+    "agent_step_decision",
+    "agent_step_loop",
+    "calculator_tool_answer_support",
+  ].forEach((key) => assign(key, source[key] ?? debug?.[key]));
+  const ledger = source.current_turn_artifact_ledger ?? debug?.current_turn_artifact_ledger;
+  if (Array.isArray(ledger)) target.current_turn_artifact_ledger = summarizeDebugArtifactsForExport(ledger);
+  const runtimeLoop = summarizeAgentRuntimeLoopForExport(source.agent_runtime_loop ?? debug?.agent_runtime_loop);
+  if (runtimeLoop) target.agent_runtime_loop = runtimeLoop;
+};
+
 const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: string): string => {
   if (text.length <= HELIX_DEBUG_EXPORT_MAX_UI_CHARS) return text;
   const debug = asRecord(payload.debug);
@@ -175,6 +304,8 @@ const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: st
       bounded_by: "shared_debug_export_builder",
     },
   };
+  copyRailCriticalDebugFields(minimal, payload, debug);
+  copyRailCriticalDebugFields(minimal.debug as Record<string, unknown>, payload, debug);
   return JSON.stringify(minimal);
 };
 

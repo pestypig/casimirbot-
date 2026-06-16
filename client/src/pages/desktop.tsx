@@ -23,6 +23,7 @@ import { useLumaMoodTheme } from "@/lib/luma-mood-theme";
 import { ProcessGraphSurfaceLayer } from "@/components/workstation/ProcessGraphSurfaceLayer";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
+import { useNarratorHoverFocusInspector } from "@/lib/narrator/hoverFocusInspector";
 import {
   HELIX_WORKSTATION_ACTION_EVENT,
   coerceHelixWorkstationActions,
@@ -119,6 +120,7 @@ export default function DesktopPage({
   layoutVariant?: "desktop" | "mobile";
 }) {
   useProfileStorageSync();
+  useNarratorHoverFocusInspector();
   const { windows, registerFromManifest, open } = useDesktopStore();
   const workstationMode = useWorkstationLayoutStore((state) => state.mode);
   const { userSettings, updateSettings } = useHelixStartSettings();

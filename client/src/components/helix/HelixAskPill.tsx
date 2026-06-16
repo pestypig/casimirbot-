@@ -16093,6 +16093,137 @@ async function resolveAuthoritativeDebugExportPayload(localPayload: string): Pro
 
 const HELIX_DEBUG_EXPORT_MAX_UI_CHARS = 750_000;
 
+function summarizeHelixDebugObservationForCopy(value: unknown): Record<string, unknown> | null {
+  const record = readAgentLoopAuditRecord(value);
+  if (!record) return null;
+  const payload = readAgentLoopAuditRecord(record.payload);
+  const observation = readAgentLoopAuditRecord(record.observation);
+  return {
+    artifact_id:
+      coerceText(record.artifact_id).trim() ||
+      coerceText(record.observation_id).trim() ||
+      coerceText(payload?.artifact_id).trim() ||
+      null,
+    kind: coerceText(record.kind).trim() || coerceText(payload?.kind).trim() || null,
+    schema:
+      coerceText(record.schema).trim() ||
+      coerceText(payload?.schema).trim() ||
+      coerceText(observation?.schema).trim() ||
+      null,
+    status: coerceText(record.status).trim() || coerceText(payload?.status).trim() || null,
+    ok:
+      typeof record.ok === "boolean"
+        ? record.ok
+        : typeof payload?.ok === "boolean"
+          ? payload.ok
+          : null,
+  };
+}
+
+function summarizeHelixDebugArtifactsForCopy(value: unknown): Record<string, unknown>[] {
+  const entries = Array.isArray(value) ? value : [];
+  return entries.slice(0, 40).map((entry, index) => {
+    const record = readAgentLoopAuditRecord(entry) ?? {};
+    const payload = readAgentLoopAuditRecord(record.payload);
+    const text = coerceText(payload?.text || payload?.answer_text || payload?.summary).trim();
+    return {
+      artifact_id: coerceText(record.artifact_id).trim() || `artifact:${index}`,
+      kind: coerceText(record.kind).trim() || null,
+      source_scope: coerceText(record.source_scope).trim() || null,
+      payload_schema: coerceText(payload?.schema).trim() || null,
+      tool_name:
+        coerceText(record.tool_name).trim() ||
+        coerceText(payload?.tool_name).trim() ||
+        coerceText(payload?.toolName).trim() ||
+        null,
+      capability_key:
+        coerceText(record.capability_key).trim() ||
+        coerceText(payload?.capability_key).trim() ||
+        coerceText(payload?.chosen_capability).trim() ||
+        null,
+      status: coerceText(record.status).trim() || coerceText(payload?.status).trim() || null,
+      ok:
+        typeof record.ok === "boolean"
+          ? record.ok
+          : typeof payload?.ok === "boolean"
+            ? payload.ok
+            : null,
+      supports_goal:
+        typeof payload?.supports_goal === "boolean"
+          ? payload.supports_goal
+          : coerceText(payload?.supports_goal).trim() || null,
+      expression: coerceText(payload?.expression || payload?.input).trim() || null,
+      result: coerceText(payload?.result || payload?.value || payload?.computed_result).trim() || null,
+      text_preview: text ? clipText(text, 240) : null,
+    };
+  });
+}
+
+function summarizeHelixAgentRuntimeLoopForCopy(value: unknown): Record<string, unknown> | null {
+  const record = readAgentLoopAuditRecord(value);
+  if (!record) return null;
+  const iterations = Array.isArray(record.iterations) ? record.iterations : [];
+  return {
+    schema: coerceText(record.schema).trim() || "helix.agent_runtime_loop.v1",
+    status: coerceText(record.status).trim() || null,
+    selected_capability: coerceText(record.selected_capability).trim() || null,
+    executed_tool_call_count:
+      typeof record.executed_tool_call_count === "number" ? record.executed_tool_call_count : null,
+    iteration_count: iterations.length,
+    iterations: iterations.slice(0, 16).map((entry, index) => {
+      const iteration = readAgentLoopAuditRecord(entry) ?? {};
+      return {
+        iteration: typeof iteration.iteration === "number" ? iteration.iteration : index + 1,
+        decision_id: coerceText(iteration.decision_id).trim() || null,
+        chosen_capability: coerceText(iteration.chosen_capability).trim() || null,
+        executed_action_key: coerceText(iteration.executed_action_key).trim() || null,
+        next_step: coerceText(iteration.next_step).trim() || null,
+        decision_timing: coerceText(iteration.decision_timing).trim() || null,
+        decision_authority: coerceText(iteration.decision_authority).trim() || null,
+        observation_role: coerceText(iteration.observation_role).trim() || null,
+        observed_artifact_refs: Array.isArray(iteration.observed_artifact_refs)
+          ? iteration.observed_artifact_refs.slice(0, 8)
+          : Array.isArray(iteration.artifact_refs)
+            ? iteration.artifact_refs.slice(0, 8)
+            : [],
+        tool_observation: summarizeHelixDebugObservationForCopy(iteration.tool_observation),
+      };
+    }),
+  };
+}
+
+function copyHelixRailCriticalDebugFieldsForUi(
+  target: Record<string, unknown>,
+  source: Record<string, unknown>,
+  debug: Record<string, unknown> | null,
+): void {
+  const assign = (key: string, value: unknown): void => {
+    if (value !== undefined && value !== null) target[key] = value;
+  };
+  [
+    "terminal_answer_envelope",
+    "terminal_boundary_eligibility",
+    "terminal_projection_guard",
+    "terminal_authority_single_writer",
+    "tool_turn_chain_audit",
+    "tool_rail_failure_triage",
+    "tool_turn_chain_family_matrix",
+    "artifact_query_index",
+    "goal_satisfaction_evaluation",
+    "post_tool_authority_bridge",
+    "ask_turn_solver_trace",
+    "solver_controller_decision",
+    "solver_controller_summary",
+    "agent_step_decision",
+    "agent_step_loop",
+    "calculator_tool_answer_support",
+  ].forEach((key) => assign(key, source[key] ?? debug?.[key]));
+  const ledgerSource = source.current_turn_artifact_ledger ?? debug?.current_turn_artifact_ledger;
+  if (Array.isArray(ledgerSource)) target.current_turn_artifact_ledger = summarizeHelixDebugArtifactsForCopy(ledgerSource);
+  const runtimeLoop = summarizeHelixAgentRuntimeLoopForCopy(source.agent_runtime_loop ?? debug?.agent_runtime_loop);
+  if (runtimeLoop) target.agent_runtime_loop = runtimeLoop;
+}
+
 function boundHelixDebugExportTextForUi(payload: string): string {
   const trimmed = typeof payload === "string" ? payload.trim() : "";
   if (!trimmed || trimmed.length <= HELIX_DEBUG_EXPORT_MAX_UI_CHARS) return payload;
@@ -16158,6 +16289,7 @@ function boundHelixDebugExportTextForUi(payload: string): string {
     ].forEach((key) => {
       if (parsed[key] !== undefined) minimal[key] = parsed[key];
     });
+    copyHelixRailCriticalDebugFieldsForUi(minimal, parsed, debug);
     minimal.debug = {
       schema: "helix.ask.debug_export_minimal_debug.v1",
       language_contract: parsed.language_contract ?? debug?.language_contract ?? null,
@@ -16178,6 +16310,7 @@ function boundHelixDebugExportTextForUi(payload: string): string {
       terminal_artifact_kind: parsed.terminal_artifact_kind ?? debug?.terminal_artifact_kind ?? null,
       terminal_error_code: parsed.terminal_error_code ?? debug?.terminal_error_code ?? null,
     };
+    copyHelixRailCriticalDebugFieldsForUi(minimal.debug as Record<string, unknown>, parsed, debug);
     minimal.debug_export_size_control = {
       schema: "helix.ask.debug_export_size_control.v1",
       truncated: true,
@@ -16190,7 +16323,7 @@ function boundHelixDebugExportTextForUi(payload: string): string {
     };
     const text = safeJsonStringify(minimal);
     if (text.length <= HELIX_DEBUG_EXPORT_MAX_UI_CHARS) return text;
-    return safeJsonStringify({
+    const fallback: Record<string, unknown> = {
       schema: parsed.schema ?? "helix.ask.debug_export.v1",
       active_turn_id: parsed.active_turn_id ?? null,
       selected_final_answer: parsed.selected_final_answer ?? null,
@@ -16206,7 +16339,9 @@ function boundHelixDebugExportTextForUi(payload: string): string {
         llm_provider_called: parsed.llm_provider_called ?? debug?.llm_provider_called ?? null,
         repo_evidence_relevance_gate: parsed.repo_evidence_relevance_gate ?? debug?.repo_evidence_relevance_gate ?? null,
         debug_export_size_control: minimal.debug_export_size_control,
-      });
+      };
+    copyHelixRailCriticalDebugFieldsForUi(fallback, parsed, debug);
+    return safeJsonStringify(fallback);
   } catch {
     return payload;
   }

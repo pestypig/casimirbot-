@@ -129,6 +129,72 @@ const addScholarlyRuntimeProof = (
   };
 };
 
+const addCalculatorRuntimeProof = (
+  payload: Record<string, unknown>,
+  observationRef: string,
+  artifactKind = "workstation_tool_evaluation",
+): void => {
+  payload.agent_step_decision = {
+    schema: "helix.agent_step_decision.v1",
+    decision_id: `${payload.turn_id}:decision:1`,
+    chosen_capability: "scientific-calculator.solve_expression",
+    decision_authority: "llm",
+    decision_timing: "pre_action",
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  payload.runtime_tool_call = {
+    schema: "helix.runtime_tool_call.v1",
+    capability_key: "scientific-calculator.solve_expression",
+    artifact_ref: observationRef,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  payload.agent_runtime_loop = {
+    schema: "helix.agent_runtime_loop.v1",
+    iterations: [
+      {
+        iteration: 1,
+        decision_id: `${payload.turn_id}:decision:1`,
+        next_step: "next_action",
+        chosen_capability: "scientific-calculator.solve_expression",
+        executed_action_key: "scientific-calculator.solve_expression",
+        decision_authority: "llm",
+        decision_timing: "pre_action",
+        observed_artifact_refs: [observationRef],
+        artifact_refs: [observationRef],
+        tool_observation: {
+          kind: artifactKind,
+          artifact_id: observationRef,
+          status: "completed",
+          ok: true,
+        },
+      },
+      {
+        iteration: 2,
+        decision_id: `${payload.turn_id}:decision:2`,
+        next_step: "answer",
+        chosen_capability: "model.synthesize_from_tool_observation",
+        decision_authority: "llm",
+        decision_timing: "post_observation",
+        observation_role: "model_answer_draft",
+      },
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  payload.goal_satisfaction_evaluation = {
+    schema: "helix.goal_satisfaction_evaluation.v1",
+    canonical_goal_kind: "calculator_solve",
+    required_terminal_kind: "workstation_tool_evaluation",
+    terminal_artifact_kind: "workstation_tool_evaluation",
+    satisfaction: "satisfied",
+    next_decision: "allow_terminal",
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
 describe("final_answer_draft terminal selection", () => {
   it("selects a later complete final draft over an earlier weak direct answer", () => {
     const turnId = "ask:test:later-draft-over-direct";
@@ -1123,6 +1189,187 @@ describe("final_answer_draft terminal selection", () => {
     expect(payload.terminal_artifact_kind).toBe("model_synthesized_answer");
     expect((payload.terminal_presentation as Record<string, unknown>).terminal_artifact_kind).toBe("model_synthesized_answer");
     expect(payload.selected_final_answer).toBe("Authority-selected draft text.");
+  });
+
+  it("fails closed when calculator route has only a model-authored draft and no calculator observation", () => {
+    const turnId = "ask:test:calculator-draft-without-receipt";
+    const draftText =
+      "I cannot perform calculations or access tools directly. However, sqrt(81)=9 and ln(e^3)=3, so the result is 29.5.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: draftText,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      canonical_goal_frame: {
+        turn_id: turnId,
+        goal_kind: "calculator_solve",
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      source_target_intent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "calculator_stream",
+        target_kind: "calculator_stream",
+        strength: "hard",
+        must_enter_backend_ask: true,
+        allow_client_shortcut: false,
+        allow_no_tool_direct: false,
+      },
+      route_product_contract: {
+        ...modelOnlyContract(turnId),
+        source_target: "calculator_stream",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure", "request_user_input"],
+        forbidden_terminal_artifact_kinds: ["direct_answer_text", "model_only_concept", "no_tool_direct"],
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: draftText,
+      final_answer_source: "model_direct_answer",
+      terminal_artifact_kind: "direct_answer_text",
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: turnId,
+        terminal_artifact_kind: "direct_answer_text",
+        concise_text: draftText,
+      },
+    };
+    addModelOnlyRuntimeProof(payload);
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.final_answer_source).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("calculator_tool_answer_support_missing");
+    expect((payload.calculator_tool_answer_support as Record<string, unknown>).missing_reason).toBe("calculator_result_missing");
+    expect(result.rejected_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "model_synthesized_answer",
+          source: "final_answer_draft",
+          reason: "missing_required_observation",
+        }),
+      ]),
+    );
+  });
+
+  it("uses calculator missing-support failure when hard calculator route metadata is present before canonical frame repair", () => {
+    const turnId = "ask:test:calculator-route-metadata-before-frame";
+    const draftText =
+      "I cannot perform calculations or access tools directly, but the expression evaluates to 29.5 by mental math.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: draftText,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      route_reason_code: "calculator_solve / model_synthesized_answer",
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: draftText,
+      final_answer_source: "final_answer_draft",
+      terminal_artifact_kind: "model_synthesized_answer",
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: turnId,
+        terminal_artifact_kind: "model_synthesized_answer",
+        concise_text: draftText,
+      },
+    };
+    addModelOnlyRuntimeProof(payload);
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(result.integrity.terminal_projection_guard_applied).toBe(false);
+    expect(result.integrity.terminal_projection_failure_code).toBeNull();
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.final_answer_source).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("calculator_tool_answer_support_missing");
+    expect((payload.terminal_presentation as Record<string, unknown>).terminal_artifact_kind).toBe("typed_failure");
+    expect((payload.calculator_tool_answer_support as Record<string, unknown>).applies).toBe(true);
+  });
+
+  it("selects calculator workstation evaluation over a model-authored draft", () => {
+    const turnId = "ask:test:calculator-evaluation-terminal";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:workstation_tool_evaluation`,
+        kind: "workstation_tool_evaluation",
+        payload: {
+          schema: "helix.workstation_tool_evaluation.v1",
+          evaluation_id: `${turnId}:workstation_tool_evaluation`,
+          supports_goal: true,
+          summary: "The calculator evaluated ((sqrt(81)+ln(e^3))*7-5^2)/2 and produced 29.5.",
+        },
+      },
+      {
+        artifact_id: `${turnId}:draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: "A model-authored draft says the expression is 29.5.",
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      source_target_intent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "calculator_stream",
+        target_kind: "calculator_stream",
+      },
+      route_product_contract: {
+        ...modelOnlyContract(turnId),
+        source_target: "calculator_stream",
+        allowed_terminal_artifact_kinds: ["workstation_tool_evaluation", "model_synthesized_answer", "typed_failure"],
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: "A model-authored draft says the expression is 29.5.",
+      final_answer_source: "final_answer_draft",
+      terminal_artifact_kind: "model_synthesized_answer",
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: turnId,
+        terminal_artifact_kind: "model_synthesized_answer",
+        concise_text: "A model-authored draft says the expression is 29.5.",
+      },
+    };
+    addCalculatorRuntimeProof(payload, `${turnId}:workstation_tool_evaluation`);
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(result.source).toBe("workstation_tool_evaluation");
+    expect(payload.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(payload.final_answer_source).toBe("workstation_tool_evaluation");
+    expect(payload.selected_final_answer).toContain("produced 29.5");
+    expect((payload.terminal_presentation as Record<string, unknown>).terminal_artifact_kind).toBe(
+      "workstation_tool_evaluation",
+    );
+    expect(payload.terminal_error_code).toBeUndefined();
   });
 
   it("keeps calculator receipts as side artifacts when a final draft explains the result", () => {

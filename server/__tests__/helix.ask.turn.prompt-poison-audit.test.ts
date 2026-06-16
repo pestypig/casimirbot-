@@ -173,5 +173,9 @@ describe("helix ask prompt poison audit", () => {
     expect(response.body?.source_target_intent?.target_source, debug).toBe("calculator_stream");
     expect(response.body?.route_reason_code, debug).not.toMatch(/debug_diagnosis/);
     expect(response.body?.terminal_error_code, debug).not.toBe("bad_request");
+    expect(response.body?.terminal_error_code, debug).not.toBe("terminal_projection_mismatch");
+    if (response.body?.terminal_artifact_kind === "typed_failure") {
+      expect(response.body?.terminal_error_code, debug).toBe("calculator_tool_answer_support_missing");
+    }
   }, 60_000);
 });

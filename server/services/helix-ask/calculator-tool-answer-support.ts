@@ -32,6 +32,32 @@ const readArray = (value: unknown): unknown[] => (Array.isArray(value) ? value :
 const textFromPayload = (payload: RecordLike | null): string =>
   readString(payload?.text) || readString(payload?.answer_text) || readString(payload?.draft_text) || readString(payload?.visible_text);
 
+export const routeMetadataIndicatesCalculator = (payload: RecordLike): boolean => {
+  const sourceTargetIntent = readRecord(payload.source_target_intent);
+  const routeProductContract = readRecord(payload.route_product_contract);
+  const committedRoute = readRecord(payload.committed_ask_route);
+  const committedCanonicalGoal = readRecord(committedRoute?.canonical_goal);
+  const workstationToolPlan = readRecord(payload.workstation_tool_plan);
+  const activeWorkstationToolPlan = readRecord(payload.active_workstation_tool_plan);
+  const routeText = [
+    readString(payload.route),
+    readString(payload.route_reason_code),
+    readString(readRecord(payload.resolved_turn_summary)?.resolved_route_label),
+    readString(readRecord(payload.canonical_goal_frame)?.goal_kind),
+    readString(committedCanonicalGoal?.goal_kind),
+    readString(sourceTargetIntent?.target_source),
+    readString(sourceTargetIntent?.target_kind),
+    readString(routeProductContract?.source_target),
+    readString(committedRoute?.source_target),
+    readString(payload.mandatory_next_tool),
+    readString(workstationToolPlan?.intent),
+    readString(activeWorkstationToolPlan?.intent),
+  ].join(" ");
+  return /\b(?:calculator_solve|calculator_verify|calculator_live_source|calculator_stream|scientific-calculator\.solve_expression)\b/i.test(
+    routeText,
+  );
+};
+
 const latestArtifact = (payload: RecordLike, pattern: RegExp): RecordLike | null => {
   const artifacts = readArray(payload.current_turn_artifact_ledger).map(readRecord).filter(Boolean) as RecordLike[];
   for (const artifact of [...artifacts].reverse()) {
@@ -65,20 +91,33 @@ const collectCalculatorArtifacts = (payload: RecordLike): RecordLike[] =>
     });
 
 const extractCalculatorResult = (artifacts: RecordLike[]): { result: string; expression: string } => {
+  let fallbackExpression = "";
   for (const artifact of [...artifacts].reverse()) {
     const artifactPayload = readRecord(artifact.payload);
+    const text =
+      readString(artifactPayload?.text) ||
+      readString(artifactPayload?.answer_text) ||
+      readString(artifactPayload?.summary);
+    const textEquation = text.match(/^\s*(.+?)\s*=\s*([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)\s*$/i);
+    const textResult = text.match(
+      /\b(?:result|produced|evaluated\s+to|equals)\s*(?:is|:)?\s*([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)\b/i,
+    );
     const result =
       readString(artifactPayload?.result) ||
       readString(artifactPayload?.value) ||
       readString(artifactPayload?.computed_result) ||
-      readString(readRecord(artifactPayload?.calculation)?.result);
+      readString(readRecord(artifactPayload?.calculation)?.result) ||
+      (textEquation ? textEquation[2] ?? "" : "") ||
+      (textResult ? textResult[1] ?? "" : "");
     const expression =
       readString(artifactPayload?.expression) ||
       readString(artifactPayload?.input) ||
-      readString(readRecord(artifactPayload?.calculation)?.expression);
-    if (result || expression) return { result, expression };
+      readString(readRecord(artifactPayload?.calculation)?.expression) ||
+      (textEquation ? textEquation[1] ?? "" : "");
+    if (expression && !fallbackExpression) fallbackExpression = expression;
+    if (result) return { result, expression: expression || fallbackExpression };
   }
-  return { result: "", expression: "" };
+  return { result: "", expression: fallbackExpression };
 };
 
 const draftExplains = (draftText: string, result: string, expression: string): boolean => {
@@ -106,6 +145,7 @@ export function evaluateCalculatorToolAnswerSupport(input: {
   const calculatorArtifacts = collectCalculatorArtifacts(input.payload);
   const applies =
     /calculator/i.test(canonicalGoalKind) ||
+    routeMetadataIndicatesCalculator(input.payload) ||
     /scientific-calculator|calculator/i.test(selectedCapability) ||
     calculatorArtifacts.length > 0;
   const { result, expression } = extractCalculatorResult(calculatorArtifacts);

@@ -24,6 +24,7 @@ import {
 } from "./language-contract";
 import { liveSourceModelSynthesisMissingFailure } from "./live-source-terminal-failure-repair";
 import { hashHelixTerminalText } from "./turn-terminal-authority";
+import { evaluateCalculatorToolAnswerSupport, routeMetadataIndicatesCalculator } from "./calculator-tool-answer-support";
 
 type ArtifactLike = {
   artifact_id?: unknown;
@@ -409,6 +410,29 @@ const routeContractRequiresScholarlyResearchAnswer = (payload: Record<string, un
 const routeContractRequiresInternetSearchAnswer = (payload: Record<string, unknown>): boolean =>
   readString(readRecord(payload.canonical_goal_frame)?.required_terminal_kind) === "internet_search_answer" ||
   routeContractAllowedTerminalKinds(payload).includes("internet_search_answer");
+
+const goalContractAllowsWorkstationToolEvaluation = (payload: Record<string, unknown>): boolean => {
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  const goalSatisfaction = readRecord(payload.goal_satisfaction_evaluation);
+  const terminalContract = readRecord(goalSatisfaction?.terminal_contract);
+  const sourceTargetIntent = readRecord(payload.source_target_intent);
+  const requiredKinds = [
+    readString(canonicalGoal?.required_terminal_kind),
+    readString(goalSatisfaction?.required_terminal_kind),
+    readString(goalSatisfaction?.terminal_artifact_kind),
+    ...readArray(terminalContract?.required_terminal_kinds).map(readString),
+    ...readArray(sourceTargetIntent?.requested_outputs).map(readString),
+  ].filter((entry): entry is string => Boolean(entry));
+  if (requiredKinds.includes("workstation_tool_evaluation")) return true;
+  return readArray(goalSatisfaction?.observed_results)
+    .map(readRecord)
+    .some((entry) =>
+      Boolean(
+        entry &&
+          readString(entry.kind) === "workstation_tool_evaluation" &&
+          entry.supports_goal === true,
+      ));
+};
 
 const artifactPayload = (artifact: ArtifactLike): Record<string, unknown> | null =>
   readRecord(artifact.payload);
@@ -898,6 +922,73 @@ const findGoalSatisfyingDocumentArtifact = (
   return null;
 };
 
+const workstationToolEvaluationText = (artifact: ArtifactLike): string | null => {
+  const payload = artifactPayload(artifact);
+  return (
+    artifactText(artifact) ??
+    readString(payload?.summary) ??
+    readString(readRecord(payload?.result)?.summary) ??
+    readString(readRecord(payload?.result)?.text) ??
+    readString(readRecord(payload?.evaluation)?.summary)
+  );
+};
+
+const findGoalSatisfyingWorkstationToolEvaluationArtifact = (
+  payload: Record<string, unknown>,
+  artifacts: ArtifactLike[],
+): { artifact: ArtifactLike; kind: "workstation_tool_evaluation"; text: string; ref: string | null } | null => {
+  if (
+    !routeMetadataIndicatesCalculator(payload) &&
+    readString(readRecord(payload.canonical_goal_frame)?.required_terminal_kind) !== "workstation_tool_evaluation"
+  ) {
+    return null;
+  }
+  if (
+    !routeContractAllowsTerminalKind(payload, "workstation_tool_evaluation") &&
+    !goalContractAllowsWorkstationToolEvaluation(payload)
+  ) {
+    return null;
+  }
+  for (let index = artifacts.length - 1; index >= 0; index -= 1) {
+    const artifact = artifacts[index];
+    if (!artifact) continue;
+    const kind = artifactKind(artifact);
+    const schema = artifactSchema(artifact);
+    if (kind !== "workstation_tool_evaluation" && schema !== "helix.workstation_tool_evaluation.v1") continue;
+    const payloadRecord = artifactPayload(artifact);
+    if (payloadRecord?.ok === false) continue;
+    const supportsGoal = readString(payloadRecord?.supports_goal);
+    if (supportsGoal && supportsGoal !== "true" && supportsGoal !== "partial") continue;
+    const text = workstationToolEvaluationText(artifact);
+    if (!text || isStaleWorkspaceFailureText(text)) continue;
+    return {
+      artifact,
+      kind: "workstation_tool_evaluation",
+      text,
+      ref: artifactId(artifact) ?? readString(payloadRecord?.evaluation_id),
+    };
+  }
+  const evaluation = readRecord(payload.workstation_tool_evaluation);
+  if (!evaluation || evaluation.ok === false) return null;
+  const supportsGoal = readString(evaluation.supports_goal);
+  if (supportsGoal && supportsGoal !== "true" && supportsGoal !== "partial") return null;
+  const text =
+    readString(evaluation.answer_text) ??
+    readString(evaluation.text) ??
+    readString(evaluation.summary);
+  if (!text || isStaleWorkspaceFailureText(text)) return null;
+  return {
+    artifact: {
+      artifact_id: readString(evaluation.evaluation_id) ?? undefined,
+      kind: "workstation_tool_evaluation",
+      payload: evaluation,
+    },
+    kind: "workstation_tool_evaluation",
+    text,
+    ref: readString(evaluation.evaluation_id),
+  };
+};
+
 const quarantineStaleRequestUserInput = (payload: Record<string, unknown>): void => {
   const staleRequest =
     readRecord(payload.request_user_input) ??
@@ -1175,6 +1266,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const deterministicReceiptFallbackDraft = selectedDraft
     ? null
     : findDeterministicReceiptFallbackDraftAfterRequiredObservation(artifacts);
+  const selectedWorkstationToolEvaluation = findGoalSatisfyingWorkstationToolEvaluationArtifact(input.payload, artifacts);
   const selectedGoalArtifact =
     findGoalSatisfyingDocumentArtifact(input.payload, artifacts) ??
     findGoalSatisfyingVisualSituationArtifact(input.payload, artifacts);
@@ -1194,6 +1286,23 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const internetSearchAnswerSynthesisMissing =
     routeContractRequiresInternetSearchAnswer(input.payload) &&
     artifacts.some((artifact) => /internet_search_observation/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" ")));
+  const calculatorToolAnswerSupport = evaluateCalculatorToolAnswerSupport({
+    turnId: input.turnId,
+    payload: {
+      ...input.payload,
+      current_turn_artifact_ledger: artifacts,
+    },
+  });
+  const calculatorTerminalMissingSupport =
+    calculatorToolAnswerSupport.applies &&
+    !calculatorToolAnswerSupport.supports_goal &&
+    !selectedWorkstationToolEvaluation &&
+    routeMetadataIndicatesCalculator(input.payload);
+  if (calculatorToolAnswerSupport.applies) {
+    input.payload.calculator_tool_answer_support = calculatorToolAnswerSupport;
+    const debug = readRecord(input.payload.debug);
+    if (debug) debug.calculator_tool_answer_support = calculatorToolAnswerSupport;
+  }
 
   if (draftMaterialization?.ok === true && !itineraryObservationCriteriaSatisfied && !docsDraftMaterializationMatchesRequiredGoal) {
     rejectedCandidates.push({
@@ -1277,7 +1386,78 @@ export function applyHelixTerminalAuthoritySingleWriter(
   let selectedArtifactKind: HelixTerminalAuthoritySingleWriterResult["selected_terminal_artifact_kind"] = null;
   let selectedSource: HelixTerminalAuthoritySingleWriterResult["source"] = "terminal_authority_repair_failure";
 
-  if (compoundCoverageFailedClosed) {
+  if (calculatorTerminalMissingSupport) {
+    const terminalErrorCode = "calculator_tool_answer_support_missing";
+    const missingReason = calculatorToolAnswerSupport.missing_reason ?? "calculator_result_missing";
+    const terminalErrorText =
+      missingReason === "calculator_result_missing"
+        ? "I could not complete this calculator turn because no calculator result observation was available for terminal authority."
+        : missingReason === "final_answer_draft_missing"
+          ? "I could not complete this calculator turn because no calculator-backed final answer draft was materialized."
+          : missingReason === "draft_does_not_explain_result"
+            ? "I could not complete this calculator turn because the final draft was not grounded in the calculator result observation."
+            : "I could not complete this calculator turn because calculator-backed terminal support was missing.";
+    if (selectedDirectAnswerTerminal) {
+      rejectedCandidates.push({
+        ref: selectedDirectAnswerTerminal.ref ?? undefined,
+        kind: "direct_answer_text",
+        source: "direct_answer_text",
+        reason: "missing_required_observation",
+      });
+    }
+    const latestDraft = findLatestFinalAnswerDraftCandidate(artifacts);
+    if (latestDraft) {
+      rejectedCandidates.push({
+        ref: latestDraft.ref ?? undefined,
+        kind: "model_synthesized_answer",
+        source: "final_answer_draft",
+        reason: "missing_required_observation",
+      });
+    }
+    if (draftMaterialization?.ok === true) {
+      rejectedCandidates.push({
+        ref: draftMaterialization.materialized_terminal_artifact_ref ?? draftMaterialization.final_answer_draft_ref ?? undefined,
+        kind: draftMaterialization.materialized_terminal_artifact_kind ?? "model_synthesized_answer",
+        source: "final_answer_draft",
+        reason: "missing_required_observation",
+      });
+    }
+    input.payload.ok = false;
+    input.payload.response_type = "final_failure";
+    input.payload.final_status = "final_failure";
+    input.payload.terminal_artifact_kind = "typed_failure";
+    input.payload.final_answer_source = "typed_failure";
+    input.payload.terminal_error_code = terminalErrorCode;
+    input.payload.terminal_failure_text = terminalErrorText;
+    input.payload.selected_final_answer = terminalErrorText;
+    input.payload.answer = terminalErrorText;
+    input.payload.text = terminalErrorText;
+    input.payload.assistant_answer = terminalErrorText;
+    input.payload.typed_failure = {
+      ...(readRecord(input.payload.typed_failure) ?? {}),
+      schema: "helix.typed_failure.v1",
+      error_code: terminalErrorCode,
+      message: terminalErrorText,
+      text: terminalErrorText,
+      answer_text: terminalErrorText,
+      missing_reason: missingReason,
+      missing_required_evidence: ["calculator_receipt", "workstation_tool_evaluation"],
+      calculator_tool_answer_support: calculatorToolAnswerSupport,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    input.payload.terminal_presentation = {
+      ...(readRecord(input.payload.terminal_presentation) ?? {}),
+      schema: "helix.terminal_presentation.v1",
+      turn_id: input.turnId,
+      terminal_artifact_kind: "typed_failure",
+      concise_text: terminalErrorText,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    selectedArtifactKind = "typed_failure";
+    selectedSource = "typed_failure";
+  } else if (compoundCoverageFailedClosed) {
     const unresolved = readArray(compoundCoverageGate?.unresolved_requirement_ids)
       .map(readString)
       .filter((entry): entry is string => Boolean(entry));
@@ -1325,6 +1505,41 @@ export function applyHelixTerminalAuthoritySingleWriter(
     };
     selectedArtifactKind = "typed_failure";
     selectedSource = "typed_failure";
+  } else if (!solverContinuationPending && selectedWorkstationToolEvaluation) {
+    selectedArtifactRef = selectedWorkstationToolEvaluation.ref;
+    selectedArtifactKind = "workstation_tool_evaluation";
+    selectedSource = "workstation_tool_evaluation";
+    quarantineStaleRequestUserInput(input.payload);
+    input.payload.ok = true;
+    input.payload.response_type = "final_answer";
+    input.payload.final_status = "final_answer";
+    input.payload.status = "final_answer";
+    input.payload.terminal_artifact_kind = "workstation_tool_evaluation";
+    input.payload.final_answer_source = "workstation_tool_evaluation";
+    input.payload.selected_final_answer = selectedWorkstationToolEvaluation.text;
+    input.payload.answer = selectedWorkstationToolEvaluation.text;
+    input.payload.text = selectedWorkstationToolEvaluation.text;
+    input.payload.assistant_answer = selectedWorkstationToolEvaluation.text;
+    input.payload.terminal_artifact_id = selectedWorkstationToolEvaluation.ref ?? undefined;
+    input.payload.terminal_presentation = {
+      ...(readRecord(input.payload.terminal_presentation) ?? {}),
+      schema: "helix.terminal_presentation.v1",
+      turn_id: input.turnId,
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      concise_text: selectedWorkstationToolEvaluation.text,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    delete input.payload.terminal_error_code;
+    delete input.payload.terminal_failure_text;
+    if (selectedDraft) {
+      rejectedCandidates.push({
+        ref: artifactId(selectedDraft.artifact) ?? undefined,
+        kind: "model_synthesized_answer",
+        source: "final_answer_draft",
+        reason: "later_valid_final_answer_draft",
+      });
+    }
   } else if (!solverContinuationPending && !itineraryObservationCriteriaSatisfied) {
     const terminalErrorCode = "capability_itinerary_observations_missing";
     const terminalErrorText = `I could not complete this turn because required itinerary observations are missing: ${missingItineraryFamilies.join(", ")}.`;
