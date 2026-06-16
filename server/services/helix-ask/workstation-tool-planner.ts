@@ -923,6 +923,21 @@ function makeOpenStep(panelId: string, depends_on: string[] = []): HelixWorkstat
   };
 }
 
+function retiredSituationRoomToolResult(
+  reason: string,
+  scores: AffordanceScore[],
+): WorkstationToolPlannerResult {
+  return {
+    intent: "direct_answer",
+    action: null,
+    tool_plan: null,
+    scores,
+    should_use_tool: false,
+    reason,
+    missing_required_args: [],
+  };
+}
+
 function makeTheoryReflectionAskToolStep(prompt: string): HelixWorkstationToolPlanStep {
   return {
     step_id: "reflect_theory_context",
@@ -1239,7 +1254,10 @@ export function planWorkstationToolUse(
   const pushScore = (score: AffordanceScore) => scores.push(score);
 
   if (isMinecraftLiveContinuationPrompt(normalized)) {
-    return buildMinecraftLiveContinuationPlan(normalized, options, scores);
+    return retiredSituationRoomToolResult(
+      "Retired Situation Room live-continuation tool calls are no longer admitted; use the Live Answer surface and Stage Play badge graph instead.",
+      scores,
+    );
   }
 
   const voiceContextKind = classifyVoiceContextRequest(normalized);
@@ -1268,6 +1286,10 @@ export function planWorkstationToolUse(
   }
 
   if (isDottieObserverToolPrompt(normalized)) {
+    return retiredSituationRoomToolResult(
+      "Retired Situation Room Dottie/observer tool calls are no longer admitted; voice and witness behavior must be derived from the Live Answer/Stage Play path.",
+      scores,
+    );
     const targetRunId = extractDottieTargetRunId(normalized);
     const targetTurnId = extractDottieTargetTurnId(normalized);
     const sourceEventId = extractDottieSourceEventId(normalized);

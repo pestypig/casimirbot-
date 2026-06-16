@@ -668,7 +668,7 @@ describe("Helix Ask workstation tool planner", () => {
     ]);
   });
 
-  it("routes explicit Auntie Dottie observer commands through Situation Room actions", () => {
+  it("retires explicit Auntie Dottie observer Situation Room tool commands", () => {
     const plan = planWorkstationToolUse(
       [
         "Operator command: run panel action situation-room-pipelines.observer.attach",
@@ -680,129 +680,53 @@ describe("Helix Ask workstation tool planner", () => {
       { threadId: "thread:dottie-test", turnId: "turn:dottie-test" },
     );
 
-    expect(plan.intent).toBe("dottie_observer");
-    expect(plan.should_use_tool).toBe(true);
+    expect(plan.intent).toBe("direct_answer");
+    expect(plan.should_use_tool).toBe(false);
     expect(plan.missing_required_args).toEqual([]);
-    expect(plan.action).toEqual({
-      panel_id: "situation-room-pipelines",
-      action_id: "observer.attach",
-      args: expect.objectContaining({
-        target_run_id: "run:ask:dottie-ui-smoke",
-        observer_profile: "auntie_dottie",
-        voice_mode: "text_only",
-        max_chars: 120,
-      }),
-    });
-    expect(plan.tool_plan?.steps.map((step) => `${step.panel_id}.${step.action_id}`)).toEqual([
-      "situation-room-pipelines.open",
-      "situation-room-pipelines.observer.attach",
-      "situation-room-pipelines.voice_delivery.propose_from_trace",
-      "situation-room-pipelines.observer.query",
-      "undefined.undefined",
-    ]);
-    const voiceStep = plan.tool_plan?.steps.find((step) => step.action_id === "voice_delivery.propose_from_trace");
-    expect(voiceStep?.args).toEqual(expect.objectContaining({
-      source_event_id: "agent_commentary:orientation",
-      source_text: "I am checking the public commentary path",
-      voice_mode: "text_only",
-    }));
+    expect(plan.action).toBeNull();
+    expect(plan.tool_plan).toBeNull();
+    expect(plan.reason).toContain("Retired Situation Room");
   });
 
-  it("routes natural-language Auntie Dottie manifest requests to the manifest action", () => {
+  it("retires natural-language Auntie Dottie manifest action planning", () => {
     const plan = planWorkstationToolUse(
       "Manifest Auntie Dottie as a witness-only observer preset for this room.",
       { threadId: "thread:dottie-manifest", turnId: "turn:dottie-manifest" },
     );
 
-    expect(plan.intent).toBe("dottie_observer");
-    expect(plan.should_use_tool).toBe(true);
+    expect(plan.intent).toBe("direct_answer");
+    expect(plan.should_use_tool).toBe(false);
     expect(plan.missing_required_args).toEqual([]);
-    expect(plan.action).toEqual({
-      panel_id: "situation-room-pipelines",
-      action_id: "dottie.manifest",
-      args: expect.objectContaining({
-        thread_id: "thread:dottie-manifest",
-        observer_profile: "auntie_dottie",
-        objective: "Manifest Auntie Dottie as a witness-only Situation Room observer preset.",
-      }),
-    });
-    expect(plan.scores[0]).toMatchObject({
-      affordance_id: "situation-room-pipelines.dottie.manifest",
-      action_id: "dottie.manifest",
-    });
-    expect(plan.tool_plan?.steps.map((step) => `${step.panel_id}.${step.action_id}`)).toEqual([
-      "situation-room-pipelines.open",
-      "situation-room-pipelines.dottie.manifest",
-      "undefined.undefined",
-    ]);
+    expect(plan.action).toBeNull();
+    expect(plan.tool_plan).toBeNull();
+    expect(plan.reason).toContain("Retired Situation Room");
   });
 
-  it("routes Auntie Dottie mode requests as Situation Room manifest setup", () => {
+  it("retires Auntie Dottie mode Situation Room manifest setup", () => {
     const plan = planWorkstationToolUse(
       "Go into Auntie Dottie mode while I play Minecraft.",
       { threadId: "thread:dottie-mode", turnId: "turn:dottie-mode" },
     );
 
-    expect(plan.intent).toBe("dottie_observer");
-    expect(plan.should_use_tool).toBe(true);
+    expect(plan.intent).toBe("direct_answer");
+    expect(plan.should_use_tool).toBe(false);
     expect(plan.missing_required_args).toEqual([]);
-    expect(plan.action).toEqual({
-      panel_id: "situation-room-pipelines",
-      action_id: "dottie.manifest",
-      args: expect.objectContaining({
-        thread_id: "thread:dottie-mode",
-        observer_profile: "auntie_dottie",
-        objective: "Manifest Auntie Dottie as a witness-only Situation Room observer preset.",
-      }),
-    });
+    expect(plan.action).toBeNull();
+    expect(plan.tool_plan).toBeNull();
   });
 
-  it("plans Minecraft live answer continuation as create, source admission, then continuation start", () => {
+  it("retires Minecraft live answer continuation Situation Room tool planning", () => {
     const plan = planWorkstationToolUse(
       "Keep watching the Minecraft server as a live answer.",
       { threadId: "thread:minecraft-live", turnId: "turn:minecraft-live" },
     );
 
-    expect(plan.intent).toBe("minecraft_live_continuation");
-    expect(plan.should_use_tool).toBe(true);
+    expect(plan.intent).toBe("direct_answer");
+    expect(plan.should_use_tool).toBe(false);
     expect(plan.missing_required_args).toEqual([]);
-    expect(plan.action).toEqual({
-      panel_id: "situation-room-pipelines",
-      action_id: "create_live_answer_environment",
-      args: expect.objectContaining({
-        thread_id: "thread:minecraft-live",
-        room_id: "room:minecraft-minehut",
-        source_ids: ["source:minecraft-server"],
-        source_config: expect.objectContaining({
-          source_kind: "minecraft_world_events",
-          transport: "cloudflarelink",
-        }),
-      }),
-    });
-    expect(plan.tool_plan?.steps.map((step) => `${step.panel_id}.${step.action_id}`)).toEqual([
-      "situation-room-pipelines.open",
-      "situation-room-pipelines.create_live_answer_environment",
-      "situation-room-pipelines.attach_live_source",
-      "situation-room-pipelines.live_continuation.start",
-      "undefined.undefined",
-    ]);
-    const continuationStep = plan.tool_plan?.steps.find((step) => step.action_id === "live_continuation.start");
-    expect(continuationStep?.args).toEqual(expect.objectContaining({
-      thread_id: "thread:minecraft-live",
-      room_id: "room:minecraft-minehut",
-      source_ids: ["source:minecraft-server"],
-      voice_policy: "confirm_speak_required",
-      evidence_threshold: "observed",
-      lanes_enabled: expect.arrayContaining([
-        "source_health",
-        "world_state",
-        "risk_watch",
-        "objective_progress",
-        "route_watch",
-        "prediction_reflection",
-        "voice_gate",
-      ]),
-    }));
+    expect(plan.action).toBeNull();
+    expect(plan.tool_plan).toBeNull();
+    expect(plan.reason).toContain("Retired Situation Room");
   });
 
   it("routes Dottie read-aloud requests to voice proposal planning with missing source input", () => {
@@ -811,14 +735,12 @@ describe("Helix Ask workstation tool planner", () => {
       { threadId: "thread:dottie-voice", turnId: "turn:dottie-voice" },
     );
 
-    expect(plan.intent).toBe("dottie_observer");
-    expect(plan.should_use_tool).toBe(true);
-    expect(plan.missing_required_args).toContain("answer_snapshot.latest_or_selected_text_ref_or_source_event_id");
-    expect(plan.tool_plan?.steps.map((step) => `${step.panel_id}.${step.action_id}`)).toContain(
-      "situation-room-pipelines.voice_delivery.propose_from_trace",
-    );
+    expect(plan.intent).toBe("direct_answer");
+    expect(plan.should_use_tool).toBe(false);
+    expect(plan.missing_required_args).toEqual([]);
+    expect(plan.tool_plan).toBeNull();
     expect(plan.action).toBeNull();
-    expect(plan.scores.some((score) => score.action_id === "voice_delivery.propose_from_trace")).toBe(true);
+    expect(plan.reason).toContain("Retired Situation Room");
   });
 
   it("accepts answer snapshot refs as Dottie delivery sources without speaking pre-solver", () => {
@@ -828,14 +750,10 @@ describe("Helix Ask workstation tool planner", () => {
     );
 
     expect(classifyVoiceContextRequest("Have Dottie read answer_snapshot.latest out loud.")).toBe("delivery_requested");
-    expect(plan.intent).toBe("dottie_observer");
-    expect(plan.should_use_tool).toBe(true);
+    expect(plan.intent).toBe("direct_answer");
+    expect(plan.should_use_tool).toBe(false);
     expect(plan.missing_required_args).toEqual([]);
-    const voiceStep = plan.tool_plan?.steps.find((step) => step.action_id === "voice_delivery.propose_from_trace");
-    expect(voiceStep?.args).toEqual(expect.objectContaining({
-      source_event_id: "answer_snapshot.latest",
-      voice_mode: "voice_on_confirm",
-    }));
+    expect(plan.tool_plan).toBeNull();
   });
 
   it("keeps Dottie style and post-solver voice requests out of delivery routing", () => {

@@ -115,6 +115,18 @@ type PanelCapabilitiesLike = Record<
   }
 >;
 
+const RETIRED_WORKSTATION_TOOL_PANEL_IDS = new Set(["situation-room-sources", "situation-room-pipelines"]);
+
+export function isRetiredWorkstationDynamicToolAction(
+  action: Pick<WorkstationDynamicToolActionDefinition, "panel_id">,
+): boolean {
+  return RETIRED_WORKSTATION_TOOL_PANEL_IDS.has(action.panel_id);
+}
+
+function isRetiredWorkspaceActionRegistryEntry(entry: Pick<WorkspaceActionRegistryEntry, "target_id" | "action_key">): boolean {
+  return RETIRED_WORKSTATION_TOOL_PANEL_IDS.has(entry.target_id) || entry.action_key.startsWith("situation-room.");
+}
+
 const SITUATION_ROOM_MANUAL_ONLY_ACTIONS = new Set([
   "situation-room-pipelines.setup_from_prompt",
   "situation-room-pipelines.create_job",
@@ -188,7 +200,7 @@ const SITUATION_ROOM_MANUAL_ONLY_ACTIONS = new Set([
   "situation-room-pipelines.live-source.set_rate",
 ]);
 
-export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefinition[] = [
+const WORKSTATION_DYNAMIC_TOOL_ACTIONS_WITH_RETIRED: WorkstationDynamicToolActionDefinition[] = [
   { panel_id: "docs-viewer", action_id: "open", required_args: [], optional_args: [] },
   {
     panel_id: "docs-viewer",
@@ -1054,7 +1066,13 @@ export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefin
   },
 ];
 
-export const WORKSPACE_ACTION_REGISTRY: WorkspaceActionRegistryEntry[] = [
+export const WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefinition[] =
+  WORKSTATION_DYNAMIC_TOOL_ACTIONS_WITH_RETIRED.filter((action) => !isRetiredWorkstationDynamicToolAction(action));
+
+export const RETIRED_WORKSTATION_DYNAMIC_TOOL_ACTIONS: WorkstationDynamicToolActionDefinition[] =
+  WORKSTATION_DYNAMIC_TOOL_ACTIONS_WITH_RETIRED.filter(isRetiredWorkstationDynamicToolAction);
+
+const WORKSPACE_ACTION_REGISTRY_WITH_RETIRED: WorkspaceActionRegistryEntry[] = [
   {
     action_key: "docs-viewer.open",
     family: "docs_viewer",
@@ -1262,6 +1280,12 @@ export const WORKSPACE_ACTION_REGISTRY: WorkspaceActionRegistryEntry[] = [
   },
 ];
 
+export const WORKSPACE_ACTION_REGISTRY: WorkspaceActionRegistryEntry[] =
+  WORKSPACE_ACTION_REGISTRY_WITH_RETIRED.filter((entry) => !isRetiredWorkspaceActionRegistryEntry(entry));
+
+export const RETIRED_WORKSPACE_ACTION_REGISTRY: WorkspaceActionRegistryEntry[] =
+  WORKSPACE_ACTION_REGISTRY_WITH_RETIRED.filter(isRetiredWorkspaceActionRegistryEntry);
+
 export const WORKSPACE_ACTION_MANIFEST_VERSION = "e67.workspace-action-manifest.v1";
 
 export const WORKSPACE_ACTION_VISIBLE_PANEL_IDS = [
@@ -1269,8 +1293,6 @@ export const WORKSPACE_ACTION_VISIBLE_PANEL_IDS = [
   "workstation-notes",
   "mission-ethos",
   "workstation-clipboard-history",
-  "situation-room-sources",
-  "situation-room-pipelines",
   "workstation-workflow-timeline",
   "workstation-process-graph",
   "workstation-task-manager",
@@ -1808,7 +1830,7 @@ export function buildWorkstationDynamicToolsFromCapabilities(
       returns_artifact: action.returns_artifact,
     })),
   );
-  return buildWorkstationDynamicTools(actions);
+  return buildWorkstationDynamicTools(actions.filter((action) => !isRetiredWorkstationDynamicToolAction(action)));
 }
 
 export function findWorkstationDynamicTool(

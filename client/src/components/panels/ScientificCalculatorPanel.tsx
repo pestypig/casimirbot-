@@ -206,7 +206,7 @@ export function resolveScientificCalculatorVisibleHistory(
 }
 
 export default function ScientificCalculatorPanel() {
-  const { currentLatex, history, lastSolve, lastArtifactV1, lastTheoryLoadout, activeTheoryLoadoutItemIndex, lastSetup, steps, debugEvents, ingestLatex, setSolveResult, loadTheoryLoadoutItem, recordDebugEvent, clear } =
+  const { currentLatex, history, lastSolve, lastArtifactV1, lastTheoryLoadout, activeTheoryLoadoutItemIndex, lastSetup, steps, debugEvents, ingestLatex, setSolveResult, setTheoryLoadout, loadTheoryLoadoutItem, recordDebugEvent, clear } =
     useScientificCalculatorStore();
   const {
     activeTheoryRun,
@@ -214,6 +214,7 @@ export default function ScientificCalculatorPanel() {
     selectedTheoryRunRowId,
     theoryRunStatus,
     loadTheoryRun,
+    clearTheoryRun,
     selectTheoryRunRow,
     setTheoryRunStatus,
   } = useTheoryCompoundRunStore();
@@ -233,7 +234,9 @@ export default function ScientificCalculatorPanel() {
   const lastStoredLatexRef = useRef(currentLatex);
   const lastTheoryRunIdRef = useRef<string | null>(null);
   const lastTheoryLoadoutIdRef = useRef<string | null>(null);
+  const lastStandaloneSolveDebugEventIdRef = useRef<string | null>(null);
   const skipNextScalarInputPromotionRef = useRef(false);
+  const scalarSectionElementRef = useRef<HTMLDivElement | null>(null);
   const selectedTheoryRunRowElementRef = useRef<HTMLButtonElement | null>(null);
 
   const promoteWorkbenchSection = useCallback((sectionId: ScientificCalculatorWorkbenchSection) => {
@@ -300,6 +303,40 @@ export default function ScientificCalculatorPanel() {
       promoteWorkbenchSection("theory");
     }
   }, [activeTheoryRun, lastTheoryLoadout?.loadoutId, promoteWorkbenchSection]);
+
+  useEffect(() => {
+    const latestEvent = debugEvents[0] ?? null;
+    if (
+      !latestEvent ||
+      latestEvent.id === lastStandaloneSolveDebugEventIdRef.current ||
+      (latestEvent.action_id !== "solve_expression" && latestEvent.action_id !== "solve_with_steps") ||
+      latestEvent.source !== "workstation_action" ||
+      latestEvent.compound_run_id ||
+      !latestEvent.input_latex?.trim()
+    ) {
+      return;
+    }
+    lastStandaloneSolveDebugEventIdRef.current = latestEvent.id;
+    const nextInput = normalizeCalculatorInputDraft(latestEvent.input_latex);
+    clearTheoryRun();
+    setTheoryLoadout(null);
+    setInput(nextInput);
+    if (nextInput) {
+      rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, nextInput);
+    } else {
+      clearDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY);
+    }
+    promoteWorkbenchSection("scalar");
+    const timeoutId = window.setTimeout(() => {
+      const scalarElement = scalarSectionElementRef.current;
+      if (typeof scalarElement?.scrollIntoView !== "function") return;
+      scalarElement.scrollIntoView({
+        block: "start",
+        behavior: "smooth",
+      });
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [clearDraft, clearTheoryRun, debugEvents, promoteWorkbenchSection, rememberDraft, setTheoryLoadout]);
 
   useEffect(() => {
     if (activeSection !== "theory" || !selectedTheoryRunRowId) return;
@@ -993,6 +1030,7 @@ export default function ScientificCalculatorPanel() {
       ) : null}
 
       <div
+        ref={scalarSectionElementRef}
         className="space-y-3 rounded-md border border-slate-800 bg-slate-900/50 p-3"
         data-testid="scientific-calculator-scalar-section"
         style={{ order: workbenchSectionRank("scalar") }}

@@ -4,10 +4,7 @@ import {
   mapClientWorkstationDynamicToolCallToAction,
 } from "@/lib/workstation/workstationDynamicTools";
 import { WORKSTATION_V1_PANEL_CAPABILITIES } from "@/lib/workstation/panelCapabilities";
-import {
-  WORKSTATION_DYNAMIC_TOOL_ACTIONS,
-  buildWorkstationToolName,
-} from "@shared/workstation-dynamic-tools";
+import { WORKSTATION_DYNAMIC_TOOL_ACTIONS } from "@shared/workstation-dynamic-tools";
 
 const AGENT_CONTINUATION_ACTION_IDS = [
   "create_live_answer_environment",
@@ -34,55 +31,17 @@ const AGENT_CONTINUATION_ACTION_IDS = [
 ] as const;
 
 describe("workstation dynamic tools", () => {
-  it("exposes Situation Room panels as schema-bound workstation tools", () => {
+  it("retires Situation Room panels from generated workstation tools", () => {
     const tools = getWorkstationDynamicTools();
-    const createJob = tools.find((tool) => tool.name === "situation_room_pipelines.create_job");
-    const createTranslationPair = tools.find((tool) => tool.name === "situation_room_pipelines.create_translation_pair");
-    const attachSource = tools.find((tool) => tool.name === "situation_room_sources.attach_display_audio_source");
+    const panelActions = WORKSTATION_V1_PANEL_CAPABILITIES["situation-room-pipelines"].actions.map((action) => action.id);
 
-    expect(createJob).toMatchObject({
-      namespace: "workstation",
-      panel_id: "situation-room-pipelines",
-      action_id: "create_job",
-      deferLoading: true,
-      risk: "medium",
-      returns_artifact: true,
-      terminal_artifact_kind: "situation_room_job",
-      attachment_policy: "manual_only",
-      context_injection: "explicit_attachment_only",
-    });
-    expect(createJob?.inputSchema).toMatchObject({
-      required: ["kind"],
-      properties: {
-        kind: { enum: ["translate", "rolling_summary", "action_items", "prompt_composer"] },
-        target_language: { type: "string" },
-        attachment_policy: { enum: ["manual_only"] },
-        context_injection: { enum: ["explicit_attachment_only"] },
-      },
-    });
-    expect(createTranslationPair).toMatchObject({
-      namespace: "workstation",
-      panel_id: "situation-room-pipelines",
-      action_id: "create_translation_pair",
-      risk: "medium",
-      returns_artifact: true,
-      terminal_artifact_kind: "situation_room_graph",
-      attachment_policy: "manual_only",
-      context_injection: "explicit_attachment_only",
-    });
-    expect(createTranslationPair?.inputSchema).toMatchObject({
-      required: ["speaker_a_id", "speaker_b_id", "speaker_a_native_language", "speaker_b_native_language"],
-      properties: {
-        render_policy: { enum: ["target_language", "native_language", "dual"] },
-        voice_output: { enum: ["off", "on_confirm", "auto_when_direct_addressed"] },
-      },
-    });
-    expect(attachSource).toMatchObject({
-      terminal_artifact_kind: "situation_room_context",
-    });
+    expect(panelActions).toContain("create_job");
+    expect(tools.some((tool) => tool.panel_id === "situation-room-pipelines")).toBe(false);
+    expect(tools.some((tool) => tool.panel_id === "situation-room-sources")).toBe(false);
+    expect(WORKSTATION_DYNAMIC_TOOL_ACTIONS.some((action) => action.panel_id.startsWith("situation-room"))).toBe(false);
   });
 
-  it("maps workstation tool calls onto the existing dispatcher action contract", () => {
+  it("does not map retired Situation Room tool calls onto the dispatcher action contract", () => {
     const mapped = mapClientWorkstationDynamicToolCallToAction("situation_room_pipelines.create_job", {
       kind: "translate",
       target_language: "es",
@@ -91,19 +50,9 @@ describe("workstation dynamic tools", () => {
     });
 
     expect(mapped).toEqual({
-      ok: true,
-      action: {
-        schema_version: "helix.workstation.action/v1",
-        action: "run_panel_action",
-        panel_id: "situation-room-pipelines",
-        action_id: "create_job",
-        args: {
-          kind: "translate",
-          target_language: "es",
-          attachment_policy: "manual_only",
-          context_injection: "explicit_attachment_only",
-        },
-      },
+      ok: false,
+      reason: "unknown_tool",
+      missing_required_args: [],
     });
   });
 
@@ -143,19 +92,19 @@ describe("workstation dynamic tools", () => {
     });
   });
 
-  it("returns a bounded missing-slot result instead of choosing another action", () => {
+  it("returns unknown for retired tools instead of choosing another action", () => {
     const mapped = mapClientWorkstationDynamicToolCallToAction("situation_room_pipelines.create_job", {
       target_language: "es",
     });
 
     expect(mapped).toEqual({
       ok: false,
-      reason: "missing_required_args",
-      missing_required_args: ["kind"],
+      reason: "unknown_tool",
+      missing_required_args: [],
     });
   });
 
-  it("maps translation-pair graph tools onto panel actions", () => {
+  it("does not map retired translation-pair graph tools onto panel actions", () => {
     const mapped = mapClientWorkstationDynamicToolCallToAction("situation_room_pipelines.create_translation_pair", {
       speaker_a_id: "spk_user_1",
       speaker_b_id: "spk_rowan",
@@ -165,128 +114,44 @@ describe("workstation dynamic tools", () => {
     });
 
     expect(mapped).toEqual({
-      ok: true,
-      action: {
-        schema_version: "helix.workstation.action/v1",
-        action: "run_panel_action",
-        panel_id: "situation-room-pipelines",
-        action_id: "create_translation_pair",
-        args: {
-          speaker_a_id: "spk_user_1",
-          speaker_b_id: "spk_rowan",
-          speaker_a_native_language: "en",
-          speaker_b_native_language: "es",
-          render_policy: "dual",
-        },
-      },
+      ok: false,
+      reason: "unknown_tool",
+      missing_required_args: [],
     });
   });
 
-  it("keeps save-as-note as a separate explicit tool", () => {
+  it("retires save-as-note Situation Room job tools", () => {
     const tools = getWorkstationDynamicTools();
     const createJob = tools.find((tool) => tool.name === "situation_room_pipelines.create_job");
     const saveJob = tools.find((tool) => tool.name === "situation_room_pipelines.save_job_as_note");
 
-    expect(createJob?.terminal_artifact_kind).toBe("situation_room_job");
-    expect(saveJob).toMatchObject({
-      terminal_artifact_kind: "workstation_note",
-      panel_id: "situation-room-pipelines",
-      action_id: "save_job_as_note",
-    });
+    expect(createJob).toBeUndefined();
+    expect(saveJob).toBeUndefined();
   });
 
-  it("exposes Dottie observer tools as receipt-backed manual actions", () => {
+  it("retires Dottie observer tools from generated workstation tools", () => {
     const tools = getWorkstationDynamicTools();
     const manifest = tools.find((tool) => tool.name === "situation_room_pipelines.dottie_manifest");
     const attach = tools.find((tool) => tool.name === "situation_room_pipelines.observer_attach");
     const propose = tools.find((tool) => tool.name === "situation_room_pipelines.voice_delivery_propose_from_trace");
 
-    expect(manifest).toMatchObject({
-      namespace: "workstation",
-      panel_id: "situation-room-pipelines",
-      action_id: "dottie.manifest",
-      risk: "medium",
-      returns_artifact: true,
-      terminal_artifact_kind: "dottie_manifest_preset_receipt",
-      attachment_policy: "manual_only",
-      context_injection: "explicit_attachment_only",
-    });
-    expect(manifest?.inputSchema).toMatchObject({
-      properties: {
-        voice_mode: { enum: expect.arrayContaining(["off", "propose_only", "on_confirm"]) },
-        commentary_cadence: { enum: ["milestones_only", "salience_only", "manual"] },
-      },
-    });
-    expect(attach).toMatchObject({
-      namespace: "workstation",
-      panel_id: "situation-room-pipelines",
-      action_id: "observer.attach",
-      risk: "medium",
-      returns_artifact: true,
-      terminal_artifact_kind: "dottie_observer_subscription_receipt",
-      attachment_policy: "manual_only",
-      context_injection: "explicit_attachment_only",
-    });
-    expect(attach?.inputSchema).toMatchObject({
-      required: ["target_run_id", "observer_profile"],
-      properties: {
-        observer_profile: { enum: ["auntie_dottie", "dottie", "custom"] },
-        event_filter: { type: "array", items: { type: "string" } },
-        max_chars: { type: "number" },
-      },
-    });
-    expect(propose).toMatchObject({
-      panel_id: "situation-room-pipelines",
-      action_id: "voice_delivery.propose_from_trace",
-      terminal_artifact_kind: "dottie_voice_receipt",
-      attachment_policy: "manual_only",
-      context_injection: "explicit_attachment_only",
-    });
+    expect(manifest).toBeUndefined();
+    expect(attach).toBeUndefined();
+    expect(propose).toBeUndefined();
   });
 
-  it("exposes generic construct recipe actions as the Situation Room builder surface", () => {
+  it("retires generic construct recipe actions from generated workstation tools", () => {
     const tools = getWorkstationDynamicTools();
     const createConstruct = tools.find((tool) => tool.name === "situation_room_pipelines.construct_create_from_recipe");
     const listRecipes = tools.find((tool) => tool.name === "situation_room_pipelines.construct_list_recipes");
     const queryConstructs = tools.find((tool) => tool.name === "situation_room_pipelines.construct_query");
 
-    expect(createConstruct).toMatchObject({
-      namespace: "workstation",
-      panel_id: "situation-room-pipelines",
-      action_id: "construct.create_from_recipe",
-      risk: "medium",
-      returns_artifact: true,
-      terminal_artifact_kind: "situation_construct_recipe_run",
-      attachment_policy: "manual_only",
-      context_injection: "explicit_attachment_only",
-    });
-    expect(createConstruct?.inputSchema).toMatchObject({
-      required: ["recipe_id"],
-      properties: {
-        recipe_id: {
-          enum: expect.arrayContaining(["auntie_dottie_witness", "browser_audio_transcriber"]),
-        },
-        output: {
-          enum: expect.arrayContaining(["transcript_stream", "voice_proposal", "live_answer_environment"]),
-        },
-        environment_id: {
-          type: "string",
-        },
-      },
-    });
-    expect(listRecipes).toMatchObject({
-      terminal_artifact_kind: "situation_construct_recipe_registry",
-      attachment_policy: "manual_only",
-      context_injection: "explicit_attachment_only",
-    });
-    expect(queryConstructs).toMatchObject({
-      terminal_artifact_kind: "situation_construct_query_result",
-      attachment_policy: "manual_only",
-      context_injection: "explicit_attachment_only",
-    });
+    expect(createConstruct).toBeUndefined();
+    expect(listRecipes).toBeUndefined();
+    expect(queryConstructs).toBeUndefined();
   });
 
-  it("maps construct recipe calls onto panel actions", () => {
+  it("does not map retired construct recipe calls onto panel actions", () => {
     const mapped = mapClientWorkstationDynamicToolCallToAction("situation_room_pipelines.construct_create_from_recipe", {
       recipe_id: "auntie_dottie_witness",
       thread_id: "thread:dottie",
@@ -294,18 +159,9 @@ describe("workstation dynamic tools", () => {
     });
 
     expect(mapped).toEqual({
-      ok: true,
-      action: {
-        schema_version: "helix.workstation.action/v1",
-        action: "run_panel_action",
-        panel_id: "situation-room-pipelines",
-        action_id: "construct.create_from_recipe",
-        args: {
-          recipe_id: "auntie_dottie_witness",
-          thread_id: "thread:dottie",
-          room_id: "room:dottie",
-        },
-      },
+      ok: false,
+      reason: "unknown_tool",
+      missing_required_args: [],
     });
   });
 
@@ -394,7 +250,7 @@ describe("workstation dynamic tools", () => {
     });
   });
 
-  it("keeps agent continuation Situation Room actions present in both tool registries", () => {
+  it("keeps retired agent continuation actions out of executable tool registries", () => {
     const panelActions = new Set(
       WORKSTATION_V1_PANEL_CAPABILITIES["situation-room-pipelines"].actions.map((action) => action.id),
     );
@@ -407,20 +263,11 @@ describe("workstation dynamic tools", () => {
 
     for (const actionId of AGENT_CONTINUATION_ACTION_IDS) {
       expect(panelActions.has(actionId), `${actionId} missing from panel capabilities`).toBe(true);
-      expect(sharedActions.has(actionId), `${actionId} missing from shared dynamic tool actions`).toBe(true);
-
+      expect(sharedActions.has(actionId), `${actionId} should be retired from shared dynamic tool actions`).toBe(false);
       expect(
-        tools.find(
-          (tool) =>
-            tool.name === buildWorkstationToolName("situation-room-pipelines", actionId) &&
-            tool.panel_id === "situation-room-pipelines" &&
-            tool.action_id === actionId,
-        ),
-        `${actionId} missing from generated client workstation tools`,
-      ).toMatchObject({
-        namespace: "workstation",
-        returns_artifact: true,
-      });
+        tools.some((tool) => tool.panel_id === "situation-room-pipelines" && tool.action_id === actionId),
+        `${actionId} should be retired from generated client workstation tools`,
+      ).toBe(false);
     }
   });
 });

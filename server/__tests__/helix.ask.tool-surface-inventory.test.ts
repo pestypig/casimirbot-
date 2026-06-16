@@ -11,7 +11,9 @@ describe("Helix Ask tool surface inventory", () => {
     expect(snapshot.total_dynamic_tools).toBeGreaterThan(snapshot.visible_panels.length);
     expect(snapshot.visible_panels.length).toBeGreaterThan(0);
     expect(snapshot.workspace_actions.length).toBeGreaterThan(0);
-    expect(snapshot.grouped_by_panel["situation-room-pipelines"]?.length ?? 0).toBeGreaterThan(20);
+    expect(snapshot.grouped_by_panel["situation-room-pipelines"]).toBeUndefined();
+    expect(snapshot.visible_panels).not.toContain("situation-room-pipelines");
+    expect(snapshot.workspace_actions.some((action) => action.startsWith("situation-room"))).toBe(false);
     expect(snapshot.grouped_by_panel["docs-viewer"]).toEqual(
       expect.arrayContaining(["open", "search_docs", "summarize_doc"]),
     );
@@ -45,7 +47,7 @@ describe("Helix Ask tool surface inventory", () => {
     });
   });
 
-  it("filters manual-only and attachment-only capabilities with traceable omissions", () => {
+  it("does not expose retired Situation Room capabilities even when the panel is active", () => {
     const packet = buildHelixToolSurfacePacket({
       turnId: "turn-manual-filter",
       prompt: "What is the situation room status?",
@@ -56,9 +58,8 @@ describe("Helix Ask tool surface inventory", () => {
       maxEntries: 30,
     });
 
-    expect(packet.entries.map((entry) => entry.capability_key)).not.toContain("situation-room-pipelines.create_job");
-    expect(packet.omitted.some((entry) => entry.reason === "manual_only")).toBe(true);
-    expect(packet.omitted.some((entry) => entry.reason === "explicit_attachment_missing")).toBe(true);
+    expect(packet.entries.map((entry) => entry.capability_key).some((key) => key.startsWith("situation-room"))).toBe(false);
+    expect(packet.active_panels.map((entry) => entry.panel_id)).not.toContain("situation-room-pipelines");
   });
 
   it("suppresses executable tools for contextual docs-viewer references", () => {

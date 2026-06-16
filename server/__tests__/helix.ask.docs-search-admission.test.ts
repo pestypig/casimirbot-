@@ -1,10 +1,19 @@
 import { describe, expect, it } from "vitest";
+import express from "express";
+import request from "supertest";
 
 import { arbitrateAskSourceTarget } from "../services/helix-ask/ask-source-target-arbitrator";
 import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
 import { buildHelixCapabilityItinerary } from "../services/helix-ask/capability-itinerary";
 import { buildToolUseRestatement } from "../services/helix-ask/internet-search-intent";
-import { __testHelixRuntimeToolCallValidation } from "../routes/agi.plan";
+import { planRouter, __testHelixRuntimeToolCallValidation } from "../routes/agi.plan";
+
+const createApp = () => {
+  const app = express();
+  app.use(express.json());
+  app.use("/api/agi", planRouter);
+  return app;
+};
 
 const turnId = "ask:test-docs-search-admission";
 const threadId = "thread:test-docs-search-admission";
@@ -114,6 +123,42 @@ describe("Helix Ask docs-search admission", () => {
     expect(admission.admitted_tool_families).not.toContain("docs_viewer");
     expect(admission.reason).not.toBe("docs_viewer_requires_document_tool_path");
   });
+
+  it("does not turn a Docs Viewer capability-coverage claim into a doc-open Ask turn", async () => {
+    const app = createApp();
+    const promptText =
+      "Docs Viewer: strongest dynamic surface. All 14 dynamic actions have some test evidence; core actions like open, locate_in_doc, summarize_doc, search_docs, and explain_paper are well represented.";
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        thread_id: threadId,
+        question: promptText,
+      })
+      .expect(200);
+
+    const body = response.body ?? {};
+    const sourceTargetIntent = body.source_target_intent ?? {};
+    const canonicalGoal = body.canonical_goal_frame ?? {};
+    const universalGoal = body.universal_goal_frame ?? {};
+    const runtimeLoop = body.agent_runtime_loop ?? [];
+    const runtimeText = JSON.stringify(runtimeLoop);
+
+    expect(sourceTargetIntent.target_source).not.toBe("docs_viewer");
+    expect(sourceTargetIntent.target_source).not.toBe("active_doc");
+    expect(sourceTargetIntent.reasons ?? []).toContain("docs_viewer_topic_label_not_active_doc_command");
+    expect(sourceTargetIntent.suppressed_routes ?? []).toEqual(
+      expect.arrayContaining(["active_doc_identity", "active_doc_summary", "doc_open_best"]),
+    );
+    expect(canonicalGoal.goal_kind).not.toMatch(/doc_open|doc_summary|active_doc_summary/);
+    expect(universalGoal.user_goal?.goal_kind).not.toBe("open_workspace");
+    expect(universalGoal.requested_outputs ?? []).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: "doc_open" })]),
+    );
+    expect(String(body.selected_capability ?? "")).not.toMatch(/^docs-viewer\./);
+    expect(runtimeText).not.toMatch(/docs-viewer\.(?:open|summarize|search|locate|explain)/);
+    expect(JSON.stringify(body)).not.toMatch(/active_doc_path/);
+  }, 15000);
 
   it("rejects repo-code runtime calls under hard docs-viewer admission", () => {
     const sourceTargetIntent = arbitrateAskSourceTarget({

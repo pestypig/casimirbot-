@@ -5,6 +5,7 @@ import "@testing-library/jest-dom/vitest";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ScientificCalculatorPanel from "@/components/panels/ScientificCalculatorPanel";
+import { runScientificSolve } from "@/lib/scientific-calculator/solver";
 import { useScientificCalculatorStore } from "@/store/useScientificCalculatorStore";
 import { useTheoryCompoundRunStore } from "@/store/useTheoryCompoundRunStore";
 import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
@@ -230,6 +231,51 @@ describe("ScientificCalculatorPanel theory run workbench", () => {
     });
     expect(screen.getAllByTestId("scientific-calculator-theory-run-section")).toHaveLength(1);
     expect(screen.getAllByTestId("scientific-calculator-scalar-section")).toHaveLength(1);
+  });
+
+  it("clears stale theory context when a standalone workstation solve arrives", async () => {
+    const scrollIntoView = vi.fn();
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    useTheoryCompoundRunStore.getState().loadTheoryRun(buildScalarTheoryRun());
+
+    try {
+      render(<ScientificCalculatorPanel />);
+
+      const theorySection = await screen.findByTestId("scientific-calculator-theory-run-section");
+      const scalarSection = screen.getByTestId("scientific-calculator-scalar-section");
+      expect(theorySection).toHaveStyle({ order: "0" });
+      expect(scalarSection).toHaveStyle({ order: "1" });
+
+      act(() => {
+        useScientificCalculatorStore.getState().setSolveResult(runScientificSolve("2*(3+4)", false), {
+          actionId: "solve_expression",
+          source: "workstation_action",
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue("2*(3+4)")).toBeInTheDocument();
+        expect(screen.getByTestId("scientific-calculator-scalar-section")).toHaveStyle({ order: "0" });
+        expect(screen.queryByTestId("scientific-calculator-theory-run-section")).toBeNull();
+      });
+      expect(useTheoryCompoundRunStore.getState().activeTheoryRun).toBeNull();
+      await waitFor(() => {
+        expect(scrollIntoView).toHaveBeenCalledWith({ block: "start", behavior: "smooth" });
+      });
+    } finally {
+      if (originalScrollIntoView) {
+        Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+          configurable: true,
+          value: originalScrollIntoView,
+        });
+      } else {
+        delete (HTMLElement.prototype as Partial<Pick<HTMLElement, "scrollIntoView">>).scrollIntoView;
+      }
+    }
   });
 
   it("scrolls the selected theory run row into view", async () => {
