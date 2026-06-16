@@ -447,6 +447,100 @@ describe("Helix Ask tool lifecycle trace", () => {
     });
   });
 
+  it("does not count a policy-rejected runtime tool call as execution", () => {
+    const payload: Record<string, unknown> = {
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:calculator-policy-rejected",
+        capability_family: "debug_export",
+        requested_action: "scientific-calculator.solve_expression",
+        admission_status: "admitted",
+      },
+      runtime_tool_call: {
+        tool_call_id: "tool:calculator-policy-rejected",
+        capability_key: "scientific-calculator.solve_expression",
+        status: "rejected",
+      },
+      terminal_artifact_kind: "typed_failure",
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer.v1",
+        selected_terminal_artifact_kind: "typed_failure",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "typed_failure",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "runtime_tool_call:calculator-policy-rejected",
+          kind: "runtime_tool_call",
+          payload: {
+            schema: "helix.runtime_tool_call.v1",
+            capability_key: "scientific-calculator.solve_expression",
+          },
+        },
+        {
+          artifact_id: "runtime_tool_observation:calculator-policy-rejected",
+          kind: "runtime_tool_observation",
+          payload: {
+            schema: "helix.runtime_tool_observation.v1",
+            summary:
+              "Runtime tool call rejected before execution: runtime_capability_not_admitted_by_tool_policy:scientific-calculator.solve_expression:calculator|workstation_action, runtime_tool_forbidden_by_tool_policy:scientific-calculator.solve_expression.",
+          },
+        },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:calculator-policy-rejected", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:calculator-policy-rejected", payload });
+
+    expect(index).toMatchObject({
+      tool_family: "calculator",
+      capability: "scientific-calculator.solve_expression",
+      missing_required_observation_kinds: expect.arrayContaining([
+        "calculator_receipt",
+        "calculator_result_trace",
+        "calculator_result_validation",
+      ]),
+    });
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      route_family: "calculator",
+      selected_capability: "scientific-calculator.solve_expression",
+      executed_capability: null,
+      policy_rejection_ref: "runtime_tool_observation:calculator-policy-rejected",
+      observation_ref: null,
+      materialized_terminal_artifact_kind: "typed_failure",
+      terminal_authority_kind: "typed_failure",
+      visible_terminal_kind: "typed_failure",
+      rail_status: "fail_closed",
+      rail_failure_code: "tool_execution_rejected",
+    });
+    expect(index.tool_rail_failure_triage).toMatchObject({
+      route_family: "calculator",
+      selected_capability: "scientific-calculator.solve_expression",
+      executed_capability: null,
+      did_tool_run: false,
+      observation_ref: null,
+      first_broken_rail: "capability_execution",
+      failure_bucket: "A_tool_did_not_execute",
+      repair_target: "tool_admission",
+      rail_status: "fail_closed",
+      rail_failure_code: "tool_execution_rejected",
+    });
+    expect(index.tool_turn_chain_family_matrix).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          route_family: "calculator",
+          observed: true,
+          did_tool_run: false,
+          artifact_produced: false,
+          rail_status: "fail_closed",
+          rail_failure_code: "tool_execution_rejected",
+        }),
+      ]),
+    );
+  });
+
   it("classifies internet search provider key failures as config_missing", () => {
     const payload: Record<string, unknown> = {
       capability_plan: {

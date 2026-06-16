@@ -11,7 +11,7 @@ import React, {
 } from "react";
 import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
-import { BrainCircuit, Bug, Copy, FileText, Image as ImageIcon, Mic, Plus, Radio, RotateCcw, Search, Square, Volume2, X } from "lucide-react";
+import { BrainCircuit, Bug, Copy, FileText, Headphones, Image as ImageIcon, Mic, Plus, Radio, RotateCcw, Search, Square, Volume2, X } from "lucide-react";
 import { panelRegistry, getPanelDef, type PanelDefinition } from "@/lib/desktop/panelRegistry";
 import {
   findBestDocForTopic,
@@ -35985,6 +35985,7 @@ export function HelixAskPill({
                     type="button"
                     aria-label={micArmState === "on" ? "Disable microphone" : "Enable microphone"}
                     aria-pressed={micArmState === "on"}
+                    title={micArmState === "on" ? "Disable microphone" : "Enable microphone"}
                     className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
                       micArmState === "on"
                         ? voiceInputState === "transcribing"
@@ -36016,6 +36017,7 @@ export function HelixAskPill({
                     type="button"
                     aria-label="Capture visual source for Situation Room"
                     aria-pressed={visualSituationSourceStatus === "active"}
+                    title="Capture visual source"
                     className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
                       visualSituationSourceStatus === "active"
                         ? "border-cyan-300/50 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-400/20"
@@ -36035,7 +36037,7 @@ export function HelixAskPill({
                     type="button"
                     aria-label={visualSituationIncludeAudio ? "Disable tab audio for visual capture" : "Enable tab audio for visual capture"}
                     aria-pressed={visualSituationIncludeAudio}
-                    title={visualSituationIncludeAudio ? "Tab audio will be requested with visual capture" : "Visual capture only"}
+                    title={visualSituationIncludeAudio ? "Disable tab audio for visual capture" : "Enable tab audio for visual capture"}
                     className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
                       visualSituationIncludeAudio
                         ? displayAudioStatus === "error"
@@ -36046,12 +36048,13 @@ export function HelixAskPill({
                     onClick={handleVisualSituationAudioPreferenceToggle}
                     disabled={visualSituationSourceStatus === "requesting"}
                   >
-                    <Volume2
+                    <Headphones
                       className={`h-4 w-4 ${visualSituationIncludeAudio && displayAudioStatus !== "error" ? "animate-pulse" : ""}`}
                     />
                   </button>
                   <button
                     aria-label={askBusy ? "Stop generation" : "Submit prompt"}
+                    title={askBusy ? "Stop generation" : "Submit prompt"}
                     className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-100 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60"
                     onClick={askBusy ? handleStop : undefined}
                     type={askBusy ? "button" : "submit"}

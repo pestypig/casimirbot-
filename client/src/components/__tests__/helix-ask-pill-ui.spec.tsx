@@ -781,7 +781,20 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("attachDisplayAudioSource(");
     expect(source).toContain("onTranscriptChunk: postHelixAskAudioTranscriptChunk");
     expect(source).toContain('aria-label={visualSituationIncludeAudio ? "Disable tab audio for visual capture" : "Enable tab audio for visual capture"}');
+    expect(source).toContain('title={visualSituationIncludeAudio ? "Disable tab audio for visual capture" : "Enable tab audio for visual capture"}');
+    expect(source).toContain("<Headphones");
+    expect(source).not.toContain("Visual capture only");
     expect(source).toContain("handleVisualSituationAudioPreferenceToggle");
+  });
+
+  it("keeps primary composer icon buttons discoverable on hover", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+
+    expect(source).toContain('title="Attach image"');
+    expect(source).toContain('title={micArmState === "on" ? "Disable microphone" : "Enable microphone"}');
+    expect(source).toContain('title="Capture visual source"');
+    expect(source).toContain('title={visualSituationIncludeAudio ? "Disable tab audio for visual capture" : "Enable tab audio for visual capture"}');
+    expect(source).toContain('title={askBusy ? "Stop generation" : "Submit prompt"}');
   });
 
   it("routes finalized voice into active-turn steering before normal Ask dispatch", () => {

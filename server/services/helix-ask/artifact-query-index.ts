@@ -10,6 +10,7 @@ type RecordLike = Record<string, unknown>;
 type RailFailureCode =
   | "route_family_mismatch"
   | "tool_admission_drift"
+  | "tool_execution_rejected"
   | "observation_missing"
   | "observation_not_reentered"
   | "reentry_step_not_executed"
@@ -57,6 +58,7 @@ type RepairTarget =
 const TOOL_TURN_CHAIN_FAILURE_CODES: RailFailureCode[] = [
   "route_family_mismatch",
   "tool_admission_drift",
+  "tool_execution_rejected",
   "observation_missing",
   "observation_not_reentered",
   "reentry_step_not_executed",
@@ -202,6 +204,17 @@ const normalizedEqual = (left: unknown, right: unknown): boolean => {
   return Boolean(normalizedLeft && normalizedRight && normalizedLeft === normalizedRight);
 };
 
+const isGenericAuditFamily = (family: unknown): boolean => {
+  const normalized = normalize(family);
+  return (
+    !normalized ||
+    normalized === "none" ||
+    normalized === "unknown" ||
+    normalized === "debug_export" ||
+    normalized === "workstation_action"
+  );
+};
+
 const capabilityFromPayload = (payload: RecordLike, lifecycleTrace: RecordLike | null): string | null => {
   const operationalTrace = readRecord(payload.operational_capability_trace);
   const plan = readRecord(payload.capability_plan);
@@ -290,10 +303,7 @@ const shouldPreferArtifactFamily = (family: string | null, capability: string | 
   const normalizedFamily = normalize(family);
   const normalizedCapability = normalize(capability);
   return (
-    !normalizedFamily ||
-    normalizedFamily === "none" ||
-    normalizedFamily === "unknown" ||
-    normalizedFamily === "workstation_action" ||
+    isGenericAuditFamily(normalizedFamily) ||
     normalizedCapability === "model_direct_answer" ||
     normalizedCapability === "model_answer"
   );
@@ -324,7 +334,8 @@ const contractSummary = (contract: ToolFamilyContract | null): RecordLike | null
     : null;
 
 const canonicalAuditFamily = (family: unknown, capability?: unknown): string | null => {
-  const normalized = normalize(family) || normalize(capability);
+  const capabilityFamily = inferToolFamilyFromToolName(readString(capability));
+  const normalized = isGenericAuditFamily(family) && capabilityFamily ? normalize(capabilityFamily) : normalize(family) || normalize(capability);
   if (!normalized) return null;
   if (normalized.includes("live_source") || normalized.includes("live_env") || normalized.includes("micro_reasoner")) {
     return "live_env";
@@ -334,6 +345,67 @@ const canonicalAuditFamily = (family: unknown, capability?: unknown): string | n
   }
   return normalized;
 };
+
+const rejectedToolExecutionTexts = (payload: RecordLike, artifacts: RecordLike[]): string[] => {
+  const payloadCandidates = [
+    payload.runtime_tool_observation,
+    payload.runtime_tool_call_validation,
+    payload.runtime_tool_rejection,
+    payload.tool_call_admission_decision,
+    payload.capability_result,
+  ];
+  const artifactCandidates = artifacts.filter((artifact) =>
+    /runtime_tool_observation|runtime_tool_call_validation|tool_rejection|tool_admission/i.test(
+      [
+        readString(artifact.kind),
+        readString(artifact.schema),
+        readString(artifactPayload(artifact)?.schema),
+        readString(artifact.producer_item_id),
+      ].join(" "),
+    ),
+  );
+  return [
+    ...payloadCandidates.map(readRecord).filter((entry): entry is RecordLike => Boolean(entry)),
+    ...artifactCandidates.flatMap((artifact) => [artifact, artifactPayload(artifact)].filter(Boolean) as RecordLike[]),
+  ].map((entry) =>
+    [
+      readString(entry.status),
+      readString(entry.decision),
+      readString(entry.reason),
+      readString(entry.failure_reason),
+      readString(entry.error_code),
+      readString(entry.message),
+      readString(entry.summary),
+      readString(entry.text),
+    ].join("\n"),
+  );
+};
+
+const runtimeToolExecutionRejected = (payload: RecordLike, artifacts: RecordLike[]): boolean =>
+  rejectedToolExecutionTexts(payload, artifacts).some((text) =>
+    /\b(?:rejected\s+before\s+execution|forbidden(?:\s+by\s+tool\s+policy)?|not[_\s-]?admitted|blocked\s+before\s+execution|runtime_capability_not_admitted_by_tool_policy|runtime_tool_forbidden_by_tool_policy|tool_call_rejected|tool_execution_rejected)\b/i.test(text),
+  );
+
+const runtimeToolPolicyRejectionArtifact = (artifacts: RecordLike[]): RecordLike | null =>
+  artifacts.find((artifact) =>
+    /\b(?:runtime_tool_observation|runtime_tool_call_validation|tool_rejection|tool_admission)\b/i.test(
+      [
+        readString(artifact.kind),
+        readString(artifact.schema),
+        readString(artifactPayload(artifact)?.schema),
+        readString(artifact.producer_item_id),
+      ].join(" "),
+    ) &&
+      /\b(?:rejected\s+before\s+execution|forbidden|not[_\s-]?admitted|runtime_capability_not_admitted_by_tool_policy|runtime_tool_forbidden_by_tool_policy)\b/i.test(
+        [
+          readString(artifactPayload(artifact)?.summary),
+          readString(artifactPayload(artifact)?.message),
+          readString(artifactPayload(artifact)?.failure_reason),
+          readString(artifactPayload(artifact)?.error_code),
+          readString(artifactPayload(artifact)?.text),
+        ].join("\n"),
+      ),
+  ) ?? null;
 
 const likelyInternetSearchConfigMissing = (payload: RecordLike, routeFamily: string | null): boolean => {
   if (canonicalAuditFamily(routeFamily) !== "internet_search") return false;
@@ -469,24 +541,32 @@ const buildToolTurnChainAudit = (input: {
     firstString(input.lifecycleTrace?.admitted_capability, input.lifecycleTrace?.requested_capability) ?? input.capability;
   const operationalTrace = readRecord(input.payload.operational_capability_trace);
   const runtimeToolCall = readRecord(input.payload.runtime_tool_call);
-  const executedCapability = firstString(
+  const toolExecutionRejected = runtimeToolExecutionRejected(input.payload, input.artifacts);
+  const rawExecutedCapability = firstString(
     input.lifecycleTrace?.executed_capability,
     operationalTrace?.executed_capability,
     runtimeToolCall?.capability_key,
   );
-  const routeFamily = firstString(input.toolFamily, input.contract?.toolFamily, inferToolFamilyFromToolName(selectedCapability));
+  const executedCapability = toolExecutionRejected ? null : rawExecutedCapability;
   const selectedFamily = inferToolFamilyFromToolName(selectedCapability);
+  const rawRouteFamily = firstString(input.toolFamily, input.contract?.toolFamily, selectedFamily);
+  const routeFamily = isGenericAuditFamily(rawRouteFamily) && selectedFamily ? selectedFamily : rawRouteFamily;
   const executedFamily = inferToolFamilyFromToolName(executedCapability);
   const observationCoverage = input.requiredObservationCoverage.find((entry) => readBoolean(entry.present));
+  const policyRejectionArtifact = runtimeToolPolicyRejectionArtifact(input.artifacts);
   const observationArtifactKind =
-    readString(observationCoverage?.kind) ||
-    input.artifacts
-      .map((artifact) => readString(artifact.kind) || readString(artifact.schema))
-      .find((kind) => /(?:observation|result|receipt|context|validation|trace|packet|resolution|reflection)/i.test(kind)) ||
-    null;
+    toolExecutionRejected
+      ? null
+      : readString(observationCoverage?.kind) ||
+        input.artifacts
+          .map((artifact) => readString(artifact.kind) || readString(artifact.schema))
+          .find((kind) => /(?:observation|result|receipt|context|validation|trace|packet|resolution|reflection)/i.test(kind)) ||
+        null;
   const observationRef =
-    readStringArray(observationCoverage?.artifact_refs)[0] ||
-    (observationArtifactKind ? artifactRef(artifactForKind(input.artifacts, observationArtifactKind) ?? {}) : null);
+    toolExecutionRejected
+      ? null
+      : readStringArray(observationCoverage?.artifact_refs)[0] ||
+        (observationArtifactKind ? artifactRef(artifactForKind(input.artifacts, observationArtifactKind) ?? {}) : null);
   const requiredTerminal = requiredTerminalKind(input.payload, input.contract);
   const supportCount = supportRefsCount(input.payload, input.artifacts);
   const materializedTerminal = materializedTerminalKind(input.payload);
@@ -532,21 +612,23 @@ const buildToolTurnChainAudit = (input: {
         ? "route_family_mismatch"
         : toolAdmissionDrift
           ? "tool_admission_drift"
-          : !input.requiredObservationsSatisfied
-            ? "observation_missing"
-            : observationRef && !reentryExecuted
-              ? "observation_not_reentered"
-              : expectedReentry && !reentryExecuted
-                ? "reentry_step_not_executed"
-                : draftNeedsSupport && supportCount === 0
-                  ? "support_refs_missing"
-                  : terminalProductMismatch
-                    ? "terminal_product_mismatch"
-                    : !materializedTerminal
-                      ? "terminal_not_materialized"
-                      : terminalProjectionMismatch
-                        ? "terminal_projection_mismatch"
-                        : null;
+          : toolExecutionRejected
+            ? "tool_execution_rejected"
+            : !input.requiredObservationsSatisfied
+              ? "observation_missing"
+              : observationRef && !reentryExecuted
+                ? "observation_not_reentered"
+                : expectedReentry && !reentryExecuted
+                  ? "reentry_step_not_executed"
+                  : draftNeedsSupport && supportCount === 0
+                    ? "support_refs_missing"
+                    : terminalProductMismatch
+                      ? "terminal_product_mismatch"
+                      : !materializedTerminal
+                        ? "terminal_not_materialized"
+                        : terminalProjectionMismatch
+                          ? "terminal_projection_mismatch"
+                          : null;
   const railStatus: RailStatus =
     railFailureCode === null ? "complete" : materializedTerminal === "typed_failure" ? "fail_closed" : "broken";
 
@@ -555,6 +637,8 @@ const buildToolTurnChainAudit = (input: {
     route_family: routeFamily,
     selected_capability: selectedCapability,
     executed_capability: executedCapability,
+    policy_rejection_ref: toolExecutionRejected && policyRejectionArtifact ? artifactRef(policyRejectionArtifact) : null,
+    policy_rejection_reason: toolExecutionRejected ? rejectedToolExecutionTexts(input.payload, input.artifacts).find(Boolean) ?? null : null,
     observation_artifact_kind: observationArtifactKind,
     observation_ref: observationRef,
     required_terminal_kind: requiredTerminal,
@@ -642,6 +726,13 @@ const triageFromAudit = (audit: RecordLike): {
       repair_target: "tool_admission",
     };
   }
+  if (railFailureCode === "tool_execution_rejected") {
+    return {
+      first_broken_rail: "capability_execution",
+      failure_bucket: "A_tool_did_not_execute",
+      repair_target: "tool_admission",
+    };
+  }
   if (selectedCapability && !executedCapability) {
     return {
       first_broken_rail: "capability_execution",
@@ -715,6 +806,8 @@ const buildToolRailFailureTriage = (input: {
     selected_capability: readNullableString(input.audit.selected_capability),
     executed_capability: executedCapability || null,
     did_tool_run: Boolean(executedCapability),
+    policy_rejection_ref: readNullableString(input.audit.policy_rejection_ref),
+    policy_rejection_reason: readNullableString(input.audit.policy_rejection_reason),
     observation_artifact_kind: readNullableString(input.audit.observation_artifact_kind),
     observation_ref: observationRef || null,
     reentry_executed: input.audit.reentry_executed === true,
@@ -788,6 +881,7 @@ export const buildArtifactQueryIndex = (input: {
     toolName: capability,
     toolFamily,
   });
+  const resolvedToolFamily = isGenericAuditFamily(toolFamily) && contract?.toolFamily ? contract.toolFamily : toolFamily;
   const artifactRefs = artifacts.map(buildArtifactEntry);
   const requiredObservationCoverage = (contract?.requiredObservationKinds ?? []).map((kind) => {
     const matches = artifacts.filter((artifact) => observationKindMatches(artifact, kind)).map(artifactRef);
@@ -807,7 +901,7 @@ export const buildArtifactQueryIndex = (input: {
     lifecycleTrace,
     followupDecision,
     capability,
-    toolFamily,
+    toolFamily: resolvedToolFamily,
     contract,
     requiredObservationCoverage,
     requiredObservationsSatisfied,
@@ -824,7 +918,7 @@ export const buildArtifactQueryIndex = (input: {
     artifact_count: artifactRefs.length,
     artifact_refs: artifactRefs,
     queryable_artifact_keys: unique(artifactRefs.flatMap((entry) => readStringArray(entry.query_keys))),
-    tool_family: toolFamily,
+    tool_family: resolvedToolFamily,
     capability,
     tool_family_contract: contractSummary(contract),
     required_observation_coverage: requiredObservationCoverage,
