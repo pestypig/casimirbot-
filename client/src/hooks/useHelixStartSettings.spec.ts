@@ -26,6 +26,7 @@ describe("Helix Start settings defaults", () => {
 
   it("resolves interface message catalogs with English fallback", () => {
     expect(createInterfaceTextResolver("haw").t("account.language.title")).toBe("\u02bb\u014clelo");
+    expect(createInterfaceTextResolver("haw").t("account.header.title")).toBe("Account & Sessions");
     expect(createInterfaceTextResolver("zz").t("account.language.interfaceLabel")).toBe("Interface language");
   });
 });

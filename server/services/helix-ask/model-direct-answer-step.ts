@@ -220,10 +220,19 @@ export function applyModelDirectAnswerDraftStep(input: {
   agentStepDecision: RecordLike;
   draftText: string;
   authority?: "model" | "deterministic_policy_fallback";
+  artifactRefs?: string[];
+  supportRefs?: string[];
+  evidenceRefs?: string[];
+  goalKind?: string;
+  requiredTerminalKind?: string;
+  modelStepCapability?: string;
 }): RecordLike {
   const text = input.draftText.trim();
   const authority = input.authority ?? "model";
   const payload = input.payload ?? {};
+  const artifactRefs = input.artifactRefs ?? input.supportRefs ?? input.evidenceRefs ?? [];
+  const supportRefs = input.supportRefs ?? input.artifactRefs ?? input.evidenceRefs ?? [];
+  const evidenceRefs = input.evidenceRefs ?? input.supportRefs ?? input.artifactRefs ?? [];
   const existingLoop = readRecord(payload.agent_runtime_loop);
   const existingIterations = readArray(existingLoop?.iterations).map(normalizeRuntimeLoopIterationDecisionAuthority);
   const decisionId =
@@ -257,6 +266,12 @@ export function applyModelDirectAnswerDraftStep(input: {
     source: "model_direct_answer",
     direct_answer_ref: directAnswerArtifactId,
     decision_ref: decisionId,
+    goal_kind: input.goalKind,
+    required_terminal_kind: input.requiredTerminalKind,
+    artifact_refs: artifactRefs,
+    support_refs: supportRefs,
+    evidence_refs: evidenceRefs,
+    model_step_capability: input.modelStepCapability ?? "model.direct_answer",
     assistant_answer: false,
     raw_content_included: false,
   };

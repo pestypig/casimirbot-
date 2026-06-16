@@ -4,15 +4,16 @@ import {
   normalizeInterfaceLanguageCode,
   type InterfaceLanguageCode,
 } from "@/lib/i18n/interfaceLanguage";
+import { pushWorkstationDebugEvent } from "@/lib/helix/workstation-debug";
 import { enMessages } from "@/lib/i18n/messages/en";
 import { hawMessages } from "@/lib/i18n/messages/haw";
 import type {
-  InterfaceMessageCatalog,
   InterfaceMessageId,
   InterfaceMessageValues,
+  InterfaceTargetCatalog,
 } from "@/lib/i18n/messages/types";
 
-const interfaceMessageCatalogs: Record<InterfaceLanguageCode, InterfaceMessageCatalog> = {
+const interfaceMessageCatalogs: Record<InterfaceLanguageCode, InterfaceTargetCatalog<InterfaceMessageId>> = {
   en: enMessages,
   haw: hawMessages,
 };
@@ -38,7 +39,25 @@ export function createInterfaceTextResolver(languageValue: unknown): InterfaceTe
   const fallbackCatalog = interfaceMessageCatalogs[DEFAULT_INTERFACE_LANGUAGE];
   return {
     language,
-    t: (id, values) => formatMessage(catalog[id] ?? fallbackCatalog[id] ?? id, values),
+    t: (id, values) => {
+      const localized = catalog[id];
+      if (localized !== undefined) return formatMessage(localized, values);
+      const fallback = fallbackCatalog[id];
+      if (fallback !== undefined && language !== DEFAULT_INTERFACE_LANGUAGE) {
+        pushWorkstationDebugEvent({
+          channel: "interface_i18n",
+          action: "message.fallback_used",
+          detail: {
+            language,
+            message_id: id,
+            fallback_language: DEFAULT_INTERFACE_LANGUAGE,
+            source_surface: "account-session",
+          },
+        });
+        return formatMessage(fallback, values);
+      }
+      return formatMessage(id, values);
+    },
   };
 }
 

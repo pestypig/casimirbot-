@@ -3,6 +3,8 @@ export type WorkstationDebugEvent = {
   ts: string;
   channel:
     | "account_session"
+    | "interface_i18n"
+    | "interface_translation_job"
     | "situation_room"
     | "situation_room_job"
     | "situation_room_translation"

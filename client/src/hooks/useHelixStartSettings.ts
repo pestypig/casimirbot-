@@ -3,6 +3,7 @@ import { setAlcubierreDebugLogEnabled } from "@/lib/alcubierre-debug-log";
 import { setWorkstationDebugEnabled } from "@/lib/helix/workstation-debug";
 import {
   DEFAULT_INTERFACE_LANGUAGE,
+  getInterfaceLanguageOption,
   normalizeInterfaceLanguageCode,
   type InterfaceLanguageCode,
 } from "@/lib/i18n/interfaceLanguage";
@@ -145,6 +146,13 @@ export function useHelixStartSettings() {
     window.addEventListener(INTERFACE_LANGUAGE_CHANGED_EVENT, handleInterfaceLanguageChanged);
     return () => window.removeEventListener(INTERFACE_LANGUAGE_CHANGED_EVENT, handleInterfaceLanguageChanged);
   }, []);
+
+  React.useEffect(() => {
+    if (typeof document === "undefined") return;
+    const option = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+    document.documentElement.lang = option.bcp47;
+    document.documentElement.dir = option.direction;
+  }, [userSettings.interfaceLanguage]);
 
   React.useEffect(() => {
     setAlcubierreDebugLogEnabled(Boolean(userSettings.showAlcubierreRenderDebugLog));

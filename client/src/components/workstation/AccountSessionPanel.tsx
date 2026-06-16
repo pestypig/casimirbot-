@@ -251,6 +251,7 @@ export default function AccountSessionPanel() {
   const usage = status.usage;
   const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
   const interfaceText = useInterfaceText(interfaceLanguage.code);
+  const t = interfaceText.t;
   const showLocalDevSignIn = import.meta.env.DEV;
 
   return (
@@ -260,10 +261,10 @@ export default function AccountSessionPanel() {
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-sm font-semibold text-white">
               <UserCircle className="h-4 w-4 text-cyan-300" />
-              Account & Sessions
+              {t("account.header.title")}
             </div>
             <p className="mt-1 text-xs text-slate-400">
-              Profile, linked sources, memory scope, and usage for the current workstation.
+              {t("account.header.description")}
             </p>
           </div>
           <button
@@ -271,7 +272,7 @@ export default function AccountSessionPanel() {
             onClick={refresh}
             className="rounded border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-200 hover:bg-white/10"
           >
-            {loading ? "Loading..." : "Refresh"}
+            {loading ? t("account.action.loading") : t("account.action.refresh")}
           </button>
         </div>
         {error ? <p className="mt-2 text-xs text-rose-300">{error}</p> : null}
@@ -282,7 +283,7 @@ export default function AccountSessionPanel() {
           <section className="rounded-lg border border-white/10 bg-black/20 p-3">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
               <ShieldCheck className="h-3.5 w-3.5" />
-              Session
+              {t("account.session.title")}
             </div>
             {session ? (
               <div className="mt-3 space-y-2 text-sm">
@@ -290,13 +291,19 @@ export default function AccountSessionPanel() {
                 <p className="break-all text-xs text-slate-400">{session.profile.profile_id}</p>
                 {session.profile.email ? <p className="break-all text-xs text-slate-500">{session.profile.email}</p> : null}
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <span className="rounded bg-white/5 px-2 py-1">status {session.status}</span>
-                  <span className="rounded bg-white/5 px-2 py-1">memory {session.memory_scope}</span>
-                  <span className="rounded bg-white/5 px-2 py-1">auth {session.profile.auth_mode}</span>
                   <span className="rounded bg-white/5 px-2 py-1">
-                    provider {session.profile.provider ?? "local"}
+                    {t("account.session.statusValue", { status: session.status })}
                   </span>
-                  <span className="rounded bg-white/5 px-2 py-1">agent passwords off</span>
+                  <span className="rounded bg-white/5 px-2 py-1">
+                    {t("account.session.memoryValue", { memory: session.memory_scope })}
+                  </span>
+                  <span className="rounded bg-white/5 px-2 py-1">
+                    {t("account.session.authValue", { authMode: session.profile.auth_mode })}
+                  </span>
+                  <span className="rounded bg-white/5 px-2 py-1">
+                    {t("account.session.providerValue", { provider: session.profile.provider ?? "local" })}
+                  </span>
+                  <span className="rounded bg-white/5 px-2 py-1">{t("account.session.agentPasswordsOff")}</span>
                 </div>
                 <button
                   type="button"
@@ -304,13 +311,13 @@ export default function AccountSessionPanel() {
                   className="mt-2 inline-flex items-center gap-2 rounded border border-rose-400/40 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-100 hover:bg-rose-500/20"
                 >
                   <LogOut className="h-3.5 w-3.5" />
-                  Sign out
+                  {t("account.session.signOut")}
                 </button>
               </div>
             ) : showLocalDevSignIn ? (
               <div className="mt-3 space-y-3">
                 <label className="block text-xs text-slate-300">
-                  Username
+                  {t("account.signIn.username")}
                   <input
                     value={localUsername}
                     onChange={(event) => setLocalUsername(event.target.value)}
@@ -319,7 +326,7 @@ export default function AccountSessionPanel() {
                   />
                 </label>
                 <label className="block text-xs text-slate-300">
-                  Password
+                  {t("account.signIn.password")}
                   <input
                     type="password"
                     value={localPassword}
@@ -335,17 +342,18 @@ export default function AccountSessionPanel() {
                   className="inline-flex items-center gap-2 rounded border border-cyan-400/40 bg-cyan-500/15 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/25"
                 >
                   <LogIn className="h-3.5 w-3.5" />
-                  Sign in
+                  {t("account.signIn.submit")}
                 </button>
                 <p className="text-[11px] text-slate-500">
-                  Development-only profile sign-in for local profile-storage experiments.
-                  {status.auth_boundary.local_password_profile_dev_default
-                    ? " Default credentials are admin/password until HELIX_LOCAL_PROFILE_PASSWORD_HASH is configured."
-                    : null}
+                  {t("account.signIn.devNote", {
+                    defaultCredentialsNote: status.auth_boundary.local_password_profile_dev_default
+                      ? t("account.signIn.defaultCredentialsNote")
+                      : "",
+                  })}
                 </p>
                 <div className="border-t border-white/10 pt-3">
                   <p className="mb-2 text-xs text-slate-400">
-                    Use Google when you want this workstation profile and remembered procedures attached to your account.
+                    {t("account.signIn.googleProfileNote")}
                   </p>
                   <GoogleSignInButton redirectTarget={null} onSignedIn={refresh} />
                 </div>
@@ -353,13 +361,12 @@ export default function AccountSessionPanel() {
             ) : (
               <div className="mt-3 space-y-3">
                 <p className="text-xs text-slate-400">
-                  No profile session is active. You can keep using the workstation as a guest; sign in only when you want
-                  profile-scoped memory and remembered procedures.
+                  {t("account.guest.description")}
                 </p>
                 <div className="rounded border border-cyan-400/20 bg-cyan-500/10 p-3">
                   <div className="mb-2 flex items-center gap-2 text-xs font-medium text-cyan-100">
                     <LogIn className="h-3.5 w-3.5" />
-                    Save to your CasimirBot profile
+                    {t("account.guest.saveProfileTitle")}
                   </div>
                   <GoogleSignInButton redirectTarget={null} onSignedIn={refresh} />
                 </div>
@@ -385,7 +392,11 @@ export default function AccountSessionPanel() {
                   >
                     {INTERFACE_LANGUAGE_OPTIONS.map((option) => (
                       <option key={option.code} value={option.code}>
-                        {option.label} ({option.nativeLabel})
+                        {t("account.language.optionReadiness", {
+                          label: option.label,
+                          nativeLabel: option.nativeLabel,
+                          readiness: option.readiness,
+                        })}
                       </option>
                     ))}
                   </select>
@@ -395,21 +406,24 @@ export default function AccountSessionPanel() {
 
             <details className="group rounded-lg border border-white/10 bg-black/20 p-3">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
-                <span>Usage</span>
+                <span>{t("account.usage.title")}</span>
                 <ChevronDown
                   className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180"
                   aria-hidden
                 />
               </summary>
               <div className="mt-3 grid grid-cols-2 gap-2 text-xs md:grid-cols-5">
-                <Metric label="Threads" value={usage.thread_count} />
-                <Metric label="Items" value={usage.item_count} />
-                <Metric label="Answers" value={usage.answer_count} />
-                <Metric label="Observations" value={usage.tool_observation_count} />
-                <Metric label="Est. tokens" value={usage.estimated_token_count} />
+                <Metric label={t("account.usage.threads")} value={usage.thread_count} />
+                <Metric label={t("account.usage.items")} value={usage.item_count} />
+                <Metric label={t("account.usage.answers")} value={usage.answer_count} />
+                <Metric label={t("account.usage.observations")} value={usage.tool_observation_count} />
+                <Metric label={t("account.usage.estimatedTokens")} value={usage.estimated_token_count} />
               </div>
               <div className="mt-4 text-xs text-slate-400">
-                Window: {usage.window_started_at || "none"} {"->"} {usage.window_ended_at || "none"}
+                {t("account.usage.window", {
+                  startedAt: usage.window_started_at || t("account.common.none"),
+                  endedAt: usage.window_ended_at || t("account.common.none"),
+                })}
               </div>
             </details>
           </div>
@@ -418,11 +432,11 @@ export default function AccountSessionPanel() {
         <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
             <Link2 className="h-3.5 w-3.5" />
-            Linked Accounts & Sessions
+            {t("account.linked.title")}
           </div>
           <div className="mt-3 space-y-2">
             {status.linked_accounts.length === 0 ? (
-              <p className="text-xs text-slate-500">No linked accounts yet.</p>
+              <p className="text-xs text-slate-500">{t("account.linked.empty")}</p>
             ) : (
               status.linked_accounts.map((account: HelixAccountLinkedAccount) => (
                 <div
@@ -442,20 +456,20 @@ export default function AccountSessionPanel() {
         <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
             <Database className="h-3.5 w-3.5" />
-            Workspace Memory
+            {t("account.memory.title")}
           </div>
           <p className="mt-2 text-xs text-slate-400">
-            Local registry for notes, Helix Ask chats, layout snapshots, and browser-session drafts.
+            {t("account.memory.description")}
           </p>
           <div className="mt-3 grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
-            <Metric label="Artifacts" value={memoryRegistrySnapshot.artifacts.length} />
-            <Metric label="Profile-ready" value={memoryRegistrySnapshot.profile_ready_artifact_count} />
-            <Metric label="Local only" value={memoryRegistrySnapshot.local_only_artifact_count} />
-            <Metric label="Session only" value={memoryRegistrySnapshot.session_only_artifact_count} />
+            <Metric label={t("account.memory.artifacts")} value={memoryRegistrySnapshot.artifacts.length} />
+            <Metric label={t("account.memory.profileReady")} value={memoryRegistrySnapshot.profile_ready_artifact_count} />
+            <Metric label={t("account.memory.localOnly")} value={memoryRegistrySnapshot.local_only_artifact_count} />
+            <Metric label={t("account.memory.sessionOnly")} value={memoryRegistrySnapshot.session_only_artifact_count} />
           </div>
           <div className="mt-3 space-y-1.5">
             {memoryRegistrySnapshot.artifacts.length === 0 ? (
-              <p className="text-xs text-slate-500">No workspace memory artifacts have been registered yet.</p>
+              <p className="text-xs text-slate-500">{t("account.memory.empty")}</p>
             ) : (
               memoryRegistrySnapshot.artifacts.slice(0, 8).map((artifact) => (
                 <div
@@ -486,14 +500,14 @@ export default function AccountSessionPanel() {
         <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
             <Link2 className="h-3.5 w-3.5" />
-            Discord Companion Sessions
+            {t("account.discord.title")}
           </div>
           <p className="mt-2 text-xs text-slate-400">
-            Linked Discord sessions use web profile linking. The bot never collects account passwords.
+            {t("account.discord.description")}
           </p>
           <div className="mt-3 space-y-2">
             {discordSessions.length === 0 ? (
-              <p className="text-xs text-slate-500">No Discord companion sessions are active.</p>
+              <p className="text-xs text-slate-500">{t("account.discord.empty")}</p>
             ) : (
               discordSessions.map((discordSession: DiscordSessionView) => {
                 const commander = discordSession.participants.find(
@@ -507,15 +521,29 @@ export default function AccountSessionPanel() {
                   >
                     <div className="min-w-0">
                       <div className="truncate font-medium text-slate-200">{discordSession.session_id}</div>
-                      <div className="mt-1 truncate text-slate-500">thread {discordSession.thread_id ?? "unbound"}</div>
+                      <div className="mt-1 truncate text-slate-500">
+                        {t("account.discord.threadValue", {
+                          threadId: discordSession.thread_id ?? t("account.common.unbound"),
+                        })}
+                      </div>
                     </div>
                     <span className="rounded bg-white/5 px-2 py-1 text-center text-slate-300">
                       {discordSession.status}
                     </span>
                     <div className="text-slate-300">
-                      <div>profile {discordSession.linked_profile_id ?? "unlinked"}</div>
-                      <div className="mt-1">commander {commander?.display_name ?? "none"}</div>
-                      <div className="mt-1">live envs {discordSession.live_environment_ids.length}</div>
+                      <div>
+                        {t("account.discord.profileValue", {
+                          profileId: discordSession.linked_profile_id ?? t("account.common.unlinked"),
+                        })}
+                      </div>
+                      <div className="mt-1">
+                        {t("account.discord.commanderValue", {
+                          commander: commander?.display_name ?? t("account.common.none"),
+                        })}
+                      </div>
+                      <div className="mt-1">
+                        {t("account.discord.liveEnvsValue", { count: discordSession.live_environment_ids.length })}
+                      </div>
                     </div>
                   </div>
                 );
@@ -527,14 +555,14 @@ export default function AccountSessionPanel() {
         <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
             <Archive className="h-3.5 w-3.5" />
-            Profile Situation Archives
+            {t("account.archives.title")}
           </div>
           <p className="mt-2 text-xs text-slate-400">
-            Durable session summaries and evidence indexes saved from continuous categorization jobs.
+            {t("account.archives.description")}
           </p>
           <div className="mt-3 space-y-2">
             {profileArchives.length === 0 ? (
-              <p className="text-xs text-slate-500">No profile situation archives have been saved yet.</p>
+              <p className="text-xs text-slate-500">{t("account.archives.empty")}</p>
             ) : (
               profileArchives.slice(-6).reverse().map((archive: ProfileArchiveView) => (
                 <div
@@ -547,13 +575,13 @@ export default function AccountSessionPanel() {
                     <p className="mt-2 line-clamp-2 text-slate-400">{archive.summary}</p>
                   </div>
                   <div className="space-y-1 text-slate-300">
-                    <div>source {archive.source_family}</div>
-                    <div>evidence {archive.evidence_index.length}</div>
-                    <div>patterns {archive.learned_pattern_candidates.length}</div>
+                    <div>{t("account.archives.sourceValue", { source: archive.source_family })}</div>
+                    <div>{t("account.archives.evidenceValue", { count: archive.evidence_index.length })}</div>
+                    <div>{t("account.archives.patternsValue", { count: archive.learned_pattern_candidates.length })}</div>
                   </div>
                   <div className="space-y-1 text-slate-400">
-                    <div>raw logs {String(archive.raw_logs_included)}</div>
-                    <div>assistant answer {String(archive.assistant_answer)}</div>
+                    <div>{t("account.archives.rawLogsValue", { value: String(archive.raw_logs_included) })}</div>
+                    <div>{t("account.archives.assistantAnswerValue", { value: String(archive.assistant_answer) })}</div>
                     <div>{archive.ended_at}</div>
                   </div>
                 </div>
@@ -565,14 +593,14 @@ export default function AccountSessionPanel() {
         <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
             <Archive className="h-3.5 w-3.5" />
-            Active Categorization Jobs
+            {t("account.jobs.title")}
           </div>
           <p className="mt-2 text-xs text-slate-400">
-            Background evidence builders attached to Helix threads. These are observations and validations, not assistant answers.
+            {t("account.jobs.description")}
           </p>
           <div className="mt-3 space-y-2">
             {categorizationJobs.length === 0 ? (
-              <p className="text-xs text-slate-500">No categorization jobs are active for helix-ask:desktop.</p>
+              <p className="text-xs text-slate-500">{t("account.jobs.empty")}</p>
             ) : (
               categorizationJobs.map((job: CategorizationJobView) => (
                 <div
@@ -589,15 +617,15 @@ export default function AccountSessionPanel() {
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-1 text-slate-300">
-                    <span>events {job.counters.source_events_seen}</span>
-                    <span>categories {job.counters.categorization_events}</span>
-                    <span>evidence {job.counters.synthetic_evidence}</span>
-                    <span>patterns {job.counters.pattern_candidates}</span>
+                    <span>{t("account.jobs.eventsValue", { count: job.counters.source_events_seen })}</span>
+                    <span>{t("account.jobs.categoriesValue", { count: job.counters.categorization_events })}</span>
+                    <span>{t("account.jobs.evidenceValue", { count: job.counters.synthetic_evidence })}</span>
+                    <span>{t("account.jobs.patternsValue", { count: job.counters.pattern_candidates })}</span>
                   </div>
                   <div className="space-y-1 text-slate-400">
-                    <div>archive on stop {String(job.policy.archive_on_stop)}</div>
-                    <div>raw logs {String(job.raw_logs_included)}</div>
-                    <div>{job.last_event_ts ?? "waiting for events"}</div>
+                    <div>{t("account.jobs.archiveOnStopValue", { value: String(job.policy.archive_on_stop) })}</div>
+                    <div>{t("account.jobs.rawLogsValue", { value: String(job.raw_logs_included) })}</div>
+                    <div>{job.last_event_ts ?? t("account.jobs.waitingForEvents")}</div>
                   </div>
                 </div>
               ))
@@ -608,10 +636,10 @@ export default function AccountSessionPanel() {
         <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
             <KeyRound className="h-3.5 w-3.5" />
-            Profile Ingress
+            {t("account.ingress.title")}
           </div>
           <p className="mt-2 text-xs text-slate-400">
-            Per-profile API links for live sources. Secrets are shown once and only a hash is retained server-side.
+            {t("account.ingress.description")}
           </p>
           <div className="mt-3 grid gap-2 md:grid-cols-[1fr_auto]">
             <input
@@ -619,7 +647,7 @@ export default function AccountSessionPanel() {
               onChange={(event) => setIngressLabel(event.target.value)}
               disabled={!session}
               className="rounded border border-white/15 bg-slate-900 px-2 py-1.5 text-sm text-white outline-none focus:border-cyan-400 disabled:opacity-50"
-              placeholder="Token label"
+              placeholder={t("account.ingress.tokenLabel")}
             />
             <button
               type="button"
@@ -627,24 +655,24 @@ export default function AccountSessionPanel() {
               disabled={!session || loading}
               className="rounded border border-cyan-400/40 bg-cyan-500/15 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Create ingress token
+              {t("account.ingress.createToken")}
             </button>
           </div>
           {newTokenValue ? (
             <div className="mt-3 rounded border border-amber-300/30 bg-amber-400/10 p-2 text-xs text-amber-100">
-              <div className="font-medium">Token shown once</div>
+              <div className="font-medium">{t("account.ingress.tokenShownOnce")}</div>
               <div className="mt-1 break-all font-mono text-[11px]">{newTokenValue}</div>
             </div>
           ) : null}
           <div className="mt-3 grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
-            <Metric label="Ingress requests" value={status.profile_ingress_usage.request_count} />
-            <Metric label="Accepted" value={status.profile_ingress_usage.accepted_count} />
-            <Metric label="Rejected" value={status.profile_ingress_usage.rejected_count} />
-            <Metric label="Ingress tokens" value={status.profile_ingress_tokens.length} />
+            <Metric label={t("account.ingress.requests")} value={status.profile_ingress_usage.request_count} />
+            <Metric label={t("account.ingress.accepted")} value={status.profile_ingress_usage.accepted_count} />
+            <Metric label={t("account.ingress.rejected")} value={status.profile_ingress_usage.rejected_count} />
+            <Metric label={t("account.ingress.tokens")} value={status.profile_ingress_tokens.length} />
           </div>
           <div className="mt-3 space-y-2">
             {status.profile_ingress_tokens.length === 0 ? (
-              <p className="text-xs text-slate-500">No profile ingress tokens yet.</p>
+              <p className="text-xs text-slate-500">{t("account.ingress.empty")}</p>
             ) : (
               status.profile_ingress_tokens.map((token: HelixProfileIngressTokenSummary) => (
                 <div
@@ -657,16 +685,20 @@ export default function AccountSessionPanel() {
                   </div>
                   <div className="min-w-0">
                     <div className="break-all text-slate-400">{token.public_ingress_url}</div>
-                    <div className="mt-1 text-[10px] text-slate-500">prefix {token.token_prefix}...</div>
+                    <div className="mt-1 text-[10px] text-slate-500">
+                      {t("account.ingress.prefixValue", { prefix: token.token_prefix })}
+                    </div>
                   </div>
-                  <div className="text-slate-300">{token.request_count} requests</div>
+                  <div className="text-slate-300">
+                    {t("account.ingress.requestsValue", { count: token.request_count })}
+                  </div>
                   <button
                     type="button"
                     onClick={() => revokeIngressToken(token.token_id)}
                     disabled={token.status !== "active" || loading}
                     className="rounded border border-rose-400/30 bg-rose-500/10 px-2 py-1 text-rose-100 hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    Revoke
+                    {t("account.ingress.revoke")}
                   </button>
                 </div>
               ))
@@ -675,16 +707,22 @@ export default function AccountSessionPanel() {
         </section>
 
         <section className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3 text-xs text-slate-300">
-          <div className="font-semibold uppercase tracking-[0.12em] text-slate-400">Boundary</div>
+          <div className="font-semibold uppercase tracking-[0.12em] text-slate-400">{t("account.boundary.title")}</div>
           <div className="mt-2 grid gap-2 md:grid-cols-3">
             <span className="rounded bg-white/5 px-2 py-1">
-              agent credentials: {String(status.auth_boundary.credential_collection_allowed_in_agents)}
+              {t("account.boundary.agentCredentialsValue", {
+                value: String(status.auth_boundary.credential_collection_allowed_in_agents),
+              })}
             </span>
             <span className="rounded bg-white/5 px-2 py-1">
-              raw passwords stored: {String(status.auth_boundary.raw_password_stored)}
+              {t("account.boundary.rawPasswordsValue", {
+                value: String(status.auth_boundary.raw_password_stored),
+              })}
             </span>
             <span className="rounded bg-white/5 px-2 py-1">
-              Discord password collection: {String(status.auth_boundary.discord_bot_password_collection_allowed)}
+              {t("account.boundary.discordPasswordCollectionValue", {
+                value: String(status.auth_boundary.discord_bot_password_collection_allowed),
+              })}
             </span>
           </div>
         </section>

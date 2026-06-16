@@ -114,6 +114,37 @@ describe("model-only compound coverage from answer artifacts", () => {
     });
   });
 
+  it("writes support refs and terminal metadata into model answer drafts", () => {
+    const turnId = "ask:test:model-direct-doc-support-refs";
+    const payload = applyModelDirectAnswerDraftStep({
+      turnId,
+      promptText: prompt,
+      payload: basePayload(turnId),
+      agentStepDecision: {
+        decision_id: `${turnId}:decision`,
+        next_step: "answer",
+        chosen_capability: "model.direct_answer",
+      },
+      draftText: completeAnswer,
+      artifactRefs: ["doc-summary:flow", "doc-summary:discipline"],
+      supportRefs: ["doc-summary:flow", "doc-summary:discipline"],
+      evidenceRefs: ["doc-summary:flow", "doc-summary:discipline"],
+      goalKind: "doc_evidence_synthesis",
+      requiredTerminalKind: "doc_evidence_synthesis_answer",
+      modelStepCapability: "model.direct_answer",
+    });
+    const draft = payload.final_answer_draft as Record<string, unknown>;
+
+    expect(draft).toMatchObject({
+      goal_kind: "doc_evidence_synthesis",
+      required_terminal_kind: "doc_evidence_synthesis_answer",
+      model_step_capability: "model.direct_answer",
+      artifact_refs: ["doc-summary:flow", "doc-summary:discipline"],
+      support_refs: ["doc-summary:flow", "doc-summary:discipline"],
+      evidence_refs: ["doc-summary:flow", "doc-summary:discipline"],
+    });
+  });
+
   it("normalizes preserved runtime loop iterations before appending a model answer draft", () => {
     const turnId = "ask:test:model-direct-normalizes-existing-loop";
     const payload = applyModelDirectAnswerDraftStep({

@@ -1,9 +1,10 @@
-export const INTERFACE_MESSAGE_IDS = [
-  "account.language.title",
-  "account.language.interfaceLabel",
-] as const;
-
-export type InterfaceMessageId = (typeof INTERFACE_MESSAGE_IDS)[number];
+export { INTERFACE_MESSAGE_IDS, interfaceSourceMessages, type InterfaceMessageId } from "./source";
+export type {
+  InterfaceCatalogReadiness,
+  InterfaceMessageMeta,
+  InterfaceMessagePlaceholderType,
+  InterfaceTargetCatalog,
+} from "./catalogTypes";
 
 export type InterfaceMessageValue = string | number | boolean | null | undefined;
 

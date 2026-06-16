@@ -63,6 +63,10 @@ const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: st
     final_answer_source: payload.final_answer_source,
     terminal_artifact_kind: payload.terminal_artifact_kind,
     terminal_error_code: payload.terminal_error_code,
+    server_build_commit: payload.server_build_commit ?? debug?.server_build_commit ?? null,
+    server_build_started_at_ms: payload.server_build_started_at_ms ?? debug?.server_build_started_at_ms ?? null,
+    helix_docs_synthesis_bridge_version:
+      payload.helix_docs_synthesis_bridge_version ?? debug?.helix_docs_synthesis_bridge_version ?? null,
     language_contract: payload.language_contract ?? debug?.language_contract ?? null,
     response_language: payload.response_language ?? debug?.response_language ?? null,
     source_language: payload.source_language ?? debug?.source_language ?? null,
@@ -72,6 +76,15 @@ const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: st
     pivot_confidence: payload.pivot_confidence ?? debug?.pivot_confidence ?? null,
     translated: payload.translated ?? debug?.translated ?? null,
     repo_evidence_relevance_gate: payload.repo_evidence_relevance_gate ?? debug?.repo_evidence_relevance_gate ?? null,
+    docs_synthesis_debug: payload.docs_synthesis_debug ?? debug?.docs_synthesis_debug ?? null,
+    docs_continuation_contract: payload.docs_continuation_contract ?? debug?.docs_continuation_contract ?? null,
+    doc_evidence_synthesis_plan: payload.doc_evidence_synthesis_plan ?? debug?.doc_evidence_synthesis_plan ?? null,
+    doc_evidence_synthesis_coverage:
+      payload.doc_evidence_synthesis_coverage ?? debug?.doc_evidence_synthesis_coverage ?? null,
+    doc_evidence_synthesis_answer:
+      payload.doc_evidence_synthesis_answer ?? debug?.doc_evidence_synthesis_answer ?? null,
+    docs_synthesis_materializer_result:
+      payload.docs_synthesis_materializer_result ?? debug?.docs_synthesis_materializer_result ?? null,
     terminal_answer_authority: payload.terminal_answer_authority ?? debug?.terminal_answer_authority ?? null,
     terminal_presentation: payload.terminal_presentation ?? debug?.terminal_presentation ?? null,
     debug: {
@@ -81,7 +94,12 @@ const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: st
       source_language: payload.source_language ?? debug?.source_language ?? null,
       language_detected: payload.language_detected ?? debug?.language_detected ?? null,
       code_mixed: payload.code_mixed ?? debug?.code_mixed ?? null,
+      server_build_commit: payload.server_build_commit ?? debug?.server_build_commit ?? null,
+      server_build_started_at_ms: payload.server_build_started_at_ms ?? debug?.server_build_started_at_ms ?? null,
+      helix_docs_synthesis_bridge_version:
+        payload.helix_docs_synthesis_bridge_version ?? debug?.helix_docs_synthesis_bridge_version ?? null,
       repo_evidence_relevance_gate: payload.repo_evidence_relevance_gate ?? debug?.repo_evidence_relevance_gate ?? null,
+      docs_synthesis_debug: payload.docs_synthesis_debug ?? debug?.docs_synthesis_debug ?? null,
       final_answer_source: payload.final_answer_source ?? debug?.final_answer_source ?? null,
       terminal_artifact_kind: payload.terminal_artifact_kind ?? debug?.terminal_artifact_kind ?? null,
       terminal_error_code: payload.terminal_error_code ?? debug?.terminal_error_code ?? null,
