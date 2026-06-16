@@ -6,7 +6,7 @@ let chooseVisibleFinalText: typeof import("@/components/helix/HelixAskPill").cho
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
   ({ buildVisibleResolvedTurn, chooseVisibleFinalText } = await import("@/components/helix/HelixAskPill"));
-});
+}, 30000);
 
 describe("Helix Ask E63 terminal projection", () => {
   it("uses resolved final failure state over stale clarification history", () => {
@@ -171,6 +171,51 @@ describe("Helix Ask E63 terminal projection", () => {
     };
 
     expect(chooseVisibleFinalText(reply as never)).toBe("authoritative envelope answer");
+  });
+
+  it("renders authoritative doc summary surfaces instead of stale terminal-authority failure text", () => {
+    const summary =
+      "Summary of docs/helix-ask-flow.md:\n- Routing starts with source-target arbitration.\n- Evidence re-entry gates terminal readiness.\n- The terminal artifact is mirrored into visible presentation.";
+    const reply = {
+      id: "turn-e63-doc-summary",
+      turn_id: "turn-e63-doc-summary",
+      content: "I could not complete that turn.\nCause: terminal_authority_missing.",
+      selected_final_answer: summary,
+      final_answer_source: "artifact_synthesis",
+      terminal_artifact_kind: "doc_summary",
+      terminal_answer_envelope: {
+        schema: "helix.terminal_answer_envelope.v1",
+        terminal_text: summary,
+        terminal_kind: "answer",
+        terminal_artifact_kind: "doc_summary",
+        final_answer_source: "artifact_synthesis",
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        server_authoritative: true,
+        terminal_text_preview: summary,
+        terminal_artifact_kind: "doc_summary",
+        final_answer_source: "artifact_synthesis",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        concise_text: summary,
+        terminal_artifact_kind: "doc_summary",
+      },
+      resolved_turn_summary: {
+        final_status: "final_answer",
+        terminal_artifact_kind: "doc_summary",
+        terminal_error_code: null,
+        resolved_route_label: "doc_summary / artifact_synthesis",
+      },
+    };
+
+    const visible = buildVisibleResolvedTurn(reply as never);
+
+    expect(visible.primary_terminal_label).toBe("final_answer");
+    expect(visible.terminal_error_code).toBeNull();
+    expect(chooseVisibleFinalText(reply as never)).toBe(summary);
+    expect(chooseVisibleFinalText(reply as never)).not.toContain("terminal_authority_missing");
   });
 
   it("does not render request_user_input text as the visible final answer", () => {

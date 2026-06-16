@@ -759,10 +759,17 @@ export function applyPostToolAuthorityBridgeRepair(input: {
     input.payload.final_answer_source = "request_user_input";
     input.payload.request_user_input = requestUserInput;
     input.payload.pending_server_request = requestUserInput;
-    input.payload.selected_final_answer = prompt;
-    input.payload.answer = prompt;
-    input.payload.text = prompt;
-    input.payload.assistant_answer = prompt;
+    input.payload.request_user_input_preview = {
+      schema: "helix.request_user_input_preview.v1",
+      prompt,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    delete input.payload.selected_final_answer;
+    delete input.payload.answer;
+    delete input.payload.text;
+    delete input.payload.finalAnswer;
+    input.payload.assistant_answer = false;
     delete input.payload.terminal_error_code;
     const goal = readRecord(input.payload.goal_satisfaction_evaluation);
     if (goal) {

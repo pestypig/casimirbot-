@@ -100,6 +100,21 @@ describe("Helix Ask docs-search admission", () => {
     expect(admission.reason).not.toBe("docs_viewer_requires_document_tool_path");
   });
 
+  it("does not treat a Docs Viewer capability-coverage claim as an active document command", () => {
+    const promptText =
+      "Docs Viewer: strongest dynamic surface. All 14 dynamic actions have some test evidence; core actions like open, locate_in_doc, summarize_doc, search_docs, and explain_paper are well represented.";
+    const restatement = buildToolUseRestatement(promptText);
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, promptText, sourceTargetIntent });
+
+    expect(restatement.requiredToolFamilies).not.toContain("docs_viewer");
+    expect(sourceTargetIntent.target_source).not.toBe("docs_viewer");
+    expect(sourceTargetIntent.target_source).not.toBe("active_doc");
+    expect(sourceTargetIntent.requested_outputs).not.toContain("file_path");
+    expect(admission.admitted_tool_families).not.toContain("docs_viewer");
+    expect(admission.reason).not.toBe("docs_viewer_requires_document_tool_path");
+  });
+
   it("rejects repo-code runtime calls under hard docs-viewer admission", () => {
     const sourceTargetIntent = arbitrateAskSourceTarget({
       turnId,

@@ -11,17 +11,27 @@ import {
 } from "../services/helix-ask/route-product-contract";
 
 const allTerminalSurfacesEqual = (body: Record<string, any>): void => {
-  const expected = String(body.selected_final_answer ?? "");
+  const isPendingInput =
+    body.terminal_artifact_kind === "request_user_input" ||
+    body.final_answer_source === "request_user_input" ||
+    body.resolved_turn_summary?.final_status === "pending_input";
+  const expected = String(body.selected_final_answer ?? body.pending_server_request?.prompt ?? "");
   const events = Array.isArray(body.current_turn_events)
     ? body.current_turn_events
     : Array.isArray(body.turn_events)
       ? body.turn_events
       : [body.current_turn_events?.terminal_answer];
-  const terminalEvent = [...events].reverse().find((event) => event?.type === "terminal_answer");
+  const terminalEvent = [...events].reverse().find((event) =>
+    event?.type === (isPendingInput ? "request_user_input" : "terminal_answer")
+  );
   expect(body.terminal_presentation?.concise_text).toBe(expected);
   expect(body.terminal_answer_authority?.terminal_text_preview).toBe(expected);
   expect(terminalEvent?.text).toBe(expected);
-  expect(body.answer ?? body.text ?? body.finalAnswer).toBe(expected);
+  if (isPendingInput) {
+    expect(body.answer ?? body.text ?? body.finalAnswer ?? "").toBe("");
+  } else {
+    expect(body.answer ?? body.text ?? body.finalAnswer).toBe(expected);
+  }
 };
 
 describe("Helix Ask terminal authority contracts", () => {
@@ -113,6 +123,81 @@ describe("Helix Ask terminal authority contracts", () => {
     });
     expect((payload.terminal_answer_authority as Record<string, unknown>).terminal_text_preview).not.toBe("Retrying after tool timeout...");
     expect((payload.poison_audit as Record<string, unknown>).ok).toBe(true);
+    expect((payload.terminal_presentation_coverage_audit as Record<string, unknown>).violations).toEqual([]);
+    allTerminalSurfacesEqual(payload);
+  });
+
+  it("materializes doc_summary artifact synthesis into all terminal surfaces", () => {
+    const summary =
+      "Summary of docs/helix-ask-flow.md:\n- Helix Ask starts by framing intent and route authority.\n- Tool observations must re-enter evidence before terminal selection.\n- The selected doc_summary is the only terminal answer.";
+    const payload: Record<string, unknown> = {
+      turn_id: "ask:test:doc-summary-envelope",
+      thread_id: "thread:test",
+      selected_final_answer: summary,
+      terminal_artifact_kind: "doc_summary",
+      final_answer_source: "artifact_synthesis",
+      canonical_goal_frame: {
+        goal_kind: "doc_summary",
+        required_terminal_kind: "doc_summary",
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_step_decision: {
+        decision_id: "decision:doc-summary",
+        next_step: "answer",
+        chosen_capability: "docs-viewer.summarize_doc",
+        decision_timing: "post_observation",
+        decision_authority: "deterministic_policy_fallback",
+      },
+      agent_runtime_loop: {
+        terminal_state: "terminal_satisfied",
+        iterations: [
+          {
+            decision_id: "decision:doc-summary",
+            capability_key: "docs-viewer.summarize_doc",
+            chosen_capability: "docs-viewer.summarize_doc",
+            observed_artifact_refs: ["artifact:doc-summary"],
+            decision_timing: "post_observation",
+            decision_authority: "deterministic_policy_fallback",
+            next_step: "answer",
+            status: "succeeded",
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "artifact:doc-summary",
+          kind: "doc_summary",
+          capability_key: "docs-viewer.summarize_doc",
+          payload: {
+            schema: "helix.doc_summary.v1",
+            text: summary,
+          },
+        },
+      ],
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        concise_text: summary,
+      },
+      terminal_error_code: "terminal_authority_missing",
+      typed_failure: {
+        schema: "helix.typed_failure.v1",
+        error_code: "terminal_authority_missing",
+        text: "I could not complete that turn.\nCause: terminal_authority_missing.",
+      },
+    };
+
+    const envelope = resolveTerminalAnswerEnvelope(payload);
+    applyTerminalAnswerEnvelope(payload, envelope);
+
+    expect(payload.terminal_artifact_kind).toBe("doc_summary");
+    expect(payload.final_answer_source).toBe("artifact_synthesis");
+    expect(payload.terminal_error_code ?? null).toBeNull();
+    expect(payload.typed_failure ?? null).toBeNull();
+    expect((payload.terminal_answer_envelope as Record<string, unknown>).terminal_text).toBe(summary);
+    expect((payload.terminal_answer_authority as Record<string, unknown>).server_authoritative).toBe(true);
     expect((payload.terminal_presentation_coverage_audit as Record<string, unknown>).violations).toEqual([]);
     allTerminalSurfacesEqual(payload);
   });

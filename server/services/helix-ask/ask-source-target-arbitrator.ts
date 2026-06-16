@@ -114,6 +114,11 @@ const isDocsViewerTopicLabelPrompt = (prompt: string): boolean => {
     /\b(?:not|isn't|is\s+not|without|rather\s+than)\b[\s\S]{0,80}\b(?:current|active|open|this|that)\s+(?:docs?|documents?|papers?)\b/i.test(afterLabel) ||
     /\b(?:current|active|open|this|that)\s+(?:docs?|documents?|papers?)\b[\s\S]{0,80}\b(?:not|isn't|is\s+not|without)\b/i.test(afterLabel);
   if (activeDocCue && !negatedActiveDocCue) return false;
+  if (
+    /\b(?:dynamic\s+actions?|capabilit(?:y|ies)|coverage|test\s+evidence|surface|well\s+represented|core\s+actions?)\b/i.test(afterLabel)
+  ) {
+    return true;
+  }
   if (/\b(?:open|search|find|locate|summari[sz]e|explain|describe|read|show|load)\b[\s\S]{0,100}\b(?:docs?|documents?|papers?|viewer|path|source)\b/i.test(afterLabel)) {
     return false;
   }

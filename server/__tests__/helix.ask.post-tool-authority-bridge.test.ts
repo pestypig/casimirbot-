@@ -72,7 +72,22 @@ describe("Helix Ask post-tool authority bridge", () => {
     const bridge = applyPostToolAuthorityBridgeRepair({ turnId, payload });
     expect(bridge.route_family).toBe("voice_delivery");
     expect(payload.terminal_artifact_kind).toBe("request_user_input");
-    expect(String(payload.text)).toMatch(/confirmation before speaking/i);
+    expect(payload.final_status).toBe("pending_input");
+    expect(payload.response_type).toBe("pending_input");
+    expect(payload.assistant_answer).toBe(false);
+    expect(payload.selected_final_answer).toBeUndefined();
+    expect(payload.answer).toBeUndefined();
+    expect(payload.text).toBeUndefined();
+    expect(payload.pending_server_request).toMatchObject({
+      prompt: expect.stringMatching(/confirmation before speaking/i),
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(payload.request_user_input_preview).toMatchObject({
+      prompt: expect.stringMatching(/confirmation before speaking/i),
+      assistant_answer: false,
+      raw_content_included: false,
+    });
     expect(payload.terminal_error_code).toBeUndefined();
   });
 

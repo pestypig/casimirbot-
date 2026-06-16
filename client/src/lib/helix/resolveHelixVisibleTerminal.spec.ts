@@ -29,6 +29,46 @@ describe("resolveHelixVisibleTerminal", () => {
     expect(terminal.usedLegacyShadow).toBe(false);
   });
 
+  it("uses authoritative doc summary terminal surfaces over stale authority-missing content", () => {
+    const summary =
+      "Summary of docs/helix-ask-flow.md:\n- Routing enters Helix Ask through source-target arbitration.\n- Evidence must re-enter the solver path before terminal authority.\n- Presentation mirrors the selected terminal artifact.";
+    const terminal = resolveHelixVisibleTerminal({
+      content: "I could not complete that turn.\nCause: terminal_authority_missing.",
+      selected_final_answer: summary,
+      final_answer_source: "artifact_synthesis",
+      terminal_artifact_kind: "doc_summary",
+      terminal_answer_envelope: {
+        schema: "helix.terminal_answer_envelope.v1",
+        terminal_text: summary,
+        terminal_kind: "answer",
+        terminal_artifact_kind: "doc_summary",
+        final_answer_source: "artifact_synthesis",
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        server_authoritative: true,
+        terminal_text_preview: summary,
+        terminal_artifact_kind: "doc_summary",
+        final_answer_source: "artifact_synthesis",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        concise_text: summary,
+        terminal_artifact_kind: "doc_summary",
+      },
+      resolved_turn_summary: {
+        final_status: "final_answer",
+        terminal_artifact_kind: "doc_summary",
+        terminal_error_code: null,
+      },
+    });
+
+    expect(terminal.text).toBe(summary);
+    expect(terminal.source).toBe("terminal_answer_envelope");
+    expect(terminal.terminalErrorCode).toBeNull();
+    expect(terminal.text).not.toContain("terminal_authority_missing");
+  });
+
   it("does not let source-targeted legacy selected_final_answer become visible truth without authority", () => {
     const terminal = resolveHelixVisibleTerminal({
       selected_final_answer: "legacy ghost answer",
