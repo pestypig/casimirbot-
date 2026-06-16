@@ -7,6 +7,43 @@ import {
 
 type RecordLike = Record<string, unknown>;
 
+type RailFailureCode =
+  | "route_family_mismatch"
+  | "tool_admission_drift"
+  | "observation_missing"
+  | "observation_not_reentered"
+  | "reentry_step_not_executed"
+  | "support_refs_missing"
+  | "terminal_product_mismatch"
+  | "terminal_not_materialized"
+  | "terminal_projection_mismatch"
+  | "config_missing";
+
+type RailStatus = "complete" | "broken" | "fail_closed";
+
+const TOOL_TURN_CHAIN_FAILURE_CODES: RailFailureCode[] = [
+  "route_family_mismatch",
+  "tool_admission_drift",
+  "observation_missing",
+  "observation_not_reentered",
+  "reentry_step_not_executed",
+  "support_refs_missing",
+  "terminal_product_mismatch",
+  "terminal_not_materialized",
+  "terminal_projection_mismatch",
+  "config_missing",
+];
+
+const TOOL_TURN_CHAIN_MATRIX_FAMILIES = [
+  "docs_viewer",
+  "repo_code",
+  "live_env",
+  "workspace_directory",
+  "calculator",
+  "internet_search",
+  "image_lens / visual_capture",
+] as const;
+
 const readRecord = (value: unknown): RecordLike | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as RecordLike) : null;
 
@@ -21,6 +58,9 @@ const readStringArray = (value: unknown): string[] =>
         .map((entry) => readString(entry))
         .filter(Boolean)
     : [];
+
+const readNumber = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
 
 const unique = (values: string[]): string[] =>
   Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
@@ -101,6 +141,20 @@ const observationKindMatches = (artifact: RecordLike, requiredKind: string): boo
   });
 };
 
+const firstString = (...values: unknown[]): string | null => {
+  for (const value of values) {
+    const stringValue = readString(value);
+    if (stringValue) return stringValue;
+  }
+  return null;
+};
+
+const normalizedEqual = (left: unknown, right: unknown): boolean => {
+  const normalizedLeft = normalize(left);
+  const normalizedRight = normalize(right);
+  return Boolean(normalizedLeft && normalizedRight && normalizedLeft === normalizedRight);
+};
+
 const capabilityFromPayload = (payload: RecordLike, lifecycleTrace: RecordLike | null): string | null => {
   const operationalTrace = readRecord(payload.operational_capability_trace);
   const plan = readRecord(payload.capability_plan);
@@ -140,6 +194,51 @@ const artifactInferredFamily = (artifacts: RecordLike[]): string | null => {
   return best?.family ?? null;
 };
 
+const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
+  const haystack = artifacts
+    .flatMap((artifact) => [
+      artifactRef(artifact),
+      readString(artifact.kind),
+      readString(artifact.schema),
+      readString(artifact.producer_item_id),
+      readString(artifact.source_scope),
+      readString(artifactPayload(artifact)?.tool_name),
+      readString(artifactPayload(artifact)?.capability),
+      readString(artifactPayload(artifact)?.capability_key),
+    ])
+    .join("\n")
+    .toLowerCase();
+  if (/scientific[-_]calculator[-_.:]solve[-_]expression|calculator_result|calculator_receipt/.test(haystack)) {
+    return "scientific-calculator.solve_expression";
+  }
+  if (/docs[-_]viewer[-_.:]summarize[-_]doc|doc_summary/.test(haystack)) return "docs-viewer.summarize_doc";
+  if (/docs[-_]viewer[-_.:]locate[-_]in[-_]doc|doc_location|doc_evidence_location/.test(haystack)) {
+    return "docs-viewer.locate_in_doc";
+  }
+  if (/docs[-_]viewer[-_.:]doc[-_]equation[-_]context|doc_equation_context/.test(haystack)) {
+    return "docs-viewer.doc_equation_context";
+  }
+  if (/repo[-_]code[-_.:]search[-_]concept|repo_code_search|repo_code_evidence/.test(haystack)) {
+    return "repo-code.search_concept";
+  }
+  if (/internet[-_]search[-_.:]web[-_]research|web_research_observation|internet_search_observation/.test(haystack)) {
+    return "internet_search.web_research";
+  }
+  if (/workspace[-_]directory[-_.:]resolve|workspace_directory_resolution/.test(haystack)) {
+    return "workspace-directory.resolve";
+  }
+  if (/live_env[-_.:]process_live_source_mail|stage_play_live_source_mail_read_result/.test(haystack)) {
+    return "live_env.process_live_source_mail";
+  }
+  if (/live_env[-_.:]read_processed_live_source_mail|stage_play_processed_mail_packet/.test(haystack)) {
+    return "live_env.read_processed_live_source_mail";
+  }
+  if (/live_env[-_.:]reflect_live_source_mail_loop|stage_play_live_source_mail_loop_reflection/.test(haystack)) {
+    return "live_env.reflect_live_source_mail_loop";
+  }
+  return null;
+};
+
 const shouldPreferArtifactFamily = (family: string | null, capability: string | null): boolean => {
   const normalizedFamily = normalize(family);
   const normalizedCapability = normalize(capability);
@@ -150,6 +249,16 @@ const shouldPreferArtifactFamily = (family: string | null, capability: string | 
     normalizedFamily === "workstation_action" ||
     normalizedCapability === "model_direct_answer" ||
     normalizedCapability === "model_answer"
+  );
+};
+
+const shouldPreferArtifactCapability = (capability: string | null): boolean => {
+  const normalizedCapability = normalize(capability);
+  return (
+    !normalizedCapability ||
+    normalizedCapability === "model_direct_answer" ||
+    normalizedCapability === "model_answer" ||
+    normalizedCapability === "direct_answer"
   );
 };
 
@@ -166,6 +275,275 @@ const contractSummary = (contract: ToolFamilyContract | null): RecordLike | null
         requires_goal_satisfaction: contract.requiresGoalSatisfaction,
       }
     : null;
+
+const canonicalAuditFamily = (family: unknown, capability?: unknown): string | null => {
+  const normalized = normalize(family) || normalize(capability);
+  if (!normalized) return null;
+  if (normalized.includes("live_source") || normalized.includes("live_env") || normalized.includes("micro_reasoner")) {
+    return "live_env";
+  }
+  if (normalized.includes("image_lens") || normalized.includes("visual_capture") || normalized.includes("visual")) {
+    return "image_lens / visual_capture";
+  }
+  return normalized;
+};
+
+const likelyInternetSearchConfigMissing = (payload: RecordLike, routeFamily: string | null): boolean => {
+  if (canonicalAuditFamily(routeFamily) !== "internet_search") return false;
+  const terminalError = readString(payload.terminal_error_code);
+  const finalAnswer = readString(payload.selected_final_answer);
+  const typedFailure = readRecord(payload.typed_failure);
+  const text = [
+    terminalError,
+    finalAnswer,
+    readString(typedFailure?.code),
+    readString(typedFailure?.reason),
+    readString(typedFailure?.message),
+  ].join("\n");
+  return /\b(?:config|configuration|api[-_\s]?key|provider|credential|tavily|exa|google\s+cse|search\s+key|missing\s+key)\b/i.test(text);
+};
+
+const artifactForKind = (artifacts: RecordLike[], kind: string): RecordLike | null =>
+  artifacts.find((artifact) => observationKindMatches(artifact, kind)) ?? null;
+
+const finalAnswerDraftRef = (payload: RecordLike, artifacts: RecordLike[]): string | null => {
+  const draftArtifact = [...artifacts].reverse().find((artifact) => normalize(artifact.kind) === "final_answer_draft");
+  return (
+    readString(draftArtifact?.artifact_id) ||
+    readString(draftArtifact?.id) ||
+    readString(readRecord(payload.final_answer_draft)?.draft_id) ||
+    readString(readRecord(payload.final_answer_draft)?.artifact_id) ||
+    null
+  );
+};
+
+const supportRefsCount = (payload: RecordLike, artifacts: RecordLike[]): number => {
+  const draftArtifact = [...artifacts].reverse().find((artifact) => normalize(artifact.kind) === "final_answer_draft");
+  const draftPayload = readRecord(draftArtifact?.payload);
+  const payloadDraft = readRecord(payload.final_answer_draft);
+  const terminalAuthority = readRecord(payload.terminal_authority_single_writer);
+  const terminalAnswerAuthority = readRecord(payload.terminal_answer_authority);
+  const draftSelection = readRecord(payload.final_answer_draft_selection);
+  const refs = unique([
+    ...readStringArray(payloadDraft?.support_refs),
+    ...readStringArray(payloadDraft?.artifact_refs),
+    ...readStringArray(draftPayload?.support_refs),
+    ...readStringArray(draftPayload?.artifact_refs),
+    ...readStringArray(terminalAuthority?.support_refs),
+    ...readStringArray(terminalAnswerAuthority?.support_refs),
+    ...readStringArray(draftSelection?.support_refs),
+  ]);
+  return (
+    refs.length ||
+    readNumber(payloadDraft?.support_refs_count) ||
+    readNumber(draftPayload?.support_refs_count) ||
+    readNumber(terminalAuthority?.support_refs_count) ||
+    readNumber(terminalAnswerAuthority?.support_refs_count) ||
+    readNumber(draftSelection?.support_refs_count) ||
+    0
+  );
+};
+
+const requiredTerminalKind = (payload: RecordLike, contract: ToolFamilyContract | null): string | null => {
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  const routeProductContract = readRecord(payload.route_product_contract);
+  return (
+    firstString(
+      canonicalGoal?.required_terminal_kind,
+      routeProductContract?.required_terminal_artifact_kind,
+      routeProductContract?.required_terminal_kind,
+    ) ||
+    readStringArray(routeProductContract?.allowed_terminal_artifact_kinds)[0] ||
+    contract?.allowedTerminalKinds[0] ||
+    null
+  );
+};
+
+const materializedTerminalKind = (payload: RecordLike): string | null => {
+  const terminalAuthority = readRecord(payload.terminal_authority_single_writer);
+  const draftSelection = readRecord(payload.final_answer_draft_selection);
+  return firstString(
+    draftSelection?.materialized_terminal_artifact_kind,
+    terminalAuthority?.integrity && readRecord(terminalAuthority.integrity)?.materialized_terminal_artifact_kind,
+    terminalAuthority?.materialized_terminal_artifact_kind,
+    payload.terminal_artifact_kind,
+  );
+};
+
+const terminalAuthorityKind = (payload: RecordLike): string | null => {
+  const terminalAuthority = readRecord(payload.terminal_authority_single_writer);
+  const terminalAnswerAuthority = readRecord(payload.terminal_answer_authority);
+  const resolvedSummary = readRecord(payload.resolved_turn_summary);
+  return firstString(
+    terminalAuthority?.selected_terminal_artifact_kind,
+    terminalAnswerAuthority?.terminal_artifact_kind,
+    terminalAuthority?.terminal_artifact_kind,
+    resolvedSummary?.terminal_artifact_kind,
+    payload.terminal_artifact_kind,
+  );
+};
+
+const visibleTerminalKind = (payload: RecordLike): string | null => {
+  const presentation = readRecord(payload.terminal_presentation);
+  const resolvedSummary = readRecord(payload.resolved_turn_summary);
+  return firstString(presentation?.terminal_artifact_kind, resolvedSummary?.terminal_artifact_kind, payload.terminal_artifact_kind);
+};
+
+const expectedReentryCapability = (
+  contract: ToolFamilyContract | null,
+  artifacts: RecordLike[],
+  followupDecision: RecordLike | null,
+  observationRef: string | null,
+): string | null => {
+  const explicit = firstString(followupDecision?.required_next_capability, followupDecision?.next_tool);
+  if (explicit) return explicit;
+  for (const rule of contract?.requiredNextWhen ?? []) {
+    const hasTrigger = artifacts.some((artifact) => observationKindMatches(artifact, rule.observationKind));
+    const hasForbidUntil = rule.forbidTerminalUntil.some((kind) =>
+      artifacts.some((artifact) => observationKindMatches(artifact, kind)),
+    );
+    if (hasTrigger && !hasForbidUntil) return rule.nextTool;
+  }
+  return contract?.requiredReentry && observationRef ? "model.direct_answer" : null;
+};
+
+const buildToolTurnChainAudit = (input: {
+  payload: RecordLike;
+  artifacts: RecordLike[];
+  lifecycleTrace: RecordLike | null;
+  followupDecision: RecordLike | null;
+  capability: string | null;
+  toolFamily: string | null;
+  contract: ToolFamilyContract | null;
+  requiredObservationCoverage: RecordLike[];
+  requiredObservationsSatisfied: boolean;
+}): RecordLike => {
+  const selectedCapability =
+    firstString(input.lifecycleTrace?.admitted_capability, input.lifecycleTrace?.requested_capability) ?? input.capability;
+  const executedCapability = firstString(input.lifecycleTrace?.executed_capability, input.capability);
+  const routeFamily = firstString(input.toolFamily, input.contract?.toolFamily, inferToolFamilyFromToolName(selectedCapability));
+  const selectedFamily = inferToolFamilyFromToolName(selectedCapability);
+  const executedFamily = inferToolFamilyFromToolName(executedCapability);
+  const observationCoverage = input.requiredObservationCoverage.find((entry) => readBoolean(entry.present));
+  const observationArtifactKind =
+    readString(observationCoverage?.kind) ||
+    input.artifacts
+      .map((artifact) => readString(artifact.kind) || readString(artifact.schema))
+      .find((kind) => /(?:observation|result|receipt|context|validation|trace|packet|resolution|reflection)/i.test(kind)) ||
+    null;
+  const observationRef =
+    readStringArray(observationCoverage?.artifact_refs)[0] ||
+    (observationArtifactKind ? artifactRef(artifactForKind(input.artifacts, observationArtifactKind) ?? {}) : null);
+  const requiredTerminal = requiredTerminalKind(input.payload, input.contract);
+  const supportCount = supportRefsCount(input.payload, input.artifacts);
+  const materializedTerminal = materializedTerminalKind(input.payload);
+  const authorityTerminal = terminalAuthorityKind(input.payload);
+  const visibleTerminal = visibleTerminalKind(input.payload);
+  const finalDraftRef = finalAnswerDraftRef(input.payload, input.artifacts);
+  const reentryExecuted =
+    readString(input.lifecycleTrace?.lifecycle_stage) === "reentered_solver" ||
+    readBoolean(input.followupDecision?.evidence_reentered) ||
+    Boolean(observationRef && supportCount > 0 && finalDraftRef);
+  const expectedReentry = expectedReentryCapability(
+    input.contract,
+    input.artifacts,
+    input.followupDecision,
+    observationRef,
+  );
+  const terminalProjectionMismatch = Boolean(authorityTerminal && visibleTerminal && !normalizedEqual(authorityTerminal, visibleTerminal));
+  const terminalProductMismatch = Boolean(
+    requiredTerminal &&
+      materializedTerminal &&
+      materializedTerminal !== "typed_failure" &&
+      !normalizedEqual(requiredTerminal, materializedTerminal) &&
+      !(input.contract?.allowedTerminalKinds ?? []).some((kind) => normalizedEqual(kind, materializedTerminal)),
+  );
+  const routeFamilyMismatch = Boolean(
+    selectedFamily && executedFamily && selectedFamily !== executedFamily,
+  );
+  const toolAdmissionDrift = Boolean(
+    selectedCapability &&
+      executedCapability &&
+      !normalizedEqual(selectedCapability, executedCapability) &&
+      !routeFamilyMismatch,
+  );
+  const configMissing = likelyInternetSearchConfigMissing(input.payload, routeFamily);
+  const draftNeedsSupport =
+    Boolean(finalDraftRef) &&
+    Boolean(materializedTerminal) &&
+    !["typed_failure", "direct_answer_text", "tool_receipt"].some((kind) => normalizedEqual(kind, materializedTerminal));
+  const railFailureCode: RailFailureCode | null =
+    configMissing
+      ? "config_missing"
+      : routeFamilyMismatch
+        ? "route_family_mismatch"
+        : toolAdmissionDrift
+          ? "tool_admission_drift"
+          : !input.requiredObservationsSatisfied
+            ? "observation_missing"
+            : observationRef && !reentryExecuted
+              ? "observation_not_reentered"
+              : expectedReentry && !reentryExecuted
+                ? "reentry_step_not_executed"
+                : draftNeedsSupport && supportCount === 0
+                  ? "support_refs_missing"
+                  : terminalProductMismatch
+                    ? "terminal_product_mismatch"
+                    : !materializedTerminal
+                      ? "terminal_not_materialized"
+                      : terminalProjectionMismatch
+                        ? "terminal_projection_mismatch"
+                        : null;
+  const railStatus: RailStatus =
+    railFailureCode === null ? "complete" : materializedTerminal === "typed_failure" ? "fail_closed" : "broken";
+
+  return {
+    schema: "helix.tool_turn_chain_audit.v1",
+    route_family: routeFamily,
+    selected_capability: selectedCapability,
+    executed_capability: executedCapability,
+    observation_artifact_kind: observationArtifactKind,
+    observation_ref: observationRef,
+    required_terminal_kind: requiredTerminal,
+    expected_reentry_capability: expectedReentry,
+    reentry_executed: reentryExecuted,
+    final_answer_draft_ref: finalDraftRef,
+    support_refs_count: supportCount,
+    materialized_terminal_artifact_kind: materializedTerminal,
+    terminal_authority_kind: authorityTerminal,
+    visible_terminal_kind: visibleTerminal,
+    rail_status: railStatus,
+    rail_failure_code: railFailureCode,
+    normalized_failure_codes: TOOL_TURN_CHAIN_FAILURE_CODES,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const buildToolTurnChainFamilyMatrix = (audit: RecordLike): RecordLike[] => {
+  const family = canonicalAuditFamily(audit.route_family, audit.executed_capability);
+  return TOOL_TURN_CHAIN_MATRIX_FAMILIES.map((matrixFamily) => {
+    const observed = family === matrixFamily;
+    const authority = readString(audit.terminal_authority_kind);
+    const visible = readString(audit.visible_terminal_kind);
+    return {
+      route_family: matrixFamily,
+      observed,
+      did_tool_run: observed ? Boolean(readString(audit.executed_capability)) : null,
+      artifact_produced: observed ? Boolean(readString(audit.observation_ref)) : null,
+      observation_artifact_kind: observed ? audit.observation_artifact_kind ?? null : null,
+      observation_ref: observed ? audit.observation_ref ?? null : null,
+      artifact_reentered: observed ? audit.reentry_executed === true : null,
+      required_terminal_kind: observed ? audit.required_terminal_kind ?? null : null,
+      materialized: observed ? Boolean(readString(audit.materialized_terminal_artifact_kind)) : null,
+      materialized_terminal_artifact_kind: observed ? audit.materialized_terminal_artifact_kind ?? null : null,
+      terminal_authority_selected: observed ? Boolean(authority) : null,
+      visible_projection_matches: observed && authority && visible ? normalizedEqual(authority, visible) : observed ? null : null,
+      rail_status: observed ? audit.rail_status ?? "broken" : "not_applicable",
+      rail_failure_code: observed ? audit.rail_failure_code ?? null : null,
+    };
+  });
+};
 
 const buildArtifactEntry = (artifact: RecordLike): RecordLike => {
   const payload = artifactPayload(artifact);
@@ -205,7 +583,12 @@ export const buildArtifactQueryIndex = (input: {
   const lifecycleTrace = readRecord(input.payload.tool_lifecycle_trace);
   const followupDecision = readRecord(input.payload.tool_followup_decision);
   const artifacts = artifactsForPayload(input.payload);
-  const capability = capabilityFromPayload(input.payload, lifecycleTrace);
+  const lifecycleCapability = capabilityFromPayload(input.payload, lifecycleTrace);
+  const artifactCapability = capabilityFromArtifacts(artifacts);
+  const capability =
+    artifactCapability && shouldPreferArtifactCapability(lifecycleCapability)
+      ? artifactCapability
+      : lifecycleCapability ?? artifactCapability;
   const lifecycleFamily = familyFromPayload(input.payload, lifecycleTrace);
   const inferredArtifactFamily = artifactInferredFamily(artifacts);
   const toolFamily =
@@ -229,6 +612,17 @@ export const buildArtifactQueryIndex = (input: {
   const lifecycleObservationRefs = readStringArray(lifecycleTrace?.observation_refs);
   const lifecycleReceiptRefs = readStringArray(lifecycleTrace?.receipt_refs);
   const lifecycleEvidenceRefs = readStringArray(lifecycleTrace?.evidence_refs);
+  const toolTurnChainAudit = buildToolTurnChainAudit({
+    payload: input.payload,
+    artifacts,
+    lifecycleTrace,
+    followupDecision,
+    capability,
+    toolFamily,
+    contract,
+    requiredObservationCoverage,
+    requiredObservationsSatisfied,
+  });
 
   return {
     schema: "helix.artifact_query_index.v1",
@@ -259,6 +653,8 @@ export const buildArtifactQueryIndex = (input: {
         readString(followupDecision?.next_action) === "terminal_answer" &&
         requiredObservationsSatisfied,
     },
+    tool_turn_chain_audit: toolTurnChainAudit,
+    tool_turn_chain_family_matrix: buildToolTurnChainFamilyMatrix(toolTurnChainAudit),
     assistant_answer: false,
     raw_content_included: false,
   };

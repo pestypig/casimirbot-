@@ -386,6 +386,16 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
     requiresGoalSatisfaction: true,
   }),
   contract({
+    toolName: "docs-viewer.summarize_doc",
+    toolFamily: "docs_viewer",
+    authority: "terminal_candidate",
+    mutating: false,
+    requiredObservationKinds: ["observation_review"],
+    allowedTerminalKinds: ["doc_summary", "doc_evidence_synthesis_answer", ...evidenceOnlyTerminalKinds],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+  }),
+  contract({
     toolName: "docs-viewer.doc_equation_context",
     toolFamily: "docs_viewer",
     authority: "evidence_only",

@@ -220,6 +220,24 @@ describe("Helix Ask tool lifecycle trace", () => {
         ok: true,
         failure_codes: [],
       },
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        draft_id: "ask:test:calculator-index:final_answer_draft",
+        support_refs: [
+          "calculator_receipt:1",
+          "calculator_result_trace:1",
+          "calculator_result_validation:1",
+        ],
+      },
+      terminal_artifact_kind: "calculator_stream_result",
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer.v1",
+        selected_terminal_artifact_kind: "calculator_stream_result",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "calculator_stream_result",
+      },
       current_turn_artifact_ledger: [
         {
           artifact_id: "calculator_receipt:1",
@@ -274,6 +292,38 @@ describe("Helix Ask tool lifecycle trace", () => {
     expect(index.queryable_artifact_keys).toEqual(
       expect.arrayContaining(["calculator_receipt:1", "calculator_result_trace:1", "calculator_result_validation:1"]),
     );
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      schema: "helix.tool_turn_chain_audit.v1",
+      route_family: "calculator",
+      selected_capability: "scientific-calculator.solve_expression",
+      executed_capability: "scientific-calculator.solve_expression",
+      observation_artifact_kind: "calculator_receipt",
+      required_terminal_kind: "calculator_stream_result",
+      expected_reentry_capability: "model.direct_answer",
+      reentry_executed: true,
+      final_answer_draft_ref: "ask:test:calculator-index:final_answer_draft",
+      support_refs_count: 3,
+      materialized_terminal_artifact_kind: "calculator_stream_result",
+      terminal_authority_kind: "calculator_stream_result",
+      visible_terminal_kind: "calculator_stream_result",
+      rail_status: "complete",
+      rail_failure_code: null,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(index.tool_turn_chain_family_matrix).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          route_family: "calculator",
+          observed: true,
+          did_tool_run: true,
+          artifact_produced: true,
+          artifact_reentered: true,
+          rail_status: "complete",
+          rail_failure_code: null,
+        }),
+      ]),
+    );
   });
 
   it("reports missing contract observations for incomplete tool evidence", () => {
@@ -309,7 +359,63 @@ describe("Helix Ask tool lifecycle trace", () => {
       evidence_reentered: false,
       terminal_use_allowed: false,
     });
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      route_family: "calculator",
+      rail_status: "broken",
+      rail_failure_code: "observation_missing",
+    });
     expect(index.assistant_answer).toBe(false);
+  });
+
+  it("classifies internet search provider key failures as config_missing", () => {
+    const payload: Record<string, unknown> = {
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:internet-config-missing",
+        capability_family: "internet_search",
+        requested_action: "internet_search.web_research",
+        admission_status: "admitted",
+      },
+      terminal_error_code: "internet_search_config_missing",
+      selected_final_answer: "Internet search is unavailable because Tavily, Exa, or Google CSE API keys are missing.",
+      terminal_artifact_kind: "typed_failure",
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer.v1",
+        selected_terminal_artifact_kind: "typed_failure",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "typed_failure",
+      },
+      current_turn_artifact_ledger: [],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:internet-config-missing", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:internet-config-missing", payload });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      route_family: "internet_search",
+      selected_capability: "internet_search.web_research",
+      executed_capability: "internet_search.web_research",
+      observation_ref: null,
+      materialized_terminal_artifact_kind: "typed_failure",
+      terminal_authority_kind: "typed_failure",
+      visible_terminal_kind: "typed_failure",
+      rail_status: "fail_closed",
+      rail_failure_code: "config_missing",
+    });
+    expect(index.tool_turn_chain_family_matrix).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          route_family: "internet_search",
+          observed: true,
+          did_tool_run: true,
+          artifact_produced: false,
+          rail_status: "fail_closed",
+          rail_failure_code: "config_missing",
+        }),
+      ]),
+    );
   });
 
   it("keeps contextual tool mentions as follow-up reasoning, not execution", () => {
