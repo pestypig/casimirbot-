@@ -77,6 +77,27 @@ const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: st
     ask_entrypoint_observed: payload.ask_entrypoint_observed ?? debug?.ask_entrypoint_observed ?? null,
     ask_entrypoint_failure_code: payload.ask_entrypoint_failure_code ?? debug?.ask_entrypoint_failure_code ?? null,
     blocked_projection_kind: payload.blocked_projection_kind ?? debug?.blocked_projection_kind ?? null,
+    hard_prompt_projection_guard: payload.hard_prompt_projection_guard ?? debug?.hard_prompt_projection_guard ?? null,
+    client_projection_policy_version:
+      payload.client_projection_policy_version ?? debug?.client_projection_policy_version ?? null,
+    demoted_projection_layers: payload.demoted_projection_layers ?? debug?.demoted_projection_layers ?? null,
+    evidence_finalization_gate_demoted:
+      payload.evidence_finalization_gate_demoted ?? debug?.evidence_finalization_gate_demoted ?? null,
+    client_entrypoint_guard_version: payload.client_entrypoint_guard_version ?? debug?.client_entrypoint_guard_version ?? null,
+    submit_handler_source: payload.submit_handler_source ?? debug?.submit_handler_source ?? null,
+    runAsk_entered: payload.runAsk_entered ?? debug?.runAsk_entered ?? null,
+    hard_backend_entrypoint_required:
+      payload.hard_backend_entrypoint_required ?? debug?.hard_backend_entrypoint_required ?? null,
+    use_backend_ask_turn_entrypoint:
+      payload.use_backend_ask_turn_entrypoint ?? debug?.use_backend_ask_turn_entrypoint ?? null,
+    backend_ask_call_attempted: payload.backend_ask_call_attempted ?? debug?.backend_ask_call_attempted ?? null,
+    backend_ask_call_path: payload.backend_ask_call_path ?? debug?.backend_ask_call_path ?? null,
+    backend_ask_call_error: payload.backend_ask_call_error ?? debug?.backend_ask_call_error ?? null,
+    route_metadata_source: payload.route_metadata_source ?? debug?.route_metadata_source ?? null,
+    mandatory_next_tool_name: payload.mandatory_next_tool_name ?? debug?.mandatory_next_tool_name ?? null,
+    legacy_ask_local_bypassed: payload.legacy_ask_local_bypassed ?? debug?.legacy_ask_local_bypassed ?? null,
+    first_broken_rail: payload.first_broken_rail ?? debug?.first_broken_rail ?? null,
+    repair_target: payload.repair_target ?? debug?.repair_target ?? null,
     server_build_commit: payload.server_build_commit ?? debug?.server_build_commit ?? null,
     server_build_started_at_ms: payload.server_build_started_at_ms ?? debug?.server_build_started_at_ms ?? null,
     helix_docs_synthesis_bridge_version:
@@ -121,6 +142,27 @@ const boundDebugExportEnvelopeText = (payload: Record<string, unknown>, text: st
       ask_entrypoint_observed: payload.ask_entrypoint_observed ?? debug?.ask_entrypoint_observed ?? null,
       ask_entrypoint_failure_code: payload.ask_entrypoint_failure_code ?? debug?.ask_entrypoint_failure_code ?? null,
       blocked_projection_kind: payload.blocked_projection_kind ?? debug?.blocked_projection_kind ?? null,
+      hard_prompt_projection_guard: payload.hard_prompt_projection_guard ?? debug?.hard_prompt_projection_guard ?? null,
+      client_projection_policy_version:
+        payload.client_projection_policy_version ?? debug?.client_projection_policy_version ?? null,
+      demoted_projection_layers: payload.demoted_projection_layers ?? debug?.demoted_projection_layers ?? null,
+      evidence_finalization_gate_demoted:
+        payload.evidence_finalization_gate_demoted ?? debug?.evidence_finalization_gate_demoted ?? null,
+      client_entrypoint_guard_version: payload.client_entrypoint_guard_version ?? debug?.client_entrypoint_guard_version ?? null,
+      submit_handler_source: payload.submit_handler_source ?? debug?.submit_handler_source ?? null,
+      runAsk_entered: payload.runAsk_entered ?? debug?.runAsk_entered ?? null,
+      hard_backend_entrypoint_required:
+        payload.hard_backend_entrypoint_required ?? debug?.hard_backend_entrypoint_required ?? null,
+      use_backend_ask_turn_entrypoint:
+        payload.use_backend_ask_turn_entrypoint ?? debug?.use_backend_ask_turn_entrypoint ?? null,
+      backend_ask_call_attempted: payload.backend_ask_call_attempted ?? debug?.backend_ask_call_attempted ?? null,
+      backend_ask_call_path: payload.backend_ask_call_path ?? debug?.backend_ask_call_path ?? null,
+      backend_ask_call_error: payload.backend_ask_call_error ?? debug?.backend_ask_call_error ?? null,
+      route_metadata_source: payload.route_metadata_source ?? debug?.route_metadata_source ?? null,
+      mandatory_next_tool_name: payload.mandatory_next_tool_name ?? debug?.mandatory_next_tool_name ?? null,
+      legacy_ask_local_bypassed: payload.legacy_ask_local_bypassed ?? debug?.legacy_ask_local_bypassed ?? null,
+      first_broken_rail: payload.first_broken_rail ?? debug?.first_broken_rail ?? null,
+      repair_target: payload.repair_target ?? debug?.repair_target ?? null,
     },
     debug_export_size_control: {
       schema: "helix.ask.debug_export_size_control.v1",
@@ -680,6 +722,94 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     readString(debug?.blocked_projection_kind) ??
     readString(payload.blocked_projection_kind) ??
     (askEntrypointRequired && askEntrypointObserved === false ? "client_projection" : null);
+  const backendEntrypointRuntimeFingerprint = asRecord(
+    payload.backend_ask_entrypoint_runtime_fingerprint ??
+      debug?.backend_ask_entrypoint_runtime_fingerprint ??
+      agentLoop?.backend_ask_entrypoint_runtime_fingerprint,
+  );
+  const hardPromptProjectionGuard = asRecord(
+    payload.hard_prompt_projection_guard ??
+      debug?.hard_prompt_projection_guard ??
+      agentLoop?.hard_prompt_projection_guard,
+  );
+  const clientProjectionPolicyVersion =
+    readString(hardPromptProjectionGuard?.client_projection_policy_version) ??
+    readString(debug?.client_projection_policy_version) ??
+    readString(payload.client_projection_policy_version);
+  const demotedProjectionLayers = Array.isArray(hardPromptProjectionGuard?.demoted_projection_layers)
+    ? hardPromptProjectionGuard.demoted_projection_layers
+    : Array.isArray(debug?.demoted_projection_layers)
+      ? debug.demoted_projection_layers
+      : Array.isArray(payload.demoted_projection_layers)
+        ? payload.demoted_projection_layers
+        : [];
+  const evidenceFinalizationGateDemoted =
+    readBoolean(debug?.evidence_finalization_gate_demoted) ??
+    readBoolean(payload.evidence_finalization_gate_demoted) ??
+    false;
+  const clientEntrypointGuardVersion =
+    readString(backendEntrypointRuntimeFingerprint?.client_entrypoint_guard_version) ??
+    readString(debug?.client_entrypoint_guard_version) ??
+    readString(payload.client_entrypoint_guard_version);
+  const submitHandlerSource =
+    readString(backendEntrypointRuntimeFingerprint?.submit_handler_source) ??
+    readString(debug?.submit_handler_source) ??
+    readString(payload.submit_handler_source);
+  const runAskEntered =
+    readBoolean(backendEntrypointRuntimeFingerprint?.runAsk_entered) ??
+    readBoolean(debug?.runAsk_entered) ??
+    readBoolean(payload.runAsk_entered);
+  const hardBackendEntrypointRequired =
+    readBoolean(backendEntrypointRuntimeFingerprint?.hard_backend_entrypoint_required) ??
+    readBoolean(debug?.hard_backend_entrypoint_required) ??
+    readBoolean(payload.hard_backend_entrypoint_required) ??
+    askEntrypointRequired;
+  const useBackendAskTurnEntrypoint =
+    readBoolean(backendEntrypointRuntimeFingerprint?.use_backend_ask_turn_entrypoint) ??
+    readBoolean(debug?.use_backend_ask_turn_entrypoint) ??
+    readBoolean(payload.use_backend_ask_turn_entrypoint);
+  const backendAskCallAttempted =
+    readBoolean(backendEntrypointRuntimeFingerprint?.backend_ask_call_attempted) ??
+    readBoolean(debug?.backend_ask_call_attempted) ??
+    readBoolean(payload.backend_ask_call_attempted);
+  const backendAskCallPath =
+    readString(backendEntrypointRuntimeFingerprint?.backend_ask_call_path) ??
+    readString(debug?.backend_ask_call_path) ??
+    readString(payload.backend_ask_call_path);
+  const backendAskCallError =
+    readString(backendEntrypointRuntimeFingerprint?.backend_ask_call_error) ??
+    readString(debug?.backend_ask_call_error) ??
+    readString(payload.backend_ask_call_error);
+  const routeMetadataSource =
+    readString(backendEntrypointRuntimeFingerprint?.route_metadata_source) ??
+    readString(debug?.route_metadata_source) ??
+    readString(payload.route_metadata_source);
+  const mandatoryNextToolName =
+    readString(backendEntrypointRuntimeFingerprint?.mandatory_next_tool_name) ??
+    readString(debug?.mandatory_next_tool_name) ??
+    readString(payload.mandatory_next_tool_name);
+  const legacyAskLocalBypassed =
+    readBoolean(backendEntrypointRuntimeFingerprint?.legacy_ask_local_bypassed) ??
+    readBoolean(debug?.legacy_ask_local_bypassed) ??
+    readBoolean(payload.legacy_ask_local_bypassed);
+  const firstBrokenRail =
+    readString(backendEntrypointRuntimeFingerprint?.first_broken_rail) ??
+    readString(debug?.first_broken_rail) ??
+    readString(payload.first_broken_rail) ??
+    (askEntrypointRequired && askEntrypointObserved === false
+      ? backendAskCallAttempted === true
+        ? "backend_debug_materialization"
+        : "backend_ask_entrypoint"
+      : null);
+  const repairTarget =
+    readString(backendEntrypointRuntimeFingerprint?.repair_target) ??
+    readString(debug?.repair_target) ??
+    readString(payload.repair_target) ??
+    (firstBrokenRail === "backend_debug_materialization"
+      ? "debug_export_bridge"
+      : firstBrokenRail === "backend_ask_entrypoint" || firstBrokenRail === "prompt_submit_entrypoint"
+        ? "prompt_submit_entrypoint"
+        : null);
   const effectiveTerminalErrorCode = terminalErrorCode ?? askEntrypointFailureCode;
   const effectiveTerminalArtifactKind =
     terminalArtifactKind ?? (effectiveTerminalErrorCode ? "typed_failure" : null);
@@ -707,6 +837,8 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
         readString(typedFailure?.message) ??
         (effectiveTerminalErrorCode === "backend_ask_entry_required"
           ? "This prompt requires the backend Ask solver path before a final answer can be shown."
+          : effectiveTerminalErrorCode === "backend_debug_materialization"
+            ? "Backend Ask was reached, but no server terminal artifact or debug artifact was materialized for this turn."
           : null) ??
         terminalAuthorityText
       : readString(terminalPresentation?.concise_text) ??
@@ -757,6 +889,24 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: {
     ask_entrypoint_observed: askEntrypointObserved,
     ask_entrypoint_failure_code: askEntrypointFailureCode,
     blocked_projection_kind: blockedProjectionKind,
+    hard_prompt_projection_guard: hardPromptProjectionGuard,
+    client_projection_policy_version: clientProjectionPolicyVersion,
+    demoted_projection_layers: demotedProjectionLayers,
+    evidence_finalization_gate_demoted: evidenceFinalizationGateDemoted,
+    backend_ask_entrypoint_runtime_fingerprint: backendEntrypointRuntimeFingerprint,
+    client_entrypoint_guard_version: clientEntrypointGuardVersion,
+    submit_handler_source: submitHandlerSource,
+    runAsk_entered: runAskEntered,
+    hard_backend_entrypoint_required: hardBackendEntrypointRequired,
+    use_backend_ask_turn_entrypoint: useBackendAskTurnEntrypoint,
+    backend_ask_call_attempted: backendAskCallAttempted,
+    backend_ask_call_path: backendAskCallPath,
+    backend_ask_call_error: backendAskCallError,
+    route_metadata_source: routeMetadataSource,
+    mandatory_next_tool_name: mandatoryNextToolName,
+    legacy_ask_local_bypassed: legacyAskLocalBypassed,
+    first_broken_rail: firstBrokenRail,
+    repair_target: repairTarget,
     voice_playback_reconciliation: voicePlaybackReconciliation,
     voice_steering_debug: voiceSteeringDebug,
     narrator_debug: narratorDebug,

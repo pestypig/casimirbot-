@@ -49,6 +49,13 @@ function mapIntentToCategorization(intent: HelixWorkstationToolPlan["intent"]): 
       produced_by: "workstation_note",
     };
   }
+  if (intent === "narrator_debug_probe") {
+    return {
+      source_family: "live_environment",
+      category: "context_reference",
+      produced_by: "deterministic_reducer",
+    };
+  }
   if (intent === "zen_graph_reflection") {
     return {
       source_family: "ideology",
@@ -119,6 +126,8 @@ export function evaluateWorkstationToolPlan(input: EvaluateWorkstationToolPlanIn
         ? "Create a workstation note and preserve the body outside raw Ask context."
       : input.plan.intent === "notes_append" || input.plan.intent === "notes_store_large_text"
         ? "Store text in workstation notes and keep compact references."
+      : input.plan.intent === "narrator_debug_probe"
+        ? "Publish a governed Narrator debug auto-speak probe through the workstation action lane."
       : input.plan.intent === "zen_graph_reflection"
         ? "Reflect the prompt through ZenGraph and Fruition as evidence-only procedural state."
       : input.plan.intent === "dottie_observer"

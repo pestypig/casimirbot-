@@ -35,8 +35,16 @@ export function auditHelixPromptForPoison(input: {
   if (/\b(?:toolObservation|tool_receipt|dynamicToolCall|workspace_action_receipt)\b/i.test(userText)) {
     addViolation(violations, "tool_receipt_in_user_text", "Tool receipt language leaked into user prompt text.");
   }
-  if (/\b(?:helix\.visual_extraction_evidence|visual_extraction_evidence|hotbar_slots|derived_equation|calculator_receipt)\b/i.test(userText)) {
+  if (/\b(?:helix\.visual_extraction_evidence|visual_extraction_evidence|hotbar_slots|derived_equation)\b/i.test(userText)) {
     addViolation(violations, "tool_receipt_in_user_text", "Derived multimodal extraction, equation, or calculator receipt leaked into user prompt text.");
+  }
+  if (
+    /\bhelix\.calculator_receipt\.v1\b/i.test(userText) ||
+    /\bkind\s*[:=]\s*["']calculator_receipt["']/i.test(userText) ||
+    /\bcalculator_receipt\s*[:=]\s*[{[]/i.test(userText) ||
+    /\breceipt_id\s*[:=]\s*["'][^"']*calculator_receipt/i.test(userText)
+  ) {
+    addViolation(violations, "tool_receipt_in_user_text", "Structured calculator receipt payload leaked into user prompt text.");
   }
   if (/\b(?:Now|Structure|Goal|Risk|Progress|Unknowns|Next check)\s*:/i.test(userText)) {
     addViolation(violations, "live_projection_in_user_text", "Live-card projection labels leaked into user prompt text.");

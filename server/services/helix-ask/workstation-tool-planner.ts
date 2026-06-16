@@ -29,6 +29,7 @@ export type WorkstationToolIntent =
   | "notes_create"
   | "notes_append"
   | "notes_store_large_text"
+  | "narrator_debug_probe"
   | "dottie_observer"
   | "live_environment_create"
   | "minecraft_live_continuation"
@@ -540,9 +541,31 @@ function extractIdeologyMotive(prompt: string): string | null {
 
 function extractNamedArg(prompt: string, names: string[]): string | null {
   for (const name of names) {
-    const pattern = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b\\s*(?::|=)?\\s*([A-Za-z0-9:._-]+)`, "i");
+    const pattern = new RegExp(
+      `\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b\\s*(?::|=)?\\s*(?:"([^"]+)"|'([^']+)'|([A-Za-z0-9:._-]+))`,
+      "i",
+    );
     const match = prompt.match(pattern);
-    if (match?.[1]) return stripOuterPunctuation(match[1]);
+    const value = match?.[1] ?? match?.[2] ?? match?.[3];
+    if (value) return stripOuterPunctuation(value);
+  }
+  return null;
+}
+
+function extractNamedTextArg(prompt: string, names: string[]): string | null {
+  for (const name of names) {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const quotedPattern = new RegExp(`\\b${escaped}\\b\\s*(?::|=)?\\s*(?:"([^"]+)"|'([^']+)')`, "i");
+    const quoted = prompt.match(quotedPattern);
+    const quotedValue = quoted?.[1] ?? quoted?.[2];
+    if (quotedValue?.trim()) return stripOuterPunctuation(quotedValue);
+
+    const barePattern = new RegExp(
+      `\\b${escaped}\\b\\s*(?::|=)\\s*([^.;]+?)(?=\\s+trace[_ ]?id\\s*(?::|=)|\\s+event[_ ]?id\\s*(?::|=)|\\s+turn[_ ]?id\\s*(?::|=)|$)`,
+      "i",
+    );
+    const bare = prompt.match(barePattern)?.[1]?.trim();
+    if (bare) return stripOuterPunctuation(bare);
   }
   return null;
 }
@@ -703,6 +726,107 @@ function applyVoiceInterpretationContextRequest(
     evidence_refs: kind === "post_solver_voice_lane_requested" ? ["answer_snapshot:pending"] : [],
     reason_codes: reasonCodes,
   });
+}
+
+function isNarratorDebugProbeToolPrompt(prompt: string): boolean {
+  const normalized = normalizePrompt(prompt);
+  if (!normalized) return false;
+  const mentionsExactAction =
+    /\bpanel[_\s-]?id\s*(?:=|:)\s*narrator\b/i.test(normalized) &&
+    /\baction[_\s-]?id\s*(?:=|:)\s*narrator\.debug_auto_speak_probe\b/i.test(normalized);
+  const mentionsPanelActionCommand =
+    /\b(?:run|trigger|use|execute|publish)\s+(?:the\s+)?(?:workstation\s+)?(?:panel\s+)?action\b[\s\S]{0,120}\bnarrator\.debug_auto_speak_probe\b/i.test(
+      normalized,
+    );
+  if (!mentionsExactAction && !mentionsPanelActionCommand) return false;
+
+  const affirmative =
+    /\boperator\s+command\b/i.test(normalized) ||
+    /\b(?:run|trigger|use|execute|publish|send|start)\b[\s\S]{0,120}\b(?:workstation\s+action|panel\s+action|narrator\.debug_auto_speak_probe|debug\s+probe)\b/i.test(
+      normalized,
+    );
+  if (!affirmative) return false;
+
+  const negated =
+    /\b(?:do\s+not|don't|dont|without|not\s+asking\s+to|no\s+need\s+to|never)\b[\s\S]{0,160}\b(?:run|trigger|use|execute|publish|send|start|narrator\.debug_auto_speak_probe|debug\s+probe)\b/i.test(
+      normalized,
+    );
+  const hypothetical =
+    /\b(?:what\s+would\s+happen|what\s+happens|if\s+(?:i|we|you)\s+(?:ran|run|trigger|use|execute)|would\s+you|could\s+you|should\s+(?:we|you)|tomorrow|later|next\s+time|in\s+the\s+future)\b[\s\S]{0,180}\b(?:narrator\.debug_auto_speak_probe|panel[_\s-]?id\s*(?:=|:)\s*narrator)\b/i.test(
+      normalized,
+    );
+  const quotedOnly =
+    /^["'`].*(?:panel[_\s-]?id\s*(?:=|:)\s*narrator|narrator\.debug_auto_speak_probe).*["'`]$/i.test(normalized) ||
+    /\b(?:the\s+text|screen|document|quote|quoted)\b[\s\S]{0,80}\b(?:says|contains|shows)\b[\s\S]{0,160}\b(?:panel[_\s-]?id\s*(?:=|:)\s*narrator|narrator\.debug_auto_speak_probe)\b/i.test(
+      normalized,
+    );
+  return !negated && !hypothetical && !quotedOnly;
+}
+
+function buildNarratorDebugProbePlan(
+  normalized: string,
+  options: PlanWorkstationToolUseOptions,
+  scores: AffordanceScore[],
+): WorkstationToolPlannerResult {
+  const text =
+    extractNamedTextArg(normalized, ["text", "message", "probe text", "source text"]) ??
+    "Narrator debug probe from Helix Ask.";
+  const traceId =
+    extractNamedArg(normalized, ["trace_id", "trace id"]) ??
+    `narrator:ask-probe:${options.turnId ?? Date.now()}`;
+  const args = {
+    text,
+    trace_id: traceId,
+    source: "helix_ask",
+  };
+  const steps: HelixWorkstationToolPlanStep[] = [
+    makeOpenStep("narrator"),
+    {
+      step_id: "publish_narrator_debug_auto_speak_probe",
+      kind: "run_panel_action",
+      panel_id: "narrator",
+      action_id: "narrator.debug_auto_speak_probe",
+      args,
+      depends_on: ["open_narrator"],
+      expected_receipt_kind: "helix.narrator_debug_auto_speak_probe_receipt.v1",
+      expected_state_change: { store: "narrator", proof_key: "debug_auto_speak_probe" },
+      required: true,
+    },
+    {
+      step_id: "evaluate_narrator_debug_probe_receipt",
+      kind: "evaluate_result",
+      depends_on: ["publish_narrator_debug_auto_speak_probe"],
+      expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+      required: true,
+    },
+  ];
+  scores.push({
+    affordance_id: "narrator.debug_auto_speak_probe",
+    panel_id: "narrator",
+    action_id: "narrator.debug_auto_speak_probe",
+    score: 0.96,
+    reason: "affirmative explicit narrator debug probe command includes panel_id and action_id",
+    required_args_missing: [],
+  });
+  return {
+    intent: "narrator_debug_probe",
+    action: {
+      panel_id: "narrator",
+      action_id: "narrator.debug_auto_speak_probe",
+      args,
+    },
+    tool_plan: buildToolPlan({
+      prompt: normalized,
+      intent: "narrator_debug_probe",
+      missing: [],
+      options,
+      steps,
+    }),
+    scores,
+    should_use_tool: true,
+    reason: "Prompt explicitly asks the Narrator panel to publish the governed auto-speak debug probe.",
+    missing_required_args: [],
+  };
 }
 
 function isDottieObserverToolPrompt(prompt: string): boolean {
@@ -1257,6 +1381,10 @@ export function planWorkstationToolUse(
       "Retired Situation Room live-continuation tool calls are no longer admitted; use the Live Answer surface and Stage Play badge graph instead.",
       scores,
     );
+  }
+
+  if (isNarratorDebugProbeToolPrompt(normalized)) {
+    return buildNarratorDebugProbePlan(normalized, options, scores);
   }
 
   const voiceContextKind = classifyVoiceContextRequest(normalized);

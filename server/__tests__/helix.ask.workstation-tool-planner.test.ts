@@ -668,6 +668,46 @@ describe("Helix Ask workstation tool planner", () => {
     ]);
   });
 
+  it("routes explicit narrator debug probes through the narrator panel action", () => {
+    const plan = planWorkstationToolUse(
+      'Run workstation action panel_id=narrator action_id=narrator.debug_auto_speak_probe with args text="Narrator debug probe from Helix Ask" trace_id="narrator:ask-probe".',
+      { threadId: "thread:narrator-probe", turnId: "turn:narrator-probe" },
+    );
+
+    expect(plan.intent).toBe("narrator_debug_probe");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.action).toEqual({
+      panel_id: "narrator",
+      action_id: "narrator.debug_auto_speak_probe",
+      args: {
+        text: "Narrator debug probe from Helix Ask",
+        trace_id: "narrator:ask-probe",
+        source: "helix_ask",
+      },
+    });
+    expect(plan.tool_plan?.steps.map((step) => `${step.panel_id}.${step.action_id}`)).toEqual([
+      "narrator.open",
+      "narrator.narrator.debug_auto_speak_probe",
+      "undefined.undefined",
+    ]);
+    expect(plan.missing_required_args).toEqual([]);
+  });
+
+  it("does not execute negated or hypothetical narrator debug probe mentions", () => {
+    for (const prompt of [
+      "Do not run workstation action panel_id=narrator action_id=narrator.debug_auto_speak_probe.",
+      'The document says "panel_id=narrator action_id=narrator.debug_auto_speak_probe"; explain what that means.',
+      "What would happen if you ran panel_id=narrator action_id=narrator.debug_auto_speak_probe?",
+      "Tomorrow run panel_id=narrator action_id=narrator.debug_auto_speak_probe.",
+    ]) {
+      const plan = planWorkstationToolUse(prompt, { threadId: "thread:narrator-negative" });
+      expect(plan.intent).toBe("direct_answer");
+      expect(plan.should_use_tool).toBe(false);
+      expect(plan.action).toBeNull();
+      expect(plan.tool_plan).toBeNull();
+    }
+  });
+
   it("retires explicit Auntie Dottie observer Situation Room tool commands", () => {
     const plan = planWorkstationToolUse(
       [

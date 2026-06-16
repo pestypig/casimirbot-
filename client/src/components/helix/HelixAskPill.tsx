@@ -6038,6 +6038,7 @@ function buildHelixAskPastedTextResumeRecallRouteMetadata(args: {
 type HelixAskHardBackendEntrypointFamily =
   | "calculator"
   | "docs_viewer"
+  | "narrator"
   | "repo_code"
   | "workspace_diagnostic"
   | "internet_search"
@@ -6081,6 +6082,19 @@ const resolveHelixAskHardBackendEntrypointFamily = (
       selectedCapability: capability,
       explicitCue: "docs_viewer_tool_family",
       requestedOutputs: ["tool_call_eligibility", "doc_evidence", "typed_failure"],
+    };
+  }
+  if (/\b(?:narrator\.[a-z0-9_.-]+|panel[_\s-]?id\s*(?:=|:)\s*narrator)\b/i.test(normalized)) {
+    const explicitAction = normalized.match(/\baction[_\s-]?id\s*(?:=|:)\s*(narrator\.[a-z0-9_.-]+)\b/i)?.[1] ?? null;
+    const capability = explicitAction ?? normalized.match(/\bnarrator\.[a-z0-9_.-]+\b/i)?.[0] ?? null;
+    return {
+      family: "narrator",
+      sourceTarget: "workstation_panel",
+      targetKind: "workstation_state",
+      requiredToolFamily: "narrator",
+      selectedCapability: capability,
+      explicitCue: "narrator_tool_family",
+      requestedOutputs: ["tool_call_eligibility", "workspace_action_receipt", "voice_debug_receipt", "typed_failure"],
     };
   }
   if (/\b(?:repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+)\b/i.test(normalized)) {
@@ -7589,9 +7603,14 @@ function shouldSuppressGeneratedStagePlayMailWakeChatProjection(
 export const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE = "backend_ask_entry_required";
 export const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT =
   "This prompt requires the backend Ask solver path before a final answer can be shown.";
+export const HELIX_ASK_ENTRYPOINT_GUARD_VERSION = "E79";
+export const HELIX_ASK_SINGLE_TERMINAL_PROJECTOR_VERSION = "E80";
+export const HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_ERROR_CODE = "backend_debug_materialization";
+export const HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_TEXT =
+  "Backend Ask was reached, but no server terminal artifact or debug artifact was materialized for this turn.";
 
 const HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_PROMPT_RE =
-  /\b(?:scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\s+viewer|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image_lens|visual_capture)\b/i;
+  /\b(?:scientific-calculator\.[a-z0-9_.-]+|scientific\s+calculator|calculator_receipt|calculator\s+tool|docs-viewer\.[a-z0-9_.-]+|docs\s+viewer|narrator\.[a-z0-9_.-]+|panel[_\s-]?id\s*(?:=|:)\s*narrator|repo-code\.[a-z0-9_.-]+|repo_code\.[a-z0-9_.-]+|workspace-directory\.[a-z0-9_.-]+|workspace_directory\.[a-z0-9_.-]+|workspace_os\.status|internet_search\.[a-z0-9_.-]+|internet\s+search\s+tool|live_env\.[a-z0-9_.-]+|helix_ask\.[a-z0-9_.-]+|image_lens|visual_capture)\b/i;
 
 export function requiresHelixAskBackendEntrypoint(question: string | null | undefined): boolean {
   const normalized = coerceText(question).trim();
@@ -7604,6 +7623,119 @@ export function shouldUseHelixAskBackendTurnEntrypoint(args: {
   hardBackendEntrypointRequired: boolean;
 }): boolean {
   return args.manualCanaryEnabled || args.hardBackendEntrypointRequired;
+}
+
+export function buildHelixAskBackendEntrypointRuntimeFingerprint(args: {
+  submitHandlerSource: string;
+  runAskEntered: boolean;
+  hardBackendEntrypointRequired: boolean;
+  useBackendAskTurnEntrypoint: boolean;
+  backendAskCallAttempted: boolean;
+  backendAskCallPath: "runAskTurnStream" | "runAskTurn" | "askLocal" | null;
+  backendAskCallError?: string | null;
+  routeMetadata?: unknown;
+  legacyAskLocalBypassed: boolean;
+  askEntrypointObserved?: boolean | null;
+}): Record<string, unknown> {
+  const routeMetadata = readAgentLoopAuditRecord(args.routeMetadata);
+  const mandatoryNextTool = readAgentLoopAuditRecord(routeMetadata?.mandatory_next_tool);
+  const firstBrokenRail =
+    !args.runAskEntered
+      ? "prompt_submit_entrypoint"
+      : args.hardBackendEntrypointRequired && !args.useBackendAskTurnEntrypoint
+      ? "backend_ask_entrypoint"
+      : args.hardBackendEntrypointRequired && !args.backendAskCallAttempted
+      ? "backend_ask_entrypoint"
+      : args.hardBackendEntrypointRequired &&
+        args.backendAskCallAttempted &&
+        args.askEntrypointObserved === false
+      ? "backend_debug_materialization"
+      : null;
+  const repairTarget =
+    firstBrokenRail === "prompt_submit_entrypoint" || firstBrokenRail === "backend_ask_entrypoint"
+      ? "prompt_submit_entrypoint"
+      : firstBrokenRail === "backend_debug_materialization"
+      ? "debug_export_bridge"
+      : null;
+  return {
+    schema: "helix.backend_ask_entrypoint_runtime_fingerprint.v1",
+    client_entrypoint_guard_version: HELIX_ASK_ENTRYPOINT_GUARD_VERSION,
+    submit_handler_source: args.submitHandlerSource,
+    runAsk_entered: args.runAskEntered,
+    hard_backend_entrypoint_required: args.hardBackendEntrypointRequired,
+    use_backend_ask_turn_entrypoint: args.useBackendAskTurnEntrypoint,
+    backend_ask_call_attempted: args.backendAskCallAttempted,
+    backend_ask_call_path: args.backendAskCallPath,
+    backend_ask_call_error: args.backendAskCallError ?? null,
+    route_metadata_source: coerceText(routeMetadata?.source).trim() || null,
+    mandatory_next_tool_name:
+      coerceText(mandatoryNextTool?.tool_name).trim() ||
+      coerceText(mandatoryNextTool?.selected_capability).trim() ||
+      null,
+    legacy_ask_local_bypassed: args.legacyAskLocalBypassed,
+    first_broken_rail: firstBrokenRail,
+    repair_target: repairTarget,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+}
+
+export function resolveHelixAskHardPromptProjectionGuard(args: {
+  hardBackendEntrypointRequired: boolean;
+  backendAskCallAttempted: boolean | null;
+  serverTerminalText?: string | null;
+  serverTerminalSource?: string | null;
+  currentBrokenRail?: string | null;
+  currentRepairTarget?: string | null;
+}): Record<string, unknown> | null {
+  if (!args.hardBackendEntrypointRequired) return null;
+  const serverTerminalText = coerceText(args.serverTerminalText).trim();
+  const serverTerminalSource = coerceText(args.serverTerminalSource).trim();
+  if (serverTerminalText && serverTerminalSource && serverTerminalSource !== "legacy_shadow" && serverTerminalSource !== "empty") {
+    return {
+      schema: "helix.hard_prompt_projection_guard.v1",
+      client_projection_policy_version: HELIX_ASK_SINGLE_TERMINAL_PROJECTOR_VERSION,
+      projection_allowed: true,
+      allowed_projection_source: serverTerminalSource,
+      selected_failure_code: null,
+      selected_failure_text: null,
+      demoted_projection_layers: [],
+      first_broken_rail: null,
+      repair_target: null,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+  const backendAskAttempted = args.backendAskCallAttempted === true;
+  const selectedFailureCode = backendAskAttempted
+    ? HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_ERROR_CODE
+    : HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE;
+  return {
+    schema: "helix.hard_prompt_projection_guard.v1",
+    client_projection_policy_version: HELIX_ASK_SINGLE_TERMINAL_PROJECTOR_VERSION,
+    projection_allowed: false,
+    allowed_projection_source: null,
+    selected_failure_code: selectedFailureCode,
+    selected_failure_text: backendAskAttempted
+      ? HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_TEXT
+      : HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
+    demoted_projection_layers: [
+      "durable_chat_session",
+      "client_projection",
+      "evidence_finalization_fallback",
+      "model_synthesized_fallback",
+      "receipt_derived_final",
+      "debug_export_derived_final",
+    ],
+    first_broken_rail:
+      coerceText(args.currentBrokenRail).trim() ||
+      (backendAskAttempted ? "backend_debug_materialization" : "backend_ask_entrypoint"),
+    repair_target:
+      coerceText(args.currentRepairTarget).trim() ||
+      (backendAskAttempted ? "debug_export_bridge" : "prompt_submit_entrypoint"),
+    assistant_answer: false,
+    raw_content_included: false,
+  };
 }
 
 export function hasHelixAskBackendEntrypointTurnId(turnId: string | null | undefined): boolean {
@@ -8437,6 +8569,12 @@ const renderTypedFailureFallback = (code?: string | null): string => {
   }
   if (normalized === "equation_source_unavailable") {
     return "I looked for an equation-bearing source, but no current-turn equation artifact satisfied the source contract.\nCause: equation_source_unavailable.";
+  }
+  if (normalized === HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_ERROR_CODE) {
+    return HELIX_ASK_BACKEND_DEBUG_MATERIALIZATION_TEXT;
+  }
+  if (normalized === HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE) {
+    return HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT;
   }
   return normalized ? `I could not complete that turn.\nCause: ${normalized}.` : "I could not complete that turn.";
 };
@@ -15238,6 +15376,123 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     coerceText(debug?.blocked_projection_kind).trim() ||
     coerceText(payload.blocked_projection_kind).trim() ||
     (askEntrypointRequired && askEntrypointObserved === false ? "client_projection" : null);
+  const backendEntrypointRuntimeFingerprint = readAgentLoopAuditRecord(
+    payload.backend_ask_entrypoint_runtime_fingerprint ??
+      debug?.backend_ask_entrypoint_runtime_fingerprint ??
+      agentLoop?.backend_ask_entrypoint_runtime_fingerprint,
+  );
+  const hardPromptProjectionGuard = readAgentLoopAuditRecord(
+    payload.hard_prompt_projection_guard ??
+      debug?.hard_prompt_projection_guard ??
+      agentLoop?.hard_prompt_projection_guard,
+  );
+  const clientProjectionPolicyVersion =
+    coerceText(hardPromptProjectionGuard?.client_projection_policy_version).trim() ||
+    coerceText(debug?.client_projection_policy_version).trim() ||
+    coerceText(payload.client_projection_policy_version).trim() ||
+    null;
+  const demotedProjectionLayers =
+    Array.isArray(hardPromptProjectionGuard?.demoted_projection_layers)
+      ? hardPromptProjectionGuard.demoted_projection_layers
+      : Array.isArray(debug?.demoted_projection_layers)
+        ? debug.demoted_projection_layers
+        : Array.isArray(payload.demoted_projection_layers)
+          ? payload.demoted_projection_layers
+          : [];
+  const evidenceFinalizationGateDemoted =
+    typeof debug?.evidence_finalization_gate_demoted === "boolean"
+      ? debug.evidence_finalization_gate_demoted
+      : typeof payload.evidence_finalization_gate_demoted === "boolean"
+        ? payload.evidence_finalization_gate_demoted
+        : false;
+  const clientEntrypointGuardVersion =
+    coerceText(backendEntrypointRuntimeFingerprint?.client_entrypoint_guard_version).trim() ||
+    coerceText(debug?.client_entrypoint_guard_version).trim() ||
+    coerceText(payload.client_entrypoint_guard_version).trim() ||
+    null;
+  const submitHandlerSource =
+    coerceText(backendEntrypointRuntimeFingerprint?.submit_handler_source).trim() ||
+    coerceText(debug?.submit_handler_source).trim() ||
+    coerceText(payload.submit_handler_source).trim() ||
+    null;
+  const runAskEntered =
+    typeof backendEntrypointRuntimeFingerprint?.runAsk_entered === "boolean"
+      ? backendEntrypointRuntimeFingerprint.runAsk_entered
+      : typeof debug?.runAsk_entered === "boolean"
+        ? debug.runAsk_entered
+        : typeof payload.runAsk_entered === "boolean"
+          ? payload.runAsk_entered
+          : null;
+  const hardBackendEntrypointRequired =
+    typeof backendEntrypointRuntimeFingerprint?.hard_backend_entrypoint_required === "boolean"
+      ? backendEntrypointRuntimeFingerprint.hard_backend_entrypoint_required
+      : typeof debug?.hard_backend_entrypoint_required === "boolean"
+        ? debug.hard_backend_entrypoint_required
+        : typeof payload.hard_backend_entrypoint_required === "boolean"
+          ? payload.hard_backend_entrypoint_required
+          : askEntrypointRequired;
+  const useBackendAskTurnEntrypoint =
+    typeof backendEntrypointRuntimeFingerprint?.use_backend_ask_turn_entrypoint === "boolean"
+      ? backendEntrypointRuntimeFingerprint.use_backend_ask_turn_entrypoint
+      : typeof debug?.use_backend_ask_turn_entrypoint === "boolean"
+        ? debug.use_backend_ask_turn_entrypoint
+        : typeof payload.use_backend_ask_turn_entrypoint === "boolean"
+          ? payload.use_backend_ask_turn_entrypoint
+          : null;
+  const backendAskCallAttempted =
+    typeof backendEntrypointRuntimeFingerprint?.backend_ask_call_attempted === "boolean"
+      ? backendEntrypointRuntimeFingerprint.backend_ask_call_attempted
+      : typeof debug?.backend_ask_call_attempted === "boolean"
+        ? debug.backend_ask_call_attempted
+        : typeof payload.backend_ask_call_attempted === "boolean"
+          ? payload.backend_ask_call_attempted
+          : null;
+  const backendAskCallPath =
+    coerceText(backendEntrypointRuntimeFingerprint?.backend_ask_call_path).trim() ||
+    coerceText(debug?.backend_ask_call_path).trim() ||
+    coerceText(payload.backend_ask_call_path).trim() ||
+    null;
+  const backendAskCallError =
+    coerceText(backendEntrypointRuntimeFingerprint?.backend_ask_call_error).trim() ||
+    coerceText(debug?.backend_ask_call_error).trim() ||
+    coerceText(payload.backend_ask_call_error).trim() ||
+    null;
+  const routeMetadataSource =
+    coerceText(backendEntrypointRuntimeFingerprint?.route_metadata_source).trim() ||
+    coerceText(debug?.route_metadata_source).trim() ||
+    coerceText(payload.route_metadata_source).trim() ||
+    null;
+  const mandatoryNextToolName =
+    coerceText(backendEntrypointRuntimeFingerprint?.mandatory_next_tool_name).trim() ||
+    coerceText(debug?.mandatory_next_tool_name).trim() ||
+    coerceText(payload.mandatory_next_tool_name).trim() ||
+    null;
+  const legacyAskLocalBypassed =
+    typeof backendEntrypointRuntimeFingerprint?.legacy_ask_local_bypassed === "boolean"
+      ? backendEntrypointRuntimeFingerprint.legacy_ask_local_bypassed
+      : typeof debug?.legacy_ask_local_bypassed === "boolean"
+        ? debug.legacy_ask_local_bypassed
+        : typeof payload.legacy_ask_local_bypassed === "boolean"
+          ? payload.legacy_ask_local_bypassed
+          : null;
+  const firstBrokenRail =
+    coerceText(backendEntrypointRuntimeFingerprint?.first_broken_rail).trim() ||
+    coerceText(debug?.first_broken_rail).trim() ||
+    coerceText(payload.first_broken_rail).trim() ||
+    (askEntrypointRequired && askEntrypointObserved === false
+      ? backendAskCallAttempted === true
+        ? "backend_debug_materialization"
+        : "backend_ask_entrypoint"
+      : null);
+  const repairTarget =
+    coerceText(backendEntrypointRuntimeFingerprint?.repair_target).trim() ||
+    coerceText(debug?.repair_target).trim() ||
+    coerceText(payload.repair_target).trim() ||
+    (firstBrokenRail === "backend_debug_materialization"
+      ? "debug_export_bridge"
+      : firstBrokenRail === "backend_ask_entrypoint" || firstBrokenRail === "prompt_submit_entrypoint"
+        ? "prompt_submit_entrypoint"
+        : null);
   const toolTraceDisclosureForDebug = buildCompactToolTraceDisclosure(actionEnvelopeForDebug, canonicalActiveTurnId);
   const voicePlaybackReconciliation = buildVoicePlaybackReconciliationDebug({
     activeTurnId: canonicalActiveTurnId,
@@ -15266,6 +15521,24 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
     ask_entrypoint_observed: askEntrypointObserved,
     ask_entrypoint_failure_code: askEntrypointFailureCode,
     blocked_projection_kind: blockedProjectionKind,
+    hard_prompt_projection_guard: hardPromptProjectionGuard,
+    client_projection_policy_version: clientProjectionPolicyVersion,
+    demoted_projection_layers: demotedProjectionLayers,
+    evidence_finalization_gate_demoted: evidenceFinalizationGateDemoted,
+    backend_ask_entrypoint_runtime_fingerprint: backendEntrypointRuntimeFingerprint,
+    client_entrypoint_guard_version: clientEntrypointGuardVersion,
+    submit_handler_source: submitHandlerSource,
+    runAsk_entered: runAskEntered,
+    hard_backend_entrypoint_required: hardBackendEntrypointRequired,
+    use_backend_ask_turn_entrypoint: useBackendAskTurnEntrypoint,
+    backend_ask_call_attempted: backendAskCallAttempted,
+    backend_ask_call_path: backendAskCallPath,
+    backend_ask_call_error: backendAskCallError,
+    route_metadata_source: routeMetadataSource,
+    mandatory_next_tool_name: mandatoryNextToolName,
+    legacy_ask_local_bypassed: legacyAskLocalBypassed,
+    first_broken_rail: firstBrokenRail,
+    repair_target: repairTarget,
     voice_playback_reconciliation: voicePlaybackReconciliation,
     situation_context_pack: situationContextPackForDebug,
     live_environment_turn_relevance: liveEnvironmentRelevanceForDebug,
@@ -33302,6 +33575,9 @@ export function HelixAskPill({
         manualCanaryEnabled: HELIX_E6_ASK_TURN_MANUAL_CANARY_FLAG,
         hardBackendEntrypointRequired,
       });
+      let backendAskCallAttempted = false;
+      let backendAskCallPath: "runAskTurnStream" | "runAskTurn" | "askLocal" | null = null;
+      let backendAskCallError: string | null = null;
       resetHelixAskConsoleStreamIngressDebug({ turnId: runAskTurnId, traceId, startedAtMs });
       const voiceAutoSpeakArmedAtTurnStart = micArmStateRef.current === "on";
       const manualAttempt = manualDispatchHint
@@ -33425,6 +33701,7 @@ export function HelixAskPill({
         let responseDebugWithClientMode: HelixAskReply["debug"] | undefined;
         let timelineDebugContext: Record<string, unknown> | null = null;
         let localResponseForTerminal: AskLocalResult | null = null;
+        let backendEntrypointRuntimeFingerprint: Record<string, unknown> = {};
         setAskStatus("Generating answer...");
         try {
           const askModeForRequest =
@@ -33528,6 +33805,8 @@ export function HelixAskPill({
               routeMetadata: routeMetadataForTurn,
             };
             try {
+              backendAskCallAttempted = true;
+              backendAskCallPath = "runAskTurnStream";
               localResponse = await runAskTurnStream(askTurnPayload, (event) => {
                 const record = readAgentLoopAuditRecord(event.data);
                 updateHelixAskConsoleStreamIngressDebug((current) => ({
@@ -33619,14 +33898,17 @@ export function HelixAskPill({
                 }));
               });
             } catch (streamError) {
+              backendAskCallError = streamError instanceof Error ? streamError.message : String(streamError);
+              backendAskCallPath = "runAskTurn";
               localResponse = await runAskTurn(askTurnPayload);
               localResponse.debug = {
                 ...(localResponse.debug ?? {}),
                 stream_used: false,
-                stream_fallback_reason: streamError instanceof Error ? streamError.message : String(streamError),
+                stream_fallback_reason: backendAskCallError,
               };
             }
           } else {
+            backendAskCallPath = "askLocal";
             const askResult = await askLocalWithPreflightScopeFallback(undefined, {
               sessionId: sessionId ?? undefined,
               traceId,
@@ -33717,6 +33999,32 @@ export function HelixAskPill({
             ? responseActionEnvelope.workstation_actions[0]
             : undefined;
           const localResponseRecord = localResponse as unknown as Record<string, unknown>;
+          const backendEntrypointObservedForRuntime =
+            hardBackendEntrypointRequired
+              ? Boolean(
+                  localResponseRecord.debug_export_ref ||
+                    localResponse.debug?.debug_export_ref ||
+                    localResponseRecord.ask_turn_solver_trace ||
+                    localResponse.debug?.ask_turn_solver_trace ||
+                    localResponseRecord.agent_runtime_loop ||
+                    localResponse.debug?.agent_runtime_loop ||
+                    localResponseRecord.canonical_goal_frame ||
+                    localResponse.debug?.canonical_goal_frame ||
+                    localResponseRecord.agent_loop_audit,
+                )
+              : null;
+          backendEntrypointRuntimeFingerprint = buildHelixAskBackendEntrypointRuntimeFingerprint({
+            submitHandlerSource: "HelixAskPill.runAsk",
+            runAskEntered: true,
+            hardBackendEntrypointRequired,
+            useBackendAskTurnEntrypoint,
+            backendAskCallAttempted,
+            backendAskCallPath,
+            backendAskCallError,
+            routeMetadata: routeMetadataForTurn,
+            legacyAskLocalBypassed: useBackendAskTurnEntrypoint,
+            askEntrypointObserved: backendEntrypointObservedForRuntime,
+          });
           const askLevelTheoryReflection = extractAskLevelTheoryReflection(localResponseRecord);
           if (askLevelTheoryReflection) {
             useTheoryMapOverlayStore.getState().setLiveAnswerContextReflection(askLevelTheoryReflection);
@@ -33734,6 +34042,20 @@ export function HelixAskPill({
             );
             responseDebugWithClientMode = {
               ...responseDebugWithClientMode,
+              backend_ask_entrypoint_runtime_fingerprint: backendEntrypointRuntimeFingerprint,
+              client_entrypoint_guard_version: backendEntrypointRuntimeFingerprint.client_entrypoint_guard_version,
+              submit_handler_source: backendEntrypointRuntimeFingerprint.submit_handler_source,
+              runAsk_entered: backendEntrypointRuntimeFingerprint.runAsk_entered,
+              hard_backend_entrypoint_required: backendEntrypointRuntimeFingerprint.hard_backend_entrypoint_required,
+              use_backend_ask_turn_entrypoint: backendEntrypointRuntimeFingerprint.use_backend_ask_turn_entrypoint,
+              backend_ask_call_attempted: backendEntrypointRuntimeFingerprint.backend_ask_call_attempted,
+              backend_ask_call_path: backendEntrypointRuntimeFingerprint.backend_ask_call_path,
+              backend_ask_call_error: backendEntrypointRuntimeFingerprint.backend_ask_call_error,
+              route_metadata_source: backendEntrypointRuntimeFingerprint.route_metadata_source,
+              mandatory_next_tool_name: backendEntrypointRuntimeFingerprint.mandatory_next_tool_name,
+              legacy_ask_local_bypassed: backendEntrypointRuntimeFingerprint.legacy_ask_local_bypassed,
+              first_broken_rail: backendEntrypointRuntimeFingerprint.first_broken_rail,
+              repair_target: backendEntrypointRuntimeFingerprint.repair_target,
               ui_turn_contract_source: useBackendAskTurnEntrypoint ? "ask_turn" : "legacy_local",
               ui_local_fast_path_suppressed: unifiedAskTurnOwnsManualDispatch,
               ui_visual_attachment_submitted: Boolean(visualEvidenceForTurn || submittedAttachments.length > 0),
@@ -34112,57 +34434,100 @@ export function HelixAskPill({
                 localResponseRecord.agent_runtime_loop ||
                 localResponseRecord.agent_loop_audit,
             );
+          const hardPromptProjectionGuard = resolveHelixAskHardPromptProjectionGuard({
+            hardBackendEntrypointRequired: askEntrypointRequiredForResponse,
+            backendAskCallAttempted:
+              typeof backendEntrypointRuntimeFingerprint.backend_ask_call_attempted === "boolean"
+                ? backendEntrypointRuntimeFingerprint.backend_ask_call_attempted
+                : null,
+            serverTerminalText: terminalResolutionForFinal.backendTerminalText,
+            serverTerminalSource: terminalResolutionForFinal.source,
+            currentBrokenRail:
+              typeof backendEntrypointRuntimeFingerprint.first_broken_rail === "string"
+                ? backendEntrypointRuntimeFingerprint.first_broken_rail
+                : null,
+            currentRepairTarget:
+              typeof backendEntrypointRuntimeFingerprint.repair_target === "string"
+                ? backendEntrypointRuntimeFingerprint.repair_target
+                : null,
+          });
+          const hardPromptProjectionBlocked =
+            hardPromptProjectionGuard?.projection_allowed === false;
+          if (hardPromptProjectionBlocked) {
+            responseText =
+              typeof hardPromptProjectionGuard.selected_failure_text === "string"
+                ? hardPromptProjectionGuard.selected_failure_text
+                : HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT;
+            if (responseDebugPayload && typeof responseDebugPayload === "object") {
+              const failureCode =
+                typeof hardPromptProjectionGuard.selected_failure_code === "string"
+                  ? hardPromptProjectionGuard.selected_failure_code
+                  : HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE;
+              Object.assign(responseDebugPayload, {
+                hard_prompt_projection_guard: hardPromptProjectionGuard,
+                client_projection_policy_version: HELIX_ASK_SINGLE_TERMINAL_PROJECTOR_VERSION,
+                ask_entrypoint_required: true,
+                ask_entrypoint_observed: askEntrypointObservedForResponse,
+                ask_entrypoint_failure_code:
+                  failureCode === HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE
+                    ? HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE
+                    : responseDebugPayload.ask_entrypoint_failure_code ?? null,
+                blocked_projection_kind: "single_terminal_projector",
+                demoted_projection_layers: hardPromptProjectionGuard.demoted_projection_layers,
+                selected_final_answer: responseText,
+                final_answer_source: "typed_failure",
+                terminal_artifact_kind: "typed_failure",
+                terminal_error_code: failureCode,
+                first_broken_rail: hardPromptProjectionGuard.first_broken_rail,
+                repair_target: hardPromptProjectionGuard.repair_target,
+                typed_failure: {
+                  schema: "helix.ask.typed_failure.v1",
+                  code: failureCode,
+                  message: responseText,
+                },
+                resolved_turn_summary: {
+                  ...(readAgentLoopAuditRecord(responseDebugPayload.resolved_turn_summary) ?? {}),
+                  final_status: "final_failure",
+                  terminal_artifact_kind: "typed_failure",
+                  terminal_error_code: failureCode,
+                },
+              });
+            }
+          }
           if (evidenceGateDecision.blocked && !preserveAuthoritativeTerminal) {
-            appendSyntheticLiveEvent(
-              buildNeedsRetrievalPlanEvent({
-                source: "run_ask",
-                question: trimmed,
-                reason: evidenceGateDecision.reason ?? "needs_retrieval",
-                evidence_refs: evidenceGateDecision.evidence_refs,
-                traceId,
-              }),
-            );
-            addHelixTimelineEntry({
-              type: "conversation_brief",
-              source: "manual",
-              status: "queued",
-              text: "Needs retrieval: deferring final claim until grounded evidence references are available.",
-              detail: "observer_lane_orchestrator | needs_retrieval",
-              mode: "observe",
-              traceId,
-              meta: {
-                kind: "observer_lane_orchestrator",
-                plan_step: "needs_retrieval",
-                reason: evidenceGateDecision.reason,
-                evidence_refs: evidenceGateDecision.evidence_refs,
-              },
-            });
-            if (askEntrypointRequiredForResponse && !askEntrypointObservedForResponse) {
-              responseText = HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT;
+            if (hardPromptProjectionGuard) {
               if (responseDebugPayload && typeof responseDebugPayload === "object") {
                 Object.assign(responseDebugPayload, {
-                  ask_entrypoint_required: true,
-                  ask_entrypoint_observed: false,
-                  ask_entrypoint_failure_code: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
-                  blocked_projection_kind: "evidence_finalization_fallback",
-                  selected_final_answer: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
-                  final_answer_source: "typed_failure",
-                  terminal_artifact_kind: "typed_failure",
-                  terminal_error_code: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
-                  typed_failure: {
-                    schema: "helix.ask.typed_failure.v1",
-                    code: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
-                    message: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_TEXT,
-                  },
-                  resolved_turn_summary: {
-                    ...(readAgentLoopAuditRecord(responseDebugPayload.resolved_turn_summary) ?? {}),
-                    final_status: "final_failure",
-                    terminal_artifact_kind: "typed_failure",
-                    terminal_error_code: HELIX_ASK_BACKEND_ENTRYPOINT_REQUIRED_ERROR_CODE,
-                  },
+                  evidence_finalization_gate_demoted: true,
+                  evidence_finalization_gate_reason: evidenceGateDecision.reason ?? "needs_retrieval",
+                  evidence_finalization_gate_evidence_refs: evidenceGateDecision.evidence_refs,
                 });
               }
             } else {
+              appendSyntheticLiveEvent(
+                buildNeedsRetrievalPlanEvent({
+                  source: "run_ask",
+                  question: trimmed,
+                  reason: evidenceGateDecision.reason ?? "needs_retrieval",
+                  evidence_refs: evidenceGateDecision.evidence_refs,
+                  traceId,
+                }),
+              );
+              addHelixTimelineEntry({
+                type: "conversation_brief",
+                source: "manual",
+                status: "queued",
+                text: "Needs retrieval: deferring final claim until grounded evidence references are available.",
+                detail: "observer_lane_orchestrator | needs_retrieval",
+                mode: "observe",
+                traceId,
+                meta: {
+                  kind: "observer_lane_orchestrator",
+                  plan_step: "needs_retrieval",
+                  reason: evidenceGateDecision.reason,
+                  evidence_refs: evidenceGateDecision.evidence_refs,
+                },
+              });
               responseText = evidenceGateDecision.safe_text ?? responseText;
             }
           }

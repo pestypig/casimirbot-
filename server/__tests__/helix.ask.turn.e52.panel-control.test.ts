@@ -3762,6 +3762,46 @@ describe("helix ask E52 panel control terminal contract", () => {
     expect(response.body?.poison_audit?.violations ?? []).toEqual([]);
   }, 60000);
 
+  it("admits explicit narrator debug probe commands as governed workstation actions", async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          'Run workstation action panel_id=narrator action_id=narrator.debug_auto_speak_probe with args text="Narrator debug probe from Helix Ask" trace_id="narrator:ask-probe".',
+        mode: "read",
+        debug: true,
+        sessionId: `e52-narrator-probe-${Date.now()}`,
+      })
+      .expect(200);
+
+    const action = findAction(response.body, "narrator", "narrator.debug_auto_speak_probe");
+    expect(action).toBeTruthy();
+    expect(action?.args).toMatchObject({
+      text: "Narrator debug probe from Helix Ask",
+      trace_id: "narrator:ask-probe",
+      source: "helix_ask",
+    });
+    expect(response.body?.canonical_goal_frame).toMatchObject({
+      goal_kind: "panel_control",
+      required_terminal_kind: "workstation_tool_evaluation",
+    });
+    expect(response.body?.available_capabilities?.recommended_capability_key).toBe(
+      "narrator.narrator.debug_auto_speak_probe",
+    );
+    expect(response.body?.action_envelope?.schema).toBe("helix.ask.action_envelope.v1");
+    expect(actionsOf(response.body).map((entry) => `${entry.panel_id}.${entry.action_id}`)).toEqual(
+      expect.arrayContaining(["narrator.open", "narrator.narrator.debug_auto_speak_probe"]),
+    );
+    expect(response.body?.final_answer_source).not.toBe("typed_failure");
+    expect(response.body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(response.body?.goal_satisfaction_evaluation).toMatchObject({
+      satisfaction: "satisfied",
+      canonical_goal_kind: "panel_control",
+      required_terminal_kind: "workstation_tool_evaluation",
+    });
+  }, 60000);
+
   it("admits explicit Auntie Dottie observer commands as Situation Room workstation actions", async () => {
     const app = createApp();
     const response = await request(app)

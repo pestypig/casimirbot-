@@ -2,8 +2,10 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 let parseHelixAskQueuedQuestionsInput: typeof import("@/components/helix/HelixAskPill").parseHelixAskQueuedQuestionsInput;
 let buildHelixAskRepliesFromChatSession: typeof import("@/components/helix/HelixAskPill").buildHelixAskRepliesFromChatSession;
+let buildHelixAskBackendEntrypointRuntimeFingerprint: typeof import("@/components/helix/HelixAskPill").buildHelixAskBackendEntrypointRuntimeFingerprint;
 let buildHelixAskHardBackendEntrypointRouteMetadata: typeof import("@/components/helix/HelixAskPill").buildHelixAskHardBackendEntrypointRouteMetadata;
 let requiresHelixAskBackendEntrypoint: typeof import("@/components/helix/HelixAskPill").requiresHelixAskBackendEntrypoint;
+let resolveHelixAskHardPromptProjectionGuard: typeof import("@/components/helix/HelixAskPill").resolveHelixAskHardPromptProjectionGuard;
 let shouldUseHelixAskBackendTurnEntrypoint: typeof import("@/components/helix/HelixAskPill").shouldUseHelixAskBackendTurnEntrypoint;
 let buildHelixPillDebugExportEnvelopeFromMasterPayload: typeof import("@/components/helix/HelixAskPill").buildHelixDebugExportEnvelopeFromMasterPayload;
 let buildHelixDebugExportEnvelopeFromMasterPayload: typeof import("@/lib/agi/debugExport").buildHelixDebugExportEnvelopeFromMasterPayload;
@@ -11,11 +13,13 @@ let buildHelixDebugExportEnvelopeFromMasterPayload: typeof import("@/lib/agi/deb
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
   ({
+    buildHelixAskBackendEntrypointRuntimeFingerprint,
     buildHelixAskHardBackendEntrypointRouteMetadata,
     buildHelixAskRepliesFromChatSession,
     buildHelixDebugExportEnvelopeFromMasterPayload: buildHelixPillDebugExportEnvelopeFromMasterPayload,
     parseHelixAskQueuedQuestionsInput,
     requiresHelixAskBackendEntrypoint,
+    resolveHelixAskHardPromptProjectionGuard,
     shouldUseHelixAskBackendTurnEntrypoint,
   } = await import("@/components/helix/HelixAskPill"));
   ({ buildHelixDebugExportEnvelopeFromMasterPayload } = await import("@/lib/agi/debugExport"));
@@ -102,6 +106,105 @@ describe("Helix Ask backend entrypoint projection guard", () => {
         hardBackendEntrypointRequired: false,
       }),
     ).toBe(false);
+  });
+
+  it("classifies backend Ask entrypoint runtime fingerprints without treating calculator as failed", () => {
+    const routeMetadata = buildHelixAskHardBackendEntrypointRouteMetadata({
+      question: hardCalculatorPrompt,
+      turnId: "ask:calculator-turn",
+      threadId: "session-1",
+    });
+    const fingerprint = buildHelixAskBackendEntrypointRuntimeFingerprint({
+      submitHandlerSource: "HelixAskPill.runAsk",
+      runAskEntered: true,
+      hardBackendEntrypointRequired: true,
+      useBackendAskTurnEntrypoint: false,
+      backendAskCallAttempted: false,
+      backendAskCallPath: "askLocal",
+      backendAskCallError: null,
+      routeMetadata,
+      legacyAskLocalBypassed: false,
+      askEntrypointObserved: false,
+    });
+
+    expect(fingerprint).toMatchObject({
+      schema: "helix.backend_ask_entrypoint_runtime_fingerprint.v1",
+      client_entrypoint_guard_version: "E79",
+      submit_handler_source: "HelixAskPill.runAsk",
+      runAsk_entered: true,
+      hard_backend_entrypoint_required: true,
+      use_backend_ask_turn_entrypoint: false,
+      backend_ask_call_attempted: false,
+      backend_ask_call_path: "askLocal",
+      route_metadata_source: "hard_tool_backend_entrypoint",
+      mandatory_next_tool_name: "scientific-calculator.solve_expression",
+      legacy_ask_local_bypassed: false,
+      first_broken_rail: "backend_ask_entrypoint",
+      repair_target: "prompt_submit_entrypoint",
+      assistant_answer: false,
+    });
+  });
+
+  it("classifies backend debug materialization separately once backend Ask was attempted", () => {
+    const fingerprint = buildHelixAskBackendEntrypointRuntimeFingerprint({
+      submitHandlerSource: "HelixAskPill.runAsk",
+      runAskEntered: true,
+      hardBackendEntrypointRequired: true,
+      useBackendAskTurnEntrypoint: true,
+      backendAskCallAttempted: true,
+      backendAskCallPath: "runAskTurn",
+      backendAskCallError: "stream failed",
+      routeMetadata: null,
+      legacyAskLocalBypassed: true,
+      askEntrypointObserved: false,
+    });
+
+    expect(fingerprint.first_broken_rail).toBe("backend_debug_materialization");
+    expect(fingerprint.repair_target).toBe("debug_export_bridge");
+    expect(fingerprint.backend_ask_call_attempted).toBe(true);
+    expect(fingerprint.legacy_ask_local_bypassed).toBe(true);
+  });
+
+  it("demotes projection layers for hard prompts when no server terminal exists", () => {
+    const guard = resolveHelixAskHardPromptProjectionGuard({
+      hardBackendEntrypointRequired: true,
+      backendAskCallAttempted: true,
+      serverTerminalText: null,
+      serverTerminalSource: "legacy_shadow",
+      currentBrokenRail: "backend_debug_materialization",
+      currentRepairTarget: "debug_export_bridge",
+    });
+
+    expect(guard).toMatchObject({
+      schema: "helix.hard_prompt_projection_guard.v1",
+      client_projection_policy_version: "E80",
+      projection_allowed: false,
+      selected_failure_code: "backend_debug_materialization",
+      selected_failure_text: "Backend Ask was reached, but no server terminal artifact or debug artifact was materialized for this turn.",
+      first_broken_rail: "backend_debug_materialization",
+      repair_target: "debug_export_bridge",
+      assistant_answer: false,
+    });
+    expect(guard?.demoted_projection_layers).toEqual(
+      expect.arrayContaining(["durable_chat_session", "client_projection", "evidence_finalization_fallback"]),
+    );
+  });
+
+  it("allows projection for hard prompts only when a non-legacy server terminal source exists", () => {
+    const guard = resolveHelixAskHardPromptProjectionGuard({
+      hardBackendEntrypointRequired: true,
+      backendAskCallAttempted: true,
+      serverTerminalText: "Calculator-backed result.",
+      serverTerminalSource: "terminal_answer_authority",
+    });
+
+    expect(guard).toMatchObject({
+      client_projection_policy_version: "E80",
+      projection_allowed: true,
+      allowed_projection_source: "terminal_answer_authority",
+      selected_failure_code: null,
+      first_broken_rail: null,
+    });
   });
 
   it("does not build hard backend Ask route metadata for ordinary chat", () => {
@@ -254,6 +357,8 @@ describe("Helix Ask backend entrypoint projection guard", () => {
     expect(debugExport.blocked_projection_kind).toBe("durable_chat_session");
     expect(debugExport.final_answer_source).toBe("typed_failure");
     expect(debugExport.terminal_artifact_kind).toBe("typed_failure");
+    expect(debugExport.first_broken_rail).toBe("backend_ask_entrypoint");
+    expect(debugExport.repair_target).toBe("prompt_submit_entrypoint");
   });
 
   it("exposes backend entrypoint failure fields in the Helix Ask pill debug export", () => {
