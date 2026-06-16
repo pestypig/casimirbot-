@@ -5,6 +5,7 @@ import { buildCommittedAskRoute, committedRouteAllowsTerminalKind } from "../ser
 import {
   buildDocEvidenceSynthesisModelPrompt,
   buildDocEvidenceSynthesisPlan,
+  chooseStrongerDocEvidenceSynthesisPlan,
   evaluateDocEvidenceSynthesisCoverage,
   materializeDocEvidenceSynthesisAnswer,
 } from "../services/helix-ask/doc-evidence-synthesis";
@@ -138,6 +139,127 @@ describe("Helix Ask docs evidence synthesis answer", () => {
           artifact.artifact_id === materialized?.materialized_terminal_artifact_ref,
       ),
     ).toBe(true);
+  });
+
+  it("materializes docs compare from preserved plan when active_prompt is empty", () => {
+    const prompt =
+      "Compare docs/helix-ask-flow.md and docs/helix-ask-codex-loop-discipline.md. Give three differences in what each document is responsible for.";
+    const payload: Record<string, unknown> = synthesisPayload("");
+    payload.active_prompt = "";
+    payload.doc_evidence_synthesis_plan = {
+      schema: "helix.doc_evidence_synthesis_plan.v1",
+      turn_id: turnId,
+      synthesis_kind: "compare",
+      required_doc_paths: [
+        "/docs/helix-ask-flow.md",
+        "/docs/helix-ask-codex-loop-discipline.md",
+      ],
+      required_anchors: [],
+      required_questions: [prompt],
+      required_observation_kinds: ["doc_summary"],
+      terminal_product: "doc_evidence_synthesis_answer",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const finalDraft = {
+      artifact_id: "draft:compare-preserved-plan",
+      turn_id: turnId,
+      kind: "final_answer_draft",
+      payload: {
+        schema: "helix.final_answer_draft.v1",
+        artifact_id: "draft:compare-preserved-plan",
+        text: "Flow owns the operational Ask flow; discipline owns the Codex-parity method.",
+        goal_kind: "doc_evidence_synthesis",
+        required_terminal_kind: "doc_evidence_synthesis_answer",
+        artifact_refs: ["doc-summary:flow", "doc-summary:discipline"],
+        support_refs: ["doc-summary:flow", "doc-summary:discipline"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+
+    const result = materializeFinalAnswerDraftTerminal({
+      turnId,
+      payload,
+      artifactLedger: [...docsEvidenceArtifacts, finalDraft],
+      routeProductContract: payload.route_product_contract as Record<string, unknown>,
+    });
+
+    expect(result?.ok).toBe(true);
+    expect(result?.materialized_terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+    expect((payload.doc_evidence_synthesis_plan as { synthesis_kind?: string }).synthesis_kind).toBe("compare");
+    expect(payload.doc_evidence_synthesis_answer).toMatchObject({
+      synthesis_kind: "compare",
+      source_docs: expect.arrayContaining([
+        expect.objectContaining({ path: "/docs/helix-ask-flow.md" }),
+        expect.objectContaining({ path: "/docs/helix-ask-codex-loop-discipline.md" }),
+      ]),
+    });
+    expect(payload.docs_synthesis_debug).toMatchObject({
+      materializer_called: true,
+      materializer_plan_synthesis_kind: "compare",
+      materializer_support_refs_count: expect.any(Number),
+      materialization_ok: true,
+    });
+  });
+
+  it("materializes docs synthesis from payload ledger when artifactLedger argument is stale", () => {
+    const prompt =
+      "Compare docs/helix-ask-flow.md and docs/helix-ask-codex-loop-discipline.md. Give three differences in what each document is responsible for.";
+    const payload: Record<string, unknown> = synthesisPayload(prompt);
+    const finalDraft = {
+      artifact_id: "draft:payload-ledger-only",
+      turn_id: turnId,
+      kind: "final_answer_draft",
+      payload: {
+        schema: "helix.final_answer_draft.v1",
+        artifact_id: "draft:payload-ledger-only",
+        text: "Flow owns route sequencing; discipline owns the runtime boundary.",
+        goal_kind: "doc_evidence_synthesis",
+        required_terminal_kind: "doc_evidence_synthesis_answer",
+        artifact_refs: ["doc-summary:flow", "doc-summary:discipline"],
+        support_refs: ["doc-summary:flow", "doc-summary:discipline"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+    payload.current_turn_artifact_ledger = [...docsEvidenceArtifacts, finalDraft];
+
+    const result = materializeFinalAnswerDraftTerminal({
+      turnId,
+      payload,
+      artifactLedger: docsEvidenceArtifacts,
+      routeProductContract: payload.route_product_contract as Record<string, unknown>,
+    });
+
+    expect(result?.ok).toBe(true);
+    expect(result?.materialized_terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+    expect(payload.doc_evidence_synthesis_answer).toBeTruthy();
+    expect(payload.docs_synthesis_debug).toMatchObject({
+      materializer_called: true,
+      materialization_ok: true,
+      support_refs_count: expect.any(Number),
+    });
+  });
+
+  it("does not let a weaker rebuilt plan overwrite a preserved compare plan", () => {
+    const preserved = buildDocEvidenceSynthesisPlan({
+      turnId,
+      promptText:
+        "Compare docs/helix-ask-flow.md and docs/helix-ask-codex-loop-discipline.md. Give three differences.",
+    });
+    const rebuilt = buildDocEvidenceSynthesisPlan({
+      turnId,
+      promptText: "",
+    });
+
+    const chosen = chooseStrongerDocEvidenceSynthesisPlan(preserved, rebuilt);
+
+    expect(chosen.synthesis_kind).toBe("compare");
+    expect(chosen.required_doc_paths).toEqual([
+      "/docs/helix-ask-flow.md",
+      "/docs/helix-ask-codex-loop-discipline.md",
+    ]);
   });
 
   it("builds a model synthesis packet with doc evidence refs and requested output shape", () => {

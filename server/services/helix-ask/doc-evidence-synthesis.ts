@@ -82,6 +82,40 @@ const artifactText = (artifact: ArtifactLike): string | null => {
 const stringArray = (value: unknown): string[] =>
   readArray(value).map(readString).filter((entry): entry is string => Boolean(entry));
 
+const artifactIdentity = (artifact: ArtifactLike, index: number): string =>
+  artifactId(artifact) ??
+  [
+    readString(artifact.kind),
+    readString(artifactPayload(artifact)?.kind),
+    readString(artifactPayload(artifact)?.schema),
+    index,
+  ].filter(Boolean).join(":");
+
+export function effectiveArtifactLedger(input: {
+  payload: RecordLike;
+  artifactLedger?: ArtifactLike[] | null;
+}): ArtifactLike[] {
+  const fromArg = input.artifactLedger ?? [];
+  const fromPayload = readArray(input.payload.current_turn_artifact_ledger)
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry)) as ArtifactLike[];
+  const topDraft = readRecord(input.payload.final_answer_draft);
+  const topDraftArtifact = topDraft
+    ? [{
+        artifact_id: readString(topDraft.artifact_id) ?? "final_answer_draft:top_level",
+        kind: "final_answer_draft",
+        payload: topDraft,
+      } satisfies ArtifactLike]
+    : [];
+  const merged = [...fromArg, ...fromPayload, ...topDraftArtifact];
+  const byIdentity = new Map<string, ArtifactLike>();
+  merged.forEach((artifact, index) => {
+    if (!artifact) return;
+    byIdentity.set(artifactIdentity(artifact, index), artifact);
+  });
+  return Array.from(byIdentity.values());
+}
+
 const isDocsEvidenceArtifact = (artifact: ArtifactLike): boolean => {
   const signature = [artifactKind(artifact), artifactSchema(artifact)].join(" ");
   return /\b(?:doc_summary|doc_location_result|doc_evidence_location|doc_location_matches|doc_equation_context|doc_equation_location|doc_calculator_evidence|agent_step_observation_packet)\b/i.test(signature);
@@ -186,7 +220,7 @@ export function buildDocEvidenceSynthesisPlan(input: {
   promptText: string;
   committedAskRoute?: HelixCommittedAskRoute | null;
 }): DocEvidenceSynthesisPlan {
-  const prompt = input.promptText;
+  const prompt = input.promptText.trim();
   const paths = extractUnquotedDocsMarkdownPaths(prompt);
   const synthesisKind: HelixDocEvidenceSynthesisKind =
     /\b(?:compare|comparison|differences?|versus|vs\.?|two-column|table)\b/i.test(prompt)
@@ -211,12 +245,75 @@ export function buildDocEvidenceSynthesisPlan(input: {
     synthesis_kind: synthesisKind,
     required_doc_paths: paths,
     required_anchors: unique(anchorMatches),
-    required_questions: [prompt],
+    required_questions: prompt ? [prompt] : [],
     required_observation_kinds: requiredObservationKinds,
     terminal_product: "doc_evidence_synthesis_answer",
     assistant_answer: false,
     raw_content_included: false,
   };
+}
+
+export function readExistingDocEvidenceSynthesisPlan(
+  payload: RecordLike,
+): DocEvidenceSynthesisPlan | null {
+  const existing = readRecord(payload.doc_evidence_synthesis_plan);
+  if (existing?.schema !== "helix.doc_evidence_synthesis_plan.v1") return null;
+  if (readString(existing.terminal_product) !== "doc_evidence_synthesis_answer") return null;
+  const synthesisKind = readString(existing.synthesis_kind) as HelixDocEvidenceSynthesisKind | null;
+  if (!synthesisKind) return null;
+  return {
+    schema: "helix.doc_evidence_synthesis_plan.v1",
+    turn_id: readString(existing.turn_id) ?? "",
+    synthesis_kind: synthesisKind,
+    required_doc_paths: stringArray(existing.required_doc_paths),
+    required_anchors: stringArray(existing.required_anchors),
+    required_questions: stringArray(existing.required_questions),
+    required_observation_kinds: stringArray(existing.required_observation_kinds)
+      .filter((entry): entry is DocEvidenceSynthesisPlan["required_observation_kinds"][number] =>
+        entry === "doc_summary" ||
+        entry === "doc_location_result" ||
+        entry === "doc_evidence_location" ||
+        entry === "doc_equation_context",
+      ),
+    terminal_product: "doc_evidence_synthesis_answer",
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+}
+
+const synthesisKindStrength = (kind: HelixDocEvidenceSynthesisKind): number => {
+  if (kind === "compare") return 50;
+  if (kind === "locate_then_explain") return 45;
+  if (kind === "runbook_answer") return 40;
+  if (kind === "multi_doc_summary") return 35;
+  return 10;
+};
+
+const planStrength = (plan: DocEvidenceSynthesisPlan | null): number => {
+  if (!plan) return -1;
+  return (
+    synthesisKindStrength(plan.synthesis_kind) +
+    plan.required_doc_paths.length * 8 +
+    plan.required_questions.length * 4 +
+    plan.required_anchors.length * 3 +
+    plan.required_observation_kinds.length
+  );
+};
+
+export function chooseStrongerDocEvidenceSynthesisPlan(
+  existingPlan: DocEvidenceSynthesisPlan | null,
+  rebuiltPlan: DocEvidenceSynthesisPlan,
+): DocEvidenceSynthesisPlan {
+  if (!existingPlan) return rebuiltPlan;
+  const existingStrongOperation =
+    (existingPlan.synthesis_kind === "compare" || existingPlan.synthesis_kind === "locate_then_explain") &&
+    (existingPlan.required_doc_paths.length > 0 || existingPlan.required_questions.length > 0);
+  const rebuiltWeakBlank =
+    rebuiltPlan.synthesis_kind === "focused_explanation" &&
+    rebuiltPlan.required_doc_paths.length === 0 &&
+    rebuiltPlan.required_questions.length === 0;
+  if (existingStrongOperation && rebuiltWeakBlank) return existingPlan;
+  return planStrength(existingPlan) >= planStrength(rebuiltPlan) ? existingPlan : rebuiltPlan;
 }
 
 export function collectDocEvidenceForSynthesis(input: {
@@ -375,13 +472,17 @@ export function materializeDocEvidenceSynthesisAnswer(input: {
   answerText: string;
   finalAnswerDraftRef?: string | null;
 }): { ok: boolean; answer?: HelixDocEvidenceSynthesisAnswer; coverage: DocEvidenceSynthesisCoverage; blocked_reason?: string } {
+  const artifactLedger = effectiveArtifactLedger({
+    payload: input.payload,
+    artifactLedger: input.artifactLedger,
+  });
   const committedRoute = readRecord(input.payload.committed_ask_route) as HelixCommittedAskRoute | null;
   const goal = readRecord(input.payload.canonical_goal_frame);
   const draftPayload = input.finalAnswerDraftRef
-    ? input.artifactLedger
+    ? artifactLedger
         .map((artifact) => readRecord(artifact.payload))
         .find((payload) => readString(payload?.artifact_id) === input.finalAnswerDraftRef)
-    : null;
+    : readRecord(input.payload.final_answer_draft);
   const goalKind =
     committedRoute?.canonical_goal.goal_kind ??
     readString(goal?.goal_kind) ??
@@ -390,20 +491,24 @@ export function materializeDocEvidenceSynthesisAnswer(input: {
     committedRoute?.canonical_goal.required_terminal_kind ??
     readString(goal?.required_terminal_kind) ??
     readString(draftPayload?.required_terminal_kind);
-  const plan = buildDocEvidenceSynthesisPlan({
+  const rebuiltPlan = buildDocEvidenceSynthesisPlan({
     turnId: input.turnId,
     promptText: input.promptText,
     committedAskRoute: committedRoute,
   });
+  const plan = chooseStrongerDocEvidenceSynthesisPlan(
+    readExistingDocEvidenceSynthesisPlan(input.payload),
+    rebuiltPlan,
+  );
   input.payload.doc_evidence_synthesis_plan = plan;
-  const evidenceArtifacts = collectDocEvidenceForSynthesis({ artifactLedger: input.artifactLedger });
+  const evidenceArtifacts = collectDocEvidenceForSynthesis({ artifactLedger });
   const coverage = evaluateDocEvidenceSynthesisCoverage({
     turnId: input.turnId,
     plan,
     evidenceArtifacts,
   });
   const evidenceRefs = coverage.observed_artifact_refs;
-  const draftSupportRefs = finalAnswerDraftSupportRefs(input.artifactLedger, input.finalAnswerDraftRef);
+  const draftSupportRefs = finalAnswerDraftSupportRefs(artifactLedger, input.finalAnswerDraftRef);
   const hasDraftSupportForDocs = draftSupportRefs.some((ref) =>
     evidenceRefs.includes(ref) ||
     evidenceRefs.some((evidenceRef) => ref.includes(evidenceRef) || evidenceRef.includes(ref)),

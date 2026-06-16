@@ -11,7 +11,10 @@ import {
   inferFinalAnswerDraftRouteFamily,
   type FinalAnswerDraftQualityGate,
 } from "./final-answer-draft-quality-gate";
-import { materializeDocEvidenceSynthesisAnswer } from "./doc-evidence-synthesis";
+import {
+  effectiveArtifactLedger,
+  materializeDocEvidenceSynthesisAnswer,
+} from "./doc-evidence-synthesis";
 
 export type FinalAnswerDraftTerminalMaterializerResult = {
   schema: "helix.final_answer_draft_terminal_materializer_result.v1";
@@ -183,6 +186,41 @@ const contractAllows = (
 const materializedRef = (turnId: string, kind: string): string =>
   `${turnId}:${kind}:from_final_answer_draft`;
 
+const resolveDocsSynthesisPromptText = (input: {
+  payload: Record<string, unknown>;
+  draftPayload?: Record<string, unknown> | null;
+}): { text: string; source: string } => {
+  const plan = readRecord(input.payload.doc_evidence_synthesis_plan);
+  const planQuestion = readArray(plan?.required_questions).map(readString).find(Boolean);
+  const candidates: Array<[string, string | null]> = [
+    ["payload.doc_evidence_synthesis_plan.required_questions", planQuestion ?? null],
+    ["final_answer_draft.prompt", readString(input.draftPayload?.prompt)],
+    ["final_answer_draft.user_request", readString(input.draftPayload?.user_request)],
+    ["final_answer_draft.question", readString(input.draftPayload?.question)],
+    ["payload.active_prompt", readString(input.payload.active_prompt)],
+    ["payload.question", readString(input.payload.question)],
+    ["payload.prompt", readString(input.payload.prompt)],
+    ["canonical_goal_frame.user_goal_summary", readString(readRecord(input.payload.canonical_goal_frame)?.user_goal_summary)],
+  ];
+  const selected = candidates.find(([, value]) => Boolean(value));
+  return { text: selected?.[1] ?? "", source: selected?.[0] ?? "empty" };
+};
+
+const updateDocsSynthesisMaterializerDebug = (
+  payload: Record<string, unknown>,
+  patch: Record<string, unknown>,
+): void => {
+  const existing = readRecord(payload.docs_synthesis_debug) ?? {};
+  payload.docs_synthesis_debug = {
+    ...existing,
+    schema: "helix.docs_synthesis_debug.v1",
+    materializer_called: true,
+    ...patch,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
 const persistDocEvidenceSynthesisAnswerArtifact = (input: {
   turnId: string;
   payload: Record<string, unknown>;
@@ -213,22 +251,31 @@ export function materializeFinalAnswerDraftTerminal(input: {
   routeProductContract?: HelixRouteProductContract | Record<string, unknown> | null;
   finalAnswerDraftRef?: string | null;
 }): FinalAnswerDraftTerminalMaterializerResult | null {
-  const draft = findLatestFinalAnswerDraftCandidate(input.artifactLedger);
+  const artifactLedger = effectiveArtifactLedger({
+    payload: input.payload,
+    artifactLedger: input.artifactLedger,
+  });
+  const draft = input.finalAnswerDraftRef
+    ? findLatestFinalAnswerDraftCandidate(
+        artifactLedger.filter((artifact) => artifactId(artifact) === input.finalAnswerDraftRef),
+      )
+    : findLatestFinalAnswerDraftCandidate(artifactLedger);
   if (!draft) return null;
   if (input.finalAnswerDraftRef && input.finalAnswerDraftRef !== draft.ref) return null;
 
   const draftPayload = artifactPayload(draft.artifact);
   const contract = input.routeProductContract ?? readRecord(input.payload.route_product_contract);
   const routeAllowed = effectiveAllowedKinds(input.payload, contract);
+  const docsPrompt = resolveDocsSynthesisPromptText({ payload: input.payload, draftPayload });
   const qualityGate = evaluateFinalAnswerDraftQualityGate({
     turnId: input.turnId,
     finalAnswerDraftRef: draft.ref,
     draftText: draft.text,
     draftPayload,
-    promptText: readString(input.payload.active_prompt),
+    promptText: docsPrompt.text || readString(input.payload.active_prompt),
     routeProductContract: contract,
     payload: input.payload,
-    artifactLedger: input.artifactLedger,
+    artifactLedger,
   });
   input.payload.final_answer_draft_quality_gate = qualityGate;
   const draftAuthority =
@@ -248,11 +295,11 @@ export function materializeFinalAnswerDraftTerminal(input: {
     };
   }
 
-  const directSequence = latestDirectAnswerSequence(input.artifactLedger);
+  const directSequence = latestDirectAnswerSequence(artifactLedger);
   const routeFamily = inferFinalAnswerDraftRouteFamily({
     routeProductContract: contract,
     payload: input.payload,
-    artifactLedger: input.artifactLedger,
+    artifactLedger,
   });
   if (!qualityGate.ok) {
     const blocked = qualityGate.violations.includes("empty_draft")
@@ -282,7 +329,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
   }
 
   if (routeFamily === "repo_evidence") {
-    if (!input.artifactLedger.some(isRepoEvidenceObservation)) {
+    if (!artifactLedger.some(isRepoEvidenceObservation)) {
       return {
         schema: "helix.final_answer_draft_terminal_materializer_result.v1",
         turn_id: input.turnId,
@@ -297,7 +344,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
     }
     const supportRefs = collectFinalAnswerDraftSupportRefs({
       draftPayload,
-      artifactLedger: input.artifactLedger,
+      artifactLedger,
     });
     if (supportRefs.length === 0) {
       return {
@@ -322,7 +369,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
       support_refs: supportRefs,
       model_authored: true,
       synthesis_attempt_ref:
-        readString(input.artifactLedger.find((artifact) =>
+        readString(artifactLedger.find((artifact) =>
           artifactKind(artifact) === "repo_evidence_synthesis_attempt" ||
           artifactSchema(artifact) === "helix.repo_evidence_synthesis_attempt.v1",
         )?.artifact_id) ?? `${input.turnId}:repo_evidence_synthesis_attempt:from_final_answer_draft`,
@@ -368,7 +415,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
   }
 
   if (routeFamily === "scholarly_research") {
-    if (!input.artifactLedger.some(isScholarlyResearchObservation)) {
+    if (!artifactLedger.some(isScholarlyResearchObservation)) {
       return {
         schema: "helix.final_answer_draft_terminal_materializer_result.v1",
         turn_id: input.turnId,
@@ -383,7 +430,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
     }
     const supportRefs = collectFinalAnswerDraftSupportRefs({
       draftPayload,
-      artifactLedger: input.artifactLedger,
+      artifactLedger,
     });
     if (supportRefs.length === 0) {
       return {
@@ -456,7 +503,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
   }
 
   if (routeFamily === "internet_search") {
-    if (!input.artifactLedger.some(isInternetSearchObservation)) {
+    if (!artifactLedger.some(isInternetSearchObservation)) {
       return {
         schema: "helix.final_answer_draft_terminal_materializer_result.v1",
         turn_id: input.turnId,
@@ -471,7 +518,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
     }
     const supportRefs = collectFinalAnswerDraftSupportRefs({
       draftPayload,
-      artifactLedger: input.artifactLedger,
+      artifactLedger,
     });
     if (supportRefs.length === 0) {
       return {
@@ -545,6 +592,14 @@ export function materializeFinalAnswerDraftTerminal(input: {
 
   if (routeFamily === "docs_source") {
     if (!contractAllows(input.payload, contract, "doc_evidence_synthesis_answer")) {
+      updateDocsSynthesisMaterializerDebug(input.payload, {
+        materializer_prompt_source: docsPrompt.source,
+        materializer_final_answer_draft_ref: draft.ref,
+        materializer_support_refs_count: 0,
+        materialization_ok: false,
+        materialization_blocked_reason: "route_contract_disallowed",
+        blocked_reason: "route_contract_disallowed",
+      });
       return {
         schema: "helix.final_answer_draft_terminal_materializer_result.v1",
         turn_id: input.turnId,
@@ -557,7 +612,15 @@ export function materializeFinalAnswerDraftTerminal(input: {
         raw_content_included: false,
       };
     }
-    if (!input.artifactLedger.some(isDocsEvidenceObservation)) {
+    if (!artifactLedger.some(isDocsEvidenceObservation)) {
+      updateDocsSynthesisMaterializerDebug(input.payload, {
+        materializer_prompt_source: docsPrompt.source,
+        materializer_final_answer_draft_ref: draft.ref,
+        materializer_support_refs_count: 0,
+        materialization_ok: false,
+        materialization_blocked_reason: "doc_evidence_required_but_missing",
+        blocked_reason: "doc_evidence_required_but_missing",
+      });
       return {
         schema: "helix.final_answer_draft_terminal_materializer_result.v1",
         turn_id: input.turnId,
@@ -572,9 +635,20 @@ export function materializeFinalAnswerDraftTerminal(input: {
     }
     const supportRefs = collectFinalAnswerDraftSupportRefs({
       draftPayload,
-      artifactLedger: input.artifactLedger,
+      artifactLedger,
     });
     if (supportRefs.length === 0) {
+      updateDocsSynthesisMaterializerDebug(input.payload, {
+        materializer_prompt_source: docsPrompt.source,
+        materializer_final_answer_draft_ref: draft.ref,
+        final_answer_draft_ref: draft.ref,
+        final_answer_draft_support_refs: [],
+        materializer_support_refs_count: 0,
+        support_refs_count: 0,
+        materialization_ok: false,
+        materialization_blocked_reason: "doc_support_refs_missing",
+        blocked_reason: "doc_support_refs_missing",
+      });
       return {
         schema: "helix.final_answer_draft_terminal_materializer_result.v1",
         turn_id: input.turnId,
@@ -587,13 +661,35 @@ export function materializeFinalAnswerDraftTerminal(input: {
         raw_content_included: false,
       };
     }
+    const hadPreservedPlan = Boolean(readRecord(input.payload.doc_evidence_synthesis_plan));
     const materialized = materializeDocEvidenceSynthesisAnswer({
       turnId: input.turnId,
-      promptText: readString(input.payload.active_prompt) ?? "",
+      promptText: docsPrompt.text,
       payload: input.payload,
-      artifactLedger: input.artifactLedger,
+      artifactLedger,
       answerText: draft.text,
       finalAnswerDraftRef: draft.ref,
+    });
+    const materializedPlan = readRecord(input.payload.doc_evidence_synthesis_plan);
+    const coverage = readRecord(input.payload.doc_evidence_synthesis_coverage);
+    const coverageSupportCount =
+      typeof coverage?.support_refs_count === "number" ? coverage.support_refs_count : supportRefs.length;
+    updateDocsSynthesisMaterializerDebug(input.payload, {
+      materializer_prompt_source: docsPrompt.source,
+      materializer_plan_source: hadPreservedPlan ? "payload.doc_evidence_synthesis_plan" : "rebuilt_from_prompt",
+      materializer_plan_synthesis_kind: readString(materializedPlan?.synthesis_kind),
+      materializer_plan_required_doc_paths: readArray(materializedPlan?.required_doc_paths).map(readString).filter(Boolean),
+      materializer_final_answer_draft_ref: draft.ref,
+      final_answer_draft_ref: draft.ref,
+      final_answer_draft_support_refs: supportRefs,
+      materializer_support_refs_count: supportRefs.length,
+      support_refs_count: coverageSupportCount,
+      coverage_support_refs_count: coverageSupportCount,
+      materialization_ok: materialized.ok,
+      materialized_terminal_artifact_kind: materialized.answer?.terminal_artifact_kind ?? null,
+      materialized_terminal_artifact_ref: materialized.answer?.artifact_id ?? null,
+      materialization_blocked_reason: materialized.blocked_reason ?? null,
+      blocked_reason: materialized.blocked_reason ?? null,
     });
     if (!materialized.ok || !materialized.answer) {
       return {
@@ -613,7 +709,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
     persistDocEvidenceSynthesisAnswerArtifact({
       turnId: input.turnId,
       payload: input.payload,
-      artifactLedger: input.artifactLedger,
+      artifactLedger,
       answer: materialized.answer as unknown as Record<string, unknown>,
     });
     return {
