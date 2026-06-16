@@ -73,6 +73,11 @@ export type SituationRoomSource = {
   transcript_preview?: string;
 };
 
+type AttachDisplayAudioSourceOptions = {
+  stream?: MediaStream | null;
+  stopStreamOnStop?: boolean;
+};
+
 export type SituationRoomStoredEvent = HelixSituationEvent & {
   event_id: string;
   source_id?: string;
@@ -87,7 +92,7 @@ export type SituationRoomStoreState = {
   createRoom: (title?: string) => SituationRoom;
   renameRoom: (roomId: string, title: string) => void;
   setActiveRoom: (roomId: string) => void;
-  attachDisplayAudioSource: (roomId: string, label?: string) => Promise<SituationRoomSource | null>;
+  attachDisplayAudioSource: (roomId: string, label?: string, options?: AttachDisplayAudioSourceOptions) => Promise<SituationRoomSource | null>;
   attachMicAudioSource: (roomId: string, label?: string) => Promise<SituationRoomSource | null>;
   stopSource: (sourceId: string) => void;
   stopRoom: (roomId: string) => void;
@@ -317,7 +322,7 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
         set((state: SituationRoomStoreState) => ({
           active_room_id: state.rooms[roomId] ? roomId : state.active_room_id,
         })),
-      attachDisplayAudioSource: async (roomId, label) => {
+      attachDisplayAudioSource: async (roomId, label, options) => {
         const room = get().rooms[roomId];
         if (!room) return null;
 
@@ -353,6 +358,8 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
           const session = await startDisplayAudioSituationSession({
             roomId,
             captureSessionId,
+            stream: options?.stream ?? null,
+            stopStreamOnStop: options?.stopStreamOnStop,
             onEvent: (event: HelixSituationEvent) => {
               get().appendSituationEvent(event, sourceId);
             },

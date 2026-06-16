@@ -1,3 +1,10 @@
+import type { HelixCommittedAskRoute } from "@shared/helix-committed-ask-route";
+import {
+  buildCommittedAskRoute,
+  inferCommittedRouteToolFamily,
+  readCommittedAskRoute,
+} from "./committed-ask-route";
+
 type RecordLike = Record<string, unknown>;
 
 export type HelixModelTurnPacket = {
@@ -8,6 +15,7 @@ export type HelixModelTurnPacket = {
   canonical_goal_frame?: RecordLike;
   source_target_intent?: RecordLike;
   route_product_contract?: RecordLike;
+  committed_ask_route?: HelixCommittedAskRoute;
   compound_prompt_contract?: RecordLike;
   capability_itinerary?: RecordLike;
   available_capabilities: unknown[];
@@ -52,6 +60,26 @@ const capabilityAllowsToolUse = (capability: unknown): boolean => {
   return true;
 };
 
+const capabilityKey = (capability: unknown): string => {
+  const record = readRecord(capability);
+  return readString(record?.capability_key) ?? readString(record?.capability_id) ?? readString(record?.model_visible_name) ?? "";
+};
+
+const capabilityAllowedByCommittedRoute = (
+  capability: unknown,
+  committedRoute: HelixCommittedAskRoute | null,
+): boolean => {
+  if (!committedRoute) return true;
+  const key = capabilityKey(capability);
+  if (!key) return true;
+  const family = inferCommittedRouteToolFamily(key);
+  if (committedRoute.capability_policy.suppressed_tool_families.includes(family)) return false;
+  if (readBoolean(readRecord(capability)?.requires_action) !== true) return true;
+  if (committedRoute.capability_policy.allowed_tool_families.length === 0) return false;
+  if (family === "unknown" || family === "model_only") return true;
+  return committedRoute.capability_policy.allowed_tool_families.includes(family);
+};
+
 export function buildHelixModelTurnPacket(input: {
   turnId: string;
   promptText: string;
@@ -88,12 +116,24 @@ export function buildHelixModelTurnPacket(input: {
     .slice(-16);
   const artifactRefs = modelVisibleArtifacts.map((artifact) => artifact.artifact_id);
   const sourceTargetIntent = readRecord(input.payload.source_target_intent);
+  const committedAskRoute =
+    readCommittedAskRoute(input.payload) ??
+    buildCommittedAskRoute({
+      turnId: input.turnId,
+      promptText: input.promptText,
+      selectedRoute: readString(input.payload.route_reason_code) ?? readString(input.payload.route) ?? "unknown",
+      payload: input.payload,
+    });
+  const availableCapabilities = (input.availableCapabilities ?? []).filter((capability) =>
+    capabilityAllowedByCommittedRoute(capability, committedAskRoute),
+  );
   const sourceTargetAllowsToolUse =
+    committedAskRoute.capability_policy.allowed_tool_families.length > 0 ||
     sourceTargetIntent?.must_enter_backend_ask === true ||
     sourceTargetIntent?.allow_no_tool_direct === false ||
     (readString(sourceTargetIntent?.target_source) !== undefined &&
       readString(sourceTargetIntent?.target_source) !== "model_only");
-  const hasAvailableToolCapability = (input.availableCapabilities ?? []).some(capabilityAllowsToolUse);
+  const hasAvailableToolCapability = availableCapabilities.some(capabilityAllowsToolUse);
   return {
     schema: "helix.model_turn_packet.v1",
     turn_id: input.turnId,
@@ -102,9 +142,10 @@ export function buildHelixModelTurnPacket(input: {
     canonical_goal_frame: readRecord(input.payload.canonical_goal_frame),
     source_target_intent: sourceTargetIntent,
     route_product_contract: readRecord(input.payload.route_product_contract),
+    committed_ask_route: committedAskRoute,
     compound_prompt_contract: compoundPromptContract,
     capability_itinerary: readRecord(input.payload.capability_itinerary),
-    available_capabilities: input.availableCapabilities ?? [],
+    available_capabilities: availableCapabilities,
     artifact_refs: artifactRefs,
     model_visible_artifacts: modelVisibleArtifacts,
     output_budget: input.outputBudget,

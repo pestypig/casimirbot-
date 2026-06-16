@@ -1,4 +1,8 @@
 import { buildPostToolAuthorityBridge } from "./post-tool-authority-bridge";
+import {
+  inferCommittedRouteToolFamily,
+  readCommittedAskRoute,
+} from "./committed-ask-route";
 
 export type HelixRuntimeAuthoritySeverity = "pass" | "p0" | "p1" | "p2";
 
@@ -110,6 +114,7 @@ const readBoolean = (value: unknown): boolean | null =>
   typeof value === "boolean" ? value : null;
 
 const payloadGoalKind = (payload: Record<string, unknown>): string | null =>
+  readCommittedAskRoute(payload)?.canonical_goal.goal_kind ??
   readString(readRecord(payload.canonical_goal_frame)?.goal_kind) ??
   readString(readRecord(payload.goal_satisfaction_evaluation)?.canonical_goal_kind) ??
   readString(readRecord(payload.terminal_contract)?.goal_kind);
@@ -652,6 +657,7 @@ export function buildCapabilityBindingMismatchObservation(
   payload: Record<string, unknown>,
 ): HelixCapabilityBindingMismatchObservation | null {
   if (hasSelectedCapabilityObservation(payload)) return null;
+  const committedRoute = readCommittedAskRoute(payload);
   const loop = readRecord(payload.agent_runtime_loop);
   const iterations = readArray(loop?.iterations)
     .map(readRecord)
@@ -667,6 +673,30 @@ export function buildCapabilityBindingMismatchObservation(
   for (const iteration of iterations) {
     const selectedCapability = readString(iteration.chosen_capability);
     if (!selectedCapability) continue;
+    const selectedFamily = inferCommittedRouteToolFamily(selectedCapability);
+    const selectedFamilySuppressed = committedRoute?.capability_policy.suppressed_tool_families.includes(selectedFamily) === true;
+    const selectedFamilyAllowed =
+      !committedRoute ||
+      selectedFamily === "unknown" ||
+      selectedFamily === "model_only" ||
+      committedRoute.capability_policy.allowed_tool_families.length === 0 ||
+      committedRoute.capability_policy.allowed_tool_families.includes(selectedFamily);
+    if (committedRoute && (!selectedFamilyAllowed || selectedFamilySuppressed)) {
+      return {
+        schema: "helix.capability_binding_mismatch_observation.v1",
+        selected_capability: selectedCapability,
+        observed_artifact_refs: [],
+        observed_artifact_kinds: [],
+        observed_capability_families: committedRoute.capability_policy.allowed_tool_families,
+        suggested_capability: committedRoute.capability_policy.allowed_tool_families[0] ?? null,
+        suggested_repair: "fail_closed",
+        repair_reason: selectedFamilySuppressed
+          ? "selected_capability_not_allowed_by_committed_route: selected capability family is suppressed by committed route"
+          : "selected_capability_not_allowed_by_committed_route: selected capability family is outside committed route policy",
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+    }
     const referencedArtifacts = observedArtifactRefsForIteration(iteration)
       .map((ref) => artifactById.get(ref) ?? null)
       .filter((artifact): artifact is Record<string, unknown> => Boolean(artifact));

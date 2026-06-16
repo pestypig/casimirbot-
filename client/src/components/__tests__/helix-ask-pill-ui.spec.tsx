@@ -765,6 +765,20 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).not.toContain("env?.HELIX_E6_ASK_TURN_VOICE_PARITY");
   });
 
+  it("lets Helix Ask visual capture request and sync tab audio preference", () => {
+    const source = fs.readFileSync(pillPath, "utf8");
+
+    expect(source).toContain("readHelixAskVisualCaptureAudioPreference");
+    expect(source).toContain("syncHelixAskVisualCaptureRoutePreference");
+    expect(source).toContain('HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_SYNC_EVENT = "helix:live-answer:visual-capture-routes"');
+    expect(source).toContain("visualSituationIncludeAudio");
+    expect(source).toContain("audio: input.includeAudio ? HELIX_ASK_DISPLAY_AUDIO_CONSTRAINTS : false");
+    expect(source).toContain("attachDisplayAudioSource(");
+    expect(source).toContain("{ stream, stopStreamOnStop: false }");
+    expect(source).toContain('aria-label={visualSituationIncludeAudio ? "Disable tab audio for visual capture" : "Enable tab audio for visual capture"}');
+    expect(source).toContain("handleVisualSituationAudioPreferenceToggle");
+  });
+
   it("routes finalized voice into active-turn steering before normal Ask dispatch", () => {
     const source = fs.readFileSync(pillPath, "utf8");
     expect(source).toContain("activeAskTurnIdRef.current");

@@ -21,13 +21,17 @@ export type HelixContextualToolAdmissionSuppression = {
 export type HelixContextualToolSuppressionFamily =
   | "docs_viewer"
   | "scientific_calculator"
+  | "calculator"
   | "scholarly_research"
   | "internet_search"
   | "theory_locator"
   | "workstation_action"
   | "notes"
   | "repo_code"
-  | "live_environment";
+  | "live_environment"
+  | "live_pipeline"
+  | "process_graph"
+  | "workspace_directory";
 
 const DOCS_VIEWER_CUE_RE = /\bdocs?\s+viewer\b|\bdocuments?\s+viewer\b|\bdocs?\s+panel\b|\bdocuments?\s+panel\b|\bdocs[-_. ]viewer(?:[-_. ][a-z][a-z0-9_]*)?\b/i;
 const DOCS_VIEWER_ACTION_RE = /\b(?:open|open\s+up|show|view|pull\s+up|bring\s+up|switch\s+to|go\s+to|navigate\s+to|load|run|call|execute|use)\b[\s\S]{0,100}(?:the\s+|a\s+)?(?:docs?\s+viewer|documents?\s+viewer|docs?\s+panel|documents?\s+panel|docs?|docs[-_. ]viewer(?:[-_. ][a-z][a-z0-9_]*)?)\b/i;
@@ -70,13 +74,16 @@ export function contextualToolSuppressionBlocksFamily(
   if (!suppression) return false;
   const cue = suppression.verb_or_cue;
   if (family === "docs_viewer") return /docs_viewer|docs-viewer/i.test(cue) || DOCS_MD_PATH_CUE_RE.test(suppression.text);
-  if (family === "scientific_calculator") return /scientific[_-]calculator|calculator/i.test(cue);
+  if (family === "scientific_calculator" || family === "calculator") return /scientific[_-]calculator|calculator/i.test(cue);
   if (family === "scholarly_research") return /scholarly|doi|arxiv|paper|citation|research/i.test(cue);
   if (family === "internet_search") return /internet|web|search|browse|google|bing/i.test(cue);
   if (family === "theory_locator") return /theory|locator|badge|graph|reflection/i.test(cue);
   if (family === "workstation_action" || family === "notes") return /workstation|workspace|note|write|file/i.test(cue);
   if (family === "repo_code") return /repo|code/i.test(cue) || DOCS_MD_PATH_CUE_RE.test(suppression.text);
   if (family === "live_environment") return /live|stage_play/i.test(cue);
+  if (family === "live_pipeline") return /live[_-]?pipeline|live[_-]?source|situation-room\.live-source|stage_play/i.test(cue);
+  if (family === "process_graph") return /process[_-]?graph|workstation|workspace/i.test(cue);
+  if (family === "workspace_directory") return /workspace[_-]?directory|workspace|file|directory/i.test(cue);
   return false;
 }
 

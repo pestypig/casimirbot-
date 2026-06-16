@@ -5,6 +5,7 @@ import {
   buildCapabilityBindingMismatchObservation,
   evaluateTerminalBoundaryEligibility,
 } from "./runtime-authority-contract";
+import { readCommittedAskRoute } from "./committed-ask-route";
 
 type RecordLike = Record<string, unknown>;
 
@@ -640,6 +641,7 @@ export function buildSolverControllerDecision(input: {
   const nonAnswerTerminal = isNonAnswerTerminal(payload);
   const canonicalGoal = readRecord(payload.canonical_goal_frame);
   const solverTrace = readRecord(payload.ask_turn_solver_trace);
+  const committedRoute = readCommittedAskRoute(payload) ?? readCommittedAskRoute(solverTrace);
   const retrievalResult = readRecord(payload.procedure_evidence_retrieval_result ?? solverTrace?.procedure_evidence_retrieval_result);
   const routeAuthority = readRecord(payload.route_authority_audit);
   const poisonAudit = readRecord(payload.poison_audit);
@@ -648,10 +650,14 @@ export function buildSolverControllerDecision(input: {
   const terminalEquivalence = readRecord(payload.terminal_equivalence_harness_result);
   const liveSourceIdentity = readRecord(payload.live_source_identity_audit ?? solverTrace?.live_source_identity_audit);
   const terminalArtifactKind = readString(payload.terminal_artifact_kind);
-  const requiredTerminalKind = readString(canonicalGoal?.required_terminal_kind);
+  const requiredTerminalKind =
+    committedRoute?.canonical_goal.required_terminal_kind ??
+    readString(canonicalGoal?.required_terminal_kind);
   const requiredTerminalKindsFromContract = readStringArray(terminalContract?.required_terminal_kinds);
   const requiredTerminalKinds =
-    requiredTerminalKindsFromContract.length > 0
+    committedRoute?.canonical_goal.allowed_terminal_artifact_kinds.length
+      ? committedRoute.canonical_goal.allowed_terminal_artifact_kinds
+      : requiredTerminalKindsFromContract.length > 0
       ? requiredTerminalKindsFromContract
       : requiredTerminalKind
         ? [requiredTerminalKind]
@@ -660,13 +666,17 @@ export function buildSolverControllerDecision(input: {
     ...requiredTerminalKinds,
     ...readStringArray(terminalContract?.acceptable_fallbacks),
   ]));
-  const forbiddenTerminalKinds = readStringArray(terminalContract?.forbidden_terminal_kinds);
+  const forbiddenTerminalKinds =
+    committedRoute?.canonical_goal.forbidden_terminal_artifact_kinds ??
+    readStringArray(terminalContract?.forbidden_terminal_kinds);
   const goalSatisfactionState = readString(goalSatisfaction?.satisfaction);
   const goalNextDecision = readString(goalSatisfaction?.next_decision);
   const terminalContractGoalKind = readString(terminalContract?.goal_kind);
   const finalRoute = readString(input.finalRoute) ?? readString(payload.route_reason_code) ?? readString(payload.route);
   const finalRouteBase = normalizeHelixRouteBase(finalRoute);
-  const canonicalGoalKind = readString(canonicalGoal?.goal_kind);
+  const canonicalGoalKind =
+    committedRoute?.canonical_goal.goal_kind ??
+    readString(canonicalGoal?.goal_kind);
   const stagePlayCheckpointReceiptTerminal =
     canonicalGoalKind === "live_environment_review" &&
     terminalArtifactKind === "tool_receipt" &&
@@ -762,6 +772,7 @@ export function buildSolverControllerDecision(input: {
     "capability_adapter_request",
     "capability_adapter_result",
     "live_source_turn_phase_resolution",
+    ...(committedRoute ? ["committed_ask_route"] : []),
   ];
 
   if (liveSourcePhaseRequiresMailDecision(payload)) {
@@ -781,6 +792,25 @@ export function buildSolverControllerDecision(input: {
   }
 
   if (!nonAnswerTerminal) {
+    if (!committedRoute && disciplineGuardRequired) {
+      pushUnique(blockingReasons, "committed_route_missing");
+    }
+    if (committedRoute?.compatibility.violations.some((violation) => /goal|terminal|capability|source/i.test(violation))) {
+      pushUnique(blockingReasons, "committed_route_incompatible_goal");
+    }
+    if (terminalArtifactKind && committedRoute?.canonical_goal.forbidden_terminal_artifact_kinds.includes(terminalArtifactKind)) {
+      pushUnique(blockingReasons, "committed_route_terminal_product_mismatch");
+    }
+    if (
+      terminalArtifactKind &&
+      committedRoute &&
+      committedRoute.canonical_goal.allowed_terminal_artifact_kinds.length > 0 &&
+      !committedRoute.canonical_goal.allowed_terminal_artifact_kinds.includes(terminalArtifactKind) &&
+      terminalArtifactKind !== "typed_failure" &&
+      terminalArtifactKind !== "request_user_input"
+    ) {
+      pushUnique(blockingReasons, "committed_route_terminal_product_mismatch");
+    }
     if (!goalSatisfaction) {
       pushUnique(blockingReasons, "goal_satisfaction_missing");
     } else if (!interimVoiceCalloutStatusTerminal && !liveSourceSetupReceiptTerminal && (goalSatisfactionState !== "satisfied" || goalNextDecision !== "allow_terminal")) {
@@ -906,7 +936,9 @@ export function buildSolverControllerDecision(input: {
   }
 
   const sourceTarget = readRecord(payload.source_target_intent);
-  const sourceTargetName = readString(sourceTarget?.target_source);
+  const sourceTargetName =
+    committedRoute?.route.source_target ??
+    readString(sourceTarget?.target_source);
   const promptText = readString(payload.active_prompt) ?? readString(payload.prompt) ?? readString(payload.question) ?? "";
   const visualContentPrompt =
     /\b(?:describe|review|analy[sz]e|what\s+(?:do\s+you\s+)?see|what(?:'s|\s+is)\s+(?:happening|on|visible))\b[\s\S]{0,140}\b(?:live|screen|visual|display)\s+(?:capture|source|frame|screen)\b/i.test(promptText) ||
@@ -938,7 +970,7 @@ export function buildSolverControllerDecision(input: {
   const situationEvidenceSelection = readRecord(payload.situation_evidence_selection);
   const deicticReference = readRecord(payload.deictic_reference);
   const visualSourceRequired =
-    readString(sourceTarget?.target_source) === "visual_capture" ||
+    sourceTargetName === "visual_capture" ||
     readString(deicticReference?.reference_type) === "current_screen" ||
     readString(deicticReference?.reference_type) === "selected_visible_file" ||
     /\b(?:live\s+capture|screen\s*capture|visual\s*capture|screenshot|visual|visible)\b/i.test(
@@ -1085,7 +1117,7 @@ export function buildSolverControllerDecision(input: {
     schema: "helix.solver_controller_decision.v1",
     turn_id: input.turnId,
     final_route: finalRoute,
-    canonical_goal_kind: readString(canonicalGoal?.goal_kind),
+    canonical_goal_kind: canonicalGoalKind,
     required_terminal_kind: requiredTerminalKind,
     selected_terminal_artifact_kind: terminalArtifactKind,
     decision: controllerDecision,

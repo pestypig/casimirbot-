@@ -33,7 +33,13 @@ export type HelixSolverControllerBlockingReason =
   | "subgoals_observed_not_satisfied"
   | "prompt_requirement_coverage_incomplete"
   | "doc_retrieval_coverage_incomplete"
-  | "compound_prompt_coverage_incomplete";
+  | "compound_prompt_coverage_incomplete"
+  | "committed_route_missing"
+  | "committed_route_incompatible_goal"
+  | "committed_route_tool_family_suppressed"
+  | "committed_route_terminal_product_mismatch"
+  | "stale_route_metadata_override_rejected"
+  | "shortcut_bypassed_committed_route_firewall";
 
 export type HelixSolverControllerDecision = {
   schema: typeof HELIX_SOLVER_CONTROLLER_DECISION_SCHEMA;

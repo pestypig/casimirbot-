@@ -7,6 +7,7 @@ import {
   readLiveSourceMailForAsk,
   recordLiveSourceMailDecisionForAsk,
 } from "../services/stage-play/stage-play-visual-summary-mail-ingest";
+import { enqueueAudioTranscriptMailFromChunk } from "../services/stage-play/stage-play-audio-transcript-mail-ingest";
 import {
   configureStagePlayLiveSourceWatchJobPolicy,
   enqueueStagePlayLiveSourceMailItem,
@@ -232,6 +233,54 @@ describe("Stage Play live-source mailbox", () => {
       raw_content_included: false,
     });
     expect(JSON.stringify(mailItems[0])).not.toMatch(/raw_image|image_ref|data:image|base64/i);
+  });
+
+  it("enqueues audio transcript chunks as Stage Play mail for earbud MicroDeck processing", () => {
+    const mail = enqueueAudioTranscriptMailFromChunk({
+      threadId,
+      roomId,
+      environmentId: "live_env:stage-play-mailbox",
+      sourceId: "audio_transcript:helix-ask:desktop",
+      transcript: "splitting off, which is important when considering Madagascar's split during the Cretaceous period",
+      eventRef: "voice:transcribe:capture:test",
+      chunkRef: "live_source_chunk:audio-test",
+      analysisJobRef: "live_source_analysis_job:audio-test",
+      evidenceRefs: ["transcript:audio-test"],
+      durationMs: 10_000,
+      now: "2026-06-04T12:00:10.000Z",
+    });
+
+    expect(mail).toMatchObject({
+      artifactId: "stage_play_live_source_mail_item",
+      sourceId: "audio_transcript:helix-ask:desktop",
+      sourceKind: "audio_transcript",
+      sourceRefs: {
+        sourceId: "audio_transcript:helix-ask:desktop",
+        evidenceRef: "live_source_chunk:audio-test",
+        observationRef: "voice:transcribe:capture:test",
+      },
+      summary: {
+        text: expect.stringContaining("Audio transcript chunk: splitting off"),
+        analysisState: "analysis_ready",
+      },
+      evidenceRefs: expect.arrayContaining([
+        "audio_transcript:helix-ask:desktop",
+        "voice:transcribe:capture:test",
+        "live_source_chunk:audio-test",
+        "live_source_analysis_job:audio-test",
+      ]),
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+    expect(listStagePlayLiveSourceMailWakeRequests({ threadId })[0]).toMatchObject({
+      status: "queued",
+      mailIds: [mail.mailId],
+      sourceIds: ["audio_transcript:helix-ask:desktop"],
+      reason: "unread_mail",
+    });
+    expect(JSON.stringify(mail)).not.toMatch(/raw_audio|audio_data|base64/i);
   });
 
   it("stales narrative projections on new same-source mail and supersedes them on the next interpretation", () => {

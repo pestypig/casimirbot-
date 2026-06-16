@@ -33,6 +33,7 @@ import type { HelixLiveCardLineSourceCoverage, HelixLiveCardLineState } from "@s
 import type { HelixSituationSourceCapability, HelixSituationSourceModality, HelixSituationSourceStatus } from "@shared/helix-situation-source-capability";
 import type { HelixVisualEvidenceHealth } from "@shared/helix-visual-evidence-health";
 import type {
+  StagePlayMicroReasonerRunV1,
   StagePlayMicroReasonerPromptPresetV1,
   StagePlayMicroReasonerPromptV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
@@ -71,6 +72,7 @@ type LiveEnvironmentTab = "present_state" | "navigation_evidence" | "worker_lane
 type VisualCaptureRoute = "live_answer" | "image_lens" | "audio_transcript";
 type AudioTranscriptCaptureStatus = "idle" | "requesting_permission" | "listening" | "transcribing" | "error";
 const VISUAL_CAPTURE_ROUTE_STORAGE_KEY = "helix.liveAnswer.visualCaptureRoutes.v1";
+const VISUAL_CAPTURE_ROUTE_SYNC_EVENT = "helix:live-answer:visual-capture-routes";
 const VISUAL_CAPTURE_ROUTE_VALUES: VisualCaptureRoute[] = ["live_answer", "image_lens", "audio_transcript"];
 const AUDIO_TRANSCRIPT_DEFAULT_CHUNK_MS = 10_000;
 const AUDIO_TRANSCRIPT_HISTORY_LIMIT = 20;
@@ -86,6 +88,13 @@ function readStoredVisualCaptureRoutes(): VisualCaptureRoute[] {
   } catch {
     return ["live_answer"];
   }
+}
+
+function coerceVisualCaptureRoutes(value: unknown): VisualCaptureRoute[] {
+  if (!Array.isArray(value)) return ["live_answer"];
+  const routes = value.filter((entry: unknown): entry is VisualCaptureRoute =>
+    typeof entry === "string" && VISUAL_CAPTURE_ROUTE_VALUES.includes(entry as VisualCaptureRoute));
+  return routes.length ? routes : ["live_answer"];
 }
 type ClientCapabilityActionRead = {
   action_request_id: string;
@@ -363,6 +372,21 @@ type MicroReasonerPromptPresetListRead = {
   microReasonerPrompts?: StagePlayMicroReasonerPromptV1[];
 };
 
+type StagePlayLiveSourceMailRead = {
+  microReasonerRuns?: StagePlayMicroReasonerRunV1[];
+  micro_reasoner_runs?: StagePlayMicroReasonerRunV1[];
+};
+
+type EarbudMicroReasonerOutput = {
+  runId: string;
+  text: string;
+  sourceId: string;
+  deckTitle: string;
+  status: StagePlayMicroReasonerRunV1["status"];
+  createdAt: string;
+  refs: string[];
+};
+
 type SourceBindingTransitionRead = {
   transition_id: string;
   source_id: string;
@@ -430,6 +454,23 @@ const readStringList = (value: unknown): string[] =>
   Array.isArray(value)
     ? value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
     : [];
+
+const readEarbudRunText = (run: StagePlayMicroReasonerRunV1): string => {
+  const fallback = run.outputPreview?.trim() ?? "";
+  try {
+    const parsed = readRecord(JSON.parse(fallback));
+    const preferred = [
+      parsed?.translatedText,
+      parsed?.explanation,
+      parsed?.summary,
+      parsed?.speakerIntent,
+    ].find((entry) => typeof entry === "string" && entry.trim().length > 0);
+    if (typeof preferred === "string") return preferred.trim();
+  } catch {
+    // Prompted MicroDeck previews can be clipped by the overview API.
+  }
+  return fallback;
+};
 
 const pruneAudioTranscriptHistory = (items: AudioTranscriptHistoryItem[]): AudioTranscriptHistoryItem[] => {
   const deduped = new Map<string, AudioTranscriptHistoryItem>();
@@ -697,6 +738,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [activeEarbudMicroReasonerPromptPreset, setActiveEarbudMicroReasonerPromptPreset] = useState<StagePlayMicroReasonerPromptPresetV1 | null>(null);
   const [earbudMicroReasonerPrompts, setEarbudMicroReasonerPrompts] = useState<StagePlayMicroReasonerPromptV1[]>([]);
   const [selectedEarbudMicroReasonerPromptPresetId, setSelectedEarbudMicroReasonerPromptPresetId] = useState<string>("");
+  const [earbudMicroReasonerRuns, setEarbudMicroReasonerRuns] = useState<StagePlayMicroReasonerRunV1[]>([]);
   const [visualShadePromptDraft, setVisualShadePromptDraft] = useState<string>("");
   const [visualShadePromptBaseProfileId, setVisualShadePromptBaseProfileId] = useState<string>("");
   const [selectedVisualFrameHistoryId, setSelectedVisualFrameHistoryId] = useState<string | null>(null);
@@ -835,6 +877,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const activeAudioTranscriptSourceId =
     audioTranscriptSourceId ??
     audioTranscriptSourceIdRef.current ??
+    serverAudioTranscriptHistory.at(-1)?.source_id ??
     null;
   const canStartSourceMonitor = sourceSignal.status === "live" && Boolean(sourceSignal.source);
   const liveCardLineStateByKey = useMemo(() => {
@@ -999,6 +1042,16 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(VISUAL_CAPTURE_ROUTE_STORAGE_KEY, JSON.stringify(visualCaptureRoutes));
   }, [visualCaptureRoutes]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleRouteSync = (event: Event) => {
+      const detail = (event as CustomEvent<{ routes?: unknown }>).detail;
+      setVisualCaptureRoutes(coerceVisualCaptureRoutes(detail?.routes));
+    };
+    window.addEventListener(VISUAL_CAPTURE_ROUTE_SYNC_EVENT, handleRouteSync);
+    return () => window.removeEventListener(VISUAL_CAPTURE_ROUTE_SYNC_EVENT, handleRouteSync);
+  }, []);
   const visualCaptureStatus =
     visualEvidenceHealth?.status ??
     visualLatest?.active_source?.status ??
@@ -1124,6 +1177,40 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       : [],
     [earbudMicroReasonerPrompts, selectedEarbudMicroReasonerPromptPreset],
   );
+  const earbudMicroReasonerOutputs = useMemo<EarbudMicroReasonerOutput[]>(() => {
+    const sourceId = activeAudioTranscriptSourceId ?? `audio_transcript:${threadId}`;
+    const activePresetIds = new Set([
+      activeEarbudMicroReasonerPromptPreset?.presetId,
+      selectedEarbudMicroReasonerPromptPreset?.presetId,
+    ].filter((entry): entry is string => Boolean(entry)));
+    return earbudMicroReasonerRuns
+      .filter((run: StagePlayMicroReasonerRunV1) => run.role === "packet_composer")
+      .filter((run: StagePlayMicroReasonerRunV1) => run.sourceId === sourceId)
+      .filter((run: StagePlayMicroReasonerRunV1) =>
+        !activePresetIds.size ||
+        (run.deckPresetId ? activePresetIds.has(run.deckPresetId) : false) ||
+        /earbud/i.test(run.deckPresetTitle ?? "")
+      )
+      .map((run: StagePlayMicroReasonerRunV1): EarbudMicroReasonerOutput => ({
+        runId: run.runId,
+        text: readEarbudRunText(run),
+        sourceId: run.sourceId,
+        deckTitle: run.deckPresetTitle ?? "Earbud MicroDeck",
+        status: run.status,
+        createdAt: run.completedAt ?? run.startedAt,
+        refs: run.outputRefs?.length ? run.outputRefs : run.mailIds,
+      }))
+      .filter((output: EarbudMicroReasonerOutput) => output.text.length > 0)
+      .sort((left: EarbudMicroReasonerOutput, right: EarbudMicroReasonerOutput) => left.createdAt.localeCompare(right.createdAt))
+      .slice(-6);
+  }, [
+    activeAudioTranscriptSourceId,
+    activeEarbudMicroReasonerPromptPreset?.presetId,
+    earbudMicroReasonerRuns,
+    selectedEarbudMicroReasonerPromptPreset?.presetId,
+    threadId,
+  ]);
+  const latestEarbudMicroReasonerOutput = earbudMicroReasonerOutputs.at(-1) ?? null;
   const visualShadePromptChanged = Boolean(
     visualShadePromptDraft.trim() &&
       selectedVisualObserverProfile &&
@@ -1229,8 +1316,13 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         handoffConsumptionRes.json().catch(() => ({})),
         planExecutionRes.json().catch(() => ({})),
       ]);
+      const eventItems = Array.isArray(eventBody.events) ? eventBody.events as WorkstationLiveSourceEvent[] : [];
+      const latestAudioTranscriptSourceId = [...eventItems]
+        .reverse()
+        .find((event: WorkstationLiveSourceEvent) => event.kind === "browser_audio_transcript" || event.event_type === "transcript_chunk")
+        ?.source_id ?? null;
       setSources(Array.isArray(sourceBody.sources) ? sourceBody.sources : []);
-      setEvents(Array.isArray(eventBody.events) ? eventBody.events : []);
+      setEvents(eventItems);
       setWindows(Array.isArray(windowBody.windows) ? windowBody.windows : []);
       setCommentarySession(commentaryBody.session ?? null);
       setCommentaryCandidates(Array.isArray(commentaryBody.candidates) ? commentaryBody.candidates : []);
@@ -1299,6 +1391,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       const earbudMicroDeckSourceId =
         audioTranscriptSourceIdRef.current ??
         audioTranscriptSourceId ??
+        latestAudioTranscriptSourceId ??
         serverAudioTranscriptHistory.at(-1)?.source_id ??
         `audio_transcript:${threadId}`;
       const earbudPresetParams = new URLSearchParams({
@@ -1316,6 +1409,23 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           ? earbudMicroReasonerPromptPresetBody.prompts
           : Array.isArray(earbudMicroReasonerPromptPresetBody.microReasonerPrompts)
             ? earbudMicroReasonerPromptPresetBody.microReasonerPrompts
+            : [],
+      );
+      const earbudMailParams = new URLSearchParams({
+        threadId,
+        sourceId: earbudMicroDeckSourceId,
+        view: "overview",
+        includeConfig: "0",
+        limit: "12",
+      });
+      const earbudMailBody: StagePlayLiveSourceMailRead = await fetch(
+        `/api/helix/stage-play/live-source-mail?${earbudMailParams.toString()}`,
+      ).then((response) => response.ok ? response.json() : {}).catch(() => ({}));
+      setEarbudMicroReasonerRuns(
+        Array.isArray(earbudMailBody.microReasonerRuns)
+          ? earbudMailBody.microReasonerRuns
+          : Array.isArray(earbudMailBody.micro_reasoner_runs)
+            ? earbudMailBody.micro_reasoner_runs
             : [],
       );
       setLastFetchError(null);
@@ -2372,7 +2482,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   };
 
   return (
-    <section className="rounded-lg border border-cyan-300/20 bg-cyan-950/10 p-3">
+    <section className="flex flex-col rounded-lg border border-cyan-300/20 bg-cyan-950/10 p-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold uppercase text-cyan-200">Live Environments</p>
@@ -2473,7 +2583,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           </p>
         </div>
       ) : null}
-      <div className="mt-3 rounded border border-white/10 bg-slate-950/60 p-3">
+      <div className="hidden">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="text-xs font-semibold text-slate-100">Source Health</p>
@@ -2555,7 +2665,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           </p>
         ) : null}
       </div>
-      <div className="mt-3 rounded border border-white/10 bg-slate-950/60 p-3">
+      <div className="order-30 mt-3 rounded border border-white/10 bg-slate-950/60 p-3">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <p className="text-xs font-semibold text-slate-100">{sourceLabel}</p>
@@ -2611,8 +2721,8 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           </div>
         ) : null}
       </div>
-      <div className="mt-3 rounded border border-sky-300/15 bg-sky-950/10 p-3">
-        <div className="flex flex-wrap items-start justify-between gap-2">
+      <div className="mt-3 flex flex-col rounded border border-sky-300/15 bg-sky-950/10 p-3">
+        <div className="order-1 flex flex-wrap items-start justify-between gap-2">
           <div>
             <p className="text-xs font-semibold text-sky-100">Visual capture source</p>
             <p className="mt-1 text-[11px] leading-5 text-slate-400">
@@ -2631,7 +2741,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             {visualCaptureStatus}
           </span>
         </div>
-        <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)]">
+        <div className="order-3 mt-3 grid gap-3 lg:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)]">
           <div className="overflow-hidden rounded border border-sky-300/15 bg-black">
             <div className="flex aspect-video items-center justify-center">
               {visualProducerState?.last_frame_preview_data_url ? (
@@ -2683,7 +2793,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             </div>
           </div>
         </div>
-        <div className="mt-3 rounded border border-white/10 bg-black/20 p-2" data-testid="visual-frame-review-carousel">
+        <div className="order-4 mt-3 rounded border border-white/10 bg-black/20 p-2" data-testid="visual-frame-review-carousel">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-[11px] font-semibold text-slate-200">Recent frame review</p>
@@ -2793,7 +2903,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             </div>
           ) : null}
         </div>
-        <div className="mt-3 rounded border border-teal-300/20 bg-teal-950/10 p-2" data-testid="audio-transcript-review">
+        <div className="order-6 mt-3 rounded border border-teal-300/20 bg-teal-950/10 p-2" data-testid="audio-transcript-review">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <p className="text-[11px] font-semibold text-teal-100">Earbud outputs</p>
@@ -2913,6 +3023,42 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
               </div>
             ) : null}
           </div>
+          <div className="mt-2 rounded border border-emerald-300/15 bg-black/20 px-2 py-2" data-testid="earbud-micro-reasoner-output">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[10px] font-semibold uppercase text-emerald-100">Earbud output candidates</p>
+              <span className="font-mono text-[10px] text-slate-500">
+                {earbudMicroReasonerOutputs.length ? `${earbudMicroReasonerOutputs.length} translated` : "waiting"}
+              </span>
+            </div>
+            {latestEarbudMicroReasonerOutput ? (
+              <div className="mt-2 rounded border border-emerald-300/20 bg-emerald-950/10 px-2 py-1.5">
+                <p className="text-[11px] leading-5 text-emerald-50">{latestEarbudMicroReasonerOutput.text}</p>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-emerald-100/80">
+                  <span>{latestEarbudMicroReasonerOutput.deckTitle}</span>
+                  <span>{latestEarbudMicroReasonerOutput.status}</span>
+                  <span>{formatTime(latestEarbudMicroReasonerOutput.createdAt)}</span>
+                  <span className="truncate font-mono">{latestEarbudMicroReasonerOutput.refs.at(0) ?? latestEarbudMicroReasonerOutput.runId}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-2 rounded border border-white/10 bg-slate-950/60 px-2 py-1.5 text-[11px] leading-5 text-slate-500">
+                No translated earbud output has been projected yet. Captured chunks will appear here after a completed earbud packet_composer run.
+              </p>
+            )}
+            {earbudMicroReasonerOutputs.length > 1 ? (
+              <div className="mt-2 grid gap-1.5 md:grid-cols-2" aria-label="Recent translated earbud outputs">
+                {earbudMicroReasonerOutputs.slice(0, -1).slice(-4).reverse().map((output: EarbudMicroReasonerOutput) => (
+                  <div key={output.runId} className="min-w-0 rounded border border-white/10 bg-slate-950/70 px-2 py-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-[10px] font-semibold text-emerald-100">{output.deckTitle}</span>
+                      <span className="shrink-0 font-mono text-[10px] text-slate-500">{formatTime(output.createdAt)}</span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-300">{output.text}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
           {audioRouteNeedsFreshShare ? (
             <p className="mt-2 rounded border border-amber-300/20 bg-amber-950/10 px-2 py-1 text-[10px] leading-4 text-amber-100">
               Current visual share has no audio track; starting selected live sources will request a fresh browser share.
@@ -2982,7 +3128,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             </div>
           ) : null}
         </div>
-        <div className="mt-3 rounded border border-violet-300/20 bg-violet-950/10 p-2" data-testid="visual-frame-action-replay">
+        <div className="order-7 mt-3 rounded border border-violet-300/20 bg-violet-950/10 p-2" data-testid="visual-frame-action-replay">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <p className="text-[11px] font-semibold text-violet-100">Action replay</p>
@@ -3048,7 +3194,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             </p>
           )}
         </div>
-        <div className="mt-3 flex flex-wrap gap-1.5">
+        <div className="order-2 mt-3 flex flex-wrap gap-1.5">
           <fieldset
             aria-label="Visual capture route"
             className="inline-flex flex-wrap items-center gap-1 rounded border border-white/10 bg-black/20 px-2 py-1 text-[11px] text-slate-300"
@@ -3126,7 +3272,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             Go to log
           </button>
         </div>
-        <div className="mt-2 rounded border border-violet-300/20 bg-violet-950/10 px-2 py-2">
+        <div className="order-5 mt-3 rounded border border-violet-300/20 bg-violet-950/10 px-2 py-2">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase text-violet-100">Shades</p>
@@ -3227,7 +3373,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             </div>
           ) : null}
         </div>
-        <div className="mt-2 rounded border border-cyan-300/20 bg-cyan-950/10 px-2 py-2">
+        <div className="order-8 mt-3 rounded border border-cyan-300/20 bg-cyan-950/10 px-2 py-2">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase text-cyan-100">MicroDeck</p>
@@ -3321,22 +3467,22 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           ) : null}
         </div>
         {visualLatest?.evidence?.summary ? (
-          <p className="mt-2 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-slate-300">
+          <p className="order-9 mt-2 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-slate-300">
             {visualLatest.evidence.summary}
           </p>
         ) : null}
         {!visualLatest?.evidence?.summary && visualEvidenceHealth?.latest_summary ? (
-          <p className="mt-2 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-slate-300">
+          <p className="order-10 mt-2 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-slate-300">
             {visualEvidenceHealth.latest_summary}
           </p>
         ) : null}
         {visualProducerState?.capture_mode === "interval" ? (
-          <p className="mt-2 rounded border border-cyan-300/15 bg-cyan-950/10 px-2 py-1.5 text-[11px] text-cyan-100">
+          <p className="order-11 mt-2 rounded border border-cyan-300/15 bg-cyan-950/10 px-2 py-1.5 text-[11px] text-cyan-100">
             Interval {visualProducerState.interval_active ? "active" : "paused"} every {Math.round((visualProducerState.cadence_ms ?? 0) / 1000)}s; stream {visualProducerState.stream_active ? "shared" : "stopped"}; track {visualProducerState.track_ready_state}; scheduler {visualProducerState.scheduler_adoption_status ?? "not adopted"}; captures {visualProducerState.capture_count ?? 0}; posts {visualProducerState.post_count ?? 0}; latest chunk {visualProducerState.last_chunk_id ?? "none"}; last frame {formatTime(visualProducerState.last_frame_at)}{visualProducerState.last_error ? `; error ${visualProducerState.last_error}` : ""}.
           </p>
         ) : null}
         {(clientActions.length > 0 || clientAdoptions.length > 0) ? (
-          <p className="mt-2 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-slate-300">
+          <p className="order-12 mt-2 rounded border border-white/10 bg-black/20 px-2 py-1.5 text-[11px] text-slate-300">
             Client actions: {clientActions.length} pending; latest action {latestClientAction?.action ?? "none"}; latest adoption {latestClientAdoption?.ok ? "adopted" : latestClientAdoption ? "failed" : "none"}; stream {latestClientObserved.client_stream_confirmed === true ? "active" : latestClientObserved.client_stream_confirmed === false ? "missing" : "unknown"}; interval {latestClientObserved.interval_active === true ? "active" : latestClientObserved.interval_active === false ? "inactive" : "unknown"}; chunk {typeof latestClientObserved.latest_chunk_id === "string" ? latestClientObserved.latest_chunk_id : "none"}.
           </p>
         ) : null}

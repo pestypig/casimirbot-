@@ -1298,11 +1298,16 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
     const activeVisualObserverProfile = getActiveStagePlayVisualObserverProfileForSource({
       sourceId: sourceId ?? mailItems.find((item) => item.sourceKind === "visual_frame")?.sourceId ?? null,
     });
-    const activeMicroReasonerSourceId = sourceId ?? mailItems.at(-1)?.sourceId ?? null;
+    const activeMicroReasonerMailItem = [...mailItems].reverse().find((item) =>
+      !sourceId || item.sourceId === sourceId
+    ) ?? mailItems.at(-1) ?? null;
+    const activeMicroReasonerSourceId = sourceId ?? activeMicroReasonerMailItem?.sourceId ?? null;
+    const activeMicroReasonerSourceKind = activeMicroReasonerMailItem?.sourceKind ?? null;
     const includePresetDirectory = includeConfig || operator;
     const microReasonerPromptPresets = includePresetDirectory
       ? listStagePlayMicroReasonerPromptPresets({
           sourceId: activeMicroReasonerSourceId,
+          sourceKind: activeMicroReasonerSourceKind,
           includePresets: true,
           active: true,
           limit: operator ? 20 : 100,
@@ -1311,6 +1316,7 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
     const activeMicroReasonerPromptPreset = includePresetDirectory
       ? getActiveStagePlayMicroReasonerPromptPresetForSource({
           sourceId: activeMicroReasonerSourceId,
+          sourceKind: activeMicroReasonerSourceKind,
         })
       : null;
     const jobStates = listStagePlayLiveSourceJobStates({
@@ -1416,6 +1422,7 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       microReasonerPrompts: includeConfig
         ? listStagePlayActiveMicroReasonerPromptsForSource({
             sourceId: activeMicroReasonerSourceId,
+            sourceKind: activeMicroReasonerSourceKind,
           })
         : [],
       microReasonerPromptPresets,

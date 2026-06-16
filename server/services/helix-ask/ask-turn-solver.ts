@@ -43,6 +43,12 @@ import {
   type ToolUseRestatementV1,
 } from "./internet-search-intent";
 import { contextualToolSuppressionBlocksFamily } from "./contextual-tool-admission";
+import type { HelixCommittedAskRoute } from "@shared/helix-committed-ask-route";
+import {
+  buildCommittedAskRoute,
+  evaluateCommittedAskRouteCompatibility,
+  readCommittedAskRoute,
+} from "./committed-ask-route";
 
 type RecordLike = Record<string, unknown>;
 
@@ -114,6 +120,15 @@ export type HelixAskTurnSolverTrace = {
     raw_content_included: false;
   };
   compound_prompt_coverage_gate?: HelixCompoundPromptCoverageGate;
+  committed_ask_route?: HelixCommittedAskRoute;
+  committed_route_compatibility?: {
+    schema: "helix.committed_ask_route_compatibility.v1";
+    turn_id: string;
+    compatible: boolean;
+    violations: string[];
+    assistant_answer: false;
+    raw_content_included: false;
+  };
   intent_hypotheses: HelixIntentHypothesis[];
   intent_arbitration: HelixIntentArbitration;
   selected_primary_intent: HelixAskTurnIntentKind | null;
@@ -469,6 +484,15 @@ const buildContextualToolAudit = (input: {
 };
 
 const sourceTargetFromPayload = (payload: RecordLike): { sourceTarget: string; targetKind: string; reason: string; strength: string } => {
+  const committedRoute = readCommittedAskRoute(payload);
+  if (committedRoute) {
+    return {
+      sourceTarget: committedRoute.route.source_target,
+      targetKind: committedRoute.route.target_kind,
+      reason: committedRoute.route.route_reason,
+      strength: committedRoute.route.strength,
+    };
+  }
   const sourceTargetIntent = readRecord(payload.source_target_intent);
   const routeContract = readRecord(payload.route_product_contract);
   const canonicalGoalFrame = readRecord(payload.canonical_goal_frame);
@@ -489,9 +513,11 @@ const sourceTargetFromPayload = (payload: RecordLike): { sourceTarget: string; t
 };
 
 const allowedTerminalProducts = (payload: RecordLike): string[] =>
+  readCommittedAskRoute(payload)?.canonical_goal.allowed_terminal_artifact_kinds ??
   readStringArray(readRecord(payload.route_product_contract)?.allowed_terminal_artifact_kinds);
 
 const forbiddenTerminalProducts = (payload: RecordLike): string[] =>
+  readCommittedAskRoute(payload)?.canonical_goal.forbidden_terminal_artifact_kinds ??
   readStringArray(readRecord(payload.route_product_contract)?.forbidden_terminal_artifact_kinds);
 
 const isHardSourceTarget = (payload: RecordLike, trace: HelixAskTurnSolverTrace | null): boolean => {
@@ -802,13 +828,31 @@ const collectRouteCandidatesForIntent = (payload: RecordLike, selectedRoute: str
 };
 
 const buildToolAdmissions = (payload: RecordLike, loopTrace: HelixLoopParityTrace | RecordLike | null): HelixAskTurnSolverTrace["tool_admission_candidates"] => {
+  const committedRoute = readCommittedAskRoute(payload);
   const admittedFamilies = readStringArray(readRecord(payload.tool_call_admission_decision)?.admitted_tool_families);
   const chosenCapability = readString(readRecord(payload.agent_step_decision)?.chosen_capability);
   const actualCalls = (Array.isArray(loopTrace?.actual_tool_calls) ? loopTrace.actual_tool_calls : [])
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry));
   const candidates = new Map<string, HelixAskTurnSolverTrace["tool_admission_candidates"][number]>();
+  for (const family of committedRoute?.capability_policy.allowed_tool_families ?? []) {
+    candidates.set(`committed-family:${family}`, {
+      tool_family: family,
+      admitted: true,
+      mutating: toolFamilyMutating(family),
+      reason: "allowed_by_committed_ask_route",
+    });
+  }
+  for (const family of committedRoute?.capability_policy.suppressed_tool_families ?? []) {
+    candidates.set(`committed-suppressed-family:${family}`, {
+      tool_family: family,
+      admitted: false,
+      mutating: toolFamilyMutating(family),
+      reason: "suppressed_by_committed_ask_route",
+    });
+  }
   for (const family of admittedFamilies) {
+    if (committedRoute?.capability_policy.suppressed_tool_families.includes(family)) continue;
     candidates.set(`family:${family}`, {
       tool_family: family,
       admitted: true,
@@ -1035,8 +1079,28 @@ export function buildAskTurnSolverTrace(input: {
   const secondary = intentArbitration.secondary_intent_ids
     .map((id) => intentHypotheses.find((entry) => entry.id === id)?.kind)
     .filter((kind): kind is HelixAskTurnIntentKind => Boolean(kind));
+  const committedAskRoute = buildCommittedAskRoute({
+    turnId: input.turnId,
+    promptText,
+    selectedRoute: input.selectedRoute,
+    payload: input.payload,
+    promptInterpretation,
+    intentArbitration,
+    secondaryIntentKinds: secondary,
+  });
+  input.payload.committed_ask_route = committedAskRoute;
+  const committedRouteCompatibility = evaluateCommittedAskRouteCompatibility({
+    committedRoute: committedAskRoute,
+    payload: input.payload,
+  });
+  const effectiveSourceTargetInfo = {
+    sourceTarget: committedAskRoute.route.source_target,
+    targetKind: committedAskRoute.route.target_kind,
+    reason: committedAskRoute.route.route_reason,
+    strength: committedAskRoute.route.strength,
+  };
   const evidenceRequired =
-    sourceRequiresEvidence(sourceTargetInfo.sourceTarget) ||
+    sourceRequiresEvidence(effectiveSourceTargetInfo.sourceTarget) ||
     repoConceptRequiresEvidence ||
     toolUseRestatement.requiredToolFamilies.includes("internet_search");
   const evidenceResults = buildEvidenceResults(loopTrace, input.payload);
@@ -1059,14 +1123,14 @@ export function buildAskTurnSolverTrace(input: {
     finalAnswerSource,
     finalArbitrationRan,
     sourceEvidenceRequired: evidenceRequired,
-    allowedTerminalProducts: terminalProductsAllowed,
+    allowedTerminalProducts: committedAskRoute.canonical_goal.allowed_terminal_artifact_kinds,
     toolUseRestatement,
   });
   const followupReasoningGate = buildFollowupReasoningGate({
     turnId: input.turnId,
     primaryIntent: primary,
     secondaryIntentKinds: secondary,
-    sourceTarget: sourceTargetInfo.sourceTarget,
+    sourceTarget: effectiveSourceTargetInfo.sourceTarget,
     terminalArtifactKind,
     selectedEvidenceCount: evidenceReentryGate.selected_evidence_refs.length,
     conflictingHypotheses: intentHypotheses.length > 1 && secondary.length > 0,
@@ -1146,7 +1210,7 @@ export function buildAskTurnSolverTrace(input: {
   const solverRiskFlags = buildRiskFlags({
     payload: input.payload,
     loopTrace,
-    sourceTarget: sourceTargetInfo.sourceTarget,
+    sourceTarget: effectiveSourceTargetInfo.sourceTarget,
     selectedRoute: input.selectedRoute,
     terminalArtifactKind,
     finalAnswerSource,
@@ -1191,16 +1255,18 @@ export function buildAskTurnSolverTrace(input: {
     ...(compoundContract ? { compound_prompt_contract: compoundContract } : {}),
     ...(compoundCoverage ? { compound_prompt_coverage: compoundCoverage } : {}),
     ...(compoundCoverageGate ? { compound_prompt_coverage_gate: compoundCoverageGate } : {}),
+    committed_ask_route: committedAskRoute,
+    committed_route_compatibility: committedRouteCompatibility,
     intent_hypotheses: intentHypotheses,
     intent_arbitration: intentArbitration,
     selected_primary_intent: primary,
     secondary_intents: secondary,
-    source_admission_candidates: sourceTargetInfo.sourceTarget === "unknown"
+    source_admission_candidates: effectiveSourceTargetInfo.sourceTarget === "unknown"
       ? []
       : [{
-          source_target: sourceTargetInfo.sourceTarget,
+          source_target: effectiveSourceTargetInfo.sourceTarget,
           admitted: true,
-          reason: sourceTargetInfo.reason,
+          reason: effectiveSourceTargetInfo.reason,
           evidence_required: evidenceRequired,
         }],
     tool_admission_candidates: buildToolAdmissions(input.payload, loopTrace),
@@ -1222,8 +1288,8 @@ export function buildAskTurnSolverTrace(input: {
           purpose: "Explain project-internal concept from repo evidence",
         }]
       : [{
-          request_id: `evidence_request:${hashShort([input.turnId, sourceTargetInfo.sourceTarget, input.selectedRoute])}`,
-          source_target: sourceTargetInfo.sourceTarget,
+          request_id: `evidence_request:${hashShort([input.turnId, effectiveSourceTargetInfo.sourceTarget, input.selectedRoute])}`,
+          source_target: effectiveSourceTargetInfo.sourceTarget,
           required: evidenceReentryGate.required,
           purpose: evidenceReentryGate.required
             ? "provide source evidence before final arbitration"
@@ -1316,14 +1382,14 @@ export function buildAskTurnSolverTrace(input: {
     assistant_answer: false,
     raw_content_included: false,
     completed_solver_path: completedSolverPath,
-    primary_intent: sourceTargetInfo.sourceTarget === "unknown"
+    primary_intent: effectiveSourceTargetInfo.sourceTarget === "unknown"
       ? null
       : {
           intent_kind: primary,
           route: input.selectedRoute,
-          source_target: sourceTargetInfo.sourceTarget,
-          target_kind: sourceTargetInfo.targetKind,
-          selection_reason: sourceTargetInfo.reason,
+          source_target: effectiveSourceTargetInfo.sourceTarget,
+          target_kind: effectiveSourceTargetInfo.targetKind,
+          selection_reason: effectiveSourceTargetInfo.reason,
         },
     solver_short_circuit_flags: solverRiskFlags,
     hard_gate: readRecord(input.payload.solver_hard_gate) as HelixAskTurnSolverHardGate | undefined,

@@ -11,6 +11,7 @@ import {
 } from "./language-contract";
 import { liveSourceModelSynthesisMissingFailure } from "./live-source-terminal-failure-repair";
 import type { HelixTerminalAuthority } from "@shared/helix-turn-poison-guard";
+import { readCommittedAskRoute } from "./committed-ask-route";
 
 export type HelixTerminalAnswerEnvelope = {
   schema: "helix.terminal_answer_envelope.v1";
@@ -52,12 +53,21 @@ const readTerminalPresentationText = (payload: Record<string, unknown>): string 
 };
 
 const readSourceTarget = (payload: Record<string, unknown>): string =>
+  readCommittedAskRoute(payload)?.route.source_target ??
   readString(readRecord(payload.route_product_contract)?.source_target) ??
   readString(readRecord(payload.source_target_intent)?.target_source) ??
   "unknown";
 
 const readTerminalArtifactKind = (payload: Record<string, unknown>): string =>
   readString(payload.terminal_artifact_kind) ?? "typed_failure";
+
+const committedRouteAllowsTerminalKind = (payload: Record<string, unknown>, kind: string): boolean => {
+  const committedRoute = readCommittedAskRoute(payload);
+  if (!committedRoute || kind === "typed_failure" || kind === "request_user_input") return true;
+  if (committedRoute.canonical_goal.forbidden_terminal_artifact_kinds.includes(kind)) return false;
+  const allowed = committedRoute.canonical_goal.allowed_terminal_artifact_kinds;
+  return allowed.length === 0 || allowed.includes(kind);
+};
 
 const readFinalAnswerSource = (payload: Record<string, unknown>): string =>
   readString(payload.final_answer_source) ?? readTerminalArtifactKind(payload);
@@ -465,6 +475,29 @@ export function resolveTerminalAnswerEnvelope(
     terminalArtifactKind = "typed_failure";
     finalAnswerSource = "typed_failure";
     terminalText = typedFailureText(payload);
+    authorityOrigin = "typed_failure";
+  }
+  if (!committedRouteAllowsTerminalKind(payload, terminalArtifactKind)) {
+    payload.committed_route_terminal_rejection = {
+      schema: "helix.committed_route_terminal_rejection.v1",
+      turn_id: turnId,
+      rejected_terminal_artifact_kind: terminalArtifactKind,
+      reason: "committed_route_terminal_product_mismatch",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    terminalArtifactKind = "typed_failure";
+    finalAnswerSource = "typed_failure";
+    terminalText = typedFailureText({
+      ...payload,
+      terminal_error_code: "committed_route_terminal_product_mismatch",
+      typed_failure: {
+        schema: "helix.typed_failure.v1",
+        error_code: "committed_route_terminal_product_mismatch",
+        message: "I could not produce a terminal answer because the selected terminal product did not match the committed Ask route.",
+        text: "I could not produce a terminal answer because the selected terminal product did not match the committed Ask route.",
+      },
+    });
     authorityOrigin = "typed_failure";
   }
   const visibleFaithfulnessGate = evaluateVisibleAnswerPolicyFaithfulnessGate({

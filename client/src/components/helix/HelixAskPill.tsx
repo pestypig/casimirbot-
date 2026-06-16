@@ -115,6 +115,7 @@ import {
   reconcileWorkstationIntentDecisionWithPrompt,
   shouldProbeWorkstationIntentClassifier,
 } from "@/lib/workstation/intentClassifier";
+
 import {
   buildProcessGraphOverviewText,
   shouldUseProcessGraphContextPack,
@@ -246,6 +247,35 @@ import {
 } from "@/store/useSituationRoomJobStore";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
+
+type HelixAskVisualCaptureRoute = "live_answer" | "image_lens" | "audio_transcript";
+
+const HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_STORAGE_KEY = "helix.liveAnswer.visualCaptureRoutes.v1";
+const HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_SYNC_EVENT = "helix:live-answer:visual-capture-routes";
+const HELIX_ASK_DISPLAY_AUDIO_CONSTRAINTS: MediaTrackConstraints = {
+  echoCancellation: false,
+  noiseSuppression: false,
+  autoGainControl: false,
+};
+
+function readHelixAskVisualCaptureAudioPreference(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_STORAGE_KEY) ?? "null");
+    return Array.isArray(parsed) && parsed.includes("audio_transcript");
+  } catch {
+    return false;
+  }
+}
+
+function syncHelixAskVisualCaptureRoutePreference(includeAudio: boolean): HelixAskVisualCaptureRoute[] {
+  const routes: HelixAskVisualCaptureRoute[] = includeAudio ? ["live_answer", "audio_transcript"] : ["live_answer"];
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_STORAGE_KEY, JSON.stringify(routes));
+    window.dispatchEvent(new CustomEvent(HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_SYNC_EVENT, { detail: { routes } }));
+  }
+  return routes;
+}
 
 
 const HELIX_ASK_ANSWER_EXPANSION_STORAGE_KEY = "helix.ask.answerExpansion.v1";
@@ -18307,6 +18337,7 @@ export function HelixAskPill({
   const [visualSituationSourceError, setVisualSituationSourceError] = useState<string | null>(null);
   const [visualSituationSourceLabel, setVisualSituationSourceLabel] = useState<string | null>(null);
   const [visualSituationEvidenceForTurn, setVisualSituationEvidenceForTurn] = useState<Record<string, unknown> | null>(null);
+  const [visualSituationIncludeAudio, setVisualSituationIncludeAudio] = useState<boolean>(() => readHelixAskVisualCaptureAudioPreference());
   const visualSituationSourceIdRef = useRef<string | null>(null);
   const situationRoomSourcesById = useSituationRoomStore((state) => state.sources);
   useEffect(() => {
@@ -24238,7 +24269,7 @@ export function HelixAskPill({
     return sourceId;
   }, [postSituationJson, situationRoomId]);
 
-  const requestHelixAskVisualFrame = useCallback(async (): Promise<{ summary: string; visualEvidence: Record<string, unknown> | null }> => {
+  const requestHelixAskVisualFrame = useCallback(async (input: { includeAudio?: boolean } = {}): Promise<{ summary: string; visualEvidence: Record<string, unknown> | null }> => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
       throw new Error("screen_capture_not_available_in_this_browser");
     }
@@ -24246,8 +24277,16 @@ export function HelixAskPill({
     try {
       const sourceId = await ensureHelixAskVisualSource();
       stream = getActiveVisualFrameStream(sourceId) ?? getLatestActiveVisualFrameStream("helix-ask:desktop")?.stream ?? null;
-      if (!stream) {
-        stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      const existingStreamNeedsAudioUpgrade = Boolean(stream && input.includeAudio && stream.getAudioTracks().length === 0);
+      if (!stream || existingStreamNeedsAudioUpgrade) {
+        const supersededStream = stream;
+        stream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: input.includeAudio ? HELIX_ASK_DISPLAY_AUDIO_CONSTRAINTS : false,
+        });
+        if (existingStreamNeedsAudioUpgrade) {
+          supersededStream?.getTracks().forEach((track) => track.stop());
+        }
       }
       const result = await runVisualFrameProducerOnce({
         sourceId,
@@ -24256,6 +24295,44 @@ export function HelixAskPill({
         stream,
         postJson: postSituationJson,
       });
+      if (input.includeAudio) {
+        if (stream.getAudioTracks().length > 0) {
+          const situationStore = useSituationRoomStore.getState();
+          const existingRoomId =
+            situationStore.active_room_id && situationStore.rooms[situationStore.active_room_id]
+              ? situationStore.active_room_id
+              : null;
+          const room = existingRoomId
+            ? situationStore.rooms[existingRoomId]
+            : situationStore.createRoom("Helix Ask Sources");
+          if (room?.room_id) {
+            situationStore.setActiveRoom(room.room_id);
+          }
+          if (displayAudioSourceIdRef.current) {
+            situationStore.stopSource(displayAudioSourceIdRef.current);
+            displayAudioSourceIdRef.current = null;
+          }
+          setDisplayAudioStatus("requesting");
+          setDisplayAudioError(null);
+          const audioSource = await situationStore.attachDisplayAudioSource(
+            room?.room_id ?? situationRoomId,
+            "Helix Ask shared tab audio",
+            { stream, stopStreamOnStop: false },
+          );
+          if (!audioSource || audioSource.status === "error") {
+            const message = audioSource?.last_error ?? "Display audio capture failed.";
+            setDisplayAudioStatus("error");
+            setDisplayAudioError(message);
+          } else {
+            displayAudioSourceIdRef.current = audioSource.source_id;
+            setDisplayAudioStatus("active");
+            setDisplayAudioCaptureLabel(audioSource.label || sourceLabelForSituationSource(audioSource.capture_source));
+          }
+        } else {
+          setDisplayAudioStatus("error");
+          setDisplayAudioError("Selected visual share did not include tab audio. Share a Chrome tab and enable tab audio.");
+        }
+      }
       stream = null;
       return {
         summary: result.summary,
@@ -24300,13 +24377,14 @@ export function HelixAskPill({
       });
       return;
     }
+    syncHelixAskVisualCaptureRoutePreference(visualSituationIncludeAudio);
     onOpenPanel?.("live-answer-environment");
     setDisplayAudioError(null);
     setDisplayAudioStatus((current) => (current === "error" ? "idle" : current));
     setVisualSituationSourceStatus("requesting");
     setVisualSituationSourceError(null);
     setVisualSituationSourceLabel("Visual screen capture");
-    void requestHelixAskVisualFrame()
+    void requestHelixAskVisualFrame({ includeAudio: visualSituationIncludeAudio })
       .then(({ summary, visualEvidence }) => {
         setVisualSituationEvidenceForTurn(visualEvidence);
         setVisualSituationSourceStatus("active");
@@ -24333,6 +24411,51 @@ export function HelixAskPill({
     onOpenPanel,
     requestHelixAskVisualFrame,
     situationRoomId,
+    visualSituationIncludeAudio,
+    visualSituationSourceStatus,
+  ]);
+
+  const handleVisualSituationAudioPreferenceToggle = useCallback(() => {
+    const next = !visualSituationIncludeAudio;
+    setVisualSituationIncludeAudio(next);
+    syncHelixAskVisualCaptureRoutePreference(next);
+    if (!next) {
+      stopDisplayAudioCapture();
+      return;
+    }
+    if (visualSituationSourceStatus !== "active") return;
+    setDisplayAudioError(null);
+    setDisplayAudioStatus((current) => (current === "error" ? "idle" : current));
+    setVisualSituationSourceStatus("requesting");
+    setVisualSituationSourceError(null);
+    void requestHelixAskVisualFrame({ includeAudio: true })
+      .then(({ summary, visualEvidence }) => {
+        setVisualSituationEvidenceForTurn(visualEvidence);
+        setVisualSituationSourceStatus("active");
+        appendSyntheticLiveEvent({
+          id: `situation:visual-audio:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+          tool: "situation_room",
+          ts: new Date().toISOString(),
+          text: summary,
+          meta: {
+            room_id: situationRoomId,
+            source: "visual_screen_capture",
+            event_type: "visual_frame_captured_with_audio_preference",
+            raw_image_included: false,
+            assistant_answer: false,
+          },
+        });
+      })
+      .catch((error) => {
+        setVisualSituationSourceStatus("error");
+        setVisualSituationSourceError(error instanceof Error ? error.message : String(error));
+      });
+  }, [
+    appendSyntheticLiveEvent,
+    requestHelixAskVisualFrame,
+    situationRoomId,
+    stopDisplayAudioCapture,
+    visualSituationIncludeAudio,
     visualSituationSourceStatus,
   ]);
 
@@ -35811,6 +35934,25 @@ export function HelixAskPill({
                   >
                     <ImageIcon
                       className={`h-4 w-4 ${visualSituationSourceStatus === "active" ? "animate-pulse" : ""}`}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={visualSituationIncludeAudio ? "Disable tab audio for visual capture" : "Enable tab audio for visual capture"}
+                    aria-pressed={visualSituationIncludeAudio}
+                    title={visualSituationIncludeAudio ? "Tab audio will be requested with visual capture" : "Visual capture only"}
+                    className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 disabled:opacity-60 ${
+                      visualSituationIncludeAudio
+                        ? displayAudioStatus === "error"
+                          ? "border-rose-300/45 bg-rose-400/12 text-rose-100 hover:bg-rose-400/20"
+                          : "border-teal-300/50 bg-teal-400/15 text-teal-100 hover:bg-teal-400/20"
+                        : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
+                    }`}
+                    onClick={handleVisualSituationAudioPreferenceToggle}
+                    disabled={visualSituationSourceStatus === "requesting"}
+                  >
+                    <Volume2
+                      className={`h-4 w-4 ${visualSituationIncludeAudio && displayAudioStatus !== "error" ? "animate-pulse" : ""}`}
                     />
                   </button>
                   <button

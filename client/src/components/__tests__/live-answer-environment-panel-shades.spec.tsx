@@ -35,6 +35,18 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain("Selected shade applied");
   });
 
+  it("orders live source controls around the visual capture workflow", () => {
+    const source = panelSource();
+
+    expect(source).toContain('<div className="hidden">');
+    expect(source).toContain('className="order-30 mt-3 rounded border border-white/10 bg-slate-950/60 p-3"');
+    expect(source).toContain('className="order-2 mt-3 flex flex-wrap gap-1.5"');
+    expect(source).toContain('className="order-5 mt-3 rounded border border-violet-300/20 bg-violet-950/10 px-2 py-2"');
+    expect(source).toContain('className="order-6 mt-3 rounded border border-teal-300/20 bg-teal-950/10 p-2"');
+    expect(source).toContain('className="order-7 mt-3 rounded border border-violet-300/20 bg-violet-950/10 p-2"');
+    expect(source).toContain('className="order-8 mt-3 rounded border border-cyan-300/20 bg-cyan-950/10 px-2 py-2"');
+  });
+
   it("organizes visual observer shades by subject category", () => {
     const source = panelSource();
 
@@ -134,8 +146,11 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain("Start selected live sources");
     expect(source).toContain("visualCaptureRoutes");
     expect(source).toContain("VISUAL_CAPTURE_ROUTE_STORAGE_KEY");
+    expect(source).toContain('VISUAL_CAPTURE_ROUTE_SYNC_EVENT = "helix:live-answer:visual-capture-routes"');
     expect(source).toContain("readStoredVisualCaptureRoutes");
+    expect(source).toContain("coerceVisualCaptureRoutes");
     expect(source).toContain("window.localStorage.setItem(VISUAL_CAPTURE_ROUTE_STORAGE_KEY");
+    expect(source).toContain("window.addEventListener(VISUAL_CAPTURE_ROUTE_SYNC_EVENT");
     expect(source).toContain("toggleVisualCaptureRoute");
     expect(source).toContain("routeVisualCaptureToImageLensWithStream");
     expect(source).toContain("startAudioTranscriptRoute");
@@ -152,6 +167,13 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain('sourceKind: "audio_transcript"');
     expect(source).toContain("Future audio transcript chunks will use this prompt deck.");
     expect(source).toContain("earbudMicroReasonerPromptPresets");
+    expect(source).toContain("earbudMicroReasonerRuns");
+    expect(source).toContain("/api/helix/stage-play/live-source-mail?");
+    expect(source).toContain('data-testid="earbud-micro-reasoner-output"');
+    expect(source).toContain("Earbud output candidates");
+    expect(source).toContain("latestEarbudMicroReasonerOutput");
+    expect(source).toContain("completed earbud packet_composer run");
+    expect(source).toContain("readEarbudRunText");
     expect(source).toContain("audioTranscriptHistory");
     expect(source).toContain("pruneAudioTranscriptHistory");
     expect(source).toContain("Transcript chunks will appear here");

@@ -7,6 +7,10 @@ import {
   buildHelixModelTurnPacket,
 } from "./model-turn-packet";
 import { applyModelTurnAssistantMessageAsFinalDraft } from "./model-turn-final-draft";
+import {
+  assertCapabilityAllowedByCommittedRoute,
+  readCommittedAskRoute,
+} from "./committed-ask-route";
 
 type RecordLike = Record<string, unknown>;
 
@@ -148,6 +152,42 @@ export async function runHelixModelTurnToolContinuation(input: {
     };
   }
 
+  const committedRoute = input.packet.committed_ask_route ?? readCommittedAskRoute(payload);
+  const committedRouteAdmission = assertCapabilityAllowedByCommittedRoute({
+    committedRoute,
+    capabilityId: firstResult.requested_tool_call.capability_id,
+    args: firstResult.requested_tool_call.args,
+    fromShortcut: false,
+  });
+  payload.committed_route_tool_admission = committedRouteAdmission;
+  if (!committedRouteAdmission.allowed) {
+    const blockedResult: RecordLike = {
+      status: "blocked",
+      summary: `Capability ${firstResult.requested_tool_call.capability_id} blocked by committed route: ${committedRouteAdmission.reason}.`,
+      committed_route_tool_admission: committedRouteAdmission,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const observation = buildModelTurnToolObservationArtifact({
+      turnId: input.packet.turn_id,
+      iteration: 1,
+      toolCall: firstResult.requested_tool_call,
+      result: blockedResult,
+    });
+    payload.model_turn_tool_observation = observation.payload;
+    return {
+      schema: "helix.model_turn_tool_continuation_result.v1",
+      turn_id: input.packet.turn_id,
+      status: "tool_continuation_blocked",
+      packets: [input.packet],
+      model_turn_results: [firstResult],
+      observation_artifacts: [observation],
+      payload,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+
   const toolResult = await input.executeCapability(firstResult.requested_tool_call);
   const observation = buildModelTurnToolObservationArtifact({
     turnId: input.packet.turn_id,
@@ -168,6 +208,7 @@ export async function runHelixModelTurnToolContinuation(input: {
       canonical_goal_frame: input.packet.canonical_goal_frame,
       source_target_intent: input.packet.source_target_intent,
       route_product_contract: input.packet.route_product_contract,
+      committed_ask_route: input.packet.committed_ask_route,
       compound_prompt_contract: input.packet.compound_prompt_contract,
     },
     artifactLedger: [...(input.artifactLedger ?? []), observation],
