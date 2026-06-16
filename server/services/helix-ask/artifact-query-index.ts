@@ -21,6 +21,39 @@ type RailFailureCode =
 
 type RailStatus = "complete" | "broken" | "fail_closed";
 
+type FirstBrokenRail =
+  | "route_admission"
+  | "capability_execution"
+  | "observation_artifact"
+  | "evidence_reentry"
+  | "support_backed_draft"
+  | "terminal_materialization"
+  | "terminal_authority"
+  | "visible_projection"
+  | "config";
+
+type FailureBucket =
+  | "A_tool_did_not_execute"
+  | "B_tool_executed_observation_missing"
+  | "C_observation_not_reentered"
+  | "D_support_backed_draft_missing"
+  | "E_terminal_materializer_gap"
+  | "F_terminal_projection_mismatch"
+  | "G_config_missing"
+  | "H_route_tool_family_contract_mismatch";
+
+type RepairTarget =
+  | "tool_admission"
+  | "tool_execution"
+  | "tool_family_contract"
+  | "observation_materializer"
+  | "reentry_gate"
+  | "draft_builder"
+  | "terminal_materializer"
+  | "terminal_authority"
+  | "presenter_boundary"
+  | "operator_config";
+
 const TOOL_TURN_CHAIN_FAILURE_CODES: RailFailureCode[] = [
   "route_family_mismatch",
   "tool_admission_drift",
@@ -44,11 +77,25 @@ const TOOL_TURN_CHAIN_MATRIX_FAMILIES = [
   "image_lens / visual_capture",
 ] as const;
 
+const TERMINAL_RECEIPT_KINDS = new Set([
+  "tool_receipt",
+  "workspace_action_receipt",
+  "workstation_tool_evaluation",
+  "live_pipeline_receipt",
+  "doc_open_receipt",
+  "docs_viewer_receipt",
+]);
+
 const readRecord = (value: unknown): RecordLike | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as RecordLike) : null;
 
 const readString = (value: unknown): string =>
   typeof value === "string" && value.trim() ? value.trim() : "";
+
+const readNullableString = (value: unknown): string | null => {
+  const stringValue = readString(value);
+  return stringValue || null;
+};
 
 const readBoolean = (value: unknown): boolean => value === true;
 
@@ -420,7 +467,13 @@ const buildToolTurnChainAudit = (input: {
 }): RecordLike => {
   const selectedCapability =
     firstString(input.lifecycleTrace?.admitted_capability, input.lifecycleTrace?.requested_capability) ?? input.capability;
-  const executedCapability = firstString(input.lifecycleTrace?.executed_capability, input.capability);
+  const operationalTrace = readRecord(input.payload.operational_capability_trace);
+  const runtimeToolCall = readRecord(input.payload.runtime_tool_call);
+  const executedCapability = firstString(
+    input.lifecycleTrace?.executed_capability,
+    operationalTrace?.executed_capability,
+    runtimeToolCall?.capability_key,
+  );
   const routeFamily = firstString(input.toolFamily, input.contract?.toolFamily, inferToolFamilyFromToolName(selectedCapability));
   const selectedFamily = inferToolFamilyFromToolName(selectedCapability);
   const executedFamily = inferToolFamilyFromToolName(executedCapability);
@@ -545,6 +598,142 @@ const buildToolTurnChainFamilyMatrix = (audit: RecordLike): RecordLike[] => {
   });
 };
 
+const hasTerminalProduct = (audit: RecordLike): boolean => Boolean(readString(audit.materialized_terminal_artifact_kind));
+
+const terminalKindRequiresSupportBackedDraft = (audit: RecordLike): boolean => {
+  const terminalKind = normalize(audit.materialized_terminal_artifact_kind) || normalize(audit.required_terminal_kind);
+  if (!terminalKind) return false;
+  if (terminalKind === "typed_failure" || terminalKind === "request_user_input") return false;
+  if (TERMINAL_RECEIPT_KINDS.has(terminalKind)) return false;
+  return terminalKind.includes("model_synthesized") || terminalKind.includes("answer") || terminalKind.includes("summary");
+};
+
+const triageFromAudit = (audit: RecordLike): {
+  first_broken_rail: FirstBrokenRail | null;
+  failure_bucket: FailureBucket | null;
+  repair_target: RepairTarget | null;
+} => {
+  const railFailureCode = readString(audit.rail_failure_code);
+  const routeFamily = readString(audit.route_family);
+  const selectedCapability = readString(audit.selected_capability);
+  const executedCapability = readString(audit.executed_capability);
+  const observationRef = readString(audit.observation_ref);
+  const reentryExecuted = audit.reentry_executed === true;
+  const finalDraftRef = readString(audit.final_answer_draft_ref);
+  const supportCount = readNumber(audit.support_refs_count) ?? 0;
+  const materializedTerminal = readString(audit.materialized_terminal_artifact_kind);
+  const terminalAuthority = readString(audit.terminal_authority_kind);
+  const visibleTerminal = readString(audit.visible_terminal_kind);
+
+  if (railFailureCode === "config_missing") {
+    return { first_broken_rail: "config", failure_bucket: "G_config_missing", repair_target: "operator_config" };
+  }
+  if (!routeFamily || railFailureCode === "route_family_mismatch") {
+    return {
+      first_broken_rail: "route_admission",
+      failure_bucket: "H_route_tool_family_contract_mismatch",
+      repair_target: "tool_admission",
+    };
+  }
+  if (railFailureCode === "tool_admission_drift") {
+    return {
+      first_broken_rail: "capability_execution",
+      failure_bucket: "H_route_tool_family_contract_mismatch",
+      repair_target: "tool_admission",
+    };
+  }
+  if (selectedCapability && !executedCapability) {
+    return {
+      first_broken_rail: "capability_execution",
+      failure_bucket: "A_tool_did_not_execute",
+      repair_target: "tool_execution",
+    };
+  }
+  if (!observationRef || railFailureCode === "observation_missing") {
+    return {
+      first_broken_rail: "observation_artifact",
+      failure_bucket: "B_tool_executed_observation_missing",
+      repair_target: "observation_materializer",
+    };
+  }
+  if (!reentryExecuted || railFailureCode === "observation_not_reentered" || railFailureCode === "reentry_step_not_executed") {
+    return {
+      first_broken_rail: "evidence_reentry",
+      failure_bucket: "C_observation_not_reentered",
+      repair_target: "reentry_gate",
+    };
+  }
+  if (!finalDraftRef && !hasTerminalProduct(audit)) {
+    return {
+      first_broken_rail: "support_backed_draft",
+      failure_bucket: "D_support_backed_draft_missing",
+      repair_target: "draft_builder",
+    };
+  }
+  if (terminalKindRequiresSupportBackedDraft(audit) && finalDraftRef && supportCount === 0) {
+    return {
+      first_broken_rail: "support_backed_draft",
+      failure_bucket: "D_support_backed_draft_missing",
+      repair_target: "draft_builder",
+    };
+  }
+  if (!materializedTerminal || railFailureCode === "terminal_not_materialized" || railFailureCode === "terminal_product_mismatch") {
+    return {
+      first_broken_rail: "terminal_materialization",
+      failure_bucket: "E_terminal_materializer_gap",
+      repair_target: "terminal_materializer",
+    };
+  }
+  if (!terminalAuthority) {
+    return {
+      first_broken_rail: "terminal_authority",
+      failure_bucket: "E_terminal_materializer_gap",
+      repair_target: "terminal_authority",
+    };
+  }
+  if (!visibleTerminal || railFailureCode === "terminal_projection_mismatch" || !normalizedEqual(terminalAuthority, visibleTerminal)) {
+    return {
+      first_broken_rail: "visible_projection",
+      failure_bucket: "F_terminal_projection_mismatch",
+      repair_target: "presenter_boundary",
+    };
+  }
+  return { first_broken_rail: null, failure_bucket: null, repair_target: null };
+};
+
+const buildToolRailFailureTriage = (input: {
+  turnId: string;
+  audit: RecordLike;
+}): RecordLike => {
+  const triage = triageFromAudit(input.audit);
+  const executedCapability = readString(input.audit.executed_capability);
+  const observationRef = readString(input.audit.observation_ref);
+  return {
+    schema: "helix.tool_rail_failure_triage.v1",
+    turn_id: input.turnId,
+    route_family: readNullableString(input.audit.route_family),
+    selected_capability: readNullableString(input.audit.selected_capability),
+    executed_capability: executedCapability || null,
+    did_tool_run: Boolean(executedCapability),
+    observation_artifact_kind: readNullableString(input.audit.observation_artifact_kind),
+    observation_ref: observationRef || null,
+    reentry_executed: input.audit.reentry_executed === true,
+    required_terminal_kind: readNullableString(input.audit.required_terminal_kind),
+    final_answer_draft_ref: readNullableString(input.audit.final_answer_draft_ref),
+    support_refs_count: readNumber(input.audit.support_refs_count) ?? 0,
+    materialized_terminal_artifact_kind: readNullableString(input.audit.materialized_terminal_artifact_kind),
+    terminal_authority_kind: readNullableString(input.audit.terminal_authority_kind),
+    visible_terminal_kind: readNullableString(input.audit.visible_terminal_kind),
+    first_broken_rail: triage.first_broken_rail,
+    failure_bucket: triage.failure_bucket,
+    rail_status: readString(input.audit.rail_status) || "broken",
+    rail_failure_code: readNullableString(input.audit.rail_failure_code),
+    repair_target: triage.repair_target,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
 const buildArtifactEntry = (artifact: RecordLike): RecordLike => {
   const payload = artifactPayload(artifact);
   const ref = artifactRef(artifact);
@@ -623,6 +812,10 @@ export const buildArtifactQueryIndex = (input: {
     requiredObservationCoverage,
     requiredObservationsSatisfied,
   });
+  const toolRailFailureTriage = buildToolRailFailureTriage({
+    turnId: input.turnId,
+    audit: toolTurnChainAudit,
+  });
 
   return {
     schema: "helix.artifact_query_index.v1",
@@ -654,6 +847,7 @@ export const buildArtifactQueryIndex = (input: {
         requiredObservationsSatisfied,
     },
     tool_turn_chain_audit: toolTurnChainAudit,
+    tool_rail_failure_triage: toolRailFailureTriage,
     tool_turn_chain_family_matrix: buildToolTurnChainFamilyMatrix(toolTurnChainAudit),
     assistant_answer: false,
     raw_content_included: false,

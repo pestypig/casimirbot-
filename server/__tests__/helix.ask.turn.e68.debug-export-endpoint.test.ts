@@ -66,6 +66,11 @@ describe("helix ask E68 debug export endpoint", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+    expect(debugExport.body?.payload?.tool_rail_failure_triage).toMatchObject({
+      schema: "helix.tool_rail_failure_triage.v1",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
     expect(Array.isArray(debugExport.body?.payload?.tool_turn_chain_family_matrix)).toBe(true);
     expect(Array.isArray(debugExport.body?.payload?.artifact_query_index?.artifact_refs)).toBe(true);
     expect(Array.isArray(debugExport.body?.payload?.artifact_query_index?.queryable_artifact_keys)).toBe(true);

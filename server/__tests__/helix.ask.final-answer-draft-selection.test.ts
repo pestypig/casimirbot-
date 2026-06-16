@@ -5,6 +5,7 @@ import { materializeFinalAnswerDraftTerminal } from "../services/helix-ask/final
 import { applyHelixProjectionMismatchGate } from "../services/helix-ask/projection-mismatch-gate";
 import {
   applyHelixTerminalAuthoritySingleWriter,
+  applyTerminalProjectionKindGuard,
   syncHelixTypedFailureAuthorityPublicMirrors,
 } from "../services/helix-ask/terminal-authority-single-writer";
 
@@ -1018,6 +1019,110 @@ describe("final_answer_draft terminal selection", () => {
     expect(result.terminal_projection_health.projection_mismatch_repaired).toBe(true);
     expect(payload.selected_final_answer).toBe(draftText);
     expect((payload.terminal_authority_single_writer as Record<string, unknown>)).toBeTruthy();
+  });
+
+  it("fails closed when visible projection disagrees with typed failure authority", () => {
+    const turnId = "ask:test:projection-kind-typed-failure";
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      selected_final_answer: "A good-looking but unauthorized answer.",
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: turnId,
+        terminal_artifact_kind: "model_synthesized_answer",
+        concise_text: "A good-looking but unauthorized answer.",
+      },
+    };
+    const result = applyTerminalProjectionKindGuard(payload, {
+      schema: "helix.terminal_authority_single_writer_result.v1",
+      turn_id: turnId,
+      selected_terminal_artifact_ref: "typed_failure:test",
+      selected_terminal_artifact_kind: "typed_failure",
+      visible_text: "The authorized failure.",
+      assistant_answer: false,
+      source: "typed_failure",
+      rejected_candidates: [],
+      writes: {
+        payload_text: "The authorized failure.",
+        payload_answer: "The authorized failure.",
+        payload_assistant_answer: "The authorized failure.",
+        payload_selected_final_answer: "The authorized failure.",
+        terminal_presentation_concise_text: "The authorized failure.",
+        debug_selected_final_answer: "The authorized failure.",
+      },
+      integrity: {
+        single_writer_applied: true,
+        visible_matches_selected_artifact: true,
+        visible_matches_draft: true,
+        stale_failure_visible: false,
+        receipt_visible_as_answer: false,
+        post_tool_model_step_satisfied: true,
+        legacy_terminal_candidate_count: 0,
+        forbidden_terminal_candidate_count: 0,
+        payload_mirror_written_after_terminal_selection: true,
+      },
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(result.integrity.terminal_projection_guard_applied).toBe(true);
+    expect(result.integrity.terminal_projection_guard_action).toBe("fail_closed");
+    expect(result.integrity.terminal_projection_failure_code).toBe("terminal_projection_mismatch");
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("terminal_projection_mismatch");
+    expect((payload.terminal_presentation as Record<string, unknown>).terminal_artifact_kind).toBe("typed_failure");
+  });
+
+  it("projects the authority-selected artifact when presentation kind is stale", () => {
+    const turnId = "ask:test:projection-kind-repair";
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      terminal_artifact_kind: "direct_answer_text",
+      final_answer_source: "model_direct_answer",
+      selected_final_answer: "Stale direct text.",
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: turnId,
+        terminal_artifact_kind: "direct_answer_text",
+        concise_text: "Stale direct text.",
+      },
+    };
+    const result = applyTerminalProjectionKindGuard(payload, {
+      schema: "helix.terminal_authority_single_writer_result.v1",
+      turn_id: turnId,
+      selected_terminal_artifact_ref: `${turnId}:draft`,
+      selected_terminal_artifact_kind: "model_synthesized_answer",
+      visible_text: "Authority-selected draft text.",
+      assistant_answer: false,
+      source: "final_answer_draft",
+      rejected_candidates: [],
+      writes: {
+        payload_text: "Authority-selected draft text.",
+        payload_answer: "Authority-selected draft text.",
+        payload_assistant_answer: "Authority-selected draft text.",
+        payload_selected_final_answer: "Authority-selected draft text.",
+        terminal_presentation_concise_text: "Authority-selected draft text.",
+        debug_selected_final_answer: "Authority-selected draft text.",
+      },
+      integrity: {
+        single_writer_applied: true,
+        visible_matches_selected_artifact: true,
+        visible_matches_draft: true,
+        stale_failure_visible: false,
+        receipt_visible_as_answer: false,
+        post_tool_model_step_satisfied: true,
+        legacy_terminal_candidate_count: 0,
+        forbidden_terminal_candidate_count: 0,
+        payload_mirror_written_after_terminal_selection: true,
+      },
+    });
+
+    expect(result.integrity.terminal_projection_guard_applied).toBe(true);
+    expect(result.integrity.terminal_projection_guard_action).toBe("project_authority_artifact");
+    expect(payload.terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect((payload.terminal_presentation as Record<string, unknown>).terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(payload.selected_final_answer).toBe("Authority-selected draft text.");
   });
 
   it("keeps calculator receipts as side artifacts when a final draft explains the result", () => {

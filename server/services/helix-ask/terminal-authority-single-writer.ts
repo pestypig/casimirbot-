@@ -202,6 +202,171 @@ const VISIBLE_ANSWER_FIELDS = [
   "terminal_presentation.concise_text",
 ] as const;
 
+const TERMINAL_PROJECTION_MISMATCH_TEXT =
+  "I could not produce a terminal answer because terminal authority and visible projection selected different artifacts.";
+
+export const applyTerminalProjectionKindGuard = (
+  payload: Record<string, unknown>,
+  result: HelixTerminalAuthoritySingleWriterResult,
+): HelixTerminalAuthoritySingleWriterResult => {
+  const authorityKind = readString(result.selected_terminal_artifact_kind);
+  const presentation = readRecord(payload.terminal_presentation);
+  const visibleKind = readString(presentation?.terminal_artifact_kind) ?? readString(payload.terminal_artifact_kind);
+  if (!authorityKind || !visibleKind || authorityKind === visibleKind) {
+    return {
+      ...result,
+      integrity: {
+        ...result.integrity,
+        terminal_projection_kind_match: Boolean(authorityKind && visibleKind && authorityKind === visibleKind),
+        terminal_projection_guard_applied: false,
+        terminal_projection_guard_action: null,
+        terminal_projection_failure_code: null,
+      },
+    };
+  }
+
+  payload.terminal_projection_guard = {
+    schema: "helix.terminal_projection_guard.v1",
+    turn_id: result.turn_id,
+    terminal_authority_kind: authorityKind,
+    visible_terminal_kind: visibleKind,
+    action: authorityKind === "typed_failure" ? "fail_closed" : "project_authority_artifact",
+    error_code: authorityKind === "typed_failure" ? "terminal_projection_mismatch" : null,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+
+  if (authorityKind !== "typed_failure") {
+    const projectedTextHash = hashHelixTerminalText(result.visible_text);
+    payload.terminal_artifact_kind = authorityKind;
+    payload.final_answer_source = result.source;
+    payload.selected_final_answer = result.visible_text;
+    payload.answer = result.visible_text;
+    payload.text = result.visible_text;
+    payload.assistant_answer = result.visible_text;
+    payload.terminal_presentation = {
+      ...(presentation ?? {}),
+      schema: "helix.terminal_presentation.v1",
+      turn_id: result.turn_id,
+      terminal_artifact_kind: authorityKind,
+      concise_text: result.visible_text,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    payload.terminal_answer_authority = {
+      ...(readRecord(payload.terminal_answer_authority) ?? {}),
+      schema: "helix.turn_terminal_authority.v1",
+      turn_id: result.turn_id,
+      terminal_kind: "answer",
+      final_answer_source: result.source,
+      terminal_artifact_kind: authorityKind,
+      terminal_text_preview: result.visible_text.slice(0, 240),
+      terminal_text_hash: projectedTextHash,
+      server_authoritative: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    return {
+      ...result,
+      writes: {
+        ...result.writes,
+        payload_text: result.visible_text,
+        payload_answer: result.visible_text,
+        payload_assistant_answer: result.visible_text,
+        payload_selected_final_answer: result.visible_text,
+        terminal_presentation_concise_text: result.visible_text,
+        debug_selected_final_answer: result.visible_text,
+      },
+      integrity: {
+        ...result.integrity,
+        terminal_projection_kind_match: true,
+        terminal_projection_guard_applied: true,
+        terminal_projection_guard_action: "project_authority_artifact",
+        terminal_projection_failure_code: null,
+      },
+    };
+  }
+
+  payload.ok = false;
+  payload.response_type = "final_failure";
+  payload.final_status = "final_failure";
+  payload.status = "final_failure";
+  payload.final_answer_source = "typed_failure";
+  payload.terminal_artifact_kind = "typed_failure";
+  payload.terminal_error_code = "terminal_projection_mismatch";
+  payload.terminal_failure_text = TERMINAL_PROJECTION_MISMATCH_TEXT;
+  payload.selected_final_answer = TERMINAL_PROJECTION_MISMATCH_TEXT;
+  payload.answer = TERMINAL_PROJECTION_MISMATCH_TEXT;
+  payload.text = TERMINAL_PROJECTION_MISMATCH_TEXT;
+  payload.assistant_answer = TERMINAL_PROJECTION_MISMATCH_TEXT;
+  payload.typed_failure = {
+    ...(readRecord(payload.typed_failure) ?? {}),
+    schema: "helix.typed_failure.v1",
+    error_code: "terminal_projection_mismatch",
+    message: TERMINAL_PROJECTION_MISMATCH_TEXT,
+    text: TERMINAL_PROJECTION_MISMATCH_TEXT,
+    answer_text: TERMINAL_PROJECTION_MISMATCH_TEXT,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  payload.terminal_presentation = {
+    ...(presentation ?? {}),
+    schema: "helix.terminal_presentation.v1",
+    turn_id: result.turn_id,
+    terminal_artifact_kind: "typed_failure",
+    concise_text: TERMINAL_PROJECTION_MISMATCH_TEXT,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  payload.terminal_answer_authority = {
+    ...(readRecord(payload.terminal_answer_authority) ?? {}),
+    schema: "helix.turn_terminal_authority.v1",
+    turn_id: result.turn_id,
+    terminal_kind: "failure",
+    final_answer_source: "typed_failure",
+    terminal_artifact_kind: "typed_failure",
+    terminal_text_preview: TERMINAL_PROJECTION_MISMATCH_TEXT,
+    terminal_text_hash: hashHelixTerminalText(TERMINAL_PROJECTION_MISMATCH_TEXT),
+    server_authoritative: true,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  const summary = readRecord(payload.resolved_turn_summary);
+  if (summary) {
+    payload.resolved_turn_summary = {
+      ...summary,
+      final_status: "final_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "terminal_projection_mismatch",
+      final_answer_source: "typed_failure",
+    };
+  }
+  return {
+    ...result,
+    selectedArtifactKind: "typed_failure",
+    selectedArtifactRef: `typed_failure:${textHash(`${result.turn_id}:${TERMINAL_PROJECTION_MISMATCH_TEXT}`)}`,
+    selected_terminal_artifact_kind: "typed_failure",
+    selected_terminal_artifact_ref: `typed_failure:${textHash(`${result.turn_id}:${TERMINAL_PROJECTION_MISMATCH_TEXT}`)}`,
+    visible_text: TERMINAL_PROJECTION_MISMATCH_TEXT,
+    source: "typed_failure",
+    writes: {
+      payload_text: TERMINAL_PROJECTION_MISMATCH_TEXT,
+      payload_answer: TERMINAL_PROJECTION_MISMATCH_TEXT,
+      payload_assistant_answer: TERMINAL_PROJECTION_MISMATCH_TEXT,
+      payload_selected_final_answer: TERMINAL_PROJECTION_MISMATCH_TEXT,
+      terminal_presentation_concise_text: TERMINAL_PROJECTION_MISMATCH_TEXT,
+      debug_selected_final_answer: TERMINAL_PROJECTION_MISMATCH_TEXT,
+    },
+    integrity: {
+      ...result.integrity,
+      terminal_projection_kind_match: false,
+      terminal_projection_guard_applied: true,
+      terminal_projection_guard_action: "fail_closed",
+      terminal_projection_failure_code: "terminal_projection_mismatch",
+    },
+  };
+};
+
 const isStaleModelOnlyNoObservationText = (value: unknown): boolean =>
   /\b(?:no\s+(?:accepted\s+)?observations?|no\s+(?:live[-\s]?source\s+)?context|no\s+context\s+(?:is\s+)?available|unable\s+to\s+provide\s+(?:the\s+)?context|unable\s+to\s+provide\s+(?:an\s+)?answer\s+from\s+(?:observations|context)|could\s+not\s+provide\s+(?:the\s+)?context|can't\s+provide\s+(?:the\s+)?context|cannot\s+provide\s+(?:the\s+)?context|without\s+(?:any\s+)?observations?|no\s+receipts?\s+(?:exist|available|were\s+found))\b/i.test(
     readString(value) ?? "",
@@ -1487,7 +1652,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     wroteVisibleFields,
     forbiddenPreAuthorityVisibleFields,
   };
-  const result: HelixTerminalAuthoritySingleWriterResult = {
+  let result: HelixTerminalAuthoritySingleWriterResult = {
     schema: "helix.terminal_authority_single_writer_result.v1",
     artifactId: "terminal_authority_single_writer",
     schemaVersion: "helix.terminal_authority_single_writer.v1",
@@ -1537,6 +1702,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       materialization_blocked_reason: draftMaterialization?.blocked_reason ?? null,
     },
   };
+  result = applyTerminalProjectionKindGuard(input.payload, result);
 
   input.payload.terminal_authority_single_writer = result;
   input.payload.terminal_candidate_rejections = auditRejectedCandidates;
@@ -1546,6 +1712,9 @@ export function applyHelixTerminalAuthoritySingleWriter(
     debug.terminal_authority_single_writer = result;
     debug.terminal_candidate_rejections = auditRejectedCandidates;
     debug.legacy_terminal_candidates = legacyCandidates;
+    if (input.payload.terminal_projection_guard) {
+      debug.terminal_projection_guard = input.payload.terminal_projection_guard;
+    }
   }
 
   return result;

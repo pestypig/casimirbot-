@@ -169,5 +169,9 @@ export type HelixTerminalAuthoritySingleWriterResult = {
     materialized_terminal_artifact_kind?: string | null;
     materialized_terminal_artifact_ref?: string | null;
     materialization_blocked_reason?: string | null;
+    terminal_projection_kind_match?: boolean;
+    terminal_projection_guard_applied?: boolean;
+    terminal_projection_guard_action?: "project_authority_artifact" | "fail_closed" | null;
+    terminal_projection_failure_code?: "terminal_projection_mismatch" | null;
   };
 };
