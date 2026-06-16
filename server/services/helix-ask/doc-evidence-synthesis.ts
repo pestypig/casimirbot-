@@ -37,6 +37,9 @@ export type DocEvidenceSynthesisCoverage = {
   sufficient: boolean;
   observed_doc_paths: string[];
   observed_artifact_refs: string[];
+  final_answer_draft_ref?: string | null;
+  final_answer_draft_support_refs?: string[];
+  support_refs_count?: number;
   missing_requirements: string[];
   assistant_answer: false;
   raw_content_included: false;
@@ -76,9 +79,49 @@ const artifactText = (artifact: ArtifactLike): string | null => {
   return readString(payload?.answer_text) ?? readString(payload?.text) ?? readString(payload?.summary);
 };
 
+const stringArray = (value: unknown): string[] =>
+  readArray(value).map(readString).filter((entry): entry is string => Boolean(entry));
+
 const isDocsEvidenceArtifact = (artifact: ArtifactLike): boolean => {
   const signature = [artifactKind(artifact), artifactSchema(artifact)].join(" ");
   return /\b(?:doc_summary|doc_location_result|doc_evidence_location|doc_location_matches|doc_equation_context|doc_equation_location|doc_calculator_evidence|agent_step_observation_packet)\b/i.test(signature);
+};
+
+const finalAnswerDraftPayload = (
+  artifactLedger: ArtifactLike[],
+  finalAnswerDraftRef?: string | null,
+): RecordLike | null => {
+  const drafts = artifactLedger.filter((artifact) => {
+    if (artifactKind(artifact) === "final_answer_draft") return true;
+    if (artifactSchema(artifact) === "helix.final_answer_draft.v1") return true;
+    return false;
+  });
+  if (finalAnswerDraftRef) {
+    const matched = drafts.find((artifact) => artifactId(artifact) === finalAnswerDraftRef);
+    if (matched) return artifactPayload(matched);
+  }
+  return artifactPayload(drafts.at(-1) ?? {});
+};
+
+const finalAnswerDraftSupportRefs = (
+  artifactLedger: ArtifactLike[],
+  finalAnswerDraftRef?: string | null,
+): string[] => {
+  const payload = finalAnswerDraftPayload(artifactLedger, finalAnswerDraftRef);
+  if (!payload) return [];
+  const sourceDocRefs = readArray(payload.source_docs).flatMap((doc) => {
+    const record = readRecord(doc);
+    return [
+      readString(record?.path),
+      ...stringArray(record?.evidence_refs),
+    ];
+  });
+  return unique([
+    ...stringArray(payload.artifact_refs),
+    ...stringArray(payload.support_refs),
+    ...stringArray(payload.evidence_refs),
+    ...sourceDocRefs,
+  ]);
 };
 
 const pathsFromPayload = (payload: RecordLike | null): string[] => {
@@ -217,6 +260,51 @@ export function evaluateDocEvidenceSynthesisCoverage(input: {
   };
 }
 
+export function buildDocEvidenceSynthesisModelPrompt(input: {
+  promptText: string;
+  plan: DocEvidenceSynthesisPlan;
+  evidenceArtifacts: ArtifactLike[];
+}): string {
+  const evidenceLines = input.evidenceArtifacts.map((artifact, index) => {
+    const payload = artifactPayload(artifact);
+    const ref = artifactId(artifact) ?? `doc_evidence:${index + 1}`;
+    const paths = pathsFromPayload(payload);
+    const anchors = anchorsFromPayload(payload);
+    const text = artifactText(artifact) ?? "";
+    return [
+      `Evidence ${index + 1}: ${ref}`,
+      paths.length ? `Path: ${paths.join(", ")}` : null,
+      anchors.length ? `Anchors: ${anchors.join("; ")}` : null,
+      text ? `Observation: ${text.slice(0, 900)}` : null,
+    ].filter(Boolean).join("\n");
+  });
+  const outputShape =
+    input.plan.synthesis_kind === "compare"
+      ? "Give the requested comparison, with clear differences grounded in the provided document observations."
+      : input.plan.synthesis_kind === "runbook_answer" || /\bchecklist\b/i.test(input.promptText)
+        ? "Give the requested checklist or runbook, grounded in the located document observations."
+        : input.plan.synthesis_kind === "locate_then_explain"
+          ? "Explain the located document section and cite the relevant anchor names."
+          : "Answer from the provided document observations.";
+  return [
+    "You are the Docs evidence synthesis step for Helix Ask.",
+    "Use only the document observations below. Do not call tools. Do not answer from general knowledge.",
+    "Produce the final answer text for a doc_evidence_synthesis_answer.",
+    outputShape,
+    "",
+    `Required terminal kind: doc_evidence_synthesis_answer`,
+    `Synthesis kind: ${input.plan.synthesis_kind}`,
+    `Required document paths: ${input.plan.required_doc_paths.join(", ") || "none"}`,
+    `Required anchors: ${input.plan.required_anchors.join(", ") || "none"}`,
+    "",
+    "User request:",
+    input.promptText,
+    "",
+    "Document observations:",
+    evidenceLines.join("\n\n") || "No document observations were provided.",
+  ].join("\n");
+}
+
 export function buildDocEvidenceSynthesisAnswerCandidate(input: {
   turnId: string;
   plan: DocEvidenceSynthesisPlan;
@@ -303,6 +391,22 @@ export function materializeDocEvidenceSynthesisAnswer(input: {
     plan,
     evidenceArtifacts,
   });
+  const evidenceRefs = coverage.observed_artifact_refs;
+  const draftSupportRefs = finalAnswerDraftSupportRefs(input.artifactLedger, input.finalAnswerDraftRef);
+  const hasDraftSupportForDocs = draftSupportRefs.some((ref) =>
+    evidenceRefs.includes(ref) ||
+    evidenceRefs.some((evidenceRef) => ref.includes(evidenceRef) || evidenceRef.includes(ref)),
+  );
+  coverage.final_answer_draft_ref = input.finalAnswerDraftRef ?? null;
+  coverage.final_answer_draft_support_refs = draftSupportRefs;
+  coverage.support_refs_count = hasDraftSupportForDocs ? draftSupportRefs.length : 0;
+  if (!hasDraftSupportForDocs) {
+    coverage.sufficient = false;
+    coverage.missing_requirements = unique([
+      ...coverage.missing_requirements,
+      "final_answer_draft_doc_support_refs",
+    ]);
+  }
   input.payload.doc_evidence_synthesis_coverage = coverage;
   if (goalKind !== "doc_evidence_synthesis" || requiredTerminalKind !== "doc_evidence_synthesis_answer") {
     return { ok: false, coverage, blocked_reason: "route_contract_disallowed" };

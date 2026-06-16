@@ -81,6 +81,14 @@ import {
   recordStagePlayVisualObserverProfile,
 } from "../../services/stage-play/stage-play-visual-observer-profile-store";
 import {
+  applyStagePlayAdaptiveVisualLensProposal,
+  evaluateStagePlayAdaptiveVisualLens,
+} from "../../services/stage-play/stage-play-adaptive-visual-lens-controller";
+import {
+  getLatestStagePlayAdaptiveVisualLensProposal,
+  listStagePlayAdaptiveVisualLensProposals,
+} from "../../services/stage-play/stage-play-adaptive-visual-lens-store";
+import {
   buildMailLoopTranscriptRows,
   readLiveSourceMailForAsk,
   recordLiveSourceMailDecisionForAsk,
@@ -358,6 +366,21 @@ helixStagePlayRouter.options("/visual-observer-profile/apply", (_req, res) => {
 });
 
 helixStagePlayRouter.options("/visual-observer-profile/test", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+helixStagePlayRouter.options("/adaptive-visual-lens", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+helixStagePlayRouter.options("/adaptive-visual-lens/evaluate", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+helixStagePlayRouter.options("/adaptive-visual-lens/apply", (_req, res) => {
   setCors(res);
   res.status(200).end();
 });
@@ -1898,6 +1921,144 @@ helixStagePlayRouter.post("/visual-observer-profile/test", (req: Request, res: R
       error: "stage-play-visual-observer-profile-test-failed",
       err,
       schema: "stage_play_visual_observer_profile_test_result/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.get("/adaptive-visual-lens", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const threadId = readQueryString(req.query.threadId) ?? readQueryString(req.query.thread_id);
+    const sourceId = readQueryString(req.query.sourceId) ?? readQueryString(req.query.source_id);
+    const limit = readOptionalNumber(req.query.limit) ?? 25;
+    const proposals = listStagePlayAdaptiveVisualLensProposals({
+      threadId,
+      sourceId,
+      limit,
+    });
+    const latestProposal = getLatestStagePlayAdaptiveVisualLensProposal({
+      threadId,
+      sourceId,
+    });
+    return res.json({
+      ok: true,
+      schema: "stage_play_adaptive_visual_lens_list_response/v1",
+      proposals,
+      latestProposal,
+      latest_proposal: latestProposal,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-adaptive-visual-lens-list-failed",
+      err,
+      schema: "stage_play_adaptive_visual_lens_list_response/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.post("/adaptive-visual-lens/evaluate", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const body = readStagePlayJsonBody(req, res, "tool_evidence");
+    if (!body) return;
+    const sourceId =
+      readQueryString(body.sourceId) ??
+      readQueryString(body.source_id) ??
+      readQueryString(req.query.sourceId) ??
+      readQueryString(req.query.source_id);
+    if (!sourceId) {
+      return stagePlayJsonError(res, 400, {
+        schema: "stage_play_adaptive_visual_lens_evaluate_response/v1",
+        error: "missing_source",
+        message: "sourceId/source_id is required for adaptive visual lens evaluation.",
+        contextRole: "tool_evidence",
+      });
+    }
+    const proposal = evaluateStagePlayAdaptiveVisualLens({
+      threadId:
+        readQueryString(body.threadId) ??
+        readQueryString(body.thread_id) ??
+        readQueryString(req.query.threadId) ??
+        readQueryString(req.query.thread_id),
+      sourceId,
+      limit: readOptionalNumber(body.limit) ?? readOptionalNumber(req.query.limit) ?? 5,
+    });
+    return res.json({
+      ok: true,
+      schema: "stage_play_adaptive_visual_lens_evaluate_response/v1",
+      proposal,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-adaptive-visual-lens-evaluate-failed",
+      err,
+      schema: "stage_play_adaptive_visual_lens_evaluate_response/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.post("/adaptive-visual-lens/apply", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const body = readStagePlayJsonBody(req, res, "tool_evidence");
+    if (!body) return;
+    const proposalId =
+      readQueryString(body.proposalId) ??
+      readQueryString(body.proposal_id) ??
+      readQueryString(req.query.proposalId) ??
+      readQueryString(req.query.proposal_id);
+    const sourceId =
+      readQueryString(body.sourceId) ??
+      readQueryString(body.source_id) ??
+      readQueryString(req.query.sourceId) ??
+      readQueryString(req.query.source_id);
+    if (!proposalId || !sourceId) {
+      return stagePlayJsonError(res, 400, {
+        schema: "stage_play_adaptive_visual_lens_apply_result/v1",
+        error: "missing_proposal_or_source",
+        message: "proposalId/proposal_id and sourceId/source_id are required.",
+        contextRole: "tool_evidence",
+      });
+    }
+    const result = applyStagePlayAdaptiveVisualLensProposal({
+      proposalId,
+      sourceId,
+      minConfidence: readOptionalNumber(body.minConfidence ?? body.min_confidence) ?? undefined,
+    });
+    return res.json({
+      ok: result.applied,
+      schema: "stage_play_adaptive_visual_lens_apply_response/v1",
+      result,
+      profile: result.profile,
+      applied: result.applied,
+      reason: result.reason,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-adaptive-visual-lens-apply-failed",
+      err,
+      schema: "stage_play_adaptive_visual_lens_apply_response/v1",
       contextRole: "tool_evidence",
     });
   }

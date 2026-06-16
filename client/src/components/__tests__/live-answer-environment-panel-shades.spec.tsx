@@ -126,6 +126,23 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).not.toContain("selectedMicroPromptPreview");
   });
 
+  it("gates adaptive expert lens evaluation behind the adaptive visual mail preset", () => {
+    const source = panelSource();
+
+    expect(source).toContain("ADAPTIVE_VISUAL_LENS_CONTROLLER_PRESET_ID");
+    expect(source).toContain("selectedMicroReasonerPromptPresetId === ADAPTIVE_VISUAL_LENS_CONTROLLER_PRESET_ID");
+    expect(source).toContain('data-testid="live-answer-adaptive-visual-lens"');
+    expect(source).toContain("Adaptive Expert Lens");
+    expect(source).toContain("mail reasoning -&gt; capture prompt suggestion");
+    expect(source).toContain('aria-label="Evaluate adaptive visual lens"');
+    expect(source).toContain('aria-label="Apply adaptive visual lens suggested shade"');
+    expect(source).toContain("/api/helix/stage-play/adaptive-visual-lens/evaluate");
+    expect(source).toContain("/api/helix/stage-play/adaptive-visual-lens/apply");
+    expect(source).toContain("adaptiveVisualLensCanApply");
+    expect(source).toContain("adaptiveVisualLensProposal.microReasonerRunRefs");
+    expect(source).toContain("setSelectedVisualObserverProfileId(profile.profileId)");
+  });
+
   it("renders a local-only last-frame preview in the visual capture source panel", () => {
     const source = panelSource();
 

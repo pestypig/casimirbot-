@@ -12,6 +12,9 @@ import {
   STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA,
   STAGE_PLAY_MICRO_REASONER_PROMPT_SCHEMA,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
+import {
+  ADAPTIVE_VISUAL_LENS_CONTROLLER_PRESET_ID,
+} from "@shared/contracts/stage-play-adaptive-visual-lens.v1";
 
 const promptsById = new Map<string, StagePlayMicroReasonerPromptV1>();
 const promptPresetsById = new Map<string, StagePlayMicroReasonerPromptPresetV1>();
@@ -1421,6 +1424,26 @@ const DEFAULT_MICRO_REASONER_PROMPT_PRESETS: Array<Omit<StagePlayMicroReasonerPr
     },
     wakeCoalescingPolicy: DEFAULT_WAKE_COALESCING_POLICY,
     outputPolicy: "ask_prompt_delegation",
+    active: true,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  },
+  {
+    artifactId: "stage_play_micro_reasoner_prompt_preset",
+    schemaVersion: STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA,
+    presetId: ADAPTIVE_VISUAL_LENS_CONTROLLER_PRESET_ID,
+    title: "Adaptive Visual Lens Controller",
+    description: "Visual-frame MicroDeck that classifies the observed subject and proposes a capture shade; it does not apply visual capture prompts automatically.",
+    domain: "science_visual",
+    sourceKinds: ["visual_frame"],
+    sourceIds: [],
+    rolePromptIds: {},
+    promptedRoles: ["observation_classifier", "hypothesis_arbiter"],
+    deckRunPlan: "baseline_plus_prompted",
+    baselineRoles: [],
+    wakeCoalescingPolicy: DEFAULT_WAKE_COALESCING_POLICY,
+    outputPolicy: "record_only",
     active: true,
     assistant_answer: false,
     terminal_eligible: false,

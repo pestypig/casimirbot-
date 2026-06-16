@@ -19,6 +19,9 @@ import {
   recordStagePlayMailWakeResult,
   resetStagePlayLiveSourceMailWakeStoreForTest,
 } from "../services/stage-play/stage-play-live-source-mail-wake-store";
+import {
+  ADAPTIVE_VISUAL_LENS_CONTROLLER_PRESET_ID,
+} from "../../shared/contracts/stage-play-adaptive-visual-lens.v1";
 
 describe("stage play micro-reasoner prompt presets", () => {
   beforeEach(() => {
@@ -73,6 +76,33 @@ describe("stage play micro-reasoner prompt presets", () => {
       sourceId: "audio_transcript:test",
       sourceKind: "audio_transcript",
     })?.presetId).toBe("stage_play_micro_reasoner_prompt_preset:earbud-translate-english:v1");
+  });
+
+  it("lists the adaptive visual lens controller only for visual frame sources", () => {
+    const visualPresets = listStagePlayMicroReasonerPromptPresets({
+      sourceId: "visual_source:adaptive",
+      sourceKind: "visual_frame",
+      includePresets: true,
+    });
+    const audioPresets = listStagePlayMicroReasonerPromptPresets({
+      sourceId: "audio_transcript:adaptive",
+      sourceKind: "audio_transcript",
+      includePresets: true,
+    });
+
+    const adaptivePreset = visualPresets.find((preset) => preset.presetId === ADAPTIVE_VISUAL_LENS_CONTROLLER_PRESET_ID);
+
+    expect(adaptivePreset).toMatchObject({
+      title: "Adaptive Visual Lens Controller",
+      sourceKinds: ["visual_frame"],
+      outputPolicy: "record_only",
+      promptedRoles: ["observation_classifier", "hypothesis_arbiter"],
+    });
+    expect(audioPresets.map((preset) => preset.presetId)).not.toContain(ADAPTIVE_VISUAL_LENS_CONTROLLER_PRESET_ID);
+    expect(getActiveStagePlayMicroReasonerPromptPresetForSource({
+      sourceId: "visual_source:adaptive",
+      sourceKind: "visual_frame",
+    })?.presetId).not.toBe(ADAPTIVE_VISUAL_LENS_CONTROLLER_PRESET_ID);
   });
 
   it("applies an earbud translation deck only to audio transcript sources", () => {

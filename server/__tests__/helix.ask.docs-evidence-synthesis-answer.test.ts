@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { arbitrateAskSourceTarget } from "../services/helix-ask/ask-source-target-arbitrator";
 import { buildCommittedAskRoute, committedRouteAllowsTerminalKind } from "../services/helix-ask/committed-ask-route";
 import {
+  buildDocEvidenceSynthesisModelPrompt,
   buildDocEvidenceSynthesisPlan,
   evaluateDocEvidenceSynthesisCoverage,
   materializeDocEvidenceSynthesisAnswer,
@@ -130,6 +131,24 @@ describe("Helix Ask docs evidence synthesis answer", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+  });
+
+  it("builds a model synthesis packet with doc evidence refs and requested output shape", () => {
+    const prompt =
+      "Compare docs/helix-ask-flow.md and docs/helix-ask-codex-loop-discipline.md. Give three differences in what each document is responsible for.";
+    const plan = buildDocEvidenceSynthesisPlan({ turnId, promptText: prompt });
+    const modelPrompt = buildDocEvidenceSynthesisModelPrompt({
+      promptText: prompt,
+      plan,
+      evidenceArtifacts: docsEvidenceArtifacts,
+    });
+
+    expect(modelPrompt).toContain("Required terminal kind: doc_evidence_synthesis_answer");
+    expect(modelPrompt).toContain("Synthesis kind: compare");
+    expect(modelPrompt).toContain("Evidence 1: doc-summary:flow");
+    expect(modelPrompt).toContain("Evidence 2: doc-summary:discipline");
+    expect(modelPrompt).toContain("Give the requested comparison");
+    expect(modelPrompt).toContain("Use only the document observations below");
   });
 
   it("lets terminal authority select the materialized docs synthesis answer", () => {
@@ -318,5 +337,39 @@ describe("Helix Ask docs evidence synthesis answer", () => {
     expect(result.ok).toBe(false);
     expect(result.blocked_reason).toBe("doc_evidence_coverage_missing");
     expect(result.coverage.missing_requirements).toEqual(expect.arrayContaining(["multi_doc_coverage"]));
+  });
+
+  it("does not materialize a model draft without doc support refs", () => {
+    const prompt =
+      "Compare docs/helix-ask-flow.md and docs/helix-ask-codex-loop-discipline.md.";
+    const payload: Record<string, unknown> = synthesisPayload(prompt);
+    const finalDraft = {
+      artifact_id: "draft:no-refs",
+      turn_id: turnId,
+      kind: "final_answer_draft",
+      payload: {
+        schema: "helix.final_answer_draft.v1",
+        artifact_id: "draft:no-refs",
+        text: "Flow explains routing, while discipline explains runtime boundaries.",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+
+    const result = materializeDocEvidenceSynthesisAnswer({
+      turnId,
+      promptText: prompt,
+      payload,
+      artifactLedger: [...docsEvidenceArtifacts, finalDraft],
+      answerText: "Flow explains routing, while discipline explains runtime boundaries.",
+      finalAnswerDraftRef: "draft:no-refs",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.blocked_reason).toBe("doc_evidence_coverage_missing");
+    expect(result.coverage.support_refs_count).toBe(0);
+    expect(result.coverage.missing_requirements).toEqual(
+      expect.arrayContaining(["final_answer_draft_doc_support_refs"]),
+    );
   });
 });

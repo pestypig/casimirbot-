@@ -38,6 +38,11 @@ import type {
   StagePlayMicroReasonerPromptV1,
   StagePlayLiveSourceMailSourceKindV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
+import {
+  ADAPTIVE_VISUAL_LENS_CONTROLLER_PRESET_ID,
+  type StagePlayAdaptiveVisualLensApplyResultV1,
+  type StagePlayAdaptiveVisualLensProposalV1,
+} from "@shared/contracts/stage-play-adaptive-visual-lens.v1";
 import type { StagePlayVisualObserverProfileV1 } from "@shared/contracts/stage-play-visual-observer-profile.v1";
 import type { HelixVisualFrameActionReplayRequest } from "@shared/helix-visual-frame-action-replay";
 import type { HelixLiveWorkerLane } from "@shared/helix-live-worker-lane";
@@ -405,6 +410,16 @@ type MicroReasonerPromptPresetListRead = {
 type StagePlayLiveSourceMailRead = {
   microReasonerRuns?: StagePlayMicroReasonerRunV1[];
   micro_reasoner_runs?: StagePlayMicroReasonerRunV1[];
+};
+
+type AdaptiveVisualLensRead = {
+  latestProposal?: StagePlayAdaptiveVisualLensProposalV1 | null;
+  latest_proposal?: StagePlayAdaptiveVisualLensProposalV1 | null;
+  proposal?: StagePlayAdaptiveVisualLensProposalV1 | null;
+  result?: StagePlayAdaptiveVisualLensApplyResultV1 | null;
+  profile?: StagePlayVisualObserverProfileV1 | null;
+  applied?: boolean;
+  reason?: string;
 };
 
 type EarbudMicroReasonerOutput = {
@@ -781,6 +796,9 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [activeMicroReasonerPromptPreset, setActiveMicroReasonerPromptPreset] = useState<StagePlayMicroReasonerPromptPresetV1 | null>(null);
   const [microReasonerPrompts, setMicroReasonerPrompts] = useState<StagePlayMicroReasonerPromptV1[]>([]);
   const [selectedMicroReasonerPromptPresetId, setSelectedMicroReasonerPromptPresetId] = useState<string>("");
+  const [adaptiveVisualLensProposal, setAdaptiveVisualLensProposal] = useState<StagePlayAdaptiveVisualLensProposalV1 | null>(null);
+  const [adaptiveVisualLensRunning, setAdaptiveVisualLensRunning] = useState(false);
+  const [adaptiveVisualLensError, setAdaptiveVisualLensError] = useState<string | null>(null);
   const [earbudMicroReasonerPromptPresets, setEarbudMicroReasonerPromptPresets] = useState<StagePlayMicroReasonerPromptPresetV1[]>([]);
   const [activeEarbudMicroReasonerPromptPreset, setActiveEarbudMicroReasonerPromptPreset] = useState<StagePlayMicroReasonerPromptPresetV1 | null>(null);
   const [earbudMicroReasonerPrompts, setEarbudMicroReasonerPrompts] = useState<StagePlayMicroReasonerPromptV1[]>([]);
@@ -1301,6 +1319,20 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const earbudMicroReasonerPresetStatus = activeEarbudMicroReasonerPromptPreset
     ? `${activeEarbudMicroReasonerPromptPreset.title} ${activeAudioTranscriptSourceId && activeEarbudMicroReasonerPromptPreset.sourceIds.includes(activeAudioTranscriptSourceId) ? "applied" : "available"}; ${activeEarbudMicroReasonerPromptPreset.outputPolicy}`
     : "Earbud translation presets are available after audio transcript routing loads.";
+  const adaptiveVisualLensSelected = selectedMicroReasonerPromptPresetId === ADAPTIVE_VISUAL_LENS_CONTROLLER_PRESET_ID;
+  const adaptiveVisualLensCanApply = Boolean(
+    adaptiveVisualLensSelected &&
+      adaptiveVisualLensProposal?.applyable &&
+      adaptiveVisualLensProposal.decision === "suggest_profile" &&
+      adaptiveVisualLensProposal.sourceId === activeVisualSourceId,
+  );
+  const adaptiveVisualLensSuggestedPrompt =
+    adaptiveVisualLensProposal?.suggestedProfileDraft?.prompt ??
+    (adaptiveVisualLensProposal?.candidateProfileId
+      ? visualShadeProfiles.find((profile: StagePlayVisualObserverProfileV1) =>
+        profile.profileId === adaptiveVisualLensProposal.candidateProfileId)?.prompt
+      : null) ??
+    "";
   const selectedEarbudMicroPromptPreview = useMemo(
     () => selectedEarbudMicroReasonerPromptPreset
       ? earbudMicroReasonerPrompts
@@ -1523,6 +1555,19 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             ? microReasonerPromptPresetBody.microReasonerPrompts
             : [],
       );
+      if (visualSourceId) {
+        const adaptiveVisualLensBody: AdaptiveVisualLensRead = await fetch(
+          `/api/helix/stage-play/adaptive-visual-lens?threadId=${encodeURIComponent(threadId)}&sourceId=${encodeURIComponent(visualSourceId)}&limit=1`,
+        ).then((response) => response.ok ? response.json() : {}).catch(() => ({}));
+        setAdaptiveVisualLensProposal(
+          adaptiveVisualLensBody.latestProposal ??
+            adaptiveVisualLensBody.latest_proposal ??
+            adaptiveVisualLensBody.proposal ??
+            null,
+        );
+      } else {
+        setAdaptiveVisualLensProposal(null);
+      }
       const earbudMicroDeckSourceId =
         audioTranscriptSourceIdRef.current ??
         audioTranscriptSourceId ??
@@ -2231,6 +2276,73 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       await refresh();
     } catch (error) {
       setLastActionStatus(error instanceof Error ? error.message : "visual_observer_profile_apply_failed");
+    }
+  };
+
+  const evaluateAdaptiveVisualLens = async () => {
+    if (!adaptiveVisualLensSelected) {
+      setLastActionStatus("Select the Adaptive Visual Lens Controller preset before evaluating an adaptive shade.");
+      return;
+    }
+    if (!activeVisualSourceId) {
+      setLastActionStatus("Adaptive lens evaluation needs an active visual source.");
+      return;
+    }
+    setAdaptiveVisualLensRunning(true);
+    setAdaptiveVisualLensError(null);
+    try {
+      const response: AdaptiveVisualLensRead = await postJson("/api/helix/stage-play/adaptive-visual-lens/evaluate", {
+        threadId,
+        sourceId: activeVisualSourceId,
+        limit: 5,
+      });
+      const proposal = response?.proposal ?? response?.latestProposal ?? response?.latest_proposal ?? null;
+      setAdaptiveVisualLensProposal(proposal);
+      setLastActionStatus(
+        proposal
+          ? `Adaptive lens evaluated ${proposal.recognizedSubject}; ${proposal.decision}.`
+          : "Adaptive lens evaluation returned no proposal.",
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "adaptive_visual_lens_evaluate_failed";
+      setAdaptiveVisualLensError(message);
+      setLastActionStatus(message);
+    } finally {
+      setAdaptiveVisualLensRunning(false);
+    }
+  };
+
+  const applyAdaptiveVisualLensSuggestion = async () => {
+    if (!adaptiveVisualLensCanApply || !adaptiveVisualLensProposal || !activeVisualSourceId) {
+      setLastActionStatus("Adaptive lens suggestion is not ready to apply.");
+      return;
+    }
+    setAdaptiveVisualLensRunning(true);
+    setAdaptiveVisualLensError(null);
+    try {
+      const response: AdaptiveVisualLensRead = await postJson("/api/helix/stage-play/adaptive-visual-lens/apply", {
+        proposalId: adaptiveVisualLensProposal.proposalId,
+        sourceId: activeVisualSourceId,
+      });
+      const result = response?.result ?? null;
+      const profile = result?.profile ?? response?.profile ?? null;
+      if (profile?.profileId) {
+        setSelectedVisualObserverProfileId(profile.profileId);
+        setVisualShadePromptDraft(profile.prompt);
+        setVisualShadePromptBaseProfileId(profile.profileId);
+      }
+      setLastActionStatus(
+        result?.applied || response?.applied
+          ? `${profile?.title ?? "Adaptive shade"} applied to ${activeVisualSourceId}.`
+          : `Adaptive lens apply blocked: ${result?.reason ?? response?.reason ?? "unknown"}.`,
+      );
+      await refresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "adaptive_visual_lens_apply_failed";
+      setAdaptiveVisualLensError(message);
+      setLastActionStatus(message);
+    } finally {
+      setAdaptiveVisualLensRunning(false);
     }
   };
 
@@ -3478,6 +3590,103 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
               </div>
             ))}
           </div>
+          {adaptiveVisualLensSelected ? (
+            <div className="mt-2 rounded border border-emerald-300/25 bg-emerald-950/10 p-2" data-testid="live-answer-adaptive-visual-lens">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase text-emerald-100">Adaptive Expert Lens</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">
+                    mail reasoning -&gt; capture prompt suggestion
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    aria-label="Evaluate adaptive visual lens"
+                    onClick={() => void evaluateAdaptiveVisualLens()}
+                    disabled={adaptiveVisualLensRunning || !activeVisualSourceId}
+                    className="rounded border border-emerald-300/35 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-100 hover:bg-emerald-400/10 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {adaptiveVisualLensRunning ? "Evaluating" : "Evaluate"}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Apply adaptive visual lens suggested shade"
+                    onClick={() => void applyAdaptiveVisualLensSuggestion()}
+                    disabled={adaptiveVisualLensRunning || !adaptiveVisualLensCanApply}
+                    className="rounded border border-violet-300/35 px-2.5 py-1.5 text-[11px] font-semibold text-violet-100 hover:bg-violet-400/10 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    Apply suggested shade
+                  </button>
+                </div>
+              </div>
+              <div className="mt-2 grid gap-2 md:grid-cols-2">
+                <div className="rounded border border-white/10 bg-black/20 p-2">
+                  <div className="grid gap-x-3 gap-y-1 text-[10px] md:grid-cols-2">
+                    <div className="min-w-0">
+                      <span className="uppercase text-slate-500">Active shade</span>{" "}
+                      <span className="break-all font-mono text-slate-300">{adaptiveVisualLensProposal?.activeProfileTitle ?? activeVisualObserverProfile?.title ?? "none"}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <span className="uppercase text-slate-500">Subject</span>{" "}
+                      <span className="break-all font-mono text-slate-300">{adaptiveVisualLensProposal?.recognizedSubject ?? "not evaluated"}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <span className="uppercase text-slate-500">Confidence</span>{" "}
+                      <span className="break-all font-mono text-slate-300">
+                        {adaptiveVisualLensProposal ? adaptiveVisualLensProposal.recognizedSubjectConfidence.toFixed(2) : "none"}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      <span className="uppercase text-slate-500">Drift</span>{" "}
+                      <span className="break-all font-mono text-slate-300">{adaptiveVisualLensProposal?.driftState ?? "unknown"}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <span className="uppercase text-slate-500">Decision</span>{" "}
+                      <span className="break-all font-mono text-slate-300">{adaptiveVisualLensProposal?.decision ?? "not evaluated"}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <span className="uppercase text-slate-500">Suggested shade</span>{" "}
+                      <span className="break-all font-mono text-slate-300">{adaptiveVisualLensProposal?.candidateProfileTitle ?? adaptiveVisualLensProposal?.suggestedProfileDraft?.title ?? "none"}</span>
+                    </div>
+                  </div>
+                  {adaptiveVisualLensProposal?.reason ? (
+                    <p className="mt-2 text-[11px] leading-5 text-emerald-100">{adaptiveVisualLensProposal.reason}</p>
+                  ) : (
+                    <p className="mt-2 text-[11px] text-slate-500">
+                      Evaluation waits for recent visual mail from the selected source.
+                    </p>
+                  )}
+                  {adaptiveVisualLensError ? (
+                    <p className="mt-2 rounded border border-rose-300/20 bg-rose-950/10 px-2 py-1.5 text-[11px] text-rose-100">
+                      {adaptiveVisualLensError}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="rounded border border-white/10 bg-black/20 p-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[10px] font-semibold uppercase text-slate-300">Suggested capture prompt</p>
+                    <span className="font-mono text-[10px] text-slate-500">
+                      {adaptiveVisualLensProposal?.candidateProfilePromptHash ?? "no hash"}
+                    </span>
+                  </div>
+                  <pre className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap rounded border border-white/10 bg-slate-950/60 p-2 font-mono text-[10px] leading-4 text-slate-300">
+                    {adaptiveVisualLensSuggestedPrompt || "Run Evaluate to prepare a suggested shade prompt."}
+                  </pre>
+                  {adaptiveVisualLensProposal?.evidenceRefs.length ? (
+                    <p className="mt-2 line-clamp-2 break-all font-mono text-[10px] text-slate-500">
+                      refs {adaptiveVisualLensProposal.evidenceRefs.slice(0, 6).join(" / ")}
+                    </p>
+                  ) : null}
+                  {adaptiveVisualLensProposal?.microReasonerRunRefs.length ? (
+                    <p className="mt-1 line-clamp-2 break-all font-mono text-[10px] text-emerald-200/80">
+                      microdeck {adaptiveVisualLensProposal.microReasonerRunRefs.slice(0, 4).join(" / ")}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
         <div className="order-5 mt-3 rounded border border-violet-300/20 bg-violet-950/10 px-2 py-2">
           <div className="flex flex-wrap items-start justify-between gap-3">
