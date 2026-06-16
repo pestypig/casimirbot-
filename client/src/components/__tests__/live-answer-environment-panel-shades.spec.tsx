@@ -40,7 +40,8 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
 
     expect(source).toContain('<div className="hidden">');
     expect(source).toContain('className="order-30 mt-3 rounded border border-white/10 bg-slate-950/60 p-3"');
-    expect(source).toContain('className="order-2 mt-3 flex flex-wrap gap-1.5"');
+    expect(source).toContain('className="mt-3 flex flex-wrap gap-1.5"');
+    expect(source.indexOf("Route screen share to")).toBeLessThan(source.indexOf("Visual capture source"));
     expect(source).toContain('className="order-5 mt-3 rounded border border-violet-300/20 bg-violet-950/10 px-2 py-2"');
     expect(source).toContain('className="order-6 mt-3 rounded border border-teal-300/20 bg-teal-950/10 p-2"');
     expect(source).toContain('className="order-7 mt-3 rounded border border-violet-300/20 bg-violet-950/10 p-2"');

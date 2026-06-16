@@ -2532,6 +2532,84 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           <button type="button" onClick={() => void refresh()} className="rounded border border-cyan-300/30 px-2 py-1 text-[11px] text-cyan-100 hover:bg-cyan-400/10">Refresh</button>
         </div>
       </div>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        <fieldset
+          aria-label="Visual capture route"
+          className="inline-flex flex-wrap items-center gap-1 rounded border border-white/10 bg-black/20 px-2 py-1 text-[11px] text-slate-300"
+        >
+          <span className="mr-1 text-slate-400">Route screen share to</span>
+          {([
+            ["live_answer", "Live Answer visual"],
+            ["image_lens", "Image Lens"],
+            ["audio_transcript", "Audio transcript"],
+          ] as const).map(([route, label]) => (
+            <label key={route} className="inline-flex items-center gap-1 rounded border border-white/10 bg-slate-950/70 px-1.5 py-0.5 text-slate-100">
+              <input
+                type="checkbox"
+                checked={visualCaptureRoutes.includes(route)}
+                onChange={() => toggleVisualCaptureRoute(route)}
+                aria-label={`Route screen share to ${label}`}
+                className="h-3 w-3 accent-cyan-300"
+              />
+              {label}
+            </label>
+          ))}
+        </fieldset>
+        <button
+          type="button"
+          onClick={() => void startVisualCaptureByRoute()}
+          disabled={selectedRouteCount === 0}
+          className="rounded border border-sky-300/30 px-2 py-1 text-[11px] text-sky-100 hover:bg-sky-400/10 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          {routeAudioTranscript || routeImageLens
+            ? audioRouteNeedsFreshShare ? "Restart selected live sources" : "Start selected live sources"
+            : visualLatest?.source ? "Grant visual capture + first frame" : "Register + first frame"}
+        </button>
+        <button
+          type="button"
+          onClick={() => void captureVisualFrameNow()}
+          className="rounded border border-emerald-300/30 px-2 py-1 text-[11px] text-emerald-100 hover:bg-emerald-400/10 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          {visualSourceCapability?.next_required_action === "capture_first_frame" ? "Capture first frame" : "Capture now"}
+        </button>
+        <button
+          type="button"
+          onClick={() => void startVisualInterval(10_000)}
+          className="rounded border border-cyan-300/30 px-2 py-1 text-[11px] text-cyan-100 hover:bg-cyan-400/10"
+        >
+          Set interval 10s
+        </button>
+        <button
+          type="button"
+          onClick={() => void startVisualInterval(30_000)}
+          className="rounded border border-cyan-300/30 px-2 py-1 text-[11px] text-cyan-100 hover:bg-cyan-400/10"
+        >
+          Set interval 30s
+        </button>
+        <button
+          type="button"
+          onClick={() => void pauseVisualInterval()}
+          disabled={!visualProducerState?.interval_active}
+          className="rounded border border-amber-300/30 px-2 py-1 text-[11px] text-amber-100 hover:bg-amber-400/10 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          Pause interval, keep sharing
+        </button>
+        <button
+          type="button"
+          onClick={() => void stopVisualSharing()}
+          disabled={!visualProducerState?.stream_active && !activeAudioTranscriptSourceId}
+          className="rounded border border-rose-300/30 px-2 py-1 text-[11px] text-rose-100 hover:bg-rose-400/10 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          Stop sharing
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("interpreted_log")}
+          className="rounded border border-white/15 px-2 py-1 text-[11px] text-slate-200 hover:bg-white/10"
+        >
+          Go to log
+        </button>
+      </div>
       {lastActionStatus ? (
         <p className="mt-2 rounded border border-white/10 bg-black/20 px-2 py-1 text-[11px] text-slate-300">
           {lastActionStatus}
@@ -3193,84 +3271,6 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
               Replay results will appear here without replacing the live capture carousel.
             </p>
           )}
-        </div>
-        <div className="order-2 mt-3 flex flex-wrap gap-1.5">
-          <fieldset
-            aria-label="Visual capture route"
-            className="inline-flex flex-wrap items-center gap-1 rounded border border-white/10 bg-black/20 px-2 py-1 text-[11px] text-slate-300"
-          >
-            <span className="mr-1 text-slate-400">Route screen share to</span>
-            {([
-              ["live_answer", "Live Answer visual"],
-              ["image_lens", "Image Lens"],
-              ["audio_transcript", "Audio transcript"],
-            ] as const).map(([route, label]) => (
-              <label key={route} className="inline-flex items-center gap-1 rounded border border-white/10 bg-slate-950/70 px-1.5 py-0.5 text-slate-100">
-                <input
-                  type="checkbox"
-                  checked={visualCaptureRoutes.includes(route)}
-                  onChange={() => toggleVisualCaptureRoute(route)}
-                  aria-label={`Route screen share to ${label}`}
-                  className="h-3 w-3 accent-cyan-300"
-                />
-                {label}
-              </label>
-            ))}
-          </fieldset>
-          <button
-            type="button"
-            onClick={() => void startVisualCaptureByRoute()}
-            disabled={selectedRouteCount === 0}
-            className="rounded border border-sky-300/30 px-2 py-1 text-[11px] text-sky-100 hover:bg-sky-400/10 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            {routeAudioTranscript || routeImageLens
-              ? audioRouteNeedsFreshShare ? "Restart selected live sources" : "Start selected live sources"
-              : visualLatest?.source ? "Grant visual capture + first frame" : "Register + first frame"}
-          </button>
-          <button
-            type="button"
-            onClick={() => void captureVisualFrameNow()}
-            className="rounded border border-emerald-300/30 px-2 py-1 text-[11px] text-emerald-100 hover:bg-emerald-400/10 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            {visualSourceCapability?.next_required_action === "capture_first_frame" ? "Capture first frame" : "Capture now"}
-          </button>
-          <button
-            type="button"
-            onClick={() => void startVisualInterval(10_000)}
-            className="rounded border border-cyan-300/30 px-2 py-1 text-[11px] text-cyan-100 hover:bg-cyan-400/10"
-          >
-            Set interval 10s
-          </button>
-          <button
-            type="button"
-            onClick={() => void startVisualInterval(30_000)}
-            className="rounded border border-cyan-300/30 px-2 py-1 text-[11px] text-cyan-100 hover:bg-cyan-400/10"
-          >
-            Set interval 30s
-          </button>
-          <button
-            type="button"
-            onClick={() => void pauseVisualInterval()}
-            disabled={!visualProducerState?.interval_active}
-            className="rounded border border-amber-300/30 px-2 py-1 text-[11px] text-amber-100 hover:bg-amber-400/10 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            Pause interval, keep sharing
-          </button>
-          <button
-            type="button"
-            onClick={() => void stopVisualSharing()}
-            disabled={!visualProducerState?.stream_active && !activeAudioTranscriptSourceId}
-            className="rounded border border-rose-300/30 px-2 py-1 text-[11px] text-rose-100 hover:bg-rose-400/10 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            Stop sharing
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("interpreted_log")}
-            className="rounded border border-white/15 px-2 py-1 text-[11px] text-slate-200 hover:bg-white/10"
-          >
-            Go to log
-          </button>
         </div>
         <div className="order-5 mt-3 rounded border border-violet-300/20 bg-violet-950/10 px-2 py-2">
           <div className="flex flex-wrap items-start justify-between gap-3">
