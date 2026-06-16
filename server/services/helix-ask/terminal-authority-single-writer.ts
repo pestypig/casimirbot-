@@ -859,10 +859,17 @@ export function applyHelixTerminalAuthoritySingleWriter(
     draftMaterialization?.ok === true &&
     hasAcceptedObservation &&
     isStaleModelOnlyNoObservationText(latestDraftCandidateForStaleCheck?.text);
+  const canonicalGoal = readRecord(input.payload.canonical_goal_frame);
+  const docsDraftMaterializationMatchesRequiredGoal =
+    draftMaterialization?.ok === true &&
+    !materializedDraftRejectedForStaleObservation &&
+    draftMaterialization.materialized_terminal_artifact_kind === "doc_evidence_synthesis_answer" &&
+    readString(canonicalGoal?.goal_kind) === "doc_evidence_synthesis" &&
+    readString(canonicalGoal?.required_terminal_kind) === "doc_evidence_synthesis_answer";
   const usableDraftMaterialization =
     draftMaterialization?.ok === true &&
     !materializedDraftRejectedForStaleObservation &&
-    itineraryObservationCriteriaSatisfied;
+    (itineraryObservationCriteriaSatisfied || docsDraftMaterializationMatchesRequiredGoal);
   if (draftMaterialization) {
     input.payload.final_answer_draft_selection = {
       candidate_count: artifacts.filter(isFinalAnswerDraft).length,
@@ -922,6 +929,9 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const docsTerminalMaterialized =
     usableDraftMaterialization &&
     draftMaterialization.materialized_terminal_artifact_kind === "doc_evidence_synthesis_answer";
+  const docsTerminalMatchesRequiredGoal =
+    docsTerminalMaterialized &&
+    docsDraftMaterializationMatchesRequiredGoal;
   const latestDraftForContinuation = findLatestFinalAnswerDraftCandidate(artifacts);
   const stagePlayTerminalMaterialized =
     usableDraftMaterialization &&
@@ -931,6 +941,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     !(
       (repoTerminalMaterialized && goalAllowsTerminal) ||
       (docsTerminalMaterialized && goalAllowsTerminal) ||
+      docsTerminalMatchesRequiredGoal ||
       (scholarlyTerminalMaterialized && goalAllowsTerminal) ||
       (stagePlayTerminalMaterialized && goalAllowsTerminal)
     );
@@ -957,6 +968,11 @@ export function applyHelixTerminalAuthoritySingleWriter(
     rejectedCandidates.push({
       kind: "typed_failure",
       reason: "stale_solver_continuation_superseded_by_docs_terminal",
+    });
+  } else if (rawSolverContinuationPending && docsTerminalMatchesRequiredGoal) {
+    rejectedCandidates.push({
+      kind: "typed_failure",
+      reason: "stale_solver_continuation_superseded_by_required_docs_terminal",
     });
   } else if (rawSolverContinuationPending && scholarlyTerminalMaterialized && goalAllowsTerminal) {
     rejectedCandidates.push({
@@ -1014,7 +1030,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     routeContractRequiresInternetSearchAnswer(input.payload) &&
     artifacts.some((artifact) => /internet_search_observation/i.test([artifactKind(artifact), artifactSchema(artifact)].join(" ")));
 
-  if (draftMaterialization?.ok === true && !itineraryObservationCriteriaSatisfied) {
+  if (draftMaterialization?.ok === true && !itineraryObservationCriteriaSatisfied && !docsDraftMaterializationMatchesRequiredGoal) {
     rejectedCandidates.push({
       ref: draftMaterialization.materialized_terminal_artifact_ref ?? draftMaterialization.final_answer_draft_ref ?? undefined,
       kind: draftMaterialization.materialized_terminal_artifact_kind ?? "model_synthesized_answer",

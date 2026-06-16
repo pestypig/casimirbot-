@@ -960,6 +960,17 @@ export function goalSatisfactionAllowsTerminal(payload: Record<string, unknown>)
   if (terminalKind === "typed_failure") return hasCleanTypedFailure(payload);
   if (livePipelineReceiptTerminalAllowed(payload)) return true;
   if (satisfaction === "satisfied" && (!nextDecision || nextDecision === "allow_terminal")) return true;
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  const docsSynthesisAnswer = readRecord(payload.doc_evidence_synthesis_answer);
+  if (
+    terminalKind === "doc_evidence_synthesis_answer" &&
+    readString(canonicalGoal?.goal_kind) === "doc_evidence_synthesis" &&
+    readString(canonicalGoal?.required_terminal_kind) === "doc_evidence_synthesis_answer" &&
+    readString(docsSynthesisAnswer?.terminal_artifact_kind) === "doc_evidence_synthesis_answer" &&
+    readString(docsSynthesisAnswer?.answer_text)
+  ) {
+    return true;
+  }
   const bridge = readRecord(payload.post_tool_authority_bridge);
   if (
     terminalKind === "model_synthesized_answer" &&

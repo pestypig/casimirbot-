@@ -95,6 +95,21 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
     readString(input.payload?.goal_kind);
   const terminalKind = readString(input.payload?.terminal_artifact_kind);
   const finalAnswerSource = readString(input.payload?.final_answer_source);
+  const latestDraftPayload = [...(input.artifactLedger ?? [])]
+    .reverse()
+    .map((artifact) => readRecord(artifact?.payload))
+    .find((payload) =>
+      readString(payload?.kind) === "final_answer_draft" ||
+      readString(payload?.schema) === "helix.final_answer_draft.v1",
+    );
+  const draftGoalKind = readString(latestDraftPayload?.goal_kind);
+  const draftRequiredTerminalKind = readString(latestDraftPayload?.required_terminal_kind);
+  if (
+    draftGoalKind === "doc_evidence_synthesis" ||
+    draftRequiredTerminalKind === "doc_evidence_synthesis_answer"
+  ) {
+    return "docs_source";
+  }
   const routeText = [
     sourceTarget,
     goalKind,

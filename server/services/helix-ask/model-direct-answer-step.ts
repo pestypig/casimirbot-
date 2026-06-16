@@ -10,6 +10,26 @@ const readString = (value: unknown): string =>
 
 const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
 
+const normalizeRuntimeDecisionAuthority = (value: unknown): "llm" | "deterministic_policy_fallback" => {
+  const text = readString(value);
+  return text === "llm" || text === "model"
+    ? "llm"
+    : "deterministic_policy_fallback";
+};
+
+const normalizeRuntimeLoopIterationDecisionAuthority = (iteration: unknown): unknown => {
+  const record = readRecord(iteration);
+  if (!record) return iteration;
+  const authority = normalizeRuntimeDecisionAuthority(
+    record.decision_source ?? record.decision_authority ?? record.decisionAuthority ?? record.sampling_mode,
+  );
+  return {
+    ...record,
+    decision_source: authority,
+    decision_authority: authority,
+  };
+};
+
 const hashShort = (value: unknown): string =>
   crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16);
 
@@ -205,7 +225,7 @@ export function applyModelDirectAnswerDraftStep(input: {
   const authority = input.authority ?? "model";
   const payload = input.payload ?? {};
   const existingLoop = readRecord(payload.agent_runtime_loop);
-  const existingIterations = readArray(existingLoop?.iterations);
+  const existingIterations = readArray(existingLoop?.iterations).map(normalizeRuntimeLoopIterationDecisionAuthority);
   const decisionId =
     readString(input.agentStepDecision.decision_id) ||
     `agent_step_decision:${hashShort([input.turnId, input.promptText, existingIterations.length])}`;
@@ -246,8 +266,10 @@ export function applyModelDirectAnswerDraftStep(input: {
     decision_id: decisionId,
     next_step: "answer",
     chosen_capability: "model.direct_answer",
-    decision_authority: authority,
+    decision_source: normalizeRuntimeDecisionAuthority(authority),
+    decision_authority: normalizeRuntimeDecisionAuthority(authority),
   };
+  const runtimeDecisionAuthority = normalizeRuntimeDecisionAuthority(authority);
 
   const answerIteration = {
     iteration_index: existingIterations.length,
@@ -256,7 +278,8 @@ export function applyModelDirectAnswerDraftStep(input: {
     next_step: "answer",
     chosen_capability: "model.direct_answer",
     decision_timing: "terminal_review",
-    decision_authority: authority,
+    decision_source: runtimeDecisionAuthority,
+    decision_authority: runtimeDecisionAuthority,
     observation_role: "model_answer_draft",
     artifact_refs: [directAnswerArtifactId, finalDraftArtifactId],
     observed_artifact_refs: [directAnswerArtifactId, finalDraftArtifactId],

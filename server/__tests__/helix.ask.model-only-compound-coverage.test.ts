@@ -95,6 +95,84 @@ const installCoverage = (payload: Record<string, unknown>, turnId: string) => {
 };
 
 describe("model-only compound coverage from answer artifacts", () => {
+  it("records Codex-style decision source and authority on model answer draft iterations", () => {
+    const turnId = "ask:test:model-direct-runtime-authority";
+    const payload = withModelAnswer(turnId, completeAnswer);
+    const loop = payload.agent_runtime_loop as { iterations?: Array<Record<string, unknown>> };
+    const answerIteration = loop.iterations?.find((iteration) => iteration.chosen_capability === "model.direct_answer");
+
+    expect(answerIteration).toMatchObject({
+      decision_source: "llm",
+      decision_authority: "llm",
+      next_step: "answer",
+      observation_role: "model_answer_draft",
+    });
+    expect(payload.agent_step_decision).toMatchObject({
+      decision_source: "llm",
+      decision_authority: "llm",
+      chosen_capability: "model.direct_answer",
+    });
+  });
+
+  it("normalizes preserved runtime loop iterations before appending a model answer draft", () => {
+    const turnId = "ask:test:model-direct-normalizes-existing-loop";
+    const payload = applyModelDirectAnswerDraftStep({
+      turnId,
+      promptText: prompt,
+      payload: {
+        ...basePayload(turnId),
+        agent_runtime_loop: {
+          schema: "helix.agent_runtime_loop.v1",
+          iterations: [
+            {
+              iteration: 1,
+              next_step: "next_action",
+              chosen_capability: "docs-viewer.locate_in_doc",
+              observation_role: "tool_observation",
+            },
+            {
+              iteration: 2,
+              next_step: "answer",
+              chosen_capability: "model.direct_answer",
+              decision_authority: "model",
+              observation_role: "model_answer_draft",
+            },
+          ],
+        },
+      },
+      agentStepDecision: {
+        decision_id: `${turnId}:decision`,
+        next_step: "answer",
+        chosen_capability: "model.direct_answer",
+      },
+      draftText: completeAnswer,
+    });
+    const loop = payload.agent_runtime_loop as { iterations?: Array<Record<string, unknown>> };
+
+    expect(loop.iterations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          chosen_capability: "docs-viewer.locate_in_doc",
+          decision_source: "deterministic_policy_fallback",
+          decision_authority: "deterministic_policy_fallback",
+        }),
+        expect.objectContaining({
+          chosen_capability: "model.direct_answer",
+          decision_source: "llm",
+          decision_authority: "llm",
+        }),
+      ]),
+    );
+    expect(loop.iterations?.every((iteration) =>
+      iteration.decision_source === "llm" ||
+      iteration.decision_source === "deterministic_policy_fallback",
+    )).toBe(true);
+    expect(loop.iterations?.every((iteration) =>
+      iteration.decision_authority === "llm" ||
+      iteration.decision_authority === "deterministic_policy_fallback",
+    )).toBe(true);
+  });
+
   it("passes electron/proton model-only compound coverage from the final draft", () => {
     const turnId = "ask:test:model-only-compound-pass";
     const payload = withModelAnswer(turnId, completeAnswer);

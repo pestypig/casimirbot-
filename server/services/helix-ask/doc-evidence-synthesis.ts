@@ -377,8 +377,19 @@ export function materializeDocEvidenceSynthesisAnswer(input: {
 }): { ok: boolean; answer?: HelixDocEvidenceSynthesisAnswer; coverage: DocEvidenceSynthesisCoverage; blocked_reason?: string } {
   const committedRoute = readRecord(input.payload.committed_ask_route) as HelixCommittedAskRoute | null;
   const goal = readRecord(input.payload.canonical_goal_frame);
-  const goalKind = committedRoute?.canonical_goal.goal_kind ?? readString(goal?.goal_kind);
-  const requiredTerminalKind = committedRoute?.canonical_goal.required_terminal_kind ?? readString(goal?.required_terminal_kind);
+  const draftPayload = input.finalAnswerDraftRef
+    ? input.artifactLedger
+        .map((artifact) => readRecord(artifact.payload))
+        .find((payload) => readString(payload?.artifact_id) === input.finalAnswerDraftRef)
+    : null;
+  const goalKind =
+    committedRoute?.canonical_goal.goal_kind ??
+    readString(goal?.goal_kind) ??
+    readString(draftPayload?.goal_kind);
+  const requiredTerminalKind =
+    committedRoute?.canonical_goal.required_terminal_kind ??
+    readString(goal?.required_terminal_kind) ??
+    readString(draftPayload?.required_terminal_kind);
   const plan = buildDocEvidenceSynthesisPlan({
     turnId: input.turnId,
     promptText: input.promptText,

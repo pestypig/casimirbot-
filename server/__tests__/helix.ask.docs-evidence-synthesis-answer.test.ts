@@ -238,6 +238,152 @@ describe("Helix Ask docs evidence synthesis answer", () => {
     expect(payload.final_answer_source).toBe("final_answer_draft");
   });
 
+  it("lets a required docs synthesis terminal supersede a stale solver continuation observation", () => {
+    const prompt =
+      "Locate Patch-Time Contract in docs/helix-ask-codex-loop-discipline.md and turn it into a five-step checklist.";
+    const payload: Record<string, unknown> = synthesisPayload(prompt);
+    const docLocation = {
+      artifact_id: "doc-location:discipline-patch-time-contract",
+      turn_id: turnId,
+      kind: "doc_location_result",
+      payload: {
+        schema: "helix.doc_location_result.v1",
+        path: "/docs/helix-ask-codex-loop-discipline.md",
+        query: "Patch-Time Contract",
+        anchors: ["Patch-Time Contract"],
+        matches: [
+          {
+            anchor: "Patch-Time Contract",
+            evidence_ref: "doc-location:discipline-patch-time-contract#patch-time-contract",
+          },
+        ],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+    payload.solver_continuation_observation = {
+      schema: "helix.solver_continuation_observation.v1",
+      required_next_step: "model.direct_answer",
+      reason: "stale continuation marker from pre-materialization state",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    payload.agent_step_decision = {
+      schema: "helix.agent_step_decision.v1",
+      decision_id: "decision:model-synthesis-after-locate",
+      next_step: "answer",
+      chosen_capability: "model.direct_answer",
+      decision_source: "llm",
+      decision_authority: "llm",
+      decision_timing: "post_observation",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const finalDraft = {
+      artifact_id: "draft:stale-continuation-docs",
+      turn_id: turnId,
+      kind: "final_answer_draft",
+      payload: {
+        schema: "helix.final_answer_draft.v1",
+        artifact_id: "draft:stale-continuation-docs",
+        text: "1. Classify the patch. 2. Keep Codex-owned runtime separate. 3. Preserve route authority. 4. Require evidence re-entry. 5. Terminalize only the route-required artifact.",
+        goal_kind: "doc_evidence_synthesis",
+        required_terminal_kind: "doc_evidence_synthesis_answer",
+        artifact_refs: ["doc-location:discipline-patch-time-contract", "doc-summary:discipline"],
+        support_refs: ["doc-location:discipline-patch-time-contract", "doc-summary:discipline"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+    payload.agent_runtime_loop = {
+      schema: "helix.agent_runtime_loop.v1",
+      iterations: [
+        {
+          decision_id: "decision:locate-patch-time-contract",
+          next_step: "use_tool",
+          chosen_capability: "docs-viewer.locate_in_doc",
+          decision_source: "llm",
+          decision_authority: "llm",
+          executed_action_key: "docs-viewer.locate_in_doc",
+          observed_artifact_refs: ["doc-location:discipline-patch-time-contract"],
+          tool_observation: {
+            status: "completed",
+            ok: true,
+            artifact_id: "doc-location:discipline-patch-time-contract",
+          },
+        },
+        {
+          decision_id: "decision:model-synthesis-after-locate",
+          next_step: "answer",
+          chosen_capability: "model.direct_answer",
+          decision_source: "llm",
+          decision_authority: "llm",
+          observed_artifact_refs: ["draft:stale-continuation-docs"],
+          observation_role: "model_answer_draft",
+        },
+      ],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    payload.current_turn_artifact_ledger = [docLocation, docsEvidenceArtifacts[1], finalDraft];
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId,
+      payload,
+      artifactLedger: [docLocation, docsEvidenceArtifacts[1], finalDraft],
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+    expect(payload.terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect(result.rejected_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "typed_failure",
+          reason: "stale_solver_continuation_superseded_by_required_docs_terminal",
+        }),
+      ]),
+    );
+  });
+
+  it("materializes docs synthesis from a draft-level terminal contract when route surfaces are absent", () => {
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      active_prompt:
+        "Compare docs/helix-ask-flow.md and docs/helix-ask-codex-loop-discipline.md. Give three differences in what each document is responsible for.",
+    };
+    const finalDraft = {
+      artifact_id: "draft:self-routed-docs",
+      turn_id: turnId,
+      kind: "final_answer_draft",
+      payload: {
+        schema: "helix.final_answer_draft.v1",
+        artifact_id: "draft:self-routed-docs",
+        text: "Flow owns the user-facing route sequence; discipline owns the Codex parity boundary.",
+        goal_kind: "doc_evidence_synthesis",
+        required_terminal_kind: "doc_evidence_synthesis_answer",
+        artifact_refs: ["doc-summary:flow", "doc-summary:discipline"],
+        support_refs: ["doc-summary:flow", "doc-summary:discipline"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+
+    const materialized = materializeFinalAnswerDraftTerminal({
+      turnId,
+      payload,
+      artifactLedger: [...docsEvidenceArtifacts, finalDraft],
+    });
+
+    expect(materialized?.ok).toBe(true);
+    expect(materialized?.materialized_terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+    expect(payload.doc_evidence_synthesis_answer).toMatchObject({
+      terminal_artifact_kind: "doc_evidence_synthesis_answer",
+      goal_kind: "doc_evidence_synthesis",
+      support_refs: expect.arrayContaining(["doc-summary:flow", "doc-summary:discipline"]),
+    });
+  });
+
   it("rejects doc_summary as the terminal product for a synthesis route", () => {
     const prompt =
       "Compare docs/helix-ask-flow.md and docs/helix-ask-codex-loop-discipline.md.";
