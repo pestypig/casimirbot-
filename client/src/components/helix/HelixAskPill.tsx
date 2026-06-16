@@ -89,6 +89,8 @@ import {
   getLatestActiveVisualFrameStream,
   runVisualFrameProducerOnce,
 } from "@/lib/helix/visualFrameProducer";
+import type { DisplayAudioTranscriptChunk } from "@/lib/helix/display-audio-capture";
+import { postAudioTranscriptLiveSourceDescriptor } from "@/lib/helix/liveSourceDescriptorClient";
 import {
   createSituationRoomState,
   sourceLabelForSituationSource,
@@ -252,11 +254,14 @@ type HelixAskVisualCaptureRoute = "live_answer" | "image_lens" | "audio_transcri
 
 const HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_STORAGE_KEY = "helix.liveAnswer.visualCaptureRoutes.v1";
 const HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_SYNC_EVENT = "helix:live-answer:visual-capture-routes";
+const HELIX_ASK_THREAD_ID = "helix-ask:desktop";
+const HELIX_ASK_AUDIO_TRANSCRIPT_SOURCE_ID = `audio_transcript:${HELIX_ASK_THREAD_ID}`;
 const HELIX_ASK_DISPLAY_AUDIO_CONSTRAINTS: MediaTrackConstraints = {
   echoCancellation: false,
   noiseSuppression: false,
   autoGainControl: false,
 };
+const HELIX_ASK_DISPLAY_AUDIO_CHUNK_MS = 10_000;
 
 function readHelixAskVisualCaptureAudioPreference(): boolean {
   if (typeof window === "undefined") return false;
@@ -24201,7 +24206,9 @@ export function HelixAskPill({
     }
     void useSituationRoomStore
       .getState()
-      .attachDisplayAudioSource(room?.room_id ?? situationRoomId, "Helix Ask display audio")
+      .attachDisplayAudioSource(room?.room_id ?? situationRoomId, "Helix Ask display audio", {
+        chunkMs: HELIX_ASK_DISPLAY_AUDIO_CHUNK_MS,
+      })
       .then((source) => {
         if (!source || source.status === "error") {
           const message = source?.last_error ?? "Display audio capture failed.";
@@ -24247,10 +24254,66 @@ export function HelixAskPill({
     return response.json().catch(() => null);
   }, []);
 
+  const registerHelixAskAudioTranscriptSource = useCallback(async (input: {
+    roomId?: string | null;
+    stream?: MediaStream | null;
+  } = {}) => {
+    await postSituationJson("/api/agi/situation/audio-source/permission-granted", {
+      source_id: HELIX_ASK_AUDIO_TRANSCRIPT_SOURCE_ID,
+      thread_id: HELIX_ASK_THREAD_ID,
+      room_id: input.roomId ?? null,
+      ts: new Date().toISOString(),
+    });
+    await postAudioTranscriptLiveSourceDescriptor({
+      postJson: postSituationJson,
+      sourceId: HELIX_ASK_AUDIO_TRANSCRIPT_SOURCE_ID,
+      threadId: HELIX_ASK_THREAD_ID,
+      currentState: "active_interval",
+      cadenceMs: HELIX_ASK_DISPLAY_AUDIO_CHUNK_MS,
+      stream: input.stream ?? null,
+    });
+  }, [postSituationJson]);
+
+  const postHelixAskAudioTranscriptChunk = useCallback(async (chunk: DisplayAudioTranscriptChunk) => {
+    const transcript = chunk.event.text?.trim() ?? "";
+    if (!transcript) return;
+    const response = await postSituationJson("/api/agi/situation/audio-source/transcript-chunk", {
+      source_id: HELIX_ASK_AUDIO_TRANSCRIPT_SOURCE_ID,
+      thread_id: HELIX_ASK_THREAD_ID,
+      room_id: chunk.event.room_id ?? null,
+      environment_id: chunk.environmentId ?? null,
+      transcript,
+      transcript_is_final: true,
+      direct_address_classification: "unclassified",
+      evidence_refs: chunk.event.evidence_refs,
+      chunk_index: chunk.chunkIndex,
+      capture_session_id: chunk.captureSessionId,
+      capture_source: chunk.source,
+      duration_ms: chunk.durationMs,
+      from_ts: chunk.fromTs,
+      to_ts: chunk.toTs,
+      ts: chunk.toTs,
+    });
+    const latestObservationRefs = [
+      response?.live_source_event?.event_id,
+      response?.live_source_chunk?.chunk_id,
+      response?.live_source_analysis_job?.job_id,
+    ].filter((ref): ref is string => typeof ref === "string" && ref.trim().length > 0);
+    await postAudioTranscriptLiveSourceDescriptor({
+      postJson: postSituationJson,
+      sourceId: HELIX_ASK_AUDIO_TRANSCRIPT_SOURCE_ID,
+      threadId: HELIX_ASK_THREAD_ID,
+      environmentId: chunk.environmentId ?? null,
+      currentState: "active_interval",
+      cadenceMs: HELIX_ASK_DISPLAY_AUDIO_CHUNK_MS,
+      latestObservationRefs,
+    });
+  }, [postSituationJson]);
+
   const ensureHelixAskVisualSource = useCallback(async (): Promise<string> => {
     if (visualSituationSourceIdRef.current) return visualSituationSourceIdRef.current;
     const response = await postSituationJson("/api/agi/situation/visual-source/start", {
-      thread_id: "helix-ask:desktop",
+      thread_id: HELIX_ASK_THREAD_ID,
       room_id: null,
       capture_mode: "manual",
       source_surface: "minecraft_client_window",
@@ -24276,7 +24339,7 @@ export function HelixAskPill({
     let stream: MediaStream | null = null;
     try {
       const sourceId = await ensureHelixAskVisualSource();
-      stream = getActiveVisualFrameStream(sourceId) ?? getLatestActiveVisualFrameStream("helix-ask:desktop")?.stream ?? null;
+      stream = getActiveVisualFrameStream(sourceId) ?? getLatestActiveVisualFrameStream(HELIX_ASK_THREAD_ID)?.stream ?? null;
       const existingStreamNeedsAudioUpgrade = Boolean(stream && input.includeAudio && stream.getAudioTracks().length === 0);
       if (!stream || existingStreamNeedsAudioUpgrade) {
         const supersededStream = stream;
@@ -24290,7 +24353,7 @@ export function HelixAskPill({
       }
       const result = await runVisualFrameProducerOnce({
         sourceId,
-        threadId: "helix-ask:desktop",
+        threadId: HELIX_ASK_THREAD_ID,
         roomId: null,
         stream,
         postJson: postSituationJson,
@@ -24314,10 +24377,19 @@ export function HelixAskPill({
           }
           setDisplayAudioStatus("requesting");
           setDisplayAudioError(null);
+          await registerHelixAskAudioTranscriptSource({
+            roomId: room?.room_id ?? situationRoomId,
+            stream,
+          });
           const audioSource = await situationStore.attachDisplayAudioSource(
             room?.room_id ?? situationRoomId,
             "Helix Ask shared tab audio",
-            { stream, stopStreamOnStop: false },
+            {
+              stream,
+              stopStreamOnStop: false,
+              chunkMs: HELIX_ASK_DISPLAY_AUDIO_CHUNK_MS,
+              onTranscriptChunk: postHelixAskAudioTranscriptChunk,
+            },
           );
           if (!audioSource || audioSource.status === "error") {
             const message = audioSource?.last_error ?? "Display audio capture failed.";
@@ -24352,7 +24424,13 @@ export function HelixAskPill({
     } finally {
       stream?.getTracks().forEach((track) => track.stop());
     }
-  }, [ensureHelixAskVisualSource, postSituationJson, situationRoomId]);
+  }, [
+    ensureHelixAskVisualSource,
+    postHelixAskAudioTranscriptChunk,
+    postSituationJson,
+    registerHelixAskAudioTranscriptSource,
+    situationRoomId,
+  ]);
 
   const handleVisualSituationSourceCapture = useCallback(() => {
     if (visualSituationSourceStatus === "requesting") return;

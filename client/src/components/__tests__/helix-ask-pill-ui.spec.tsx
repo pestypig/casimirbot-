@@ -771,10 +771,15 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("readHelixAskVisualCaptureAudioPreference");
     expect(source).toContain("syncHelixAskVisualCaptureRoutePreference");
     expect(source).toContain('HELIX_LIVE_ANSWER_VISUAL_CAPTURE_ROUTE_SYNC_EVENT = "helix:live-answer:visual-capture-routes"');
+    expect(source).toContain('HELIX_ASK_AUDIO_TRANSCRIPT_SOURCE_ID = `audio_transcript:${HELIX_ASK_THREAD_ID}`');
+    expect(source).toContain("HELIX_ASK_DISPLAY_AUDIO_CHUNK_MS = 10_000");
+    expect(source).toContain("postHelixAskAudioTranscriptChunk");
+    expect(source).toContain('postSituationJson("/api/agi/situation/audio-source/transcript-chunk"');
+    expect(source).toContain("source_id: HELIX_ASK_AUDIO_TRANSCRIPT_SOURCE_ID");
     expect(source).toContain("visualSituationIncludeAudio");
     expect(source).toContain("audio: input.includeAudio ? HELIX_ASK_DISPLAY_AUDIO_CONSTRAINTS : false");
     expect(source).toContain("attachDisplayAudioSource(");
-    expect(source).toContain("{ stream, stopStreamOnStop: false }");
+    expect(source).toContain("onTranscriptChunk: postHelixAskAudioTranscriptChunk");
     expect(source).toContain('aria-label={visualSituationIncludeAudio ? "Disable tab audio for visual capture" : "Enable tab audio for visual capture"}');
     expect(source).toContain("handleVisualSituationAudioPreferenceToggle");
   });

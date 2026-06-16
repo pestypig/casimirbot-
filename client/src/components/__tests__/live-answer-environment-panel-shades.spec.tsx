@@ -171,6 +171,8 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain("earbudMicroReasonerRuns");
     expect(source).toContain("/api/helix/stage-play/live-source-mail?");
     expect(source).toContain('data-testid="earbud-micro-reasoner-output"');
+    expect(source).toContain("activeServerAudioTranscriptSource");
+    expect(source).toContain("effectiveAudioTranscriptStatus");
     expect(source).toContain("Earbud output candidates");
     expect(source).toContain("latestEarbudMicroReasonerOutput");
     expect(source).toContain("completed earbud packet_composer run");

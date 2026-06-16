@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
   startDisplayAudioSituationSession,
+  type DisplayAudioTranscriptChunk,
   type DisplayAudioSituationSession,
 } from "@/lib/helix/display-audio-capture";
 import {
@@ -76,6 +77,8 @@ export type SituationRoomSource = {
 type AttachDisplayAudioSourceOptions = {
   stream?: MediaStream | null;
   stopStreamOnStop?: boolean;
+  chunkMs?: number;
+  onTranscriptChunk?: (chunk: DisplayAudioTranscriptChunk) => void | Promise<void>;
 };
 
 export type SituationRoomStoredEvent = HelixSituationEvent & {
@@ -360,9 +363,11 @@ export const useSituationRoomStore = create<SituationRoomStoreState>()(
             captureSessionId,
             stream: options?.stream ?? null,
             stopStreamOnStop: options?.stopStreamOnStop,
+            chunkMs: options?.chunkMs,
             onEvent: (event: HelixSituationEvent) => {
               get().appendSituationEvent(event, sourceId);
             },
+            onTranscriptChunk: options?.onTranscriptChunk,
             onError: (error: Error) => {
               const message = error.message || String(error);
               set((state: SituationRoomStoreState) => {

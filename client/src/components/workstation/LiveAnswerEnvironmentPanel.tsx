@@ -839,6 +839,12 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     () => events.filter((event: WorkstationLiveSourceEvent) => sourceIds.size === 0 || sourceIds.has(event.source_id) || event.environment_id === environment?.environment_id),
     [environment?.environment_id, events, sourceIds],
   );
+  const activeServerAudioTranscriptSource = useMemo(
+    () => relevantSources.find((source: WorkstationLiveSource) =>
+      source.kind === "browser_audio_transcript" && source.status === "active"
+    ) ?? null,
+    [relevantSources],
+  );
   const relevantWindows = useMemo(
     () => windows.filter((window: LiveSourceWindowSummary) => sourceIds.size === 0 || sourceIds.has(window.source_id) || window.environment_id === environment?.environment_id),
     [environment?.environment_id, sourceIds, windows],
@@ -878,7 +884,16 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     audioTranscriptSourceId ??
     audioTranscriptSourceIdRef.current ??
     serverAudioTranscriptHistory.at(-1)?.source_id ??
+    activeServerAudioTranscriptSource?.source_id ??
     null;
+  const effectiveAudioTranscriptStatus =
+    audioTranscriptStatus === "idle" && activeServerAudioTranscriptSource
+      ? "listening"
+      : audioTranscriptStatus;
+  const effectiveAudioTranscriptStatusDetail =
+    audioTranscriptStatus === "idle" && activeServerAudioTranscriptSource
+      ? `Helix Ask shared audio source is registered; waiting for transcript chunks from ${activeServerAudioTranscriptSource.source_id}.`
+      : audioTranscriptStatusDetail;
   const canStartSourceMonitor = sourceSignal.status === "live" && Boolean(sourceSignal.source);
   const liveCardLineStateByKey = useMemo(() => {
     const entries = presentStateCard?.line_states ?? [];
@@ -1393,6 +1408,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         audioTranscriptSourceId ??
         latestAudioTranscriptSourceId ??
         serverAudioTranscriptHistory.at(-1)?.source_id ??
+        activeServerAudioTranscriptSource?.source_id ??
         `audio_transcript:${threadId}`;
       const earbudPresetParams = new URLSearchParams({
         sourceId: earbudMicroDeckSourceId,
@@ -3015,24 +3031,24 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                 Chunk traffic {Math.round(audioTranscriptChunkMs / 1000)}s
               </span>
               <span className={`rounded border px-2 py-1 ${
-                audioTranscriptStatus === "listening" || audioTranscriptStatus === "transcribing"
+                effectiveAudioTranscriptStatus === "listening" || effectiveAudioTranscriptStatus === "transcribing"
                   ? "border-emerald-300/30 text-emerald-100"
-                  : audioTranscriptStatus === "requesting_permission"
+                  : effectiveAudioTranscriptStatus === "requesting_permission"
                     ? "border-amber-300/30 text-amber-100"
-                    : audioTranscriptStatus === "error"
+                    : effectiveAudioTranscriptStatus === "error"
                       ? "border-rose-300/30 text-rose-100"
                       : "border-white/10 text-slate-400"
               }`}>
-                {audioTranscriptStatus}
+                {effectiveAudioTranscriptStatus}
               </span>
             </div>
           </div>
           <p className={`mt-2 rounded border px-2 py-1 text-[10px] leading-4 ${
-            audioTranscriptStatus === "error"
+            effectiveAudioTranscriptStatus === "error"
               ? "border-rose-300/20 bg-rose-950/10 text-rose-100"
               : "border-white/10 bg-black/20 text-slate-400"
           }`}>
-            {audioTranscriptStatusDetail}
+            {effectiveAudioTranscriptStatusDetail}
           </p>
           <div className="mt-2 rounded border border-cyan-300/15 bg-black/20 px-2 py-2">
             <div className="flex flex-wrap items-start justify-between gap-2">

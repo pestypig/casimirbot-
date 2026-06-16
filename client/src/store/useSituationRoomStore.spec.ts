@@ -4,14 +4,24 @@ import type { DisplayAudioSituationSessionOptions } from "@/lib/helix/display-au
 import type { HelixSituationEvent } from "@/lib/helix/situation-room";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 
+(globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
+
 const displayAudioMock = vi.hoisted(() => ({
   startDisplayAudioSituationSession: vi.fn(),
   options: [] as DisplayAudioSituationSessionOptions[],
   stops: [] as Array<() => void>,
 }));
 
+const micAudioMock = vi.hoisted(() => ({
+  startMicAudioSituationSession: vi.fn(),
+}));
+
 vi.mock("@/lib/helix/display-audio-capture", () => ({
   startDisplayAudioSituationSession: displayAudioMock.startDisplayAudioSituationSession,
+}));
+
+vi.mock("@/lib/helix/mic-audio-situation-capture", () => ({
+  startMicAudioSituationSession: micAudioMock.startMicAudioSituationSession,
 }));
 
 import {
@@ -90,9 +100,15 @@ describe("useSituationRoomStore", () => {
 
   it("orders transcript chunks by capture session chunk index", async () => {
     const room = useSituationRoomStore.getState().createRoom("Transcript Room");
-    const source = await useSituationRoomStore.getState().attachDisplayAudioSource(room.room_id, "Discord tab");
+    const onTranscriptChunk = vi.fn();
+    const source = await useSituationRoomStore.getState().attachDisplayAudioSource(room.room_id, "Discord tab", {
+      chunkMs: 10_000,
+      onTranscriptChunk,
+    });
     expect(source).toBeTruthy();
     const options = displayAudioMock.options[0];
+    expect(options.chunkMs).toBe(10_000);
+    expect(options.onTranscriptChunk).toBe(onTranscriptChunk);
 
     options.onEvent(
       makeTranscriptEvent({
