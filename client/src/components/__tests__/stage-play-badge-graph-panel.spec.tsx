@@ -2049,7 +2049,10 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-packet-inspector-deck-title")).toHaveTextContent("Minecraft Minimal Operator");
     expect(screen.getByTestId("stage-play-packet-inspector-deck-plan")).toHaveTextContent("minimal_prompted_arbiter");
     expect(screen.getByTestId("stage-play-packet-inspector-coalescing")).toHaveTextContent("superseded 2 older wakes");
-    const arbiterRole = screen.getAllByTestId("stage-play-microdeck-role-square").find((node) =>
+    expect(screen.getByTestId("stage-play-applied-microdeck-checklist")).toBeTruthy();
+    expect(screen.getAllByTestId("stage-play-applied-microdeck-chip").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/packet color match|packet match/i).length).toBeGreaterThan(0);
+    const arbiterRole = screen.getAllByTestId("stage-play-microdeck-role-square").find((node: HTMLElement) =>
       node.textContent?.includes("Hypothesis Arbiter")
     );
     expect(arbiterRole).toBeTruthy();

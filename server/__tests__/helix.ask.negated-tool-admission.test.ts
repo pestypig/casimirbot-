@@ -726,6 +726,36 @@ describe("Helix Ask negated/contextual tool admission", () => {
     });
   });
 
+  it("extracts explicit query fields for docs locate tool calls", () => {
+    const promptText =
+      "Call docs-viewer.locate_in_doc for docs/helix-ask-codex-loop-discipline.md with query: receipts are observations not answers. Return only line-backed document evidence from that tool observation.";
+
+    expect(__testHelixAgentStepActionResolution.resolveAskTurnDocLocateQuery(promptText)).toBe(
+      "receipts are observations not answers",
+    );
+    expect(__testHelixAgentStepActionResolution.resolveHelixAgentStepActionForCapability({
+      capabilityKey: "docs-viewer.locate_in_doc",
+      transcript: promptText,
+      canonicalGoalFrame: {
+        ...canonicalGoal,
+        goal_kind: "locate_in_doc",
+        required_terminal_kind: "doc_location_matches",
+      },
+      workspaceSnapshot: {
+        activeDocPath: "docs/helix-ask-codex-loop-discipline.md",
+      } as any,
+      capabilityArgs: {},
+    })).toMatchObject({
+      panel_id: "docs-viewer",
+      action_id: "locate_in_doc",
+      args: {
+        query: "receipts are observations not answers",
+        target_transcript: "receipts are observations not answers",
+        path: "docs/helix-ask-codex-loop-discipline.md",
+      },
+    });
+  });
+
   it("scopes 'do not write files' to mutation while admitting research plus locator observations", () => {
     const promptText =
       "Do not write files. Use scholarly papers and citations to research microtubule coherence, then place it on the theory badge graph with scale bands and uncertainty mode.";

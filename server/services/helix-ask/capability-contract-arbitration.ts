@@ -106,6 +106,7 @@ const suppressionBlocksContract = (
 ): boolean => {
   if (!suppression) return false;
   if (!contract) return false;
+  if (suppression.suppression_reason === "explanatory_only") return false;
   return contract.admission_families.some((family: ExplicitCapabilityContract["admission_families"][number]) =>
     contextualToolSuppressionBlocksFamily(suppression, family)
   );

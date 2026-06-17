@@ -570,6 +570,7 @@ export const buildCapabilityPlan = (input: {
   const canonicalGoalKind = contractArbitration.canonical_goal_kind;
   const contextualSuppressionBlocksPlan =
     Boolean(contextualSuppression) &&
+    contextualSuppression?.suppression_reason !== "explanatory_only" &&
     (
       sourceTarget === "model_only" ||
       contextualSuppressionBlocksCapabilityFamily(contextualSuppression, family)

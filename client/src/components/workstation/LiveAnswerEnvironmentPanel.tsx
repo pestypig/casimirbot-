@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { CheckCircle2 } from "lucide-react";
 import {
   selectActiveLiveAnswerEnvironment,
   selectLiveAnswerEnvironmentDeltas,
@@ -408,8 +409,16 @@ type MicroReasonerPromptPresetListRead = {
 };
 
 type StagePlayLiveSourceMailRead = {
+  mailItems?: Array<Record<string, unknown>>;
+  mail_items?: Array<Record<string, unknown>>;
+  processedMailPackets?: Array<Record<string, unknown>>;
+  processed_mail_packets?: Array<Record<string, unknown>>;
   microReasonerRuns?: StagePlayMicroReasonerRunV1[];
   micro_reasoner_runs?: StagePlayMicroReasonerRunV1[];
+  wakeRequests?: Array<Record<string, unknown>>;
+  wake_requests?: Array<Record<string, unknown>>;
+  wakeResults?: Array<Record<string, unknown>>;
+  wake_results?: Array<Record<string, unknown>>;
 };
 
 type AdaptiveVisualLensRead = {
@@ -431,6 +440,14 @@ type EarbudMicroReasonerOutput = {
   status: StagePlayMicroReasonerRunV1["status"];
   createdAt: string;
   refs: string[];
+};
+
+type DocumentMicroReasonerTraceItem = {
+  id: string;
+  label: string;
+  status: string;
+  detail: string;
+  createdAt: string;
 };
 
 type SourceBindingTransitionRead = {
@@ -501,6 +518,14 @@ const readStringList = (value: unknown): string[] =>
     ? value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
     : [];
 
+const readTraceString = (record: Record<string, unknown>, keys: string[], fallback = ""): string => {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim().length > 0) return value.trim();
+  }
+  return fallback;
+};
+
 const documentMarkdownSourceIdFromLocation = (threadId: string): string => {
   if (typeof window === "undefined") return `document_markdown:${threadId}`;
   const params = new URLSearchParams(window.location.search);
@@ -556,8 +581,13 @@ const readDocumentTranslationRunText = (run: StagePlayMicroReasonerRunV1): strin
   } catch {
     // Prompted MicroDeck previews can be clipped by the overview API.
   }
-  return fallback;
+  return fallback || run.error || "document_microdeck_output_unavailable";
 };
+
+const isDocumentTranslationProductRun = (run: StagePlayMicroReasonerRunV1): boolean =>
+  run.role === "packet_composer" &&
+  run.deckProductRole === true &&
+  run.deckExecutionMode !== "baseline_fallback";
 
 const pruneAudioTranscriptHistory = (items: AudioTranscriptHistoryItem[]): AudioTranscriptHistoryItem[] => {
   const deduped = new Map<string, AudioTranscriptHistoryItem>();
@@ -853,6 +883,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [documentMicroReasonerPrompts, setDocumentMicroReasonerPrompts] = useState<StagePlayMicroReasonerPromptV1[]>([]);
   const [selectedDocumentMicroReasonerPromptPresetId, setSelectedDocumentMicroReasonerPromptPresetId] = useState<string>("");
   const [documentMicroReasonerRuns, setDocumentMicroReasonerRuns] = useState<StagePlayMicroReasonerRunV1[]>([]);
+  const [documentSourceMailItems, setDocumentSourceMailItems] = useState<Array<Record<string, unknown>>>([]);
+  const [documentSourceWakeRequests, setDocumentSourceWakeRequests] = useState<Array<Record<string, unknown>>>([]);
+  const [documentSourceWakeResults, setDocumentSourceWakeResults] = useState<Array<Record<string, unknown>>>([]);
+  const [documentSourceProcessedPackets, setDocumentSourceProcessedPackets] = useState<Array<Record<string, unknown>>>([]);
   const [visualShadePromptDraft, setVisualShadePromptDraft] = useState<string>("");
   const [visualShadePromptBaseProfileId, setVisualShadePromptBaseProfileId] = useState<string>("");
   const [selectedVisualFrameHistoryId, setSelectedVisualFrameHistoryId] = useState<string | null>(null);
@@ -1502,8 +1536,8 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     ].filter((entry): entry is string => Boolean(entry)));
     return documentMicroReasonerRuns
       .filter((run: StagePlayMicroReasonerRunV1) => run.sourceId === activeDocumentMarkdownSourceId)
-      .filter((run: StagePlayMicroReasonerRunV1) => run.role === "packet_composer")
-      .filter((run: StagePlayMicroReasonerRunV1) => run.status === "completed")
+      .filter(isDocumentTranslationProductRun)
+      .filter((run: StagePlayMicroReasonerRunV1) => run.status === "completed" || run.status === "failed")
       .filter((run: StagePlayMicroReasonerRunV1) =>
         !activePresetIds.size ||
         (run.deckPresetId ? activePresetIds.has(run.deckPresetId) : false) ||
@@ -1529,6 +1563,65 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     selectedDocumentMicroReasonerPromptPreset?.presetId,
   ]);
   const latestDocumentMicroReasonerOutput = documentMicroReasonerOutputs.at(-1) ?? null;
+  const documentMicroReasonerTraceItems = useMemo<DocumentMicroReasonerTraceItem[]>(() => {
+    const mailRows = documentSourceMailItems.slice(-3).map((item: Record<string, unknown>): DocumentMicroReasonerTraceItem => {
+      const summary = readRecord(item.summary);
+      return {
+        id: readTraceString(item, ["mailId", "mail_id"], "document-mail"),
+        label: "live-source mail",
+        status: readTraceString(item, ["status"], readTraceString(summary ?? {}, ["analysisState", "analysis_state"], "queued")),
+        detail: readTraceString(summary ?? {}, ["preview", "text"], readTraceString(item, ["sourceId", "source_id"], activeDocumentMarkdownSourceId)),
+        createdAt: readTraceString(item, ["createdAt", "created_at"], ""),
+      };
+    });
+    const wakeRows = documentSourceWakeRequests.slice(-3).map((wake: Record<string, unknown>): DocumentMicroReasonerTraceItem => ({
+      id: readTraceString(wake, ["wakeRequestId", "wake_request_id"], "document-wake"),
+      label: "wake request",
+      status: readTraceString(wake, ["status"], "unknown"),
+      detail: readTraceString(wake, ["reason", "failedReason", "failed_reason"], readTraceString(wake, ["jobId", "job_id"], activeDocumentMarkdownSourceId)),
+      createdAt: readTraceString(wake, ["updatedAt", "updated_at", "createdAt", "created_at"], ""),
+    }));
+    const wakeResultRows = documentSourceWakeResults.slice(-3).map((result: Record<string, unknown>): DocumentMicroReasonerTraceItem => ({
+      id: readTraceString(result, ["wakeResultId", "wake_result_id", "wakeRequestId", "wake_request_id"], "document-wake-result"),
+      label: "wake result",
+      status: readTraceString(result, ["status"], "unknown"),
+      detail: readTraceString(result, ["failedReason", "failed_reason", "decision", "result"], activeDocumentMarkdownSourceId),
+      createdAt: readTraceString(result, ["createdAt", "created_at"], ""),
+    }));
+    const packetRows = documentSourceProcessedPackets.slice(-3).map((packet: Record<string, unknown>): DocumentMicroReasonerTraceItem => ({
+      id: readTraceString(packet, ["packetId", "packet_id"], "document-packet"),
+      label: "processed packet",
+      status: readTraceString(packet, ["resolutionState", "resolution_state"], "recorded"),
+      detail: readTraceString(packet, ["recommendedNext", "recommended_next"], readTraceString(packet, ["packetId", "packet_id"], "")),
+      createdAt: readTraceString(packet, ["createdAt", "created_at"], ""),
+    }));
+    const runRows = documentMicroReasonerRuns
+      .filter((run: StagePlayMicroReasonerRunV1) => run.sourceId === activeDocumentMarkdownSourceId)
+      .slice(-6)
+      .map((run: StagePlayMicroReasonerRunV1): DocumentMicroReasonerTraceItem => ({
+        id: run.runId,
+        label: `run:${run.role}`,
+        status: run.status,
+        detail: [
+          run.deckPresetTitle,
+          run.deckExecutionMode,
+          run.deckProductRole ? "product" : "non-product",
+          run.error,
+        ].filter(Boolean).join(" / ") || run.outputPreview,
+        createdAt: run.completedAt ?? run.startedAt,
+      }));
+    return [...mailRows, ...wakeRows, ...wakeResultRows, ...packetRows, ...runRows]
+      .filter((item) => item.id || item.detail)
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+      .slice(-12);
+  }, [
+    activeDocumentMarkdownSourceId,
+    documentMicroReasonerRuns,
+    documentSourceMailItems,
+    documentSourceProcessedPackets,
+    documentSourceWakeRequests,
+    documentSourceWakeResults,
+  ]);
   const visualShadePromptChanged = Boolean(
     visualShadePromptDraft.trim() &&
       selectedVisualObserverProfile &&
@@ -1781,7 +1874,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         threadId,
         sourceId: activeDocumentMarkdownSourceId,
         sourceKind: "document_markdown",
-        view: "overview",
+        view: "full",
         includeConfig: "0",
         limit: "12",
       });
@@ -1793,6 +1886,34 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           ? documentMailBody.microReasonerRuns
           : Array.isArray(documentMailBody.micro_reasoner_runs)
             ? documentMailBody.micro_reasoner_runs
+            : [],
+      );
+      setDocumentSourceMailItems(
+        Array.isArray(documentMailBody.mailItems)
+          ? documentMailBody.mailItems
+          : Array.isArray(documentMailBody.mail_items)
+            ? documentMailBody.mail_items
+            : [],
+      );
+      setDocumentSourceWakeRequests(
+        Array.isArray(documentMailBody.wakeRequests)
+          ? documentMailBody.wakeRequests
+          : Array.isArray(documentMailBody.wake_requests)
+            ? documentMailBody.wake_requests
+            : [],
+      );
+      setDocumentSourceWakeResults(
+        Array.isArray(documentMailBody.wakeResults)
+          ? documentMailBody.wakeResults
+          : Array.isArray(documentMailBody.wake_results)
+            ? documentMailBody.wake_results
+            : [],
+      );
+      setDocumentSourceProcessedPackets(
+        Array.isArray(documentMailBody.processedMailPackets)
+          ? documentMailBody.processedMailPackets
+          : Array.isArray(documentMailBody.processed_mail_packets)
+            ? documentMailBody.processed_mail_packets
             : [],
       );
       setLastFetchError(null);
@@ -3667,6 +3788,32 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                 ))}
               </div>
             ) : null}
+            <div className="mt-2 rounded border border-white/10 bg-slate-950/50 px-2 py-1.5" data-testid="document-markdown-micro-reasoner-trace">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] font-semibold uppercase text-slate-300">Document source trace</p>
+                <span className="font-mono text-[10px] text-slate-500">
+                  {documentMicroReasonerTraceItems.length ? `${documentMicroReasonerTraceItems.length} events` : "empty"}
+                </span>
+              </div>
+              {documentMicroReasonerTraceItems.length ? (
+                <div className="mt-1.5 grid gap-1.5">
+                  {documentMicroReasonerTraceItems.slice().reverse().map((item: DocumentMicroReasonerTraceItem) => (
+                    <div key={`${item.label}:${item.id}`} className="min-w-0 rounded border border-white/10 bg-black/20 px-2 py-1">
+                      <div className="flex flex-wrap items-center gap-2 text-[10px]">
+                        <span className="font-semibold text-slate-200">{item.label}</span>
+                        <span className="font-mono text-lime-100">{item.status}</span>
+                        <span className="text-slate-500">{formatTime(item.createdAt)}</span>
+                      </div>
+                      <p className="mt-0.5 truncate text-[10px] text-slate-400">{item.detail || item.id}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-1.5 text-[11px] leading-5 text-slate-500">
+                  No document source mail, wake, packet, or MicroDeck run has been observed for this document source.
+                </p>
+              )}
+            </div>
           </div>
           <div className="mt-2 rounded border border-emerald-300/15 bg-black/20 px-2 py-2" data-testid="earbud-micro-reasoner-output">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -3848,7 +3995,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
               </p>
             </div>
             <span className="rounded border border-cyan-300/20 px-2 py-1 font-mono text-[10px] text-cyan-100">
-              view model only
+              {microDeckCatalogGroups.reduce((sum, group) => sum + group.items.filter((item) => item.applied).length, 0)} applied
             </span>
           </div>
           <div className="mt-2 grid gap-2 lg:grid-cols-3">
@@ -3881,8 +4028,16 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                             ? "border-emerald-300/35 bg-emerald-400/10"
                             : "border-white/10 bg-slate-950/50"
                         }`}
+                        aria-pressed={item.applied}
                       >
-                        <span className="block truncate text-[11px] font-semibold text-slate-100">{item.title}</span>
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          {item.applied ? (
+                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-300" aria-hidden="true" />
+                          ) : (
+                            <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-white/10" aria-hidden="true" />
+                          )}
+                          <span className="block truncate text-[11px] font-semibold text-slate-100">{item.title}</span>
+                        </span>
                         <span className="mt-0.5 flex flex-wrap gap-1">
                           <span className="rounded border border-cyan-300/15 px-1.5 py-0.5 font-mono text-[10px] text-cyan-100">
                             {liveAnswerMicroDeckPhaseLabel(item.phase)}
@@ -3896,8 +4051,9 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                             </span>
                           ) : null}
                           {item.applied ? (
-                            <span className="rounded border border-emerald-300/20 px-1.5 py-0.5 text-[10px] text-emerald-100">
-                              applied
+                            <span className="inline-flex items-center gap-1 rounded border border-emerald-300/20 px-1.5 py-0.5 text-[10px] text-emerald-100">
+                              <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                              checked applied
                             </span>
                           ) : null}
                         </span>

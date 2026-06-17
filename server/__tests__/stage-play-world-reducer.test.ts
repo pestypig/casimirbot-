@@ -47,7 +47,11 @@ import {
 import { resetStagePlayPerturbationEventsForTest } from "../services/stage-play/stage-play-perturbation-event-store";
 import { resetStagePlayCheckpointQueueForTest } from "../services/stage-play/stage-play-checkpoint-queue";
 import { resetStagePlayRawSessionBufferForTest } from "../services/stage-play/stage-play-raw-session-buffer-store";
-import { resetStagePlayProcessedMailPacketStoreForTest } from "../services/stage-play/stage-play-processed-mail-packet-store";
+import {
+  recordStagePlayMicroReasonerRun,
+  recordStagePlayProcessedMailPacket,
+  resetStagePlayProcessedMailPacketStoreForTest,
+} from "../services/stage-play/stage-play-processed-mail-packet-store";
 
 const threadId = "thread:stage-play-reducer";
 const roomId = "room:minecraft-stage-play-reducer";
@@ -338,6 +342,252 @@ describe("Stage Play world-state badge reducer", () => {
         from: "workstation_state_plane.gates",
         to: "workstation_state_plane.output_bus",
         relation: "constrains",
+      }),
+    ]));
+  });
+
+  it("renders individual processed-mail packet circuits for separate MicroDeck routes", () => {
+    upsertLiveSourceProducer({
+      sourceId: "visual_source:packet-circuit",
+      threadId,
+      modality: "visual_frame",
+      status: "active",
+      cadenceMs: 5000,
+      captureMode: "interval",
+      latestChunkId: "live_source_chunk:visual-packet",
+      now: "2026-06-02T12:20:00.000Z",
+    });
+    upsertLiveSourceProducer({
+      sourceId: "audio_transcript:packet-circuit",
+      threadId,
+      modality: "audio_transcript",
+      status: "active",
+      cadenceMs: 3000,
+      captureMode: "interval",
+      latestChunkId: "live_source_chunk:audio-packet",
+      now: "2026-06-02T12:20:01.000Z",
+    });
+
+    recordStagePlayMicroReasonerRun({
+      artifactId: "stage_play_micro_reasoner_run",
+      schemaVersion: "stage_play_micro_reasoner_run/v1",
+      runId: "stage_play_micro_reasoner_run:visual-shade",
+      promptId: "stage_play_micro_reasoner_prompt:claim_extractor:v1",
+      deckPresetId: "stage_play_micro_reasoner_prompt_preset:science-visual:v1",
+      deckPresetTitle: "Science visual",
+      deckRunPlan: "baseline_plus_prompted",
+      deckRoleIndex: 1,
+      deckRoleCount: 2,
+      deckExecutionMode: "independent",
+      deckProductRole: false,
+      role: "claim_extractor",
+      jobId: "stage_play_mail_job:visual-shade",
+      sourceId: "visual_source:packet-circuit",
+      mailIds: ["stage_play_live_source_mail:visual-shade"],
+      inputRefs: ["stage_play_live_source_mail:visual-shade", "visual_frame:shade"],
+      outputRefs: ["microdeck_output:visual-shade:claims"],
+      inputPreview: "Live Answer screen packet with shade preset output.",
+      outputPreview: "Shade preset appears active and routes back to visual capture.",
+      status: "completed",
+      reasoningMode: "micro_live_interval",
+      selectedDecision: "record_interpretation",
+      salienceLevel: "medium",
+      voiceCandidate: false,
+      confidence: "high",
+      startedAt: "2026-06-02T12:20:02.000Z",
+      completedAt: "2026-06-02T12:20:03.000Z",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "micro_reasoner_evidence",
+    });
+    recordStagePlayMicroReasonerRun({
+      artifactId: "stage_play_micro_reasoner_run",
+      schemaVersion: "stage_play_micro_reasoner_run/v1",
+      runId: "stage_play_micro_reasoner_run:audio-translation",
+      promptId: "stage_play_micro_reasoner_prompt:earbud-translate-english:packet_composer:v1",
+      deckPresetId: "stage_play_micro_reasoner_prompt_preset:earbud-translate-english:v1",
+      deckPresetTitle: "Earbud translate English",
+      deckRunPlan: "minimal_prompted_arbiter",
+      deckRoleIndex: 1,
+      deckRoleCount: 1,
+      deckExecutionMode: "independent",
+      deckProductRole: true,
+      role: "packet_composer",
+      jobId: "stage_play_mail_job:audio-translation",
+      sourceId: "audio_transcript:packet-circuit",
+      mailIds: ["stage_play_live_source_mail:audio-translation"],
+      inputRefs: ["stage_play_live_source_mail:audio-translation", "audio_chunk:translation"],
+      outputRefs: ["microdeck_output:audio-translation:text"],
+      inputPreview: "Earbud transcript packet needing translation.",
+      outputPreview: "Translated text is ready for the Live Answer output lane.",
+      status: "completed",
+      reasoningMode: "micro_live_interval",
+      selectedDecision: "draft_text_answer",
+      salienceLevel: "high",
+      voiceCandidate: true,
+      confidence: "high",
+      startedAt: "2026-06-02T12:20:04.000Z",
+      completedAt: "2026-06-02T12:20:05.000Z",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "micro_reasoner_evidence",
+    });
+    recordStagePlayProcessedMailPacket({
+      artifactId: "stage_play_processed_mail_packet",
+      schemaVersion: "stage_play_processed_mail_packet/v1",
+      packetId: "stage_play_processed_mail_packet:visual-shade",
+      jobId: "stage_play_mail_job:visual-shade",
+      sourceId: "visual_source:packet-circuit",
+      mailIds: ["stage_play_live_source_mail:visual-shade"],
+      visualEvidenceRefs: ["visual_frame:shade"],
+      observedFacts: ["Shade preset output is visible in Live Answer."],
+      inferredFacts: ["The visual packet route can return to the visual capture source."],
+      uncertainties: [],
+      stableFactsUsed: ["visual source active"],
+      changedFacts: ["shade preset changed"],
+      sceneTags: ["live_answer"],
+      activityTags: ["shade_preset"],
+      objectTags: ["screen"],
+      matchedCriteria: ["visual_source_packet"],
+      suppressedCriteria: [],
+      riskMatches: [],
+      opportunityMatches: ["debug_packet_route"],
+      voiceCalloutMatches: [],
+      salience: {
+        level: "medium",
+        reasons: ["visual output changed"],
+        voiceCandidate: false,
+      },
+      recommendedNext: "record_interpretation",
+      watchNext: ["visual capture source"],
+      resolutionState: "processed_packet_ready",
+      microReasonerRunRefs: ["stage_play_micro_reasoner_run:visual-shade"],
+      evidenceRefs: ["stage_play_processed_mail_packet:visual-shade", "microdeck_output:visual-shade:claims"],
+      createdAt: "2026-06-02T12:20:06.000Z",
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+    });
+    recordStagePlayProcessedMailPacket({
+      artifactId: "stage_play_processed_mail_packet",
+      schemaVersion: "stage_play_processed_mail_packet/v1",
+      packetId: "stage_play_processed_mail_packet:audio-translation",
+      jobId: "stage_play_mail_job:audio-translation",
+      sourceId: "audio_transcript:packet-circuit",
+      mailIds: ["stage_play_live_source_mail:audio-translation"],
+      visualEvidenceRefs: [],
+      observedFacts: ["Earbud transcript packet is available."],
+      inferredFacts: ["The audio route can produce text without crossing the visual packet route."],
+      uncertainties: ["translation should stay marked as projection until reviewed"],
+      stableFactsUsed: ["audio transcript source active"],
+      changedFacts: ["new transcript chunk"],
+      sceneTags: ["live_answer"],
+      activityTags: ["translation"],
+      objectTags: ["earbuds"],
+      matchedCriteria: ["audio_translation_packet"],
+      suppressedCriteria: [],
+      riskMatches: [],
+      opportunityMatches: ["debug_independent_packet_route"],
+      voiceCalloutMatches: ["translation_candidate"],
+      salience: {
+        level: "high",
+        reasons: ["translation requested"],
+        voiceCandidate: true,
+        calloutDraft: "Translation ready.",
+      },
+      recommendedNext: "draft_text_answer",
+      watchNext: ["audio transcript source"],
+      resolutionState: "ask_decision_needed",
+      microReasonerRunRefs: ["stage_play_micro_reasoner_run:audio-translation"],
+      evidenceRefs: ["stage_play_processed_mail_packet:audio-translation", "microdeck_output:audio-translation:text"],
+      createdAt: "2026-06-02T12:20:07.000Z",
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+    });
+
+    const graph = buildStagePlayGraphFromWorld({
+      threadId,
+      now: new Date("2026-06-02T12:20:10.000Z"),
+    });
+
+    expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
+    const packetBadges = graph.badges.filter((badge) => badge.tags.includes("processed_mail_packet"));
+    const runBadges = graph.badges.filter((badge) => badge.tags.includes("microdeck_run"));
+    const promptBadges = graph.badges.filter((badge) => badge.tags.includes("microdeck_prompt"));
+    expect(packetBadges).toHaveLength(2);
+    expect(runBadges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        subjects: expect.arrayContaining(["stage_play_micro_reasoner_run:visual-shade"]),
+      }),
+      expect.objectContaining({
+        subjects: expect.arrayContaining(["stage_play_micro_reasoner_run:audio-translation"]),
+      }),
+    ]));
+    expect(promptBadges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        subjects: expect.arrayContaining(["stage_play_micro_reasoner_prompt:claim_extractor:v1"]),
+      }),
+      expect.objectContaining({
+        subjects: expect.arrayContaining(["stage_play_micro_reasoner_prompt:earbud-translate-english:packet_composer:v1"]),
+      }),
+    ]));
+
+    const visualPacket = packetBadges.find((badge) =>
+      badge.subjects.includes("stage_play_processed_mail_packet:visual-shade")
+    );
+    const audioPacket = packetBadges.find((badge) =>
+      badge.subjects.includes("stage_play_processed_mail_packet:audio-translation")
+    );
+    const visualRun = runBadges.find((badge) =>
+      badge.subjects.includes("stage_play_micro_reasoner_run:visual-shade")
+    );
+    const audioRun = runBadges.find((badge) =>
+      badge.subjects.includes("stage_play_micro_reasoner_run:audio-translation")
+    );
+
+    expect(visualPacket?.dataTray).toEqual(expect.objectContaining({
+      transformLabel: "source mail -> MicroDeck packet circuit",
+      inputRefs: expect.arrayContaining(["visual_source:packet-circuit", "stage_play_live_source_mail:visual-shade"]),
+      outputPreview: expect.stringContaining("recommended: record_interpretation"),
+    }));
+    expect(audioPacket?.dataTray).toEqual(expect.objectContaining({
+      blockedUntil: "route authority / checkpoint gate",
+      inputRefs: expect.arrayContaining(["audio_transcript:packet-circuit", "stage_play_live_source_mail:audio-translation"]),
+      outputPreview: expect.stringContaining("recommended: draft_text_answer"),
+    }));
+    expect(graph.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        from: "workstation_state_plane.source_bus",
+        to: visualPacket?.id,
+        relation: "feeds",
+      }),
+      expect.objectContaining({
+        from: "workstation_state_plane.source_bus",
+        to: audioPacket?.id,
+        relation: "feeds",
+      }),
+      expect.objectContaining({
+        from: visualRun?.id,
+        to: visualPacket?.id,
+        relation: "produces",
+      }),
+      expect.objectContaining({
+        from: audioRun?.id,
+        to: audioPacket?.id,
+        relation: "produces",
+      }),
+      expect.objectContaining({
+        from: audioPacket?.id,
+        to: "workstation_state_plane.gates",
+        relation: "needs_check",
+      }),
+      expect.objectContaining({
+        from: audioPacket?.id,
+        to: "workstation_state_plane.output_bus",
+        relation: "feeds",
       }),
     ]));
   });

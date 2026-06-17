@@ -105,6 +105,7 @@ const commandMentionsCapability = (prompt: string, capability: string): boolean 
 const familySuppressed = (prompt: string, contract: ExplicitCapabilityContract): boolean => {
   const suppression = detectContextualToolAdmissionSuppression(prompt);
   if (!suppression) return false;
+  if (suppression.suppression_reason === "explanatory_only") return false;
   return contract.admission_families.some((family: HelixToolCallAdmissionFamily) =>
     contextualToolSuppressionBlocksFamily(suppression, family)
   );

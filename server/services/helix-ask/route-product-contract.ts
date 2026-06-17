@@ -67,6 +67,7 @@ export const AUXILIARY_TERMINAL_PRODUCTS = [
   "client_projection",
   "panel_generated_answer",
   "ask_debug_history_summary",
+  "capability_help_summary",
 ] as const;
 
 export const ALL_ROUTE_TERMINAL_PRODUCTS = [
@@ -238,6 +239,23 @@ const isLiveAnswerEnvironmentStatePrompt = (promptText: string): boolean => {
   );
 };
 
+const isAskCapabilityCatalogPrompt = (promptText: string): boolean => {
+  const normalized = promptText.trim().toLowerCase().replace(/[?!.]+$/g, "").replace(/\s+/g, " ");
+  if (!normalized) return false;
+  const mentionsAskSurface = /\b(?:helix\s+ask|ask\s+turn|this\s+agent|the\s+agent)\b/i.test(normalized);
+  return (
+    /\bwhat\s+tools\s+are\s+available\s+for\s+(?:the\s+)?helix\s+ask\s+to\s+use\b/i.test(normalized) ||
+    (
+      mentionsAskSurface &&
+      (
+        /\bwhat\s+(?:tools?|tool\s+calls?|capabilities)\s+(?:are\s+)?(?:available|visible|admissible)\b/i.test(normalized) ||
+        /\bwhat\s+(?:tools?|tool\s+calls?|capabilities)\s+can\s+(?:helix\s+ask|ask|agent)\s+(?:use|call|run|see|access)\b/i.test(normalized) ||
+        /\b(?:list|show|inspect|tell\s+me)\b[\s\S]{0,60}\b(?:tools?|tool\s+calls?|capabilities)\b/i.test(normalized)
+      )
+    )
+  );
+};
+
 export function buildRouteProductContract(input: {
   turnId: string;
   threadId?: string | null;
@@ -335,6 +353,33 @@ export function buildRouteProductContract(input: {
       ],
       precedenceReason: "explicit_prior_ask_debug_summary_allows_read_only_debug_history_product",
       sideArtifactKindsAllowed: ["ask_debug_history_summary"],
+    });
+  }
+
+  if (isAskCapabilityCatalogPrompt(promptText)) {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget: "runtime_evidence",
+      allowedCore: [],
+      allowedExtra: ["capability_help_summary"],
+      forbiddenExtra: [
+        "direct_answer_text",
+        "no_tool_direct",
+        "model_only_concept",
+        "model_synthesized_answer",
+        "client_projection",
+        "panel_generated_answer",
+        "workspace_action_receipt",
+        "live_pipeline_receipt",
+        "docs_viewer_receipt",
+      ],
+      precedenceReason: "capability_catalog_prompt_requires_capability_help_summary",
+      sideArtifactKindsAllowed: [
+        "capability_registry",
+        "available_capabilities",
+        "tool_surface_packet",
+      ],
     });
   }
 

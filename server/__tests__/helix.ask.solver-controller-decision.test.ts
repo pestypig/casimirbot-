@@ -972,6 +972,166 @@ describe("helix ask solver controller decision", () => {
     expect(decision.blocking_reasons).toContain("terminal_kind_not_required");
   });
 
+  it("allows satisfied model-only direct answers carried by a final-answer draft", () => {
+    const turnId = "ask:model-only-direct";
+    const payload = {
+      active_prompt:
+        "Do not call tools. Explain conceptually why receipts should be observations rather than terminal answers.",
+      canonical_goal_frame: {
+        turn_id: turnId,
+        goal_kind: "model_only_concept",
+        required_terminal_kind: "direct_answer_text",
+      },
+      route_reason_code: "model_only_concept",
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        turn_id: turnId,
+        text: "Receipts are observations because they record what a tool produced; terminal answers require the solver path to select an answer artifact.",
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        turn_id: turnId,
+        route: "model_only_concept",
+        terminal_artifact_kind: "direct_answer_text",
+        final_answer_source: "model_direct_answer",
+        server_authoritative: true,
+      },
+      poison_audit: { schema: "helix.turn_poison_audit.v1", ok: true, violations: [] },
+      route_authority_audit: { schema: "helix.route_authority_audit.v1", route_authority_ok: true },
+      ask_turn_solver_trace: { schema: "helix.ask_turn_solver_trace.v1", turn_id: turnId, completed_solver_path: true },
+      goal_satisfaction_evaluation: {
+        ...satisfiedGoal("model_only_concept", "direct_answer_text"),
+        turn_id: turnId,
+        required_evidence: [
+          {
+            kind: "direct_answer_text",
+            required: true,
+            satisfied: true,
+            evidence_ref: `${turnId}:final_answer_draft`,
+          },
+        ],
+        observed_results: [
+          {
+            ref: `${turnId}:final_answer_draft`,
+            kind: "direct_answer_text",
+            status: "present",
+            supports_goal: true,
+            reason: "model-only direct answer draft satisfies the suppression contract.",
+          },
+        ],
+      },
+      terminal_equivalence_harness_result: terminalEquivalenceOk,
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: `${turnId}:final_answer_draft`,
+          turn_id: turnId,
+          kind: "final_answer_draft",
+          payload: {
+            kind: "direct_answer_text",
+            text: "Receipts are observations because they record what a tool produced.",
+          },
+        },
+      ],
+    };
+
+    const decision = buildSolverControllerDecision({
+      turnId,
+      finalRoute: "model_only_concept",
+      payload,
+      turnIdIntegrityAudit: buildTurnIdIntegrityAudit({ turnId, payload }),
+      finalRouteReconciliation: buildFinalRouteReconciliation({
+        turnId,
+        finalRoute: "model_only_concept",
+        payload,
+      }),
+    });
+
+    expect(decision.decision).toBe("allow_terminal");
+    expect(decision.blocking_reasons).not.toContain("terminal_kind_not_required");
+    expect(decision.blocking_reasons).not.toContain("solver_path_incomplete");
+  });
+
+  it("allows satisfied model-only direct answers carried by current-turn ledger evidence", () => {
+    const turnId = "ask:model-only-ledger-direct";
+    const directAnswerRef = "direct_answer_text:ledger-proof";
+    const payload = {
+      active_prompt: "Explain conceptually why a controller may answer directly.",
+      canonical_goal_frame: {
+        turn_id: turnId,
+        goal_kind: "model_only_concept",
+        required_terminal_kind: "direct_answer_text",
+      },
+      route_reason_code: "model_only_concept",
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "agent_runtime_loop",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        turn_id: turnId,
+        route: "model_only_concept",
+        terminal_artifact_kind: "direct_answer_text",
+        final_answer_source: "model_direct_answer",
+        server_authoritative: true,
+      },
+      poison_audit: { schema: "helix.turn_poison_audit.v1", ok: true, violations: [] },
+      route_authority_audit: { schema: "helix.route_authority_audit.v1", route_authority_ok: true },
+      ask_turn_solver_trace: {
+        schema: "helix.ask_turn_solver_trace.v1",
+        turn_id: turnId,
+        completed_solver_path: false,
+      },
+      goal_satisfaction_evaluation: {
+        ...satisfiedGoal("model_only_concept", "direct_answer_text"),
+        turn_id: turnId,
+        required_evidence: [
+          {
+            kind: "direct_answer_text",
+            required: true,
+            satisfied: true,
+            evidence_ref: directAnswerRef,
+          },
+        ],
+        observed_results: [
+          {
+            ref: directAnswerRef,
+            kind: "direct_answer_text",
+            status: "observed",
+            supports_goal: true,
+            reason: "satisfies_goal_terminal_contract",
+          },
+        ],
+      },
+      terminal_equivalence_harness_result: terminalEquivalenceOk,
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: directAnswerRef,
+          turn_id: turnId,
+          kind: "direct_answer_text",
+          payload: {
+            text: "Direct answers are allowed only when the model-only terminal contract is satisfied.",
+          },
+        },
+      ],
+    };
+
+    const decision = buildSolverControllerDecision({
+      turnId,
+      finalRoute: "model_only_concept",
+      payload,
+      turnIdIntegrityAudit: buildTurnIdIntegrityAudit({ turnId, payload }),
+      finalRouteReconciliation: buildFinalRouteReconciliation({
+        turnId,
+        finalRoute: "model_only_concept",
+        payload,
+      }),
+    });
+
+    expect(decision.decision).toBe("allow_terminal");
+    expect(decision.blocking_reasons).not.toContain("terminal_kind_not_required");
+    expect(decision.blocking_reasons).not.toContain("solver_path_incomplete");
+  });
+
   it("fails source-targeted normal terminals that lack a required artifact contract", () => {
     const payload = {
       active_prompt: "Open the docs panel.",

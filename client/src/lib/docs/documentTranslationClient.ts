@@ -286,6 +286,15 @@ export function extractDocumentMarkdownTranslationsFromRuns(
       : Array.isArray(parsed.unitErrors)
         ? parsed.unitErrors
         : [];
+    const baselineOnlyUnavailable =
+      run.status === "completed" &&
+      (run.deckExecutionMode === "baseline_fallback" || run.deckProductRole !== true) &&
+      unitErrors.length > 0 &&
+      unitErrors.every((entry) => {
+        const record = readRecord(entry);
+        return readFirstString(record, ["reason", "error", "message"]) === "document_translation_model_output_unavailable";
+      });
+    if (baselineOnlyUnavailable) continue;
     for (const item of unitErrors) {
       const record = readRecord(item);
       const unitId = readFirstString(record, ["unit_id", "unitId", "id"]);

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Copy, Link2, PanelLeftClose, PanelLeftOpen, RadioTower, Search, Trash2, Volume2, Waypoints } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Copy, Link2, PanelLeftClose, PanelLeftOpen, RadioTower, Search, Trash2, Volume2, Waypoints } from "lucide-react";
 import type {
   StagePlayBadgeEdgeV1,
   StagePlayBadgeGraphRecommendedActionV1,
@@ -744,6 +744,14 @@ type StagePlayMailJourneyReasonerRow = {
     subtitle: string;
     missingPreview: string;
   };
+};
+
+type StagePlayAppliedMicroDeck = {
+  presetId: string;
+  title: string;
+  sourceId: string | null;
+  colorKey: string;
+  reason: string;
 };
 
 const isActiveStagePlayCheckpointRequest = (request: StagePlayCheckpointRequest): boolean =>
@@ -2497,6 +2505,9 @@ const packetTrailColor = (value: string): { hsl: string; border: string; backgro
   };
 };
 
+const stagePlayAppliedDeckKey = (presetId: string, sourceId: string | null, reason: string): string =>
+  `${presetId}:${sourceId ?? "source_unknown"}:${reason}`;
+
 const stagePlayTrafficStatusClass = (status: StagePlayPacketTrafficStationStatus): string => {
   if (status === "complete") return "border-emerald-800/60 bg-emerald-950/20 text-emerald-100";
   if (status === "running") return "border-cyan-600/70 bg-cyan-950/25 text-cyan-100";
@@ -2881,6 +2892,7 @@ function StagePlayPacketTrafficBoard({
   workBudget?: StagePlayMailLoopWorkBudgetV1 | null;
 }) {
   const selected = traffic.find((row) => row.packetKey === selectedPacketKey) ?? null;
+  const selectedColor = selected ? packetTrailColor(selected.colorKey) : null;
   const workBudgetTone = stagePlayBudgetTone(workBudget?.pressure?.level, workBudget?.pressure?.ratio);
   const budgetLevel = workBudget?.pressure?.level ? labelize(workBudget.pressure.level) : "n/a";
   const rolesPerPacket = workBudget?.usage?.rolesPerPacket;
@@ -3074,7 +3086,10 @@ function StagePlayPacketTrafficBoard({
             />
           </div>
           <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(220px,280px)]">
-            <div className="rounded border border-cyan-900/60 bg-cyan-950/15 p-3">
+            <div
+              className="rounded border border-cyan-900/60 bg-cyan-950/15 p-3"
+              style={selectedColor ? { borderColor: selectedColor.border, boxShadow: selectedColor.glow } : undefined}
+            >
               <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Selected deck</div>
               <div className="mt-1 text-sm font-semibold text-cyan-50" data-testid="stage-play-packet-inspector-deck-title">
                 {stagePlayPacketDeckTitle(selected.deck)}
@@ -3102,9 +3117,18 @@ function StagePlayPacketTrafficBoard({
           </div>
           <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {selected.microReasonerRuns.map((run) => (
-              <div key={run.runId} className="rounded border border-slate-800 bg-slate-950/70 p-2">
+              <div
+                key={run.runId}
+                className="rounded border border-slate-800 bg-slate-950/70 p-2"
+                style={selectedColor ? { borderColor: selectedColor.border } : undefined}
+              >
                 <div className="flex items-center justify-between gap-2">
-                  <div className="truncate text-[11px] font-semibold text-slate-100">{MICRO_REASONER_DISPLAY[run.role].title}</div>
+                  <div className="inline-flex min-w-0 items-center gap-1.5">
+                    {selectedColor ? (
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: selectedColor.hsl }} aria-hidden="true" />
+                    ) : null}
+                    <div className="truncate text-[11px] font-semibold text-slate-100">{MICRO_REASONER_DISPLAY[run.role].title}</div>
+                  </div>
                   <div className="font-mono text-[9px] text-slate-500">{run.latencyMs == null ? run.status : `${run.latencyMs}ms`}</div>
                 </div>
                 <div className="mt-1 line-clamp-2 text-[10px] text-slate-400">{run.outputPreview || "No output yet."}</div>
@@ -5055,6 +5079,83 @@ function StagePlayMailLoopLiveOverview({
       selectedMicroReasonerPromptPreset &&
       activeMicroReasonerPromptPreset.presetId === selectedMicroReasonerPromptPreset.presetId,
   );
+  const appliedMicroReasonerPresetIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (activeMicroReasonerPromptPreset?.presetId) ids.add(activeMicroReasonerPromptPreset.presetId);
+    for (const packet of packets) {
+      if (packet.microReasonerDeck?.presetId) ids.add(packet.microReasonerDeck.presetId);
+    }
+    for (const run of runs) {
+      if (run.deckPresetId) ids.add(run.deckPresetId);
+    }
+    for (const wake of wakeRequests) {
+      if (wake.deckPresetId) ids.add(wake.deckPresetId);
+    }
+    if (mailbox?.mailLoopWorkBudget?.selectedDeck?.presetId) ids.add(mailbox.mailLoopWorkBudget.selectedDeck.presetId);
+    return ids;
+  }, [
+    activeMicroReasonerPromptPreset?.presetId,
+    mailbox?.mailLoopWorkBudget?.selectedDeck?.presetId,
+    packets,
+    runs,
+    wakeRequests,
+  ]);
+  const appliedMicroDecks = useMemo<StagePlayAppliedMicroDeck[]>(() => {
+    const presetsById = new Map(microReasonerPromptPresets.map((preset) => [preset.presetId, preset]));
+    const entries = new Map<string, StagePlayAppliedMicroDeck>();
+    const put = (input: StagePlayAppliedMicroDeck) => {
+      entries.set(stagePlayAppliedDeckKey(input.presetId, input.sourceId, input.reason), input);
+    };
+    if (activeMicroReasonerPromptPreset?.presetId) {
+      put({
+        presetId: activeMicroReasonerPromptPreset.presetId,
+        title: activeMicroReasonerPromptPreset.title,
+        sourceId: microDeckSourceId,
+        colorKey: latestPacket?.packetId ?? microDeckSourceId ?? activeMicroReasonerPromptPreset.presetId,
+        reason: "active source deck",
+      });
+    }
+    for (const packet of packets.slice(-8)) {
+      const presetId = packet.microReasonerDeck?.presetId;
+      if (!presetId) continue;
+      put({
+        presetId,
+        title: packet.microReasonerDeck?.presetTitle ?? presetsById.get(presetId)?.title ?? presetId,
+        sourceId: packet.sourceId,
+        colorKey: packet.packetId,
+        reason: "packet deck",
+      });
+    }
+    for (const run of runs.slice(-12)) {
+      if (!run.deckPresetId) continue;
+      put({
+        presetId: run.deckPresetId,
+        title: run.deckPresetTitle ?? presetsById.get(run.deckPresetId)?.title ?? run.deckPresetId,
+        sourceId: run.sourceId,
+        colorKey: latestPacket?.microReasonerRunRefs.includes(run.runId) ? latestPacket.packetId : run.runId,
+        reason: "run deck",
+      });
+    }
+    for (const wake of wakeRequests.slice(-8)) {
+      if (!wake.deckPresetId) continue;
+      put({
+        presetId: wake.deckPresetId,
+        title: wake.deckPresetTitle ?? presetsById.get(wake.deckPresetId)?.title ?? wake.deckPresetId,
+        sourceId: wake.sourceIds[0] ?? null,
+        colorKey: wake.packetIds[0] ?? wake.wakeRequestId,
+        reason: "wake deck",
+      });
+    }
+    return Array.from(entries.values()).slice(-10).reverse();
+  }, [
+    activeMicroReasonerPromptPreset,
+    latestPacket,
+    microDeckSourceId,
+    microReasonerPromptPresets,
+    packets,
+    runs,
+    wakeRequests,
+  ]);
   const microReasonerPresetGroups = useMemo(() => {
     const groups = new Map<string, StagePlayMicroReasonerPromptPresetV1[]>();
     for (const preset of microReasonerPromptPresets) {
@@ -5184,6 +5285,7 @@ function StagePlayMailLoopLiveOverview({
     ? Math.max(heapRamPercent ?? 0, rssRamPercent ?? 0)
     : null;
   const combinedRuntimeTone = stagePlayRuntimeTone(combinedRuntimePercent, runtimePressureLevel);
+  const latestPacketColor = packetTrailColor(latestPacket?.packetId ?? latestMail?.mailId ?? microDeckSourceId ?? "packet");
   const mailLoopWorkBudget = mailbox?.mailLoopWorkBudget ?? null;
   const workBudgetTone = stagePlayBudgetTone(mailLoopWorkBudget?.pressure?.level, mailLoopWorkBudget?.pressure?.ratio);
   const workBudgetLabel = mailLoopWorkBudget?.pressure?.level
@@ -6459,11 +6561,14 @@ function StagePlayMailLoopLiveOverview({
               ) : (
                 microReasonerPresetGroups.map((group) => (
                   <optgroup key={group.category} label={`${group.category} source`}>
-                    {group.presets.map((preset) => (
-                      <option key={preset.presetId} value={preset.presetId}>
-                        {microReasonerPresetOptionLabel(preset)}
-                      </option>
-                    ))}
+                    {group.presets.map((preset) => {
+                      const applied = appliedMicroReasonerPresetIds.has(preset.presetId);
+                      return (
+                        <option key={preset.presetId} value={preset.presetId}>
+                          {applied ? "[applied] " : ""}{microReasonerPresetOptionLabel(preset)}
+                        </option>
+                      );
+                    })}
                   </optgroup>
                 ))
               )}
@@ -6494,6 +6599,36 @@ function StagePlayMailLoopLiveOverview({
             <span className="ml-2 font-mono text-[10px] text-cyan-200/70">
               {selectedMicroReasonerPromptPreset.promptedRoles.length} prompted role{selectedMicroReasonerPromptPreset.promptedRoles.length === 1 ? "" : "s"} | {selectedMicroReasonerPromptPreset.outputPolicy}
             </span>
+          </div>
+        ) : null}
+        {appliedMicroDecks.length > 0 ? (
+          <div
+            className="mt-3 rounded border border-emerald-300/20 bg-emerald-950/10 p-2"
+            data-testid="stage-play-applied-microdeck-checklist"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-100">Applied deck checklist</div>
+              <div className="font-mono text-[10px] text-emerald-100/70">{appliedMicroDecks.length} applied</div>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {appliedMicroDecks.map((entry) => {
+                const color = packetTrailColor(entry.colorKey);
+                return (
+                  <div
+                    key={stagePlayAppliedDeckKey(entry.presetId, entry.sourceId, entry.reason)}
+                    className="inline-flex max-w-full items-center gap-1.5 rounded border bg-slate-950/70 px-2 py-1 text-[10px] text-slate-100"
+                    style={{ borderColor: color.border, boxShadow: color.glow }}
+                    title={`${entry.title} | ${entry.sourceId ?? "source pending"} | ${entry.reason}`}
+                    data-testid="stage-play-applied-microdeck-chip"
+                  >
+                    <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-300" aria-hidden="true" />
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color.hsl }} aria-hidden="true" />
+                    <span className="max-w-[16rem] truncate font-semibold">{entry.title}</span>
+                    <span className="font-mono text-[9px] text-slate-400">{entry.reason}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         ) : null}
         {microDeckApplyStatus.message ? (
@@ -6542,6 +6677,14 @@ function StagePlayMailLoopLiveOverview({
                     const selected = selectedDeckRow?.role === role;
                     const roleLoaded = Boolean(prompt);
                     const inactiveForPreset = selectedMicroReasonerPromptPreset && !promptedBySelectedPreset;
+                    const roleBoundToLatestPacket = Boolean(run && latestPacket?.microReasonerRunRefs.includes(run.runId));
+                    const roleColorStyle = roleBoundToLatestPacket && !inactiveForPreset
+                      ? {
+                          borderColor: latestPacketColor.border,
+                          boxShadow: selected ? latestPacketColor.glow : undefined,
+                          background: selected ? latestPacketColor.background : undefined,
+                        }
+                      : undefined;
                     return (
                       <button
                         key={role}
@@ -6558,11 +6701,18 @@ function StagePlayMailLoopLiveOverview({
                               ? "border-cyan-800 bg-cyan-950/15 hover:border-cyan-500"
                               : "border-slate-800 bg-slate-950/65 hover:border-slate-600"
                         }`}
+                        style={roleColorStyle}
                         aria-pressed={selected}
                         data-testid="stage-play-microdeck-role-square"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
+                            {roleBoundToLatestPacket && !inactiveForPreset ? (
+                              <div className="mb-1 flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-cyan-100">
+                                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: latestPacketColor.hsl }} aria-hidden="true" />
+                                packet color match
+                              </div>
+                            ) : null}
                             <div className={`truncate text-xs font-semibold ${inactiveForPreset ? "text-slate-500" : "text-slate-100"}`}>{display.title}</div>
                             <div className={`mt-0.5 truncate text-[10px] ${inactiveForPreset ? "text-slate-700" : "text-slate-500"}`}>{display.subtitle}</div>
                           </div>
@@ -7049,6 +7199,7 @@ function StagePlayMailLoopLiveOverview({
         <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.max(recentPackets.length, 1)}, minmax(180px, 1fr))` }}>
           {recentPackets.length > 0 ? recentPackets.map((packet) => {
             const active = packet.packetId === latestPacket?.packetId;
+            const color = packetTrailColor(packet.packetId);
             return (
               <div
                 key={packet.packetId}
@@ -7057,10 +7208,14 @@ function StagePlayMailLoopLiveOverview({
                     ? "border-cyan-500 bg-cyan-950/30"
                     : "border-slate-800 bg-slate-950/55"
                 }`}
+                style={{ borderColor: color.border, boxShadow: active ? color.glow : undefined }}
                 data-testid="stage-play-packet-flow-card"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-xs font-semibold text-slate-100">{labelize(packet.recommendedNext)}</span>
+                  <span className="inline-flex min-w-0 items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color.hsl }} aria-hidden="true" />
+                    <span className="truncate text-xs font-semibold text-slate-100">{labelize(packet.recommendedNext)}</span>
+                  </span>
                   <span className="font-mono text-[10px] text-slate-500">{formatStagePlayClock(packet.createdAt)}</span>
                 </div>
                 <div className="mt-2 line-clamp-2 text-[11px] text-slate-300">
@@ -7069,8 +7224,8 @@ function StagePlayMailLoopLiveOverview({
                 </div>
                 <div className="mt-2 h-1.5 rounded bg-slate-800">
                   <div
-                    className={`h-1.5 rounded ${packet.arbiter?.wakeAsk ? "bg-amber-400" : "bg-emerald-400"}`}
-                    style={{ width: `${Math.min(100, Math.max(18, (packet.hypotheses?.length ?? 1) * 24))}%` }}
+                    className="h-1.5 rounded"
+                    style={{ backgroundColor: color.hsl, width: `${Math.min(100, Math.max(18, (packet.hypotheses?.length ?? 1) * 24))}%` }}
                   />
                 </div>
                 <div className="mt-2 font-mono text-[10px] text-slate-500">{formatStagePlayCount(jsonCharCount(packet))} chars</div>
@@ -7098,68 +7253,81 @@ function StagePlayMailLoopLiveOverview({
           </div>
         </div>
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3" data-testid="stage-play-micro-reasoner-deck">
-          {deckRows.map(({ role, run, prompt, display }) => (
-            <button
-              key={role}
-              type="button"
-              className={`min-h-[160px] rounded-md border p-3 text-left ${
-                run
-                  ? "border-slate-700 bg-slate-900/70 hover:border-cyan-500"
-                  : prompt
-                    ? "border-slate-800 bg-slate-950/70"
-                    : "border-rose-900 bg-rose-950/20"
-              }`}
-              title={prompt?.template ?? "Prompt missing"}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="truncate text-xs font-semibold text-slate-100">{display.title}</div>
-                  <div className="mt-0.5 truncate text-[10px] text-slate-500">{display.subtitle}</div>
-                </div>
-                <span className={`rounded border px-1.5 py-0.5 font-mono text-[9px] ${
-                  run?.status === "completed"
-                    ? "border-emerald-800 text-emerald-100"
-                    : run
-                      ? "border-amber-800 text-amber-100"
-                      : "border-slate-700 text-slate-400"
-                }`}>
-                  {run?.status ?? "ready"}
-                </span>
-              </div>
-              <div className="mt-2 grid grid-cols-4 gap-1 text-[9px]">
-                <span className="rounded border border-slate-800 px-1.5 py-1 text-slate-400">{formatStagePlayMs(run?.latencyMs)}</span>
-                <span className="rounded border border-slate-800 px-1.5 py-1 text-slate-400">{formatStagePlayCount(jsonCharCount(prompt?.template ?? ""))} prompt</span>
-                <span className="rounded border border-slate-800 px-1.5 py-1 text-slate-400">{formatStagePlayCount((run?.outputPreview ?? "").length)} out</span>
-                <span
-                  className={`rounded border px-1.5 py-1 ${
-                    combinedRuntimeTone === "blocked"
-                      ? "border-rose-800 text-rose-100"
-                      : combinedRuntimeTone === "warn"
+          {deckRows.map(({ role, run, prompt, display }) => {
+            const boundToLatestPacket = Boolean(run && latestPacket?.microReasonerRunRefs.includes(run.runId));
+            const style = boundToLatestPacket
+              ? { borderColor: latestPacketColor.border, boxShadow: latestPacketColor.glow }
+              : undefined;
+            return (
+              <button
+                key={role}
+                type="button"
+                className={`min-h-[160px] rounded-md border p-3 text-left ${
+                  run
+                    ? "border-slate-700 bg-slate-900/70 hover:border-cyan-500"
+                    : prompt
+                      ? "border-slate-800 bg-slate-950/70"
+                      : "border-rose-900 bg-rose-950/20"
+                }`}
+                style={style}
+                title={prompt?.template ?? "Prompt missing"}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    {boundToLatestPacket ? (
+                      <div className="mb-1 flex items-center gap-1 text-[9px] font-semibold uppercase tracking-wide text-cyan-100">
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: latestPacketColor.hsl }} aria-hidden="true" />
+                        packet match
+                      </div>
+                    ) : null}
+                    <div className="truncate text-xs font-semibold text-slate-100">{display.title}</div>
+                    <div className="mt-0.5 truncate text-[10px] text-slate-500">{display.subtitle}</div>
+                  </div>
+                  <span className={`rounded border px-1.5 py-0.5 font-mono text-[9px] ${
+                    run?.status === "completed"
+                      ? "border-emerald-800 text-emerald-100"
+                      : run
                         ? "border-amber-800 text-amber-100"
-                        : "border-slate-800 text-slate-400"
-                  }`}
-                  title="Runtime RAM pressure is sampled for the shared server process that runs this micro-reasoner deck."
-                >
-                  {deckRuntimeLabel}
-                </span>
-              </div>
-              <div className="mt-2 rounded border border-slate-800 bg-black/20 p-2">
-                <div className="flex items-center justify-between gap-2 text-[9px] font-semibold uppercase tracking-wide text-slate-500">
-                  <span>Output</span>
-                  <span>{run?.deckProductRole ? "product" : run?.deckExecutionMode === "uses_prior_outputs" ? "chain" : "independent"}</span>
+                        : "border-slate-700 text-slate-400"
+                  }`}>
+                    {run?.status ?? "ready"}
+                  </span>
                 </div>
-                <div className="mt-1 line-clamp-3 text-[11px] leading-snug text-slate-200">
-                  {run?.outputPreview ?? display.missingPreview}
+                <div className="mt-2 grid grid-cols-4 gap-1 text-[9px]">
+                  <span className="rounded border border-slate-800 px-1.5 py-1 text-slate-400">{formatStagePlayMs(run?.latencyMs)}</span>
+                  <span className="rounded border border-slate-800 px-1.5 py-1 text-slate-400">{formatStagePlayCount(jsonCharCount(prompt?.template ?? ""))} prompt</span>
+                  <span className="rounded border border-slate-800 px-1.5 py-1 text-slate-400">{formatStagePlayCount((run?.outputPreview ?? "").length)} out</span>
+                  <span
+                    className={`rounded border px-1.5 py-1 ${
+                      combinedRuntimeTone === "blocked"
+                        ? "border-rose-800 text-rose-100"
+                        : combinedRuntimeTone === "warn"
+                          ? "border-amber-800 text-amber-100"
+                          : "border-slate-800 text-slate-400"
+                    }`}
+                    title="Runtime RAM pressure is sampled for the shared server process that runs this micro-reasoner deck."
+                  >
+                    {deckRuntimeLabel}
+                  </span>
                 </div>
-              </div>
-              <div className="mt-2 rounded border border-slate-800 bg-black/20 p-2">
-                <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Prompt</div>
-                <div className="mt-1 line-clamp-2 text-[10px] leading-snug text-slate-400">
-                  {prompt?.template ?? "Prompt missing."}
+                <div className="mt-2 rounded border border-slate-800 bg-black/20 p-2">
+                  <div className="flex items-center justify-between gap-2 text-[9px] font-semibold uppercase tracking-wide text-slate-500">
+                    <span>Output</span>
+                    <span>{run?.deckProductRole ? "product" : run?.deckExecutionMode === "uses_prior_outputs" ? "chain" : "independent"}</span>
+                  </div>
+                  <div className="mt-1 line-clamp-3 text-[11px] leading-snug text-slate-200">
+                    {run?.outputPreview ?? display.missingPreview}
+                  </div>
                 </div>
-              </div>
-            </button>
-          ))}
+                <div className="mt-2 rounded border border-slate-800 bg-black/20 p-2">
+                  <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Prompt</div>
+                  <div className="mt-1 line-clamp-2 text-[10px] leading-snug text-slate-400">
+                    {prompt?.template ?? "Prompt missing."}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
         </div>

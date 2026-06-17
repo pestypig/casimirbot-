@@ -1305,6 +1305,26 @@ const collectMicroReasonerState = (sources: StagePlayBadgeGraphV1["sourceWindow"
   return { prompts, runs, packets };
 };
 
+const statePlanePacketBadgeId = (packetId: string): string =>
+  `workstation_state_plane.packet.${hashShort(packetId, 12)}`;
+
+const statePlaneDeckRunBadgeId = (runId: string): string =>
+  `workstation_state_plane.deck_run.${hashShort(runId, 12)}`;
+
+const statePlaneDeckPromptBadgeId = (promptId: string): string =>
+  `workstation_state_plane.deck_prompt.${hashShort(promptId, 12)}`;
+
+const packetRoutesToGate = (recommendedNext: string): boolean =>
+  recommendedNext === "request_more_evidence" ||
+  recommendedNext === "request_stage_play_checkpoint" ||
+  recommendedNext === "request_voice_callout" ||
+  recommendedNext === "draft_text_answer";
+
+const packetRoutesToOutput = (recommendedNext: string): boolean =>
+  recommendedNext === "record_interpretation" ||
+  recommendedNext === "draft_text_answer" ||
+  recommendedNext === "request_voice_callout";
+
 const addWorkstationStatePlaneBadges = (
   badges: StagePlayBadgeV1[],
   edges: StagePlayBadgeGraphV1["edges"],
@@ -1581,6 +1601,254 @@ const addWorkstationStatePlaneBadges = (
     },
     admission: "auto",
   }));
+
+  const runPromptIds = new Set(input.microReasoners.runs.map((run) => run.promptId).filter(isNonEmptyString));
+  const circuitPrompts = uniqueBy(
+    [
+      ...input.microReasoners.prompts.filter((prompt) => runPromptIds.has(prompt.promptId)),
+      ...input.microReasoners.prompts.slice(-12),
+    ],
+    (prompt) => prompt.promptId,
+  );
+  const promptBadgeIdsByPromptId = new Map<string, string>();
+  for (const prompt of circuitPrompts) {
+    const promptId = statePlaneDeckPromptBadgeId(prompt.promptId);
+    promptBadgeIdsByPromptId.set(prompt.promptId, promptId);
+    pushBadge(badges, badge({
+      id: promptId,
+      title: `MicroDeck prompt: ${prompt.title}`,
+      plainMeaning: `Active ${prompt.role} MicroDeck prompt available to process live-source packets.`,
+      whyItMatters: "Showing prompts as individual circuit elements makes the live deck configuration inspectable without treating prompt text as an answer.",
+      kind: "workstation_state_plane",
+      status: prompt.active ? "observed" : "stale",
+      subjects: [prompt.promptId, prompt.role],
+      tags: ["workstation_state_plane", "microdeck_prompt", "micro_reasoner", prompt.role],
+      sourceRefs: [{ kind: "synthetic_evidence", id: prompt.promptId }],
+      evidenceRefs: [prompt.promptId],
+      confidence: prompt.active ? 0.78 : 0.48,
+      reasonCodes: ["microdeck_prompt", "packet_circuit_component", "not_terminal_authority"],
+      dataTray: {
+        title: prompt.title,
+        summary: `${prompt.role}; ${prompt.modelPreference}; ${prompt.inputSchemaName} -> ${prompt.outputSchemaName}.`,
+        updatedAt: prompt.updatedAt,
+        freshness: prompt.active ? "fresh" : "stale",
+        confidence: prompt.active ? 0.78 : 0.48,
+        evidenceRefs: [prompt.promptId],
+        inputRefs: [prompt.inputSchemaName],
+        inputPreview: prompt.role,
+        transformLabel: "MicroDeck prompt policy",
+        outputRefs: [prompt.outputSchemaName],
+        outputPreview: `${prompt.maxInputItems} input item(s); ${prompt.maxOutputTokens ?? "default"} output token budget`,
+      },
+      admission: "auto",
+    }));
+    pushEdge(edges, {
+      from: bufferId,
+      to: promptId,
+      relation: "contains",
+      label: "MicroDeck buffer contains active prompt",
+      evidenceRefs: [prompt.promptId],
+      reasonCodes: ["microdeck_buffer_contains_prompt"],
+    });
+  }
+
+  const runBadgeIdsByRunId = new Map<string, string>();
+  for (const run of input.microReasoners.runs.slice(-12)) {
+    const runId = statePlaneDeckRunBadgeId(run.runId);
+    runBadgeIdsByRunId.set(run.runId, runId);
+    const runEvidenceRefs = unique([run.runId, ...run.inputRefs, ...run.outputRefs]);
+    pushBadge(badges, badge({
+      id: runId,
+      title: `Deck run: ${run.role}`,
+      plainMeaning: `A recent MicroDeck run processed source mail for ${run.sourceId}.`,
+      whyItMatters: "Deck-run nodes let packet traffic show which micro-reasoners transformed a source packet and whether those jobs were independent or chained.",
+      kind: "workstation_state_plane",
+      status: run.status === "completed" ? "observed" : run.status === "failed" ? "blocked" : "candidate",
+      subjects: unique([run.runId, run.sourceId, run.role, ...(run.promptId ? [run.promptId] : [])]),
+      tags: [
+        "workstation_state_plane",
+        "microdeck_run",
+        "packet_circuit",
+        run.role,
+        run.deckExecutionMode ?? "execution_mode_unknown",
+      ],
+      sourceRefs: uniqueBy(
+        [
+          { kind: "synthetic_evidence" as const, id: run.runId },
+          ...(run.promptId ? [{ kind: "synthetic_evidence" as const, id: run.promptId }] : []),
+        ],
+        (ref) => `${ref.kind}:${ref.id}`,
+      ),
+      evidenceRefs: runEvidenceRefs,
+      confidence: run.status === "completed" ? 0.8 : run.status === "failed" ? 0.52 : 0.62,
+      missingEvidence: run.missingEvidence ?? [],
+      reasonCodes: ["microdeck_run", "packet_circuit_component", run.status],
+      dataTray: {
+        title: `${run.role} run`,
+        summary: `${run.status}; ${run.reasoningMode ?? "reasoning mode unknown"}; source ${run.sourceId}.`,
+        updatedAt: run.completedAt ?? run.startedAt,
+        freshness: run.status === "completed" ? "fresh" : run.status === "failed" ? "stale" : "unknown",
+        confidence: run.status === "completed" ? 0.8 : run.status === "failed" ? 0.52 : 0.62,
+        evidenceRefs: runEvidenceRefs,
+        inputRefs: unique([run.sourceId, ...run.mailIds, ...run.inputRefs]).slice(0, 10),
+        inputPreview: compactPreview(run.inputPreview, `${run.mailIds.length} mail item(s)`, 140),
+        transformLabel: run.deckRunPlan
+          ? `MicroDeck ${run.deckRunPlan} / ${run.deckExecutionMode ?? "execution"}`
+          : "MicroDeck run",
+        outputRefs: unique([run.runId, ...run.outputRefs]).slice(0, 10),
+        outputPreview: compactPreview(run.outputPreview, run.selectedDecision ?? run.status, 140),
+        skipped: run.missingEvidence?.slice(0, 5),
+      },
+      admission: "auto",
+    }));
+    pushEdge(edges, {
+      from: bufferId,
+      to: runId,
+      relation: "contains",
+      label: "MicroDeck buffer contains recent run",
+      evidenceRefs: runEvidenceRefs,
+      reasonCodes: ["microdeck_buffer_contains_run"],
+    });
+    pushEdge(edges, {
+      from: sourceBusId,
+      to: runId,
+      relation: "feeds",
+      label: "source bus feeds MicroDeck run",
+      evidenceRefs: runEvidenceRefs,
+      reasonCodes: ["source_bus_feeds_microdeck_run"],
+    });
+    if (run.promptId) {
+      const promptId = promptBadgeIdsByPromptId.get(run.promptId);
+      if (promptId) {
+        pushEdge(edges, {
+          from: promptId,
+          to: runId,
+          relation: "feeds",
+          label: "prompt policy feeds deck run",
+          evidenceRefs: unique([run.promptId, run.runId]),
+          reasonCodes: ["microdeck_prompt_feeds_run"],
+        });
+      }
+    }
+  }
+
+  const packetBadgeIdsByPacketId = new Map<string, string>();
+  for (const packet of input.microReasoners.packets.slice(-10)) {
+    const packetId = statePlanePacketBadgeId(packet.packetId);
+    packetBadgeIdsByPacketId.set(packet.packetId, packetId);
+    const packetEvidenceRefs = unique([
+      packet.packetId,
+      ...packet.mailIds,
+      ...packet.visualEvidenceRefs,
+      ...packet.evidenceRefs,
+      ...packet.microReasonerRunRefs,
+    ]);
+    pushBadge(badges, badge({
+      id: packetId,
+      title: `Packet: ${packet.resolutionState}`,
+      plainMeaning: `Processed source packet from ${packet.sourceId} with MicroDeck run refs and routing disposition.`,
+      whyItMatters: "Packet nodes make each live-source journey debuggable: source receipts, MicroDeck transforms, gate decisions, and output destinations stay separated per packet.",
+      kind: "workstation_state_plane",
+      status: packet.resolutionState === "deferred_for_pressure" ? "stale" : "observed",
+      subjects: unique([packet.packetId, packet.sourceId, ...packet.mailIds, ...packet.microReasonerRunRefs.slice(0, 6)]),
+      tags: [
+        "workstation_state_plane",
+        "processed_mail_packet",
+        "packet_circuit",
+        packet.resolutionState,
+        packet.recommendedNext,
+        packet.salience.level,
+      ],
+      sourceRefs: uniqueBy(
+        [
+          { kind: "synthetic_evidence" as const, id: packet.packetId },
+          ...packet.mailIds.map((id) => ({ kind: "synthetic_evidence" as const, id })),
+          ...packet.microReasonerRunRefs.map((id) => ({ kind: "synthetic_evidence" as const, id })),
+        ],
+        (ref) => `${ref.kind}:${ref.id}`,
+      ),
+      evidenceRefs: packetEvidenceRefs,
+      confidence: packet.resolutionState === "processed_packet_ready" ? 0.82 : 0.72,
+      missingEvidence: packet.uncertainties.slice(0, 5),
+      reasonCodes: ["processed_mail_packet", "packet_circuit_trace", packet.resolutionState, packet.recommendedNext],
+      dataTray: {
+        title: packet.packetId,
+        summary: `${packet.sourceId}; ${packet.resolutionState}; next ${packet.recommendedNext}; salience ${packet.salience.level}.`,
+        updatedAt: packet.createdAt,
+        freshness: packet.resolutionState === "deferred_for_pressure" ? "stale" : "fresh",
+        confidence: packet.resolutionState === "processed_packet_ready" ? 0.82 : 0.72,
+        evidenceRefs: packetEvidenceRefs,
+        inputRefs: unique([packet.sourceId, ...packet.mailIds, ...packet.visualEvidenceRefs]).slice(0, 10),
+        inputPreview: packet.mailIds.join(", ") || packet.sourceId,
+        transformLabel: "source mail -> MicroDeck packet circuit",
+        outputRefs: unique([
+          ...packet.microReasonerRunRefs,
+          ...packet.evidenceRefs,
+          packet.recommendedNext,
+        ]).slice(0, 12),
+        outputPreview: compactPreview(
+          [
+            packet.observedFacts[0],
+            packet.inferredFacts[0],
+            `recommended: ${packet.recommendedNext}`,
+          ].filter(Boolean).join(" | "),
+          packet.resolutionState,
+          170,
+        ),
+        skipped: packet.uncertainties.slice(0, 5),
+        blockedUntil: packetRoutesToGate(packet.recommendedNext) ? "route authority / checkpoint gate" : null,
+      },
+      admission: "auto",
+    }));
+    pushEdge(edges, {
+      from: sourceBusId,
+      to: packetId,
+      relation: "feeds",
+      label: "source bus feeds packet",
+      evidenceRefs: packetEvidenceRefs,
+      reasonCodes: ["source_bus_feeds_packet"],
+    });
+    pushEdge(edges, {
+      from: processLoopId,
+      to: packetId,
+      relation: "contains",
+      label: "process loop contains packet trace",
+      evidenceRefs: packetEvidenceRefs,
+      reasonCodes: ["process_loop_contains_packet"],
+    });
+    for (const runRef of packet.microReasonerRunRefs.slice(0, 10)) {
+      const runId = runBadgeIdsByRunId.get(runRef);
+      if (!runId) continue;
+      pushEdge(edges, {
+        from: runId,
+        to: packetId,
+        relation: "produces",
+        label: "MicroDeck run contributes to packet",
+        evidenceRefs: unique([runRef, packet.packetId]),
+        reasonCodes: ["microdeck_run_produces_packet"],
+      });
+    }
+    if (packetRoutesToGate(packet.recommendedNext)) {
+      pushEdge(edges, {
+        from: packetId,
+        to: gateId,
+        relation: "needs_check",
+        label: "packet route needs gate review",
+        evidenceRefs: packetEvidenceRefs,
+        reasonCodes: ["packet_route_needs_gate", packet.recommendedNext],
+      });
+    }
+    if (packetRoutesToOutput(packet.recommendedNext)) {
+      pushEdge(edges, {
+        from: packetId,
+        to: outputBusId,
+        relation: "feeds",
+        label: "packet route feeds output lane",
+        evidenceRefs: packetEvidenceRefs,
+        reasonCodes: ["packet_route_feeds_output", packet.recommendedNext],
+      });
+    }
+  }
 
   for (const childId of [sourceBusId, gateId, bufferId, processLoopId, outputBusId, controlId]) {
     pushEdge(edges, {

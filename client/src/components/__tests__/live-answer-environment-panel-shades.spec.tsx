@@ -97,7 +97,9 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain("LiveAnswerMicroDeckCatalogGroup");
     expect(source).toContain("microDeckCatalogGroups");
     expect(source).toContain("MicroDeck catalog");
-    expect(source).toContain("view model only");
+    expect(source).toContain("CheckCircle2");
+    expect(source).toContain("checked applied");
+    expect(source).toContain("} applied");
     expect(source).toContain("Visual Capture Decks");
     expect(source).toContain("Visual Mail Decks");
     expect(source).toContain("Audio Transcript Decks");
@@ -225,10 +227,17 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain("Document Markdown Decks");
     expect(source).toContain('data-testid="document-markdown-micro-reasoner"');
     expect(source).toContain('data-testid="document-markdown-micro-reasoner-output"');
+    expect(source).toContain('data-testid="document-markdown-micro-reasoner-trace"');
     expect(source).toContain('sourceKind: "document_markdown"');
+    expect(source).toContain('view: "full"');
     expect(source).toContain("documentMarkdownSourceIdFromLocation");
     expect(source).toContain("Future visible document Markdown packets will use this prompt deck.");
     expect(source).toContain("Document inline translation candidates");
+    expect(source).toContain("Document source trace");
+    expect(source).toContain("documentSourceWakeRequests");
+    expect(source).toContain("isDocumentTranslationProductRun");
+    expect(source).toContain('run.deckExecutionMode !== "baseline_fallback"');
+    expect(source).toContain('run.deckProductRole === true');
     expect(source).toContain("readDocumentTranslationRunText");
     expect(source).toContain("audioTranscriptHistory");
     expect(source).toContain("pruneAudioTranscriptHistory");

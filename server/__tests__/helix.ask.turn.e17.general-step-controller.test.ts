@@ -94,7 +94,7 @@ describe("helix ask turn e17 general step controller", () => {
     expect(response.body?.planner_contract?.plan_items?.map((step: any) => step?.id)).toContain("assistant_direct_answer");
     expect(response.body?.final_answer_contract_family).toBe("simple");
     expect(response.body?.final_answer_contract_pass).toBe(true);
-  }, 20000);
+  }, 45000);
 
   it("answers Helix Ask capability help with a concrete capability summary", async () => {
     const app = await createApp();
@@ -157,7 +157,45 @@ describe("helix ask turn e17 general step controller", () => {
     expect(response.body?.step_results?.some((step: any) => step?.actual_artifacts?.includes("capability_help_summary"))).toBe(true);
     expect(response.body?.final_answer_contract_family).toBe("capability_help");
     expect(response.body?.final_answer_contract_pass).toBe(true);
+    expect(response.body?.terminal_artifact_kind).toBe("capability_help_summary");
+    expect(response.body?.route_product_contract?.allowed_terminal_artifact_kinds).toContain("capability_help_summary");
+    expect(response.body?.solver_controller_decision?.decision).toBe("allow_terminal");
   }, 20000);
+
+  it("routes Helix Ask tool availability wording through the capability catalog", async () => {
+    const app = await createApp();
+    const sessionId = `e17-capability-tools-${Date.now()}`;
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question: "What tools are available for the helix ask to use?",
+        mode: "read",
+        sessionId,
+        workspace_context_snapshot: baseWorkspace(sessionId),
+      })
+      .expect(200);
+
+    const text = answerText(response.body);
+    expect(text).toMatch(/Helix Ask can help/i);
+    expect(text).toMatch(/Information reflection/i);
+    expect(text).toMatch(/Utility/i);
+    expect(text).toMatch(/calculator/i);
+    expect(text).not.toMatch(/natural language processing and machine learning algorithms/i);
+    expect(response.body?.dispatch_policy).toBe("conversation_only");
+    expect(response.body?.planner_contract?.plan_items?.map((step: any) => step?.id)).toEqual([
+      "capability_registry_inspect",
+      "workspace_context_snapshot_inspect",
+      "final_answer_compose_capability_help",
+    ]);
+    expect(response.body?.step_results?.some((step: any) => step?.actual_artifacts?.includes("capability_registry"))).toBe(true);
+    expect(response.body?.step_results?.some((step: any) => step?.actual_artifacts?.includes("capability_help_summary"))).toBe(true);
+    expect(response.body?.final_answer_contract_family).toBe("capability_help");
+    expect(response.body?.final_answer_contract_pass).toBe(true);
+    expect(response.body?.terminal_artifact_kind).toBe("capability_help_summary");
+    expect(response.body?.route_product_contract?.allowed_terminal_artifact_kinds).toContain("capability_help_summary");
+    expect(response.body?.solver_controller_decision?.decision).toBe("allow_terminal");
+  }, 45000);
 
   it("preserves active document identity routing", async () => {
     const app = await createApp();

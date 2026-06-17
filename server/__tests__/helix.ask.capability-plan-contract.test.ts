@@ -614,6 +614,36 @@ describe("Helix capability plan contract", () => {
     });
   });
 
+  it("keeps exact docs locate commands explicit when the prompt also asks for explanation", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:docs-locate-explain-explicit",
+      promptText:
+        "Use docs-viewer.locate_in_doc to find where docs/helix-ask-codex-loop-discipline.md says receipts are observations, not answers. Explain the rule using only the docs-viewer observation and cite the line-backed evidence.",
+      sourceTargetIntent: {
+        ...baseSourceTarget("model_only", "general_background"),
+        reasons: ["explicit_model_only_target", "negative_workspace_scope"],
+      },
+      toolCallAdmissionDecision: toolAdmission("model_only", ["model_only"]),
+      canonicalGoalFrame: canonicalGoal("model_only_concept", "direct_answer_text"),
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "docs",
+      source_target: "docs_viewer",
+      requested_capability: "docs-viewer.locate_in_doc",
+      requested_action: "docs-viewer.locate_in_doc",
+      selected_capability: "docs-viewer.locate_in_doc",
+      goal_kind: "locate_in_doc",
+      required_terminal_kind: "doc_location_matches",
+    });
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "explicit_capability_command",
+      requested_capability: "docs-viewer.locate_in_doc",
+      selected_source_target: "docs_viewer",
+      selected_plan_family: "docs",
+    });
+  });
+
   it("lets negated calculator references suppress hard calculator metadata", () => {
     const plan = buildCapabilityPlan({
       turnId: "ask:negated-calculator-reference",

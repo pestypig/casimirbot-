@@ -27,6 +27,15 @@ const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : 
 const readStringArray = (value: unknown): string[] =>
   readArray(value).map(readString).filter((entry): entry is string => Boolean(entry));
 
+const hasSatisfiedRequiredEvidenceKind = (goalSatisfaction: RecordLike | null, kind: string): boolean =>
+  readArray(goalSatisfaction?.required_evidence).some((entry) => {
+    const record = readRecord(entry);
+    return readString(record?.kind) === kind && readBoolean(record?.satisfied) === true;
+  });
+
+const hasCurrentTurnArtifactKind = (payload: RecordLike, kind: string): boolean =>
+  readArray(payload.current_turn_artifact_ledger).some((entry) => readString(readRecord(entry)?.kind) === kind);
+
 const resolveAuthoritativeWorkstationToolTerminal = (
   payload: RecordLike,
 ): { terminalArtifactKind: "workstation_tool_evaluation"; finalAnswerSource: "workstation_tool_evaluation" } | null => {
@@ -764,14 +773,39 @@ export function buildSolverControllerDecision(input: {
     : input.finalRouteReconciliation ?? buildFinalRouteReconciliation({ turnId: input.turnId, finalRoute, payload });
   const disciplineGuardRequired = isSourceTargetedOrCapabilityTurn(payload);
   const capabilityTerminal = isCapabilityTerminalKind(terminalArtifactKind);
-  const modelDirectAnswerTerminal =
-    terminalArtifactKind === "direct_answer_text" &&
-    readString(payload.final_answer_source) === "model_direct_answer" &&
+  const hasModelOnlyDirectAnswerEvidence =
+    hasSatisfiedRequiredEvidenceKind(goalSatisfaction, "direct_answer_text") ||
+    hasCurrentTurnArtifactKind(payload, "direct_answer_text") ||
+    Boolean(readString(readRecord(payload.final_answer_draft)?.text));
+  const modelOnlyDirectAnswerContractSatisfied =
     (
       canonicalGoalKind === "model_only_concept" ||
       canonicalGoalKind === "workspace_help" ||
-      canonicalGoalKind === "conversation" ||
-      canonicalGoalKind === "live_environment_review"
+      canonicalGoalKind === "conversation"
+    ) &&
+    goalSatisfactionState === "satisfied" &&
+    goalNextDecision === "allow_terminal" &&
+    (
+      requiredTerminalKind === "direct_answer_text" ||
+      requiredTerminalKinds.includes("direct_answer_text")
+    ) &&
+    hasModelOnlyDirectAnswerEvidence &&
+    (
+      terminalArtifactKind === "direct_answer_text" ||
+      terminalArtifactKind === "model_synthesized_answer" ||
+      terminalArtifactKind === "final_answer_draft"
+    );
+  const modelDirectAnswerTerminal =
+    modelOnlyDirectAnswerContractSatisfied ||
+    (
+      terminalArtifactKind === "direct_answer_text" &&
+      readString(payload.final_answer_source) === "model_direct_answer" &&
+      (
+        canonicalGoalKind === "model_only_concept" ||
+        canonicalGoalKind === "workspace_help" ||
+        canonicalGoalKind === "conversation" ||
+        canonicalGoalKind === "live_environment_review"
+      )
     );
   const interimVoiceCalloutStatusTerminal =
     canonicalGoalKind === "live_environment_review" &&
@@ -863,7 +897,7 @@ export function buildSolverControllerDecision(input: {
             finalAnswerSource: readString(payload.final_answer_source),
           })
       : true;
-    if (terminalArtifactKind && committedRoute && !committedRouteAllowsTerminal) {
+    if (terminalArtifactKind && committedRoute && !committedRouteAllowsTerminal && !modelDirectAnswerTerminal) {
       pushUnique(blockingReasons, "committed_route_terminal_product_mismatch");
     }
     if (!goalSatisfaction) {
@@ -878,6 +912,7 @@ export function buildSolverControllerDecision(input: {
       terminalArtifactKind &&
       allowedTerminalKinds.length > 0 &&
       !allowedTerminalKinds.includes(normalizeCommittedRouteTerminalKind(terminalArtifactKind)) &&
+      !modelDirectAnswerTerminal &&
       !(modelOnlyAnswerCoverageSupersedesCompoundGate && terminalArtifactKind === "model_synthesized_answer")
     ) {
       pushUnique(blockingReasons, "terminal_kind_not_required");

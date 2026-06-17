@@ -116,7 +116,14 @@ describe("document translation MicroDeck output parsing", () => {
     });
 
     const entries = extractDocumentMarkdownTranslationsFromRuns([
-      { ...baseRun, status: "failed", outputPreview },
+      {
+        ...baseRun,
+        status: "failed",
+        deckPresetId: "stage_play_micro_reasoner_prompt_preset:document-translate-haw-inline:v1",
+        deckPresetTitle: "Document Markdown Translate To Hawaiian",
+        deckExecutionMode: "uses_prior_outputs",
+        outputPreview,
+      },
     ]);
 
     expect(entries).toEqual([
@@ -128,6 +135,31 @@ describe("document translation MicroDeck output parsing", () => {
         role: "packet_composer",
       },
     ]);
+  });
+
+  it("ignores baseline-only document unavailable projections before a prompted deck product run exists", () => {
+    const outputPreview = JSON.stringify({
+      schema: "stage_play_document_inline_translation_output/v1",
+      projectionTarget: "docs_viewer_inline",
+      translations: [],
+      unit_errors: [
+        { unit_id: "u0003", reason: "document_translation_model_output_unavailable" },
+      ],
+    });
+
+    const entries = extractDocumentMarkdownTranslationsFromRuns([
+      {
+        ...baseRun,
+        status: "completed",
+        deckPresetId: "stage_play_micro_reasoner_prompt_preset:document-translate-haw-inline:v1",
+        deckPresetTitle: "Document Markdown Translate To Hawaiian",
+        deckExecutionMode: "baseline_fallback",
+        deckProductRole: true,
+        outputPreview,
+      },
+    ]);
+
+    expect(entries).toEqual([]);
   });
 
   it("ignores completed run notes that are not structured translation output", () => {
