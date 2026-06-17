@@ -73,6 +73,17 @@ The visual panel should stay compact:
 - phase and layer controls
 - glyph and status cues
 
+The nation diagnostic atlas layer adds transient state vectors:
+
+- parameter-scope coloring for material, governance, security, cohesion,
+  information, and environmental pressure
+- event-pulse sizing for current conflict/protest/strategic-development
+  signals
+- dependency-edge overlays for trade, logistics, security, climate, and
+  institutional relationships
+- selected-country receipts with freshness, confidence, source families, and
+  missing observations
+
 Long explanations belong in backend receipts, debug export, and Helix Ask synthesis, not in panel chrome.
 
 ## Current Scenario Adapter

@@ -60,8 +60,8 @@ describe("CivilizationBoundsRoadmap", () => {
     render(<CivilizationBoundsRoadmap />);
 
     expect(screen.getByText("Civilization Bounds Atlas")).toBeTruthy();
-    expect(screen.getByText("Material")).toBeTruthy();
-    expect(screen.getByText("Governance")).toBeTruthy();
+    expect(screen.getAllByText("Material").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Governance").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("dependency edges")).toBeTruthy();
     expect(screen.getByLabelText("event pulse")).toBeTruthy();
     expect(screen.getByLabelText("missing evidence")).toBeTruthy();
