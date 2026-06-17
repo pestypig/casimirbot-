@@ -582,7 +582,7 @@ describe("Helix capability plan contract", () => {
       requested_action: "workspace_os.status",
       selected_capability: "workspace_os.status",
       goal_kind: "workspace_status_diagnostic",
-      required_terminal_kind: "workstation_tool_evaluation",
+      required_terminal_kind: "model_synthesized_answer",
     });
     expect(plan.capability_contract_arbitration).toMatchObject({
       contract_state: "explicit_capability_command",
@@ -642,6 +642,49 @@ describe("Helix capability plan contract", () => {
       contract_state: "suppressed_contextual_reference",
       route_metadata_demoted: true,
       demotion_reason: "contextual_tool_reference_demoted_route_metadata",
+    });
+  });
+
+  it("lets explicit calculator capability beat negated live-source mailbox cues", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:explicit-calculator-not-live-mailbox",
+      promptText:
+        "Do not use live source mail. Use scientific-calculator.solve_expression to evaluate 2 + 2 and return the workstation_tool_evaluation.",
+      sourceTargetIntent: baseSourceTarget("live_source_mailbox", "live_source_mailbox"),
+      toolCallAdmissionDecision: toolAdmission("live_source_mailbox", ["live_environment"]),
+      canonicalGoalFrame: canonicalGoal("live_source_processed_mail_interpretation", "model_synthesized_answer"),
+      routeMetadata: {
+        schema: "helix.ask.route_metadata.v1",
+        invocationKind: "stage_play_mail_wake",
+        sourceTarget: "live_source_mailbox",
+        requiredPhase: "read_processed_mail",
+      },
+      liveSourceTurnPhaseResolution: {
+        artifactId: "live_source_turn_phase_resolution",
+        schemaVersion: "live_source_turn_phase_resolution/v1",
+        phase: "read_processed_mail",
+        allowedTools: ["live_env.read_processed_live_source_mail"],
+        forbiddenTools: ["scientific-calculator.solve_expression", "final_answer"],
+        requiredEvidence: ["stage_play_processed_mail_packet"],
+        completionEvidence: ["stage_play_processed_mail_packet"],
+        phaseLock: {
+          locked: false,
+          reason: "Fixture verifies explicit calculator dominance over negated live-source cue.",
+        },
+      },
+    });
+
+    expect(plan).toMatchObject({
+      source_target: "calculator_stream",
+      requested_capability: "scientific-calculator.solve_expression",
+      selected_capability: "scientific-calculator.solve_expression",
+      goal_kind: "calculator_solve",
+      required_terminal_kind: "workstation_tool_evaluation",
+    });
+    expect(plan.phase_repaired).toBeUndefined();
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "explicit_capability_command",
+      route_metadata_demoted: true,
     });
   });
 });

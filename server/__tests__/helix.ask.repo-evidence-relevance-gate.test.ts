@@ -130,6 +130,47 @@ describe("repo evidence relevance gate", () => {
     expect(gate.missing_required_roles).not.toContain("runtime_contract");
   });
 
+  it("requires receipt-observation evidence for compound terminal-authority claims", () => {
+    const gate = evaluateRepoEvidenceRelevanceGate({
+      turnId: "turn:repo-relevance",
+      concept: "Terminal Authority",
+      query: "Where does Helix Ask enforce that receipts are observations and terminal authority chooses the answer?",
+      observation: observationWithPaths("Terminal Authority", [
+        "server/services/helix-ask/runtime-authority-contract.ts",
+        "server/services/helix-ask/terminal-authority-single-writer.ts",
+      ]),
+    });
+
+    expect(gate.required_facets).toEqual(expect.arrayContaining([
+      "receipts_as_observations",
+      "terminal_authority_selects_answer",
+    ]));
+    expect(gate.missing_facets).toContain("receipts_as_observations_evidence");
+    expect(gate.missing_facets).not.toContain("terminal_authority_evidence");
+    expect(gate.terminal_allowed).toBe(false);
+    expect(gate.blocking_reasons).toContain("prompt_facet_evidence_missing");
+  });
+
+  it("allows compound terminal-authority claims when both facets have evidence", () => {
+    const gate = evaluateRepoEvidenceRelevanceGate({
+      turnId: "turn:repo-relevance",
+      concept: "Terminal Authority",
+      query: "Where does Helix Ask enforce that receipts are observations and terminal authority chooses the answer?",
+      observation: observationWithPaths("Terminal Authority", [
+        "docs/helix-ask-codex-loop-discipline.md",
+        "server/services/helix-ask/runtime-authority-contract.ts",
+      ]),
+    });
+
+    expect(gate.required_facets).toEqual(expect.arrayContaining([
+      "receipts_as_observations",
+      "terminal_authority_selects_answer",
+    ]));
+    expect(gate.missing_facets).toEqual([]);
+    expect(gate.violations).not.toContain("prompt_facet_evidence_missing");
+    expect(gate.terminal_allowed).toBe(true);
+  });
+
   it("allows StarSim codebase evidence from StarSim paths", () => {
     const gate = evaluateRepoEvidenceRelevanceGate({
       turnId: "turn:repo-relevance",

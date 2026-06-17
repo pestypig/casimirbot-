@@ -2017,6 +2017,13 @@ export const interfaceSourceMessages = {
     context: "Docs Viewer document translation status.",
     screenshotSurface: "workstation",
   },
+  "docsViewer.translation.errorTimeout": {
+    id: "docsViewer.translation.errorTimeout",
+    defaultMessage: "Document translation timed out.",
+    description: "Document translation failure shown when the provider does not respond in time.",
+    context: "Docs Viewer document translation status.",
+    screenshotSurface: "workstation",
+  },
   "docsViewer.reading.active": {
     id: "docsViewer.reading.active",
     defaultMessage: "Reading aloud with Auntie Dottie...",

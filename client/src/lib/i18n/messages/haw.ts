@@ -266,6 +266,7 @@ export const hawMessages = {
   "docsViewer.translation.status.unavailable": "ʻAʻole loaʻa ka unuhi document: {reason}",
   "docsViewer.translation.status.error": "Hāʻule ka unuhi document: {reason}",
   "docsViewer.translation.errorGeneric": "Hāʻule ka unuhi document.",
+  "docsViewer.translation.errorTimeout": "Ua pau ka manawa o ka unuhi document.",
   "docsViewer.reading.active": "Ke heluhelu leo nei me Auntie Dottie...",
   "docsViewer.reading.progress": "Heluhelu {chunkIndex}/{chunkCount}: {snippet}",
   "docsViewer.reading.stopped": "Ua kū ka heluhelu leo: {reason}",

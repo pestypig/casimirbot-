@@ -251,6 +251,7 @@ export function DocViewerPanel() {
   const followLiveReadRef = React.useRef(followLiveRead);
   const liveReadChunkRef = React.useRef<string | null>(null);
   const lastProceduralTraceIdRef = React.useRef<string | null>(null);
+  const translationRequestControllerRef = React.useRef<AbortController | null>(null);
   const currentEntry = React.useMemo(() => (currentPath ? findDocEntry(currentPath) : null), [currentPath]);
   const rawMarkdownSourceHash = React.useMemo(
     () => (rawMarkdown ? hashDocumentSource(rawMarkdown) : null),
@@ -329,6 +330,8 @@ export function DocViewerPanel() {
   }, [mode, currentEntry, t]);
 
   React.useEffect(() => {
+    translationRequestControllerRef.current?.abort();
+    translationRequestControllerRef.current = null;
     setTranslationResult(null);
     setTranslationViewMode("original");
     setTranslationStatus("idle");
@@ -639,6 +642,9 @@ export function DocViewerPanel() {
 
   const handleGenerateTranslation = React.useCallback(async () => {
     if (!translationEligible || !currentEntry || !rawMarkdown) return;
+    translationRequestControllerRef.current?.abort();
+    const controller = new AbortController();
+    translationRequestControllerRef.current = controller;
     setTranslationStatus("translating");
     setTranslationError(null);
     try {
@@ -647,15 +653,27 @@ export function DocViewerPanel() {
         locale: interfaceLanguage.code,
         source_markdown: rawMarkdown,
         title: currentEntry.title,
-      });
+      }, controller.signal);
       writeCachedDocumentTranslation(result);
       setTranslationResult(result);
       setTranslationViewMode("translated");
       setTranslationStatus("ready");
     } catch (err) {
-      const message = err instanceof Error ? err.message : t("docsViewer.translation.errorGeneric");
+      if (controller.signal.aborted && translationRequestControllerRef.current !== controller) {
+        return;
+      }
+      const message =
+        isAbortError(err)
+          ? t("docsViewer.translation.errorTimeout")
+          : err instanceof Error
+            ? err.message
+            : t("docsViewer.translation.errorGeneric");
       setTranslationError(message);
       setTranslationStatus(message.toLowerCase().includes("not configured") ? "unavailable" : "error");
+    } finally {
+      if (translationRequestControllerRef.current === controller) {
+        translationRequestControllerRef.current = null;
+      }
     }
   }, [currentEntry, interfaceLanguage.code, rawMarkdown, t, translationEligible]);
 
@@ -1127,6 +1145,10 @@ function PanelHeader({
       </div>
     </header>
   );
+}
+
+function isAbortError(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && "name" in error && error.name === "AbortError");
 }
 
 function getDocumentTranslationStatusLabel(args: {

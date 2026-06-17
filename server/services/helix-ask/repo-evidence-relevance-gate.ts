@@ -29,7 +29,11 @@ export type RepoEvidenceRelevanceGate = {
   prompt_facet: {
     schema: "helix.repo_evidence_prompt_facet.v1";
     applies: boolean;
-    facet: "final_answer_language_debug_contract" | null;
+    facet:
+      | "final_answer_language_debug_contract"
+      | "receipts_as_observations"
+      | "terminal_authority_selects_answer"
+      | null;
     required_terms: string[];
     preferred_paths: string[];
   };
@@ -78,7 +82,7 @@ const pathHintExists = (repoRoot: string, hint: string): boolean => {
   const parent = path.dirname(resolved);
   const basename = path.basename(resolved).toLowerCase();
   try {
-    return fs.readdirSync(parent).some((entry) => entry.toLowerCase().startsWith(basename));
+    return fs.readdirSync(parent).some((entry: string) => entry.toLowerCase().startsWith(basename));
   } catch {
     return false;
   }
@@ -86,7 +90,7 @@ const pathHintExists = (repoRoot: string, hint: string): boolean => {
 
 const selectedPathContainsAlias = (selectedPath: string, aliases: string[]): boolean => {
   const normalizedPath = normalizePath(selectedPath).toLowerCase();
-  return aliases.some((alias) => {
+  return aliases.some((alias: string) => {
     const normalizedAlias = alias.toLowerCase();
     if (normalizedAlias.length < 3) return false;
     return (
@@ -121,6 +125,11 @@ const rolesForSelectedPaths = (selectedPaths: string[]): RepoConceptEvidenceRole
 
 const LANGUAGE_DEBUG_FACET_QUERY_RE =
   /\b(?:final answer(?:\s+language)?|response language|language contract|language[_ -]?detected|source[_ -]?language|code[_ -]?mixed|debug(?:\s+export|\s+payload)?|includeMultilangMetadata|terminal answer|synthesis)\b|(?:idioma\s+final|respuesta\s+final|contrato\s+de\s+idioma|lenguaje\s+de\s+respuesta|evidencia\s+del\s+c[o\u00f3]digo|archivos?\s+y\s+l[i\u00ed]neas?|depuraci[o\u00f3]n|exportaci[o\u00f3]n(?:\s+de\s+debug)?)|(?:\u6700\u7ec8\u56de\u7b54\u8bed\u8a00|\u6700\u7ec8\u56de\u7b54|\u56de\u7b54\u8bed\u8a00|\u8bed\u8a00\u9009\u62e9|\u8bed\u8a00\u5951\u7ea6|\u4ee3\u7801\u4ed3\u5e93|\u4ee3\u7801\u8bc1\u636e|\u5f15\u7528\u6587\u4ef6|\u884c\u53f7|\u8c03\u8bd5|\u5bfc\u51fa)/iu;
+
+type RepoEvidenceFacetId =
+  | "final_answer_language_debug_contract"
+  | "receipts_as_observations"
+  | "terminal_authority_selects_answer";
 
 export const LANGUAGE_DEBUG_FACET_TERMS = [
   "response_language",
@@ -189,6 +198,54 @@ export const LANGUAGE_DEBUG_FACET_PATHS = [
   "docs/architecture/voice-service-contract.md",
 ];
 
+const RECEIPTS_AS_OBSERVATIONS_QUERY_RE =
+  /\b(?:receipts?\s+(?:are|as|become|remain)\s+observations?|observations?\s+re[-\s]?enter\s+reasoning|tools?\s+produce\s+observations?|receipts?\s+are\s+not\s+answers?)\b/i;
+
+const TERMINAL_AUTHORITY_QUERY_RE =
+  /\b(?:terminal\s+authority|authority\s+(?:selects|chooses|writes)\s+(?:the\s+)?answer|completed\s+solver\s+path\s+(?:may|can)\s+answer|visible\s+answer\s+must\s+project|terminal\s+single[-\s]?writer)\b/i;
+
+export const RECEIPTS_AS_OBSERVATIONS_FACET_TERMS = [
+  "Routes choose procedures",
+  "Tools produce observations",
+  "Observations re-enter reasoning",
+  "Receipts are observations",
+  "receipt",
+  "observation",
+  "tool-lifecycle-trace",
+  "FunctionCallOutput",
+];
+
+export const RECEIPTS_AS_OBSERVATIONS_FACET_PATHS = [
+  "docs/helix-ask-codex-loop-discipline.md",
+  "docs/helix-ask-turn-solver-spine.md",
+  "server/services/helix-ask/tool-lifecycle-trace.ts",
+  "server/services/helix-ask/tool-family-contract.ts",
+  "server/services/helix-ask/evidence-reentry-gate.ts",
+  "server/routes/agi.plan.ts",
+];
+
+export const TERMINAL_AUTHORITY_FACET_TERMS = [
+  "terminal_authority",
+  "terminal authority",
+  "terminal_answer_authority",
+  "terminal_authority_single_writer",
+  "completed solver path",
+  "visible answer",
+  "route-product-contract",
+  "runtime-authority-contract",
+];
+
+export const TERMINAL_AUTHORITY_FACET_PATHS = [
+  "server/services/helix-ask/runtime-authority-contract.ts",
+  "server/services/helix-ask/terminal-authority-single-writer.ts",
+  "server/services/helix-ask/terminal-answer-envelope.ts",
+  "server/services/helix-ask/route-product-contract.ts",
+  "server/services/helix-ask/solver-controller-decision.ts",
+  "server/__tests__/helix.ask.final-answer-draft-selection.test.ts",
+  "docs/helix-ask-codex-loop-discipline.md",
+  "docs/helix-ask-turn-solver-spine.md",
+];
+
 export const detectRepoEvidencePromptFacet = (query: string) => {
   const applies = LANGUAGE_DEBUG_FACET_QUERY_RE.test(query);
   return {
@@ -200,13 +257,38 @@ export const detectRepoEvidencePromptFacet = (query: string) => {
   };
 };
 
+const detectRepoEvidencePromptFacets = (query: string): RepoEvidenceFacetId[] =>
+  unique([
+    ...(LANGUAGE_DEBUG_FACET_QUERY_RE.test(query) ? ["final_answer_language_debug_contract" as const] : []),
+    ...(RECEIPTS_AS_OBSERVATIONS_QUERY_RE.test(query) ? ["receipts_as_observations" as const] : []),
+    ...(TERMINAL_AUTHORITY_QUERY_RE.test(query) ? ["terminal_authority_selects_answer" as const] : []),
+  ]);
+
+const facetTerms = (facet: RepoEvidenceFacetId): string[] => {
+  if (facet === "final_answer_language_debug_contract") return LANGUAGE_DEBUG_FACET_TERMS;
+  if (facet === "receipts_as_observations") return RECEIPTS_AS_OBSERVATIONS_FACET_TERMS;
+  return TERMINAL_AUTHORITY_FACET_TERMS;
+};
+
+const facetPreferredPaths = (facet: RepoEvidenceFacetId): string[] => {
+  if (facet === "final_answer_language_debug_contract") return LANGUAGE_DEBUG_FACET_PATHS;
+  if (facet === "receipts_as_observations") return RECEIPTS_AS_OBSERVATIONS_FACET_PATHS;
+  return TERMINAL_AUTHORITY_FACET_PATHS;
+};
+
+const facetMissingCode = (facet: RepoEvidenceFacetId): string => {
+  if (facet === "final_answer_language_debug_contract") return "language_debug_evidence";
+  if (facet === "receipts_as_observations") return "receipts_as_observations_evidence";
+  return "terminal_authority_evidence";
+};
+
 export const repoEvidencePathOrTextMatchesPromptFacet = (
   input: { path?: unknown; excerpt?: unknown; raw_excerpt?: unknown; sanitized_excerpt?: unknown; reason?: unknown },
   promptFacet: ReturnType<typeof detectRepoEvidencePromptFacet>,
 ): boolean => {
   if (!promptFacet.applies) return true;
   const normalizedPath = normalizePath(typeof input.path === "string" ? input.path : "");
-  if (promptFacet.preferred_paths.some((pathHint) => {
+  if (promptFacet.preferred_paths.some((pathHint: string) => {
     const normalizedHint = normalizePath(pathHint);
     return normalizedPath.endsWith(normalizedHint) || normalizedPath.startsWith(normalizedHint);
   })) {
@@ -220,11 +302,11 @@ export const repoEvidencePathOrTextMatchesPromptFacet = (
   ].filter(Boolean).join("\n").toLowerCase();
   if (
     LANGUAGE_DEBUG_OFF_FACET_PATH_RE.test(normalizedPath) &&
-    !LANGUAGE_DEBUG_CONCRETE_METADATA_TERMS.some((term) => haystack.includes(term.toLowerCase()))
+    !LANGUAGE_DEBUG_CONCRETE_METADATA_TERMS.some((term: string) => haystack.includes(term.toLowerCase()))
   ) {
     return false;
   }
-  return promptFacet.required_terms.some((term) => haystack.includes(term.toLowerCase()));
+  return promptFacet.required_terms.some((term: string) => haystack.includes(term.toLowerCase()));
 };
 
 const selectedSpanMatchesPromptFacet = (
@@ -232,6 +314,27 @@ const selectedSpanMatchesPromptFacet = (
   promptFacet: ReturnType<typeof detectRepoEvidencePromptFacet>,
 ): boolean => {
   return repoEvidencePathOrTextMatchesPromptFacet(span, promptFacet);
+};
+
+const repoEvidencePathOrTextMatchesFacet = (
+  input: { path?: unknown; excerpt?: unknown; raw_excerpt?: unknown; sanitized_excerpt?: unknown; reason?: unknown },
+  facet: RepoEvidenceFacetId,
+): boolean => {
+  const normalizedPath = normalizePath(typeof input.path === "string" ? input.path : "");
+  if (facetPreferredPaths(facet).some((pathHint: string) => {
+    const normalizedHint = normalizePath(pathHint);
+    return normalizedPath.endsWith(normalizedHint) || normalizedPath.startsWith(normalizedHint);
+  })) {
+    return true;
+  }
+  const haystack = [
+    normalizedPath,
+    input.excerpt,
+    input.raw_excerpt,
+    input.sanitized_excerpt,
+    input.reason,
+  ].filter(Boolean).join("\n").toLowerCase();
+  return facetTerms(facet).some((term: string) => haystack.includes(term.toLowerCase()));
 };
 
 export function evaluateRepoEvidenceRelevanceGate(input: {
@@ -245,36 +348,49 @@ export function evaluateRepoEvidenceRelevanceGate(input: {
   const repoRoot = input.repoRoot ?? process.cwd();
   const aliasEntry = findRepoConceptAliasEntry([input.concept, input.query].join(" "));
   const normalizedAliases = repoConceptAliasTerms(aliasEntry);
-  const selectedPaths = unique(input.observation.spans.map((span) => normalizePath(span.path)).filter(Boolean));
+  const selectedPaths = unique(input.observation.spans.map((span: HelixRepoCodeEvidenceObservation["spans"][number]) =>
+    normalizePath(span.path)
+  ).filter(Boolean));
   const promptFacet = detectRepoEvidencePromptFacet(input.query);
+  const requiredFacetIds = detectRepoEvidencePromptFacets(input.query);
   const selectedPromptFacetPaths = unique(
     input.observation.spans
-      .filter((span) => selectedSpanMatchesPromptFacet(span, promptFacet))
-      .map((span) => normalizePath(span.path))
+      .filter((span: HelixRepoCodeEvidenceObservation["spans"][number]) =>
+        selectedSpanMatchesPromptFacet(span, promptFacet) ||
+        requiredFacetIds.some((facet: RepoEvidenceFacetId) => repoEvidencePathOrTextMatchesFacet(span, facet))
+      )
+      .map((span: HelixRepoCodeEvidenceObservation["spans"][number]) => normalizePath(span.path))
       .filter(Boolean),
   );
+  const missingFacets = requiredFacetIds
+    .filter((facet: RepoEvidenceFacetId) =>
+      !input.observation.spans.some((span: HelixRepoCodeEvidenceObservation["spans"][number]) =>
+        repoEvidencePathOrTextMatchesFacet(span, facet)
+      )
+    )
+    .map(facetMissingCode);
   const expectedPathHints = aliasEntry?.exact_path_hints ?? [];
-  const existingHints = expectedPathHints.filter((hint) => pathHintExists(repoRoot, hint));
+  const existingHints = expectedPathHints.filter((hint: string) => pathHintExists(repoRoot, hint));
   const exactMatchFilesFound = existingHints.length > 0;
   const exactMatchFilesSelected = aliasEntry
-    ? selectedPaths.some((selectedPath) => repoConceptPathMatchesHint(selectedPath, aliasEntry))
+    ? selectedPaths.some((selectedPath: string) => repoConceptPathMatchesHint(selectedPath, aliasEntry))
     : false;
   const preferredSelected = aliasEntry
-    ? selectedPaths.some((selectedPath) => repoConceptPathMatchesPreferredPrefix(selectedPath, aliasEntry))
+    ? selectedPaths.some((selectedPath: string) => repoConceptPathMatchesPreferredPrefix(selectedPath, aliasEntry))
     : false;
   const selectedFilesCoverConcept = aliasEntry
-    ? selectedPaths.some((selectedPath) => selectedPathContainsAlias(selectedPath, normalizedAliases)) ||
+    ? selectedPaths.some((selectedPath: string) => selectedPathContainsAlias(selectedPath, normalizedAliases)) ||
       exactMatchFilesSelected ||
       preferredSelected
     : selectedPaths.length > 0;
   const selectedEvidenceRoles = rolesForSelectedPaths(selectedPaths);
   const requiredRoles = aliasEntry?.broad_concept ? aliasEntry.required_evidence_roles ?? [] : [];
-  const missingRequiredRoles = requiredRoles.filter((role) => !selectedEvidenceRoles.includes(role));
+  const missingRequiredRoles = requiredRoles.filter((role: RepoConceptEvidenceRole) => !selectedEvidenceRoles.includes(role));
   const singleRoleOnly = Boolean(aliasEntry?.broad_concept && selectedPaths.length > 1 && selectedEvidenceRoles.length <= 1);
-  const selectedDocsOnly = selectedPaths.length > 0 && selectedPaths.every((entry) => entry.startsWith("docs/"));
+  const selectedDocsOnly = selectedPaths.length > 0 && selectedPaths.every((entry: string) => entry.startsWith("docs/"));
   const weakFuzzyOnly = Boolean(aliasEntry && exactMatchFilesFound && !exactMatchFilesSelected && !preferredSelected);
-  const missingExpectedPathHints = existingHints.filter((hint) =>
-    !selectedPaths.some((selectedPath) => repoConceptPathMatchesHint(selectedPath, {
+  const missingExpectedPathHints = existingHints.filter((hint: string) =>
+    !selectedPaths.some((selectedPath: string) => repoConceptPathMatchesHint(selectedPath, {
       ...aliasEntry!,
       exact_path_hints: [hint],
     })),
@@ -284,21 +400,21 @@ export function evaluateRepoEvidenceRelevanceGate(input: {
     violations.push("exact_match_files_found_but_not_selected");
   }
   if (weakFuzzyOnly) violations.push("weak_fuzzy_only");
-  if (aliasEntry && input.observation.concept !== aliasEntry.canonical_concept) violations.push("alias_not_normalized");
+  if (
+    aliasEntry &&
+    input.observation.concept.trim().toLowerCase() !== aliasEntry.canonical_concept.trim().toLowerCase()
+  ) {
+    violations.push("alias_not_normalized");
+  }
   if (aliasEntry && !selectedFilesCoverConcept) violations.push("selected_evidence_missing_concept_terms");
   if (singleRoleOnly) violations.push("single_role_only");
   if (missingRequiredRoles.length > 0 && selectedPaths.length > 0) violations.push("missing_required_evidence_roles");
   if (selectedDocsOnly && /\b(?:codebase|repo|repository|source|implementation|helix ask|this app)\b/i.test(input.query)) {
     violations.push("docs_only_for_codebase_question");
   }
-  if (promptFacet.applies && selectedPaths.length > 0 && selectedPromptFacetPaths.length === 0) {
+  if (requiredFacetIds.length > 0 && selectedPaths.length > 0 && missingFacets.length > 0) {
     violations.push("prompt_facet_evidence_missing");
   }
-  const requiredFacets = promptFacet.applies ? ["final_answer_language_debug_contract"] : [];
-  const missingFacets =
-    promptFacet.applies && selectedPaths.length > 0 && selectedPromptFacetPaths.length === 0
-      ? ["language_debug_evidence"]
-      : [];
   const sourceTargetExactContract =
     input.sourceTargetExactContract ??
     (input.observation.source_target_exact_contract as Record<string, unknown> | undefined) ??
@@ -336,13 +452,16 @@ export function evaluateRepoEvidenceRelevanceGate(input: {
     missing_required_roles: missingRequiredRoles,
     single_role_only: singleRoleOnly,
     weak_fuzzy_only: weakFuzzyOnly,
-    alias_normalization_applied: Boolean(aliasEntry && input.concept === aliasEntry.canonical_concept),
+    alias_normalization_applied: Boolean(
+      aliasEntry &&
+      input.concept.trim().toLowerCase() === aliasEntry.canonical_concept.trim().toLowerCase(),
+    ),
     expected_path_hints: expectedPathHints,
     selected_paths: selectedPaths,
     missing_expected_path_hints: missingExpectedPathHints,
     prompt_facet: promptFacet,
     selected_prompt_facet_paths: selectedPromptFacetPaths,
-    required_facets: requiredFacets,
+    required_facets: requiredFacetIds,
     missing_facets: missingFacets,
     blocking_reasons: blockingReasons,
     coverage,

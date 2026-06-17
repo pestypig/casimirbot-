@@ -73,6 +73,7 @@ export function contextualToolSuppressionBlocksFamily(
 ): boolean {
   if (!suppression) return false;
   const cue = suppression.verb_or_cue;
+  if (/all[_-]?tools/i.test(cue)) return true;
   if (family === "docs_viewer") return /docs_viewer|docs-viewer/i.test(cue) || DOCS_MD_PATH_CUE_RE.test(suppression.text);
   if (family === "scientific_calculator" || family === "calculator") return /scientific[_-]calculator|calculator/i.test(cue);
   if (family === "scholarly_research") return /scholarly|doi|arxiv|paper|citation|research/i.test(cue);
@@ -101,6 +102,16 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
     )
   ) return null;
   MUTATING_WRITE_NEGATION_RE.lastIndex = 0;
+
+  const genericNoTools = prompt.match(/\b(?:do\s+not|don't|dont|never|without)\s+(?:call|use|run|execute)\s+(?:any\s+)?tools?\b|\bno\s+tools?\b/i)?.[0];
+  if (genericNoTools) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: "negated_tool_instruction",
+      verb_or_cue: "all_tools",
+      text: genericNoTools,
+    };
+  }
 
   const quotedDocsPathCommand = prompt.match(QUOTED_DOCS_PATH_COMMAND_RE)?.[0];
   if (quotedDocsPathCommand) {
@@ -193,7 +204,7 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       text: negated,
     };
   }
-  const negatedCalculator = prompt.match(/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to)\b[\s\S]{0,120}(?:open|open\s+up|show|view|pull\s+up|bring\s+up|switch\s+to|go\s+to|navigate\s+to|load|use|run|call|calculate|compute|solve|evaluate)\b[\s\S]{0,120}(?:scientific\s+calculator|calculator|equation|expression)\b|\b(?:earlier|previously|last\s+turn|before)\b[\s\S]{0,120}(?:open|opened|use|used|run|ran|call|called|calculate|computed|solve|solved|evaluate|evaluated)\b[\s\S]{0,120}(?:scientific\s+calculator|calculator|equation|expression)\b[\s\S]{0,120}\b(?:do\s+not|don't|dont|not\s+now|no\s+need\s+to)\b/i)?.[0];
+  const negatedCalculator = prompt.match(/\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to)\b[^.!?;\n]{0,120}(?:open|open\s+up|show|view|pull\s+up|bring\s+up|switch\s+to|go\s+to|navigate\s+to|load|use|run|call|calculate|compute|solve|evaluate)\b[^.!?;\n]{0,120}(?:scientific\s+calculator|calculator|equation|expression)\b|\b(?:earlier|previously|last\s+turn|before)\b[^.!?;\n]{0,120}(?:open|opened|use|used|run|ran|call|called|calculate|computed|solve|solved|evaluate|evaluated)\b[^.!?;\n]{0,120}(?:scientific\s+calculator|calculator|equation|expression)\b[^.!?;\n]{0,120}\b(?:do\s+not|don't|dont|not\s+now|no\s+need\s+to)\b/i)?.[0];
   if (negatedCalculator) {
     return {
       tool_admission_suppressed: true,

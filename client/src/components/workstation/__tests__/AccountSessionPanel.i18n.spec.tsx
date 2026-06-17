@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from "react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import AccountSessionPanel from "@/components/workstation/AccountSessionPanel";
 import { hawMessages } from "@/lib/i18n/messages/haw";
@@ -216,5 +216,28 @@ describe("AccountSessionPanel interface language", () => {
     expect(screen.queryByText(/session_only/)).not.toBeInTheDocument();
     expect(screen.queryByText(/helix-ask:desktop/)).not.toBeInTheDocument();
     expect(screen.queryByText(/false/)).not.toBeInTheDocument();
+  });
+
+  it("broadcasts interface language changes so workstation chrome updates in the same tab", async () => {
+    localStorage.setItem("helix-start-settings", JSON.stringify({ interfaceLanguage: "haw" }));
+    vi.stubGlobal("fetch", mockFetch());
+    const observedLanguages: string[] = [];
+    const handleLanguageChanged = ((event: CustomEvent<{ language: string }>) => {
+      observedLanguages.push(event.detail.language);
+    }) as EventListener;
+    window.addEventListener("helix:interface-language-changed", handleLanguageChanged);
+
+    render(<AccountSessionPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("combobox")).toHaveValue("haw");
+    });
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "en" } });
+
+    await waitFor(() => {
+      expect(observedLanguages).toContain("en");
+      expect(screen.getByRole("combobox")).toHaveValue("en");
+    });
+    window.removeEventListener("helix:interface-language-changed", handleLanguageChanged);
   });
 });

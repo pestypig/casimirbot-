@@ -19,6 +19,7 @@ const DEFAULT_OPENAI_BASE = "https://api.openai.com";
 const DEFAULT_MODEL = "gpt-4o-mini";
 const MAX_TRANSLATION_UNITS = Number.parseInt(process.env.DOC_TRANSLATION_MAX_UNITS ?? "80", 10);
 const MAX_TRANSLATION_CHARS = Number.parseInt(process.env.DOC_TRANSLATION_MAX_CHARS ?? "12000", 10);
+const TRANSLATION_TIMEOUT_MS = Number.parseInt(process.env.DOC_TRANSLATION_TIMEOUT_MS ?? "55000", 10);
 
 docsTranslationRouter.post("/translate", async (req, res) => {
   const payload = req.body as Partial<DocumentTranslationRequestPayload>;
@@ -154,52 +155,67 @@ async function requestTranslations(params: {
   if (params.apiKey) {
     headers.Authorization = `Bearer ${params.apiKey}`;
   }
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      model: params.model,
-      temperature: 0.1,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content:
-            "Translate technical Markdown units from English into the requested locale. Preserve Markdown structure, code spans, math, URLs, API paths, file paths, product names, and every protected span exactly. Return only JSON.",
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            schema: "casimir.document_translation_request.v1",
-            locale: params.locale,
-            locale_guidance:
-              params.locale === "haw"
-                ? "Use Hawaiian where confident. Keep uncertain product terms in English. Use correct okina and kahako when Hawaiian words require them."
-                : "Use the requested locale where confident. Keep uncertain product terms in English.",
-            doc_path: params.docPath,
-            title: params.title ?? null,
-            output_shape: {
-              translations: [
-                {
-                  unit_id: "u0001",
-                  translated_markdown: "translated Markdown preserving protected spans",
-                },
-              ],
-              warnings: ["optional warnings"],
-            },
-            units: params.units,
-          }),
-        },
-      ],
-    }),
-  });
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`Provider returned ${response.status}${text ? `: ${text.slice(0, 400)}` : ""}`);
-  }
-  const body = (await response.json()) as {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TRANSLATION_TIMEOUT_MS);
+  let body: {
     choices?: Array<{ message?: { content?: string } }>;
   };
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: params.model,
+        temperature: 0.1,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content:
+              "Translate technical Markdown units from English into the requested locale. Preserve Markdown structure, code spans, math, URLs, API paths, file paths, product names, and every protected span exactly. Return only JSON.",
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              schema: "casimir.document_translation_request.v1",
+              locale: params.locale,
+              locale_guidance:
+                params.locale === "haw"
+                  ? "Use Hawaiian where confident. Keep uncertain product terms in English. Use correct okina and kahako when Hawaiian words require them."
+                  : "Use the requested locale where confident. Keep uncertain product terms in English.",
+              doc_path: params.docPath,
+              title: params.title ?? null,
+              output_shape: {
+                translations: [
+                  {
+                    unit_id: "u0001",
+                    translated_markdown: "translated Markdown preserving protected spans",
+                  },
+                ],
+                warnings: ["optional warnings"],
+              },
+              units: params.units,
+            }),
+          },
+        ],
+      }),
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new Error(`Provider returned ${response.status}${text ? `: ${text.slice(0, 400)}` : ""}`);
+    }
+    body = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw new Error("Document translation timed out.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
   const content = body.choices?.[0]?.message?.content;
   if (!content) {
     throw new Error("Provider response did not include translated content.");
@@ -216,6 +232,10 @@ async function requestTranslations(params: {
       )
       .map((item) => [item.unit_id, item.translated_markdown]),
   );
+}
+
+function isAbortError(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && "name" in error && error.name === "AbortError");
 }
 
 function selectUnitsForTranslation(units: DocumentTranslationUnit[]): DocumentTranslationUnit[] {

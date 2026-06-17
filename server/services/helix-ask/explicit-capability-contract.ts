@@ -38,12 +38,8 @@ const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
     plan_family: "workspace_diagnostic",
     source_target: "workspace_diagnostic",
     admission_families: ["workspace_diagnostic"],
-    required_observation_kinds: [
-      "workspace_os_status_observation",
-      "workspace_action_receipt",
-      "workstation_tool_evaluation",
-    ],
-    required_terminal_kind: "workstation_tool_evaluation",
+    required_observation_kinds: ["workspace_os_status_observation"],
+    required_terminal_kind: "model_synthesized_answer",
     allowed_substitutions: [],
     forbidden_nearby_capabilities: ["debug.inspect_current_turn"],
   },
@@ -109,7 +105,9 @@ const commandMentionsCapability = (prompt: string, capability: string): boolean 
 const familySuppressed = (prompt: string, contract: ExplicitCapabilityContract): boolean => {
   const suppression = detectContextualToolAdmissionSuppression(prompt);
   if (!suppression) return false;
-  return contract.admission_families.some((family) => contextualToolSuppressionBlocksFamily(suppression, family));
+  return contract.admission_families.some((family: HelixToolCallAdmissionFamily) =>
+    contextualToolSuppressionBlocksFamily(suppression, family)
+  );
 };
 
 export const explicitCapabilityContractForCapability = (
@@ -117,7 +115,7 @@ export const explicitCapabilityContractForCapability = (
 ): ExplicitCapabilityContract | null => {
   const normalized = String(capability ?? "").trim();
   if (!normalized) return null;
-  return explicitCapabilityContracts.find((contract) => contract.capability === normalized) ?? null;
+  return explicitCapabilityContracts.find((contract: ExplicitCapabilityContract) => contract.capability === normalized) ?? null;
 };
 
 export const extractExplicitCapabilityContract = (
@@ -125,7 +123,9 @@ export const extractExplicitCapabilityContract = (
 ): ExplicitCapabilityContract | null => {
   const prompt = String(promptText ?? "").trim();
   if (!prompt) return null;
-  const contract = explicitCapabilityContracts.find((entry) => commandMentionsCapability(prompt, entry.capability));
+  const contract = explicitCapabilityContracts.find((entry: ExplicitCapabilityContract) =>
+    commandMentionsCapability(prompt, entry.capability)
+  );
   if (!contract) return null;
   return familySuppressed(prompt, contract) ? null : contract;
 };

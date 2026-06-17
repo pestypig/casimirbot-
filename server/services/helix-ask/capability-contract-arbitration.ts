@@ -65,7 +65,7 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
     case "docs-viewer.locate_in_doc":
       return "locate_in_doc";
     case "repo-code.search_concept":
-      return "repo_concept_explanation";
+      return "repo_code_evidence_question";
     case "workspace-directory.resolve":
       return "workspace_directory_resolution";
     case "internet_search.web_research":
@@ -106,7 +106,9 @@ const suppressionBlocksContract = (
 ): boolean => {
   if (!suppression) return false;
   if (!contract) return false;
-  return contract.admission_families.some((family) => contextualToolSuppressionBlocksFamily(suppression, family));
+  return contract.admission_families.some((family: ExplicitCapabilityContract["admission_families"][number]) =>
+    contextualToolSuppressionBlocksFamily(suppression, family)
+  );
 };
 
 const suppressionBlocksFallback = (

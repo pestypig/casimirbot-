@@ -3,6 +3,7 @@ import { Archive, ChevronDown, Database, KeyRound, Languages, Link2, LogIn, LogO
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { getInterfaceLanguageOption, getInterfaceLanguageReadiness, INTERFACE_LANGUAGE_OPTIONS } from "@/lib/i18n/interfaceLanguage";
+import { writeInterfaceLanguagePreference } from "@/lib/i18n/interfaceLanguagePreference";
 import { useInterfaceText, type InterfaceTextResolver } from "@/lib/i18n/interfaceText";
 import type { InterfaceMessageId } from "@/lib/i18n/messages/types";
 import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
@@ -487,9 +488,11 @@ export default function AccountSessionPanel() {
                   {interfaceText.t("account.language.interfaceLabel")}
                   <select
                     value={interfaceLanguage.code}
-                    onChange={(event) =>
-                      updateSettings({ interfaceLanguage: getInterfaceLanguageOption(event.target.value).code })
-                    }
+                    onChange={(event) => {
+                      const nextLanguage = getInterfaceLanguageOption(event.target.value).code;
+                      updateSettings({ interfaceLanguage: nextLanguage });
+                      writeInterfaceLanguagePreference(nextLanguage, "account_session_panel");
+                    }}
                     className="mt-1 h-9 w-full rounded border border-white/15 bg-slate-900 px-2 text-sm text-white outline-none focus:border-cyan-400"
                   >
                     {INTERFACE_LANGUAGE_OPTIONS.map((option) => (
