@@ -14,6 +14,7 @@ import {
   buildNarratorDedupeKey,
   shouldDropNarratorDuplicate,
 } from "@/lib/narrator/narratorDedupe";
+import type { NarratorPlaybackDiagnostic } from "@/lib/narrator/narratorAudioPlayback";
 
 export type NarratorDeliveryStatus = "visible" | "queued" | "suppressed" | "spoken" | "failed";
 
@@ -24,6 +25,7 @@ export type NarratorQueueState = {
   lastSpokenByDedupeKey: Record<string, number>;
   lastSeenByDedupeKey: Record<string, number>;
   deliveryStatusByEventId: Record<string, NarratorDeliveryStatus>;
+  playbackDiagnosticsByEventId: Record<string, NarratorPlaybackDiagnostic>;
 };
 
 export type PublishNarratorEventInput = Omit<
@@ -41,9 +43,10 @@ type NarratorState = {
   queueState: NarratorQueueState;
   publishEvent: (input: PublishNarratorEventInput, options?: { voiceArmed?: boolean; nowMs?: number }) => NarratorEventV1 | null;
   setSourcePolicy: (sourceKind: NarratorSourceKind, patch: Partial<NarratorSourcePolicy>) => void;
-  markQueued: (eventId: string) => void;
-  markSpoken: (eventId: string, atMs?: number) => void;
-  markFailed: (eventId: string) => void;
+  markQueued: (eventId: string, diagnostic?: NarratorPlaybackDiagnostic) => void;
+  markSpoken: (eventId: string, atMs?: number, diagnostic?: NarratorPlaybackDiagnostic) => void;
+  markFailed: (eventId: string, diagnostic?: NarratorPlaybackDiagnostic) => void;
+  recordPlaybackDiagnostic: (eventId: string, diagnostic: NarratorPlaybackDiagnostic) => void;
   clearFeed: () => void;
   resetPolicies: () => void;
 };
@@ -74,6 +77,7 @@ const emptyQueueState = (): NarratorQueueState => ({
   lastSpokenByDedupeKey: {},
   lastSeenByDedupeKey: {},
   deliveryStatusByEventId: {},
+  playbackDiagnosticsByEventId: {},
 });
 
 function createNarratorEvent(input: PublishNarratorEventInput): NarratorEventV1 {
@@ -147,7 +151,7 @@ export const useNarratorStore = create<NarratorState>()(
             },
           },
         })),
-      markQueued: (eventId) =>
+      markQueued: (eventId, diagnostic) =>
         set((current) => ({
           queueState: {
             ...current.queueState,
@@ -158,9 +162,15 @@ export const useNarratorStore = create<NarratorState>()(
               ...current.queueState.deliveryStatusByEventId,
               [eventId]: "queued",
             },
+            playbackDiagnosticsByEventId: diagnostic
+              ? {
+                  ...current.queueState.playbackDiagnosticsByEventId,
+                  [eventId]: diagnostic,
+                }
+              : current.queueState.playbackDiagnosticsByEventId,
           },
         })),
-      markSpoken: (eventId, atMs) =>
+      markSpoken: (eventId, atMs, diagnostic) =>
         set((current) => {
           const event = current.events.find((entry) => entry.eventId === eventId);
           return {
@@ -177,10 +187,16 @@ export const useNarratorStore = create<NarratorState>()(
                 ...current.queueState.deliveryStatusByEventId,
                 [eventId]: "spoken",
               },
+              playbackDiagnosticsByEventId: diagnostic
+                ? {
+                    ...current.queueState.playbackDiagnosticsByEventId,
+                    [eventId]: diagnostic,
+                  }
+                : current.queueState.playbackDiagnosticsByEventId,
             },
           };
         }),
-      markFailed: (eventId) =>
+      markFailed: (eventId, diagnostic) =>
         set((current) => ({
           queueState: {
             ...current.queueState,
@@ -188,6 +204,22 @@ export const useNarratorStore = create<NarratorState>()(
             deliveryStatusByEventId: {
               ...current.queueState.deliveryStatusByEventId,
               [eventId]: "failed",
+            },
+            playbackDiagnosticsByEventId: diagnostic
+              ? {
+                  ...current.queueState.playbackDiagnosticsByEventId,
+                  [eventId]: diagnostic,
+                }
+              : current.queueState.playbackDiagnosticsByEventId,
+          },
+        })),
+      recordPlaybackDiagnostic: (eventId, diagnostic) =>
+        set((current) => ({
+          queueState: {
+            ...current.queueState,
+            playbackDiagnosticsByEventId: {
+              ...current.queueState.playbackDiagnosticsByEventId,
+              [eventId]: diagnostic,
             },
           },
         })),

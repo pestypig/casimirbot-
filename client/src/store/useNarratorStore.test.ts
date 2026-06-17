@@ -15,6 +15,7 @@ describe("useNarratorStore", () => {
         lastSpokenByDedupeKey: {},
         lastSeenByDedupeKey: {},
         deliveryStatusByEventId: {},
+        playbackDiagnosticsByEventId: {},
       },
     }, true);
   });
@@ -76,5 +77,55 @@ describe("useNarratorStore", () => {
 
     expect(event).not.toBeNull();
     expect(useNarratorStore.getState().queueState.deliveryStatusByEventId[event?.eventId ?? ""]).toBe("visible");
+  });
+
+  it("records playback diagnostics with delivery state", () => {
+    const event = useNarratorStore.getState().publishEvent({
+      sourceKind: "workstation_panel",
+      sourceId: "panel:narrator",
+      text: "Playback diagnostic event.",
+      authority: "panel_observation",
+      assistant_answer: false,
+      terminal_eligible: false,
+      evidenceRefs: ["panel:narrator"],
+      rawContentIncluded: false,
+      speakable: true,
+      requestedDeliveryMode: "auto_speak",
+      defaultDeliveryMode: "visible_only",
+    }, { voiceArmed: true, nowMs: 400 });
+
+    expect(event).not.toBeNull();
+    const diagnostic = {
+      schema: "helix.narrator_playback_diagnostic.v1" as const,
+      stage: "ended" as const,
+      startedAtMs: 400,
+      updatedAtMs: 450,
+      provider: "elevenlabs",
+      profile: "vU0dJF9WOwsWEUfX1Aqw",
+      mimeType: "audio/mpeg",
+      audioBytes: 42,
+      playResolved: true,
+      playingObserved: true,
+      endedObserved: true,
+      timeupdateCount: 2,
+      maxCurrentTime: 1.5,
+      duration: 1.5,
+      muted: false,
+      volume: 1,
+      paused: true,
+      readyState: 4,
+      networkState: 1,
+      mediaErrorCode: null,
+      errorMessage: null,
+    };
+    useNarratorStore.getState().markSpoken(event?.eventId ?? "", 450, diagnostic);
+
+    expect(useNarratorStore.getState().queueState.deliveryStatusByEventId[event?.eventId ?? ""]).toBe("spoken");
+    expect(useNarratorStore.getState().queueState.playbackDiagnosticsByEventId[event?.eventId ?? ""]).toMatchObject({
+      stage: "ended",
+      playResolved: true,
+      playingObserved: true,
+      endedObserved: true,
+    });
   });
 });

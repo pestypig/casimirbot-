@@ -8,6 +8,11 @@ import {
   NARRATOR_AUTHORITY_LABELS,
   NARRATOR_SOURCE_LABELS,
 } from "@/lib/narrator/narratorPolicy";
+import {
+  NarratorPlaybackError,
+  playNarratorVoiceResponse,
+  stopNarratorAudioPlayback,
+} from "@/lib/narrator/narratorAudioPlayback";
 import { buildNarratorVoiceSpeakPayload } from "@/lib/narrator/narratorVoiceBridge";
 import { useNarratorStore } from "@/store/useNarratorStore";
 import type {
@@ -59,35 +64,47 @@ export default function NarratorPanel() {
   const markQueued = useNarratorStore((state) => state.markQueued);
   const markSpoken = useNarratorStore((state) => state.markSpoken);
   const markFailed = useNarratorStore((state) => state.markFailed);
+  const recordPlaybackDiagnostic = useNarratorStore((state) => state.recordPlaybackDiagnostic);
   const clearFeed = useNarratorStore((state) => state.clearFeed);
   const resetPolicies = useNarratorStore((state) => state.resetPolicies);
   const [speakingEventId, setSpeakingEventId] = React.useState<string | null>(null);
   const autoSpeakAttemptedEventIdsRef = React.useRef<Set<string>>(new Set());
+  const activeSpeakRef = React.useRef<{ eventId: string; controller: AbortController } | null>(null);
 
   const speakEvent = React.useCallback(async (event: NarratorEventV1) => {
     if (!event.speakable || event.sourceKind === "voice_receipt") return;
+    if (activeSpeakRef.current && activeSpeakRef.current.eventId !== event.eventId) {
+      activeSpeakRef.current.controller.abort();
+      markFailed(activeSpeakRef.current.eventId);
+    }
+    const controller = new AbortController();
+    activeSpeakRef.current = { eventId: event.eventId, controller };
     setSpeakingEventId(event.eventId);
     markQueued(event.eventId);
     try {
       const payload = buildNarratorVoiceSpeakPayload({ event });
-      const response = await speakVoice(payload);
-      if (
-        response.kind === "json" &&
-        (response.status >= 400 ||
-          response.payload.ok === false ||
-          response.payload.suppressed === true ||
-          response.payload.dryRun === true)
-      ) {
-        markFailed(event.eventId);
-      } else {
-        markSpoken(event.eventId);
-      }
-    } catch {
-      markFailed(event.eventId);
+      const response = await speakVoice(payload, { signal: controller.signal });
+      const diagnostic = await playNarratorVoiceResponse(response, {
+        signal: controller.signal,
+        onDiagnostic: (nextDiagnostic) => recordPlaybackDiagnostic(event.eventId, nextDiagnostic),
+      });
+      markSpoken(event.eventId, undefined, diagnostic);
+    } catch (error) {
+      markFailed(
+        event.eventId,
+        error instanceof NarratorPlaybackError ? error.diagnostic : undefined,
+      );
     } finally {
+      if (activeSpeakRef.current?.eventId === event.eventId) activeSpeakRef.current = null;
       setSpeakingEventId(null);
     }
-  }, [markFailed, markQueued, markSpoken]);
+  }, [markFailed, markQueued, markSpoken, recordPlaybackDiagnostic]);
+
+  React.useEffect(() => () => {
+    activeSpeakRef.current?.controller.abort();
+    activeSpeakRef.current = null;
+    stopNarratorAudioPlayback();
+  }, []);
 
   React.useEffect(() => {
     if (speakingEventId) return;
@@ -109,7 +126,7 @@ export default function NarratorPanel() {
 
   const publishDebugProbe = React.useCallback(() => {
     const nowMs = Date.now();
-    publishEvent({
+    const event = publishEvent({
       sourceKind: "workstation_panel",
       sourceId: "panel:narrator:debug_probe",
       sourceLabelMessageId: "narrator.source.workstationPanel",
@@ -125,7 +142,11 @@ export default function NarratorPanel() {
       requestedDeliveryMode: "auto_speak",
       defaultDeliveryMode: "visible_only",
     }, { voiceArmed: true, nowMs });
-  }, [publishEvent]);
+    if (event) {
+      autoSpeakAttemptedEventIdsRef.current.add(event.eventId);
+      void speakEvent(event);
+    }
+  }, [publishEvent, speakEvent]);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-zinc-950 text-zinc-100">
@@ -213,6 +234,7 @@ export default function NarratorPanel() {
             <div className="space-y-2">
               {events.map((event) => {
                 const status = queueState.deliveryStatusByEventId[event.eventId] ?? "visible";
+                const playbackDiagnostic = queueState.playbackDiagnosticsByEventId[event.eventId];
                 const canSpeak = event.speakable && event.sourceKind !== "voice_receipt";
                 return (
                   <article key={event.eventId} className="rounded border border-white/10 bg-black/20 p-3 text-xs">
@@ -234,6 +256,28 @@ export default function NarratorPanel() {
                       {event.traceId ? <span>trace={event.traceId}</span> : null}
                       {event.evidenceRefs.length ? <span>evidence={event.evidenceRefs.length}</span> : null}
                     </div>
+                    {playbackDiagnostic ? (
+                      <div className="mt-2 rounded border border-white/10 bg-zinc-950/80 px-2 py-1 font-mono text-[10px] leading-4 text-zinc-400">
+                        playback={playbackDiagnostic.stage}
+                        {" "}
+                        playResolved={String(playbackDiagnostic.playResolved)}
+                        {" "}
+                        playing={String(playbackDiagnostic.playingObserved)}
+                        {" "}
+                        ended={String(playbackDiagnostic.endedObserved)}
+                        {" "}
+                        timeupdates={playbackDiagnostic.timeupdateCount}
+                        {" "}
+                        current={playbackDiagnostic.maxCurrentTime.toFixed(2)}
+                        {" "}
+                        duration={playbackDiagnostic.duration === null ? "n/a" : playbackDiagnostic.duration.toFixed(2)}
+                        {" "}
+                        volume={playbackDiagnostic.volume === null ? "n/a" : playbackDiagnostic.volume.toFixed(2)}
+                        {" "}
+                        muted={String(playbackDiagnostic.muted)}
+                        {playbackDiagnostic.errorMessage ? ` error=${playbackDiagnostic.errorMessage}` : ""}
+                      </div>
+                    ) : null}
                     <div className="mt-2 flex items-center gap-1">
                       <button
                         type="button"

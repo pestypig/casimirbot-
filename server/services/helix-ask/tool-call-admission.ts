@@ -28,6 +28,48 @@ const readRecord = (value: unknown): Record<string, unknown> | null =>
     ? value as Record<string, unknown>
     : null;
 
+const readString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+
+const readStringArray = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.map((entry: unknown) => readString(entry)).filter((entry: string | null): entry is string => Boolean(entry))
+    : [];
+
+const readNestedRecord = (
+  record: Record<string, unknown> | null | undefined,
+  ...keys: string[]
+): Record<string, unknown> | null => {
+  for (const key of keys) {
+    const nested = readRecord(record?.[key]);
+    if (nested) return nested;
+  }
+  return null;
+};
+
+const readMandatoryToolName = (record: Record<string, unknown> | null | undefined): string | null =>
+  readString(record?.tool_name) ??
+  readString(record?.toolName) ??
+  readString(record?.selected_capability) ??
+  readString(record?.selectedCapability) ??
+  readString(record?.capability) ??
+  readString(record?.required_capability) ??
+  readString(record?.requiredCapability) ??
+  readString(record?.name);
+
+const isCalculatorSolveCapability = (value: string | null | undefined): boolean =>
+  Boolean(value && /^scientific-calculator\.solve(?:_expression|_with_steps)?$/i.test(value.trim()));
+
+const promptRequiresCalculatorExecution = (promptText: string): boolean => {
+  const prompt = promptText.trim();
+  if (!prompt) return false;
+  const namesCalculatorTool = /\bscientific-calculator\.solve(?:_expression|_with_steps)?\b/i.test(prompt);
+  const affirmativeToolVerb = /\b(?:call|run|use|invoke|execute)\b[\s\S]{0,80}\bscientific-calculator\.solve(?:_expression|_with_steps)?\b/i.test(prompt);
+  const receiptOrTerminalCue = /\b(?:calculator_receipt|workstation_tool_evaluation|calculator-backed terminal result|calculator-backed terminal)\b/i.test(prompt);
+  const exactExpressionCue = /\bwith\s+this\s+exact\s+expression\b/i.test(prompt);
+  return namesCalculatorTool && affirmativeToolVerb && (receiptOrTerminalCue || exactExpressionCue);
+};
+
 const HARD_SOURCE_TARGETS = new Set([
   "visual_capture",
   "procedure_memory",
@@ -54,6 +96,31 @@ const HARD_SOURCE_TARGETS = new Set([
   "calculator_solve",
   "calculator_stream",
 ]);
+
+const HELIX_TOOL_CALL_ADMISSION_FAMILIES = new Set<string>([
+  "situation_run",
+  "procedure_memory",
+  "visual_scene_memory",
+  "docs_viewer",
+  "workspace_directory",
+  "repo_code",
+  "scholarly_research",
+  "internet_search",
+  "theory_locator",
+  "runtime_evidence",
+  "workspace_diagnostic",
+  "live_environment",
+  "live_pipeline",
+  "process_graph",
+  "world_event",
+  "calculator",
+  "notes",
+  "workstation_action",
+  "model_only",
+]);
+
+const isToolCallAdmissionFamily = (value: string): value is HelixToolCallAdmissionFamily =>
+  HELIX_TOOL_CALL_ADMISSION_FAMILIES.has(value);
 
 const sourceTargetToolFamilies = (
   sourceTarget: string,
@@ -184,14 +251,26 @@ export function buildToolCallAdmissionDecision(input: {
   turnId: string;
   sourceTargetIntent?: HelixAskSourceTargetIntent | Record<string, unknown> | null;
   routeProductContract?: HelixRouteProductContract | Record<string, unknown> | null;
+  canonicalGoalFrame?: Record<string, unknown> | null;
+  mandatoryNextTool?: Record<string, unknown> | null;
   promptText?: string | null;
 }): HelixToolCallAdmissionDecision {
+  const sourceTargetIntentRecord = readRecord(input.sourceTargetIntent);
+  const routeProductContractRecord = readRecord(input.routeProductContract);
+  const canonicalGoalFrameRecord =
+    readRecord(input.canonicalGoalFrame) ??
+    readNestedRecord(routeProductContractRecord, "canonical_goal_frame", "canonicalGoalFrame", "canonical_goal", "canonicalGoal") ??
+    readNestedRecord(sourceTargetIntentRecord, "canonical_goal_frame", "canonicalGoalFrame", "canonical_goal", "canonicalGoal");
+  const mandatoryNextToolRecord =
+    readRecord(input.mandatoryNextTool) ??
+    readNestedRecord(sourceTargetIntentRecord, "mandatory_next_tool", "mandatoryNextTool") ??
+    readNestedRecord(routeProductContractRecord, "mandatory_next_tool", "mandatoryNextTool");
   const intentSourceTarget = String(
-    (input.sourceTargetIntent as Record<string, unknown> | null | undefined)?.target_source ??
+    sourceTargetIntentRecord?.target_source ??
     "",
   );
   const contractSourceTarget = String(
-    (input.routeProductContract as Record<string, unknown> | null | undefined)?.source_target ??
+    routeProductContractRecord?.source_target ??
     "",
   );
   const sourceTarget = String(
@@ -202,14 +281,10 @@ export function buildToolCallAdmissionDecision(input: {
     "unknown",
   );
   const sourceTargetKind = String(
-    (input.sourceTargetIntent as Record<string, unknown> | null | undefined)?.target_kind ?? "",
+    sourceTargetIntentRecord?.target_kind ?? "",
   );
-  const contractForbidden = Array.isArray((input.routeProductContract as Record<string, unknown> | null | undefined)?.forbidden_terminal_artifact_kinds)
-    ? (input.routeProductContract as Record<string, unknown>).forbidden_terminal_artifact_kinds as string[]
-    : [];
-  const sourceForbiddenRoutes = Array.isArray((input.sourceTargetIntent as Record<string, unknown> | null | undefined)?.suppressed_routes)
-    ? (input.sourceTargetIntent as Record<string, unknown>).suppressed_routes as string[]
-    : [];
+  const contractForbidden = readStringArray(routeProductContractRecord?.forbidden_terminal_artifact_kinds);
+  const sourceForbiddenRoutes = readStringArray(sourceTargetIntentRecord?.suppressed_routes);
   const promptText = String(input.promptText ?? "");
   const operationalConstraints = buildTurnOperationalConstraints({
     turnId: input.turnId,
@@ -224,12 +299,49 @@ export function buildToolCallAdmissionDecision(input: {
   const contextualSuppression = detectContextualToolAdmissionSuppression(promptText);
   const toolUseRestatement = buildToolUseRestatement(promptText);
   const calculatorSolveIntent = calculatorSolveRequested(promptText, input.sourceTargetIntent);
+  const mandatoryToolName = readMandatoryToolName(mandatoryNextToolRecord);
+  const canonicalGoalKind =
+    readString(canonicalGoalFrameRecord?.goal_kind) ??
+    readString(canonicalGoalFrameRecord?.goalKind) ??
+    readString(routeProductContractRecord?.goal_kind) ??
+    readString(routeProductContractRecord?.goalKind) ??
+    readString(sourceTargetIntentRecord?.goal_kind) ??
+    null;
+  const requiredActions = unique([
+    ...readStringArray(routeProductContractRecord?.required_actions),
+    ...readStringArray(routeProductContractRecord?.requiredActions),
+    ...readStringArray(canonicalGoalFrameRecord?.required_actions),
+    ...readStringArray(canonicalGoalFrameRecord?.requiredActions),
+  ]);
+  const mandatoryCalculatorSolve =
+    canonicalGoalKind === "calculator_solve" ||
+    isCalculatorSolveCapability(mandatoryToolName) ||
+    requiredActions.some(isCalculatorSolveCapability) ||
+    promptRequiresCalculatorExecution(promptText);
+  const mandatoryCalculatorBlockedByContext =
+    contextualToolSuppressionBlocksFamily(contextualSuppression, "calculator") ||
+    contextualToolSuppressionBlocksFamily(contextualSuppression, "scientific_calculator") ||
+    contextualToolSuppressionBlocksFamily(contextualSuppression, "workstation_action");
+  const calculatorAdmissionDominatesSourceTarget =
+    mandatoryCalculatorSolve &&
+    !mandatoryCalculatorBlockedByContext &&
+    sourceTarget !== "unknown" &&
+    sourceTarget !== "calculator_stream" &&
+    sourceTarget !== "calculator" &&
+    sourceTarget !== "calculator_solve";
+  const admittedToolFamiliesBeforeMandatoryOverride =
+    calculatorAdmissionDominatesSourceTarget
+      ? sourceTargetToolFamilies(sourceTarget, promptText, input.sourceTargetIntent)
+          .filter(isToolCallAdmissionFamily)
+      : [];
   const effectiveSourceTarget =
-    sourceTarget === "unknown" && toolUseRestatement.requiredToolFamilies.includes("docs_viewer")
+    calculatorAdmissionDominatesSourceTarget
+      ? "calculator_stream"
+      : sourceTarget === "unknown" && toolUseRestatement.requiredToolFamilies.includes("docs_viewer")
       ? "docs_viewer"
       : sourceTarget === "unknown" && toolUseRestatement.requiredToolFamilies.includes("internet_search")
       ? "internet_search"
-      : sourceTarget === "unknown" && calculatorSolveIntent
+      : sourceTarget === "unknown" && (calculatorSolveIntent || mandatoryCalculatorSolve)
       ? "calculator_stream"
       : sourceTarget === "calculator" || sourceTarget === "calculator_solve"
       ? "calculator_stream"
@@ -240,7 +352,7 @@ export function buildToolCallAdmissionDecision(input: {
       effectiveSourceTarget === "unknown" ||
       effectiveSourceTarget === "model_only" ||
       effectiveSourceTarget === "general_background" ||
-      sourceTargetToolFamilies(effectiveSourceTarget, promptText, input.sourceTargetIntent).some((family) =>
+      sourceTargetToolFamilies(effectiveSourceTarget, promptText, input.sourceTargetIntent).some((family: string) =>
         contextualToolSuppressionBlocksFamily(contextualSuppression, family),
       )
     );
@@ -528,10 +640,10 @@ export function buildToolCallAdmissionDecision(input: {
   const uniqueCompoundPromptFamilies = unique(compoundPromptFamilies);
   if (uniqueCompoundPromptFamilies.length > 1) {
     const nextFamilies = unique([
-      ...admittedToolFamilies.filter((family) => family !== "model_only"),
+      ...admittedToolFamilies.filter((family: HelixToolCallAdmissionFamily) => family !== "model_only"),
       ...uniqueCompoundPromptFamilies,
     ]);
-    if (nextFamilies.length > admittedToolFamilies.filter((family) => family !== "model_only").length) {
+    if (nextFamilies.length > admittedToolFamilies.filter((family: HelixToolCallAdmissionFamily) => family !== "model_only").length) {
       admittedToolFamilies = nextFamilies;
       required = true;
       reason = `${reason}+compound_evidence_families_required`;
@@ -550,10 +662,47 @@ export function buildToolCallAdmissionDecision(input: {
       admittedToolFamilies.includes("repo_code")
     );
   if (compoundLocatorRequired && !admittedToolFamilies.includes("theory_locator")) {
-    admittedToolFamilies = [...admittedToolFamilies.filter((family) => family !== "model_only"), "theory_locator"];
+    admittedToolFamilies = [...admittedToolFamilies.filter((family: HelixToolCallAdmissionFamily) => family !== "model_only"), "theory_locator"];
     required = true;
     reason = `${reason}+compound_theory_locator_required`;
   }
+
+  if (calculatorAdmissionDominatesSourceTarget) {
+    reason = `${reason}+mandatory_calculator_admission_dominance`;
+  }
+  const finalAdmittedToolFamilies = unique(admittedToolFamilies);
+  const mandatoryCapabilityAdmitted =
+    mandatoryCalculatorSolve &&
+    finalAdmittedToolFamilies.includes("calculator") &&
+    finalAdmittedToolFamilies.includes("workstation_action");
+  const routeArbitration =
+    mandatoryCalculatorSolve || calculatorAdmissionDominatesSourceTarget
+      ? {
+          schema: "helix.tool_call_admission_route_arbitration.v1" as const,
+          guard_version: "E80" as const,
+          original_source_target: sourceTarget,
+          effective_source_target: effectiveSourceTarget,
+          canonical_goal_kind: canonicalGoalKind,
+          mandatory_next_tool_name: mandatoryToolName,
+          mandatory_capability_family: "calculator" as const,
+          mandatory_capability_admitted: mandatoryCapabilityAdmitted,
+          admitted_tool_families_before_mandatory_override: unique(admittedToolFamiliesBeforeMandatoryOverride),
+          admitted_tool_families_after_mandatory_override: finalAdmittedToolFamilies,
+          calculator_goal_overrode_repo_source_target: calculatorAdmissionDominatesSourceTarget && sourceTarget === "repo_code",
+          repo_code_preserved_as_secondary_context: calculatorAdmissionDominatesSourceTarget && sourceTarget === "repo_code",
+          secondary_source_targets: calculatorAdmissionDominatesSourceTarget && sourceTarget === "repo_code" ? ["repo_code"] : [],
+          tool_admission_reason: reason,
+          tool_admission_dominance_reason: calculatorAdmissionDominatesSourceTarget
+            ? "mandatory_calculator_capability"
+            : null,
+          selected_capability: mandatoryToolName ?? (mandatoryCalculatorSolve ? "scientific-calculator.solve_expression" : null),
+          runtime_capability_rejection_reason: mandatoryCapabilityAdmitted ? null : "mandatory_capability_not_admitted",
+          first_broken_rail: mandatoryCapabilityAdmitted ? null : "capability_execution" as const,
+          repair_target: mandatoryCapabilityAdmitted ? null : "tool_admission" as const,
+          assistant_answer: false as const,
+          raw_content_included: false as const,
+        }
+      : null;
 
   return {
     schema: HELIX_TOOL_CALL_ADMISSION_DECISION_SCHEMA,
@@ -562,7 +711,7 @@ export function buildToolCallAdmissionDecision(input: {
     ...(admissionMode !== "direct" ? { admission_mode: admissionMode } : {}),
     ...(discoveryPolicy ? { discovery_policy: discoveryPolicy } : {}),
     required,
-    admitted_tool_families: unique(admittedToolFamilies),
+    admitted_tool_families: finalAdmittedToolFamilies,
     forbidden_terminal_artifact_kinds: unique([
       ...contractForbidden,
       ...extraForbiddenTerminalKinds,
@@ -585,6 +734,34 @@ export function buildToolCallAdmissionDecision(input: {
     ]),
     required_surface: operationalFields.required_surface,
     reason,
+    ...(routeArbitration
+      ? {
+          route_arbitration_guard_version: "E80" as const,
+          original_source_target: routeArbitration.original_source_target,
+          effective_source_target: routeArbitration.effective_source_target,
+          canonical_goal_kind: routeArbitration.canonical_goal_kind,
+          mandatory_next_tool_name: routeArbitration.mandatory_next_tool_name,
+          mandatory_capability_family: routeArbitration.mandatory_capability_family,
+          mandatory_capability_admitted: routeArbitration.mandatory_capability_admitted,
+          admitted_tool_families_before_mandatory_override:
+            routeArbitration.admitted_tool_families_before_mandatory_override,
+          admitted_tool_families_after_mandatory_override:
+            routeArbitration.admitted_tool_families_after_mandatory_override,
+          calculator_goal_overrode_repo_source_target:
+            routeArbitration.calculator_goal_overrode_repo_source_target,
+          repo_code_preserved_as_secondary_context:
+            routeArbitration.repo_code_preserved_as_secondary_context,
+          tool_admission_reason: routeArbitration.tool_admission_reason,
+          tool_admission_dominance_reason: routeArbitration.tool_admission_dominance_reason,
+          selected_capability: routeArbitration.selected_capability,
+          executed_capability: null,
+          runtime_capability_rejection_reason:
+            routeArbitration.runtime_capability_rejection_reason,
+          first_broken_rail: routeArbitration.first_broken_rail,
+          repair_target: routeArbitration.repair_target,
+          route_arbitration: routeArbitration,
+        }
+      : {}),
     assistant_answer: false,
     raw_content_included: false,
   };
@@ -602,6 +779,8 @@ export function ensureToolCallAdmissionDecisionForPayload(input: {
     promptText: input.promptText,
     sourceTargetIntent: readRecord(input.payload.source_target_intent),
     routeProductContract: readRecord(input.payload.route_product_contract),
+    canonicalGoalFrame: readRecord(input.payload.canonical_goal_frame),
+    mandatoryNextTool: readRecord(input.payload.mandatory_next_tool),
   });
   input.payload.tool_call_admission_decision = decision;
   return decision;

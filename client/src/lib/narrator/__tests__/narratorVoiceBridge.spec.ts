@@ -3,7 +3,11 @@ import {
   NARRATOR_EVENT_SCHEMA,
   type NarratorEventV1,
 } from "@shared/contracts/narrator-event.v1";
-import { buildNarratorVoiceSpeakPayload } from "../narratorVoiceBridge";
+import {
+  NARRATOR_AUNTIE_DOTTIE_VOICE_PROFILE_ID,
+  NARRATOR_VOICE_PROVIDER,
+  buildNarratorVoiceSpeakPayload,
+} from "../narratorVoiceBridge";
 
 const event: NarratorEventV1 = {
   schemaVersion: NARRATOR_EVENT_SCHEMA,
@@ -31,6 +35,9 @@ describe("narrator voice bridge", () => {
       text: event.text,
       mode: "callout",
       chunkKind: "panel_narration",
+      provider: NARRATOR_VOICE_PROVIDER,
+      voiceProfile: NARRATOR_AUNTIE_DOTTIE_VOICE_PROFILE_ID,
+      voice_profile_id: NARRATOR_AUNTIE_DOTTIE_VOICE_PROFILE_ID,
       traceId: "trace:1",
       turnKey: "turn:1",
       evidenceRefs: ["panel:receipt:1"],
@@ -52,5 +59,17 @@ describe("narrator voice bridge", () => {
         terminal_eligible: true,
       },
     }).chunkKind).toBe("final");
+  });
+
+  it("allows callers to override the provider and voice profile", () => {
+    expect(buildNarratorVoiceSpeakPayload({
+      event,
+      provider: "local-chatterbox",
+      voiceProfileId: "dottie_default",
+    })).toMatchObject({
+      provider: "local-chatterbox",
+      voiceProfile: "dottie_default",
+      voice_profile_id: "dottie_default",
+    });
   });
 });

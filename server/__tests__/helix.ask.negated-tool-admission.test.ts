@@ -8,6 +8,7 @@ import { buildHelixCapabilityItinerary } from "../services/helix-ask/capability-
 import { buildCapabilityPlan } from "../services/helix-ask/capability-planner";
 import { buildSolverContinuationObservation } from "../services/helix-ask/solver-continuation";
 import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
+import { __testHelixRuntimeToolCallValidation } from "../routes/agi.plan";
 
 const turnId = "ask:test:negated-tool-admission";
 const threadId = "helix-ask:test";
@@ -326,6 +327,141 @@ describe("Helix Ask negated/contextual tool admission", () => {
     expect(admission.forbidden_tool_families ?? []).not.toEqual(
       expect.arrayContaining(["calculator", "workstation_action"]),
     );
+  });
+
+  it("lets mandatory calculator admission dominate repo-code debug wording", () => {
+    const promptText =
+      "Call scientific-calculator.solve_expression with this exact expression: ((sqrt(81)+ln(e^3))*7-5^2)/2. " +
+      "Use the calculator tool, wait for calculator_receipt, re-enter that receipt as evidence, and answer only from the calculator-backed terminal result. " +
+      "Evaluate the project_local_agent_loop rail after the calculator observation.";
+    const sourceTargetIntent = {
+      schema: "helix.ask_source_target_intent.v1",
+      turn_id: turnId,
+      thread_id: threadId,
+      target_source: "repo_code",
+      target_kind: "repo_code",
+      strength: "hard",
+      explicit_cues: ["project_local_agent_loop"],
+      reasons: ["explicit_repo_code_source_target", "project_local_agent_loop"],
+      requested_outputs: ["repo_code", "tool_call_eligibility", "terminal_contract"],
+      suppressed_routes: ["model_only_concept", "no_tool_direct"],
+      precedence_reason: "explicit_repo_code_source_target",
+      must_enter_backend_ask: true,
+      allow_client_shortcut: false,
+      allow_no_tool_direct: false,
+      confidence: 0.97,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const admission = buildToolCallAdmissionDecision({
+      turnId,
+      sourceTargetIntent,
+      promptText,
+      mandatoryNextTool: {
+        schema: "helix.mandatory_next_tool.v1",
+        tool_name: "scientific-calculator.solve_expression",
+      },
+      canonicalGoalFrame: {
+        goal_kind: "calculator_solve",
+        required_terminal_kind: "workstation_tool_evaluation",
+        required_actions: ["scientific-calculator.solve_expression"],
+      },
+    });
+
+    expect(admission).toMatchObject({
+      source_target: "calculator_stream",
+      required: true,
+      admitted_tool_families: expect.arrayContaining(["calculator", "workstation_action"]),
+      route_arbitration_guard_version: "E80",
+      original_source_target: "repo_code",
+      effective_source_target: "calculator_stream",
+      canonical_goal_kind: "calculator_solve",
+      mandatory_next_tool_name: "scientific-calculator.solve_expression",
+      mandatory_capability_family: "calculator",
+      mandatory_capability_admitted: true,
+      calculator_goal_overrode_repo_source_target: true,
+      repo_code_preserved_as_secondary_context: true,
+      tool_admission_dominance_reason: "mandatory_calculator_capability",
+      runtime_capability_rejection_reason: null,
+    });
+    expect(admission.reason).toContain("mandatory_calculator_admission_dominance");
+    expect(admission.forbidden_tool_families ?? []).not.toEqual(
+      expect.arrayContaining(["calculator", "workstation_action"]),
+    );
+  });
+
+  it("keeps pure repo-code tool-call eligibility questions on the repo rail", () => {
+    const promptText =
+      "Starting from the top of the agentic turn-based system, can the agent make the right tool calls? Cite the repo paths.";
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, sourceTargetIntent, promptText });
+
+    expect(sourceTargetIntent.reasons).toContain("project_local_agent_loop");
+    expect(admission).toMatchObject({
+      source_target: "repo_code",
+      required: true,
+      admitted_tool_families: ["repo_code"],
+      reason: "repo_code_requires_repo_evidence_path",
+    });
+    expect(admission.admitted_tool_families).not.toContain("calculator");
+    expect(admission.route_arbitration_guard_version).toBeUndefined();
+  });
+
+  it("classifies mandatory calculator admission rejection for one-shot fail closed handling", () => {
+    const validation = __testHelixRuntimeToolCallValidation.validateHelixRuntimeToolCall({
+      call: {
+        schema: "helix.runtime_tool_call.v1",
+        turn_id: turnId,
+        call_id: "tool:test:calculator-denied",
+        capability_key: "scientific-calculator.solve_expression",
+        args: { expression: "((sqrt(81)+ln(e^3))*7-5^2)/2" },
+        reason: "test",
+        expected_artifacts: ["calculator_receipt", "workstation_tool_evaluation"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      availableCapabilities: availableCapabilities(["scientific-calculator.solve_expression"]) as any,
+      toolCallAdmissionDecision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        turn_id: turnId,
+        source_target: "repo_code",
+        required: true,
+        admitted_tool_families: ["repo_code"],
+        forbidden_terminal_artifact_kinds: ["direct_answer_text", "no_tool_direct", "model_only_concept"],
+        forbidden_routes: ["model_only_concept", "no_tool_direct"],
+        reason: "repo_code_requires_repo_evidence_path",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    }).validation;
+
+    expect(validation.valid).toBe(false);
+    expect(validation.errors).toEqual(
+      expect.arrayContaining([
+        "runtime_capability_not_admitted_by_tool_policy:scientific-calculator.solve_expression:calculator|workstation_action",
+        "runtime_tool_forbidden_by_tool_policy:scientific-calculator.solve_expression",
+      ]),
+    );
+    expect(__testHelixRuntimeToolCallValidation.isMandatoryCapabilityAdmissionRejection({
+      payload: {
+        mandatory_next_tool: {
+          schema: "helix.mandatory_next_tool.v1",
+          tool_name: "scientific-calculator.solve_expression",
+        },
+      },
+      runtimeToolCall: {
+        schema: "helix.runtime_tool_call.v1",
+        turn_id: turnId,
+        call_id: "tool:test:calculator-denied",
+        capability_key: "scientific-calculator.solve_expression",
+        args: { expression: "((sqrt(81)+ln(e^3))*7-5^2)/2" },
+        reason: "test",
+        expected_artifacts: ["calculator_receipt", "workstation_tool_evaluation"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      runtimeToolValidation: validation,
+    })).toBe(true);
   });
 
   it("suppresses quoted and negated calculator mentions before tool admission", () => {

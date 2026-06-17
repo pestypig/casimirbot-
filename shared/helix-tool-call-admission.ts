@@ -26,6 +26,30 @@ export type HelixToolCallAdmissionMode =
   | "direct"
   | "unknown_source_discovery";
 
+export type HelixToolCallAdmissionRouteArbitration = {
+  schema: "helix.tool_call_admission_route_arbitration.v1";
+  guard_version: "E80";
+  original_source_target: string;
+  effective_source_target: string;
+  canonical_goal_kind: string | null;
+  mandatory_next_tool_name: string | null;
+  mandatory_capability_family: HelixToolCallAdmissionFamily | null;
+  mandatory_capability_admitted: boolean;
+  admitted_tool_families_before_mandatory_override: HelixToolCallAdmissionFamily[];
+  admitted_tool_families_after_mandatory_override: HelixToolCallAdmissionFamily[];
+  calculator_goal_overrode_repo_source_target: boolean;
+  repo_code_preserved_as_secondary_context: boolean;
+  secondary_source_targets: string[];
+  tool_admission_reason: string;
+  tool_admission_dominance_reason: string | null;
+  selected_capability: string | null;
+  runtime_capability_rejection_reason: string | null;
+  first_broken_rail: "capability_execution" | null;
+  repair_target: "tool_admission" | null;
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
 export type HelixToolCallAdmissionDecision = {
   schema: typeof HELIX_TOOL_CALL_ADMISSION_DECISION_SCHEMA;
   turn_id: string;
@@ -46,6 +70,25 @@ export type HelixToolCallAdmissionDecision = {
   operational_constraints_ref?: string;
   required_surface?: string | null;
   reason: string;
+  route_arbitration_guard_version?: "E80";
+  original_source_target?: string;
+  effective_source_target?: string;
+  canonical_goal_kind?: string | null;
+  mandatory_next_tool_name?: string | null;
+  mandatory_capability_family?: HelixToolCallAdmissionFamily | null;
+  mandatory_capability_admitted?: boolean;
+  admitted_tool_families_before_mandatory_override?: HelixToolCallAdmissionFamily[];
+  admitted_tool_families_after_mandatory_override?: HelixToolCallAdmissionFamily[];
+  calculator_goal_overrode_repo_source_target?: boolean;
+  repo_code_preserved_as_secondary_context?: boolean;
+  tool_admission_reason?: string;
+  tool_admission_dominance_reason?: string | null;
+  selected_capability?: string | null;
+  executed_capability?: string | null;
+  runtime_capability_rejection_reason?: string | null;
+  first_broken_rail?: "capability_execution" | null;
+  repair_target?: "tool_admission" | null;
+  route_arbitration?: HelixToolCallAdmissionRouteArbitration;
   tool_admission_suppressed?: boolean;
   suppression_reason?: string;
   assistant_answer: false;

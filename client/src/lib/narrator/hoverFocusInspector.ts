@@ -1,5 +1,9 @@
 import { useEffect, useRef } from "react";
-import { speakVoice, type VoiceSpeakResponse } from "@/lib/agi/api";
+import { speakVoice } from "@/lib/agi/api";
+import {
+  NarratorPlaybackError,
+  playNarratorVoiceResponse,
+} from "@/lib/narrator/narratorAudioPlayback";
 import { buildNarratorVoiceSpeakPayload } from "@/lib/narrator/narratorVoiceBridge";
 import { useNarratorStore } from "@/store/useNarratorStore";
 
@@ -204,16 +208,6 @@ export function buildHoverFocusNarratorInspection(
   };
 }
 
-function isFailedVoiceResponse(response: VoiceSpeakResponse): boolean {
-  return Boolean(
-    response.kind === "json" &&
-      (response.status >= 400 ||
-        response.payload.ok === false ||
-        response.payload.suppressed === true ||
-        response.payload.dryRun === true),
-  );
-}
-
 export function useNarratorHoverFocusInspector(options?: {
   hoverDelayMs?: number;
   chunkMaxChars?: number;
@@ -223,6 +217,7 @@ export function useNarratorHoverFocusInspector(options?: {
   const markQueued = useNarratorStore((state) => state.markQueued);
   const markSpoken = useNarratorStore((state) => state.markSpoken);
   const markFailed = useNarratorStore((state) => state.markFailed);
+  const recordPlaybackDiagnostic = useNarratorStore((state) => state.recordPlaybackDiagnostic);
   const timerRef = useRef<number | null>(null);
   const activeRef = useRef<{ key: string; controller: AbortController; eventId: string } | null>(null);
   const lastKeyRef = useRef<string | null>(null);
@@ -238,7 +233,10 @@ export function useNarratorHoverFocusInspector(options?: {
       }
     };
     const abortActive = () => {
-      activeRef.current?.controller.abort();
+      if (activeRef.current) {
+        activeRef.current.controller.abort();
+        markFailed(activeRef.current.eventId);
+      }
       activeRef.current = null;
     };
     const schedule = (target: EventTarget | null, point?: HoverFocusNarratorPoint) => {
@@ -271,17 +269,20 @@ export function useNarratorHoverFocusInspector(options?: {
         activeRef.current = { key: inspection.dedupeKey, controller, eventId: event.eventId };
         markQueued(event.eventId);
         void speakVoice(buildNarratorVoiceSpeakPayload({ event, text: inspection.text }), { signal: controller.signal })
-          .then((response) => {
+          .then(async (response) => {
             if (controller.signal.aborted) return;
-            if (isFailedVoiceResponse(response)) {
-              markFailed(event.eventId);
-            } else {
-              markSpoken(event.eventId);
-            }
+            const diagnostic = await playNarratorVoiceResponse(response, {
+              signal: controller.signal,
+              onDiagnostic: (nextDiagnostic) => recordPlaybackDiagnostic(event.eventId, nextDiagnostic),
+            });
+            markSpoken(event.eventId, undefined, diagnostic);
           })
           .catch((error) => {
             if (controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) return;
-            markFailed(event.eventId);
+            markFailed(
+              event.eventId,
+              error instanceof NarratorPlaybackError ? error.diagnostic : undefined,
+            );
           })
           .finally(() => {
             if (activeRef.current?.eventId === event.eventId) activeRef.current = null;
@@ -304,5 +305,5 @@ export function useNarratorHoverFocusInspector(options?: {
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("focusin", onFocusIn);
     };
-  }, [markFailed, markQueued, markSpoken, options?.hoverDelayMs, policy?.deliveryMode, policy?.enabled, publishEvent]);
+  }, [markFailed, markQueued, markSpoken, options?.hoverDelayMs, policy?.deliveryMode, policy?.enabled, publishEvent, recordPlaybackDiagnostic]);
 }

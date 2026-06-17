@@ -1372,6 +1372,96 @@ describe("final_answer_draft terminal selection", () => {
     expect(payload.terminal_error_code).toBeUndefined();
   });
 
+  it("lets satisfied calculator workstation evaluation supersede stale continuation state", () => {
+    const turnId = "ask:test:calculator-evaluation-stale-continuation";
+    const terminalText = "Calculator-backed result: ((sqrt(81)+ln(e^3))*7-5^2)/2 = 29.5.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:workstation_tool_evaluation`,
+        kind: "workstation_tool_evaluation",
+        payload: {
+          schema: "helix.workstation_tool_evaluation.v1",
+          evaluation_id: `${turnId}:workstation_tool_evaluation`,
+          supports_goal: true,
+          result_summary: terminalText,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "calculator_solve",
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      source_target_intent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "calculator_stream",
+        target_kind: "calculator_stream",
+      },
+      route_product_contract: {
+        ...modelOnlyContract(turnId),
+        source_target: "calculator_stream",
+        allowed_terminal_artifact_kinds: ["workstation_tool_evaluation", "typed_failure"],
+        required_terminal_kinds: ["workstation_tool_evaluation"],
+      },
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        canonical_goal_kind: "calculator_solve",
+        required_terminal_kind: "workstation_tool_evaluation",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+        observed_results: [
+          {
+            ref: `${turnId}:workstation_tool_evaluation`,
+            kind: "workstation_tool_evaluation",
+            status: "observed",
+            supports_goal: true,
+          },
+        ],
+      },
+      solver_continuation_observation: {
+        schema: "helix.solver_continuation_observation.v1",
+        required_next_step: "model.synthesize_from_tool_observation",
+      },
+      pending_server_request: {
+        schema: "helix.pending_server_request.v1",
+        reason: "stale_continuation",
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: "I could not produce a terminal answer for this turn.",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "pending_request_missing",
+    };
+    addCalculatorRuntimeProof(payload, `${turnId}:workstation_tool_evaluation`);
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(result.source).toBe("workstation_tool_evaluation");
+    expect(result.rejected_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          reason: "stale_solver_continuation_superseded_by_workstation_terminal",
+        }),
+      ]),
+    );
+    expect(payload.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(payload.final_answer_source).toBe("workstation_tool_evaluation");
+    expect(payload.selected_final_answer).toBe(terminalText);
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect(payload.pending_server_request).toBeUndefined();
+    expect(payload.pending_request).toBeUndefined();
+    expect(payload.stale_pending_server_request).toEqual(
+      expect.objectContaining({ reason: "stale_continuation" }),
+    );
+  });
+
   it("keeps calculator receipts as side artifacts when a final draft explains the result", () => {
     const turnId = "ask:test:calculator-draft";
     const artifacts = [

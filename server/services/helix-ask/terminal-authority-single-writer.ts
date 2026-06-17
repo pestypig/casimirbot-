@@ -453,6 +453,9 @@ const artifactText = (artifact: ArtifactLike): string | null => {
   return (
     readString(payload?.answer_text) ??
     readString(payload?.text) ??
+    readString(payload?.summary) ??
+    readString(payload?.result_summary) ??
+    readString(payload?.result_text) ??
     readString(payload?.visible_text) ??
     readString(artifactPayload(artifact)?.message)
   );
@@ -927,6 +930,8 @@ const workstationToolEvaluationText = (artifact: ArtifactLike): string | null =>
   return (
     artifactText(artifact) ??
     readString(payload?.summary) ??
+    readString(payload?.result_summary) ??
+    readString(payload?.result_text) ??
     readString(readRecord(payload?.result)?.summary) ??
     readString(readRecord(payload?.result)?.text) ??
     readString(readRecord(payload?.evaluation)?.summary)
@@ -1192,6 +1197,9 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const stagePlayTerminalMaterialized =
     usableDraftMaterialization &&
     isStagePlayPostObservationSynthesisText(latestDraftForContinuation?.text);
+  const selectedWorkstationToolEvaluation = findGoalSatisfyingWorkstationToolEvaluationArtifact(input.payload, artifacts);
+  const workstationTerminalMaterialized =
+    Boolean(selectedWorkstationToolEvaluation) && goalAllowsTerminal;
   const solverContinuationPending =
     rawSolverContinuationPending &&
     !(
@@ -1199,7 +1207,8 @@ export function applyHelixTerminalAuthoritySingleWriter(
       (docsTerminalMaterialized && goalAllowsTerminal) ||
       docsTerminalMatchesRequiredGoal ||
       (scholarlyTerminalMaterialized && goalAllowsTerminal) ||
-      (stagePlayTerminalMaterialized && goalAllowsTerminal)
+      (stagePlayTerminalMaterialized && goalAllowsTerminal) ||
+      workstationTerminalMaterialized
     );
   if (solverContinuationPending) {
     const pendingText =
@@ -1240,6 +1249,11 @@ export function applyHelixTerminalAuthoritySingleWriter(
       kind: "typed_failure",
       reason: "stale_solver_continuation_superseded_by_stage_play_terminal",
     });
+  } else if (rawSolverContinuationPending && workstationTerminalMaterialized) {
+    rejectedCandidates.push({
+      kind: "typed_failure",
+      reason: "stale_solver_continuation_superseded_by_workstation_terminal",
+    });
   }
   const selectedDraftCandidate = compoundCoverageFailedClosed ? null : findSelectedDraftAfterRequiredObservation(artifacts);
   const selectedDraftRejectedForStaleObservation =
@@ -1266,7 +1280,6 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const deterministicReceiptFallbackDraft = selectedDraft
     ? null
     : findDeterministicReceiptFallbackDraftAfterRequiredObservation(artifacts);
-  const selectedWorkstationToolEvaluation = findGoalSatisfyingWorkstationToolEvaluationArtifact(input.payload, artifacts);
   const selectedGoalArtifact =
     findGoalSatisfyingDocumentArtifact(input.payload, artifacts) ??
     findGoalSatisfyingVisualSituationArtifact(input.payload, artifacts);
