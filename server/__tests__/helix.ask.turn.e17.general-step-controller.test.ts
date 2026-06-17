@@ -94,7 +94,7 @@ describe("helix ask turn e17 general step controller", () => {
     expect(response.body?.planner_contract?.plan_items?.map((step: any) => step?.id)).toContain("assistant_direct_answer");
     expect(response.body?.final_answer_contract_family).toBe("simple");
     expect(response.body?.final_answer_contract_pass).toBe(true);
-  }, 45000);
+  }, 20000);
 
   it("answers Helix Ask capability help with a concrete capability summary", async () => {
     const app = await createApp();
@@ -160,7 +160,7 @@ describe("helix ask turn e17 general step controller", () => {
     expect(response.body?.terminal_artifact_kind).toBe("capability_help_summary");
     expect(response.body?.route_product_contract?.allowed_terminal_artifact_kinds).toContain("capability_help_summary");
     expect(response.body?.solver_controller_decision?.decision).toBe("allow_terminal");
-  }, 20000);
+  }, 45000);
 
   it("routes Helix Ask tool availability wording through the capability catalog", async () => {
     const app = await createApp();

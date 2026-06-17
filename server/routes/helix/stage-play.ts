@@ -115,6 +115,8 @@ import {
 const helixStagePlayRouter = Router();
 const STAGE_PLAY_ROUTE_MAX_BODY_BYTES = 256 * 1024;
 const DEFAULT_STAGE_PLAY_MAILBOX_THREAD_ID = "helix-ask:desktop";
+const DOCUMENT_MARKDOWN_TRANSLATION_MAX_UNITS_PER_MAIL = 3;
+const DOCUMENT_MARKDOWN_TRANSLATION_MAX_CHARS_PER_MAIL = 2200;
 
 const setCors = (res: Response) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -1516,8 +1518,12 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
       readQueryString(body.sourceId) ??
       readQueryString(body.source_id) ??
       `document_markdown:${docPath}`;
+    const chunkId =
+      readQueryString(body.chunkId) ??
+      readQueryString(body.chunk_id) ??
+      `document_markdown_chunk:${sourceHash ?? "no_hash"}:${Date.now().toString(36)}`;
     const rawUnits = Array.isArray(body.units) ? body.units : [];
-    const units = rawUnits
+    const parsedUnits = rawUnits
       .map((unit) => readRecord(unit))
       .filter((unit): unit is Record<string, unknown> => Boolean(unit))
       .map((unit) => ({
@@ -1531,8 +1537,17 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
             ? unit.protectedSpans.filter((entry): entry is string => typeof entry === "string")
             : [],
       }))
-      .filter((unit) => unit.unit_id && unit.source_markdown)
-      .slice(0, 12);
+      .filter((unit) => unit.unit_id && unit.source_markdown);
+    const units: typeof parsedUnits = [];
+    let acceptedChars = 0;
+    for (const unit of parsedUnits) {
+      if (units.length >= DOCUMENT_MARKDOWN_TRANSLATION_MAX_UNITS_PER_MAIL) break;
+      const nextChars = acceptedChars + unit.source_markdown.length;
+      if (units.length > 0 && nextChars > DOCUMENT_MARKDOWN_TRANSLATION_MAX_CHARS_PER_MAIL) break;
+      units.push(unit);
+      acceptedChars = nextChars;
+    }
+    const deferredUnits = Math.max(0, parsedUnits.length - units.length);
 
     if (units.length === 0) {
       return res.status(400).json({
@@ -1548,16 +1563,25 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
     const unitIds = units.map((unit) => unit.unit_id);
     const summaryText = JSON.stringify({
       schema: "stage_play.document_markdown_visible_units.v1",
+      chunk_id: chunkId,
       doc_path: docPath,
       source_hash: sourceHash,
       locale,
+      traffic: {
+        accepted_units: units.length,
+        deferred_units: deferredUnits,
+        accepted_chars: acceptedChars,
+        max_units: DOCUMENT_MARKDOWN_TRANSLATION_MAX_UNITS_PER_MAIL,
+        max_chars: DOCUMENT_MARKDOWN_TRANSLATION_MAX_CHARS_PER_MAIL,
+      },
       units,
     });
-    const summaryPreview = `${docPath}: ${units.length} visible Markdown unit${units.length === 1 ? "" : "s"} for ${locale} inline translation.`;
+    const summaryPreview = `${docPath}: chunk ${chunkId}; ${units.length} visible Markdown unit${units.length === 1 ? "" : "s"} for ${locale} inline translation${deferredUnits ? `; ${deferredUnits} deferred` : ""}.`;
     const evidenceRef = [
       "document_markdown",
       docPath,
       sourceHash,
+      chunkId,
       unitIds.join(","),
     ].filter(Boolean).join(":");
     const roomId = readQueryString(body.roomId) ?? readQueryString(body.room_id);
@@ -1590,6 +1614,14 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
       schema: "stage_play_document_markdown_mail_enqueue_response/v1",
       mail,
       wakeRequest,
+      traffic: {
+        chunkId,
+        acceptedUnits: units.length,
+        deferredUnits,
+        acceptedChars,
+        maxUnits: DOCUMENT_MARKDOWN_TRANSLATION_MAX_UNITS_PER_MAIL,
+        maxChars: DOCUMENT_MARKDOWN_TRANSLATION_MAX_CHARS_PER_MAIL,
+      },
       sourceKind: "document_markdown",
       sourceId,
       mailboxThreadId: threadId,

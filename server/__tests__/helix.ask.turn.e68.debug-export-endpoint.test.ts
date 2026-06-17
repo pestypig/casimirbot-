@@ -24,6 +24,66 @@ beforeEach(() => {
   runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
 });
 
+const expectNullableStringField = (record: Record<string, unknown>, key: string): void => {
+  expect(record).toHaveProperty(key);
+  const value = record[key];
+  expect(value === null || typeof value === "string").toBe(true);
+};
+
+const CODEX_PARITY_CLASSES = [
+  "complete",
+  "tool_surface_missing",
+  "explicit_capability_demoted",
+  "tool_admission_rejected",
+  "selected_not_executed",
+  "observation_missing",
+  "observation_not_reentered",
+  "goal_contract_mismatch",
+  "terminal_product_not_allowed",
+  "terminal_authority_mismatch",
+  "visible_projection_mismatch",
+  "debug_mirror_stale",
+  "provider_config_missing",
+];
+
+const expectCodexParityRailTableShape = (railTable: Record<string, unknown>, turnId: string): void => {
+  expect(railTable).toMatchObject({
+    schema: "helix.codex_parity_agent_spine_rail_table.v1",
+    turn_id: turnId,
+    assistant_answer: false,
+    raw_content_included: false,
+  });
+  expectNullableStringField(railTable, "prompt");
+  expect(Array.isArray(railTable.visible_tool_surface)).toBe(true);
+  for (const key of [
+    "requested_capability",
+    "selected_capability",
+    "admitted_capability",
+    "executed_capability",
+    "observation_kind",
+    "observation_ref",
+    "goal_satisfaction",
+    "required_terminal_kind",
+    "selected_terminal_kind",
+    "visible_terminal_kind",
+    "first_broken_rail",
+    "repair_target",
+    "rail_failure_code",
+  ]) {
+    expectNullableStringField(railTable, key);
+  }
+  expect(["reentered", "not_reentered", "no_observation"]).toContain(railTable.reentry_status);
+  expect(["complete", "broken", "fail_closed"]).toContain(railTable.rail_status);
+  expect(CODEX_PARITY_CLASSES).toContain(railTable.codex_parity_class);
+  if (railTable.codex_parity_class === "complete" || railTable.rail_status === "complete") {
+    expect(railTable.first_broken_rail).toBeNull();
+    expect(railTable.rail_failure_code).toBeNull();
+  } else {
+    expect(typeof railTable.first_broken_rail).toBe("string");
+    expect(String(railTable.first_broken_rail).length).toBeGreaterThan(0);
+  }
+};
+
 describe("helix ask E68 debug export endpoint", () => {
   it("returns a canonical active-turn debug export matching the completed turn", async () => {
     const app = createApp();
@@ -61,6 +121,41 @@ describe("helix ask E68 debug export endpoint", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+    const indexedRailTable = debugExport.body?.payload?.artifact_query_index?.codex_parity_agent_spine_rail_table;
+    const payloadRailTable = debugExport.body?.payload?.codex_parity_agent_spine_rail_table;
+    const debugRailTable = debugExport.body?.payload?.debug?.codex_parity_agent_spine_rail_table;
+    const debugIndexedRailTable =
+      debugExport.body?.payload?.debug?.artifact_query_index?.codex_parity_agent_spine_rail_table;
+    expect(indexedRailTable && typeof indexedRailTable === "object" && !Array.isArray(indexedRailTable)).toBe(true);
+    expect(payloadRailTable && typeof payloadRailTable === "object" && !Array.isArray(payloadRailTable)).toBe(true);
+    expect(debugRailTable && typeof debugRailTable === "object" && !Array.isArray(debugRailTable)).toBe(true);
+    expect(debugIndexedRailTable && typeof debugIndexedRailTable === "object" && !Array.isArray(debugIndexedRailTable)).toBe(true);
+    expectCodexParityRailTableShape(indexedRailTable as Record<string, unknown>, turnId);
+    expectCodexParityRailTableShape(payloadRailTable as Record<string, unknown>, turnId);
+    expectCodexParityRailTableShape(debugRailTable as Record<string, unknown>, turnId);
+    expectCodexParityRailTableShape(debugIndexedRailTable as Record<string, unknown>, turnId);
+    expect(indexedRailTable.prompt).toBe("Open Scientific Calculator");
+    expect(payloadRailTable.prompt).toBe("Open Scientific Calculator");
+    expect(debugRailTable.prompt).toBe("Open Scientific Calculator");
+    expect(debugIndexedRailTable.prompt).toBe("Open Scientific Calculator");
+    expect(debugRailTable).toMatchObject({
+      codex_parity_class: payloadRailTable.codex_parity_class,
+      first_broken_rail: payloadRailTable.first_broken_rail,
+      repair_target: payloadRailTable.repair_target,
+    });
+    expect(indexedRailTable).toMatchObject({
+      codex_parity_class: payloadRailTable.codex_parity_class,
+      first_broken_rail: payloadRailTable.first_broken_rail,
+      repair_target: payloadRailTable.repair_target,
+    });
+    expect(debugIndexedRailTable).toMatchObject({
+      codex_parity_class: payloadRailTable.codex_parity_class,
+      first_broken_rail: payloadRailTable.first_broken_rail,
+      repair_target: payloadRailTable.repair_target,
+    });
+    expect(indexedRailTable).toEqual(payloadRailTable);
+    expect(debugRailTable).toEqual(payloadRailTable);
+    expect(debugIndexedRailTable).toEqual(payloadRailTable);
     expect(debugExport.body?.payload?.tool_turn_chain_audit).toMatchObject({
       schema: "helix.tool_turn_chain_audit.v1",
       assistant_answer: false,

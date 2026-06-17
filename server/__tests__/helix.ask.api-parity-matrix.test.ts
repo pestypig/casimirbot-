@@ -70,6 +70,66 @@ const resetAll = (): void => {
   resetInterpretationCardsForTest();
 };
 
+const expectNullableStringField = (record: Record<string, unknown>, key: string): void => {
+  expect(record).toHaveProperty(key);
+  const value = record[key];
+  expect(value === null || typeof value === "string").toBe(true);
+};
+
+const CODEX_PARITY_CLASSES = [
+  "complete",
+  "tool_surface_missing",
+  "explicit_capability_demoted",
+  "tool_admission_rejected",
+  "selected_not_executed",
+  "observation_missing",
+  "observation_not_reentered",
+  "goal_contract_mismatch",
+  "terminal_product_not_allowed",
+  "terminal_authority_mismatch",
+  "visible_projection_mismatch",
+  "debug_mirror_stale",
+  "provider_config_missing",
+];
+
+const expectCodexParityRailTableShape = (railTable: Record<string, unknown>, turnId: string): void => {
+  expect(railTable).toMatchObject({
+    schema: "helix.codex_parity_agent_spine_rail_table.v1",
+    turn_id: turnId,
+    assistant_answer: false,
+    raw_content_included: false,
+  });
+  expectNullableStringField(railTable, "prompt");
+  expect(Array.isArray(railTable.visible_tool_surface)).toBe(true);
+  for (const key of [
+    "requested_capability",
+    "selected_capability",
+    "admitted_capability",
+    "executed_capability",
+    "observation_kind",
+    "observation_ref",
+    "goal_satisfaction",
+    "required_terminal_kind",
+    "selected_terminal_kind",
+    "visible_terminal_kind",
+    "first_broken_rail",
+    "repair_target",
+    "rail_failure_code",
+  ]) {
+    expectNullableStringField(railTable, key);
+  }
+  expect(["reentered", "not_reentered", "no_observation"]).toContain(railTable.reentry_status);
+  expect(["complete", "broken", "fail_closed"]).toContain(railTable.rail_status);
+  expect(CODEX_PARITY_CLASSES).toContain(railTable.codex_parity_class);
+  if (railTable.codex_parity_class === "complete" || railTable.rail_status === "complete") {
+    expect(railTable.first_broken_rail).toBeNull();
+    expect(railTable.rail_failure_code).toBeNull();
+  } else {
+    expect(typeof railTable.first_broken_rail).toBe("string");
+    expect(String(railTable.first_broken_rail).length).toBeGreaterThan(0);
+  }
+};
+
 const seedIdentitySource = (input: {
   threadId: string;
   sourceId: string;
@@ -293,6 +353,41 @@ describe("Helix Ask API parity matrix", () => {
     const debug = await request(app)
       .get(`/api/agi/ask/turn/${encodeURIComponent(ask.body.turn_id)}/debug-export`)
       .expect(200);
+    const railTable = debug.body?.payload?.codex_parity_agent_spine_rail_table;
+    const debugRailTable = debug.body?.payload?.debug?.codex_parity_agent_spine_rail_table;
+    const indexedRailTable = debug.body?.payload?.artifact_query_index?.codex_parity_agent_spine_rail_table;
+    const debugIndexedRailTable = debug.body?.payload?.debug?.artifact_query_index?.codex_parity_agent_spine_rail_table;
+    expect(railTable && typeof railTable === "object" && !Array.isArray(railTable)).toBe(true);
+    expect(debugRailTable && typeof debugRailTable === "object" && !Array.isArray(debugRailTable)).toBe(true);
+    expect(indexedRailTable && typeof indexedRailTable === "object" && !Array.isArray(indexedRailTable)).toBe(true);
+    expect(debugIndexedRailTable && typeof debugIndexedRailTable === "object" && !Array.isArray(debugIndexedRailTable)).toBe(true);
+    expectCodexParityRailTableShape(railTable as Record<string, unknown>, ask.body.turn_id);
+    expectCodexParityRailTableShape(debugRailTable as Record<string, unknown>, ask.body.turn_id);
+    expectCodexParityRailTableShape(indexedRailTable as Record<string, unknown>, ask.body.turn_id);
+    expectCodexParityRailTableShape(debugIndexedRailTable as Record<string, unknown>, ask.body.turn_id);
+    expect(debugRailTable).toMatchObject({
+      codex_parity_class: railTable.codex_parity_class,
+      first_broken_rail: railTable.first_broken_rail,
+      repair_target: railTable.repair_target,
+    });
+    expect(indexedRailTable).toMatchObject({
+      codex_parity_class: railTable.codex_parity_class,
+      first_broken_rail: railTable.first_broken_rail,
+      repair_target: railTable.repair_target,
+    });
+    expect(debugIndexedRailTable).toMatchObject({
+      codex_parity_class: railTable.codex_parity_class,
+      first_broken_rail: railTable.first_broken_rail,
+      repair_target: railTable.repair_target,
+    });
+    expect(debugRailTable).toEqual(railTable);
+    expect(indexedRailTable).toEqual(railTable);
+    expect(debugIndexedRailTable).toEqual(railTable);
+    if (railTable.codex_parity_class === "complete") {
+      expect(railTable.first_broken_rail).toBeNull();
+    } else {
+      expect(typeof railTable.first_broken_rail).toBe("string");
+    }
     const probe = buildApiParityProbeResult({
       scenario,
       askTurn: ask.body,

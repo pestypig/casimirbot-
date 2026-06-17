@@ -30,6 +30,12 @@ import type {
   StagePlayLiveSourceMailWakeRequestV1,
   StagePlayLiveSourceMailWakeResultV1,
 } from "@shared/contracts/stage-play-live-source-mail-wake.v1";
+import {
+  WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
+  type AgentGoalSessionV1,
+  type WorkstationDispatchActionV1,
+  type WorkstationGoalContextUpdateV1,
+} from "@shared/contracts/workstation-goal-context.v1";
 import type { LiveSourceBudgetStateV1 } from "@shared/contracts/stage-play-live-source-current-state.v1";
 import type { StagePlayRawSessionBufferEntryV1 } from "@shared/stage-play-raw-session-buffer";
 import type {
@@ -487,6 +493,8 @@ type StagePlayLiveSourceMailListResponse = {
   narrativeStates?: StagePlayLiveSourceNarrativeStateV1[];
   wakeRequests?: StagePlayLiveSourceMailWakeRequestV1[];
   wakeResults?: StagePlayLiveSourceMailWakeResultV1[];
+  goalContextUpdates?: WorkstationGoalContextUpdateV1[];
+  agentGoalSessions?: AgentGoalSessionV1[];
   budgetStates?: LiveSourceBudgetStateV1[];
   mailLoopWorkBudget?: StagePlayMailLoopWorkBudgetV1 | null;
   assistant_answer: false;
@@ -714,6 +722,8 @@ type StagePlayPacketTrafficViewV1 = {
     | "failed";
   stationStates: StagePlayPacketTrafficStationState[];
   microReasonerRuns: StagePlayPacketTrafficReasonerRun[];
+  goalContextUpdates: WorkstationGoalContextUpdateV1[];
+  dispatchActions: WorkstationDispatchActionV1[];
   metrics: {
     mailAgeMs?: number | null;
     packetAgeMs?: number | null;
@@ -2485,7 +2495,7 @@ const STAGE_PLAY_PACKET_TRAFFIC_STATIONS: Array<{
   { key: "raw_mail", label: "Raw Mail", shortLabel: "Mail" },
   { key: "processed_packet", label: "Processed Packet", shortLabel: "Packet" },
   { key: "micro_reasoner_deck", label: "Micro-Reasoner Deck", shortLabel: "Deck" },
-  { key: "ask_handoff", label: "Ask Handoff", shortLabel: "Ask" },
+  { key: "ask_handoff", label: "Goal / Interrupt", shortLabel: "Dispatch" },
   { key: "decision", label: "Decision", shortLabel: "Decision" },
   { key: "output", label: "Output", shortLabel: "Output" },
   { key: "loop_state", label: "Loop State", shortLabel: "Loop" },
@@ -2507,6 +2517,31 @@ const packetTrailColor = (value: string): { hsl: string; border: string; backgro
 
 const stagePlayAppliedDeckKey = (presetId: string, sourceId: string | null, reason: string): string =>
   `${presetId}:${sourceId ?? "source_unknown"}:${reason}`;
+
+const stagePlayIsoMs = (value?: string | null): number => {
+  const ms = value ? new Date(value).getTime() : NaN;
+  return Number.isFinite(ms) && ms > 0 ? ms : 1;
+};
+
+const stagePlayDispatchActionLabel = (action: WorkstationDispatchActionV1): string => {
+  if (action.kind === "update_live_answer") return `Live Answer: ${action.lineKey}`;
+  if (action.kind === "append_goal_context") return `Goal context: ${action.goalId}`;
+  if (action.kind === "speak_narrator") return `Narrator: ${action.mode}`;
+  if (action.kind === "change_preset") return `Preset: ${action.presetId}`;
+  if (action.kind === "update_panel") return `Panel: ${action.panelId}`;
+  if (action.kind === "repair_loop") return `Repair: ${action.loopRef}`;
+  if (action.kind === "wake_agent") return `Wake interrupt${action.reason ? `: ${compactStagePlayText(action.reason, "wake", 42)}` : ""}`;
+  if (action.kind === "log_receipt") return `Receipt: ${action.receiptRef ?? "latest"}`;
+  if (action.kind === "ask_user") return "Ask user";
+  return "No dispatch";
+};
+
+const stagePlayDispatchTone = (action: WorkstationDispatchActionV1): "default" | "good" | "warn" | "blocked" => {
+  if (action.kind === "wake_agent" || action.kind === "ask_user") return "warn";
+  if (action.kind === "repair_loop") return "blocked";
+  if (action.kind === "append_goal_context" || action.kind === "update_live_answer") return "good";
+  return "default";
+};
 
 const stagePlayTrafficStatusClass = (status: StagePlayPacketTrafficStationStatus): string => {
   if (status === "complete") return "border-emerald-800/60 bg-emerald-950/20 text-emerald-100";
@@ -3137,6 +3172,113 @@ function StagePlayPacketTrafficBoard({
           </div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function StagePlayGoalContextBoard({
+  updates,
+  sessions,
+}: {
+  updates: WorkstationGoalContextUpdateV1[];
+  sessions: AgentGoalSessionV1[];
+}) {
+  const recentUpdates = updates.slice(0, 6);
+  const activeSessions = sessions.filter((session) => session.status === "active" || session.status === "blocked").slice(0, 3);
+  const wakeInterruptCount = updates.reduce(
+    (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "wake_agent").length,
+    0,
+  );
+  const narratorDispatchCount = updates.reduce(
+    (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "speak_narrator").length,
+    0,
+  );
+  return (
+    <div className="rounded-md border border-violet-900/60 bg-violet-950/10 p-3" data-testid="stage-play-goal-context-board">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-violet-200">Goal Context Substrate</div>
+          <div className="mt-0.5 text-xs text-violet-100/70">
+            Micro-reasoner outputs feed queryable goal context first. Wake is shown only as an interrupt dispatch.
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <StagePlayMetricPill label="updates" value={formatStagePlayCount(updates.length)} />
+          <StagePlayMetricPill label="wake interrupts" value={formatStagePlayCount(wakeInterruptCount)} tone={wakeInterruptCount > 0 ? "warn" : "default"} />
+          <StagePlayMetricPill label="narrator dispatch" value={formatStagePlayCount(narratorDispatchCount)} tone={narratorDispatchCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="active goals" value={formatStagePlayCount(activeSessions.length)} tone={activeSessions.length > 0 ? "good" : "default"} />
+        </div>
+      </div>
+      <div className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(240px,320px)]">
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          {recentUpdates.length > 0 ? recentUpdates.map((update) => {
+            const color = packetTrailColor(update.contentRef);
+            return (
+              <div
+                key={update.updateId}
+                className="rounded border border-violet-900/60 bg-slate-950/70 p-2"
+                style={{ borderColor: color.border }}
+                data-testid="stage-play-goal-context-update"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="inline-flex min-w-0 items-center gap-1.5">
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color.hsl }} />
+                    <span className="truncate text-[11px] font-semibold text-violet-50">{labelize(update.updateKind)}</span>
+                  </div>
+                  <span className="font-mono text-[9px] text-violet-200/70">{labelize(update.producerKind)}</span>
+                </div>
+                <div className="mt-1 line-clamp-2 text-[10px] leading-snug text-slate-300">{update.preview}</div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {update.suggestedDispatch.slice(0, 4).map((action, index) => (
+                    <span
+                      key={`${update.updateId}:dispatch:${index}`}
+                      className={`rounded border px-1.5 py-0.5 font-mono text-[9px] ${stagePlayTrafficRowTone(stagePlayDispatchTone(action))}`}
+                      data-testid="stage-play-goal-context-dispatch"
+                    >
+                      {stagePlayDispatchActionLabel(action)}
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-2 truncate border-t border-violet-900/40 pt-1.5 font-mono text-[9px] text-slate-500">
+                  {update.contentRef}
+                </div>
+              </div>
+            );
+          }) : (
+            <div className="rounded border border-slate-800 bg-black/20 p-3 text-sm text-slate-500">
+              Waiting for micro-reasoner outputs, trace receipts, or live-source summaries to feed goal context.
+            </div>
+          )}
+        </div>
+        <div className="rounded border border-slate-800 bg-black/25 p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Agent goal sessions</div>
+          <div className="mt-1 text-xs leading-relaxed text-slate-500">
+            Goal sessions read these streams and actuate panels; final reports still require terminal authority.
+          </div>
+          <div className="mt-3 space-y-2">
+            {activeSessions.length > 0 ? activeSessions.map((session) => (
+              <div key={session.goalId} className="rounded border border-violet-900/50 bg-violet-950/15 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="truncate text-[11px] font-semibold text-violet-50">{session.userVisibleSummary}</div>
+                  <span className="font-mono text-[9px] text-violet-200/70">{labelize(session.status)}</span>
+                </div>
+                <div className="mt-1 line-clamp-2 text-[10px] text-slate-400">{session.objective}</div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {session.allowedActuators.slice(0, 4).map((actuator) => (
+                    <span key={`${session.goalId}:${actuator}`} className="rounded border border-slate-700 bg-slate-950 px-1.5 py-0.5 font-mono text-[9px] text-slate-300">
+                      {labelize(actuator)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )) : (
+              <div className="rounded border border-slate-800 bg-slate-950/70 p-2 text-xs text-slate-500">
+                No active goal session is attached. Updates remain available as workstation context.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -5798,6 +5940,61 @@ function StagePlayMailLoopLiveOverview({
       recommendedNext: packet.recommendedNext,
       evidenceRefs: packet.evidenceRefs.slice(0, 10),
     });
+    const goalId = primaryMail?.objective?.objectiveId || "workstation_goal_context";
+    const packetDispatchActions: WorkstationDispatchActionV1[] = [
+      { kind: "log_receipt", receiptRef: primaryMail?.mailId ?? packet.packetId },
+      { kind: "append_goal_context", goalId },
+      { kind: "update_panel", panelId: "stage-play-badge-graph" },
+    ];
+    if (packetVoiceRequested) {
+      packetDispatchActions.push({ kind: "speak_narrator", mode: "confirm" });
+    }
+    if (packet.arbiter?.wakeAsk) {
+      packetDispatchActions.push({
+        kind: "wake_agent",
+        reason: packet.arbiter.reason ?? "micro-reasoner marked this packet as interruption-worthy",
+      });
+    }
+    const packetGoalContextUpdate: WorkstationGoalContextUpdateV1 = {
+      schemaVersion: WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
+      updateId: `workstation_goal_context_update:${packet.packetId}`,
+      createdAtMs: stagePlayIsoMs(packet.createdAt),
+      sourceRefs: uniqueSorted([packet.sourceId, primaryMail?.sourceId, visualSource?.sourceId].filter(Boolean) as string[]),
+      loopRefs: uniqueSorted([
+        "stage_play_mail_loop:desktop",
+        packet.microReasonerDeck?.presetId ?? null,
+        ...reasonerRuns.map((run) => run.runId),
+      ].filter(Boolean) as string[]),
+      producerKind: "microdeck",
+      updateKind: packetVoiceRequested ? "suggested_action" : "visual_observation",
+      contentRef: packet.packetId,
+      preview: compactStagePlayText(
+        packet.arbiter?.reason ??
+          packet.observedFacts.slice(0, 3).join("; ") ??
+          primaryMail?.summary.preview,
+        "Processed packet available for goal context.",
+        180,
+      ),
+      evidenceRefs: uniqueSorted([...packet.evidenceRefs, ...reasonerRuns.flatMap((run) => run.refs)]),
+      receiptRefs: uniqueSorted([primaryMail?.mailId ?? null, wake?.wakeRequestId ?? null, wakeResult?.wakeResultId ?? null].filter(Boolean) as string[]),
+      freshness: {
+        observedAtMs: stagePlayIsoMs(packet.createdAt),
+        staleAfterMs: 30_000,
+        status: primaryMail?.hints.sourceFreshness === "stale" ? "stale" : "fresh",
+      },
+      goalRelevance: {
+        goalId,
+        relevance: packet.salience.score ?? 0,
+        reason: packet.salience.reasons.slice(0, 3).join("; ") || labelize(packet.recommendedNext),
+      },
+      suggestedDispatch: packetDispatchActions,
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    };
     const stationStates: StagePlayPacketTrafficStationState[] = [
       {
         station: "visual_source",
@@ -5838,10 +6035,10 @@ function StagePlayMailLoopLiveOverview({
         station: "ask_handoff",
         status: askStatus,
         preview: wake
-          ? `${labelize(wake.lifecycleStage ?? wake.status)} | ${wake.askTurnId ?? "no Ask turn"}`
+          ? `${labelize(wake.lifecycleStage ?? wake.status)} interrupt | ${wake.askTurnId ?? "no Ask turn"}`
           : packet.arbiter?.wakeAsk
-            ? "Wake requested, admission pending."
-            : "Ask skipped by packet decision.",
+            ? "Wake interrupt requested; admission pending."
+            : "No wake interrupt; packet remains goal context.",
         refs: wake ? [wake.wakeRequestId, ...wake.evidenceRefs] : [],
         completedAt: wake?.updatedAt ?? wakeResult?.createdAt ?? null,
       },
@@ -5909,6 +6106,8 @@ function StagePlayMailLoopLiveOverview({
       status: trafficStatus,
       stationStates,
       microReasonerRuns: reasonerRuns,
+      goalContextUpdates: [packetGoalContextUpdate],
+      dispatchActions: packetDispatchActions,
       metrics: {
         mailAgeMs: ageMsFromIso(primaryMail?.createdAt),
         packetAgeMs: ageMsFromIso(packet.createdAt),
@@ -5991,7 +6190,7 @@ function StagePlayMailLoopLiveOverview({
       {
         station: "ask_handoff",
         status: "skipped",
-        preview: "Ask cannot wake until packet exists.",
+        preview: "No interrupt dispatch until packet exists.",
         refs: [],
       },
       {
@@ -6014,6 +6213,8 @@ function StagePlayMailLoopLiveOverview({
       },
     ],
     microReasonerRuns: buildReasonerTrafficRuns(null, [mail.mailId]),
+    goalContextUpdates: [],
+    dispatchActions: [{ kind: "log_receipt", receiptRef: mail.mailId }],
     metrics: {
       mailAgeMs: ageMsFromIso(mail.createdAt),
       packetAgeMs: null,
@@ -6056,6 +6257,16 @@ function StagePlayMailLoopLiveOverview({
     if (selectedPacketTrafficKey && packetTrafficRows.some((row) => row.packetKey === selectedPacketTrafficKey)) return;
     setSelectedPacketTrafficKey(defaultPacketTrafficKey);
   }, [defaultPacketTrafficKey, packetTrafficIds, selectedPacketTrafficKey]);
+  const derivedGoalContextUpdates = packetTrafficRows.flatMap((row) => row.goalContextUpdates);
+  const goalContextUpdates = [
+    ...(mailbox?.goalContextUpdates ?? []),
+    ...derivedGoalContextUpdates,
+  ]
+    .filter((update, index, list) =>
+      list.findIndex((candidate) => candidate.updateId === update.updateId) === index
+    )
+    .sort((left, right) => right.createdAtMs - left.createdAtMs);
+  const agentGoalSessions = mailbox?.agentGoalSessions ?? [];
   const trafficDetails: StagePlayTrafficDetail[] = [
     ...mailItems.slice(-5).reverse().map((mail): StagePlayTrafficDetail => ({
       id: mail.mailId,
@@ -6527,6 +6738,11 @@ function StagePlayMailLoopLiveOverview({
         selectedPacketKey={selectedPacketTrafficKey}
         onSelectPacket={setSelectedPacketTrafficKey}
         workBudget={mailLoopWorkBudget}
+      />
+
+      <StagePlayGoalContextBoard
+        updates={goalContextUpdates}
+        sessions={agentGoalSessions}
       />
 
       <section

@@ -2052,6 +2052,12 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-applied-microdeck-checklist")).toBeTruthy();
     expect(screen.getAllByTestId("stage-play-applied-microdeck-chip").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/packet color match|packet match/i).length).toBeGreaterThan(0);
+    expect(screen.getByTestId("stage-play-goal-context-board")).toBeTruthy();
+    expect(screen.getByText(/Goal Context Substrate/i)).toBeTruthy();
+    expect(screen.getAllByTestId("stage-play-goal-context-update").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("stage-play-goal-context-dispatch").some((node) =>
+      /Goal context|Panel|Narrator|Wake interrupt/i.test(node.textContent ?? "")
+    )).toBe(true);
     const arbiterRole = screen.getAllByTestId("stage-play-microdeck-role-square").find((node: HTMLElement) =>
       node.textContent?.includes("Hypothesis Arbiter")
     );

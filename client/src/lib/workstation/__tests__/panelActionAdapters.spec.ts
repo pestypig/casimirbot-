@@ -236,6 +236,52 @@ describe("panelActionAdapters", () => {
       panel_generated_answer: false,
     });
 
+    const sayResult = executeHelixPanelAction(
+      {
+        panel_id: "narrator",
+        action_id: "narrator.say",
+        args: {
+          text: "Narration is on for the translation stream.",
+          source_kind: "helix_console",
+          source_id: "helix_ask:goal-context",
+          evidence_refs: ["goal_context_update:translation"],
+          delivery_mode: "confirm_to_speak",
+        },
+      },
+      actionContext(),
+    );
+    expect(sayResult.ok).toBe(true);
+    expect(sayResult.artifact).toMatchObject({
+      kind: "narrator_say_receipt",
+      published: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      panel_generated_answer: false,
+    });
+
+    const bindResult = executeHelixPanelAction(
+      {
+        panel_id: "narrator",
+        action_id: "narrator.bind_stream",
+        args: {
+          source_ref: "source:browser-audio",
+          stream_kind: "translated_transcript",
+          delivery_mode: "visible_only",
+          voice_policy: "confirm_speak_required",
+        },
+      },
+      actionContext(),
+    );
+    expect(bindResult.ok).toBe(true);
+    expect(bindResult.artifact).toMatchObject({
+      kind: "narrator_bind_stream_receipt",
+      source_ref: "source:browser-audio",
+      stream_kind: "translated_transcript",
+      assistant_answer: false,
+      terminal_eligible: false,
+      panel_generated_answer: false,
+    });
+
     const probeResult = executeHelixPanelAction(
       {
         panel_id: "narrator",

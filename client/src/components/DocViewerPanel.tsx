@@ -68,6 +68,9 @@ type InlineTranslationState = {
 };
 
 const DOC_INLINE_TRANSLATION_SESSION_PREFIX = "casimir.docs.inlineTranslation.v1";
+const DOC_TRANSLATION_MAX_UNITS_PER_CHUNK = 3;
+const DOC_TRANSLATION_MAX_CHARS_PER_CHUNK = 2200;
+const DOC_TRANSLATION_SCAN_DEBOUNCE_MS = 360;
 
 type StoredInlineTranslationSession = {
   enabled: boolean;
@@ -267,6 +270,7 @@ export function DocViewerPanel() {
   const lastProceduralTraceIdRef = React.useRef<string | null>(null);
   const visibleTranslationScanTimerRef = React.useRef<number | null>(null);
   const inFlightTranslationUnitIdsRef = React.useRef<Set<string>>(new Set());
+  const documentTranslationChunkInFlightRef = React.useRef(false);
   const translationScopeKeyRef = React.useRef<string | null>(null);
   const currentEntry = React.useMemo(() => (currentPath ? findDocEntry(currentPath) : null), [currentPath]);
   const rawMarkdownSourceHash = React.useMemo(
@@ -450,6 +454,7 @@ export function DocViewerPanel() {
       !rawMarkdownSourceHash ||
       translationStatus === "error" ||
       translationStatus === "unavailable" ||
+      documentTranslationChunkInFlightRef.current ||
       !contentRef.current
     ) {
       return;
@@ -459,6 +464,8 @@ export function DocViewerPanel() {
       units: translationUnits,
       translations: inlineTranslations,
       inFlightIds: inFlightTranslationUnitIdsRef.current,
+      maxUnits: DOC_TRANSLATION_MAX_UNITS_PER_CHUNK,
+      maxChars: DOC_TRANSLATION_MAX_CHARS_PER_CHUNK,
     });
     if (targetIds.length === 0) return;
     const targetSet = new Set(targetIds);
@@ -466,6 +473,7 @@ export function DocViewerPanel() {
     if (targetUnits.length === 0) return;
     const scopeKey = activeTranslationScopeKey;
     translationScopeKeyRef.current = scopeKey;
+    documentTranslationChunkInFlightRef.current = true;
     targetIds.forEach((unitId) => inFlightTranslationUnitIdsRef.current.add(unitId));
     setTranslationStatus("translating");
     setTranslationError(null);
@@ -484,6 +492,7 @@ export function DocViewerPanel() {
         sourceHash: rawMarkdownSourceHash,
         title: currentEntry.title,
         sourceId: documentMarkdownSourceId(currentEntry.relativePath),
+        chunkId: `doc-inline:${rawMarkdownSourceHash}:${targetIds.join(",")}`,
         units: targetUnits,
       });
       if (translationScopeKeyRef.current !== scopeKey) return;
@@ -517,6 +526,7 @@ export function DocViewerPanel() {
       setTranslationStatus("error");
     } finally {
       targetIds.forEach((unitId) => inFlightTranslationUnitIdsRef.current.delete(unitId));
+      documentTranslationChunkInFlightRef.current = false;
     }
   }, [
     activeTranslationScopeKey,
@@ -618,7 +628,7 @@ export function DocViewerPanel() {
     visibleTranslationScanTimerRef.current = window.setTimeout(() => {
       visibleTranslationScanTimerRef.current = null;
       void requestVisibleInlineTranslations();
-    }, 180);
+    }, DOC_TRANSLATION_SCAN_DEBOUNCE_MS);
   }, [inlineTranslationEnabled, requestVisibleInlineTranslations]);
 
   React.useEffect(() => {
@@ -1496,9 +1506,11 @@ function collectVisibleTranslationUnitIds(args: {
   units: DocumentTranslationUnit[];
   translations: Record<string, InlineTranslationState>;
   inFlightIds: Set<string>;
+  maxUnits: number;
+  maxChars: number;
 }): string[] {
-  const translatableUnitIds = new Set(
-    args.units.filter((unit) => unit.translatable).map((unit) => unit.unit_id),
+  const translatableUnitsById = new Map(
+    args.units.filter((unit) => unit.translatable).map((unit) => [unit.unit_id, unit] as const),
   );
   const containerRect = args.container.getBoundingClientRect();
   const verticalBuffer = Math.max(160, containerRect.height * 0.75);
@@ -1506,17 +1518,25 @@ function collectVisibleTranslationUnitIds(args: {
     args.container.querySelectorAll<HTMLElement>("[data-doc-translation-anchor]"),
   );
   const visibleIds: string[] = [];
+  let sourceChars = 0;
+  const maxUnits = Math.max(1, args.maxUnits);
+  const maxChars = Math.max(1, args.maxChars);
   for (const marker of markers) {
     const unitId = marker.dataset.docTranslationAnchor;
-    if (!unitId || !translatableUnitIds.has(unitId)) continue;
+    if (!unitId) continue;
+    const unit = translatableUnitsById.get(unitId);
+    if (!unit) continue;
     if (args.translations[unitId] || args.inFlightIds.has(unitId)) continue;
     const rect = marker.getBoundingClientRect();
     const nearViewport =
       rect.top >= containerRect.top - verticalBuffer &&
       rect.top <= containerRect.bottom + verticalBuffer;
     if (!nearViewport) continue;
+    const nextChars = sourceChars + unit.source_markdown.length;
+    if (visibleIds.length > 0 && nextChars > maxChars) break;
     visibleIds.push(unitId);
-    if (visibleIds.length >= 6) break;
+    sourceChars = nextChars;
+    if (visibleIds.length >= maxUnits) break;
   }
   return visibleIds;
 }

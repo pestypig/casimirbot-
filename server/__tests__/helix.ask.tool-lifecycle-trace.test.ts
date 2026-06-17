@@ -348,6 +348,41 @@ describe("Helix Ask tool lifecycle trace", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      requested_capability: null,
+      selected_capability: "scientific-calculator.solve_expression",
+      admitted_capability: "scientific-calculator.solve_expression",
+      executed_capability: "scientific-calculator.solve_expression",
+      observation_kind: "calculator_receipt",
+      observation_ref: "calculator_receipt:1",
+      reentry_status: "reentered",
+      required_terminal_kind: "calculator_stream_result",
+      selected_terminal_kind: "calculator_stream_result",
+      visible_terminal_kind: "calculator_stream_result",
+      first_broken_rail: null,
+      repair_target: null,
+      codex_parity_class: "complete",
+      rail_status: "complete",
+      rail_failure_code: null,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(index.codex_parity_agent_spine_rail_table.normalized_codex_parity_classes).toEqual([
+      "complete",
+      "tool_surface_missing",
+      "explicit_capability_demoted",
+      "tool_admission_rejected",
+      "selected_not_executed",
+      "observation_missing",
+      "observation_not_reentered",
+      "goal_contract_mismatch",
+      "terminal_product_not_allowed",
+      "terminal_authority_mismatch",
+      "visible_projection_mismatch",
+      "debug_mirror_stale",
+      "provider_config_missing",
+    ]);
     expect(index.tool_turn_chain_family_matrix).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ route_family: "docs_viewer" }),
@@ -492,8 +527,9 @@ describe("Helix Ask tool lifecycle trace", () => {
         schema: "helix.tool_lifecycle_trace.v1",
         requested_capability: "scientific-calculator.solve_expression",
         executed_capability: "scientific-calculator.solve_expression",
-        observation_refs: ["calculator_receipt:1"],
-        evidence_refs: ["workstation_tool_evaluation:1"],
+        observation_refs: ["calculator_receipt:1", "calculator_result_trace:1", "calculator_result_validation:1"],
+        evidence_refs: ["calculator_result_validation:1", "workstation_tool_evaluation:1"],
+        lifecycle_stage: "reentered_solver",
         status: "succeeded",
         evidence_reentered: true,
       },
@@ -540,6 +576,26 @@ describe("Helix Ask tool lifecycle trace", () => {
             raw_content_included: false,
           },
         },
+        {
+          artifact_id: "calculator_result_trace:1",
+          kind: "calculator_result_trace",
+          payload: {
+            schema: "helix.calculator_result_trace.v1",
+            trace_id: "calculator_result_trace:1",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: "calculator_result_validation:1",
+          kind: "calculator_result_validation",
+          payload: {
+            schema: "helix.calculator_result_validation.v1",
+            validation_id: "calculator_result_validation:1",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
       ],
     };
 
@@ -549,6 +605,23 @@ describe("Helix Ask tool lifecycle trace", () => {
       materialized_terminal_artifact_kind: "workstation_tool_evaluation",
       terminal_authority_kind: "workstation_tool_evaluation",
       visible_terminal_kind: "workstation_tool_evaluation",
+      rail_status: "broken",
+      rail_failure_code: "debug_mirror_stale",
+      stale_terminal_debug_mirrors: [
+        {
+          source: "final_answer_draft_selection.materialized_terminal_artifact_kind",
+          terminal_kind: "model_synthesized_answer",
+        },
+      ],
+    });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      selected_terminal_kind: "workstation_tool_evaluation",
+      visible_terminal_kind: "workstation_tool_evaluation",
+      first_broken_rail: "visible_projection",
+      repair_target: "presenter_boundary",
+      codex_parity_class: "debug_mirror_stale",
+      rail_failure_code: "debug_mirror_stale",
     });
   });
 
@@ -966,6 +1039,17 @@ describe("Helix Ask tool lifecycle trace", () => {
       rail_status: "broken",
       rail_failure_code: "observation_missing",
     });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      selected_capability: "scientific-calculator.solve_expression",
+      executed_capability: "scientific-calculator.solve_expression",
+      observation_kind: "calculator_receipt",
+      reentry_status: "reentered",
+      first_broken_rail: "observation_artifact",
+      repair_target: "observation_materializer",
+      codex_parity_class: "observation_missing",
+      rail_failure_code: "observation_missing",
+    });
     expect(index.tool_rail_failure_triage).toMatchObject({
       first_broken_rail: "observation_artifact",
       failure_bucket: "B_tool_executed_observation_missing",
@@ -998,6 +1082,18 @@ describe("Helix Ask tool lifecycle trace", () => {
       first_broken_rail: "capability_execution",
       failure_bucket: "A_tool_did_not_execute",
       repair_target: "tool_execution",
+    });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      selected_capability: "workspace-directory.resolve",
+      admitted_capability: "workspace-directory.resolve",
+      executed_capability: null,
+      observation_kind: null,
+      reentry_status: "no_observation",
+      first_broken_rail: "capability_execution",
+      repair_target: "tool_execution",
+      codex_parity_class: "selected_not_executed",
+      rail_failure_code: "observation_missing",
     });
   });
 
@@ -1071,6 +1167,16 @@ describe("Helix Ask tool lifecycle trace", () => {
       first_broken_rail: "route_admission",
       rail_failure_code: "explicit_capability_not_selected",
       repair_target: "intent_arbitration",
+    });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      requested_capability: "docs-viewer.locate_in_doc",
+      selected_capability: "docs-viewer.summarize_doc",
+      executed_capability: "docs-viewer.summarize_doc",
+      first_broken_rail: "route_admission",
+      repair_target: "intent_arbitration",
+      codex_parity_class: "explicit_capability_demoted",
+      rail_failure_code: "explicit_capability_not_selected",
     });
   });
 
@@ -1164,6 +1270,16 @@ describe("Helix Ask tool lifecycle trace", () => {
       rail_failure_code: "weak_evidence_repair_loop",
       repair_target: "repo_retrieval_repair_policy",
     });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      requested_capability: "repo-code.search_concept",
+      selected_capability: "repo-code.search_concept",
+      executed_capability: "repo-code.search_concept",
+      first_broken_rail: "evidence_reentry",
+      repair_target: "repo_retrieval_repair_policy",
+      codex_parity_class: "observation_not_reentered",
+      rail_failure_code: "weak_evidence_repair_loop",
+    });
   });
 
   it("does not count a policy-rejected runtime tool call as execution", () => {
@@ -1246,6 +1362,24 @@ describe("Helix Ask tool lifecycle trace", () => {
       rail_status: "fail_closed",
       rail_failure_code: "tool_execution_rejected",
     });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      selected_capability: "scientific-calculator.solve_expression",
+      executed_capability: null,
+      observation_kind: null,
+      observation_ref: null,
+      reentry_status: "no_observation",
+      required_terminal_kind: expect.any(String),
+      selected_terminal_kind: "typed_failure",
+      visible_terminal_kind: "typed_failure",
+      first_broken_rail: "capability_execution",
+      repair_target: "tool_admission",
+      codex_parity_class: "tool_admission_rejected",
+      rail_status: "fail_closed",
+      rail_failure_code: "tool_execution_rejected",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
     expect(index.tool_turn_chain_family_matrix).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -1301,6 +1435,16 @@ describe("Helix Ask tool lifecycle trace", () => {
       first_broken_rail: "config",
       failure_bucket: "G_config_missing",
       repair_target: "operator_config",
+      rail_status: "fail_closed",
+      rail_failure_code: "config_missing",
+    });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      selected_capability: "internet_search.web_research",
+      executed_capability: null,
+      first_broken_rail: "config",
+      repair_target: "operator_config",
+      codex_parity_class: "provider_config_missing",
       rail_status: "fail_closed",
       rail_failure_code: "config_missing",
     });
@@ -1386,6 +1530,781 @@ describe("Helix Ask tool lifecycle trace", () => {
       failure_bucket: "F_terminal_projection_mismatch",
       repair_target: "presenter_boundary",
     });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      selected_capability: "scientific-calculator.solve_expression",
+      executed_capability: "scientific-calculator.solve_expression",
+      first_broken_rail: "visible_projection",
+      repair_target: "presenter_boundary",
+      codex_parity_class: "visible_projection_mismatch",
+      rail_failure_code: "terminal_projection_mismatch",
+    });
+  });
+
+  it("reports a missing terminal authority writer as a terminal authority mismatch", () => {
+    const payload: Record<string, unknown> = {
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:terminal-authority-missing",
+        capability_family: "calculator",
+        requested_action: "scientific-calculator.solve_expression",
+        admission_status: "admitted",
+      },
+      capability_result: {
+        schema: "helix.capability_result.v1",
+        turn_id: "ask:test:terminal-authority-missing",
+        status: "succeeded",
+        receipt_refs: ["calculator_receipt:authority"],
+        evidence_refs: ["calculator_result_validation:authority"],
+        selected_for_answer: true,
+        reentered_solver: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      operational_satisfaction_evaluation: {
+        schema: "helix.operational_satisfaction_evaluation.v1",
+        turn_id: "ask:test:terminal-authority-missing",
+        requested_surface_satisfied: true,
+        next_decision: "allow_terminal",
+      },
+      runtime_tool_call: {
+        tool_call_id: "tool:terminal-authority-missing",
+        capability_key: "scientific-calculator.solve_expression",
+        status: "completed",
+      },
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        draft_id: "ask:test:terminal-authority-missing:final_answer_draft",
+        support_refs: [
+          "calculator_receipt:authority",
+          "calculator_result_trace:authority",
+          "calculator_result_validation:authority",
+        ],
+      },
+      terminal_artifact_kind: "calculator_stream_result",
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "calculator_stream_result",
+      },
+      current_turn_artifact_ledger: [
+        { artifact_id: "calculator_receipt:authority", kind: "calculator_receipt", payload: { schema: "helix.calculator_receipt.v1" } },
+        { artifact_id: "calculator_result_trace:authority", kind: "calculator_result_trace", payload: { schema: "helix.calculator_result_trace.v1" } },
+        { artifact_id: "calculator_result_validation:authority", kind: "calculator_result_validation", payload: { schema: "helix.calculator_result_validation.v1" } },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:terminal-authority-missing", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:terminal-authority-missing", payload });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      materialized_terminal_artifact_kind: "calculator_stream_result",
+      terminal_authority_kind: null,
+      visible_terminal_kind: "calculator_stream_result",
+      rail_status: "broken",
+      rail_failure_code: "terminal_authority_missing",
+    });
+    expect(index.tool_rail_failure_triage).toMatchObject({
+      first_broken_rail: "terminal_authority",
+      repair_target: "terminal_authority",
+      rail_failure_code: "terminal_authority_missing",
+    });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      selected_terminal_kind: null,
+      visible_terminal_kind: "calculator_stream_result",
+      first_broken_rail: "terminal_authority",
+      repair_target: "terminal_authority",
+      codex_parity_class: "terminal_authority_mismatch",
+      rail_failure_code: "terminal_authority_missing",
+    });
+  });
+
+  it("classifies a materialized terminal product that violates the route contract", () => {
+    const payload: Record<string, unknown> = {
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "calculator_solve",
+        required_terminal_kind: "calculator_stream_result",
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:terminal-product-mismatch",
+        capability_family: "calculator",
+        requested_action: "scientific-calculator.solve_expression",
+        admission_status: "admitted",
+      },
+      capability_result: {
+        schema: "helix.capability_result.v1",
+        turn_id: "ask:test:terminal-product-mismatch",
+        status: "succeeded",
+        receipt_refs: ["calculator_receipt:terminal-product"],
+        evidence_refs: ["calculator_result_validation:terminal-product"],
+        selected_for_answer: true,
+        reentered_solver: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      operational_satisfaction_evaluation: {
+        schema: "helix.operational_satisfaction_evaluation.v1",
+        turn_id: "ask:test:terminal-product-mismatch",
+        requested_surface_satisfied: true,
+        next_decision: "allow_terminal",
+      },
+      runtime_tool_call: {
+        tool_call_id: "tool:terminal-product-mismatch",
+        capability_key: "scientific-calculator.solve_expression",
+        status: "completed",
+      },
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        draft_id: "ask:test:terminal-product-mismatch:final_answer_draft",
+        support_refs: [
+          "calculator_receipt:terminal-product",
+          "calculator_result_trace:terminal-product",
+          "calculator_result_validation:terminal-product",
+        ],
+      },
+      terminal_artifact_kind: "doc_summary",
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        selected_terminal_artifact_kind: "doc_summary",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "doc_summary",
+      },
+      current_turn_artifact_ledger: [
+        { artifact_id: "calculator_receipt:terminal-product", kind: "calculator_receipt", payload: { schema: "helix.calculator_receipt.v1" } },
+        { artifact_id: "calculator_result_trace:terminal-product", kind: "calculator_result_trace", payload: { schema: "helix.calculator_result_trace.v1" } },
+        { artifact_id: "calculator_result_validation:terminal-product", kind: "calculator_result_validation", payload: { schema: "helix.calculator_result_validation.v1" } },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:terminal-product-mismatch", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:terminal-product-mismatch", payload });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      required_terminal_kind: "calculator_stream_result",
+      materialized_terminal_artifact_kind: "doc_summary",
+      terminal_authority_kind: "doc_summary",
+      visible_terminal_kind: "doc_summary",
+      rail_status: "broken",
+      rail_failure_code: "terminal_product_mismatch",
+    });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      required_terminal_kind: "calculator_stream_result",
+      selected_terminal_kind: "doc_summary",
+      visible_terminal_kind: "doc_summary",
+      first_broken_rail: "terminal_materialization",
+      repair_target: "terminal_materializer",
+      codex_parity_class: "terminal_product_not_allowed",
+      rail_failure_code: "terminal_product_mismatch",
+    });
+  });
+
+  it("classifies unsupported terminal drafts as goal contract mismatches", () => {
+    const payload: Record<string, unknown> = {
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "calculator_solve",
+        required_terminal_kind: "calculator_stream_result",
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:support-refs-missing",
+        capability_family: "calculator",
+        requested_action: "scientific-calculator.solve_expression",
+        admission_status: "admitted",
+      },
+      capability_result: {
+        schema: "helix.capability_result.v1",
+        turn_id: "ask:test:support-refs-missing",
+        status: "succeeded",
+        receipt_refs: ["calculator_receipt:support-missing"],
+        evidence_refs: ["calculator_result_validation:support-missing"],
+        selected_for_answer: true,
+        reentered_solver: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      tool_lifecycle_trace: {
+        schema: "helix.tool_lifecycle_trace.v1",
+        requested_capability: "scientific-calculator.solve_expression",
+        admitted_capability: "scientific-calculator.solve_expression",
+        executed_capability: "scientific-calculator.solve_expression",
+        lifecycle_stage: "reentered_solver",
+        status: "completed",
+        observation_refs: ["calculator_receipt:support-missing"],
+        evidence_refs: ["calculator_result_validation:support-missing"],
+      },
+      runtime_tool_call: {
+        tool_call_id: "tool:support-refs-missing",
+        capability_key: "scientific-calculator.solve_expression",
+        status: "completed",
+      },
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        draft_id: "ask:test:support-refs-missing:final_answer_draft",
+        support_refs: [],
+      },
+      terminal_artifact_kind: "calculator_stream_result",
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        selected_terminal_artifact_kind: "calculator_stream_result",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "calculator_stream_result",
+      },
+      current_turn_artifact_ledger: [
+        { artifact_id: "calculator_receipt:support-missing", kind: "calculator_receipt", payload: { schema: "helix.calculator_receipt.v1" } },
+        { artifact_id: "calculator_result_trace:support-missing", kind: "calculator_result_trace", payload: { schema: "helix.calculator_result_trace.v1" } },
+        { artifact_id: "calculator_result_validation:support-missing", kind: "calculator_result_validation", payload: { schema: "helix.calculator_result_validation.v1" } },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:support-refs-missing", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:support-refs-missing", payload });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      selected_capability: "scientific-calculator.solve_expression",
+      executed_capability: "scientific-calculator.solve_expression",
+      reentry_executed: true,
+      final_answer_draft_ref: "ask:test:support-refs-missing:final_answer_draft",
+      support_refs_count: 0,
+      rail_status: "broken",
+      rail_failure_code: "support_refs_missing",
+    });
+    expect(index.tool_rail_failure_triage).toMatchObject({
+      first_broken_rail: "support_backed_draft",
+      repair_target: "draft_builder",
+      rail_failure_code: "support_refs_missing",
+    });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      selected_capability: "scientific-calculator.solve_expression",
+      executed_capability: "scientific-calculator.solve_expression",
+      reentry_status: "reentered",
+      first_broken_rail: "support_backed_draft",
+      repair_target: "draft_builder",
+      codex_parity_class: "goal_contract_mismatch",
+      rail_failure_code: "support_refs_missing",
+    });
+  });
+
+  it("surfaces a missing visible capability surface before treating selected capability as progress", () => {
+    const payload: Record<string, unknown> = {
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:tool-surface-missing",
+        capability_family: "docs",
+        requested_action: "docs-viewer.locate_in_doc",
+        selected_capability: "docs-viewer.locate_in_doc",
+        requested_capability: "docs-viewer.locate_in_doc",
+        requested_capability_source: "explicit_user_command",
+        admission_status: "admitted",
+      },
+      current_turn_artifact_ledger: [],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:tool-surface-missing", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:tool-surface-missing", payload });
+
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      requested_capability: "docs-viewer.locate_in_doc",
+      visible_tool_surface: [],
+      selected_capability: "docs-viewer.locate_in_doc",
+      executed_capability: null,
+      first_broken_rail: "capability_execution",
+      codex_parity_class: "tool_surface_missing",
+    });
+  });
+
+  it("normalizes a completed workspace_os.status turn through the same rail table", () => {
+    const payload: Record<string, unknown> = {
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "workspace_status_diagnostic",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        turn_id: "ask:test:workspace-os-status",
+        source_target: "workspace_diagnostic",
+        required: true,
+        admitted_tool_families: ["workspace_diagnostic"],
+        requested_capability: "workspace_os.status",
+        requested_capability_family: "workspace_diagnostic",
+        requested_capability_source: "explicit_user_command",
+        required_observation_kinds_for_requested_capability: ["workspace_os_status_observation"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:workspace-os-status",
+        capability_family: "workspace_diagnostic",
+        requested_action: "workspace_os.status",
+        selected_capability: "workspace_os.status",
+        requested_capability: "workspace_os.status",
+        admission_status: "admitted",
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            iteration: 1,
+            chosen_capability: "workspace_os.status",
+            executed_action_key: "workspace_os.status",
+            observed_artifact_refs: ["workspace_os_status_observation:1"],
+          },
+        ],
+        executed_tool_call_count: 1,
+      },
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        draft_id: "ask:test:workspace-os-status:final_answer_draft",
+        support_refs: ["workspace_os_status_observation:1"],
+      },
+      terminal_artifact_kind: "model_synthesized_answer",
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        selected_terminal_artifact_kind: "model_synthesized_answer",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "model_synthesized_answer",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "workspace_os_status_observation:1",
+          kind: "workspace_os_status_observation",
+          payload: {
+            schema: "helix.workspace_os_status_observation.v1",
+            available_count: 18,
+            blocked_count: 3,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:workspace-os-status", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:workspace-os-status", payload });
+
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      requested_capability: "workspace_os.status",
+      selected_capability: "workspace_os.status",
+      admitted_capability: "workspace_os.status",
+      executed_capability: "workspace_os.status",
+      observation_kind: "workspace_os_status_observation",
+      observation_ref: "workspace_os_status_observation:1",
+      reentry_status: "reentered",
+      required_terminal_kind: "model_synthesized_answer",
+      selected_terminal_kind: "model_synthesized_answer",
+      visible_terminal_kind: "model_synthesized_answer",
+      first_broken_rail: null,
+      codex_parity_class: "complete",
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
+  });
+
+  it("normalizes a completed live-source mail read through the same rail table", () => {
+    const payload: Record<string, unknown> = {
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "live_source_mailbox_review",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:live-mail-read",
+        capability_family: "live_environment",
+        requested_action: "live_env.read_processed_live_source_mail",
+        selected_capability: "live_env.read_processed_live_source_mail",
+        admission_status: "admitted",
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            iteration: 1,
+            chosen_capability: "live_env.read_processed_live_source_mail",
+            executed_action_key: "live_env.read_processed_live_source_mail",
+            observed_artifact_refs: ["stage_play_processed_mail_packet:1"],
+          },
+        ],
+        executed_tool_call_count: 1,
+      },
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        draft_id: "ask:test:live-mail-read:final_answer_draft",
+        support_refs: ["stage_play_processed_mail_packet:1"],
+      },
+      terminal_artifact_kind: "model_synthesized_answer",
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        selected_terminal_artifact_kind: "model_synthesized_answer",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "model_synthesized_answer",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "stage_play_processed_mail_packet:1",
+          kind: "stage_play_processed_mail_packet",
+          producer_item_id: "live_env.read_processed_live_source_mail",
+          payload: {
+            schema: "stage_play_processed_mail_packet/v1",
+            tool_name: "live_env.read_processed_live_source_mail",
+            packet_id: "stage_play_processed_mail_packet:1",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:live-mail-read", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:live-mail-read", payload });
+
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      selected_capability: "live_env.read_processed_live_source_mail",
+      admitted_capability: "live_env.read_processed_live_source_mail",
+      executed_capability: "live_env.read_processed_live_source_mail",
+      observation_kind: "stage_play_processed_mail_packet",
+      observation_ref: "stage_play_processed_mail_packet:1",
+      reentry_status: "reentered",
+      selected_terminal_kind: "model_synthesized_answer",
+      visible_terminal_kind: "model_synthesized_answer",
+      first_broken_rail: null,
+      codex_parity_class: "complete",
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
+    expect(index.tool_turn_chain_family_matrix).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          route_family: "live_env",
+          observed: true,
+          did_tool_run: true,
+          artifact_produced: true,
+          rail_status: "complete",
+        }),
+      ]),
+    );
+  });
+
+  it("normalizes a completed internet_search.web_research turn through the same rail table", () => {
+    const payload: Record<string, unknown> = {
+      active_prompt: "Use internet_search.web_research to find current source evidence.",
+      tool_surface_packet: {
+        schema: "helix.tool_surface_packet.v1",
+        tools: [{ name: "internet_search.web_research" }],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "internet_research",
+        required_terminal_kind: "internet_search_answer",
+      },
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        turn_id: "ask:test:internet-search-complete",
+        source_target: "internet_search",
+        required: true,
+        admitted_tool_families: ["internet_search"],
+        requested_capability: "internet_search.web_research",
+        requested_capability_family: "internet_search",
+        requested_capability_source: "explicit_user_command",
+        required_observation_kinds_for_requested_capability: ["internet_search_observation"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:internet-search-complete",
+        capability_family: "internet_search",
+        requested_action: "internet_search.web_research",
+        selected_capability: "internet_search.web_research",
+        requested_capability: "internet_search.web_research",
+        admission_status: "admitted",
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            iteration: 1,
+            chosen_capability: "internet_search.web_research",
+            executed_action_key: "internet_search.web_research",
+            observed_artifact_refs: ["internet_search_observation:1"],
+          },
+        ],
+        executed_tool_call_count: 1,
+      },
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        draft_id: "ask:test:internet-search-complete:final_answer_draft",
+        support_refs: ["internet_search_observation:1"],
+      },
+      terminal_artifact_kind: "internet_search_answer",
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        selected_terminal_artifact_kind: "internet_search_answer",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "internet_search_answer",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "internet_search_observation:1",
+          kind: "internet_search_observation",
+          producer_item_id: "internet_search.web_research",
+          payload: {
+            schema: "helix.internet_search_observation.v1",
+            result_count: 3,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:internet-search-complete", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:internet-search-complete", payload });
+
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      prompt: "Use internet_search.web_research to find current source evidence.",
+      requested_capability: "internet_search.web_research",
+      visible_tool_surface: expect.arrayContaining(["internet_search.web_research"]),
+      selected_capability: "internet_search.web_research",
+      admitted_capability: "internet_search.web_research",
+      executed_capability: "internet_search.web_research",
+      observation_kind: "internet_search_observation",
+      observation_ref: "internet_search_observation:1",
+      reentry_status: "reentered",
+      required_terminal_kind: "internet_search_answer",
+      selected_terminal_kind: "internet_search_answer",
+      visible_terminal_kind: "internet_search_answer",
+      first_broken_rail: null,
+      codex_parity_class: "complete",
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
+  });
+
+  it("normalizes a completed visual capture turn through the same rail table", () => {
+    const payload: Record<string, unknown> = {
+      active_prompt: "What is happening right now in the visual screen capture?",
+      tool_surface_packet: {
+        schema: "helix.tool_surface_packet.v1",
+        tools: [{ name: "situation-room.describe_visual_capture" }],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "visual_capture_describe",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:visual-capture-complete",
+        capability_family: "visual_capture",
+        requested_action: "situation-room.describe_visual_capture",
+        selected_capability: "situation-room.describe_visual_capture",
+        admission_status: "admitted",
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            iteration: 1,
+            chosen_capability: "situation-room.describe_visual_capture",
+            executed_action_key: "situation-room.describe_visual_capture",
+            observed_artifact_refs: ["visual_frame_evidence:1"],
+          },
+        ],
+        executed_tool_call_count: 1,
+      },
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        draft_id: "ask:test:visual-capture-complete:final_answer_draft",
+        support_refs: ["visual_frame_evidence:1"],
+      },
+      terminal_artifact_kind: "model_synthesized_answer",
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        selected_terminal_artifact_kind: "model_synthesized_answer",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "model_synthesized_answer",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "visual_frame_evidence:1",
+          kind: "visual_frame_evidence",
+          producer_item_id: "situation-room.describe_visual_capture",
+          payload: {
+            schema: "helix.visual_frame_evidence.v1",
+            summary: "A seeded visual frame is available.",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:visual-capture-complete", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:visual-capture-complete", payload });
+
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      prompt: "What is happening right now in the visual screen capture?",
+      visible_tool_surface: expect.arrayContaining(["situation-room.describe_visual_capture"]),
+      selected_capability: "situation-room.describe_visual_capture",
+      admitted_capability: "situation-room.describe_visual_capture",
+      executed_capability: "situation-room.describe_visual_capture",
+      observation_kind: "visual_frame_evidence",
+      observation_ref: "visual_frame_evidence:1",
+      reentry_status: "reentered",
+      required_terminal_kind: "model_synthesized_answer",
+      selected_terminal_kind: "model_synthesized_answer",
+      visible_terminal_kind: "model_synthesized_answer",
+      first_broken_rail: null,
+      codex_parity_class: "complete",
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
+    expect(index.tool_turn_chain_family_matrix).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          route_family: "image_lens / visual_capture",
+          observed: true,
+          did_tool_run: true,
+          artifact_produced: true,
+          rail_status: "complete",
+        }),
+      ]),
+    );
+  });
+
+  it("normalizes a completed capability catalog turn through the same rail table", () => {
+    const payload: Record<string, unknown> = {
+      active_prompt: "What tools are available for Helix Ask to use?",
+      tool_surface_packet: {
+        schema: "helix.tool_surface_packet.v1",
+        tools: [{ name: "helix_ask.inspect_capability_catalog" }],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "capability_help",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:capability-catalog-complete",
+        capability_family: "capability_catalog",
+        requested_action: "helix_ask.inspect_capability_catalog",
+        selected_capability: "helix_ask.inspect_capability_catalog",
+        admission_status: "admitted",
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            iteration: 1,
+            chosen_capability: "helix_ask.inspect_capability_catalog",
+            executed_action_key: "helix_ask.inspect_capability_catalog",
+            observed_artifact_refs: ["capability_registry:1", "capability_help_summary:1"],
+          },
+        ],
+        executed_tool_call_count: 1,
+      },
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        draft_id: "ask:test:capability-catalog-complete:final_answer_draft",
+        support_refs: ["capability_registry:1", "capability_help_summary:1"],
+      },
+      terminal_artifact_kind: "model_synthesized_answer",
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        selected_terminal_artifact_kind: "model_synthesized_answer",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "model_synthesized_answer",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "capability_registry:1",
+          kind: "capability_registry",
+          producer_item_id: "helix_ask.inspect_capability_catalog",
+          payload: {
+            schema: "helix.capability_registry.v1",
+            tools: [{ name: "repo-code.search_concept" }, { name: "workspace_os.status" }],
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: "capability_help_summary:1",
+          kind: "capability_help_summary",
+          producer_item_id: "helix_ask.inspect_capability_catalog",
+          payload: {
+            schema: "helix.capability_help_summary.v1",
+            summary: "Capability catalog was inspected.",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:capability-catalog-complete", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:capability-catalog-complete", payload });
+
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      prompt: "What tools are available for Helix Ask to use?",
+      visible_tool_surface: expect.arrayContaining([
+        "helix_ask.inspect_capability_catalog",
+        "repo-code.search_concept",
+        "workspace_os.status",
+      ]),
+      selected_capability: "helix_ask.inspect_capability_catalog",
+      admitted_capability: "helix_ask.inspect_capability_catalog",
+      executed_capability: "helix_ask.inspect_capability_catalog",
+      observation_kind: "capability_registry",
+      observation_ref: "capability_registry:1",
+      reentry_status: "reentered",
+      required_terminal_kind: "model_synthesized_answer",
+      selected_terminal_kind: "model_synthesized_answer",
+      visible_terminal_kind: "model_synthesized_answer",
+      first_broken_rail: null,
+      codex_parity_class: "complete",
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
+    expect(index.required_observation_coverage).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "capability_registry", present: true }),
+        expect.objectContaining({ kind: "capability_help_summary", present: true }),
+      ]),
+    );
   });
 
   it("keeps contextual tool mentions as follow-up reasoning, not execution", () => {

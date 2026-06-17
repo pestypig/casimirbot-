@@ -248,6 +248,9 @@ const isAskCapabilityCatalogPrompt = (promptText: string): boolean => {
     (
       mentionsAskSurface &&
       (
+        /\bwhat\s+can\s+i\s+do\s+with\s+helix\s+ask\b/i.test(normalized) ||
+        /\bwhat\s+can\s+(?:helix\s+ask|ask|this\s+agent|the\s+agent)\s+do\b/i.test(normalized) ||
+        /\bhow\s+can\s+(?:helix\s+ask|ask|this\s+agent|the\s+agent)\s+help\b/i.test(normalized) ||
         /\bwhat\s+(?:tools?|tool\s+calls?|capabilities)\s+(?:are\s+)?(?:available|visible|admissible)\b/i.test(normalized) ||
         /\bwhat\s+(?:tools?|tool\s+calls?|capabilities)\s+can\s+(?:helix\s+ask|ask|agent)\s+(?:use|call|run|see|access)\b/i.test(normalized) ||
         /\b(?:list|show|inspect|tell\s+me)\b[\s\S]{0,60}\b(?:tools?|tool\s+calls?|capabilities)\b/i.test(normalized)

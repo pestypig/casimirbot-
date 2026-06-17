@@ -61,6 +61,7 @@ describe("document translation MicroDeck output parsing", () => {
       locale: "haw",
       sourceHash: "fnv1a32:test",
       sourceId: "document_markdown:docs/example.md",
+      chunkId: "doc-inline:fnv1a32:test:u0001",
       units: [
         {
           unit_id: "u0001",
@@ -77,6 +78,8 @@ describe("document translation MicroDeck output parsing", () => {
     expect(String(fetchMock.mock.calls[1]?.[0] ?? "")).toBe("/api/helix/stage-play/live-source-mail/document-markdown");
     expect(String(fetchMock.mock.calls[2]?.[0] ?? "")).toBe("/api/helix/stage-play/live-source-mail/wake/cycle");
     const wakeBody = JSON.parse(String((fetchMock.mock.calls[2]?.[1] as RequestInit | undefined)?.body ?? "{}"));
+    const mailBody = JSON.parse(String((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.body ?? "{}"));
+    expect(mailBody.chunkId).toBe("doc-inline:fnv1a32:test:u0001");
     expect(wakeBody).toMatchObject({
       threadId: "helix-ask:desktop",
       sourceId: "document_markdown:docs/example.md",

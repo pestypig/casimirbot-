@@ -217,6 +217,15 @@ const narratorDeliveryModes = new Set<NarratorDeliveryMode>([
   "auto_speak",
 ]);
 
+const narratorStreamKinds = new Set([
+  "transcript_stream",
+  "translated_transcript",
+  "translated_speech",
+  "typed_commentary",
+  "route_evidence",
+  "source_health_status",
+]);
+
 function asNarratorSourceKind(value: unknown): NarratorSourceKind | null {
   const sourceKind = asNonEmptyString(value);
   return sourceKind && narratorSourceKinds.has(sourceKind as NarratorSourceKind)
@@ -229,6 +238,11 @@ function asNarratorDeliveryMode(value: unknown): NarratorDeliveryMode | null {
   return mode && narratorDeliveryModes.has(mode as NarratorDeliveryMode)
     ? mode as NarratorDeliveryMode
     : null;
+}
+
+function asNarratorStreamKind(value: unknown): string | null {
+  const streamKind = asNonEmptyString(value);
+  return streamKind && narratorStreamKinds.has(streamKind) ? streamKind : null;
 }
 
 function asTheoryContextReflectionSource(value: unknown): TheoryContextReflectionSource {
@@ -2310,6 +2324,110 @@ export function executeHelixPanelAction(
           speakable: event.speakable,
           output_authority: "operator_confirmed_narrator_event",
           evidence_refs: event.evidenceRefs,
+          assistant_answer: false,
+          raw_content_included: false,
+          terminal_eligible: false,
+          panel_generated_answer: false,
+        },
+      };
+    }
+
+    if (actionId === "narrator.say") {
+      const nowMs = Date.now();
+      const text = asNonEmptyString(args.text);
+      if (!text) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "narrator.say requires text.",
+        };
+      }
+      const sourceKind = asNarratorSourceKind(args.source_kind ?? args.sourceKind) ?? "helix_console";
+      const sourceId = asNonEmptyString(args.source_id ?? args.sourceId) ?? "helix_ask:narrator.say";
+      const requestedDeliveryMode = asNarratorDeliveryMode(args.delivery_mode ?? args.deliveryMode) ?? "confirm_to_speak";
+      const evidenceRefs = asStringArray(args.evidence_refs ?? args.evidenceRefs);
+      const event = narratorStore.publishEvent({
+        sourceKind,
+        sourceId,
+        sourceLabelMessageId: sourceKind === "helix_console" ? "narrator.source.helixConsole" : undefined,
+        text,
+        language: asNonEmptyString(args.language) ?? undefined,
+        authority: "tool_evidence",
+        assistant_answer: false,
+        terminal_eligible: false,
+        certainty: "medium",
+        evidenceRefs: evidenceRefs.length > 0 ? evidenceRefs : [sourceId],
+        traceId: asNonEmptyString(args.trace_id ?? args.traceId) ?? `narrator:say:${nowMs}`,
+        rawContentIncluded: false,
+        speakable: true,
+        requestedDeliveryMode: requestedDeliveryMode === "hidden" ? "visible_only" : requestedDeliveryMode,
+        defaultDeliveryMode: "visible_only",
+        dedupeKey: asNonEmptyString(args.dedupe_key ?? args.dedupeKey) ?? undefined,
+      }, { voiceArmed: requestedDeliveryMode === "auto_speak", nowMs });
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "narrator_say_receipt",
+          schema: "helix.narrator_say_receipt.v1",
+          event_id: event?.eventId ?? null,
+          published: Boolean(event),
+          source_kind: sourceKind,
+          source_id: sourceId,
+          delivery_mode: requestedDeliveryMode,
+          priority: asNonEmptyString(args.priority) ?? "normal",
+          output_authority: "narrator_router_observation",
+          evidence_refs: evidenceRefs,
+          assistant_answer: false,
+          raw_content_included: false,
+          terminal_eligible: false,
+          panel_generated_answer: false,
+        },
+      };
+    }
+
+    if (actionId === "narrator.bind_stream") {
+      const sourceRef = asNonEmptyString(args.source_ref ?? args.sourceRef);
+      const streamKind = asNarratorStreamKind(args.stream_kind ?? args.streamKind);
+      if (!sourceRef || !streamKind) {
+        return {
+          ok: false,
+          panel_id: panelId,
+          action_id: actionId,
+          message: "narrator.bind_stream requires source_ref and stream_kind.",
+        };
+      }
+      const deliveryMode = asNarratorDeliveryMode(args.delivery_mode ?? args.deliveryMode) ?? "visible_only";
+      const voicePolicy = asNonEmptyString(args.voice_policy ?? args.voicePolicy) ?? "confirm_speak_required";
+      const sourceKind: NarratorSourceKind =
+        streamKind === "translated_transcript" || streamKind === "translated_speech" || streamKind === "transcript_stream"
+          ? "situation_room"
+          : "workstation_panel";
+      narratorStore.setSourcePolicy(sourceKind, {
+        enabled: true,
+        deliveryMode: deliveryMode === "hidden" ? "visible_only" : deliveryMode,
+      });
+      context.openPanel(panelId, undefined);
+      context.focusPanel(panelId, undefined);
+      return {
+        ok: true,
+        panel_id: panelId,
+        action_id: actionId,
+        artifact: {
+          kind: "narrator_bind_stream_receipt",
+          schema: "helix.narrator_bind_stream_receipt.v1",
+          source_ref: sourceRef,
+          stream_kind: streamKind,
+          preset_id: asNonEmptyString(args.preset_id ?? args.presetId),
+          delivery_mode: deliveryMode,
+          voice_policy: voicePolicy,
+          evidence_threshold: asNonEmptyString(args.evidence_threshold ?? args.evidenceThreshold),
+          bound_source_kind: sourceKind,
+          output_authority: "narrator_stream_binding_observation",
           assistant_answer: false,
           raw_content_included: false,
           terminal_eligible: false,

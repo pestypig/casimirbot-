@@ -25,7 +25,9 @@ type RailFailureCode =
   | "support_refs_missing"
   | "terminal_product_mismatch"
   | "terminal_not_materialized"
+  | "terminal_authority_missing"
   | "terminal_projection_mismatch"
+  | "debug_mirror_stale"
   | "config_missing";
 
 type RailStatus = "complete" | "broken" | "fail_closed";
@@ -66,6 +68,21 @@ type RepairTarget =
   | "agent_step_selection"
   | "repo_retrieval_repair_policy";
 
+type CodexParityClass =
+  | "complete"
+  | "tool_surface_missing"
+  | "explicit_capability_demoted"
+  | "tool_admission_rejected"
+  | "selected_not_executed"
+  | "observation_missing"
+  | "observation_not_reentered"
+  | "goal_contract_mismatch"
+  | "terminal_product_not_allowed"
+  | "terminal_authority_mismatch"
+  | "visible_projection_mismatch"
+  | "debug_mirror_stale"
+  | "provider_config_missing";
+
 const TOOL_TURN_CHAIN_FAILURE_CODES: RailFailureCode[] = [
   "explicit_capability_not_selected",
   "wrong_capability_executed",
@@ -80,7 +97,9 @@ const TOOL_TURN_CHAIN_FAILURE_CODES: RailFailureCode[] = [
   "support_refs_missing",
   "terminal_product_mismatch",
   "terminal_not_materialized",
+  "terminal_authority_missing",
   "terminal_projection_mismatch",
+  "debug_mirror_stale",
   "config_missing",
 ];
 
@@ -93,6 +112,22 @@ const TOOL_TURN_CHAIN_MATRIX_FAMILIES = [
   "internet_search",
   "image_lens / visual_capture",
 ] as const;
+
+const CODEX_PARITY_AGENT_SPINE_CLASSES: CodexParityClass[] = [
+  "complete",
+  "tool_surface_missing",
+  "explicit_capability_demoted",
+  "tool_admission_rejected",
+  "selected_not_executed",
+  "observation_missing",
+  "observation_not_reentered",
+  "goal_contract_mismatch",
+  "terminal_product_not_allowed",
+  "terminal_authority_mismatch",
+  "visible_projection_mismatch",
+  "debug_mirror_stale",
+  "provider_config_missing",
+];
 
 const TERMINAL_RECEIPT_KINDS = new Set([
   "tool_receipt",
@@ -125,6 +160,17 @@ const readStringArray = (value: unknown): string[] =>
 
 const readNumber = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const readFirstPromptText = (payload: RecordLike): string | null =>
+  [
+    payload.active_prompt,
+    payload.prompt,
+    payload.question,
+    payload.user_prompt,
+    payload.input_text,
+    readRecord(payload.request)?.prompt,
+    readRecord(payload.request)?.question,
+  ].map(readString).find(Boolean) ?? null;
 
 const unique = (values: string[]): string[] =>
   Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
@@ -558,13 +604,10 @@ const materializedTerminalKind = (payload: RecordLike): string | null => {
 const terminalAuthorityKind = (payload: RecordLike): string | null => {
   const terminalAuthority = readRecord(payload.terminal_authority_single_writer);
   const terminalAnswerAuthority = readRecord(payload.terminal_answer_authority);
-  const resolvedSummary = readRecord(payload.resolved_turn_summary);
   return firstString(
     terminalAuthority?.selected_terminal_artifact_kind,
     terminalAnswerAuthority?.terminal_artifact_kind,
     terminalAuthority?.terminal_artifact_kind,
-    resolvedSummary?.terminal_artifact_kind,
-    payload.terminal_artifact_kind,
   );
 };
 
@@ -572,6 +615,38 @@ const visibleTerminalKind = (payload: RecordLike): string | null => {
   const presentation = readRecord(payload.terminal_presentation);
   const resolvedSummary = readRecord(payload.resolved_turn_summary);
   return firstString(presentation?.terminal_artifact_kind, resolvedSummary?.terminal_artifact_kind, payload.terminal_artifact_kind);
+};
+
+const terminalDebugMirrorKinds = (payload: RecordLike): Array<{ source: string; terminal_kind: string }> => {
+  const resolvedSummary = readRecord(payload.resolved_turn_summary);
+  const terminalAuthority = readRecord(payload.terminal_authority_single_writer);
+  const authorityIntegrity = readRecord(terminalAuthority?.integrity);
+  const draftSelection = readRecord(payload.final_answer_draft_selection);
+  const debug = readRecord(payload.debug);
+  const debugResolvedSummary = readRecord(debug?.resolved_turn_summary);
+  const candidates: Array<{ source: string; terminal_kind: string | null }> = [
+    { source: "payload.terminal_artifact_kind", terminal_kind: readString(payload.terminal_artifact_kind) },
+    { source: "payload.resolved_turn_summary.terminal_artifact_kind", terminal_kind: readString(resolvedSummary?.terminal_artifact_kind) },
+    {
+      source: "terminal_authority_single_writer.integrity.materialized_terminal_artifact_kind",
+      terminal_kind: readString(authorityIntegrity?.materialized_terminal_artifact_kind),
+    },
+    {
+      source: "final_answer_draft_selection.materialized_terminal_artifact_kind",
+      terminal_kind: readString(draftSelection?.materialized_terminal_artifact_kind),
+    },
+    { source: "debug.terminal_artifact_kind", terminal_kind: readString(debug?.terminal_artifact_kind) },
+    {
+      source: "debug.resolved_turn_summary.terminal_artifact_kind",
+      terminal_kind: readString(debugResolvedSummary?.terminal_artifact_kind),
+    },
+  ];
+  return candidates.filter((entry): entry is { source: string; terminal_kind: string } => Boolean(entry.terminal_kind));
+};
+
+const staleTerminalDebugMirrors = (payload: RecordLike, terminalAuthority: string | null): Array<{ source: string; terminal_kind: string }> => {
+  if (!terminalAuthority) return [];
+  return terminalDebugMirrorKinds(payload).filter((entry) => !normalizedEqual(entry.terminal_kind, terminalAuthority));
 };
 
 const expectedReentryCapability = (
@@ -680,7 +755,7 @@ const buildToolTurnChainAudit = (input: {
       : readString(observationCoverage?.kind) ||
         input.artifacts
           .map((artifact) => readString(artifact.kind) || readString(artifact.schema))
-          .find((kind) => /(?:observation|result|receipt|context|validation|trace|packet|resolution|reflection)/i.test(kind)) ||
+          .find((kind) => /(?:observation|evidence|result|receipt|context|validation|trace|packet|resolution|reflection)/i.test(kind)) ||
         null;
   const observationRef =
     toolExecutionRejected
@@ -701,6 +776,7 @@ const buildToolTurnChainAudit = (input: {
   const materializedTerminal = materializedTerminalKind(input.payload);
   const authorityTerminal = terminalAuthorityKind(input.payload);
   const visibleTerminal = visibleTerminalKind(input.payload);
+  const staleDebugMirrors = staleTerminalDebugMirrors(input.payload, authorityTerminal);
   const finalDraftRef = finalAnswerDraftRef(input.payload, input.artifacts);
   const reentryExecuted =
     readString(input.lifecycleTrace?.lifecycle_stage) === "reentered_solver" ||
@@ -796,9 +872,13 @@ const buildToolTurnChainAudit = (input: {
                               ? "terminal_product_mismatch"
                               : !materializedTerminal
                                 ? "terminal_not_materialized"
-                                : terminalProjectionMismatch
-                                  ? "terminal_projection_mismatch"
-                                  : null;
+                                : !authorityTerminal
+                                  ? "terminal_authority_missing"
+                                  : terminalProjectionMismatch
+                                    ? "terminal_projection_mismatch"
+                                    : staleDebugMirrors.length > 0
+                                      ? "debug_mirror_stale"
+                                      : null;
   const railStatus: RailStatus =
     railFailureCode === null ? "complete" : materializedTerminal === "typed_failure" ? "fail_closed" : "broken";
 
@@ -838,6 +918,7 @@ const buildToolTurnChainAudit = (input: {
     materialized_terminal_artifact_kind: materializedTerminal,
     terminal_authority_kind: authorityTerminal,
     visible_terminal_kind: visibleTerminal,
+    stale_terminal_debug_mirrors: staleDebugMirrors,
     rail_status: railStatus,
     rail_failure_code: railFailureCode,
     normalized_failure_codes: TOOL_TURN_CHAIN_FAILURE_CODES,
@@ -985,7 +1066,7 @@ const triageFromAudit = (audit: RecordLike): {
       repair_target: "draft_builder",
     };
   }
-  if (terminalKindRequiresSupportBackedDraft(audit) && finalDraftRef && supportCount === 0) {
+  if (railFailureCode === "support_refs_missing" || (terminalKindRequiresSupportBackedDraft(audit) && finalDraftRef && supportCount === 0)) {
     return {
       first_broken_rail: "support_backed_draft",
       failure_bucket: "D_support_backed_draft_missing",
@@ -999,11 +1080,18 @@ const triageFromAudit = (audit: RecordLike): {
       repair_target: "terminal_materializer",
     };
   }
-  if (!terminalAuthority) {
+  if (!terminalAuthority || railFailureCode === "terminal_authority_missing") {
     return {
       first_broken_rail: "terminal_authority",
       failure_bucket: "E_terminal_materializer_gap",
       repair_target: "terminal_authority",
+    };
+  }
+  if (railFailureCode === "debug_mirror_stale") {
+    return {
+      first_broken_rail: "visible_projection",
+      failure_bucket: "F_terminal_projection_mismatch",
+      repair_target: "presenter_boundary",
     };
   }
   if (!visibleTerminal || railFailureCode === "terminal_projection_mismatch" || !normalizedEqual(terminalAuthority, visibleTerminal)) {
@@ -1063,6 +1151,193 @@ const buildToolRailFailureTriage = (input: {
     rail_status: readString(input.audit.rail_status) || "broken",
     rail_failure_code: readNullableString(input.audit.rail_failure_code),
     repair_target: triage.repair_target,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const collectVisibleCapabilitySurfaceFromRecord = (record: RecordLike | null): string[] => {
+  if (!record) return [];
+  const keys = [
+    "visible_tools",
+    "tools",
+    "tool_specs",
+    "capabilities",
+    "capability_keys",
+    "available_capabilities",
+    "admitted_capabilities",
+    "admitted_tool_families",
+    "allowed_tool_families",
+    "information_reflection",
+    "utility",
+    "reasoning",
+  ];
+  const values: string[] = [];
+  for (const key of keys) {
+    for (const entry of readArray(record[key])) {
+      if (typeof entry === "string") {
+        values.push(entry);
+        continue;
+      }
+      const entryRecord = readRecord(entry);
+      if (!entryRecord) continue;
+      values.push(
+        ...[
+          entryRecord.name,
+          entryRecord.tool_name,
+          entryRecord.capability,
+          entryRecord.capability_key,
+          entryRecord.action,
+          entryRecord.id,
+          entryRecord.family,
+        ].map(readString),
+      );
+    }
+  }
+  return unique(values);
+};
+
+const visibleCapabilitySurface = (payload: RecordLike, artifacts: RecordLike[]): string[] => {
+  const capabilityPlan = readRecord(payload.capability_plan);
+  const admission = readRecord(payload.tool_call_admission_decision);
+  const runtimeIntent = readRecord(payload.runtime_intent_packet);
+  const directRecords = [
+    payload.available_capabilities,
+    payload.initial_available_capabilities,
+    payload.tool_surface_packet,
+    payload.capability_catalog_observation,
+    capabilityPlan,
+    admission,
+    runtimeIntent,
+  ].map(readRecord);
+  const artifactRecords = artifacts
+    .filter((artifact) =>
+      ["available_capabilities", "tool_surface_packet", "capability_registry"].some((kind) =>
+        observationKindMatches(artifact, kind),
+      ),
+    )
+    .map((artifact) => artifactPayload(artifact) ?? artifact);
+  return unique([
+    ...directRecords.flatMap(collectVisibleCapabilitySurfaceFromRecord),
+    ...artifactRecords.flatMap(collectVisibleCapabilitySurfaceFromRecord),
+  ]);
+};
+
+const readAdmittedCapability = (
+  payload: RecordLike,
+  audit: RecordLike,
+  lifecycleTrace: RecordLike | null,
+): string | null => {
+  const admission = readRecord(payload.tool_call_admission_decision);
+  const capabilityPlan = readRecord(payload.capability_plan);
+  const operationalTrace = readRecord(payload.operational_capability_trace);
+  const planAdmitted =
+    readString(capabilityPlan?.admission_status) === "admitted" ||
+    readString(capabilityPlan?.status) === "admitted" ||
+    capabilityPlan?.admitted === true;
+  return firstString(
+    admission?.admitted_capability,
+    admission?.selected_capability,
+    operationalTrace?.policy_admitted_capability,
+    planAdmitted ? capabilityPlan?.selected_capability : null,
+    planAdmitted ? capabilityPlan?.requested_action : null,
+    planAdmitted ? audit.selected_capability : null,
+    lifecycleTrace?.admitted_capability,
+  );
+};
+
+const normalizeGoalSatisfaction = (payload: RecordLike): string | null => {
+  const goal = readRecord(payload.goal_satisfaction_evaluation);
+  return firstString(goal?.satisfaction, goal?.next_decision, payload.final_status, payload.response_type);
+};
+
+const codexParityClassFromAudit = (input: {
+  audit: RecordLike;
+  triage: RecordLike;
+  visibleSurface: string[];
+}): CodexParityClass => {
+  const railStatus = readString(input.audit.rail_status);
+  const failureCode = readString(input.audit.rail_failure_code);
+  const requestedCapability = readString(input.audit.requested_capability);
+  const selectedCapability = readString(input.audit.selected_capability);
+  const executedCapability = readString(input.audit.executed_capability);
+  const firstBrokenRail = readString(input.triage.first_broken_rail);
+  const repairTarget = readString(input.triage.repair_target);
+  if (!failureCode && railStatus === "complete") return "complete";
+  if (failureCode === "config_missing") return "provider_config_missing";
+  if (requestedCapability && input.visibleSurface.length === 0) return "tool_surface_missing";
+  if (failureCode === "explicit_capability_not_selected" || failureCode === "wrong_capability_executed") {
+    return "explicit_capability_demoted";
+  }
+  if (
+    failureCode === "tool_execution_rejected" ||
+    failureCode === "tool_admission_drift" ||
+    repairTarget === "tool_admission"
+  ) {
+    return "tool_admission_rejected";
+  }
+  if (selectedCapability && !executedCapability) return "selected_not_executed";
+  if (failureCode === "observation_missing" || failureCode === "required_observation_missing") return "observation_missing";
+  if (
+    failureCode === "observation_not_reentered" ||
+    failureCode === "reentry_step_not_executed" ||
+    failureCode === "weak_evidence_repair_loop"
+  ) {
+    return "observation_not_reentered";
+  }
+  if (failureCode === "terminal_product_mismatch") return "terminal_product_not_allowed";
+  if (failureCode === "terminal_not_materialized" || failureCode === "support_refs_missing") {
+    return "goal_contract_mismatch";
+  }
+  if (failureCode === "terminal_authority_missing") return "terminal_authority_mismatch";
+  if (firstBrokenRail === "terminal_authority") return "terminal_authority_mismatch";
+  if (failureCode === "debug_mirror_stale") return "debug_mirror_stale";
+  if (failureCode === "terminal_projection_mismatch" || firstBrokenRail === "visible_projection") {
+    return "visible_projection_mismatch";
+  }
+  return "goal_contract_mismatch";
+};
+
+const buildCodexParityAgentSpineRailTable = (input: {
+  turnId: string;
+  payload: RecordLike;
+  artifacts: RecordLike[];
+  lifecycleTrace: RecordLike | null;
+  audit: RecordLike;
+  triage: RecordLike;
+}): RecordLike => {
+  const visibleSurface = visibleCapabilitySurface(input.payload, input.artifacts);
+  const codexParityClass = codexParityClassFromAudit({
+    audit: input.audit,
+    triage: input.triage,
+    visibleSurface,
+  });
+  return {
+    schema: "helix.codex_parity_agent_spine_rail_table.v1",
+    turn_id: input.turnId,
+    prompt: readFirstPromptText(input.payload),
+    requested_capability: readNullableString(input.audit.requested_capability),
+    visible_tool_surface: visibleSurface,
+    selected_capability: readNullableString(input.audit.selected_capability),
+    admitted_capability: readAdmittedCapability(input.payload, input.audit, input.lifecycleTrace),
+    executed_capability: readNullableString(input.audit.executed_capability),
+    observation_kind: readNullableString(input.audit.observation_artifact_kind),
+    observation_ref: readNullableString(input.audit.observation_ref),
+    reentry_status: input.audit.reentry_executed === true
+      ? "reentered"
+      : readString(input.audit.observation_ref)
+        ? "not_reentered"
+        : "no_observation",
+    goal_satisfaction: normalizeGoalSatisfaction(input.payload),
+    required_terminal_kind: readNullableString(input.audit.required_terminal_kind),
+    selected_terminal_kind: readNullableString(input.audit.terminal_authority_kind),
+    visible_terminal_kind: readNullableString(input.audit.visible_terminal_kind),
+    first_broken_rail: readNullableString(input.triage.first_broken_rail),
+    repair_target: readNullableString(input.triage.repair_target),
+    codex_parity_class: codexParityClass,
+    normalized_codex_parity_classes: CODEX_PARITY_AGENT_SPINE_CLASSES,
+    rail_status: readString(input.audit.rail_status) || "broken",
+    rail_failure_code: readNullableString(input.audit.rail_failure_code),
     assistant_answer: false,
     raw_content_included: false,
   };
@@ -1167,6 +1442,14 @@ export const buildArtifactQueryIndex = (input: {
     turnId: input.turnId,
     audit: toolTurnChainAudit,
   });
+  const codexParityAgentSpineRailTable = buildCodexParityAgentSpineRailTable({
+    turnId: input.turnId,
+    payload: input.payload,
+    artifacts,
+    lifecycleTrace,
+    audit: toolTurnChainAudit,
+    triage: toolRailFailureTriage,
+  });
 
   return {
     schema: "helix.artifact_query_index.v1",
@@ -1199,6 +1482,7 @@ export const buildArtifactQueryIndex = (input: {
         readString(followupDecision?.next_action) === "terminal_answer" &&
         requiredObservationsSatisfied,
     },
+    codex_parity_agent_spine_rail_table: codexParityAgentSpineRailTable,
     tool_turn_chain_audit: toolTurnChainAudit,
     tool_rail_failure_triage: toolRailFailureTriage,
     tool_turn_chain_family_matrix: buildToolTurnChainFamilyMatrix(toolTurnChainAudit),

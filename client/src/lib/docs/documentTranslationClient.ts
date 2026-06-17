@@ -20,6 +20,14 @@ type StagePlayDocumentMarkdownMailResponse =
       sourceKind: "document_markdown";
       mailboxThreadId?: string;
       mail?: { mailId?: string; sourceId?: string; sourceKind?: string };
+      traffic?: {
+        chunkId?: string;
+        acceptedUnits?: number;
+        deferredUnits?: number;
+        acceptedChars?: number;
+        maxUnits?: number;
+        maxChars?: number;
+      };
     }
   | { ok: false; error: string; message?: string };
 
@@ -146,6 +154,7 @@ export async function enqueueDocumentMarkdownTranslationMail(params: {
   sourceHash: string;
   title?: string;
   sourceId?: string;
+  chunkId?: string;
   units: DocumentTranslationUnit[];
   signal?: AbortSignal;
 }): Promise<{ sourceId: string; mailId: string | null }> {
@@ -165,6 +174,7 @@ export async function enqueueDocumentMarkdownTranslationMail(params: {
         sourceHash: params.sourceHash,
         title: params.title,
         sourceId,
+        chunkId: params.chunkId,
         units: params.units,
       }),
       signal: controller.signal,
