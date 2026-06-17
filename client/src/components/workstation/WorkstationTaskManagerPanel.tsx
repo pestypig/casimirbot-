@@ -1,6 +1,10 @@
 import * as React from "react";
 import { Activity, Gauge, Monitor, RefreshCw, Server } from "lucide-react";
 import { getPanelDef } from "@/lib/desktop/panelRegistry";
+import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
+import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
+import { useInterfaceText, type InterfaceTextResolver } from "@/lib/i18n/interfaceText";
+import type { InterfaceMessageId } from "@/lib/i18n/messages/types";
 import { useMobileAppStore } from "@/store/useMobileAppStore";
 import { useWorkstationInteractionStore, type WorkstationInteractionState } from "@/store/useWorkstationInteractionStore";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
@@ -31,6 +35,8 @@ const VISIBLE_UPDATE_INTERVAL_MS = 1500;
 const INTERACTION_UPDATE_INTERVAL_MS = 3500;
 let cachedBrowserDomNodeCount = 0;
 let cachedStagePlayPacketNodeCount: number | null = null;
+type Translate = InterfaceTextResolver["t"];
+type DisplayMessageMap = Record<string, InterfaceMessageId>;
 
 type TaskManagerInteractionState = Pick<
   WorkstationInteractionState,
@@ -74,14 +80,14 @@ const readStagePlayPacketNodeCount = (): number | null => {
   return cachedStagePlayPacketNodeCount;
 };
 
-const formatMiB = (value: number | null | undefined): string => {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "unknown";
+const formatMiB = (value: number | null | undefined, t: Translate): string => {
+  if (typeof value !== "number" || !Number.isFinite(value)) return t("workstation.common.unknown");
   if (value >= 100) return `${Math.round(value)} MiB`;
   return `${Math.round(value * 10) / 10} MiB`;
 };
 
-const formatMetric = (value: number | null | undefined, suffix: string): string => {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "unknown";
+const formatMetric = (value: number | null | undefined, suffix: string, t: Translate): string => {
+  if (typeof value !== "number" || !Number.isFinite(value)) return t("workstation.common.unknown");
   return `${Math.round(value * 10) / 10}${suffix}`;
 };
 
@@ -117,42 +123,80 @@ const statusClass = (status: string): string => {
   }
 };
 
-const kindLabel = (kind: string): string =>
-  kind.replace(/_/g, " ").replace(/\b\w/g, (letter: string) => letter.toUpperCase());
+const statusMessages = {
+  active: "taskManager.display.status.active",
+  open: "taskManager.display.status.open",
+  focused: "taskManager.display.status.focused",
+  background: "taskManager.display.status.background",
+  hidden: "taskManager.display.status.hidden",
+  idle: "taskManager.display.status.idle",
+  queued: "taskManager.display.status.queued",
+  paused: "taskManager.display.status.paused",
+  suspended: "taskManager.display.status.suspended",
+  deload_candidate: "taskManager.display.status.deloadCandidate",
+  blocked: "taskManager.display.status.blocked",
+  degraded: "taskManager.display.status.degraded",
+  unknown: "taskManager.display.status.unknown",
+} satisfies DisplayMessageMap;
 
-const memoryDisplay = (process: HelixWorkstationTaskManagerProcess): string => {
-  const memory = process.memory;
-  if (memory.used_mib != null) return formatMiB(memory.used_mib);
-  if (memory.rss_mib != null) return formatMiB(memory.rss_mib);
-  if (memory.heap_used_mib != null) return formatMiB(memory.heap_used_mib);
-  if (memory.estimate_mib != null) return `~${formatMiB(memory.estimate_mib)}`;
-  return "unknown";
+const kindMessages = {
+  server_runtime: "taskManager.display.kind.serverRuntime",
+  runtime_task: "taskManager.display.kind.runtimeTask",
+  runtime_task_class: "taskManager.display.kind.runtimeTaskClass",
+  browser_renderer: "taskManager.display.kind.browserRenderer",
+  browser_frame_loop: "taskManager.display.kind.browserFrameLoop",
+  browser_interaction_loop: "taskManager.display.kind.browserInteractionLoop",
+  workstation_scheduler: "taskManager.display.kind.workstationScheduler",
+  workstation_command_reliability: "taskManager.display.kind.workstationCommandReliability",
+  workstation_panel: "taskManager.display.kind.workstationPanel",
+  stage_play_packet_flow: "taskManager.display.kind.stagePlayPacketFlow",
+  workspace_os: "taskManager.display.kind.workspaceOs",
+  unknown: "taskManager.display.kind.unknown",
+} satisfies DisplayMessageMap;
+
+const displayMappedValue = (t: Translate, value: string | null | undefined, messages: DisplayMessageMap): string => {
+  if (!value) return t("workstation.common.unknown");
+  const messageId = messages[value];
+  return messageId ? t(messageId) : value;
 };
 
-const signalDisplay = (process: HelixWorkstationTaskManagerProcess): string => {
+const memoryDisplay = (process: HelixWorkstationTaskManagerProcess, t: Translate): string => {
+  const memory = process.memory;
+  if (memory.used_mib != null) return formatMiB(memory.used_mib, t);
+  if (memory.rss_mib != null) return formatMiB(memory.rss_mib, t);
+  if (memory.heap_used_mib != null) return formatMiB(memory.heap_used_mib, t);
+  if (memory.estimate_mib != null) return `~${formatMiB(memory.estimate_mib, t)}`;
+  return t("workstation.common.unknown");
+};
+
+const signalDisplay = (process: HelixWorkstationTaskManagerProcess, t: Translate): string => {
   if (process.kind === "browser_frame_loop") {
-    const fps = typeof process.diagnostics?.fps === "number" ? `${process.diagnostics.fps} fps` : "fps unknown";
-    const p95 = typeof process.diagnostics?.p95_frame_ms === "number" ? `p95 ${process.diagnostics.p95_frame_ms}ms` : "p95 unknown";
+    const fps = typeof process.diagnostics?.fps === "number" ? `${process.diagnostics.fps} fps` : t("taskManager.signal.fpsUnknown");
+    const p95 = typeof process.diagnostics?.p95_frame_ms === "number"
+      ? t("taskManager.signal.p95Value", { value: process.diagnostics.p95_frame_ms })
+      : t("taskManager.signal.p95Unknown");
     return `${fps} / ${p95}`;
   }
   if (process.kind === "browser_interaction_loop") {
     const p95 = typeof process.diagnostics?.input_to_next_frame_p95_ms === "number"
-      ? `input p95 ${process.diagnostics.input_to_next_frame_p95_ms}ms`
-      : "input p95 unknown";
+      ? t("taskManager.signal.inputP95Value", { value: process.diagnostics.input_to_next_frame_p95_ms })
+      : t("taskManager.signal.inputP95Unknown");
     const active = typeof process.diagnostics?.active_interaction_kind === "string"
       ? process.diagnostics.active_interaction_kind
-      : "interaction";
+      : t("taskManager.signal.interaction");
     return `${active} / ${p95}`;
   }
   if (process.kind === "workstation_command_reliability") {
     const failed = typeof process.diagnostics?.failed_receipt_count === "number" ? process.diagnostics.failed_receipt_count : 0;
     const recent = typeof process.diagnostics?.recent_receipt_count === "number" ? process.diagnostics.recent_receipt_count : 0;
-    return `${recent} receipts / ${failed} failed`;
+    return t("taskManager.signal.receiptsValue", { recent, failed });
   }
   if (process.kind === "workstation_scheduler") {
-    const mode = typeof process.diagnostics?.interaction_mode === "string" ? process.diagnostics.interaction_mode : "unknown";
+    const mode = typeof process.diagnostics?.interaction_mode === "string"
+      ? process.diagnostics.interaction_mode
+      : t("workstation.common.unknown");
     const pending = typeof process.diagnostics?.pending_task_count === "number" ? process.diagnostics.pending_task_count : 0;
-    return `${mode} / ${pending} queued`;
+    return t("taskManager.signal.queuedValue", { mode, pending });
   }
   if (process.panel_id && typeof process.diagnostics?.render_pressure === "string") {
     return process.diagnostics.render_pressure;
@@ -525,16 +569,22 @@ const useBudgetedInteractionState = (): TaskManagerInteractionState => {
 
 const TaskManagerProcessRow = React.memo(function TaskManagerProcessRow({
   process,
+  t,
 }: {
   process: HelixWorkstationTaskManagerProcess;
+  t: Translate;
 }) {
   return (
     <tr className="border-b border-white/5 hover:bg-white/[0.03]">
       <td className="px-3 py-2">
-        <div className="font-semibold text-slate-100">{memoryDisplay(process)}</div>
+        <div className="font-semibold text-slate-100">{memoryDisplay(process, t)}</div>
         <div className="mt-0.5 text-[10px] text-slate-500">
-          {process.memory.observed ? "observed" : process.memory.estimate_mib != null ? "estimated" : "unknown"}
-          {process.memory.approximate ? " / approximate" : ""}
+          {process.memory.observed
+            ? t("taskManager.memory.observed")
+            : process.memory.estimate_mib != null
+              ? t("taskManager.memory.estimated")
+              : t("workstation.common.unknown")}
+          {process.memory.approximate ? t("taskManager.memory.approximateSuffix") : ""}
         </div>
       </td>
       <td className="px-3 py-2">
@@ -543,19 +593,22 @@ const TaskManagerProcessRow = React.memo(function TaskManagerProcessRow({
       </td>
       <td className="px-3 py-2">
         <span className={`inline-flex rounded border px-1.5 py-0.5 text-[10px] uppercase ${statusClass(process.status)}`}>
-          {process.status}
+          {displayMappedValue(t, process.status, statusMessages)}
         </span>
       </td>
-      <td className="px-3 py-2 text-slate-300">{kindLabel(process.kind)}</td>
+      <td className="px-3 py-2 text-slate-300">{displayMappedValue(t, process.kind, kindMessages)}</td>
       <td className="px-3 py-2">
         <div className="truncate text-slate-300">{process.memory.source.replace(/_/g, " ")}</div>
-        <div className="mt-0.5 truncate text-[10px] text-slate-500">{signalDisplay(process)}</div>
+        <div className="mt-0.5 truncate text-[10px] text-slate-500">{signalDisplay(process, t)}</div>
       </td>
     </tr>
   );
 });
 
 export default function WorkstationTaskManagerPanel() {
+  const { userSettings } = useHelixStartSettings();
+  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const { t } = useInterfaceText(interfaceLanguage.code);
   const layoutGroups = useWorkstationLayoutStore((state: any) => state.groups);
   const activeGroupId = useWorkstationLayoutStore((state: any) => state.activeGroupId);
   const mobileStack = useMobileAppStore((state: any) => state.stack);
@@ -642,7 +695,7 @@ export default function WorkstationTaskManagerPanel() {
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
         <div className="flex items-center gap-2 text-sm font-semibold">
           <Activity className="h-4 w-4 text-emerald-200" />
-          Task Manager
+          {t("taskManager.header.title")}
         </div>
         <button
           type="button"
@@ -650,42 +703,42 @@ export default function WorkstationTaskManagerPanel() {
             void refreshServerSnapshot();
           }}
           className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:border-emerald-300/40 hover:bg-emerald-500/10"
-          title="Refresh"
-          aria-label="Refresh task manager"
+          title={t("taskManager.action.refresh")}
+          aria-label={t("taskManager.action.refreshAria")}
         >
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          Refresh
+          {t("taskManager.action.refresh")}
         </button>
       </div>
 
       <div className="overflow-x-auto border-b border-white/10 bg-white/10">
         <div className="grid min-w-[46rem] grid-cols-6 gap-px text-xs">
           <div className="min-w-0 bg-slate-950 px-3 py-2">
-            <div className="flex items-center gap-1.5 text-slate-400"><Gauge className="h-3.5 w-3.5" /> Pressure</div>
-            <div className="mt-1 truncate font-semibold text-slate-100">{summary.pressure_level ?? "unknown"}</div>
+            <div className="flex items-center gap-1.5 text-slate-400"><Gauge className="h-3.5 w-3.5" /> {t("taskManager.summary.pressure")}</div>
+            <div className="mt-1 truncate font-semibold text-slate-100">{summary.pressure_level ?? t("workstation.common.unknown")}</div>
           </div>
           <div className="min-w-0 bg-slate-950 px-3 py-2">
-            <div className="text-slate-400">UI FPS</div>
-            <div className="mt-1 truncate font-semibold text-slate-100">{formatMetric(summary.ui_fps, "")}</div>
+            <div className="text-slate-400">{t("taskManager.summary.uiFps")}</div>
+            <div className="mt-1 truncate font-semibold text-slate-100">{formatMetric(summary.ui_fps, "", t)}</div>
           </div>
           <div className="min-w-0 bg-slate-950 px-3 py-2">
-            <div className="text-slate-400">Responsiveness</div>
+            <div className="text-slate-400">{t("taskManager.summary.responsiveness")}</div>
             <div className="mt-1 truncate font-semibold text-slate-100">
-              {summary.ui_responsiveness_pressure ?? "unknown"} / {formatMetric(summary.ui_input_to_next_frame_p95_ms, "ms")}
+              {summary.ui_responsiveness_pressure ?? t("workstation.common.unknown")} / {formatMetric(summary.ui_input_to_next_frame_p95_ms, "ms", t)}
             </div>
           </div>
           <div className="min-w-0 bg-slate-950 px-3 py-2">
-            <div className="flex items-center gap-1.5 text-slate-400"><Server className="h-3.5 w-3.5" /> Observed</div>
-            <div className="mt-1 truncate font-semibold text-slate-100">{formatMiB(summary.total_observed_mib)}</div>
+            <div className="flex items-center gap-1.5 text-slate-400"><Server className="h-3.5 w-3.5" /> {t("taskManager.summary.observed")}</div>
+            <div className="mt-1 truncate font-semibold text-slate-100">{formatMiB(summary.total_observed_mib, t)}</div>
           </div>
           <div className="min-w-0 bg-slate-950 px-3 py-2">
-            <div className="flex items-center gap-1.5 text-slate-400"><Monitor className="h-3.5 w-3.5" /> Processes</div>
+            <div className="flex items-center gap-1.5 text-slate-400"><Monitor className="h-3.5 w-3.5" /> {t("taskManager.summary.processes")}</div>
             <div className="mt-1 truncate font-semibold text-slate-100">{summary.process_count}</div>
           </div>
           <div className="min-w-0 bg-slate-950 px-3 py-2">
-            <div className="text-slate-400">Samples</div>
+            <div className="text-slate-400">{t("taskManager.summary.samples")}</div>
             <div className="mt-1 truncate font-semibold text-slate-100">
-              {summary.server_sample_included ? "server" : "no server"} / {summary.browser_sample_included ? "browser" : "no browser"}
+              {summary.server_sample_included ? t("taskManager.sample.server") : t("taskManager.sample.noServer")} / {summary.browser_sample_included ? t("taskManager.sample.browser") : t("taskManager.sample.noBrowser")}
             </div>
           </div>
         </div>
@@ -699,21 +752,21 @@ export default function WorkstationTaskManagerPanel() {
         <table className="w-full min-w-[54rem] table-fixed text-left text-xs">
           <thead className="sticky top-0 z-10 border-b border-white/10 bg-slate-950/95 text-[11px] uppercase text-slate-500">
             <tr>
-              <th className="w-[8rem] px-3 py-2 font-medium">Memory</th>
-              <th className="w-[19rem] px-3 py-2 font-medium">Name</th>
-              <th className="w-[8rem] px-3 py-2 font-medium">Status</th>
-              <th className="w-[10rem] px-3 py-2 font-medium">Kind</th>
-              <th className="w-[9rem] px-3 py-2 font-medium">Signal</th>
+              <th className="w-[8rem] px-3 py-2 font-medium">{t("taskManager.table.memory")}</th>
+              <th className="w-[19rem] px-3 py-2 font-medium">{t("taskManager.table.name")}</th>
+              <th className="w-[8rem] px-3 py-2 font-medium">{t("taskManager.table.status")}</th>
+              <th className="w-[10rem] px-3 py-2 font-medium">{t("taskManager.table.kind")}</th>
+              <th className="w-[9rem] px-3 py-2 font-medium">{t("taskManager.table.signal")}</th>
             </tr>
           </thead>
           <tbody>
             {processes.map((process: HelixWorkstationTaskManagerProcess) => (
-              <TaskManagerProcessRow key={process.process_id} process={process} />
+              <TaskManagerProcessRow key={process.process_id} process={process} t={t} />
             ))}
             {processes.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-3 py-8 text-center text-slate-500">
-                  No task snapshot available.
+                  {t("taskManager.empty")}
                 </td>
               </tr>
             ) : null}
@@ -722,7 +775,7 @@ export default function WorkstationTaskManagerPanel() {
       </div>
 
       <div className="border-t border-white/10 px-3 py-2 text-[11px] text-slate-500">
-        schema {serverSnapshot?.schema_version ?? "local.browser_task_manager.v1"} - sorted by observed memory, then estimates
+        {t("taskManager.footer", { schema: serverSnapshot?.schema_version ?? "local.browser_task_manager.v1" })}
       </div>
     </div>
   );

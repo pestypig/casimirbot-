@@ -72,7 +72,10 @@ function firstText(...values: unknown[]): string {
   return "";
 }
 
-function normalizeFinalAnswerSourceForTerminalKind(source: string | null, terminalArtifactKind: string | null): string | null {
+export function normalizeFinalAnswerSourceForTerminalKind(
+  source: string | null,
+  terminalArtifactKind: string | null,
+): string | null {
   if (
     source === "final_answer_draft" &&
     terminalArtifactKind &&

@@ -87,6 +87,20 @@ describe("hoverFocusInspector", () => {
     expect(inspection?.text).toBe("One sentence.");
   });
 
+  it("prefers Helix console paragraph text over broad role container labels", () => {
+    document.body.innerHTML = `
+      <div role="group" aria-label="Turn stream">
+        <p>Question text should be read. Final answer text is later.</p>
+      </div>
+    `;
+
+    const paragraph = document.querySelector("p");
+    const inspection = buildHoverFocusNarratorInspection(paragraph);
+
+    expect(inspection?.text).toBe("Question text should be read.");
+    expect(inspection?.sourceId).not.toContain("Turn stream");
+  });
+
   it("does not read password input values or placeholders", () => {
     document.body.innerHTML = `
       <input type="password" aria-label="Password" placeholder="Secret password" value="12345" />

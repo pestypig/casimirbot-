@@ -1,5 +1,9 @@
 import * as React from "react";
 import { Activity, Database, HardDrive, Layers, RefreshCw, Server } from "lucide-react";
+import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
+import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
+import { useInterfaceText, type InterfaceTextResolver } from "@/lib/i18n/interfaceText";
+import type { InterfaceMessageId } from "@/lib/i18n/messages/types";
 import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
 import { buildBrowserWorkspaceStorageStatus } from "@/lib/workstation/workspaceStorageScanner";
 import { HELIX_WORKSPACE_MEMORY_REGISTRY_SCHEMA } from "@shared/helix-workspace-memory-registry";
@@ -18,9 +22,11 @@ type Rect = {
   w: number;
   h: number;
 };
+type Translate = InterfaceTextResolver["t"];
+type DisplayMessageMap = Record<string, InterfaceMessageId>;
 
-const formatBytes = (value: number | null | undefined): string => {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "unknown";
+const formatBytes = (value: number | null | undefined, t: Translate): string => {
+  if (typeof value !== "number" || !Number.isFinite(value)) return t("workstation.common.unknown");
   const units = ["B", "KiB", "MiB", "GiB"];
   let scaled = value;
   let unit = 0;
@@ -32,7 +38,39 @@ const formatBytes = (value: number | null | undefined): string => {
   return `${rounded} ${units[unit]}`;
 };
 
-const backendLabel = (value: string): string => value.replace(/_/g, " ");
+const backendMessages = {
+  helix_ask_runtime: "storageMap.display.backend.helixAskRuntime",
+  localStorage: "storageMap.display.backend.localStorage",
+  sessionStorage: "storageMap.display.backend.sessionStorage",
+  profile_server: "storageMap.display.backend.profileServer",
+  replit_app_storage: "storageMap.display.backend.replitAppStorage",
+} satisfies DisplayMessageMap;
+
+const scopeMessages = {
+  browser_guest: "storageMap.display.scope.browserGuest",
+  profile: "storageMap.display.scope.profile",
+  surface_session_only: "storageMap.display.scope.surfaceSessionOnly",
+} satisfies DisplayMessageMap;
+
+const syncMessages = {
+  local_only: "storageMap.display.sync.localOnly",
+  profile_candidate: "storageMap.display.sync.profileCandidate",
+  profile_synced: "storageMap.display.sync.profileSynced",
+} satisfies DisplayMessageMap;
+
+const statusMessages = {
+  available: "storageMap.display.status.available",
+  configured_missing: "storageMap.display.status.configuredMissing",
+  degraded: "storageMap.display.status.degraded",
+  error: "storageMap.display.status.error",
+  unknown: "storageMap.display.status.unknown",
+} satisfies DisplayMessageMap;
+
+const displayMappedValue = (t: Translate, value: string | null | undefined, messages: DisplayMessageMap): string => {
+  if (!value) return t("workstation.common.unknown");
+  const messageId = messages[value];
+  return messageId ? t(messageId) : value;
+};
 
 const backendClass = (backend: string): string => {
   switch (backend) {
@@ -133,17 +171,20 @@ const readDiagnosticBoolean = (
   return typeof value === "boolean" ? value : null;
 };
 
-const formatTokens = (value: number | null | undefined): string => {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "unknown";
+const formatTokens = (value: number | null | undefined, t: Translate): string => {
+  if (typeof value !== "number" || !Number.isFinite(value)) return t("workstation.common.unknown");
   return new Intl.NumberFormat("en-US").format(Math.max(0, Math.round(value)));
 };
 
-const formatPercent = (ratio: number | null | undefined): string => {
-  if (typeof ratio !== "number" || !Number.isFinite(ratio)) return "unknown";
+const formatPercent = (ratio: number | null | undefined, t: Translate): string => {
+  if (typeof ratio !== "number" || !Number.isFinite(ratio)) return t("workstation.common.unknown");
   return `${Math.round(ratio * 1000) / 10}%`;
 };
 
 export default function WorkstationStorageMapPanel() {
+  const { userSettings } = useHelixStartSettings();
+  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const { t } = useInterfaceText(interfaceLanguage.code);
   const registryArtifacts = useWorkspaceMemoryRegistryStore((state) => state.artifacts);
   const registrySnapshot = React.useMemo(() => {
     const artifacts = Object.values(registryArtifacts).sort((left, right) => {
@@ -234,35 +275,35 @@ export default function WorkstationStorageMapPanel() {
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
         <div className="flex items-center gap-2 text-sm font-semibold">
           <HardDrive className="h-4 w-4 text-cyan-200" />
-          Storage Map
+          {t("storageMap.header.title")}
         </div>
         <button
           type="button"
           onClick={() => void refreshServerStatus()}
           className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:border-cyan-300/40 hover:bg-cyan-500/10"
-          title="Refresh"
-          aria-label="Refresh storage map"
+          title={t("storageMap.action.refresh")}
+          aria-label={t("storageMap.action.refreshAria")}
         >
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          Refresh
+          {t("storageMap.action.refresh")}
         </button>
       </div>
 
       <div className="grid grid-cols-2 gap-px border-b border-white/10 bg-white/10 text-xs md:grid-cols-4">
         <div className="bg-slate-950 px-3 py-2">
-          <div className="flex items-center gap-1.5 text-slate-400"><Database className="h-3.5 w-3.5" /> Observed</div>
-          <div className="mt-1 font-semibold text-slate-100">{formatBytes(storageStatus.summary.total_observed_bytes)}</div>
+          <div className="flex items-center gap-1.5 text-slate-400"><Database className="h-3.5 w-3.5" /> {t("storageMap.summary.observed")}</div>
+          <div className="mt-1 font-semibold text-slate-100">{formatBytes(storageStatus.summary.total_observed_bytes, t)}</div>
         </div>
         <div className="bg-slate-950 px-3 py-2">
-          <div className="flex items-center gap-1.5 text-slate-400"><Layers className="h-3.5 w-3.5" /> Artifacts</div>
+          <div className="flex items-center gap-1.5 text-slate-400"><Layers className="h-3.5 w-3.5" /> {t("storageMap.summary.artifacts")}</div>
           <div className="mt-1 font-semibold text-slate-100">{storageStatus.summary.artifact_count}</div>
         </div>
         <div className="bg-slate-950 px-3 py-2">
-          <div className="flex items-center gap-1.5 text-slate-400"><Server className="h-3.5 w-3.5" /> Profile</div>
-          <div className="mt-1 font-semibold text-slate-100">{formatBytes(storageStatus.summary.profile_storage_bytes)}</div>
+          <div className="flex items-center gap-1.5 text-slate-400"><Server className="h-3.5 w-3.5" /> {t("storageMap.summary.profile")}</div>
+          <div className="mt-1 font-semibold text-slate-100">{formatBytes(storageStatus.summary.profile_storage_bytes, t)}</div>
         </div>
         <div className="bg-slate-950 px-3 py-2">
-          <div className="text-slate-400">Pressure</div>
+          <div className="text-slate-400">{t("storageMap.summary.pressure")}</div>
           <div className="mt-1 font-semibold text-slate-100">{storageStatus.summary.pressure}</div>
         </div>
       </div>
@@ -275,36 +316,41 @@ export default function WorkstationStorageMapPanel() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2 font-semibold text-slate-100">
             <Activity className="h-4 w-4 text-sky-200" />
-            Ask Active Context
+            {t("storageMap.activeContext.title")}
           </div>
           <div className={`rounded border px-2 py-0.5 text-[10px] uppercase ${activeContextPaused ? "border-amber-300/40 bg-amber-500/10 text-amber-100" : "border-slate-500/30 bg-slate-900 text-slate-300"}`}>
-            {activeContextPaused ? "chat paused" : activeContextHandoff}
+            {activeContextPaused ? t("storageMap.activeContext.chatPaused") : activeContextHandoff}
           </div>
         </div>
         <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <div>
-            <div className="text-slate-500">Context tokens</div>
+            <div className="text-slate-500">{t("storageMap.activeContext.contextTokens")}</div>
             <div className="font-semibold text-slate-100">
-              {formatTokens(activeContextTokens)} / {formatTokens(activeContextWindow)}
+              {formatTokens(activeContextTokens, t)} / {formatTokens(activeContextWindow, t)}
             </div>
           </div>
           <div>
-            <div className="text-slate-500">Usage</div>
-            <div className="font-semibold text-slate-100">{formatPercent(activeContextRatio)}</div>
+            <div className="text-slate-500">{t("storageMap.activeContext.usage")}</div>
+            <div className="font-semibold text-slate-100">{formatPercent(activeContextRatio, t)}</div>
           </div>
           <div>
-            <div className="text-slate-500">Compaction</div>
-            <div className="font-semibold text-slate-100">{backendLabel(activeContextCompaction)}</div>
+            <div className="text-slate-500">{t("storageMap.activeContext.compaction")}</div>
+            <div className="font-semibold text-slate-100">{activeContextCompaction.replace(/_/g, " ")}</div>
           </div>
           <div>
-            <div className="text-slate-500">Pending frames</div>
+            <div className="text-slate-500">{t("storageMap.activeContext.pendingFrames")}</div>
             <div className="font-semibold text-slate-100">
-              {activeContextPendingInputs} inputs / {activeContextUnresolvedFrames} frames
+              {t("storageMap.activeContext.pendingFramesValue", {
+                inputs: activeContextPendingInputs,
+                frames: activeContextUnresolvedFrames,
+              })}
             </div>
           </div>
         </div>
         <div className="mt-1 text-[11px] text-slate-500">
-          Model-visible context: {activeContextModelVisible ? "yes" : "no"} - raw history excluded
+          {t("storageMap.activeContext.modelVisible", {
+            value: activeContextModelVisible ? t("workstation.common.yes") : t("workstation.common.no"),
+          })}
         </div>
       </div>
 
@@ -326,18 +372,18 @@ export default function WorkstationStorageMapPanel() {
                       width: `${Math.max(0.8, rect.w / 10)}%`,
                       height: `${Math.max(1.2, rect.h / 5.2)}%`,
                     }}
-                    title={`${rect.record.label} - ${formatBytes(rect.record.size_bytes)}`}
-                    aria-label={`${rect.record.label} ${formatBytes(rect.record.size_bytes)}`}
+                    title={`${rect.record.label} - ${formatBytes(rect.record.size_bytes, t)}`}
+                    aria-label={`${rect.record.label} ${formatBytes(rect.record.size_bytes, t)}`}
                   >
                     <span className="block truncate text-[11px] font-semibold leading-tight">{rect.record.label}</span>
-                    <span className="mt-0.5 block text-[10px] leading-tight opacity-85">{formatBytes(rect.record.size_bytes)}</span>
+                    <span className="mt-0.5 block text-[10px] leading-tight opacity-85">{formatBytes(rect.record.size_bytes, t)}</span>
                   </button>
                 );
               })}
             </div>
           ) : (
             <div className="flex h-full items-center justify-center text-xs text-slate-500">
-              No observed browser storage records yet.
+              {t("storageMap.empty")}
             </div>
           )}
         </div>
@@ -349,25 +395,25 @@ export default function WorkstationStorageMapPanel() {
               <div className="mt-1 truncate text-[11px] text-slate-500">{selected.path_ref}</div>
               <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                 <div>
-                  <div className="text-slate-500">Size</div>
-                  <div className="font-semibold">{formatBytes(selected.size_bytes)}</div>
+                  <div className="text-slate-500">{t("storageMap.detail.size")}</div>
+                  <div className="font-semibold">{formatBytes(selected.size_bytes, t)}</div>
                 </div>
                 <div>
-                  <div className="text-slate-500">Backend</div>
-                  <div className="truncate font-semibold">{backendLabel(selected.storage_backend)}</div>
+                  <div className="text-slate-500">{t("storageMap.detail.backend")}</div>
+                  <div className="truncate font-semibold">{displayMappedValue(t, selected.storage_backend, backendMessages)}</div>
                 </div>
                 <div>
-                  <div className="text-slate-500">Scope</div>
-                  <div className="truncate font-semibold">{backendLabel(selected.owner_scope)}</div>
+                  <div className="text-slate-500">{t("storageMap.detail.scope")}</div>
+                  <div className="truncate font-semibold">{displayMappedValue(t, selected.owner_scope, scopeMessages)}</div>
                 </div>
                 <div>
-                  <div className="text-slate-500">Sync</div>
-                  <div className="truncate font-semibold">{backendLabel(selected.sync_status)}</div>
+                  <div className="text-slate-500">{t("storageMap.detail.sync")}</div>
+                  <div className="truncate font-semibold">{displayMappedValue(t, selected.sync_status, syncMessages)}</div>
                 </div>
               </div>
               <div className="mt-3">
                 <span className={`inline-flex rounded border px-1.5 py-0.5 text-[10px] uppercase ${statusClass(selected.status)}`}>
-                  {selected.status}
+                  {displayMappedValue(t, selected.status, statusMessages)}
                 </span>
               </div>
             </div>
@@ -376,9 +422,9 @@ export default function WorkstationStorageMapPanel() {
           <table className="w-full table-fixed text-left text-xs">
             <thead className="sticky top-0 z-10 border-b border-white/10 bg-slate-950/95 text-[11px] uppercase text-slate-500">
               <tr>
-                <th className="w-[44%] px-3 py-2 font-medium">Name</th>
-                <th className="w-[22%] px-3 py-2 font-medium">Size</th>
-                <th className="w-[34%] px-3 py-2 font-medium">Backend</th>
+                <th className="w-[44%] px-3 py-2 font-medium">{t("storageMap.table.name")}</th>
+                <th className="w-[22%] px-3 py-2 font-medium">{t("storageMap.table.size")}</th>
+                <th className="w-[34%] px-3 py-2 font-medium">{t("storageMap.table.backend")}</th>
               </tr>
             </thead>
             <tbody>
@@ -393,12 +439,14 @@ export default function WorkstationStorageMapPanel() {
                     <div className="mt-0.5 truncate text-[10px] text-slate-500">{record.artifact_type}</div>
                   </td>
                   <td className="px-3 py-2">
-                    <div className="font-semibold text-slate-100">{formatBytes(record.size_bytes)}</div>
-                    <div className="mt-0.5 text-[10px] text-slate-500">{record.observed ? "observed" : "unknown"}</div>
+                    <div className="font-semibold text-slate-100">{formatBytes(record.size_bytes, t)}</div>
+                    <div className="mt-0.5 text-[10px] text-slate-500">
+                      {record.observed ? t("storageMap.record.observed") : t("workstation.common.unknown")}
+                    </div>
                   </td>
                   <td className="px-3 py-2">
-                    <div className="truncate text-slate-300">{backendLabel(record.storage_backend)}</div>
-                    <div className="mt-0.5 truncate text-[10px] text-slate-500">{backendLabel(record.owner_scope)}</div>
+                    <div className="truncate text-slate-300">{displayMappedValue(t, record.storage_backend, backendMessages)}</div>
+                    <div className="mt-0.5 truncate text-[10px] text-slate-500">{displayMappedValue(t, record.owner_scope, scopeMessages)}</div>
                   </td>
                 </tr>
               ))}
@@ -408,7 +456,7 @@ export default function WorkstationStorageMapPanel() {
       </div>
 
       <div className="border-t border-white/10 px-3 py-2 text-[11px] text-slate-500">
-        schema {storageStatus.schema_version} - values and file contents excluded
+        {t("storageMap.footer", { schema: storageStatus.schema_version })}
       </div>
     </div>
   );

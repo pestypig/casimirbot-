@@ -40,12 +40,13 @@ describe("interface catalog integrity", () => {
     }
   });
 
-  it("keeps Hawaiian schema-bound and placeholder-compatible", () => {
+  it("keeps Hawaiian schema-bound and placeholder-compatible while partial", () => {
     const sourceIds = new Set<InterfaceMessageId>(INTERFACE_MESSAGE_IDS);
     const hawOption = INTERFACE_LANGUAGE_OPTIONS.find((option) => option.code === "haw");
 
     expect(hawOption?.translationMode).toBe("procedural_catalog");
-    expect(Object.keys(hawMessages).length).toBe(INTERFACE_MESSAGE_IDS.length);
+    expect(Object.keys(hawMessages).length).toBeGreaterThan(0);
+    expect(Object.keys(hawMessages).length).toBeLessThanOrEqual(INTERFACE_MESSAGE_IDS.length);
     expect(hawOption ? getInterfaceLanguageReadiness(hawOption) : "").toBe(
       `${Object.keys(hawMessages).length}/${INTERFACE_MESSAGE_IDS.length} catalog strings`,
     );

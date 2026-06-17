@@ -1,10 +1,11 @@
 import { useEffect, useRef } from "react";
-import { speakVoiceStream } from "@/lib/agi/api";
+import { speakVoice, speakVoiceStream } from "@/lib/agi/api";
 import {
   NarratorPlaybackError,
   createNarratorPlaybackLockedDiagnostic,
   installNarratorAudioUnlockGestureListeners,
   isNarratorAudioPlaybackUnlocked,
+  playNarratorVoiceResponse,
   playNarratorVoiceStreamResponse,
   primeNarratorAudioPlayback,
 } from "@/lib/narrator/narratorAudioPlayback";
@@ -32,9 +33,6 @@ const SENTENCE_PATTERN = /[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g;
 const PRIMARY_MEANINGFUL_SELECTOR = [
   "[data-narrator-label]",
   "[data-narrator-description]",
-  "[aria-label]",
-  "[aria-labelledby]",
-  "[aria-describedby]",
   "[title]",
   "button",
   "a[href]",
@@ -42,7 +40,15 @@ const PRIMARY_MEANINGFUL_SELECTOR = [
   "textarea",
   "select",
   "label",
-  "[role]",
+  "img",
+  "[role='button']",
+  "[role='link']",
+  "[role='checkbox']",
+  "[role='radio']",
+  "[role='switch']",
+  "[role='tab']",
+  "[role='menuitem']",
+  "[role='option']",
   "h1",
   "h2",
   "h3",
@@ -346,19 +352,33 @@ export function useNarratorHoverFocusInspector(options?: {
             markFailed(event.eventId, createNarratorPlaybackLockedDiagnostic());
             return;
           }
-          const response = await speakVoiceStream(
-            buildNarratorVoiceSpeakPayload({ event, text: inspection.text }),
-            { signal: controller.signal },
-          );
+          const payload = buildNarratorVoiceSpeakPayload({ event, text: inspection.text });
+          const response = await speakVoiceStream(payload, { signal: controller.signal });
           if (!isLatestActive(event.eventId, seq, controller)) return;
-          const diagnostic = await playNarratorVoiceStreamResponse(response, {
-            signal: controller.signal,
-            onDiagnostic: (nextDiagnostic) => {
-              if (isLatestActive(event.eventId, seq, controller)) {
-                recordPlaybackDiagnostic(event.eventId, nextDiagnostic);
-              }
-            },
-          });
+          let diagnostic;
+          try {
+            diagnostic = await playNarratorVoiceStreamResponse(response, {
+              signal: controller.signal,
+              onDiagnostic: (nextDiagnostic) => {
+                if (isLatestActive(event.eventId, seq, controller)) {
+                  recordPlaybackDiagnostic(event.eventId, nextDiagnostic);
+                }
+              },
+            });
+          } catch (error) {
+            if (controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) throw error;
+            if (!isLatestActive(event.eventId, seq, controller)) return;
+            const fallbackResponse = await speakVoice(payload, { signal: controller.signal });
+            if (!isLatestActive(event.eventId, seq, controller)) return;
+            diagnostic = await playNarratorVoiceResponse(fallbackResponse, {
+              signal: controller.signal,
+              onDiagnostic: (nextDiagnostic) => {
+                if (isLatestActive(event.eventId, seq, controller)) {
+                  recordPlaybackDiagnostic(event.eventId, nextDiagnostic);
+                }
+              },
+            });
+          }
           if (isLatestActive(event.eventId, seq, controller)) {
             markSpoken(event.eventId, undefined, diagnostic);
           }

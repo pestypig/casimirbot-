@@ -2,10 +2,11 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 let buildVisibleResolvedTurn: typeof import("@/components/helix/HelixAskPill").buildVisibleResolvedTurn;
 let chooseVisibleFinalText: typeof import("@/components/helix/HelixAskPill").chooseVisibleFinalText;
+let readHelixAskFinalAnswerSourceLabel: typeof import("@/components/helix/HelixAskPill").readHelixAskFinalAnswerSourceLabel;
 
 beforeAll(async () => {
   (globalThis as Record<string, unknown>).__HELIX_ASK_JOB_TIMEOUT_MS__ = "1200000";
-  ({ buildVisibleResolvedTurn, chooseVisibleFinalText } = await import("@/components/helix/HelixAskPill"));
+  ({ buildVisibleResolvedTurn, chooseVisibleFinalText, readHelixAskFinalAnswerSourceLabel } = await import("@/components/helix/HelixAskPill"));
 }, 30000);
 
 describe("Helix Ask E63 terminal projection", () => {
@@ -349,6 +350,57 @@ describe("Helix Ask E63 terminal projection", () => {
 
     expect(visible.selected_final_answer).toBe(longSelected);
     expect(chooseVisibleFinalText(reply as never)).toBe(longSelected);
+  });
+
+  it("labels calculator workstation terminals by terminal authority instead of stale final draft mirrors", () => {
+    const text =
+      "Calculator verification plan completed.\nExpression: ((sqrt(81)+ln(e^3))*7-5^2)/2\nResult: 29.5\nTrace source: scientific-calculator.solve_expression.";
+    const reply = {
+      id: "turn-e63-calculator-workstation-label",
+      turn_id: "turn-e63-calculator-workstation-label",
+      content: text,
+      selected_final_answer: text,
+      final_answer_source: "final_answer_draft",
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        visible_text: text,
+        selected_terminal_artifact_kind: "workstation_tool_evaluation",
+        source: "workstation_tool_evaluation",
+        integrity: {
+          single_writer_applied: true,
+          materialized_terminal_artifact_kind: "workstation_tool_evaluation",
+        },
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        server_authoritative: true,
+        terminal_text_preview: text,
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        final_answer_source: "final_answer_draft",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        concise_text: text,
+        terminal_artifact_kind: "workstation_tool_evaluation",
+      },
+      canonical_goal_frame: {
+        goal_kind: "calculator_solve",
+      },
+      resolved_turn_summary: {
+        final_status: "final_answer",
+        resolved_route_label: "calculator_solve / model_synthesized_answer",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        final_answer_source: "final_answer_draft",
+      },
+    };
+
+    const visible = buildVisibleResolvedTurn(reply as never);
+
+    expect(visible.primary_source_label).toBe("workstation tool evaluation");
+    expect(visible.primary_route_label).toBe("calculator_solve / workstation_tool_evaluation");
+    expect(readHelixAskFinalAnswerSourceLabel(reply)).toBe("workstation tool evaluation");
+    expect(visible.selected_final_answer).toBe(text);
+    expect(chooseVisibleFinalText(reply as never)).toBe(text);
   });
 
   it("does not let source-targeted legacy selected_final_answer become visible truth without authority", () => {

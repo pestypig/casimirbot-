@@ -80,6 +80,7 @@ import {
 import type { StagePlayLiveSourceMailTranscriptEntryV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import {
   formatHelixVisibleTerminalSourceLabel,
+  normalizeFinalAnswerSourceForTerminalKind,
   resolveHelixVisibleTerminal as resolveHelixVisibleTerminalCore,
   shouldShowHelixRuntimeStopReason,
 } from "@/lib/helix/resolveHelixVisibleTerminal";
@@ -8515,8 +8516,11 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
     coerceText(replyRecord?.terminal_artifact_kind).trim() ||
     coerceText(debugRecord?.terminal_artifact_kind).trim() ||
     coerceText(terminalAuthorityRecord?.terminal_artifact_kind).trim();
+  const effectiveFinalAnswerSource =
+    normalizeFinalAnswerSourceForTerminalKind(finalAnswerSource, terminalArtifactKind) ??
+    finalAnswerSource;
   const situationContextAnswer =
-    finalAnswerSource === "artifact_synthesis" && terminalArtifactKind === "situation_context_pack"
+    effectiveFinalAnswerSource === "artifact_synthesis" && terminalArtifactKind === "situation_context_pack"
       ? (
           coerceText(replyRecord?.assistant_answer).trim() ||
           coerceText(replyRecord?.answer).trim() ||
@@ -8525,7 +8529,7 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
         )
       : "";
   const canonicalSelectedFinalAnswer =
-    !isTypedFailure && terminalArtifactKind === "model_synthesized_answer" && finalAnswerSource === "final_answer_draft"
+    !isTypedFailure && terminalArtifactKind === "model_synthesized_answer" && effectiveFinalAnswerSource === "final_answer_draft"
       ? (
           coerceText(replyRecord?.selected_final_answer).trim() ||
           coerceText(debugRecord?.selected_final_answer).trim()
@@ -8558,16 +8562,18 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
         goalKind: canonicalGoalKind,
         terminalKind: terminalArtifactKind,
       }) ?? selectedFinalAnswerRaw;
+  const summaryRouteLabel = coerceText(summary?.resolved_route_label).trim();
   const routeLabel =
-    coerceText(summary?.resolved_route_label).trim() ||
-    `${canonicalGoalKind} / ${finalAnswerSource}`;
+    terminalArtifactKind === "workstation_tool_evaluation" && /model_synthesized_answer/i.test(summaryRouteLabel)
+      ? `${canonicalGoalKind} / workstation_tool_evaluation`
+      : summaryRouteLabel || `${canonicalGoalKind} / ${effectiveFinalAnswerSource}`;
   return {
     active_turn_id: coerceText(reply.turn_id).trim() || coerceText(summary?.turn_id).trim() || reply.id,
     primary_route_label: routeLabel,
     primary_terminal_label: normalizedStatus,
     primary_source_label: formatHelixVisibleTerminalSourceLabel({
       terminalArtifactKind,
-      finalAnswerSource,
+      finalAnswerSource: effectiveFinalAnswerSource,
     }),
     selected_final_answer: selectedFinalAnswer,
     terminal_error_code: terminalErrorCode,
@@ -8618,15 +8624,19 @@ const readTerminalSourceLabelCandidate = (
   const terminalKind =
     typeof record?.terminal_artifact_kind === "string" && record.terminal_artifact_kind.trim()
       ? record.terminal_artifact_kind.trim()
+      : typeof record?.selected_terminal_artifact_kind === "string" && record.selected_terminal_artifact_kind.trim()
+        ? record.selected_terminal_artifact_kind.trim()
       : null;
   const recordSource =
     typeof record?.final_answer_source === "string" && record.final_answer_source.trim()
       ? record.final_answer_source.trim()
+      : typeof record?.source === "string" && record.source.trim()
+        ? record.source.trim()
       : null;
   if (!terminalKind && !recordSource) return null;
   return formatHelixVisibleTerminalSourceLabel({
     terminalArtifactKind: terminalKind,
-    finalAnswerSource: recordSource ?? fallbackFinalAnswerSource,
+    finalAnswerSource: normalizeFinalAnswerSourceForTerminalKind(recordSource ?? fallbackFinalAnswerSource ?? null, terminalKind),
   });
 };
 
@@ -8648,14 +8658,18 @@ export function readHelixAskFinalAnswerSourceLabel(...sources: unknown[]): strin
         : null;
     const resolvedSummary = readAgentLoopAuditRecord(record.resolved_turn_summary);
     const terminalAuthorityRecord = readTerminalAnswerAuthorityRecord(record.terminal_answer_authority);
+    const terminalAuthoritySingleWriterRecord = readAgentLoopAuditRecord(record.terminal_authority_single_writer);
     const debugRecord = readAgentLoopAuditRecord(record.debug);
     const debugResolvedSummary = readAgentLoopAuditRecord(debugRecord?.resolved_turn_summary);
     const debugTerminalAuthorityRecord = readTerminalAnswerAuthorityRecord(debugRecord?.terminal_answer_authority);
+    const debugTerminalAuthoritySingleWriterRecord = readAgentLoopAuditRecord(debugRecord?.terminal_authority_single_writer);
     for (const terminalRecord of [
-      resolvedSummary,
       terminalAuthorityRecord,
-      debugResolvedSummary,
+      terminalAuthoritySingleWriterRecord,
       debugTerminalAuthorityRecord,
+      debugTerminalAuthoritySingleWriterRecord,
+      resolvedSummary,
+      debugResolvedSummary,
     ]) {
       const label = readTerminalSourceLabelCandidate(terminalRecord, directSource);
       if (label) return label;
@@ -8667,7 +8681,7 @@ export function readHelixAskFinalAnswerSourceLabel(...sources: unknown[]): strin
     if (directSource || directTerminalKind) {
       return formatHelixVisibleTerminalSourceLabel({
         terminalArtifactKind: directTerminalKind,
-        finalAnswerSource: directSource,
+        finalAnswerSource: normalizeFinalAnswerSourceForTerminalKind(directSource, directTerminalKind),
       });
     }
     const truthTable = readAgentLoopAuditRecord(record.turn_truth_table);
@@ -8685,7 +8699,7 @@ export function readHelixAskFinalAnswerSourceLabel(...sources: unknown[]): strin
     if (truthSource || truthTerminalKind) {
       return formatHelixVisibleTerminalSourceLabel({
         terminalArtifactKind: truthTerminalKind,
-        finalAnswerSource: truthSource,
+        finalAnswerSource: normalizeFinalAnswerSourceForTerminalKind(truthSource, truthTerminalKind),
       });
     }
     const audit = readAgentLoopAuditRecord(record.agent_loop_audit);
@@ -8700,7 +8714,7 @@ export function readHelixAskFinalAnswerSourceLabel(...sources: unknown[]): strin
     if (auditSource || auditTerminalKind) {
       return formatHelixVisibleTerminalSourceLabel({
         terminalArtifactKind: auditTerminalKind,
-        finalAnswerSource: auditSource,
+        finalAnswerSource: normalizeFinalAnswerSourceForTerminalKind(auditSource, auditTerminalKind),
       });
     }
   }
