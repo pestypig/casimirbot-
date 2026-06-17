@@ -40,8 +40,24 @@ import {
   markInteraction,
   runWhenQuiet,
 } from "@/lib/workstation/performance/workstationInteractionScheduler";
+import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
+import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
+import { useInterfaceText, type InterfaceTextResolver } from "@/lib/i18n/interfaceText";
+import type { InterfaceMessageId } from "@/lib/i18n/messages/types";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
+
+type Translate = InterfaceTextResolver["t"];
+type DisplayMessageMap = Record<string, InterfaceMessageId>;
+
+const proceduralStepMessages = {
+  highlight_plus: "docsViewer.procedural.focusingPanelPicker",
+  open_picker: "docsViewer.procedural.openingPanelPicker",
+  target_panel: "docsViewer.procedural.selectingDocsPanel",
+  open_doc: "docsViewer.procedural.openingSelectedDocument",
+  read_start: "docsViewer.procedural.startingReadAloud",
+  highlight_copy: "docsViewer.procedural.highlightingTopicSectionForCopy",
+} satisfies DisplayMessageMap;
 
 export type DocMathPickContext = {
   latex: string;
@@ -178,6 +194,9 @@ export function DocViewerPanel() {
     clearPendingAutoRead,
     applyIntent,
   } = useDocViewerStore();
+  const { userSettings } = useHelixStartSettings();
+  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const { t } = useInterfaceText(interfaceLanguage.code);
   const [query, setQuery] = React.useState("");
   const [html, setHtml] = React.useState<string>("");
   const [rawMarkdown, setRawMarkdown] = React.useState<string>("");
@@ -253,7 +272,7 @@ export function DocViewerPanel() {
       })
       .catch((err) => {
         if (canceled) return;
-        setError(err instanceof Error ? err.message : "Unable to render document.");
+        setError(err instanceof Error ? err.message : t("docsViewer.error.render"));
         setHtml("");
         setRawMarkdown("");
         setLoadedDocId(currentEntry.id);
@@ -266,7 +285,7 @@ export function DocViewerPanel() {
     return () => {
       canceled = true;
     };
-  }, [mode, currentEntry]);
+  }, [mode, currentEntry, t]);
 
   React.useEffect(() => {
     if (mode !== "doc" || !anchor || !contentRef.current) return;
@@ -331,20 +350,8 @@ export function DocViewerPanel() {
       if (typeof detail.traceId === "string" && detail.traceId.trim()) {
         lastProceduralTraceIdRef.current = detail.traceId.trim();
       }
-      const label =
-        detail.step === "highlight_plus"
-          ? "Agent: focusing panel picker."
-          : detail.step === "open_picker"
-            ? "Agent: opening panel picker."
-            : detail.step === "target_panel"
-              ? "Agent: selecting Docs panel."
-              : detail.step === "open_doc"
-                ? "Agent: opening selected document."
-                : detail.step === "read_start"
-                  ? "Agent: starting read-aloud."
-                  : detail.step === "highlight_copy"
-                    ? "Agent: highlighting topic section for copy."
-                  : null;
+      const messageId = proceduralStepMessages[detail.step as keyof typeof proceduralStepMessages];
+      const label = messageId ? t(messageId) : null;
       if (!label) return;
       setProceduralStatus(label);
     };
@@ -352,7 +359,7 @@ export function DocViewerPanel() {
     return () => {
       window.removeEventListener(HELIX_WORKSTATION_PROCEDURAL_STEP_EVENT, handleStep as EventListener);
     };
-  }, []);
+  }, [t]);
 
   const clearActiveReadTarget = React.useCallback(() => {
     const target = activeReadTargetRef.current;
@@ -440,7 +447,7 @@ export function DocViewerPanel() {
     }
 
     if (!currentEntry) {
-      const message = "Selected document could not be resolved for read-aloud.";
+      const message = t("docsViewer.error.autoReadMissingDocument");
       setAutoReadError(message);
       clearPendingAutoRead();
       emitAutoReadEvent(`fail: docs auto-read blocked - ${message}`, false, "doc_manifest_miss");
@@ -452,7 +459,7 @@ export function DocViewerPanel() {
     const plain = markdownToSpeechText(rawMarkdown);
     if (!plain) {
       clearPendingAutoRead();
-      setAutoReadError("Document has no readable text for voice playback.");
+      setAutoReadError(t("docsViewer.error.autoReadEmptyDocument"));
       emitAutoReadEvent("fail: docs auto-read blocked - no readable text extracted.", false, "empty_plain_text");
       return;
     }
@@ -527,7 +534,7 @@ export function DocViewerPanel() {
     void run()
       .catch((err) => {
         if (controller.signal.aborted) return;
-        const message = err instanceof Error ? err.message : "Unable to read this document aloud.";
+        const message = err instanceof Error ? err.message : t("docsViewer.error.autoReadGeneric");
         setAutoReadError(message);
         emitAutoReadEvent(`fail: docs auto-read failed (${message}).`, false, "runtime_error");
       })
@@ -555,6 +562,7 @@ export function DocViewerPanel() {
     mode,
     pendingAutoReadNonce,
     rawMarkdown,
+    t,
   ]);
 
   React.useEffect(() => {
@@ -586,7 +594,7 @@ export function DocViewerPanel() {
   const filteredEntries = React.useMemo(() => {
     return filterDocManifestEntries(queryValue);
   }, [queryValue]);
-  const grouped = React.useMemo(() => groupBySubject(filteredEntries), [filteredEntries]);
+  const grouped = React.useMemo(() => groupBySubject(filteredEntries, t), [filteredEntries, t]);
   const handleDocMathClick = React.useCallback(
     (event: React.MouseEvent<HTMLElement>) => {
       const target = event.target as HTMLElement | null;
@@ -634,6 +642,7 @@ export function DocViewerPanel() {
           onSelect={viewDoc}
           variant="full"
           scrollMemoryKey="docs-viewer:directory"
+          t={t}
         />
       ) : (
         <div className="flex min-w-0 flex-1 flex-col">
@@ -649,6 +658,7 @@ export function DocViewerPanel() {
             onShowDirectory={handleShowDirectory}
             canRejoinLiveRead={false}
             onRejoinLiveRead={rejoinLiveRead}
+            t={t}
           />
           <div
             ref={contentRef}
@@ -658,11 +668,11 @@ export function DocViewerPanel() {
           >
             {loading ? (
               <div className="flex h-full items-center justify-center text-sm text-slate-400">
-                Loading document…
+                {t("docsViewer.loading")}
               </div>
             ) : error ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-                <p className="text-sm text-amber-300">Unable to load the document.</p>
+                <p className="text-sm text-amber-300">{t("docsViewer.error.load")}</p>
                 <p className="text-xs text-slate-400">{error}</p>
                 {currentEntry && (
                   <Button
@@ -670,7 +680,7 @@ export function DocViewerPanel() {
                     size="sm"
                     onClick={() => viewDoc(currentEntry.route, anchor)}
                   >
-                    Retry
+                    {t("docsViewer.action.retry")}
                   </Button>
                 )}
               </div>
@@ -682,7 +692,7 @@ export function DocViewerPanel() {
               />
             ) : (
               <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-400">
-                Select a document from the directory to open the reader.
+                {t("docsViewer.empty.selectDocument")}
               </div>
             )}
           </div>
@@ -707,6 +717,7 @@ type DirectoryRailProps = {
   onSelect: (path: string) => void;
   variant?: "rail" | "full";
   scrollMemoryKey?: string;
+  t: Translate;
 };
 
 function DirectoryRail({
@@ -719,6 +730,7 @@ function DirectoryRail({
   onSelect,
   variant = "rail",
   scrollMemoryKey,
+  t,
 }: DirectoryRailProps) {
   const entryRefs = React.useRef<Record<string, HTMLButtonElement | null>>({});
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
@@ -786,12 +798,12 @@ function DirectoryRail({
           <Input
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="Search docs & digests"
+            placeholder={t("docsViewer.search.placeholder")}
             className="h-9 border-none bg-transparent text-sm focus-visible:ring-0"
           />
         </div>
         <p className="mt-2 text-xs text-slate-400">
-          Showing {filteredCount} of {total} files.
+          {t("docsViewer.search.count", { filteredCount, total })}
         </p>
       </div>
       <div
@@ -808,7 +820,7 @@ function DirectoryRail({
             <ul className="space-y-1.5">
               {group.entries.map((entry) => {
                 const selected = entry.route === currentRoute;
-                const catalogDate = formatDocCatalogDate(entry);
+                const catalogDate = formatDocCatalogDate(entry, t);
                 return (
                   <li key={entry.id}>
                     <button
@@ -836,7 +848,7 @@ function DirectoryRail({
           </div>
         ))}
         {entries.length === 0 && (
-          <p className="text-xs text-slate-400">No documents match that search.</p>
+          <p className="text-xs text-slate-400">{t("docsViewer.empty.noMatches")}</p>
         )}
       </div>
     </aside>
@@ -859,6 +871,7 @@ type PanelHeaderProps = {
   onShowDirectory: () => void;
   canRejoinLiveRead: boolean;
   onRejoinLiveRead: () => void;
+  t: Translate;
 };
 
 type DocViewerState = ReturnType<typeof useDocViewerStore.getState>;
@@ -875,15 +888,16 @@ function PanelHeader({
   onShowDirectory,
   canRejoinLiveRead,
   onRejoinLiveRead,
+  t,
 }: PanelHeaderProps) {
   const title =
     mode === "doc" && entry
       ? entry.title
-      : "Docs & Papers Directory";
+      : t("docsViewer.title.directory");
   const subtitle =
     mode === "doc" && entry
       ? entry.relativePath + (anchor ? ` #${anchor}` : "")
-      : "Browse every note, digest, and ethos memo from the repo.";
+      : t("docsViewer.subtitle.directory");
   const pathRef = mode === "doc" && entry ? buildWorkstationPathRef(entry.relativePath) : null;
 
   return (
@@ -892,7 +906,7 @@ function PanelHeader({
         variant="ghost"
         size="icon"
         onClick={onShowDirectory}
-        aria-label="Back to docs and digests"
+        aria-label={t("docsViewer.action.backToDirectory")}
         className="h-9 w-9 shrink-0 rounded-full border border-white/10 text-slate-100 hover:bg-white/10 hover:text-cyan-100"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -940,27 +954,31 @@ function PanelHeader({
         )}
         <h2 className="truncate text-lg font-semibold text-white">{title}</h2>
         {isAutoReading ? (
-          <p className="mt-0.5 text-[11px] text-cyan-200">Reading aloud with Auntie Dottie...</p>
+          <p className="mt-0.5 text-[11px] text-cyan-200">{t("docsViewer.reading.active")}</p>
         ) : null}
         {proceduralStatus ? <p className="mt-0.5 text-[11px] text-sky-200">{proceduralStatus}</p> : null}
         {readProgress ? (
           <p className="mt-0.5 line-clamp-2 text-[11px] text-cyan-100/90">
-            Read {readProgress.chunkIndex}/{readProgress.chunkCount}: {readProgress.snippet}
+            {t("docsViewer.reading.progress", {
+              chunkIndex: readProgress.chunkIndex,
+              chunkCount: readProgress.chunkCount,
+              snippet: readProgress.snippet,
+            })}
           </p>
         ) : null}
         {!isAutoReading && autoReadError ? (
-          <p className="mt-0.5 text-[11px] text-amber-300">Read-aloud stopped: {autoReadError}</p>
+          <p className="mt-0.5 text-[11px] text-amber-300">{t("docsViewer.reading.stopped", { reason: autoReadError })}</p>
         ) : null}
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {isAutoReading ? (
           <Button variant="destructive" size="sm" onClick={onStopAutoRead}>
-            Stop Reading
+            {t("docsViewer.action.stopReading")}
           </Button>
         ) : null}
         {canRejoinLiveRead ? (
           <Button variant="outline" size="sm" onClick={onRejoinLiveRead}>
-            Rejoin Live Read
+            {t("docsViewer.action.rejoinLiveRead")}
           </Button>
         ) : null}
       </div>
@@ -968,10 +986,10 @@ function PanelHeader({
   );
 }
 
-function groupBySubject(entries: DocManifestEntry[]): GroupedDocs[] {
+function groupBySubject(entries: DocManifestEntry[], t: Translate): GroupedDocs[] {
   const map = new Map<string, DocManifestEntry[]>();
   entries.forEach((entry) => {
-    const label = entry.subjectLabel || "General Reference";
+    const label = entry.subjectLabel || t("docsViewer.group.generalReference");
     const bucket = map.get(label);
     if (bucket) {
       bucket.push(entry);
@@ -993,10 +1011,10 @@ function groupRecencyScore(entries: DocManifestEntry[]): number {
   }, 0);
 }
 
-function formatDocCatalogDate(entry: DocManifestEntry): string | null {
+function formatDocCatalogDate(entry: DocManifestEntry, t: Translate): string | null {
   if (!entry.catalogDate) return null;
-  if (entry.catalogDateSource === "mtime") return `Edited ${entry.catalogDate}`;
-  return `Dated ${entry.catalogDate}`;
+  if (entry.catalogDateSource === "mtime") return t("docsViewer.catalog.editedDate", { date: entry.catalogDate });
+  return t("docsViewer.catalog.datedDate", { date: entry.catalogDate });
 }
 
 function markdownToSpeechText(markdown: string): string {

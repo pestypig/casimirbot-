@@ -24,6 +24,10 @@ import {
 import { captureFrameDataUrlFromStream } from "@/lib/helix/visualFrameProducer";
 import { submitImageLensCropFrame } from "@/lib/helix/imageLensVisualFrame";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
+import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
+import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
+import { useInterfaceText, type InterfaceTextResolver } from "@/lib/i18n/interfaceText";
+import type { InterfaceMessageId } from "@/lib/i18n/messages/types";
 import { useDocumentImageRegionStore, type DocumentImageRegionState } from "@/store/useDocumentImageRegionStore";
 import { useImageLensLiveSourceStore } from "@/store/useImageLensLiveSourceStore";
 
@@ -40,13 +44,19 @@ type SentFrameState = {
   summary: string;
 };
 
-const SOURCE_KIND_LABELS: Record<DocumentImageSourceKindV1, string> = {
-  image_attachment: "Image attachment",
-  pdf_page_render: "PDF page render",
-  manual_image_url: "Manual image URL",
-};
+type Translate = InterfaceTextResolver["t"];
+type DisplayMessageMap = Record<string, InterfaceMessageId>;
 
-const SOURCE_KIND_OPTIONS = Object.entries(SOURCE_KIND_LABELS) as Array<[DocumentImageSourceKindV1, string]>;
+const sourceKindMessages = {
+  image_attachment: "imageLens.sourceKind.imageAttachment",
+  pdf_page_render: "imageLens.sourceKind.pdfPageRender",
+  manual_image_url: "imageLens.sourceKind.manualImageUrl",
+} satisfies DisplayMessageMap;
+
+const displayMappedValue = (t: Translate, value: string, messages: DisplayMessageMap): string => {
+  const messageId = messages[value];
+  return messageId ? t(messageId) : value;
+};
 
 function parseNumber(value: string, fallback: number): number {
   const parsed = Number(value);
@@ -165,6 +175,11 @@ export default function ImageLensPanel() {
   const imageRef = useRef<HTMLImageElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { userSettings } = useHelixStartSettings();
+  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const { t } = useInterfaceText(interfaceLanguage.code);
+  const initialStatusMessage = t("imageLens.status.initial");
+  const initialStatusRef = useRef(initialStatusMessage);
   const [urlDraft, setUrlDraft] = useState("");
   const [sourceKind, setSourceKind] = useState<DocumentImageSourceKindV1>("manual_image_url");
   const [pageDraft, setPageDraft] = useState("1");
@@ -172,7 +187,7 @@ export default function ImageLensPanel() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [lastSentFrame, setLastSentFrame] = useState<SentFrameState | null>(null);
-  const [statusMessage, setStatusMessage] = useState("Load an image, drag a crop region, then send the crop as a visual-source frame.");
+  const [statusMessage, setStatusMessage] = useState(initialStatusMessage);
   const source = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.source);
   const naturalSize = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.naturalSize);
   const cropDraft = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.cropDraft);
@@ -186,6 +201,18 @@ export default function ImageLensPanel() {
   const clearReceipts = useDocumentImageRegionStore((state: DocumentImageRegionState) => state.clearReceipts);
   const liveSourceActive = Boolean(liveSource?.streamActive && liveSource.stream);
   const hasVisualInput = Boolean(source || liveSourceActive);
+  const sourceKindOptions = useMemo<Array<[DocumentImageSourceKindV1, string]>>(
+    () => Object.keys(sourceKindMessages).map((value) => [
+      value as DocumentImageSourceKindV1,
+      displayMappedValue(t, value, sourceKindMessages),
+    ]),
+    [t],
+  );
+
+  useEffect(() => {
+    setStatusMessage((current) => (current === initialStatusRef.current ? initialStatusMessage : current));
+    initialStatusRef.current = initialStatusMessage;
+  }, [initialStatusMessage]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -215,7 +242,7 @@ export default function ImageLensPanel() {
   const loadUrl = () => {
     const trimmed = urlDraft.trim();
     if (!trimmed) {
-      setStatusMessage("Enter an image URL or choose a local image file.");
+      setStatusMessage(t("imageLens.status.missingImage"));
       return;
     }
     const pageNumber = sourceKind === "pdf_page_render" ? Math.max(1, Math.floor(parseNumber(pageDraft, 1))) : null;
@@ -225,7 +252,7 @@ export default function ImageLensPanel() {
       sourceKind,
       pageNumber,
     });
-    setStatusMessage("Image loaded. Drag on the image to set a crop region.");
+    setStatusMessage(t("imageLens.status.imageLoaded"));
   };
 
   const loadFile = (file: File | null) => {
@@ -239,7 +266,7 @@ export default function ImageLensPanel() {
       sourceKind: "image_attachment",
       pageNumber: null,
     });
-    setStatusMessage("Local image loaded. Drag on the image to set a crop region.");
+    setStatusMessage(t("imageLens.status.localImageLoaded"));
   };
 
   const useFullImage = () => {
@@ -282,15 +309,15 @@ export default function ImageLensPanel() {
   const endCropDrag = (event: React.PointerEvent<HTMLDivElement>) => {
     if (!dragState || dragState.pointerId !== event.pointerId) return;
     setDragState(null);
-    setStatusMessage("Crop region set. Send it to Live Answer when ready.");
+    setStatusMessage(t("imageLens.status.cropSet"));
   };
 
   const sendFrameToLiveAnswer = async () => {
     if (!hasVisualInput || !naturalSize) {
-      setStatusMessage("Load an image or route a live visual source before sending a visual-source frame.");
+      setStatusMessage(t("imageLens.status.missingVisualInput"));
       return;
     }
-    setStatusMessage("Sending crop frame to Live Answer visual source...");
+    setStatusMessage(t("imageLens.status.sendingCrop"));
     const img = imageRef.current;
     const bboxPx = clampDocumentImageBbox(cropDraft, naturalSize);
     let sourceImageRef = source?.sourceImageUrl ?? liveSource?.latestFrameDataUrl ?? `live-source://${liveSource?.sourceId ?? "unknown"}`;
@@ -312,7 +339,7 @@ export default function ImageLensPanel() {
           lastFrameAt: new Date().toISOString(),
         });
       } catch {
-        setStatusMessage("Could not sample the live visual source. Try sharing the screen again.");
+        setStatusMessage(t("imageLens.status.sampleFailed"));
         return;
       }
     } else if (img && source) {
@@ -325,11 +352,11 @@ export default function ImageLensPanel() {
       }
     }
     if (!imageRefValue.startsWith("data:image/")) {
-      setStatusMessage("The crop could not be converted into an inline image frame. Use a local image or a CORS-readable image URL.");
+      setStatusMessage(t("imageLens.status.inlineFrameFailed"));
       return;
     }
 
-    const summary = `Manual crop frame from Image Lens (${bboxPx.width}x${bboxPx.height}px). Live Answer visual shades own interpretation.`;
+    const summary = t("imageLens.summary.manualCropFrame", { width: bboxPx.width, height: bboxPx.height });
     const receipt = buildDocumentImageRegionReceipt({
       sourceAttachmentId,
       sourceKind: sourceKindForReceipt,
@@ -377,10 +404,10 @@ export default function ImageLensPanel() {
         evidenceId: result.evidenceId,
         summary: result.summary,
       });
-      setStatusMessage("Crop frame sent to Live Answer visual source.");
+      setStatusMessage(t("imageLens.status.sendSuccess"));
     } catch (error) {
       const message = error instanceof Error ? error.message : "visual_frame_send_failed";
-      setStatusMessage(`Could not send crop frame to Live Answer: ${message}`);
+      setStatusMessage(t("imageLens.status.sendFailed", { message }));
     }
   };
 
@@ -389,7 +416,7 @@ export default function ImageLensPanel() {
       <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
         <div className="flex items-center gap-2 text-sm font-semibold">
           <FileImage className="h-4 w-4 text-cyan-200" />
-          Image Lens
+          {t("imageLens.header.title")}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -398,7 +425,7 @@ export default function ImageLensPanel() {
             className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10"
           >
             <ChevronDown className={`h-3.5 w-3.5 transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
-            Advanced
+            {t("imageLens.action.advanced")}
           </button>
           <button
             type="button"
@@ -406,7 +433,7 @@ export default function ImageLensPanel() {
             className="inline-flex items-center gap-1 rounded border border-rose-400/40 bg-rose-500/10 px-2 py-1 text-xs text-rose-100 hover:bg-rose-500/20"
           >
             <Trash2 className="h-3.5 w-3.5" />
-            Clear
+            {t("imageLens.action.clear")}
           </button>
         </div>
       </div>
@@ -414,12 +441,12 @@ export default function ImageLensPanel() {
       <div className="border-b border-white/10 bg-black/20 p-3">
         <div className="flex flex-wrap items-end gap-2">
           <label className="min-w-[260px] flex-1 text-xs text-slate-300">
-            Image URL
+            {t("imageLens.input.imageUrl")}
             <input
               value={urlDraft}
               onChange={(event: React.ChangeEvent<HTMLInputElement>) => setUrlDraft(event.target.value)}
               className="mt-1 w-full rounded border border-white/10 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none focus:border-cyan-400/60"
-              placeholder="https://... or data:image/..."
+              placeholder={t("imageLens.input.urlPlaceholder")}
             />
           </label>
           <button
@@ -428,7 +455,7 @@ export default function ImageLensPanel() {
             className="inline-flex items-center gap-1 rounded border border-cyan-400/40 bg-cyan-500/10 px-2 py-1.5 text-xs text-cyan-100 hover:bg-cyan-500/20"
           >
             <Link className="h-3.5 w-3.5" />
-            Load URL
+            {t("imageLens.action.loadUrl")}
           </button>
           <button
             type="button"
@@ -436,7 +463,7 @@ export default function ImageLensPanel() {
             className="inline-flex items-center gap-1 rounded border border-slate-500/50 bg-slate-800 px-2 py-1.5 text-xs text-slate-100 hover:bg-slate-700"
           >
             <Plus className="h-3.5 w-3.5" />
-            Choose file
+            {t("imageLens.action.chooseFile")}
           </button>
           <input
             ref={fileInputRef}
@@ -452,7 +479,7 @@ export default function ImageLensPanel() {
             className="inline-flex items-center gap-1 rounded border border-emerald-400/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-100 hover:bg-emerald-500/20 disabled:opacity-50"
           >
             <Scissors className="h-3.5 w-3.5" />
-            Send crop frame
+            {t("imageLens.action.sendCropFrame")}
           </button>
           <button
             type="button"
@@ -461,20 +488,20 @@ export default function ImageLensPanel() {
             className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-slate-200 hover:bg-white/10 disabled:opacity-50"
           >
             <RotateCcw className="h-3.5 w-3.5" />
-            Full image
+            {t("imageLens.action.fullImage")}
           </button>
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-slate-400">{statusMessage}</p>
         {liveSourceActive ? (
           <p className="mt-1 text-[11px] leading-relaxed text-cyan-100">
-            Image Lens is using live visual source {liveSource?.sourceId}. Raw screen frames are not summarized until a crop is sent.
+            {t("imageLens.liveSource.note", { sourceId: liveSource?.sourceId ?? "unknown" })}
           </p>
         ) : null}
         {lastSentFrame ? (
           <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-emerald-400/30 bg-emerald-500/10 px-2 py-1.5 text-xs text-emerald-100">
             <span className="min-w-0 flex-1 truncate">
-              Sent to Live Answer source {lastSentFrame.sourceId}
-              {lastSentFrame.evidenceId ? ` - evidence ${lastSentFrame.evidenceId}` : ""}
+              {t("imageLens.sent.source", { sourceId: lastSentFrame.sourceId })}
+              {lastSentFrame.evidenceId ? t("imageLens.sent.evidence", { evidenceId: lastSentFrame.evidenceId }) : ""}
             </span>
             <button
               type="button"
@@ -482,7 +509,7 @@ export default function ImageLensPanel() {
               className="inline-flex items-center gap-1 rounded border border-emerald-300/40 px-2 py-1 text-[11px] hover:bg-emerald-500/20"
             >
               <ImageIcon className="h-3.5 w-3.5" />
-              Open Live Answer
+              {t("imageLens.action.openLiveAnswer")}
             </button>
           </div>
         ) : null}
@@ -526,7 +553,7 @@ export default function ImageLensPanel() {
                 <img
                   ref={imageRef}
                   src={source.sourceImageUrl}
-                  alt="Image source"
+                  alt={t("imageLens.image.alt")}
                   crossOrigin="anonymous"
                   draggable={false}
                   className="max-h-[68vh] max-w-full select-none object-contain"
@@ -534,7 +561,7 @@ export default function ImageLensPanel() {
                     const img = event.currentTarget;
                     setNaturalSize({ width: img.naturalWidth || 1, height: img.naturalHeight || 1 });
                   }}
-                  onError={() => setStatusMessage("Image failed to load. Check the URL or choose a local file.")}
+                  onError={() => setStatusMessage(t("imageLens.status.imageLoadFailed"))}
                 />
                 <div
                   className="pointer-events-none absolute border-2 border-cyan-300 bg-cyan-300/10 shadow-[0_0_0_9999px_rgba(2,6,23,0.35)]"
@@ -547,10 +574,10 @@ export default function ImageLensPanel() {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="flex h-40 w-40 flex-col items-center justify-center rounded border border-dashed border-cyan-300/40 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/20"
-                aria-label="Choose image file"
+                aria-label={t("imageLens.action.chooseImageFileAria")}
               >
                 <Plus className="h-10 w-10" />
-                <span className="mt-2 text-xs">Add image</span>
+                <span className="mt-2 text-xs">{t("imageLens.action.addImage")}</span>
               </button>
             )}
           </div>
@@ -560,22 +587,22 @@ export default function ImageLensPanel() {
           <div className="border-t border-white/10 bg-black/20 p-3" data-testid="image-lens-advanced">
             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
               <div className="rounded border border-white/10 bg-slate-900/60 p-2">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-300">Source details</div>
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-300">{t("imageLens.advanced.sourceDetails")}</div>
                 <div className="grid grid-cols-[1fr_92px] gap-2">
                   <label className="block text-xs text-slate-300">
-                    Source kind
+                    {t("imageLens.advanced.sourceKind")}
                     <select
                       value={sourceKind}
                       onChange={(event: React.ChangeEvent<HTMLSelectElement>) => setSourceKind(event.target.value as DocumentImageSourceKindV1)}
                       className="mt-1 w-full rounded border border-white/10 bg-slate-900 px-2 py-1.5 text-xs"
                     >
-                      {SOURCE_KIND_OPTIONS.map(([value, label]: [DocumentImageSourceKindV1, string]) => (
+                      {sourceKindOptions.map(([value, label]: [DocumentImageSourceKindV1, string]) => (
                         <option key={value} value={value}>{label}</option>
                       ))}
                     </select>
                   </label>
                   <label className="block text-xs text-slate-300">
-                    Page
+                    {t("imageLens.advanced.page")}
                     <input
                       value={pageDraft}
                       onChange={(event: React.ChangeEvent<HTMLInputElement>) => setPageDraft(event.target.value)}
@@ -586,7 +613,7 @@ export default function ImageLensPanel() {
                 </div>
               </div>
               <div className="rounded border border-white/10 bg-slate-900/60 p-2">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-300">Crop coordinates</div>
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-300">{t("imageLens.advanced.cropCoordinates")}</div>
                 <div className="grid grid-cols-4 gap-2">
                   {(["x", "y", "width", "height"] as const).map((key: keyof DocumentImageBboxPxV1) => (
                     <label key={key} className="block text-xs text-slate-300">
@@ -602,13 +629,15 @@ export default function ImageLensPanel() {
                   ))}
                 </div>
                 <p className="mt-2 text-[11px] text-slate-500">
-                  Natural size: {naturalSize ? `${naturalSize.width} x ${naturalSize.height}px` : "not loaded"}
+                  {t("imageLens.advanced.naturalSize", {
+                    value: naturalSize ? `${naturalSize.width} x ${naturalSize.height}px` : t("imageLens.advanced.notLoaded"),
+                  })}
                 </p>
               </div>
               <div className="rounded border border-white/10 bg-slate-900/60 p-2">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-300">Frame receipt</div>
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-300">{t("imageLens.advanced.frameReceipt")}</div>
                 <label className="block text-xs text-slate-300">
-                  Region kind
+                  {t("imageLens.advanced.regionKind")}
                   <select
                     value={kind}
                     onChange={(event: React.ChangeEvent<HTMLSelectElement>) => setKind(event.target.value as DocumentImageRegionKindV1)}
@@ -620,7 +649,7 @@ export default function ImageLensPanel() {
                   </select>
                 </label>
                 <p className="mt-2 text-[11px] text-slate-500">
-                  Interpretation belongs in Live Answer visual shades; this panel only sends frames.
+                  {t("imageLens.advanced.interpretationBoundary")}
                 </p>
               </div>
             </div>
@@ -629,11 +658,11 @@ export default function ImageLensPanel() {
 
         <div className="max-h-56 overflow-auto border-t border-white/10 bg-black/20 p-3">
           <div className="mb-2 flex items-center justify-between">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">Manual visual-source frames</div>
-            <div className="text-[11px] text-slate-500">observation only / not answer authority</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-300">{t("imageLens.frames.title")}</div>
+            <div className="text-[11px] text-slate-500">{t("imageLens.frames.authority")}</div>
           </div>
           {receipts.length === 0 ? (
-            <p className="text-xs text-slate-500">No crop frames sent yet.</p>
+            <p className="text-xs text-slate-500">{t("imageLens.frames.empty")}</p>
           ) : (
             <div className="space-y-2">
               {receipts.map((receipt: NonNullable<DocumentImageRegionState["lastReceipt"]>) => (
@@ -642,14 +671,14 @@ export default function ImageLensPanel() {
                     <div className="font-medium text-slate-100">
                       {receipt.classification.kind} - {receipt.extraction.status}
                     </div>
-                    <div className="text-[11px] text-slate-500">source {receipt.visualSource.sourceId}</div>
+                    <div className="text-[11px] text-slate-500">{t("imageLens.frames.source", { sourceId: receipt.visualSource.sourceId })}</div>
                   </div>
                   <p className="mt-1 text-slate-300">{receipt.classification.summary}</p>
                   <p className="mt-1 break-all text-[11px] text-slate-500">
                     {receipt.crop.regionId} - bbox={receipt.crop.bboxPx.x},{receipt.crop.bboxPx.y},{receipt.crop.bboxPx.width},{receipt.crop.bboxPx.height} - hash={receipt.crop.imageHash}
                   </p>
                   <p className="mt-1 text-[11px] text-amber-200">
-                    Claim boundary: visual crop observation only; not answer authority.
+                    {t("imageLens.frames.claimBoundary")}
                   </p>
                 </article>
               ))}
