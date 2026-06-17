@@ -13,6 +13,7 @@ export type HelixCapabilityFamily =
   | "internet_search"
   | "process_graph"
   | "debug_export"
+  | "context_reflection"
   | "workspace_diagnostic"
   | "subagent_runtime_adapter";
 

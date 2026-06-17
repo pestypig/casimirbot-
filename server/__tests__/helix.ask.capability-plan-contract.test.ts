@@ -687,4 +687,28 @@ describe("Helix capability plan contract", () => {
       route_metadata_demoted: true,
     });
   });
+
+  it("plans selected context attachments through context reflection", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:context-reflection",
+      promptText: "Use this microreasoner cutout as context for the next prompt.",
+      sourceTargetIntent: {
+        ...baseSourceTarget("context_reflection", "context_attachment"),
+        requested_outputs: ["context_attachment_reflection", "bounded_context_reference"],
+      },
+      toolCallAdmissionDecision: toolAdmission("context_reflection", ["context_reflection"]),
+      canonicalGoalFrame: canonicalGoal("context_attachment_reflection", "model_synthesized_answer"),
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "context_reflection",
+      requested_action: "helix_ask.reflect_context_attachments",
+      selected_capability: "helix_ask.reflect_context_attachments",
+      mutating: false,
+      operator_command_required: false,
+      operator_command_present: true,
+      source_target: "context_reflection",
+      admission_status: "needs_evidence",
+    });
+  });
 });

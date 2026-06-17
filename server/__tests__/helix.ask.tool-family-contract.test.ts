@@ -32,6 +32,8 @@ describe("Helix Ask tool-family contract registry", () => {
       "live_source_mail",
       "live_source_decision",
       "voice_delivery",
+      "zen_graph_reflection",
+      "context_reflection",
       "civilization_bounds",
       "capability_catalog",
     ];
@@ -64,11 +66,12 @@ describe("Helix Ask tool-family contract registry", () => {
       ["helix_civilization_bounds_tool_result", "civilization_bounds", "evidence_only"],
       ["helix_ask.inspect_capability_catalog", "capability_catalog", "evidence_only"],
       ["helix_ask.reflect_workstation_tool_alignment", "capability_catalog", "evidence_only"],
-      ["helix_ask.reflect_live_synthetic_data", "capability_catalog", "evidence_only"],
+      ["helix_ask.reflect_live_synthetic_data", "context_reflection", "evidence_only"],
+      ["helix_ask.reflect_context_attachments", "context_reflection", "evidence_only"],
       ["toolchain_matrix", "capability_catalog", "evidence_only"],
-      ["microdeck_reflection", "capability_catalog", "evidence_only"],
-      ["macro_reasoner_deck_reflection", "capability_catalog", "evidence_only"],
-      ["mail_loop_synthetic_data", "capability_catalog", "evidence_only"],
+      ["microdeck_reflection", "context_reflection", "evidence_only"],
+      ["macro_reasoner_deck_reflection", "context_reflection", "evidence_only"],
+      ["mail_loop_synthetic_data", "context_reflection", "evidence_only"],
     ];
 
     for (const [toolName, toolFamily, authority] of required) {

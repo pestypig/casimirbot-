@@ -1353,6 +1353,7 @@ function statusTone(status: string): string {
 function kindTone(kind: string): string {
   if (kind === "observer") return "border-amber-800/70 bg-amber-950/25";
   if (kind === "source") return "border-sky-800/70 bg-sky-950/25";
+  if (kind === "workstation_state_plane") return "border-teal-800/70 bg-teal-950/25";
   if (kind === "fusion") return "border-indigo-800/70 bg-indigo-950/25";
   if (kind === "interpreter") return "border-fuchsia-800/70 bg-fuchsia-950/25";
   if (kind === "hazard" || kind === "blocked_affordance") return "border-rose-800/70 bg-rose-950/25";
@@ -1364,7 +1365,12 @@ function kindTone(kind: string): string {
 
 function laneForBadge(badge: StagePlayBadgeV1): StagePlayLaneId {
   if (badge.kind === "observer" || badge.kind === "source") return "observer";
-  if (badge.kind === "compact_observation" || badge.kind === "fusion" || badge.kind === "interpreter") {
+  if (
+    badge.kind === "compact_observation" ||
+    badge.kind === "fusion" ||
+    badge.kind === "interpreter" ||
+    badge.kind === "workstation_state_plane"
+  ) {
     return "compact_observation";
   }
   if (
@@ -1540,6 +1546,7 @@ function proceduralExpression(badge: StagePlayBadgeV1): string {
 function badgeActionLine(badge: StagePlayBadgeV1): string {
   if (badge.kind === "observer") return "Source custody and routing";
   if (badge.kind === "source") return "Routed live source";
+  if (badge.kind === "workstation_state_plane") return "Workstation state plane";
   if (badge.kind === "compact_observation") return "Compact source window";
   if (badge.kind === "stage_interpretation") return "Current interpreted stage bounds";
   if (badge.kind === "ask_checkpoint" || badge.kind === "helix_ask_checkpoint") return "Model checkpoint boundary";
@@ -1561,6 +1568,7 @@ function selectedNodeConsoleTitle(badge: StagePlayBadgeV1 | null): string {
   if (!badge) return "Builder Palette";
   if (badge.kind === "observer") return "Observer Source Setup";
   if (badge.kind === "source") return "Source Routing";
+  if (badge.kind === "workstation_state_plane") return "Workstation State Plane";
   if (badge.kind === "compact_observation") return "Compact Observation Evidence";
   if (badge.kind === "procedural_binding") return "Procedural Binding";
   if (badge.kind === "ask_checkpoint" || badge.kind === "helix_ask_checkpoint") return "Helix Ask Checkpoint";
@@ -1579,6 +1587,7 @@ function selectedNodeConsoleDescription(badge: StagePlayBadgeV1 | null): string 
   }
   if (badge.kind === "observer") return "Configure source custody, routing, cadence, and audit buffers.";
   if (badge.kind === "source") return "Route this source into Stage Play and inspect its evidence custody.";
+  if (badge.kind === "workstation_state_plane") return "Inspect deterministic workstation process state without granting answer or action authority.";
   if (badge.kind === "compact_observation") return "Inspect compact facts, evidence refs, and raw-buffer audit links.";
   if (badge.kind === "procedural_binding") return "Inspect the expression and badges that support this procedure.";
   if (badge.kind === "ask_checkpoint" || badge.kind === "helix_ask_checkpoint") return "Inspect Ask turn refs, tool observation refs, and solver/debug status.";

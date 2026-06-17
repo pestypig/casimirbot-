@@ -420,6 +420,7 @@ export async function runStagePlayLiveSourceMailWakeAdmissionCycle(input: {
   roomId?: string | null;
   environmentId?: string | null;
   jobId?: string | null;
+  sourceId?: string | null;
   baseUrl?: string;
   askTurnRunner?: AskWakeTurnRunner;
   executeHiddenAsk?: boolean;
@@ -529,6 +530,7 @@ export async function runStagePlayLiveSourceMailWakeAdmissionCycle(input: {
       roomId: input.roomId ?? null,
       environmentId: input.environmentId ?? null,
       jobId: input.jobId ?? null,
+      sourceId: input.sourceId ?? null,
       baseUrl: input.baseUrl,
       askTurnRunner: input.askTurnRunner,
       executeHiddenAsk: input.executeHiddenAsk ?? Boolean(input.askTurnRunner),

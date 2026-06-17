@@ -47,6 +47,7 @@ import {
 import { resetStagePlayPerturbationEventsForTest } from "../services/stage-play/stage-play-perturbation-event-store";
 import { resetStagePlayCheckpointQueueForTest } from "../services/stage-play/stage-play-checkpoint-queue";
 import { resetStagePlayRawSessionBufferForTest } from "../services/stage-play/stage-play-raw-session-buffer-store";
+import { resetStagePlayProcessedMailPacketStoreForTest } from "../services/stage-play/stage-play-processed-mail-packet-store";
 
 const threadId = "thread:stage-play-reducer";
 const roomId = "room:minecraft-stage-play-reducer";
@@ -67,6 +68,7 @@ beforeEach(() => {
   resetStagePlayAskCheckpointReceiptsForTest();
   resetStagePlayPerturbationEventsForTest();
   resetStagePlayCheckpointQueueForTest();
+  resetStagePlayProcessedMailPacketStoreForTest();
   clearEventJournalForTest();
 });
 
@@ -202,6 +204,36 @@ describe("Stage Play world-state badge reducer", () => {
           }),
         ]),
       }),
+      expect.objectContaining({
+        id: "workstation_state_plane.current",
+        kind: "workstation_state_plane",
+        status: "observed",
+        reasonCodes: expect.arrayContaining(["workstation_state_plane", "process_graph_reflection"]),
+      }),
+      expect.objectContaining({
+        id: "workstation_state_plane.microdeck_buffer",
+        kind: "workstation_state_plane",
+        status: "observed",
+        dataTray: expect.objectContaining({
+          transformLabel: "MicroDeck prompt/run buffer",
+          summary: expect.stringMatching(/\d+ prompt\(s\), \d+ run\(s\), \d+ processed packet\(s\)\./),
+        }),
+      }),
+      expect.objectContaining({
+        id: "workstation_state_plane.gates",
+        kind: "workstation_state_plane",
+        missingEvidence: expect.arrayContaining([
+          "A fresh model-reviewed checkpoint is needed before output lanes can be upheld as current.",
+        ]),
+      }),
+      expect.objectContaining({
+        id: "workstation_state_plane.output_bus",
+        kind: "workstation_state_plane",
+        dataTray: expect.objectContaining({
+          transformLabel: "authority-gated output projection",
+          outputRefs: expect.arrayContaining(["answer_snapshot.latest", "live_output.current"]),
+        }),
+      }),
     ]));
     const sourceNode = graph.badges.find((badge) => badge.id === "source.visual_frame.active");
     expect(sourceNode?.dataTray).toEqual(expect.objectContaining({
@@ -291,6 +323,21 @@ describe("Stage Play world-state badge reducer", () => {
         from: "answer_snapshot.latest",
         to: "live_output.current",
         relation: "produces",
+      }),
+      expect.objectContaining({
+        from: "workstation_state_plane.current",
+        to: "workstation_state_plane.source_bus",
+        relation: "contains",
+      }),
+      expect.objectContaining({
+        from: "workstation_state_plane.microdeck_buffer",
+        to: "interpreter.stage_play_reflection",
+        relation: "feeds",
+      }),
+      expect.objectContaining({
+        from: "workstation_state_plane.gates",
+        to: "workstation_state_plane.output_bus",
+        relation: "constrains",
       }),
     ]));
   });

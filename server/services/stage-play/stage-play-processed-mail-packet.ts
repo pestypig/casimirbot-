@@ -331,11 +331,11 @@ const readDocumentMarkdownVisibleUnitsPayload = (
   mailItems: StagePlayLiveSourceMailItemV1[],
 ): DocumentMarkdownVisibleUnitsPayload => {
   const parsed = mailItems
-    .map((item) => parseStructuredObserverOutput(item.summary.text))
-    .find((record) => record?.schema === "stage_play.document_markdown_visible_units.v1");
-  const units = Array.isArray(parsed?.units)
-    ? parsed.units
-        .map((entry) => readRecord(entry))
+    .map((item: StagePlayLiveSourceMailItemV1) => parseStructuredObserverOutput(item.summary.text))
+    .find((record: Record<string, unknown> | null) => record?.schema === "stage_play.document_markdown_visible_units.v1");
+  const rawUnits: unknown[] = Array.isArray(parsed?.units) ? parsed.units : [];
+  const units = rawUnits
+        .map((entry: unknown) => readRecord(entry))
         .filter((entry): entry is Record<string, unknown> => Boolean(entry))
         .map((entry): DocumentMarkdownVisibleUnit => ({
           unit_id: readStringFromJson(entry, "unit_id") ?? readStringFromJson(entry, "unitId") ?? "",
@@ -343,13 +343,12 @@ const readDocumentMarkdownVisibleUnitsPayload = (
           source_markdown: readStringFromJson(entry, "source_markdown") ?? readStringFromJson(entry, "sourceMarkdown") ?? "",
           translatable: entry.translatable !== false,
           protected_spans: Array.isArray(entry.protected_spans)
-            ? entry.protected_spans.filter((value): value is string => typeof value === "string")
+            ? (entry.protected_spans as unknown[]).filter((value: unknown): value is string => typeof value === "string")
             : Array.isArray(entry.protectedSpans)
-              ? entry.protectedSpans.filter((value): value is string => typeof value === "string")
+              ? (entry.protectedSpans as unknown[]).filter((value: unknown): value is string => typeof value === "string")
               : [],
         }))
-        .filter((unit) => unit.unit_id.length > 0)
-    : [];
+        .filter((unit: DocumentMarkdownVisibleUnit) => unit.unit_id.length > 0);
   return {
     docPath: readStringFromJson(parsed, "doc_path") ?? readStringFromJson(parsed, "docPath"),
     sourceHash: readStringFromJson(parsed, "source_hash") ?? readStringFromJson(parsed, "sourceHash"),
@@ -361,11 +360,11 @@ const readDocumentMarkdownVisibleUnitsPayload = (
 const readDocumentTranslationItems = (
   json: Record<string, unknown> | null,
 ): StagePlayDocumentInlineTranslationOutputV1["translations"] => {
-  const translations = Array.isArray(json?.translations) ? json.translations : [];
+  const translations: unknown[] = Array.isArray(json?.translations) ? json.translations : [];
   return translations
-    .map((entry) => readRecord(entry))
+    .map((entry: unknown) => readRecord(entry))
     .filter((entry): entry is Record<string, unknown> => Boolean(entry))
-    .map((entry) => ({
+    .map((entry: Record<string, unknown>) => ({
       unit_id: readStringFromJson(entry, "unit_id") ?? readStringFromJson(entry, "unitId") ?? "",
       translated_markdown:
         readStringFromJson(entry, "translated_markdown") ??
@@ -375,25 +374,26 @@ const readDocumentTranslationItems = (
       confidence: readConfidence(entry.confidence) ?? "medium",
       warnings: readStringArrayFromJson(entry, "warnings"),
     }))
-    .filter((entry) => entry.unit_id.length > 0 && entry.translated_markdown.trim().length > 0);
+    .filter((entry: StagePlayDocumentInlineTranslationOutputV1["translations"][number]) =>
+      entry.unit_id.length > 0 && entry.translated_markdown.trim().length > 0);
 };
 
 const readDocumentUnitErrors = (
   json: Record<string, unknown> | null,
 ): StagePlayDocumentInlineTranslationOutputV1["unit_errors"] => {
-  const errors = Array.isArray(json?.unit_errors)
+  const errors: unknown[] = Array.isArray(json?.unit_errors)
     ? json.unit_errors
     : Array.isArray(json?.unitErrors)
       ? json.unitErrors
       : [];
   return errors
-    .map((entry) => readRecord(entry))
+    .map((entry: unknown) => readRecord(entry))
     .filter((entry): entry is Record<string, unknown> => Boolean(entry))
-    .map((entry) => ({
+    .map((entry: Record<string, unknown>) => ({
       unit_id: readStringFromJson(entry, "unit_id") ?? readStringFromJson(entry, "unitId") ?? "",
       reason: readStringFromJson(entry, "reason") ?? "translation_unavailable",
     }))
-    .filter((entry) => entry.unit_id.length > 0);
+    .filter((entry: StagePlayDocumentInlineTranslationOutputV1["unit_errors"][number]) => entry.unit_id.length > 0);
 };
 
 const readDocumentQualityChecks = (
@@ -401,11 +401,11 @@ const readDocumentQualityChecks = (
   fallbackStatus: "pass" | "warn" | "fail",
   fallbackDetail: string,
 ): StagePlayDocumentInlineTranslationOutputV1["qualityChecks"] => {
-  const checks = Array.isArray(json?.qualityChecks) ? json.qualityChecks : [];
+  const checks: unknown[] = Array.isArray(json?.qualityChecks) ? json.qualityChecks : [];
   const parsed = checks
-    .map((entry) => readRecord(entry))
+    .map((entry: unknown) => readRecord(entry))
     .filter((entry): entry is Record<string, unknown> => Boolean(entry))
-    .map((entry) => {
+    .map((entry: Record<string, unknown>) => {
       const status = entry.status === "pass" || entry.status === "warn" || entry.status === "fail"
         ? entry.status
         : fallbackStatus;
@@ -436,15 +436,15 @@ const buildDocumentInlineTranslationOutput = (input: {
   const explicitErrors = readDocumentUnitErrors(input.json ?? null);
   const fallbackUnitErrors = translations.length === 0 && explicitErrors.length === 0 && input.fallbackReason
     ? visible.units
-        .filter((unit) => unit.translatable)
-        .map((unit) => ({
+        .filter((unit: DocumentMarkdownVisibleUnit) => unit.translatable)
+        .map((unit: DocumentMarkdownVisibleUnit) => ({
           unit_id: unit.unit_id,
           reason: input.fallbackReason ?? "translation_unavailable",
         }))
     : [];
   const unitErrors = uniqueStrings([...explicitErrors, ...fallbackUnitErrors].map((entry) => JSON.stringify(entry)))
-    .map((entry) => JSON.parse(entry) as StagePlayDocumentInlineTranslationOutputV1["unit_errors"][number]);
-  const fallbackStatus = translations.length > 0 ? "pass" : input.fallbackReason ? "fail" : "warn";
+    .map((entry: string) => JSON.parse(entry) as StagePlayDocumentInlineTranslationOutputV1["unit_errors"][number]);
+  const fallbackStatus: "pass" | "warn" | "fail" = translations.length > 0 ? "pass" : input.fallbackReason ? "fail" : "warn";
   const fallbackDetail = translations.length > 0
     ? "Structured document translation candidates are available."
     : input.fallbackReason ?? "No structured document translation candidates were returned.";
@@ -461,9 +461,9 @@ const buildDocumentInlineTranslationOutput = (input: {
     unit_errors: unitErrors,
     qualityChecks: readDocumentQualityChecks(input.json ?? null, fallbackStatus, fallbackDetail),
     evidenceRefs: uniqueStrings([
-      ...input.mailItems.flatMap((item) => item.evidenceRefs),
+      ...input.mailItems.flatMap((item: StagePlayLiveSourceMailItemV1) => item.evidenceRefs),
       ...readStringArrayFromJson(input.json ?? null, "evidenceRefs"),
-      ...visible.units.map((unit) => `${input.sourceId}:unit:${unit.unit_id}`),
+      ...visible.units.map((unit: DocumentMarkdownVisibleUnit) => `${input.sourceId}:unit:${unit.unit_id}`),
     ]),
     createdAt: input.now,
     assistant_answer: false,

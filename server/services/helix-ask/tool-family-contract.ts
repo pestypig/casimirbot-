@@ -14,6 +14,7 @@ export type ToolFamily =
   | "live_source_decision"
   | "voice_delivery"
   | "zen_graph_reflection"
+  | "context_reflection"
   | "civilization_bounds"
   | "capability_catalog";
 
@@ -183,6 +184,35 @@ export const TOOL_FAMILY_DEFAULT_CONTRACTS: Record<ToolFamily, ToolFamilyContrac
       "zengraph",
       "helix_ask.reflect_ideology_context",
       "procedural_zen_classification/v1",
+    ],
+  }),
+  context_reflection: contract({
+    toolName: "family:context_reflection",
+    toolFamily: "context_reflection",
+    authority: "evidence_only",
+    mutating: false,
+    requiredObservationKinds: [
+      "helix_context_reflection_tool_receipt/v1",
+      "context_attachment",
+      "bounded_context_reference",
+    ],
+    allowedTerminalKinds: [...evidenceOnlyTerminalKinds],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+    aliases: [
+      "context_reflection",
+      "context_binding",
+      "bounded_context_reference",
+      "dragged_cutout_context",
+      "selected_ui_region",
+      "helix_ask.reflect_context_attachments",
+      "helix_ask.reflect_live_synthetic_data",
+      "live_synthetic_data_reflection",
+      "live_answer_synthetic_data",
+      "microdeck_reflection",
+      "macro_reasoner_deck_reflection",
+      "mail_loop_synthetic_data",
+      "live_answer_prediction_review",
     ],
   }),
   civilization_bounds: contract({
@@ -505,10 +535,10 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
   }),
   contract({
     toolName: "helix_ask.reflect_live_synthetic_data",
-    toolFamily: "capability_catalog",
+    toolFamily: "context_reflection",
     authority: "evidence_only",
     mutating: false,
-    requiredObservationKinds: ["capability_registry"],
+    requiredObservationKinds: ["helix_context_reflection_tool_receipt/v1", "bounded_context_reference"],
     allowedTerminalKinds: [...evidenceOnlyTerminalKinds],
     requiredReentry: true,
     requiresGoalSatisfaction: true,
@@ -519,6 +549,24 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
       "macro_reasoner_deck_reflection",
       "mail_loop_synthetic_data",
       "live_answer_prediction_review",
+    ],
+  }),
+  contract({
+    toolName: "helix_ask.reflect_context_attachments",
+    toolFamily: "context_reflection",
+    authority: "evidence_only",
+    mutating: false,
+    requiredObservationKinds: ["helix_context_reflection_tool_receipt/v1", "context_attachment", "bounded_context_reference"],
+    allowedTerminalKinds: [...evidenceOnlyTerminalKinds],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+    aliases: [
+      "context_attachment_reflection",
+      "context_binding_reflection",
+      "dragged_cutout_context",
+      "selected_ui_region",
+      "selected_context_refs",
+      "helix_context_reflection_tool_receipt/v1",
     ],
   }),
 ];
@@ -539,9 +587,14 @@ const normalizeFamily = (value: unknown): ToolFamily | null => {
   if (/record-live-source-mail-decision|live[-.:]?source[-.:]?decision/.test(normalized)) return "live_source_decision";
   if (/voice[-.:]?delivery|voice[-.:]?output|request-interim-voice-callout|callout/.test(normalized)) return "voice_delivery";
   if (/zen[-.:]?graph|zengraph|reflect[-.:]?ideology[-.:]?context|procedural[-.:]?zen[-.:]?classification/.test(normalized)) return "zen_graph_reflection";
+  if (
+    /context[-.:]?reflection|context[-.:]?binding|bounded[-.:]?context|context[-.:]?attachment|dragged[-.:]?cutout|selected[-.:]?ui[-.:]?region|reflect[-.:]?context[-.:]?attachments|live[-.:]?synthetic[-.:]?data|live[-.:]?answer[-.:]?synthetic|microdeck[-.:]?reflection|macro[-.:]?reasoner[-.:]?deck|mail[-.:]?loop[-.:]?synthetic|prediction[-.:]?review/.test(
+      normalized,
+    )
+  ) return "context_reflection";
   if (/civilization[-.:]?bounds|civilization[-.:]?scenario|civilization[-.:]?roadmap|reflect-civilization-bounds/.test(normalized)) return "civilization_bounds";
   if (
-    /capability[-.:]?catalog|capability[-.:]?help|what[-.:]?tools[-.:]?are[-.:]?available|inspect-capability-catalog|workstation[-.:]?tool[-.:]?alignment|toolchain[-.:]?matrix|tool[-.:]?regression[-.:]?matrix|live[-.:]?synthetic[-.:]?data|live[-.:]?answer[-.:]?synthetic|microdeck[-.:]?reflection|macro[-.:]?reasoner[-.:]?deck|mail[-.:]?loop[-.:]?synthetic|prediction[-.:]?review/.test(
+    /capability[-.:]?catalog|capability[-.:]?help|what[-.:]?tools[-.:]?are[-.:]?available|inspect-capability-catalog|workstation[-.:]?tool[-.:]?alignment|toolchain[-.:]?matrix|tool[-.:]?regression[-.:]?matrix/.test(
       normalized,
     )
   ) return "capability_catalog";

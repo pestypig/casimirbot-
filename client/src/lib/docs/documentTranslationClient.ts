@@ -34,6 +34,10 @@ type StagePlayPresetApplyResponse =
     }
   | { ok: false; error: string; message?: string };
 
+type StagePlayWakeCycleResponse =
+  | { ok: true; cycle?: unknown }
+  | { ok: false; error: string; message?: string };
+
 type StagePlayLiveSourceMailRead =
   | {
       ok: true;
@@ -170,10 +174,45 @@ export async function enqueueDocumentMarkdownTranslationMail(params: {
       const message = body && !body.ok ? body.message ?? body.error : `Document Markdown mail enqueue failed (${response.status}).`;
       throw new Error(message);
     }
+    await runDocumentMarkdownMicroDeckCycle({ sourceId, signal: controller.signal });
     return {
       sourceId: body.sourceId,
       mailId: body.mail?.mailId ?? null,
     };
+  } finally {
+    globalThis.clearTimeout(timeout);
+    params.signal?.removeEventListener("abort", abortHandler);
+  }
+}
+
+export async function runDocumentMarkdownMicroDeckCycle(params: {
+  sourceId?: string;
+  threadId?: string;
+  signal?: AbortSignal;
+} = {}): Promise<void> {
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort(), DOCUMENT_TRANSLATION_REQUEST_TIMEOUT_MS);
+  const abortHandler = () => controller.abort();
+  params.signal?.addEventListener("abort", abortHandler, { once: true });
+  try {
+    const response = await fetch("/api/helix/stage-play/live-source-mail/wake/cycle", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        threadId: params.threadId ?? "helix-ask:desktop",
+        sourceId: params.sourceId,
+        manualRun: true,
+        executeHiddenAsk: false,
+      }),
+      signal: controller.signal,
+    });
+    const body = (await response.json().catch(() => null)) as StagePlayWakeCycleResponse | null;
+    if (!response.ok || !body || !body.ok) {
+      const message = body && !body.ok
+        ? body.message ?? body.error
+        : `Document MicroDeck wake cycle failed (${response.status}).`;
+      throw new Error(message);
+    }
   } finally {
     globalThis.clearTimeout(timeout);
     params.signal?.removeEventListener("abort", abortHandler);

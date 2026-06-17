@@ -1028,6 +1028,7 @@ const buildWakeFastLayer = async (input: {
     causalTrace: input.wake.causalTrace,
     createdAt: input.now,
   });
+  const documentMarkdownPromptedMicroReasoners = input.mailBatch.some((item) => item.sourceKind === "document_markdown");
   const { packet: processedPacket, microReasonerRuns } = await buildStagePlayProcessedMailPacketWithPromptedReasoners({
     jobId,
     sourceId: input.mailBatch[0]?.sourceId ?? input.wake.sourceIds[0] ?? "unknown_source",
@@ -1038,6 +1039,7 @@ const buildWakeFastLayer = async (input: {
     activeProfile: input.activeInterpreterProfile ?? null,
     causalTrace: input.wake.causalTrace,
     now: input.now,
+    promptedMicroReasoners: documentMarkdownPromptedMicroReasoners ? { enabled: true } : undefined,
   });
   const shouldRunSlowAsk =
     input.manualRun === true ||
@@ -2554,12 +2556,14 @@ const wakeMatchesScope = (
     roomId?: string | null;
     environmentId?: string | null;
     jobId?: string | null;
+    sourceId?: string | null;
   },
 ): boolean => {
   if (input.threadId && wake.threadId !== input.threadId) return false;
   if (input.roomId && wake.roomId !== input.roomId) return false;
   if (input.environmentId && wake.environmentId !== input.environmentId) return false;
   if (input.jobId && wake.jobId !== input.jobId) return false;
+  if (input.sourceId && !wake.sourceIds.includes(input.sourceId)) return false;
   return true;
 };
 
@@ -2628,6 +2632,7 @@ export async function runNextMailWakeRequest(input: {
   roomId?: string | null;
   environmentId?: string | null;
   jobId?: string | null;
+  sourceId?: string | null;
   baseUrl?: string;
   askTurnRunner?: AskWakeTurnRunner;
   voiceDeliveryRunner?: StagePlayLiveSourceVoiceDeliveryRunner | null;
@@ -2713,9 +2718,12 @@ export async function runNextMailWakeRequest(input: {
           jobId: input.jobId ?? null,
           limit: 250,
         }).filter((wake) =>
-          wake.status === "queued" ||
-          wake.status === "failed_retryable" ||
-          wake.status === "deferred_for_pressure"
+          wakeMatchesScope(wake, input) &&
+          (
+            wake.status === "queued" ||
+            wake.status === "failed_retryable" ||
+            wake.status === "deferred_for_pressure"
+          )
         )
       : listRunnableStagePlayLiveSourceMailWakeRequests({
           threadId: input.threadId ?? null,
@@ -2724,7 +2732,7 @@ export async function runNextMailWakeRequest(input: {
           jobId: input.jobId ?? null,
           now,
           limit: 250,
-      })
+      }).filter((wake) => wakeMatchesScope(wake, input))
   ).at(0) ?? null;
   if (!selectedWake) return null;
 

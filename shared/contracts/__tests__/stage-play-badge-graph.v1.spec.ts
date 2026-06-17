@@ -276,6 +276,67 @@ describe("stage_play_badge_graph/v1", () => {
     expect(JSON.stringify(graph)).not.toMatch(/agent[_ -]?executable\s*[:=]\s*true/i);
   });
 
+  it("accepts workstation state-plane badges as evidence-only process handles", () => {
+    const statePlaneBadge: StagePlayBadgeV1 = {
+      id: "workstation_state_plane.current",
+      title: "Workstation state plane",
+      plainMeaning: "Read-only circuit map of sources, gates, buffers, transforms, outputs, and control signals.",
+      whyItMatters: "The agent can inspect structured process state without treating the graph as an answer or action authority.",
+      kind: "workstation_state_plane",
+      status: "observed",
+      subjects: ["stage_play_badge_graph:test", "source:visual-tab"],
+      tags: ["workstation_state_plane", "evidence_only"],
+      liveBindings: [],
+      sourceRefs: [{ kind: "synthetic_evidence", id: "stage_play_badge_graph:test" }],
+      evidenceRefs: ["stage_play_badge_graph:test", "source:visual-tab"],
+      confidence: 0.82,
+      missingEvidence: [],
+      reasonCodes: ["workstation_state_plane", "process_graph_reflection", "not_terminal_authority"],
+      dataTray: {
+        title: "State plane",
+        summary: "Maps source, gate, buffer, transform, output, and control nodes.",
+        updatedAt: "2026-06-02T12:00:02.000Z",
+        freshness: "fresh",
+        confidence: 0.82,
+        evidenceRefs: ["stage_play_badge_graph:test"],
+        inputRefs: ["source:visual-tab"],
+        transformLabel: "workstation graph reducer",
+        outputRefs: ["stage_play_badge_graph:test"],
+        outputPreview: "evidence-only process graph overlay",
+      },
+      admission: "auto",
+    };
+    const graph = buildFixture({
+      badges: [sourceBadge, interpreterBadge, statePlaneBadge],
+      edges: [
+        {
+          id: "edge:state-plane:contains:source",
+          from: statePlaneBadge.id,
+          to: sourceBadge.id,
+          relation: "contains",
+          label: "state plane contains source badge",
+          evidenceRefs: statePlaneBadge.evidenceRefs,
+          reasonCodes: ["workstation_state_plane_contains_role"],
+        },
+        {
+          id: "edge:state-plane:contains:interpreter",
+          from: statePlaneBadge.id,
+          to: interpreterBadge.id,
+          relation: "contains",
+          label: "state plane contains interpreter badge",
+          evidenceRefs: statePlaneBadge.evidenceRefs,
+          reasonCodes: ["workstation_state_plane_contains_role"],
+        },
+      ],
+    });
+
+    expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
+    expect(graph.summary.kindCounts.workstation_state_plane).toBe(1);
+    expect(graph.authority.assistant_answer).toBe(false);
+    expect(graph.authority.terminal_eligible).toBe(false);
+    expect(graph.authority.agent_executable).toBe(false);
+  });
+
   it("accepts checkpoint and output badges without granting graph authority", () => {
     const graph = buildFixture({
       badges: [sourceBadge, interpreterBadge, askCheckpointBadge, answerSnapshotBadge],

@@ -40,6 +40,11 @@ import {
   recordStagePlayCheckpointRequestFromPerturbation,
 } from "./stage-play-checkpoint-queue";
 import type { StagePlayCheckpointRequestV1 } from "@shared/contracts/stage-play-checkpoint-request.v1";
+import {
+  listStagePlayActiveMicroReasonerPromptsForSource,
+  listStagePlayMicroReasonerRuns,
+  listStagePlayProcessedMailPackets,
+} from "./stage-play-processed-mail-packet-store";
 
 export type BuildStagePlayGraphFromWorldInput = {
   threadId: string;
@@ -1256,6 +1261,413 @@ const addVisualCaptureCheckpointChain = (
   }
 };
 
+const uniqueBy = <T>(items: T[], keyOf: (item: T) => string): T[] => {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of items) {
+    const key = keyOf(item);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+};
+
+const collectMicroReasonerState = (sources: StagePlayBadgeGraphV1["sourceWindow"]["sources"]) => {
+  const prompts = uniqueBy(
+    sources.flatMap((source) =>
+      listStagePlayActiveMicroReasonerPromptsForSource({
+        sourceId: source.sourceId,
+        sourceKind: source.modality,
+        limit: 14,
+      })
+    ),
+    (prompt) => prompt.promptId,
+  );
+  const runs = uniqueBy(
+    sources.flatMap((source) =>
+      listStagePlayMicroReasonerRuns({
+        sourceId: source.sourceId,
+        limit: 20,
+      })
+    ),
+    (run) => run.runId,
+  );
+  const packets = uniqueBy(
+    sources.flatMap((source) =>
+      listStagePlayProcessedMailPackets({
+        sourceId: source.sourceId,
+        limit: 20,
+      })
+    ),
+    (packet) => packet.packetId,
+  );
+  return { prompts, runs, packets };
+};
+
+const addWorkstationStatePlaneBadges = (
+  badges: StagePlayBadgeV1[],
+  edges: StagePlayBadgeGraphV1["edges"],
+  input: {
+    observerId: string;
+    interpreterId?: string | null;
+    graphId: string;
+    sourceRefs: StagePlayBadgeSourceRefV1[];
+    evidenceRefs: string[];
+    sources: StagePlayBadgeGraphV1["sourceWindow"]["sources"];
+    generatedAt: string;
+    checkpointFreshness?: StagePlayCheckpointFreshnessV1 | null;
+    microReasoners: ReturnType<typeof collectMicroReasonerState>;
+  },
+): void => {
+  const sourceBadgeIds = badges.filter((entry) => entry.kind === "source").map((entry) => entry.id);
+  const gateBadgeIds = badges
+    .filter((entry) =>
+      entry.kind === "admission_gate" ||
+      entry.kind === "helix_ask_checkpoint" ||
+      entry.kind === "ask_checkpoint" ||
+      entry.kind === "checkpoint_request" ||
+      entry.kind === "recommended_check" ||
+      entry.kind === "missing_evidence"
+    )
+    .map((entry) => entry.id);
+  const processBadgeIds = badges
+    .filter((entry) =>
+      entry.kind === "compact_observation" ||
+      entry.kind === "fusion" ||
+      entry.kind === "interpreter" ||
+      entry.kind === "stage_interpretation" ||
+      entry.kind === "procedural_binding"
+    )
+    .map((entry) => entry.id);
+  const outputBadgeIds = badges
+    .filter((entry) => entry.kind === "answer_snapshot" || entry.kind === "live_output" || entry.kind === "voice_output")
+    .map((entry) => entry.id);
+  const controlBadgeIds = badges
+    .filter((entry) => entry.kind === "checkpoint_request" || entry.kind === "perturbation")
+    .map((entry) => entry.id);
+  const activeSourceCount = input.sources.filter((source) => source.status === "active").length;
+  const selectedSourceCount = input.sources.filter((source) => source.selectedForStagePlay).length;
+  const promptRefs = input.microReasoners.prompts.map((prompt) => prompt.promptId);
+  const runRefs = input.microReasoners.runs.map((run) => run.runId);
+  const packetRefs = input.microReasoners.packets.map((packet) => packet.packetId);
+  const statePlaneEvidenceRefs = unique([
+    input.graphId,
+    ...input.evidenceRefs,
+    ...input.sources.flatMap((source) => source.evidenceRefs),
+    ...promptRefs,
+    ...runRefs,
+    ...packetRefs,
+  ]);
+  const statePlaneSourceRefs = uniqueBy(
+    [
+      ...input.sourceRefs,
+      { kind: "synthetic_evidence" as const, id: input.graphId },
+      ...promptRefs.slice(0, 8).map((id) => ({ kind: "synthetic_evidence" as const, id })),
+      ...runRefs.slice(0, 8).map((id) => ({ kind: "synthetic_evidence" as const, id })),
+      ...packetRefs.slice(0, 8).map((id) => ({ kind: "synthetic_evidence" as const, id })),
+    ],
+    (ref) => `${ref.kind}:${ref.id}`,
+  );
+  const rootId = pushBadge(badges, badge({
+    id: "workstation_state_plane.current",
+    title: "Workstation state plane",
+    plainMeaning: "Read-only circuit map of the current workstation graph: sources, gates, buffers, transforms, outputs, and control signals.",
+    whyItMatters: "The agent can inspect this stable process state instead of rebuilding live-source and MicroDeck context from scattered UI panels.",
+    kind: "workstation_state_plane",
+    status: input.sources.length > 0 || input.microReasoners.prompts.length > 0 ? "observed" : "missing_evidence",
+    subjects: unique([
+      input.graphId,
+      ...input.sources.map((source) => source.sourceId),
+      ...promptRefs.slice(0, 8),
+    ]),
+    tags: ["workstation_state_plane", "circuit_map", "evidence_only", "agent_reflection_surface"],
+    sourceRefs: statePlaneSourceRefs,
+    evidenceRefs: statePlaneEvidenceRefs,
+    confidence: input.sources.length > 0 ? 0.82 : 0.42,
+    missingEvidence: input.sources.length > 0 ? [] : ["No admitted live source is available for the workstation state plane."],
+    reasonCodes: ["workstation_state_plane", "process_graph_reflection", "not_terminal_authority"],
+    dataTray: {
+      title: "State plane",
+      summary: `Maps ${input.sources.length} source(s), ${input.microReasoners.prompts.length} MicroDeck prompt(s), ${input.microReasoners.runs.length} run(s), and ${input.microReasoners.packets.length} packet(s).`,
+      updatedAt: input.generatedAt,
+      freshness: input.sources.length > 0 ? "fresh" : "missing",
+      confidence: input.sources.length > 0 ? 0.82 : 0.42,
+      evidenceRefs: statePlaneEvidenceRefs,
+      inputRefs: unique(input.sources.map((source) => source.sourceId)).slice(0, 8),
+      inputPreview: `${activeSourceCount} active / ${selectedSourceCount} selected source(s)`,
+      transformLabel: "workstation graph reducer",
+      outputRefs: [input.graphId],
+      outputPreview: "evidence-only process graph overlay",
+    },
+    admission: "auto",
+  }));
+
+  const sourceBusId = pushBadge(badges, badge({
+    id: "workstation_state_plane.source_bus",
+    title: "Source bus",
+    plainMeaning: "All admitted source handles and producer receipts enter the workstation graph through this bus.",
+    whyItMatters: "A source bus gives the agent a single place to inspect source custody, freshness, cadence, and routing before reflection.",
+    kind: "workstation_state_plane",
+    status: activeSourceCount > 0 ? "observed" : "missing_evidence",
+    subjects: input.sources.map((source) => source.sourceId),
+    tags: ["workstation_state_plane", "source_bus", "live_sources"],
+    sourceRefs: input.sourceRefs,
+    evidenceRefs: unique([...input.evidenceRefs, ...input.sources.flatMap((source) => source.evidenceRefs)]),
+    confidence: activeSourceCount > 0 ? 0.82 : 0.38,
+    missingEvidence: activeSourceCount > 0 ? [] : ["A live source must be active before source-bus observations can refresh."],
+    reasonCodes: ["source_bus", "source_custody"],
+    dataTray: {
+      title: "Source bus",
+      summary: `${activeSourceCount} active source(s); ${selectedSourceCount} selected for Stage Play.`,
+      updatedAt: input.generatedAt,
+      freshness: activeSourceCount > 0 ? "fresh" : "missing",
+      confidence: activeSourceCount > 0 ? 0.82 : 0.38,
+      evidenceRefs: unique([...input.evidenceRefs, ...input.sources.flatMap((source) => source.evidenceRefs)]),
+      inputRefs: input.sources.map((source) => source.sourceId).slice(0, 8),
+      transformLabel: "source custody -> graph source badges",
+      outputRefs: sourceBadgeIds.slice(0, 10),
+      outputPreview: sourceBadgeIds.length > 0 ? `${sourceBadgeIds.length} source badge(s)` : "source badges pending",
+    },
+    admission: "auto",
+  }));
+
+  const gateId = pushBadge(badges, badge({
+    id: "workstation_state_plane.gates",
+    title: "Admission gates",
+    plainMeaning: "Route, checkpoint, missing-evidence, and output gates constrain what can be treated as current.",
+    whyItMatters: "Gates keep receipts and projections from becoming answer authority until the solver path and route product contract allow it.",
+    kind: "workstation_state_plane",
+    status: gateBadgeIds.length > 0 ? "observed" : "candidate",
+    subjects: gateBadgeIds,
+    tags: ["workstation_state_plane", "gates", "route_authority", "terminal_boundary"],
+    sourceRefs: statePlaneSourceRefs,
+    evidenceRefs: statePlaneEvidenceRefs,
+    confidence: gateBadgeIds.length > 0 ? 0.78 : 0.5,
+    missingEvidence: input.checkpointFreshness?.fresh === true
+      ? []
+      : ["A fresh model-reviewed checkpoint is needed before output lanes can be upheld as current."],
+    reasonCodes: ["admission_gates", "route_authority_boundary", input.checkpointFreshness?.reason ?? "checkpoint_unknown"],
+    dataTray: {
+      title: "Gates",
+      summary: `${gateBadgeIds.length} gate/checkpoint node(s); checkpoint ${input.checkpointFreshness?.reason ?? "unknown"}.`,
+      updatedAt: input.generatedAt,
+      freshness: input.checkpointFreshness?.fresh === true ? "fresh" : "missing",
+      confidence: gateBadgeIds.length > 0 ? 0.78 : 0.5,
+      evidenceRefs: statePlaneEvidenceRefs,
+      inputRefs: gateBadgeIds.slice(0, 8),
+      transformLabel: "route authority / checkpoint freshness",
+      outputRefs: outputBadgeIds.slice(0, 8),
+      outputPreview: outputBadgeIds.length > 0 ? `${outputBadgeIds.length} gated output node(s)` : "output gates pending",
+    },
+    admission: "auto",
+  }));
+
+  const bufferId = pushBadge(badges, badge({
+    id: "workstation_state_plane.microdeck_buffer",
+    title: "MicroDeck buffer",
+    plainMeaning: "Active MicroDeck prompts, recent micro-reasoner runs, and processed mail packets are queryable buffers for reflection.",
+    whyItMatters: "This offsets Ask latency by letting the agent read structured process packets instead of reassembling live-source context every turn.",
+    kind: "workstation_state_plane",
+    status: promptRefs.length > 0 || runRefs.length > 0 || packetRefs.length > 0 ? "observed" : "candidate",
+    subjects: unique([...promptRefs.slice(0, 10), ...runRefs.slice(0, 10), ...packetRefs.slice(0, 10)]),
+    tags: ["workstation_state_plane", "microdeck_buffer", "micro_reasoners", "process_memory"],
+    sourceRefs: statePlaneSourceRefs,
+    evidenceRefs: unique([...promptRefs, ...runRefs, ...packetRefs]),
+    confidence: packetRefs.length > 0 ? 0.82 : promptRefs.length > 0 ? 0.72 : 0.44,
+    missingEvidence: runRefs.length > 0 || packetRefs.length > 0
+      ? []
+      : ["No recent MicroDeck run or processed packet has been recorded for the current source window."],
+    reasonCodes: ["microdeck_buffer", "synthetic_process_data", "reflection_cache"],
+    dataTray: {
+      title: "MicroDeck buffer",
+      summary: `${promptRefs.length} prompt(s), ${runRefs.length} run(s), ${packetRefs.length} processed packet(s).`,
+      updatedAt: input.generatedAt,
+      freshness: runRefs.length > 0 || packetRefs.length > 0 ? "fresh" : promptRefs.length > 0 ? "unknown" : "missing",
+      confidence: packetRefs.length > 0 ? 0.82 : promptRefs.length > 0 ? 0.72 : 0.44,
+      evidenceRefs: unique([...promptRefs, ...runRefs, ...packetRefs]),
+      inputRefs: promptRefs.slice(0, 8),
+      inputPreview: promptRefs.slice(0, 3).join(", ") || null,
+      transformLabel: "MicroDeck prompt/run buffer",
+      outputRefs: unique([...runRefs, ...packetRefs]).slice(0, 10),
+      outputPreview: packetRefs.length > 0 ? `${packetRefs.length} packet(s) ready` : "packet output pending",
+    },
+    admission: "auto",
+  }));
+
+  const processLoopId = pushBadge(badges, badge({
+    id: "workstation_state_plane.process_loop",
+    title: "Process loop",
+    plainMeaning: "The continuous workstation work is represented as source mail, MicroDeck buffers, graph reduction, and checkpoint requests.",
+    whyItMatters: "The loop is visible as state and receipts; it is not a hidden Ask answer loop.",
+    kind: "workstation_state_plane",
+    status: processBadgeIds.length > 0 ? "observed" : "candidate",
+    subjects: processBadgeIds.slice(0, 12),
+    tags: ["workstation_state_plane", "process_loop", "mail_loop", "graph_reducer"],
+    sourceRefs: statePlaneSourceRefs,
+    evidenceRefs: statePlaneEvidenceRefs,
+    confidence: processBadgeIds.length > 0 ? 0.78 : 0.46,
+    missingEvidence: processBadgeIds.length > 0 ? [] : ["No process-loop evidence node has been assembled yet."],
+    reasonCodes: ["process_loop", "deterministic_workstation_workflow"],
+    dataTray: {
+      title: "Process loop",
+      summary: `${processBadgeIds.length} transform/procedure node(s) connected.`,
+      updatedAt: input.generatedAt,
+      freshness: processBadgeIds.length > 0 ? "fresh" : "missing",
+      confidence: processBadgeIds.length > 0 ? 0.78 : 0.46,
+      evidenceRefs: statePlaneEvidenceRefs,
+      inputRefs: unique([sourceBusId, bufferId, ...(input.interpreterId ? [input.interpreterId] : [])]),
+      transformLabel: "mail loop -> MicroDeck -> graph reducer",
+      outputRefs: unique([input.graphId, ...processBadgeIds.slice(0, 8)]),
+      outputPreview: "structured process state for Ask reflection",
+    },
+    admission: "auto",
+  }));
+
+  const outputBusId = pushBadge(badges, badge({
+    id: "workstation_state_plane.output_bus",
+    title: "Output bus",
+    plainMeaning: "Live Answer, answer snapshot, and voice output lanes are grouped here as read-only projections.",
+    whyItMatters: "Output lanes are easy to inspect without confusing projections, receipts, or voice text with answer authority.",
+    kind: "workstation_state_plane",
+    status: outputBadgeIds.length > 0 ? "observed" : "candidate",
+    subjects: outputBadgeIds,
+    tags: ["workstation_state_plane", "output_bus", "live_answer", "voice_boundary"],
+    sourceRefs: statePlaneSourceRefs,
+    evidenceRefs: statePlaneEvidenceRefs,
+    confidence: outputBadgeIds.length > 0 ? 0.76 : 0.45,
+    missingEvidence: outputBadgeIds.length > 0 ? [] : ["No output-lane badge has been assembled yet."],
+    reasonCodes: ["output_bus", "projection_boundary"],
+    dataTray: {
+      title: "Output bus",
+      summary: `${outputBadgeIds.length} output node(s) grouped behind authority gates.`,
+      updatedAt: input.generatedAt,
+      freshness: outputBadgeIds.length > 0 ? "fresh" : "missing",
+      confidence: outputBadgeIds.length > 0 ? 0.76 : 0.45,
+      evidenceRefs: statePlaneEvidenceRefs,
+      inputRefs: unique([gateId, processLoopId]),
+      transformLabel: "authority-gated output projection",
+      outputRefs: outputBadgeIds,
+      outputPreview: outputBadgeIds.join(", ") || "output lanes pending",
+    },
+    admission: "auto",
+  }));
+
+  const controlId = pushBadge(badges, badge({
+    id: "workstation_state_plane.control_signals",
+    title: "Control signals",
+    plainMeaning: "Perturbations and checkpoint requests are represented as control signals over the workstation graph.",
+    whyItMatters: "Control signals can suggest visible checks or user approval without silently starting a new reasoning path.",
+    kind: "workstation_state_plane",
+    status: controlBadgeIds.length > 0 ? "observed" : "candidate",
+    subjects: controlBadgeIds,
+    tags: ["workstation_state_plane", "control_signals", "checkpoint_queue", "perturbations"],
+    sourceRefs: statePlaneSourceRefs,
+    evidenceRefs: statePlaneEvidenceRefs,
+    confidence: controlBadgeIds.length > 0 ? 0.74 : 0.46,
+    missingEvidence: controlBadgeIds.length > 0 ? [] : ["No perturbation or checkpoint control signal is active."],
+    reasonCodes: ["control_signals", "visible_checkpoints"],
+    dataTray: {
+      title: "Control signals",
+      summary: `${controlBadgeIds.length} perturbation/checkpoint signal(s).`,
+      updatedAt: input.generatedAt,
+      freshness: controlBadgeIds.length > 0 ? "fresh" : "unknown",
+      confidence: controlBadgeIds.length > 0 ? 0.74 : 0.46,
+      evidenceRefs: statePlaneEvidenceRefs,
+      inputRefs: controlBadgeIds.slice(0, 8),
+      transformLabel: "perturbation / checkpoint signal",
+      outputRefs: gateBadgeIds.slice(0, 8),
+      outputPreview: gateBadgeIds.length > 0 ? `${gateBadgeIds.length} gate target(s)` : "gate targets pending",
+    },
+    admission: "auto",
+  }));
+
+  for (const childId of [sourceBusId, gateId, bufferId, processLoopId, outputBusId, controlId]) {
+    pushEdge(edges, {
+      from: rootId,
+      to: childId,
+      relation: "contains",
+      label: "state plane contains circuit role",
+      evidenceRefs: statePlaneEvidenceRefs,
+      reasonCodes: ["workstation_state_plane_contains_role"],
+    });
+  }
+  pushEdge(edges, {
+    from: sourceBusId,
+    to: input.observerId,
+    relation: "feeds",
+    label: "source bus feeds observer custody",
+    evidenceRefs: statePlaneEvidenceRefs,
+    reasonCodes: ["source_bus_feeds_observer"],
+  });
+  if (input.interpreterId) {
+    pushEdge(edges, {
+      from: bufferId,
+      to: input.interpreterId,
+      relation: "feeds",
+      label: "MicroDeck buffer feeds interpreter reflection",
+      evidenceRefs: statePlaneEvidenceRefs,
+      reasonCodes: ["microdeck_feeds_interpreter"],
+    });
+  }
+  for (const sourceBadgeId of sourceBadgeIds.slice(0, 12)) {
+    pushEdge(edges, {
+      from: sourceBusId,
+      to: sourceBadgeId,
+      relation: "contains",
+      label: "source bus groups source badge",
+      evidenceRefs: statePlaneEvidenceRefs,
+      reasonCodes: ["source_bus_groups_source"],
+    });
+  }
+  for (const processBadgeId of processBadgeIds.slice(0, 16)) {
+    pushEdge(edges, {
+      from: processLoopId,
+      to: processBadgeId,
+      relation: "contains",
+      label: "process loop groups transform badge",
+      evidenceRefs: statePlaneEvidenceRefs,
+      reasonCodes: ["process_loop_groups_transform"],
+    });
+  }
+  for (const outputBadgeId of outputBadgeIds.slice(0, 8)) {
+    pushEdge(edges, {
+      from: outputBusId,
+      to: outputBadgeId,
+      relation: "contains",
+      label: "output bus groups projection badge",
+      evidenceRefs: statePlaneEvidenceRefs,
+      reasonCodes: ["output_bus_groups_projection"],
+    });
+  }
+  pushEdge(edges, {
+    from: gateId,
+    to: outputBusId,
+    relation: "constrains",
+    label: "gates constrain output projection",
+    evidenceRefs: statePlaneEvidenceRefs,
+    reasonCodes: ["gates_constrain_outputs"],
+  });
+  pushEdge(edges, {
+    from: processLoopId,
+    to: outputBusId,
+    relation: "produces",
+    label: "process loop produces output candidates",
+    evidenceRefs: statePlaneEvidenceRefs,
+    reasonCodes: ["process_loop_produces_outputs"],
+  });
+  for (const controlBadgeId of controlBadgeIds.slice(0, 8)) {
+    pushEdge(edges, {
+      from: controlId,
+      to: controlBadgeId,
+      relation: "contains",
+      label: "control signal groups checkpoint or perturbation",
+      evidenceRefs: statePlaneEvidenceRefs,
+      reasonCodes: ["control_signal_groups_checkpoint"],
+    });
+  }
+};
+
 const applyStagePlayProcessingSummaryTrays = (
   badges: StagePlayBadgeV1[],
   input: {
@@ -1844,6 +2256,16 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     addLatestPerturbationNode(missingBadges, missingEdges, perturbationResult.latestEvents);
     addPerturbationBadges(missingBadges, missingEdges, perturbationResult.latestEvents);
     addCheckpointRequestBadges(missingBadges, missingEdges, checkpointRequests, perturbationResult.latestEvents);
+    addWorkstationStatePlaneBadges(missingBadges, missingEdges, {
+      observerId: missingObserverId,
+      graphId,
+      sourceRefs: [],
+      evidenceRefs: [],
+      sources: sourceWindow.sources,
+      generatedAt: resolvedAt,
+      checkpointFreshness,
+      microReasoners: collectMicroReasonerState(sourceWindow.sources),
+    });
     applyStagePlayProcessingSummaryTrays(missingBadges, {
       graphId,
       generatedAt: resolvedAt,
@@ -2931,6 +3353,17 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
   addLatestPerturbationNode(badges, edges, perturbationResult.latestEvents);
   addPerturbationBadges(badges, edges, perturbationResult.latestEvents);
   addCheckpointRequestBadges(badges, edges, checkpointRequests, perturbationResult.latestEvents);
+  addWorkstationStatePlaneBadges(badges, edges, {
+    observerId,
+    interpreterId,
+    graphId,
+    sourceRefs,
+    evidenceRefs,
+    sources: sourceWindow.sources,
+    generatedAt: resolvedAt,
+    checkpointFreshness,
+    microReasoners: collectMicroReasonerState(sourceWindow.sources),
+  });
   applyStagePlayProcessingSummaryTrays(badges, {
     graphId,
     generatedAt: resolvedAt,

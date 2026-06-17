@@ -205,6 +205,194 @@ describe("stage play micro-reasoner prompt presets", () => {
     expect(rejectedVisual).toBeNull();
   });
 
+  it("projects document Markdown translation deck output as structured inline UI evidence", async () => {
+    const sourceId = "document_markdown:docs/example.md";
+    applyStagePlayMicroReasonerPromptPreset({
+      presetId: "stage_play_micro_reasoner_prompt_preset:document-translate-haw-inline:v1",
+      sourceIds: [sourceId],
+      sourceKind: "document_markdown",
+      now: "2026-06-04T12:00:00.000Z",
+    });
+    const mailItems = [{
+      mailId: "mail:document:1",
+      sourceId,
+      sourceKind: "document_markdown",
+      summary: {
+        text: JSON.stringify({
+          schema: "stage_play.document_markdown_visible_units.v1",
+          doc_path: "docs/example.md",
+          source_hash: "fnv1a32:test",
+          locale: "haw",
+          units: [
+            {
+              unit_id: "u0001",
+              kind: "heading",
+              source_markdown: "# Account language",
+              translatable: true,
+              protected_spans: [],
+            },
+          ],
+        }),
+        preview: "docs/example.md: 1 visible Markdown unit for haw inline translation.",
+      },
+      sourceRefs: {
+        sourceId,
+        evidenceRef: "document_markdown:docs/example.md:fnv1a32:test:u0001",
+      },
+      evidenceRefs: [`${sourceId}:unit:u0001`],
+    } as any];
+    const commonInput = {
+      jobId: "stage_play_live_source_job:document",
+      sourceId,
+      now: "2026-06-04T12:00:00.000Z",
+      mailItems,
+      immersionState: {
+        immersionStateId: "stage_play_immersion_state:document",
+        policyId: null,
+        profileId: null,
+        sourceIds: [sourceId],
+        latestMailIds: ["mail:document:1"],
+        latestEvidenceRefs: [`${sourceId}:unit:u0001`],
+        sourceIdentity: { label: "Document Markdown", confidence: 0.9, stable: true },
+        stableFacts: [],
+        currentSceneFacts: ["Document Markdown visible unit: Account language."],
+        changedFacts: ["visible document unit changed"],
+        uncertainties: [],
+        currentActivity: "document_translation",
+        salience: {
+          level: "medium",
+          reasons: ["visible document unit"],
+          voiceCandidate: false,
+          calloutDraft: null,
+        },
+        prediction: null,
+        lastValidation: null,
+        evidenceRefs: ["stage_play_immersion_state:document"],
+        createdAt: "2026-06-04T12:00:00.000Z",
+        assistant_answer: false,
+        terminal_eligible: false,
+        context_role: "tool_evidence",
+      } as any,
+      predictionValidation: {
+        validationId: "stage_play_prediction_validation:document",
+        priorPredictionId: null,
+        result: "no_prior_prediction",
+        supportedSignals: [],
+        contradictedSignals: [],
+        newSignals: ["visible document unit changed"],
+        salienceHint: "medium",
+        recommendedNext: "wait_for_next_summary",
+        evidenceRefs: ["stage_play_prediction_validation:document"],
+        createdAt: "2026-06-04T12:00:00.000Z",
+      } as any,
+    };
+    const executor: StagePlayPromptedMicroReasonerExecutor = async (input) => {
+      if (input.role === "packet_composer") {
+        const json = {
+          locale: "haw",
+          translations: [
+            {
+              unit_id: "u0001",
+              translated_markdown: "Translated account language heading",
+              confidence: "medium",
+              warnings: [],
+            },
+          ],
+          qualityChecks: [
+            { name: "placeholder_parity", status: "pass", detail: "No placeholders." },
+          ],
+          evidenceRefs: [`${sourceId}:unit:u0001`],
+        };
+        return { ok: true, text: JSON.stringify(json), json, model: "test-document-translator", latencyMs: 5 };
+      }
+      const json = input.role === "claim_extractor"
+        ? {
+            observedFacts: ["u0001 heading is translatable"],
+            inferredFacts: [],
+            uncertainties: [],
+            sceneTags: ["document_markdown"],
+            activityTags: ["translation"],
+            objectTags: ["u0001"],
+            riskTags: [],
+            opportunityTags: [],
+          }
+        : {
+            changedFacts: ["u0001 ready for glossary guard"],
+            stableFactsUsed: [],
+            contradictions: [],
+            uncertainties: [],
+          };
+      return { ok: true, text: JSON.stringify(json), json, model: "test-document-classifier", latencyMs: 4 };
+    };
+
+    const prompted = await buildStagePlayProcessedMailPacketWithPromptedReasoners({
+      ...commonInput,
+      promptedMicroReasoners: {
+        enabled: true,
+        executor,
+      },
+    });
+    const promptedComposer = prompted.microReasonerRuns.find((run) => run.role === "packet_composer");
+    const promptedOutput = JSON.parse(promptedComposer?.outputPreview ?? "{}");
+
+    expect(promptedComposer).toMatchObject({
+      deckProductRole: true,
+      deckExecutionMode: "uses_prior_outputs",
+      status: "completed",
+      context_role: "micro_reasoner_evidence",
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    expect(promptedOutput).toMatchObject({
+      schema: "stage_play_document_inline_translation_output/v1",
+      sourceKind: "document_markdown",
+      sourceId,
+      projectionTarget: "docs_viewer_inline",
+      translations: [
+        {
+          unit_id: "u0001",
+          translated_markdown: "Translated account language heading",
+          confidence: "medium",
+        },
+      ],
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "micro_reasoner_evidence",
+    });
+
+    resetStagePlayProcessedMailPacketStoreForTest();
+    ensureDefaultStagePlayMicroReasonerPromptPresets();
+    applyStagePlayMicroReasonerPromptPreset({
+      presetId: "stage_play_micro_reasoner_prompt_preset:document-translate-haw-inline:v1",
+      sourceIds: [sourceId],
+      sourceKind: "document_markdown",
+      now: "2026-06-04T12:00:00.000Z",
+    });
+    const fallbackResult = await buildStagePlayProcessedMailPacketWithPromptedReasoners({
+      ...commonInput,
+      promptedMicroReasoners: { enabled: false },
+    });
+    const fallbackComposer = fallbackResult.microReasonerRuns.find((run) => run.role === "packet_composer");
+    const fallbackOutput = JSON.parse(fallbackComposer?.outputPreview ?? "{}");
+
+    expect(fallbackOutput).toMatchObject({
+      schema: "stage_play_document_inline_translation_output/v1",
+      translations: [],
+      unit_errors: [
+        {
+          unit_id: "u0001",
+          reason: "document_translation_model_output_unavailable",
+        },
+      ],
+      qualityChecks: [
+        {
+          name: "document_translation_contract",
+          status: "fail",
+        },
+      ],
+    });
+  });
+
   it("applies a source preset and resolves role prompts through the selected deck", () => {
     const applied = applyStagePlayMicroReasonerPromptPreset({
       presetId: "stage_play_micro_reasoner_prompt_preset:calculator-tool-call:v1",

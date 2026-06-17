@@ -91,6 +91,16 @@ const classifySourceFamily = (input: {
   }
   if (input.sourceTarget === "runtime_evidence") return "debug_export";
   if (
+    input.sourceTarget === "context_reflection" ||
+    input.sourceTarget === "context_attachment" ||
+    input.targetKind === "context_reflection" ||
+    input.targetKind === "context_attachment" ||
+    input.admittedFamilies.includes("context_reflection") ||
+    /\b(?:selected\s+context|context\s+attachment|dragged\s+cutout|selected\s+ui\s+region|this\s+microreasoner|this\s+micro[-\s]?deck|macro[-\s]?reasoner\s+deck)\b/.test(prompt)
+  ) {
+    return "context_reflection";
+  }
+  if (
     input.sourceTarget === "scholarly_research" ||
     input.admittedFamilies.includes("scholarly_research") ||
     detectScholarlyResearchIntent(input.promptText).researchRequested
@@ -224,6 +234,7 @@ const requestedActionFor = (
   if (family === "process_graph") return "inspect_process_graph";
   if (family === "workspace_diagnostic") return HELIX_WORKSPACE_OS_STATUS_CAPABILITY;
   if (family === "subagent_runtime_adapter") return "delegate_subagent_runtime";
+  if (family === "context_reflection") return "helix_ask.reflect_context_attachments";
   return "diagnose_debug_or_runtime_evidence";
 };
 
@@ -360,6 +371,13 @@ const allowedFamilyByToolAdmission = (family: HelixCapabilityFamily, admittedFam
   if (family === "scholarly_research") return admittedFamilies.includes("scholarly_research");
   if (family === "internet_search") return admittedFamilies.includes("internet_search");
   if (family === "debug_export") return admittedFamilies.includes("runtime_evidence") || admittedFamilies.includes("repo_code");
+  if (family === "context_reflection") {
+    return admittedFamilies.includes("context_reflection") ||
+      admittedFamilies.includes("capability_catalog") ||
+      admittedFamilies.includes("live_environment") ||
+      admittedFamilies.includes("live_source_mail") ||
+      admittedFamilies.includes("workstation_panel");
+  }
   if (family === "workspace_diagnostic") return admittedFamilies.includes("workspace_diagnostic");
   if (family === "process_graph") return admittedFamilies.includes("process_graph");
   if (family === "live_environment") return admittedFamilies.includes("live_environment");
@@ -383,6 +401,7 @@ const contextualSuppressionBlocksCapabilityFamily = (
   if (family === "workspace_directory") return contextualToolSuppressionBlocksFamily(suppression, "workspace_directory");
   if (family === "workspace_diagnostic") return contextualToolSuppressionBlocksFamily(suppression, "workspace_diagnostic");
   if (family === "process_graph") return contextualToolSuppressionBlocksFamily(suppression, "process_graph");
+  if (family === "context_reflection") return false;
   if (family === "debug_export") return true;
   return false;
 };
@@ -424,6 +443,7 @@ const admissionFor = (input: {
     input.family === "visual_capture" ||
     input.family === "procedure_memory" ||
     input.family === "debug_export" ||
+    input.family === "context_reflection" ||
     input.family === "workspace_diagnostic" ||
     input.family === "workspace_directory" ||
     input.family === "live_environment" ||

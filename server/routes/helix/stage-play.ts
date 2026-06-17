@@ -1560,10 +1560,12 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
       sourceHash,
       unitIds.join(","),
     ].filter(Boolean).join(":");
+    const roomId = readQueryString(body.roomId) ?? readQueryString(body.room_id);
+    const environmentId = readQueryString(body.environmentId) ?? readQueryString(body.environment_id);
     const mail = enqueueStagePlayLiveSourceMailItem({
       threadId,
-      roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id),
-      environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id),
+      roomId,
+      environmentId,
       sourceId,
       sourceKind: "document_markdown",
       evidenceRef,
@@ -1575,11 +1577,19 @@ helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, 
       sourceFreshness: "fresh",
       evidenceRefs: unitIds.map((unitId) => `${sourceId}:unit:${unitId}`),
     });
+    const wakeRequest = queueMailWakeForUnreadItems({
+      threadId,
+      roomId,
+      environmentId,
+      sourceId,
+      limit: units.length,
+    });
 
     return res.json({
       ok: true,
       schema: "stage_play_document_markdown_mail_enqueue_response/v1",
       mail,
+      wakeRequest,
       sourceKind: "document_markdown",
       sourceId,
       mailboxThreadId: threadId,
@@ -2533,6 +2543,7 @@ helixStagePlayRouter.post("/live-source-mail/wake/run", async (req: Request, res
       roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id) ?? readQueryString(req.query.roomId),
       environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id) ?? readQueryString(req.query.environmentId),
       jobId: readQueryString(body.jobId) ?? readQueryString(body.job_id) ?? readQueryString(req.query.jobId),
+      sourceId: readQueryString(body.sourceId) ?? readQueryString(body.source_id) ?? readQueryString(req.query.sourceId) ?? readQueryString(req.query.source_id),
       baseUrl: readQueryString(body.baseUrl) ?? readQueryString(body.base_url) ?? routeBaseUrl ?? undefined,
       manualRun: true,
       executeHiddenAsk: resolveStagePlayWakeExecuteHiddenAskForRoute(body, req.query as Record<string, unknown>),
@@ -2577,6 +2588,7 @@ helixStagePlayRouter.post("/live-source-mail/wake/cycle", async (req: Request, r
       roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id) ?? readQueryString(req.query.roomId),
       environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id) ?? readQueryString(req.query.environmentId),
       jobId: readQueryString(body.jobId) ?? readQueryString(body.job_id) ?? readQueryString(req.query.jobId),
+      sourceId: readQueryString(body.sourceId) ?? readQueryString(body.source_id) ?? readQueryString(req.query.sourceId) ?? readQueryString(req.query.source_id),
       baseUrl: readQueryString(body.baseUrl) ?? readQueryString(body.base_url) ?? routeBaseUrl ?? undefined,
       manualRun: resolveStagePlayWakeManualRunForRoute(body, req.query as Record<string, unknown>),
       executeHiddenAsk: resolveStagePlayWakeExecuteHiddenAskForRoute(body, req.query as Record<string, unknown>),

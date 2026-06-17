@@ -549,17 +549,22 @@ export function DocViewerPanel() {
       signal,
     });
     const translationByUnitId = new Map(
-      extractDocumentMarkdownTranslationsFromRuns(runs).map((entry) => [entry.unitId, entry.text] as const),
+      extractDocumentMarkdownTranslationsFromRuns(runs).map((entry) => [entry.unitId, entry] as const),
     );
     if (!translationByUnitId.size) return;
     const translatableUnitIds = new Set(translationUnits.filter((unit) => unit.translatable).map((unit) => unit.unit_id));
     setInlineTranslations((current) => {
       let changed = false;
       const next = { ...current };
-      for (const [unitId, text] of translationByUnitId) {
+      for (const [unitId, entry] of translationByUnitId) {
         if (!translatableUnitIds.has(unitId)) continue;
-        if (next[unitId]?.status === "ready" && next[unitId]?.text === text) continue;
-        next[unitId] = { status: "ready", text };
+        if (entry.status === "ready") {
+          if (next[unitId]?.status === "ready" && next[unitId]?.text === entry.text) continue;
+          next[unitId] = { status: "ready", text: entry.text };
+        } else {
+          if (next[unitId]?.status === "error" && next[unitId]?.error === entry.error) continue;
+          next[unitId] = { status: "error", error: entry.error };
+        }
         inFlightTranslationUnitIdsRef.current.delete(unitId);
         changed = true;
       }

@@ -40,6 +40,7 @@ export const STAGE_PLAY_BADGE_KINDS = [
   "answer_snapshot",
   "live_output",
   "voice_output",
+  "workstation_state_plane",
   "perturbation",
   "checkpoint_request",
 ] as const;

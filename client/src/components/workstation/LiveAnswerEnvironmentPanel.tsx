@@ -539,6 +539,20 @@ const readDocumentTranslationRunText = (run: StagePlayMicroReasonerRunV1): strin
       })
       .filter((entry): entry is string => entry.trim().length > 0);
     if (lines.length) return lines.join("\n");
+    const unitErrors = Array.isArray(parsed?.unit_errors)
+      ? parsed.unit_errors
+      : Array.isArray(parsed?.unitErrors)
+        ? parsed.unitErrors
+        : [];
+    const errorLines = unitErrors
+      .map((entry: unknown) => {
+        const record = readRecord(entry);
+        const unitId = typeof record?.unit_id === "string" ? record.unit_id : null;
+        const reason = typeof record?.reason === "string" ? record.reason.trim() : "translation unavailable";
+        return unitId ? `${unitId}: ${reason}` : reason;
+      })
+      .filter((entry): entry is string => entry.trim().length > 0);
+    if (errorLines.length) return errorLines.join("\n");
   } catch {
     // Prompted MicroDeck previews can be clipped by the overview API.
   }
