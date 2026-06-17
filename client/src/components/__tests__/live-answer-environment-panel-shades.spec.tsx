@@ -222,6 +222,14 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain("latestEarbudMicroReasonerOutput");
     expect(source).toContain("completed earbud packet_composer run");
     expect(source).toContain("readEarbudRunText");
+    expect(source).toContain("Document Markdown Decks");
+    expect(source).toContain('data-testid="document-markdown-micro-reasoner"');
+    expect(source).toContain('data-testid="document-markdown-micro-reasoner-output"');
+    expect(source).toContain('sourceKind: "document_markdown"');
+    expect(source).toContain("documentMarkdownSourceIdFromLocation");
+    expect(source).toContain("Future visible document Markdown packets will use this prompt deck.");
+    expect(source).toContain("Document inline translation candidates");
+    expect(source).toContain("readDocumentTranslationRunText");
     expect(source).toContain("audioTranscriptHistory");
     expect(source).toContain("pruneAudioTranscriptHistory");
     expect(source).toContain("Transcript chunks will appear here");

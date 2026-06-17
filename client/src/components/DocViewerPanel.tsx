@@ -395,6 +395,8 @@ export function DocViewerPanel() {
       !translationEligible ||
       !currentEntry ||
       !rawMarkdownSourceHash ||
+      translationStatus === "error" ||
+      translationStatus === "unavailable" ||
       !contentRef.current
     ) {
       return;
@@ -450,10 +452,11 @@ export function DocViewerPanel() {
           : err instanceof Error
             ? err.message
             : t("docsViewer.translation.errorGeneric");
+      translationScopeKeyRef.current = null;
       setInlineTranslations((current) => {
         const next = { ...current };
         targetIds.forEach((unitId) => {
-          next[unitId] = { status: "error", error: message };
+          delete next[unitId];
         });
         return next;
       });
@@ -469,6 +472,7 @@ export function DocViewerPanel() {
     interfaceLanguage.code,
     rawMarkdownSourceHash,
     t,
+    translationStatus,
     translationEligible,
     translationUnits,
   ]);

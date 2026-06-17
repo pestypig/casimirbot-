@@ -138,6 +138,73 @@ describe("stage play micro-reasoner prompt presets", () => {
     expect(rejected).toBeNull();
   });
 
+  it("lists document Markdown translation decks separately from audio and visual sources", () => {
+    const documentPresets = listStagePlayMicroReasonerPromptPresets({
+      sourceId: "document_markdown:docs/example.md",
+      sourceKind: "document_markdown",
+      includePresets: true,
+    });
+    const audioPresets = listStagePlayMicroReasonerPromptPresets({
+      sourceId: "audio_transcript:docs",
+      sourceKind: "audio_transcript",
+      includePresets: true,
+    });
+    const visualPresets = listStagePlayMicroReasonerPromptPresets({
+      sourceId: "visual_source:docs",
+      sourceKind: "visual_frame",
+      includePresets: true,
+    });
+    const documentPresetIds = documentPresets.map((preset) => preset.presetId);
+
+    expect(documentPresetIds).toContain("stage_play_micro_reasoner_prompt_preset:document-translate-haw-inline:v1");
+    expect(documentPresetIds).not.toContain("stage_play_micro_reasoner_prompt_preset:earbud-translate-english:v1");
+    expect(audioPresets.map((preset) => preset.presetId)).not.toContain("stage_play_micro_reasoner_prompt_preset:document-translate-haw-inline:v1");
+    expect(visualPresets.map((preset) => preset.presetId)).not.toContain("stage_play_micro_reasoner_prompt_preset:document-translate-haw-inline:v1");
+    expect(getActiveStagePlayMicroReasonerPromptPresetForSource({
+      sourceId: "document_markdown:docs/example.md",
+      sourceKind: "document_markdown",
+    })?.presetId).toBe("stage_play_micro_reasoner_prompt_preset:document-translate-haw-inline:v1");
+  });
+
+  it("applies a document Markdown translation deck only to document Markdown sources", () => {
+    const applied = applyStagePlayMicroReasonerPromptPreset({
+      presetId: "stage_play_micro_reasoner_prompt_preset:document-translate-haw-inline:v1",
+      sourceIds: ["document_markdown:docs/example.md"],
+      sourceKind: "document_markdown",
+      now: "2026-06-04T12:00:00.000Z",
+    });
+    const activePreset = getActiveStagePlayMicroReasonerPromptPresetForSource({
+      sourceId: "document_markdown:docs/example.md",
+      sourceKind: "document_markdown",
+    });
+    const prompts = listStagePlayActiveMicroReasonerPromptsForSource({
+      sourceId: "document_markdown:docs/example.md",
+      sourceKind: "document_markdown",
+    });
+    const rejectedAudio = applyStagePlayMicroReasonerPromptPreset({
+      presetId: "stage_play_micro_reasoner_prompt_preset:document-translate-haw-inline:v1",
+      sourceIds: ["audio_transcript:docs"],
+      sourceKind: "audio_transcript",
+    });
+    const rejectedVisual = applyStagePlayMicroReasonerPromptPreset({
+      presetId: "stage_play_micro_reasoner_prompt_preset:document-translate-haw-inline:v1",
+      sourceIds: ["visual_source:docs"],
+      sourceKind: "visual_frame",
+    });
+
+    expect(applied?.sourceIds).toContain("document_markdown:docs/example.md");
+    expect(activePreset).toMatchObject({
+      presetId: "stage_play_micro_reasoner_prompt_preset:document-translate-haw-inline:v1",
+      domain: "document_translation",
+      outputPolicy: "inline_document_translation",
+      promptedRoles: ["claim_extractor", "observation_classifier", "packet_composer"],
+    });
+    expect(prompts.find((prompt) => prompt.role === "packet_composer")?.promptId)
+      .toBe("stage_play_micro_reasoner_prompt:document-translate-haw-inline:packet_composer:v1");
+    expect(rejectedAudio).toBeNull();
+    expect(rejectedVisual).toBeNull();
+  });
+
   it("applies a source preset and resolves role prompts through the selected deck", () => {
     const applied = applyStagePlayMicroReasonerPromptPreset({
       presetId: "stage_play_micro_reasoner_prompt_preset:calculator-tool-call:v1",

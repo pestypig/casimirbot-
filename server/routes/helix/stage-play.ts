@@ -34,6 +34,7 @@ import {
 } from "../../services/stage-play/stage-play-checkpoint-queue";
 import {
   configureStagePlayLiveSourceWatchJobPolicy,
+  enqueueStagePlayLiveSourceMailItem,
   getStagePlayLiveSourceMailboxRetentionStats,
   listStagePlayMailDecisions,
   listStagePlayLiveSourceMailCompactionIntervals,
@@ -311,6 +312,11 @@ helixStagePlayRouter.options("/checkpoint-queue/action", (_req, res) => {
 });
 
 helixStagePlayRouter.options("/live-source-mail", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+helixStagePlayRouter.options("/live-source-mail/document-markdown", (_req, res) => {
   setCors(res);
   res.status(200).end();
 });
@@ -1260,6 +1266,7 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
     const roomId = readQueryString(req.query.roomId) ?? readQueryString(req.query.room_id);
     const environmentId = readQueryString(req.query.environmentId) ?? readQueryString(req.query.environment_id);
     const sourceId = readQueryString(req.query.sourceId) ?? readQueryString(req.query.source_id);
+    const requestedSourceKind = readQueryString(req.query.sourceKind) ?? readQueryString(req.query.source_kind);
     const status = readQueryString(req.query.status) as any;
     const view = readLiveSourceMailView(req.query.view);
     const operator = view === "operator";
@@ -1325,7 +1332,7 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       !sourceId || item.sourceId === sourceId
     ) ?? mailItems.at(-1) ?? null;
     const activeMicroReasonerSourceId = sourceId ?? activeMicroReasonerMailItem?.sourceId ?? null;
-    const activeMicroReasonerSourceKind = activeMicroReasonerMailItem?.sourceKind ?? null;
+    const activeMicroReasonerSourceKind = activeMicroReasonerMailItem?.sourceKind ?? requestedSourceKind ?? null;
     const includePresetDirectory = includeConfig || operator;
     const microReasonerPromptPresets = includePresetDirectory
       ? listStagePlayMicroReasonerPromptPresets({
@@ -1484,6 +1491,109 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       error: "stage-play-live-source-mail-list-failed",
       err,
       schema: "stage_play_live_source_mail_list_response/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.post("/live-source-mail/document-markdown", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  rememberStagePlayRequestBaseUrl(req);
+
+  try {
+    const body = readRecord(req.body) ?? {};
+    const requestedThreadId = readQueryString(body.threadId) ?? readQueryString(body.thread_id) ?? DEFAULT_STAGE_PLAY_MAILBOX_THREAD_ID;
+    const mailboxThreadResolution = resolveMailboxThreadForRoute({
+      threadId: requestedThreadId,
+      mailboxThreadId: readQueryString(body.mailboxThreadId) ?? readQueryString(body.mailbox_thread_id),
+    });
+    const threadId = mailboxThreadResolution.mailboxThreadId;
+    const docPath = readQueryString(body.docPath) ?? readQueryString(body.doc_path) ?? "current-document";
+    const sourceHash = readQueryString(body.sourceHash) ?? readQueryString(body.source_hash) ?? null;
+    const locale = readQueryString(body.locale) ?? "haw";
+    const sourceId =
+      readQueryString(body.sourceId) ??
+      readQueryString(body.source_id) ??
+      `document_markdown:${docPath}`;
+    const rawUnits = Array.isArray(body.units) ? body.units : [];
+    const units = rawUnits
+      .map((unit) => readRecord(unit))
+      .filter((unit): unit is Record<string, unknown> => Boolean(unit))
+      .map((unit) => ({
+        unit_id: readQueryString(unit.unit_id) ?? readQueryString(unit.unitId) ?? "",
+        kind: readQueryString(unit.kind) ?? "paragraph",
+        source_markdown: readQueryString(unit.source_markdown) ?? readQueryString(unit.sourceMarkdown) ?? "",
+        translatable: unit.translatable !== false,
+        protected_spans: Array.isArray(unit.protected_spans)
+          ? unit.protected_spans.filter((entry): entry is string => typeof entry === "string")
+          : Array.isArray(unit.protectedSpans)
+            ? unit.protectedSpans.filter((entry): entry is string => typeof entry === "string")
+            : [],
+      }))
+      .filter((unit) => unit.unit_id && unit.source_markdown)
+      .slice(0, 12);
+
+    if (units.length === 0) {
+      return res.status(400).json({
+        ok: false,
+        error: "document_markdown_mail_missing_units",
+        message: "At least one visible document Markdown unit is required.",
+        assistant_answer: false,
+        terminal_eligible: false,
+        context_role: "tool_evidence",
+      });
+    }
+
+    const unitIds = units.map((unit) => unit.unit_id);
+    const summaryText = JSON.stringify({
+      schema: "stage_play.document_markdown_visible_units.v1",
+      doc_path: docPath,
+      source_hash: sourceHash,
+      locale,
+      units,
+    });
+    const summaryPreview = `${docPath}: ${units.length} visible Markdown unit${units.length === 1 ? "" : "s"} for ${locale} inline translation.`;
+    const evidenceRef = [
+      "document_markdown",
+      docPath,
+      sourceHash,
+      unitIds.join(","),
+    ].filter(Boolean).join(":");
+    const mail = enqueueStagePlayLiveSourceMailItem({
+      threadId,
+      roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id),
+      environmentId: readQueryString(body.environmentId) ?? readQueryString(body.environment_id),
+      sourceId,
+      sourceKind: "document_markdown",
+      evidenceRef,
+      summaryText,
+      summaryPreview,
+      confidence: 0.7,
+      objectiveText: `Generate ${locale} inline translation candidates for visible Markdown units.`,
+      deterministicChangeHint: "summary_changed",
+      sourceFreshness: "fresh",
+      evidenceRefs: unitIds.map((unitId) => `${sourceId}:unit:${unitId}`),
+    });
+
+    return res.json({
+      ok: true,
+      schema: "stage_play_document_markdown_mail_enqueue_response/v1",
+      mail,
+      sourceKind: "document_markdown",
+      sourceId,
+      mailboxThreadId: threadId,
+      mailboxThreadResolution,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-document-markdown-mail-enqueue-failed",
+      err,
+      schema: "stage_play_document_markdown_mail_enqueue_response/v1",
       contextRole: "tool_evidence",
     });
   }

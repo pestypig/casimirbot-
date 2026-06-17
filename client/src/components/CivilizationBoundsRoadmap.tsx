@@ -6,8 +6,7 @@ import {
   Line,
   Marker,
 } from "react-simple-maps";
-import type { CivilizationLayerModeV1 } from "@shared/civilization-bounds-roadmap";
-import { buildCivilizationBoundsScenario } from "@/data/civilizationBoundsScenarios";
+import { Info, X } from "lucide-react";
 import {
   CIVILIZATION_NATION_DEPENDENCY_EDGES,
   CIVILIZATION_NATION_PARAMETER_SCOPES,
@@ -36,10 +35,6 @@ const SCOPE_RISK_ORIENTED = new Set<CivilizationNationParameterScope>([
   "environmental_pressure",
 ]);
 
-function formatLayerLabel(layer: CivilizationLayerModeV1): string {
-  return layer.replaceAll("_", " ");
-}
-
 function formatSourceRef(ref: string): string {
   return CIVILIZATION_NATION_SOURCE_REFS[
     ref as keyof typeof CIVILIZATION_NATION_SOURCE_REFS
@@ -66,6 +61,24 @@ function parameterLabel(value: number | null): string {
   return value.toFixed(2);
 }
 
+function civilizationBalanceScore(vector: CivilizationNationStateVector): number {
+  const scores = CIVILIZATION_NATION_PARAMETER_SCOPES.map((scope) => {
+    const value = vector.parameters[scope];
+    if (value === null) return null;
+    return SCOPE_RISK_ORIENTED.has(scope) ? 1 - value : value;
+  }).filter((value): value is number => value !== null);
+
+  if (scores.length === 0) return 0;
+  return scores.reduce((sum, value) => sum + value, 0) / scores.length;
+}
+
+function balanceColor(score: number): string {
+  if (score >= 0.68) return "#22c55e";
+  if (score >= 0.52) return "#eab308";
+  if (score >= 0.36) return "#f97316";
+  return "#ef4444";
+}
+
 function eventPulseScore(vector: CivilizationNationStateVector): number {
   return Math.max(
     vector.eventPulse.politicalViolence30d,
@@ -75,205 +88,114 @@ function eventPulseScore(vector: CivilizationNationStateVector): number {
   );
 }
 
-function markerRadius(vector: CivilizationNationStateVector, eventPulseOn: boolean): number {
-  const pulse = eventPulseOn ? eventPulseScore(vector) : 0;
-  return 6 + Math.max(vector.confidence, pulse) * 8;
+function markerRadius(vector: CivilizationNationStateVector): number {
+  return 6 + Math.max(vector.confidence, eventPulseScore(vector) * 0.75) * 8;
 }
 
 function edgeEndpoint(edge: CivilizationNationDependencyEdge, iso3: string) {
   return CIVILIZATION_NATION_STATE_VECTORS.find((vector) => vector.countryIso3 === iso3);
 }
 
+function selectedEdgeTone(
+  edge: CivilizationNationDependencyEdge,
+  selectedIso3s: string[],
+): "direct" | "comparison" | "hidden" {
+  const fromSelected = selectedIso3s.includes(edge.fromIso3);
+  const toSelected = selectedIso3s.includes(edge.toIso3);
+  if (fromSelected && toSelected) return "comparison";
+  if (fromSelected || toSelected) return "direct";
+  return "hidden";
+}
+
+function scopeSpread(
+  vectors: CivilizationNationStateVector[],
+  scope: CivilizationNationParameterScope,
+): string {
+  const values = vectors
+    .map((vector) => vector.parameters[scope])
+    .filter((value): value is number => value !== null);
+  if (values.length < 2) return "0.00";
+  return (Math.max(...values) - Math.min(...values)).toFixed(2);
+}
+
 export type CivilizationBoundsRoadmapProps = {
   scenarioId?: string;
 };
 
-export function CivilizationBoundsRoadmap({
-  scenarioId,
-}: CivilizationBoundsRoadmapProps) {
-  const roadmap = useMemo(() => buildCivilizationBoundsScenario(scenarioId), [scenarioId]);
-  const [selectedScope, setSelectedScope] =
-    useState<CivilizationNationParameterScope>("material_base");
-  const [selectedLayer, setSelectedLayer] = useState<CivilizationLayerModeV1>(
-    roadmap.activeLayerModes[0] ?? "ideal_bounds",
-  );
-  const [showEdges, setShowEdges] = useState(true);
-  const [showEventPulse, setShowEventPulse] = useState(true);
-  const [showMissing, setShowMissing] = useState(true);
-  const [selectedIso3, setSelectedIso3] = useState<string>(
-    CIVILIZATION_NATION_STATE_VECTORS[0]?.countryIso3 ?? "",
-  );
+export function CivilizationBoundsRoadmap(_props: CivilizationBoundsRoadmapProps) {
+  const [selectedIso3s, setSelectedIso3s] = useState<string[]>([]);
 
-  const selectedVector =
-    CIVILIZATION_NATION_STATE_VECTORS.find((vector) => vector.countryIso3 === selectedIso3) ??
-    CIVILIZATION_NATION_STATE_VECTORS[0];
-
-  const visibleEdges = useMemo(
+  const selectedVectors = useMemo(
     () =>
-      CIVILIZATION_NATION_DEPENDENCY_EDGES.filter((edge) => {
-        if (!showEdges) return false;
-        return edgeEndpoint(edge, edge.fromIso3) && edgeEndpoint(edge, edge.toIso3);
-      }),
-    [showEdges],
+      selectedIso3s
+        .map((iso3) =>
+          CIVILIZATION_NATION_STATE_VECTORS.find((vector) => vector.countryIso3 === iso3),
+        )
+        .filter((vector): vector is CivilizationNationStateVector => Boolean(vector)),
+    [selectedIso3s],
   );
 
   const selectedEdges = useMemo(
     () =>
       CIVILIZATION_NATION_DEPENDENCY_EDGES.filter(
-        (edge) => edge.fromIso3 === selectedIso3 || edge.toIso3 === selectedIso3,
+        (edge) => selectedEdgeTone(edge, selectedIso3s) !== "hidden",
       ),
-    [selectedIso3],
+    [selectedIso3s],
   );
 
+  const comparisonEdges = selectedEdges.filter(
+    (edge) => selectedEdgeTone(edge, selectedIso3s) === "comparison",
+  );
+
+  const toggleSelectedCountry = (iso3: string) => {
+    setSelectedIso3s((current) =>
+      current.includes(iso3)
+        ? current.filter((selectedIso3) => selectedIso3 !== iso3)
+        : [...current, iso3],
+    );
+  };
+
   return (
-    <div className="relative h-full min-h-[620px] overflow-hidden bg-[#06110f] text-slate-100">
-      <div className="absolute left-3 top-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-2 rounded-md border border-white/10 bg-black/70 p-2">
-        <span className="text-xs font-semibold">Civilization Bounds Atlas</span>
-        {CIVILIZATION_NATION_PARAMETER_SCOPES.map((scope) => {
-          const active = selectedScope === scope;
-          return (
+    <div
+      className="relative h-full min-h-[620px] overflow-hidden bg-[#06110f] text-slate-100"
+      aria-label="Civilization Bounds Atlas"
+    >
+      {selectedVectors.length > 0 && (
+        <div
+          className="absolute bottom-3 left-3 right-3 z-10 max-h-[42%] overflow-auto rounded-md border border-white/10 bg-black/80 p-3 text-xs shadow-2xl backdrop-blur"
+          data-testid="civilization-bounds-country-inspector"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                <Info className="h-4 w-4 text-emerald-200" aria-hidden="true" />
+                {selectedVectors.length === 1
+                  ? selectedVectors[0].label
+                  : "Compare selected countries"}
+              </div>
+              <div className="mt-1 text-[11px] text-slate-400">
+                {selectedVectors.map((vector) => vector.countryIso3).join(" + ")}
+                {" - "}
+                click a selected marker again to remove it
+              </div>
+            </div>
             <button
-              key={scope}
               type="button"
-              onClick={() => setSelectedScope(scope)}
-              className={`h-7 rounded-md border px-2 text-[11px] ${
-                active
-                  ? "border-emerald-300/80 bg-emerald-300/15 text-emerald-100"
-                  : "border-white/15 bg-white/5 text-slate-300 hover:border-white/40"
-              }`}
+              onClick={() => setSelectedIso3s([])}
+              className="grid h-7 w-7 place-items-center rounded-md border border-white/10 bg-white/5 text-slate-300 hover:border-white/30 hover:text-white"
+              aria-label="Clear selected countries"
             >
-              {CIVILIZATION_NATION_SCOPE_LABELS[scope]}
+              <X className="h-4 w-4" aria-hidden="true" />
             </button>
-          );
-        })}
-      </div>
-
-      <div className="absolute right-3 top-16 z-10 flex flex-col gap-2 rounded-md border border-white/10 bg-black/70 p-2 text-[11px] text-slate-200 sm:top-3">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={showEdges}
-            onChange={(event) => setShowEdges(event.target.checked)}
-            className="accent-emerald-400"
-          />
-          dependency edges
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={showEventPulse}
-            onChange={(event) => setShowEventPulse(event.target.checked)}
-            className="accent-emerald-400"
-          />
-          event pulse
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={showMissing}
-            onChange={(event) => setShowMissing(event.target.checked)}
-            className="accent-emerald-400"
-          />
-          missing evidence
-        </label>
-      </div>
-
-      <div
-        className="absolute bottom-3 left-3 z-10 w-[min(26rem,calc(100%-1.5rem))] rounded-md border border-white/10 bg-black/75 p-3 text-xs"
-        data-testid="civilization-bounds-country-inspector"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold text-white">
-              {selectedVector.label}
-            </div>
-            <div className="mt-1 text-[11px] text-slate-400">
-              {selectedVector.countryIso3} · observed {selectedVector.observedAt} · freshness{" "}
-              {selectedVector.freshnessDays}d
-            </div>
           </div>
-          <div className="rounded-md border border-white/10 px-2 py-1 text-[11px] text-emerald-100">
-            confidence {selectedVector.confidence.toFixed(2)}
-          </div>
-        </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {CIVILIZATION_NATION_PARAMETER_SCOPES.map((scope) => (
-            <div key={scope} className="rounded-md border border-white/10 bg-white/[0.04] p-2">
-              <div className="text-[10px] text-slate-400">
-                {CIVILIZATION_NATION_SCOPE_LABELS[scope]}
-              </div>
-              <div
-                className="mt-1 text-sm font-semibold"
-                style={{ color: parameterColor(scope, selectedVector.parameters[scope]) }}
-              >
-                {parameterLabel(selectedVector.parameters[scope])}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-3 flex flex-wrap gap-1">
-          {selectedVector.clusters.map((cluster) => (
-            <span
-              key={cluster}
-              className="rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2 py-1 text-[10px] text-cyan-100"
-            >
-              {cluster.replaceAll("_", " ")}
-            </span>
-          ))}
-        </div>
-
-        {showMissing && (
-          <div className="mt-3 text-[11px] text-slate-300">
-            <span className="text-slate-500">missing: </span>
-            {selectedVector.missingObservations.join(", ")}
-          </div>
-        )}
-
-        <div className="mt-3 text-[11px] text-slate-400">
-          sources: {selectedVector.sourceRefs.slice(0, 6).map(formatSourceRef).join(", ")}
-        </div>
-      </div>
-
-      <div className="absolute bottom-3 right-3 z-10 hidden w-72 rounded-md border border-white/10 bg-black/70 p-3 text-xs lg:block">
-        <div className="font-semibold text-white">Selected edges</div>
-        <div className="mt-2 space-y-2">
-          {selectedEdges.length === 0 ? (
-            <div className="text-[11px] text-slate-400">No seed edges selected.</div>
+          {selectedVectors.length === 1 ? (
+            <CountryReceipt vector={selectedVectors[0]} edges={selectedEdges} />
           ) : (
-            selectedEdges.map((edge) => (
-              <div key={edge.edgeId} className="border-t border-white/10 pt-2 first:border-t-0 first:pt-0">
-                <div className="text-[11px] text-slate-200">{edge.label}</div>
-                <div className="mt-1 text-[10px] text-slate-500">
-                  {edge.kind.replaceAll("_", " ")} · confidence {edge.confidence.toFixed(2)}
-                </div>
-              </div>
-            ))
+            <CountryComparison vectors={selectedVectors} comparisonEdges={comparisonEdges} />
           )}
         </div>
-      </div>
-
-      <div className="absolute left-3 top-[4.25rem] z-10 hidden rounded-md border border-white/10 bg-black/70 p-2 text-[11px] text-slate-300 md:block">
-        <span className="mr-2 text-slate-500">roadmap layer</span>
-        {roadmap.activeLayerModes.map((layer) => {
-          const active = layer === selectedLayer;
-          return (
-            <button
-              key={layer}
-              type="button"
-              onClick={() => setSelectedLayer(layer)}
-              className={`ml-1 rounded-md border px-2 py-1 ${
-                active
-                  ? "border-white/60 bg-white/15 text-white"
-                  : "border-white/15 bg-white/5 text-slate-300"
-              }`}
-            >
-              {formatLayerLabel(layer)}
-            </button>
-          );
-        })}
-      </div>
+      )}
 
       <ComposableMap
         projection="geoEqualEarth"
@@ -311,35 +233,40 @@ export function CivilizationBoundsRoadmap({
           }
         </Geographies>
 
-        {visibleEdges.map((edge) => {
+        {selectedEdges.map((edge) => {
           const from = edgeEndpoint(edge, edge.fromIso3);
           const to = edgeEndpoint(edge, edge.toIso3);
           if (!from || !to) return null;
-          const selected = edge.fromIso3 === selectedIso3 || edge.toIso3 === selectedIso3;
+          const tone = selectedEdgeTone(edge, selectedIso3s);
           return (
             <Line
               key={edge.edgeId}
+              data-testid="civilization-bounds-edge"
               from={[from.coordinates.lon, from.coordinates.lat]}
               to={[to.coordinates.lon, to.coordinates.lat]}
               stroke={EDGE_COLORS[edge.kind]}
-              strokeWidth={selected ? 2.2 : 1.1}
+              strokeWidth={tone === "comparison" ? 2.8 : 1.4}
               strokeLinecap="round"
-              strokeOpacity={selected ? 0.85 : 0.32}
+              strokeOpacity={tone === "comparison" ? 0.9 : 0.42}
             />
           );
         })}
 
         {CIVILIZATION_NATION_STATE_VECTORS.map((vector) => {
-          const value = vector.parameters[selectedScope];
-          const selected = vector.countryIso3 === selectedIso3;
+          const selected = selectedIso3s.includes(vector.countryIso3);
           const pulse = eventPulseScore(vector);
           const missing = vector.missingObservations.length > 0;
-          const radius = markerRadius(vector, showEventPulse);
+          const radius = markerRadius(vector);
+          const score = civilizationBalanceScore(vector);
+          const fill = balanceColor(score);
           return (
             <Marker
               key={vector.countryIso3}
+              data-testid="civilization-bounds-badge"
+              data-country-iso={vector.countryIso3}
+              aria-label={`${vector.label} civilization vector`}
               coordinates={[vector.coordinates.lon, vector.coordinates.lat]}
-              onClick={() => setSelectedIso3(vector.countryIso3)}
+              onClick={() => toggleSelectedCountry(vector.countryIso3)}
               style={{
                 default: { cursor: "pointer" },
                 hover: { cursor: "pointer" },
@@ -349,27 +276,46 @@ export function CivilizationBoundsRoadmap({
               <circle
                 r={radius + (selected ? 4 : 0)}
                 fill="none"
-                stroke={selected ? "#f8fafc" : parameterColor(selectedScope, value)}
+                stroke={selected ? "#f8fafc" : fill}
                 strokeWidth={selected ? 2.2 : 1.2}
-                strokeDasharray={showMissing && missing ? "3 2" : undefined}
-                strokeOpacity={selected ? 0.95 : 0.65}
+                strokeDasharray={missing ? "3 2" : undefined}
+                strokeOpacity={selected ? 0.95 : 0.62}
               />
-              {showEventPulse && pulse > 0.55 && (
+              {pulse > 0.55 && (
                 <circle
                   r={radius + 7}
                   fill="none"
                   stroke="#ef4444"
                   strokeWidth={1.2}
-                  strokeOpacity={0.55}
+                  strokeOpacity={0.5}
                 />
               )}
               <circle
                 r={radius}
-                fill={parameterColor(selectedScope, value)}
-                fillOpacity={selected ? 0.95 : 0.78}
+                fill={fill}
+                fillOpacity={selected ? 0.96 : 0.78}
                 stroke="#03120f"
                 strokeWidth={1}
               />
+              {selected && (
+                <g transform={`translate(${radius - 1}, ${-radius - 1})`}>
+                  <circle r={5} fill="#f8fafc" stroke="#06110f" strokeWidth={1} />
+                  <text
+                    y={0.5}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    style={{
+                      fontFamily: "system-ui, sans-serif",
+                      fontSize: 7,
+                      fontWeight: 800,
+                      fill: "#06110f",
+                      pointerEvents: "none",
+                    }}
+                  >
+                    i
+                  </text>
+                </g>
+              )}
               <text
                 y={1}
                 textAnchor="middle"
@@ -388,6 +334,166 @@ export function CivilizationBoundsRoadmap({
           );
         })}
       </ComposableMap>
+    </div>
+  );
+}
+
+function CountryReceipt({
+  vector,
+  edges,
+}: {
+  vector: CivilizationNationStateVector;
+  edges: CivilizationNationDependencyEdge[];
+}) {
+  return (
+    <>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-slate-300 sm:grid-cols-4">
+        <div>
+          <span className="text-slate-500">observed</span>
+          <div className="mt-1 text-slate-100">{vector.observedAt}</div>
+        </div>
+        <div>
+          <span className="text-slate-500">freshness</span>
+          <div className="mt-1 text-slate-100">{vector.freshnessDays}d</div>
+        </div>
+        <div>
+          <span className="text-slate-500">confidence</span>
+          <div className="mt-1 text-emerald-100">{vector.confidence.toFixed(2)}</div>
+        </div>
+        <div>
+          <span className="text-slate-500">balance</span>
+          <div className="mt-1 text-slate-100">
+            {civilizationBalanceScore(vector).toFixed(2)}
+          </div>
+        </div>
+      </div>
+
+      <ParameterGrid vectors={[vector]} />
+
+      <div className="mt-3 flex flex-wrap gap-1">
+        {vector.clusters.map((cluster) => (
+          <span
+            key={cluster}
+            className="rounded-md border border-cyan-300/20 bg-cyan-300/10 px-2 py-1 text-[10px] text-cyan-100"
+          >
+            {cluster.replaceAll("_", " ")}
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1fr]">
+        <div className="text-[11px] text-slate-300">
+          <span className="text-slate-500">missing: </span>
+          {vector.missingObservations.join(", ")}
+        </div>
+        <div className="text-[11px] text-slate-400">
+          sources: {vector.sourceRefs.slice(0, 6).map(formatSourceRef).join(", ")}
+        </div>
+      </div>
+
+      <DependencyList edges={edges} emptyLabel="No seeded dependency relation selected." />
+    </>
+  );
+}
+
+function CountryComparison({
+  vectors,
+  comparisonEdges,
+}: {
+  vectors: CivilizationNationStateVector[];
+  comparisonEdges: CivilizationNationDependencyEdge[];
+}) {
+  return (
+    <>
+      <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+        {vectors.map((vector) => (
+          <div key={vector.countryIso3} className="rounded-md border border-white/10 bg-white/[0.04] p-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-semibold text-white">{vector.label}</div>
+              <div className="text-[10px] text-slate-400">{vector.countryIso3}</div>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-2 text-[10px] text-slate-400">
+              <span>balance {civilizationBalanceScore(vector).toFixed(2)}</span>
+              <span>confidence {vector.confidence.toFixed(2)}</span>
+              <span>fresh {vector.freshnessDays}d</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <ParameterGrid vectors={vectors} />
+
+      <div className="mt-3 grid gap-2 md:grid-cols-3">
+        {CIVILIZATION_NATION_PARAMETER_SCOPES.map((scope) => (
+          <div key={scope} className="rounded-md border border-white/10 bg-white/[0.03] p-2">
+            <div className="text-[10px] text-slate-500">
+              {CIVILIZATION_NATION_SCOPE_LABELS[scope]} spread
+            </div>
+            <div className="mt-1 text-sm font-semibold text-white">
+              {scopeSpread(vectors, scope)}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <DependencyList edges={comparisonEdges} emptyLabel="No seeded relation directly links the selected countries." />
+    </>
+  );
+}
+
+function ParameterGrid({ vectors }: { vectors: CivilizationNationStateVector[] }) {
+  return (
+    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+      {CIVILIZATION_NATION_PARAMETER_SCOPES.map((scope) => (
+        <div key={scope} className="rounded-md border border-white/10 bg-white/[0.04] p-2">
+          <div className="text-[10px] text-slate-400">
+            {CIVILIZATION_NATION_SCOPE_LABELS[scope]}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-2">
+            {vectors.map((vector) => (
+              <span
+                key={`${vector.countryIso3}:${scope}`}
+                className="text-sm font-semibold"
+                style={{ color: parameterColor(scope, vector.parameters[scope]) }}
+              >
+                {vectors.length > 1 ? `${vector.countryIso3} ` : ""}
+                {parameterLabel(vector.parameters[scope])}
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DependencyList({
+  edges,
+  emptyLabel,
+}: {
+  edges: CivilizationNationDependencyEdge[];
+  emptyLabel: string;
+}) {
+  return (
+    <div className="mt-3 border-t border-white/10 pt-3">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+        Dependency relations
+      </div>
+      <div className="mt-2 grid gap-2 lg:grid-cols-2">
+        {edges.length === 0 ? (
+          <div className="text-[11px] text-slate-400">{emptyLabel}</div>
+        ) : (
+          edges.map((edge) => (
+            <div key={edge.edgeId} className="rounded-md border border-white/10 bg-white/[0.04] p-2">
+              <div className="text-[11px] text-slate-200">{edge.label}</div>
+              <div className="mt-1 text-[10px] text-slate-500">
+                {edge.fromIso3} to {edge.toIso3} - {edge.kind.replaceAll("_", " ")} -
+                confidence {edge.confidence.toFixed(2)}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

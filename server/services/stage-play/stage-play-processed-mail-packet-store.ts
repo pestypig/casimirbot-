@@ -47,7 +47,13 @@ const defaultPromptIdForRole = (role: StagePlayMicroReasonerRoleV1): string =>
   `stage_play_micro_reasoner_prompt:${role}:v1`;
 
 const presetPromptIdForRole = (
-  preset: "calculator-tool-call" | "science-visual" | "earbud-translate-english" | "earbud-translate-spanish" | "earbud-explain-plain-english",
+  preset:
+    | "calculator-tool-call"
+    | "science-visual"
+    | "earbud-translate-english"
+    | "earbud-translate-spanish"
+    | "earbud-explain-plain-english"
+    | "document-translate-haw-inline",
   role: StagePlayMicroReasonerRoleV1,
 ): string => `stage_play_micro_reasoner_prompt:${preset}:${role}:v1`;
 
@@ -70,12 +76,15 @@ const DEFAULT_PROMPTED_MICRO_REASONER_ROLES: StagePlayMicroReasonerRoleV1[] = [
 
 const DEFAULT_EARBUD_TRANSLATION_PRESET_ID =
   "stage_play_micro_reasoner_prompt_preset:earbud-translate-english:v1";
+export const DEFAULT_DOCUMENT_MARKDOWN_TRANSLATION_PRESET_ID =
+  "stage_play_micro_reasoner_prompt_preset:document-translate-haw-inline:v1";
 
 const inferSourceKindFromMicroReasonerSourceId = (
   sourceId?: string | null,
 ): StagePlayLiveSourceMailSourceKindV1 | null => {
   const normalized = String(sourceId ?? "").toLowerCase();
   if (!normalized) return null;
+  if (/document|markdown|docs-viewer|doc_viewer/.test(normalized)) return "document_markdown";
   if (/audio|transcript|voice|earbud/.test(normalized)) return "audio_transcript";
   if (/visual|frame|screen|capture|image/.test(normalized)) return "visual_frame";
   if (/minecraft|world/.test(normalized)) return "minecraft_world_event";
@@ -962,6 +971,139 @@ const PRESET_MICRO_REASONER_PROMPTS: Array<Omit<StagePlayMicroReasonerPromptV1, 
     terminal_eligible: false,
     context_role: "tool_policy",
   },
+  {
+    artifactId: "stage_play_micro_reasoner_prompt",
+    schemaVersion: STAGE_PLAY_MICRO_REASONER_PROMPT_SCHEMA,
+    promptId: presetPromptIdForRole("document-translate-haw-inline", "claim_extractor"),
+    title: "Document Markdown Unit Classifier",
+    role: "claim_extractor",
+    version: 1,
+    active: true,
+    template: [
+      "You are classifying visible Markdown document units for a document translation MicroDeck.",
+      "",
+      "Input is Stage Play mail from a document_markdown live source. The source text is canonical English.",
+      "",
+      "Task:",
+      "- Identify unit kinds such as heading, paragraph, list item, metadata, code, table, or quote.",
+      "- Identify protected spans that must remain unchanged.",
+      "- Identify neighboring context needed before translation.",
+      "- Mark units that should not be translated.",
+      "",
+      "Rules:",
+      "- Do not translate yet.",
+      "- Do not answer the user.",
+      "- Preserve source ids, unit ids, source hashes, and evidence refs.",
+      "- Return JSON only.",
+      "",
+      "Output:",
+      "{",
+      '  "documentUnits": [{ "unitId": string, "kind": string, "translatable": boolean, "reason": string }],',
+      '  "protectedSpans": string[],',
+      '  "contextNeeded": string[],',
+      '  "warnings": string[],',
+      '  "evidenceRefs": string[]',
+      "}",
+    ].join("\n"),
+    inputSchemaName: "StagePlayLiveSourceMailItemV1",
+    outputSchemaName: "DocumentMarkdownUnitClassificationOutputV1",
+    modelPreference: "small_fast_llm",
+    maxInputItems: 3,
+    maxOutputTokens: 520,
+    linkedNoteId: null,
+    presetIds: [DEFAULT_DOCUMENT_MARKDOWN_TRANSLATION_PRESET_ID],
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  },
+  {
+    artifactId: "stage_play_micro_reasoner_prompt",
+    schemaVersion: STAGE_PLAY_MICRO_REASONER_PROMPT_SCHEMA,
+    promptId: presetPromptIdForRole("document-translate-haw-inline", "observation_classifier"),
+    title: "Document Translation Glossary Guard",
+    role: "observation_classifier",
+    version: 1,
+    active: true,
+    template: [
+      "You are the glossary and protected-span guard for document Markdown translation.",
+      "",
+      "Input includes visible English document units, protected spans, and prior MicroDeck outputs.",
+      "",
+      "Task:",
+      "- Decide which product terms, file paths, code, URLs, dates, API labels, and names must remain English.",
+      "- Flag Hawaiian orthography requirements for any Hawaiian output.",
+      "- Keep uncertain product terms untranslated unless the glossary explicitly allows translation.",
+      "",
+      "Rules:",
+      "- Do not produce the final translation.",
+      "- Do not answer the user.",
+      "- Return JSON only.",
+      "",
+      "Output:",
+      "{",
+      '  "retainTerms": string[],',
+      '  "translateWithCare": string[],',
+      '  "orthographyNotes": string[],',
+      '  "blockedTranslations": string[],',
+      '  "evidenceRefs": string[]',
+      "}",
+    ].join("\n"),
+    inputSchemaName: "StagePlayLiveSourceMailItemV1",
+    outputSchemaName: "DocumentTranslationGlossaryGuardOutputV1",
+    modelPreference: "small_fast_llm",
+    maxInputItems: 3,
+    maxOutputTokens: 420,
+    linkedNoteId: null,
+    presetIds: [DEFAULT_DOCUMENT_MARKDOWN_TRANSLATION_PRESET_ID],
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  },
+  {
+    artifactId: "stage_play_micro_reasoner_prompt",
+    schemaVersion: STAGE_PLAY_MICRO_REASONER_PROMPT_SCHEMA,
+    promptId: presetPromptIdForRole("document-translate-haw-inline", "packet_composer"),
+    title: "Document Translate To Hawaiian Inline",
+    role: "packet_composer",
+    version: 1,
+    active: true,
+    template: [
+      "You are a document translation MicroDeck composer for visible Markdown units.",
+      "",
+      "Input is bounded document_markdown live-source mail plus prior MicroDeck classification and glossary guard outputs.",
+      "",
+      "Task:",
+      "- Generate Hawaiian inline translation candidates for translatable visible units.",
+      "- Preserve Markdown intent without rewriting the English source.",
+      "- Preserve every protected span exactly.",
+      "- Keep uncertain product terms in English.",
+      "- Use correct Hawaiian orthography, including ʻokina and kahakō where required.",
+      "",
+      "Rules:",
+      "- Do not answer the user.",
+      "- Do not claim review approval.",
+      "- Do not translate code, URLs, file paths, API paths, raw ids, or protected spans.",
+      "- Return JSON only.",
+      "",
+      "Output:",
+      "{",
+      '  "locale": "haw",',
+      '  "translations": [{ "unit_id": string, "translated_markdown": string, "confidence": "low" | "medium" | "high", "warnings": string[] }],',
+      '  "qualityChecks": [{ "name": string, "status": "pass" | "warn" | "fail", "detail": string }],',
+      '  "evidenceRefs": string[]',
+      "}",
+    ].join("\n"),
+    inputSchemaName: "StagePlayLiveSourceMailItemV1",
+    outputSchemaName: "DocumentInlineTranslationOutputV1",
+    modelPreference: "small_fast_llm",
+    maxInputItems: 3,
+    maxOutputTokens: 900,
+    linkedNoteId: null,
+    presetIds: [DEFAULT_DOCUMENT_MARKDOWN_TRANSLATION_PRESET_ID],
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  },
 ];
 
 const DEFAULT_WAKE_COALESCING_POLICY: StagePlayMicroReasonerPromptPresetV1["wakeCoalescingPolicy"] = {
@@ -1097,6 +1239,30 @@ const DEFAULT_MICRO_REASONER_PROMPT_PRESETS: Array<Omit<StagePlayMicroReasonerPr
     deckRunPlan: "baseline_plus_prompted",
     wakeCoalescingPolicy: DEFAULT_WAKE_COALESCING_POLICY,
     outputPolicy: "earbud_translation",
+    active: true,
+    assistant_answer: false,
+    terminal_eligible: false,
+    context_role: "tool_policy",
+  },
+  {
+    artifactId: "stage_play_micro_reasoner_prompt_preset",
+    schemaVersion: STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA,
+    presetId: DEFAULT_DOCUMENT_MARKDOWN_TRANSLATION_PRESET_ID,
+    title: "Document Markdown Translate To Hawaiian",
+    description: "Document Markdown live-source MicroDeck for visible-unit Hawaiian inline translation candidates.",
+    domain: "document_translation",
+    sourceKinds: ["document_markdown"],
+    sourceIds: [],
+    rolePromptIds: {
+      claim_extractor: presetPromptIdForRole("document-translate-haw-inline", "claim_extractor"),
+      observation_classifier: presetPromptIdForRole("document-translate-haw-inline", "observation_classifier"),
+      packet_composer: presetPromptIdForRole("document-translate-haw-inline", "packet_composer"),
+    },
+    promptedRoles: ["claim_extractor", "observation_classifier", "packet_composer"],
+    deckRunPlan: "baseline_plus_prompted",
+    baselineRoles: [],
+    wakeCoalescingPolicy: DEFAULT_WAKE_COALESCING_POLICY,
+    outputPolicy: "inline_document_translation",
     active: true,
     assistant_answer: false,
     terminal_eligible: false,
@@ -1772,6 +1938,9 @@ export function getActiveStagePlayMicroReasonerPromptPresetForSource(input: {
   }
   if (sourceKind === "audio_transcript") {
     return getStagePlayMicroReasonerPromptPreset(DEFAULT_EARBUD_TRANSLATION_PRESET_ID);
+  }
+  if (sourceKind === "document_markdown") {
+    return getStagePlayMicroReasonerPromptPreset(DEFAULT_DOCUMENT_MARKDOWN_TRANSLATION_PRESET_ID);
   }
   return getStagePlayMicroReasonerPromptPreset("stage_play_micro_reasoner_prompt_preset:generic-live-source:v1");
 }

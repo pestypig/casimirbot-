@@ -28,6 +28,7 @@ export const STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA =
 export type StagePlayLiveSourceMailSourceKindV1 =
   | "visual_frame"
   | "audio_transcript"
+  | "document_markdown"
   | "minecraft_world_event"
   | "screen_summary"
   | "manual_feed"
@@ -507,6 +508,7 @@ export type StagePlayMicroReasonerPromptPresetV1 = {
     | "calculator_stream"
     | "science_visual"
     | "audio_translation"
+    | "document_translation"
     | "browser_workflow"
     | "custom";
   sourceKinds: StagePlayLiveSourceMailItemV1["sourceKind"][];
@@ -524,6 +526,7 @@ export type StagePlayMicroReasonerPromptPresetV1 = {
     | "voice_candidate"
     | "ask_prompt_delegation"
     | "earbud_translation"
+    | "inline_document_translation"
     | "record_only";
   active: boolean;
   createdAt: string;

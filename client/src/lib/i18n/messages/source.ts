@@ -2033,7 +2033,7 @@ export const interfaceSourceMessages = {
   },
   "docsViewer.translation.errorGeneric": {
     id: "docsViewer.translation.errorGeneric",
-    defaultMessage: "Document translation failed.",
+    defaultMessage: "Translation service could not generate text right now.",
     description: "Generic document translation failure fallback.",
     context: "Docs Viewer document translation status.",
     screenshotSurface: "workstation",

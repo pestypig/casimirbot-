@@ -454,6 +454,51 @@ const routeContractAllowedTerminalKinds = (payload: Record<string, unknown>): st
     .map(readString)
     .filter((entry): entry is string => Boolean(entry));
 
+const routeProductContractAllowedTerminalKinds = (payload: Record<string, unknown>): string[] =>
+  readArray(readRecord(payload.route_product_contract)?.allowed_terminal_artifact_kinds)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+
+const committedRouteForbiddenTerminalKinds = (payload: Record<string, unknown>): string[] =>
+  readArray(readRecord(readRecord(payload.committed_ask_route)?.canonical_goal)?.forbidden_terminal_artifact_kinds)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+
+const existingDocEvidenceSynthesisTerminal = (
+  payload: Record<string, unknown>,
+): { ref: string | null; text: string } | null => {
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  if (
+    readString(canonicalGoal?.goal_kind) !== "doc_evidence_synthesis" ||
+    readString(canonicalGoal?.required_terminal_kind) !== "doc_evidence_synthesis_answer"
+  ) {
+    return null;
+  }
+  if (committedRouteForbiddenTerminalKinds(payload).includes("doc_evidence_synthesis_answer")) {
+    return null;
+  }
+  const routeAllowed = routeProductContractAllowedTerminalKinds(payload);
+  if (
+    routeAllowed.length > 0 &&
+    !routeAllowed.includes("doc_evidence_synthesis_answer") &&
+    !routeAllowed.includes("doc_evidence_synthesis")
+  ) {
+    return null;
+  }
+  const answer = readRecord(payload.doc_evidence_synthesis_answer);
+  if (readString(answer?.terminal_artifact_kind) !== "doc_evidence_synthesis_answer") return null;
+  const text = readString(answer?.answer_text) ?? readString(answer?.text);
+  if (!text) return null;
+  const supportRefs = readArray(answer?.support_refs)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  if (supportRefs.length === 0) return null;
+  return {
+    ref: readString(answer?.artifact_id),
+    text,
+  };
+};
+
 const routeContractAllowsTerminalKind = (
   payload: Record<string, unknown>,
   kind: string,
@@ -1355,12 +1400,16 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const scholarlyTerminalMaterialized =
     usableDraftMaterialization &&
     draftMaterialization.materialized_terminal_artifact_kind === "scholarly_research_answer";
+  const existingDocEvidenceTerminal = existingDocEvidenceSynthesisTerminal(input.payload);
   const docsTerminalMaterialized =
-    usableDraftMaterialization &&
-    draftMaterialization.materialized_terminal_artifact_kind === "doc_evidence_synthesis_answer";
+    Boolean(existingDocEvidenceTerminal) ||
+    (
+      usableDraftMaterialization &&
+      draftMaterialization.materialized_terminal_artifact_kind === "doc_evidence_synthesis_answer"
+    );
   const docsTerminalMatchesRequiredGoal =
     docsTerminalMaterialized &&
-    docsDraftMaterializationMatchesRequiredGoal;
+    (docsDraftMaterializationMatchesRequiredGoal || Boolean(existingDocEvidenceTerminal));
   const latestDraftForContinuation = findLatestFinalAnswerDraftCandidate(artifacts);
   const stagePlayTerminalMaterialized =
     usableDraftMaterialization &&
@@ -1566,7 +1615,14 @@ export function applyHelixTerminalAuthoritySingleWriter(
   let selectedArtifactRef: string | null = null;
   let selectedArtifactKind: HelixTerminalAuthoritySingleWriterResult["selected_terminal_artifact_kind"] = null;
   let selectedSource: HelixTerminalAuthoritySingleWriterResult["source"] = "terminal_authority_repair_failure";
-  const terminalBlockingToolRailFailure = readTerminalBlockingToolRailFailure(input.payload);
+  const rawTerminalBlockingToolRailFailure = readTerminalBlockingToolRailFailure(input.payload);
+  const terminalBlockingToolRailFailure =
+    rawTerminalBlockingToolRailFailure?.railFailureCode === "terminal_projection_mismatch" &&
+    existingDocEvidenceTerminal &&
+    docsTerminalMatchesRequiredGoal &&
+    goalAllowsTerminal
+      ? null
+      : rawTerminalBlockingToolRailFailure;
 
   if (terminalBlockingToolRailFailure) {
     const terminalErrorCode = terminalBlockingToolRailFailure.railFailureCode;
@@ -1873,6 +1929,33 @@ export function applyHelixTerminalAuthoritySingleWriter(
       raw_content_included: false,
     };
     delete input.payload.terminal_error_code;
+  } else if (!solverContinuationPending && existingDocEvidenceTerminal) {
+    selectedArtifactRef = existingDocEvidenceTerminal.ref;
+    selectedArtifactKind = "doc_evidence_synthesis_answer";
+    selectedSource = "final_answer_draft";
+    quarantineStaleRequestUserInput(input.payload);
+    input.payload.ok = true;
+    input.payload.response_type = "final_answer";
+    input.payload.final_status = "final_answer";
+    input.payload.status = "final_answer";
+    input.payload.terminal_artifact_kind = "doc_evidence_synthesis_answer";
+    input.payload.final_answer_source = "final_answer_draft";
+    input.payload.selected_final_answer = existingDocEvidenceTerminal.text;
+    input.payload.answer = existingDocEvidenceTerminal.text;
+    input.payload.text = existingDocEvidenceTerminal.text;
+    input.payload.assistant_answer = existingDocEvidenceTerminal.text;
+    input.payload.terminal_artifact_id = existingDocEvidenceTerminal.ref ?? undefined;
+    input.payload.terminal_presentation = {
+      ...(readRecord(input.payload.terminal_presentation) ?? {}),
+      schema: "helix.terminal_presentation.v1",
+      turn_id: input.turnId,
+      terminal_artifact_kind: "doc_evidence_synthesis_answer",
+      concise_text: existingDocEvidenceTerminal.text,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    delete input.payload.terminal_error_code;
+    delete input.payload.terminal_failure_text;
   } else if (!solverContinuationPending && selectedGoalArtifact) {
     selectedArtifactRef = selectedGoalArtifact.ref;
     selectedArtifactKind = selectedGoalArtifact.kind;

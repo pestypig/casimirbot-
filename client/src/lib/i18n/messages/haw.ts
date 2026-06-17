@@ -268,7 +268,7 @@ export const hawMessages = {
   "docsViewer.translation.status.inlineEnabled": "Hōʻike ʻia nā unuhi ma lalo o ka ʻōlelo kumu i ʻike ʻia.",
   "docsViewer.translation.status.unavailable": "ʻAʻole loaʻa ka unuhi document: {reason}",
   "docsViewer.translation.status.error": "Hāʻule ka unuhi document: {reason}",
-  "docsViewer.translation.errorGeneric": "Hāʻule ka unuhi document.",
+  "docsViewer.translation.errorGeneric": "ʻAʻole hiki i ka lawelawe unuhi ke hana i ka ʻōlelo i kēia manawa.",
   "docsViewer.translation.errorTimeout": "Ua pau ka manawa o ka unuhi document.",
   "docsViewer.translation.inlineLoading": "Ke hana nei i ka unuhi...",
   "docsViewer.translation.inlineError": "ʻAʻole loaʻa ka unuhi: {reason}",

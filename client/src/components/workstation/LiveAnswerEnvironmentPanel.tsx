@@ -94,7 +94,7 @@ type LiveAnswerMicroDeckCatalogItem =
       id: string;
       title: string;
       description: string;
-      groupTitle: "Visual Mail Decks" | "Audio Transcript Decks";
+      groupTitle: "Visual Mail Decks" | "Audio Transcript Decks" | "Document Markdown Decks";
       phase: "mail_reasoning";
       sourceKind: StagePlayLiveSourceMailSourceKindV1;
       outputPolicy: string;
@@ -500,6 +500,13 @@ const readStringList = (value: unknown): string[] =>
     ? value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
     : [];
 
+const documentMarkdownSourceIdFromLocation = (threadId: string): string => {
+  if (typeof window === "undefined") return `document_markdown:${threadId}`;
+  const params = new URLSearchParams(window.location.search);
+  const docPath = params.get("doc")?.trim();
+  return docPath ? `document_markdown:${docPath}` : `document_markdown:${threadId}`;
+};
+
 const readEarbudRunText = (run: StagePlayMicroReasonerRunV1): string => {
   const fallback = run.outputPreview?.trim() ?? "";
   try {
@@ -511,6 +518,21 @@ const readEarbudRunText = (run: StagePlayMicroReasonerRunV1): string => {
       parsed?.speakerIntent,
     ].find((entry) => typeof entry === "string" && entry.trim().length > 0);
     if (typeof preferred === "string") return preferred.trim();
+  } catch {
+    // Prompted MicroDeck previews can be clipped by the overview API.
+  }
+  return fallback;
+};
+
+const readDocumentTranslationRunText = (run: StagePlayMicroReasonerRunV1): string => {
+  const fallback = run.outputPreview?.trim() ?? "";
+  try {
+    const parsed = readRecord(JSON.parse(fallback));
+    const translations = Array.isArray(parsed?.translations) ? parsed.translations : [];
+    const first = translations
+      .map((entry: unknown) => readRecord(entry)?.translated_markdown)
+      .find((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
+    if (first) return first.trim();
   } catch {
     // Prompted MicroDeck previews can be clipped by the overview API.
   }
@@ -620,6 +642,7 @@ const preferredVisualShadeProfileId = (profiles: StagePlayVisualObserverProfileV
 
 const microReasonerPresetCategory = (preset: StagePlayMicroReasonerPromptPresetV1): string => {
   if (preset.domain === "audio_translation" || preset.outputPolicy === "earbud_translation") return "Earbuds";
+  if (preset.domain === "document_translation" || preset.outputPolicy === "inline_document_translation") return "Documents";
   if (preset.domain === "minecraft_gameplay") return "Gaming";
   if (preset.domain === "calculator_stream") return "Tools";
   if (preset.domain === "science_visual") return "Science";
@@ -640,6 +663,7 @@ const liveAnswerMicroDeckPhaseLabel = (phase: LiveAnswerMicroDeckCatalogPhase): 
 const liveAnswerMicroDeckSourceLabel = (sourceKind: StagePlayLiveSourceMailSourceKindV1): string => {
   if (sourceKind === "visual_frame") return "visual_frame";
   if (sourceKind === "audio_transcript") return "audio_transcript";
+  if (sourceKind === "document_markdown") return "document_markdown";
   return sourceKind;
 };
 
@@ -804,6 +828,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [earbudMicroReasonerPrompts, setEarbudMicroReasonerPrompts] = useState<StagePlayMicroReasonerPromptV1[]>([]);
   const [selectedEarbudMicroReasonerPromptPresetId, setSelectedEarbudMicroReasonerPromptPresetId] = useState<string>("");
   const [earbudMicroReasonerRuns, setEarbudMicroReasonerRuns] = useState<StagePlayMicroReasonerRunV1[]>([]);
+  const [documentMicroReasonerPromptPresets, setDocumentMicroReasonerPromptPresets] = useState<StagePlayMicroReasonerPromptPresetV1[]>([]);
+  const [activeDocumentMicroReasonerPromptPreset, setActiveDocumentMicroReasonerPromptPreset] = useState<StagePlayMicroReasonerPromptPresetV1 | null>(null);
+  const [documentMicroReasonerPrompts, setDocumentMicroReasonerPrompts] = useState<StagePlayMicroReasonerPromptV1[]>([]);
+  const [selectedDocumentMicroReasonerPromptPresetId, setSelectedDocumentMicroReasonerPromptPresetId] = useState<string>("");
+  const [documentMicroReasonerRuns, setDocumentMicroReasonerRuns] = useState<StagePlayMicroReasonerRunV1[]>([]);
   const [visualShadePromptDraft, setVisualShadePromptDraft] = useState<string>("");
   const [visualShadePromptBaseProfileId, setVisualShadePromptBaseProfileId] = useState<string>("");
   const [selectedVisualFrameHistoryId, setSelectedVisualFrameHistoryId] = useState<string | null>(null);
@@ -951,6 +980,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     serverAudioTranscriptHistory.at(-1)?.source_id ??
     activeServerAudioTranscriptSource?.source_id ??
     null;
+  const activeDocumentMarkdownSourceId = documentMarkdownSourceIdFromLocation(threadId);
   const effectiveAudioTranscriptStatus =
     audioTranscriptStatus === "idle" && activeServerAudioTranscriptSource
       ? "listening"
@@ -1085,6 +1115,12 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       null,
     [activeEarbudMicroReasonerPromptPreset, earbudMicroReasonerPromptPresets, selectedEarbudMicroReasonerPromptPresetId],
   );
+  const selectedDocumentMicroReasonerPromptPreset = useMemo(
+    () => documentMicroReasonerPromptPresets.find((preset: StagePlayMicroReasonerPromptPresetV1) => preset.presetId === selectedDocumentMicroReasonerPromptPresetId) ??
+      documentMicroReasonerPromptPresets.find((preset: StagePlayMicroReasonerPromptPresetV1) => preset.presetId === preferredMicroReasonerPresetId(documentMicroReasonerPromptPresets, activeDocumentMicroReasonerPromptPreset)) ??
+      null,
+    [activeDocumentMicroReasonerPromptPreset, documentMicroReasonerPromptPresets, selectedDocumentMicroReasonerPromptPresetId],
+  );
   const earbudMicroReasonerPresetGroups = useMemo(() => {
     const groups = new Map<string, StagePlayMicroReasonerPromptPresetV1[]>();
     for (const preset of earbudMicroReasonerPromptPresets) {
@@ -1098,6 +1134,19 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       }))
       .sort((left, right) => left.category.localeCompare(right.category));
   }, [earbudMicroReasonerPromptPresets]);
+  const documentMicroReasonerPresetGroups = useMemo(() => {
+    const groups = new Map<string, StagePlayMicroReasonerPromptPresetV1[]>();
+    for (const preset of documentMicroReasonerPromptPresets) {
+      const category = microReasonerPresetCategory(preset);
+      groups.set(category, [...(groups.get(category) ?? []), preset]);
+    }
+    return Array.from(groups.entries())
+      .map(([category, presets]) => ({
+        category,
+        presets: presets.sort((left, right) => left.title.localeCompare(right.title)),
+      }))
+      .sort((left, right) => left.category.localeCompare(right.category));
+  }, [documentMicroReasonerPromptPresets]);
   const visualProducerState = useVisualSourceCaptureStore((state: { producers: Record<string, VisualSourceCaptureState> }) => {
     const sourceId = visualLatest?.active_source?.source_id ?? visualLatest?.source?.source_id ?? null;
     if (sourceId) return state.producers[sourceId] ?? null;
@@ -1151,6 +1200,20 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           preset.sourceIds.includes(activeAudioTranscriptSourceId),
       ),
     }));
+    const documentMarkdownDecks: LiveAnswerMicroDeckCatalogItem[] = documentMicroReasonerPromptPresets.map((preset: StagePlayMicroReasonerPromptPresetV1) => ({
+      kind: "micro_reasoner_preset",
+      id: preset.presetId,
+      title: microReasonerPresetOptionLabel(preset, activeDocumentMarkdownSourceId),
+      description: preset.description,
+      groupTitle: "Document Markdown Decks",
+      phase: "mail_reasoning",
+      sourceKind: "document_markdown",
+      outputPolicy: preset.outputPolicy,
+      applied: Boolean(
+        activeDocumentMicroReasonerPromptPreset?.presetId === preset.presetId &&
+          preset.sourceIds.includes(activeDocumentMarkdownSourceId),
+      ),
+    }));
     return [
       {
         title: "Visual Capture Decks",
@@ -1170,13 +1233,22 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         sourceKind: "audio_transcript",
         items: sortLiveAnswerMicroDeckCatalogItems(audioTranscriptDecks),
       },
+      {
+        title: "Document Markdown Decks",
+        phase: "mail_reasoning",
+        sourceKind: "document_markdown",
+        items: sortLiveAnswerMicroDeckCatalogItems(documentMarkdownDecks),
+      },
     ];
   }, [
     activeAudioTranscriptSourceId,
+    activeDocumentMarkdownSourceId,
+    activeDocumentMicroReasonerPromptPreset?.presetId,
     activeEarbudMicroReasonerPromptPreset?.presetId,
     activeMicroReasonerPromptPreset?.presetId,
     activeVisualObserverProfile?.profileId,
     activeVisualSourceId,
+    documentMicroReasonerPromptPresets,
     earbudMicroReasonerPromptPresets,
     microReasonerPromptPresets,
     threadId,
@@ -1189,6 +1261,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     }
     if (item.sourceKind === "audio_transcript") {
       setSelectedEarbudMicroReasonerPromptPresetId(item.id);
+      return;
+    }
+    if (item.sourceKind === "document_markdown") {
+      setSelectedDocumentMicroReasonerPromptPresetId(item.id);
       return;
     }
     setSelectedMicroReasonerPromptPresetId(item.id);
@@ -1310,6 +1386,12 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       activeAudioTranscriptSourceId &&
       activeEarbudMicroReasonerPromptPreset.sourceIds.includes(activeAudioTranscriptSourceId),
   );
+  const selectedDocumentMicroPresetApplied = Boolean(
+    activeDocumentMicroReasonerPromptPreset &&
+      selectedDocumentMicroReasonerPromptPreset &&
+      activeDocumentMicroReasonerPromptPreset.presetId === selectedDocumentMicroReasonerPromptPreset.presetId &&
+      activeDocumentMicroReasonerPromptPreset.sourceIds.includes(activeDocumentMarkdownSourceId),
+  );
   const visualShadeStatus = activeVisualObserverProfile
     ? `${activeVisualObserverProfile.title} active; ${activeVisualObserverProfile.outputMode}; hash ${activeVisualObserverProfile.promptHash}`
     : "Generic visual capture prompt is active until a shade is applied.";
@@ -1319,6 +1401,9 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const earbudMicroReasonerPresetStatus = activeEarbudMicroReasonerPromptPreset
     ? `${activeEarbudMicroReasonerPromptPreset.title} ${activeAudioTranscriptSourceId && activeEarbudMicroReasonerPromptPreset.sourceIds.includes(activeAudioTranscriptSourceId) ? "applied" : "available"}; ${activeEarbudMicroReasonerPromptPreset.outputPolicy}`
     : "Earbud translation presets are available after audio transcript routing loads.";
+  const documentMicroReasonerPresetStatus = activeDocumentMicroReasonerPromptPreset
+    ? `${activeDocumentMicroReasonerPromptPreset.title} ${activeDocumentMicroReasonerPromptPreset.sourceIds.includes(activeDocumentMarkdownSourceId) ? "applied" : "available"}; ${activeDocumentMicroReasonerPromptPreset.outputPolicy}`
+    : "Document Markdown translation presets are available after the document source lane loads.";
   const adaptiveVisualLensSelected = selectedMicroReasonerPromptPresetId === ADAPTIVE_VISUAL_LENS_CONTROLLER_PRESET_ID;
   const adaptiveVisualLensCanApply = Boolean(
     adaptiveVisualLensSelected &&
@@ -1343,6 +1428,17 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         .slice(0, 3)
       : [],
     [earbudMicroReasonerPrompts, selectedEarbudMicroReasonerPromptPreset],
+  );
+  const selectedDocumentMicroPromptPreview = useMemo(
+    () => selectedDocumentMicroReasonerPromptPreset
+      ? documentMicroReasonerPrompts
+        .filter((prompt: StagePlayMicroReasonerPromptV1) =>
+          selectedDocumentMicroReasonerPromptPreset.promptedRoles.includes(prompt.role) ||
+          Boolean(selectedDocumentMicroReasonerPromptPreset.rolePromptIds[prompt.role])
+        )
+        .slice(0, 4)
+      : [],
+    [documentMicroReasonerPrompts, selectedDocumentMicroReasonerPromptPreset],
   );
   const earbudMicroReasonerOutputs = useMemo<EarbudMicroReasonerOutput[]>(() => {
     const sourceId = activeAudioTranscriptSourceId ?? `audio_transcript:${threadId}`;
@@ -1378,6 +1474,38 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     threadId,
   ]);
   const latestEarbudMicroReasonerOutput = earbudMicroReasonerOutputs.at(-1) ?? null;
+  const documentMicroReasonerOutputs = useMemo<EarbudMicroReasonerOutput[]>(() => {
+    const activePresetIds = new Set([
+      activeDocumentMicroReasonerPromptPreset?.presetId,
+      selectedDocumentMicroReasonerPromptPreset?.presetId,
+    ].filter((entry): entry is string => Boolean(entry)));
+    return documentMicroReasonerRuns
+      .filter((run: StagePlayMicroReasonerRunV1) => run.role === "packet_composer")
+      .filter((run: StagePlayMicroReasonerRunV1) => run.sourceId === activeDocumentMarkdownSourceId)
+      .filter((run: StagePlayMicroReasonerRunV1) =>
+        !activePresetIds.size ||
+        (run.deckPresetId ? activePresetIds.has(run.deckPresetId) : false) ||
+        /document/i.test(run.deckPresetTitle ?? "")
+      )
+      .map((run: StagePlayMicroReasonerRunV1): EarbudMicroReasonerOutput => ({
+        runId: run.runId,
+        text: readDocumentTranslationRunText(run),
+        sourceId: run.sourceId,
+        deckTitle: run.deckPresetTitle ?? "Document Markdown MicroDeck",
+        status: run.status,
+        createdAt: run.completedAt ?? run.startedAt,
+        refs: run.outputRefs?.length ? run.outputRefs : run.mailIds,
+      }))
+      .filter((output: EarbudMicroReasonerOutput) => output.text.length > 0)
+      .sort((left: EarbudMicroReasonerOutput, right: EarbudMicroReasonerOutput) => left.createdAt.localeCompare(right.createdAt))
+      .slice(-6);
+  }, [
+    activeDocumentMarkdownSourceId,
+    activeDocumentMicroReasonerPromptPreset?.presetId,
+    documentMicroReasonerRuns,
+    selectedDocumentMicroReasonerPromptPreset?.presetId,
+  ]);
+  const latestDocumentMicroReasonerOutput = documentMicroReasonerOutputs.at(-1) ?? null;
   const visualShadePromptChanged = Boolean(
     visualShadePromptDraft.trim() &&
       selectedVisualObserverProfile &&
@@ -1609,6 +1737,41 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             ? earbudMailBody.micro_reasoner_runs
             : [],
       );
+      const documentPresetParams = new URLSearchParams({
+        sourceId: activeDocumentMarkdownSourceId,
+        sourceKind: "document_markdown",
+        includePresets: "true",
+      });
+      const documentMicroReasonerPromptPresetBody: MicroReasonerPromptPresetListRead = await fetch(
+        `/api/helix/stage-play/micro-reasoner-prompt-preset?${documentPresetParams.toString()}`,
+      ).then((response) => response.ok ? response.json() : {}).catch(() => ({}));
+      setDocumentMicroReasonerPromptPresets(Array.isArray(documentMicroReasonerPromptPresetBody.presets) ? documentMicroReasonerPromptPresetBody.presets : []);
+      setActiveDocumentMicroReasonerPromptPreset(documentMicroReasonerPromptPresetBody.activePreset ?? documentMicroReasonerPromptPresetBody.active_preset ?? null);
+      setDocumentMicroReasonerPrompts(
+        Array.isArray(documentMicroReasonerPromptPresetBody.prompts)
+          ? documentMicroReasonerPromptPresetBody.prompts
+          : Array.isArray(documentMicroReasonerPromptPresetBody.microReasonerPrompts)
+            ? documentMicroReasonerPromptPresetBody.microReasonerPrompts
+            : [],
+      );
+      const documentMailParams = new URLSearchParams({
+        threadId,
+        sourceId: activeDocumentMarkdownSourceId,
+        sourceKind: "document_markdown",
+        view: "overview",
+        includeConfig: "0",
+        limit: "12",
+      });
+      const documentMailBody: StagePlayLiveSourceMailRead = await fetch(
+        `/api/helix/stage-play/live-source-mail?${documentMailParams.toString()}`,
+      ).then((response) => response.ok ? response.json() : {}).catch(() => ({}));
+      setDocumentMicroReasonerRuns(
+        Array.isArray(documentMailBody.microReasonerRuns)
+          ? documentMailBody.microReasonerRuns
+          : Array.isArray(documentMailBody.micro_reasoner_runs)
+            ? documentMailBody.micro_reasoner_runs
+            : [],
+      );
       setLastFetchError(null);
     } catch (error) {
       setLastFetchError(error instanceof Error ? error.message : "live_environment_refresh_failed");
@@ -1624,7 +1787,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       window.clearInterval(interval);
       window.removeEventListener("helix:image-lens:visual-frame-sent", handleImageLensFrame);
     };
-  }, [threadId]);
+  }, [activeDocumentMarkdownSourceId, threadId]);
 
   useEffect(() => {
     const selectionStillAvailable = visualShadeProfiles.some(
@@ -1652,6 +1815,15 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     const preferred = preferredMicroReasonerPresetId(earbudMicroReasonerPromptPresets, activeEarbudMicroReasonerPromptPreset);
     if (preferred) setSelectedEarbudMicroReasonerPromptPresetId(preferred);
   }, [activeEarbudMicroReasonerPromptPreset, earbudMicroReasonerPromptPresets, selectedEarbudMicroReasonerPromptPresetId]);
+
+  useEffect(() => {
+    const selectionStillAvailable = documentMicroReasonerPromptPresets.some(
+      (preset: StagePlayMicroReasonerPromptPresetV1) => preset.presetId === selectedDocumentMicroReasonerPromptPresetId,
+    );
+    if (selectionStillAvailable) return;
+    const preferred = preferredMicroReasonerPresetId(documentMicroReasonerPromptPresets, activeDocumentMicroReasonerPromptPreset);
+    if (preferred) setSelectedDocumentMicroReasonerPromptPresetId(preferred);
+  }, [activeDocumentMicroReasonerPromptPreset, documentMicroReasonerPromptPresets, selectedDocumentMicroReasonerPromptPresetId]);
 
   useEffect(() => {
     if (!selectedVisualObserverProfile) return;
@@ -2385,6 +2557,25 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       await refresh();
     } catch (error) {
       setLastActionStatus(error instanceof Error ? error.message : "earbud_micro_reasoner_prompt_preset_apply_failed");
+    }
+  };
+
+  const applyDocumentMicroReasonerPromptPreset = async (preset: StagePlayMicroReasonerPromptPresetV1 | null) => {
+    if (!preset) {
+      setLastActionStatus("Document Markdown MicroDeck preset is not available.");
+      return;
+    }
+    try {
+      const response = await postJson("/api/helix/stage-play/micro-reasoner-prompt-preset/apply", {
+        presetId: preset.presetId,
+        sourceIds: [activeDocumentMarkdownSourceId],
+        sourceKind: "document_markdown",
+      });
+      const applied = response?.preset as StagePlayMicroReasonerPromptPresetV1 | undefined;
+      setLastActionStatus(`${applied?.title ?? preset.title} document deck applied to ${activeDocumentMarkdownSourceId}. Future visible document Markdown packets will use this prompt deck.`);
+      await refresh();
+    } catch (error) {
+      setLastActionStatus(error instanceof Error ? error.message : "document_micro_reasoner_prompt_preset_apply_failed");
     }
   };
 
@@ -3348,6 +3539,96 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                 </div>
               </div>
             ) : null}
+          </div>
+          <div className="mt-2 rounded border border-lime-300/15 bg-black/20 px-2 py-2" data-testid="document-markdown-micro-reasoner">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase text-lime-100">Document Markdown Decks</p>
+                <p className="mt-0.5 truncate text-[11px] text-slate-300">
+                  {documentMicroReasonerPresetStatus}
+                </p>
+                <p className="mt-0.5 truncate text-[10px] text-slate-500">
+                  Phase: mail reasoning / Source: {activeDocumentMarkdownSourceId}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <label className="sr-only" htmlFor="document-micro-reasoner-preset-select">
+                  Document Markdown micro-reasoner prompt preset
+                </label>
+                <select
+                  id="document-micro-reasoner-preset-select"
+                  aria-label="Document Markdown micro-reasoner prompt preset"
+                  value={selectedDocumentMicroReasonerPromptPreset?.presetId ?? ""}
+                  onChange={(event) => setSelectedDocumentMicroReasonerPromptPresetId(event.currentTarget.value)}
+                  disabled={documentMicroReasonerPromptPresets.length === 0}
+                  className="min-w-[16rem] rounded border border-lime-300/30 bg-slate-950 px-2.5 py-1.5 text-[11px] font-semibold text-lime-100 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {documentMicroReasonerPresetGroups.length === 0 ? (
+                    <option value="">No document presets loaded</option>
+                  ) : (
+                    documentMicroReasonerPresetGroups.map((group) => (
+                      <optgroup key={group.category} label={`${group.category} source`}>
+                        {group.presets.map((preset) => (
+                          <option key={preset.presetId} value={preset.presetId}>
+                            {microReasonerPresetOptionLabel(preset, activeDocumentMarkdownSourceId)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))
+                  )}
+                </select>
+                <button
+                  type="button"
+                  aria-label="Apply selected Document Markdown micro-reasoner prompt preset"
+                  onClick={() => void applyDocumentMicroReasonerPromptPreset(selectedDocumentMicroReasonerPromptPreset)}
+                  disabled={!selectedDocumentMicroReasonerPromptPreset}
+                  className={`rounded border px-2.5 py-1.5 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-45 ${
+                    selectedDocumentMicroPresetApplied
+                      ? "border-emerald-300/40 bg-emerald-400/10 text-emerald-100"
+                      : "border-lime-300/30 text-lime-100 hover:bg-lime-400/10"
+                  }`}
+                >
+                  {selectedDocumentMicroPresetApplied ? "Document deck applied" : "Apply document deck"}
+                </button>
+              </div>
+            </div>
+            {selectedDocumentMicroReasonerPromptPreset ? (
+              <div className="mt-2">
+                <p className="rounded border border-lime-300/15 bg-black/20 px-2 py-1.5 text-[11px] text-lime-100">
+                  {selectedDocumentMicroReasonerPromptPreset.description}
+                </p>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {selectedDocumentMicroPromptPreview.map((prompt: StagePlayMicroReasonerPromptV1) => (
+                    <span key={prompt.promptId} className="rounded border border-lime-300/20 px-1.5 py-0.5 font-mono text-[10px] text-lime-100">
+                      {prompt.role}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <div className="mt-2 rounded border border-emerald-300/15 bg-black/20 px-2 py-2" data-testid="document-markdown-micro-reasoner-output">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[10px] font-semibold uppercase text-emerald-100">Document inline translation candidates</p>
+              <span className="font-mono text-[10px] text-slate-500">
+                {documentMicroReasonerOutputs.length ? `${documentMicroReasonerOutputs.length} generated` : "waiting"}
+              </span>
+            </div>
+            {latestDocumentMicroReasonerOutput ? (
+              <div className="mt-2 rounded border border-emerald-300/20 bg-emerald-950/10 px-2 py-1.5">
+                <p className="text-[11px] leading-5 text-emerald-50">{latestDocumentMicroReasonerOutput.text}</p>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-emerald-100/80">
+                  <span>{latestDocumentMicroReasonerOutput.deckTitle}</span>
+                  <span>{latestDocumentMicroReasonerOutput.status}</span>
+                  <span>{formatTime(latestDocumentMicroReasonerOutput.createdAt)}</span>
+                  <span className="truncate font-mono">{latestDocumentMicroReasonerOutput.refs.at(0) ?? latestDocumentMicroReasonerOutput.runId}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-2 rounded border border-white/10 bg-slate-950/60 px-2 py-1.5 text-[11px] leading-5 text-slate-500">
+                No document translation output has been projected yet. Visible Markdown packets will appear here after a completed document packet_composer run.
+              </p>
+            )}
           </div>
           <div className="mt-2 rounded border border-emerald-300/15 bg-black/20 px-2 py-2" data-testid="earbud-micro-reasoner-output">
             <div className="flex flex-wrap items-center justify-between gap-2">

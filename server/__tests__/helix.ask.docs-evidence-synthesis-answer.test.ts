@@ -865,6 +865,83 @@ describe("Helix Ask docs evidence synthesis answer", () => {
     );
   });
 
+  it("lets route-product docs synthesis dominate stale locate-in-doc terminal metadata", () => {
+    const prompt =
+      "Use docs-viewer.locate_in_doc to find where docs/helix-ask-codex-loop-discipline.md says routes choose procedures. Answer only from the docs-viewer observation and cite the document evidence.";
+    const payload: Record<string, unknown> = synthesisPayload(prompt);
+    payload.canonical_goal_frame = {
+      turn_id: turnId,
+      goal_kind: "locate_in_doc",
+      required_terminal_kind: "doc_location_matches",
+    };
+    payload.committed_ask_route = {
+      schema: "helix.committed_ask_route.v1",
+      turn_id: turnId,
+      route: { source_target: "docs_viewer" },
+      canonical_goal: {
+        goal_kind: "locate_in_doc",
+        required_terminal_kind: "doc_location_matches",
+        allowed_terminal_artifact_kinds: ["doc_location_matches", "typed_failure"],
+        forbidden_terminal_artifact_kinds: [],
+      },
+    };
+    const location = {
+      artifact_id: "doc-location:routes-stale-contract",
+      turn_id: turnId,
+      kind: "doc_location_matches",
+      payload: {
+        schema: "helix.doc_location_matches.v1",
+        kind: "doc_location_matches",
+        query: "routes choose procedures",
+        source_path: "/docs/helix-ask-codex-loop-discipline.md",
+        matches: [
+          {
+            path: "/docs/helix-ask-codex-loop-discipline.md",
+            heading: "Turn-Chain Fundamentals",
+            line_start: 196,
+            line_end: 202,
+            snippet: "Routes choose procedures. Tools produce observations.",
+          },
+        ],
+        match_count: 1,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+    const finalDraft = {
+      artifact_id: "draft:routes-stale-contract",
+      turn_id: turnId,
+      kind: "final_answer_draft",
+      payload: {
+        schema: "helix.final_answer_draft.v1",
+        artifact_id: "draft:routes-stale-contract",
+        text: "The document states that routes choose procedures.",
+        required_terminal_kind: "doc_location_matches",
+        support_refs: ["doc-location:routes-stale-contract"],
+        artifact_refs: ["doc-location:routes-stale-contract"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+
+    const result = materializeDocEvidenceSynthesisAnswer({
+      turnId,
+      promptText: prompt,
+      payload,
+      artifactLedger: [location, finalDraft],
+      answerText: "The document states that routes choose procedures.",
+      finalAnswerDraftRef: "draft:routes-stale-contract",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.blocked_reason).not.toBe("route_contract_disallowed");
+    expect(payload.docs_synthesis_debug).toMatchObject({
+      materializer_contract_allowed: true,
+      materializer_goal_kind_source: "route_product_contract.allowed_terminal_artifact_kinds",
+      materializer_required_terminal_kind: "doc_evidence_synthesis_answer",
+    });
+  });
+
   it("does not materialize a model draft without doc support refs", () => {
     const prompt =
       "Compare docs/helix-ask-flow.md and docs/helix-ask-codex-loop-discipline.md.";

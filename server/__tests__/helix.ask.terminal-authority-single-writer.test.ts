@@ -428,6 +428,168 @@ describe("Helix terminal authority single writer", () => {
     expect(payload.terminal_artifact_kind).toBe("typed_failure");
   });
 
+  it("selects materialized docs evidence synthesis over stale solver-continuation failure", () => {
+    const turnId = "ask:test:docs-synthesis-supersedes-stale-continuation";
+    const answerText = [
+      "The document states that routes choose procedures and tools produce observations.",
+      "",
+      "Document evidence:",
+      "- /docs/helix-ask-codex-loop-discipline.md:L214-L218 (Turn-Chain Fundamentals)",
+    ].join("\n");
+    const artifacts = [
+      makePostToolObservation(turnId),
+      {
+        artifact_id: `${turnId}:doc_location_matches`,
+        kind: "doc_location_matches",
+        payload: {
+          schema: "helix.doc_location_matches.v1",
+          kind: "doc_location_matches",
+          source_path: "/docs/helix-ask-codex-loop-discipline.md",
+          matches: [
+            {
+              path: "/docs/helix-ask-codex-loop-discipline.md",
+              line_start: 214,
+              line_end: 218,
+              snippet: "Routes choose procedures. Tools produce observations.",
+            },
+          ],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      current_turn_artifact_ledger: artifacts,
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        allowed_terminal_artifact_kinds: ["request_user_input", "typed_failure", "doc_evidence_synthesis_answer"],
+        forbidden_terminal_artifact_kinds: ["direct_answer_text", "doc_location_matches"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        goal_kind: "doc_evidence_synthesis",
+        required_terminal_kind: "doc_evidence_synthesis_answer",
+      },
+      source_target_intent: {
+        target_source: "docs_viewer",
+        target_kind: "document_evidence",
+      },
+      agent_step_decision: {
+        schema: "helix.agent_step_decision.v1",
+        decision_id: "agent-step-answer",
+        decision_authority: "llm",
+        decision_timing: "post_observation",
+        next_step: "answer",
+        chosen_capability: "model.direct_answer",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            iteration: 1,
+            decision_id: "agent-step-doc-locate",
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+            next_step: "next_action",
+            chosen_capability: "docs-viewer.locate_in_doc",
+            executed_action_key: "docs-viewer.locate_in_doc",
+            observed_artifact_refs: [`${turnId}:doc_location_matches`],
+            tool_observation: {
+              status: "completed",
+              artifact_refs: [`${turnId}:doc_location_matches`],
+            },
+          },
+          {
+            iteration: 2,
+            decision_id: "agent-step-answer",
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+            next_step: "answer",
+            chosen_capability: "model.direct_answer",
+            observation_role: "model_answer_draft",
+            observed_artifact_refs: [`${turnId}:doc_evidence_synthesis_answer:from_final_answer_draft`],
+          },
+        ],
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      tool_turn_chain_audit: {
+        schema: "helix.tool_turn_chain_audit.v1",
+        rail_status: "fail_closed",
+        rail_failure_code: "terminal_projection_mismatch",
+        route_family: "docs_viewer",
+        requested_capability: "docs-viewer.locate_in_doc",
+        selected_capability: "docs-viewer.locate_in_doc",
+        executed_capability: "docs-viewer.locate_in_doc",
+        observation_artifact_kind: "doc_location_matches",
+        observation_ref: `${turnId}:doc_location_matches`,
+        reentry_executed: true,
+        required_terminal_kind: "doc_evidence_synthesis_answer",
+        materialized_terminal_artifact_kind: "typed_failure",
+        terminal_authority_kind: "typed_failure",
+        visible_terminal_kind: "doc_evidence_synthesis_answer",
+        support_refs_count: 3,
+      },
+      tool_rail_failure_triage: {
+        schema: "helix.tool_rail_failure_triage.v1",
+        turn_id: turnId,
+        rail_status: "fail_closed",
+        first_broken_rail: "visible_projection",
+        rail_failure_code: "terminal_projection_mismatch",
+        failure_bucket: "F_terminal_projection_mismatch",
+        repair_target: "presenter_boundary",
+        selected_capability: "docs-viewer.locate_in_doc",
+        executed_capability: "docs-viewer.locate_in_doc",
+      },
+      solver_continuation_observation: {
+        schema: "helix.solver_continuation_observation.v1",
+        required_next_step: "model.direct_answer",
+      },
+      doc_evidence_synthesis_answer: {
+        schema: "helix.doc_evidence_synthesis_answer.v1",
+        artifact_id: `${turnId}:doc_evidence_synthesis_answer:from_final_answer_draft`,
+        turn_id: turnId,
+        answer_text: answerText,
+        text: answerText,
+        terminal_artifact_kind: "doc_evidence_synthesis_answer",
+        support_refs: [`${turnId}:doc_location_matches`, `${turnId}:final_answer_draft`],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      selected_final_answer: "I could not complete this turn yet because solver continuation is required before terminal answer selection.",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "solver_continuation_pending",
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+    expect(result.source).toBe("final_answer_draft");
+    expect(result.visible_text).toBe(answerText);
+    expect(result.rejected_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "typed_failure",
+          reason: "stale_solver_continuation_superseded_by_docs_terminal",
+        }),
+      ]),
+    );
+    expect(payload.terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+    expect(payload.final_answer_source).toBe("final_answer_draft");
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect((payload.terminal_presentation as Record<string, unknown>).terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+  });
+
   it("quarantines note receipts as side evidence and selects the synthesized note answer", () => {
     const turnId = "ask:test:note-receipt-quarantine";
     const artifacts = [

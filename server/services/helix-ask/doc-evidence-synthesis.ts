@@ -64,6 +64,20 @@ const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : 
 
 const unique = (values: string[]): string[] => Array.from(new Set(values.filter(Boolean)));
 
+const allowedTerminalArtifactKinds = (payload: RecordLike): string[] => {
+  const routeProductContract = readRecord(payload.route_product_contract);
+  const committedRoute = readSameTurnCommittedRoute(
+    payload,
+    readString(payload.turn_id) ?? readString(payload.turnId) ?? readString(payload.active_turn_id) ?? "",
+  );
+  return unique([
+    ...readArray(routeProductContract?.allowed_terminal_artifact_kinds)
+      .map(readString)
+      .filter((entry): entry is string => Boolean(entry)),
+    ...(committedRoute?.canonical_goal.allowed_terminal_artifact_kinds ?? []),
+  ]);
+};
+
 const normalizeDocsPath = (value: unknown): string | null => {
   const text = readString(value);
   if (!text) return null;
@@ -143,12 +157,22 @@ const resolveDocsSynthesisTerminalContract = (input: {
       disallowReason: "same_turn_committed_route_forbids_doc_evidence_synthesis_answer",
     };
   }
+  const routeAllowedTerminalKinds = allowedTerminalArtifactKinds(input.payload);
   const candidates: Array<{
     goalKind: string | null;
     goalKindSource: string;
     requiredTerminalKind: string | null;
     requiredTerminalKindSource: string;
   }> = [
+    ...(routeAllowedTerminalKinds.includes("doc_evidence_synthesis_answer") ||
+      routeAllowedTerminalKinds.includes("doc_evidence_synthesis")
+      ? [{
+          goalKind: "doc_evidence_synthesis",
+          goalKindSource: "route_product_contract.allowed_terminal_artifact_kinds",
+          requiredTerminalKind: "doc_evidence_synthesis_answer",
+          requiredTerminalKindSource: "route_product_contract.allowed_terminal_artifact_kinds",
+        }]
+      : []),
     {
       goalKind: readString(committedGoal?.goal_kind),
       goalKindSource: "committed_ask_route.canonical_goal.goal_kind",
