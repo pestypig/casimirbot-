@@ -74,9 +74,7 @@ const lastRuntimeCapability = (payload: RecordLike): string | null => {
   const iterations = Array.isArray(loop?.iterations) ? loop.iterations.map(readRecord).filter(Boolean) : [];
   for (const iteration of [...iterations].reverse()) {
     const executed = readString(iteration?.executed_action_key);
-    const chosen = readString(iteration?.chosen_capability);
     if (executed) return executed;
-    if (chosen) return chosen;
   }
   return readString(readRecord(payload.runtime_tool_call)?.capability_key) || null;
 };

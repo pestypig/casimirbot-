@@ -8,7 +8,13 @@ import { buildHelixCapabilityItinerary } from "../services/helix-ask/capability-
 import { buildCapabilityPlan } from "../services/helix-ask/capability-planner";
 import { buildSolverContinuationObservation } from "../services/helix-ask/solver-continuation";
 import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
-import { __testHelixRuntimeToolCallValidation } from "../routes/agi.plan";
+import {
+  __testHelixAgentStepActionResolution,
+  __testHelixCalculatorCompoundPlanning,
+  __testHelixEvidenceRetrievalFailure,
+  __testHelixGoalSatisfaction,
+  __testHelixRuntimeToolCallValidation,
+} from "../routes/agi.plan";
 
 const turnId = "ask:test:negated-tool-admission";
 const threadId = "helix-ask:test";
@@ -481,6 +487,28 @@ describe("Helix Ask negated/contextual tool admission", () => {
       selected_capability: "docs-viewer.locate_in_doc",
       requested_capability: "docs-viewer.locate_in_doc",
     });
+    expect(__testHelixAgentStepActionResolution.resolveHelixAgentStepActionForCapability({
+      capabilityKey: "docs-viewer.locate_in_doc",
+      transcript: promptText,
+      canonicalGoalFrame: {
+        ...canonicalGoal,
+        goal_kind: "locate_in_doc",
+        required_terminal_kind: "doc_location_result",
+      },
+      workspaceSnapshot: {
+        activeDocPath: "docs/helix-ask-codex-loop-discipline.md",
+      } as any,
+      capabilityArgs: {
+        query: "Codex parity",
+      },
+    })).toMatchObject({
+      panel_id: "docs-viewer",
+      action_id: "locate_in_doc",
+      args: {
+        query: "Codex parity",
+        path: "docs/helix-ask-codex-loop-discipline.md",
+      },
+    });
   });
 
   it("keeps explicit repo-code.search_concept as the requested capability contract", () => {
@@ -610,7 +638,62 @@ describe("Helix Ask negated/contextual tool admission", () => {
       });
       expect(plan.capability_family).not.toBe("calculator");
       expect(plan.capability_family).not.toBe("workstation_action");
+      const terminalContract = __testHelixGoalSatisfaction.resolveHelixGoalTerminalContract({
+        canonicalGoalFrame: canonicalGoal,
+        transcript: promptText,
+        selectedAction: {
+          panel_id: "scientific-calculator",
+          action_id: "solve_expression",
+          args: { expression: "2 + 2" },
+        },
+      });
+      expect(terminalContract).toMatchObject({
+        goal_kind: "model_only_concept",
+        required_terminal_kinds: ["direct_answer_text"],
+        required_actions: [],
+      });
+      expect(terminalContract.forbidden_terminal_kinds).toContain("workstation_tool_evaluation");
     }
+  });
+
+  it("does not let suppressed calculator references enter calculator compound planning", () => {
+    const promptText =
+      "Do not call any tools. Explain why calculator receipts are observations, not terminal answers.";
+
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, sourceTargetIntent, promptText });
+    const plan = buildCapabilityPlan({
+      turnId,
+      promptText,
+      sourceTargetIntent,
+      toolCallAdmissionDecision: admission,
+      canonicalGoalFrame: canonicalGoal,
+    });
+
+    expect(admission).toMatchObject({
+      source_target: "model_only",
+      required: false,
+      admitted_tool_families: ["model_only"],
+      tool_admission_suppressed: true,
+    });
+    expect(plan).toMatchObject({
+      requested_action: "suppressed_contextual_tool_reference",
+      source_target: "model_only",
+      required_terminal_kind: "direct_answer_text",
+    });
+    expect(__testHelixCalculatorCompoundPlanning.shouldSuppressHelixCalculatorCompoundPlanning(promptText)).toBe(true);
+  });
+
+  it("does not request doc_reference when explicit docs locate already has a path ref", () => {
+    const failure = __testHelixEvidenceRetrievalFailure.buildAskTurnEvidenceRetrievalFailure({
+      transcript:
+        "Use docs-viewer.locate_in_doc to find where docs/helix-ask-codex-loop-discipline.md says routes choose procedures.",
+      evidenceRefs: ["docs/helix-ask-codex-loop-discipline.md"],
+      workspaceSnapshot: null,
+      executionTrace: [],
+    });
+
+    expect(failure).toBeNull();
   });
 
   it("scopes 'do not write files' to mutation while admitting research plus locator observations", () => {

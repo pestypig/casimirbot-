@@ -268,6 +268,166 @@ describe("Helix terminal authority single writer", () => {
     expect((payload.terminal_presentation as Record<string, unknown>).concise_text).toBe(synthesizedText);
   });
 
+  it("does not select stale workstation artifacts when a contextual tool mention is suppressed", () => {
+    const turnId = "ask:test:suppressed-tool-direct-answer";
+    const directText = "Calculator receipts are observations because they record evidence, while terminal answers are selected after solver authority.";
+    const staleToolText = "Calculator verification plan completed.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:direct`,
+        kind: "direct_answer_text",
+        payload: {
+          schema: "helix.direct_answer_text.v1",
+          text: directText,
+          answer_text: directText,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: `${turnId}:workstation_eval`,
+        kind: "workstation_tool_evaluation",
+        payload: {
+          schema: "helix.workstation_tool_evaluation.v1",
+          evaluation_id: `${turnId}:workstation_eval`,
+          supports_goal: true,
+          text: staleToolText,
+          answer_text: staleToolText,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      current_turn_artifact_ledger: artifacts,
+      committed_ask_route: {
+        schema: "helix.committed_ask_route.v1",
+        turn_id: turnId,
+        commit_id: "commit:test",
+        prompt_hash: "hash:test",
+        committed_at_stage: "post_prompt_source_arbitration",
+        prompt_intent: {
+          primary_intent_kind: "content_question",
+          secondary_intent_kinds: [],
+        },
+        route: {
+          selected_route: "model_only_concept",
+          source_target: "model_only",
+          target_kind: "general_background",
+          strength: "hard",
+          route_reason: "contextual_tool_reference_suppressed",
+          stale_metadata_policy: "ignore_unless_matches_commit",
+        },
+        canonical_goal: {
+          goal_kind: "model_only_concept",
+          required_terminal_kind: "direct_answer_text",
+          allowed_terminal_artifact_kinds: ["direct_answer_text", "typed_failure"],
+          forbidden_terminal_artifact_kinds: ["workstation_tool_evaluation"],
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        goal_kind: "model_only_concept",
+        answer_scope: "model_only",
+        required_terminal_kind: "direct_answer_text",
+      },
+      capability_plan: {
+        capability_contract_arbitration: {
+          contract_state: "suppressed_contextual_reference",
+        },
+        tool_admission_suppressed: true,
+      },
+      tool_call_admission_decision: {
+        tool_admission_suppressed: true,
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+        terminal_contract: {
+          goal_kind: "model_only_concept",
+          required_terminal_kinds: ["direct_answer_text"],
+        },
+      },
+      selected_final_answer: staleToolText,
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      final_answer_source: "workstation_tool_evaluation",
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("direct_answer_text");
+    expect(result.visible_text).toBe(directText);
+    expect(payload.terminal_artifact_kind).toBe("direct_answer_text");
+    expect(payload.final_answer_source).toBe("model_direct_answer");
+    expect(payload.selected_final_answer).toBe(directText);
+  });
+
+  it("fails closed when terminal authority sees a broken tool rail", () => {
+    const turnId = "ask:test:broken-tool-rail-terminal-guard";
+    const draftText = "A polished answer that should not pass because the requested rail is broken.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: draftText,
+          authority: "llm_post_observation_composer",
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      current_turn_artifact_ledger: artifacts,
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        goal_kind: "post_tool_answer",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      tool_turn_chain_audit: {
+        schema: "helix.tool_turn_chain_audit.v1",
+        rail_status: "broken",
+        rail_failure_code: "wrong_capability_executed",
+        selected_capability: "docs-viewer.locate_in_doc",
+        executed_capability: "model.direct_answer",
+      },
+      selected_final_answer: draftText,
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(result.source).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("wrong_capability_executed");
+    expect(String(payload.selected_final_answer)).toContain("wrong_capability_executed");
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+  });
+
   it("quarantines note receipts as side evidence and selects the synthesized note answer", () => {
     const turnId = "ask:test:note-receipt-quarantine";
     const artifacts = [

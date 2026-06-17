@@ -552,6 +552,377 @@ describe("Helix Ask tool lifecycle trace", () => {
     });
   });
 
+  it("classifies contextual no-tool suppression as a complete model-only rail, not tool drift", () => {
+    const payload: Record<string, unknown> = {
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "model_only_concept",
+        required_terminal_kind: "direct_answer_text",
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:suppressed-model-only",
+        capability_family: "model_only",
+        requested_action: "suppressed_contextual_tool_reference",
+        selected_capability: "suppressed_contextual_tool_reference",
+        admission_status: "rejected",
+        rejection_reason: "contextual_tool_reference_suppressed",
+        tool_admission_suppressed: true,
+        capability_contract_arbitration: {
+          schema: "helix.ask_capability_contract_arbitration.v1",
+          contract_state: "suppressed_contextual_reference",
+          selected_source_target: "model_only",
+          selected_plan_family: "model_only",
+          canonical_goal_kind: "model_only_concept",
+          required_terminal_kind: "direct_answer_text",
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      operational_capability_trace: {
+        schema: "helix.operational_capability_trace.v1",
+        executed_capability: "model.direct_answer",
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            iteration: 1,
+            next_step: "answer",
+            chosen_capability: "model.direct_answer",
+            executed_action_key: null,
+            stop_reason: "terminal_satisfied",
+            satisfaction: "satisfied",
+          },
+        ],
+        executed_tool_call_count: 0,
+        stop_reason: "terminal_satisfied",
+      },
+      final_answer_source: "model_direct_answer",
+      terminal_artifact_kind: "direct_answer_text",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        final_answer_source: "model_direct_answer",
+        terminal_artifact_kind: "direct_answer_text",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "direct_answer_text",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "reasoning_context:1",
+          kind: "reasoning_context",
+          payload: {
+            schema: "helix.reasoning_context.v1",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: "direct_answer_text:1",
+          kind: "direct_answer_text",
+          payload: {
+            schema: "helix.direct_answer_text.v1",
+            text: "Receipts are observations, not terminal answers.",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: "final_answer_draft:1",
+          kind: "final_answer_draft",
+          payload: {
+            schema: "helix.final_answer_draft.v1",
+            support_refs: ["reasoning_context:1", "direct_answer_text:1"],
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:suppressed-model-only", payload });
+    (payload.tool_lifecycle_trace as Record<string, unknown>).executed_capability = "model.direct_answer";
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:suppressed-model-only", payload });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      route_family: "model_only",
+      selected_capability: "suppressed_contextual_tool_reference",
+      executed_capability: null,
+      required_terminal_kind: "direct_answer_text",
+      materialized_terminal_artifact_kind: "direct_answer_text",
+      terminal_authority_kind: "direct_answer_text",
+      visible_terminal_kind: "direct_answer_text",
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
+    expect(index.tool_rail_failure_triage).toMatchObject({
+      selected_capability: "suppressed_contextual_tool_reference",
+      executed_capability: null,
+      did_tool_run: false,
+      first_broken_rail: null,
+      failure_bucket: null,
+      rail_status: "complete",
+      rail_failure_code: null,
+      repair_target: null,
+    });
+  });
+
+  it("preserves executed docs tool capability when a later model answer performs synthesis", () => {
+    const payload: Record<string, unknown> = {
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "doc_evidence_synthesis",
+        required_terminal_kind: "doc_evidence_synthesis_answer",
+      },
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        turn_id: "ask:test:docs-locate-reentry",
+        source_target: "docs_viewer",
+        required: true,
+        admitted_tool_families: ["docs_viewer"],
+        capability_contract_guard_version: "E82",
+        requested_capability: "docs-viewer.locate_in_doc",
+        requested_capability_family: "docs_viewer",
+        requested_capability_source: "explicit_user_command",
+        requested_capability_confidence: 0.99,
+        required_observation_kinds_for_requested_capability: [
+          "doc_location_result",
+          "doc_location_matches",
+          "doc_evidence_location",
+        ],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:docs-locate-reentry",
+        capability_family: "docs_viewer",
+        requested_action: "docs-viewer.locate_in_doc",
+        selected_capability: "docs-viewer.locate_in_doc",
+        requested_capability: "docs-viewer.locate_in_doc",
+        admission_status: "admitted",
+        required_terminal_kind: "doc_evidence_synthesis_answer",
+      },
+      operational_capability_trace: {
+        schema: "helix.operational_capability_trace.v1",
+        executed_capability: "model.direct_answer",
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            iteration: 1,
+            next_step: "next_action",
+            chosen_capability: "docs-viewer.locate_in_doc",
+            executed_action_key: "docs-viewer.locate_in_doc",
+            satisfaction: "satisfied",
+            observed_artifact_refs: ["doc_location_matches:1"],
+          },
+          {
+            iteration: 2,
+            next_step: "answer",
+            chosen_capability: "model.direct_answer",
+            executed_action_key: null,
+            satisfaction: "satisfied",
+            stop_reason: "terminal_satisfied",
+          },
+        ],
+        executed_tool_call_count: 1,
+        stop_reason: "terminal_satisfied",
+      },
+      final_answer_source: "final_answer_draft",
+      terminal_artifact_kind: "doc_evidence_synthesis_answer",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        final_answer_source: "final_answer_draft",
+        terminal_artifact_kind: "doc_evidence_synthesis_answer",
+      },
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        selected_terminal_artifact_kind: "doc_evidence_synthesis_answer",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "doc_evidence_synthesis_answer",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "doc_location_matches:1",
+          kind: "doc_location_matches",
+          payload: {
+            schema: "helix.doc_location_matches.v1",
+            document_path: "docs/helix-ask-codex-loop-discipline.md",
+            matches: [{ line: 216, text: "Routes choose procedures." }],
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: "final_answer_draft:docs-locate",
+          kind: "final_answer_draft",
+          payload: {
+            schema: "helix.final_answer_draft.v1",
+            support_refs: ["doc_location_matches:1"],
+            artifact_refs: ["doc_location_matches:1"],
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:docs-locate-reentry", payload });
+    (payload.tool_lifecycle_trace as Record<string, unknown>).executed_capability = "model.direct_answer";
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:docs-locate-reentry", payload });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      capability_contract_guard_version: "E82",
+      requested_capability: "docs-viewer.locate_in_doc",
+      selected_capability: "docs-viewer.locate_in_doc",
+      executed_capability: "docs-viewer.locate_in_doc",
+      requested_selected_match: true,
+      selected_executed_match: true,
+      observation_artifact_kind: "doc_location_matches",
+      required_terminal_kind: "doc_evidence_synthesis_answer",
+      materialized_terminal_artifact_kind: "doc_evidence_synthesis_answer",
+      terminal_authority_kind: "doc_evidence_synthesis_answer",
+      visible_terminal_kind: "doc_evidence_synthesis_answer",
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
+    expect(index.tool_rail_failure_triage).toMatchObject({
+      requested_capability: "docs-viewer.locate_in_doc",
+      selected_capability: "docs-viewer.locate_in_doc",
+      executed_capability: "docs-viewer.locate_in_doc",
+      did_tool_run: true,
+      first_broken_rail: null,
+      failure_bucket: null,
+      rail_status: "complete",
+      rail_failure_code: null,
+      repair_target: null,
+    });
+  });
+
+  it("does not report observation_missing when explicit docs locate produced location matches", () => {
+    const payload: Record<string, unknown> = {
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "doc_evidence_synthesis",
+        required_terminal_kind: "doc_evidence_synthesis_answer",
+      },
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        turn_id: "ask:test:docs-locate-terminal-failed-later",
+        source_target: "docs_viewer",
+        required: true,
+        admitted_tool_families: ["docs_viewer"],
+        requested_capability: "docs-viewer.locate_in_doc",
+        requested_capability_family: "docs_viewer",
+        requested_capability_source: "explicit_user_command",
+        requested_capability_confidence: 0.99,
+        required_observation_kinds_for_requested_capability: [
+          "doc_location_result",
+          "doc_location_matches",
+          "doc_evidence_location",
+        ],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:docs-locate-terminal-failed-later",
+        capability_family: "docs",
+        requested_action: "docs-viewer.locate_in_doc",
+        selected_capability: "docs-viewer.locate_in_doc",
+        requested_capability: "docs-viewer.locate_in_doc",
+        admission_status: "admitted",
+        required_terminal_kind: "doc_evidence_synthesis_answer",
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            iteration: 1,
+            next_step: "next_action",
+            chosen_capability: "docs-viewer.locate_in_doc",
+            executed_action_key: "docs-viewer.locate_in_doc",
+            satisfaction: "satisfied",
+            observed_artifact_refs: ["doc_location_matches:1"],
+          },
+          {
+            iteration: 2,
+            next_step: "answer",
+            chosen_capability: "model.direct_answer",
+            executed_action_key: null,
+            satisfaction: "satisfied",
+          },
+        ],
+        executed_tool_call_count: 1,
+      },
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "compound_prompt_coverage_incomplete",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+      },
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        selected_terminal_artifact_kind: "typed_failure",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "typed_failure",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "doc_location_matches:1",
+          kind: "doc_location_matches",
+          payload: {
+            schema: "helix.doc_location_matches.v1",
+            document_path: "docs/helix-ask-codex-loop-discipline.md",
+            matches: [{ line: 216, text: "Routes choose procedures." }],
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: "final_answer_draft:docs-locate",
+          kind: "final_answer_draft",
+          payload: {
+            schema: "helix.final_answer_draft.v1",
+            support_refs: ["doc_location_matches:1"],
+            artifact_refs: ["doc_location_matches:1"],
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:docs-locate-terminal-failed-later", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:docs-locate-terminal-failed-later", payload });
+
+    expect(index.required_observation_coverage_mode).toBe("any");
+    expect(index.missing_required_observation_kinds).toEqual([]);
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      requested_capability: "docs-viewer.locate_in_doc",
+      executed_capability: "docs-viewer.locate_in_doc",
+      observation_artifact_kind: "doc_location_matches",
+      observed_artifact_supports_requested_capability: true,
+      rail_failure_code: null,
+    });
+    expect(index.tool_rail_failure_triage).toMatchObject({
+      requested_capability: "docs-viewer.locate_in_doc",
+      executed_capability: "docs-viewer.locate_in_doc",
+      first_broken_rail: null,
+      rail_failure_code: null,
+    });
+  });
+
   it("reports missing contract observations for incomplete tool evidence", () => {
     const payload: Record<string, unknown> = {
       capability_plan: {

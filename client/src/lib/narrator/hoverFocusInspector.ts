@@ -33,6 +33,7 @@ const SENTENCE_PATTERN = /[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g;
 const PRIMARY_MEANINGFUL_SELECTOR = [
   "[data-narrator-label]",
   "[data-narrator-description]",
+  "[data-narrator-source-id]",
   "[title]",
   "button",
   "a[href]",
@@ -74,6 +75,10 @@ const CONTAINER_MEANINGFUL_SELECTOR = [
   "[role='main']",
   "[role='region']",
 ].join(",");
+
+const READABLE_TEXT_LEAF_TAGS = new Set(["DIV", "SPAN", "PRE", "CODE", "STRONG", "EM", "SMALL"]);
+const READABLE_TEXT_LEAF_MAX_CHARS = 900;
+const READABLE_TEXT_LEAF_MAX_ANCESTORS = 6;
 
 function cleanNarratorText(value: string | null | undefined): string {
   return String(value ?? "").replace(/\s+/g, " ").trim();
@@ -143,10 +148,40 @@ function elementAccessibleText(element: Element): string | null {
   return cleanNarratorText(element.textContent);
 }
 
+function isBroadRoleContainer(element: Element): boolean {
+  const role = cleanNarratorText(element.getAttribute("role")).toLowerCase();
+  return ["article", "document", "group", "list", "main", "none", "presentation", "region"].includes(role);
+}
+
+function isReadableTextLeaf(element: Element): boolean {
+  if (!READABLE_TEXT_LEAF_TAGS.has(element.tagName)) return false;
+  if (element.matches(CONTAINER_MEANINGFUL_SELECTOR) || isBroadRoleContainer(element)) return false;
+  if (element.closest("[data-narrator-ignore='true']")) return false;
+  if (!isElementVisible(element)) return false;
+  const text = cleanNarratorText(element.textContent);
+  if (text.length < 2 || text.length > READABLE_TEXT_LEAF_MAX_CHARS) return false;
+  const meaningfulDescendant = element.querySelector(PRIMARY_MEANINGFUL_SELECTOR);
+  return !meaningfulDescendant;
+}
+
+function findReadableTextLeaf(target: Element): Element | null {
+  let current: Element | null = target;
+  let depth = 0;
+  while (current && depth < READABLE_TEXT_LEAF_MAX_ANCESTORS) {
+    if (current === current.ownerDocument.body || current === current.ownerDocument.documentElement) return null;
+    if (isReadableTextLeaf(current)) return current;
+    if (current.matches(CONTAINER_MEANINGFUL_SELECTOR) || isBroadRoleContainer(current)) return null;
+    current = current.parentElement;
+    depth += 1;
+  }
+  return null;
+}
+
 function findMeaningfulElement(target: EventTarget | null): Element | null {
   if (!(target instanceof Element)) return null;
   const candidate =
     target.closest(PRIMARY_MEANINGFUL_SELECTOR) ??
+    findReadableTextLeaf(target) ??
     target.closest(CONTAINER_MEANINGFUL_SELECTOR);
   if (!candidate || candidate.closest("[data-narrator-ignore='true']")) return null;
   if (!isElementVisible(candidate)) return null;

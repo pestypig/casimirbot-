@@ -248,9 +248,30 @@ const readStringArray = (value: unknown): string[] =>
     ? value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
     : [];
 
+const isContextualToolReferenceSuppressed = (payload: RecordLike): boolean => {
+  const capabilityPlan = readRecord(payload.capability_plan);
+  const arbitration = readRecord(capabilityPlan?.capability_contract_arbitration);
+  const admission = readRecord(payload.tool_call_admission_decision);
+  return (
+    readString(arbitration?.contract_state) === "suppressed_contextual_reference" ||
+    readBoolean(capabilityPlan?.tool_admission_suppressed) ||
+    readBoolean(admission?.tool_admission_suppressed)
+  );
+};
+
+const hasBlockingToolRailFailure = (payload: RecordLike): boolean => {
+  const audit = readRecord(payload.tool_turn_chain_audit);
+  const triage = readRecord(payload.tool_rail_failure_triage);
+  const railStatus = readString(triage?.rail_status) || readString(audit?.rail_status);
+  return railStatus === "broken" || railStatus === "fail_closed";
+};
+
 const resolveAuthoritativeWorkstationToolTerminal = (
   payload: RecordLike,
 ): { terminalArtifactKind: "workstation_tool_evaluation"; finalAnswerSource: "workstation_tool_evaluation" } | null => {
+  if (isContextualToolReferenceSuppressed(payload) || hasBlockingToolRailFailure(payload)) {
+    return null;
+  }
   const terminalAuthority = readRecord(payload.terminal_answer_authority);
   const terminalWriter = readRecord(payload.terminal_authority_single_writer);
   const terminalPresentation = readRecord(payload.terminal_presentation);

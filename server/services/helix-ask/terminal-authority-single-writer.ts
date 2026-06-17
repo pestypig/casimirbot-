@@ -53,6 +53,70 @@ const readString = (value: unknown): string | null =>
 
 const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
 
+const isContextualToolReferenceSuppressed = (payload: Record<string, unknown>): boolean => {
+  const capabilityPlan = readRecord(payload.capability_plan);
+  const arbitration = readRecord(capabilityPlan?.capability_contract_arbitration);
+  const admission = readRecord(payload.tool_call_admission_decision);
+  return (
+    readString(arbitration?.contract_state) === "suppressed_contextual_reference" ||
+    capabilityPlan?.tool_admission_suppressed === true ||
+    admission?.tool_admission_suppressed === true
+  );
+};
+
+type TerminalBlockingToolRailFailure = {
+  railStatus: string;
+  railFailureCode: string;
+  firstBrokenRail: string | null;
+  repairTarget: string | null;
+  selectedCapability: string | null;
+  executedCapability: string | null;
+};
+
+const readTerminalBlockingToolRailFailure = (
+  payload: Record<string, unknown>,
+): TerminalBlockingToolRailFailure | null => {
+  const audit = readRecord(payload.tool_turn_chain_audit);
+  const triage = readRecord(payload.tool_rail_failure_triage);
+  const railStatus = readString(triage?.rail_status) ?? readString(audit?.rail_status);
+  if (railStatus !== "broken" && railStatus !== "fail_closed") return null;
+  const railFailureCode =
+    readString(triage?.rail_failure_code) ??
+    readString(audit?.rail_failure_code) ??
+    readString(payload.terminal_error_code);
+  if (!railFailureCode) return null;
+  return {
+    railStatus,
+    railFailureCode,
+    firstBrokenRail: readString(triage?.first_broken_rail) ?? null,
+    repairTarget: readString(triage?.repair_target) ?? null,
+    selectedCapability: readString(triage?.selected_capability) ?? readString(audit?.selected_capability) ?? null,
+    executedCapability: readString(triage?.executed_capability) ?? readString(audit?.executed_capability) ?? null,
+  };
+};
+
+const toolRailFailureTerminalText = (
+  payload: Record<string, unknown>,
+  failure: TerminalBlockingToolRailFailure,
+): string => {
+  const typedFailure = readRecord(payload.typed_failure);
+  const existingTypedFailureText =
+    readString(typedFailure?.text) ??
+    readString(typedFailure?.answer_text) ??
+    readString(typedFailure?.message) ??
+    readString(payload.terminal_failure_text);
+  if (
+    existingTypedFailureText &&
+    (
+      readString(payload.final_answer_source) === "typed_failure" ||
+      readString(payload.terminal_artifact_kind) === "typed_failure"
+    )
+  ) {
+    return existingTypedFailureText;
+  }
+  return `I could not produce a terminal answer because the requested tool rail did not complete. Cause: ${failure.railFailureCode}.`;
+};
+
 const typedFailureAuthorityApplies = (authority: Record<string, unknown> | null): boolean =>
   readString(authority?.terminal_artifact_kind) === "typed_failure" ||
   readString(authority?.final_answer_source) === "typed_failure" ||
@@ -1043,6 +1107,9 @@ const findGoalSatisfyingWorkstationToolEvaluationArtifact = (
   payload: Record<string, unknown>,
   artifacts: ArtifactLike[],
 ): { artifact: ArtifactLike; kind: "workstation_tool_evaluation"; text: string; ref: string | null } | null => {
+  if (isContextualToolReferenceSuppressed(payload)) {
+    return null;
+  }
   if (
     !routeMetadataIndicatesCalculator(payload) &&
     readString(readRecord(payload.canonical_goal_frame)?.required_terminal_kind) !== "workstation_tool_evaluation"
@@ -1499,8 +1566,74 @@ export function applyHelixTerminalAuthoritySingleWriter(
   let selectedArtifactRef: string | null = null;
   let selectedArtifactKind: HelixTerminalAuthoritySingleWriterResult["selected_terminal_artifact_kind"] = null;
   let selectedSource: HelixTerminalAuthoritySingleWriterResult["source"] = "terminal_authority_repair_failure";
+  const terminalBlockingToolRailFailure = readTerminalBlockingToolRailFailure(input.payload);
 
-  if (calculatorTerminalMissingSupport) {
+  if (terminalBlockingToolRailFailure) {
+    const terminalErrorCode = terminalBlockingToolRailFailure.railFailureCode;
+    const terminalErrorText = toolRailFailureTerminalText(input.payload, terminalBlockingToolRailFailure);
+    if (selectedDirectAnswerTerminal) {
+      rejectedCandidates.push({
+        ref: selectedDirectAnswerTerminal.ref ?? undefined,
+        kind: "direct_answer_text",
+        source: "direct_answer_text",
+        reason: "missing_required_observation",
+      });
+    }
+    if (selectedWorkstationToolEvaluation) {
+      rejectedCandidates.push({
+        ref: selectedWorkstationToolEvaluation.ref ?? undefined,
+        kind: "workstation_tool_evaluation",
+        source: "workstation_tool_evaluation",
+        reason: "missing_required_observation",
+      });
+    }
+    if (draftMaterialization?.ok === true) {
+      rejectedCandidates.push({
+        ref: draftMaterialization.materialized_terminal_artifact_ref ?? draftMaterialization.final_answer_draft_ref ?? undefined,
+        kind: draftMaterialization.materialized_terminal_artifact_kind ?? "model_synthesized_answer",
+        source: "final_answer_draft",
+        reason: "missing_required_observation",
+      });
+    }
+    input.payload.ok = false;
+    input.payload.response_type = "final_failure";
+    input.payload.final_status = "final_failure";
+    input.payload.status = "final_failure";
+    input.payload.terminal_artifact_kind = "typed_failure";
+    input.payload.final_answer_source = "typed_failure";
+    input.payload.terminal_error_code = terminalErrorCode;
+    input.payload.terminal_failure_text = terminalErrorText;
+    input.payload.selected_final_answer = terminalErrorText;
+    input.payload.answer = terminalErrorText;
+    input.payload.text = terminalErrorText;
+    input.payload.assistant_answer = terminalErrorText;
+    input.payload.typed_failure = {
+      ...(readRecord(input.payload.typed_failure) ?? {}),
+      schema: "helix.typed_failure.v1",
+      error_code: terminalErrorCode,
+      message: terminalErrorText,
+      text: terminalErrorText,
+      answer_text: terminalErrorText,
+      rail_status: terminalBlockingToolRailFailure.railStatus,
+      first_broken_rail: terminalBlockingToolRailFailure.firstBrokenRail,
+      repair_target: terminalBlockingToolRailFailure.repairTarget,
+      selected_capability: terminalBlockingToolRailFailure.selectedCapability,
+      executed_capability: terminalBlockingToolRailFailure.executedCapability,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    input.payload.terminal_presentation = {
+      ...(readRecord(input.payload.terminal_presentation) ?? {}),
+      schema: "helix.terminal_presentation.v1",
+      turn_id: input.turnId,
+      terminal_artifact_kind: "typed_failure",
+      concise_text: terminalErrorText,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    selectedArtifactKind = "typed_failure";
+    selectedSource = "typed_failure";
+  } else if (calculatorTerminalMissingSupport) {
     const terminalErrorCode = "calculator_tool_answer_support_missing";
     const missingReason = calculatorToolAnswerSupport.missing_reason ?? "calculator_result_missing";
     const terminalErrorText =

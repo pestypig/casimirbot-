@@ -21406,7 +21406,10 @@ export function HelixAskPill({
                   <span className="mt-[0.15rem] text-cyan-300/80" aria-hidden="true">
                     -
                   </span>
-                  <span className="min-w-0 flex-1">
+                  <span
+                    className="min-w-0 flex-1"
+                    data-narrator-source-id={`helix-final-answer-bullet-${index}`}
+                  >
                     {renderHelixAskContent(bulletMatch[1] ?? trimmed)}
                   </span>
                 </div>
@@ -21417,6 +21420,7 @@ export function HelixAskPill({
               <div
                 key={`final-answer-line-${index}`}
                 className={isSectionHeader ? "pt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-100" : ""}
+                data-narrator-source-id={`helix-final-answer-line-${index}`}
               >
                 {renderHelixAskContent(trimmed)}
               </div>

@@ -87,6 +87,54 @@ describe("hoverFocusInspector", () => {
     expect(inspection?.text).toBe("One sentence.");
   });
 
+  it("reads generic Helix final answer text leaves inside console groups", () => {
+    document.body.innerHTML = `
+      <div role="group" aria-label="Turn stream">
+        <div class="final-answer-row">
+          <div class="final-answer-text">
+            This final answer should be read. The next sentence is later.
+          </div>
+        </div>
+      </div>
+    `;
+
+    const finalAnswer = document.querySelector(".final-answer-text");
+    const inspection = buildHoverFocusNarratorInspection(finalAnswer);
+
+    expect(inspection?.text).toBe("This final answer should be read.");
+    expect(inspection?.sourceId).not.toContain("Turn stream");
+  });
+
+  it("reads generic inline final answer spans", () => {
+    document.body.innerHTML = `
+      <div role="group" aria-label="Turn stream">
+        <span class="final-answer-span">Inline final answer text should be readable.</span>
+      </div>
+    `;
+
+    const finalAnswer = document.querySelector(".final-answer-span");
+    const inspection = buildHoverFocusNarratorInspection(finalAnswer);
+
+    expect(inspection?.text).toBe("Inline final answer text should be readable.");
+    expect(inspection?.sourceId).not.toContain("Turn stream");
+  });
+
+  it("treats explicit narrator source ids as readable final answer targets", () => {
+    document.body.innerHTML = `
+      <div role="group" aria-label="Turn stream">
+        <div data-narrator-source-id="helix-final-answer-line-0">
+          Source-id final answer should be readable. Later sentence.
+        </div>
+      </div>
+    `;
+
+    const finalAnswer = document.querySelector("[data-narrator-source-id]");
+    const inspection = buildHoverFocusNarratorInspection(finalAnswer);
+
+    expect(inspection?.text).toBe("Source-id final answer should be readable.");
+    expect(inspection?.sourceId).toContain("helix-final-answer-line-0");
+  });
+
   it("prefers Helix console paragraph text over broad role container labels", () => {
     document.body.innerHTML = `
       <div role="group" aria-label="Turn stream">
