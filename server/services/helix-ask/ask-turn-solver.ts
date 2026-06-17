@@ -248,6 +248,39 @@ const readStringArray = (value: unknown): string[] =>
     ? value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
     : [];
 
+const resolveAuthoritativeWorkstationToolTerminal = (
+  payload: RecordLike,
+): { terminalArtifactKind: "workstation_tool_evaluation"; finalAnswerSource: "workstation_tool_evaluation" } | null => {
+  const terminalAuthority = readRecord(payload.terminal_answer_authority);
+  const terminalWriter = readRecord(payload.terminal_authority_single_writer);
+  const terminalPresentation = readRecord(payload.terminal_presentation);
+  const resolvedSummary = readRecord(payload.resolved_turn_summary);
+  const authorityKind = readString(terminalAuthority?.terminal_artifact_kind);
+  const authoritySource = readString(terminalAuthority?.final_answer_source);
+  const writerKind =
+    readString(terminalWriter?.selected_terminal_artifact_kind) ||
+    readString(terminalWriter?.selectedArtifactKind);
+  const writerSource = readString(terminalWriter?.source);
+  const presentationKind = readString(terminalPresentation?.terminal_artifact_kind);
+  const resolvedKind = readString(resolvedSummary?.terminal_artifact_kind);
+  const resolvedSource = readString(resolvedSummary?.final_answer_source);
+  const authorityWorkstation =
+    authorityKind === "workstation_tool_evaluation" &&
+    authoritySource === "workstation_tool_evaluation" &&
+    readBoolean(terminalAuthority?.server_authoritative);
+  const materializedWorkstation =
+    writerKind === "workstation_tool_evaluation" ||
+    writerSource === "workstation_tool_evaluation" ||
+    presentationKind === "workstation_tool_evaluation" ||
+    (resolvedKind === "workstation_tool_evaluation" && resolvedSource === "workstation_tool_evaluation");
+  return authorityWorkstation && materializedWorkstation
+    ? {
+        terminalArtifactKind: "workstation_tool_evaluation",
+        finalAnswerSource: "workstation_tool_evaluation",
+      }
+    : null;
+};
+
 const unique = <T>(entries: T[]): T[] => Array.from(new Set(entries));
 
 const buildCompoundPromptCoverage = (
@@ -1104,8 +1137,17 @@ export function buildAskTurnSolverTrace(input: {
   loopParityTrace?: HelixLoopParityTrace | RecordLike | null;
 }): HelixAskTurnSolverTrace {
   const promptText = input.promptText;
-  const terminalArtifactKind = readString(input.terminalArtifactKind) || "unknown";
-  const finalAnswerSource = readString(input.finalAnswerSource) || "unknown";
+  const authoritativeWorkstationTerminal = resolveAuthoritativeWorkstationToolTerminal(input.payload);
+  if (authoritativeWorkstationTerminal) {
+    input.payload.terminal_artifact_kind = authoritativeWorkstationTerminal.terminalArtifactKind;
+    input.payload.final_answer_source = authoritativeWorkstationTerminal.finalAnswerSource;
+  }
+  const terminalArtifactKind =
+    authoritativeWorkstationTerminal?.terminalArtifactKind ??
+    (readString(input.terminalArtifactKind) || "unknown");
+  const finalAnswerSource =
+    authoritativeWorkstationTerminal?.finalAnswerSource ??
+    (readString(input.finalAnswerSource) || "unknown");
   const loopTrace = (input.loopParityTrace ?? readRecord(input.payload.loop_parity_trace)) as HelixLoopParityTrace | RecordLike | null;
   const sourceTargetInfo = sourceTargetFromPayload(input.payload);
   const promptInterpretation = interpretHelixAskPrompt(promptText);

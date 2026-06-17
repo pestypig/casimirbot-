@@ -27,6 +27,39 @@ const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : 
 const readStringArray = (value: unknown): string[] =>
   readArray(value).map(readString).filter((entry): entry is string => Boolean(entry));
 
+const resolveAuthoritativeWorkstationToolTerminal = (
+  payload: RecordLike,
+): { terminalArtifactKind: "workstation_tool_evaluation"; finalAnswerSource: "workstation_tool_evaluation" } | null => {
+  const terminalAuthority = readRecord(payload.terminal_answer_authority);
+  const terminalWriter = readRecord(payload.terminal_authority_single_writer);
+  const terminalPresentation = readRecord(payload.terminal_presentation);
+  const resolvedSummary = readRecord(payload.resolved_turn_summary);
+  const authorityKind = readString(terminalAuthority?.terminal_artifact_kind);
+  const authoritySource = readString(terminalAuthority?.final_answer_source);
+  const writerKind =
+    readString(terminalWriter?.selected_terminal_artifact_kind) ??
+    readString(terminalWriter?.selectedArtifactKind);
+  const writerSource = readString(terminalWriter?.source);
+  const presentationKind = readString(terminalPresentation?.terminal_artifact_kind);
+  const resolvedKind = readString(resolvedSummary?.terminal_artifact_kind);
+  const resolvedSource = readString(resolvedSummary?.final_answer_source);
+  const authorityWorkstation =
+    authorityKind === "workstation_tool_evaluation" &&
+    authoritySource === "workstation_tool_evaluation" &&
+    readBoolean(terminalAuthority?.server_authoritative) === true;
+  const materializedWorkstation =
+    writerKind === "workstation_tool_evaluation" ||
+    writerSource === "workstation_tool_evaluation" ||
+    presentationKind === "workstation_tool_evaluation" ||
+    (resolvedKind === "workstation_tool_evaluation" && resolvedSource === "workstation_tool_evaluation");
+  return authorityWorkstation && materializedWorkstation
+    ? {
+        terminalArtifactKind: "workstation_tool_evaluation",
+        finalAnswerSource: "workstation_tool_evaluation",
+      }
+    : null;
+};
+
 export const normalizeHelixRouteBase = (route: string | null | undefined): string | null => {
   const trimmed = readString(route);
   if (!trimmed) return null;
@@ -653,13 +686,23 @@ export function buildSolverControllerDecision(input: {
   const terminalContract = readRecord(goalSatisfaction?.terminal_contract);
   const terminalEquivalence = readRecord(payload.terminal_equivalence_harness_result);
   const liveSourceIdentity = readRecord(payload.live_source_identity_audit ?? solverTrace?.live_source_identity_audit);
-  const terminalArtifactKind = readString(payload.terminal_artifact_kind);
+  const authoritativeWorkstationTerminal = resolveAuthoritativeWorkstationToolTerminal(payload);
+  if (authoritativeWorkstationTerminal) {
+    payload.terminal_artifact_kind = authoritativeWorkstationTerminal.terminalArtifactKind;
+    payload.final_answer_source = authoritativeWorkstationTerminal.finalAnswerSource;
+  }
+  const terminalArtifactKind =
+    authoritativeWorkstationTerminal?.terminalArtifactKind ??
+    readString(payload.terminal_artifact_kind);
   const requiredTerminalKind =
+    authoritativeWorkstationTerminal?.terminalArtifactKind ??
     committedRoute?.canonical_goal.required_terminal_kind ??
     readString(canonicalGoal?.required_terminal_kind);
   const requiredTerminalKindsFromContract = readStringArray(terminalContract?.required_terminal_kinds);
   const requiredTerminalKinds =
-    committedRoute?.canonical_goal.allowed_terminal_artifact_kinds.length
+    authoritativeWorkstationTerminal
+      ? [authoritativeWorkstationTerminal.terminalArtifactKind]
+      : committedRoute?.canonical_goal.allowed_terminal_artifact_kinds.length
       ? committedRoute.canonical_goal.allowed_terminal_artifact_kinds
       : requiredTerminalKindsFromContract.length > 0
       ? requiredTerminalKindsFromContract
@@ -672,15 +715,19 @@ export function buildSolverControllerDecision(input: {
   ].map(normalizeCommittedRouteTerminalKind)));
   const forbiddenTerminalKinds =
     (committedRoute?.canonical_goal.forbidden_terminal_artifact_kinds ??
-    readStringArray(terminalContract?.forbidden_terminal_kinds)).map(normalizeCommittedRouteTerminalKind);
+    readStringArray(terminalContract?.forbidden_terminal_kinds))
+      .map(normalizeCommittedRouteTerminalKind)
+      .filter((kind) => !authoritativeWorkstationTerminal || kind !== authoritativeWorkstationTerminal.terminalArtifactKind);
   const goalSatisfactionState = readString(goalSatisfaction?.satisfaction);
   const goalNextDecision = readString(goalSatisfaction?.next_decision);
   const terminalContractGoalKind = readString(terminalContract?.goal_kind);
   const finalRoute = readString(input.finalRoute) ?? readString(payload.route_reason_code) ?? readString(payload.route);
   const finalRouteBase = normalizeHelixRouteBase(finalRoute);
   const canonicalGoalKind =
-    committedRoute?.canonical_goal.goal_kind ??
-    readString(canonicalGoal?.goal_kind);
+    authoritativeWorkstationTerminal
+      ? readString(canonicalGoal?.goal_kind) ?? committedRoute?.canonical_goal.goal_kind
+      : committedRoute?.canonical_goal.goal_kind ??
+        readString(canonicalGoal?.goal_kind);
   const stagePlayCheckpointReceiptTerminal =
     canonicalGoalKind === "live_environment_review" &&
     terminalArtifactKind === "tool_receipt" &&
@@ -799,15 +846,20 @@ export function buildSolverControllerDecision(input: {
     if (!committedRoute && disciplineGuardRequired) {
       pushUnique(blockingReasons, "committed_route_missing");
     }
-    if (committedRoute?.compatibility.violations.some((violation) => /goal|terminal|capability|source/i.test(violation))) {
+    if (
+      !authoritativeWorkstationTerminal &&
+      committedRoute?.compatibility.violations.some((violation) => /goal|terminal|capability|source/i.test(violation))
+    ) {
       pushUnique(blockingReasons, "committed_route_incompatible_goal");
     }
     const committedRouteAllowsTerminal = committedRoute
-      ? committedRouteAllowsTerminalKind({
-        committedRoute,
-        terminalArtifactKind,
-        finalAnswerSource: readString(payload.final_answer_source),
-      })
+      ? authoritativeWorkstationTerminal
+        ? true
+        : committedRouteAllowsTerminalKind({
+            committedRoute,
+            terminalArtifactKind,
+            finalAnswerSource: readString(payload.final_answer_source),
+          })
       : true;
     if (terminalArtifactKind && committedRoute && !committedRouteAllowsTerminal) {
       pushUnique(blockingReasons, "committed_route_terminal_product_mismatch");
