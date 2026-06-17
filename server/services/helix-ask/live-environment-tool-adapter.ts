@@ -162,7 +162,14 @@ import {
 } from "../stage-play/stage-play-visual-observer-profile-store";
 import {
   listStagePlayLiveSourceMailWakeRequests,
+  listStagePlayLiveSourceMailWakeResults,
 } from "../stage-play/stage-play-live-source-mail-wake-store";
+import {
+  ensureStagePlayAgentGoalSession,
+  listStagePlayAgentGoalSessions,
+  listStagePlayGoalContextUpdates,
+  syncStagePlayGoalContextFromMailbox,
+} from "../stage-play/stage-play-goal-context-store";
 import {
   recordInterimVoiceCalloutRequest,
 } from "./interim-voice-callout-store";
@@ -3958,6 +3965,203 @@ export function executeLiveEnvironmentTool(
       },
       forceNormalizedRefs: true,
       transcriptRows,
+    });
+  }
+
+  if (
+    input.tool_name === "live_env.query_workstation_goal_context" ||
+    input.tool_name === "live_env.start_agent_goal_session"
+  ) {
+    const scope = resolveLiveSourceToolScope({
+      args,
+      threadId: input.thread_id,
+      effectiveThreadId,
+      roomId,
+      environmentThreadId: environment?.thread_id ?? null,
+      environmentId: environment?.environment_id ?? input.environment_id ?? null,
+      explicitSourceId,
+    });
+    const environmentId = environment?.environment_id ?? input.environment_id ?? null;
+    const sourceRef =
+      readString(args.source_ref) ??
+      readString(args.sourceRef) ??
+      scope.sourceId ??
+      null;
+    const objectiveText =
+      readString(args.objective) ??
+      readString(args.objective_text) ??
+      readString(args.objectiveText) ??
+      environment?.objective ??
+      null;
+
+    if (input.tool_name === "live_env.start_agent_goal_session") {
+      const session = ensureStagePlayAgentGoalSession({
+        threadId: scope.mailboxThreadResolution.mailboxThreadId,
+        roomId,
+        objectiveId: readString(args.goal_id) ?? readString(args.goalId),
+        objectiveText,
+        sourceRefs: uniqueStrings([
+          sourceRef,
+          ...readStringArray(args.source_refs ?? args.sourceRefs ?? args.source_ids ?? args.sourceIds),
+        ]),
+        loopRefs: uniqueStrings([
+          `thread:${scope.mailboxThreadResolution.mailboxThreadId}`,
+          `stage_play_mail_loop:${scope.mailboxThreadResolution.mailboxThreadId}`,
+          ...readStringArray(args.loop_refs ?? args.loopRefs),
+        ]),
+      });
+      return makeObservation({
+        threadId: input.thread_id,
+        environmentId,
+        toolName: input.tool_name,
+        ok: Boolean(session),
+        summary: session
+          ? `Started or updated workstation goal session ${session.goalId}.`
+          : "A workstation goal session requires an objective before it can be started.",
+        observation: {
+          schema: "stage_play_agent_goal_session_tool_result/v1",
+          session,
+          mailboxThreadId: scope.mailboxThreadResolution.mailboxThreadId,
+          mailbox_thread_id: scope.mailboxThreadResolution.mailboxThreadId,
+          mailboxThreadResolution: scope.mailboxThreadResolution,
+          mailbox_thread_resolution: scope.mailboxThreadResolution,
+          post_tool_model_step_required: true,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+          context_role: "tool_evidence",
+          ask_context_policy: "evidence_only",
+        },
+        evidenceRefs: uniqueStrings([
+          session?.goalId,
+          scope.mailboxThreadResolution.mailboxThreadId,
+          sourceRef,
+          ...(session?.sourceRefs ?? []),
+          ...(session?.loopRefs ?? []),
+        ]),
+        producedRefs: session ? [session.goalId] : [],
+        forceNormalizedRefs: true,
+      });
+    }
+
+    const mailLimit = Math.max(1, Math.min(readNumber(args.mail_limit ?? args.mailLimit, 24), 80));
+    const updateLimit = Math.max(1, Math.min(readNumber(args.limit, 40), 120));
+    const mailItems = listStagePlayLiveSourceMailItems({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      sourceId: scope.sourceId,
+      sourceKind: scope.sourceKind,
+      limit: mailLimit,
+    });
+    const mailIds = new Set(mailItems.map((item) => item.mailId));
+    const processedMailPackets = listStagePlayProcessedMailPackets({
+      sourceId: scope.sourceId,
+      limit: 80,
+    }).filter((packet) =>
+      mailIds.size === 0 ||
+      packet.mailIds.some((mailId) => mailIds.has(mailId))
+    );
+    const microReasonerRuns = listStagePlayMicroReasonerRuns({
+      sourceId: scope.sourceId,
+      limit: 120,
+    }).filter((run) =>
+      run.mailIds.some((mailId) => mailIds.has(mailId)) ||
+      processedMailPackets.some((packet) => packet.microReasonerRunRefs.includes(run.runId))
+    );
+    const decisions = listStagePlayMailDecisions({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      limit: 40,
+    });
+    const wakeRequests = listStagePlayLiveSourceMailWakeRequests({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      limit: 40,
+    });
+    const wakeResults = listStagePlayLiveSourceMailWakeResults({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      limit: 40,
+    });
+    syncStagePlayGoalContextFromMailbox({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      mailItems,
+      processedMailPackets,
+      microReasonerRuns,
+      decisions,
+      wakeRequests,
+      wakeResults,
+    });
+    const goalId = readString(args.goal_id) ?? readString(args.goalId);
+    const goalContextUpdates = listStagePlayGoalContextUpdates({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      sourceRef,
+      loopRef: readString(args.loop_ref) ?? readString(args.loopRef),
+      contentRef: readString(args.content_ref) ?? readString(args.contentRef),
+      goalId,
+      producerKind: readString(args.producer_kind) ?? readString(args.producerKind),
+      updateKind: readString(args.update_kind) ?? readString(args.updateKind),
+      limit: updateLimit,
+    });
+    const agentGoalSessions = listStagePlayAgentGoalSessions({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      goalId,
+      sourceRef,
+      status: readString(args.status),
+      limit: Math.min(updateLimit, 50),
+    });
+    const evidenceRefs = uniqueStrings([
+      scope.mailboxThreadResolution.mailboxThreadId,
+      ...mailItems.map((item) => item.mailId),
+      ...processedMailPackets.map((packet) => packet.packetId),
+      ...microReasonerRuns.map((run) => run.runId),
+      ...goalContextUpdates.flatMap((update) => [
+        update.updateId,
+        update.contentRef,
+        ...update.evidenceRefs,
+        ...update.receiptRefs,
+      ]),
+      ...agentGoalSessions.map((session) => session.goalId),
+    ]);
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId,
+      toolName: input.tool_name,
+      ok: true,
+      summary: `Read ${goalContextUpdates.length} workstation goal-context update(s) and ${agentGoalSessions.length} goal session(s).`,
+      observation: {
+        schema: "stage_play_workstation_goal_context_read_result/v1",
+        mailboxThreadId: scope.mailboxThreadResolution.mailboxThreadId,
+        mailbox_thread_id: scope.mailboxThreadResolution.mailboxThreadId,
+        mailboxThreadResolution: scope.mailboxThreadResolution,
+        mailbox_thread_resolution: scope.mailboxThreadResolution,
+        goalContextUpdates,
+        goal_context_updates: goalContextUpdates,
+        agentGoalSessions,
+        agent_goal_sessions: agentGoalSessions,
+        syncedWindow: {
+          mailItemCount: mailItems.length,
+          processedPacketCount: processedMailPackets.length,
+          microReasonerRunCount: microReasonerRuns.length,
+        },
+        synced_window: {
+          mail_item_count: mailItems.length,
+          processed_packet_count: processedMailPackets.length,
+          micro_reasoner_run_count: microReasonerRuns.length,
+        },
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      },
+      evidenceRefs,
+      producedRefs: goalContextUpdates.map((update) => update.updateId),
+      forceNormalizedRefs: true,
     });
   }
 

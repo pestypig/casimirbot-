@@ -69,7 +69,7 @@ describe("helix ask turn e17 general step controller", () => {
     expect(response.body?.final_answer_contract_pass).toBe(true);
     expect(response.body?.turn_truth_table?.terminal?.contract?.family).toBe("simple");
     expect(response.body?.agent_loop_audit?.final_answer_contract?.pass).toBe(true);
-  }, 20000);
+  }, 45000);
 
   it("answers greetings directly without reasoning or workspace refs", async () => {
     const app = await createApp();

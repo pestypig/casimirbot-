@@ -74,6 +74,12 @@ import {
   recordStagePlayCustomMicroReasonerPromptPreset,
 } from "../../services/stage-play/stage-play-processed-mail-packet-store";
 import {
+  ensureStagePlayAgentGoalSession,
+  listStagePlayAgentGoalSessions,
+  listStagePlayGoalContextUpdates,
+  syncStagePlayGoalContextFromMailbox,
+} from "../../services/stage-play/stage-play-goal-context-store";
+import {
   applyStagePlayVisualObserverProfile,
   ensureDefaultStagePlayVisualObserverProfiles,
   getActiveStagePlayVisualObserverProfileForSource,
@@ -314,6 +320,16 @@ helixStagePlayRouter.options("/checkpoint-queue/action", (_req, res) => {
 });
 
 helixStagePlayRouter.options("/live-source-mail", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+helixStagePlayRouter.options("/goal-context", (_req, res) => {
+  setCors(res);
+  res.status(200).end();
+});
+
+helixStagePlayRouter.options("/goal-session", (_req, res) => {
   setCors(res);
   res.status(200).end();
 });
@@ -1253,6 +1269,104 @@ helixStagePlayRouter.post("/checkpoint-queue/action", (req: Request, res: Respon
   }
 });
 
+helixStagePlayRouter.get("/goal-context", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const threadId = readQueryString(req.query.threadId) ?? readQueryString(req.query.thread_id) ?? DEFAULT_STAGE_PLAY_MAILBOX_THREAD_ID;
+    const sourceRef = readQueryString(req.query.sourceRef) ?? readQueryString(req.query.source_ref) ?? readQueryString(req.query.sourceId);
+    const loopRef = readQueryString(req.query.loopRef) ?? readQueryString(req.query.loop_ref);
+    const contentRef = readQueryString(req.query.contentRef) ?? readQueryString(req.query.content_ref);
+    const goalId = readQueryString(req.query.goalId) ?? readQueryString(req.query.goal_id);
+    const limit = Math.min(Math.max(readOptionalNumber(req.query.limit) ?? 50, 1), 120);
+    return res.json({
+      ok: true,
+      schema: "stage_play_goal_context_query_response/v1",
+      threadId,
+      goalContextUpdates: listStagePlayGoalContextUpdates({
+        threadId,
+        sourceRef,
+        loopRef,
+        contentRef,
+        goalId,
+        producerKind: readQueryString(req.query.producerKind) ?? readQueryString(req.query.producer_kind),
+        updateKind: readQueryString(req.query.updateKind) ?? readQueryString(req.query.update_kind),
+        limit,
+      }),
+      agentGoalSessions: listStagePlayAgentGoalSessions({
+        threadId,
+        goalId,
+        sourceRef,
+        status: readQueryString(req.query.status),
+        limit: Math.min(limit, 50),
+      }),
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-goal-context-query-failed",
+      err,
+      schema: "stage_play_goal_context_query_response/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
+helixStagePlayRouter.post("/goal-session", (req: Request, res: Response) => {
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  try {
+    const body = readRecord(req.body) ?? {};
+    const threadId =
+      readQueryString(body.threadId) ??
+      readQueryString(body.thread_id) ??
+      readQueryString(req.query.threadId) ??
+      readQueryString(req.query.thread_id) ??
+      DEFAULT_STAGE_PLAY_MAILBOX_THREAD_ID;
+    const objectiveText =
+      readQueryString(body.objective) ??
+      readQueryString(body.objectiveText) ??
+      readQueryString(body.objective_text);
+    const session = ensureStagePlayAgentGoalSession({
+      threadId,
+      roomId: readQueryString(body.roomId) ?? readQueryString(body.room_id) ?? readQueryString(req.query.roomId),
+      objectiveId: readQueryString(body.goalId) ?? readQueryString(body.goal_id),
+      objectiveText,
+      sourceRefs: readStringArray(body.sourceRefs ?? body.source_refs ?? body.sourceIds ?? body.source_ids),
+      loopRefs: readStringArray(body.loopRefs ?? body.loop_refs),
+    });
+    if (!session) {
+      return stagePlayJsonError(res, 400, {
+        error: "stage_play_goal_session_missing_objective",
+        message: "A Stage Play goal session requires an objective.",
+        schema: "stage_play_goal_session_response/v1",
+        contextRole: "tool_evidence",
+      });
+    }
+    return res.json({
+      ok: true,
+      schema: "stage_play_goal_session_response/v1",
+      session,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+  } catch (err) {
+    return stagePlayRouteError(res, {
+      error: "stage-play-goal-session-upsert-failed",
+      err,
+      schema: "stage_play_goal_session_response/v1",
+      contextRole: "tool_evidence",
+    });
+  }
+});
+
 helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
@@ -1404,6 +1518,24 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       environmentId,
       limit: operator ? 4 : overview ? 8 : 20,
     });
+    const goalContextUpdates = syncStagePlayGoalContextFromMailbox({
+      threadId,
+      roomId,
+      mailItems,
+      processedMailPackets,
+      microReasonerRuns,
+      decisions,
+      wakeRequests,
+      wakeResults,
+    }).filter((update) =>
+      (!sourceId || update.sourceRefs.includes(sourceId)) &&
+      update.receiptRefs.some((receiptRef) => mailIds.has(receiptRef))
+    ).slice(0, operator ? 12 : overview ? 24 : 80);
+    const agentGoalSessions = listStagePlayAgentGoalSessions({
+      threadId,
+      sourceRef: sourceId,
+      limit: operator ? 4 : overview ? 8 : 20,
+    });
     const mailCompactionIntervals = listStagePlayLiveSourceMailCompactionIntervals({
       threadId,
       roomId,
@@ -1473,6 +1605,8 @@ helixStagePlayRouter.get("/live-source-mail", (req: Request, res: Response) => {
       narrativeStates,
       wakeRequests: overview ? responseWakeRequests.map(compactStagePlayWakeForOverview) : responseWakeRequests,
       wakeResults: overview ? responseWakeResults.map(compactStagePlayWakeResultForOverview) : responseWakeResults,
+      goalContextUpdates,
+      agentGoalSessions,
       budgetStates,
       compactionIntervals: {
         mail: mailCompactionIntervals,

@@ -1286,19 +1286,87 @@ const findLiveEnvironmentBindingDiagnosisTerminal = (
   };
 };
 
+type DocumentTerminalArtifactKind =
+  | "active_doc_identity"
+  | "doc_summary"
+  | "doc_location_matches"
+  | "doc_evidence_location"
+  | "doc_location_result";
+
+const isDocumentTerminalArtifactKind = (kind: string): kind is DocumentTerminalArtifactKind =>
+  kind === "active_doc_identity" ||
+  kind === "doc_summary" ||
+  kind === "doc_location_matches" ||
+  kind === "doc_evidence_location" ||
+  kind === "doc_location_result";
+
+const compatibleDocumentTerminalKinds = (requiredKind: DocumentTerminalArtifactKind): DocumentTerminalArtifactKind[] => {
+  if (requiredKind === "doc_evidence_location" || requiredKind === "doc_location_result") {
+    return ["doc_evidence_location", "doc_location_matches", "doc_location_result"];
+  }
+  return [requiredKind];
+};
+
+const documentTerminalText = (artifact: ArtifactLike): string | null => {
+  const payload = artifactPayload(artifact);
+  const kind = artifactKind(artifact);
+  const text = artifactText(artifact);
+  if (text) return text;
+  if (kind === "active_doc_identity") {
+    const path = readString(payload?.active_doc_path);
+    if (!path) return null;
+    const title = readString(payload?.active_doc_title) ?? path.split(/[\\/]/).pop() ?? path;
+    return ["Active doc:", `Document: ${title}`, `Path: ${path}`, "", "Open active doc"].join("\n");
+  }
+  if (kind === "doc_location_matches" || kind === "doc_evidence_location" || kind === "doc_location_result") {
+    const matches = readArray(payload?.matches)
+      .map(readRecord)
+      .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+      .slice(0, 6);
+    if (matches.length === 0) return null;
+    const lines = matches.map((match, index) => {
+      const line =
+        readString(match.line) ??
+        readString(match.line_number) ??
+        readString(match.lineNumber) ??
+        readString(match.anchor) ??
+        `${index + 1}`;
+      const snippet =
+        readString(match.snippet) ??
+        readString(match.text) ??
+        readString(match.heading) ??
+        readString(match.section) ??
+        "matched location";
+      return `- ${line}: ${snippet}`;
+    });
+    return ["Locations:", ...lines].join("\n");
+  }
+  return null;
+};
+
 const findGoalSatisfyingDocumentArtifact = (
   payload: Record<string, unknown>,
   artifacts: ArtifactLike[],
-): { artifact: ArtifactLike; kind: "doc_summary"; text: string; ref: string | null } | null => {
+): { artifact: ArtifactLike; kind: DocumentTerminalArtifactKind; text: string; ref: string | null } | null => {
   const goal = readRecord(payload.canonical_goal_frame);
-  if (readString(goal?.required_terminal_kind) !== "doc_summary") return null;
-  if (!routeContractAllowsTerminalKind(payload, "doc_summary")) return null;
+  const requiredTerminalKind = readString(goal?.required_terminal_kind);
+  if (!requiredTerminalKind || !isDocumentTerminalArtifactKind(requiredTerminalKind)) return null;
+  if (!routeContractAllowsTerminalKind(payload, requiredTerminalKind)) return null;
+  const compatibleKinds = compatibleDocumentTerminalKinds(requiredTerminalKind);
+  const goalEvaluation = readRecord(payload.goal_satisfaction_evaluation);
+  if (
+    readString(goalEvaluation?.satisfaction) !== "satisfied" &&
+    readString(goalEvaluation?.next_decision) !== "allow_terminal"
+  ) {
+    return null;
+  }
   for (let index = artifacts.length - 1; index >= 0; index -= 1) {
     const artifact = artifacts[index];
-    if (!artifact || artifactKind(artifact) !== "doc_summary") continue;
-    const text = artifactText(artifact);
+    const kind = artifact ? artifactKind(artifact) : null;
+    if (!artifact || !kind || !compatibleKinds.includes(kind as DocumentTerminalArtifactKind)) continue;
+    const text = documentTerminalText(artifact);
     if (!text || isStaleWorkspaceFailureText(text)) continue;
-    return { artifact, kind: "doc_summary", text, ref: artifactId(artifact) };
+    return { artifact, kind: kind as DocumentTerminalArtifactKind, text, ref: artifactId(artifact) };
   }
   return null;
 };
@@ -1909,8 +1977,10 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const rawTerminalBlockingToolRailFailure = readTerminalBlockingToolRailFailure(input.payload);
   const terminalBlockingToolRailFailure =
     rawTerminalBlockingToolRailFailure?.railFailureCode === "terminal_projection_mismatch" &&
-    existingDocEvidenceTerminal &&
-    docsTerminalMatchesRequiredGoal &&
+    (
+      (existingDocEvidenceTerminal && docsTerminalMatchesRequiredGoal) ||
+      Boolean(selectedGoalArtifact && isDocumentTerminalArtifactKind(selectedGoalArtifact.kind))
+    ) &&
     goalAllowsTerminal
       ? null
       : rawTerminalBlockingToolRailFailure;

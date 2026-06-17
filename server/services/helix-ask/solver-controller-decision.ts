@@ -261,6 +261,41 @@ const hasSatisfiedDocSummary = (payload: RecordLike, terminalArtifactKind: strin
   });
 };
 
+const hasSatisfiedDocumentTerminal = (payload: RecordLike, terminalArtifactKind: string | null): boolean => {
+  if (
+    terminalArtifactKind !== "active_doc_identity" &&
+    terminalArtifactKind !== "doc_location_matches" &&
+    terminalArtifactKind !== "doc_evidence_location" &&
+    terminalArtifactKind !== "doc_location_result"
+  ) {
+    return false;
+  }
+  const goalSatisfaction = readRecord(payload.goal_satisfaction_evaluation);
+  if (
+    readString(goalSatisfaction?.satisfaction) !== "satisfied" ||
+    readString(goalSatisfaction?.next_decision) !== "allow_terminal"
+  ) {
+    return false;
+  }
+  const terminalContract = readRecord(goalSatisfaction?.terminal_contract);
+  const requiredTerminalKinds = readStringArray(terminalContract?.required_terminal_kinds);
+  if (requiredTerminalKinds.length > 0 && !requiredTerminalKinds.includes(terminalArtifactKind)) return false;
+  return readArray(payload.current_turn_artifact_ledger).some((entry) => {
+    const artifact = readRecord(entry);
+    if (readString(artifact?.kind) !== terminalArtifactKind) return false;
+    const artifactPayload = readRecord(artifact?.payload);
+    if (terminalArtifactKind === "active_doc_identity") {
+      return Boolean(readString(artifactPayload?.active_doc_path));
+    }
+    return Boolean(
+      readString(artifactPayload?.text) ||
+        readString(artifactPayload?.summary) ||
+        readString(artifactPayload?.answer_text) ||
+        readArray(artifactPayload?.matches).length > 0,
+    );
+  });
+};
+
 const hasMaterializedScholarlyResearchAnswer = (payload: RecordLike, terminalArtifactKind: string | null): boolean => {
   if (terminalArtifactKind !== "scholarly_research_answer") return false;
   if (readString(payload.final_answer_source) !== "final_answer_draft") return false;
@@ -529,6 +564,7 @@ const isCapabilityLifecycleComplete = (payload: RecordLike, terminalArtifactKind
   if (hasSatisfiedLivePipelineReceipt(payload, terminalArtifactKind)) return true;
   if (hasSatisfiedDocOpenReceipt(payload, terminalArtifactKind)) return true;
   if (hasSatisfiedDocSummary(payload, terminalArtifactKind)) return true;
+  if (hasSatisfiedDocumentTerminal(payload, terminalArtifactKind)) return true;
   const plan = readRecord(payload.capability_plan);
   const result = readRecord(payload.capability_result);
   const ledger = readRecord(payload.capability_lifecycle_ledger);

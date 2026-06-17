@@ -16,6 +16,7 @@ import { resetStagePlayLiveSourceNarrativeStoreForTest } from "../services/stage
 import { resetStagePlayLiveSourceInterpreterProfileStoreForTest } from "../services/stage-play/stage-play-live-source-interpreter-profile-store";
 import { resetStagePlayProcessedMailPacketStoreForTest } from "../services/stage-play/stage-play-processed-mail-packet-store";
 import { resetStagePlayVisualObserverProfileStoreForTest } from "../services/stage-play/stage-play-visual-observer-profile-store";
+import { resetStagePlayGoalContextStoreForTest } from "../services/stage-play/stage-play-goal-context-store";
 
 const threadId = "thread:helix-ask-live-source-mail-tool";
 const roomId = "room:helix-ask-live-source-mail-tool";
@@ -28,6 +29,7 @@ beforeEach(() => {
   resetStagePlayLiveSourceInterpreterProfileStoreForTest();
   resetStagePlayProcessedMailPacketStoreForTest();
   resetStagePlayVisualObserverProfileStoreForTest();
+  resetStagePlayGoalContextStoreForTest();
   resetVisualSnapshotStoreForTest();
 });
 
@@ -165,6 +167,20 @@ describe("live-source mail live environment tools", () => {
       }),
       expect.objectContaining({
         tool_id: "live_env.reflect_live_source_mail_loop",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.query_workstation_goal_context",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.start_agent_goal_session",
         family: "live_env",
         creates_assistant_answer: false,
         requires_user_confirmation: false,

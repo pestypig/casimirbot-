@@ -33,6 +33,8 @@ const LIVE_ENV_TOOLS: Array<{
   { tool_id: "live_env.process_live_source_mail", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.read_processed_live_source_mail", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.reflect_live_source_mail_loop", requires_user_confirmation: false, can_run_automatically: true },
+  { tool_id: "live_env.query_workstation_goal_context", requires_user_confirmation: false, can_run_automatically: true },
+  { tool_id: "live_env.start_agent_goal_session", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.query_micro_reasoner_prompts", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.query_micro_reasoner_presets", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.draft_micro_reasoner_preset", requires_user_confirmation: false, can_run_automatically: true },

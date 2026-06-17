@@ -25,6 +25,7 @@ import {
   recordStagePlayLiveSourceMailTranscriptEntries,
   resetStagePlayLiveSourceMailTranscriptStoreForTest,
 } from "../services/stage-play/stage-play-live-source-mail-transcript-store";
+import { resetStagePlayGoalContextStoreForTest } from "../services/stage-play/stage-play-goal-context-store";
 import { resetStagePlayProcessedMailPacketStoreForTest } from "../services/stage-play/stage-play-processed-mail-packet-store";
 
 function makeApp() {
@@ -39,6 +40,7 @@ beforeEach(() => {
   resetStagePlayCheckpointQueueForTest();
   resetStagePlayLiveSourceMailboxForTest();
   resetStagePlayLiveSourceMailTranscriptStoreForTest();
+  resetStagePlayGoalContextStoreForTest();
   resetStagePlayProcessedMailPacketStoreForTest();
   resetLiveSourceChunkBufferForTest();
 });
@@ -756,6 +758,45 @@ describe("GET /api/helix/stage-play/live-source-mail", () => {
       raw_content_included: false,
     });
     expect(JSON.stringify(response.body.compactionIntervals.mail)).not.toContain("terrain and hotbar details terrain");
+  });
+});
+
+describe("GET /api/helix/stage-play/goal-context", () => {
+  it("returns agent goal sessions as non-terminal tool evidence", async () => {
+    const app = makeApp();
+
+    await request(app)
+      .post("/api/helix/stage-play/goal-session")
+      .send({
+        threadId: "helix-ask:desktop",
+        goalId: "goal:frog-classification",
+        objective: "Monitor the image source and prepare frog classification evidence.",
+        sourceRefs: ["visual_source:image-lens"],
+        loopRefs: ["stage_play_mail_loop:helix-ask:desktop"],
+      })
+      .expect(200);
+
+    const response = await request(app)
+      .get("/api/helix/stage-play/goal-context")
+      .query({ threadId: "helix-ask:desktop", goalId: "goal:frog-classification" })
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      ok: true,
+      schema: "stage_play_goal_context_query_response/v1",
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    });
+    expect(response.body.agentGoalSessions).toHaveLength(1);
+    expect(response.body.agentGoalSessions[0]).toMatchObject({
+      goalId: "goal:frog-classification",
+      authority: {
+        assistantAnswer: false,
+        finalReportsRequireTerminalAuthority: true,
+      },
+    });
   });
 });
 
