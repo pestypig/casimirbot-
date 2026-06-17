@@ -28,6 +28,20 @@ describe("hoverFocusInspector", () => {
     expect(pickNarratorSentenceAtOffset(text, text.indexOf("target"))).toBe("Beta is the target sentence.");
   });
 
+  it("splits long document sentences into phrase-sized chunks", () => {
+    const text =
+      "This document sentence starts with a long setup, then it narrows into a second phrase for quick hover reading, and it closes with a third phrase for the voice lane.";
+
+    expect(splitNarratorSentences(text, 72)).toEqual([
+      "This document sentence starts with a long setup,",
+      "then it narrows into a second phrase for quick hover reading,",
+      "and it closes with a third phrase for the voice lane.",
+    ]);
+    expect(pickNarratorSentenceAtOffset(text, text.indexOf("second phrase"), 72)).toBe(
+      "then it narrows into a second phrase for quick hover reading,",
+    );
+  });
+
   it("keeps sentence-ending punctuation and following space attached to the sentence", () => {
     const text = "Alpha starts here. Beta is the next sentence.";
 

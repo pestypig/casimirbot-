@@ -91,6 +91,32 @@ const artifactText = (artifact: ArtifactLike): string | null => {
 const stringArray = (value: unknown): string[] =>
   readArray(value).map(readString).filter((entry): entry is string => Boolean(entry));
 
+const hasLineBackedLocationPayload = (payload: RecordLike | null): boolean => {
+  if (!payload) return false;
+  const candidateArrays = [
+    readArray(payload.locations),
+    readArray(payload.matches),
+    readArray(payload.line_spans),
+    readArray(payload.snippets),
+  ].filter((items) => items.length > 0);
+  return candidateArrays.some((items) =>
+    items.some((item) => {
+      const record = readRecord(item);
+      if (!record) return false;
+      return [
+        record.line,
+        record.line_number,
+        record.line_start,
+        record.line_end,
+        record.start_line,
+        record.end_line,
+        record.start,
+        record.end,
+      ].some((value) => Number.isFinite(Number(value)));
+    }),
+  );
+};
+
 const readSameTurnCommittedRoute = (payload: RecordLike, turnId: string): HelixCommittedAskRoute | null => {
   const committed = readRecord(payload.committed_ask_route) as HelixCommittedAskRoute | null;
   if (committed?.schema !== "helix.committed_ask_route.v1") return null;
@@ -203,7 +229,10 @@ export function effectiveArtifactLedger(input: {
 
 const isDocsEvidenceArtifact = (artifact: ArtifactLike): boolean => {
   const signature = [artifactKind(artifact), artifactSchema(artifact)].join(" ");
-  return /\b(?:doc_summary|doc_location_result|doc_evidence_location|doc_location_matches|doc_equation_context|doc_equation_location|doc_calculator_evidence|agent_step_observation_packet)\b/i.test(signature);
+  if (/\b(?:doc_location_result|doc_evidence_location|doc_location_matches)\b/i.test(signature)) {
+    return hasLineBackedLocationPayload(artifactPayload(artifact));
+  }
+  return /\b(?:doc_summary|doc_equation_context|doc_equation_location|doc_calculator_evidence|agent_step_observation_packet)\b/i.test(signature);
 };
 
 const finalAnswerDraftPayload = (
@@ -298,6 +327,51 @@ const lineStartFromPayload = (payload: RecordLike | null): number | null => {
 const lineEndFromPayload = (payload: RecordLike | null): number | null => {
   const value = payload?.line_end ?? payload?.lineEnd;
   return typeof value === "number" ? value : null;
+};
+
+const citationLinesFromEvidence = (evidenceArtifacts: ArtifactLike[]): string[] => {
+  const lines: string[] = [];
+  for (const artifact of evidenceArtifacts) {
+    const payload = artifactPayload(artifact);
+    if (!payload || !hasLineBackedLocationPayload(payload)) continue;
+    const candidates = [
+      ...readArray(payload.matches),
+      ...readArray(payload.locations),
+      ...readArray(payload.snippets),
+      ...readArray(payload.line_spans),
+    ];
+    for (const item of candidates) {
+      const record = readRecord(item);
+      if (!record) continue;
+      const path =
+        normalizeDocsPath(record.path) ??
+        normalizeDocsPath(record.source_path) ??
+        normalizeDocsPath(payload.source_path) ??
+        normalizeDocsPath(payload.path) ??
+        normalizeDocsPath(payload.doc_path);
+      const lineStart = Number(record.line_start ?? record.start_line ?? record.line ?? record.start);
+      if (!path || !Number.isFinite(lineStart)) continue;
+      const lineEnd = Number(record.line_end ?? record.end_line ?? record.end ?? lineStart);
+      const lineLabel = `L${lineStart}${Number.isFinite(lineEnd) && lineEnd !== lineStart ? `-L${lineEnd}` : ""}`;
+      const heading = readString(record.heading) ?? readString(record.section) ?? readString(payload.heading);
+      lines.push(`${path}:${lineLabel}${heading ? ` (${heading})` : ""}`);
+    }
+  }
+  return unique(lines).slice(0, 6);
+};
+
+const appendDocEvidenceCitationLines = (answerText: string, evidenceArtifacts: ArtifactLike[]): string => {
+  if (/\bDocument evidence:\b/i.test(answerText) || /\/?docs\/[^\s:]+\.md:L\d+/i.test(answerText)) {
+    return answerText;
+  }
+  const citations = citationLinesFromEvidence(evidenceArtifacts);
+  if (citations.length === 0) return answerText;
+  return [
+    answerText,
+    "",
+    "Document evidence:",
+    ...citations.map((citation) => `- ${citation}`),
+  ].join("\n");
 };
 
 export function buildDocEvidenceSynthesisPlan(input: {
@@ -494,7 +568,7 @@ export function buildDocEvidenceSynthesisAnswerCandidate(input: {
   evidenceArtifacts: ArtifactLike[];
   finalAnswerDraftRef?: string | null;
 }): HelixDocEvidenceSynthesisAnswer | null {
-  const answerText = input.answerText.trim();
+  const answerText = appendDocEvidenceCitationLines(input.answerText.trim(), input.evidenceArtifacts);
   if (!answerText) return null;
   const evidenceByPath = new Map<string, { refs: Set<string>; anchors: Set<string>; title: string | null }>();
   const citedAnchors: HelixDocEvidenceSynthesisAnswer["cited_anchors"] = [];

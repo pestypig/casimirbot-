@@ -55,6 +55,65 @@ function authorityClass(event: NarratorEventV1): string {
   return "border-amber-400/40 bg-amber-500/10 text-amber-200";
 }
 
+export type NarratorCopyResult = {
+  ok: boolean;
+  method: "navigator.clipboard" | "textarea_fallback" | "unavailable" | "failed";
+  error?: string;
+};
+
+function copyErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error ?? "copy_failed");
+}
+
+export async function copyNarratorEventText(text: string): Promise<NarratorCopyResult> {
+  const value = text.trim();
+  if (!value) return { ok: false, method: "unavailable", error: "empty_text" };
+  let clipboardError: unknown = null;
+  if (typeof navigator !== "undefined" && typeof navigator.clipboard?.writeText === "function") {
+    try {
+      await navigator.clipboard.writeText(value);
+      return { ok: true, method: "navigator.clipboard" };
+    } catch (error) {
+      clipboardError = error;
+    }
+  }
+
+  if (typeof document === "undefined" || !document.body) {
+    return {
+      ok: false,
+      method: "unavailable",
+      error: clipboardError ? copyErrorMessage(clipboardError) : "clipboard_unavailable",
+    };
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  textarea.style.top = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    const copied = document.execCommand("copy");
+    return copied
+      ? { ok: true, method: "textarea_fallback" }
+      : {
+          ok: false,
+          method: "failed",
+          error: clipboardError ? copyErrorMessage(clipboardError) : "textarea_copy_failed",
+        };
+  } catch (error) {
+    return {
+      ok: false,
+      method: "failed",
+      error: `${clipboardError ? `${copyErrorMessage(clipboardError)}; ` : ""}${copyErrorMessage(error)}`,
+    };
+  } finally {
+    textarea.remove();
+  }
+}
+
 export default function NarratorPanel() {
   const { userSettings } = useHelixStartSettings();
   const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
@@ -301,7 +360,7 @@ export default function NarratorPanel() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => void navigator.clipboard?.writeText(event.text)}
+                        onClick={() => void copyNarratorEventText(event.text)}
                         className="inline-flex h-7 w-7 items-center justify-center rounded border border-white/10 bg-white/5 text-zinc-100 hover:bg-white/10"
                         title={t("narrator.action.copy")}
                         aria-label={t("narrator.action.copy")}

@@ -219,6 +219,14 @@ const resolveDocsSynthesisTerminalContract = (input: {
     requiredTerminalKind: string | null;
     requiredTerminalKindSource: string;
   }> = [
+    ...(allowedTerminalArtifactKinds.includes("doc_evidence_synthesis_answer")
+      ? [{
+          goalKind: "doc_evidence_synthesis",
+          goalKindSource: "route_product_contract.allowed_terminal_artifact_kinds",
+          requiredTerminalKind: "doc_evidence_synthesis_answer",
+          requiredTerminalKindSource: "route_product_contract.allowed_terminal_artifact_kinds",
+        }]
+      : []),
     {
       goalKind: readString(sameTurnCommittedRoute?.canonical_goal.goal_kind),
       goalKindSource: "committed_ask_route.canonical_goal.goal_kind",

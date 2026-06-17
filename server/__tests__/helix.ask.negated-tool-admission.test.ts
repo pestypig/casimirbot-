@@ -696,6 +696,36 @@ describe("Helix Ask negated/contextual tool admission", () => {
     expect(failure).toBeNull();
   });
 
+  it("extracts the cited phrase from explicit docs path locate commands", () => {
+    const promptText =
+      "Use docs-viewer.locate_in_doc to find where docs/helix-ask-codex-loop-discipline.md says routes choose procedures or tools produce observations. Answer only from the docs-viewer observation and cite the document evidence.";
+
+    expect(__testHelixAgentStepActionResolution.resolveAskTurnDocLocateQuery(promptText)).toBe(
+      "routes choose procedures",
+    );
+    expect(__testHelixAgentStepActionResolution.resolveHelixAgentStepActionForCapability({
+      capabilityKey: "docs-viewer.locate_in_doc",
+      transcript: promptText,
+      canonicalGoalFrame: {
+        ...canonicalGoal,
+        goal_kind: "doc_evidence_synthesis",
+        required_terminal_kind: "doc_evidence_synthesis_answer",
+      },
+      workspaceSnapshot: {
+        activeDocPath: "docs/helix-ask-codex-loop-discipline.md",
+      } as any,
+      capabilityArgs: {},
+    })).toMatchObject({
+      panel_id: "docs-viewer",
+      action_id: "locate_in_doc",
+      args: {
+        query: "routes choose procedures",
+        target_transcript: "routes choose procedures",
+        path: "docs/helix-ask-codex-loop-discipline.md",
+      },
+    });
+  });
+
   it("scopes 'do not write files' to mutation while admitting research plus locator observations", () => {
     const promptText =
       "Do not write files. Use scholarly papers and citations to research microtubule coherence, then place it on the theory badge graph with scale bands and uncertainty mode.";

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, ChevronRight, MessageSquarePlus, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, MessageSquarePlus, Trash2 } from "lucide-react";
 import { WorkstationStage } from "@/components/workstation/WorkstationStage";
 import { HelixAskDock } from "@/components/workstation/HelixAskDock";
 import { WorkstationResizeRail } from "@/components/workstation/WorkstationResizeRail";
@@ -59,6 +59,7 @@ export function HelixWorkstationShell({
   const deleteLocalSession = useAgiChatStore((state) => state.deleteSession);
   const ensureContextSession = useAgiChatStore((state) => state.ensureContextSession);
   const [sessionListOpen, setSessionListOpen] = useState(false);
+  const [mobileSurface, setMobileSurface] = useState<"ask" | "workstation">("ask");
   const [resizePreviewWidth, setResizePreviewWidth] = useState<number | null>(null);
   const resizeStartWidthRef = useRef(chatDock.widthPx);
 
@@ -67,6 +68,22 @@ export function HelixWorkstationShell({
       onOpenPanel(HELIX_CONVERSATION_TRACE_PANEL_ID);
     },
     [onOpenPanel],
+  );
+
+  const handleMobileOpenPanel = useCallback(
+    (panelId: PanelDefinition["id"]) => {
+      onOpenPanel(panelId);
+      setMobileSurface("workstation");
+    },
+    [onOpenPanel],
+  );
+
+  const handleMobileOpenConversation = useCallback(
+    (sessionId: string) => {
+      handleOpenConversation(sessionId);
+      setMobileSurface("workstation");
+    },
+    [handleOpenConversation],
   );
 
   const helixSessions = useMemo(() => listHelixAskChatSessions(sessions), [sessions]);
@@ -158,24 +175,57 @@ export function HelixWorkstationShell({
   const visibleWidth = chatDock.collapsed ? 56 : resizePreviewWidth ?? chatDock.widthPx;
 
   if (layoutVariant === "mobile") {
+    const showingWorkstation = mobileSurface === "workstation";
     return (
       <div
-        className="relative z-10 grid h-full min-h-0 w-full"
-        style={{
-          gridTemplateRows: chatDock.collapsed
-            ? "minmax(0, 1fr) 56px"
-            : "minmax(0, 1fr) minmax(300px, 46dvh)",
-        }}
+        className="relative z-10 h-full min-h-0 w-full overflow-hidden"
       >
-        <WorkstationStage layoutVariant="mobile" />
-        <HelixAskDock
-          widthPx="100%"
-          collapsed={chatDock.collapsed}
-          contextId={activeContextId}
-          placement="bottom"
-          onOpenPanel={onOpenPanel}
-          onOpenConversation={handleOpenConversation}
-        />
+        <section
+          aria-hidden={showingWorkstation}
+          className={`absolute inset-0 min-h-0 transform-gpu transition-transform duration-300 ease-out ${
+            showingWorkstation ? "-translate-x-full" : "translate-x-0"
+          }`}
+        >
+          <HelixAskDock
+            widthPx="100%"
+            collapsed={false}
+            contextId={activeContextId}
+            placement="bottom"
+            onOpenPanel={handleMobileOpenPanel}
+            onOpenConversation={handleMobileOpenConversation}
+          />
+        </section>
+
+        <section
+          aria-hidden={!showingWorkstation}
+          className={`absolute inset-0 min-h-0 transform-gpu bg-slate-950 transition-transform duration-300 ease-out ${
+            showingWorkstation ? "translate-x-0" : "translate-x-full"
+          }`}
+        >
+          <WorkstationStage layoutVariant="mobile" />
+        </section>
+
+        {!showingWorkstation ? (
+          <button
+            type="button"
+            aria-label="Open workstation"
+            title="Open workstation"
+            onClick={() => setMobileSurface("workstation")}
+            className="absolute left-0 top-1/2 z-40 inline-flex h-24 w-11 -translate-y-1/2 items-center justify-center rounded-r-full border border-l-0 border-cyan-300/40 bg-slate-950/90 text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.24)] backdrop-blur transition hover:bg-slate-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 active:scale-[0.98]"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            aria-label="Open Helix Ask"
+            title="Open Helix Ask"
+            onClick={() => setMobileSurface("ask")}
+            className="absolute right-0 top-1/2 z-40 inline-flex h-24 w-11 -translate-y-1/2 items-center justify-center rounded-l-full border border-r-0 border-cyan-300/40 bg-slate-950/90 text-cyan-100 shadow-[0_0_28px_rgba(34,211,238,0.24)] backdrop-blur transition hover:bg-slate-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 active:scale-[0.98]"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+        )}
       </div>
     );
   }

@@ -1,12 +1,11 @@
 import { useEffect, useRef } from "react";
-import { speakVoice, speakVoiceStream } from "@/lib/agi/api";
+import { speakVoice } from "@/lib/agi/api";
 import {
   NarratorPlaybackError,
   createNarratorPlaybackLockedDiagnostic,
   installNarratorAudioUnlockGestureListeners,
   isNarratorAudioPlaybackUnlocked,
   playNarratorVoiceResponse,
-  playNarratorVoiceStreamResponse,
   primeNarratorAudioPlayback,
 } from "@/lib/narrator/narratorAudioPlayback";
 import { buildNarratorVoiceSpeakPayload } from "@/lib/narrator/narratorVoiceBridge";
@@ -25,7 +24,9 @@ export type HoverFocusNarratorInspection = {
 
 const INSPECTOR_SOURCE_KIND = "hover_focus_inspector" as const;
 const DEFAULT_HOVER_DELAY_MS = 120;
-const DEFAULT_CHUNK_MAX_CHARS = 220;
+const DEFAULT_CHUNK_MAX_CHARS = 90;
+const MIN_PHRASE_CHUNK_CHARS = 36;
+const HOVER_VOICE_TIMEOUT_MS = 6500;
 const TEXT_NODE = 3;
 const TEXT_NODE_FILTER = 4;
 const SENTENCE_PATTERN = /[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g;
@@ -195,6 +196,30 @@ type NarratorSentenceSpan = {
   activeEnd: number;
 };
 
+function findNarratorPhraseCut(text: string, maxChars: number): { cut: number; skipChars: number } {
+  const limit = Math.max(1, Math.min(maxChars, text.length));
+  const windowText = text.slice(0, limit);
+  const boundaryPatterns = [", ", "; ", ": ", " - ", " -- "];
+  let best: { cut: number; skipChars: number } | null = null;
+  for (const boundary of boundaryPatterns) {
+    const index = windowText.lastIndexOf(boundary);
+    if (index >= MIN_PHRASE_CHUNK_CHARS && (!best || index > best.cut)) {
+      const keepsPunctuation = boundary === ", " || boundary === "; " || boundary === ": ";
+      best = {
+        cut: keepsPunctuation ? index + 1 : index,
+        skipChars: keepsPunctuation ? 1 : boundary.length,
+      };
+    }
+  }
+  if (best) return best;
+
+  const wordBoundary = windowText.lastIndexOf(" ");
+  if (wordBoundary >= MIN_PHRASE_CHUNK_CHARS) {
+    return { cut: wordBoundary, skipChars: 1 };
+  }
+  return { cut: limit, skipChars: 0 };
+}
+
 function splitNarratorSentenceSpans(text: string, maxChars = DEFAULT_CHUNK_MAX_CHARS): NarratorSentenceSpan[] {
   const cleaned = cleanNarratorText(text);
   if (!cleaned) return [];
@@ -215,8 +240,7 @@ function splitNarratorSentenceSpans(text: string, maxChars = DEFAULT_CHUNK_MAX_C
     let remaining = sentence;
     let remainingStart = start;
     while (remaining.length > maxChars) {
-      const cut = Math.max(60, remaining.lastIndexOf(" ", maxChars));
-      const skippedSpace = remaining.charAt(cut) === " ";
+      const { cut, skipChars } = findNarratorPhraseCut(remaining, maxChars);
       const chunk = cleanNarratorText(remaining.slice(0, cut));
       if (chunk) {
         spans.push({
@@ -226,8 +250,8 @@ function splitNarratorSentenceSpans(text: string, maxChars = DEFAULT_CHUNK_MAX_C
           activeEnd: remainingStart + chunk.length,
         });
       }
-      remaining = cleanNarratorText(remaining.slice(cut));
-      remainingStart += cut + (skippedSpace ? 1 : 0);
+      remaining = cleanNarratorText(remaining.slice(cut + skipChars));
+      remainingStart += cut + skipChars;
     }
     if (remaining) {
       spans.push({ text: remaining, start: remainingStart, end, activeEnd: end });
@@ -381,18 +405,24 @@ export function useNarratorHoverFocusInspector(options?: {
         activeRef.current = { key: inspection.dedupeKey, controller, eventId: event.eventId, seq };
         markQueued(event.eventId);
         void (async () => {
+          let timedOut = false;
+          const timeoutId = window.setTimeout(() => {
+            if (!isLatestActive(event.eventId, seq, controller)) return;
+            timedOut = true;
+            markFailed(event.eventId, createNarratorPlaybackLockedDiagnostic("narrator_hover_voice_timeout"));
+            controller.abort();
+          }, HOVER_VOICE_TIMEOUT_MS);
           const unlocked = isNarratorAudioPlaybackUnlocked() || await primeNarratorAudioPlayback();
-          if (!isLatestActive(event.eventId, seq, controller)) return;
-          if (!unlocked) {
-            markFailed(event.eventId, createNarratorPlaybackLockedDiagnostic());
-            return;
-          }
-          const payload = buildNarratorVoiceSpeakPayload({ event, text: inspection.text });
-          const response = await speakVoiceStream(payload, { signal: controller.signal });
-          if (!isLatestActive(event.eventId, seq, controller)) return;
-          let diagnostic;
           try {
-            diagnostic = await playNarratorVoiceStreamResponse(response, {
+            if (!isLatestActive(event.eventId, seq, controller)) return;
+            if (!unlocked) {
+              markFailed(event.eventId, createNarratorPlaybackLockedDiagnostic());
+              return;
+            }
+            const payload = buildNarratorVoiceSpeakPayload({ event, text: inspection.text });
+            const response = await speakVoice(payload, { signal: controller.signal });
+            if (!isLatestActive(event.eventId, seq, controller)) return;
+            const diagnostic = await playNarratorVoiceResponse(response, {
               signal: controller.signal,
               onDiagnostic: (nextDiagnostic) => {
                 if (isLatestActive(event.eventId, seq, controller)) {
@@ -400,22 +430,14 @@ export function useNarratorHoverFocusInspector(options?: {
                 }
               },
             });
-          } catch (error) {
-            if (controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) throw error;
-            if (!isLatestActive(event.eventId, seq, controller)) return;
-            const fallbackResponse = await speakVoice(payload, { signal: controller.signal });
-            if (!isLatestActive(event.eventId, seq, controller)) return;
-            diagnostic = await playNarratorVoiceResponse(fallbackResponse, {
-              signal: controller.signal,
-              onDiagnostic: (nextDiagnostic) => {
-                if (isLatestActive(event.eventId, seq, controller)) {
-                  recordPlaybackDiagnostic(event.eventId, nextDiagnostic);
-                }
-              },
-            });
-          }
-          if (isLatestActive(event.eventId, seq, controller)) {
-            markSpoken(event.eventId, undefined, diagnostic);
+            if (isLatestActive(event.eventId, seq, controller)) {
+              markSpoken(event.eventId, undefined, diagnostic);
+            }
+          } finally {
+            window.clearTimeout(timeoutId);
+            if (timedOut && activeRef.current?.eventId === event.eventId) {
+              activeRef.current = null;
+            }
           }
         })()
           .catch((error) => {

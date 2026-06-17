@@ -11,6 +11,8 @@ import {
   type DocumentTranslationApiResponse,
   type DocumentTranslationRequestPayload,
   type DocumentTranslationUnit,
+  type DocumentTranslationUnitsApiResponse,
+  type DocumentTranslationUnitsRequestPayload,
 } from "@shared/document-translation";
 
 export const docsTranslationRouter = Router();
@@ -19,6 +21,7 @@ const DEFAULT_OPENAI_BASE = "https://api.openai.com";
 const DEFAULT_MODEL = "gpt-4o-mini";
 const MAX_TRANSLATION_UNITS = Number.parseInt(process.env.DOC_TRANSLATION_MAX_UNITS ?? "80", 10);
 const MAX_TRANSLATION_CHARS = Number.parseInt(process.env.DOC_TRANSLATION_MAX_CHARS ?? "12000", 10);
+const MAX_VISIBLE_TRANSLATION_UNITS = Number.parseInt(process.env.DOC_TRANSLATION_VISIBLE_MAX_UNITS ?? "8", 10);
 const TRANSLATION_TIMEOUT_MS = Number.parseInt(process.env.DOC_TRANSLATION_TIMEOUT_MS ?? "55000", 10);
 
 docsTranslationRouter.post("/translate", async (req, res) => {
@@ -132,6 +135,106 @@ docsTranslationRouter.post("/translate", async (req, res) => {
   }
 });
 
+docsTranslationRouter.post("/translate-units", async (req, res) => {
+  const payload = req.body as Partial<DocumentTranslationUnitsRequestPayload>;
+  const docPath = typeof payload.doc_path === "string" ? payload.doc_path.trim() : "";
+  const locale = typeof payload.locale === "string" ? payload.locale.trim() : "";
+  const sourceHash = typeof payload.source_hash === "string" ? payload.source_hash.trim() : "";
+  const title = typeof payload.title === "string" ? payload.title.trim() : undefined;
+  const units = Array.isArray(payload.units)
+    ? payload.units.filter(isDocumentTranslationUnit).filter((unit) => unit.translatable)
+    : [];
+
+  if (!docPath || !locale || !sourceHash || units.length === 0) {
+    const response: DocumentTranslationUnitsApiResponse = {
+      ok: false,
+      error: "invalid_document_translation_units_request",
+      message: "doc_path, locale, source_hash, and at least one translatable unit are required.",
+    };
+    res.status(400).json(response);
+    return;
+  }
+  if (locale === "en") {
+    const response: DocumentTranslationUnitsApiResponse = {
+      ok: false,
+      error: "document_translation_not_needed",
+      message: "English is the canonical document source language.",
+    };
+    res.status(400).json(response);
+    return;
+  }
+
+  const selectedUnits = units.slice(0, MAX_VISIBLE_TRANSLATION_UNITS);
+  const warnings =
+    units.length > selectedUnits.length
+      ? [`Visible translation request capped at ${selectedUnits.length} units.`]
+      : [];
+
+  const providerBase = (process.env.DOC_TRANSLATION_BASE || process.env.LLM_HTTP_BASE || DEFAULT_OPENAI_BASE).trim();
+  const apiKey = (process.env.DOC_TRANSLATION_API_KEY || process.env.OPENAI_API_KEY || "").trim();
+  const model = (process.env.DOC_TRANSLATION_MODEL || process.env.LLM_HTTP_MODEL || DEFAULT_MODEL).trim();
+  const isDefaultOpenAIBase = providerBase.replace(/\/+$/, "") === DEFAULT_OPENAI_BASE;
+
+  if (isDefaultOpenAIBase && !apiKey) {
+    const response: DocumentTranslationUnitsApiResponse = {
+      ok: false,
+      error: "document_translation_unavailable",
+      message: "OPENAI_API_KEY or DOC_TRANSLATION_API_KEY is not configured.",
+    };
+    res.status(503).json(response);
+    return;
+  }
+
+  try {
+    const translations = await requestTranslations({
+      providerBase,
+      apiKey,
+      model,
+      locale,
+      docPath,
+      title,
+      units: selectedUnits.map((unit) => ({
+        unit_id: unit.unit_id,
+        kind: unit.kind,
+        source_markdown: unit.source_markdown,
+        protected_spans: unit.protected_spans,
+      })),
+    });
+    const sourceMarkdown = selectedUnits.map((unit) => unit.source_markdown).join("\n");
+    const translatedMarkdown = selectedUnits
+      .map((unit) => translations[unit.unit_id] ?? unit.source_markdown)
+      .join("\n");
+    const checks = runDocumentTranslationChecks(sourceMarkdown, selectedUnits, translatedMarkdown, translations);
+    const now = new Date().toISOString();
+    const response: DocumentTranslationUnitsApiResponse = {
+      ok: true,
+      result: {
+        schema: "casimir.document_translation_units.v1",
+        doc_path: docPath,
+        locale,
+        source_hash: sourceHash,
+        glossary_version: DOCUMENT_TRANSLATION_GLOSSARY_VERSION,
+        model_policy_version: DOCUMENT_TRANSLATION_MODEL_POLICY_VERSION,
+        translations,
+        checks,
+        warnings,
+        provider: providerBase,
+        model,
+        created_at: now,
+      },
+    };
+    res.json(response);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Document translation failed.";
+    const response: DocumentTranslationUnitsApiResponse = {
+      ok: false,
+      error: "document_translation_failed",
+      message,
+    };
+    res.status(502).json(response);
+  }
+});
+
 type TranslationRequestUnit = {
   unit_id: string;
   kind: string;
@@ -236,6 +339,18 @@ async function requestTranslations(params: {
 
 function isAbortError(error: unknown): boolean {
   return Boolean(error && typeof error === "object" && "name" in error && error.name === "AbortError");
+}
+
+function isDocumentTranslationUnit(value: unknown): value is DocumentTranslationUnit {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<DocumentTranslationUnit>;
+  return (
+    typeof candidate.unit_id === "string" &&
+    typeof candidate.kind === "string" &&
+    typeof candidate.source_markdown === "string" &&
+    typeof candidate.translatable === "boolean" &&
+    Array.isArray(candidate.protected_spans)
+  );
 }
 
 function selectUnitsForTranslation(units: DocumentTranslationUnit[]): DocumentTranslationUnit[] {

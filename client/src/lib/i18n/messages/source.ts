@@ -1951,6 +1951,20 @@ export const interfaceSourceMessages = {
     context: "Docs Viewer document translation controls.",
     screenshotSurface: "workstation",
   },
+  "docsViewer.translation.generateInline": {
+    id: "docsViewer.translation.generateInline",
+    defaultMessage: "Translate visible text",
+    description: "Button label that enables generated inline document translations for visible content.",
+    context: "Docs Viewer document translation controls.",
+    screenshotSurface: "workstation",
+  },
+  "docsViewer.translation.hideInline": {
+    id: "docsViewer.translation.hideInline",
+    defaultMessage: "Hide translations",
+    description: "Button label that hides generated inline document translations.",
+    context: "Docs Viewer document translation controls.",
+    screenshotSurface: "workstation",
+  },
   "docsViewer.translation.generating": {
     id: "docsViewer.translation.generating",
     defaultMessage: "Generating draft",
@@ -1994,6 +2008,13 @@ export const interfaceSourceMessages = {
     placeholders: { status: "string" },
     screenshotSurface: "workstation",
   },
+  "docsViewer.translation.status.inlineEnabled": {
+    id: "docsViewer.translation.status.inlineEnabled",
+    defaultMessage: "Generated translations appear under visible source text.",
+    description: "Status shown when inline document translation mode is enabled.",
+    context: "Docs Viewer document translation status.",
+    screenshotSurface: "workstation",
+  },
   "docsViewer.translation.status.unavailable": {
     id: "docsViewer.translation.status.unavailable",
     defaultMessage: "Document translation unavailable: {reason}",
@@ -2022,6 +2043,21 @@ export const interfaceSourceMessages = {
     defaultMessage: "Document translation timed out.",
     description: "Document translation failure shown when the provider does not respond in time.",
     context: "Docs Viewer document translation status.",
+    screenshotSurface: "workstation",
+  },
+  "docsViewer.translation.inlineLoading": {
+    id: "docsViewer.translation.inlineLoading",
+    defaultMessage: "Generating translation...",
+    description: "Inline placeholder shown under a document unit while translation is pending.",
+    context: "Docs Viewer generated inline translation.",
+    screenshotSurface: "workstation",
+  },
+  "docsViewer.translation.inlineError": {
+    id: "docsViewer.translation.inlineError",
+    defaultMessage: "Translation unavailable: {reason}",
+    description: "Inline error shown under a document unit when translation fails.",
+    context: "Docs Viewer generated inline translation.",
+    placeholders: { reason: "string" },
     screenshotSurface: "workstation",
   },
   "docsViewer.reading.active": {

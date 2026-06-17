@@ -22,11 +22,7 @@ import {
   docCatalogTimestamp,
   type DocManifestEntry,
 } from "@/lib/docs/docManifest";
-import { requestDocumentTranslation } from "@/lib/docs/documentTranslationClient";
-import {
-  readCachedDocumentTranslation,
-  writeCachedDocumentTranslation,
-} from "@/lib/docs/documentTranslationCache";
+import { requestDocumentTranslationUnits } from "@/lib/docs/documentTranslationClient";
 import { consumeDocViewerIntent } from "@/lib/docs/docViewer";
 import { buildWorkstationPathRef } from "@/lib/workstation/workstationDeepLink";
 import {
@@ -53,13 +49,18 @@ import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
 import {
   hashDocumentSource,
-  type DocumentTranslationResult,
+  segmentMarkdownForTranslation,
+  type DocumentTranslationUnit,
 } from "@shared/document-translation";
 
 type Translate = InterfaceTextResolver["t"];
 type DisplayMessageMap = Record<string, InterfaceMessageId>;
-type DocumentTranslationViewMode = "original" | "translated";
 type DocumentTranslationUiStatus = "idle" | "cached" | "translating" | "ready" | "unavailable" | "error";
+type InlineTranslationState = {
+  status: "loading" | "ready" | "error";
+  text?: string;
+  error?: string;
+};
 
 const proceduralStepMessages = {
   highlight_plus: "docsViewer.procedural.focusingPanelPicker",
@@ -187,6 +188,7 @@ const DOC_AUTO_READ_CHUNK_MAX = 560;
 const DOC_AUTO_READ_MAX_CHARS = 12_000;
 const DOC_AUTO_READ_TAG = "helix-doc-reader";
 const DOC_AUTO_READ_ACTIVE_CLASS = "doc-read-active-section";
+const DOC_NARRATOR_BLOCK_SELECTOR = "h1,h2,h3,h4,h5,h6,p,li,blockquote,td,th,pre";
 
 let globalDocReadController: AbortController | null = null;
 let globalDocReadAudio: HTMLAudioElement | null = null;
@@ -227,8 +229,8 @@ export function DocViewerPanel() {
   const [query, setQuery] = React.useState("");
   const [html, setHtml] = React.useState<string>("");
   const [rawMarkdown, setRawMarkdown] = React.useState<string>("");
-  const [translationResult, setTranslationResult] = React.useState<DocumentTranslationResult | null>(null);
-  const [translationViewMode, setTranslationViewMode] = React.useState<DocumentTranslationViewMode>("original");
+  const [inlineTranslationEnabled, setInlineTranslationEnabled] = React.useState(false);
+  const [inlineTranslations, setInlineTranslations] = React.useState<Record<string, InlineTranslationState>>({});
   const [translationStatus, setTranslationStatus] = React.useState<DocumentTranslationUiStatus>("idle");
   const [translationError, setTranslationError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
@@ -251,22 +253,29 @@ export function DocViewerPanel() {
   const followLiveReadRef = React.useRef(followLiveRead);
   const liveReadChunkRef = React.useRef<string | null>(null);
   const lastProceduralTraceIdRef = React.useRef<string | null>(null);
-  const translationRequestControllerRef = React.useRef<AbortController | null>(null);
+  const visibleTranslationScanTimerRef = React.useRef<number | null>(null);
+  const inFlightTranslationUnitIdsRef = React.useRef<Set<string>>(new Set());
+  const translationScopeKeyRef = React.useRef<string | null>(null);
   const currentEntry = React.useMemo(() => (currentPath ? findDocEntry(currentPath) : null), [currentPath]);
   const rawMarkdownSourceHash = React.useMemo(
     () => (rawMarkdown ? hashDocumentSource(rawMarkdown) : null),
     [rawMarkdown],
   );
+  const translationUnits = React.useMemo(
+    () => (rawMarkdown ? segmentMarkdownForTranslation(rawMarkdown) : []),
+    [rawMarkdown],
+  );
   const translationEligible =
     mode === "doc" && Boolean(currentEntry) && Boolean(rawMarkdown) && interfaceLanguage.code !== "en";
-  const translatedHtml = React.useMemo(() => {
-    if (!translationResult || !currentEntry) return "";
-    return renderDocumentMarkdownToHtml(translationResult.translated_markdown, currentEntry.relativePath);
-  }, [currentEntry, translationResult]);
-  const activeHtml =
-    translationViewMode === "translated" && translationResult
-      ? translatedHtml
-      : html;
+  const inlineTranslationMarkdown = React.useMemo(() => {
+    if (!inlineTranslationEnabled || !translationUnits.length) return rawMarkdown;
+    return renderMarkdownWithInlineTranslations(translationUnits, inlineTranslations, t);
+  }, [inlineTranslationEnabled, inlineTranslations, rawMarkdown, t, translationUnits]);
+  const activeHtml = React.useMemo(() => {
+    if (!currentEntry) return html;
+    if (!inlineTranslationEnabled) return html;
+    return renderDocumentMarkdownToHtml(inlineTranslationMarkdown, currentEntry.relativePath);
+  }, [currentEntry, html, inlineTranslationEnabled, inlineTranslationMarkdown]);
   const docScrollMemoryKey = React.useMemo(
     () => (mode === "doc" && currentPath ? `docs-viewer:doc:${currentPath}` : "docs-viewer:directory"),
     [currentPath, mode],
@@ -291,8 +300,8 @@ export function DocViewerPanel() {
     if (mode !== "doc" || !currentEntry) {
       setHtml("");
       setRawMarkdown("");
-      setTranslationResult(null);
-      setTranslationViewMode("original");
+      setInlineTranslationEnabled(false);
+      setInlineTranslations({});
       setTranslationStatus("idle");
       setTranslationError(null);
       setError(null);
@@ -330,23 +339,15 @@ export function DocViewerPanel() {
   }, [mode, currentEntry, t]);
 
   React.useEffect(() => {
-    translationRequestControllerRef.current?.abort();
-    translationRequestControllerRef.current = null;
-    setTranslationResult(null);
-    setTranslationViewMode("original");
+    inFlightTranslationUnitIdsRef.current.clear();
+    setInlineTranslationEnabled(false);
+    setInlineTranslations({});
     setTranslationStatus("idle");
     setTranslationError(null);
-    if (!translationEligible || !currentEntry || !rawMarkdownSourceHash) return;
-    const cached = readCachedDocumentTranslation({
-      docPath: currentEntry.relativePath,
-      locale: interfaceLanguage.code,
-      sourceHash: rawMarkdownSourceHash,
-    });
-    if (cached) {
-      setTranslationResult(cached);
-      setTranslationViewMode("translated");
-      setTranslationStatus("cached");
-    }
+    translationScopeKeyRef.current =
+      translationEligible && currentEntry && rawMarkdownSourceHash
+        ? `${currentEntry.relativePath}:${interfaceLanguage.code}:${rawMarkdownSourceHash}`
+        : null;
   }, [currentEntry, interfaceLanguage.code, rawMarkdownSourceHash, translationEligible]);
 
   React.useEffect(() => {
@@ -363,6 +364,11 @@ export function DocViewerPanel() {
     }, 1600);
     return () => window.clearTimeout(timeout);
   }, [activeHtml, anchor, mode]);
+
+  React.useEffect(() => {
+    if (mode !== "doc" || !contentRef.current) return;
+    applyDocNarratorSourceIds(contentRef.current, currentEntry?.relativePath ?? currentPath);
+  }, [activeHtml, currentEntry?.relativePath, currentPath, mode]);
 
   React.useLayoutEffect(() => {
     if (mode !== "doc" || anchor || loading || !contentRef.current) return;
@@ -383,6 +389,106 @@ export function DocViewerPanel() {
     return () => window.cancelAnimationFrame(firstFrame);
   }, [activeHtml, anchor, docScrollMemoryKey, loading, mode, readPanelScroll]);
 
+  const requestVisibleInlineTranslations = React.useCallback(async () => {
+    if (
+      !inlineTranslationEnabled ||
+      !translationEligible ||
+      !currentEntry ||
+      !rawMarkdownSourceHash ||
+      !contentRef.current
+    ) {
+      return;
+    }
+    const targetIds = collectVisibleTranslationUnitIds({
+      container: contentRef.current,
+      units: translationUnits,
+      translations: inlineTranslations,
+      inFlightIds: inFlightTranslationUnitIdsRef.current,
+    });
+    if (targetIds.length === 0) return;
+    const targetSet = new Set(targetIds);
+    const targetUnits = translationUnits.filter((unit) => targetSet.has(unit.unit_id));
+    if (targetUnits.length === 0) return;
+    const scopeKey = `${currentEntry.relativePath}:${interfaceLanguage.code}:${rawMarkdownSourceHash}`;
+    translationScopeKeyRef.current = scopeKey;
+    targetIds.forEach((unitId) => inFlightTranslationUnitIdsRef.current.add(unitId));
+    setTranslationStatus("translating");
+    setTranslationError(null);
+    setInlineTranslations((current) => {
+      const next = { ...current };
+      targetIds.forEach((unitId) => {
+        next[unitId] = { status: "loading" };
+      });
+      return next;
+    });
+
+    try {
+      const result = await requestDocumentTranslationUnits({
+        doc_path: currentEntry.relativePath,
+        locale: interfaceLanguage.code,
+        source_hash: rawMarkdownSourceHash,
+        title: currentEntry.title,
+        units: targetUnits,
+      });
+      if (translationScopeKeyRef.current !== scopeKey) return;
+      setInlineTranslations((current) => {
+        const next = { ...current };
+        targetUnits.forEach((unit) => {
+          const text = result.translations[unit.unit_id]?.trim();
+          next[unit.unit_id] = text
+            ? { status: "ready", text }
+            : { status: "error", error: t("docsViewer.translation.errorGeneric") };
+        });
+        return next;
+      });
+      setTranslationStatus("ready");
+    } catch (err) {
+      if (translationScopeKeyRef.current !== scopeKey) return;
+      const message =
+        isAbortError(err)
+          ? t("docsViewer.translation.errorTimeout")
+          : err instanceof Error
+            ? err.message
+            : t("docsViewer.translation.errorGeneric");
+      setInlineTranslations((current) => {
+        const next = { ...current };
+        targetIds.forEach((unitId) => {
+          next[unitId] = { status: "error", error: message };
+        });
+        return next;
+      });
+      setTranslationError(message);
+      setTranslationStatus(message.toLowerCase().includes("not configured") ? "unavailable" : "error");
+    } finally {
+      targetIds.forEach((unitId) => inFlightTranslationUnitIdsRef.current.delete(unitId));
+    }
+  }, [
+    currentEntry,
+    inlineTranslationEnabled,
+    inlineTranslations,
+    interfaceLanguage.code,
+    rawMarkdownSourceHash,
+    t,
+    translationEligible,
+    translationUnits,
+  ]);
+
+  const scheduleVisibleInlineTranslationScan = React.useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (!inlineTranslationEnabled) return;
+    if (visibleTranslationScanTimerRef.current !== null) {
+      window.clearTimeout(visibleTranslationScanTimerRef.current);
+    }
+    visibleTranslationScanTimerRef.current = window.setTimeout(() => {
+      visibleTranslationScanTimerRef.current = null;
+      void requestVisibleInlineTranslations();
+    }, 180);
+  }, [inlineTranslationEnabled, requestVisibleInlineTranslations]);
+
+  React.useEffect(() => {
+    scheduleVisibleInlineTranslationScan();
+  }, [activeHtml, inlineTranslationEnabled, scheduleVisibleInlineTranslationScan]);
+
   const handleContentScroll = React.useCallback(
     (event: React.UIEvent<HTMLDivElement>) => {
       const node = event.currentTarget;
@@ -400,8 +506,9 @@ export function DocViewerPanel() {
         quietMs: 450,
         timeoutMs: 1800,
       });
+      scheduleVisibleInlineTranslationScan();
     },
-    [docScrollMemoryKey, rememberPanelScroll],
+    [docScrollMemoryKey, rememberPanelScroll, scheduleVisibleInlineTranslationScan],
   );
 
   React.useEffect(() => {
@@ -640,42 +747,19 @@ export function DocViewerPanel() {
     viewDirectory();
   }, [isAutoReading, viewDirectory]);
 
-  const handleGenerateTranslation = React.useCallback(async () => {
-    if (!translationEligible || !currentEntry || !rawMarkdown) return;
-    translationRequestControllerRef.current?.abort();
-    const controller = new AbortController();
-    translationRequestControllerRef.current = controller;
-    setTranslationStatus("translating");
+  const handleToggleInlineTranslation = React.useCallback(() => {
+    if (!translationEligible) return;
     setTranslationError(null);
-    try {
-      const result = await requestDocumentTranslation({
-        doc_path: currentEntry.relativePath,
-        locale: interfaceLanguage.code,
-        source_markdown: rawMarkdown,
-        title: currentEntry.title,
-      }, controller.signal);
-      writeCachedDocumentTranslation(result);
-      setTranslationResult(result);
-      setTranslationViewMode("translated");
-      setTranslationStatus("ready");
-    } catch (err) {
-      if (controller.signal.aborted && translationRequestControllerRef.current !== controller) {
-        return;
-      }
-      const message =
-        isAbortError(err)
-          ? t("docsViewer.translation.errorTimeout")
-          : err instanceof Error
-            ? err.message
-            : t("docsViewer.translation.errorGeneric");
-      setTranslationError(message);
-      setTranslationStatus(message.toLowerCase().includes("not configured") ? "unavailable" : "error");
-    } finally {
-      if (translationRequestControllerRef.current === controller) {
-        translationRequestControllerRef.current = null;
-      }
+    if (inlineTranslationEnabled) {
+      translationScopeKeyRef.current = null;
+      inFlightTranslationUnitIdsRef.current.clear();
+      setTranslationStatus("idle");
+      setInlineTranslationEnabled(false);
+      return;
     }
-  }, [currentEntry, interfaceLanguage.code, rawMarkdown, t, translationEligible]);
+    setTranslationStatus("ready");
+    setInlineTranslationEnabled(true);
+  }, [inlineTranslationEnabled, translationEligible]);
 
   const rejoinLiveRead = React.useCallback(() => {
     if (!currentPath) return;
@@ -758,13 +842,10 @@ export function DocViewerPanel() {
             canRejoinLiveRead={false}
             onRejoinLiveRead={rejoinLiveRead}
             translationEligible={translationEligible}
-            translationViewMode={translationViewMode}
+            inlineTranslationEnabled={inlineTranslationEnabled}
             translationStatus={translationStatus}
-            translationResult={translationResult}
             translationError={translationError}
-            onGenerateTranslation={handleGenerateTranslation}
-            onViewOriginal={() => setTranslationViewMode("original")}
-            onViewTranslation={() => setTranslationViewMode("translated")}
+            onToggleInlineTranslation={handleToggleInlineTranslation}
             t={t}
           />
           <div
@@ -979,13 +1060,10 @@ type PanelHeaderProps = {
   canRejoinLiveRead: boolean;
   onRejoinLiveRead: () => void;
   translationEligible: boolean;
-  translationViewMode: DocumentTranslationViewMode;
+  inlineTranslationEnabled: boolean;
   translationStatus: DocumentTranslationUiStatus;
-  translationResult: DocumentTranslationResult | null;
   translationError: string | null;
-  onGenerateTranslation: () => void;
-  onViewOriginal: () => void;
-  onViewTranslation: () => void;
+  onToggleInlineTranslation: () => void;
   t: Translate;
 };
 
@@ -1004,13 +1082,10 @@ function PanelHeader({
   canRejoinLiveRead,
   onRejoinLiveRead,
   translationEligible,
-  translationViewMode,
+  inlineTranslationEnabled,
   translationStatus,
-  translationResult,
   translationError,
-  onGenerateTranslation,
-  onViewOriginal,
-  onViewTranslation,
+  onToggleInlineTranslation,
   t,
 }: PanelHeaderProps) {
   const title =
@@ -1025,7 +1100,6 @@ function PanelHeader({
   const isTranslating = translationStatus === "translating";
   const translationStatusLabel = getDocumentTranslationStatusLabel({
     translationStatus,
-    translationResult,
     translationError,
     t,
   });
@@ -1114,23 +1188,14 @@ function PanelHeader({
       </div>
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
         {translationEligible ? (
-          translationResult ? (
-            translationViewMode === "translated" ? (
-              <Button variant="outline" size="sm" onClick={onViewOriginal}>
-                {t("docsViewer.translation.viewOriginal")}
-              </Button>
-            ) : (
-              <Button variant="outline" size="sm" onClick={onViewTranslation}>
-                <Languages className="mr-1.5 h-3.5 w-3.5" />
-                {t("docsViewer.translation.viewDraft")}
-              </Button>
-            )
-          ) : (
-            <Button variant="outline" size="sm" onClick={onGenerateTranslation} disabled={isTranslating}>
-              <Languages className="mr-1.5 h-3.5 w-3.5" />
-              {isTranslating ? t("docsViewer.translation.generating") : t("docsViewer.translation.generateDraft")}
-            </Button>
-          )
+          <Button variant="outline" size="sm" onClick={onToggleInlineTranslation}>
+            <Languages className="mr-1.5 h-3.5 w-3.5" />
+            {inlineTranslationEnabled
+              ? t("docsViewer.translation.hideInline")
+              : isTranslating
+                ? t("docsViewer.translation.generating")
+                : t("docsViewer.translation.generateInline")}
+          </Button>
         ) : null}
         {isAutoReading ? (
           <Button variant="destructive" size="sm" onClick={onStopAutoRead}>
@@ -1153,7 +1218,6 @@ function isAbortError(error: unknown): boolean {
 
 function getDocumentTranslationStatusLabel(args: {
   translationStatus: DocumentTranslationUiStatus;
-  translationResult: DocumentTranslationResult | null;
   translationError: string | null;
   t: Translate;
 }): string | null {
@@ -1163,9 +1227,7 @@ function getDocumentTranslationStatusLabel(args: {
     case "translating":
       return args.t("docsViewer.translation.status.translating");
     case "ready":
-      return args.t("docsViewer.translation.status.ready", {
-        status: args.translationResult?.status ?? "generated_draft",
-      });
+      return args.t("docsViewer.translation.status.inlineEnabled");
     case "unavailable":
       return args.t("docsViewer.translation.status.unavailable", {
         reason: args.translationError ?? args.t("docsViewer.translation.errorGeneric"),
@@ -1218,6 +1280,68 @@ function formatDocCatalogDate(entry: DocManifestEntry, t: Translate): string | n
   return t("docsViewer.catalog.datedDate", { date: entry.catalogDate });
 }
 
+function renderMarkdownWithInlineTranslations(
+  units: DocumentTranslationUnit[],
+  translations: Record<string, InlineTranslationState>,
+  t: Translate,
+): string {
+  return units
+    .map((unit) => {
+      if (!unit.translatable) return unit.source_markdown;
+      const anchor = `<div class="doc-translation-anchor not-prose h-0" data-doc-translation-anchor="${escapeHtml(unit.unit_id)}"></div>`;
+      const state = translations[unit.unit_id];
+      if (!state) return `${unit.source_markdown}\n${anchor}`;
+      if (state.status === "loading") {
+        return `${unit.source_markdown}\n${anchor}\n<div class="doc-generated-translation not-prose my-2 border-l-2 border-emerald-400/60 pl-3 text-sm leading-relaxed text-emerald-300/80 animate-pulse" data-doc-translation-line="${escapeHtml(unit.unit_id)}">${escapeHtml(t("docsViewer.translation.inlineLoading"))}</div>`;
+      }
+      if (state.status === "error") {
+        return `${unit.source_markdown}\n${anchor}\n<div class="doc-generated-translation not-prose my-2 border-l-2 border-amber-400/70 pl-3 text-sm leading-relaxed text-amber-300" data-doc-translation-line="${escapeHtml(unit.unit_id)}">${escapeHtml(t("docsViewer.translation.inlineError", { reason: state.error ?? t("docsViewer.translation.errorGeneric") }))}</div>`;
+      }
+      const translatedText = formatInlineTranslationText(state.text ?? "");
+      return `${unit.source_markdown}\n${anchor}\n<div class="doc-generated-translation not-prose my-2 border-l-2 border-emerald-400/70 pl-3 text-sm leading-relaxed text-emerald-300" data-doc-translation-line="${escapeHtml(unit.unit_id)}">${escapeHtml(translatedText).replace(/\n/g, "<br />")}</div>`;
+    })
+    .join("\n");
+}
+
+function collectVisibleTranslationUnitIds(args: {
+  container: HTMLDivElement;
+  units: DocumentTranslationUnit[];
+  translations: Record<string, InlineTranslationState>;
+  inFlightIds: Set<string>;
+}): string[] {
+  const translatableUnitIds = new Set(
+    args.units.filter((unit) => unit.translatable).map((unit) => unit.unit_id),
+  );
+  const containerRect = args.container.getBoundingClientRect();
+  const verticalBuffer = Math.max(160, containerRect.height * 0.75);
+  const markers = Array.from(
+    args.container.querySelectorAll<HTMLElement>("[data-doc-translation-anchor]"),
+  );
+  const visibleIds: string[] = [];
+  for (const marker of markers) {
+    const unitId = marker.dataset.docTranslationAnchor;
+    if (!unitId || !translatableUnitIds.has(unitId)) continue;
+    if (args.translations[unitId] || args.inFlightIds.has(unitId)) continue;
+    const rect = marker.getBoundingClientRect();
+    const nearViewport =
+      rect.top >= containerRect.top - verticalBuffer &&
+      rect.top <= containerRect.bottom + verticalBuffer;
+    if (!nearViewport) continue;
+    visibleIds.push(unitId);
+    if (visibleIds.length >= 6) break;
+  }
+  return visibleIds;
+}
+
+function formatInlineTranslationText(text: string): string {
+  return text
+    .replace(/^ {0,3}#{1,6}\s+/gm, "")
+    .replace(/^\s*(?:[-*+]|\d+[.)])\s+/gm, "")
+    .replace(/^\s*\|\s?/gm, "")
+    .replace(/\s+\|\s*$/gm, "")
+    .trim();
+}
+
 function renderDocumentMarkdownToHtml(markdown: string, docPath?: string | null): string {
   let rendered: string | Promise<string>;
   try {
@@ -1228,6 +1352,37 @@ function renderDocumentMarkdownToHtml(markdown: string, docPath?: string | null)
   }
   const renderedHtml = typeof rendered === "string" ? rendered : String(rendered);
   return renderMathInRenderedHtml(renderedHtml, docPath);
+}
+
+export function applyDocNarratorSourceIds(container: ParentNode, docPath?: string | null): number {
+  const root =
+    container instanceof Element && container.matches("article")
+      ? container
+      : container.querySelector("article");
+  if (!root) return 0;
+  const docToken = stableDocNarratorToken(docPath ?? "unknown-doc");
+  let applied = 0;
+  Array.from(root.querySelectorAll<HTMLElement>(DOC_NARRATOR_BLOCK_SELECTOR)).forEach((element, index) => {
+    const text = element.textContent?.replace(/\s+/g, " ").trim() ?? "";
+    if (!text) return;
+    if (element.closest(".doc-math-clickable-display")) return;
+    if (!element.getAttribute("data-narrator-source-id")) {
+      element.setAttribute(
+        "data-narrator-source-id",
+        `docs-viewer:${docToken}:${element.tagName.toLowerCase()}:${index}`,
+      );
+      applied += 1;
+    }
+  });
+  return applied;
+}
+
+function stableDocNarratorToken(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 96) || "unknown-doc";
 }
 
 function markdownToSpeechText(markdown: string): string {

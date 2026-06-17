@@ -109,3 +109,9 @@ answer.
   nodes, resource anchors, action channels, dependency edges, comparison
   parameters, and prediction guardrails. It is evidence-normalization context,
   not a terminal prediction or policy authority.
+- `docs/audits/research/civilization-bounds-nation-procedural-network-fit-2026-06-17.md`
+  checks whether the same procedural scaffold can represent current nations on
+  a world map. It recommends a diagnostic atlas with transient, time-stamped
+  nation state vectors, event pulses, dependency edges, confidence, freshness,
+  and missing-observation overlays instead of fixed nation classes or final
+  civilization scores.

@@ -751,6 +751,120 @@ describe("Helix Ask docs evidence synthesis answer", () => {
     expect(result.coverage.missing_requirements).toEqual(expect.arrayContaining(["multi_doc_coverage"]));
   });
 
+  it("does not treat empty doc_location_matches as citation-grade docs synthesis evidence", () => {
+    const prompt =
+      "Use docs-viewer.locate_in_doc to find where docs/helix-ask-codex-loop-discipline.md says routes choose procedures. Answer only from the docs-viewer observation and cite the document evidence.";
+    const payload: Record<string, unknown> = synthesisPayload(prompt);
+    const emptyLocation = {
+      artifact_id: "doc-location:empty",
+      turn_id: turnId,
+      kind: "doc_location_matches",
+      payload: {
+        schema: "helix.doc_location_matches.v1",
+        kind: "doc_location_matches",
+        query: "routes choose procedures",
+        source_path: "/docs/helix-ask-codex-loop-discipline.md",
+        matches: [],
+        match_count: 0,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+    const finalDraft = {
+      artifact_id: "draft:empty-location",
+      turn_id: turnId,
+      kind: "final_answer_draft",
+      payload: {
+        schema: "helix.final_answer_draft.v1",
+        artifact_id: "draft:empty-location",
+        text: "The document states that routes choose procedures.",
+        support_refs: ["doc-location:empty"],
+        artifact_refs: ["doc-location:empty"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+
+    const result = materializeDocEvidenceSynthesisAnswer({
+      turnId,
+      promptText: prompt,
+      payload,
+      artifactLedger: [emptyLocation, finalDraft],
+      answerText: "The document states that routes choose procedures.",
+      finalAnswerDraftRef: "draft:empty-location",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.blocked_reason).toBe("doc_evidence_coverage_missing");
+    expect(result.coverage.missing_requirements).toEqual(
+      expect.arrayContaining(["doc_evidence_observation"]),
+    );
+  });
+
+  it("materializes line-backed doc_location_matches with visible document evidence citations", () => {
+    const prompt =
+      "Use docs-viewer.locate_in_doc to find where docs/helix-ask-codex-loop-discipline.md says routes choose procedures. Answer only from the docs-viewer observation and cite the document evidence.";
+    const payload: Record<string, unknown> = synthesisPayload(prompt);
+    const location = {
+      artifact_id: "doc-location:routes",
+      turn_id: turnId,
+      kind: "doc_location_matches",
+      payload: {
+        schema: "helix.doc_location_matches.v1",
+        kind: "doc_location_matches",
+        query: "routes choose procedures",
+        source_path: "/docs/helix-ask-codex-loop-discipline.md",
+        matches: [
+          {
+            path: "/docs/helix-ask-codex-loop-discipline.md",
+            heading: "Turn-Chain Fundamentals",
+            line_start: 196,
+            line_end: 202,
+            snippet: "Routes choose procedures. Tools produce observations.",
+          },
+        ],
+        match_count: 1,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+    const finalDraft = {
+      artifact_id: "draft:routes",
+      turn_id: turnId,
+      kind: "final_answer_draft",
+      payload: {
+        schema: "helix.final_answer_draft.v1",
+        artifact_id: "draft:routes",
+        text: "The document states that routes choose procedures.",
+        support_refs: ["doc-location:routes"],
+        artifact_refs: ["doc-location:routes"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+
+    const result = materializeDocEvidenceSynthesisAnswer({
+      turnId,
+      promptText: prompt,
+      payload,
+      artifactLedger: [location, finalDraft],
+      answerText: "The document states that routes choose procedures.",
+      finalAnswerDraftRef: "draft:routes",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.answer?.answer_text).toContain("Document evidence:");
+    expect(result.answer?.answer_text).toContain("/docs/helix-ask-codex-loop-discipline.md:L196-L202");
+    expect(result.answer?.source_docs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "/docs/helix-ask-codex-loop-discipline.md",
+          evidence_refs: ["doc-location:routes"],
+        }),
+      ]),
+    );
+  });
+
   it("does not materialize a model draft without doc support refs", () => {
     const prompt =
       "Compare docs/helix-ask-flow.md and docs/helix-ask-codex-loop-discipline.md.";

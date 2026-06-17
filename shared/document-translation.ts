@@ -64,8 +64,35 @@ export type DocumentTranslationRequestPayload = {
   title?: string;
 };
 
+export type DocumentTranslationUnitsRequestPayload = {
+  doc_path: string;
+  locale: string;
+  source_hash: string;
+  units: DocumentTranslationUnit[];
+  title?: string;
+};
+
 export type DocumentTranslationApiResponse =
   | { ok: true; result: DocumentTranslationResult }
+  | { ok: false; error: string; message: string };
+
+export type DocumentTranslationUnitsResult = {
+  schema: "casimir.document_translation_units.v1";
+  doc_path: string;
+  locale: string;
+  source_hash: string;
+  glossary_version: string;
+  model_policy_version: string;
+  translations: Record<string, string>;
+  checks: DocumentTranslationQualityCheck[];
+  warnings: string[];
+  provider?: string;
+  model?: string;
+  created_at: string;
+};
+
+export type DocumentTranslationUnitsApiResponse =
+  | { ok: true; result: DocumentTranslationUnitsResult }
   | { ok: false; error: string; message: string };
 
 const codeFencePattern = /```/g;
