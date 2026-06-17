@@ -31,6 +31,20 @@ describe("Helix Ask Civilization Bounds Roadmap tool", () => {
       moral_finality: false,
       execution_permission: false,
     });
+    expect(output.parameterScopes.map((scope) => scope.kind)).toEqual(
+      expect.arrayContaining([
+        "material_base",
+        "governance_institutional_capacity",
+        "security_conflict_exposure",
+      ]),
+    );
+    expect(output.actionChannels.map((channel) => channel.kind)).toEqual(
+      expect.arrayContaining(["economic", "coercive", "persuasive", "observation"]),
+    );
+    expect(output.proceduralScaffold.scaffoldId).toBe("spore_civilization_stage_procedural_scaffold");
+    expect(output.proceduralScaffold.blockedInterpretations).toEqual(
+      expect.arrayContaining(["Spore mechanics are not a history model."]),
+    );
     expect(output.bridgeContext?.systemIds.length).toBeGreaterThan(0);
     expect(output.bridgeContext?.missingEvidence).toContain("source_backed_capacity_measurements");
   });

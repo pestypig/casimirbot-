@@ -126,6 +126,12 @@ describe("civilization bounds roadmap v1", () => {
       moral_finality: false,
       execution_permission: false,
     });
+    expect(roadmap.parameterScopes).toEqual([]);
+    expect(roadmap.actionChannels).toEqual([]);
+    expect(roadmap.proceduralScaffold.scaffoldId).toBe("spore_civilization_stage_procedural_scaffold");
+    expect(roadmap.proceduralScaffold.blockedInterpretations).toEqual(
+      expect.arrayContaining(["Spore mechanics are not a history model."]),
+    );
   });
 
   it("clamps collaboration factors before computing collaborationValue", () => {
@@ -179,5 +185,74 @@ describe("civilization bounds roadmap v1", () => {
       },
     });
     expect(issues).toContain("authority.terminal_eligible must be false");
+  });
+
+  it("validates procedural comparison fields exposed to tool calls", () => {
+    const roadmap = buildCivilizationBoundsRoadmapV1({
+      ...buildValidRoadmap(),
+      parameterScopes: [
+        {
+          scopeId: "parameter:material_base",
+          kind: "material_base",
+          label: "Material base",
+          description: "Resource and production constraints.",
+          indicatorRefs: ["world_bank.world_development_indicators"],
+          missingEvidence: ["material_inventory_receipts"],
+          evidenceRefs: ["fixture:parameter"],
+          claimTier: "declared_scenario",
+        },
+      ],
+      actionChannels: [
+        {
+          channelId: "action-channel:economic",
+          kind: "economic",
+          label: "Economic channel",
+          sporeAnalogy: "trade route",
+          realWorldInterpretation: "Trade and supply-chain dependency.",
+          admissibleUses: ["compare dependencies"],
+          blockedUses: ["certify forecasts"],
+          evidenceRefs: ["fixture:channel"],
+          claimTier: "declared_scenario",
+        },
+      ],
+      dependencyChains: [
+        {
+          chainId: "chain:a",
+          label: "Chain A",
+          nodeBadgeIds: ["badge:a"],
+          edgeIds: ["edge:a"],
+          bottlenecks: ["material_inventory_receipts"],
+          missingEvidence: ["material_inventory_receipts"],
+          evidenceRefs: ["fixture:chain"],
+          claimTier: "declared_scenario",
+        },
+      ],
+      comparisonCases: [
+        {
+          caseId: "comparison:a",
+          label: "Stable peer",
+          sourceClass: "historical_case",
+          similarityAxes: ["material_base"],
+          blockers: ["named_case_refs"],
+          evidenceRefs: ["fixture:comparison"],
+          claimTier: "declared_scenario",
+        },
+      ],
+      hypothesisClaims: [
+        {
+          claimId: "hypothesis:a",
+          claim: "This remains a bounded hypothesis.",
+          strength: "bounded",
+          blockers: ["counterevidence_refs"],
+          evidenceRefs: ["fixture:hypothesis"],
+          claimTier: "declared_scenario",
+        },
+      ],
+    });
+
+    expect(validateCivilizationBoundsRoadmapV1(roadmap)).toEqual([]);
+    expect(roadmap.parameterScopes[0].kind).toBe("material_base");
+    expect(roadmap.actionChannels[0].kind).toBe("economic");
+    expect(roadmap.hypothesisClaims[0].strength).toBe("bounded");
   });
 });

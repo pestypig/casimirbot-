@@ -3,6 +3,7 @@ export type HelixVisibleTerminalResolution = {
   source: string;
   backendTerminalText: string | null;
   terminalKind: string | null;
+  terminalArtifactKind: string | null;
   finalAnswerSource: string | null;
   terminalErrorCode: string | null;
   authorityVerified: boolean;
@@ -69,6 +70,18 @@ function firstText(...values: unknown[]): string {
     if (text && !isInvalidTerminalText(text)) return text;
   }
   return "";
+}
+
+function normalizeFinalAnswerSourceForTerminalKind(source: string | null, terminalArtifactKind: string | null): string | null {
+  if (
+    source === "final_answer_draft" &&
+    terminalArtifactKind &&
+    terminalArtifactKind !== "model_synthesized_answer" &&
+    terminalArtifactKind !== "final_answer_draft"
+  ) {
+    return terminalArtifactKind;
+  }
+  return source;
 }
 
 function renderTypedFailureFallback(code?: string | null): string {
@@ -239,28 +252,66 @@ export function resolveHelixVisibleTerminal(
   const authority = firstRecord(record?.terminal_answer_authority, debug?.terminal_answer_authority, agentLoop?.terminal_answer_authority);
   const presentation = firstRecord(record?.terminal_presentation, debug?.terminal_presentation, agentLoop?.terminal_presentation);
   const summary = firstRecord(record?.resolved_turn_summary, debug?.resolved_turn_summary);
+  const sourceCapabilityTurn = isSourceOrCapabilityTurn({ record, debug, agentLoop });
   const recoveredModelDirectAnswer =
-    hasSatisfiedDirectAnswerGoal(record, debug) ? directAnswerTextFromRecord(record, debug) : "";
+    !sourceCapabilityTurn && hasSatisfiedDirectAnswerGoal(record, debug) ? directAnswerTextFromRecord(record, debug) : "";
 
-  const terminalErrorCode = firstText(record?.terminal_error_code, debug?.terminal_error_code, summary?.terminal_error_code) || null;
   const terminalKind =
     firstText(
       envelope?.terminal_kind,
+      authority?.terminal_kind,
+      summary?.terminal_kind,
+    ) || null;
+  const terminalArtifactKind =
+    firstText(
+      envelope?.terminal_artifact_kind,
       authority?.terminal_artifact_kind,
       presentation?.terminal_artifact_kind,
       record?.terminal_artifact_kind,
       debug?.terminal_artifact_kind,
       summary?.terminal_artifact_kind,
     ) || null;
-  const finalAnswerSource =
+  const rawFinalAnswerSource =
     firstText(envelope?.final_answer_source, authority?.final_answer_source, record?.final_answer_source, debug?.final_answer_source) ||
-    (terminalErrorCode ? "typed_failure" : null);
+    null;
+  const finalAnswerSource = normalizeFinalAnswerSourceForTerminalKind(rawFinalAnswerSource, terminalArtifactKind);
+  const envelopeText = firstText(envelope?.terminal_text);
+  const terminalAuthorityIndicatesSuccess =
+    Boolean(authority?.server_authoritative === true) &&
+    readString(authority?.terminal_kind) !== "failure" &&
+    readString(authority?.final_answer_source) !== "typed_failure" &&
+    readString(authority?.terminal_artifact_kind) !== "typed_failure";
+  const envelopeIndicatesSuccess =
+    Boolean(envelopeText) &&
+    readString(envelope?.terminal_kind) !== "failure" &&
+    readString(envelope?.final_answer_source) !== "typed_failure" &&
+    readString(envelope?.terminal_artifact_kind) !== "typed_failure";
+  const terminalErrorCode =
+    envelopeIndicatesSuccess || terminalAuthorityIndicatesSuccess
+      ? null
+      : firstText(record?.terminal_error_code, debug?.terminal_error_code, summary?.terminal_error_code) || null;
+  const effectiveFinalAnswerSource = finalAnswerSource || (terminalErrorCode ? "typed_failure" : null);
   const selectedFinalAnswer = firstText(record?.selected_final_answer, debug?.selected_final_answer);
   const selectedFinalAnswerIsAuthoritativeModelDraft =
     !terminalErrorCode &&
-    terminalKind === "model_synthesized_answer" &&
-    finalAnswerSource === "final_answer_draft" &&
+    !envelope &&
+    terminalArtifactKind === "model_synthesized_answer" &&
+    effectiveFinalAnswerSource === "final_answer_draft" &&
     Boolean(selectedFinalAnswer);
+
+  if (envelopeText) {
+    return {
+      text: envelopeText,
+      source: "terminal_answer_envelope",
+      backendTerminalText: envelopeText,
+      terminalKind,
+      terminalArtifactKind,
+      finalAnswerSource: effectiveFinalAnswerSource,
+      terminalErrorCode,
+      authorityVerified: Boolean(authority?.server_authoritative === true),
+      usedLegacyShadow: false,
+    };
+  }
 
   if (selectedFinalAnswerIsAuthoritativeModelDraft) {
     return {
@@ -268,7 +319,8 @@ export function resolveHelixVisibleTerminal(
       source: "selected_final_answer",
       backendTerminalText: selectedFinalAnswer,
       terminalKind,
-      finalAnswerSource,
+      terminalArtifactKind,
+      finalAnswerSource: effectiveFinalAnswerSource,
       terminalErrorCode,
       authorityVerified: Boolean(authority?.server_authoritative === true),
       usedLegacyShadow: false,
@@ -283,21 +335,8 @@ export function resolveHelixVisibleTerminal(
       source: "terminal_authority_single_writer",
       backendTerminalText: singleWriterText,
       terminalKind,
-      finalAnswerSource,
-      terminalErrorCode,
-      authorityVerified: Boolean(authority?.server_authoritative === true),
-      usedLegacyShadow: false,
-    };
-  }
-
-  const envelopeText = firstText(envelope?.terminal_text);
-  if (envelopeText) {
-    return {
-      text: envelopeText,
-      source: "terminal_answer_envelope",
-      backendTerminalText: envelopeText,
-      terminalKind,
-      finalAnswerSource,
+      terminalArtifactKind,
+      finalAnswerSource: effectiveFinalAnswerSource,
       terminalErrorCode,
       authorityVerified: Boolean(authority?.server_authoritative === true),
       usedLegacyShadow: false,
@@ -311,7 +350,8 @@ export function resolveHelixVisibleTerminal(
       source: "terminal_answer_authority",
       backendTerminalText: authorityText,
       terminalKind,
-      finalAnswerSource,
+      terminalArtifactKind,
+      finalAnswerSource: effectiveFinalAnswerSource,
       terminalErrorCode,
       authorityVerified: true,
       usedLegacyShadow: false,
@@ -319,13 +359,14 @@ export function resolveHelixVisibleTerminal(
   }
 
   const presentationText = firstText(presentation?.concise_text);
-  if (presentationText) {
+  if (presentationText && !sourceCapabilityTurn) {
     return {
       text: presentationText,
       source: "terminal_presentation",
       backendTerminalText: presentationText,
       terminalKind,
-      finalAnswerSource,
+      terminalArtifactKind,
+      finalAnswerSource: effectiveFinalAnswerSource,
       terminalErrorCode,
       authorityVerified: false,
       usedLegacyShadow: false,
@@ -338,7 +379,8 @@ export function resolveHelixVisibleTerminal(
       source: "model_direct_answer_artifact",
       backendTerminalText: recoveredModelDirectAnswer,
       terminalKind: terminalKind ?? "direct_answer_text",
-      finalAnswerSource: finalAnswerSource ?? "model_direct_answer",
+      terminalArtifactKind: terminalArtifactKind ?? "direct_answer_text",
+      finalAnswerSource: effectiveFinalAnswerSource ?? "model_direct_answer",
       terminalErrorCode,
       authorityVerified: Boolean(authority?.server_authoritative === true),
       usedLegacyShadow: false,
@@ -346,7 +388,7 @@ export function resolveHelixVisibleTerminal(
   }
 
   const typedFailureText =
-    finalAnswerSource === "typed_failure" || terminalKind === "typed_failure" || terminalErrorCode
+    effectiveFinalAnswerSource === "typed_failure" || terminalKind === "failure" || terminalArtifactKind === "typed_failure" || terminalErrorCode
       ? firstText(record?.typed_failure && readRecord(record.typed_failure)?.answer_text, record?.selected_final_answer, debug?.selected_final_answer) ||
         renderTypedFailureFallback(terminalErrorCode)
       : "";
@@ -355,15 +397,15 @@ export function resolveHelixVisibleTerminal(
       text: typedFailureText,
       source: "typed_failure",
       backendTerminalText: typedFailureText,
-      terminalKind: terminalKind ?? "typed_failure",
-      finalAnswerSource: finalAnswerSource ?? "typed_failure",
+      terminalKind: terminalKind ?? "failure",
+      terminalArtifactKind: terminalArtifactKind ?? "typed_failure",
+      finalAnswerSource: effectiveFinalAnswerSource ?? "typed_failure",
       terminalErrorCode,
       authorityVerified: false,
       usedLegacyShadow: false,
     };
   }
 
-  const sourceCapabilityTurn = isSourceOrCapabilityTurn({ record, debug, agentLoop });
   if (sourceCapabilityTurn) {
     const text = renderTypedFailureFallback("terminal_authority_missing");
     return {
@@ -371,7 +413,8 @@ export function resolveHelixVisibleTerminal(
       source: "terminal_authority_missing",
       backendTerminalText: null,
       terminalKind,
-      finalAnswerSource,
+      terminalArtifactKind,
+      finalAnswerSource: effectiveFinalAnswerSource,
       terminalErrorCode: terminalErrorCode ?? "terminal_authority_missing",
       authorityVerified: false,
       usedLegacyShadow: false,
@@ -393,7 +436,8 @@ export function resolveHelixVisibleTerminal(
     source: legacyText ? "legacy_shadow" : "empty",
     backendTerminalText: null,
     terminalKind,
-    finalAnswerSource,
+    terminalArtifactKind,
+    finalAnswerSource: effectiveFinalAnswerSource,
     terminalErrorCode,
     authorityVerified: false,
     usedLegacyShadow: Boolean(legacyText),

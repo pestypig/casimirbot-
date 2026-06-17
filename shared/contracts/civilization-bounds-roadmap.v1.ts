@@ -64,6 +64,39 @@ export const CIVILIZATION_BADGE_KINDS = [
   "zen_binding",
 ] as const;
 
+export const CIVILIZATION_PARAMETER_SCOPE_KINDS = [
+  "material_base",
+  "governance_institutional_capacity",
+  "security_conflict_exposure",
+  "social_cohesion_demographic_pressure",
+  "information_ideology_legitimacy",
+  "environment_entropy_pressure",
+] as const;
+
+export const CIVILIZATION_ACTION_CHANNEL_KINDS = [
+  "economic",
+  "coercive",
+  "persuasive",
+  "diplomatic",
+  "governance_review",
+  "infrastructure_buildout",
+  "observation",
+] as const;
+
+export const CIVILIZATION_COMPARISON_SOURCE_CLASSES = [
+  "historical_case",
+  "current_snapshot",
+  "future_scenario",
+  "fictional_construct",
+  "declared_scenario",
+] as const;
+
+export const CIVILIZATION_HYPOTHESIS_STRENGTHS = [
+  "weak",
+  "bounded",
+  "strong",
+] as const;
+
 export type CivilizationScopeBoundaryV1 =
   (typeof CIVILIZATION_SCOPE_BOUNDARIES)[number];
 export type CivilizationClaimTierV1 =
@@ -74,6 +107,14 @@ export type CivilizationRelationKindV1 =
   (typeof CIVILIZATION_RELATION_KINDS)[number];
 export type CivilizationBoundsBadgeKindV1 =
   (typeof CIVILIZATION_BADGE_KINDS)[number];
+export type CivilizationParameterScopeKindV1 =
+  (typeof CIVILIZATION_PARAMETER_SCOPE_KINDS)[number];
+export type CivilizationActionChannelKindV1 =
+  (typeof CIVILIZATION_ACTION_CHANNEL_KINDS)[number];
+export type CivilizationComparisonSourceClassV1 =
+  (typeof CIVILIZATION_COMPARISON_SOURCE_CLASSES)[number];
+export type CivilizationHypothesisStrengthV1 =
+  (typeof CIVILIZATION_HYPOTHESIS_STRENGTHS)[number];
 
 export type CivilizationQuantityV1 = {
   value?: number | null;
@@ -225,6 +266,73 @@ export type CivilizationBoundsFalsificationHookV1 = {
   evidenceRefs: string[];
 };
 
+export type CivilizationParameterScopeV1 = {
+  scopeId: string;
+  kind: CivilizationParameterScopeKindV1;
+  label: string;
+  description: string;
+  indicatorRefs: string[];
+  missingEvidence: string[];
+  evidenceRefs: string[];
+  claimTier: CivilizationClaimTierV1;
+};
+
+export type CivilizationActionChannelV1 = {
+  channelId: string;
+  kind: CivilizationActionChannelKindV1;
+  label: string;
+  sporeAnalogy: string;
+  realWorldInterpretation: string;
+  admissibleUses: string[];
+  blockedUses: string[];
+  evidenceRefs: string[];
+  claimTier: CivilizationClaimTierV1;
+};
+
+export type CivilizationDependencyChainV1 = {
+  chainId: string;
+  label: string;
+  nodeBadgeIds: string[];
+  edgeIds: string[];
+  bottlenecks: string[];
+  missingEvidence: string[];
+  evidenceRefs: string[];
+  claimTier: CivilizationClaimTierV1;
+};
+
+export type CivilizationComparisonCaseV1 = {
+  caseId: string;
+  label: string;
+  sourceClass: CivilizationComparisonSourceClassV1;
+  similarityAxes: string[];
+  blockers: string[];
+  evidenceRefs: string[];
+  claimTier: CivilizationClaimTierV1;
+};
+
+export type CivilizationHypothesisClaimV1 = {
+  claimId: string;
+  claim: string;
+  strength: CivilizationHypothesisStrengthV1;
+  blockers: string[];
+  evidenceRefs: string[];
+  claimTier: CivilizationClaimTierV1;
+};
+
+export type CivilizationProceduralScaffoldV1 = {
+  scaffoldId: "spore_civilization_stage_procedural_scaffold";
+  source: "spore_civilization_stage_research";
+  designMetaphor: string;
+  surfaces: Array<{
+    sporeSurface: string;
+    proceduralMeaning: string;
+    roadmapField: string;
+  }>;
+  blockedInterpretations: string[];
+  researchRefs: string[];
+  evidenceRefs: string[];
+};
+
 export type CivilizationBoundsBridgeContextV1 = {
   theoryBadgeIds: string[];
   zenNodeIds: string[];
@@ -261,6 +369,12 @@ export type CivilizationBoundsRoadmapV1 = {
   edges: CivilizationBoundsEdgeV1[];
   collaborationBounds: CivilizationCollaborationBoundV1[];
   falsificationHooks: CivilizationBoundsFalsificationHookV1[];
+  parameterScopes: CivilizationParameterScopeV1[];
+  actionChannels: CivilizationActionChannelV1[];
+  dependencyChains: CivilizationDependencyChainV1[];
+  comparisonCases: CivilizationComparisonCaseV1[];
+  hypothesisClaims: CivilizationHypothesisClaimV1[];
+  proceduralScaffold: CivilizationProceduralScaffoldV1;
   theoryBindings: Array<{
     badgeId: string;
     theoryBadgeIds: string[];
@@ -280,10 +394,26 @@ export type CivilizationBoundsRoadmapV1 = {
 
 export type BuildCivilizationBoundsRoadmapInput = Omit<
   CivilizationBoundsRoadmapV1,
-  "artifactId" | "schemaVersion" | "generatedAt" | "roadmapId" | "authority"
+  | "artifactId"
+  | "schemaVersion"
+  | "generatedAt"
+  | "roadmapId"
+  | "authority"
+  | "parameterScopes"
+  | "actionChannels"
+  | "dependencyChains"
+  | "comparisonCases"
+  | "hypothesisClaims"
+  | "proceduralScaffold"
 > & {
   generatedAt?: string;
   roadmapId?: string;
+  parameterScopes?: CivilizationParameterScopeV1[];
+  actionChannels?: CivilizationActionChannelV1[];
+  dependencyChains?: CivilizationDependencyChainV1[];
+  comparisonCases?: CivilizationComparisonCaseV1[];
+  hypothesisClaims?: CivilizationHypothesisClaimV1[];
+  proceduralScaffold?: CivilizationProceduralScaffoldV1;
 };
 
 export type BuildCivilizationCollaborationBoundInput = Omit<
@@ -315,6 +445,56 @@ const FORBIDDEN_CIVILIZATION_BOUNDS_PATTERNS = [
   /\bprediction guaranteed\b/i,
   /\bterminal authority\b/i,
 ] as const;
+
+const DEFAULT_PROCEDURAL_SCAFFOLD: CivilizationProceduralScaffoldV1 = {
+  scaffoldId: "spore_civilization_stage_procedural_scaffold",
+  source: "spore_civilization_stage_research",
+  designMetaphor:
+    "Spore Civilization Stage is used only as procedural grammar for nodes, resources, action channels, dependencies, and maturity gates.",
+  surfaces: [
+    {
+      sporeSurface: "city",
+      proceduralMeaning: "concentrated capability node",
+      roadmapField: "systems,badges",
+    },
+    {
+      sporeSurface: "spice geyser",
+      proceduralMeaning: "resource anchor",
+      roadmapField: "parameterScopes,badges",
+    },
+    {
+      sporeSurface: "vehicle",
+      proceduralMeaning: "mobility or projection capacity",
+      roadmapField: "actionChannels,capabilities",
+    },
+    {
+      sporeSurface: "trade route",
+      proceduralMeaning: "dependency and integration edge",
+      roadmapField: "edges,dependencyChains",
+    },
+    {
+      sporeSurface: "economic, military, religious takeover",
+      proceduralMeaning: "bounded action channels",
+      roadmapField: "actionChannels,hypothesisClaims",
+    },
+    {
+      sporeSurface: "stage completion",
+      proceduralMeaning: "maturity transition into a larger operating environment",
+      roadmapField: "phases,comparisonCases",
+    },
+  ],
+  blockedInterpretations: [
+    "Spore mechanics are not a history model.",
+    "Spore pathways do not certify real-world predictions.",
+    "Procedural comparison does not authorize policy, coercion, or moral finality.",
+  ],
+  researchRefs: [
+    "docs/audits/research/civilization-bounds-spore-procedural-systems-2026-06-17.md",
+  ],
+  evidenceRefs: [
+    "research:civilization-bounds-spore-procedural-systems-2026-06-17",
+  ],
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -414,6 +594,12 @@ export function buildCivilizationBoundsRoadmapV1(
     edges: input.edges,
     collaborationBounds: input.collaborationBounds,
     falsificationHooks: input.falsificationHooks,
+    parameterScopes: input.parameterScopes ?? [],
+    actionChannels: input.actionChannels ?? [],
+    dependencyChains: input.dependencyChains ?? [],
+    comparisonCases: input.comparisonCases ?? [],
+    hypothesisClaims: input.hypothesisClaims ?? [],
+    proceduralScaffold: input.proceduralScaffold ?? DEFAULT_PROCEDURAL_SCAFFOLD,
     theoryBindings: input.theoryBindings,
     zenBindings: input.zenBindings,
     missingEvidence: input.missingEvidence,
@@ -589,6 +775,134 @@ function validateFalsificationHook(prefix: string, value: unknown, issues: strin
   validateStringArray(`${prefix}.evidenceRefs`, value.evidenceRefs, issues);
 }
 
+function validateParameterScope(prefix: string, value: unknown, issues: string[]): void {
+  if (!isRecord(value)) {
+    issues.push(`${prefix} must be an object`);
+    return;
+  }
+  for (const field of ["scopeId", "label", "description"] as const) {
+    if (!isNonEmptyString(value[field])) issues.push(`${prefix}.${field} must be a non-empty string`);
+  }
+  if (!includes(CIVILIZATION_PARAMETER_SCOPE_KINDS, value.kind)) {
+    issues.push(`${prefix}.kind is invalid`);
+  }
+  validateStringArray(`${prefix}.indicatorRefs`, value.indicatorRefs, issues);
+  validateStringArray(`${prefix}.missingEvidence`, value.missingEvidence, issues);
+  validateStringArray(`${prefix}.evidenceRefs`, value.evidenceRefs, issues);
+  if (!includes(CIVILIZATION_CLAIM_TIERS, value.claimTier)) {
+    issues.push(`${prefix}.claimTier is invalid`);
+  }
+}
+
+function validateActionChannel(prefix: string, value: unknown, issues: string[]): void {
+  if (!isRecord(value)) {
+    issues.push(`${prefix} must be an object`);
+    return;
+  }
+  for (const field of ["channelId", "label", "sporeAnalogy", "realWorldInterpretation"] as const) {
+    if (!isNonEmptyString(value[field])) issues.push(`${prefix}.${field} must be a non-empty string`);
+  }
+  if (!includes(CIVILIZATION_ACTION_CHANNEL_KINDS, value.kind)) {
+    issues.push(`${prefix}.kind is invalid`);
+  }
+  validateStringArray(`${prefix}.admissibleUses`, value.admissibleUses, issues);
+  validateStringArray(`${prefix}.blockedUses`, value.blockedUses, issues);
+  validateStringArray(`${prefix}.evidenceRefs`, value.evidenceRefs, issues);
+  if (!includes(CIVILIZATION_CLAIM_TIERS, value.claimTier)) {
+    issues.push(`${prefix}.claimTier is invalid`);
+  }
+}
+
+function validateDependencyChain(prefix: string, value: unknown, issues: string[]): void {
+  if (!isRecord(value)) {
+    issues.push(`${prefix} must be an object`);
+    return;
+  }
+  for (const field of ["chainId", "label"] as const) {
+    if (!isNonEmptyString(value[field])) issues.push(`${prefix}.${field} must be a non-empty string`);
+  }
+  validateStringArray(`${prefix}.nodeBadgeIds`, value.nodeBadgeIds, issues);
+  validateStringArray(`${prefix}.edgeIds`, value.edgeIds, issues);
+  validateStringArray(`${prefix}.bottlenecks`, value.bottlenecks, issues);
+  validateStringArray(`${prefix}.missingEvidence`, value.missingEvidence, issues);
+  validateStringArray(`${prefix}.evidenceRefs`, value.evidenceRefs, issues);
+  if (!includes(CIVILIZATION_CLAIM_TIERS, value.claimTier)) {
+    issues.push(`${prefix}.claimTier is invalid`);
+  }
+}
+
+function validateComparisonCase(prefix: string, value: unknown, issues: string[]): void {
+  if (!isRecord(value)) {
+    issues.push(`${prefix} must be an object`);
+    return;
+  }
+  for (const field of ["caseId", "label"] as const) {
+    if (!isNonEmptyString(value[field])) issues.push(`${prefix}.${field} must be a non-empty string`);
+  }
+  if (!includes(CIVILIZATION_COMPARISON_SOURCE_CLASSES, value.sourceClass)) {
+    issues.push(`${prefix}.sourceClass is invalid`);
+  }
+  validateStringArray(`${prefix}.similarityAxes`, value.similarityAxes, issues);
+  validateStringArray(`${prefix}.blockers`, value.blockers, issues);
+  validateStringArray(`${prefix}.evidenceRefs`, value.evidenceRefs, issues);
+  if (!includes(CIVILIZATION_CLAIM_TIERS, value.claimTier)) {
+    issues.push(`${prefix}.claimTier is invalid`);
+  }
+}
+
+function validateHypothesisClaim(prefix: string, value: unknown, issues: string[]): void {
+  if (!isRecord(value)) {
+    issues.push(`${prefix} must be an object`);
+    return;
+  }
+  for (const field of ["claimId", "claim"] as const) {
+    if (!isNonEmptyString(value[field])) issues.push(`${prefix}.${field} must be a non-empty string`);
+  }
+  if (!includes(CIVILIZATION_HYPOTHESIS_STRENGTHS, value.strength)) {
+    issues.push(`${prefix}.strength is invalid`);
+  }
+  validateStringArray(`${prefix}.blockers`, value.blockers, issues);
+  validateStringArray(`${prefix}.evidenceRefs`, value.evidenceRefs, issues);
+  if (!includes(CIVILIZATION_CLAIM_TIERS, value.claimTier)) {
+    issues.push(`${prefix}.claimTier is invalid`);
+  }
+}
+
+function validateProceduralScaffold(value: unknown, issues: string[]): void {
+  if (!isRecord(value)) {
+    issues.push("proceduralScaffold must be an object");
+    return;
+  }
+  if (value.scaffoldId !== "spore_civilization_stage_procedural_scaffold") {
+    issues.push("proceduralScaffold.scaffoldId is invalid");
+  }
+  if (value.source !== "spore_civilization_stage_research") {
+    issues.push("proceduralScaffold.source is invalid");
+  }
+  if (!isNonEmptyString(value.designMetaphor)) {
+    issues.push("proceduralScaffold.designMetaphor must be a non-empty string");
+  }
+  if (!Array.isArray(value.surfaces)) {
+    issues.push("proceduralScaffold.surfaces must be an array");
+  } else {
+    value.surfaces.forEach((surface, index) => {
+      const prefix = `proceduralScaffold.surfaces[${index}]`;
+      if (!isRecord(surface)) {
+        issues.push(`${prefix} must be an object`);
+        return;
+      }
+      for (const field of ["sporeSurface", "proceduralMeaning", "roadmapField"] as const) {
+        if (!isNonEmptyString(surface[field])) {
+          issues.push(`${prefix}.${field} must be a non-empty string`);
+        }
+      }
+    });
+  }
+  validateStringArray("proceduralScaffold.blockedInterpretations", value.blockedInterpretations, issues);
+  validateStringArray("proceduralScaffold.researchRefs", value.researchRefs, issues);
+  validateStringArray("proceduralScaffold.evidenceRefs", value.evidenceRefs, issues);
+}
+
 function validateAuthority(value: unknown, issues: string[]): void {
   if (!isRecord(value)) {
     issues.push("authority must be an object");
@@ -667,6 +981,42 @@ export function validateCivilizationBoundsRoadmapV1(value: unknown): string[] {
       validateFalsificationHook(`falsificationHooks[${index}]`, entry, issues),
     );
   }
+  if (!Array.isArray(value.parameterScopes)) {
+    issues.push("parameterScopes must be an array");
+  } else {
+    value.parameterScopes.forEach((entry, index) =>
+      validateParameterScope(`parameterScopes[${index}]`, entry, issues),
+    );
+  }
+  if (!Array.isArray(value.actionChannels)) {
+    issues.push("actionChannels must be an array");
+  } else {
+    value.actionChannels.forEach((entry, index) =>
+      validateActionChannel(`actionChannels[${index}]`, entry, issues),
+    );
+  }
+  if (!Array.isArray(value.dependencyChains)) {
+    issues.push("dependencyChains must be an array");
+  } else {
+    value.dependencyChains.forEach((entry, index) =>
+      validateDependencyChain(`dependencyChains[${index}]`, entry, issues),
+    );
+  }
+  if (!Array.isArray(value.comparisonCases)) {
+    issues.push("comparisonCases must be an array");
+  } else {
+    value.comparisonCases.forEach((entry, index) =>
+      validateComparisonCase(`comparisonCases[${index}]`, entry, issues),
+    );
+  }
+  if (!Array.isArray(value.hypothesisClaims)) {
+    issues.push("hypothesisClaims must be an array");
+  } else {
+    value.hypothesisClaims.forEach((entry, index) =>
+      validateHypothesisClaim(`hypothesisClaims[${index}]`, entry, issues),
+    );
+  }
+  validateProceduralScaffold(value.proceduralScaffold, issues);
   if (!Array.isArray(value.theoryBindings)) {
     issues.push("theoryBindings must be an array");
   } else {

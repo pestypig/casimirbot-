@@ -80,3 +80,32 @@ Long explanations belong in backend receipts, debug export, and Helix Ask synthe
 The first adapter converts the existing Needle role dataset into `civilization_bounds_roadmap/v1`.
 
 This adapter marks the scenario as `declared_scenario` with `ideal_bounds`. It does not treat the role data as observed reality.
+
+## Implementation Assembly
+
+`civilization_bounds_roadmap/v1` now carries the roadmap as a typed procedural
+receipt:
+
+- `parameterScopes` for material base, governance capacity, conflict exposure,
+  social cohesion, information legitimacy, and environmental pressure
+- `actionChannels` for economic, coercive, persuasive, diplomatic, governance,
+  infrastructure, and observation pathways
+- `dependencyChains` for bottleneck and review-interface chains
+- `comparisonCases` for stable peer, stressed peer, historical analogue, and
+  null-case comparisons
+- `hypothesisClaims` for bounded, blocked, non-final hypotheses
+- `proceduralScaffold` for the Spore Civilization Stage design metaphor and
+  blocked interpretations
+
+The Helix Ask tool `helix_ask.reflect_civilization_bounds` exposes those fields
+both inside `roadmap` and as top-level tool-output fields so downstream tool
+calls can inspect the procedural scopes without treating the roadmap as a final
+answer.
+
+## Research Extensions
+
+- `docs/audits/research/civilization-bounds-spore-procedural-systems-2026-06-17.md`
+  uses Spore Civilization Stage as a bounded design metaphor for procedural
+  nodes, resource anchors, action channels, dependency edges, comparison
+  parameters, and prediction guardrails. It is evidence-normalization context,
+  not a terminal prediction or policy authority.

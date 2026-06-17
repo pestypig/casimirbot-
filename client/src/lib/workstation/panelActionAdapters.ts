@@ -4,7 +4,10 @@ import { getPanelDef } from "@/lib/desktop/panelRegistry";
 import type { SettingsTab } from "@/hooks/useHelixStartSettings";
 import { pushWorkstationDebugEvent } from "@/lib/helix/workstation-debug";
 import { writeInterfaceLanguagePreference } from "@/lib/i18n/interfaceLanguagePreference";
-import { dispatchScientificCalculatorMathPicked } from "@/lib/scientific-calculator/events";
+import {
+  SCIENTIFIC_CALCULATOR_DRAFT_KEY,
+  dispatchScientificCalculatorMathPicked,
+} from "@/lib/scientific-calculator/events";
 import {
   buildScientificCalculatorDebugSnapshot,
   formatScientificCalculatorDebugLog,
@@ -42,6 +45,7 @@ import {
   setupSituationRoomFromPrompt,
 } from "@/lib/workstation/situationRoomSetupActions";
 import { useWorkstationClipboardStore } from "@/store/useWorkstationClipboardStore";
+import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
 import { useNarratorStore } from "@/store/useNarratorStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 import { useWorkstationProcessGraphStore } from "@/store/useWorkstationProcessGraphStore";
@@ -291,10 +295,43 @@ function normalizeCalculatorArithmeticSpan(value: string): string {
   return candidate;
 }
 
+const CALCULATOR_FUNCTION_TOKEN_PATTERN =
+  /(?:\\(?:sqrt|ln|log|sin|cos|tan|asin|acos|atan|exp|abs)\b|\b(?:sqrt|ln|log|sin|cos|tan|asin|acos|atan|exp|abs)\s*\(|\b(?:pi|e)\b)/i;
+const CALCULATOR_SYMBOLIC_EXPRESSION_PATTERN = /^[A-Za-z0-9_()+\-*/^.,\\{}\[\]]+$/;
+
+function extractLabeledCalculatorExpression(value: string): string | null {
+  const match = value.match(/\b(?:exact\s+)?(?:latex|expression|input)\s*:\s*([^\r\n]+)/i);
+  return match?.[1]?.trim() || null;
+}
+
+function normalizeCalculatorSymbolicSpan(value: string): string {
+  let candidate = normalizeCalculatorMixedNumberLiterals(value)
+    .replace(/\s+/g, "")
+    .replace(/[.!?,"'`\]]+$/g, "");
+  while (candidate.endsWith(")") && !parensBalanced(candidate)) {
+    candidate = candidate.slice(0, -1);
+  }
+  return candidate;
+}
+
+function normalizeCalculatorFunctionExpression(value: string): string | null {
+  const candidate = normalizeCalculatorSymbolicSpan(value);
+  if (!candidate || candidate.includes(":")) return null;
+  if (!CALCULATOR_FUNCTION_TOKEN_PATTERN.test(candidate)) return null;
+  if (!/[0-9]/.test(candidate)) return null;
+  if (!/[()+\-*/^\\]/.test(candidate)) return null;
+  if (!parensBalanced(candidate)) return null;
+  if (!CALCULATOR_SYMBOLIC_EXPRESSION_PATTERN.test(candidate)) return null;
+  return candidate;
+}
+
 function normalizeCalculatorActionLatex(value: string): string {
   const cleaned = normalizeCalculatorMixedNumberLiterals(stripCalculatorProseTail(value));
+  const labeledExpression = extractLabeledCalculatorExpression(cleaned);
   const directiveTail = cleaned.match(/\b(?:solve|evaluate|compute|calculate|check|verify)\s+(.+)$/i)?.[1];
-  const candidate = directiveTail ? stripCalculatorProseTail(directiveTail) : cleaned;
+  const candidate = directiveTail ? stripCalculatorProseTail(directiveTail) : (labeledExpression ?? cleaned);
+  const functionExpression = normalizeCalculatorFunctionExpression(candidate);
+  if (functionExpression) return functionExpression;
   const equation = candidate.match(/(?:[-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?\s*\*\s*)?[A-Za-z_][A-Za-z0-9_]*(?:\s*\^\s*[-+]?\d+(?:\.\d+)?)?(?:\s*[+\-*/]\s*[-+()A-Za-z0-9_.*\/^\\\s]+)*\s*=\s*[-+()A-Za-z0-9_.*\/^\\\s]+/i)?.[0];
   if (equation) return equation.trim();
   if (candidate.includes("=")) return candidate;
@@ -6181,9 +6218,11 @@ export function executeHelixPanelAction(
             source: "clipboard",
             calculatorSetup,
           });
+          useWorkstationSessionMemoryStore.getState().rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, trimmed);
           dispatchScientificCalculatorMathPicked({
             latex: trimmed,
             sourcePath: "clipboard",
+            source: "clipboard",
           });
         });
       }
@@ -6212,7 +6251,9 @@ export function executeHelixPanelAction(
         latex: entry.latex,
         sourcePath: entry.sourcePath,
         anchor: entry.anchor,
+        source: "workstation_action",
       });
+      useWorkstationSessionMemoryStore.getState().rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, entry.latex);
       context.openPanel(panelId, undefined);
       context.focusPanel(panelId, undefined);
       const latestDebugEvents = useScientificCalculatorStore.getState().debugEvents;
@@ -6267,6 +6308,7 @@ export function executeHelixPanelAction(
           targetWorkbench,
         });
       }
+      useWorkstationSessionMemoryStore.getState().rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, latex);
       const solveResult = runScientificSolve(latex, actionId === "solve_with_steps");
       scientificState.setSolveResult(solveResult, {
         actionId: actionId === "solve_with_steps" ? "solve_with_steps" : "solve_expression",

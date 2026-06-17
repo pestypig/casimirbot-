@@ -125,7 +125,7 @@ function sanitizeLatexInput(value: string): string {
 function expressionFromLatexOrText(value: string): string {
   const input = sanitizeLatexInput(asNonEmpty(value));
   if (!input) return "";
-  const hasLatexSignal = /\\|\{|\}|\^|_/.test(input);
+  const hasLatexSignal = /\\|\{|\}|_/.test(input);
   if (!hasLatexSignal) return input;
   try {
     const converted = nerdamerLatex.convertFromLaTeX(input).toString();
@@ -168,12 +168,26 @@ function formatNumericResult(value: number): string {
   return Number.isInteger(value) ? String(value) : String(Number(value.toPrecision(12)));
 }
 
+const SAFE_MATH_IDENTIFIERS = new Set(["sqrt", "ln", "log", "exp", "sin", "cos", "tan", "abs", "pi", "e"]);
+
 function evaluateSafeArithmeticExpression(expression: string): string | null {
   const normalized = expression.replace(/\s+/g, "");
-  if (!normalized || !/^[\deE.+\-*/^()]+$/.test(normalized)) return null;
+  if (!normalized || !/^[\dA-Za-z_.+\-*/^(),]+$/.test(normalized)) return null;
   if (!/[+\-*/^]/.test(normalized)) return null;
+  const identifiers = normalized.match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? [];
+  if (identifiers.some((identifier) => !SAFE_MATH_IDENTIFIERS.has(identifier.toLowerCase()))) return null;
   try {
-    const jsExpression = normalized.replace(/\^/g, "**");
+    const jsExpression = normalized
+      .replace(/\b(?:pi|e)\b/gi, (constant) => (constant.toLowerCase() === "pi" ? "Math.PI" : "Math.E"))
+      .replace(/\^/g, "**")
+      .replace(/\bsqrt\s*\(/gi, "Math.sqrt(")
+      .replace(/\blog\s*\(/gi, "Math.log(")
+      .replace(/\bln\s*\(/gi, "Math.log(")
+      .replace(/\bexp\s*\(/gi, "Math.exp(")
+      .replace(/\bsin\s*\(/gi, "Math.sin(")
+      .replace(/\bcos\s*\(/gi, "Math.cos(")
+      .replace(/\btan\s*\(/gi, "Math.tan(")
+      .replace(/\babs\s*\(/gi, "Math.abs(");
     const value = Function(`"use strict"; return (${jsExpression});`)();
     return typeof value === "number" && Number.isFinite(value) ? formatNumericResult(value) : null;
   } catch {
@@ -183,7 +197,9 @@ function evaluateSafeArithmeticExpression(expression: string): string | null {
 
 function chooseSolveVariable(expressionText: string): string | null {
   try {
-    const vars = nerdamer(expressionText).variables();
+    const vars = nerdamer(expressionText)
+      .variables()
+      .filter((variable) => !SAFE_MATH_IDENTIFIERS.has(variable.toLowerCase()));
     if (!vars.length) return null;
     return vars.includes("x") ? "x" : vars[0] ?? null;
   } catch {
@@ -644,7 +660,7 @@ export function runScientificSolve(inputLatex: string, withSteps: boolean): Scie
       const safeArithmeticResult = evaluateSafeArithmeticExpression(normalizedExpression);
       if (
         safeArithmeticResult &&
-        (/[eE]/.test(normalizedExpression) || /^-?0(?:\.0+)?$/.test(evaluated.trim())) &&
+        (/[A-Za-z]/.test(evaluated) || /[eE]/.test(normalizedExpression) || /^-?0(?:\.0+)?$/.test(evaluated.trim())) &&
         safeArithmeticResult !== "0"
       ) {
         evaluated = safeArithmeticResult;

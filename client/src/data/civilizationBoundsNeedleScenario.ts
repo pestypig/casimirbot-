@@ -4,7 +4,13 @@ import {
   type CivilizationBoundsBadgeV1,
   type CivilizationBoundsBridgeContextV1,
   type CivilizationBoundsEdgeV1,
+  type CivilizationActionChannelV1,
+  type CivilizationComparisonCaseV1,
+  type CivilizationDependencyChainV1,
+  type CivilizationHypothesisClaimV1,
+  type CivilizationParameterScopeV1,
   type CivilizationBoundsRoadmapV1,
+  type CivilizationProceduralScaffoldV1,
   type CivilizationClaimTierV1,
   type CivilizationLayerModeV1,
   type CivilizationPhaseV1,
@@ -384,6 +390,122 @@ function buildEdgesAndCollaborations(
   return { edges, collaborationBounds };
 }
 
+function buildNeedleParameterScopes(): CivilizationParameterScopeV1[] {
+  const evidenceRefs = [`${EVIDENCE_PREFIX}:procedural-scaffold`];
+  return [
+    {
+      scopeId: "parameter:material_base",
+      kind: "material_base",
+      label: "Material base",
+      description: "Declared Needle role capacities mapped to resource, production, logistics, fiscal, and infrastructure constraints.",
+      indicatorRefs: ["declared:needle-world-roles", "world_bank.world_development_indicators"],
+      missingEvidence: ["observed_material_inventory", "energy_budget_receipts", "source_backed_capacity_measurements"],
+      evidenceRefs,
+      claimTier: CLAIM_TIER,
+    },
+    {
+      scopeId: "parameter:governance_institutional_capacity",
+      kind: "governance_institutional_capacity",
+      label: "Governance and institutional capacity",
+      description: "Declared review, education, ethics, and public-interface capacities that bound claim promotion.",
+      indicatorRefs: ["world_bank.worldwide_governance_indicators", "v_dem.democracy_indices"],
+      missingEvidence: ["review_interface_receipts", "affected_party_review_scope", "contestability_process"],
+      evidenceRefs,
+      claimTier: CLAIM_TIER,
+    },
+    {
+      scopeId: "parameter:security_conflict_exposure",
+      kind: "security_conflict_exposure",
+      label: "Security and conflict exposure",
+      description: "Security pressure remains a missing observation layer for any world-affairs comparison.",
+      indicatorRefs: ["acled.event_data", "ucdp.armed_conflict_data", "global_peace_index"],
+      missingEvidence: ["security_risk_assessment", "conflict_event_receipts"],
+      evidenceRefs,
+      claimTier: CLAIM_TIER,
+    },
+    {
+      scopeId: "parameter:social_cohesion_demographic_pressure",
+      kind: "social_cohesion_demographic_pressure",
+      label: "Social cohesion and demographic pressure",
+      description: "Population, trust, migration, and participation pressures are not observed by the declared role dataset.",
+      indicatorRefs: ["fragile_states_index", "world_bank.population_indicators"],
+      missingEvidence: ["demographic_pressure_refs", "public_trust_refs"],
+      evidenceRefs,
+      claimTier: CLAIM_TIER,
+    },
+    {
+      scopeId: "parameter:information_ideology_legitimacy",
+      kind: "information_ideology_legitimacy",
+      label: "Information, ideology, and legitimacy",
+      description: "Narrative and legitimacy channels can be compared only after source-backed observation enters the roadmap.",
+      indicatorRefs: ["v_dem.civil_liberties_media", "public_opinion_surveys"],
+      missingEvidence: ["media_pluralism_refs", "legitimacy_claim_refs"],
+      evidenceRefs,
+      claimTier: CLAIM_TIER,
+    },
+    {
+      scopeId: "parameter:environment_entropy_pressure",
+      kind: "environment_entropy_pressure",
+      label: "Environment and entropy pressure",
+      description: "Thermal, ecological, and sink-capacity pressure remains a constraint layer for any buildout reflection.",
+      indicatorRefs: ["world_bank.climate_environment_indicators", "our_world_in_data.environment"],
+      missingEvidence: ["ecological_sink_capacity_measurements", "thermal_ceiling_measurements"],
+      evidenceRefs,
+      claimTier: CLAIM_TIER,
+    },
+  ];
+}
+
+function buildNeedleActionChannels(): CivilizationActionChannelV1[] {
+  const evidenceRefs = [`${EVIDENCE_PREFIX}:procedural-scaffold`];
+  const blockedUses = [
+    "certify prediction",
+    "authorize action",
+    "treat procedural analogy as moral proof",
+  ];
+  return [
+    ["economic", "Economic integration channel", "economic city purchase and trade routes", "Trade, credit, supply-chain, investment, and market-access dependencies."],
+    ["coercive", "Coercive capacity channel", "military city takeover", "Force posture, deterrence, repression, occupation, or border pressure."],
+    ["persuasive", "Persuasive legitimacy channel", "religious city conversion", "Identity, ideology, education, media, and legitimacy claims."],
+    ["diplomatic", "Diplomatic transfer channel", "gifts and relation modifiers", "Aid, sanctions relief, treaty bargaining, and confidence-building measures."],
+    ["governance_review", "Governance review channel", "city building mix and morale stability", "Due process, public review, ethics review, and affected-party interfaces."],
+    ["infrastructure_buildout", "Infrastructure buildout channel", "factories, houses, turrets, and vehicles", "Production capacity, housing, energy, logistics, defense hardening, and service reach."],
+    ["observation", "Observation and evidence channel", "visible city states and map control", "Source freshness, event logs, measurement quality, and blind spots."],
+  ].map(([kind, label, sporeAnalogy, realWorldInterpretation]) => ({
+    channelId: `action-channel:${kind}`,
+    kind: kind as CivilizationActionChannelV1["kind"],
+    label,
+    sporeAnalogy,
+    realWorldInterpretation,
+    admissibleUses: ["compare scenario structure", "identify dependency evidence", "flag missing observations"],
+    blockedUses,
+    evidenceRefs,
+    claimTier: CLAIM_TIER,
+  }));
+}
+
+function buildNeedleProceduralScaffold(): CivilizationProceduralScaffoldV1 {
+  return {
+    scaffoldId: "spore_civilization_stage_procedural_scaffold",
+    source: "spore_civilization_stage_research",
+    designMetaphor: "Spore Civilization Stage supplies procedural grammar for nodes, resource anchors, action channels, dependency edges, and maturity gates.",
+    surfaces: [
+      { sporeSurface: "city", proceduralMeaning: "concentrated capability node", roadmapField: "systems,badges" },
+      { sporeSurface: "spice geyser", proceduralMeaning: "resource anchor", roadmapField: "parameterScopes,badges" },
+      { sporeSurface: "vehicle", proceduralMeaning: "mobility or projection capacity", roadmapField: "actionChannels,capabilities" },
+      { sporeSurface: "trade route", proceduralMeaning: "dependency and integration edge", roadmapField: "edges,dependencyChains" },
+      { sporeSurface: "stage completion", proceduralMeaning: "maturity transition", roadmapField: "phases,comparisonCases" },
+    ],
+    blockedInterpretations: [
+      "Spore mechanics are not a history model.",
+      "Spore pathways do not certify real-world predictions.",
+      "Procedural comparison does not authorize policy, coercion, or moral finality.",
+    ],
+    researchRefs: ["docs/audits/research/civilization-bounds-spore-procedural-systems-2026-06-17.md"],
+    evidenceRefs: [`${EVIDENCE_PREFIX}:procedural-scaffold`],
+  };
+}
+
 export function buildNeedleCivilizationBoundsScenario(options?: {
   generatedAt?: string;
 }): CivilizationBoundsRoadmapV1 {
@@ -391,6 +513,53 @@ export function buildNeedleCivilizationBoundsScenario(options?: {
   const systemEntries = buildSystems(COUNTRY_PROGRAM_ROLES);
   const { badges, theoryBindings, zenBindings } = buildBadgesAndBindings(systemEntries);
   const { edges, collaborationBounds } = buildEdgesAndCollaborations(systemEntries);
+  const systemBadgeIds = badges
+    .filter((badge) => badge.kind === "system_actor")
+    .slice(0, 10)
+    .map((badge) => badge.badgeId);
+  const topEdgeIds = edges.slice(0, 10).map((edge) => edge.edgeId);
+  const dependencyChains: CivilizationDependencyChainV1[] = [
+    {
+      chainId: "chain:needle:declared-capacity-to-review",
+      label: "Declared capacity to review dependency chain",
+      nodeBadgeIds: systemBadgeIds,
+      edgeIds: topEdgeIds,
+      bottlenecks: ["source_backed_capacity_measurements", "review_interface_receipts"],
+      missingEvidence: ["source_backed_capacity_measurements", "review_interface_receipts"],
+      evidenceRefs: [`${EVIDENCE_PREFIX}:procedural-scaffold`],
+      claimTier: CLAIM_TIER,
+    },
+  ];
+  const comparisonCases: CivilizationComparisonCaseV1[] = [
+    {
+      caseId: "comparison:needle:stable-peer",
+      label: "Stable peer with comparable industrial and governance capacity",
+      sourceClass: "historical_case",
+      similarityAxes: ["material_base", "governance_institutional_capacity"],
+      blockers: ["named_peer_case_refs", "source_scope_and_timestamp"],
+      evidenceRefs: [`${EVIDENCE_PREFIX}:procedural-scaffold`],
+      claimTier: CLAIM_TIER,
+    },
+    {
+      caseId: "comparison:needle:null-case",
+      label: "Null case where declared role similarity does not imply future outcome",
+      sourceClass: "declared_scenario",
+      similarityAxes: ["blocked_prediction_finality", "missing_observation_review"],
+      blockers: ["source_backed_capacity_measurements", "causal_direction_not_certified"],
+      evidenceRefs: [`${EVIDENCE_PREFIX}:procedural-scaffold`],
+      claimTier: CLAIM_TIER,
+    },
+  ];
+  const hypothesisClaims: CivilizationHypothesisClaimV1[] = [
+    {
+      claimId: "hypothesis:needle:dependency-bottleneck",
+      claim: "Declared Needle collaboration remains bounded by material, energy, and review evidence gaps before claim promotion.",
+      strength: "weak",
+      blockers: ["source_backed_capacity_measurements", "observed_material_inventory", "review_interface_receipts"],
+      evidenceRefs: [`${EVIDENCE_PREFIX}:procedural-scaffold`],
+      claimTier: CLAIM_TIER,
+    },
+  ];
   return buildCivilizationBoundsRoadmapV1({
     generatedAt: options?.generatedAt,
     roadmapId: "civilization-bounds:needle-hull-ideal-global-construction",
@@ -413,6 +582,12 @@ export function buildNeedleCivilizationBoundsScenario(options?: {
         evidenceRefs: [`${EVIDENCE_PREFIX}:falsification-hooks`],
       },
     ],
+    parameterScopes: buildNeedleParameterScopes(),
+    actionChannels: buildNeedleActionChannels(),
+    dependencyChains,
+    comparisonCases,
+    hypothesisClaims,
+    proceduralScaffold: buildNeedleProceduralScaffold(),
     theoryBindings,
     zenBindings,
     missingEvidence: [

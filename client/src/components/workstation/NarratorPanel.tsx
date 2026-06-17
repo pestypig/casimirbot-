@@ -10,7 +10,10 @@ import {
 } from "@/lib/narrator/narratorPolicy";
 import {
   NarratorPlaybackError,
+  createNarratorPlaybackLockedDiagnostic,
+  installNarratorAudioUnlockGestureListeners,
   playNarratorVoiceResponse,
+  primeNarratorAudioPlayback,
   stopNarratorAudioPlayback,
 } from "@/lib/narrator/narratorAudioPlayback";
 import { buildNarratorVoiceSpeakPayload } from "@/lib/narrator/narratorVoiceBridge";
@@ -82,6 +85,11 @@ export default function NarratorPanel() {
     setSpeakingEventId(event.eventId);
     markQueued(event.eventId);
     try {
+      const unlocked = await primeNarratorAudioPlayback();
+      if (!unlocked) {
+        markFailed(event.eventId, createNarratorPlaybackLockedDiagnostic());
+        return;
+      }
       const payload = buildNarratorVoiceSpeakPayload({ event });
       const response = await speakVoice(payload, { signal: controller.signal });
       const diagnostic = await playNarratorVoiceResponse(response, {
@@ -99,6 +107,8 @@ export default function NarratorPanel() {
       setSpeakingEventId(null);
     }
   }, [markFailed, markQueued, markSpoken, recordPlaybackDiagnostic]);
+
+  React.useEffect(() => installNarratorAudioUnlockGestureListeners(), []);
 
   React.useEffect(() => () => {
     activeSpeakRef.current?.controller.abort();

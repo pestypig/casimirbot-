@@ -1,4 +1,5 @@
 import type { VoiceCallDiagnosticSnapshot } from "@/lib/helix/voice-call-diagnostics";
+import type { VoicePlaybackLifecycleDiagnostic } from "@/lib/helix/voice-playback-diagnostics";
 import type {
   VoicePlaybackIntentAuthority,
   VoicePlaybackIntentSource,
@@ -53,6 +54,7 @@ export type VoicePlaybackDiagnosticsSnapshot = {
   profileHeader?: string;
   normalizationBenchmarkHeader?: string;
   normalizationSkipReasonHeader?: string;
+  playbackLifecycle?: VoicePlaybackLifecycleDiagnostic | null;
   cacheHitCount: number;
   cacheMissCount: number;
   divergence?: {
@@ -156,6 +158,7 @@ export type VoicePlaybackOutcomeReceipt = {
   error: string | null;
   audioUnlocked: boolean | null;
   playbackPath: "audio_graph" | "direct_element" | "direct_fallback" | null;
+  playbackLifecycle?: VoicePlaybackLifecycleDiagnostic | null;
   assistant_answer: false;
   terminal_eligible: false;
   raw_content_included: false;

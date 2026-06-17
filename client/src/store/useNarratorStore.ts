@@ -52,6 +52,7 @@ type NarratorState = {
 };
 
 const MAX_NARRATOR_EVENTS = 200;
+const HOVER_FOCUS_DUPLICATE_WINDOW_MS = 250;
 
 const memoryStorage = (): StateStorage => {
   const values = new Map<string, string>();
@@ -110,6 +111,7 @@ export const useNarratorStore = create<NarratorState>()(
           event,
           lastSeenByDedupeKey: state.queueState.lastSeenByDedupeKey,
           nowMs,
+          windowMs: event.sourceKind === "hover_focus_inspector" ? HOVER_FOCUS_DUPLICATE_WINDOW_MS : undefined,
         })) {
           return null;
         }

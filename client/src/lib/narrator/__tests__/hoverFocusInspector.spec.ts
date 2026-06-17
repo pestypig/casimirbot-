@@ -41,6 +41,32 @@ describe("hoverFocusInspector", () => {
     expect(inspection?.dedupeKey).toContain("hover_focus_inspector");
   });
 
+  it("prefers the specific hovered control over a broad readable container", () => {
+    document.body.innerHTML = `
+      <section aria-label="Narrator panel">
+        <button aria-label="Speak narrator event">Speak</button>
+      </section>
+    `;
+
+    const button = document.querySelector("button");
+    const inspection = buildHoverFocusNarratorInspection(button);
+
+    expect(inspection?.text).toBe("Speak narrator event");
+    expect(inspection?.sourceId).toContain("Speak narrator event");
+  });
+
+  it("uses aria-labelledby text as a readable control label", () => {
+    document.body.innerHTML = `
+      <span id="labelled-control">Auto-speak hover focus inspector</span>
+      <button aria-labelledby="labelled-control">Toggle</button>
+    `;
+
+    const button = document.querySelector("button");
+    const inspection = buildHoverFocusNarratorInspection(button);
+
+    expect(inspection?.text).toBe("Auto-speak hover focus inspector");
+  });
+
   it("uses paragraph sentences instead of forcing whole-paragraph reads", () => {
     document.body.innerHTML = `
       <p>One sentence. Two sentence. Three sentence.</p>

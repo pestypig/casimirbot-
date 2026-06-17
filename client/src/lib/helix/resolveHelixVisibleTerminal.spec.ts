@@ -29,6 +29,101 @@ describe("resolveHelixVisibleTerminal", () => {
     expect(terminal.usedLegacyShadow).toBe(false);
   });
 
+  it("lets a successful backend envelope supersede stale failure fields", () => {
+    const terminal = resolveHelixVisibleTerminal({
+      selected_final_answer: "I could not complete that turn.\nCause: pending_request_missing.",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "pending_request_missing",
+      pending_server_request: {
+        schema: "helix.pending_server_request.v1",
+        status: "pending",
+      },
+      terminal_answer_envelope: {
+        schema: "helix.terminal_answer_envelope.v1",
+        terminal_text: "Calculator-backed result: ((sqrt(81)+ln(e^3))*7-5^2)/2 = 29.5.",
+        terminal_kind: "answer",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        final_answer_source: "workstation_tool_evaluation",
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        server_authoritative: true,
+        terminal_kind: "answer",
+        terminal_text_preview: "Calculator-backed result: ((sqrt(81)+ln(e^3))*7-5^2)/2 = 29.5.",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        final_answer_source: "workstation_tool_evaluation",
+      },
+    });
+
+    expect(terminal.text).toContain("29.5");
+    expect(terminal.source).toBe("terminal_answer_envelope");
+    expect(terminal.terminalErrorCode).toBeNull();
+    expect(terminal.finalAnswerSource).toBe("workstation_tool_evaluation");
+    expect(terminal.terminalArtifactKind).toBe("workstation_tool_evaluation");
+  });
+
+  it("normalizes stale final answer draft source to the selected workstation terminal artifact", () => {
+    const terminal = resolveHelixVisibleTerminal({
+      selected_final_answer: "Calculator-backed result: ((sqrt(81)+ln(e^3))*7-5^2)/2 = 29.5.",
+      final_answer_source: "final_answer_draft",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        server_authoritative: true,
+        terminal_kind: "answer",
+        terminal_text_preview: "Calculator-backed result: ((sqrt(81)+ln(e^3))*7-5^2)/2 = 29.5.",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        final_answer_source: "final_answer_draft",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        concise_text: "Calculator-backed result: ((sqrt(81)+ln(e^3))*7-5^2)/2 = 29.5.",
+      },
+      resolved_turn_summary: {
+        final_status: "final_answer",
+        resolved_route_label: "calculator_solve / model_synthesized_answer",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+      },
+    });
+
+    expect(terminal.text).toContain("29.5");
+    expect(terminal.source).toBe("terminal_answer_authority");
+    expect(terminal.terminalArtifactKind).toBe("workstation_tool_evaluation");
+    expect(terminal.finalAnswerSource).toBe("workstation_tool_evaluation");
+    expect(
+      formatHelixVisibleTerminalSourceLabel({
+        terminalArtifactKind: terminal.terminalArtifactKind,
+        finalAnswerSource: terminal.finalAnswerSource,
+      }),
+    ).toBe("workstation tool evaluation");
+  });
+
+  it("prefers terminal envelope text over stale model-synthesis selected_final_answer", () => {
+    const terminal = resolveHelixVisibleTerminal({
+      selected_final_answer: "stale model synthesis",
+      final_answer_source: "final_answer_draft",
+      terminal_artifact_kind: "model_synthesized_answer",
+      terminal_answer_envelope: {
+        schema: "helix.terminal_answer_envelope.v1",
+        terminal_text: "authoritative model synthesis",
+        terminal_kind: "answer",
+        terminal_artifact_kind: "model_synthesized_answer",
+        final_answer_source: "final_answer_draft",
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        server_authoritative: true,
+        terminal_text_preview: "authoritative model synthesis",
+        terminal_artifact_kind: "model_synthesized_answer",
+        final_answer_source: "final_answer_draft",
+      },
+    });
+
+    expect(terminal.text).toBe("authoritative model synthesis");
+    expect(terminal.source).toBe("terminal_answer_envelope");
+  });
+
   it("uses authoritative doc summary terminal surfaces over stale authority-missing content", () => {
     const summary =
       "Summary of docs/helix-ask-flow.md:\n- Routing enters Helix Ask through source-target arbitration.\n- Evidence must re-enter the solver path before terminal authority.\n- Presentation mirrors the selected terminal artifact.";
@@ -84,6 +179,27 @@ describe("resolveHelixVisibleTerminal", () => {
 
     expect(terminal.text).toContain("terminal_authority_missing");
     expect(terminal.text).not.toContain("legacy ghost answer");
+    expect(terminal.source).toBe("terminal_authority_missing");
+  });
+
+  it("does not let source-targeted terminal presentation become visible truth without authority", () => {
+    const terminal = resolveHelixVisibleTerminal({
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        concise_text: "presentation-only answer",
+        terminal_artifact_kind: "doc_summary",
+      },
+      canonical_goal_frame: {
+        goal_kind: "doc_summary",
+      },
+      source_target_intent: {
+        target_source: "docs_viewer",
+        strength: "hard",
+      },
+    });
+
+    expect(terminal.text).toContain("terminal_authority_missing");
+    expect(terminal.text).not.toContain("presentation-only answer");
     expect(terminal.source).toBe("terminal_authority_missing");
   });
 

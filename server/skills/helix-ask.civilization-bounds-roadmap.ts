@@ -1,8 +1,14 @@
 import { z } from "zod";
 import type { ToolHandler, ToolSpecShape } from "@shared/skills";
 import type {
+  CivilizationActionChannelV1,
   CivilizationBoundsBridgeContextV1,
   CivilizationBoundsBadgeV1,
+  CivilizationComparisonCaseV1,
+  CivilizationDependencyChainV1,
+  CivilizationHypothesisClaimV1,
+  CivilizationParameterScopeV1,
+  CivilizationProceduralScaffoldV1,
   CivilizationBoundsRoadmapV1,
   CivilizationClaimTierV1,
   CivilizationLayerModeV1,
@@ -70,6 +76,12 @@ export type HelixAskCivilizationBoundsToolOutput = {
   roadmap: CivilizationBoundsRoadmapV1;
   scenarioFrame?: CivilizationScenarioFrameV1;
   bridgeContext?: CivilizationBoundsBridgeContextV1;
+  parameterScopes: CivilizationParameterScopeV1[];
+  actionChannels: CivilizationActionChannelV1[];
+  dependencyChains: CivilizationDependencyChainV1[];
+  comparisonCases: CivilizationComparisonCaseV1[];
+  hypothesisClaims: CivilizationHypothesisClaimV1[];
+  proceduralScaffold: CivilizationProceduralScaffoldV1;
 };
 
 const CONSTRAINT_BADGE_LABELS: Record<CivilizationConstraintProfileV1, string> = {
@@ -105,6 +117,131 @@ const CONSTRAINT_ZEN_BINDINGS: Partial<Record<CivilizationConstraintProfileV1, s
   security_limited: ["non_harm", "two_key_review"],
   multi_bottleneck: ["revision", "uncertainty"],
 };
+
+const PARAMETER_SCOPE_DEFS: Array<{
+  kind: CivilizationParameterScopeV1["kind"];
+  label: string;
+  description: string;
+  indicatorRefs: string[];
+  missingEvidence: string[];
+}> = [
+  {
+    kind: "material_base",
+    label: "Material base",
+    description: "Resource, production, logistics, fiscal, and infrastructure constraints before strategic claims are strengthened.",
+    indicatorRefs: [
+      "world_bank.world_development_indicators",
+      "world_bank.open_data",
+      "energy_trade_national_statistics",
+    ],
+    missingEvidence: ["energy_mix_receipts", "material_inventory_receipts", "infrastructure_bottleneck_refs"],
+  },
+  {
+    kind: "governance_institutional_capacity",
+    label: "Governance and institutional capacity",
+    description: "Formal public capacity, review interfaces, rule of law, regulatory quality, and contestability.",
+    indicatorRefs: [
+      "world_bank.worldwide_governance_indicators",
+      "v_dem.democracy_indices",
+      "fragile_states_index.political_indicators",
+    ],
+    missingEvidence: ["governance_review_record", "rule_of_law_indicator_refs", "public_service_capacity_refs"],
+  },
+  {
+    kind: "security_conflict_exposure",
+    label: "Security and conflict exposure",
+    description: "Event-level conflict, coercion, protest, strategic development, actor fragmentation, and displacement evidence.",
+    indicatorRefs: [
+      "acled.event_data",
+      "ucdp.armed_conflict_data",
+      "global_peace_index",
+    ],
+    missingEvidence: ["conflict_event_receipts", "actor_identity_refs", "displacement_trend_refs"],
+  },
+  {
+    kind: "social_cohesion_demographic_pressure",
+    label: "Social cohesion and demographic pressure",
+    description: "Population structure, migration, uneven development, trust, group grievance, and civic participation.",
+    indicatorRefs: [
+      "fragile_states_index.cohesion_social_indicators",
+      "world_bank.population_indicators",
+      "un_population_data",
+    ],
+    missingEvidence: ["demographic_pressure_refs", "public_trust_refs", "migration_displacement_refs"],
+  },
+  {
+    kind: "information_ideology_legitimacy",
+    label: "Information, ideology, and legitimacy",
+    description: "Narrative capacity, media pluralism, censorship, education reach, civil society, and legitimacy claims.",
+    indicatorRefs: [
+      "v_dem.civil_liberties_media",
+      "media_freedom_datasets",
+      "public_opinion_surveys",
+    ],
+    missingEvidence: ["media_pluralism_refs", "legitimacy_claim_refs", "civil_society_capacity_refs"],
+  },
+  {
+    kind: "environment_entropy_pressure",
+    label: "Environment and entropy pressure",
+    description: "Climate exposure, disaster frequency, water stress, agriculture vulnerability, energy transition, and pollution load.",
+    indicatorRefs: [
+      "world_bank.climate_environment_indicators",
+      "ipcc_un_climate_sources",
+      "our_world_in_data.environment",
+    ],
+    missingEvidence: ["climate_exposure_refs", "water_stress_refs", "ecological_sink_capacity_measurements"],
+  },
+];
+
+const ACTION_CHANNEL_DEFS: Array<{
+  kind: CivilizationActionChannelV1["kind"];
+  label: string;
+  sporeAnalogy: string;
+  realWorldInterpretation: string;
+}> = [
+  {
+    kind: "economic",
+    label: "Economic integration channel",
+    sporeAnalogy: "economic city purchase and trade routes",
+    realWorldInterpretation: "Trade, credit, investment, supply-chain lock-in, debt leverage, and market access.",
+  },
+  {
+    kind: "coercive",
+    label: "Coercive capacity channel",
+    sporeAnalogy: "military city takeover",
+    realWorldInterpretation: "Armed force, deterrence, repression, occupation, border pressure, or force posture.",
+  },
+  {
+    kind: "persuasive",
+    label: "Persuasive legitimacy channel",
+    sporeAnalogy: "religious city conversion",
+    realWorldInterpretation: "Identity, ideology, education, media, institutional narrative, and legitimacy claims.",
+  },
+  {
+    kind: "diplomatic",
+    label: "Diplomatic transfer channel",
+    sporeAnalogy: "gifts and relation modifiers",
+    realWorldInterpretation: "Aid, sanctions relief, treaty bargaining, side payments, and confidence-building measures.",
+  },
+  {
+    kind: "governance_review",
+    label: "Governance review channel",
+    sporeAnalogy: "city building mix and morale stability",
+    realWorldInterpretation: "Due process, public review, ethics review, affected-party interface, and contestability.",
+  },
+  {
+    kind: "infrastructure_buildout",
+    label: "Infrastructure buildout channel",
+    sporeAnalogy: "factories, houses, turrets, and vehicles",
+    realWorldInterpretation: "Production capacity, housing, energy, logistics, defense hardening, and service reach.",
+  },
+  {
+    kind: "observation",
+    label: "Observation and evidence channel",
+    sporeAnalogy: "visible city states and map control",
+    realWorldInterpretation: "Source freshness, event logs, direct observation, measurement quality, and blind spots.",
+  },
+];
 
 function slugId(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "frame";
@@ -161,6 +298,166 @@ function boundaryKindToScopeBoundary(frame: CivilizationScenarioFrameV1): Civili
     default:
       return "abstract_system";
   }
+}
+
+function buildParameterScopes(
+  frame: CivilizationScenarioFrameV1,
+  evidenceRefs: string[],
+  claimTier: CivilizationClaimTierV1,
+): CivilizationParameterScopeV1[] {
+  const frameMissing = new Set(frame.missingEvidence);
+  return PARAMETER_SCOPE_DEFS.map((scope) => ({
+    scopeId: `parameter:${scope.kind}`,
+    kind: scope.kind,
+    label: scope.label,
+    description: scope.description,
+    indicatorRefs: scope.indicatorRefs,
+    missingEvidence: Array.from(new Set([
+      ...scope.missingEvidence,
+      ...frame.missingEvidence.filter((missing) => {
+        if (scope.kind === "material_base") return /energy|material|manufactur|transport|bottleneck|collaboration/i.test(missing);
+        if (scope.kind === "governance_institutional_capacity") return /governance|review|consent|claim|source/i.test(missing);
+        if (scope.kind === "security_conflict_exposure") return /security|risk|conflict|actor|displacement/i.test(missing);
+        if (scope.kind === "environment_entropy_pressure") return /ecological|thermal|sink|waste|energy/i.test(missing);
+        return frameMissing.has(missing) && /observability|source|claim|receipt/i.test(missing);
+      }),
+    ])),
+    evidenceRefs,
+    claimTier,
+  }));
+}
+
+function buildActionChannels(
+  evidenceRefs: string[],
+  claimTier: CivilizationClaimTierV1,
+): CivilizationActionChannelV1[] {
+  return ACTION_CHANNEL_DEFS.map((channel) => ({
+    channelId: `action-channel:${channel.kind}`,
+    kind: channel.kind,
+    label: channel.label,
+    sporeAnalogy: channel.sporeAnalogy,
+    realWorldInterpretation: channel.realWorldInterpretation,
+    admissibleUses: [
+      "compare scenario structure",
+      "identify dependency evidence",
+      "flag missing observations",
+      "bound claim strength",
+    ],
+    blockedUses: [
+      "certify prediction",
+      "authorize action",
+      "treat procedural analogy as moral proof",
+      "collapse receipts into terminal answer authority",
+    ],
+    evidenceRefs,
+    claimTier,
+  }));
+}
+
+function buildComparisonCases(
+  frame: CivilizationScenarioFrameV1,
+  evidenceRefs: string[],
+  claimTier: CivilizationClaimTierV1,
+): CivilizationComparisonCaseV1[] {
+  return [
+    {
+      caseId: "comparison:stable_peer",
+      label: "Stable peer with similar material base",
+      sourceClass: "historical_case",
+      similarityAxes: ["material_base", "governance_institutional_capacity", "social_cohesion_demographic_pressure"],
+      blockers: ["named_peer_case_refs", "source_scope_and_timestamp"],
+      evidenceRefs,
+      claimTier,
+    },
+    {
+      caseId: "comparison:stressed_peer",
+      label: "Stressed peer with similar dependency bottlenecks",
+      sourceClass: "current_snapshot",
+      similarityAxes: ["material_base", "security_conflict_exposure", "environment_entropy_pressure"],
+      blockers: ["conflict_event_receipts", "resource_bottleneck_refs"],
+      evidenceRefs,
+      claimTier,
+    },
+    {
+      caseId: "comparison:historical_analogue",
+      label: "Historical analogue with explicit mismatch notes",
+      sourceClass: "historical_case",
+      similarityAxes: ["governance_institutional_capacity", "information_ideology_legitimacy", "material_base"],
+      blockers: ["historical_case_scope_refs", "mismatch_axes"],
+      evidenceRefs,
+      claimTier,
+    },
+    {
+      caseId: "comparison:null_case",
+      label: "Null case where surface similarity does not imply shared outcome",
+      sourceClass: frame.evidenceMode === "fictional_construct" ? "fictional_construct" : "future_scenario",
+      similarityAxes: ["blocked_prediction_finality", "missing_observation_review"],
+      blockers: ["counterevidence_refs", "causal_direction_not_certified"],
+      evidenceRefs,
+      claimTier,
+    },
+  ];
+}
+
+function buildHypothesisClaims(
+  frame: CivilizationScenarioFrameV1,
+  evidenceRefs: string[],
+  claimTier: CivilizationClaimTierV1,
+): CivilizationHypothesisClaimV1[] {
+  return [
+    {
+      claimId: "hypothesis:dependency_bottleneck",
+      claim: `${frame.title} may be constrained by dependency bottlenecks before any stronger scenario claim is admissible.`,
+      strength: frame.evidenceMode === "source_backed_observation" ? "bounded" : "weak",
+      blockers: ["dependency_chain_receipts", ...frame.missingEvidence.slice(0, 4)],
+      evidenceRefs,
+      claimTier,
+    },
+    {
+      claimId: "hypothesis:governance_review_bounds_claim_strength",
+      claim: "Governance and consent gaps bound claim strength even when material capacity appears plausible.",
+      strength: frame.constraintProfiles.some((profile) => profile === "governance_limited" || profile === "consent_limited")
+        ? "bounded"
+        : "weak",
+      blockers: ["governance_review_record", "affected_party_consent_interface_record"],
+      evidenceRefs,
+      claimTier,
+    },
+    {
+      claimId: "hypothesis:comparison_not_prediction",
+      claim: "Historical or current-world comparison can generate counterevidence questions, not deterministic forecasts.",
+      strength: "bounded",
+      blockers: ["named_comparison_cases", "mismatch_axes", "causal_direction_not_certified"],
+      evidenceRefs,
+      claimTier,
+    },
+  ];
+}
+
+function buildProceduralScaffold(evidenceRefs: string[]): CivilizationProceduralScaffoldV1 {
+  return {
+    scaffoldId: "spore_civilization_stage_procedural_scaffold",
+    source: "spore_civilization_stage_research",
+    designMetaphor:
+      "Spore Civilization Stage supplies a procedural grammar for nodes, resources, action channels, dependencies, and maturity gates; it is not treated as a real-world predictive model.",
+    surfaces: [
+      { sporeSurface: "city", proceduralMeaning: "concentrated capability node", roadmapField: "systems,badges" },
+      { sporeSurface: "spice geyser", proceduralMeaning: "resource anchor", roadmapField: "parameterScopes,badges" },
+      { sporeSurface: "vehicle", proceduralMeaning: "mobility or projection capacity", roadmapField: "actionChannels,capabilities" },
+      { sporeSurface: "trade route", proceduralMeaning: "dependency and integration edge", roadmapField: "edges,dependencyChains" },
+      { sporeSurface: "economic, military, religious takeover", proceduralMeaning: "bounded action channels", roadmapField: "actionChannels,hypothesisClaims" },
+      { sporeSurface: "stage completion", proceduralMeaning: "maturity transition into a larger operating environment", roadmapField: "phases,comparisonCases" },
+    ],
+    blockedInterpretations: [
+      "Spore mechanics are not a history model.",
+      "Spore pathways do not certify real-world predictions.",
+      "Procedural comparison does not authorize policy, coercion, or moral finality.",
+    ],
+    researchRefs: [
+      "docs/audits/research/civilization-bounds-spore-procedural-systems-2026-06-17.md",
+    ],
+    evidenceRefs,
+  };
 }
 
 function buildSparseRoadmapFromScenarioFrame(
@@ -270,6 +567,45 @@ function buildSparseRoadmapFromScenarioFrame(
     },
   ];
   const actorBadgeId = `badge:${frameSlug}:bounded_system`;
+  const constraintEdges = constraintBadges.map((badge) => ({
+    edgeId: `edge:${frameSlug}:${badge.badgeId}`,
+    fromBadgeId: actorBadgeId,
+    toBadgeId: badge.badgeId,
+    relation: "constrains" as const,
+    weight: 0.7,
+    confidence: 0.35,
+    evidenceRefs: frameEvidenceRefs,
+    claimTier,
+  }));
+  const parameterScopes = buildParameterScopes(frame, frameEvidenceRefs, claimTier);
+  const actionChannels = buildActionChannels(frameEvidenceRefs, claimTier);
+  const dependencyChains: CivilizationDependencyChainV1[] = [
+    {
+      chainId: `chain:${frameSlug}:constraint_profile`,
+      label: "Scenario constraint profile dependency chain",
+      nodeBadgeIds: [actorBadgeId, ...constraintBadges.map((badge) => badge.badgeId)],
+      edgeIds: constraintEdges.map((edge) => edge.edgeId),
+      bottlenecks: constraintProfiles,
+      missingEvidence: frame.missingEvidence,
+      evidenceRefs: frameEvidenceRefs,
+      claimTier,
+    },
+    {
+      chainId: `chain:${frameSlug}:review_interface`,
+      label: "Evidence and review dependency chain",
+      nodeBadgeIds: [
+        actorBadgeId,
+        `badge:${frameSlug}:governance_review`,
+        `badge:${frameSlug}:collaboration_bound`,
+        `badge:${frameSlug}:evidence_tier`,
+      ],
+      edgeIds: [],
+      bottlenecks: ["governance_review_record", "claim_receipt_identity", "collaboration_factor_measurements"],
+      missingEvidence: ["governance_review_record", "claim_receipt_identity", ...frame.missingEvidence],
+      evidenceRefs: frameEvidenceRefs,
+      claimTier,
+    },
+  ];
   return buildCivilizationBoundsRoadmapV1({
     title: `Sparse Civilization Bounds: ${frame.title}`,
     scenarioId: frame.frameId,
@@ -359,16 +695,7 @@ function buildSparseRoadmapFromScenarioFrame(
       },
     ],
     badges,
-    edges: constraintBadges.map((badge) => ({
-      edgeId: `edge:${frameSlug}:${badge.badgeId}`,
-      fromBadgeId: actorBadgeId,
-      toBadgeId: badge.badgeId,
-      relation: "constrains",
-      weight: 0.7,
-      confidence: 0.35,
-      evidenceRefs: frameEvidenceRefs,
-      claimTier,
-    })),
+    edges: constraintEdges,
     collaborationBounds: [
       buildCivilizationCollaborationBoundV1({
         boundId: `collaboration:${frameSlug}:external_interface`,
@@ -399,6 +726,12 @@ function buildSparseRoadmapFromScenarioFrame(
       revisionTrigger: `Update or remove sparse badge when ${missing} is supplied.`,
       evidenceRefs: frameEvidenceRefs,
     })),
+    parameterScopes,
+    actionChannels,
+    dependencyChains,
+    comparisonCases: buildComparisonCases(frame, frameEvidenceRefs, claimTier),
+    hypothesisClaims: buildHypothesisClaims(frame, frameEvidenceRefs, claimTier),
+    proceduralScaffold: buildProceduralScaffold(frameEvidenceRefs),
     theoryBindings: constraintBadges.map((badge) => ({
       badgeId: badge.badgeId,
       theoryBadgeIds: badge.theoryBadgeIds?.length ? badge.theoryBadgeIds : frame.proceduralBindings.theoryBindingHints,
@@ -495,6 +828,12 @@ export async function runHelixAskCivilizationBoundsTool(
   return {
     roadmap: filtered,
     ...(scenarioFrame ? { scenarioFrame } : {}),
+    parameterScopes: filtered.parameterScopes,
+    actionChannels: filtered.actionChannels,
+    dependencyChains: filtered.dependencyChains,
+    comparisonCases: filtered.comparisonCases,
+    hypothesisClaims: filtered.hypothesisClaims,
+    proceduralScaffold: filtered.proceduralScaffold,
     ...(input.options?.includeBridgeContext === false
       ? {}
       : {
@@ -540,8 +879,22 @@ export const civilizationBoundsRoadmapSpec: ToolSpecShape = {
       roadmap: { type: "object" },
       scenarioFrame: { type: "object" },
       bridgeContext: { type: "object" },
+      parameterScopes: { type: "array", items: { type: "object" } },
+      actionChannels: { type: "array", items: { type: "object" } },
+      dependencyChains: { type: "array", items: { type: "object" } },
+      comparisonCases: { type: "array", items: { type: "object" } },
+      hypothesisClaims: { type: "array", items: { type: "object" } },
+      proceduralScaffold: { type: "object" },
     },
-    required: ["roadmap"],
+    required: [
+      "roadmap",
+      "parameterScopes",
+      "actionChannels",
+      "dependencyChains",
+      "comparisonCases",
+      "hypothesisClaims",
+      "proceduralScaffold",
+    ],
   },
   deterministic: true,
   rateLimit: { rpm: 120 },

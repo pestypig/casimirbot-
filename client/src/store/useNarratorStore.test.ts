@@ -60,6 +60,32 @@ describe("useNarratorStore", () => {
     expect(useNarratorStore.getState().events).toHaveLength(1);
   });
 
+  it("uses a short duplicate window for hover focus inspector scanning", () => {
+    useNarratorStore.getState().setSourcePolicy("hover_focus_inspector", {
+      enabled: true,
+      deliveryMode: "auto_speak",
+    });
+    const input = {
+      sourceKind: "hover_focus_inspector" as const,
+      sourceId: "hover:button:Speak narrator event",
+      text: "Speak narrator event.",
+      authority: "inspection_hint" as const,
+      assistant_answer: false,
+      terminal_eligible: false,
+      evidenceRefs: ["hover:button:Speak narrator event"],
+      rawContentIncluded: false,
+      speakable: true,
+      requestedDeliveryMode: "auto_speak" as const,
+      defaultDeliveryMode: "visible_only" as const,
+      dedupeKey: "hover_focus_inspector:hover:button:Speak narrator event",
+    };
+
+    expect(useNarratorStore.getState().publishEvent(input, { nowMs: 100 })).not.toBeNull();
+    expect(useNarratorStore.getState().publishEvent(input, { nowMs: 200 })).toBeNull();
+    expect(useNarratorStore.getState().publishEvent(input, { nowMs: 351 })).not.toBeNull();
+    expect(useNarratorStore.getState().events).toHaveLength(2);
+  });
+
   it("keeps voice receipts visible without queuing speech", () => {
     const event = useNarratorStore.getState().publishEvent({
       sourceKind: "voice_receipt",
@@ -96,7 +122,7 @@ describe("useNarratorStore", () => {
 
     expect(event).not.toBeNull();
     const diagnostic = {
-      schema: "helix.narrator_playback_diagnostic.v1" as const,
+      schema: "helix.voice_playback_lifecycle_diagnostic.v1" as const,
       stage: "ended" as const,
       startedAtMs: 400,
       updatedAtMs: 450,

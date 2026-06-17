@@ -1,3 +1,5 @@
+import type { VoicePlaybackLifecycleDiagnostic } from "@/lib/helix/voice-playback-diagnostics";
+
 export type VoicePlaybackUtteranceKind =
   | "brief"
   | "final"
@@ -84,6 +86,7 @@ export type VoicePlaybackMetrics = {
   profileHeader?: string;
   normalizationBenchmarkHeader?: string;
   normalizationSkipReasonHeader?: string;
+  playbackLifecycle?: VoicePlaybackLifecycleDiagnostic | null;
   cacheHitCount: number;
   cacheMissCount: number;
 };

@@ -8,6 +8,7 @@ import { useSituationRoomGraphStore } from "@/store/useSituationRoomGraphStore";
 import { useSituationRoomJobStore } from "@/store/useSituationRoomJobStore";
 import { useSituationRoomStore } from "@/store/useSituationRoomStore";
 import { useWorkstationClipboardStore } from "@/store/useWorkstationClipboardStore";
+import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
 import { useNarratorStore } from "@/store/useNarratorStore";
 import { useWorkstationNotesStore } from "@/store/useWorkstationNotesStore";
 import { useWorkstationProcessGraphStore } from "@/store/useWorkstationProcessGraphStore";
@@ -20,6 +21,7 @@ import { isTheoryContextReflectionV1 } from "@shared/contracts/theory-context-re
 import { isTheoryContextExplanationPlanV1 } from "@shared/contracts/theory-context-explanation-plan.v1";
 import { isHelixTheoryContextReflectionToolReceiptV1 } from "@shared/contracts/helix-theory-context-reflection-tool-receipt.v1";
 import { WORKSTATION_V1_PANEL_CAPABILITIES } from "@/lib/workstation/panelCapabilities";
+import { SCIENTIFIC_CALCULATOR_DRAFT_KEY } from "@/lib/scientific-calculator/events";
 
 const hoisted = vi.hoisted(() => {
   const callOrder: string[] = [];
@@ -108,6 +110,7 @@ describe("panelActionAdapters", () => {
     window.localStorage.clear();
     useWorkstationNotesStore.setState({ notes: {}, order: [], active_note_id: undefined });
     useWorkstationClipboardStore.setState({ receipts: [] });
+    useWorkstationSessionMemoryStore.setState({ panelScroll: {}, drafts: {} });
     useScientificCalculatorStore.setState({
       currentLatex: "",
       history: [],
@@ -949,6 +952,33 @@ describe("panelActionAdapters", () => {
     expect(solve.artifact?.unit_system).toBe("SI");
     expect(solve.artifact?.target_workbench).toBe("scalar");
     expect(String(solve.artifact?.normalized_expression)).not.toContain("with the scientific calculator");
+  });
+
+  it("preserves function expressions when scientific calculator workstation solves update panel input", () => {
+    const expression = "((sqrt(81)+ln(e^3))*7-5^2)/2";
+    useWorkstationSessionMemoryStore.getState().rememberDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY, "(81)+");
+
+    const solve = executeHelixPanelAction(
+      {
+        panel_id: "scientific-calculator",
+        action_id: "solve_expression",
+        args: {
+          latex: `Call scientific-calculator.solve_expression with this exact expression: ${expression}`,
+        },
+      },
+      {
+        openPanel: () => undefined,
+        focusPanel: () => undefined,
+        closePanel: () => undefined,
+        openSettings: () => undefined,
+      },
+    );
+
+    expect(solve.ok).toBe(true);
+    expect(useScientificCalculatorStore.getState().currentLatex).toBe(expression);
+    expect(useWorkstationSessionMemoryStore.getState().readDraft(SCIENTIFIC_CALCULATOR_DRAFT_KEY)).toBe(expression);
+    expect(solve.artifact?.result_text).toBe("29.5");
+    expect(String(solve.artifact?.normalized_expression)).not.toBe("(81)+");
   });
 
   it("normalizes mixed-number notation before scientific calculator workstation solves", () => {

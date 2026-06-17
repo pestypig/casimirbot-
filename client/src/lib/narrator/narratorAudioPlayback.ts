@@ -1,52 +1,23 @@
 import type { VoiceSpeakResponse } from "@/lib/agi/api";
+import {
+  VoicePlaybackLifecycleError,
+  createVoicePlaybackLifecycleDiagnostic,
+  updateVoicePlaybackLifecycleDiagnosticFromAudio,
+  type VoicePlaybackLifecycleDiagnostic,
+  type VoicePlaybackLifecycleStage,
+} from "@/lib/helix/voice-playback-diagnostics";
 
 let activeNarratorAudio: HTMLAudioElement | null = null;
 let activeNarratorAudioUrl: string | null = null;
+let narratorAudioUnlocked = false;
+let narratorAudioUnlockLastFailure: { reason: string; atMs: number } | null = null;
 
-export type NarratorPlaybackStage =
-  | "json_response"
-  | "audio_response"
-  | "play_requested"
-  | "play_resolved"
-  | "playing"
-  | "timeupdate"
-  | "ended"
-  | "error"
-  | "aborted";
+const NARRATOR_AUDIO_UNLOCK_DATA_URI =
+  "data:audio/wav;base64,UklGRsQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
-export type NarratorPlaybackDiagnostic = {
-  schema: "helix.narrator_playback_diagnostic.v1";
-  stage: NarratorPlaybackStage;
-  startedAtMs: number;
-  updatedAtMs: number;
-  provider: string | null;
-  profile: string | null;
-  mimeType: string | null;
-  audioBytes: number | null;
-  playResolved: boolean;
-  playingObserved: boolean;
-  endedObserved: boolean;
-  timeupdateCount: number;
-  maxCurrentTime: number;
-  duration: number | null;
-  muted: boolean | null;
-  volume: number | null;
-  paused: boolean | null;
-  readyState: number | null;
-  networkState: number | null;
-  mediaErrorCode: number | null;
-  errorMessage: string | null;
-};
-
-export class NarratorPlaybackError extends Error {
-  diagnostic: NarratorPlaybackDiagnostic;
-
-  constructor(message: string, diagnostic: NarratorPlaybackDiagnostic) {
-    super(message);
-    this.name = "NarratorPlaybackError";
-    this.diagnostic = diagnostic;
-  }
-}
+export type NarratorPlaybackStage = VoicePlaybackLifecycleStage;
+export type NarratorPlaybackDiagnostic = VoicePlaybackLifecycleDiagnostic;
+export { VoicePlaybackLifecycleError as NarratorPlaybackError };
 
 function abortError(): DOMException {
   return new DOMException("Narrator audio playback aborted.", "AbortError");
@@ -56,29 +27,98 @@ function createDiagnostic(
   response: VoiceSpeakResponse,
   stage: NarratorPlaybackStage,
 ): NarratorPlaybackDiagnostic {
-  const nowMs = Date.now();
-  return {
-    schema: "helix.narrator_playback_diagnostic.v1",
+  return createVoicePlaybackLifecycleDiagnostic({
     stage,
-    startedAtMs: nowMs,
-    updatedAtMs: nowMs,
     provider: response.headers.provider,
     profile: response.headers.profile,
     mimeType: response.kind === "audio" ? response.mimeType : null,
     audioBytes: response.kind === "audio" ? response.blob.size : null,
-    playResolved: false,
-    playingObserved: false,
-    endedObserved: false,
-    timeupdateCount: 0,
-    maxCurrentTime: 0,
-    duration: null,
-    muted: null,
-    volume: null,
-    paused: null,
-    readyState: null,
-    networkState: null,
-    mediaErrorCode: null,
-    errorMessage: null,
+  });
+}
+
+export function createNarratorPlaybackLockedDiagnostic(
+  reason = "narrator_audio_playback_locked",
+): NarratorPlaybackDiagnostic {
+  return {
+    ...createVoicePlaybackLifecycleDiagnostic({ stage: "error" }),
+    errorMessage: reason,
+  };
+}
+
+function configureNarratorAudioElement(audio: HTMLAudioElement): HTMLAudioElement {
+  audio.preload = "auto";
+  audio.crossOrigin = "anonymous";
+  audio.autoplay = true;
+  audio.volume = 1;
+  audio.setAttribute?.("playsinline", "true");
+  audio.setAttribute?.("webkit-playsinline", "true");
+  const mutableAudio = audio as HTMLAudioElement & { playsInline?: boolean };
+  mutableAudio.playsInline = true;
+  if (typeof document !== "undefined" && typeof Node !== "undefined" && audio instanceof Node && !audio.isConnected) {
+    audio.dataset.helixNarratorPlayback = "true";
+    audio.style.position = "fixed";
+    audio.style.left = "-9999px";
+    audio.style.top = "0";
+    audio.style.width = "1px";
+    audio.style.height = "1px";
+    audio.style.opacity = "0";
+    audio.style.pointerEvents = "none";
+    audio.setAttribute("aria-hidden", "true");
+    document.body.appendChild(audio);
+  }
+  return audio;
+}
+
+export function isNarratorAudioPlaybackUnlocked(): boolean {
+  return narratorAudioUnlocked;
+}
+
+export function getNarratorAudioUnlockLastFailure(): { reason: string; atMs: number } | null {
+  return narratorAudioUnlockLastFailure;
+}
+
+export async function primeNarratorAudioPlayback(): Promise<boolean> {
+  if (narratorAudioUnlocked) return true;
+  if (typeof Audio === "undefined") return false;
+  try {
+    const primer = configureNarratorAudioElement(new Audio());
+    primer.muted = false;
+    primer.volume = 0.01;
+    primer.src = NARRATOR_AUDIO_UNLOCK_DATA_URI;
+    const playPromise = primer.play();
+    if (playPromise && typeof playPromise.then === "function") {
+      await playPromise;
+    }
+    primer.pause();
+    primer.currentTime = 0;
+    primer.src = "";
+    primer.load();
+    primer.volume = 1;
+    narratorAudioUnlocked = true;
+    narratorAudioUnlockLastFailure = null;
+    return true;
+  } catch (error) {
+    narratorAudioUnlockLastFailure = {
+      reason: error instanceof Error ? error.message : String(error),
+      atMs: Date.now(),
+    };
+    return false;
+  }
+}
+
+export function installNarratorAudioUnlockGestureListeners(): () => void {
+  if (typeof window === "undefined") return () => undefined;
+  const unlockOnGesture = () => {
+    if (narratorAudioUnlocked) return;
+    void primeNarratorAudioPlayback();
+  };
+  window.addEventListener("pointerdown", unlockOnGesture, { passive: true });
+  window.addEventListener("touchend", unlockOnGesture, { passive: true });
+  window.addEventListener("click", unlockOnGesture, { passive: true });
+  return () => {
+    window.removeEventListener("pointerdown", unlockOnGesture);
+    window.removeEventListener("touchend", unlockOnGesture);
+    window.removeEventListener("click", unlockOnGesture);
   };
 }
 
@@ -88,26 +128,7 @@ function updateFromAudio(
   stage: NarratorPlaybackStage,
   errorMessage?: string | null,
 ): NarratorPlaybackDiagnostic {
-  const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
-  const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : null;
-  return {
-    ...diagnostic,
-    stage,
-    updatedAtMs: Date.now(),
-    playResolved: diagnostic.playResolved || stage === "play_resolved",
-    playingObserved: diagnostic.playingObserved || stage === "playing",
-    endedObserved: diagnostic.endedObserved || stage === "ended",
-    timeupdateCount: diagnostic.timeupdateCount + (stage === "timeupdate" ? 1 : 0),
-    maxCurrentTime: Math.max(diagnostic.maxCurrentTime, currentTime),
-    duration,
-    muted: audio.muted,
-    volume: Number.isFinite(audio.volume) ? audio.volume : null,
-    paused: audio.paused,
-    readyState: audio.readyState,
-    networkState: audio.networkState,
-    mediaErrorCode: audio.error?.code ?? null,
-    errorMessage: errorMessage ?? diagnostic.errorMessage,
-  };
+  return updateVoicePlaybackLifecycleDiagnosticFromAudio(diagnostic, audio, stage, errorMessage);
 }
 
 function emitDiagnostic(
@@ -150,14 +171,14 @@ export async function playNarratorVoiceResponse(
       response.payload.reason ||
       (response.payload.dryRun ? "voice_response_dry_run" : "voice_response_missing_audio");
     diagnostic = emitDiagnostic({ ...diagnostic, stage: "error", updatedAtMs: Date.now(), errorMessage: reason }, options?.onDiagnostic);
-    throw new NarratorPlaybackError(reason, diagnostic);
+    throw new VoicePlaybackLifecycleError(reason, diagnostic);
   }
   if (response.blob.size <= 0) {
     diagnostic = emitDiagnostic(
       { ...diagnostic, stage: "error", updatedAtMs: Date.now(), errorMessage: "voice_response_empty_audio" },
       options?.onDiagnostic,
     );
-    throw new NarratorPlaybackError("voice_response_empty_audio", diagnostic);
+    throw new VoicePlaybackLifecycleError("voice_response_empty_audio", diagnostic);
   }
   return playNarratorAudioBlob(response.blob, diagnostic, options);
 }
@@ -184,7 +205,7 @@ function playNarratorAudioBlob(
 
     stopNarratorAudioPlayback();
     const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
+    const audio = configureNarratorAudioElement(new Audio(url));
     activeNarratorAudio = audio;
     activeNarratorAudioUrl = url;
     let diagnostic = emitDiagnostic(initialDiagnostic, onDiagnostic);
@@ -202,14 +223,14 @@ function playNarratorAudioBlob(
     };
     const fail = (message: string) => {
       diagnostic = emitDiagnostic(updateFromAudio(diagnostic, audio, "error", message), onDiagnostic);
-      return new NarratorPlaybackError(message, diagnostic);
+      return new VoicePlaybackLifecycleError(message, diagnostic);
     };
     const finalize = (error?: unknown) => {
       if (settled) return;
       settled = true;
       cleanup();
       if (error) {
-        reject(error instanceof NarratorPlaybackError ? error : fail(error instanceof Error ? error.message : String(error)));
+        reject(error instanceof VoicePlaybackLifecycleError ? error : fail(error instanceof Error ? error.message : String(error)));
       } else {
         resolve(diagnostic);
       }
@@ -217,7 +238,7 @@ function playNarratorAudioBlob(
     const handleAbort = () => {
       audio.pause();
       diagnostic = emitDiagnostic(updateFromAudio(diagnostic, audio, "aborted", "narrator_audio_playback_aborted"), onDiagnostic);
-      finalize(new NarratorPlaybackError("narrator_audio_playback_aborted", diagnostic));
+      finalize(new VoicePlaybackLifecycleError("narrator_audio_playback_aborted", diagnostic));
     };
 
     audio.onended = () => {

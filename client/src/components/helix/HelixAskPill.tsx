@@ -159,6 +159,11 @@ import {
   type VoiceCallDiagnosticSnapshot,
 } from "@/lib/helix/voice-call-diagnostics";
 import {
+  createVoicePlaybackLifecycleDiagnostic,
+  updateVoicePlaybackLifecycleDiagnosticFromAudio,
+  type VoicePlaybackLifecycleDiagnostic,
+} from "@/lib/helix/voice-playback-diagnostics";
+import {
   advanceReasoningTheaterFrontierTracker,
   clampFrontierMeterPct,
   createReasoningTheaterFrontierTrackerState,
@@ -8419,12 +8424,24 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
     terminalAuthorityRecord?.schema === "helix.turn_terminal_authority.v1" &&
     terminalAuthorityRecord.server_authoritative === true;
   const summary = readHelixResolvedTurnSummary(reply);
+  const terminalResolution = resolveHelixVisibleTerminalCore(reply);
+  const terminalResolutionIsFinalAnswer =
+    Boolean(terminalResolution.backendTerminalText) &&
+    terminalResolution.source !== "typed_failure" &&
+    terminalResolution.source !== "terminal_authority_missing" &&
+    terminalResolution.finalAnswerSource !== "typed_failure" &&
+    terminalResolution.finalAnswerSource !== "request_user_input" &&
+    terminalResolution.terminalKind !== "failure" &&
+    terminalResolution.terminalKind !== "request_user_input" &&
+    terminalResolution.terminalArtifactKind !== "typed_failure";
   const pendingRequest = readHelixTopLevelPendingServerRequest(reply);
-  const pendingPresent = Boolean(pendingRequest);
+  const pendingPresent = Boolean(pendingRequest) && !terminalResolutionIsFinalAnswer;
   const statusCandidate =
-    coerceText(summary?.final_status).trim() ||
-    coerceText(readAgentLoopAuditRecord(replyRecord?.satisfaction_report ?? debugRecord?.satisfaction_report)?.terminal_kind).trim() ||
-    (pendingPresent ? "pending_input" : reply.ok === false ? "final_failure" : "final_answer");
+    terminalResolutionIsFinalAnswer
+      ? "final_answer"
+      : coerceText(summary?.final_status).trim() ||
+        coerceText(readAgentLoopAuditRecord(replyRecord?.satisfaction_report ?? debugRecord?.satisfaction_report)?.terminal_kind).trim() ||
+        (pendingPresent ? "pending_input" : reply.ok === false ? "final_failure" : "final_answer");
   const normalizedStatus: VisibleResolvedTurn["primary_terminal_label"] =
     statusCandidate === "pending_input" && pendingPresent
       ? "pending_input"
@@ -8432,24 +8449,28 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
         ? "final_failure"
         : "final_answer";
   const terminalErrorCode =
-    coerceText(replyRecord?.terminal_error_code).trim() ||
-    coerceText(debugRecord?.terminal_error_code).trim() ||
-    coerceText(summary?.terminal_error_code).trim() ||
-    (
-      !pendingPresent &&
-      reply.ok !== false &&
-      !terminalAuthorityTrusted &&
-      (
-        coerceText(replyRecord?.selected_final_answer).trim() ||
-        coerceText(debugRecord?.selected_final_answer).trim() ||
-        coerceText(reply.assistant_answer).trim() ||
-        coerceText(reply.text).trim() ||
-        coerceText(reply.content).trim()
-      )
-        ? "terminal_authority_missing"
-        : null
-    );
+    terminalResolutionIsFinalAnswer
+      ? null
+      : terminalResolution.terminalErrorCode ||
+        coerceText(replyRecord?.terminal_error_code).trim() ||
+        coerceText(debugRecord?.terminal_error_code).trim() ||
+        coerceText(summary?.terminal_error_code).trim() ||
+        (
+          !pendingPresent &&
+          reply.ok !== false &&
+          !terminalAuthorityTrusted &&
+          (
+            coerceText(replyRecord?.selected_final_answer).trim() ||
+            coerceText(debugRecord?.selected_final_answer).trim() ||
+            coerceText(reply.assistant_answer).trim() ||
+            coerceText(reply.text).trim() ||
+            coerceText(reply.content).trim()
+          )
+            ? "terminal_authority_missing"
+            : null
+        );
   const explicitFinalAnswerSource =
+    coerceText(terminalResolution.finalAnswerSource).trim() ||
     coerceText(replyRecord?.final_answer_source).trim() ||
     coerceText(debugRecord?.final_answer_source).trim() ||
     coerceText(terminalAuthorityRecord?.final_answer_source).trim();
@@ -8458,13 +8479,14 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
     (terminalErrorCode ? "typed_failure" : "unknown");
   const explicitTypedFailureSignal =
     explicitFinalAnswerSource === "typed_failure" ||
+    terminalResolution.terminalKind === "failure" ||
+    terminalResolution.terminalArtifactKind === "typed_failure" ||
     coerceText(summary?.terminal_artifact_kind).trim() === "typed_failure" ||
     coerceText(replyRecord?.terminal_artifact_kind).trim() === "typed_failure" ||
     coerceText(debugRecord?.terminal_artifact_kind).trim() === "typed_failure" ||
     coerceText(terminalAuthorityRecord?.terminal_artifact_kind).trim() === "typed_failure";
   const isTypedFailure = finalAnswerSource === "typed_failure" || Boolean(terminalErrorCode);
   const liveFinalAnswer = readLatestAuthoritativeFinalLiveEventText(reply);
-  const terminalResolution = resolveHelixVisibleTerminalCore(reply);
   const terminalAuthorityText = coerceText(terminalAuthorityRecord?.terminal_text_preview).trim();
   const typedFailureRecord =
     readAgentLoopAuditRecord(replyRecord?.typed_failure) ??
@@ -8488,6 +8510,7 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
         : "";
   const canonicalGoalKind = readHelixCanonicalGoalKind(reply);
   const terminalArtifactKind =
+    coerceText(terminalResolution.terminalArtifactKind).trim() ||
     coerceText(summary?.terminal_artifact_kind).trim() ||
     coerceText(replyRecord?.terminal_artifact_kind).trim() ||
     coerceText(debugRecord?.terminal_artifact_kind).trim() ||
@@ -8509,7 +8532,9 @@ export function buildVisibleResolvedTurn(reply: HelixAskReply): VisibleResolvedT
         )
       : "";
   const selectedFinalAnswerRaw =
-    canonicalSelectedFinalAnswer
+    terminalResolutionIsFinalAnswer
+      ? terminalResolution.text
+      : canonicalSelectedFinalAnswer
       ? canonicalSelectedFinalAnswer
       : isTypedFailure
         ? selectedFinalAnswerCandidate
@@ -21755,6 +21780,7 @@ export function HelixAskPill({
       error: input.error ?? null,
       audioUnlocked: voiceAudioUnlockedRef.current,
       playbackPath: voicePlaybackCurrentPathRef.current ?? voicePlaybackLastOutcomePathRef.current,
+      playbackLifecycle: input.metrics?.playbackLifecycle ?? null,
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
@@ -22213,7 +22239,7 @@ export function HelixAskPill({
   }, [ensureVoicePlaybackAudioGraph, getOrCreateVoicePlaybackElement]);
 
   const playVoiceAudioBlob = useCallback(
-    async (input: { blob: Blob; replyId?: string | null; awaitPlayback?: boolean }): Promise<void> => {
+    async (input: { blob: Blob; replyId?: string | null; awaitPlayback?: boolean }): Promise<VoicePlaybackLifecycleDiagnostic> => {
       const replyId = input.replyId ?? null;
       if (!voiceAudioUnlockedRef.current) {
         await primeVoiceAudioPlayback().catch(() => false);
@@ -22253,6 +22279,11 @@ export function HelixAskPill({
         audio.src = url;
         audio.load();
         playbackAudioRef.current = audio;
+        let lifecycleDiagnostic = createVoicePlaybackLifecycleDiagnostic({
+          stage: "audio_response",
+          mimeType: input.blob.type || "application/octet-stream",
+          audioBytes: input.blob.size,
+        });
         if (replyId) {
           setReadAloudByReply((prev) => ({
             ...prev,
@@ -22282,6 +22313,12 @@ export function HelixAskPill({
             };
             const failWithPlaybackTimeout = (reason: "no_progress" | "duration_exceeded") => {
               if (settled) return;
+              lifecycleDiagnostic = updateVoicePlaybackLifecycleDiagnosticFromAudio(
+                lifecycleDiagnostic,
+                audio,
+                "error",
+                `voice_audio_playback_timeout:${reason}`,
+              );
               settled = true;
               cleanupPlaybackHandlers();
               if (
@@ -22319,6 +22356,12 @@ export function HelixAskPill({
             };
             const finalize = (event: "ended" | "error" | "stopped") => {
               if (settled) return;
+              lifecycleDiagnostic = updateVoicePlaybackLifecycleDiagnosticFromAudio(
+                lifecycleDiagnostic,
+                audio,
+                event === "ended" ? "ended" : event === "stopped" ? "aborted" : "error",
+                event === "error" ? "voice_audio_playback_error" : event === "stopped" ? "voice_audio_playback_stopped" : null,
+              );
               settled = true;
               cleanupPlaybackHandlers();
               if (
@@ -22375,9 +22418,19 @@ export function HelixAskPill({
             audio.onended = () => finalize("ended");
             audio.onerror = () => finalize("error");
             audio.onplaying = () => {
+              lifecycleDiagnostic = updateVoicePlaybackLifecycleDiagnosticFromAudio(
+                lifecycleDiagnostic,
+                audio,
+                "playing",
+              );
               lastProgressAtMs = Date.now();
             };
             audio.ontimeupdate = () => {
+              lifecycleDiagnostic = updateVoicePlaybackLifecycleDiagnosticFromAudio(
+                lifecycleDiagnostic,
+                audio,
+                "timeupdate",
+              );
               const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
               if (currentTime > lastCurrentTime + 0.02) {
                 lastCurrentTime = currentTime;
@@ -22423,7 +22476,17 @@ export function HelixAskPill({
             }
             const attemptPlay = async () => {
               try {
+                lifecycleDiagnostic = updateVoicePlaybackLifecycleDiagnosticFromAudio(
+                  lifecycleDiagnostic,
+                  audio,
+                  "play_requested",
+                );
                 await audio.play();
+                lifecycleDiagnostic = updateVoicePlaybackLifecycleDiagnosticFromAudio(
+                  lifecycleDiagnostic,
+                  audio,
+                  "play_resolved",
+                );
                 playResolvedAtMs = Date.now();
                 lastProgressAtMs = playResolvedAtMs;
                 voiceAudioUnlockedRef.current = true;
@@ -22435,7 +22498,17 @@ export function HelixAskPill({
                 ) {
                   const unlocked = await primeVoiceAudioPlayback();
                   if (unlocked) {
+                    lifecycleDiagnostic = updateVoicePlaybackLifecycleDiagnosticFromAudio(
+                      lifecycleDiagnostic,
+                      audio,
+                      "play_requested",
+                    );
                     await audio.play();
+                    lifecycleDiagnostic = updateVoicePlaybackLifecycleDiagnosticFromAudio(
+                      lifecycleDiagnostic,
+                      audio,
+                      "play_resolved",
+                    );
                     playResolvedAtMs = Date.now();
                     lastProgressAtMs = playResolvedAtMs;
                     voiceAudioUnlockedRef.current = true;
@@ -22462,7 +22535,7 @@ export function HelixAskPill({
               finalize("error");
             });
           });
-          return;
+          return lifecycleDiagnostic;
         } catch (error) {
           // Mobile Safari can intermittently fail MediaElementSource playback; retry once
           // with direct element output by discarding the graph-bound element.
@@ -23007,6 +23080,7 @@ export function HelixAskPill({
           cancelReason: null,
           cacheHitCount: 0,
           cacheMissCount: 0,
+          playbackLifecycle: null,
         };
         const playbackMeta = voiceUtteranceTimelineMetaByIdRef.current.get(utterance.utteranceId) ?? null;
         let playbackOutcomeStatusOverride: VoicePlaybackOutcomeStatus | null = null;
@@ -23223,7 +23297,11 @@ export function HelixAskPill({
               chunkIndex: chunk.chunkIndex,
               chunkCount: chunk.chunkCount,
             });
-            await playVoiceAudioBlob({ blob: currentResult.blob, replyId: utterance.replyId, awaitPlayback: true });
+            metrics.playbackLifecycle = await playVoiceAudioBlob({
+              blob: currentResult.blob,
+              replyId: utterance.replyId,
+              awaitPlayback: true,
+            });
             lastChunkEndedAtMs = Date.now();
             pushVoiceChunkTimelineEvent({
               kind: "chunk_play_end",
@@ -23321,7 +23399,11 @@ export function HelixAskPill({
                 chunkCount: nextChunk.chunkCount,
                 detail: "prefetched",
               });
-              await playVoiceAudioBlob({ blob: prefetched.blob, replyId: utterance.replyId, awaitPlayback: true });
+              metrics.playbackLifecycle = await playVoiceAudioBlob({
+                blob: prefetched.blob,
+                replyId: utterance.replyId,
+                awaitPlayback: true,
+              });
               lastChunkEndedAtMs = Date.now();
               pushVoiceChunkTimelineEvent({
                 kind: "chunk_play_end",
@@ -34683,6 +34765,7 @@ export function HelixAskPill({
               ? localResponseRecord.selected_final_answer.trim()
               : "";
           const responseIsModelSynthesizedFinalDraft =
+            coerceText(terminalResolutionForFinal.terminalArtifactKind).trim() === "model_synthesized_answer" &&
             (
               localResponseRecord.terminal_artifact_kind === "model_synthesized_answer" ||
               responseDebugPayload.terminal_artifact_kind === "model_synthesized_answer" ||
@@ -34703,21 +34786,42 @@ export function HelixAskPill({
             Boolean(responseLiveEnvironmentAnswerForDebug) &&
             (isInvalidTerminalAnswerText(responseText) ||
               normalizeTerminalAnswerText(responseText) === normalizeTerminalAnswerText(responseLiveEnvironmentAnswerForDebug));
+          const responseDebugResolvedTerminalArtifactKind =
+            responseDebugUsedLiveEnvironmentAnswer
+              ? "situation_context_pack"
+              : coerceText(terminalResolutionForFinal.terminalArtifactKind).trim() ||
+                (typeof localResponseRecord.terminal_artifact_kind === "string" && localResponseRecord.terminal_artifact_kind.trim()
+                  ? localResponseRecord.terminal_artifact_kind.trim()
+                  : typeof responseDebugPayload?.terminal_artifact_kind === "string" && responseDebugPayload.terminal_artifact_kind.trim()
+                    ? responseDebugPayload.terminal_artifact_kind.trim()
+                    : null);
+          const responseDebugResolvedFinalAnswerSource =
+            coerceText(terminalResolutionForFinal.finalAnswerSource).trim() ||
+            (responseDebugResolvedTerminalArtifactKind &&
+            responseDebugResolvedTerminalArtifactKind !== "model_synthesized_answer" &&
+            responseDebugResolvedTerminalArtifactKind !== "final_answer_draft"
+              ? responseDebugResolvedTerminalArtifactKind
+              : typeof localResponseRecord.final_answer_source === "string" && localResponseRecord.final_answer_source.trim()
+                ? localResponseRecord.final_answer_source.trim()
+                : responseDebugPayload?.final_answer_source);
+          const responseDebugResolvedSummary = readAgentLoopAuditRecord(responseDebugPayload?.resolved_turn_summary);
+          const responseDebugResolvedRouteLabel =
+            responseDebugResolvedSummary && responseDebugResolvedTerminalArtifactKind
+              ? (
+                  coerceText(responseDebugResolvedSummary.resolved_route_label).trim().replace(
+                    /\s*\/\s*(?:model_synthesized_answer|final_answer_draft)\s*$/i,
+                    ` / ${responseDebugResolvedTerminalArtifactKind}`,
+                  ) ||
+                  `final_answer / ${responseDebugResolvedTerminalArtifactKind}`
+                )
+              : null;
           const responseDebugForReply =
             responseDebugPayload && typeof responseDebugPayload === "object"
               ? {
                   ...responseDebugPayload,
                   selected_final_answer: responseDebugSelectedFinalAnswer,
-                  final_answer_source:
-                    typeof localResponseRecord.final_answer_source === "string"
-                      ? localResponseRecord.final_answer_source
-                      : responseDebugPayload.final_answer_source,
-                  terminal_artifact_kind:
-                    typeof localResponseRecord.terminal_artifact_kind === "string"
-                      ? localResponseRecord.terminal_artifact_kind
-                      : responseDebugUsedLiveEnvironmentAnswer
-                        ? "situation_context_pack"
-                        : responseDebugPayload.terminal_artifact_kind,
+                  final_answer_source: responseDebugResolvedFinalAnswerSource,
+                  terminal_artifact_kind: responseDebugResolvedTerminalArtifactKind,
                   terminal_artifact_id:
                     typeof localResponseRecord.terminal_artifact_id === "string"
                       ? localResponseRecord.terminal_artifact_id
@@ -34747,6 +34851,17 @@ export function HelixAskPill({
                           final_status: "final_answer",
                           resolved_route_label: "live_answer_environment / artifact_synthesis",
                           terminal_artifact_kind: "situation_context_pack",
+                        }
+                      : responseDebugResolvedSummary
+                      ? {
+                          ...responseDebugResolvedSummary,
+                          resolved_route_label:
+                            responseDebugResolvedRouteLabel ||
+                            coerceText(responseDebugResolvedSummary.resolved_route_label).trim() ||
+                            null,
+                          terminal_artifact_kind:
+                            responseDebugResolvedTerminalArtifactKind ??
+                            responseDebugResolvedSummary.terminal_artifact_kind,
                         }
                       : responseDebugPayload.resolved_turn_summary,
                   turn_truth_table: responseDebugPayload.turn_truth_table &&

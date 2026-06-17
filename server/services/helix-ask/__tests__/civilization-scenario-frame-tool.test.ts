@@ -124,6 +124,18 @@ describe("Helix Ask Civilization Scenario Frame tool", () => {
     expect(roadmapOutput.roadmap.missingEvidence).toEqual(
       expect.arrayContaining(["material_inventory_receipts", "collaboration_factor_measurements"]),
     );
+    expect(roadmapOutput.parameterScopes.map((scope) => scope.kind)).toEqual(
+      expect.arrayContaining(["material_base", "governance_institutional_capacity", "security_conflict_exposure"]),
+    );
+    expect(roadmapOutput.dependencyChains.map((chain) => chain.chainId)).toEqual(
+      expect.arrayContaining([expect.stringContaining("constraint_profile")]),
+    );
+    expect(roadmapOutput.comparisonCases.map((comparison) => comparison.sourceClass)).toEqual(
+      expect.arrayContaining(["historical_case", "current_snapshot"]),
+    );
+    expect(roadmapOutput.hypothesisClaims.map((claim) => claim.claimId)).toEqual(
+      expect.arrayContaining(["hypothesis:dependency_bottleneck", "hypothesis:comparison_not_prediction"]),
+    );
     expect(roadmapOutput.scenarioFrame?.schemaVersion).toBe("civilization_scenario_frame/v1");
   });
 

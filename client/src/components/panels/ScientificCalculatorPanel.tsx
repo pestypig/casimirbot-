@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
+  SCIENTIFIC_CALCULATOR_DRAFT_KEY,
   SCIENTIFIC_CALCULATOR_MATH_PICKED_EVENT,
   type ScientificCalculatorMathPickedDetail,
 } from "@/lib/scientific-calculator/events";
@@ -27,8 +28,6 @@ import type { ScientificCalculatorDebugEvent, ScientificCalculatorHistoryEntry }
 import type { ScientificCalculatorStepTraceArtifactV1 } from "@shared/contracts/scientific-calculator-step-schema.v1";
 import type { TheoryCompoundRunRowV1 } from "@shared/contracts/theory-compound-run.v1";
 import type { TheoryRuntimeScalarCutV1 } from "@shared/contracts/theory-runtime-math-trace.v1";
-
-const SCIENTIFIC_CALCULATOR_DRAFT_KEY = "scientific-calculator:input";
 
 type ScientificCalculatorWorkbenchSection = "scalar" | "runtime" | "theory";
 
@@ -378,7 +377,7 @@ export default function ScientificCalculatorPanel() {
         ingestLatex(detail.latex, {
           sourcePath: detail.sourcePath,
           anchor: detail.anchor,
-          source: detail.sourcePath === "clipboard" ? "clipboard" : "doc_viewer",
+          source: detail.source,
         });
       }
       setInput(detail.latex);

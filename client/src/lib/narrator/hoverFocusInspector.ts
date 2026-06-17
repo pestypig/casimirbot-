@@ -2,7 +2,11 @@ import { useEffect, useRef } from "react";
 import { speakVoice } from "@/lib/agi/api";
 import {
   NarratorPlaybackError,
+  createNarratorPlaybackLockedDiagnostic,
+  installNarratorAudioUnlockGestureListeners,
+  isNarratorAudioPlaybackUnlocked,
   playNarratorVoiceResponse,
+  primeNarratorAudioPlayback,
 } from "@/lib/narrator/narratorAudioPlayback";
 import { buildNarratorVoiceSpeakPayload } from "@/lib/narrator/narratorVoiceBridge";
 import { useNarratorStore } from "@/store/useNarratorStore";
@@ -24,16 +28,19 @@ const DEFAULT_CHUNK_MAX_CHARS = 220;
 const TEXT_NODE = 3;
 const TEXT_NODE_FILTER = 4;
 
-const MEANINGFUL_SELECTOR = [
+const PRIMARY_MEANINGFUL_SELECTOR = [
   "[data-narrator-label]",
   "[data-narrator-description]",
   "[aria-label]",
+  "[aria-labelledby]",
   "[aria-describedby]",
+  "[title]",
   "button",
   "a[href]",
   "input",
   "textarea",
   "select",
+  "label",
   "[role]",
   "h1",
   "h2",
@@ -48,8 +55,17 @@ const MEANINGFUL_SELECTOR = [
   "blockquote",
   "td",
   "th",
+  "dt",
+  "dd",
+].join(",");
+
+const CONTAINER_MEANINGFUL_SELECTOR = [
   "article",
   "section",
+  "[role='article']",
+  "[role='document']",
+  "[role='main']",
+  "[role='region']",
 ].join(",");
 
 function cleanNarratorText(value: string | null | undefined): string {
@@ -83,6 +99,17 @@ function ariaDescribedByText(element: Element): string | null {
   return text || null;
 }
 
+function ariaLabelledByText(element: Element): string | null {
+  const ids = cleanNarratorText(element.getAttribute("aria-labelledby"));
+  if (!ids) return null;
+  const text = ids
+    .split(/\s+/)
+    .map((id) => cleanNarratorText(element.ownerDocument.getElementById(id)?.textContent))
+    .filter(Boolean)
+    .join(" ");
+  return text || null;
+}
+
 function elementAccessibleText(element: Element): string | null {
   const view = element.ownerDocument.defaultView;
   if (isSensitiveElement(element)) return null;
@@ -91,6 +118,7 @@ function elementAccessibleText(element: Element): string | null {
     element.getAttribute("data-narrator-label"),
     element.getAttribute("data-narrator-description"),
     element.getAttribute("aria-label"),
+    ariaLabelledByText(element),
     ariaDescribedByText(element),
     element.getAttribute("title"),
     view && element instanceof view.HTMLImageElement ? element.alt : null,
@@ -110,7 +138,9 @@ function elementAccessibleText(element: Element): string | null {
 
 function findMeaningfulElement(target: EventTarget | null): Element | null {
   if (!(target instanceof Element)) return null;
-  const candidate = target.closest(MEANINGFUL_SELECTOR);
+  const candidate =
+    target.closest(PRIMARY_MEANINGFUL_SELECTOR) ??
+    target.closest(CONTAINER_MEANINGFUL_SELECTOR);
   if (!candidate || candidate.closest("[data-narrator-ignore='true']")) return null;
   if (!isElementVisible(candidate)) return null;
   return candidate;
@@ -184,6 +214,7 @@ function elementSourceId(element: Element, text: string): string {
     element.getAttribute("data-narrator-source-id") ??
     element.id ??
     element.getAttribute("aria-label") ??
+    element.getAttribute("aria-labelledby") ??
     element.getAttribute("role") ??
     element.tagName.toLowerCase();
   return `hover:${cleanNarratorText(explicit).slice(0, 80)}:${text.slice(0, 48)}`;
@@ -219,11 +250,13 @@ export function useNarratorHoverFocusInspector(options?: {
   const markFailed = useNarratorStore((state) => state.markFailed);
   const recordPlaybackDiagnostic = useNarratorStore((state) => state.recordPlaybackDiagnostic);
   const timerRef = useRef<number | null>(null);
-  const activeRef = useRef<{ key: string; controller: AbortController; eventId: string } | null>(null);
+  const activeRef = useRef<{ key: string; controller: AbortController; eventId: string; seq: number } | null>(null);
   const lastKeyRef = useRef<string | null>(null);
+  const seqRef = useRef(0);
 
   useEffect(() => {
     if (!policy?.enabled) return undefined;
+    const removeUnlockListeners = installNarratorAudioUnlockGestureListeners();
     const hoverDelayMs = options?.hoverDelayMs ?? DEFAULT_HOVER_DELAY_MS;
 
     const clearTimer = () => {
@@ -239,13 +272,20 @@ export function useNarratorHoverFocusInspector(options?: {
       }
       activeRef.current = null;
     };
+    const isLatestActive = (eventId: string, seq: number, controller: AbortController) =>
+      !controller.signal.aborted &&
+      activeRef.current?.eventId === eventId &&
+      activeRef.current.seq === seq;
     const schedule = (target: EventTarget | null, point?: HoverFocusNarratorPoint) => {
       const inspection = buildHoverFocusNarratorInspection(target, point, options?.chunkMaxChars);
       if (!inspection) return;
       if (inspection.dedupeKey !== lastKeyRef.current) abortActive();
       lastKeyRef.current = inspection.dedupeKey;
       clearTimer();
+      const seq = seqRef.current + 1;
+      seqRef.current = seq;
       timerRef.current = window.setTimeout(() => {
+        if (seq !== seqRef.current) return;
         const event = publishEvent({
           sourceKind: INSPECTOR_SOURCE_KIND,
           sourceId: inspection.sourceId,
@@ -266,19 +306,35 @@ export function useNarratorHoverFocusInspector(options?: {
         if (!event || policy.deliveryMode !== "auto_speak") return;
 
         const controller = new AbortController();
-        activeRef.current = { key: inspection.dedupeKey, controller, eventId: event.eventId };
+        activeRef.current = { key: inspection.dedupeKey, controller, eventId: event.eventId, seq };
         markQueued(event.eventId);
-        void speakVoice(buildNarratorVoiceSpeakPayload({ event, text: inspection.text }), { signal: controller.signal })
-          .then(async (response) => {
-            if (controller.signal.aborted) return;
-            const diagnostic = await playNarratorVoiceResponse(response, {
-              signal: controller.signal,
-              onDiagnostic: (nextDiagnostic) => recordPlaybackDiagnostic(event.eventId, nextDiagnostic),
-            });
+        void (async () => {
+          const unlocked = isNarratorAudioPlaybackUnlocked() || await primeNarratorAudioPlayback();
+          if (!isLatestActive(event.eventId, seq, controller)) return;
+          if (!unlocked) {
+            markFailed(event.eventId, createNarratorPlaybackLockedDiagnostic());
+            return;
+          }
+          const response = await speakVoice(
+            buildNarratorVoiceSpeakPayload({ event, text: inspection.text }),
+            { signal: controller.signal },
+          );
+          if (!isLatestActive(event.eventId, seq, controller)) return;
+          const diagnostic = await playNarratorVoiceResponse(response, {
+            signal: controller.signal,
+            onDiagnostic: (nextDiagnostic) => {
+              if (isLatestActive(event.eventId, seq, controller)) {
+                recordPlaybackDiagnostic(event.eventId, nextDiagnostic);
+              }
+            },
+          });
+          if (isLatestActive(event.eventId, seq, controller)) {
             markSpoken(event.eventId, undefined, diagnostic);
-          })
+          }
+        })()
           .catch((error) => {
             if (controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) return;
+            if (!isLatestActive(event.eventId, seq, controller)) return;
             markFailed(
               event.eventId,
               error instanceof NarratorPlaybackError ? error.diagnostic : undefined,
@@ -302,6 +358,7 @@ export function useNarratorHoverFocusInspector(options?: {
     return () => {
       clearTimer();
       abortActive();
+      removeUnlockListeners();
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("focusin", onFocusIn);
     };
