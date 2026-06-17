@@ -14,7 +14,8 @@ export type ToolFamily =
   | "live_source_decision"
   | "voice_delivery"
   | "zen_graph_reflection"
-  | "civilization_bounds";
+  | "civilization_bounds"
+  | "capability_catalog";
 
 export interface ToolFamilyContract {
   toolName: string;
@@ -199,6 +200,17 @@ export const TOOL_FAMILY_DEFAULT_CONTRACTS: Record<ToolFamily, ToolFamilyContrac
     requiredReentry: true,
     requiresGoalSatisfaction: true,
     aliases: ["civilization_bounds", "civilization_bounds_reflection"],
+  }),
+  capability_catalog: contract({
+    toolName: "family:capability_catalog",
+    toolFamily: "capability_catalog",
+    authority: "evidence_only",
+    mutating: false,
+    requiredObservationKinds: ["capability_catalog_observation", "capability_help_summary"],
+    allowedTerminalKinds: [...evidenceOnlyTerminalKinds],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+    aliases: ["capability_catalog", "capability_help", "helix_ask.inspect_capability_catalog"],
   }),
 };
 
@@ -457,6 +469,17 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
     requiresGoalSatisfaction: true,
     aliases: ["helix_civilization_bounds_tool_result", "civilization_bounds_roadmap/v1"],
   }),
+  contract({
+    toolName: "helix_ask.inspect_capability_catalog",
+    toolFamily: "capability_catalog",
+    authority: "evidence_only",
+    mutating: false,
+    requiredObservationKinds: ["capability_catalog_observation", "capability_help_summary"],
+    allowedTerminalKinds: [...evidenceOnlyTerminalKinds],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+    aliases: ["what_tools_are_available", "what_can_helix_ask_do", "system_capability_help"],
+  }),
 ];
 
 const normalize = (value: unknown): string =>
@@ -476,6 +499,7 @@ const normalizeFamily = (value: unknown): ToolFamily | null => {
   if (/voice[-.:]?delivery|voice[-.:]?output|request-interim-voice-callout|callout/.test(normalized)) return "voice_delivery";
   if (/zen[-.:]?graph|zengraph|reflect[-.:]?ideology[-.:]?context|procedural[-.:]?zen[-.:]?classification/.test(normalized)) return "zen_graph_reflection";
   if (/civilization[-.:]?bounds|civilization[-.:]?scenario|civilization[-.:]?roadmap|reflect-civilization-bounds/.test(normalized)) return "civilization_bounds";
+  if (/capability[-.:]?catalog|capability[-.:]?help|what[-.:]?tools[-.:]?are[-.:]?available|inspect-capability-catalog/.test(normalized)) return "capability_catalog";
   return null;
 };
 

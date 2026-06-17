@@ -101,8 +101,10 @@ describe("helix ask E54 direct-answer quality", () => {
     expect(response.body?.canonical_goal_frame?.goal_kind).toBe("workspace_help");
     expect(response.body?.retrieval_required_signal?.required).toBe(false);
     expect(response.body?.execution_trace?.some((step: any) => step?.action?.action_id === "search_docs")).not.toBe(true);
-    for (const expected of ["docs", "notes", "source paths", "locate", "compare", "summaries", "background-only"]) {
+    for (const expected of ["docs", "notes", "clipboard", "calculator", "live-source", "information reflection", "utility"]) {
       expect(answer).toContain(expected);
     }
+    expect(answer).toContain("dottie");
+    expect(answer).toContain("preset/context");
   }, 60000);
 });

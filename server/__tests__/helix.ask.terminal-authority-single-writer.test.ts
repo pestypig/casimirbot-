@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyHelixTerminalAuthoritySingleWriter,
+  syncDocEvidenceSynthesisSingleWriterFromTerminalAuthority,
   syncHelixTypedFailureAuthorityPublicMirrors,
 } from "../services/helix-ask/terminal-authority-single-writer";
 
@@ -588,6 +589,112 @@ describe("Helix terminal authority single writer", () => {
     expect(payload.final_answer_source).toBe("final_answer_draft");
     expect(payload.terminal_error_code).toBeUndefined();
     expect((payload.terminal_presentation as Record<string, unknown>).terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+  });
+
+  it("resyncs stale single-writer mirror after final docs terminal authority is recorded", () => {
+    const turnId = "ask:test:docs-terminal-authority-resync";
+    const answerText = "The cited document says receipts are observations, not terminal answers.";
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      canonical_goal_frame: {
+        goal_kind: "doc_evidence_synthesis",
+        required_terminal_kind: "doc_evidence_synthesis_answer",
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        allowed_terminal_artifact_kinds: ["doc_evidence_synthesis_answer", "typed_failure"],
+      },
+      doc_evidence_synthesis_answer: {
+        schema: "helix.doc_evidence_synthesis_answer.v1",
+        artifact_id: `${turnId}:doc_evidence_synthesis_answer:from_final_answer_draft`,
+        turn_id: turnId,
+        answer_text: answerText,
+        text: answerText,
+        terminal_artifact_kind: "doc_evidence_synthesis_answer",
+        support_refs: [`${turnId}:doc_location_matches`, `${turnId}:final_answer_draft`],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        thread_id: "thread:test",
+        turn_id: turnId,
+        terminal_kind: "answer",
+        final_answer_source: "final_answer_draft",
+        terminal_artifact_kind: "doc_evidence_synthesis_answer",
+        terminal_text_preview: answerText,
+        terminal_text_hash: "hash:docs",
+        server_authoritative: true,
+        assistant_answer: false,
+      },
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        artifactId: "terminal_authority_single_writer",
+        schemaVersion: "helix.terminal_authority_single_writer.v1",
+        turn_id: turnId,
+        selected_terminal_artifact_kind: "typed_failure",
+        selected_terminal_artifact_ref: "typed_failure:stale",
+        selectedArtifactKind: "typed_failure",
+        selectedArtifactRef: "typed_failure:stale",
+        visible_text: "I could not produce a terminal answer for this turn.",
+        assistant_answer: false,
+        source: "typed_failure",
+        rejected_candidates: [],
+        writes: {
+          payload_text: "I could not produce a terminal answer for this turn.",
+          payload_answer: "I could not produce a terminal answer for this turn.",
+          payload_assistant_answer: "I could not produce a terminal answer for this turn.",
+          payload_selected_final_answer: "I could not produce a terminal answer for this turn.",
+          terminal_presentation_concise_text: "I could not produce a terminal answer for this turn.",
+          debug_selected_final_answer: "I could not produce a terminal answer for this turn.",
+        },
+        integrity: {
+          single_writer_applied: true,
+          visible_matches_selected_artifact: true,
+          visible_matches_draft: false,
+          stale_failure_visible: false,
+          receipt_visible_as_answer: false,
+          post_tool_model_step_satisfied: false,
+          legacy_terminal_candidate_count: 0,
+          forbidden_terminal_candidate_count: 0,
+          payload_mirror_written_after_terminal_selection: true,
+          materialized_terminal_artifact_kind: null,
+          materialized_terminal_artifact_ref: null,
+        },
+      },
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: turnId,
+        terminal_artifact_kind: "typed_failure",
+        concise_text: "I could not produce a terminal answer for this turn.",
+      },
+      selected_final_answer: "I could not produce a terminal answer for this turn.",
+      answer: "I could not produce a terminal answer for this turn.",
+      text: "I could not produce a terminal answer for this turn.",
+      debug: {},
+    };
+
+    const result = syncDocEvidenceSynthesisSingleWriterFromTerminalAuthority({
+      payload,
+      turnId,
+      threadId: "thread:test",
+    });
+
+    expect(result?.selected_terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+    expect(result?.source).toBe("final_answer_draft");
+    expect(result?.visible_text).toBe(answerText);
+    expect(result?.integrity.materialized_terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+    expect(payload.terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+    expect(payload.final_answer_source).toBe("final_answer_draft");
+    expect(payload.selected_final_answer).toBe(answerText);
+    expect((payload.terminal_presentation as Record<string, unknown>).terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+    expect((payload.debug as Record<string, unknown>).terminal_authority_single_writer).toMatchObject({
+      selected_terminal_artifact_kind: "doc_evidence_synthesis_answer",
+      visible_text: answerText,
+    });
   });
 
   it("quarantines note receipts as side evidence and selects the synthesized note answer", () => {

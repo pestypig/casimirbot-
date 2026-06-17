@@ -2,6 +2,8 @@
  * @vitest-environment jsdom
  */
 import { beforeAll, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   dispatchScientificCalculatorMathPicked,
   type ScientificCalculatorMathPickedDetail
@@ -69,5 +71,17 @@ describe("doc viewer math interaction", () => {
     expect(heading?.getAttribute("data-narrator-source-id")).toBe("docs-viewer:docs-example-readme-md:h1:0");
     expect(paragraph?.getAttribute("data-narrator-source-id")).toBe("docs-viewer:docs-example-readme-md:p:1");
     expect(equation?.getAttribute("data-narrator-source-id")).toBeNull();
+  });
+
+  it("routes inline document translation through Stage Play document Markdown mail", () => {
+    const panelSource = readFileSync(join(process.cwd(), "client/src/components/DocViewerPanel.tsx"), "utf8");
+    const clientSource = readFileSync(join(process.cwd(), "client/src/lib/docs/documentTranslationClient.ts"), "utf8");
+
+    expect(panelSource).toContain("enqueueDocumentMarkdownTranslationMail");
+    expect(panelSource).toContain("documentMarkdownSourceId(currentEntry.relativePath)");
+    expect(panelSource).not.toContain("requestDocumentTranslationUnits");
+    expect(clientSource).toContain("/api/helix/stage-play/live-source-mail/document-markdown");
+    expect(clientSource).toContain("/api/helix/stage-play/micro-reasoner-prompt-preset/apply");
+    expect(clientSource).toContain("stage_play_micro_reasoner_prompt_preset:document-translate-haw-inline:v1");
   });
 });

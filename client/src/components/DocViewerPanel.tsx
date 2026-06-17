@@ -22,7 +22,10 @@ import {
   docCatalogTimestamp,
   type DocManifestEntry,
 } from "@/lib/docs/docManifest";
-import { requestDocumentTranslationUnits } from "@/lib/docs/documentTranslationClient";
+import {
+  documentMarkdownSourceId,
+  enqueueDocumentMarkdownTranslationMail,
+} from "@/lib/docs/documentTranslationClient";
 import { consumeDocViewerIntent } from "@/lib/docs/docViewer";
 import { buildWorkstationPathRef } from "@/lib/workstation/workstationDeepLink";
 import {
@@ -425,25 +428,25 @@ export function DocViewerPanel() {
     });
 
     try {
-      const result = await requestDocumentTranslationUnits({
-        doc_path: currentEntry.relativePath,
+      await enqueueDocumentMarkdownTranslationMail({
+        docPath: currentEntry.relativePath,
         locale: interfaceLanguage.code,
-        source_hash: rawMarkdownSourceHash,
+        sourceHash: rawMarkdownSourceHash,
         title: currentEntry.title,
+        sourceId: documentMarkdownSourceId(currentEntry.relativePath),
         units: targetUnits,
       });
       if (translationScopeKeyRef.current !== scopeKey) return;
       setInlineTranslations((current) => {
         const next = { ...current };
         targetUnits.forEach((unit) => {
-          const text = result.translations[unit.unit_id]?.trim();
-          next[unit.unit_id] = text
-            ? { status: "ready", text }
-            : { status: "error", error: t("docsViewer.translation.errorGeneric") };
+          next[unit.unit_id] = current[unit.unit_id]?.status === "ready"
+            ? current[unit.unit_id]
+            : { status: "loading" };
         });
         return next;
       });
-      setTranslationStatus("ready");
+      setTranslationStatus("translating");
     } catch (err) {
       if (translationScopeKeyRef.current !== scopeKey) return;
       const message =
@@ -461,7 +464,7 @@ export function DocViewerPanel() {
         return next;
       });
       setTranslationError(message);
-      setTranslationStatus(message.toLowerCase().includes("not configured") ? "unavailable" : "error");
+      setTranslationStatus("error");
     } finally {
       targetIds.forEach((unitId) => inFlightTranslationUnitIdsRef.current.delete(unitId));
     }

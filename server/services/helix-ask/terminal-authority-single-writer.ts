@@ -435,6 +435,162 @@ export const applyTerminalProjectionKindGuard = (
   };
 };
 
+export function syncDocEvidenceSynthesisSingleWriterFromTerminalAuthority(input: {
+  payload: Record<string, unknown>;
+  turnId: string;
+  threadId?: string | null;
+}): HelixTerminalAuthoritySingleWriterResult | null {
+  const authority = readRecord(input.payload.terminal_answer_authority);
+  if (readString(authority?.terminal_artifact_kind) !== "doc_evidence_synthesis_answer") return null;
+  const docTerminal = existingDocEvidenceSynthesisTerminal(input.payload);
+  if (!docTerminal) return null;
+
+  const terminalText = readString(authority?.terminal_text_preview) ?? docTerminal.text;
+  const selectedArtifactRef =
+    docTerminal.ref ??
+    readString(authority?.terminal_item_id) ??
+    `doc_evidence_synthesis_answer:${textHash(`${input.turnId}:${terminalText}`)}`;
+  const source =
+    readString(authority?.final_answer_source) === "final_answer_draft"
+      ? "final_answer_draft"
+      : "doc_evidence_synthesis_answer";
+
+  const previousWriter = readRecord(input.payload.terminal_authority_single_writer);
+  const previousWriterKind = readString(previousWriter?.selected_terminal_artifact_kind);
+  const rejectedCandidates: HelixTerminalAuthoritySingleWriterResult["rejected_candidates"] =
+    previousWriterKind && previousWriterKind !== "doc_evidence_synthesis_answer"
+      ? [{
+          ref: readString(previousWriter?.selected_terminal_artifact_ref) ?? undefined,
+          kind: previousWriterKind,
+          source: previousWriterKind === "typed_failure" ? "typed_failure" : "legacy_fallback",
+          reason: previousWriterKind === "typed_failure"
+            ? "stale_solver_continuation_superseded_by_docs_terminal"
+            : "lower_priority_than_selected_artifact",
+        }]
+      : [];
+  const auditRejectedCandidates = rejectedCandidates.map((candidate) => ({
+    artifactKind: candidate.kind,
+    artifactRef: candidate.ref,
+    reason: normalizeSingleWriterAuditRejectionReason(candidate.reason),
+  }));
+  const wroteVisibleFields = [...VISIBLE_ANSWER_FIELDS];
+  const terminalAuthoritySingleWriterAudit = {
+    artifactId: "terminal_authority_single_writer" as const,
+    schemaVersion: "helix.terminal_authority_single_writer.v1" as const,
+    selectedArtifactKind: "doc_evidence_synthesis_answer",
+    selectedArtifactRef: selectedArtifactRef,
+    rejectedCandidates: auditRejectedCandidates,
+    wroteVisibleFields,
+    forbiddenPreAuthorityVisibleFields: [],
+  };
+
+  input.payload.ok = true;
+  input.payload.response_type = "final_answer";
+  input.payload.final_status = "final_answer";
+  input.payload.status = "final_answer";
+  input.payload.terminal_artifact_kind = "doc_evidence_synthesis_answer";
+  input.payload.final_answer_source = source;
+  input.payload.terminal_artifact_id = selectedArtifactRef;
+  input.payload.selected_final_answer = terminalText;
+  input.payload.answer = terminalText;
+  input.payload.text = terminalText;
+  input.payload.assistant_answer = terminalText;
+  delete input.payload.terminal_error_code;
+  delete input.payload.terminal_failure_text;
+
+  input.payload.terminal_answer_authority = {
+    ...(authority ?? {}),
+    schema: "helix.turn_terminal_authority.v1",
+    thread_id: readString(authority?.thread_id) ?? input.threadId ?? null,
+    turn_id: readString(authority?.turn_id) ?? input.turnId,
+    terminal_kind: "answer",
+    final_answer_source: source,
+    terminal_artifact_kind: "doc_evidence_synthesis_answer",
+    terminal_text_preview: terminalText,
+    terminal_text_hash: hashHelixTerminalText(terminalText),
+    server_authoritative: true,
+    terminal_eligible: true,
+    assistant_answer: false,
+  };
+  input.payload.terminal_presentation = {
+    ...(readRecord(input.payload.terminal_presentation) ?? {}),
+    schema: "helix.terminal_presentation.v1",
+    turn_id: input.turnId,
+    terminal_artifact_kind: "doc_evidence_synthesis_answer",
+    concise_text: terminalText,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+
+  const result: HelixTerminalAuthoritySingleWriterResult = {
+    schema: "helix.terminal_authority_single_writer_result.v1",
+    artifactId: "terminal_authority_single_writer",
+    schemaVersion: "helix.terminal_authority_single_writer.v1",
+    turn_id: input.turnId,
+    selectedArtifactKind: "doc_evidence_synthesis_answer",
+    selectedArtifactRef: selectedArtifactRef,
+    selected_terminal_artifact_ref: selectedArtifactRef,
+    selected_terminal_artifact_kind: "doc_evidence_synthesis_answer",
+    visible_text: terminalText,
+    assistant_answer: false,
+    source,
+    rejected_candidates: rejectedCandidates,
+    writes: {
+      payload_text: terminalText,
+      payload_answer: terminalText,
+      payload_assistant_answer: terminalText,
+      payload_selected_final_answer: terminalText,
+      terminal_presentation_concise_text: terminalText,
+      debug_selected_final_answer: terminalText,
+    },
+    wroteVisibleFields,
+    forbiddenPreAuthorityVisibleFields: [],
+    audit: terminalAuthoritySingleWriterAudit,
+    integrity: {
+      single_writer_applied: true,
+      terminal_authority_single_writer_audit: terminalAuthoritySingleWriterAudit,
+      forbidden_pre_authority_visible_fields: [],
+      visible_matches_selected_artifact: true,
+      visible_matches_draft: true,
+      stale_failure_visible: false,
+      receipt_visible_as_answer: false,
+      post_tool_model_step_satisfied: true,
+      legacy_terminal_candidate_count: 0,
+      forbidden_terminal_candidate_count: 0,
+      payload_mirror_written_after_terminal_selection: true,
+      materialized_terminal_artifact_kind: "doc_evidence_synthesis_answer",
+      materialized_terminal_artifact_ref: selectedArtifactRef,
+      materialization_blocked_reason: null,
+      terminal_projection_kind_match: true,
+      terminal_projection_guard_applied: false,
+      terminal_projection_guard_action: null,
+      terminal_projection_failure_code: null,
+    },
+  };
+
+  input.payload.terminal_authority_single_writer = result;
+  input.payload.terminal_candidate_rejections = auditRejectedCandidates;
+  const debug = readRecord(input.payload.debug);
+  if (debug) {
+    debug.ok = true;
+    debug.response_type = "final_answer";
+    debug.final_status = "final_answer";
+    debug.status = "final_answer";
+    debug.final_answer_source = source;
+    debug.terminal_artifact_kind = "doc_evidence_synthesis_answer";
+    debug.selected_final_answer = terminalText;
+    debug.answer = terminalText;
+    debug.text = terminalText;
+    debug.assistant_answer = terminalText;
+    debug.terminal_answer_authority = input.payload.terminal_answer_authority;
+    debug.terminal_presentation = input.payload.terminal_presentation;
+    debug.terminal_authority_single_writer = result;
+    debug.terminal_candidate_rejections = auditRejectedCandidates;
+  }
+
+  return result;
+}
+
 const isStaleModelOnlyNoObservationText = (value: unknown): boolean =>
   /\b(?:no\s+(?:accepted\s+)?observations?|no\s+(?:live[-\s]?source\s+)?context|no\s+context\s+(?:is\s+)?available|unable\s+to\s+provide\s+(?:the\s+)?context|unable\s+to\s+provide\s+(?:an\s+)?answer\s+from\s+(?:observations|context)|could\s+not\s+provide\s+(?:the\s+)?context|can't\s+provide\s+(?:the\s+)?context|cannot\s+provide\s+(?:the\s+)?context|without\s+(?:any\s+)?observations?|no\s+receipts?\s+(?:exist|available|were\s+found))\b/i.test(
     readString(value) ?? "",

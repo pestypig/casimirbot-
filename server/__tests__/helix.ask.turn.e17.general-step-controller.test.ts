@@ -115,6 +115,13 @@ describe("helix ask turn e17 general step controller", () => {
     expect(text).toMatch(/\bDocs\b/i);
     expect(text).toMatch(/\bNotes\b/i);
     expect(text).toMatch(/\bClipboard\b/i);
+    expect(text).toMatch(/Information reflection/i);
+    expect(text).toMatch(/Utility/i);
+    expect(text).toMatch(/calculator/i);
+    expect(text).toMatch(/live-source mail/i);
+    expect(text).toMatch(/voice-lane callout/i);
+    expect(text).toMatch(/Legacy\/retired/i);
+    expect(text).toMatch(/Dottie should be treated as preset\/context/i);
     expect(text).toMatch(/\bReasoning\b/i);
     expect(text).not.toMatch(/could not produce a substantive final answer/i);
     expect(response.body?.dispatch_policy).toBe("conversation_only");
@@ -124,6 +131,29 @@ describe("helix ask turn e17 general step controller", () => {
       "workspace_context_snapshot_inspect",
       "final_answer_compose_capability_help",
     ]);
+    const catalogStep = response.body?.step_results?.find((step: any) => step?.step_id === "capability_registry_inspect");
+    expect(catalogStep?.actual_artifacts).toEqual(expect.arrayContaining(["capability_registry"]));
+    expect(catalogStep?.result_artifact).toMatchObject({
+      kind: "capability_registry",
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    expect(catalogStep?.result_artifact?.capability_catalog_observation).toMatchObject({
+      capability_key: "helix_ask.inspect_capability_catalog",
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+    expect(catalogStep?.result_artifact?.capability_catalog_observation?.information_reflection).toEqual(expect.arrayContaining([
+      expect.stringContaining("repo-code.search_concept"),
+      expect.stringContaining("workspace_os.status"),
+    ]));
+    expect(catalogStep?.result_artifact?.capability_catalog_observation?.utility).toEqual(expect.arrayContaining([
+      expect.stringContaining("live_env.request_interim_voice_callout"),
+    ]));
+    expect(catalogStep?.result_artifact?.capability_catalog_observation?.retired_or_legacy).toEqual(expect.arrayContaining([
+      "situation-room-pipelines.dottie.manifest",
+      "situation-room-pipelines.voice_delivery.propose_from_trace",
+    ]));
     expect(response.body?.step_results?.some((step: any) => step?.actual_artifacts?.includes("capability_help_summary"))).toBe(true);
     expect(response.body?.final_answer_contract_family).toBe("capability_help");
     expect(response.body?.final_answer_contract_pass).toBe(true);
