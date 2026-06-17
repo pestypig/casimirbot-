@@ -10,6 +10,7 @@ import {
 } from "@/lib/narrator/narratorAudioPlayback";
 import { buildNarratorVoiceSpeakPayload } from "@/lib/narrator/narratorVoiceBridge";
 import { useNarratorStore } from "@/store/useNarratorStore";
+import type { NarratorReadRegionRect } from "@/store/useNarratorStore";
 
 export type HoverFocusNarratorPoint = {
   x: number;
@@ -20,6 +21,7 @@ export type HoverFocusNarratorInspection = {
   sourceId: string;
   text: string;
   dedupeKey: string;
+  region: NarratorReadRegionRect;
 };
 
 const INSPECTOR_SOURCE_KIND = "hover_focus_inspector" as const;
@@ -316,6 +318,22 @@ function elementSourceId(element: Element, text: string): string {
   return `hover:${cleanNarratorText(explicit).slice(0, 80)}:${text.slice(0, 48)}`;
 }
 
+function elementReadRegion(element: Element): NarratorReadRegionRect {
+  const rect = element.getBoundingClientRect();
+  const viewportWidth = element.ownerDocument.defaultView?.innerWidth ?? window.innerWidth;
+  const viewportHeight = element.ownerDocument.defaultView?.innerHeight ?? window.innerHeight;
+  const left = Math.max(0, Math.min(rect.left, viewportWidth));
+  const top = Math.max(0, Math.min(rect.top, viewportHeight));
+  const right = Math.max(left, Math.min(rect.right, viewportWidth));
+  const bottom = Math.max(top, Math.min(rect.bottom, viewportHeight));
+  return {
+    left,
+    top,
+    width: Math.max(8, right - left),
+    height: Math.max(8, bottom - top),
+  };
+}
+
 export function buildHoverFocusNarratorInspection(
   target: EventTarget | null,
   point?: HoverFocusNarratorPoint,
@@ -332,6 +350,7 @@ export function buildHoverFocusNarratorInspection(
     sourceId,
     text,
     dedupeKey: `${INSPECTOR_SOURCE_KIND}:${sourceId}:${text}`,
+    region: elementReadRegion(element),
   };
 }
 
@@ -345,6 +364,8 @@ export function useNarratorHoverFocusInspector(options?: {
   const markSpoken = useNarratorStore((state) => state.markSpoken);
   const markFailed = useNarratorStore((state) => state.markFailed);
   const recordPlaybackDiagnostic = useNarratorStore((state) => state.recordPlaybackDiagnostic);
+  const setReadRegion = useNarratorStore((state) => state.setReadRegion);
+  const clearReadRegion = useNarratorStore((state) => state.clearReadRegion);
   const timerRef = useRef<number | null>(null);
   const activeRef = useRef<{ key: string; controller: AbortController; eventId: string; seq: number } | null>(null);
   const lastKeyRef = useRef<string | null>(null);
@@ -374,12 +395,29 @@ export function useNarratorHoverFocusInspector(options?: {
       activeRef.current.seq === seq;
     const schedule = (target: EventTarget | null, point?: HoverFocusNarratorPoint) => {
       const inspection = buildHoverFocusNarratorInspection(target, point, options?.chunkMaxChars);
-      if (!inspection) return;
+      if (!inspection) {
+        clearTimer();
+        abortActive();
+        clearReadRegion();
+        lastKeyRef.current = null;
+        return;
+      }
       if (inspection.dedupeKey !== lastKeyRef.current) abortActive();
       lastKeyRef.current = inspection.dedupeKey;
       clearTimer();
       const seq = seqRef.current + 1;
       seqRef.current = seq;
+      if (policy.deliveryMode === "auto_speak") {
+        setReadRegion({
+          phase: "hover_pending",
+          sourceId: inspection.sourceId,
+          textPreview: inspection.text,
+          rect: inspection.region,
+          pointer: point ?? null,
+          startedAtMs: Date.now(),
+          durationMs: hoverDelayMs,
+        });
+      }
       timerRef.current = window.setTimeout(() => {
         if (seq !== seqRef.current) return;
         const event = publishEvent({
@@ -403,6 +441,16 @@ export function useNarratorHoverFocusInspector(options?: {
 
         const controller = new AbortController();
         activeRef.current = { key: inspection.dedupeKey, controller, eventId: event.eventId, seq };
+        setReadRegion({
+          phase: "voice_loading",
+          eventId: event.eventId,
+          sourceId: inspection.sourceId,
+          textPreview: inspection.text,
+          rect: inspection.region,
+          pointer: point ?? null,
+          startedAtMs: Date.now(),
+          durationMs: HOVER_VOICE_TIMEOUT_MS,
+        });
         markQueued(event.eventId);
         void (async () => {
           let timedOut = false;
@@ -422,6 +470,16 @@ export function useNarratorHoverFocusInspector(options?: {
             const payload = buildNarratorVoiceSpeakPayload({ event, text: inspection.text });
             const response = await speakVoice(payload, { signal: controller.signal });
             if (!isLatestActive(event.eventId, seq, controller)) return;
+            setReadRegion({
+              phase: "speaking",
+              eventId: event.eventId,
+              sourceId: inspection.sourceId,
+              textPreview: inspection.text,
+              rect: inspection.region,
+              pointer: point ?? null,
+              startedAtMs: Date.now(),
+              durationMs: 2200,
+            });
             const diagnostic = await playNarratorVoiceResponse(response, {
               signal: controller.signal,
               onDiagnostic: (nextDiagnostic) => {
@@ -450,6 +508,7 @@ export function useNarratorHoverFocusInspector(options?: {
           })
           .finally(() => {
             if (activeRef.current?.eventId === event.eventId) activeRef.current = null;
+            window.setTimeout(() => clearReadRegion(inspection.sourceId), 260);
           });
       }, hoverDelayMs);
     };
@@ -466,9 +525,10 @@ export function useNarratorHoverFocusInspector(options?: {
     return () => {
       clearTimer();
       abortActive();
+      clearReadRegion();
       removeUnlockListeners();
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("focusin", onFocusIn);
     };
-  }, [markFailed, markQueued, markSpoken, options?.hoverDelayMs, policy?.deliveryMode, policy?.enabled, publishEvent, recordPlaybackDiagnostic]);
+  }, [clearReadRegion, markFailed, markQueued, markSpoken, options?.hoverDelayMs, policy?.deliveryMode, policy?.enabled, publishEvent, recordPlaybackDiagnostic, setReadRegion]);
 }

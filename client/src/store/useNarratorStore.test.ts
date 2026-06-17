@@ -154,4 +154,36 @@ describe("useNarratorStore", () => {
       endedObserved: true,
     });
   });
+
+  it("tracks narrator read regions through voice loading and completion", () => {
+    useNarratorStore.getState().setReadRegion({
+      phase: "hover_pending",
+      sourceId: "hover:button:read",
+      textPreview: "Read this button.",
+      rect: { left: 10, top: 20, width: 120, height: 40 },
+      pointer: { x: 30, y: 35 },
+      startedAtMs: 100,
+      durationMs: 500,
+    });
+
+    expect(useNarratorStore.getState().readRegion).toMatchObject({
+      visible: true,
+      phase: "hover_pending",
+      sourceId: "hover:button:read",
+    });
+
+    useNarratorStore.getState().markQueued("event:read-region");
+
+    expect(useNarratorStore.getState().readRegion).toMatchObject({
+      visible: true,
+      eventId: "event:read-region",
+      phase: "voice_loading",
+    });
+
+    useNarratorStore.getState().clearReadRegion("other-source");
+    expect(useNarratorStore.getState().readRegion.visible).toBe(true);
+
+    useNarratorStore.getState().markSpoken("event:read-region", 700);
+    expect(useNarratorStore.getState().readRegion.visible).toBe(false);
+  });
 });

@@ -660,6 +660,8 @@ type StagePlayPacketTrafficReasonerRun = {
   role: StagePlayMicroReasonerRoleV1;
   status: StagePlayMicroReasonerRunV1["status"] | "missing";
   promptId?: string | null;
+  deckExecutionMode?: StagePlayMicroReasonerRunV1["deckExecutionMode"];
+  deckProductRole?: boolean | null;
   outputPreview: string;
   inputPreview?: string | null;
   latencyMs?: number | null;
@@ -5566,6 +5568,8 @@ function StagePlayMailLoopLiveOverview({
         role,
         status: run?.status ?? "missing",
         promptId: run?.promptId ?? null,
+        deckExecutionMode: run?.deckExecutionMode ?? null,
+        deckProductRole: run?.deckProductRole ?? false,
         inputPreview: run?.inputPreview ?? null,
         outputPreview: run?.outputPreview ?? MICRO_REASONER_DISPLAY[role].missingPreview,
         latencyMs: run?.latencyMs ?? null,
@@ -5574,6 +5578,10 @@ function StagePlayMailLoopLiveOverview({
     });
   };
   const stationStatusForDeck = (reasonerRuns: StagePlayPacketTrafficReasonerRun[]): StagePlayPacketTrafficStationStatus => {
+    const productRuns = reasonerRuns.filter((run) => run.deckProductRole);
+    if (productRuns.some((run) => run.status === "completed")) return "complete";
+    if (productRuns.some((run) => run.status === "running" || run.status === "queued")) return "running";
+    if (productRuns.some((run) => run.status === "failed")) return "failed";
     if (reasonerRuns.some((run) => run.status === "failed")) return "failed";
     if (reasonerRuns.some((run) => run.status === "running" || run.status === "queued")) return "running";
     if (reasonerRuns.some((run) => run.status === "completed")) return "complete";
@@ -5711,7 +5719,7 @@ function StagePlayMailLoopLiveOverview({
       {
         station: "micro_reasoner_deck",
         status: deckStatus,
-        preview: `${stagePlayPacketDeckTitle(deck)} | ${stagePlayPacketDeckRunPlan(deck)} | ${reasonerRuns.filter((run) => run.status === "completed").length}/${reasonerRuns.length} complete`,
+        preview: `${stagePlayPacketDeckTitle(deck)} | ${stagePlayPacketDeckRunPlan(deck)} | ${reasonerRuns.filter((run) => run.status === "completed").length}/${reasonerRuns.length} complete${reasonerRuns.some((run) => run.deckProductRole && run.status === "completed") ? " | product ready" : ""}`,
         refs: reasonerRuns.flatMap((run) => run.refs),
         durationMs: packetDeckMs,
       },
@@ -7127,7 +7135,10 @@ function StagePlayMailLoopLiveOverview({
                 </span>
               </div>
               <div className="mt-2 rounded border border-slate-800 bg-black/20 p-2">
-                <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-500">Output</div>
+                <div className="flex items-center justify-between gap-2 text-[9px] font-semibold uppercase tracking-wide text-slate-500">
+                  <span>Output</span>
+                  <span>{run?.deckProductRole ? "product" : run?.deckExecutionMode === "uses_prior_outputs" ? "chain" : "independent"}</span>
+                </div>
                 <div className="mt-1 line-clamp-3 text-[11px] leading-snug text-slate-200">
                   {run?.outputPreview ?? display.missingPreview}
                 </div>

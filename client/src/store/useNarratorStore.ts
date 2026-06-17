@@ -18,6 +18,32 @@ import type { NarratorPlaybackDiagnostic } from "@/lib/narrator/narratorAudioPla
 
 export type NarratorDeliveryStatus = "visible" | "queued" | "suppressed" | "spoken" | "failed";
 
+export type NarratorReadRegionRect = {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+};
+
+export type NarratorReadRegionPoint = {
+  x: number;
+  y: number;
+};
+
+export type NarratorReadRegionPhase = "hover_pending" | "voice_loading" | "speaking" | "tool_loading";
+
+export type NarratorReadRegionState = {
+  visible: boolean;
+  eventId: string | null;
+  sourceId: string | null;
+  textPreview: string | null;
+  phase: NarratorReadRegionPhase;
+  rect: NarratorReadRegionRect | null;
+  pointer: NarratorReadRegionPoint | null;
+  startedAtMs: number;
+  durationMs: number;
+};
+
 export type NarratorQueueState = {
   speaking: boolean;
   queuedEventIds: string[];
@@ -41,8 +67,11 @@ type NarratorState = {
   events: NarratorEventV1[];
   sourcePolicies: Record<NarratorSourceKind, NarratorSourcePolicy>;
   queueState: NarratorQueueState;
+  readRegion: NarratorReadRegionState;
   publishEvent: (input: PublishNarratorEventInput, options?: { voiceArmed?: boolean; nowMs?: number }) => NarratorEventV1 | null;
   setSourcePolicy: (sourceKind: NarratorSourceKind, patch: Partial<NarratorSourcePolicy>) => void;
+  setReadRegion: (patch: Partial<NarratorReadRegionState> & Pick<NarratorReadRegionState, "phase">) => void;
+  clearReadRegion: (sourceId?: string | null) => void;
   markQueued: (eventId: string, diagnostic?: NarratorPlaybackDiagnostic) => void;
   markSpoken: (eventId: string, atMs?: number, diagnostic?: NarratorPlaybackDiagnostic) => void;
   markFailed: (eventId: string, diagnostic?: NarratorPlaybackDiagnostic) => void;
@@ -81,6 +110,18 @@ const emptyQueueState = (): NarratorQueueState => ({
   playbackDiagnosticsByEventId: {},
 });
 
+const emptyReadRegion = (): NarratorReadRegionState => ({
+  visible: false,
+  eventId: null,
+  sourceId: null,
+  textPreview: null,
+  phase: "hover_pending",
+  rect: null,
+  pointer: null,
+  startedAtMs: 0,
+  durationMs: 0,
+});
+
 function createNarratorEvent(input: PublishNarratorEventInput): NarratorEventV1 {
   const nowMs = input.createdAtMs ?? Date.now();
   const eventId = input.eventId ?? `narrator:event:${nowMs}:${Math.random().toString(36).slice(2, 8)}`;
@@ -103,6 +144,7 @@ export const useNarratorStore = create<NarratorState>()(
       events: [],
       sourcePolicies: DEFAULT_NARRATOR_SOURCE_POLICIES,
       queueState: emptyQueueState(),
+      readRegion: emptyReadRegion(),
       publishEvent: (input, options) => {
         const event = createNarratorEvent(input);
         const state = get();
@@ -153,6 +195,21 @@ export const useNarratorStore = create<NarratorState>()(
             },
           },
         })),
+      setReadRegion: (patch) =>
+        set((current) => ({
+          readRegion: {
+            ...current.readRegion,
+            ...patch,
+            visible: patch.visible ?? true,
+            startedAtMs: patch.startedAtMs ?? Date.now(),
+            durationMs: Math.max(0, patch.durationMs ?? current.readRegion.durationMs ?? 0),
+          },
+        })),
+      clearReadRegion: (sourceId) =>
+        set((current) => {
+          if (sourceId && current.readRegion.sourceId && current.readRegion.sourceId !== sourceId) return current;
+          return { readRegion: emptyReadRegion() };
+        }),
       markQueued: (eventId, diagnostic) =>
         set((current) => ({
           queueState: {
@@ -171,6 +228,16 @@ export const useNarratorStore = create<NarratorState>()(
                 }
               : current.queueState.playbackDiagnosticsByEventId,
           },
+          readRegion:
+            current.readRegion.eventId === eventId || (!current.readRegion.eventId && current.readRegion.visible)
+              ? {
+                  ...current.readRegion,
+                  eventId,
+                  phase: "voice_loading",
+                  startedAtMs: Date.now(),
+                  durationMs: current.readRegion.durationMs || 900,
+                }
+              : current.readRegion,
         })),
       markSpoken: (eventId, atMs, diagnostic) =>
         set((current) => {
@@ -196,6 +263,13 @@ export const useNarratorStore = create<NarratorState>()(
                   }
                 : current.queueState.playbackDiagnosticsByEventId,
             },
+            readRegion:
+              current.readRegion.eventId === eventId
+                ? {
+                    ...current.readRegion,
+                    visible: false,
+                  }
+                : current.readRegion,
           };
         }),
       markFailed: (eventId, diagnostic) =>
@@ -214,6 +288,13 @@ export const useNarratorStore = create<NarratorState>()(
                 }
               : current.queueState.playbackDiagnosticsByEventId,
           },
+          readRegion:
+            current.readRegion.eventId === eventId
+              ? {
+                  ...current.readRegion,
+                  visible: false,
+                }
+              : current.readRegion,
         })),
       recordPlaybackDiagnostic: (eventId, diagnostic) =>
         set((current) => ({
@@ -225,7 +306,11 @@ export const useNarratorStore = create<NarratorState>()(
             },
           },
         })),
-      clearFeed: () => set((current) => ({ events: [], queueState: { ...emptyQueueState(), lastSpokenByDedupeKey: current.queueState.lastSpokenByDedupeKey } })),
+      clearFeed: () => set((current) => ({
+        events: [],
+        queueState: { ...emptyQueueState(), lastSpokenByDedupeKey: current.queueState.lastSpokenByDedupeKey },
+        readRegion: emptyReadRegion(),
+      })),
       resetPolicies: () => set({ sourcePolicies: DEFAULT_NARRATOR_SOURCE_POLICIES }),
     }),
     {

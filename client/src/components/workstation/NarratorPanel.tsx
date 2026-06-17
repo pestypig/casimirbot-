@@ -127,11 +127,36 @@ export default function NarratorPanel() {
   const markSpoken = useNarratorStore((state) => state.markSpoken);
   const markFailed = useNarratorStore((state) => state.markFailed);
   const recordPlaybackDiagnostic = useNarratorStore((state) => state.recordPlaybackDiagnostic);
+  const setReadRegion = useNarratorStore((state) => state.setReadRegion);
+  const clearReadRegion = useNarratorStore((state) => state.clearReadRegion);
   const clearFeed = useNarratorStore((state) => state.clearFeed);
   const resetPolicies = useNarratorStore((state) => state.resetPolicies);
   const [speakingEventId, setSpeakingEventId] = React.useState<string | null>(null);
   const autoSpeakAttemptedEventIdsRef = React.useRef<Set<string>>(new Set());
   const activeSpeakRef = React.useRef<{ eventId: string; controller: AbortController } | null>(null);
+  const eventArticleRefs = React.useRef<Map<string, HTMLElement>>(new Map());
+
+  const setEventArticleRef = React.useCallback((eventId: string, node: HTMLElement | null) => {
+    if (node) {
+      eventArticleRefs.current.set(eventId, node);
+    } else {
+      eventArticleRefs.current.delete(eventId);
+    }
+  }, []);
+
+  const readRegionForEvent = React.useCallback((event: NarratorEventV1) => {
+    const node =
+      eventArticleRefs.current.get(event.eventId) ??
+      document.querySelector<HTMLElement>("[data-narrator-panel-root]");
+    if (!node) return null;
+    const rect = node.getBoundingClientRect();
+    return {
+      left: Math.max(0, rect.left),
+      top: Math.max(0, rect.top),
+      width: Math.max(8, Math.min(rect.width, window.innerWidth - Math.max(0, rect.left))),
+      height: Math.max(8, Math.min(rect.height, window.innerHeight - Math.max(0, rect.top))),
+    };
+  }, []);
 
   const speakEvent = React.useCallback(async (event: NarratorEventV1) => {
     if (!event.speakable || event.sourceKind === "voice_receipt") return;
@@ -142,6 +167,20 @@ export default function NarratorPanel() {
     const controller = new AbortController();
     activeSpeakRef.current = { eventId: event.eventId, controller };
     setSpeakingEventId(event.eventId);
+    const policy = sourcePolicies[event.sourceKind];
+    const showReadRegion = policy?.deliveryMode === "auto_speak" || event.requestedDeliveryMode === "auto_speak";
+    if (showReadRegion) {
+      setReadRegion({
+        phase: "voice_loading",
+        eventId: event.eventId,
+        sourceId: event.sourceId,
+        textPreview: event.text,
+        rect: readRegionForEvent(event),
+        pointer: null,
+        startedAtMs: Date.now(),
+        durationMs: 1200,
+      });
+    }
     markQueued(event.eventId);
     try {
       const unlocked = await primeNarratorAudioPlayback();
@@ -151,6 +190,18 @@ export default function NarratorPanel() {
       }
       const payload = buildNarratorVoiceSpeakPayload({ event });
       const response = await speakVoice(payload, { signal: controller.signal });
+      if (showReadRegion) {
+        setReadRegion({
+          phase: "speaking",
+          eventId: event.eventId,
+          sourceId: event.sourceId,
+          textPreview: event.text,
+          rect: readRegionForEvent(event),
+          pointer: null,
+          startedAtMs: Date.now(),
+          durationMs: 2200,
+        });
+      }
       const diagnostic = await playNarratorVoiceResponse(response, {
         signal: controller.signal,
         onDiagnostic: (nextDiagnostic) => recordPlaybackDiagnostic(event.eventId, nextDiagnostic),
@@ -164,8 +215,9 @@ export default function NarratorPanel() {
     } finally {
       if (activeSpeakRef.current?.eventId === event.eventId) activeSpeakRef.current = null;
       setSpeakingEventId(null);
+      window.setTimeout(() => clearReadRegion(event.sourceId), 260);
     }
-  }, [markFailed, markQueued, markSpoken, recordPlaybackDiagnostic]);
+  }, [clearReadRegion, markFailed, markQueued, markSpoken, readRegionForEvent, recordPlaybackDiagnostic, setReadRegion, sourcePolicies]);
 
   React.useEffect(() => installNarratorAudioUnlockGestureListeners(), []);
 
@@ -218,7 +270,7 @@ export default function NarratorPanel() {
   }, [publishEvent, speakEvent]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-zinc-950 text-zinc-100">
+    <div data-narrator-panel-root="true" className="flex h-full min-h-0 flex-col bg-zinc-950 text-zinc-100">
       <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
           <Bell className="h-4 w-4 text-cyan-200" />
@@ -306,7 +358,11 @@ export default function NarratorPanel() {
                 const playbackDiagnostic = queueState.playbackDiagnosticsByEventId[event.eventId];
                 const canSpeak = event.speakable && event.sourceKind !== "voice_receipt";
                 return (
-                  <article key={event.eventId} className="rounded border border-white/10 bg-black/20 p-3 text-xs">
+                  <article
+                    key={event.eventId}
+                    ref={(node) => setEventArticleRef(event.eventId, node)}
+                    className="rounded border border-white/10 bg-black/20 p-3 text-xs"
+                  >
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-[11px] text-zinc-500">{formatWhen(event.createdAtMs)}</span>
                       <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[11px] text-zinc-200">

@@ -13,6 +13,8 @@ export const STAGE_PLAY_LIVE_SOURCE_PREDICTION_VALIDATION_SCHEMA =
 export const STAGE_PLAY_MICRO_REASONER_PROMPT_SCHEMA = "stage_play_micro_reasoner_prompt/v1" as const;
 export const STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA = "stage_play_micro_reasoner_prompt_preset/v1" as const;
 export const STAGE_PLAY_MICRO_REASONER_RUN_SCHEMA = "stage_play_micro_reasoner_run/v1" as const;
+export const STAGE_PLAY_DOCUMENT_INLINE_TRANSLATION_OUTPUT_SCHEMA =
+  "stage_play_document_inline_translation_output/v1" as const;
 export const STAGE_PLAY_MICRO_REASONER_PROMPT_DELEGATION_RESULT_SCHEMA =
   "stage_play_micro_reasoner_prompt_delegation_result/v1" as const;
 export const STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_DRAFT_SCHEMA =
@@ -653,6 +655,10 @@ export type StagePlayMicroReasonerRunV1 = {
   deckPresetId?: string | null;
   deckPresetTitle?: string | null;
   deckRunPlan?: StagePlayMicroReasonerDeckRunPlanV1 | null;
+  deckRoleIndex?: number | null;
+  deckRoleCount?: number | null;
+  deckExecutionMode?: "independent" | "uses_prior_outputs" | "baseline_fallback" | null;
+  deckProductRole?: boolean | null;
   role: StagePlayMicroReasonerRoleV1;
   jobId: string;
   sourceId: string;
@@ -683,6 +689,38 @@ export type StagePlayMicroReasonerRunV1 = {
   terminal_eligible: false;
   raw_content_included: false;
   context_role: "tool_evidence" | "micro_reasoner_evidence";
+};
+
+export type StagePlayDocumentInlineTranslationOutputV1 = {
+  schema: typeof STAGE_PLAY_DOCUMENT_INLINE_TRANSLATION_OUTPUT_SCHEMA;
+  schemaVersion: typeof STAGE_PLAY_DOCUMENT_INLINE_TRANSLATION_OUTPUT_SCHEMA;
+  sourceKind: "document_markdown";
+  sourceId: string;
+  docPath: string | null;
+  sourceHash: string | null;
+  locale: string;
+  projectionTarget: "docs_viewer_inline";
+  translations: Array<{
+    unit_id: string;
+    translated_markdown: string;
+    confidence: "low" | "medium" | "high";
+    warnings: string[];
+  }>;
+  unit_errors: Array<{
+    unit_id: string;
+    reason: string;
+  }>;
+  qualityChecks: Array<{
+    name: string;
+    status: "pass" | "warn" | "fail";
+    detail: string;
+  }>;
+  evidenceRefs: string[];
+  createdAt: string;
+  assistant_answer: false;
+  terminal_eligible: false;
+  raw_content_included: false;
+  context_role: "micro_reasoner_evidence";
 };
 
 export type StagePlayProcessedMailPacketResolutionStateV1 =

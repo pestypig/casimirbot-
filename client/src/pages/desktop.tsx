@@ -24,6 +24,7 @@ import { SurfaceStack } from "@/components/surface/SurfaceStack";
 import { generateSurfaceRecipe } from "@/lib/surfacekit/generateSurface";
 import { useLumaMoodTheme } from "@/lib/luma-mood-theme";
 import { ProcessGraphSurfaceLayer } from "@/components/workstation/ProcessGraphSurfaceLayer";
+import NarratorReadRegionOverlay from "@/components/workstation/NarratorReadRegionOverlay";
 import { HELIX_ASK_CONTEXT_ID } from "@/lib/helix/voice-surface-contract";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import { useNarratorHoverFocusInspector } from "@/lib/narrator/hoverFocusInspector";
@@ -887,6 +888,7 @@ export default function DesktopPage({
       >
         <SurfaceStack recipe={wallpaperRecipe} />
         {processGraphSurfaceEnabled ? <ProcessGraphSurfaceLayer mood={mood} orientation={orientation} mode="ambient" /> : null}
+        <NarratorReadRegionOverlay />
         {workstationEnabled ? (
           <HelixWorkstationShell
             layoutVariant={layoutVariant}

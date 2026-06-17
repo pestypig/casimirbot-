@@ -78,9 +78,12 @@ describe("doc viewer math interaction", () => {
     const clientSource = readFileSync(join(process.cwd(), "client/src/lib/docs/documentTranslationClient.ts"), "utf8");
 
     expect(panelSource).toContain("enqueueDocumentMarkdownTranslationMail");
+    expect(panelSource).toContain("readDocumentMarkdownMicroDeckRuns");
+    expect(panelSource).toContain("extractDocumentMarkdownTranslationsFromRuns");
     expect(panelSource).toContain("documentMarkdownSourceId(currentEntry.relativePath)");
     expect(panelSource).not.toContain("requestDocumentTranslationUnits");
     expect(clientSource).toContain("/api/helix/stage-play/live-source-mail/document-markdown");
+    expect(clientSource).toContain("/api/helix/stage-play/live-source-mail?");
     expect(clientSource).toContain("/api/helix/stage-play/micro-reasoner-prompt-preset/apply");
     expect(clientSource).toContain("stage_play_micro_reasoner_prompt_preset:document-translate-haw-inline:v1");
   });

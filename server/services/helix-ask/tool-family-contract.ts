@@ -206,11 +206,17 @@ export const TOOL_FAMILY_DEFAULT_CONTRACTS: Record<ToolFamily, ToolFamilyContrac
     toolFamily: "capability_catalog",
     authority: "evidence_only",
     mutating: false,
-    requiredObservationKinds: ["capability_catalog_observation", "capability_help_summary"],
+    requiredObservationKinds: ["capability_registry", "capability_help_summary"],
     allowedTerminalKinds: [...evidenceOnlyTerminalKinds],
     requiredReentry: true,
     requiresGoalSatisfaction: true,
-    aliases: ["capability_catalog", "capability_help", "helix_ask.inspect_capability_catalog"],
+    aliases: [
+      "capability_catalog",
+      "capability_help",
+      "helix_ask.inspect_capability_catalog",
+      "helix_ask.reflect_workstation_tool_alignment",
+      "helix_ask.reflect_live_synthetic_data",
+    ],
   }),
 };
 
@@ -474,11 +480,46 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
     toolFamily: "capability_catalog",
     authority: "evidence_only",
     mutating: false,
-    requiredObservationKinds: ["capability_catalog_observation", "capability_help_summary"],
+    requiredObservationKinds: ["capability_registry", "capability_help_summary"],
     allowedTerminalKinds: [...evidenceOnlyTerminalKinds],
     requiredReentry: true,
     requiresGoalSatisfaction: true,
     aliases: ["what_tools_are_available", "what_can_helix_ask_do", "system_capability_help"],
+  }),
+  contract({
+    toolName: "helix_ask.reflect_workstation_tool_alignment",
+    toolFamily: "capability_catalog",
+    authority: "evidence_only",
+    mutating: false,
+    requiredObservationKinds: ["capability_registry"],
+    allowedTerminalKinds: [...evidenceOnlyTerminalKinds],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+    aliases: [
+      "workstation_tool_alignment",
+      "workstation_tools_matrix",
+      "toolchain_matrix",
+      "tool_regression_matrix",
+      "release_checklist_tools",
+    ],
+  }),
+  contract({
+    toolName: "helix_ask.reflect_live_synthetic_data",
+    toolFamily: "capability_catalog",
+    authority: "evidence_only",
+    mutating: false,
+    requiredObservationKinds: ["capability_registry"],
+    allowedTerminalKinds: [...evidenceOnlyTerminalKinds],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+    aliases: [
+      "live_synthetic_data_reflection",
+      "live_answer_synthetic_data",
+      "microdeck_reflection",
+      "macro_reasoner_deck_reflection",
+      "mail_loop_synthetic_data",
+      "live_answer_prediction_review",
+    ],
   }),
 ];
 
@@ -499,7 +540,11 @@ const normalizeFamily = (value: unknown): ToolFamily | null => {
   if (/voice[-.:]?delivery|voice[-.:]?output|request-interim-voice-callout|callout/.test(normalized)) return "voice_delivery";
   if (/zen[-.:]?graph|zengraph|reflect[-.:]?ideology[-.:]?context|procedural[-.:]?zen[-.:]?classification/.test(normalized)) return "zen_graph_reflection";
   if (/civilization[-.:]?bounds|civilization[-.:]?scenario|civilization[-.:]?roadmap|reflect-civilization-bounds/.test(normalized)) return "civilization_bounds";
-  if (/capability[-.:]?catalog|capability[-.:]?help|what[-.:]?tools[-.:]?are[-.:]?available|inspect-capability-catalog/.test(normalized)) return "capability_catalog";
+  if (
+    /capability[-.:]?catalog|capability[-.:]?help|what[-.:]?tools[-.:]?are[-.:]?available|inspect-capability-catalog|workstation[-.:]?tool[-.:]?alignment|toolchain[-.:]?matrix|tool[-.:]?regression[-.:]?matrix|live[-.:]?synthetic[-.:]?data|live[-.:]?answer[-.:]?synthetic|microdeck[-.:]?reflection|macro[-.:]?reasoner[-.:]?deck|mail[-.:]?loop[-.:]?synthetic|prediction[-.:]?review/.test(
+      normalized,
+    )
+  ) return "capability_catalog";
   return null;
 };
 

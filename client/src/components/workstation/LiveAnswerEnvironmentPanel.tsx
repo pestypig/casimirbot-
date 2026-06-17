@@ -424,6 +424,7 @@ type AdaptiveVisualLensRead = {
 
 type EarbudMicroReasonerOutput = {
   runId: string;
+  role: StagePlayMicroReasonerRunV1["role"];
   text: string;
   sourceId: string;
   deckTitle: string;
@@ -529,10 +530,15 @@ const readDocumentTranslationRunText = (run: StagePlayMicroReasonerRunV1): strin
   try {
     const parsed = readRecord(JSON.parse(fallback));
     const translations = Array.isArray(parsed?.translations) ? parsed.translations : [];
-    const first = translations
-      .map((entry: unknown) => readRecord(entry)?.translated_markdown)
-      .find((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
-    if (first) return first.trim();
+    const lines = translations
+      .map((entry: unknown) => {
+        const record = readRecord(entry);
+        const unitId = typeof record?.unit_id === "string" ? record.unit_id : null;
+        const text = typeof record?.translated_markdown === "string" ? record.translated_markdown.trim() : "";
+        return unitId && text ? `${unitId}: ${text}` : text;
+      })
+      .filter((entry): entry is string => entry.trim().length > 0);
+    if (lines.length) return lines.join("\n");
   } catch {
     // Prompted MicroDeck previews can be clipped by the overview API.
   }
@@ -1456,6 +1462,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       )
       .map((run: StagePlayMicroReasonerRunV1): EarbudMicroReasonerOutput => ({
         runId: run.runId,
+        role: run.role,
         text: readEarbudRunText(run),
         sourceId: run.sourceId,
         deckTitle: run.deckPresetTitle ?? "Earbud MicroDeck",
@@ -1480,8 +1487,9 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       selectedDocumentMicroReasonerPromptPreset?.presetId,
     ].filter((entry): entry is string => Boolean(entry)));
     return documentMicroReasonerRuns
-      .filter((run: StagePlayMicroReasonerRunV1) => run.role === "packet_composer")
       .filter((run: StagePlayMicroReasonerRunV1) => run.sourceId === activeDocumentMarkdownSourceId)
+      .filter((run: StagePlayMicroReasonerRunV1) => run.role === "packet_composer")
+      .filter((run: StagePlayMicroReasonerRunV1) => run.status === "completed")
       .filter((run: StagePlayMicroReasonerRunV1) =>
         !activePresetIds.size ||
         (run.deckPresetId ? activePresetIds.has(run.deckPresetId) : false) ||
@@ -1489,6 +1497,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       )
       .map((run: StagePlayMicroReasonerRunV1): EarbudMicroReasonerOutput => ({
         runId: run.runId,
+        role: run.role,
         text: readDocumentTranslationRunText(run),
         sourceId: run.sourceId,
         deckTitle: run.deckPresetTitle ?? "Document Markdown MicroDeck",
@@ -1498,7 +1507,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       }))
       .filter((output: EarbudMicroReasonerOutput) => output.text.length > 0)
       .sort((left: EarbudMicroReasonerOutput, right: EarbudMicroReasonerOutput) => left.createdAt.localeCompare(right.createdAt))
-      .slice(-6);
+      .slice(-9);
   }, [
     activeDocumentMarkdownSourceId,
     activeDocumentMicroReasonerPromptPreset?.presetId,
@@ -3616,9 +3625,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             </div>
             {latestDocumentMicroReasonerOutput ? (
               <div className="mt-2 rounded border border-emerald-300/20 bg-emerald-950/10 px-2 py-1.5">
-                <p className="text-[11px] leading-5 text-emerald-50">{latestDocumentMicroReasonerOutput.text}</p>
+                <p className="whitespace-pre-wrap text-[11px] leading-5 text-emerald-50">{latestDocumentMicroReasonerOutput.text}</p>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-emerald-100/80">
                   <span>{latestDocumentMicroReasonerOutput.deckTitle}</span>
+                  <span>{latestDocumentMicroReasonerOutput.role}</span>
                   <span>{latestDocumentMicroReasonerOutput.status}</span>
                   <span>{formatTime(latestDocumentMicroReasonerOutput.createdAt)}</span>
                   <span className="truncate font-mono">{latestDocumentMicroReasonerOutput.refs.at(0) ?? latestDocumentMicroReasonerOutput.runId}</span>
@@ -3626,9 +3636,23 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
               </div>
             ) : (
               <p className="mt-2 rounded border border-white/10 bg-slate-950/60 px-2 py-1.5 text-[11px] leading-5 text-slate-500">
-                No document translation output has been projected yet. Visible Markdown packets will appear here after a completed document packet_composer run.
+                No document translation output has been projected yet. Visible Markdown packets will appear here after completed document MicroDeck runs.
               </p>
             )}
+            {documentMicroReasonerOutputs.length > 1 ? (
+              <div className="mt-2 grid gap-1.5 md:grid-cols-2" aria-label="Recent document Markdown MicroDeck outputs">
+                {documentMicroReasonerOutputs.slice(0, -1).slice(-6).reverse().map((output: EarbudMicroReasonerOutput) => (
+                  <div key={output.runId} className="min-w-0 rounded border border-white/10 bg-slate-950/70 px-2 py-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-[10px] font-semibold text-emerald-100">{output.role}</span>
+                      <span className="shrink-0 font-mono text-[10px] text-slate-500">{formatTime(output.createdAt)}</span>
+                    </div>
+                    <p className="mt-1 line-clamp-3 text-[11px] leading-4 text-slate-300">{output.text}</p>
+                    <p className="mt-1 truncate text-[10px] text-emerald-100/70">{output.deckTitle}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
           <div className="mt-2 rounded border border-emerald-300/15 bg-black/20 px-2 py-2" data-testid="earbud-micro-reasoner-output">
             <div className="flex flex-wrap items-center justify-between gap-2">

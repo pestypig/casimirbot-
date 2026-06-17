@@ -255,4 +255,132 @@ describe("prompted stage-play micro-reasoners", () => {
       recommendedNextTool: null,
     });
   });
+
+  it("keeps MicroDeck product roles independent when helper roles fail", async () => {
+    const calls: string[] = [];
+    const executor: StagePlayPromptedMicroReasonerExecutor = async (input) => {
+      calls.push(input.role);
+      if (input.role === "claim_extractor") {
+        return {
+          ok: false,
+          text: "",
+          json: null,
+          model: "test-micro-llm",
+          latencyMs: 5,
+          error: "classifier unavailable",
+        };
+      }
+      if (input.role === "packet_composer") {
+        const json = {
+          inlineTranslations: [
+            { unitId: "u0001", sourceText: "Final answer", translatedText: "Pane hope", confidence: "medium" },
+          ],
+          warnings: [],
+          evidenceRefs: ["mail:doc:1"],
+        };
+        return {
+          ok: true,
+          text: JSON.stringify(json),
+          json,
+          model: "test-micro-llm",
+          latencyMs: 9,
+          tokenEstimateIn: 90,
+          tokenEstimateOut: 35,
+        };
+      }
+      const json = { retainTerms: ["Helix"], orthographyNotes: ["Use okina/kahako when known"], evidenceRefs: ["mail:doc:1"] };
+      return {
+        ok: true,
+        text: JSON.stringify(json),
+        json,
+        model: "test-micro-llm",
+        latencyMs: 6,
+        tokenEstimateIn: 70,
+        tokenEstimateOut: 24,
+      };
+    };
+
+    const result = await buildStagePlayProcessedMailPacketWithPromptedReasoners({
+      jobId: "stage_play_live_source_job:doc",
+      sourceId: "document_markdown:docs/test.md",
+      now: "2026-06-04T12:00:00.000Z",
+      mailItems: [{
+        mailId: "mail:doc:1",
+        sourceId: "document_markdown:docs/test.md",
+        sourceKind: "document_markdown",
+        summary: {
+          text: "Final answer",
+          preview: "Final answer",
+        },
+        sourceRefs: {
+          evidenceRef: "document_markdown:docs/test.md:u0001",
+          frameRef: "document_markdown:docs/test.md",
+          observationRef: "document_markdown_visible_unit:u0001",
+        },
+        evidenceRefs: ["document_markdown:docs/test.md:u0001"],
+      } as any],
+      immersionState: {
+        immersionStateId: "stage_play_immersion_state:doc",
+        policyId: null,
+        profileId: null,
+        sourceIds: ["document_markdown:docs/test.md"],
+        latestMailIds: ["mail:doc:1"],
+        latestEvidenceRefs: ["document_markdown:docs/test.md:u0001"],
+        sourceIdentity: { label: "Document Markdown", confidence: 0.8, stable: true },
+        stableFacts: [],
+        currentSceneFacts: ["Visible document text: Final answer"],
+        changedFacts: ["document visible unit changed"],
+        uncertainties: [],
+        currentActivity: "document_reading",
+        salience: {
+          level: "low",
+          reasons: ["document packet"],
+          voiceCandidate: false,
+        },
+        prediction: null,
+        lastValidation: null,
+        evidenceRefs: ["stage_play_immersion_state:doc"],
+        createdAt: "2026-06-04T12:00:00.000Z",
+        assistant_answer: false,
+        terminal_eligible: false,
+        context_role: "tool_evidence",
+      } as any,
+      predictionValidation: {
+        validationId: "stage_play_prediction_validation:doc",
+        priorPredictionId: null,
+        result: "no_prior_prediction",
+        supportedSignals: [],
+        contradictedSignals: [],
+        newSignals: [],
+        salienceHint: "low",
+        recommendedNext: "wait_for_next_summary",
+        evidenceRefs: ["stage_play_prediction_validation:doc"],
+        createdAt: "2026-06-04T12:00:00.000Z",
+      } as any,
+      promptedMicroReasoners: {
+        enabled: true,
+        executor,
+      },
+    });
+
+    expect(calls).toEqual(["claim_extractor", "observation_classifier", "packet_composer"]);
+    expect(result.microReasonerRuns.find((run) => run.role === "claim_extractor")).toMatchObject({
+      status: "failed",
+      error: "classifier unavailable",
+    });
+    const composer = result.microReasonerRuns.find((run) => run.role === "packet_composer");
+    expect(composer).toMatchObject({
+      status: "completed",
+      deckProductRole: true,
+      deckExecutionMode: "uses_prior_outputs",
+      outputPreview: expect.stringContaining("translatedText"),
+    });
+    expect(result.packet.microReasonerRunRefs).toContain(composer?.runId);
+    const packetRunRoles = result.packet.microReasonerRunRefs
+      .map((runId) => result.microReasonerRuns.find((run) => run.runId === runId)?.role)
+      .filter(Boolean)
+      .sort();
+    expect(packetRunRoles).toEqual(["claim_extractor", "observation_classifier", "packet_composer"]);
+    expect(result.packet.evidenceRefs).toContain("prompted_micro_reasoner:packet_composer");
+  });
 });

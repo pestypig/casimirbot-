@@ -273,6 +273,111 @@ const VISIBLE_ANSWER_FIELDS = [
 const TERMINAL_PROJECTION_MISMATCH_TEXT =
   "I could not produce a terminal answer because terminal authority and visible projection selected different artifacts.";
 
+const syncDocsToolRailMirrorsFromTerminalAuthority = (input: {
+  payload: Record<string, unknown>;
+  turnId: string;
+  terminalArtifactRef: string;
+}): void => {
+  const audit = readRecord(input.payload.tool_turn_chain_audit);
+  if (
+    !audit ||
+    readString(audit.required_terminal_kind) !== "doc_evidence_synthesis_answer" ||
+    readString(audit.visible_terminal_kind) !== "doc_evidence_synthesis_answer"
+  ) {
+    return;
+  }
+  if (
+    readString(audit.rail_failure_code) &&
+    readString(audit.rail_failure_code) !== "terminal_projection_mismatch"
+  ) {
+    return;
+  }
+
+  const syncedAudit = {
+    ...audit,
+    materialized_terminal_artifact_kind: "doc_evidence_synthesis_answer",
+    materialized_terminal_artifact_ref:
+      readString(audit.materialized_terminal_artifact_ref) ?? input.terminalArtifactRef,
+    terminal_authority_kind: "doc_evidence_synthesis_answer",
+    visible_terminal_kind: "doc_evidence_synthesis_answer",
+    rail_status: "complete",
+    rail_failure_code: null,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  const syncedTriage = {
+    ...(readRecord(input.payload.tool_rail_failure_triage) ?? {}),
+    schema: "helix.tool_rail_failure_triage.v1",
+    turn_id: input.turnId,
+    route_family: syncedAudit.route_family ?? null,
+    capability_contract_guard_version: syncedAudit.capability_contract_guard_version ?? null,
+    requested_capability: syncedAudit.requested_capability ?? null,
+    requested_capability_family: syncedAudit.requested_capability_family ?? null,
+    requested_capability_source: syncedAudit.requested_capability_source ?? null,
+    requested_capability_confidence: syncedAudit.requested_capability_confidence ?? null,
+    selected_capability: syncedAudit.selected_capability ?? null,
+    executed_capability: syncedAudit.executed_capability ?? null,
+    requested_selected_match: syncedAudit.requested_selected_match ?? null,
+    selected_executed_match: syncedAudit.selected_executed_match ?? null,
+    substitution_rule_applied: syncedAudit.substitution_rule_applied === true,
+    substitution_rule_id: syncedAudit.substitution_rule_id ?? null,
+    required_observation_kinds_for_requested_capability:
+      readArray(syncedAudit.required_observation_kinds_for_requested_capability),
+    observed_artifact_supports_requested_capability:
+      typeof syncedAudit.observed_artifact_supports_requested_capability === "boolean"
+        ? syncedAudit.observed_artifact_supports_requested_capability
+        : null,
+    did_tool_run: Boolean(readString(syncedAudit.executed_capability)),
+    policy_rejection_ref: syncedAudit.policy_rejection_ref ?? null,
+    policy_rejection_reason: syncedAudit.policy_rejection_reason ?? null,
+    observation_artifact_kind: syncedAudit.observation_artifact_kind ?? null,
+    observation_ref: syncedAudit.observation_ref ?? null,
+    reentry_executed: syncedAudit.reentry_executed === true,
+    required_terminal_kind: "doc_evidence_synthesis_answer",
+    final_answer_draft_ref: syncedAudit.final_answer_draft_ref ?? null,
+    support_refs_count: syncedAudit.support_refs_count ?? 0,
+    materialized_terminal_artifact_kind: "doc_evidence_synthesis_answer",
+    terminal_authority_kind: "doc_evidence_synthesis_answer",
+    visible_terminal_kind: "doc_evidence_synthesis_answer",
+    first_broken_rail: null,
+    failure_bucket: null,
+    rail_status: "complete",
+    rail_failure_code: null,
+    repair_target: null,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+
+  input.payload.tool_turn_chain_audit = syncedAudit;
+  input.payload.tool_rail_failure_triage = syncedTriage;
+  const familyMatrix = readArray(input.payload.tool_turn_chain_family_matrix)
+    .map((entry) => {
+      const record = readRecord(entry);
+      if (!record || record.observed !== true) return entry;
+      return {
+        ...record,
+        materialized: true,
+        materialized_terminal_artifact_kind: "doc_evidence_synthesis_answer",
+        terminal_authority_selected: true,
+        visible_projection_matches: true,
+        rail_status: "complete",
+        rail_failure_code: null,
+      };
+    });
+  if (familyMatrix.length > 0) {
+    input.payload.tool_turn_chain_family_matrix = familyMatrix;
+  }
+
+  const debug = readRecord(input.payload.debug);
+  if (debug) {
+    debug.tool_turn_chain_audit = syncedAudit;
+    debug.tool_rail_failure_triage = syncedTriage;
+    if (familyMatrix.length > 0) {
+      debug.tool_turn_chain_family_matrix = familyMatrix;
+    }
+  }
+};
+
 export const applyTerminalProjectionKindGuard = (
   payload: Record<string, unknown>,
   result: HelixTerminalAuthoritySingleWriterResult,
@@ -570,6 +675,11 @@ export function syncDocEvidenceSynthesisSingleWriterFromTerminalAuthority(input:
 
   input.payload.terminal_authority_single_writer = result;
   input.payload.terminal_candidate_rejections = auditRejectedCandidates;
+  syncDocsToolRailMirrorsFromTerminalAuthority({
+    payload: input.payload,
+    turnId: input.turnId,
+    terminalArtifactRef: selectedArtifactRef,
+  });
   const debug = readRecord(input.payload.debug);
   if (debug) {
     debug.ok = true;

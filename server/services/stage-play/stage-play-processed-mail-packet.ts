@@ -1,8 +1,10 @@
 import crypto from "node:crypto";
 import { performance } from "node:perf_hooks";
 import {
+  STAGE_PLAY_DOCUMENT_INLINE_TRANSLATION_OUTPUT_SCHEMA,
   STAGE_PLAY_MICRO_REASONER_RUN_SCHEMA,
   STAGE_PLAY_PROCESSED_MAIL_PACKET_SCHEMA,
+  type StagePlayDocumentInlineTranslationOutputV1,
   type LiveSourceCausalTraceV1,
   type StagePlayAxiomFrameV1,
   type StagePlayEffortEstimateV1,
@@ -92,14 +94,54 @@ const deckTraceFor = (input: {
 const applyDeckTraceToRun = (
   run: StagePlayMicroReasonerRunV1,
   deck: StagePlayMicroReasonerDeckTraceV1 | undefined,
+  roleOrder?: StagePlayMicroReasonerRoleV1[],
 ): StagePlayMicroReasonerRunV1 => {
   if (!deck) return run;
+  const promptedRoleIndex = roleOrder?.indexOf(run.role) ?? deck.promptedRoles.indexOf(run.role);
+  const roleIsPrompted = promptedRoleIndex >= 0;
   return recordStagePlayMicroReasonerRun({
     ...run,
     deckPresetId: deck.presetId,
     deckPresetTitle: deck.presetTitle,
     deckRunPlan: deck.deckRunPlan,
+    deckRoleIndex: roleIsPrompted ? promptedRoleIndex : null,
+    deckRoleCount: roleOrder?.length ?? deck.promptedRoles.length,
+    deckExecutionMode: roleIsPrompted
+      ? deckExecutionModeForRole(deck, run.role)
+      : "baseline_fallback",
+    deckProductRole: isDeckProductRole(deck, run.role),
   });
+};
+
+const isDeckProductRole = (
+  deck: StagePlayMicroReasonerDeckTraceV1 | undefined,
+  role: StagePlayMicroReasonerRoleV1,
+): boolean => {
+  if (!deck) return false;
+  if ((deck.outputPolicy === "earbud_translation" || deck.outputPolicy === "inline_document_translation") && role === "packet_composer") {
+    return true;
+  }
+  if (deck.outputPolicy === "ask_prompt_delegation" && role === "prompt_router") return true;
+  if (deck.outputPolicy === "tool_call_candidate" && role === "decision_selector") return true;
+  if (deck.outputPolicy === "voice_candidate" && role === "voice_callout_drafter") return true;
+  return false;
+};
+
+const deckExecutionModeForRole = (
+  deck: StagePlayMicroReasonerDeckTraceV1 | undefined,
+  role: StagePlayMicroReasonerRoleV1,
+): StagePlayMicroReasonerRunV1["deckExecutionMode"] => {
+  if (!deck) return null;
+  if (deck.outputPolicy === "inline_document_translation") {
+    return role === "claim_extractor" ? "independent" : "uses_prior_outputs";
+  }
+  if (deck.outputPolicy === "earbud_translation") {
+    return role === "packet_composer" ? "independent" : "uses_prior_outputs";
+  }
+  if (role === "decision_selector" || role === "hypothesis_arbiter" || role === "voice_callout_drafter") {
+    return "uses_prior_outputs";
+  }
+  return "independent";
 };
 
 const markRunSkippedByDeckPlan = (input: {
@@ -113,6 +155,10 @@ const markRunSkippedByDeckPlan = (input: {
     deckPresetId: input.deck?.presetId ?? input.run.deckPresetId ?? null,
     deckPresetTitle: input.deck?.presetTitle ?? input.run.deckPresetTitle ?? null,
     deckRunPlan: input.deck?.deckRunPlan ?? input.run.deckRunPlan ?? null,
+    deckRoleIndex: input.run.deckRoleIndex ?? null,
+    deckRoleCount: input.run.deckRoleCount ?? input.deck?.promptedRoles.length ?? null,
+    deckExecutionMode: input.run.deckExecutionMode ?? "baseline_fallback",
+    deckProductRole: input.run.deckProductRole ?? false,
     outputRefs: uniqueStrings([
       ...input.run.outputRefs,
       "skipped_by_deck_run_plan",
@@ -166,6 +212,7 @@ export type StagePlayPromptedMicroReasonerExecutor = (input: {
   promptTitle: string;
   promptTemplate: string;
   outputSchemaName: string;
+  maxOutputTokens?: number | null;
   inputPreview: string;
   baselineOutputPreview: string;
   packet: StagePlayProcessedMailPacketV1;
@@ -234,6 +281,16 @@ const parseJsonObjectFromText = (text: string): Record<string, unknown> | null =
   }
 };
 
+const promptedMicroReasonerJsonFailureCode = (text: string): string => {
+  const trimmed = text.trim();
+  if (!trimmed) return "prompted_micro_reasoner_empty_response";
+  if (trimmed.startsWith("[") || (trimmed.includes("[") && !trimmed.includes("{"))) {
+    return "prompted_micro_reasoner_json_array_response";
+  }
+  if (!trimmed.includes("{") || !trimmed.includes("}")) return "prompted_micro_reasoner_non_json_response";
+  return "prompted_micro_reasoner_malformed_json_object";
+};
+
 const readStringArrayFromJson = (record: Record<string, unknown> | null | undefined, key: string): string[] => {
   const value = record?.[key];
   if (!Array.isArray(value)) return [];
@@ -254,6 +311,176 @@ const readConfidence = (value: unknown): StagePlayMicroReasonerRunV1["confidence
   if (value === "low" || value === "medium" || value === "high") return value;
   return null;
 };
+
+type DocumentMarkdownVisibleUnit = {
+  unit_id: string;
+  kind: string;
+  source_markdown: string;
+  translatable: boolean;
+  protected_spans: string[];
+};
+
+type DocumentMarkdownVisibleUnitsPayload = {
+  docPath: string | null;
+  sourceHash: string | null;
+  locale: string;
+  units: DocumentMarkdownVisibleUnit[];
+};
+
+const readDocumentMarkdownVisibleUnitsPayload = (
+  mailItems: StagePlayLiveSourceMailItemV1[],
+): DocumentMarkdownVisibleUnitsPayload => {
+  const parsed = mailItems
+    .map((item) => parseStructuredObserverOutput(item.summary.text))
+    .find((record) => record?.schema === "stage_play.document_markdown_visible_units.v1");
+  const units = Array.isArray(parsed?.units)
+    ? parsed.units
+        .map((entry) => readRecord(entry))
+        .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+        .map((entry): DocumentMarkdownVisibleUnit => ({
+          unit_id: readStringFromJson(entry, "unit_id") ?? readStringFromJson(entry, "unitId") ?? "",
+          kind: readStringFromJson(entry, "kind") ?? "paragraph",
+          source_markdown: readStringFromJson(entry, "source_markdown") ?? readStringFromJson(entry, "sourceMarkdown") ?? "",
+          translatable: entry.translatable !== false,
+          protected_spans: Array.isArray(entry.protected_spans)
+            ? entry.protected_spans.filter((value): value is string => typeof value === "string")
+            : Array.isArray(entry.protectedSpans)
+              ? entry.protectedSpans.filter((value): value is string => typeof value === "string")
+              : [],
+        }))
+        .filter((unit) => unit.unit_id.length > 0)
+    : [];
+  return {
+    docPath: readStringFromJson(parsed, "doc_path") ?? readStringFromJson(parsed, "docPath"),
+    sourceHash: readStringFromJson(parsed, "source_hash") ?? readStringFromJson(parsed, "sourceHash"),
+    locale: readStringFromJson(parsed, "locale") ?? "haw",
+    units,
+  };
+};
+
+const readDocumentTranslationItems = (
+  json: Record<string, unknown> | null,
+): StagePlayDocumentInlineTranslationOutputV1["translations"] => {
+  const translations = Array.isArray(json?.translations) ? json.translations : [];
+  return translations
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .map((entry) => ({
+      unit_id: readStringFromJson(entry, "unit_id") ?? readStringFromJson(entry, "unitId") ?? "",
+      translated_markdown:
+        readStringFromJson(entry, "translated_markdown") ??
+        readStringFromJson(entry, "translatedMarkdown") ??
+        readStringFromJson(entry, "translation") ??
+        "",
+      confidence: readConfidence(entry.confidence) ?? "medium",
+      warnings: readStringArrayFromJson(entry, "warnings"),
+    }))
+    .filter((entry) => entry.unit_id.length > 0 && entry.translated_markdown.trim().length > 0);
+};
+
+const readDocumentUnitErrors = (
+  json: Record<string, unknown> | null,
+): StagePlayDocumentInlineTranslationOutputV1["unit_errors"] => {
+  const errors = Array.isArray(json?.unit_errors)
+    ? json.unit_errors
+    : Array.isArray(json?.unitErrors)
+      ? json.unitErrors
+      : [];
+  return errors
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .map((entry) => ({
+      unit_id: readStringFromJson(entry, "unit_id") ?? readStringFromJson(entry, "unitId") ?? "",
+      reason: readStringFromJson(entry, "reason") ?? "translation_unavailable",
+    }))
+    .filter((entry) => entry.unit_id.length > 0);
+};
+
+const readDocumentQualityChecks = (
+  json: Record<string, unknown> | null,
+  fallbackStatus: "pass" | "warn" | "fail",
+  fallbackDetail: string,
+): StagePlayDocumentInlineTranslationOutputV1["qualityChecks"] => {
+  const checks = Array.isArray(json?.qualityChecks) ? json.qualityChecks : [];
+  const parsed = checks
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .map((entry) => {
+      const status = entry.status === "pass" || entry.status === "warn" || entry.status === "fail"
+        ? entry.status
+        : fallbackStatus;
+      return {
+        name: readStringFromJson(entry, "name") ?? "document_translation_contract",
+        status,
+        detail: readStringFromJson(entry, "detail") ?? fallbackDetail,
+      };
+    });
+  return parsed.length > 0
+    ? parsed
+    : [{
+        name: "document_translation_contract",
+        status: fallbackStatus,
+        detail: fallbackDetail,
+      }];
+};
+
+const buildDocumentInlineTranslationOutput = (input: {
+  sourceId: string;
+  mailItems: StagePlayLiveSourceMailItemV1[];
+  json?: Record<string, unknown> | null;
+  now: string;
+  fallbackReason?: string | null;
+}): StagePlayDocumentInlineTranslationOutputV1 => {
+  const visible = readDocumentMarkdownVisibleUnitsPayload(input.mailItems);
+  const translations = readDocumentTranslationItems(input.json ?? null);
+  const explicitErrors = readDocumentUnitErrors(input.json ?? null);
+  const fallbackUnitErrors = translations.length === 0 && explicitErrors.length === 0 && input.fallbackReason
+    ? visible.units
+        .filter((unit) => unit.translatable)
+        .map((unit) => ({
+          unit_id: unit.unit_id,
+          reason: input.fallbackReason ?? "translation_unavailable",
+        }))
+    : [];
+  const unitErrors = uniqueStrings([...explicitErrors, ...fallbackUnitErrors].map((entry) => JSON.stringify(entry)))
+    .map((entry) => JSON.parse(entry) as StagePlayDocumentInlineTranslationOutputV1["unit_errors"][number]);
+  const fallbackStatus = translations.length > 0 ? "pass" : input.fallbackReason ? "fail" : "warn";
+  const fallbackDetail = translations.length > 0
+    ? "Structured document translation candidates are available."
+    : input.fallbackReason ?? "No structured document translation candidates were returned.";
+  return {
+    schema: STAGE_PLAY_DOCUMENT_INLINE_TRANSLATION_OUTPUT_SCHEMA,
+    schemaVersion: STAGE_PLAY_DOCUMENT_INLINE_TRANSLATION_OUTPUT_SCHEMA,
+    sourceKind: "document_markdown",
+    sourceId: input.sourceId,
+    docPath: visible.docPath,
+    sourceHash: visible.sourceHash,
+    locale: readStringFromJson(input.json ?? null, "locale") ?? visible.locale,
+    projectionTarget: "docs_viewer_inline",
+    translations,
+    unit_errors: unitErrors,
+    qualityChecks: readDocumentQualityChecks(input.json ?? null, fallbackStatus, fallbackDetail),
+    evidenceRefs: uniqueStrings([
+      ...input.mailItems.flatMap((item) => item.evidenceRefs),
+      ...readStringArrayFromJson(input.json ?? null, "evidenceRefs"),
+      ...visible.units.map((unit) => `${input.sourceId}:unit:${unit.unit_id}`),
+    ]),
+    createdAt: input.now,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+    context_role: "micro_reasoner_evidence",
+  };
+};
+
+const documentInlineTranslationOutputPreview = (input: {
+  sourceId: string;
+  mailItems: StagePlayLiveSourceMailItemV1[];
+  json?: Record<string, unknown> | null;
+  now: string;
+  fallbackReason?: string | null;
+}): string =>
+  JSON.stringify(buildDocumentInlineTranslationOutput(input));
 
 const isRecommendedNext = (value: unknown): value is StagePlayLiveSourcePredictionValidationRecommendedNextV1 =>
   value === "wait_for_next_summary" ||
@@ -305,7 +532,7 @@ const defaultPromptedMicroReasonerExecutor: StagePlayPromptedMicroReasonerExecut
   const result = await llmHttpHandler({
     model: process.env.STAGE_PLAY_MICRO_REASONER_LLM_MODEL ?? process.env.LLM_HTTP_MODEL ?? "gpt-4o-mini",
     temperature: Number(process.env.STAGE_PLAY_MICRO_REASONER_LLM_TEMPERATURE ?? 0.1),
-    max_tokens: Number(process.env.STAGE_PLAY_MICRO_REASONER_LLM_MAX_TOKENS ?? 420),
+    max_tokens: Number(input.maxOutputTokens ?? process.env.STAGE_PLAY_MICRO_REASONER_LLM_MAX_TOKENS ?? 420),
     messages: [
       {
         role: "system",
@@ -1191,6 +1418,7 @@ const makeRun = (input: {
   tokenBudget?: number | null;
   missingEvidence?: string[];
   causalTrace?: LiveSourceCausalTraceV1;
+  preserveOutputPreview?: boolean;
 }): StagePlayMicroReasonerRunV1 => {
   const activePrompt = getActiveStagePlayMicroReasonerPromptForRole(input.role, { sourceId: input.sourceId });
   const activePreset = getActiveStagePlayMicroReasonerPromptPresetForSource({ sourceId: input.sourceId });
@@ -1223,7 +1451,7 @@ const makeRun = (input: {
     inputRefs: uniqueStrings(input.inputRefs),
     outputRefs: uniqueStrings(input.outputRefs),
     inputPreview: clipText(input.inputPreview, 320),
-    outputPreview: clipText(input.outputPreview, 320),
+    outputPreview: input.preserveOutputPreview ? input.outputPreview : clipText(input.outputPreview, 320),
     status: "completed",
     reasoningMode: "micro_live_interval",
     selectedDecision: input.selectedDecision ?? null,
@@ -1774,9 +2002,17 @@ export function buildStagePlayProcessedMailPacket(input: {
     inputRefs: packet.evidenceRefs.filter((ref) => ref !== packet.packetId),
     outputRefs: [packet.packetId],
     inputPreview: microReasonerRuns.map((run) => run.outputPreview).join(" | "),
-    outputPreview: `${packet.recommendedNext}; ${packet.salience.level}; ${packet.observedFacts.slice(0, 2).join(" | ")}`,
+    outputPreview: microReasonerDeck?.outputPolicy === "inline_document_translation"
+      ? documentInlineTranslationOutputPreview({
+          sourceId,
+          mailItems: input.mailItems,
+          now,
+          fallbackReason: "document_translation_model_output_unavailable",
+        })
+      : `${packet.recommendedNext}; ${packet.salience.level}; ${packet.observedFacts.slice(0, 2).join(" | ")}`,
     now,
     causalTrace: input.causalTrace,
+    preserveOutputPreview: microReasonerDeck?.outputPolicy === "inline_document_translation",
   }));
   const finalPacket = timed("final_packet_record", () => recordStagePlayProcessedMailPacket({
     ...packet,
@@ -1976,6 +2212,16 @@ const outputRefsFromPromptedJson = (
       ...readStringArrayFromJson(json, "missingEvidence"),
     ]).slice(0, 12);
   }
+  if (
+    role === "packet_composer" &&
+    (Array.isArray(json.translations) || Array.isArray(json.unit_errors) || Array.isArray(json.unitErrors))
+  ) {
+    return uniqueStrings([
+      STAGE_PLAY_DOCUMENT_INLINE_TRANSLATION_OUTPUT_SCHEMA,
+      ...readDocumentTranslationItems(json).map((entry) => `translated:${entry.unit_id}`),
+      ...readDocumentUnitErrors(json).map((entry) => `translation_error:${entry.unit_id}`),
+    ]).slice(0, 24);
+  }
   return uniqueStrings(Object.values(json).map((value) => typeof value === "string" ? value : JSON.stringify(value))).slice(0, 12);
 };
 
@@ -2032,6 +2278,7 @@ export async function buildStagePlayProcessedMailPacketWithPromptedReasoners(inp
         promptTitle: prompt.title,
         promptTemplate: prompt.template,
         outputSchemaName: prompt.outputSchemaName,
+        maxOutputTokens: prompt.maxOutputTokens ?? null,
         inputPreview: run.inputPreview,
         baselineOutputPreview: run.outputPreview,
         packet,
@@ -2055,11 +2302,24 @@ export async function buildStagePlayProcessedMailPacketWithPromptedReasoners(inp
     }
     const json = output.json ?? parseJsonObjectFromText(output.text);
     if (!output.ok || !json) {
+      const failureCode = output.error ?? promptedMicroReasonerJsonFailureCode(output.text);
+      const isDocumentInlineProductRun =
+        role === "packet_composer" &&
+        microReasonerDeck?.outputPolicy === "inline_document_translation";
       const fallbackRun = recordStagePlayMicroReasonerRun({
         ...run,
+        status: "failed",
+        outputPreview: isDocumentInlineProductRun
+          ? documentInlineTranslationOutputPreview({
+              sourceId,
+              mailItems: input.mailItems,
+              now,
+              fallbackReason: failureCode,
+            })
+          : clipText(`Prompted ${role} failed: ${failureCode}`, 320),
         modelUsed: output.model ?? run.modelUsed ?? "deterministic_fallback",
         latencyMs: output.latencyMs ?? run.latencyMs ?? null,
-        error: output.error ?? "prompted_micro_reasoner_invalid_or_empty_json",
+        error: failureCode,
         completedAt: now,
       });
       runs.splice(runs.findIndex((entry) => entry.runId === run.runId), 1, fallbackRun);
@@ -2074,6 +2334,9 @@ export async function buildStagePlayProcessedMailPacketWithPromptedReasoners(inp
       : role === "hypothesis_arbiter" && isRecommendedNext(readStringFromJson(json, "recommendedNext"))
         ? readStringFromJson(json, "recommendedNext") as StagePlayLiveSourcePredictionValidationRecommendedNextV1
         : run.selectedDecision ?? null;
+    const isDocumentInlineProductRun =
+      role === "packet_composer" &&
+      microReasonerDeck?.outputPolicy === "inline_document_translation";
     const updatedRun = mergePromptedRun({
       run,
       output: {
@@ -2082,7 +2345,14 @@ export async function buildStagePlayProcessedMailPacketWithPromptedReasoners(inp
         model: output.model ?? prompt.modelPreference,
         latencyMs: output.latencyMs ?? Math.max(0, Math.round(performance.now() - startedAt)),
       },
-      outputPreview: promptedOutputPreview(role, json, run.outputPreview),
+      outputPreview: isDocumentInlineProductRun
+        ? documentInlineTranslationOutputPreview({
+            sourceId,
+            mailItems: input.mailItems,
+            json,
+            now,
+          })
+        : promptedOutputPreview(role, json, run.outputPreview),
       outputRefs: outputRefsFromPromptedJson(role, json),
       selectedDecision,
       salienceLevel: role === "salience_scorer" ? salienceLevelFromJson(json, packet.salience.level) : run.salienceLevel,
@@ -2103,17 +2373,28 @@ export async function buildStagePlayProcessedMailPacketWithPromptedReasoners(inp
   const minimalPromptedArbiter = microReasonerDeck?.deckRunPlan === "minimal_prompted_arbiter";
   const requestedRoleSet = new Set<StagePlayMicroReasonerRoleV1>(requestedRoles);
   const baselineRunIds = new Set(baseline.microReasonerRuns.map((run) => run.runId));
+  const explicitBaselineRoles = Array.isArray(microReasonerDeck?.baselineRoles)
+    ? microReasonerDeck.baselineRoles
+    : null;
+  const activeDeckRoleSet = explicitBaselineRoles
+    ? new Set<StagePlayMicroReasonerRoleV1>([...requestedRoles, ...explicitBaselineRoles])
+    : null;
   const activeDeckRuns = runs
-    .filter((run) => !minimalPromptedArbiter || requestedRoleSet.has(run.role))
-    .map((run) => applyDeckTraceToRun(run, microReasonerDeck));
+    .filter((run) => {
+      if (minimalPromptedArbiter) return requestedRoleSet.has(run.role);
+      if (activeDeckRoleSet) return activeDeckRoleSet.has(run.role);
+      return true;
+    })
+    .map((run) => applyDeckTraceToRun(run, microReasonerDeck, requestedRoles));
   const skippedDeckRuns = minimalPromptedArbiter
     ? runs
         .filter((run) => !requestedRoleSet.has(run.role))
         .map((run) => markRunSkippedByDeckPlan({ run, deck: microReasonerDeck, now }))
     : [];
   runs = [...activeDeckRuns, ...skippedDeckRuns];
-  const packetEvidenceRefs = minimalPromptedArbiter
-    ? packet.evidenceRefs.filter((ref) => !baselineRunIds.has(ref))
+  const activeDeckRunIds = new Set(activeDeckRuns.map((run) => run.runId));
+  const packetEvidenceRefs = minimalPromptedArbiter || explicitBaselineRoles
+    ? packet.evidenceRefs.filter((ref) => !baselineRunIds.has(ref) || activeDeckRunIds.has(ref))
     : packet.evidenceRefs;
 
   const finalPacket = recordStagePlayProcessedMailPacket({
