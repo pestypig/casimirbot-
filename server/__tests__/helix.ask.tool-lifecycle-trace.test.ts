@@ -369,6 +369,110 @@ describe("Helix Ask tool lifecycle trace", () => {
     );
   });
 
+  it("does not report observation_missing after a calculator workstation terminal chain completes", () => {
+    const payload: Record<string, unknown> = {
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "calculator_solve",
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "calculator_stream",
+        allowed_terminal_artifact_kinds: ["workstation_tool_evaluation", "typed_failure"],
+        required_terminal_kinds: ["workstation_tool_evaluation"],
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:calculator-workstation-terminal",
+        capability_family: "calculator",
+        requested_action: "scientific-calculator.solve_expression",
+        admission_status: "admitted",
+      },
+      runtime_tool_call: {
+        tool_call_id: "tool:calculator-workstation-terminal",
+        capability_key: "scientific-calculator.solve_expression",
+        status: "completed",
+      },
+      selected_final_answer: "Calculator verification plan completed.\nExpression: ((sqrt(81)+ln(e^3))*7-5^2)/2\nResult: 29.5",
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        concise_text: "Calculator verification plan completed.\nExpression: ((sqrt(81)+ln(e^3))*7-5^2)/2\nResult: 29.5",
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        final_answer_source: "workstation_tool_evaluation",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        terminal_kind: "answer",
+        terminal_text_preview:
+          "Calculator verification plan completed.\nExpression: ((sqrt(81)+ln(e^3))*7-5^2)/2\nResult: 29.5",
+        server_authoritative: true,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "calculator_receipt:1",
+          kind: "calculator_receipt",
+          payload: {
+            schema: "helix.calculator_receipt.v1",
+            expression: "((sqrt(81)+ln(e^3))*7-5^2)/2",
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: "workstation_tool_evaluation:1",
+          kind: "workstation_tool_evaluation",
+          payload: {
+            schema: "helix.workstation_tool_evaluation.v1",
+            supports_goal: true,
+            summary: "Calculator-backed result: ((sqrt(81)+ln(e^3))*7-5^2)/2 = 29.5.",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: "final_answer_draft:1",
+          kind: "final_answer_draft",
+          payload: {
+            schema: "helix.final_answer_draft.v1",
+            text: "Calculator verification plan completed.\nExpression: ((sqrt(81)+ln(e^3))*7-5^2)/2\nResult: 29.5",
+            support_refs: ["calculator_receipt:1", "workstation_tool_evaluation:1"],
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:calculator-workstation-terminal", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:calculator-workstation-terminal", payload });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      route_family: "calculator",
+      selected_capability: "scientific-calculator.solve_expression",
+      executed_capability: "scientific-calculator.solve_expression",
+      observation_artifact_kind: "calculator_receipt",
+      required_terminal_kind: "workstation_tool_evaluation",
+      reentry_executed: true,
+      materialized_terminal_artifact_kind: "workstation_tool_evaluation",
+      terminal_authority_kind: "workstation_tool_evaluation",
+      visible_terminal_kind: "workstation_tool_evaluation",
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
+    expect(index.tool_rail_failure_triage).toMatchObject({
+      first_broken_rail: null,
+      failure_bucket: null,
+      rail_status: "complete",
+      rail_failure_code: null,
+      repair_target: null,
+    });
+  });
+
   it("reports missing contract observations for incomplete tool evidence", () => {
     const payload: Record<string, unknown> = {
       capability_plan: {

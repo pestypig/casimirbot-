@@ -1393,8 +1393,8 @@ describe("final_answer_draft terminal selection", () => {
             latex: expression,
             calculator_setup: {
               schema: "helix.calculator_setup_context.v1",
-              expression,
-              display_latex: expression,
+              expression: "(81)+",
+              display_latex: "(81)+",
               domain: "generic",
               subgoal: "Evaluate the supplied calculator expression.",
               equation: null,
@@ -1423,7 +1423,7 @@ describe("final_answer_draft terminal selection", () => {
           subgoal: "Evaluate the supplied calculator expression.",
           tool_receipt_ids: [`${turnId}:calculator_receipt`],
           supports_goal: true,
-          summary: `Calculator verified ${expression} with result 29.5.`,
+          summary: `Calculator-backed result: ${expression} = 29.5.`,
           evidence_refs: [`${turnId}:calculator_receipt`],
           deterministic: true,
           model_invoked: false,
@@ -1469,6 +1469,15 @@ describe("final_answer_draft terminal selection", () => {
     expect(result.source).toBe("workstation_tool_evaluation");
     expect(payload.terminal_artifact_kind).toBe("workstation_tool_evaluation");
     expect(payload.final_answer_source).toBe("workstation_tool_evaluation");
+    expect((payload.terminal_answer_authority as Record<string, unknown>).final_answer_source).toBe(
+      "workstation_tool_evaluation",
+    );
+    expect((payload.resolved_turn_summary as Record<string, unknown>).final_answer_source).toBe(
+      "workstation_tool_evaluation",
+    );
+    expect((payload.resolved_turn_summary as Record<string, unknown>).resolved_route_label).toBe(
+      "calculator_solve / workstation_tool_evaluation",
+    );
     expect(payload.selected_final_answer).toContain("Calculator verification plan completed.");
     expect(payload.selected_final_answer).toContain(`Expression: ${expression}`);
     expect(payload.selected_final_answer).toContain("Result: 29.5");

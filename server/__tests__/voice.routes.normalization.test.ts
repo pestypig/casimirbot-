@@ -88,6 +88,11 @@ describe("voice routes normalization", () => {
     delete process.env.VOICE_TRANSCRIBE_MEMORY_GUARD;
     delete process.env.VOICE_TRANSCRIBE_MAX_HEAP_USED_MB;
     delete process.env.VOICE_TRANSCRIBE_MAX_RSS_MB;
+    delete process.env.ELEVENLABS_API_KEY;
+    delete process.env.ELEVENLABS_VOICE_ID;
+    delete process.env.ELEVENLABS_API_BASE;
+    delete process.env.ELEVENLABS_MODEL_ID;
+    delete process.env.ELEVENLABS_OUTPUT_FORMAT;
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -333,5 +338,48 @@ describe("voice routes normalization", () => {
     );
     expect(response.headers["content-type"]).toContain("audio/mpeg");
     expect(Buffer.compare(response.body as Buffer, sourceMp3)).not.toBe(0);
+  });
+
+  it("streams ElevenLabs speech without buffering normalization", async () => {
+    delete process.env.TTS_BASE_URL;
+    process.env.ELEVENLABS_API_KEY = "test-elevenlabs-key";
+    process.env.ELEVENLABS_VOICE_ID = "voice-default";
+    process.env.ELEVENLABS_API_BASE = "https://elevenlabs.test";
+    process.env.ELEVENLABS_MODEL_ID = "eleven_flash_v2_5";
+    const sourceMp3 = Buffer.from("ID3STREAMAUDIO", "utf8");
+    const fetchMock = vi.fn(async (url: string) => {
+      expect(url).toBe("https://elevenlabs.test/v1/text-to-speech/voice-default/stream");
+      return new Response(sourceMp3, {
+        status: 200,
+        headers: { "content-type": "audio/mpeg" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const app = await buildApp();
+    const response = await request(app)
+      .post("/api/voice/speak")
+      .send({
+        text: "stream output",
+        mode: "briefing",
+        priority: "info",
+        provider: "elevenlabs",
+        streaming: true,
+      })
+      .buffer(true)
+      .parse(parseBinary)
+      .expect(200);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const options = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(JSON.parse(String(options.body))).toMatchObject({
+      text: "stream output",
+      model_id: "eleven_flash_v2_5",
+    });
+    expect(response.headers["x-voice-provider"]).toBe("elevenlabs");
+    expect(response.headers["x-voice-cache"]).toBe("stream");
+    expect(response.headers["x-voice-streaming"]).toBe("1");
+    expect(response.headers["content-type"]).toContain("audio/mpeg");
+    expect(response.body).toEqual(sourceMp3);
   });
 });

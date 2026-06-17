@@ -1041,6 +1041,15 @@ export type VoiceSpeakPayload = {
   textCertainty?: "unknown" | "hypothesis" | "reasoned" | "confirmed";
   voiceCertainty?: "unknown" | "hypothesis" | "reasoned" | "confirmed";
   dedupe_key?: string;
+  streaming?: boolean;
+};
+
+type VoiceSpeakHeaders = {
+  provider: string | null;
+  profile: string | null;
+  cache: "hit" | "miss" | "stream" | null;
+  normalizationBenchmark: string | null;
+  normalizationSkipReason: string | null;
 };
 
 export type VoiceSpeakJsonResponse = {
@@ -1059,26 +1068,29 @@ export type VoiceSpeakResponse =
       kind: "json";
       status: number;
       payload: VoiceSpeakJsonResponse;
-      headers: {
-        provider: string | null;
-        profile: string | null;
-        cache: "hit" | "miss" | null;
-        normalizationBenchmark: string | null;
-        normalizationSkipReason: string | null;
-      };
+      headers: VoiceSpeakHeaders;
     }
   | {
       kind: "audio";
       status: number;
       mimeType: string;
       blob: Blob;
-      headers: {
-        provider: string | null;
-        profile: string | null;
-        cache: "hit" | "miss" | null;
-        normalizationBenchmark: string | null;
-        normalizationSkipReason: string | null;
-      };
+      headers: VoiceSpeakHeaders;
+    };
+
+export type VoiceSpeakStreamResponse =
+  | {
+      kind: "json";
+      status: number;
+      payload: VoiceSpeakJsonResponse;
+      headers: VoiceSpeakHeaders;
+    }
+  | {
+      kind: "stream";
+      status: number;
+      mimeType: string;
+      stream: ReadableStream<Uint8Array>;
+      headers: VoiceSpeakHeaders;
     };
 
 export type VoiceTranscribeSegment = {
@@ -1375,6 +1387,17 @@ const recordVoiceCall = (
   });
 };
 
+function voiceSpeakHeaderSnapshot(response: Response): VoiceSpeakHeaders {
+  const cacheHeader = response.headers.get("x-voice-cache")?.toLowerCase();
+  return {
+    provider: response.headers.get("x-voice-provider"),
+    profile: response.headers.get("x-voice-profile"),
+    cache: cacheHeader === "hit" || cacheHeader === "miss" || cacheHeader === "stream" ? cacheHeader : null,
+    normalizationBenchmark: response.headers.get("x-voice-normalization-benchmark"),
+    normalizationSkipReason: response.headers.get("x-voice-normalization-skip-reason"),
+  };
+}
+
 async function asJson<T>(response: Response): Promise<T> {
   const contentType = response.headers.get("content-type") ?? "";
   const isJson = contentType.includes("application/json");
@@ -1481,13 +1504,7 @@ export async function speakVoice(
       body: JSON.stringify(payload),
       signal: options?.signal,
     });
-    const headerSnapshot = {
-      provider: response.headers.get("x-voice-provider"),
-      profile: response.headers.get("x-voice-profile"),
-      cache: (response.headers.get("x-voice-cache")?.toLowerCase() as "hit" | "miss" | null) ?? null,
-      normalizationBenchmark: response.headers.get("x-voice-normalization-benchmark"),
-      normalizationSkipReason: response.headers.get("x-voice-normalization-skip-reason"),
-    };
+    const headerSnapshot = voiceSpeakHeaderSnapshot(response);
     const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
     if (contentType.includes("application/json")) {
       const json = (await response.json().catch(() => ({}))) as VoiceSpeakJsonResponse;
@@ -1542,7 +1559,101 @@ export async function speakVoice(
       contentType: response?.headers.get("content-type")?.toLowerCase() ?? null,
       providerHeader: response?.headers.get("x-voice-provider") ?? null,
       profileHeader: response?.headers.get("x-voice-profile") ?? null,
-      cacheHeader: (response?.headers.get("x-voice-cache")?.toLowerCase() as "hit" | "miss" | null) ?? null,
+      cacheHeader: response ? voiceSpeakHeaderSnapshot(response).cache : null,
+      error: sanitizeVoiceCallError(error),
+    });
+    throw error;
+  }
+}
+
+export async function speakVoiceStream(
+  payload: VoiceSpeakPayload,
+  options?: { signal?: AbortSignal },
+): Promise<VoiceSpeakStreamResponse> {
+  const startedAtMs = Date.now();
+  const streamPayload = { ...payload, streaming: true };
+  const baseDiagnostic = {
+    kind: "speak" as const,
+    endpoint: "/api/voice/speak" as const,
+    startedAtMs,
+    traceId: payload.traceId ?? null,
+    missionId: payload.missionId ?? null,
+    eventId: payload.eventId ?? null,
+    utteranceId: payload.utteranceId ?? null,
+    turnKey: payload.turnKey ?? null,
+    mode: payload.mode ?? null,
+    priority: payload.priority ?? null,
+    textLength: typeof payload.text === "string" ? payload.text.length : null,
+    textHash: hashVoiceDiagnosticText(payload.text),
+  };
+  let response: Response | null = null;
+  try {
+    response = await fetch("/api/voice/speak", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, audio/mpeg",
+      },
+      body: JSON.stringify(streamPayload),
+      signal: options?.signal,
+    });
+    const headerSnapshot = voiceSpeakHeaderSnapshot(response);
+    const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+    if (contentType.includes("application/json")) {
+      const json = (await response.json().catch(() => ({}))) as VoiceSpeakJsonResponse;
+      recordVoiceCall({
+        ...baseDiagnostic,
+        ok: response.ok,
+        status: response.status,
+        responseKind: "json",
+        contentType,
+        providerHeader: headerSnapshot.provider,
+        profileHeader: headerSnapshot.profile,
+        cacheHeader: headerSnapshot.cache,
+        error: response.ok ? null : json.message ?? json.error ?? response.statusText ?? "Voice stream request failed",
+      });
+      return {
+        kind: "json",
+        status: response.status,
+        payload: json,
+        headers: headerSnapshot,
+      };
+    }
+    if (!response.ok) {
+      throw new Error(`${response.status} ${response.statusText || "Voice stream request failed"}`);
+    }
+    if (!response.body) {
+      throw new Error("voice_stream_missing_body");
+    }
+    recordVoiceCall({
+      ...baseDiagnostic,
+      ok: true,
+      status: response.status,
+      responseKind: "audio",
+      contentType: contentType || "audio/mpeg",
+      providerHeader: headerSnapshot.provider,
+      profileHeader: headerSnapshot.profile,
+      cacheHeader: headerSnapshot.cache,
+      audioMimeType: contentType || "audio/mpeg",
+      error: null,
+    });
+    return {
+      kind: "stream",
+      status: response.status,
+      mimeType: contentType || "audio/mpeg",
+      stream: response.body,
+      headers: headerSnapshot,
+    };
+  } catch (error) {
+    recordVoiceCall({
+      ...baseDiagnostic,
+      ok: false,
+      status: response?.status ?? null,
+      responseKind: "error",
+      contentType: response?.headers.get("content-type")?.toLowerCase() ?? null,
+      providerHeader: response?.headers.get("x-voice-provider") ?? null,
+      profileHeader: response?.headers.get("x-voice-profile") ?? null,
+      cacheHeader: response ? voiceSpeakHeaderSnapshot(response).cache : null,
       error: sanitizeVoiceCallError(error),
     });
     throw error;

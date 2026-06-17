@@ -61,8 +61,17 @@ const readSourceTarget = (payload: Record<string, unknown>): string =>
 const readTerminalArtifactKind = (payload: Record<string, unknown>): string =>
   readString(payload.terminal_artifact_kind) ?? "typed_failure";
 
-const readFinalAnswerSource = (payload: Record<string, unknown>): string =>
-  readString(payload.final_answer_source) ?? readTerminalArtifactKind(payload);
+const readFinalAnswerSource = (payload: Record<string, unknown>): string => {
+  const terminalArtifactKind = readTerminalArtifactKind(payload);
+  const finalAnswerSource = readString(payload.final_answer_source);
+  if (
+    terminalArtifactKind === "workstation_tool_evaluation" &&
+    (!finalAnswerSource || finalAnswerSource === "final_answer_draft" || finalAnswerSource === "model_synthesized_answer")
+  ) {
+    return "workstation_tool_evaluation";
+  }
+  return finalAnswerSource ?? terminalArtifactKind;
+};
 
 const readValidRepoEvidenceAnswerText = (payload: Record<string, unknown>): string | null => {
   if (readTerminalArtifactKind(payload) !== "repo_code_evidence_answer") return null;
@@ -772,6 +781,7 @@ function syncSuccessfulTerminalStatusMirrors(
     turn_id: envelope.turn_id,
     final_status: "final_answer",
     resolved_route_label: resolvedRouteLabel,
+    final_answer_source: envelope.final_answer_source,
     terminal_kind: "final_answer",
     terminal_artifact_kind: envelope.terminal_artifact_kind,
     terminal_error_code: null,

@@ -1,11 +1,11 @@
 import { useEffect, useRef } from "react";
-import { speakVoice } from "@/lib/agi/api";
+import { speakVoiceStream } from "@/lib/agi/api";
 import {
   NarratorPlaybackError,
   createNarratorPlaybackLockedDiagnostic,
   installNarratorAudioUnlockGestureListeners,
   isNarratorAudioPlaybackUnlocked,
-  playNarratorVoiceResponse,
+  playNarratorVoiceStreamResponse,
   primeNarratorAudioPlayback,
 } from "@/lib/narrator/narratorAudioPlayback";
 import { buildNarratorVoiceSpeakPayload } from "@/lib/narrator/narratorVoiceBridge";
@@ -27,6 +27,7 @@ const DEFAULT_HOVER_DELAY_MS = 120;
 const DEFAULT_CHUNK_MAX_CHARS = 220;
 const TEXT_NODE = 3;
 const TEXT_NODE_FILTER = 4;
+const SENTENCE_PATTERN = /[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g;
 
 const PRIMARY_MEANINGFUL_SELECTOR = [
   "[data-narrator-label]",
@@ -146,25 +147,59 @@ function findMeaningfulElement(target: EventTarget | null): Element | null {
   return candidate;
 }
 
-export function splitNarratorSentences(text: string, maxChars = DEFAULT_CHUNK_MAX_CHARS): string[] {
+type NarratorSentenceSpan = {
+  text: string;
+  start: number;
+  end: number;
+  activeEnd: number;
+};
+
+function splitNarratorSentenceSpans(text: string, maxChars = DEFAULT_CHUNK_MAX_CHARS): NarratorSentenceSpan[] {
   const cleaned = cleanNarratorText(text);
   if (!cleaned) return [];
-  const sentenceMatches = cleaned.match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) ?? [cleaned];
-  const chunks: string[] = [];
-  for (const sentence of sentenceMatches.map(cleanNarratorText).filter(Boolean)) {
+  const matches = Array.from(cleaned.matchAll(SENTENCE_PATTERN));
+  const spans: NarratorSentenceSpan[] = [];
+  for (const match of matches.length ? matches : [{ 0: cleaned, index: 0 } as RegExpMatchArray]) {
+    const rawSentence = match[0] ?? "";
+    const leadingWhitespace = rawSentence.match(/^\s*/)?.[0].length ?? 0;
+    const trailingWhitespace = rawSentence.match(/\s*$/)?.[0].length ?? 0;
+    const sentence = cleanNarratorText(rawSentence);
+    if (!sentence) continue;
+    const start = (match.index ?? 0) + leadingWhitespace;
+    const end = Math.max(start, (match.index ?? 0) + rawSentence.length - trailingWhitespace);
     if (sentence.length <= maxChars) {
-      chunks.push(sentence);
+      spans.push({ text: sentence, start, end, activeEnd: end });
       continue;
     }
     let remaining = sentence;
+    let remainingStart = start;
     while (remaining.length > maxChars) {
       const cut = Math.max(60, remaining.lastIndexOf(" ", maxChars));
-      chunks.push(cleanNarratorText(remaining.slice(0, cut)));
+      const skippedSpace = remaining.charAt(cut) === " ";
+      const chunk = cleanNarratorText(remaining.slice(0, cut));
+      if (chunk) {
+        spans.push({
+          text: chunk,
+          start: remainingStart,
+          end: remainingStart + chunk.length,
+          activeEnd: remainingStart + chunk.length,
+        });
+      }
       remaining = cleanNarratorText(remaining.slice(cut));
+      remainingStart += cut + (skippedSpace ? 1 : 0);
     }
-    if (remaining) chunks.push(remaining);
+    if (remaining) {
+      spans.push({ text: remaining, start: remainingStart, end, activeEnd: end });
+    }
   }
-  return chunks;
+  return spans.map((span, index) => ({
+    ...span,
+    activeEnd: spans[index + 1] ? Math.max(span.end, spans[index + 1].start - 1) : span.end,
+  }));
+}
+
+export function splitNarratorSentences(text: string, maxChars = DEFAULT_CHUNK_MAX_CHARS): string[] {
+  return splitNarratorSentenceSpans(text, maxChars).map((span) => span.text);
 }
 
 function textOffsetFromPoint(element: Element, point?: HoverFocusNarratorPoint): number | null {
@@ -195,18 +230,14 @@ export function pickNarratorSentenceAtOffset(
   offset: number | null,
   maxChars = DEFAULT_CHUNK_MAX_CHARS,
 ): string | null {
-  const chunks = splitNarratorSentences(text, maxChars);
-  if (chunks.length === 0) return null;
-  if (offset === null || offset <= 0) return chunks[0];
+  const spans = splitNarratorSentenceSpans(text, maxChars);
+  if (spans.length === 0) return null;
+  if (offset === null || offset <= spans[0].start) return spans[0].text;
 
-  let cursor = 0;
-  for (const chunk of chunks) {
-    const start = text.indexOf(chunk, cursor);
-    const end = start >= 0 ? start + chunk.length : cursor + chunk.length;
-    if (offset >= start && offset <= end) return chunk;
-    cursor = end;
+  for (const span of spans) {
+    if (offset >= span.start && offset <= span.activeEnd) return span.text;
   }
-  return chunks[0];
+  return spans[spans.length - 1].text;
 }
 
 function elementSourceId(element: Element, text: string): string {
@@ -315,12 +346,12 @@ export function useNarratorHoverFocusInspector(options?: {
             markFailed(event.eventId, createNarratorPlaybackLockedDiagnostic());
             return;
           }
-          const response = await speakVoice(
+          const response = await speakVoiceStream(
             buildNarratorVoiceSpeakPayload({ event, text: inspection.text }),
             { signal: controller.signal },
           );
           if (!isLatestActive(event.eventId, seq, controller)) return;
-          const diagnostic = await playNarratorVoiceResponse(response, {
+          const diagnostic = await playNarratorVoiceStreamResponse(response, {
             signal: controller.signal,
             onDiagnostic: (nextDiagnostic) => {
               if (isLatestActive(event.eventId, seq, controller)) {

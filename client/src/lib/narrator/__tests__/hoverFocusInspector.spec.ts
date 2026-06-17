@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/agi/api", () => ({
   speakVoice: vi.fn(),
+  speakVoiceStream: vi.fn(),
 }));
 import {
   buildHoverFocusNarratorInspection,
@@ -25,6 +26,14 @@ describe("hoverFocusInspector", () => {
     const text = "Alpha starts here. Beta is the target sentence. Gamma is later.";
 
     expect(pickNarratorSentenceAtOffset(text, text.indexOf("target"))).toBe("Beta is the target sentence.");
+  });
+
+  it("keeps sentence-ending punctuation and following space attached to the sentence", () => {
+    const text = "Alpha starts here. Beta is the next sentence.";
+
+    expect(pickNarratorSentenceAtOffset(text, text.indexOf("."))).toBe("Alpha starts here.");
+    expect(pickNarratorSentenceAtOffset(text, text.indexOf(".") + 1)).toBe("Alpha starts here.");
+    expect(pickNarratorSentenceAtOffset(text, text.indexOf("Beta"))).toBe("Beta is the next sentence.");
   });
 
   it("builds inspection events from accessible labels before raw text", () => {

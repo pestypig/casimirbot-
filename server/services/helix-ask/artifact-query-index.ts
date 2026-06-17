@@ -591,6 +591,22 @@ const buildToolTurnChainAudit = (input: {
       !normalizedEqual(requiredTerminal, materializedTerminal) &&
       !(input.contract?.allowedTerminalKinds ?? []).some((kind) => normalizedEqual(kind, materializedTerminal)),
   );
+  const terminalProductAllowed = Boolean(
+    materializedTerminal &&
+      !terminalProductMismatch &&
+      (!requiredTerminal ||
+        normalizedEqual(requiredTerminal, materializedTerminal) ||
+        (input.contract?.allowedTerminalKinds ?? []).some((kind) => normalizedEqual(kind, materializedTerminal))),
+  );
+  const concreteTurnChainComplete = Boolean(
+    executedCapability &&
+      observationRef &&
+      reentryExecuted &&
+      terminalProductAllowed &&
+      authorityTerminal &&
+      visibleTerminal &&
+      normalizedEqual(authorityTerminal, visibleTerminal),
+  );
   const routeFamilyMismatch = Boolean(
     selectedFamily && executedFamily && selectedFamily !== executedFamily,
   );
@@ -614,7 +630,7 @@ const buildToolTurnChainAudit = (input: {
           ? "tool_admission_drift"
           : toolExecutionRejected
             ? "tool_execution_rejected"
-            : !input.requiredObservationsSatisfied
+            : !input.requiredObservationsSatisfied && !concreteTurnChainComplete
               ? "observation_missing"
               : observationRef && !reentryExecuted
                 ? "observation_not_reentered"

@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import multer from "multer";
 import { z } from "zod";
 import { createHash } from "node:crypto";
+import { Readable } from "node:stream";
 import { enforceCalloutParity, type CertaintyClass } from "../../shared/helix-dottie-callout-contract";
 import { evaluateCalloutEligibility as evaluateSharedEligibility } from "../../shared/callout-eligibility";
 import { authorizeDotVoiceSource } from "../../shared/helix-dot-voice-authority";
@@ -112,6 +113,7 @@ const requestSchema = z.object({
   evidenceRefs: z.array(z.string().trim().min(1).max(500)).max(32).optional(),
   repoAttributed: z.boolean().optional(),
   replayMode: z.boolean().optional(),
+  streaming: z.boolean().optional(),
   policyTsMs: z.number().int().nonnegative().optional(),
   tsMs: z.number().int().nonnegative().optional(),
   voiceAuthorityState: z
@@ -3059,6 +3061,136 @@ voiceRouter.post("/speak", async (req: Request, res: Response) => {
       },
       traceId,
     );
+  }
+
+  if (payload.streaming === true) {
+    if (!elevenLabsRequested || !elevenLabsConfig) {
+      writeVoiceLaneBreadcrumb("voice.speak.stream_rejected", {
+        breadcrumbId,
+        traceId,
+        reason: "streaming_requires_elevenlabs",
+        provider,
+      });
+      return errorEnvelope(
+        res,
+        400,
+        "voice_invalid_request",
+        "Streaming voice playback currently requires the ElevenLabs provider.",
+        { provider },
+        traceId,
+      );
+    }
+    const config = elevenLabsConfig;
+    const controller = new AbortController();
+    const streamUrl = `${config.baseUrl}/v1/text-to-speech/${encodeURIComponent(config.voiceId)}/stream`;
+    try {
+      writeVoiceLaneBreadcrumb("voice.speak.stream_backend_attempt", {
+        breadcrumbId,
+        traceId,
+        provider: "elevenlabs",
+        endpoint: "stream",
+      });
+      const upstream = await fetch(streamUrl, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "audio/mpeg",
+          "xi-api-key": config.apiKey,
+        },
+        body: JSON.stringify({
+          text: payload.text,
+          model_id: config.modelId,
+          output_format: config.outputFormat,
+        }),
+        signal: controller.signal,
+      });
+      if (!upstream.ok || !upstream.body) {
+        const responseText = await upstream.text().catch(() => "");
+        recordBackendFailure(policyNowMs);
+        writeVoiceLaneBreadcrumb("voice.speak.stream_backend_error", {
+          breadcrumbId,
+          traceId,
+          provider: "elevenlabs",
+          status: upstream.status,
+        });
+        return errorEnvelope(
+          res,
+          upstream.status >= 500 ? 502 : upstream.status,
+          "voice_backend_error",
+          "Voice streaming backend returned an error response.",
+          {
+            provider: "elevenlabs",
+            body: clipBackendErrorDetail(responseText),
+          },
+          traceId,
+        );
+      }
+
+      const contentType = upstream.headers.get("content-type") ?? "audio/mpeg";
+      const durationHeader = upstream.headers.get("x-audio-duration-ms") ?? (payload.durationMs ? String(payload.durationMs) : "");
+      res.status(200);
+      res.setHeader("content-type", contentType);
+      res.setHeader("x-voice-provider", "elevenlabs");
+      res.setHeader("x-voice-profile", config.voiceId);
+      res.setHeader("x-voice-cache", "stream");
+      res.setHeader("x-voice-streaming", "1");
+      res.setHeader("x-voice-meter-request-count", String(metering.requestCount));
+      res.setHeader("x-voice-meter-char-count", String(metering.charCount));
+      if (durationHeader) {
+        res.setHeader("x-voice-meter-duration-ms", durationHeader);
+      }
+      writeVoiceLaneBreadcrumb("voice.speak.stream_started", {
+        breadcrumbId,
+        traceId,
+        provider: "elevenlabs",
+        contentType,
+      });
+      recordBackendSuccess();
+      const nodeStream = Readable.fromWeb(upstream.body as any);
+      let streamCompleted = false;
+      const abortStream = () => {
+        if (!streamCompleted) controller.abort();
+      };
+      res.once("close", abortStream);
+      nodeStream.on("error", (error) => {
+        writeVoiceLaneBreadcrumb("voice.speak.stream_error", {
+          breadcrumbId,
+          traceId,
+          provider: "elevenlabs",
+          error,
+        });
+        if (!res.destroyed) res.destroy(error);
+      });
+      nodeStream.on("end", () => {
+        streamCompleted = true;
+        res.off("close", abortStream);
+        writeVoiceLaneBreadcrumb("voice.speak.stream_ended", {
+          breadcrumbId,
+          traceId,
+          provider: "elevenlabs",
+        });
+      });
+      return nodeStream.pipe(res);
+    } catch (error) {
+      const aborted = error instanceof Error && error.name === "AbortError";
+      if (aborted && res.headersSent) return res.end();
+      recordBackendFailure(policyNowMs);
+      writeVoiceLaneBreadcrumb("voice.speak.stream_exception", {
+        breadcrumbId,
+        traceId,
+        provider: "elevenlabs",
+        aborted,
+        error,
+      });
+      return errorEnvelope(
+        res,
+        aborted ? 504 : 502,
+        aborted ? "voice_backend_timeout" : "voice_backend_error",
+        aborted ? "Voice streaming backend timed out." : "Voice streaming backend request failed.",
+        { provider: "elevenlabs" },
+        traceId,
+      );
+    }
   }
 
   const timeoutMs = 15_000;

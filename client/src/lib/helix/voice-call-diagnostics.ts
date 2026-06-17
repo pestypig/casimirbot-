@@ -20,7 +20,7 @@ export type VoiceCallDiagnosticSnapshot = {
   priority?: string | null;
   providerHeader?: string | null;
   profileHeader?: string | null;
-  cacheHeader?: "hit" | "miss" | null;
+  cacheHeader?: "hit" | "miss" | "stream" | null;
   textLength?: number | null;
   textHash?: string | null;
   audioBytes?: number | null;

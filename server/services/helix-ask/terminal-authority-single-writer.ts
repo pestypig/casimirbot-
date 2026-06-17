@@ -989,10 +989,12 @@ const synthesizeWorkstationToolEvaluationTerminalText = (input: {
   if (!isCalculatorWorkstationPlan(plan)) return { text: input.terminal.text, audit: null };
   const prompt = readPromptForWorkstationTerminalSynthesis(input.payload, plan!);
   if (!prompt) return { text: input.terminal.text, audit: null };
-  const evaluationPayload =
-    artifactPayload(input.terminal.artifact) ??
-    readRecord(input.payload.workstation_tool_evaluation);
-  if (!evaluationPayload) return { text: input.terminal.text, audit: null };
+  const evaluationPayload = {
+    ...(readRecord(input.payload.workstation_tool_evaluation) ?? {}),
+    ...(artifactPayload(input.terminal.artifact) ?? {}),
+    terminal_text: input.terminal.text,
+    text_preview: input.terminal.text,
+  };
   const synthesizedText = synthesizeWorkstationToolAnswer({
     prompt,
     plan: plan!,

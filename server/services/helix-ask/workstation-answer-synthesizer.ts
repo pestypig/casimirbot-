@@ -77,6 +77,8 @@ function calculatorExpressionFromEvaluation(
   const normalizedDirectExpression = normalizeCalculatorExpressionText(directExpression);
   if (normalizedDirectExpression) return normalizedDirectExpression;
   const text = [
+    readString(record.terminal_text),
+    readString(record.text_preview),
     readString(record.summary),
     readString(record.result_summary),
     readString(record.answer_text),
@@ -84,11 +86,15 @@ function calculatorExpressionFromEvaluation(
   ].filter(Boolean).join("\n");
   if (!text) return null;
   const expressionLabel = text.match(/\bexpression\s*:\s*([^\n]+)/i);
+  const backedResultExpression = text.match(
+    /\b(?:calculator-backed result|calculator result|result)\s*:\s*(.+?)\s*=/i,
+  );
   const evaluatedExpression = text.match(
     /\b(?:verified|evaluated|solved|computed)\s+(.+?)\s+(?:with\s+result|and\s+(?:produced|returned)|=)\b/i,
   );
   return (
     normalizeCalculatorExpressionText(expressionLabel?.[1] ?? null) ??
+    normalizeCalculatorExpressionText(backedResultExpression?.[1] ?? null) ??
     normalizeCalculatorExpressionText(evaluatedExpression?.[1] ?? null)
   );
 }
@@ -108,6 +114,8 @@ function calculatorResultFromEvaluation(
   if (directResult && !WORKSTATION_EVALUATION_STATUS_VALUES.has(directResult)) return directResult;
   const resultPattern = "([-+]?(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:e[-+]?\\d+)?)";
   const text = [
+    readString(record.terminal_text),
+    readString(record.text_preview),
     readString(record.summary),
     readString(record.result_summary),
     readString(record.answer_text),
