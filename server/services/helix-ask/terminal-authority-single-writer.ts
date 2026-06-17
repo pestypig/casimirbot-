@@ -3,6 +3,8 @@ import type {
   HelixTerminalCandidate,
   TerminalAuthoritySingleWriterAuditRejectionReason,
 } from "@shared/helix-terminal-authority";
+import type { HelixWorkstationToolEvaluation } from "@shared/helix-workstation-tool-evaluation";
+import type { HelixWorkstationToolPlan } from "@shared/helix-workstation-tool-plan";
 import {
   HELIX_COMMITTED_ASK_ROUTE_SCHEMA,
   type HelixCommittedAskRoute,
@@ -25,6 +27,7 @@ import {
 import { liveSourceModelSynthesisMissingFailure } from "./live-source-terminal-failure-repair";
 import { hashHelixTerminalText } from "./turn-terminal-authority";
 import { evaluateCalculatorToolAnswerSupport, routeMetadataIndicatesCalculator } from "./calculator-tool-answer-support";
+import { synthesizeWorkstationToolAnswer } from "./workstation-answer-synthesizer";
 
 type ArtifactLike = {
   artifact_id?: unknown;
@@ -938,6 +941,102 @@ const workstationToolEvaluationText = (artifact: ArtifactLike): string | null =>
   );
 };
 
+const readWorkstationToolPlanForTerminalSynthesis = (
+  payload: Record<string, unknown>,
+): HelixWorkstationToolPlan | null => {
+  const plannerContract = readRecord(payload.planner_contract);
+  const debug = readRecord(payload.debug);
+  const candidates = [
+    payload.active_workstation_tool_plan,
+    payload.workstation_tool_plan,
+    plannerContract?.workstation_tool_plan,
+    debug?.active_workstation_tool_plan,
+    debug?.workstation_tool_plan,
+  ];
+  for (const candidate of candidates) {
+    const record = readRecord(candidate);
+    if (!record) continue;
+    if (Array.isArray(record.steps) && readString(record.intent)) {
+      return record as unknown as HelixWorkstationToolPlan;
+    }
+  }
+  return null;
+};
+
+const isCalculatorWorkstationPlan = (plan: HelixWorkstationToolPlan | null): boolean =>
+  Boolean(plan && /calculator_(?:verify|solve|live_source)/i.test(plan.intent));
+
+const readPromptForWorkstationTerminalSynthesis = (
+  payload: Record<string, unknown>,
+  plan: HelixWorkstationToolPlan,
+): string | null =>
+  readString(payload.active_prompt) ??
+  readString(payload.question) ??
+  readString(payload.prompt) ??
+  readString(payload.user_prompt) ??
+  readString(payload.input_text) ??
+  readString(plan.goal);
+
+const synthesizeWorkstationToolEvaluationTerminalText = (input: {
+  turnId: string;
+  payload: Record<string, unknown>;
+  terminal: { artifact: ArtifactLike; text: string; ref: string | null };
+}): {
+  text: string;
+  audit: Record<string, unknown> | null;
+} => {
+  const plan = readWorkstationToolPlanForTerminalSynthesis(input.payload);
+  if (!isCalculatorWorkstationPlan(plan)) return { text: input.terminal.text, audit: null };
+  const prompt = readPromptForWorkstationTerminalSynthesis(input.payload, plan!);
+  if (!prompt) return { text: input.terminal.text, audit: null };
+  const evaluationPayload =
+    artifactPayload(input.terminal.artifact) ??
+    readRecord(input.payload.workstation_tool_evaluation);
+  if (!evaluationPayload) return { text: input.terminal.text, audit: null };
+  const synthesizedText = synthesizeWorkstationToolAnswer({
+    prompt,
+    plan: plan!,
+    evaluation: evaluationPayload as unknown as HelixWorkstationToolEvaluation,
+  }).trim();
+  const synthesisMissingObservedResult =
+    /available in (?:the )?(?:scientific )?calculator receipt\/trace|available in the calculator receipt/i.test(synthesizedText) &&
+    /\b(?:result|produced|with result|=)\s*[-+]?(?:\d|\.\d)/i.test(input.terminal.text);
+  if (!synthesizedText || isStaleWorkspaceFailureText(synthesizedText) || synthesisMissingObservedResult) {
+    return {
+      text: input.terminal.text,
+      audit: {
+        schema: "helix.workstation_tool_terminal_synthesis.v1",
+        turn_id: input.turnId,
+        applied: false,
+        reason: synthesisMissingObservedResult ? "synthesis_did_not_consume_observed_result" : "synthesis_unavailable",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        terminal_artifact_ref: input.terminal.ref,
+        plan_id: readString(plan?.plan_id),
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+  }
+  if (synthesizedText === input.terminal.text) return { text: input.terminal.text, audit: null };
+  return {
+    text: synthesizedText,
+    audit: {
+      schema: "helix.workstation_tool_terminal_synthesis.v1",
+      turn_id: input.turnId,
+      applied: true,
+      source: "workstation_answer_synthesizer",
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      terminal_artifact_ref: input.terminal.ref,
+      plan_id: readString(plan?.plan_id),
+      evaluation_ref: input.terminal.ref,
+      original_text_preview: input.terminal.text.slice(0, 240),
+      synthesized_text_preview: synthesizedText.slice(0, 240),
+      assistant_answer: false,
+      raw_content_included: false,
+    },
+  };
+};
+
 const findGoalSatisfyingWorkstationToolEvaluationArtifact = (
   payload: Record<string, unknown>,
   artifacts: ArtifactLike[],
@@ -1519,6 +1618,19 @@ export function applyHelixTerminalAuthoritySingleWriter(
     selectedArtifactKind = "typed_failure";
     selectedSource = "typed_failure";
   } else if (!solverContinuationPending && selectedWorkstationToolEvaluation) {
+    const workstationTerminalText = synthesizeWorkstationToolEvaluationTerminalText({
+      turnId: input.turnId,
+      payload: input.payload,
+      terminal: selectedWorkstationToolEvaluation,
+    });
+    const selectedWorkstationTerminalText = workstationTerminalText.text;
+    if (workstationTerminalText.audit) {
+      input.payload.workstation_tool_terminal_synthesis = workstationTerminalText.audit;
+      const debug = readRecord(input.payload.debug);
+      if (debug) {
+        debug.workstation_tool_terminal_synthesis = workstationTerminalText.audit;
+      }
+    }
     selectedArtifactRef = selectedWorkstationToolEvaluation.ref;
     selectedArtifactKind = "workstation_tool_evaluation";
     selectedSource = "workstation_tool_evaluation";
@@ -1529,17 +1641,17 @@ export function applyHelixTerminalAuthoritySingleWriter(
     input.payload.status = "final_answer";
     input.payload.terminal_artifact_kind = "workstation_tool_evaluation";
     input.payload.final_answer_source = "workstation_tool_evaluation";
-    input.payload.selected_final_answer = selectedWorkstationToolEvaluation.text;
-    input.payload.answer = selectedWorkstationToolEvaluation.text;
-    input.payload.text = selectedWorkstationToolEvaluation.text;
-    input.payload.assistant_answer = selectedWorkstationToolEvaluation.text;
+    input.payload.selected_final_answer = selectedWorkstationTerminalText;
+    input.payload.answer = selectedWorkstationTerminalText;
+    input.payload.text = selectedWorkstationTerminalText;
+    input.payload.assistant_answer = selectedWorkstationTerminalText;
     input.payload.terminal_artifact_id = selectedWorkstationToolEvaluation.ref ?? undefined;
     input.payload.terminal_presentation = {
       ...(readRecord(input.payload.terminal_presentation) ?? {}),
       schema: "helix.terminal_presentation.v1",
       turn_id: input.turnId,
       terminal_artifact_kind: "workstation_tool_evaluation",
-      concise_text: selectedWorkstationToolEvaluation.text,
+      concise_text: selectedWorkstationTerminalText,
       assistant_answer: false,
       raw_content_included: false,
     };

@@ -31,6 +31,53 @@ function normalizeNumberText(value: number): string {
   return Number.isInteger(value) ? String(value) : String(Number(value.toPrecision(12)));
 }
 
+function readRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function readString(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+const WORKSTATION_EVALUATION_STATUS_VALUES = new Set([
+  "supports_subgoal",
+  "contradicts_subgoal",
+  "insufficient",
+  "needs_followup_tool",
+  "stored_for_reference",
+]);
+
+function calculatorResultFromEvaluation(
+  evaluation: HelixWorkstationToolEvaluation | null | undefined,
+): string | null {
+  const record = readRecord(evaluation);
+  if (!record) return null;
+  const directResult =
+    readString(record.result_text) ??
+    readString(record.result_value) ??
+    readString(record.calculator_result) ??
+    readString(record.computed_result) ??
+    readString(record.numeric_result) ??
+    readString(readRecord(record.calculation)?.result);
+  if (directResult && !WORKSTATION_EVALUATION_STATUS_VALUES.has(directResult)) return directResult;
+  const resultPattern = "([-+]?(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:e[-+]?\\d+)?)";
+  const text = [
+    readString(record.summary),
+    readString(record.result_summary),
+    readString(record.answer_text),
+    readString(record.text),
+  ].filter(Boolean).join("\n");
+  if (!text) return null;
+  const labeledResult = text.match(
+    new RegExp(`\\b(?:with result|result(?:\\s+is)?|evaluated to|produced|equals)\\s*:?\\s*${resultPattern}\\b`, "i"),
+  );
+  if (labeledResult?.[1]) return labeledResult[1];
+  const equationResult = text.match(new RegExp(`=\\s*${resultPattern}\\b`, "i"));
+  return equationResult?.[1] ?? null;
+}
+
 function solveSimpleQuadraticZero(expression: string): string | null {
   const normalized = expression.replace(/\s+/g, "");
   const match = normalized.match(/^x\^2([+-]\d+(?:\.\d+)?)=0$/i);
@@ -107,8 +154,12 @@ function calculatorSetupFromPlan(plan: HelixWorkstationToolPlan): HelixCalculato
     : null;
 }
 
-function calculatorResultText(prompt: string, plan: HelixWorkstationToolPlan): string {
-  const observation = buildCalculatorObservation(prompt, plan);
+function calculatorResultText(
+  prompt: string,
+  plan: HelixWorkstationToolPlan,
+  evaluation?: HelixWorkstationToolEvaluation | null,
+): string {
+  const observation = buildCalculatorObservation(prompt, plan, evaluation);
   const expression = observation.expression;
   const unit = observation.setup?.result_unit ? ` ${observation.setup.result_unit}` : "";
   if (observation.result) {
@@ -136,12 +187,17 @@ function calculatorResultText(prompt: string, plan: HelixWorkstationToolPlan): s
   ].join("\n");
 }
 
-export function buildCalculatorObservation(prompt: string, plan: HelixWorkstationToolPlan): CalculatorObservation {
+export function buildCalculatorObservation(
+  prompt: string,
+  plan: HelixWorkstationToolPlan,
+  evaluation?: HelixWorkstationToolEvaluation | null,
+): CalculatorObservation {
   const setup = calculatorSetupFromPlan(plan);
   const expression = setup?.display_latex ?? setup?.expression ?? extractCalculatorExpression(prompt) ?? "the expression";
+  const observedResult = calculatorResultFromEvaluation(evaluation);
   return {
     expression,
-    result: solveSimpleArithmeticExpression(expression) ?? solveSimpleQuadraticZero(expression) ?? solveSimpleLinearZero(expression),
+    result: observedResult ?? solveSimpleArithmeticExpression(expression) ?? solveSimpleQuadraticZero(expression) ?? solveSimpleLinearZero(expression),
     traceSource: calculatorTraceSource(plan),
     setup,
   };
@@ -161,8 +217,12 @@ export function isCompoundCalculatorReasoningPrompt(prompt: string): boolean {
   return !explicitOnlyResult;
 }
 
-function synthesizeCompoundCalculatorAnswer(prompt: string, plan: HelixWorkstationToolPlan): string {
-  const observation = buildCalculatorObservation(prompt, plan);
+function synthesizeCompoundCalculatorAnswer(
+  prompt: string,
+  plan: HelixWorkstationToolPlan,
+  evaluation?: HelixWorkstationToolEvaluation | null,
+): string {
+  const observation = buildCalculatorObservation(prompt, plan, evaluation);
   const result = observation.result ?? "available in the calculator receipt";
   if (/\bphoton\b/i.test(prompt) || /\be\s*=\s*h\s*f\b/i.test(prompt)) {
     const frequency = prompt.match(/\bf(?:requency)?\s*(?:=|is|of)?\s*([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)(?:\s*(?:hz|hertz))?\b/i)?.[1] ??
@@ -291,8 +351,8 @@ function synthesizeTheoryReflectionCalculatorAnswer(input: SynthesizeWorkstation
   const needsPhysicsSynthesis =
     isCompoundCalculatorReasoningPrompt(input.prompt) || /\b(?:photon|e\s*=\s*h\s*f)\b/i.test(input.prompt);
   const calculatorAnswer = needsPhysicsSynthesis
-    ? synthesizeCompoundCalculatorAnswer(input.prompt, input.plan)
-    : calculatorResultText(input.prompt, input.plan);
+    ? synthesizeCompoundCalculatorAnswer(input.prompt, input.plan, input.evaluation)
+    : calculatorResultText(input.prompt, input.plan, input.evaluation);
   return appendAskToolTraceDisclosureNote(calculatorAnswer, buildAskToolTraceDisclosure({ plan: input.plan }));
 }
 
@@ -593,7 +653,7 @@ export function synthesizeWorkstationToolAnswer(input: SynthesizeWorkstationAnsw
     return synthesizeTheoryReflectionCalculatorAnswer(input);
   }
   if (input.plan.intent === "calculator_live_source") {
-    const observation = buildCalculatorObservation(input.prompt, input.plan);
+    const observation = buildCalculatorObservation(input.prompt, input.plan, input.evaluation);
     return [
       "Started the calculator equation live source and used its current tick as workstation evidence.",
       `Calculator live subgoal: ${observation.expression}`,
@@ -604,9 +664,9 @@ export function synthesizeWorkstationToolAnswer(input: SynthesizeWorkstationAnsw
   }
   if (input.plan.intent === "calculator_verify" || input.plan.intent === "calculator_solve") {
     if (isCompoundCalculatorReasoningPrompt(input.prompt)) {
-      return synthesizeCompoundCalculatorAnswer(input.prompt, input.plan);
+      return synthesizeCompoundCalculatorAnswer(input.prompt, input.plan, input.evaluation);
     }
-    return calculatorResultText(input.prompt, input.plan);
+    return calculatorResultText(input.prompt, input.plan, input.evaluation);
   }
   if (input.plan.intent === "notes_create") {
     return `Created workstation note "${noteTitleFromPlan(input.plan)}". I can refer to it through the note receipt instead of reinjecting the full body into Ask.`;
