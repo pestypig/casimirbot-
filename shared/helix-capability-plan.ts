@@ -28,6 +28,10 @@ export type HelixCapabilityPlan = {
 
   capability_family: HelixCapabilityFamily;
   requested_action: string;
+  requested_capability?: string | null;
+  requested_capability_source?: string | null;
+  requested_capability_contract_ref?: string | null;
+  requested_selected_match?: boolean;
   mutating: boolean;
 
   operator_command_required: boolean;

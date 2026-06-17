@@ -64,6 +64,9 @@ import {
 } from "@/lib/helix/liveSourceMailRefreshEvent";
 import { recordWorkstationCommandLifecycle } from "@/lib/workstation/performance/workstationCommandReceipts";
 import { useWorkstationPerformanceStore } from "@/store/useWorkstationPerformanceStore";
+import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
+import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
+import { useInterfaceText } from "@/lib/i18n/interfaceText";
 
 const STAGE_PLAY_PANEL_THREAD_ID = "helix-ask:desktop";
 const STAGE_PLAY_MAILBOX_QUERY_KEY = [
@@ -9054,6 +9057,9 @@ function StagePlayBindingOverlay({
   onClearSelectedBadge: () => void;
   onClose: () => void;
 }) {
+  const { userSettings } = useHelixStartSettings();
+  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const { t } = useInterfaceText(interfaceLanguage.code);
   const selectedBadges = graph.badges.filter((badge) => selectedBadgeIds.includes(badge.id));
   const selectedExpression = selectedBadges.length > 0
     ? selectedBadges.map((badge) => proceduralExpression(badge) || badge.id).join(" + ")
@@ -9088,7 +9094,7 @@ function StagePlayBindingOverlay({
           type="button"
           onClick={onClose}
           className="rounded border border-slate-700 p-1.5 text-slate-300 hover:border-slate-500 hover:text-slate-100"
-          aria-label="Close Stage Play console"
+          aria-label={t("stagePlay.action.closeConsole")}
         >
           <PanelLeftClose className="h-4 w-4" />
         </button>
@@ -10238,6 +10244,9 @@ function Inspector({
 
 export default function StagePlayBadgeGraphPanel() {
   const queryClient = useQueryClient();
+  const { userSettings } = useHelixStartSettings();
+  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const { t } = useInterfaceText(interfaceLanguage.code);
   const [query, setQuery] = useState("");
   const [bindingOverlayOpen, setBindingOverlayOpen] = useState(false);
   const [draftNodes, setDraftNodes] = useState<DraftStagePlayNode[]>([]);
@@ -11114,13 +11123,13 @@ export default function StagePlayBadgeGraphPanel() {
   }, [heldNode]);
 
   if (isLoading) {
-    return <div className="flex h-full items-center justify-center bg-slate-950 text-sm text-slate-400">Loading Stage Play Badge Graph...</div>;
+    return <div className="flex h-full items-center justify-center bg-slate-950 text-sm text-slate-400">{t("stagePlay.loading")}</div>;
   }
 
   if (error || !graph) {
     return (
       <div className="flex h-full items-center justify-center bg-slate-950 p-6 text-sm text-rose-200">
-        Stage Play graph failed to load.
+        {t("stagePlay.error.load")}
       </div>
     );
   }
@@ -11133,10 +11142,10 @@ export default function StagePlayBadgeGraphPanel() {
             type="button"
             onClick={() => setBindingOverlayOpen(true)}
             className="absolute left-3 top-3 z-30 flex items-center gap-2 rounded-md border border-slate-700 bg-slate-950/90 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-cyan-100 shadow-xl hover:border-cyan-500"
-            aria-label="Open Stage Play console"
+            aria-label={t("stagePlay.action.openConsole")}
           >
             <PanelLeftOpen className="h-4 w-4" />
-            Console
+            {t("stagePlay.action.console")}
           </button>
         ) : null}
 
@@ -11152,10 +11161,10 @@ export default function StagePlayBadgeGraphPanel() {
                 ? "bg-cyan-950 text-cyan-100"
                 : "text-slate-400 hover:text-slate-100"
             }`}
-            aria-label="Show observer mail loop"
+            aria-label={t("stagePlay.view.showObserverMailLoop")}
             data-testid="stage-play-observer-mail-loop-toggle"
           >
-            Processed Mail Loop
+            {t("stagePlay.view.processedMailLoop")}
           </button>
           <button
             type="button"
@@ -11165,10 +11174,10 @@ export default function StagePlayBadgeGraphPanel() {
                 ? "bg-cyan-950 text-cyan-100"
                 : "text-slate-400 hover:text-slate-100"
             }`}
-            aria-label="Show full Stage Play graph"
+            aria-label={t("stagePlay.view.showFullGraph")}
             data-testid="stage-play-full-graph-toggle"
           >
-            Full Graph
+            {t("stagePlay.view.fullGraph")}
           </button>
         </div>
 

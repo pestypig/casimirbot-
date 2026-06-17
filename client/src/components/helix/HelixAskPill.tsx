@@ -37845,10 +37845,10 @@ export function HelixAskPill({
             const expanded = isLatestReply || Boolean(askExpandedByReply[reply.id]);
             const transcriptTerminal = resolveHelixAskVisibleTerminal(reply, reply.content);
             const finalAnswerSourceLabel = readHelixAskFinalAnswerSourceLabel(
-              reply,
               replyDebugRecord,
               agentLoopAudit,
               runtimeSummary,
+              reply,
             ) ?? visibleResolvedTurn.primary_source_label;
             const finalAnswerPresentation = resolveHelixAskFinalAnswerPresentation(finalAnswerSourceLabel);
             const turnTranscriptRows = buildHelixTurnTranscriptRows(reply);
@@ -37921,7 +37921,7 @@ export function HelixAskPill({
               liveAnswerTurnBridge,
               finalAnswerText: finalAnswerRawText,
               finalAnswerHeading: finalAnswerPresentation.heading,
-              finalAnswerSourceLabel: finalAnswerPresentation.sourceLabel || transcriptTerminal.source,
+              finalAnswerSourceLabel: finalAnswerPresentation.sourceLabel || finalAnswerSourceLabel || transcriptTerminal.source,
               terminalMismatch: terminalMismatchForReply,
             });
             const latestTurnTestId = isLatestReply ? "helix-ask-latest-turn" : undefined;
@@ -37995,7 +37995,11 @@ export function HelixAskPill({
                               data-final-answer-text={isFinalRow ? finalAnswerRawText : undefined}
                               data-reasoning-stage-palette={isFinalRow ? replyBattleAnswerTint?.palette ?? "" : undefined}
                               data-reasoning-stage-balance={isFinalRow ? replyBattleAnswerTint?.label ?? "" : undefined}
-                              data-visible-terminal-source={isFinalRow ? transcriptTerminal.source : undefined}
+                              data-visible-terminal-source={
+                                isFinalRow
+                                  ? finalAnswerPresentation.sourceLabel || finalAnswerSourceLabel || transcriptTerminal.source
+                                  : undefined
+                              }
                               data-backend-terminal-answer={isFinalRow ? transcriptTerminal.backendTerminalText ?? "" : undefined}
                               data-final-answer-authority={
                                 isFinalRow

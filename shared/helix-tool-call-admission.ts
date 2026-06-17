@@ -28,7 +28,7 @@ export type HelixToolCallAdmissionMode =
 
 export type HelixToolCallAdmissionRouteArbitration = {
   schema: "helix.tool_call_admission_route_arbitration.v1";
-  guard_version: "E80";
+  guard_version: "E80" | "E82";
   original_source_target: string;
   effective_source_target: string;
   canonical_goal_kind: string | null;
@@ -39,6 +39,12 @@ export type HelixToolCallAdmissionRouteArbitration = {
   admitted_tool_families_after_mandatory_override: HelixToolCallAdmissionFamily[];
   calculator_goal_overrode_repo_source_target: boolean;
   repo_code_preserved_as_secondary_context: boolean;
+  requested_capability?: string | null;
+  requested_capability_family?: HelixToolCallAdmissionFamily | string | null;
+  requested_capability_source?: string | null;
+  requested_capability_confidence?: number | null;
+  required_observation_kinds_for_requested_capability?: string[];
+  explicit_capability_overrode_source_target?: boolean;
   secondary_source_targets: string[];
   tool_admission_reason: string;
   tool_admission_dominance_reason: string | null;
@@ -70,7 +76,7 @@ export type HelixToolCallAdmissionDecision = {
   operational_constraints_ref?: string;
   required_surface?: string | null;
   reason: string;
-  route_arbitration_guard_version?: "E80";
+  route_arbitration_guard_version?: "E80" | "E82";
   original_source_target?: string;
   effective_source_target?: string;
   canonical_goal_kind?: string | null;
@@ -81,6 +87,14 @@ export type HelixToolCallAdmissionDecision = {
   admitted_tool_families_after_mandatory_override?: HelixToolCallAdmissionFamily[];
   calculator_goal_overrode_repo_source_target?: boolean;
   repo_code_preserved_as_secondary_context?: boolean;
+  capability_contract_guard_version?: "E82";
+  requested_capability?: string | null;
+  requested_capability_family?: HelixToolCallAdmissionFamily | string | null;
+  requested_capability_source?: string | null;
+  requested_capability_confidence?: number | null;
+  required_observation_kinds_for_requested_capability?: string[];
+  explicit_capability_overrode_source_target?: boolean;
+  secondary_source_targets?: string[];
   tool_admission_reason?: string;
   tool_admission_dominance_reason?: string | null;
   selected_capability?: string | null;

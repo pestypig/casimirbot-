@@ -41,6 +41,12 @@ function readString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
+function cleanNullableText(value: unknown): string | null {
+  const text = readString(value);
+  if (!text || /^(?:null|undefined)$/i.test(text)) return null;
+  return text.replace(/\s+(?:null|undefined)\s*$/i, "").trim() || null;
+}
+
 const WORKSTATION_EVALUATION_STATUS_VALUES = new Set([
   "supports_subgoal",
   "contradicts_subgoal",
@@ -105,12 +111,12 @@ function calculatorResultFromEvaluation(
   const record = readRecord(evaluation);
   if (!record) return null;
   const directResult =
-    readString(record.result_text) ??
-    readString(record.result_value) ??
-    readString(record.calculator_result) ??
-    readString(record.computed_result) ??
-    readString(record.numeric_result) ??
-    readString(readRecord(record.calculation)?.result);
+    cleanNullableText(record.result_text) ??
+    cleanNullableText(record.result_value) ??
+    cleanNullableText(record.calculator_result) ??
+    cleanNullableText(record.computed_result) ??
+    cleanNullableText(record.numeric_result) ??
+    cleanNullableText(readRecord(record.calculation)?.result);
   if (directResult && !WORKSTATION_EVALUATION_STATUS_VALUES.has(directResult)) return directResult;
   const resultPattern = "([-+]?(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:e[-+]?\\d+)?)";
   const text = [
@@ -213,7 +219,7 @@ function calculatorResultText(
 ): string {
   const observation = buildCalculatorObservation(prompt, plan, evaluation);
   const expression = observation.expression;
-  const unit = observation.setup?.result_unit ? ` ${observation.setup.result_unit}` : "";
+  const unit = cleanNullableText(observation.setup?.result_unit) ? ` ${cleanNullableText(observation.setup?.result_unit)}` : "";
   if (observation.result) {
     return [
       "Calculator verification plan completed.",

@@ -3,9 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
+import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
+import { useInterfaceText } from "@/lib/i18n/interfaceText";
 import { useScientificCalculatorLiveSourceStore } from "@/store/useScientificCalculatorLiveSourceStore";
 
 export function ScientificCalculatorLiveSourceControls({ currentEquation }: { currentEquation: string }) {
+  const { userSettings } = useHelixStartSettings();
+  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const { t } = useInterfaceText(interfaceLanguage.code);
   const {
     status,
     mode,
@@ -31,7 +37,7 @@ export function ScientificCalculatorLiveSourceControls({ currentEquation }: { cu
   const [start, setStart] = useState("2");
   const [rate, setRate] = useState("1000");
   const [max, setMax] = useState("1");
-  const [equationContext, setEquationContext] = useState("Explain each solved value in the big-picture context of what this equation is used for.");
+  const [equationContext, setEquationContext] = useState(() => t("scientificCalculator.live.contextDefault"));
   const sourceEquationPreview = sourceMode === "prime_trial_division"
     ? "n \\bmod d = r"
     : currentEquation.trim();
@@ -67,9 +73,9 @@ export function ScientificCalculatorLiveSourceControls({ currentEquation }: { cu
     <div className="mt-3 rounded-md border border-cyan-900/60 bg-cyan-950/20 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-[10px] uppercase tracking-wide text-cyan-300">Equation Live Source</div>
+          <div className="text-[10px] uppercase tracking-wide text-cyan-300">{t("scientificCalculator.live.title")}</div>
           <div className="text-xs text-slate-400">
-            Uses the calculator equation as the live source; prime trial division is only a preset.
+            {t("scientificCalculator.live.description")}
           </div>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
@@ -82,9 +88,9 @@ export function ScientificCalculatorLiveSourceControls({ currentEquation }: { cu
       <div className="mt-3 rounded border border-slate-800 bg-slate-950/50 p-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <div className="text-[10px] uppercase tracking-wide text-slate-500">Source equation</div>
+            <div className="text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.live.sourceEquation")}</div>
             <div className={`mt-1 break-words font-mono text-[11px] ${missingCurrentEquation ? "text-red-300" : "text-cyan-50"}`}>
-              {sourceEquationPreview || "Missing: add or click an equation in the calculator first."}
+              {sourceEquationPreview || t("scientificCalculator.live.missingEquation")}
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -97,7 +103,7 @@ export function ScientificCalculatorLiveSourceControls({ currentEquation }: { cu
                 setMax("1");
               }}
             >
-              Current equation
+              {t("scientificCalculator.live.currentEquation")}
             </Button>
             <Button
               size="sm"
@@ -108,14 +114,16 @@ export function ScientificCalculatorLiveSourceControls({ currentEquation }: { cu
                 setMax("100");
               }}
             >
-              Prime preset
+              {t("scientificCalculator.live.primePreset")}
             </Button>
           </div>
         </div>
       </div>
       <div className="mt-3 grid gap-2 md:grid-cols-3">
         <div>
-          <Label className="text-[11px] text-slate-300">{sourceMode === "prime_trial_division" ? "Candidate Start" : "Repeats"}</Label>
+          <Label className="text-[11px] text-slate-300">
+            {sourceMode === "prime_trial_division" ? t("scientificCalculator.live.candidateStart") : t("scientificCalculator.live.repeats")}
+          </Label>
           <Input
             value={sourceMode === "prime_trial_division" ? start : max}
             onChange={(event: ChangeEvent<HTMLInputElement>) => {
@@ -126,11 +134,11 @@ export function ScientificCalculatorLiveSourceControls({ currentEquation }: { cu
           />
         </div>
         <div>
-          <Label className="text-[11px] text-slate-300">Tick Rate Ms</Label>
+          <Label className="text-[11px] text-slate-300">{t("scientificCalculator.live.tickRateMs")}</Label>
           <Input value={rate} onChange={(event: ChangeEvent<HTMLInputElement>) => setRate(event.target.value)} className="h-8 border-slate-700 bg-slate-950 text-xs text-slate-100" />
         </div>
         <div>
-          <Label className="text-[11px] text-slate-300">Max Ticks</Label>
+          <Label className="text-[11px] text-slate-300">{t("scientificCalculator.live.maxTicks")}</Label>
           <Input
             value={max}
             onChange={(event: ChangeEvent<HTMLInputElement>) => setMax(event.target.value)}
@@ -140,28 +148,28 @@ export function ScientificCalculatorLiveSourceControls({ currentEquation }: { cu
       </div>
       {sourceMode === "current_equation" ? (
         <div className="mt-3">
-          <Label className="text-[11px] text-slate-300">Interpretation context</Label>
+          <Label className="text-[11px] text-slate-300">{t("scientificCalculator.live.interpretationContext")}</Label>
           <Input
             value={equationContext}
             onChange={(event: ChangeEvent<HTMLInputElement>) => setEquationContext(event.target.value)}
             className="mt-1 h-8 border-slate-700 bg-slate-950 text-xs text-slate-100"
-            placeholder="What is this equation used for?"
+            placeholder={t("scientificCalculator.live.contextPlaceholder")}
           />
         </div>
       ) : null}
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button size="sm" className="bg-cyan-600 hover:bg-cyan-700" onClick={startStream} disabled={missingCurrentEquation}>Start Live Source</Button>
-        <Button size="sm" variant="outline" onClick={stopPrimeStream}>Stop</Button>
-        <Button size="sm" variant="outline" onClick={() => void restartPrimeStream()}>Restart</Button>
-        <Button size="sm" variant="outline" onClick={copyLog}>Copy Live Debug Log</Button>
+        <Button size="sm" className="bg-cyan-600 hover:bg-cyan-700" onClick={startStream} disabled={missingCurrentEquation}>{t("scientificCalculator.live.start")}</Button>
+        <Button size="sm" variant="outline" onClick={stopPrimeStream}>{t("scientificCalculator.live.stop")}</Button>
+        <Button size="sm" variant="outline" onClick={() => void restartPrimeStream()}>{t("scientificCalculator.live.restart")}</Button>
+        <Button size="sm" variant="outline" onClick={copyLog}>{t("scientificCalculator.live.copyDebugLog")}</Button>
       </div>
       <div className="mt-3 grid gap-2 text-[11px] text-slate-300 lg:grid-cols-2">
         <div className="rounded border border-slate-800 bg-slate-950/50 p-2">
-          <div className="text-slate-500">attached environment</div>
-          <div className="break-all font-mono">{environmentId ?? "active thread environment will be resolved on start"}</div>
+          <div className="text-slate-500">{t("scientificCalculator.live.attachedEnvironment")}</div>
+          <div className="break-all font-mono">{environmentId ?? t("scientificCalculator.live.environmentFallback")}</div>
         </div>
         <div className="rounded border border-slate-800 bg-slate-950/50 p-2">
-          <div className="text-slate-500">latest event</div>
+          <div className="text-slate-500">{t("scientificCalculator.live.latestEvent")}</div>
           <div className="font-mono">
             {latestTick
               ? latestTick.event_type === "equation_evaluated"
@@ -175,17 +183,17 @@ export function ScientificCalculatorLiveSourceControls({ currentEquation }: { cu
       <div className="mt-3 rounded border border-cyan-800/70 bg-slate-950/60 p-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <div className="text-[10px] uppercase tracking-wide text-cyan-300">Visible workbench solve</div>
+            <div className="text-[10px] uppercase tracking-wide text-cyan-300">{t("scientificCalculator.live.visibleSolve")}</div>
             <div className="text-[11px] text-slate-400">
-              Live ticks use the same equation shown in the calculator workbench; output lines stay in the live answer trace.
+              {t("scientificCalculator.live.visibleSolveDescription")}
             </div>
           </div>
           <Badge variant="outline" className="border-cyan-700 text-cyan-100">
-            {latestTick ? latestTick.trace.algorithm : sourceEquation || "waiting"}
+            {latestTick ? latestTick.trace.algorithm : sourceEquation || t("scientificCalculator.live.waiting")}
           </Badge>
         </div>
         <pre className="mt-2 max-h-32 overflow-auto rounded border border-slate-800 bg-black/30 p-2 font-mono text-[11px] leading-relaxed text-cyan-50">
-          {liveWorkbenchExpression || sourceEquationPreview || "Start the live source to populate the active equation."}
+          {liveWorkbenchExpression || sourceEquationPreview || t("scientificCalculator.live.startToPopulate")}
         </pre>
         {liveSolveSteps.length > 0 ? (
           <div className="mt-2 grid gap-1.5 md:grid-cols-5">

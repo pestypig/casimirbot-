@@ -23,6 +23,10 @@ import {
 } from "@/store/useTheoryCompoundRunStore";
 import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
 import { ScientificCalculatorLiveSourceControls } from "./ScientificCalculatorLiveSourceControls";
+import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
+import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
+import { useInterfaceText, type InterfaceTextResolver } from "@/lib/i18n/interfaceText";
+import type { InterfaceMessageId } from "@/lib/i18n/messages/types";
 import type { HelixCalculatorSetupVariable } from "@shared/helix-calculator-setup-context";
 import type { ScientificCalculatorDebugEvent, ScientificCalculatorHistoryEntry } from "@/store/useScientificCalculatorStore";
 import type { ScientificCalculatorStepTraceArtifactV1 } from "@shared/contracts/scientific-calculator-step-schema.v1";
@@ -30,14 +34,15 @@ import type { TheoryCompoundRunRowV1 } from "@shared/contracts/theory-compound-r
 import type { TheoryRuntimeScalarCutV1 } from "@shared/contracts/theory-runtime-math-trace.v1";
 
 type ScientificCalculatorWorkbenchSection = "scalar" | "runtime" | "theory";
+type Translate = InterfaceTextResolver["t"];
 
 const WORKBENCH_SECTIONS: Array<{
   id: ScientificCalculatorWorkbenchSection;
-  label: string;
+  labelId: InterfaceMessageId;
 }> = [
-  { id: "scalar", label: "Scalar Workbench" },
-  { id: "runtime", label: "Tensor / Runtime Workbench" },
-  { id: "theory", label: "Theory Run" },
+  { id: "scalar", labelId: "scientificCalculator.section.scalar" },
+  { id: "runtime", labelId: "scientificCalculator.section.runtime" },
+  { id: "theory", labelId: "scientificCalculator.section.theory" },
 ];
 
 function isLiveRegisterSummary(value: string | null | undefined): boolean {
@@ -120,7 +125,7 @@ function theoryRunRowTone(kind: string, status: string): string {
   return "border-slate-800 bg-slate-950/60";
 }
 
-function theoryRunExecutionLabels(row: TheoryCompoundRunRowV1): string[] {
+function theoryRunExecutionLabels(row: TheoryCompoundRunRowV1, t: Translate): string[] {
   const labels: string[] = [];
   if (row.runtimeRunRequestV1) labels.push("Manifest only");
   if (row.runtimeReceiptV1?.command) labels.push("Runtime executed");
@@ -134,6 +139,7 @@ function theoryRunExecutionLabels(row: TheoryCompoundRunRowV1): string[] {
   ) {
     labels.push("Blocked by missing evidence");
   }
+  void t;
   return Array.from(new Set(labels));
 }
 
@@ -207,6 +213,9 @@ export function resolveScientificCalculatorVisibleHistory(
 export default function ScientificCalculatorPanel() {
   const { currentLatex, history, lastSolve, lastArtifactV1, lastTheoryLoadout, activeTheoryLoadoutItemIndex, lastSetup, steps, debugEvents, ingestLatex, setSolveResult, setTheoryLoadout, loadTheoryLoadoutItem, recordDebugEvent, clear } =
     useScientificCalculatorStore();
+  const { userSettings } = useHelixStartSettings();
+  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const { t } = useInterfaceText(interfaceLanguage.code);
   const {
     activeTheoryRun,
     activeRuntimeTrace,
@@ -494,7 +503,7 @@ export default function ScientificCalculatorPanel() {
         action_id: "copy_result",
         source: "panel",
         ok: false,
-        message: "No calculator result available to copy.",
+        message: t("scientificCalculator.copy.noResult"),
       });
       return;
     }
@@ -534,7 +543,7 @@ export default function ScientificCalculatorPanel() {
         action_id: "copy_steps_markdown",
         source: "panel",
         ok: false,
-        message: "No schema step artifact available to copy.",
+        message: t("scientificCalculator.copy.noSteps"),
       });
       return;
     }
@@ -642,22 +651,22 @@ export default function ScientificCalculatorPanel() {
         stale: Boolean(activeTheoryLoadoutItem?.solveExpression),
       };
     }
-    return {
-      label: input.trim() ? "Manual or previous calculator input" : "No scalar row loaded",
+      return {
+      label: input.trim() ? t("scientificCalculator.input.sourceManual") : t("scientificCalculator.input.noScalarLoaded"),
       stale: Boolean(activeTheoryLoadoutItem?.solveExpression && input.trim()),
     };
-  }, [activeTheoryLoadoutItem, input, lastSetup?.subgoal]);
+  }, [activeTheoryLoadoutItem, input, lastSetup?.subgoal, t]);
   const showTheoryWorkbench = activeSection === "theory" || Boolean(activeTheoryRun || lastTheoryLoadout);
   const showRuntimeWorkbench = activeSection === "runtime" || Boolean(activeRuntimeTrace || runtimeTheoryRunRows.length > 0);
 
   return (
     <div className="h-full w-full overflow-auto bg-slate-950/90 p-4 text-slate-100">
       <div className="mb-3">
-        <div className="text-xs uppercase tracking-wide text-cyan-300">Scientific Calculator</div>
-        <div className="text-sm text-slate-300">Paste or click equations from Docs, then solve with step traces.</div>
+        <div className="text-xs uppercase tracking-wide text-cyan-300">{t("scientificCalculator.header.title")}</div>
+        <div className="text-sm text-slate-300">{t("scientificCalculator.header.description")}</div>
       </div>
 
-      <div className="mb-3 flex flex-wrap gap-2" role="tablist" aria-label="Scientific calculator workbench sections">
+      <div className="mb-3 flex flex-wrap gap-2" role="tablist" aria-label={t("scientificCalculator.tabs.ariaLabel")}>
         {WORKBENCH_SECTIONS.map((section) => (
           <Button
             key={section.id}
@@ -668,7 +677,7 @@ export default function ScientificCalculatorPanel() {
             role="tab"
             aria-selected={activeSection === section.id}
           >
-            {section.label}
+            {t(section.labelId)}
           </Button>
         ))}
       </div>
@@ -682,41 +691,50 @@ export default function ScientificCalculatorPanel() {
         >
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-cyan-300">Theory Run</div>
+              <div className="text-[10px] uppercase tracking-wide text-cyan-300">{t("scientificCalculator.section.theory")}</div>
               <div className="text-xs text-slate-300">
                 {activeTheoryRun
-                  ? `${activeTheoryRun.summary.rowCount} rows / ${activeTheoryRun.summary.scalarCount} scalar / ${activeTheoryRun.summary.tensorCount} tensor / status ${theoryRunStatus}`
+                  ? t("scientificCalculator.theory.summary.run", {
+                      rows: activeTheoryRun.summary.rowCount,
+                      scalar: activeTheoryRun.summary.scalarCount,
+                      tensor: activeTheoryRun.summary.tensorCount,
+                      status: theoryRunStatus,
+                    })
                   : lastTheoryLoadout
-                    ? `${lastTheoryLoadout.objectContext?.label ?? lastTheoryLoadout.mode} / ${lastTheoryLoadout.summary.scalarCount} scalar rows / ${lastTheoryLoadout.summary.contextCount} context rows`
-                    : "No theory run or loadout loaded."}
+                    ? t("scientificCalculator.theory.summary.loadout", {
+                        label: lastTheoryLoadout.objectContext?.label ?? lastTheoryLoadout.mode,
+                        scalar: lastTheoryLoadout.summary.scalarCount,
+                        context: lastTheoryLoadout.summary.contextCount,
+                      })
+                    : t("scientificCalculator.theory.empty")}
               </div>
             </div>
             {activeTheoryRunRow ? (
               <Badge variant="outline" className="border-cyan-700/70 text-cyan-100">
-                selected: {activeTheoryRunRow.index}
+                {t("scientificCalculator.theory.selected", { index: activeTheoryRunRow.index })}
               </Badge>
             ) : null}
           </div>
           {activeTheoryRun ? (
             <div className="mb-3 flex flex-wrap gap-2">
               <Button size="sm" variant="secondary" onClick={() => handleRunTheoryCompoundRun("scalar_only")}>
-                Solve Scalar Rows
+                {t("scientificCalculator.action.solveScalarRows")}
               </Button>
               <Button size="sm" variant="outline" onClick={() => handleRunTheoryCompoundRun("runtime_trace_only")}>
-                Build Runtime Traces
+                {t("scientificCalculator.action.buildRuntimeTraces")}
               </Button>
               <Button size="sm" variant="outline" onClick={() => handleRunTheoryCompoundRun("all_available")}>
-                Solve Available
+                {t("scientificCalculator.action.solveAvailable")}
               </Button>
             </div>
           ) : null}
           {!activeTheoryRun && lastTheoryLoadout ? (
             <div className="mb-3 flex flex-wrap gap-2">
               <Button size="sm" variant="secondary" onClick={handleSolveTheoryLoadout}>
-                Solve All Scalar
+                {t("scientificCalculator.action.solveAllScalar")}
               </Button>
               <Button size="sm" variant="outline" onClick={handleSolveTheoryLoadoutWithRuntime}>
-                Solve + Runtime
+                {t("scientificCalculator.action.solveRuntime")}
               </Button>
             </div>
           ) : null}
@@ -751,18 +769,18 @@ export default function ScientificCalculatorPanel() {
                       <Badge variant="outline" className="border-slate-700 text-[10px] text-slate-300">
                         {row.solver}
                       </Badge>
-                      {theoryRunExecutionLabels(row).map((label) => (
+                      {theoryRunExecutionLabels(row, t).map((label) => (
                         <Badge key={`${row.id}:execution-label:${label}`} variant="outline" className="border-emerald-800/70 text-[10px] text-emerald-100">
                           {label}
                         </Badge>
                       ))}
                     </div>
                     <div className="mt-2 break-all font-mono text-slate-100">
-                      {row.displayLatex ?? row.expression ?? "context row"}
+                      {row.displayLatex ?? row.expression ?? t("scientificCalculator.theory.contextRow")}
                     </div>
                     {row.evidenceRefs && row.evidenceRefs.length > 0 ? (
                       <div className="mt-2 rounded border border-slate-800 bg-slate-950/50 p-2 text-[11px] text-slate-300">
-                        <div className="mb-1 font-semibold uppercase tracking-wide text-slate-400">Evidence refs</div>
+                        <div className="mb-1 font-semibold uppercase tracking-wide text-slate-400">{t("scientificCalculator.theory.evidenceRefs")}</div>
                         <div className="space-y-1">
                           {row.evidenceRefs.slice(0, 4).map((ref, index) => (
                             <div key={`${row.id}:evidence:${index}`} className="truncate" title={ref.path}>
@@ -771,7 +789,7 @@ export default function ScientificCalculatorPanel() {
                             </div>
                           ))}
                           {row.evidenceRefs.length > 4 ? (
-                            <div className="text-slate-500">+{row.evidenceRefs.length - 4} more refs</div>
+                            <div className="text-slate-500">{t("scientificCalculator.theory.moreRefs", { count: row.evidenceRefs.length - 4 })}</div>
                           ) : null}
                         </div>
                       </div>
@@ -779,7 +797,7 @@ export default function ScientificCalculatorPanel() {
                     {row.runtimeReceiptV1 ? (
                       <div className="mt-2 rounded border border-violet-900/60 bg-violet-950/20 p-2 text-[11px] text-violet-100">
                         <div className="mb-1 flex flex-wrap items-center gap-2">
-                          <span className="font-semibold">Runtime receipt</span>
+                          <span className="font-semibold">{t("scientificCalculator.theory.runtimeReceipt")}</span>
                           <Badge variant="outline" className="border-violet-700/70 text-violet-100">
                             {row.runtimeReceiptV1.status}
                           </Badge>
@@ -812,9 +830,9 @@ export default function ScientificCalculatorPanel() {
                     {row.runtimeRunRequestV1 ? (
                       <div className="mt-2 rounded border border-indigo-900/60 bg-indigo-950/20 p-2 text-[11px] text-indigo-100">
                         <div className="mb-1 flex flex-wrap items-center gap-2">
-                          <span className="font-semibold">Runtime request</span>
+                          <span className="font-semibold">{t("scientificCalculator.theory.runtimeRequest")}</span>
                           <Badge variant="outline" className="border-indigo-700/70 text-indigo-100">
-                            {row.runtimeRunRequestV1.status === "created" ? "manifest created" : row.runtimeRunRequestV1.status}
+                            {row.runtimeRunRequestV1.status === "created" ? t("scientificCalculator.theory.manifestCreated") : row.runtimeRunRequestV1.status}
                           </Badge>
                           <Badge variant="outline" className="border-slate-700 text-slate-300">
                             {row.runtimeRunRequestV1.runtimeId}
@@ -834,7 +852,7 @@ export default function ScientificCalculatorPanel() {
                     {row.sweepRunV1 ? (
                       <div className="mt-2 rounded border border-emerald-900/60 bg-emerald-950/20 p-2 text-[11px] text-emerald-100">
                         <div className="mb-1 flex flex-wrap items-center gap-2">
-                          <span className="font-semibold">Sweep summary</span>
+                          <span className="font-semibold">{t("scientificCalculator.theory.sweepSummary")}</span>
                           <Badge variant="outline" className="border-emerald-700/70 text-emerald-100">
                             {row.sweepRunV1.samplePolicy.kind}
                           </Badge>
@@ -910,19 +928,19 @@ export default function ScientificCalculatorPanel() {
                     </Badge>
                     {item.calculatorArtifactV1 ? (
                       <Badge variant="outline" className="border-emerald-700/70 text-emerald-100">
-                        solved
+                        {t("scientificCalculator.theory.solved")}
                       </Badge>
                     ) : null}
                     {item.runtimeReceiptV1 ? (
                       <Badge variant="outline" className="border-violet-700/70 text-violet-100">
-                        runtime completed
+                        {t("scientificCalculator.theory.runtimeCompleted")}
                       </Badge>
                     ) : null}
                   </div>
                   {item.solveExpression ? (
                     <div className="mt-2 break-all font-mono text-cyan-100">{item.solveExpression}</div>
                   ) : (
-                    <div className="mt-2 break-all font-mono text-slate-500">{item.displayLatex ?? "context row"}</div>
+                    <div className="mt-2 break-all font-mono text-slate-500">{item.displayLatex ?? t("scientificCalculator.theory.contextRow")}</div>
                   )}
                   {Object.keys(item.usedBindings).length > 0 ? (
                     <div className="mt-2 flex flex-wrap gap-1">
@@ -957,7 +975,7 @@ export default function ScientificCalculatorPanel() {
             </div>
           ) : (
             <div className="rounded border border-slate-800 bg-slate-950/50 p-3 text-xs text-slate-400">
-              Theory Badge Graph presets can load scalar, tensor/runtime, evidence, gate, and boundary rows here.
+              {t("scientificCalculator.theory.presetsHelp")}
             </div>
           )}
         </div>
@@ -971,18 +989,21 @@ export default function ScientificCalculatorPanel() {
         >
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-violet-300">Tensor / Runtime Workbench</div>
+              <div className="text-[10px] uppercase tracking-wide text-violet-300">{t("scientificCalculator.section.runtime")}</div>
               <div className="text-xs text-slate-300">
                 {activeRuntimeTrace
-                  ? `${activeRuntimeTrace.summary.stepCount} static/reference steps / ${activeRuntimeTrace.summary.scalarCutCount} scalar cuts`
+                  ? t("scientificCalculator.runtime.summary.trace", {
+                      steps: activeRuntimeTrace.summary.stepCount,
+                      cuts: activeRuntimeTrace.summary.scalarCutCount,
+                    })
                   : activeTheoryRun
-                    ? `${runtimeTheoryRunRows.length} tensor/runtime rows available. Select a row with a runtime trace.`
-                    : "No runtime trace loaded."}
+                    ? t("scientificCalculator.runtime.summary.rows", { count: runtimeTheoryRunRows.length })
+                    : t("scientificCalculator.runtime.empty")}
               </div>
             </div>
             {scalarTheoryRunRows.length > 0 ? (
               <Badge variant="outline" className="border-cyan-700/70 text-cyan-100">
-                {scalarTheoryRunRows.length} scalar rows
+                {t("scientificCalculator.runtime.scalarRows", { count: scalarTheoryRunRows.length })}
               </Badge>
             ) : null}
           </div>
@@ -1012,7 +1033,7 @@ export default function ScientificCalculatorPanel() {
                     </Badge>
                   </div>
                   <div className="mt-2 break-all font-mono text-slate-200">
-                    {step.displayLatex ?? step.expression ?? "reference step"}
+                    {step.displayLatex ?? step.expression ?? t("scientificCalculator.runtime.referenceStep")}
                   </div>
                   {step.scalarCuts.length > 0 ? (
                     <div className="mt-2 space-y-2">
@@ -1026,7 +1047,7 @@ export default function ScientificCalculatorPanel() {
                               </div>
                             </div>
                             <Button size="sm" variant="outline" onClick={() => handleLoadScalarCut(cut, step.id)}>
-                              Load Scalar Cut
+                              {t("scientificCalculator.action.loadScalarCut")}
                             </Button>
                           </div>
                         </div>
@@ -1041,7 +1062,7 @@ export default function ScientificCalculatorPanel() {
             </div>
           ) : (
             <div className="rounded border border-slate-800 bg-slate-950/50 p-3 text-xs text-slate-400">
-              Tensor/runtime traces appear here as static/reference traces until a later runtime adapter provides receipts.
+              {t("scientificCalculator.runtime.help")}
             </div>
           )}
         </div>
@@ -1055,11 +1076,11 @@ export default function ScientificCalculatorPanel() {
       >
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <div className="text-[10px] uppercase tracking-wide text-cyan-300">Scalar Workbench</div>
-            <Label className="text-xs text-slate-300">LaTeX / Expression Input</Label>
+            <div className="text-[10px] uppercase tracking-wide text-cyan-300">{t("scientificCalculator.section.scalar")}</div>
+            <Label className="text-xs text-slate-300">{t("scientificCalculator.input.label")}</Label>
           </div>
           <div className="flex max-w-full flex-wrap items-center gap-2 text-[11px] text-slate-400">
-            <span>source:</span>
+            <span>{t("scientificCalculator.input.source")}</span>
             <Badge
               variant="outline"
               className={
@@ -1075,37 +1096,37 @@ export default function ScientificCalculatorPanel() {
         </div>
         {activeInputSource.stale ? (
           <div className="rounded border border-amber-900/60 bg-amber-950/20 p-2 text-[11px] text-amber-100">
-            The scalar input is not the selected theory row. Pick a row in Theory Run, or solve this as a manual/previous expression.
+            {t("scientificCalculator.input.staleWarning")}
           </div>
         ) : null}
         <Textarea
           className="min-h-[130px] border-slate-700 bg-slate-900/70 font-mono text-xs text-slate-100"
           value={input}
           onChange={(event) => handleInputChange(event.target.value)}
-          placeholder="Example: t_{\\text{proper}} = t_{\\text{shift-driven}} + \\Delta t_{\\text{lapse-driven}}"
+          placeholder={t("scientificCalculator.input.placeholder")}
         />
         <div className="grid gap-2 lg:grid-cols-2">
           <div className="rounded-md border border-slate-800 bg-slate-950/50 p-2">
-            <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Scientific Preview</div>
+            <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.preview.title")}</div>
             {inputPreviewHtml ? (
               <div
                 className="overflow-x-auto rounded border border-slate-800 bg-slate-900/70 px-2 py-2 text-slate-100"
                 dangerouslySetInnerHTML={{ __html: inputPreviewHtml }}
               />
             ) : (
-              <div className="text-xs text-slate-500">No renderable math yet.</div>
+              <div className="text-xs text-slate-500">{t("scientificCalculator.preview.empty")}</div>
             )}
           </div>
           <div className="rounded-md border border-slate-800 bg-slate-950/50 p-2">
-            <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Normalized Expression</div>
+            <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.normalized.title")}</div>
             <div className="break-words font-mono text-xs text-slate-200">
-              {lastSolve?.normalized_expression || "Solve to inspect normalized form."}
+              {lastSolve?.normalized_expression || t("scientificCalculator.normalized.empty")}
             </div>
           </div>
         </div>
         {lastSetup ? (
           <div className="rounded-md border border-slate-800 bg-slate-950/50 p-2 text-xs">
-            <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Setup</div>
+            <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.setup.title")}</div>
             <div className="text-slate-200">{lastSetup.subgoal}</div>
             {lastSetup.equation ? <div className="mt-1 font-mono text-slate-300">{lastSetup.equation}</div> : null}
             {lastSetup.variables?.length ? (
@@ -1118,7 +1139,7 @@ export default function ScientificCalculatorPanel() {
               </div>
             ) : null}
             <div className="mt-3 rounded border border-slate-800 bg-slate-900/50 p-2">
-              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Units & Dimensions</div>
+              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.setup.unitsTitle")}</div>
               <div className="flex flex-wrap gap-2">
                 {lastSetup.unit_system ? (
                   <Badge variant="outline" className="border-cyan-700/70 text-cyan-100">
@@ -1143,7 +1164,7 @@ export default function ScientificCalculatorPanel() {
               </div>
               {lastSetup.input_units && Object.keys(lastSetup.input_units).length > 0 ? (
                 <div className="mt-2">
-                  <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Input Units</div>
+                  <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.setup.inputUnits")}</div>
                   <div className="flex flex-wrap gap-2">
                     {Object.entries(lastSetup.input_units as Record<string, string>).map(([symbol, unit]: [string, string]) => (
                       <Badge key={`${symbol}:${unit}`} variant="outline" className="border-slate-700 text-slate-300">
@@ -1155,7 +1176,7 @@ export default function ScientificCalculatorPanel() {
               ) : null}
               {lastSetup.unit_options?.length ? (
                 <div className="mt-2">
-                  <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Compatible Units</div>
+                  <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.setup.compatibleUnits")}</div>
                   <div className="flex flex-wrap gap-2">
                     {lastSetup.unit_options.slice(0, 8).map((option: { symbol: string; quantity: string; si_factor: number }) => (
                       <Badge key={option.symbol} variant="outline" className="border-slate-700 text-slate-300">
@@ -1179,26 +1200,26 @@ export default function ScientificCalculatorPanel() {
         ) : null}
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" onClick={handlePasteClipboard}>
-            Paste from Clipboard
+            {t("scientificCalculator.action.pasteClipboard")}
           </Button>
           <Button size="sm" className="bg-cyan-600 hover:bg-cyan-700" onClick={() => solve(false)}>
-            Solve
+            {t("scientificCalculator.action.solve")}
           </Button>
           <Button size="sm" variant="outline" onClick={() => solve(true)}>
-            Solve with Steps
+            {t("scientificCalculator.action.solveSteps")}
           </Button>
           <Button
             size="sm"
             variant="outline"
             onClick={handleCopyResult}
           >
-            Copy Result
+            {t("scientificCalculator.action.copyResult")}
           </Button>
           <Button size="sm" variant="outline" onClick={handleCopyDebugLog}>
-            Copy Debug Log
+            {t("scientificCalculator.action.copyDebugLog")}
           </Button>
           <Button size="sm" variant="ghost" onClick={handleClear}>
-            Clear
+            {t("scientificCalculator.action.clear")}
           </Button>
         </div>
       </div>
@@ -1208,7 +1229,7 @@ export default function ScientificCalculatorPanel() {
 
       {compoundSolveEvents.length >= 2 ? (
         <div className="mt-3 rounded-md border border-cyan-900/60 bg-cyan-950/20 p-3">
-          <div className="mb-2 text-[10px] uppercase tracking-wide text-cyan-300">Compound Solve Trace</div>
+          <div className="mb-2 text-[10px] uppercase tracking-wide text-cyan-300">{t("scientificCalculator.compoundTrace.title")}</div>
           <div className="space-y-2">
             {compoundSolveEvents.map((entry, index) => (
               <div key={entry.id} className="rounded border border-cyan-900/40 bg-slate-950/60 p-2 text-xs">
@@ -1216,17 +1237,17 @@ export default function ScientificCalculatorPanel() {
                   <Badge variant="outline" className="border-cyan-700/70 text-cyan-100">
                     {index + 1}
                   </Badge>
-                  <span className="text-slate-200">{entry.calculator_setup?.subgoal ?? "Calculator subgoal"}</span>
+                  <span className="text-slate-200">{entry.calculator_setup?.subgoal ?? t("scientificCalculator.compoundTrace.subgoalFallback")}</span>
                 </div>
                 <div className="mt-2 grid gap-2 md:grid-cols-2">
                   <div>
-                    <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Expression</div>
+                    <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.common.expression")}</div>
                     <div className="break-all rounded border border-slate-800 bg-slate-900/60 px-2 py-1 font-mono text-slate-200">
                       {entry.input_latex}
                     </div>
                   </div>
                   <div>
-                    <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Result</div>
+                    <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.common.result")}</div>
                     <div className="break-all rounded border border-slate-800 bg-slate-900/60 px-2 py-1 font-mono text-slate-100">
                       {entry.result_text}
                       {entry.calculator_setup?.result_unit ? ` ${entry.calculator_setup.result_unit}` : ""}
@@ -1261,7 +1282,7 @@ export default function ScientificCalculatorPanel() {
               ) : null}
             </div>
             <div className="rounded-md border border-slate-800 bg-slate-950/60 p-3 text-xs">
-              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Result</div>
+              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.common.result")}</div>
               {resultMathHtml ? (
                 <div
                   className="mb-2 overflow-x-auto rounded border border-slate-800 bg-slate-900/70 px-2 py-2 text-slate-100"
@@ -1271,7 +1292,7 @@ export default function ScientificCalculatorPanel() {
               <div className="font-mono text-slate-100">{lastSolve.result_text || lastSolve.error || "n/a"}</div>
             </div>
             <div className="rounded-md border border-slate-800 bg-slate-950/50 p-3 text-xs">
-              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Trace</div>
+              <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.result.trace")}</div>
               <div className="flex flex-wrap gap-2">
                 <Badge variant="outline" className="border-slate-600 text-slate-200">
                   {solveTrace.route}
@@ -1304,40 +1325,40 @@ export default function ScientificCalculatorPanel() {
             {lastArtifactV1 ? (
               <details className="space-y-3 rounded-md border border-slate-800 bg-slate-950/50 p-3 text-xs">
                 <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 text-[10px] uppercase tracking-wide text-slate-400">
-                  <span>Evidence / Schema Trace</span>
+                  <span>{t("scientificCalculator.result.evidenceTrace")}</span>
                   <Button size="sm" variant="outline" onClick={(event) => {
                     event.preventDefault();
                     handleCopyStepsMarkdown();
                   }}>
-                    Copy Steps Markdown
+                    {t("scientificCalculator.action.copyStepsMarkdown")}
                   </Button>
                 </summary>
                 <div className="grid gap-2 lg:grid-cols-2">
                   <div className="rounded border border-slate-800 bg-slate-950/50 p-2">
-                    <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Method</div>
+                    <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.result.method")}</div>
                     <div className="text-slate-200">{schemaStepItems.find((step) => step.stage === "method")?.text ?? "n/a"}</div>
                   </div>
                   <div className="rounded border border-slate-800 bg-slate-950/50 p-2">
-                    <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Assumptions</div>
+                    <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.result.assumptions")}</div>
                     <div className="font-mono text-slate-200">
                       domain={lastArtifactV1.request.assumptions.domain}; angle={lastArtifactV1.request.assumptions.angleMode}
                     </div>
                   </div>
                   <div className="rounded border border-slate-800 bg-slate-950/50 p-2">
-                    <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Verification</div>
+                    <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.result.verification")}</div>
                     <div className="text-slate-200">
                       {lastArtifactV1.result.verification?.status ?? "not_run"}: {lastArtifactV1.result.verification?.text ?? "n/a"}
                     </div>
                   </div>
                   <div className="rounded border border-slate-800 bg-slate-950/50 p-2">
-                    <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Confidence / Fallback</div>
+                    <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.result.confidenceFallback")}</div>
                     <div className="font-mono text-slate-200">
                       {lastArtifactV1.quality.confidence.toFixed(2)} / {lastArtifactV1.quality.fallbackReason ?? "none"}
                     </div>
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <div className="text-[10px] uppercase tracking-wide text-slate-500">Schema Steps</div>
+                  <div className="text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.result.schemaSteps")}</div>
                   {schemaStepItems.map((step) => (
                     <div key={step.id} className="rounded-md border border-slate-800 bg-slate-950/50 p-2">
                       <div className="flex flex-wrap gap-2 text-[10px] uppercase tracking-wide text-slate-500">
@@ -1362,7 +1383,7 @@ export default function ScientificCalculatorPanel() {
               </details>
             ) : stepItems.length > 0 ? (
               <div className="space-y-2">
-                <div className="text-[10px] uppercase tracking-wide text-slate-500">Steps</div>
+                <div className="text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.result.steps")}</div>
                 {stepItems.map((step, index) => (
                   <div key={`${step.id}:${index}`} className="rounded-md border border-slate-800 bg-slate-950/50 p-2 text-xs">
                     <div className="text-[10px] uppercase tracking-wide text-slate-500">{index + 1}. {step.label}</div>
@@ -1379,12 +1400,12 @@ export default function ScientificCalculatorPanel() {
             ) : null}
           </>
         ) : (
-          <p className="text-xs text-slate-400">No solve executed yet.</p>
+          <p className="text-xs text-slate-400">{t("scientificCalculator.result.empty")}</p>
         )}
       </div>
 
       <div className="mt-3 rounded-md border border-slate-800 bg-slate-900/30 p-3">
-        <div className="text-[10px] uppercase tracking-wide text-slate-500">Recent Ingest</div>
+        <div className="text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.history.title")}</div>
         <div className="mt-2 space-y-1">
           {visibleHistory.map((entry) => (
             <div
@@ -1401,7 +1422,7 @@ export default function ScientificCalculatorPanel() {
       </div>
 
       <div className="mt-3 rounded-md border border-slate-800 bg-slate-900/30 p-3">
-        <div className="text-[10px] uppercase tracking-wide text-slate-500">Calculator Event Log</div>
+        <div className="text-[10px] uppercase tracking-wide text-slate-500">{t("scientificCalculator.events.title")}</div>
         <div
           className="mt-2 space-y-1"
           data-testid="scientific-calculator-debug-log"
@@ -1432,7 +1453,7 @@ export default function ScientificCalculatorPanel() {
               ) : null}
             </div>
           ))}
-          {debugEvents.length === 0 ? <div className="text-xs text-slate-500">No calculator events yet.</div> : null}
+          {debugEvents.length === 0 ? <div className="text-xs text-slate-500">{t("scientificCalculator.events.empty")}</div> : null}
         </div>
       </div>
     </div>

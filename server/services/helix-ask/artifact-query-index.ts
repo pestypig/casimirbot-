@@ -4,16 +4,24 @@ import {
   TOOL_FAMILY_DEFAULT_CONTRACTS,
   type ToolFamilyContract,
 } from "./tool-family-contract";
+import {
+  explicitCapabilityContractForCapability,
+  explicitCapabilityMatches,
+} from "./explicit-capability-contract";
 
 type RecordLike = Record<string, unknown>;
 
 type RailFailureCode =
+  | "explicit_capability_not_selected"
+  | "wrong_capability_executed"
   | "route_family_mismatch"
   | "tool_admission_drift"
   | "tool_execution_rejected"
+  | "required_observation_missing"
   | "observation_missing"
   | "observation_not_reentered"
   | "reentry_step_not_executed"
+  | "weak_evidence_repair_loop"
   | "support_refs_missing"
   | "terminal_product_mismatch"
   | "terminal_not_materialized"
@@ -53,15 +61,22 @@ type RepairTarget =
   | "terminal_materializer"
   | "terminal_authority"
   | "presenter_boundary"
-  | "operator_config";
+  | "operator_config"
+  | "intent_arbitration"
+  | "agent_step_selection"
+  | "repo_retrieval_repair_policy";
 
 const TOOL_TURN_CHAIN_FAILURE_CODES: RailFailureCode[] = [
+  "explicit_capability_not_selected",
+  "wrong_capability_executed",
   "route_family_mismatch",
   "tool_admission_drift",
   "tool_execution_rejected",
+  "required_observation_missing",
   "observation_missing",
   "observation_not_reentered",
   "reentry_step_not_executed",
+  "weak_evidence_repair_loop",
   "support_refs_missing",
   "terminal_product_mismatch",
   "terminal_not_materialized",
@@ -537,8 +552,19 @@ const buildToolTurnChainAudit = (input: {
   requiredObservationCoverage: RecordLike[];
   requiredObservationsSatisfied: boolean;
 }): RecordLike => {
+  const admission = readRecord(input.payload.tool_call_admission_decision);
+  const capabilityPlan = readRecord(input.payload.capability_plan);
+  const requestedCapability = firstString(
+    admission?.requested_capability,
+    capabilityPlan?.requested_capability,
+  );
+  const requestedCapabilityContract = explicitCapabilityContractForCapability(requestedCapability);
   const selectedCapability =
-    firstString(input.lifecycleTrace?.admitted_capability, input.lifecycleTrace?.requested_capability) ?? input.capability;
+    firstString(
+      capabilityPlan?.selected_capability,
+      input.lifecycleTrace?.admitted_capability,
+      input.lifecycleTrace?.requested_capability,
+    ) ?? input.capability;
   const operationalTrace = readRecord(input.payload.operational_capability_trace);
   const runtimeToolCall = readRecord(input.payload.runtime_tool_call);
   const toolExecutionRejected = runtimeToolExecutionRejected(input.payload, input.artifacts);
@@ -548,6 +574,24 @@ const buildToolTurnChainAudit = (input: {
     runtimeToolCall?.capability_key,
   );
   const executedCapability = toolExecutionRejected ? null : rawExecutedCapability;
+  const requestedSelectedMatch =
+    requestedCapability && selectedCapability
+      ? explicitCapabilityMatches(requestedCapability, selectedCapability)
+      : requestedCapability
+        ? false
+        : null;
+  const selectedExecutedMatch =
+    selectedCapability && executedCapability
+      ? normalizedEqual(selectedCapability, executedCapability)
+      : selectedCapability
+        ? false
+        : null;
+  const requestedExecutedMatch =
+    requestedCapability && executedCapability
+      ? explicitCapabilityMatches(requestedCapability, executedCapability)
+      : requestedCapability
+        ? false
+        : null;
   const selectedFamily = inferToolFamilyFromToolName(selectedCapability);
   const rawRouteFamily = firstString(input.toolFamily, input.contract?.toolFamily, selectedFamily);
   const routeFamily = isGenericAuditFamily(rawRouteFamily) && selectedFamily ? selectedFamily : rawRouteFamily;
@@ -567,6 +611,15 @@ const buildToolTurnChainAudit = (input: {
       ? null
       : readStringArray(observationCoverage?.artifact_refs)[0] ||
         (observationArtifactKind ? artifactRef(artifactForKind(input.artifacts, observationArtifactKind) ?? {}) : null);
+  const requestedObservationKinds = unique([
+    ...readStringArray(admission?.required_observation_kinds_for_requested_capability),
+    ...(requestedCapabilityContract?.required_observation_kinds ?? []),
+  ]);
+  const observedArtifactSupportsRequestedCapability =
+    requestedObservationKinds.length === 0 ||
+    input.artifacts.some((artifact) =>
+      requestedObservationKinds.some((kind) => observationKindMatches(artifact, kind)),
+    );
   const requiredTerminal = requiredTerminalKind(input.payload, input.contract);
   const supportCount = supportRefsCount(input.payload, input.artifacts);
   const materializedTerminal = materializedTerminalKind(input.payload);
@@ -617,6 +670,13 @@ const buildToolTurnChainAudit = (input: {
       !routeFamilyMismatch,
   );
   const configMissing = likelyInternetSearchConfigMissing(input.payload, routeFamily);
+  const repoWeakEvidenceRepairLoop =
+    readString(input.payload.terminal_error_code) === "repo_evidence_weak_after_repair" ||
+    input.artifacts.some((artifact) => {
+      if (normalize(artifact.kind) !== "typed_failure") return false;
+      const payload = artifactPayload(artifact);
+      return readString(payload?.error_code) === "repo_evidence_weak_after_repair";
+    });
   const draftNeedsSupport =
     Boolean(finalDraftRef) &&
     Boolean(materializedTerminal) &&
@@ -624,35 +684,62 @@ const buildToolTurnChainAudit = (input: {
   const railFailureCode: RailFailureCode | null =
     configMissing
       ? "config_missing"
-      : routeFamilyMismatch
-        ? "route_family_mismatch"
-        : toolAdmissionDrift
-          ? "tool_admission_drift"
-          : toolExecutionRejected
-            ? "tool_execution_rejected"
-            : !input.requiredObservationsSatisfied && !concreteTurnChainComplete
-              ? "observation_missing"
-              : observationRef && !reentryExecuted
-                ? "observation_not_reentered"
-                : expectedReentry && !reentryExecuted
-                  ? "reentry_step_not_executed"
-                  : draftNeedsSupport && supportCount === 0
-                    ? "support_refs_missing"
-                    : terminalProductMismatch
-                      ? "terminal_product_mismatch"
-                      : !materializedTerminal
-                        ? "terminal_not_materialized"
-                        : terminalProjectionMismatch
-                          ? "terminal_projection_mismatch"
-                          : null;
+      : requestedCapability && requestedSelectedMatch === false
+        ? "explicit_capability_not_selected"
+        : requestedCapability && executedCapability && requestedExecutedMatch === false
+          ? "wrong_capability_executed"
+          : routeFamilyMismatch
+            ? "route_family_mismatch"
+            : toolAdmissionDrift
+              ? "tool_admission_drift"
+              : toolExecutionRejected
+                ? "tool_execution_rejected"
+                : requestedCapability && observationRef && !observedArtifactSupportsRequestedCapability
+                  ? "required_observation_missing"
+                  : repoWeakEvidenceRepairLoop
+                    ? "weak_evidence_repair_loop"
+                    : !input.requiredObservationsSatisfied && !concreteTurnChainComplete
+                      ? "observation_missing"
+                      : observationRef && !reentryExecuted
+                        ? "observation_not_reentered"
+                        : expectedReentry && !reentryExecuted
+                          ? "reentry_step_not_executed"
+                          : draftNeedsSupport && supportCount === 0
+                            ? "support_refs_missing"
+                            : terminalProductMismatch
+                              ? "terminal_product_mismatch"
+                              : !materializedTerminal
+                                ? "terminal_not_materialized"
+                                : terminalProjectionMismatch
+                                  ? "terminal_projection_mismatch"
+                                  : null;
   const railStatus: RailStatus =
     railFailureCode === null ? "complete" : materializedTerminal === "typed_failure" ? "fail_closed" : "broken";
 
   return {
     schema: "helix.tool_turn_chain_audit.v1",
+    capability_contract_guard_version: requestedCapability ? "E82" : null,
     route_family: routeFamily,
+    requested_capability: requestedCapability,
+    requested_capability_family:
+      readNullableString(admission?.requested_capability_family) ??
+      requestedCapabilityContract?.capability_family ??
+      null,
+    requested_capability_source:
+      readNullableString(admission?.requested_capability_source) ??
+      readNullableString(capabilityPlan?.requested_capability_source) ??
+      null,
+    requested_capability_confidence: readNumber(admission?.requested_capability_confidence),
     selected_capability: selectedCapability,
     executed_capability: executedCapability,
+    requested_selected_match: requestedSelectedMatch,
+    selected_executed_match: selectedExecutedMatch,
+    substitution_rule_applied: false,
+    substitution_rule_id: null,
+    required_observation_kinds_for_requested_capability: requestedObservationKinds,
+    observed_artifact_supports_requested_capability: requestedCapability
+      ? observedArtifactSupportsRequestedCapability
+      : null,
     policy_rejection_ref: toolExecutionRejected && policyRejectionArtifact ? artifactRef(policyRejectionArtifact) : null,
     policy_rejection_reason: toolExecutionRejected ? rejectedToolExecutionTexts(input.payload, input.artifacts).find(Boolean) ?? null : null,
     observation_artifact_kind: observationArtifactKind,
@@ -682,6 +769,9 @@ const buildToolTurnChainFamilyMatrix = (audit: RecordLike): RecordLike[] => {
     return {
       route_family: matrixFamily,
       observed,
+      requested_capability: observed ? audit.requested_capability ?? null : null,
+      requested_selected_match: observed ? audit.requested_selected_match ?? null : null,
+      selected_executed_match: observed ? audit.selected_executed_match ?? null : null,
       did_tool_run: observed ? Boolean(readString(audit.executed_capability)) : null,
       artifact_produced: observed ? Boolean(readString(audit.observation_ref)) : null,
       observation_artifact_kind: observed ? audit.observation_artifact_kind ?? null : null,
@@ -728,6 +818,20 @@ const triageFromAudit = (audit: RecordLike): {
   if (railFailureCode === "config_missing") {
     return { first_broken_rail: "config", failure_bucket: "G_config_missing", repair_target: "operator_config" };
   }
+  if (railFailureCode === "explicit_capability_not_selected") {
+    return {
+      first_broken_rail: "route_admission",
+      failure_bucket: "H_route_tool_family_contract_mismatch",
+      repair_target: "intent_arbitration",
+    };
+  }
+  if (railFailureCode === "wrong_capability_executed") {
+    return {
+      first_broken_rail: "capability_execution",
+      failure_bucket: "H_route_tool_family_contract_mismatch",
+      repair_target: "agent_step_selection",
+    };
+  }
   if (!routeFamily || railFailureCode === "route_family_mismatch") {
     return {
       first_broken_rail: "route_admission",
@@ -756,7 +860,21 @@ const triageFromAudit = (audit: RecordLike): {
       repair_target: "tool_execution",
     };
   }
+  if (railFailureCode === "weak_evidence_repair_loop") {
+    return {
+      first_broken_rail: "evidence_reentry",
+      failure_bucket: "C_observation_not_reentered",
+      repair_target: "repo_retrieval_repair_policy",
+    };
+  }
   if (!observationRef || railFailureCode === "observation_missing") {
+    return {
+      first_broken_rail: "observation_artifact",
+      failure_bucket: "B_tool_executed_observation_missing",
+      repair_target: "observation_materializer",
+    };
+  }
+  if (railFailureCode === "required_observation_missing") {
     return {
       first_broken_rail: "observation_artifact",
       failure_bucket: "B_tool_executed_observation_missing",
@@ -819,8 +937,25 @@ const buildToolRailFailureTriage = (input: {
     schema: "helix.tool_rail_failure_triage.v1",
     turn_id: input.turnId,
     route_family: readNullableString(input.audit.route_family),
+    capability_contract_guard_version: readNullableString(input.audit.capability_contract_guard_version),
+    requested_capability: readNullableString(input.audit.requested_capability),
+    requested_capability_family: readNullableString(input.audit.requested_capability_family),
+    requested_capability_source: readNullableString(input.audit.requested_capability_source),
+    requested_capability_confidence: readNumber(input.audit.requested_capability_confidence),
     selected_capability: readNullableString(input.audit.selected_capability),
     executed_capability: executedCapability || null,
+    requested_selected_match:
+      typeof input.audit.requested_selected_match === "boolean" ? input.audit.requested_selected_match : null,
+    selected_executed_match:
+      typeof input.audit.selected_executed_match === "boolean" ? input.audit.selected_executed_match : null,
+    substitution_rule_applied: input.audit.substitution_rule_applied === true,
+    substitution_rule_id: readNullableString(input.audit.substitution_rule_id),
+    required_observation_kinds_for_requested_capability:
+      readStringArray(input.audit.required_observation_kinds_for_requested_capability),
+    observed_artifact_supports_requested_capability:
+      typeof input.audit.observed_artifact_supports_requested_capability === "boolean"
+        ? input.audit.observed_artifact_supports_requested_capability
+        : null,
     did_tool_run: Boolean(executedCapability),
     policy_rejection_ref: readNullableString(input.audit.policy_rejection_ref),
     policy_rejection_reason: readNullableString(input.audit.policy_rejection_reason),

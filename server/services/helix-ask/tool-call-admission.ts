@@ -15,6 +15,10 @@ import { buildTurnOperationalConstraints } from "./operational-constraints";
 import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
 import {
+  extractExplicitCapabilityContract,
+  explicitCapabilityContractForCapability,
+} from "./explicit-capability-contract";
+import {
   isStagePlayCheckpointRequestPrompt,
   isStagePlayJobPlanningPrompt,
   isStagePlayReflectionPrompt,
@@ -300,6 +304,20 @@ export function buildToolCallAdmissionDecision(input: {
   const toolUseRestatement = buildToolUseRestatement(promptText);
   const calculatorSolveIntent = calculatorSolveRequested(promptText, input.sourceTargetIntent);
   const mandatoryToolName = readMandatoryToolName(mandatoryNextToolRecord);
+  const promptExplicitCapabilityContract = extractExplicitCapabilityContract(promptText);
+  const explicitCapabilityContract =
+    promptExplicitCapabilityContract ??
+    explicitCapabilityContractForCapability(mandatoryToolName);
+  const requestedCapabilitySource = promptExplicitCapabilityContract
+    ? "explicit_user_command"
+    : explicitCapabilityContract
+      ? "mandatory_next_tool"
+      : null;
+  const requestedCapabilityConfidence = promptExplicitCapabilityContract
+    ? 0.99
+    : explicitCapabilityContract
+      ? 0.95
+      : null;
   const canonicalGoalKind =
     readString(canonicalGoalFrameRecord?.goal_kind) ??
     readString(canonicalGoalFrameRecord?.goalKind) ??
@@ -329,13 +347,22 @@ export function buildToolCallAdmissionDecision(input: {
     sourceTarget !== "calculator_stream" &&
     sourceTarget !== "calculator" &&
     sourceTarget !== "calculator_solve";
+  const explicitCapabilityDominatesSourceTarget =
+    Boolean(explicitCapabilityContract) &&
+    sourceTarget !== "unknown" &&
+    sourceTarget !== explicitCapabilityContract?.source_target &&
+    !sourceTargetToolFamilies(sourceTarget, promptText, input.sourceTargetIntent).some((family) =>
+      explicitCapabilityContract?.admission_families.includes(family as HelixToolCallAdmissionFamily),
+    );
   const admittedToolFamiliesBeforeMandatoryOverride =
-    calculatorAdmissionDominatesSourceTarget
+    calculatorAdmissionDominatesSourceTarget || explicitCapabilityDominatesSourceTarget
       ? sourceTargetToolFamilies(sourceTarget, promptText, input.sourceTargetIntent)
           .filter(isToolCallAdmissionFamily)
       : [];
   const effectiveSourceTarget =
-    calculatorAdmissionDominatesSourceTarget
+    explicitCapabilityContract
+      ? explicitCapabilityContract.source_target
+      : calculatorAdmissionDominatesSourceTarget
       ? "calculator_stream"
       : sourceTarget === "unknown" && toolUseRestatement.requiredToolFamilies.includes("docs_viewer")
       ? "docs_viewer"
@@ -374,7 +401,7 @@ export function buildToolCallAdmissionDecision(input: {
     };
   }
 
-  let required = HARD_SOURCE_TARGETS.has(effectiveSourceTarget);
+  let required = Boolean(explicitCapabilityContract) || HARD_SOURCE_TARGETS.has(effectiveSourceTarget);
   let admittedToolFamilies: HelixToolCallAdmissionFamily[] = [];
   let extraForbiddenTerminalKinds: string[] = [];
   let extraForbiddenRoutes: string[] = [];
@@ -667,6 +694,20 @@ export function buildToolCallAdmissionDecision(input: {
     reason = `${reason}+compound_theory_locator_required`;
   }
 
+  if (explicitCapabilityContract) {
+    const requestedFamilies = explicitCapabilityContract.admission_families.filter(familyAllowed);
+    const nextFamilies = unique([
+      ...admittedToolFamilies.filter((family: HelixToolCallAdmissionFamily) => family !== "model_only"),
+      ...requestedFamilies,
+    ]);
+    admittedToolFamilies = nextFamilies;
+    required = true;
+    reason = `${reason}+explicit_capability_contract_required`;
+    if (explicitCapabilityDominatesSourceTarget) {
+      reason = `${reason}+explicit_capability_contract_dominance`;
+    }
+  }
+
   if (calculatorAdmissionDominatesSourceTarget) {
     reason = `${reason}+mandatory_calculator_admission_dominance`;
   }
@@ -675,30 +716,56 @@ export function buildToolCallAdmissionDecision(input: {
     mandatoryCalculatorSolve &&
     finalAdmittedToolFamilies.includes("calculator") &&
     finalAdmittedToolFamilies.includes("workstation_action");
+  const explicitCapabilityAdmitted = explicitCapabilityContract
+    ? explicitCapabilityContract.admission_families.every((family) => finalAdmittedToolFamilies.includes(family))
+    : false;
+  const routeArbitrationGuardVersion = explicitCapabilityContract ? "E82" as const : "E80" as const;
+  const routeArbitrationSelectedCapability =
+    explicitCapabilityContract?.capability ??
+    mandatoryToolName ??
+    (mandatoryCalculatorSolve ? "scientific-calculator.solve_expression" : null);
+  const routeArbitrationMandatoryFamily =
+    explicitCapabilityContract?.admission_families[0] ??
+    (mandatoryCalculatorSolve ? "calculator" as const : null);
+  const routeArbitrationMandatoryAdmitted =
+    explicitCapabilityContract ? explicitCapabilityAdmitted : mandatoryCapabilityAdmitted;
+  const secondarySourceTargets = unique([
+    ...(calculatorAdmissionDominatesSourceTarget && sourceTarget === "repo_code" ? ["repo_code"] : []),
+    ...(explicitCapabilityDominatesSourceTarget && sourceTarget !== "unknown" ? [sourceTarget] : []),
+  ]);
   const routeArbitration =
-    mandatoryCalculatorSolve || calculatorAdmissionDominatesSourceTarget
+    explicitCapabilityContract || mandatoryCalculatorSolve || calculatorAdmissionDominatesSourceTarget
       ? {
           schema: "helix.tool_call_admission_route_arbitration.v1" as const,
-          guard_version: "E80" as const,
+          guard_version: routeArbitrationGuardVersion,
           original_source_target: sourceTarget,
           effective_source_target: effectiveSourceTarget,
           canonical_goal_kind: canonicalGoalKind,
-          mandatory_next_tool_name: mandatoryToolName,
-          mandatory_capability_family: "calculator" as const,
-          mandatory_capability_admitted: mandatoryCapabilityAdmitted,
+          mandatory_next_tool_name: explicitCapabilityContract?.capability ?? mandatoryToolName,
+          mandatory_capability_family: routeArbitrationMandatoryFamily,
+          mandatory_capability_admitted: routeArbitrationMandatoryAdmitted,
           admitted_tool_families_before_mandatory_override: unique(admittedToolFamiliesBeforeMandatoryOverride),
           admitted_tool_families_after_mandatory_override: finalAdmittedToolFamilies,
           calculator_goal_overrode_repo_source_target: calculatorAdmissionDominatesSourceTarget && sourceTarget === "repo_code",
           repo_code_preserved_as_secondary_context: calculatorAdmissionDominatesSourceTarget && sourceTarget === "repo_code",
-          secondary_source_targets: calculatorAdmissionDominatesSourceTarget && sourceTarget === "repo_code" ? ["repo_code"] : [],
+          requested_capability: explicitCapabilityContract?.capability ?? null,
+          requested_capability_family: explicitCapabilityContract?.capability_family ?? null,
+          requested_capability_source: requestedCapabilitySource,
+          requested_capability_confidence: requestedCapabilityConfidence,
+          required_observation_kinds_for_requested_capability:
+            explicitCapabilityContract?.required_observation_kinds ?? [],
+          explicit_capability_overrode_source_target: explicitCapabilityDominatesSourceTarget,
+          secondary_source_targets: secondarySourceTargets,
           tool_admission_reason: reason,
-          tool_admission_dominance_reason: calculatorAdmissionDominatesSourceTarget
-            ? "mandatory_calculator_capability"
-            : null,
-          selected_capability: mandatoryToolName ?? (mandatoryCalculatorSolve ? "scientific-calculator.solve_expression" : null),
-          runtime_capability_rejection_reason: mandatoryCapabilityAdmitted ? null : "mandatory_capability_not_admitted",
-          first_broken_rail: mandatoryCapabilityAdmitted ? null : "capability_execution" as const,
-          repair_target: mandatoryCapabilityAdmitted ? null : "tool_admission" as const,
+          tool_admission_dominance_reason: explicitCapabilityContract
+            ? "explicit_requested_capability_contract"
+            : calculatorAdmissionDominatesSourceTarget
+              ? "mandatory_calculator_capability"
+              : null,
+          selected_capability: routeArbitrationSelectedCapability,
+          runtime_capability_rejection_reason: routeArbitrationMandatoryAdmitted ? null : "mandatory_capability_not_admitted",
+          first_broken_rail: routeArbitrationMandatoryAdmitted ? null : "capability_execution" as const,
+          repair_target: routeArbitrationMandatoryAdmitted ? null : "tool_admission" as const,
           assistant_answer: false as const,
           raw_content_included: false as const,
         }
@@ -736,7 +803,7 @@ export function buildToolCallAdmissionDecision(input: {
     reason,
     ...(routeArbitration
       ? {
-          route_arbitration_guard_version: "E80" as const,
+          route_arbitration_guard_version: routeArbitration.guard_version,
           original_source_target: routeArbitration.original_source_target,
           effective_source_target: routeArbitration.effective_source_target,
           canonical_goal_kind: routeArbitration.canonical_goal_kind,
@@ -751,6 +818,19 @@ export function buildToolCallAdmissionDecision(input: {
             routeArbitration.calculator_goal_overrode_repo_source_target,
           repo_code_preserved_as_secondary_context:
             routeArbitration.repo_code_preserved_as_secondary_context,
+          ...(explicitCapabilityContract
+            ? {
+                capability_contract_guard_version: "E82" as const,
+                requested_capability: explicitCapabilityContract.capability,
+                requested_capability_family: explicitCapabilityContract.capability_family,
+                requested_capability_source: requestedCapabilitySource,
+                requested_capability_confidence: requestedCapabilityConfidence,
+                required_observation_kinds_for_requested_capability:
+                  explicitCapabilityContract.required_observation_kinds,
+                explicit_capability_overrode_source_target: explicitCapabilityDominatesSourceTarget,
+                secondary_source_targets: routeArbitration.secondary_source_targets,
+              }
+            : {}),
           tool_admission_reason: routeArbitration.tool_admission_reason,
           tool_admission_dominance_reason: routeArbitration.tool_admission_dominance_reason,
           selected_capability: routeArbitration.selected_capability,

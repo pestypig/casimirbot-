@@ -296,6 +296,8 @@ export const buildToolLifecycleTrace = (input: {
   const lifecycleLedger = readRecord(input.payload.capability_lifecycle_ledger);
   const decision = readRecord(input.payload.agent_step_decision) ?? readRecord(input.payload.initial_agent_step_decision);
   const requestedCapability =
+    readString(admission?.requested_capability) ||
+    readString(plan?.requested_capability) ||
     readString(operationalTrace?.model_proposed_capability) ||
     modelCapability(decision) ||
     capabilityFromPlan(plan);

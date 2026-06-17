@@ -321,15 +321,18 @@ describe("Helix Ask negated/contextual tool admission", () => {
       source_target: "calculator_stream",
       required: true,
       admitted_tool_families: expect.arrayContaining(["calculator", "workstation_action"]),
-      reason: "calculator_stream_requires_calculator_tool_path",
+      capability_contract_guard_version: "E82",
+      requested_capability: "scientific-calculator.solve_expression",
     });
+    expect(admission.reason).toContain("calculator_stream_requires_calculator_tool_path");
+    expect(admission.reason).toContain("explicit_capability_contract_required");
     expect(admission.tool_admission_suppressed).toBeUndefined();
     expect(admission.forbidden_tool_families ?? []).not.toEqual(
       expect.arrayContaining(["calculator", "workstation_action"]),
     );
   });
 
-  it("lets mandatory calculator admission dominate repo-code debug wording", () => {
+  it("lets explicit mandatory calculator admission dominate repo-code debug wording", () => {
     const promptText =
       "Call scientific-calculator.solve_expression with this exact expression: ((sqrt(81)+ln(e^3))*7-5^2)/2. " +
       "Use the calculator tool, wait for calculator_receipt, re-enter that receipt as evidence, and answer only from the calculator-backed terminal result. " +
@@ -372,18 +375,21 @@ describe("Helix Ask negated/contextual tool admission", () => {
       source_target: "calculator_stream",
       required: true,
       admitted_tool_families: expect.arrayContaining(["calculator", "workstation_action"]),
-      route_arbitration_guard_version: "E80",
+      route_arbitration_guard_version: "E82",
       original_source_target: "repo_code",
       effective_source_target: "calculator_stream",
       canonical_goal_kind: "calculator_solve",
       mandatory_next_tool_name: "scientific-calculator.solve_expression",
+      requested_capability: "scientific-calculator.solve_expression",
+      requested_capability_source: "explicit_user_command",
       mandatory_capability_family: "calculator",
       mandatory_capability_admitted: true,
       calculator_goal_overrode_repo_source_target: true,
       repo_code_preserved_as_secondary_context: true,
-      tool_admission_dominance_reason: "mandatory_calculator_capability",
+      tool_admission_dominance_reason: "explicit_requested_capability_contract",
       runtime_capability_rejection_reason: null,
     });
+    expect(admission.reason).toContain("explicit_capability_contract_required");
     expect(admission.reason).toContain("mandatory_calculator_admission_dominance");
     expect(admission.forbidden_tool_families ?? []).not.toEqual(
       expect.arrayContaining(["calculator", "workstation_action"]),
@@ -405,6 +411,108 @@ describe("Helix Ask negated/contextual tool admission", () => {
     });
     expect(admission.admitted_tool_families).not.toContain("calculator");
     expect(admission.route_arbitration_guard_version).toBeUndefined();
+  });
+
+  it("makes explicit workspace_os.status dominate debug diagnosis routing", () => {
+    const promptText =
+      "Use workspace_os.status to inspect workstation status. Answer only from the produced workstation tool evaluation or status artifact.";
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, sourceTargetIntent, promptText });
+    const plan = buildCapabilityPlan({
+      turnId,
+      promptText,
+      sourceTargetIntent,
+      toolCallAdmissionDecision: admission,
+      canonicalGoalFrame: {
+        ...canonicalGoal,
+        goal_kind: "debug_diagnosis",
+        required_terminal_kind: "debug_evidence_diagnosis",
+      },
+    });
+
+    expect(admission).toMatchObject({
+      source_target: "workspace_diagnostic",
+      required: true,
+      admitted_tool_families: expect.arrayContaining(["workspace_diagnostic"]),
+      capability_contract_guard_version: "E82",
+      requested_capability: "workspace_os.status",
+      requested_capability_family: "workspace_diagnostic",
+    });
+    expect(plan).toMatchObject({
+      capability_family: "workspace_diagnostic",
+      requested_action: "workspace_os.status",
+      selected_capability: "workspace_os.status",
+      requested_capability: "workspace_os.status",
+    });
+  });
+
+  it("makes explicit docs-viewer.locate_in_doc dominate summary heuristics", () => {
+    const promptText =
+      "Use docs-viewer.locate_in_doc to find the section in the open document that discusses Codex parity or tool-output re-entry. Answer only from the docs-viewer observation and cite the document evidence.";
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, sourceTargetIntent, promptText });
+    const plan = buildCapabilityPlan({
+      turnId,
+      promptText,
+      sourceTargetIntent,
+      toolCallAdmissionDecision: admission,
+      canonicalGoalFrame: {
+        ...canonicalGoal,
+        goal_kind: "active_doc_summary",
+        required_terminal_kind: "doc_summary",
+      },
+    });
+
+    expect(admission).toMatchObject({
+      source_target: "docs_viewer",
+      required: true,
+      admitted_tool_families: ["docs_viewer"],
+      capability_contract_guard_version: "E82",
+      requested_capability: "docs-viewer.locate_in_doc",
+      required_observation_kinds_for_requested_capability: expect.arrayContaining([
+        "doc_location_result",
+        "doc_location_matches",
+        "doc_evidence_location",
+      ]),
+    });
+    expect(plan).toMatchObject({
+      capability_family: "docs",
+      requested_action: "docs-viewer.locate_in_doc",
+      selected_capability: "docs-viewer.locate_in_doc",
+      requested_capability: "docs-viewer.locate_in_doc",
+    });
+  });
+
+  it("keeps explicit repo-code.search_concept as the requested capability contract", () => {
+    const promptText =
+      "Use repo-code.search_concept to find where Helix Ask terminal authority or terminal projection is implemented. Answer only from repo/code evidence and cite file paths.";
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, sourceTargetIntent, promptText });
+    const plan = buildCapabilityPlan({
+      turnId,
+      promptText,
+      sourceTargetIntent,
+      toolCallAdmissionDecision: admission,
+      canonicalGoalFrame: {
+        ...canonicalGoal,
+        goal_kind: "repo_code_evidence_question",
+        required_terminal_kind: "repo_code_evidence_answer",
+      },
+    });
+
+    expect(admission).toMatchObject({
+      source_target: "repo_code",
+      required: true,
+      admitted_tool_families: ["repo_code"],
+      capability_contract_guard_version: "E82",
+      requested_capability: "repo-code.search_concept",
+    });
+    expect(plan).toMatchObject({
+      capability_family: "repo_evidence",
+      requested_action: "repo-code.search_concept",
+      selected_capability: "repo-code.search_concept",
+      requested_capability: "repo-code.search_concept",
+    });
   });
 
   it("classifies mandatory calculator admission rejection for one-shot fail closed handling", () => {

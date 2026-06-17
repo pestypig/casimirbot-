@@ -28,6 +28,10 @@ import {
 import { HELIX_WORKSPACE_DIRECTORY_RESOLVE_CAPABILITY } from "./workspace-directory-resolver";
 import { mandatoryToolForPhase } from "./live-source-turn-phase-resolver";
 import { isExplicitDocsPathDocumentOperation } from "./docs-viewer-intent";
+import {
+  explicitCapabilityContractForCapability,
+  extractExplicitCapabilityContract,
+} from "./explicit-capability-contract";
 
 type RecordLike = Record<string, unknown>;
 
@@ -459,6 +463,9 @@ export const buildCapabilityPlan = (input: {
   const instructionFrame = readRecord(input.instructionFrame);
   const routeMetadata = readRecord(input.routeMetadata);
   const mandatoryPhaseTool = mandatoryToolForPhase(input.liveSourceTurnPhaseResolution as LiveSourceTurnPhaseResolutionV1 | null);
+  const requestedCapabilityContract =
+    explicitCapabilityContractForCapability(readString(toolCallAdmissionDecision?.requested_capability)) ??
+    extractExplicitCapabilityContract(input.promptText);
   const firstAllowedPhaseTool = firstAllowedToolForPhase(input.liveSourceTurnPhaseResolution);
   const explicitDocsPathOperation = isExplicitDocsPathDocumentOperation(input.promptText);
   const hardLiveSourceMailboxRoute = !explicitDocsPathOperation && isHardLiveSourceMailboxRoute({
@@ -485,6 +492,7 @@ export const buildCapabilityPlan = (input: {
     toolUseRestatement.requiredToolFamilies.includes("docs_viewer");
   const sourceTarget =
     (hardLiveSourceMailboxRoute ? "live_source_mailbox" : "") ||
+    (requestedCapabilityContract?.source_target ?? "") ||
     (requiresDocsViewerEvidence ? "docs_viewer" : "") ||
     (requiresInternetEvidence ? "internet_search" : "") ||
     (requiresRepoConceptEvidence ? "repo_code" : "") ||
@@ -505,6 +513,8 @@ export const buildCapabilityPlan = (input: {
   });
   const family: HelixCapabilityFamily = hardLiveSourceMailboxRoute
     ? "live_environment"
+    : requestedCapabilityContract
+    ? requestedCapabilityContract.plan_family
     : requiresDocsViewerEvidence
     ? "docs"
     : requiresRepoConceptEvidence
@@ -527,6 +537,8 @@ export const buildCapabilityPlan = (input: {
     ? (mandatoryPhaseTool ?? firstAllowedPhaseTool) || "live_env.read_processed_live_source_mail"
     : contextualSuppressionBlocksPlan
       ? "suppressed_contextual_tool_reference"
+    : requestedCapabilityContract
+      ? requestedCapabilityContract.capability
     : family === "live_source" &&
       rules.includes("do_not_change_cadence_without_affirmative_operator_command")
         ? "inspect_live_source"
@@ -578,6 +590,15 @@ export const buildCapabilityPlan = (input: {
     turn_id: input.turnId,
     capability_family: family,
     requested_action: requestedAction,
+    ...(requestedCapabilityContract
+      ? {
+          requested_capability: requestedCapabilityContract.capability,
+          requested_capability_source:
+            readString(toolCallAdmissionDecision?.requested_capability_source) || "explicit_user_command",
+          requested_capability_contract_ref: requestedCapabilityContract.schema,
+          requested_selected_match: requestedAction === phaseFilteredPlan.selectedCapability,
+        }
+      : {}),
     mutating,
     operator_command_required: operatorCommandRequired,
     operator_command_present: operatorCommandPresent,

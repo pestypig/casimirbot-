@@ -57,6 +57,37 @@ describe("Helix Ask workstation answer synthesizer", () => {
     expect(answer).not.toContain("available in the Scientific Calculator receipt/trace");
   });
 
+  it("does not print null-ish calculator result metadata", () => {
+    const prompt = "Use the scientific calculator to solve 2+2.";
+    const plan = planWorkstationToolUse(prompt).tool_plan;
+
+    expect(plan).toBeTruthy();
+    const answer = synthesizeWorkstationToolAnswer({
+      prompt,
+      plan: plan!,
+      evaluation: {
+        schema: "helix.workstation_tool_evaluation.v1",
+        evaluation_id: "eval:null-unit",
+        plan_id: plan!.plan_id,
+        thread_id: "thread:test",
+        turn_id: "turn:test",
+        goal: prompt,
+        subgoal: "Evaluate the supplied calculator expression.",
+        tool_receipt_ids: ["calculator:receipt:null-unit"],
+        supports_goal: true,
+        result_text: "4 null",
+        summary: "Calculator verified 2+2 with result 4 null.",
+        evidence_refs: ["calculator:receipt:null-unit"],
+        deterministic: true,
+        model_invoked: false,
+        created_at: "2026-06-16T00:00:00.000Z",
+      },
+    });
+
+    expect(answer).toContain("Result: 4");
+    expect(answer).not.toContain("Result: 4 null");
+  });
+
   it("continues reasoning after calculator output for compound photon-energy prompts", () => {
     const prompt = "Explain photon energy using E=hf and calculate it for f=5e14 Hz.";
     const plan = planWorkstationToolUse(prompt).tool_plan;

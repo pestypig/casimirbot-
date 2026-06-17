@@ -403,6 +403,45 @@ describe("Helix Ask E63 terminal projection", () => {
     expect(chooseVisibleFinalText(reply as never)).toBe(text);
   });
 
+  it("prefers backend debug terminal authority over stale reply source labels", () => {
+    const text =
+      "Calculator verification plan completed.\nExpression: 2 + 2\nResult: 4\nTrace source: scientific-calculator.solve_expression.";
+    const staleReply = {
+      id: "turn-e63-stale-source-shell",
+      turn_id: "turn-e63-stale-source-shell",
+      content: text,
+      selected_final_answer: text,
+      final_answer_source: "model_synthesized_answer",
+      terminal_artifact_kind: "model_synthesized_answer",
+      resolved_turn_summary: {
+        resolved_route_label: "calculator_solve / model_synthesized_answer",
+        terminal_artifact_kind: "model_synthesized_answer",
+        final_answer_source: "model_synthesized_answer",
+      },
+    };
+    const backendDebug = {
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        server_authoritative: true,
+        terminal_text_preview: text,
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        final_answer_source: "workstation_tool_evaluation",
+      },
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        visible_text: text,
+        selected_terminal_artifact_kind: "workstation_tool_evaluation",
+        source: "workstation_tool_evaluation",
+        integrity: {
+          single_writer_applied: true,
+          materialized_terminal_artifact_kind: "workstation_tool_evaluation",
+        },
+      },
+    };
+
+    expect(readHelixAskFinalAnswerSourceLabel(backendDebug, staleReply)).toBe("workstation tool evaluation");
+  });
+
   it("does not let source-targeted legacy selected_final_answer become visible truth without authority", () => {
     const reply = {
       id: "turn-e63-source-no-authority",

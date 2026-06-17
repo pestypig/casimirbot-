@@ -551,6 +551,171 @@ describe("Helix Ask tool lifecycle trace", () => {
     });
   });
 
+  it("fails audit when a selected docs summary does not satisfy explicit locate_in_doc request", () => {
+    const payload: Record<string, unknown> = {
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        turn_id: "ask:test:wrong-docs-procedure",
+        source_target: "docs_viewer",
+        required: true,
+        admitted_tool_families: ["docs_viewer"],
+        capability_contract_guard_version: "E82",
+        requested_capability: "docs-viewer.locate_in_doc",
+        requested_capability_family: "docs_viewer",
+        requested_capability_source: "explicit_user_command",
+        requested_capability_confidence: 0.99,
+        required_observation_kinds_for_requested_capability: [
+          "doc_location_result",
+          "doc_location_matches",
+          "doc_evidence_location",
+        ],
+        forbidden_terminal_artifact_kinds: ["direct_answer_text"],
+        forbidden_routes: ["model_only_concept"],
+        reason: "docs_viewer_requires_document_tool_path+explicit_capability_contract_required",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:wrong-docs-procedure",
+        capability_family: "docs",
+        requested_action: "docs-viewer.summarize_doc",
+        selected_capability: "docs-viewer.summarize_doc",
+        requested_capability: "docs-viewer.locate_in_doc",
+        admission_status: "admitted",
+      },
+      runtime_tool_call: {
+        tool_call_id: "tool:wrong-docs-procedure",
+        capability_key: "docs-viewer.summarize_doc",
+        status: "completed",
+      },
+      terminal_artifact_kind: "doc_summary",
+      terminal_presentation: { terminal_artifact_kind: "doc_summary" },
+      terminal_answer_authority: { terminal_artifact_kind: "doc_summary" },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "doc_summary:wrong",
+          kind: "observation_review",
+          payload: {
+            schema: "helix.observation_review.v1",
+            summary: "Summarized the document.",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:wrong-docs-procedure", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:wrong-docs-procedure", payload });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      capability_contract_guard_version: "E82",
+      requested_capability: "docs-viewer.locate_in_doc",
+      selected_capability: "docs-viewer.summarize_doc",
+      requested_selected_match: false,
+      rail_status: "broken",
+      rail_failure_code: "explicit_capability_not_selected",
+    });
+    expect(index.tool_rail_failure_triage).toMatchObject({
+      first_broken_rail: "route_admission",
+      rail_failure_code: "explicit_capability_not_selected",
+      repair_target: "intent_arbitration",
+    });
+  });
+
+  it("classifies repeated weak repo evidence as an evidence re-entry progress failure", () => {
+    const payload: Record<string, unknown> = {
+      terminal_error_code: "repo_evidence_weak_after_repair",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        turn_id: "ask:test:weak-repo-loop",
+        source_target: "repo_code",
+        required: true,
+        admitted_tool_families: ["repo_code"],
+        capability_contract_guard_version: "E82",
+        requested_capability: "repo-code.search_concept",
+        requested_capability_family: "repo_code",
+        requested_capability_source: "explicit_user_command",
+        required_observation_kinds_for_requested_capability: [
+          "repo_code_evidence_observation",
+          "repo_evidence_relevance_gate",
+        ],
+        forbidden_terminal_artifact_kinds: ["direct_answer_text"],
+        forbidden_routes: ["model_only_concept"],
+        reason: "repo_code_requires_repo_evidence_path+explicit_capability_contract_required",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:weak-repo-loop",
+        capability_family: "repo_evidence",
+        requested_action: "repo-code.search_concept",
+        selected_capability: "repo-code.search_concept",
+        requested_capability: "repo-code.search_concept",
+        admission_status: "needs_evidence",
+      },
+      runtime_tool_call: {
+        tool_call_id: "tool:weak-repo-loop",
+        capability_key: "repo-code.search_concept",
+        status: "completed",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "repo_obs:weak",
+          kind: "repo_code_evidence_observation",
+          payload: {
+            schema: "helix.repo_code_evidence_observation.v1",
+            concept: "terminal authority",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: "repo_gate:weak",
+          kind: "repo_evidence_relevance_gate",
+          payload: {
+            schema: "helix.repo_evidence_relevance_gate.v1",
+            repair_required: true,
+            terminal_allowed: false,
+            coverage: "weak",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: "typed_failure:weak",
+          kind: "typed_failure",
+          payload: {
+            schema: "helix.typed_failure.v1",
+            error_code: "repo_evidence_weak_after_repair",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:weak-repo-loop", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:weak-repo-loop", payload });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      requested_capability: "repo-code.search_concept",
+      selected_capability: "repo-code.search_concept",
+      executed_capability: "repo-code.search_concept",
+      rail_status: "fail_closed",
+      rail_failure_code: "weak_evidence_repair_loop",
+    });
+    expect(index.tool_rail_failure_triage).toMatchObject({
+      first_broken_rail: "evidence_reentry",
+      rail_failure_code: "weak_evidence_repair_loop",
+      repair_target: "repo_retrieval_repair_policy",
+    });
+  });
+
   it("does not count a policy-rejected runtime tool call as execution", () => {
     const payload: Record<string, unknown> = {
       capability_plan: {
