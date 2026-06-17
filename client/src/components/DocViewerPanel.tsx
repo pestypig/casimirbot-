@@ -2,7 +2,7 @@ import React from "react";
 import { marked, type MarkedOptions } from "marked";
 import { renderToString as renderKatexToString } from "katex";
 import "katex/dist/katex.min.css";
-import { ArrowLeft, Folder, Search } from "lucide-react";
+import { ArrowLeft, Folder, Languages, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +22,11 @@ import {
   docCatalogTimestamp,
   type DocManifestEntry,
 } from "@/lib/docs/docManifest";
+import { requestDocumentTranslation } from "@/lib/docs/documentTranslationClient";
+import {
+  readCachedDocumentTranslation,
+  writeCachedDocumentTranslation,
+} from "@/lib/docs/documentTranslationCache";
 import { consumeDocViewerIntent } from "@/lib/docs/docViewer";
 import { buildWorkstationPathRef } from "@/lib/workstation/workstationDeepLink";
 import {
@@ -46,9 +51,15 @@ import { useInterfaceText, type InterfaceTextResolver } from "@/lib/i18n/interfa
 import type { InterfaceMessageId } from "@/lib/i18n/messages/types";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useWorkstationSessionMemoryStore } from "@/store/useWorkstationSessionMemoryStore";
+import {
+  hashDocumentSource,
+  type DocumentTranslationResult,
+} from "@shared/document-translation";
 
 type Translate = InterfaceTextResolver["t"];
 type DisplayMessageMap = Record<string, InterfaceMessageId>;
+type DocumentTranslationViewMode = "original" | "translated";
+type DocumentTranslationUiStatus = "idle" | "cached" | "translating" | "ready" | "unavailable" | "error";
 
 const proceduralStepMessages = {
   highlight_plus: "docsViewer.procedural.focusingPanelPicker",
@@ -57,6 +68,22 @@ const proceduralStepMessages = {
   open_doc: "docsViewer.procedural.openingSelectedDocument",
   read_start: "docsViewer.procedural.startingReadAloud",
   highlight_copy: "docsViewer.procedural.highlightingTopicSectionForCopy",
+} satisfies DisplayMessageMap;
+
+const docSubjectLabelMessages: DisplayMessageMap = {
+  Architecture: "docsViewer.group.architecture",
+  "Casimir and Quantum Bounds": "docsViewer.group.casimirAndQuantumBounds",
+  "Curvature Studies": "docsViewer.group.curvatureStudies",
+  "Ethos and Ideology": "docsViewer.group.ethosAndIdeology",
+  "General Reference": "docsViewer.group.generalReference",
+  "Helix Ask and Voice": "docsViewer.group.helixAskAndVoice",
+  "Knowledge System": "docsViewer.group.knowledgeSystem",
+  "Panels and UI": "docsViewer.group.panelsAndUi",
+  "Physics Reference": "docsViewer.group.physicsReference",
+  "Research and Development Logs": "docsViewer.group.researchAndDevelopmentLogs",
+  Runbooks: "docsViewer.group.runbooks",
+  "Stellar and Solar": "docsViewer.group.stellarAndSolar",
+  "Warp Mechanics": "docsViewer.group.warpMechanics",
 } satisfies DisplayMessageMap;
 
 export type DocMathPickContext = {
@@ -200,6 +227,10 @@ export function DocViewerPanel() {
   const [query, setQuery] = React.useState("");
   const [html, setHtml] = React.useState<string>("");
   const [rawMarkdown, setRawMarkdown] = React.useState<string>("");
+  const [translationResult, setTranslationResult] = React.useState<DocumentTranslationResult | null>(null);
+  const [translationViewMode, setTranslationViewMode] = React.useState<DocumentTranslationViewMode>("original");
+  const [translationStatus, setTranslationStatus] = React.useState<DocumentTranslationUiStatus>("idle");
+  const [translationError, setTranslationError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [loadedDocId, setLoadedDocId] = React.useState<string | null>(null);
@@ -221,6 +252,20 @@ export function DocViewerPanel() {
   const liveReadChunkRef = React.useRef<string | null>(null);
   const lastProceduralTraceIdRef = React.useRef<string | null>(null);
   const currentEntry = React.useMemo(() => (currentPath ? findDocEntry(currentPath) : null), [currentPath]);
+  const rawMarkdownSourceHash = React.useMemo(
+    () => (rawMarkdown ? hashDocumentSource(rawMarkdown) : null),
+    [rawMarkdown],
+  );
+  const translationEligible =
+    mode === "doc" && Boolean(currentEntry) && Boolean(rawMarkdown) && interfaceLanguage.code !== "en";
+  const translatedHtml = React.useMemo(() => {
+    if (!translationResult || !currentEntry) return "";
+    return renderDocumentMarkdownToHtml(translationResult.translated_markdown, currentEntry.relativePath);
+  }, [currentEntry, translationResult]);
+  const activeHtml =
+    translationViewMode === "translated" && translationResult
+      ? translatedHtml
+      : html;
   const docScrollMemoryKey = React.useMemo(
     () => (mode === "doc" && currentPath ? `docs-viewer:doc:${currentPath}` : "docs-viewer:directory"),
     [currentPath, mode],
@@ -245,6 +290,10 @@ export function DocViewerPanel() {
     if (mode !== "doc" || !currentEntry) {
       setHtml("");
       setRawMarkdown("");
+      setTranslationResult(null);
+      setTranslationViewMode("original");
+      setTranslationStatus("idle");
+      setTranslationError(null);
       setError(null);
       setLoading(false);
       setLoadedDocId(null);
@@ -259,15 +308,7 @@ export function DocViewerPanel() {
       .then((raw) => {
         if (canceled) return;
         setRawMarkdown(raw);
-        let rendered: string | Promise<string>;
-        try {
-          activeMarkedDocPath = currentEntry.relativePath;
-          rendered = marked.parse(renderMathMarkdown(raw, currentEntry.relativePath));
-        } finally {
-          activeMarkedDocPath = null;
-        }
-        const renderedHtml = typeof rendered === "string" ? rendered : String(rendered);
-        setHtml(renderMathInRenderedHtml(renderedHtml, currentEntry.relativePath));
+        setHtml(renderDocumentMarkdownToHtml(raw, currentEntry.relativePath));
         setLoadedDocId(currentEntry.id);
       })
       .catch((err) => {
@@ -288,6 +329,24 @@ export function DocViewerPanel() {
   }, [mode, currentEntry, t]);
 
   React.useEffect(() => {
+    setTranslationResult(null);
+    setTranslationViewMode("original");
+    setTranslationStatus("idle");
+    setTranslationError(null);
+    if (!translationEligible || !currentEntry || !rawMarkdownSourceHash) return;
+    const cached = readCachedDocumentTranslation({
+      docPath: currentEntry.relativePath,
+      locale: interfaceLanguage.code,
+      sourceHash: rawMarkdownSourceHash,
+    });
+    if (cached) {
+      setTranslationResult(cached);
+      setTranslationViewMode("translated");
+      setTranslationStatus("cached");
+    }
+  }, [currentEntry, interfaceLanguage.code, rawMarkdownSourceHash, translationEligible]);
+
+  React.useEffect(() => {
     if (mode !== "doc" || !anchor || !contentRef.current) return;
     const container = contentRef.current;
     const selector = `#${cssEscape(anchor)}`;
@@ -300,7 +359,7 @@ export function DocViewerPanel() {
       target.classList.remove("ring-2", "ring-cyan-400/70");
     }, 1600);
     return () => window.clearTimeout(timeout);
-  }, [anchor, html, mode]);
+  }, [activeHtml, anchor, mode]);
 
   React.useLayoutEffect(() => {
     if (mode !== "doc" || anchor || loading || !contentRef.current) return;
@@ -319,7 +378,7 @@ export function DocViewerPanel() {
       window.requestAnimationFrame(restore);
     });
     return () => window.cancelAnimationFrame(firstFrame);
-  }, [anchor, docScrollMemoryKey, html, loading, mode, readPanelScroll]);
+  }, [activeHtml, anchor, docScrollMemoryKey, loading, mode, readPanelScroll]);
 
   const handleContentScroll = React.useCallback(
     (event: React.UIEvent<HTMLDivElement>) => {
@@ -404,7 +463,7 @@ export function DocViewerPanel() {
 
   React.useEffect(() => {
     clearActiveReadTarget();
-  }, [clearActiveReadTarget, currentPath, html]);
+  }, [activeHtml, clearActiveReadTarget, currentPath]);
 
   React.useEffect(() => {
     if (!proceduralStatus) return;
@@ -578,6 +637,28 @@ export function DocViewerPanel() {
     viewDirectory();
   }, [isAutoReading, viewDirectory]);
 
+  const handleGenerateTranslation = React.useCallback(async () => {
+    if (!translationEligible || !currentEntry || !rawMarkdown) return;
+    setTranslationStatus("translating");
+    setTranslationError(null);
+    try {
+      const result = await requestDocumentTranslation({
+        doc_path: currentEntry.relativePath,
+        locale: interfaceLanguage.code,
+        source_markdown: rawMarkdown,
+        title: currentEntry.title,
+      });
+      writeCachedDocumentTranslation(result);
+      setTranslationResult(result);
+      setTranslationViewMode("translated");
+      setTranslationStatus("ready");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t("docsViewer.translation.errorGeneric");
+      setTranslationError(message);
+      setTranslationStatus(message.toLowerCase().includes("not configured") ? "unavailable" : "error");
+    }
+  }, [currentEntry, interfaceLanguage.code, rawMarkdown, t, translationEligible]);
+
   const rejoinLiveRead = React.useCallback(() => {
     if (!currentPath) return;
     viewDoc(currentPath, anchor);
@@ -658,6 +739,14 @@ export function DocViewerPanel() {
             onShowDirectory={handleShowDirectory}
             canRejoinLiveRead={false}
             onRejoinLiveRead={rejoinLiveRead}
+            translationEligible={translationEligible}
+            translationViewMode={translationViewMode}
+            translationStatus={translationStatus}
+            translationResult={translationResult}
+            translationError={translationError}
+            onGenerateTranslation={handleGenerateTranslation}
+            onViewOriginal={() => setTranslationViewMode("original")}
+            onViewTranslation={() => setTranslationViewMode("translated")}
             t={t}
           />
           <div
@@ -688,7 +777,7 @@ export function DocViewerPanel() {
               <article
                 className="prose prose-invert max-w-none overflow-x-hidden px-6 py-6 [&_*]:max-w-full [&_a]:break-words [&_code]:whitespace-pre-wrap [&_pre]:overflow-x-auto [&_table]:block [&_table]:overflow-x-auto"
                 onClick={handleDocMathClick}
-                dangerouslySetInnerHTML={{ __html: html }}
+                dangerouslySetInnerHTML={{ __html: activeHtml }}
               />
             ) : (
               <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-400">
@@ -871,6 +960,14 @@ type PanelHeaderProps = {
   onShowDirectory: () => void;
   canRejoinLiveRead: boolean;
   onRejoinLiveRead: () => void;
+  translationEligible: boolean;
+  translationViewMode: DocumentTranslationViewMode;
+  translationStatus: DocumentTranslationUiStatus;
+  translationResult: DocumentTranslationResult | null;
+  translationError: string | null;
+  onGenerateTranslation: () => void;
+  onViewOriginal: () => void;
+  onViewTranslation: () => void;
   t: Translate;
 };
 
@@ -888,6 +985,14 @@ function PanelHeader({
   onShowDirectory,
   canRejoinLiveRead,
   onRejoinLiveRead,
+  translationEligible,
+  translationViewMode,
+  translationStatus,
+  translationResult,
+  translationError,
+  onGenerateTranslation,
+  onViewOriginal,
+  onViewTranslation,
   t,
 }: PanelHeaderProps) {
   const title =
@@ -899,6 +1004,13 @@ function PanelHeader({
       ? entry.relativePath + (anchor ? ` #${anchor}` : "")
       : t("docsViewer.subtitle.directory");
   const pathRef = mode === "doc" && entry ? buildWorkstationPathRef(entry.relativePath) : null;
+  const isTranslating = translationStatus === "translating";
+  const translationStatusLabel = getDocumentTranslationStatusLabel({
+    translationStatus,
+    translationResult,
+    translationError,
+    t,
+  });
 
   return (
     <header className="flex min-w-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
@@ -969,8 +1081,39 @@ function PanelHeader({
         {!isAutoReading && autoReadError ? (
           <p className="mt-0.5 text-[11px] text-amber-300">{t("docsViewer.reading.stopped", { reason: autoReadError })}</p>
         ) : null}
+        {translationStatusLabel ? (
+          <p
+            className={cn(
+              "mt-0.5 text-[11px]",
+              translationStatus === "error" || translationStatus === "unavailable"
+                ? "text-amber-300"
+                : "text-emerald-200",
+            )}
+          >
+            {translationStatusLabel}
+          </p>
+        ) : null}
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+        {translationEligible ? (
+          translationResult ? (
+            translationViewMode === "translated" ? (
+              <Button variant="outline" size="sm" onClick={onViewOriginal}>
+                {t("docsViewer.translation.viewOriginal")}
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" onClick={onViewTranslation}>
+                <Languages className="mr-1.5 h-3.5 w-3.5" />
+                {t("docsViewer.translation.viewDraft")}
+              </Button>
+            )
+          ) : (
+            <Button variant="outline" size="sm" onClick={onGenerateTranslation} disabled={isTranslating}>
+              <Languages className="mr-1.5 h-3.5 w-3.5" />
+              {isTranslating ? t("docsViewer.translation.generating") : t("docsViewer.translation.generateDraft")}
+            </Button>
+          )
+        ) : null}
         {isAutoReading ? (
           <Button variant="destructive" size="sm" onClick={onStopAutoRead}>
             {t("docsViewer.action.stopReading")}
@@ -986,10 +1129,39 @@ function PanelHeader({
   );
 }
 
+function getDocumentTranslationStatusLabel(args: {
+  translationStatus: DocumentTranslationUiStatus;
+  translationResult: DocumentTranslationResult | null;
+  translationError: string | null;
+  t: Translate;
+}): string | null {
+  switch (args.translationStatus) {
+    case "cached":
+      return args.t("docsViewer.translation.status.cached");
+    case "translating":
+      return args.t("docsViewer.translation.status.translating");
+    case "ready":
+      return args.t("docsViewer.translation.status.ready", {
+        status: args.translationResult?.status ?? "generated_draft",
+      });
+    case "unavailable":
+      return args.t("docsViewer.translation.status.unavailable", {
+        reason: args.translationError ?? args.t("docsViewer.translation.errorGeneric"),
+      });
+    case "error":
+      return args.t("docsViewer.translation.status.error", {
+        reason: args.translationError ?? args.t("docsViewer.translation.errorGeneric"),
+      });
+    case "idle":
+    default:
+      return null;
+  }
+}
+
 function groupBySubject(entries: DocManifestEntry[], t: Translate): GroupedDocs[] {
   const map = new Map<string, DocManifestEntry[]>();
   entries.forEach((entry) => {
-    const label = entry.subjectLabel || t("docsViewer.group.generalReference");
+    const label = localizeDocSubjectLabel(entry.subjectLabel, t);
     const bucket = map.get(label);
     if (bucket) {
       bucket.push(entry);
@@ -1005,6 +1177,13 @@ function groupBySubject(entries: DocManifestEntry[], t: Translate): GroupedDocs[
     }));
 }
 
+function localizeDocSubjectLabel(subjectLabel: string | null | undefined, t: Translate): string {
+  const normalized = subjectLabel?.trim();
+  if (!normalized) return t("docsViewer.group.generalReference");
+  const messageId = docSubjectLabelMessages[normalized];
+  return messageId ? t(messageId) : normalized;
+}
+
 function groupRecencyScore(entries: DocManifestEntry[]): number {
   return entries.reduce((score, entry) => {
     return Math.max(score, docCatalogTimestamp(entry));
@@ -1015,6 +1194,18 @@ function formatDocCatalogDate(entry: DocManifestEntry, t: Translate): string | n
   if (!entry.catalogDate) return null;
   if (entry.catalogDateSource === "mtime") return t("docsViewer.catalog.editedDate", { date: entry.catalogDate });
   return t("docsViewer.catalog.datedDate", { date: entry.catalogDate });
+}
+
+function renderDocumentMarkdownToHtml(markdown: string, docPath?: string | null): string {
+  let rendered: string | Promise<string>;
+  try {
+    activeMarkedDocPath = docPath ?? null;
+    rendered = marked.parse(renderMathMarkdown(markdown, docPath));
+  } finally {
+    activeMarkedDocPath = null;
+  }
+  const renderedHtml = typeof rendered === "string" ? rendered : String(rendered);
+  return renderMathInRenderedHtml(renderedHtml, docPath);
 }
 
 function markdownToSpeechText(markdown: string): string {

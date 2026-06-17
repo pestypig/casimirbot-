@@ -1,6 +1,10 @@
 import React, { useMemo } from "react";
 import * as Lucide from "lucide-react";
+import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { panelRegistry } from "@/lib/desktop/panelRegistry";
+import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
+import { useInterfaceText } from "@/lib/i18n/interfaceText";
+import { getInterfacePanelTitle } from "@/lib/i18n/panelTitles";
 import { useDesktopStore, type DesktopClickBehavior } from "@/store/useDesktopStore";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,6 +57,9 @@ export function TaskbarShelf({
     setClickBehavior,
     openInHelix
   } = useDesktopStore();
+  const { userSettings } = useHelixStartSettings();
+  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const { t } = useInterfaceText(interfaceLanguage.code);
 
   const frontmostId = useMemo(() => {
     return Object.values(windows)
@@ -99,6 +106,7 @@ export function TaskbarShelf({
     const panelId = panel.id;
     const win = windows[panelId];
     const Icon = panel.icon ?? Lucide.AppWindow;
+    const panelTitle = getInterfacePanelTitle(t, String(panel.id), panel.title);
     const isPinned = Boolean(pinned[panelId]);
     const isOpen = Boolean(win?.isOpen);
     const isMinimized = Boolean(win?.isMinimized);
@@ -124,10 +132,10 @@ export function TaskbarShelf({
             variant="ghost"
             className={`${baseButtonClass} ${isActive ? activeButtonClass : ""}`}
             onClick={onOpen}
-            title={panel.title}
+            title={panelTitle}
           >
             <Icon className="mr-2 h-4 w-4" />
-            <span className="max-w-[9rem] truncate text-sm">{panel.title}</span>
+            <span className="max-w-[9rem] truncate text-sm">{panelTitle}</span>
             {isOpen && (
               <span
                 className={`absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${

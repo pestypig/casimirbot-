@@ -24,6 +24,7 @@ export type HelixSolverArtifactAuditEntry = {
     | "terminal"
     | "other";
   selected_for_answer: boolean;
+  selected_as_support?: boolean;
   rejected_for_answer: boolean;
   reentered_solver: boolean;
   allowed_by_canonical_goal: boolean;

@@ -12,6 +12,9 @@ import {
   PROFILE_STORAGE_KEY,
   useHelixStartSettings,
 } from "@/hooks/useHelixStartSettings";
+import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
+import { useInterfaceText } from "@/lib/i18n/interfaceText";
+import { getInterfacePanelTitle } from "@/lib/i18n/panelTitles";
 import { useHelixSettingsDialog } from "@/hooks/useHelixSettingsDialog";
 import { resolvePanelIds, type DesktopLayoutHash } from "@/lib/desktop/shareState";
 import { useKnowledgeProjectsStore } from "@/store/useKnowledgeProjectsStore";
@@ -124,6 +127,8 @@ export default function DesktopPage({
   const { windows, registerFromManifest, open } = useDesktopStore();
   const workstationMode = useWorkstationLayoutStore((state) => state.mode);
   const { userSettings, updateSettings } = useHelixStartSettings();
+  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const { t } = useInterfaceText(interfaceLanguage.code);
   const {
     settingsOpen,
     settingsTab,
@@ -910,7 +915,7 @@ export default function DesktopPage({
                   <DesktopWindow
                     key={w.id}
                     id={w.id}
-                    title={def.title}
+                    title={getInterfacePanelTitle(t, String(def.id), def.title)}
                     Loader={def.loader}
                   />
                 );

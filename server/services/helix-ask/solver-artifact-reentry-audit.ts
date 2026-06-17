@@ -85,7 +85,25 @@ const collectPayloadRefs = (payload: RecordLike | null): string[] =>
     ...readStringArray(payload?.receipt_refs),
   ].filter(Boolean));
 
-const collectSelectedRefs = (payload: RecordLike): Set<string> => {
+const collectTerminalSelectedRefs = (payload: RecordLike): Set<string> => {
+  const refs = new Set<string>();
+  const add = (value: unknown): void => {
+    if (typeof value === "string" && value.trim()) refs.add(value.trim());
+  };
+  const terminalKind = readString(payload.terminal_artifact_kind);
+  const terminalId = readString(payload.terminal_artifact_id);
+  const terminalAuthority = readRecord(payload.terminal_authority_single_writer);
+  const answerAuthority = readRecord(payload.terminal_answer_authority);
+  add(readString(terminalAuthority?.selected_terminal_artifact_kind));
+  add(readString(terminalAuthority?.selected_terminal_artifact_id));
+  add(readString(answerAuthority?.terminal_artifact_kind));
+  add(readString(answerAuthority?.terminal_artifact_id));
+  add(terminalKind);
+  add(terminalId);
+  return refs;
+};
+
+const collectSupportSelectedRefs = (payload: RecordLike): Set<string> => {
   const refs = new Set<string>();
   const add = (value: unknown): void => {
     if (typeof value === "string" && value.trim()) refs.add(value.trim());
@@ -104,10 +122,10 @@ const collectSelectedRefs = (payload: RecordLike): Set<string> => {
     addArray(capabilityResult.receipt_refs);
     addArray(capabilityResult.evidence_refs);
   }
-  const terminalKind = readString(payload.terminal_artifact_kind);
-  const terminalId = readString(payload.terminal_artifact_id);
-  add(terminalKind);
-  add(terminalId);
+  const terminalAuthority = readRecord(payload.terminal_authority_single_writer);
+  const answerAuthority = readRecord(payload.terminal_answer_authority);
+  addArray(terminalAuthority?.support_refs);
+  addArray(answerAuthority?.support_refs);
   return refs;
 };
 
@@ -218,7 +236,8 @@ export const buildSolverArtifactReentryAudit = (input: {
   const terminalArtifactKind = readString(input.terminalArtifactKind) || readString(input.payload.terminal_artifact_kind) || "unknown";
   const terminalArtifactId = readString(input.terminalArtifactId) || readString(input.payload.terminal_artifact_id);
   const finalAnswerSource = readString(input.finalAnswerSource) || readString(input.payload.final_answer_source) || "unknown";
-  const selectedRefs = collectSelectedRefs(input.payload);
+  const terminalSelectedRefs = collectTerminalSelectedRefs(input.payload);
+  const supportSelectedRefs = collectSupportSelectedRefs(input.payload);
   const rejectedRefs = collectRejectedRefs(input.payload);
   const reenteredRefs = collectReenteredRefs(input.payload);
   const requiredTerminal = requiredTerminalKind(input.payload);
@@ -226,7 +245,7 @@ export const buildSolverArtifactReentryAudit = (input: {
   const forbiddenKinds = forbiddenTerminalKinds(input.payload);
   const terminalAuthority = readRecord(input.payload.terminal_answer_authority);
   const solverTrace = readRecord(input.payload.ask_turn_solver_trace);
-  const evidenceSelected = selectedRefs.size > 0 || reenteredRefs.size > 0;
+  const evidenceSelected = supportSelectedRefs.size > 0 || reenteredRefs.size > 0;
   const retrievalPlan = readRecord(input.payload.procedure_evidence_retrieval_plan);
   const retrievalResult = readRecord(input.payload.procedure_evidence_retrieval_result);
   const artifacts = dedupeArtifacts([
@@ -242,7 +261,8 @@ export const buildSolverArtifactReentryAudit = (input: {
         classification !== "other" ||
         artifact.kind === terminalArtifactKind ||
         artifact.ref === terminalArtifactId ||
-        artifactRefsOverlap(artifact, selectedRefs) ||
+        artifactRefsOverlap(artifact, terminalSelectedRefs) ||
+        artifactRefsOverlap(artifact, supportSelectedRefs) ||
         artifactRefsOverlap(artifact, rejectedRefs)
       );
     })
@@ -254,7 +274,8 @@ export const buildSolverArtifactReentryAudit = (input: {
       const selectedForAnswer =
         artifact.kind === terminalArtifactKind ||
         artifact.ref === terminalArtifactId ||
-        artifactRefsOverlap(artifact, selectedRefs);
+        artifactRefsOverlap(artifact, terminalSelectedRefs);
+      const selectedAsSupport = artifactRefsOverlap(artifact, supportSelectedRefs);
       const rejectedForAnswer = artifactRefsOverlap(artifact, rejectedRefs);
       const reenteredSolver = artifactRefsOverlap(artifact, reenteredRefs);
       const allowedByCanonicalGoal =
@@ -275,7 +296,7 @@ export const buildSolverArtifactReentryAudit = (input: {
         terminalArtifactId,
       });
       const failureCodes = unique<HelixSolverArtifactReentryFailureCode>([
-        selectedForAnswer && !reenteredSolver && classification !== "terminal" ? "artifact_not_reentered" : "",
+        (selectedForAnswer || selectedAsSupport) && !reenteredSolver && classification !== "terminal" ? "artifact_not_reentered" : "",
         selectedForAnswer && isReceiptKind(artifact.kind) && !allowedByCanonicalGoal ? "receipt_selected_without_goal_authority" : "",
         selectedForAnswer && isProjectionKind(artifact.kind) && !evidenceSelected ? "projection_selected_without_evidence" : "",
         classification === "capability_result" && readRecord(input.payload.capability_result)?.selected_for_answer === true && !readBoolean(readRecord(input.payload.capability_result)?.reentered_solver)
@@ -293,6 +314,7 @@ export const buildSolverArtifactReentryAudit = (input: {
         produced: true,
         classified_as: classification,
         selected_for_answer: selectedForAnswer,
+        selected_as_support: selectedAsSupport,
         rejected_for_answer: rejectedForAnswer,
         reentered_solver: reenteredSolver,
         allowed_by_canonical_goal: allowedByCanonicalGoal,

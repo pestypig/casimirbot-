@@ -11,7 +11,7 @@ describe("WorkstationPanelTabs layering", () => {
     const stagePlaySource = fs.readFileSync(stagePlayPath, "utf8");
 
     expect(tabsSource).toContain("top-8 z-[90] w-72");
-    expect(tabsSource).toContain("Launch panel");
+    expect(tabsSource).toContain("workstation.panelPicker.title");
     expect(tabsSource).not.toContain("Job-ready");
     expect(tabsSource).not.toContain("Helix Start Settings");
     expect(tabsSource).not.toContain("open-helix-settings");

@@ -1,7 +1,11 @@
 import React from "react";
 import * as Lucide from "lucide-react";
 import { TaskbarShelf } from "@/components/desktop/TaskbarPanel";
+import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import HelixMarkIcon from "@/components/icons/HelixMarkIcon";
+import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
+import { useInterfaceText } from "@/lib/i18n/interfaceText";
+import { getInterfacePanelTitle } from "@/lib/i18n/panelTitles";
 import { useDesktopStore } from "@/store/useDesktopStore";
 import { HELIX_PANELS, type HelixPanelRef } from "@/pages/helix-core.panels";
 import { Button } from "@/components/ui/button";
@@ -66,15 +70,20 @@ export function DesktopTaskbar({
 function HelixStartLauncher({ onOpenPanel }: { onOpenPanel?: (panelId: string) => void }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const { windows, open, focus, restore } = useDesktopStore();
+  const { userSettings } = useHelixStartSettings();
+  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const { t } = useInterfaceText(interfaceLanguage.code);
 
   const helixPanels = React.useMemo(
     () =>
       [...HELIX_PANELS]
         .filter((panel) => !panel.startHidden)
-        .sort((a, b) =>
-        a.title.localeCompare(b.title, undefined, { sensitivity: "base" })
-      ),
-    []
+        .sort((a, b) => {
+          const aTitle = getInterfacePanelTitle(t, a.id, a.title);
+          const bTitle = getInterfacePanelTitle(t, b.id, b.title);
+          return aTitle.localeCompare(bTitle, undefined, { sensitivity: "base" });
+        }),
+    [t]
   );
 
   const keywordFilter = React.useCallback((value: string, search: string) => {
@@ -160,7 +169,8 @@ function HelixStartLauncher({ onOpenPanel }: { onOpenPanel?: (panelId: string) =
                     : win?.isMinimized
                       ? "Minimized"
                       : "Running";
-                  const searchValue = buildPanelSearchValue(panel);
+                  const panelTitle = getInterfacePanelTitle(t, panel.id, panel.title);
+                  const searchValue = buildPanelSearchValue(panel, panelTitle);
                   return (
                     <CommandItem
                       key={panel.id}
@@ -172,7 +182,7 @@ function HelixStartLauncher({ onOpenPanel }: { onOpenPanel?: (panelId: string) =
                         <Icon className="h-4 w-4 text-primary" />
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-sm font-medium text-foreground">{panel.title}</span>
+                        <span className="text-sm font-medium text-foreground">{panelTitle}</span>
                         <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
                           {panel.id}
                         </span>
@@ -198,9 +208,10 @@ function HelixStartLauncher({ onOpenPanel }: { onOpenPanel?: (panelId: string) =
   );
 }
 
-function buildPanelSearchValue(panel: HelixPanelRef) {
+function buildPanelSearchValue(panel: HelixPanelRef, localizedTitle?: string) {
   const sections = [
     panel.title,
+    localizedTitle ?? "",
     panel.id,
     panel.keywords?.join(" ") ?? "",
     panel.endpoints?.join(" ") ?? ""

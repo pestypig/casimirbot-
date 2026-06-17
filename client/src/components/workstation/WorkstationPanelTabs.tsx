@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { panelRegistry } from "@/lib/desktop/panelRegistry";
+import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
+import { useInterfaceText } from "@/lib/i18n/interfaceText";
+import { getInterfacePanelTitle } from "@/lib/i18n/panelTitles";
 import { isUserLaunchPanel } from "@/lib/workstation/launchPanelPolicy";
 import {
   HELIX_WORKSTATION_PROCEDURAL_STEP_EVENT,
@@ -18,6 +22,9 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
   const [plusPulseActive, setPlusPulseActive] = useState(false);
   const [plusPulseTick, setPlusPulseTick] = useState(0);
   const [targetPanelId, setTargetPanelId] = useState<string | null>(null);
+  const { userSettings } = useHelixStartSettings();
+  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const { t } = useInterfaceText(interfaceLanguage.code);
 
   const availablePanels = useMemo(
     () =>
@@ -27,9 +34,11 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
           const aReady = a.workstationCapabilities?.v1_job_ready ? 1 : 0;
           const bReady = b.workstationCapabilities?.v1_job_ready ? 1 : 0;
           if (aReady !== bReady) return bReady - aReady;
-          return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+          const aTitle = getInterfacePanelTitle(t, String(a.id), a.title);
+          const bTitle = getInterfacePanelTitle(t, String(b.id), b.title);
+          return aTitle.localeCompare(bTitle, undefined, { sensitivity: "base" });
         }),
-    [],
+    [t],
   );
 
   useEffect(() => {
@@ -101,6 +110,7 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
           {group.panelIds.map((panelId) => {
             const panelDef = panelRegistry.find((panel) => panel.id === panelId);
             const isActive = panelId === group.activePanelId;
+            const panelTitle = getInterfacePanelTitle(t, panelId, panelDef?.title ?? panelId);
             return (
               <button
                 key={panelId}
@@ -112,7 +122,7 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
                     : "border-white/10 bg-black/20 text-slate-300 hover:bg-white/10"
                 }`}
               >
-                <span>{panelDef?.title ?? panelId}</span>
+                <span>{panelTitle}</span>
                 <span
                   className="rounded px-1 text-[10px] text-slate-400 hover:bg-white/10"
                   onClick={(event) => {
@@ -138,34 +148,39 @@ export function WorkstationPanelTabs({ groupId }: { groupId: string }) {
           }`}
           onClick={() => setPickerOpen((current) => !current)}
           aria-expanded={pickerOpen}
-          aria-label="Open panel picker"
+          aria-label={t("workstation.panelPicker.open")}
         >
           +
         </button>
         {pickerOpen ? (
           <div className="absolute right-0 top-8 z-[90] w-72 rounded-lg border border-white/20 bg-slate-950/95 p-2 shadow-xl">
-            <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-400">Launch panel</div>
+            <div className="mb-2 text-[11px] uppercase tracking-wide text-slate-400">
+              {t("workstation.panelPicker.title")}
+            </div>
             <div className="max-h-72 space-y-1 overflow-y-auto">
-              {availablePanels.map((panel) => (
-                <button
-                  key={panel.id}
-                  type="button"
-                  onClick={() => {
-                    openPanelInGroup(groupId, panel.id);
-                    focusGroup(groupId);
-                    setPickerOpen(false);
-                  }}
-                  className={`block w-full rounded px-2 py-1 text-left text-xs text-slate-200 hover:bg-white/10 ${
-                    targetPanelId === panel.id
-                      ? "bg-cyan-500/20 ring-1 ring-cyan-300/70 shadow-[0_0_14px_rgba(34,211,238,0.45)]"
-                      : ""
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <span>{panel.title}</span>
-                  </span>
-                </button>
-              ))}
+              {availablePanels.map((panel) => {
+                const panelTitle = getInterfacePanelTitle(t, String(panel.id), panel.title);
+                return (
+                  <button
+                    key={panel.id}
+                    type="button"
+                    onClick={() => {
+                      openPanelInGroup(groupId, panel.id);
+                      focusGroup(groupId);
+                      setPickerOpen(false);
+                    }}
+                    className={`block w-full rounded px-2 py-1 text-left text-xs text-slate-200 hover:bg-white/10 ${
+                      targetPanelId === panel.id
+                        ? "bg-cyan-500/20 ring-1 ring-cyan-300/70 shadow-[0_0_14px_rgba(34,211,238,0.45)]"
+                        : ""
+                    }`}
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <span>{panelTitle}</span>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         ) : null}

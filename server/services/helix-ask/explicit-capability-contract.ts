@@ -55,7 +55,7 @@ const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
     source_target: "docs_viewer",
     admission_families: ["docs_viewer"],
     required_observation_kinds: ["doc_location_result", "doc_location_matches", "doc_evidence_location"],
-    required_terminal_kind: "doc_location_result",
+    required_terminal_kind: "doc_location_matches",
     allowed_substitutions: [],
     forbidden_nearby_capabilities: ["docs-viewer.summarize_doc"],
   },

@@ -72,7 +72,8 @@ describe("Helix solver artifact re-entry audit", () => {
       expect.arrayContaining([
         expect.objectContaining({
           ref: "artifact:evidence",
-          selected_for_answer: true,
+          selected_for_answer: false,
+          selected_as_support: true,
           reentered_solver: false,
           failure_codes: expect.arrayContaining(["artifact_not_reentered"]),
         }),
@@ -114,6 +115,87 @@ describe("Helix solver artifact re-entry audit", () => {
 
     expect(audit.ok).toBe(false);
     expect(audit.failure_codes).toContain("receipt_selected_without_goal_authority");
+  });
+
+  it("does not treat support receipts as terminal answer selections", () => {
+    const audit = buildSolverArtifactReentryAudit({
+      turnId: "ask:calculator-support-receipt",
+      terminalArtifactKind: "workstation_tool_evaluation",
+      terminalArtifactId: "artifact:workstation-eval",
+      finalAnswerSource: "workstation_tool_evaluation",
+      payload: {
+        ...basePayload(),
+        canonical_goal_frame: {
+          goal_kind: "calculator_solve",
+          required_terminal_kind: "workstation_tool_evaluation",
+        },
+        route_product_contract: {
+          schema: "helix.route_product_contract.v1",
+          allowed_terminal_artifact_kinds: ["workstation_tool_evaluation", "typed_failure"],
+          forbidden_terminal_artifact_kinds: ["direct_answer_text", "model_only_concept"],
+        },
+        terminal_answer_authority: {
+          schema: "helix.turn_terminal_authority.v1",
+          server_authoritative: true,
+          terminal_artifact_kind: "workstation_tool_evaluation",
+          terminal_artifact_id: "artifact:workstation-eval",
+          support_refs: ["receipt:calculator"],
+        },
+        terminal_authority_single_writer: {
+          schema: "helix.terminal_authority_single_writer_result.v1",
+          selected_terminal_artifact_kind: "workstation_tool_evaluation",
+          selected_terminal_artifact_id: "artifact:workstation-eval",
+          support_refs: ["receipt:calculator"],
+        },
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: "receipt:calculator",
+            kind: "calculator_receipt",
+            payload: { receipt_id: "receipt:calculator" },
+          },
+          {
+            artifact_id: "artifact:workstation-eval",
+            kind: "workstation_tool_evaluation",
+            payload: { evaluation_id: "artifact:workstation-eval" },
+          },
+        ],
+        capability_result: {
+          schema: "helix.capability_result.v1",
+          turn_id: "ask:calculator-support-receipt",
+          status: "succeeded",
+          receipt_refs: ["receipt:calculator"],
+          evidence_refs: ["artifact:workstation-eval"],
+          selected_for_answer: true,
+          reentered_solver: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        loop_parity_trace: {
+          evidence_selected_for_answer: ["artifact:workstation-eval"],
+          evidence_rejected_for_answer: [],
+        },
+        ask_turn_solver_trace: {
+          schema: "helix.ask_turn_solver_trace.v1",
+          completed_solver_path: true,
+          evidence_reentry_gate: {
+            selected_evidence_refs: ["artifact:workstation-eval"],
+            receipts_reentered: ["receipt:calculator"],
+            projections_reentered: [],
+            rejected_evidence_refs: [],
+          },
+        },
+      },
+    });
+
+    expect(audit.failure_codes).not.toContain("receipt_selected_without_goal_authority");
+    expect(audit.terminal_relevant_artifacts).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        ref: "receipt:calculator",
+        selected_for_answer: false,
+        selected_as_support: true,
+        failure_codes: [],
+      }),
+    ]));
   });
 
   it("flags projection answers selected without evidence", () => {

@@ -495,11 +495,15 @@ const requiredTerminalKind = (payload: RecordLike, contract: ToolFamilyContract 
 
 const materializedTerminalKind = (payload: RecordLike): string | null => {
   const terminalAuthority = readRecord(payload.terminal_authority_single_writer);
+  const terminalAnswerAuthority = readRecord(payload.terminal_answer_authority);
   const draftSelection = readRecord(payload.final_answer_draft_selection);
   return firstString(
-    draftSelection?.materialized_terminal_artifact_kind,
+    terminalAuthority?.selected_terminal_artifact_kind,
+    terminalAnswerAuthority?.terminal_artifact_kind,
+    terminalAuthority?.terminal_artifact_kind,
     terminalAuthority?.integrity && readRecord(terminalAuthority.integrity)?.materialized_terminal_artifact_kind,
     terminalAuthority?.materialized_terminal_artifact_kind,
+    draftSelection?.materialized_terminal_artifact_kind,
     payload.terminal_artifact_kind,
   );
 };

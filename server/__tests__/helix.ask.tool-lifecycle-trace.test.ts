@@ -473,6 +473,85 @@ describe("Helix Ask tool lifecycle trace", () => {
     });
   });
 
+  it("prefers terminal authority over draft materializer when mirroring materialized terminal kind", () => {
+    const payload: Record<string, unknown> = {
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:terminal-authority-mirror",
+        capability_family: "calculator",
+        requested_action: "scientific-calculator.solve_expression",
+        admission_status: "admitted",
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      runtime_tool_call: {
+        tool_call_id: "tool:terminal-authority-mirror",
+        capability_key: "scientific-calculator.solve_expression",
+        status: "completed",
+      },
+      tool_lifecycle_trace: {
+        schema: "helix.tool_lifecycle_trace.v1",
+        requested_capability: "scientific-calculator.solve_expression",
+        executed_capability: "scientific-calculator.solve_expression",
+        observation_refs: ["calculator_receipt:1"],
+        evidence_refs: ["workstation_tool_evaluation:1"],
+        status: "succeeded",
+        evidence_reentered: true,
+      },
+      canonical_goal_frame: {
+        goal_kind: "calculator_solve",
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        selected_terminal_artifact_kind: "workstation_tool_evaluation",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+      },
+      final_answer_draft_selection: {
+        schema: "helix.final_answer_draft_selection.v1",
+        materialized_terminal_artifact_kind: "model_synthesized_answer",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "calculator_receipt:1",
+          kind: "calculator_receipt",
+          payload: {
+            schema: "helix.calculator_receipt.v1",
+            receipt_id: "calculator_receipt:1",
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: "workstation_tool_evaluation:1",
+          kind: "workstation_tool_evaluation",
+          payload: {
+            schema: "helix.workstation_tool_evaluation.v1",
+            evaluation_id: "workstation_tool_evaluation:1",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:terminal-authority-mirror", payload });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      materialized_terminal_artifact_kind: "workstation_tool_evaluation",
+      terminal_authority_kind: "workstation_tool_evaluation",
+      visible_terminal_kind: "workstation_tool_evaluation",
+    });
+  });
+
   it("reports missing contract observations for incomplete tool evidence", () => {
     const payload: Record<string, unknown> = {
       capability_plan: {
@@ -928,7 +1007,7 @@ describe("Helix Ask tool lifecycle trace", () => {
     const index = buildArtifactQueryIndex({ turnId: "ask:test:calculator-projection-mismatch", payload });
 
     expect(index.tool_turn_chain_audit).toMatchObject({
-      rail_status: "broken",
+      rail_status: "fail_closed",
       rail_failure_code: "terminal_projection_mismatch",
     });
     expect(index.tool_rail_failure_triage).toMatchObject({

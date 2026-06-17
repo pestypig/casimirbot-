@@ -32,6 +32,7 @@ import {
   explicitCapabilityContractForCapability,
   extractExplicitCapabilityContract,
 } from "./explicit-capability-contract";
+import { resolveAskCapabilityContractArbitration } from "./capability-contract-arbitration";
 
 type RecordLike = Record<string, unknown>;
 
@@ -151,15 +152,6 @@ const isHardLiveSourceMailboxRoute = (input: {
 }): boolean =>
   routeMetadataSourceTarget(input.routeMetadata) === "live_source_mailbox" ||
   Boolean(input.mandatoryPhaseTool);
-
-const firstAllowedToolForPhase = (phaseResolution?: RecordLike | null): string => {
-  const phase = readRecord(phaseResolution);
-  const allowedTools = uniqueStrings([
-    ...readStringArray(phase?.allowedTools),
-    ...readStringArray(phase?.allowed_tools),
-  ]);
-  return allowedTools[0] ?? "";
-};
 
 const requestedActionFor = (
   family: HelixCapabilityFamily,
@@ -466,7 +458,6 @@ export const buildCapabilityPlan = (input: {
   const requestedCapabilityContract =
     explicitCapabilityContractForCapability(readString(toolCallAdmissionDecision?.requested_capability)) ??
     extractExplicitCapabilityContract(input.promptText);
-  const firstAllowedPhaseTool = firstAllowedToolForPhase(input.liveSourceTurnPhaseResolution);
   const explicitDocsPathOperation = isExplicitDocsPathDocumentOperation(input.promptText);
   const hardLiveSourceMailboxRoute = !explicitDocsPathOperation && isHardLiveSourceMailboxRoute({
     routeMetadata,
@@ -490,7 +481,7 @@ export const buildCapabilityPlan = (input: {
     !requiresRepoConceptEvidence &&
     !requiresInternetEvidence &&
     toolUseRestatement.requiredToolFamilies.includes("docs_viewer");
-  const sourceTarget =
+  const fallbackSourceTarget =
     (hardLiveSourceMailboxRoute ? "live_source_mailbox" : "") ||
     (requestedCapabilityContract?.source_target ?? "") ||
     (requiresDocsViewerEvidence ? "docs_viewer" : "") ||
@@ -502,16 +493,16 @@ export const buildCapabilityPlan = (input: {
     readString(toolCallAdmissionDecision?.source_target) ||
     (contextualSuppression ? "model_only" : "") ||
     "unknown";
-  const targetKind = readString(sourceTargetIntent?.target_kind) || sourceTarget;
+  const targetKind = readString(sourceTargetIntent?.target_kind) || fallbackSourceTarget;
   const admittedFamilies = readStringArray(toolCallAdmissionDecision?.admitted_tool_families);
-  const canonicalGoalKind = readString(canonicalGoalFrame?.goal_kind);
+  const originalCanonicalGoalKind = readString(canonicalGoalFrame?.goal_kind);
   const classifiedFamily = classifySourceFamily({
     promptText: input.promptText,
-    sourceTarget,
+    sourceTarget: fallbackSourceTarget,
     targetKind,
     admittedFamilies,
   });
-  const family: HelixCapabilityFamily = hardLiveSourceMailboxRoute
+  const fallbackFamily: HelixCapabilityFamily = hardLiveSourceMailboxRoute
     ? "live_environment"
     : requestedCapabilityContract
     ? requestedCapabilityContract.plan_family
@@ -521,11 +512,42 @@ export const buildCapabilityPlan = (input: {
     ? "repo_evidence"
     : requiresInternetEvidence
       ? "internet_search"
-      : contextualSuppression && sourceTarget === "model_only"
+      : contextualSuppression && fallbackSourceTarget === "model_only"
         ? "debug_export"
-        : canonicalGoalKind === "panel_control" || canonicalGoalKind === "note_mutation"
+        : originalCanonicalGoalKind === "panel_control" || originalCanonicalGoalKind === "note_mutation"
           ? "workstation_action"
           : classifiedFamily;
+  const fallbackGoalKind = requiresRepoConceptEvidence
+    ? "repo_concept_explanation"
+    : requiresDocsViewerEvidence
+      ? "doc_open_best"
+    : requiresInternetEvidence
+      ? "internet_search_lookup"
+      : originalCanonicalGoalKind || "unknown";
+  const fallbackRequiredTerminalKind = requiresRepoConceptEvidence
+    ? "repo_code_evidence_answer"
+    : requiresInternetEvidence
+      ? "internet_search_answer"
+      : readString(canonicalGoalFrame?.required_terminal_kind) || null;
+  const contractArbitration = resolveAskCapabilityContractArbitration({
+    turnId: input.turnId,
+    promptText: input.promptText,
+    sourceTargetIntent,
+    routeProductContract,
+    toolCallAdmissionDecision,
+    canonicalGoalFrame,
+    routeMetadata,
+    hardLiveSourceMailboxRoute,
+    requestedCapabilityContract,
+    contextualSuppression,
+    fallbackSourceTarget,
+    fallbackPlanFamily: fallbackFamily,
+    fallbackGoalKind,
+    fallbackRequiredTerminalKind,
+  });
+  const sourceTarget = contractArbitration.selected_source_target;
+  const family = contractArbitration.selected_plan_family;
+  const canonicalGoalKind = contractArbitration.canonical_goal_kind;
   const contextualSuppressionBlocksPlan =
     Boolean(contextualSuppression) &&
     (
@@ -533,8 +555,8 @@ export const buildCapabilityPlan = (input: {
       contextualSuppressionBlocksCapabilityFamily(contextualSuppression, family)
     );
   const rules = instructionRules(instructionFrame);
-  const plannedRequestedAction = hardLiveSourceMailboxRoute
-    ? (mandatoryPhaseTool ?? firstAllowedPhaseTool) || "live_env.read_processed_live_source_mail"
+  const plannedRequestedAction = contractArbitration.contract_state === "hard_live_source_phase"
+    ? (mandatoryPhaseTool ?? "live_env.read_processed_live_source_mail")
     : contextualSuppressionBlocksPlan
       ? "suppressed_contextual_tool_reference"
     : requestedCapabilityContract
@@ -544,7 +566,7 @@ export const buildCapabilityPlan = (input: {
         ? "inspect_live_source"
         : requestedActionFor(family, input.promptText, sourceTarget);
   const phaseFilteredPlan =
-    family === "live_environment" || sourceTarget === "live_source_mailbox"
+    contractArbitration.allow_phase_repair && (family === "live_environment" || sourceTarget === "live_source_mailbox")
       ? applyLiveSourcePhaseCapabilityFilter({
           requestedAction: plannedRequestedAction,
           phaseResolution: input.liveSourceTurnPhaseResolution,
@@ -603,18 +625,9 @@ export const buildCapabilityPlan = (input: {
     operator_command_required: operatorCommandRequired,
     operator_command_present: operatorCommandPresent,
     source_target: sourceTarget,
-    goal_kind: requiresRepoConceptEvidence
-      ? "repo_concept_explanation"
-      : requiresDocsViewerEvidence
-        ? "doc_open_best"
-      : requiresInternetEvidence
-        ? "internet_search_lookup"
-        : canonicalGoalKind || "unknown",
-    required_terminal_kind: requiresRepoConceptEvidence
-      ? "repo_code_evidence_answer"
-      : requiresInternetEvidence
-        ? "internet_search_answer"
-        : readString(canonicalGoalFrame?.required_terminal_kind) || null,
+    goal_kind: canonicalGoalKind || "unknown",
+    required_terminal_kind: contractArbitration.required_terminal_kind,
+    capability_contract_arbitration: contractArbitration as unknown as Record<string, unknown>,
     admission_status: admission.status,
     selected_capability: phaseFilteredPlan.selectedCapability,
     ...(phaseFilteredPlan.repaired ? { phase_repaired: true } : {}),

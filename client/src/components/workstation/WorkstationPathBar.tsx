@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState } from "react";
 import { Check, Copy, Monitor, Send, X } from "lucide-react";
+import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -7,6 +8,9 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
+import { useInterfaceText, type InterfaceTextResolver } from "@/lib/i18n/interfaceText";
+import { getInterfacePanelTitle } from "@/lib/i18n/panelTitles";
 import {
   buildWorkstationPanelPathRef,
   buildWorkstationPathRef,
@@ -18,6 +22,8 @@ import { useDocEquationContextStore } from "@/store/useDocEquationContextStore";
 import { useDocViewerStore } from "@/store/useDocViewerStore";
 import { useWorkstationLayoutStore } from "@/store/useWorkstationLayoutStore";
 import { cn } from "@/lib/utils";
+
+type Translate = InterfaceTextResolver["t"];
 
 export function WorkstationPathBar({
   activePanelId,
@@ -98,6 +104,12 @@ function WorkstationPathBreadcrumb({
 }) {
   const [inputValue, setInputValue] = useState(pathRef.virtualUri);
   const [status, setStatus] = useState<"idle" | "copied" | "invalid">("idle");
+  const { userSettings } = useHelixStartSettings();
+  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const { t } = useInterfaceText(interfaceLanguage.code);
+  const displaySegments = pathRef.displaySegments.map((segment, index) =>
+    localizeWorkstationPathSegment(segment, index, pathRef, t),
+  );
 
   useEffect(() => {
     setInputValue(pathRef.virtualUri);
@@ -133,10 +145,11 @@ function WorkstationPathBreadcrumb({
       <Monitor className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
       <Breadcrumb className="min-w-0 flex-1">
         <BreadcrumbList className="flex-nowrap gap-1 overflow-hidden text-xs text-slate-400 sm:gap-1.5">
-          {pathRef.displaySegments.map((segment, index) => {
-            const isLast = index === pathRef.displaySegments.length - 1;
+          {displaySegments.map((segment, index) => {
+            const rawSegment = pathRef.displaySegments[index] ?? segment;
+            const isLast = index === displaySegments.length - 1;
             return (
-              <Fragment key={`${segment}:${index}`}>
+              <Fragment key={`${rawSegment}:${index}`}>
                 <BreadcrumbItem className="min-w-0">
                   <BreadcrumbPage
                     className={cn(
@@ -178,7 +191,7 @@ function WorkstationPathBreadcrumb({
           value={inputValue}
           onChange={(event) => setInputValue(event.target.value)}
           className="min-w-0 flex-1 bg-transparent px-1 text-xs text-slate-200 outline-none placeholder:text-slate-600"
-          aria-label="Workspace path"
+          aria-label={t("workstation.path.inputLabel")}
           data-testid="workstation-path-input"
           placeholder="workspace://workspace/docs/file.md"
         />
@@ -186,8 +199,8 @@ function WorkstationPathBreadcrumb({
           type="button"
           className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-slate-400 hover:bg-white/10 hover:text-cyan-100"
           onClick={copyCurrentPath}
-          title="Copy workspace path"
-          aria-label="Copy workspace path"
+          title={t("workstation.path.copy")}
+          aria-label={t("workstation.path.copy")}
         >
           {status === "copied" ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
         </button>
@@ -197,12 +210,30 @@ function WorkstationPathBreadcrumb({
             "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-white/10",
             status === "invalid" ? "text-amber-300" : "text-slate-300 hover:text-cyan-100",
           )}
-          title={status === "invalid" ? "Use a workspace://, panels/, or docs/ path" : "Navigate workspace path"}
-          aria-label="Navigate workspace path"
+          title={status === "invalid" ? t("workstation.path.invalidTitle") : t("workstation.path.navigate")}
+          aria-label={t("workstation.path.navigate")}
         >
           {status === "invalid" ? <X className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
         </button>
       </form>
     </div>
   );
+}
+
+function localizeWorkstationPathSegment(
+  segment: string,
+  index: number,
+  pathRef: WorkstationPathRef,
+  t: Translate,
+): string {
+  if (segment === "Workspace") return t("workstation.path.segment.workspace");
+  if (segment === "Panels") return t("workstation.path.segment.panels");
+  const isLast = index === pathRef.displaySegments.length - 1;
+  const panelId = isLast ? readPanelIdFromPathUri(pathRef.virtualUri) : null;
+  return panelId ? getInterfacePanelTitle(t, panelId, segment) : segment;
+}
+
+function readPanelIdFromPathUri(value: string): string | null {
+  const match = value.match(/^workspace:\/\/(?:workspace\/)?panels\/([^/?#]+)/);
+  return match?.[1] ?? null;
 }

@@ -1,9 +1,17 @@
 import React, { Suspense, useMemo } from "react";
+import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
 import { getPanelDef } from "@/lib/desktop/panelRegistry";
+import { getInterfaceLanguageOption } from "@/lib/i18n/interfaceLanguage";
+import { useInterfaceText } from "@/lib/i18n/interfaceText";
+import { getInterfacePanelTitle } from "@/lib/i18n/panelTitles";
 import { markInteraction } from "@/lib/workstation/performance/workstationInteractionScheduler";
 
 export function WorkstationPanelHost({ panelId }: { panelId: string }) {
   const def = getPanelDef(panelId);
+  const { userSettings } = useHelixStartSettings();
+  const interfaceLanguage = getInterfaceLanguageOption(userSettings.interfaceLanguage);
+  const { t } = useInterfaceText(interfaceLanguage.code);
+  const panelTitle = def ? getInterfacePanelTitle(t, panelId, def.title) : panelId;
   const LazyPanel = useMemo(() => {
     if (!def) return null;
     return React.lazy(def.loader);
@@ -33,7 +41,13 @@ export function WorkstationPanelHost({ panelId }: { panelId: string }) {
         containIntrinsicSize: def.heavy ? "960px 720px" : "760px 560px",
       }}
     >
-      <Suspense fallback={<div className="p-4 text-sm text-slate-400">Loading {def.title}...</div>}>
+      <Suspense
+        fallback={
+          <div className="p-4 text-sm text-slate-400">
+            {t("workstation.panel.loadingTitle", { title: panelTitle })}
+          </div>
+        }
+      >
         <LazyPanel />
       </Suspense>
     </div>

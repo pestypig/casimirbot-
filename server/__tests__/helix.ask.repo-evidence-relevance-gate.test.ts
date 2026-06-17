@@ -110,6 +110,26 @@ describe("repo evidence relevance gate", () => {
     expect(gate.violations).toEqual([]);
   });
 
+  it("classifies runtime authority files as both terminal authority and runtime contract evidence", () => {
+    const gate = evaluateRepoEvidenceRelevanceGate({
+      turnId: "turn:repo-relevance",
+      concept: "Terminal Authority",
+      query: "Where does Helix Ask enforce that receipts are observations and terminal authority chooses the answer?",
+      observation: observationWithPaths("Terminal Authority", [
+        "server/services/helix-ask/runtime-authority-contract.ts",
+        "server/services/helix-ask/terminal-authority-single-writer.ts",
+        "server/__tests__/helix.ask.final-answer-draft-selection.test.ts",
+      ]),
+    });
+
+    expect(gate.selected_evidence_roles).toEqual(expect.arrayContaining([
+      "terminal_authority",
+      "runtime_contract",
+      "test_contract",
+    ]));
+    expect(gate.missing_required_roles).not.toContain("runtime_contract");
+  });
+
   it("allows StarSim codebase evidence from StarSim paths", () => {
     const gate = evaluateRepoEvidenceRelevanceGate({
       turnId: "turn:repo-relevance",

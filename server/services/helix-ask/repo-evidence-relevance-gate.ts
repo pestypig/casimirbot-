@@ -97,26 +97,27 @@ const selectedPathContainsAlias = (selectedPath: string, aliases: string[]): boo
   });
 };
 
-const evidenceRoleForPath = (selectedPath: string): RepoConceptEvidenceRole | null => {
+const evidenceRolesForPath = (selectedPath: string): RepoConceptEvidenceRole[] => {
   const normalized = normalizePath(selectedPath).toLowerCase();
-  if (/(?:^|\/)__tests__\/|(?:\.test|\.spec)\.[tj]sx?$/.test(normalized)) return "test_contract";
+  const roles: RepoConceptEvidenceRole[] = [];
+  if (/(?:^|\/)__tests__\/|(?:\.test|\.spec)\.[tj]sx?$/.test(normalized)) roles.push("test_contract");
   if (/terminal|authority|terminal-answer-envelope|runtime-authority-contract|solver-controller|route-product-contract/.test(normalized)) {
-    return "terminal_authority";
+    roles.push("terminal_authority");
   }
   if (/workstation-dynamic-tools|panelcapabilities|panelactionadapters|tool[_-]?registry|capabilit/.test(normalized)) {
-    return "capability_registry";
+    roles.push("capability_registry");
   }
-  if (/client\/src\/store\/|use.*store\.ts$|store\.ts$/.test(normalized)) return "state_model";
-  if (/client\/src\/components\/|(?:panel|pill)\.tsx$/.test(normalized)) return "ui_surface";
+  if (/client\/src\/store\/|use.*store\.ts$|store\.ts$/.test(normalized)) roles.push("state_model");
+  if (/client\/src\/components\/|(?:panel|pill)\.tsx$/.test(normalized)) roles.push("ui_surface");
   if (/server\/(?:services|routes)\/|server\/modules\/|client\/src\/lib\/helix\/|shared\/(?:helix|situation|workstation|starsim)/.test(normalized)) {
-    return "runtime_contract";
+    roles.push("runtime_contract");
   }
-  if (/docs\/|readme|architecture|contract|manifest|preset/.test(normalized)) return "definition";
-  return null;
+  if (/docs\/|readme|architecture|contract|manifest|preset/.test(normalized)) roles.push("definition");
+  return unique(roles);
 };
 
 const rolesForSelectedPaths = (selectedPaths: string[]): RepoConceptEvidenceRole[] =>
-  unique(selectedPaths.map(evidenceRoleForPath).filter((entry): entry is RepoConceptEvidenceRole => Boolean(entry)));
+  unique(selectedPaths.flatMap(evidenceRolesForPath));
 
 const LANGUAGE_DEBUG_FACET_QUERY_RE =
   /\b(?:final answer(?:\s+language)?|response language|language contract|language[_ -]?detected|source[_ -]?language|code[_ -]?mixed|debug(?:\s+export|\s+payload)?|includeMultilangMetadata|terminal answer|synthesis)\b|(?:idioma\s+final|respuesta\s+final|contrato\s+de\s+idioma|lenguaje\s+de\s+respuesta|evidencia\s+del\s+c[o\u00f3]digo|archivos?\s+y\s+l[i\u00ed]neas?|depuraci[o\u00f3]n|exportaci[o\u00f3]n(?:\s+de\s+debug)?)|(?:\u6700\u7ec8\u56de\u7b54\u8bed\u8a00|\u6700\u7ec8\u56de\u7b54|\u56de\u7b54\u8bed\u8a00|\u8bed\u8a00\u9009\u62e9|\u8bed\u8a00\u5951\u7ea6|\u4ee3\u7801\u4ed3\u5e93|\u4ee3\u7801\u8bc1\u636e|\u5f15\u7528\u6587\u4ef6|\u884c\u53f7|\u8c03\u8bd5|\u5bfc\u51fa)/iu;

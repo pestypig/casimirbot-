@@ -519,4 +519,129 @@ describe("Helix capability plan contract", () => {
     expect(plan.capability_family).not.toBe("internet_search");
     expect(plan.capability_family).not.toBe("repo_evidence");
   });
+
+  it("lets explicit calculator capability beat hard live-source mailbox route metadata", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:explicit-calculator-not-mailbox",
+      promptText:
+        "Use scientific-calculator.solve_expression to evaluate 2 + 2 and return the workstation_tool_evaluation.",
+      sourceTargetIntent: baseSourceTarget("unknown", "unknown"),
+      toolCallAdmissionDecision: toolAdmission("live_source_mailbox", ["live_environment"]),
+      canonicalGoalFrame: canonicalGoal("live_source_processed_mail_interpretation", "model_synthesized_answer"),
+      routeMetadata: {
+        schema: "helix.ask.route_metadata.v1",
+        invocationKind: "stage_play_mail_wake",
+        sourceTarget: "live_source_mailbox",
+        requiredPhase: "read_processed_mail",
+      },
+      liveSourceTurnPhaseResolution: {
+        artifactId: "live_source_turn_phase_resolution",
+        schemaVersion: "live_source_turn_phase_resolution/v1",
+        phase: "read_processed_mail",
+        allowedTools: ["live_env.read_processed_live_source_mail"],
+        forbiddenTools: ["scientific-calculator.solve_expression", "final_answer"],
+        requiredEvidence: ["stage_play_processed_mail_packet"],
+        completionEvidence: ["stage_play_processed_mail_packet"],
+        phaseLock: {
+          locked: false,
+          reason: "Fixture only verifies explicit calculator dominance.",
+        },
+      },
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "workstation_action",
+      source_target: "calculator_stream",
+      requested_capability: "scientific-calculator.solve_expression",
+      requested_action: "scientific-calculator.solve_expression",
+      selected_capability: "scientific-calculator.solve_expression",
+      goal_kind: "calculator_solve",
+      required_terminal_kind: "workstation_tool_evaluation",
+    });
+    expect(plan.phase_repaired).toBeUndefined();
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "explicit_capability_command",
+      route_metadata_demoted: true,
+      demotion_reason: "explicit_capability_contract_demoted_route_metadata",
+    });
+  });
+
+  it("lets explicit workspace status capability beat stale model-only canonical goal", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:workspace-status-explicit",
+      promptText: "Use workspace_os.status to inspect workstation status.",
+      sourceTargetIntent: baseSourceTarget("model_only", "general_background"),
+      toolCallAdmissionDecision: toolAdmission("model_only", ["model_only"]),
+      canonicalGoalFrame: canonicalGoal("model_only_concept", "direct_answer_text"),
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "workspace_diagnostic",
+      source_target: "workspace_diagnostic",
+      requested_capability: "workspace_os.status",
+      requested_action: "workspace_os.status",
+      selected_capability: "workspace_os.status",
+      goal_kind: "workspace_status_diagnostic",
+      required_terminal_kind: "workstation_tool_evaluation",
+    });
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "explicit_capability_command",
+      requested_capability: "workspace_os.status",
+    });
+  });
+
+  it("lets explicit docs locate capability beat stale panel-control canonical goal", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:docs-locate-explicit",
+      promptText: "Use docs-viewer.locate_in_doc, not summarize_doc, to locate the Codex parity claim.",
+      sourceTargetIntent: baseSourceTarget("workstation_panel", "panel_control"),
+      toolCallAdmissionDecision: toolAdmission("workstation_panel", ["workstation_action"]),
+      canonicalGoalFrame: canonicalGoal("panel_control", "workspace_action_receipt"),
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "docs",
+      source_target: "docs_viewer",
+      requested_capability: "docs-viewer.locate_in_doc",
+      requested_action: "docs-viewer.locate_in_doc",
+      selected_capability: "docs-viewer.locate_in_doc",
+      goal_kind: "locate_in_doc",
+      required_terminal_kind: "doc_location_matches",
+    });
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "explicit_capability_command",
+      requested_capability: "docs-viewer.locate_in_doc",
+    });
+  });
+
+  it("lets negated calculator references suppress hard calculator metadata", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:negated-calculator-reference",
+      promptText:
+        "Do not call any tools. Explain what evidence would be needed before running scientific-calculator.solve_expression.",
+      sourceTargetIntent: baseSourceTarget("calculator_stream", "calculator_stream"),
+      toolCallAdmissionDecision: toolAdmission("calculator_stream", ["calculator", "workstation_action"]),
+      canonicalGoalFrame: canonicalGoal("calculator_solve", "workstation_tool_evaluation"),
+      routeMetadata: {
+        schema: "helix.ask.route_metadata.v1",
+        sourceTarget: "calculator_stream",
+        mandatoryNextTool: { name: "scientific-calculator.solve_expression" },
+      },
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "debug_export",
+      source_target: "model_only",
+      requested_action: "suppressed_contextual_tool_reference",
+      selected_capability: "suppressed_contextual_tool_reference",
+      goal_kind: "model_only_concept",
+      required_terminal_kind: "direct_answer_text",
+      tool_admission_suppressed: true,
+    });
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "suppressed_contextual_reference",
+      route_metadata_demoted: true,
+      demotion_reason: "contextual_tool_reference_demoted_route_metadata",
+    });
+  });
 });

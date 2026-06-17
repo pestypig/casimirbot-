@@ -40,6 +40,7 @@ export type HelixCapabilityPlan = {
   source_target: string;
   goal_kind: string;
   required_terminal_kind: string | null;
+  capability_contract_arbitration?: Record<string, unknown>;
 
   admission_status: HelixCapabilityAdmissionStatus;
   rejection_reason?: string;
