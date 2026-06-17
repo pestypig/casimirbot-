@@ -1372,6 +1372,112 @@ describe("final_answer_draft terminal selection", () => {
     expect(payload.terminal_error_code).toBeUndefined();
   });
 
+  it("materializes calculator workstation evaluation text through the backend synthesizer", () => {
+    const turnId = "ask:test:calculator-evaluation-synthesized-terminal";
+    const expression = "((sqrt(81)+ln(e^3))*7-5^2)/2";
+    const prompt = `Use the scientific calculator to solve ${expression}.`;
+    const plan = {
+      schema: "helix.workstation_tool_plan.v1",
+      plan_id: `${turnId}:plan`,
+      thread_id: "thread:test",
+      turn_id: turnId,
+      goal: prompt,
+      intent: "calculator_solve",
+      steps: [
+        {
+          step_id: "solve_expression",
+          kind: "run_panel_action",
+          panel_id: "scientific-calculator",
+          action_id: "solve_expression",
+          args: {
+            latex: expression,
+            calculator_setup: {
+              schema: "helix.calculator_setup_context.v1",
+              expression,
+              display_latex: expression,
+              domain: "generic",
+              subgoal: "Evaluate the supplied calculator expression.",
+              equation: null,
+              variables: [],
+              result_unit: null,
+              interpretation_prompt: null,
+            },
+          },
+          required: true,
+        },
+      ],
+      missing_requirements: [],
+      created_at: "2026-06-16T00:00:00.000Z",
+    };
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:workstation_tool_evaluation`,
+        kind: "workstation_tool_evaluation",
+        payload: {
+          schema: "helix.workstation_tool_evaluation.v1",
+          evaluation_id: `${turnId}:workstation_tool_evaluation`,
+          plan_id: plan.plan_id,
+          thread_id: "thread:test",
+          turn_id: turnId,
+          goal: prompt,
+          subgoal: "Evaluate the supplied calculator expression.",
+          tool_receipt_ids: [`${turnId}:calculator_receipt`],
+          supports_goal: true,
+          summary: `Calculator verified ${expression} with result 29.5.`,
+          evidence_refs: [`${turnId}:calculator_receipt`],
+          deterministic: true,
+          model_invoked: false,
+          created_at: "2026-06-16T00:00:00.000Z",
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt: prompt,
+      workstation_tool_plan: plan,
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "calculator_solve",
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      source_target_intent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "calculator_stream",
+        target_kind: "calculator_stream",
+      },
+      route_product_contract: {
+        ...modelOnlyContract(turnId),
+        source_target: "calculator_stream",
+        allowed_terminal_artifact_kinds: ["workstation_tool_evaluation", "model_synthesized_answer", "typed_failure"],
+        required_terminal_kinds: ["workstation_tool_evaluation"],
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: "Calculator-backed result: stale UI text.",
+      final_answer_source: "final_answer_draft",
+      terminal_artifact_kind: "model_synthesized_answer",
+    };
+    addCalculatorRuntimeProof(payload, `${turnId}:workstation_tool_evaluation`);
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(result.source).toBe("workstation_tool_evaluation");
+    expect(payload.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(payload.final_answer_source).toBe("workstation_tool_evaluation");
+    expect(payload.selected_final_answer).toContain("Calculator verification plan completed.");
+    expect(payload.selected_final_answer).toContain(`Expression: ${expression}`);
+    expect(payload.selected_final_answer).toContain("Result: 29.5");
+    expect(payload.selected_final_answer).toContain("Trace source: scientific-calculator.solve_expression.");
+    expect(payload.selected_final_answer).not.toContain("stale UI text");
+    expect((payload.terminal_presentation as Record<string, unknown>).concise_text).toBe(payload.selected_final_answer);
+    expect((payload.workstation_tool_terminal_synthesis as Record<string, unknown>).applied).toBe(true);
+  });
+
   it("lets satisfied calculator workstation evaluation supersede stale continuation state", () => {
     const turnId = "ask:test:calculator-evaluation-stale-continuation";
     const terminalText = "Calculator-backed result: ((sqrt(81)+ln(e^3))*7-5^2)/2 = 29.5.";

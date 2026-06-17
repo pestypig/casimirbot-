@@ -2972,7 +2972,7 @@ export const DOC_FILE_METADATA: Record<string, DocFileMetadata> = {
   "docs/casimir-tile-mechanism.md": {"mtimeMs":1767594092423,"mtimeIso":"2026-01-05T06:21:32.423Z","sizeBytes":10835},
   "docs/casimir-tile-roadmap.md": {"mtimeMs":1756928987722,"mtimeIso":"2025-09-03T19:49:47.722Z","sizeBytes":3265},
   "docs/casimir-tile-schematic-roadmap.md": {"mtimeMs":1766034595367,"mtimeIso":"2025-12-18T05:09:55.367Z","sizeBytes":5882},
-  "docs/civilization-bounds-roadmap.md": {"mtimeMs":1781659805856,"mtimeIso":"2026-06-17T01:30:05.856Z","sizeBytes":3487},
+  "docs/civilization-bounds-roadmap.md": {"mtimeMs":1781662261429,"mtimeIso":"2026-06-17T02:11:01.429Z","sizeBytes":4453},
   "docs/client-index.md": {"mtimeMs":1768877108462,"mtimeIso":"2026-01-20T02:45:08.462Z","sizeBytes":26557},
   "docs/CODEX_QUICKSTART.md": {"mtimeMs":1767199027332,"mtimeIso":"2025-12-31T16:37:07.332Z","sizeBytes":2039},
   "docs/collapse-benchmark-backend-roadmap.md": {"mtimeMs":1766038638155,"mtimeIso":"2025-12-18T06:17:18.155Z","sizeBytes":11455},

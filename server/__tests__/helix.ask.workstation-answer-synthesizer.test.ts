@@ -23,6 +23,40 @@ describe("Helix Ask workstation answer synthesizer", () => {
     );
   });
 
+  it("uses observed calculator evaluation results for function expressions", () => {
+    const expression = "((sqrt(81)+ln(e^3))*7-5^2)/2";
+    const prompt = `Use the scientific calculator to solve ${expression}.`;
+    const plan = planWorkstationToolUse(prompt).tool_plan;
+
+    expect(plan).toBeTruthy();
+    const answer = synthesizeWorkstationToolAnswer({
+      prompt,
+      plan: plan!,
+      evaluation: {
+        schema: "helix.workstation_tool_evaluation.v1",
+        evaluation_id: "eval:function-expression",
+        plan_id: plan!.plan_id,
+        thread_id: "thread:test",
+        turn_id: "turn:test",
+        goal: prompt,
+        subgoal: "Evaluate the supplied calculator expression.",
+        tool_receipt_ids: ["calculator:receipt:function-expression"],
+        supports_goal: true,
+        summary: `Calculator verified ${expression} with result 29.5.`,
+        evidence_refs: ["calculator:receipt:function-expression"],
+        deterministic: true,
+        model_invoked: false,
+        created_at: "2026-06-16T00:00:00.000Z",
+      },
+    });
+
+    expect(answer).toContain("Calculator verification plan completed.");
+    expect(answer).toContain(`Expression: ${expression}`);
+    expect(answer).toContain("Result: 29.5");
+    expect(answer).toContain("Trace source: scientific-calculator.solve_expression.");
+    expect(answer).not.toContain("available in the Scientific Calculator receipt/trace");
+  });
+
   it("continues reasoning after calculator output for compound photon-energy prompts", () => {
     const prompt = "Explain photon energy using E=hf and calculate it for f=5e14 Hz.";
     const plan = planWorkstationToolUse(prompt).tool_plan;

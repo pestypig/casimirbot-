@@ -49,6 +49,50 @@ const WORKSTATION_EVALUATION_STATUS_VALUES = new Set([
   "stored_for_reference",
 ]);
 
+function normalizeCalculatorExpressionText(value: string | null): string | null {
+  if (!value) return null;
+  const normalized = value
+    .trim()
+    .replace(/^[`"']+|[`"'.]+$/g, "")
+    .trim();
+  if (!normalized || normalized.length > 240) return null;
+  if (!/[+\-*/^=()]|sqrt|ln|log|sin|cos|tan|exp/i.test(normalized)) return null;
+  return normalized;
+}
+
+function calculatorExpressionFromEvaluation(
+  evaluation: HelixWorkstationToolEvaluation | null | undefined,
+): string | null {
+  const record = readRecord(evaluation);
+  if (!record) return null;
+  const calculatorSetup = readRecord(record.calculator_setup);
+  const directExpression =
+    readString(record.expression) ??
+    readString(record.input_expression) ??
+    readString(record.calculator_expression) ??
+    readString(record.latex) ??
+    readString(readRecord(record.calculation)?.expression) ??
+    readString(calculatorSetup?.display_latex) ??
+    readString(calculatorSetup?.expression);
+  const normalizedDirectExpression = normalizeCalculatorExpressionText(directExpression);
+  if (normalizedDirectExpression) return normalizedDirectExpression;
+  const text = [
+    readString(record.summary),
+    readString(record.result_summary),
+    readString(record.answer_text),
+    readString(record.text),
+  ].filter(Boolean).join("\n");
+  if (!text) return null;
+  const expressionLabel = text.match(/\bexpression\s*:\s*([^\n]+)/i);
+  const evaluatedExpression = text.match(
+    /\b(?:verified|evaluated|solved|computed)\s+(.+?)\s+(?:with\s+result|and\s+(?:produced|returned)|=)\b/i,
+  );
+  return (
+    normalizeCalculatorExpressionText(expressionLabel?.[1] ?? null) ??
+    normalizeCalculatorExpressionText(evaluatedExpression?.[1] ?? null)
+  );
+}
+
 function calculatorResultFromEvaluation(
   evaluation: HelixWorkstationToolEvaluation | null | undefined,
 ): string | null {
@@ -193,7 +237,9 @@ export function buildCalculatorObservation(
   evaluation?: HelixWorkstationToolEvaluation | null,
 ): CalculatorObservation {
   const setup = calculatorSetupFromPlan(plan);
-  const expression = setup?.display_latex ?? setup?.expression ?? extractCalculatorExpression(prompt) ?? "the expression";
+  const observedExpression = calculatorExpressionFromEvaluation(evaluation);
+  const expression =
+    observedExpression ?? setup?.display_latex ?? setup?.expression ?? extractCalculatorExpression(prompt) ?? "the expression";
   const observedResult = calculatorResultFromEvaluation(evaluation);
   return {
     expression,
