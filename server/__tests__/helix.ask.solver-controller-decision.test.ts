@@ -1176,6 +1176,102 @@ describe("helix ask solver controller decision", () => {
     expect(decision.blocking_reasons).not.toContain("capability_lifecycle_incomplete");
   });
 
+  it("normalizes stale model-draft mirrors when terminal authority selected workstation tool evaluation", () => {
+    const payload = {
+      active_prompt: "Call scientific-calculator.solve_expression with 2+2 and answer from workstation_tool_evaluation.",
+      canonical_goal_frame: {
+        turn_id: "ask:calculator-stale-model-mirror",
+        goal_kind: "calculator_solve",
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      route_reason_code: "calculator_solve",
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        turn_id: "ask:calculator-stale-model-mirror",
+        route: "dispatch:act",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        final_answer_source: "workstation_tool_evaluation",
+        server_authoritative: true,
+      },
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        turn_id: "ask:calculator-stale-model-mirror",
+        selected_terminal_artifact_kind: "workstation_tool_evaluation",
+        source: "workstation_tool_evaluation",
+        visible_text: "Calculator verification plan completed.\nExpression: 2+2\nResult: 4",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: "ask:calculator-stale-model-mirror",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        concise_text: "Calculator verification plan completed.\nExpression: 2+2\nResult: 4",
+      },
+      resolved_turn_summary: {
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        final_answer_source: "workstation_tool_evaluation",
+      },
+      poison_audit: { schema: "helix.turn_poison_audit.v1", ok: true, violations: [] },
+      route_authority_audit: { schema: "helix.route_authority_audit.v1", route_authority_ok: true },
+      ask_turn_solver_trace: {
+        schema: "helix.ask_turn_solver_trace.v1",
+        turn_id: "ask:calculator-stale-model-mirror",
+        completed_solver_path: true,
+        final_arbitration: {
+          terminal_artifact_kind: "model_synthesized_answer",
+          final_answer_source: "final_answer_draft",
+        },
+      },
+      goal_satisfaction_evaluation: {
+        ...satisfiedGoal("calculator_solve", "workstation_tool_evaluation"),
+        terminal_contract: {
+          goal_kind: "calculator_solve",
+          required_terminal_kinds: ["workstation_tool_evaluation"],
+          acceptable_fallbacks: ["typed_failure"],
+          forbidden_terminal_kinds: ["direct_answer_text", "model_synthesized_answer"],
+          required_actions: ["scientific-calculator.solve_expression"],
+          required_evidence: ["calculator_receipt", "workstation_tool_evaluation"],
+        },
+      },
+      observation_review: {
+        schema: "helix.observation_review.v1",
+        does_it_satisfy_goal: true,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "ask:calculator-stale-model-mirror:workstation_tool_evaluation",
+          turn_id: "ask:calculator-stale-model-mirror",
+          kind: "workstation_tool_evaluation",
+          payload: {
+            schema: "helix.workstation_tool_evaluation.v1",
+            supports_goal: true,
+          },
+        },
+      ],
+      terminal_equivalence_harness_result: terminalEquivalenceOk,
+    };
+
+    const decision = buildSolverControllerDecision({
+      turnId: "ask:calculator-stale-model-mirror",
+      finalRoute: "calculator_solve",
+      payload,
+      turnIdIntegrityAudit: buildTurnIdIntegrityAudit({ turnId: "ask:calculator-stale-model-mirror", payload }),
+      finalRouteReconciliation: buildFinalRouteReconciliation({
+        turnId: "ask:calculator-stale-model-mirror",
+        finalRoute: "calculator_solve",
+        payload,
+      }),
+    });
+
+    expect(decision.decision).toBe("allow_terminal");
+    expect(decision.canonical_goal_kind).toBe("calculator_solve");
+    expect(decision.required_terminal_kind).toBe("workstation_tool_evaluation");
+    expect(decision.selected_terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(payload.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(payload.final_answer_source).toBe("workstation_tool_evaluation");
+  });
+
   it("continues live-source record_decision phase instead of allowing typed failure without decision receipt", () => {
     const turnId = "ask:live-source-missing-decision";
     const payload = {

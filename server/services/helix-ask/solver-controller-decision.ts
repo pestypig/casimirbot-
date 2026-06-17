@@ -759,7 +759,9 @@ export function buildSolverControllerDecision(input: {
     noteMutationTerminal ||
     Boolean(canonicalGoalKind && requiredTerminalKind && finalRouteBase === canonicalGoalKind && terminalArtifactKind === requiredTerminalKind);
   const turnIdIntegrityAudit = input.turnIdIntegrityAudit ?? buildTurnIdIntegrityAudit({ turnId: input.turnId, payload });
-  const finalRouteReconciliation = input.finalRouteReconciliation ?? buildFinalRouteReconciliation({ turnId: input.turnId, finalRoute, payload });
+  const finalRouteReconciliation = authoritativeWorkstationTerminal
+    ? buildFinalRouteReconciliation({ turnId: input.turnId, finalRoute, payload })
+    : input.finalRouteReconciliation ?? buildFinalRouteReconciliation({ turnId: input.turnId, finalRoute, payload });
   const disciplineGuardRequired = isSourceTargetedOrCapabilityTurn(payload);
   const capabilityTerminal = isCapabilityTerminalKind(terminalArtifactKind);
   const modelDirectAnswerTerminal =
@@ -940,7 +942,13 @@ export function buildSolverControllerDecision(input: {
   }
 
   if (!turnIdIntegrityAudit.ok) pushUnique(blockingReasons, "turn_id_integrity_failed");
-  if (!finalRouteReconciliation.ok && !noteMutationTerminal && !modelDirectAnswerTerminal && !liveSourceSetupReceiptTerminal) {
+  if (
+    !finalRouteReconciliation.ok &&
+    !authoritativeWorkstationTerminal &&
+    !noteMutationTerminal &&
+    !modelDirectAnswerTerminal &&
+    !liveSourceSetupReceiptTerminal
+  ) {
     pushUnique(blockingReasons, "terminal_route_mismatch");
     if (finalRouteReconciliation.violations.some((entry) => entry.code === "terminal_artifact_forbidden_by_final_route")) {
       pushUnique(blockingReasons, "route_product_contract_rejected_terminal");

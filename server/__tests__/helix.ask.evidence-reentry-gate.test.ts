@@ -170,6 +170,79 @@ describe("Helix Ask evidence re-entry and follow-up gates", () => {
     expect(trace.completed_solver_path).toBe(true);
   });
 
+  it("keeps solver final arbitration aligned with authoritative workstation terminal metadata", () => {
+    const payload = {
+      ...authorityPayload({
+        sourceTarget: "workspace_panel",
+        allowed: ["workstation_tool_evaluation", "typed_failure", "request_user_input"],
+      }),
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "calculator_solve",
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        final_answer_source: "workstation_tool_evaluation",
+        server_authoritative: true,
+      },
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        selected_terminal_artifact_kind: "workstation_tool_evaluation",
+        source: "workstation_tool_evaluation",
+        visible_text: "Calculator verification plan completed.\nExpression: 2+2\nResult: 4",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+      },
+      resolved_turn_summary: {
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        final_answer_source: "workstation_tool_evaluation",
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    };
+
+    const trace = buildAskTurnSolverTrace({
+      turnId: "turn:calculator-authority-mirror",
+      promptText: "Call scientific-calculator.solve_expression with 2+2 and answer from the workstation tool evaluation.",
+      selectedRoute: "dispatch:act",
+      terminalArtifactKind: "model_synthesized_answer",
+      finalAnswerSource: "final_answer_draft",
+      payload,
+      loopParityTrace: {
+        actual_tool_calls: [{
+          tool_id: "scientific-calculator.solve_expression",
+          family: "calculator",
+          admitted: true,
+          mutating: false,
+          result_ref: "turn:calculator-authority-mirror:calculator_receipt",
+        }],
+        observations_created: [{
+          observation_id: "turn:calculator-authority-mirror:workstation_tool_evaluation",
+          source_kind: "workstation_tool_evaluation",
+        }],
+        evidence_selected_for_answer: ["turn:calculator-authority-mirror:workstation_tool_evaluation"],
+        evidence_rejected_for_answer: [],
+        terminal_selection_ran_after_observations: true,
+        route_authority_ok: true,
+        poison_audit_ok: true,
+        terminal_authority_ok: true,
+      },
+    });
+
+    expect(trace.final_arbitration.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(trace.final_arbitration.final_answer_source).toBe("workstation_tool_evaluation");
+    expect(payload.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(payload.final_answer_source).toBe("workstation_tool_evaluation");
+  });
+
   it("keeps the original negated cadence prompt on content intent without receipt terminal authority", () => {
     const trace = buildAskTurnSolverTrace({
       turnId: "turn:negated-cadence",

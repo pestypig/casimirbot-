@@ -3,6 +3,105 @@ import { describe, expect, it } from "vitest";
 import { __testHelixAskOutputContract } from "../routes/agi.plan";
 
 describe("Helix Ask response-boundary terminal mirrors", () => {
+  it("projects workstation terminal authority over stale model-synthesized debug mirrors", () => {
+    const answerText = "Calculator verification plan completed.\nExpression: 2+2\nResult: 4";
+    const payload = {
+      turn_id: "ask:test-workstation-terminal-mirror",
+      ok: true,
+      response_type: "final_answer",
+      final_status: "final_answer",
+      status: "final_answer",
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      selected_final_answer: answerText,
+      answer: answerText,
+      text: answerText,
+      canonical_goal_frame: {
+        goal_kind: "calculator_solve",
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        terminal_kind: "answer",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        final_answer_source: "workstation_tool_evaluation",
+        terminal_text_preview: answerText,
+        server_authoritative: true,
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        concise_text: answerText,
+      },
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        selected_terminal_artifact_kind: "workstation_tool_evaluation",
+        source: "workstation_tool_evaluation",
+        visible_text: answerText,
+      },
+      resolved_turn_summary: {
+        final_status: "final_answer",
+        resolved_route_label: "calculator_solve / workstation_tool_evaluation",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        final_answer_source: "workstation_tool_evaluation",
+      },
+      ask_turn_solver_trace: {
+        schema: "helix.ask_turn_solver_trace.v1",
+        final_arbitration: {
+          terminal_artifact_kind: "model_synthesized_answer",
+          final_answer_source: "final_answer_draft",
+        },
+      },
+      solver_controller_decision: {
+        schema: "helix.solver_controller_decision.v1",
+        decision: "allow_terminal",
+        canonical_goal_kind: "temporal_followup",
+        required_terminal_kind: "model_synthesized_answer",
+        selected_terminal_artifact_kind: "model_synthesized_answer",
+      },
+      solver_controller_summary: {
+        decision: "allow_terminal",
+        required_terminal_kind: "model_synthesized_answer",
+        selected_terminal_artifact_kind: "model_synthesized_answer",
+      },
+      terminal_projection_guard: {
+        schema: "helix.terminal_projection_guard.v1",
+        terminal_authority_kind: "workstation_tool_evaluation",
+        visible_terminal_kind: "model_synthesized_answer",
+        action: "project_authority_artifact",
+        error_code: null,
+      },
+      debug: {},
+    };
+
+    const envelope = __testHelixAskOutputContract.buildHelixDebugExportEnvelope({
+      payload,
+      prompt: "Call scientific-calculator.solve_expression with 2+2.",
+      sessionId: "test-session",
+    }) as Record<string, any>;
+
+    expect(envelope.final_answer_source).toBe("workstation_tool_evaluation");
+    expect(envelope.resolved_turn_summary).toMatchObject({
+      resolved_route_label: "calculator_solve / workstation_tool_evaluation",
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      final_answer_source: "workstation_tool_evaluation",
+    });
+    expect(envelope.ask_turn_solver_trace.final_arbitration).toMatchObject({
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      final_answer_source: "workstation_tool_evaluation",
+    });
+    expect(envelope.solver_controller_decision).toMatchObject({
+      canonical_goal_kind: "calculator_solve",
+      required_terminal_kind: "workstation_tool_evaluation",
+      selected_terminal_artifact_kind: "workstation_tool_evaluation",
+    });
+    expect(envelope.terminal_projection_guard).toMatchObject({
+      terminal_authority_kind: "workstation_tool_evaluation",
+      visible_terminal_kind: "workstation_tool_evaluation",
+      error_code: null,
+    });
+  });
+
   it("normalizes stale top-level final-draft mirrors from typed-failure authority", () => {
     const failureText = "I could not produce a terminal answer for this turn.";
     const payload = {
