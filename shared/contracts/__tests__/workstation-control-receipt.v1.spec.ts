@@ -1,4 +1,9 @@
 import { describe, expect, it } from "vitest";
+import {
+  WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
+  WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
+  type AgentGoalSessionV1,
+} from "../workstation-goal-context.v1";
 import type { WorkstationControlReceiptV1 } from "../workstation-control-receipt.v1";
 import {
   WORKSTATION_CONTROL_RECEIPT_SCHEMA,
@@ -7,7 +12,42 @@ import {
 
 const receiptFixture = (
   overrides: Partial<WorkstationControlReceiptV1> = {},
-): WorkstationControlReceiptV1 => ({
+): WorkstationControlReceiptV1 => {
+  const agentGoalSession: AgentGoalSessionV1 = {
+    schemaVersion: WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
+    goalId: "goal:frog",
+    threadId: "helix-ask:desktop",
+    roomId: "room:desktop",
+    objective: "Classify frog imagery from ImageLens visual capture.",
+    userVisibleSummary: "Classifying frog imagery.",
+    status: "active",
+    sourceRefs: ["visual_source:image-lens", "source:visual:active"],
+    loopRefs: ["helix-ask:desktop", "workstation_control:change_preset", "workstation_actuator:change_preset"],
+    constructRefs: ["stage-play-badge-graph", "live-answer-environment"],
+    contextFeeds: [{
+      feedId: "feed:visual-summaries",
+      sourceKind: "visual_summaries",
+      freshnessMs: 30_000,
+      relevancePolicy: "same-source-or-goal-id",
+    }],
+    allowedActuators: ["change_preset"],
+    cadence: { kind: "user_turn_only" },
+    stopConditions: ["user stops the goal", "visual source disconnects"],
+    checkpoints: [{
+      checkpointId: "goal_checkpoint:frog:control",
+      createdAtMs: 1_780_000_000_000,
+      summary: "Preset control prepared for frog classification.",
+      evidenceRefs: ["stage_play_workstation_control_receipt:change_preset:frog"],
+      actionsTaken: ["change_preset"],
+      nextStep: "continue",
+    }],
+    authority: {
+      assistantAnswer: false,
+      finalReportsRequireTerminalAuthority: true,
+      finalReportRequirements: WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
+    },
+  };
+  return {
   schema: WORKSTATION_CONTROL_RECEIPT_SCHEMA,
   receiptId: "stage_play_workstation_control_receipt:change_preset:frog",
   controlKind: "change_preset",
@@ -35,7 +75,7 @@ const receiptFixture = (
     "stage_play_workstation_control_receipt:change_preset:frog",
     "stage_play_goal_context_update:control:frog",
   ],
-  agentGoalSession: null,
+  agentGoalSession,
   targetRef: "source:visual:active",
   sourceRef: "visual_source:image-lens",
   presetId: "preset:frog-classifier",
@@ -73,7 +113,8 @@ const receiptFixture = (
   context_role: "tool_evidence",
   ask_context_policy: "evidence_only",
   ...overrides,
-});
+  };
+};
 
 describe("stage_play_workstation_control_receipt/v1", () => {
   it("accepts prepared workstation control receipts as non-terminal tool evidence", () => {
@@ -115,6 +156,22 @@ describe("stage_play_workstation_control_receipt/v1", () => {
     });
 
     expect(validateWorkstationControlReceiptV1(receipt)).toEqual([]);
+  });
+
+  it("rejects prepared receipts without actuator policy or valid goal-session evidence", () => {
+    expect(validateWorkstationControlReceiptV1(receiptFixture({
+      actuatorAllowed: false,
+      policyEvidenceRefs: ["goal:policy-context"],
+      agentGoalSession: {
+        goalId: "goal:wrong",
+        threadId: "helix-ask:desktop",
+      },
+    }))).toEqual(expect.arrayContaining([
+      "prepared receipts must have actuatorAllowed=true",
+      "policyEvidenceRefs must include required actuator policy ref",
+      "agentGoalSession.schemaVersion must match agent goal session schema",
+      "agentGoalSession.goalId must match goalId",
+    ]));
   });
 
   it("requires prepared process-graph focus receipts to name a node", () => {
