@@ -122,6 +122,20 @@ requested/visible capability -> selected/admitted/executed capability
 It currently covers calculator, workspace status, docs locate, repo search,
 internet search/config, live-source mail, runtime capability catalog, negated
 tool mentions, visual capture, and the image-lens visual alias.
+Dry-run output exposes explicit coverage tags for these acceptance families:
+
+```txt
+calculator
+docs
+repo_code
+workspace_status
+live_source_mail
+internet_search
+visual_capture
+image_lens
+capability_catalog
+negated_contextual_tool_mentions
+```
 
 The normalized rail also records `admission_proof_source`, `admission_proven`,
 `required_observation_kinds_for_requested_capability`,
@@ -141,6 +155,27 @@ The browser/UI debug parity harness also checks that copied UI debug exports
 contain the same normalized rail table and that its selected terminal kind
 matches the visible terminal kind and terminal authority with source-backed
 terminal/projection proof fields.
+
+For the broader workstation/tool-chain regression matrix, run:
+
+```bash
+npm run helix:ask:tool-chain-matrix
+```
+
+That probe also uses the operator-started server. It writes Ask responses,
+debug exports, per-scenario probe results, and a normalized matrix summary for
+tool-backed turns across calculator, docs, repo, workspace, live environment,
+internet-search/config, and visual/tool aliases. Before running scenarios it
+preflights the Ask turn debug-export endpoint. If the endpoint is unreachable or
+not mounted, the probe writes a blocked summary instead of reporting misleading
+tool-chain failures.
+
+Both live probes support dry-run inspection without server access:
+
+```bash
+npm run helix:ask:live-spine-smoke -- --dry-run
+npm run helix:ask:tool-chain-matrix -- --dry-run
+```
 
 For any rail marked `complete`, the API probe, live spine smoke, tool-chain
 matrix probe, and UI debug harness also treat the answer envelope as part of the
@@ -163,6 +198,11 @@ HELIX_ASK_API_PARITY_SCENARIOS=visual_content_negated_cadence,affirmative_cadenc
 HELIX_ASK_API_PARITY_INCLUDE_DISABLED=1
 HELIX_ASK_LIVE_SPINE_OUT=artifacts/helix-ask-live-spine-smoke
 HELIX_ASK_LIVE_SPINE_SCENARIOS=calculator_explicit,capability_catalog_runtime
+HELIX_ASK_TOOL_CHAIN_OUT=artifacts/helix-ask-tool-chain-matrix
+HELIX_ASK_TOOL_CHAIN_SCENARIOS=negated_docs_open,auntie_dottie_repo
+HELIX_ASK_TOOL_CHAIN_TIMEOUT_MS=240000
+HELIX_ASK_TOOL_CHAIN_FAIL_ON_WARN=1
+HELIX_ASK_TOOL_CHAIN_DRY_RUN=1
 ```
 
 Each scenario writes:

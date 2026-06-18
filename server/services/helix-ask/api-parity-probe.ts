@@ -11,13 +11,18 @@ type RecordLike = Record<string, unknown>;
 
 export type HelixApiParityRailTableSummary = {
   present: boolean;
+  prompt: string | null;
   requested_capability: string | null;
+  visible_tool_surface: string[];
+  visible_tool_surface_original_count: number | null;
+  visible_tool_surface_truncated: boolean | null;
   selected_capability: string | null;
   admitted_capability: string | null;
   admission_proof_source: string | null;
   admission_proven: boolean;
   executed_capability: string | null;
   observation_kind: string | null;
+  observation_ref: string | null;
   required_observation_kinds_for_requested_capability: string[];
   observed_artifact_supports_requested_capability: boolean | null;
   reentry_status: string | null;
@@ -34,6 +39,7 @@ export type HelixApiParityRailTableSummary = {
   first_broken_rail: string | null;
   repair_target: string | null;
   codex_parity_class: string | null;
+  normalized_codex_parity_classes: string[];
   rail_status: string | null;
   rail_failure_code: string | null;
 };
@@ -184,13 +190,22 @@ const readRailTable = (ask: RecordLike, debug: RecordLike | null): RecordLike | 
 
 const buildRailTableSummary = (railTable: RecordLike | null): HelixApiParityRailTableSummary => ({
   present: Boolean(railTable),
+  prompt: readString(railTable?.prompt),
   requested_capability: readString(railTable?.requested_capability),
+  visible_tool_surface: readStringArray(railTable?.visible_tool_surface),
+  visible_tool_surface_original_count:
+    typeof railTable?.visible_tool_surface_original_count === "number" && Number.isFinite(railTable.visible_tool_surface_original_count)
+      ? railTable.visible_tool_surface_original_count
+      : null,
+  visible_tool_surface_truncated:
+    typeof railTable?.visible_tool_surface_truncated === "boolean" ? railTable.visible_tool_surface_truncated : null,
   selected_capability: readString(railTable?.selected_capability),
   admitted_capability: readString(railTable?.admitted_capability),
   admission_proof_source: readString(railTable?.admission_proof_source),
   admission_proven: railTable?.admission_proven === true,
   executed_capability: readString(railTable?.executed_capability),
   observation_kind: readString(railTable?.observation_kind),
+  observation_ref: readString(railTable?.observation_ref),
   required_observation_kinds_for_requested_capability: readStringArray(railTable?.required_observation_kinds_for_requested_capability),
   observed_artifact_supports_requested_capability:
     typeof railTable?.observed_artifact_supports_requested_capability === "boolean"
@@ -210,6 +225,7 @@ const buildRailTableSummary = (railTable: RecordLike | null): HelixApiParityRail
   first_broken_rail: readString(railTable?.first_broken_rail),
   repair_target: readString(railTable?.repair_target),
   codex_parity_class: readString(railTable?.codex_parity_class),
+  normalized_codex_parity_classes: readStringArray(railTable?.normalized_codex_parity_classes),
   rail_status: readString(railTable?.rail_status),
   rail_failure_code: readString(railTable?.rail_failure_code),
 });

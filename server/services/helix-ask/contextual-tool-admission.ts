@@ -54,6 +54,8 @@ const EXTERNAL_READONLY_TOOL_RE =
   /\b(?:browse|browsing|search(?:ing)?|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|verify\s+online|do\s+research|research|retrieve|fetch|query|resolve|collect|cite|citations?|sources?|papers?|doi|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall)\b/i;
 const MUTATING_WRITE_NEGATION_RE =
   /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no)\s+(?:write|create|edit|modify|save|append|update|delete|remove|commit|stage)\s+(?:any\s+)?(?:files?|notes?|docs?|documents?|repo|repository|workspace|disk)\b/gi;
+const LIVE_ENV_CONTROL_CUE_RE =
+  /\blive_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|start_agent_goal_session)\b|\bnarrator\.(?:say|bind_stream)\b/i;
 
 const stripWriteOnlyNegationsForExternalToolMatching = (prompt: string): string =>
   prompt.replace(MUTATING_WRITE_NEGATION_RE, " ").replace(NEGATED_MUTATING_WRITE_CLAUSE_RE, (clause) => {
@@ -98,6 +100,7 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       !SCIENTIFIC_CALCULATOR_CUE_RE.test(prompt) &&
       !SCHOLARLY_CUE_RE.test(prompt) &&
       !INTERNET_SEARCH_CUE_RE.test(prompt) &&
+      !LIVE_ENV_CONTROL_CUE_RE.test(prompt) &&
       !MUTATING_WRITE_NEGATION_RE.test(prompt)
     )
   ) return null;
@@ -120,6 +123,26 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       suppression_reason: "quoted_tool_command",
       verb_or_cue: "docs_viewer.open",
       text: quotedDocsPathCommand,
+    };
+  }
+
+  const liveEnvControlReference = prompt.match(
+    /(?:\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to)\b[^.!?;\n]{0,160}(?:run|call|use|execute|start|set|change|bind|update|repair|focus)?[^.!?;\n]{0,120}(?:live_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|start_agent_goal_session)|narrator\.(?:say|bind_stream))\b)|(?:"[^"]*(?:live_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|start_agent_goal_session)|narrator\.(?:say|bind_stream))[^"]*")|(?:`[^`]*(?:live_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|start_agent_goal_session)|narrator\.(?:say|bind_stream))[^`]*`)|(?:\b(?:if|when|before|after|would|could|might|hypothetically|later|tomorrow|previously|earlier|last\s+turn|screen|visible|button|label|document|docs?)\b[^.!?;\n]{0,180}(?:live_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|start_agent_goal_session)|narrator\.(?:say|bind_stream))\b)/i,
+  )?.[0];
+  if (liveEnvControlReference) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to)\b/i.test(liveEnvControlReference)
+        ? "negated_tool_instruction"
+        : /["'`]/.test(liveEnvControlReference)
+          ? "quoted_tool_command"
+          : /\b(?:previously|earlier|last\s+turn)\b/i.test(liveEnvControlReference)
+            ? "historical_tool_reference"
+            : /\b(?:screen|visible|button|label|document|docs?)\b/i.test(liveEnvControlReference)
+              ? "screen_visible_tool_reference"
+              : "hypothetical_tool_reference",
+      verb_or_cue: LIVE_ENV_CONTROL_CUE_RE.exec(liveEnvControlReference)?.[0] ?? "live_env.control",
+      text: liveEnvControlReference,
     };
   }
 

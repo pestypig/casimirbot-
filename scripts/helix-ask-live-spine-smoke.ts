@@ -12,6 +12,17 @@ type RecordLike = Record<string, unknown>;
 
 type Verdict = "PASS" | "FAIL";
 type ExpectedValue = string | null | Array<string | null>;
+type LiveSpineCoverage =
+  | "calculator"
+  | "docs"
+  | "repo_code"
+  | "workspace_status"
+  | "live_source_mail"
+  | "internet_search"
+  | "visual_capture"
+  | "image_lens"
+  | "capability_catalog"
+  | "negated_contextual_tool_mentions";
 
 type LiveSmokePreflight = {
   ok: boolean;
@@ -24,6 +35,7 @@ type LiveSmokePreflight = {
 type LiveSpineScenario = {
   id: string;
   prompt: string;
+  coverage: LiveSpineCoverage[];
   seed?: "visual_capture";
   expected: {
     requestedCapability?: string | null;
@@ -62,6 +74,7 @@ const SCENARIO_FILTER = (process.env.HELIX_ASK_LIVE_SPINE_SCENARIOS ?? "")
 const SCENARIOS: LiveSpineScenario[] = [
   {
     id: "calculator_explicit",
+    coverage: ["calculator"],
     prompt:
       "Call scientific-calculator.solve_expression with this exact expression: 2 + 2. Wait for calculator_receipt and answer from workstation_tool_evaluation.",
     expected: {
@@ -85,6 +98,7 @@ const SCENARIOS: LiveSpineScenario[] = [
   },
   {
     id: "workspace_status_explicit",
+    coverage: ["workspace_status"],
     prompt: "Use workspace_os.status to inspect workstation status.",
     expected: {
       requestedCapability: "workspace_os.status",
@@ -105,6 +119,7 @@ const SCENARIOS: LiveSpineScenario[] = [
   },
   {
     id: "docs_locate_explicit",
+    coverage: ["docs"],
     prompt: "Use docs-viewer.locate_in_doc to locate the rule of thumb in docs/helix-ask-codex-loop-discipline.md.",
     expected: {
       requestedCapability: "docs-viewer.locate_in_doc",
@@ -123,6 +138,7 @@ const SCENARIOS: LiveSpineScenario[] = [
   },
   {
     id: "repo_search_explicit",
+    coverage: ["repo_code"],
     prompt: "Use repo-code.search_concept to find where terminal authority selects the answer.",
     expected: {
       requestedCapability: "repo-code.search_concept",
@@ -141,6 +157,7 @@ const SCENARIOS: LiveSpineScenario[] = [
   },
   {
     id: "internet_search_config_or_complete",
+    coverage: ["internet_search"],
     prompt: "Use internet_search.web_research to find current public evidence about OpenAI Codex.",
     expected: {
       requestedCapability: "internet_search.web_research",
@@ -159,6 +176,7 @@ const SCENARIOS: LiveSpineScenario[] = [
   },
   {
     id: "live_source_mail_observation_or_fail_closed",
+    coverage: ["live_source_mail"],
     prompt: "Use live_env.read_processed_live_source_mail to inspect the latest processed live-source mail.",
     expected: {
       requestedCapability: "live_env.read_processed_live_source_mail",
@@ -175,6 +193,7 @@ const SCENARIOS: LiveSpineScenario[] = [
   },
   {
     id: "capability_catalog_runtime",
+    coverage: ["capability_catalog"],
     prompt: "What tools are available for the helix ask to use?",
     expected: {
       requestedCapability: null,
@@ -193,6 +212,7 @@ const SCENARIOS: LiveSpineScenario[] = [
   },
   {
     id: "negated_calculator_context",
+    coverage: ["negated_contextual_tool_mentions"],
     prompt:
       "Do not call scientific-calculator.solve_expression. Explain why calculator receipts are observations rather than terminal authority.",
     expected: {
@@ -212,6 +232,7 @@ const SCENARIOS: LiveSpineScenario[] = [
   },
   {
     id: "visual_capture_current_screen",
+    coverage: ["visual_capture"],
     seed: "visual_capture",
     prompt: "What is happening right now in the visual screen capture?",
     expected: {
@@ -226,6 +247,7 @@ const SCENARIOS: LiveSpineScenario[] = [
   },
   {
     id: "image_lens_alias",
+    coverage: ["image_lens", "visual_capture"],
     seed: "visual_capture",
     prompt: "Use image_lens.inspect to inspect the current image lens visual source.",
     expected: {
@@ -618,6 +640,7 @@ const classify = (scenario: LiveSpineScenario, ask: RecordLike, debugExport: unk
   return {
     schema: "helix.ask_live_spine_smoke_result.v1",
     scenario_id: scenario.id,
+    coverage: scenario.coverage,
     prompt: scenario.prompt,
     turn_id: turnId,
     verdict,
@@ -629,23 +652,39 @@ const classify = (scenario: LiveSpineScenario, ask: RecordLike, debugExport: unk
     selected_final_answer_excerpt: selectedFinalText(ask, debugExport).slice(0, 500),
     rail_table: rail
       ? {
+          prompt: rail.prompt ?? null,
           requested_capability: rail.requested_capability ?? null,
           visible_tool_surface: rail.visible_tool_surface ?? [],
+          visible_tool_surface_original_count: rail.visible_tool_surface_original_count ?? null,
+          visible_tool_surface_truncated: rail.visible_tool_surface_truncated ?? null,
           selected_capability: rail.selected_capability ?? null,
           admitted_capability: rail.admitted_capability ?? null,
+          admission_proof_source: rail.admission_proof_source ?? null,
+          admission_proven: rail.admission_proven ?? null,
           executed_capability: rail.executed_capability ?? null,
           observation_kind: rail.observation_kind ?? null,
           observation_ref: rail.observation_ref ?? null,
+          required_observation_kinds_for_requested_capability:
+            rail.required_observation_kinds_for_requested_capability ?? [],
+          observed_artifact_supports_requested_capability:
+            rail.observed_artifact_supports_requested_capability ?? null,
           reentry_status: rail.reentry_status ?? null,
+          reentry_proof_source: rail.reentry_proof_source ?? null,
+          reentry_proven: rail.reentry_proven ?? null,
           goal_satisfaction: rail.goal_satisfaction ?? null,
           required_terminal_kind: rail.required_terminal_kind ?? null,
           selected_terminal_kind: rail.selected_terminal_kind ?? null,
+          terminal_authority_proof_source: rail.terminal_authority_proof_source ?? null,
+          terminal_authority_proven: rail.terminal_authority_proven ?? null,
           visible_terminal_kind: rail.visible_terminal_kind ?? null,
+          visible_projection_source: rail.visible_projection_source ?? null,
+          visible_projection_proven: rail.visible_projection_proven ?? null,
           first_broken_rail: rail.first_broken_rail ?? null,
           repair_target: rail.repair_target ?? null,
           rail_status: rail.rail_status ?? null,
           rail_failure_code: rail.rail_failure_code ?? null,
           codex_parity_class: rail.codex_parity_class ?? null,
+          normalized_codex_parity_classes: rail.normalized_codex_parity_classes ?? [],
         }
       : null,
   };

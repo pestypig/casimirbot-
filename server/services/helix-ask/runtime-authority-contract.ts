@@ -385,6 +385,23 @@ const selectedRepoEvidenceCapabilityHasCurrentTurnObservation = (
   });
 };
 
+const hasCurrentTurnRepoCodeEvidenceObservation = (payload: Record<string, unknown>): boolean =>
+  readArray(payload.current_turn_artifact_ledger)
+    .map(readRecord)
+    .filter((artifact): artifact is Record<string, unknown> => Boolean(artifact))
+    .some((artifact) => {
+      const sourceScope = readString(artifact.source_scope);
+      if (sourceScope === "prior_context" || sourceScope === "prior_turn_context" || sourceScope === "prior_artifact") return false;
+      return artifactKindMatchesCapability("repo-code.search_concept", artifact);
+    });
+
+const repoEvidenceAnswerTerminalAllowed = (payload: Record<string, unknown>): boolean => {
+  if (readString(payload.terminal_artifact_kind) !== "repo_code_evidence_answer") return false;
+  if (!goalSatisfactionAllowsTerminal(payload)) return false;
+  if (!hasCurrentTurnRepoCodeEvidenceObservation(payload)) return false;
+  return hasPostObservationModelDecision(payload);
+};
+
 const hasGoalSatisfyingVisualSituationEvidence = (payload: Record<string, unknown>): boolean => {
   const terminalKind = readString(payload.terminal_artifact_kind);
   if (
@@ -1057,12 +1074,13 @@ export function evaluateTerminalBoundaryEligibility(payload: Record<string, unkn
   const contextResumeFrameRecallAllowed = contextResumeFrameRecallTerminalAllowed(payload);
   const microDeckObservationBackedRoute = isMicroDeckObservationBackedRoute(payload);
   const microDeckCapability = selectedMicroDeckCapability(payload);
+  const repoEvidenceAnswerTerminal = repoEvidenceAnswerTerminalAllowed(payload);
   const checks = {
     agent_runtime_loop: hasAgentRuntimeLoopDecisionChain(payload),
     agent_step_decision: Boolean(readRecord(payload.agent_step_decision)) || hasAgentRuntimeLoopDecisionChain(payload),
     runtime_tool_call: !microDeckObservationBackedRoute || hasRuntimeToolCallForSelectedCapability(payload, microDeckCapability),
     microdeck_selected_capability: !microDeckObservationBackedRoute || selectedCapabilityMatches(payload, microDeckCapability),
-    selected_capability_observation: hasSelectedCapabilityObservation(payload),
+    selected_capability_observation: repoEvidenceAnswerTerminal || hasSelectedCapabilityObservation(payload),
     post_observation_model_decision: hasPostObservationModelDecision(payload),
     goal_satisfaction_allows_terminal: goalSatisfactionAllowsTerminal(payload),
     typed_failure_clean: hasCleanTypedFailure(payload),

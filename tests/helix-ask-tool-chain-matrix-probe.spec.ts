@@ -8,10 +8,10 @@ import { describe, expect, it } from "vitest";
 import { CODEX_PARITY_AGENT_SPINE_CLASSES } from "../server/services/helix-ask/codex-parity-agent-spine-contract";
 
 const TSX_CLI = path.join(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
-const LIVE_SPINE_SMOKE_SCRIPT = path.join(process.cwd(), "scripts", "helix-ask-live-spine-smoke.ts");
+const TOOL_CHAIN_MATRIX_SCRIPT = path.join(process.cwd(), "scripts", "helix-ask-tool-chain-matrix-probe.ts");
 
-const runLiveSpineSmoke = (extraEnv: Record<string, string>, args: string[] = []) =>
-  spawnSync(process.execPath, [TSX_CLI, LIVE_SPINE_SMOKE_SCRIPT, ...args], {
+const runToolChainMatrix = (extraEnv: Record<string, string>, args: string[] = []) =>
+  spawnSync(process.execPath, [TSX_CLI, TOOL_CHAIN_MATRIX_SCRIPT, ...args], {
     cwd: process.cwd(),
     env: {
       ...process.env,
@@ -21,12 +21,12 @@ const runLiveSpineSmoke = (extraEnv: Record<string, string>, args: string[] = []
     timeout: 20_000,
   });
 
-const runLiveSpineSmokeAsync = (
+const runToolChainMatrixAsync = (
   extraEnv: Record<string, string>,
   args: string[] = [],
 ): Promise<{ status: number | null; stdout: string; stderr: string }> =>
   new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [TSX_CLI, LIVE_SPINE_SMOKE_SCRIPT, ...args], {
+    const child = spawn(process.execPath, [TSX_CLI, TOOL_CHAIN_MATRIX_SCRIPT, ...args], {
       cwd: process.cwd(),
       env: {
         ...process.env,
@@ -38,7 +38,7 @@ const runLiveSpineSmokeAsync = (
     let stderr = "";
     const timeout = setTimeout(() => {
       child.kill("SIGTERM");
-      reject(new Error(`live-spine smoke child timed out\nstdout:\n${stdout}\nstderr:\n${stderr}`));
+      reject(new Error(`tool-chain matrix child timed out\nstdout:\n${stdout}\nstderr:\n${stderr}`));
     }, 20_000);
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
@@ -58,69 +58,64 @@ const runLiveSpineSmokeAsync = (
     });
   });
 
-describe("helix-ask-live-spine-smoke", () => {
-  it("dry-runs the required convergence scenario pack without touching the live server", () => {
-    const result = runLiveSpineSmoke({}, ["--dry-run"]);
+describe("helix-ask-tool-chain-matrix-probe", () => {
+  it("dry-runs the tool-chain scenario pack without touching the live server", () => {
+    const result = runToolChainMatrix({}, ["--dry-run"]);
     expect(result.status).toBe(0);
 
     const summary = JSON.parse(result.stdout);
     const scenarioIds = summary.scenarios.map((scenario: { id: string }) => scenario.id);
-    const coverage = new Set(summary.scenarios.flatMap((scenario: { coverage?: string[] }) => scenario.coverage ?? []));
+    const categories = new Set(summary.scenarios.map((scenario: { category: string }) => scenario.category));
     expect(summary.ok).toBe(true);
     expect(summary.dry_run).toBe(true);
     expect(scenarioIds).toEqual(
       expect.arrayContaining([
-        "calculator_explicit",
-        "workspace_status_explicit",
-        "docs_locate_explicit",
-        "repo_search_explicit",
-        "internet_search_config_or_complete",
-        "live_source_mail_observation_or_fail_closed",
-        "capability_catalog_runtime",
-        "negated_calculator_context",
-        "visual_capture_current_screen",
-        "image_lens_alias",
+        "docs_open",
+        "docs_loop_discipline_summary",
+        "calculator_steps",
+        "note_delete_guard",
+        "note_create_receipt_quarantine",
+        "dottie_minecraft_missing_source",
+        "voice_readout_guard",
+        "negated_docs_open",
+        "auntie_dottie_repo",
       ]),
     );
-    expect(coverage).toEqual(
+    expect(categories).toEqual(
       new Set([
-        "calculator",
-        "docs",
-        "repo_code",
-        "workspace_status",
-        "live_source_mail",
-        "internet_search",
-        "visual_capture",
-        "image_lens",
-        "capability_catalog",
-        "negated_contextual_tool_mentions",
+        "workstation_tool",
+        "docs_source",
+        "calculator_tool",
+        "mutating_guard",
+        "note_mutation",
+        "situation_room",
+        "voice_policy",
+        "negated_tool",
+        "repo_evidence",
       ]),
     );
-    for (const scenario of summary.scenarios) {
-      expect(scenario.coverage.length).toBeGreaterThan(0);
-    }
   });
 
   it("fails closed as a preflight block when the Ask turn API is unreachable", () => {
-    const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), "helix-live-spine-smoke-"));
-    const result = runLiveSpineSmoke({
+    const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), "helix-tool-chain-matrix-"));
+    const result = runToolChainMatrix({
       HELIX_ASK_BASE_URL: "http://127.0.0.1:1",
-      HELIX_ASK_LIVE_SPINE_OUT: outputRoot,
-      HELIX_ASK_LIVE_SPINE_SCENARIOS: "capability_catalog_runtime",
-      HELIX_ASK_LIVE_SPINE_TIMEOUT_MS: "1000",
+      HELIX_ASK_TOOL_CHAIN_OUT: outputRoot,
+      HELIX_ASK_TOOL_CHAIN_SCENARIOS: "negated_docs_open",
+      HELIX_ASK_TOOL_CHAIN_TIMEOUT_MS: "1000",
     });
 
     expect(result.status).toBe(1);
     const summary = JSON.parse(result.stdout);
     expect(summary).toMatchObject({
-      schema: "helix.ask_live_spine_smoke_summary.v1",
+      schema: "helix.ask_tool_chain_matrix_probe_summary.v1",
       ok: false,
       blocked: true,
       blocked_reason: "ask_turn_api_unreachable",
       counts: {
         pass: 0,
-        fail: 0,
         warn: 1,
+        fail: 0,
       },
       preflight: {
         ok: false,
@@ -141,27 +136,26 @@ describe("helix-ask-live-spine-smoke", () => {
   });
 
   it("persists the full normalized rail summary from a live-style Ask/debug response", async () => {
-    const prompt = "What tools are available for the helix ask to use?";
-    const visibleText = "Helix Ask can inspect its runtime capability catalog for this turn.";
+    const prompt = "Do not open the docs viewer; just explain what the docs viewer is for.";
     const railTable = {
       schema: "helix.codex_parity_agent_spine_rail_table.v1",
-      turn_id: "turn-live-spine-rail",
+      turn_id: "turn-tool-chain-rail",
       prompt,
-      requested_capability: null,
-      visible_tool_surface: ["helix_ask.inspect_capability_catalog"],
+      requested_capability: "model.direct_answer",
+      visible_tool_surface: ["model.direct_answer"],
       visible_tool_surface_original_count: 1,
       visible_tool_surface_truncated: false,
-      selected_capability: "helix_ask.inspect_capability_catalog",
-      admitted_capability: "helix_ask.inspect_capability_catalog",
+      selected_capability: "model.direct_answer",
+      admitted_capability: "model.direct_answer",
       admission_proof_source: "capability_contract_arbitration",
       admission_proven: true,
-      executed_capability: "helix_ask.inspect_capability_catalog",
-      observation_kind: "capability_registry",
-      observation_ref: "artifact:capability-registry",
-      required_observation_kinds_for_requested_capability: [],
+      executed_capability: "model.direct_answer",
+      observation_kind: "direct_answer_text",
+      observation_ref: "artifact:direct-answer",
+      required_observation_kinds_for_requested_capability: ["direct_answer_text"],
       observed_artifact_supports_requested_capability: true,
       reentry_status: "reentered",
-      reentry_proof_source: "capability_registry_observation",
+      reentry_proof_source: "model_answer_artifact_created",
       reentry_proven: true,
       goal_satisfaction: "satisfied",
       required_terminal_kind: "model_synthesized_answer",
@@ -181,36 +175,33 @@ describe("helix-ask-live-spine-smoke", () => {
       terminal_eligible: false,
       raw_content_included: false,
     };
+    const visibleText = "The docs viewer is for reading and navigating project documents.";
     const server = createServer((req, res) => {
       res.setHeader("Content-Type", "application/json");
-      if (req.method === "GET" && req.url?.includes("__helix_live_spine_preflight__/debug-export")) {
+      if (req.method === "GET" && req.url?.includes("__helix_tool_chain_preflight__/debug-export")) {
         res.statusCode = 404;
         res.end(JSON.stringify({ error: "debug_export_not_found" }));
         return;
       }
       if (req.method === "POST" && req.url === "/api/agi/ask/turn") {
-        res.end(
-          JSON.stringify({
-            turn_id: "turn-live-spine-rail",
-            terminal_artifact_kind: "model_synthesized_answer",
-            final_status: "final_answer",
-            response_type: "final_answer",
-            final_answer_source: "model_synthesized_answer",
-            answer: visibleText,
-          }),
-        );
+        res.end(JSON.stringify({ turn_id: "turn-tool-chain-rail", terminal_artifact_kind: "model_synthesized_answer", answer: visibleText }));
         return;
       }
-      if (req.method === "GET" && req.url === "/api/agi/ask/turn/turn-live-spine-rail/debug-export") {
+      if (req.method === "GET" && req.url === "/api/agi/ask/turn/turn-tool-chain-rail/debug-export") {
         res.end(
           JSON.stringify({
             payload: {
               codex_parity_agent_spine_rail_table: railTable,
+              causal_turn_timeline: {
+                events: [{ stage: "model_answer_artifact_created" }],
+              },
+              terminal_authority_single_writer: {
+                applied: true,
+                selected_terminal_artifact_kind: "model_synthesized_answer",
+                visible_text: visibleText,
+              },
               terminal_artifact_kind: "model_synthesized_answer",
-              final_status: "final_answer",
-              response_type: "final_answer",
-              final_answer_source: "model_synthesized_answer",
-              answer: visibleText,
+              text: visibleText,
             },
           }),
         );
@@ -223,36 +214,33 @@ describe("helix-ask-live-spine-smoke", () => {
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     try {
       const address = server.address() as AddressInfo;
-      const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), "helix-live-spine-smoke-"));
-      const result = await runLiveSpineSmokeAsync({
+      const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), "helix-tool-chain-matrix-"));
+      const result = await runToolChainMatrixAsync({
         HELIX_ASK_BASE_URL: `http://127.0.0.1:${address.port}`,
-        HELIX_ASK_LIVE_SPINE_OUT: outputRoot,
-        HELIX_ASK_LIVE_SPINE_SCENARIOS: "capability_catalog_runtime",
-        HELIX_ASK_LIVE_SPINE_TIMEOUT_MS: "5000",
+        HELIX_ASK_TOOL_CHAIN_OUT: outputRoot,
+        HELIX_ASK_TOOL_CHAIN_SCENARIOS: "negated_docs_open",
+        HELIX_ASK_TOOL_CHAIN_TIMEOUT_MS: "5000",
       });
 
       expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
       const summary = JSON.parse(result.stdout);
       expect(summary.ok).toBe(true);
       expect(summary.results).toHaveLength(1);
-      expect(summary.results[0]).toMatchObject({
-        scenario_id: "capability_catalog_runtime",
-        coverage: ["capability_catalog"],
-        verdict: "PASS",
-      });
       expect(summary.results[0].rail_table).toMatchObject({
+        present: true,
+        turn_id: "turn-tool-chain-rail",
         prompt,
-        requested_capability: null,
-        visible_tool_surface: ["helix_ask.inspect_capability_catalog"],
+        requested_capability: "model.direct_answer",
+        visible_tool_surface: ["model.direct_answer"],
         visible_tool_surface_original_count: 1,
         visible_tool_surface_truncated: false,
-        selected_capability: "helix_ask.inspect_capability_catalog",
-        admitted_capability: "helix_ask.inspect_capability_catalog",
+        selected_capability: "model.direct_answer",
+        admitted_capability: "model.direct_answer",
         admission_proof_source: "capability_contract_arbitration",
         admission_proven: true,
-        executed_capability: "helix_ask.inspect_capability_catalog",
-        observation_kind: "capability_registry",
-        observation_ref: "artifact:capability-registry",
+        executed_capability: "model.direct_answer",
+        observation_kind: "direct_answer_text",
+        observation_ref: "artifact:direct-answer",
         reentry_status: "reentered",
         goal_satisfaction: "satisfied",
         required_terminal_kind: "model_synthesized_answer",

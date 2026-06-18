@@ -21,6 +21,33 @@ export type ExplicitCapabilityContract = {
   forbidden_nearby_capabilities: string[];
 };
 
+const liveEnvironmentControlContract = (input: {
+  capability: string;
+  aliases?: string[];
+  requiredObservationKind?: string;
+  requiredTerminalKind?: string;
+  forbiddenNearbyCapabilities?: string[];
+}): ExplicitCapabilityContract => ({
+  schema: "helix.explicit_capability_contract.v1",
+  capability: input.capability,
+  ...(input.aliases ? { aliases: input.aliases } : {}),
+  capability_family: "live_environment",
+  plan_family: "live_environment",
+  source_target: "live_environment",
+  admission_families: ["live_environment", "workstation_action"],
+  required_observation_kinds: [
+    "live_environment_tool_observation",
+    input.requiredObservationKind ?? "stage_play_workstation_control_receipt",
+  ],
+  required_terminal_kind: input.requiredTerminalKind ?? input.requiredObservationKind ?? "stage_play_workstation_control_receipt",
+  allowed_substitutions: [],
+  forbidden_nearby_capabilities: input.forbiddenNearbyCapabilities ?? [
+    "live_env.read_processed_live_source_mail",
+    "live_env.read_live_source_mail",
+    "model.direct_answer",
+  ],
+});
+
 const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
   {
     schema: "helix.explicit_capability_contract.v1",
@@ -132,6 +159,95 @@ const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
     allowed_substitutions: [],
     forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
   },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: "live_env.reflect_stage_play_context",
+    aliases: ["reflect_stage_play_context", "stage_play_reflection"],
+    capability_family: "live_environment",
+    plan_family: "live_environment",
+    source_target: "live_environment",
+    admission_families: ["live_environment"],
+    required_observation_kinds: ["live_environment_tool_observation", "stage_play_reflection_result"],
+    required_terminal_kind: "direct_answer_text",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: [
+      "live_env.configure_live_source_watch_job",
+      "live_env.read_processed_live_source_mail",
+      "live_env.read_live_source_mail",
+      "situation-room.describe_visual_capture",
+      "model.direct_answer",
+    ],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: "live_env.narrator_say",
+    aliases: ["narrator.say", "narrator_say"],
+    capability_family: "live_environment",
+    plan_family: "live_environment",
+    source_target: "live_environment",
+    admission_families: ["live_environment", "workstation_action"],
+    required_observation_kinds: ["live_environment_tool_observation", "helix.narrator_say_request.v1"],
+    required_terminal_kind: "helix.narrator_say_request.v1",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: [
+      "live_env.narrator_bind_stream",
+      "live_env.read_processed_live_source_mail",
+      "live_env.read_live_source_mail",
+      "model.direct_answer",
+    ],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: "live_env.narrator_bind_stream",
+    aliases: ["narrator.bind_stream", "narrator_bind_stream"],
+    capability_family: "live_environment",
+    plan_family: "live_environment",
+    source_target: "live_environment",
+    admission_families: ["live_environment", "workstation_action"],
+    required_observation_kinds: ["live_environment_tool_observation", "helix.narrator_bind_stream_request.v1"],
+    required_terminal_kind: "helix.narrator_bind_stream_request.v1",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: [
+      "live_env.narrator_say",
+      "live_env.read_processed_live_source_mail",
+      "live_env.read_live_source_mail",
+      "model.direct_answer",
+    ],
+  },
+  liveEnvironmentControlContract({
+    capability: "live_env.change_workstation_preset",
+    aliases: ["change_workstation_preset", "change_preset"],
+  }),
+  liveEnvironmentControlContract({
+    capability: "live_env.bind_workstation_source",
+    aliases: ["bind_workstation_source", "bind_source"],
+  }),
+  liveEnvironmentControlContract({
+    capability: "live_env.unbind_workstation_source",
+    aliases: ["unbind_workstation_source", "unbind_source"],
+  }),
+  liveEnvironmentControlContract({
+    capability: "live_env.set_workstation_loop_state",
+    aliases: ["set_workstation_loop_state", "pause_workstation_loop", "resume_workstation_loop"],
+  }),
+  liveEnvironmentControlContract({
+    capability: "live_env.repair_workstation_source",
+    aliases: ["repair_workstation_source", "repair_workstation_loop"],
+  }),
+  liveEnvironmentControlContract({
+    capability: "live_env.update_live_answer_projection",
+    aliases: ["update_live_answer_projection", "update_live_answer"],
+  }),
+  liveEnvironmentControlContract({
+    capability: "live_env.focus_process_graph",
+    aliases: ["focus_process_graph"],
+  }),
+  liveEnvironmentControlContract({
+    capability: "live_env.start_agent_goal_session",
+    aliases: ["start_agent_goal_session"],
+    requiredObservationKind: "stage_play_agent_goal_session_tool_result",
+    requiredTerminalKind: "stage_play_agent_goal_session_tool_result",
+  }),
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "image_lens.inspect",

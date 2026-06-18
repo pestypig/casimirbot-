@@ -164,7 +164,10 @@ const sourceTargetToolFamilies = (
           : []
       ),
     ].join(" ");
-    if (/theory_context_reflection|reflect_theory_context|theory\s+badge\s+graph|theory\s+graph|badge\s+graph|scale\s+bands?|uncertainty\s+mode/i.test(joined)) {
+    if (
+      !/\b(?:stage\s*play|stage_play|live_env\.reflect_stage_play_context|reflect_stage_play_context|live\s+interpretation|stage\s*play\s+badge\s+graph)\b/i.test(joined) &&
+      /theory_context_reflection|reflect_theory_context|theory\s+badge\s+graph|theory\s+graph|badge\s+graph|scale\s+bands?|uncertainty\s+mode/i.test(joined)
+    ) {
       return ["theory_locator"];
     }
     return ["workstation_action"];
@@ -175,6 +178,9 @@ const sourceTargetToolFamilies = (
 const theoryLocatorRequested = (promptText: string): boolean => {
   const prompt = promptText.trim();
   if (!prompt) return false;
+  if (/\b(?:stage\s*play|stage_play|live_env\.reflect_stage_play_context|reflect_stage_play_context|live\s+interpretation|stage\s*play\s+badge\s+graph)\b/i.test(prompt)) {
+    return false;
+  }
   if (/\b(?:do\s+not|don't|dont|never|without|no)\b[^.!?;\n]{0,120}\b(?:theory\s+badge\s+graph|badge\s+graph|theory\s+graph|theory_context_reflection|reflect_theory_context|scale\s+bands?|uncertainty\s+mode)\b/i.test(prompt)) {
     return false;
   }

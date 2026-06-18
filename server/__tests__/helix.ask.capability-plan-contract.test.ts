@@ -778,6 +778,241 @@ describe("Helix capability plan contract", () => {
     });
   });
 
+  it("routes explicit narrator say through a governed live-environment control contract", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:narrator-say-explicit",
+      promptText:
+        'Run live_env.narrator_say goal_id=goal:translate text="Translation is now routed through Narrator." source_id=helix_ask:translation delivery_mode=confirm_to_speak.',
+      sourceTargetIntent: baseSourceTarget("model_only", "general_background"),
+      toolCallAdmissionDecision: toolAdmission("live_environment", ["live_environment"]),
+      canonicalGoalFrame: canonicalGoal("model_only_concept", "direct_answer_text"),
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "live_environment",
+      source_target: "live_environment",
+      requested_capability: "live_env.narrator_say",
+      requested_action: "live_env.narrator_say",
+      selected_capability: "live_env.narrator_say",
+      goal_kind: "live_environment_review",
+      required_terminal_kind: "helix.narrator_say_request.v1",
+      mutating: true,
+      operator_command_required: true,
+      operator_command_present: true,
+      admission_status: "needs_evidence",
+    });
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "explicit_capability_command",
+      requested_capability: "live_env.narrator_say",
+      selected_source_target: "live_environment",
+      selected_plan_family: "live_environment",
+      required_observation_kinds: expect.arrayContaining([
+        "live_environment_tool_observation",
+        "helix.narrator_say_request.v1",
+      ]),
+    });
+  });
+
+  it("routes explicit narrator stream binding through a governed non-terminal request contract", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:narrator-bind-stream-explicit",
+      promptText:
+        "Run live_env.narrator_bind_stream goal_id=goal:translate source_ref=source:browser-audio stream_kind=translated_transcript delivery_mode=visible_only.",
+      sourceTargetIntent: baseSourceTarget("live_source_mailbox", "live_source_mailbox"),
+      toolCallAdmissionDecision: toolAdmission("live_environment", ["live_environment"]),
+      canonicalGoalFrame: canonicalGoal("live_source_processed_mail_interpretation", "model_synthesized_answer"),
+      routeMetadata: {
+        schema: "helix.ask.route_metadata.v1",
+        invocationKind: "stage_play_mail_wake",
+        sourceTarget: "live_source_mailbox",
+        requiredPhase: "read_processed_mail",
+      },
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "live_environment",
+      source_target: "live_environment",
+      requested_capability: "live_env.narrator_bind_stream",
+      requested_action: "live_env.narrator_bind_stream",
+      selected_capability: "live_env.narrator_bind_stream",
+      goal_kind: "live_environment_review",
+      required_terminal_kind: "helix.narrator_bind_stream_request.v1",
+      mutating: true,
+      operator_command_present: true,
+      admission_status: "needs_evidence",
+    });
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "explicit_capability_command",
+      requested_capability: "live_env.narrator_bind_stream",
+      route_metadata_demoted: true,
+      demotion_reason: "explicit_capability_contract_demoted_route_metadata",
+    });
+  });
+
+  it("suppresses contextual narrator capability mentions instead of admitting voice control", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:narrator-contextual-reference",
+      promptText: "Do not run live_env.narrator_say; explain what the narrator policy would require first.",
+      sourceTargetIntent: baseSourceTarget("live_environment", "live_environment"),
+      toolCallAdmissionDecision: toolAdmission("live_environment", ["live_environment"]),
+      canonicalGoalFrame: canonicalGoal("live_environment_review", "direct_answer_text"),
+      routeMetadata: {
+        schema: "helix.ask.route_metadata.v1",
+        sourceTarget: "live_environment",
+        mandatoryNextTool: { name: "live_env.narrator_say" },
+      },
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "debug_export",
+      source_target: "model_only",
+      requested_action: "model.direct_answer",
+      selected_capability: "model.direct_answer",
+      tool_admission_suppressed: true,
+    });
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "suppressed_contextual_reference",
+      route_metadata_demoted: true,
+      demotion_reason: "contextual_tool_reference_demoted_route_metadata",
+    });
+  });
+
+  it.each([
+    {
+      label: "preset change",
+      prompt:
+        "Run live_env.change_workstation_preset goal_id=goal:frog target_ref=source:visual:active preset_id=preset:frog-classifier.",
+      capability: "live_env.change_workstation_preset",
+      terminalKind: "stage_play_workstation_control_receipt",
+    },
+    {
+      label: "source bind",
+      prompt:
+        "Run live_env.bind_workstation_source goal_id=goal:frog source_ref=source:visual:active target_ref=live-answer:visual.",
+      capability: "live_env.bind_workstation_source",
+      terminalKind: "stage_play_workstation_control_receipt",
+    },
+    {
+      label: "source unbind",
+      prompt:
+        "Run live_env.unbind_workstation_source goal_id=goal:frog source_ref=source:visual:active.",
+      capability: "live_env.unbind_workstation_source",
+      terminalKind: "stage_play_workstation_control_receipt",
+    },
+    {
+      label: "loop state",
+      prompt:
+        "Run live_env.set_workstation_loop_state goal_id=goal:frog loop_ref=loop:visual-mail state=paused.",
+      capability: "live_env.set_workstation_loop_state",
+      terminalKind: "stage_play_workstation_control_receipt",
+    },
+    {
+      label: "source repair",
+      prompt:
+        "Run live_env.repair_workstation_source goal_id=goal:frog loop_ref=loop:visual-mail.",
+      capability: "live_env.repair_workstation_source",
+      terminalKind: "stage_play_workstation_control_receipt",
+    },
+    {
+      label: "Live Answer projection",
+      prompt:
+        "Run live_env.update_live_answer_projection goal_id=goal:frog line_key=translation.",
+      capability: "live_env.update_live_answer_projection",
+      terminalKind: "stage_play_workstation_control_receipt",
+    },
+    {
+      label: "process graph focus",
+      prompt:
+        "Run live_env.focus_process_graph goal_id=goal:frog node_ref=packet:visual-shade.",
+      capability: "live_env.focus_process_graph",
+      terminalKind: "stage_play_workstation_control_receipt",
+    },
+    {
+      label: "agent goal session",
+      prompt:
+        "Run live_env.start_agent_goal_session goal_id=goal:frog objective=\"Monitor visual frog classification.\"",
+      capability: "live_env.start_agent_goal_session",
+      terminalKind: "stage_play_agent_goal_session_tool_result",
+    },
+  ])("routes explicit workstation control contract: $label", ({ prompt, capability, terminalKind }) => {
+    const plan = buildCapabilityPlan({
+      turnId: `ask:${capability.replace(/[^a-z0-9]+/gi, "-")}`,
+      promptText: prompt,
+      sourceTargetIntent: baseSourceTarget("model_only", "general_background"),
+      toolCallAdmissionDecision: toolAdmission("live_environment", ["live_environment"]),
+      canonicalGoalFrame: canonicalGoal("model_only_concept", "direct_answer_text"),
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "live_environment",
+      source_target: "live_environment",
+      requested_capability: capability,
+      requested_action: capability,
+      selected_capability: capability,
+      goal_kind: "live_environment_review",
+      required_terminal_kind: terminalKind,
+      mutating: true,
+      operator_command_required: true,
+      operator_command_present: true,
+      admission_status: "needs_evidence",
+    });
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "explicit_capability_command",
+      requested_capability: capability,
+      selected_source_target: "live_environment",
+      selected_plan_family: "live_environment",
+      required_observation_kinds: expect.arrayContaining([
+        "live_environment_tool_observation",
+        terminalKind,
+      ]),
+      required_terminal_kind: terminalKind,
+    });
+  });
+
+  it.each([
+    {
+      prompt:
+        "Do not run live_env.change_workstation_preset; explain what evidence would be needed first.",
+      mandatory: "live_env.change_workstation_preset",
+    },
+    {
+      prompt:
+        'The UI label says "live_env.focus_process_graph"; summarize that label without focusing anything.',
+      mandatory: "live_env.focus_process_graph",
+    },
+    {
+      prompt:
+        "If we run live_env.repair_workstation_source later, what loop refs should we gather?",
+      mandatory: "live_env.repair_workstation_source",
+    },
+  ])("suppresses contextual workstation control mention: $mandatory", ({ prompt, mandatory }) => {
+    const plan = buildCapabilityPlan({
+      turnId: `ask:contextual-${mandatory.replace(/[^a-z0-9]+/gi, "-")}`,
+      promptText: prompt,
+      sourceTargetIntent: baseSourceTarget("live_environment", "live_environment"),
+      toolCallAdmissionDecision: toolAdmission("live_environment", ["live_environment"]),
+      canonicalGoalFrame: canonicalGoal("live_environment_review", "direct_answer_text"),
+      routeMetadata: {
+        schema: "helix.ask.route_metadata.v1",
+        sourceTarget: "live_environment",
+        mandatoryNextTool: { name: mandatory },
+      },
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "debug_export",
+      source_target: "model_only",
+      requested_action: "model.direct_answer",
+      selected_capability: "model.direct_answer",
+      tool_admission_suppressed: true,
+    });
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "suppressed_contextual_reference",
+      route_metadata_demoted: true,
+      demotion_reason: "contextual_tool_reference_demoted_route_metadata",
+    });
+  });
+
   it("maps explicit ImageLens inspection to the governed visual-capture runtime capability", () => {
     const plan = buildCapabilityPlan({
       turnId: "ask:image-lens-explicit",

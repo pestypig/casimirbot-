@@ -12,13 +12,29 @@ type RecordLike = Record<string, unknown>;
 
 type Verdict = "PASS" | "WARN" | "FAIL";
 
+type ToolChainPreflight = {
+  ok: boolean;
+  status: number;
+  reason: string;
+  message: string;
+  hint?: string;
+};
+
 type RailSummary = {
   present: boolean;
+  turn_id: string | null;
+  prompt: string | null;
   requested_capability: string | null;
+  visible_tool_surface: string[];
+  visible_tool_surface_original_count: number | null;
+  visible_tool_surface_truncated: boolean | null;
   selected_capability: string | null;
   admitted_capability: string | null;
+  admission_proof_source: string | null;
+  admission_proven: boolean;
   executed_capability: string | null;
   observation_kind: string | null;
+  observation_ref: string | null;
   required_observation_kinds_for_requested_capability: string[];
   observed_artifact_supports_requested_capability: boolean | null;
   reentry_status: string | null;
@@ -35,6 +51,7 @@ type RailSummary = {
   first_broken_rail: string | null;
   repair_target: string | null;
   codex_parity_class: string | null;
+  normalized_codex_parity_classes: string[];
   rail_status: string | null;
   rail_failure_code: string | null;
 };
@@ -58,6 +75,7 @@ const BASE_URL = (process.env.HELIX_ASK_BASE_URL ?? "http://127.0.0.1:5050").rep
 const OUT_DIR = process.env.HELIX_ASK_TOOL_CHAIN_OUT ?? "artifacts/helix-ask-tool-chain-matrix";
 const TIMEOUT_MS = Math.max(1000, Number(process.env.HELIX_ASK_TOOL_CHAIN_TIMEOUT_MS ?? 240_000));
 const FAIL_ON_WARN = process.env.HELIX_ASK_TOOL_CHAIN_FAIL_ON_WARN === "1";
+const DRY_RUN = process.argv.includes("--dry-run") || process.env.HELIX_ASK_TOOL_CHAIN_DRY_RUN === "1";
 const SCENARIO_FILTER = (process.env.HELIX_ASK_TOOL_CHAIN_SCENARIOS ?? "")
   .split(",")
   .map((entry) => entry.trim())
@@ -127,6 +145,14 @@ const readNullableString = (value: unknown): string | null => {
 const readStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry: unknown): entry is string => typeof entry === "string" && entry.trim().length > 0) : [];
 
+const parseJsonRecord = (text: string): RecordLike | null => {
+  try {
+    return readRecord(JSON.parse(text));
+  } catch {
+    return null;
+  }
+};
+
 const getPath = (value: unknown, pathParts: string[]): unknown =>
   pathParts.reduce<unknown>((current, key) => {
     if (!current || typeof current !== "object") return undefined;
@@ -158,6 +184,59 @@ const fetchJson = async <T>(url: string, init?: RequestInit): Promise<T> => {
   }
 };
 
+const probeAskTurnApi = async (): Promise<ToolChainPreflight> => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Math.min(TIMEOUT_MS, 10_000));
+  const url = `${BASE_URL}/api/agi/ask/turn/__helix_tool_chain_preflight__/debug-export?view=rail`;
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json",
+      },
+    });
+    const text = await response.text();
+    const payload = parseJsonRecord(text);
+    const error = readString(payload?.error);
+    const terminalError = readString(payload?.terminal_error_code);
+    if (response.ok || error === "debug_export_not_found" || terminalError === "debug_export_turn_not_found") {
+      return {
+        ok: true,
+        status: response.status,
+        reason: response.ok ? "ask_turn_debug_export_available" : "ask_turn_routes_available",
+        message: response.ok ? "Ask turn debug-export endpoint is available." : "Ask turn routes are mounted; fake turn was not found as expected.",
+      };
+    }
+    if (error === "api_not_found") {
+      return {
+        ok: false,
+        status: response.status,
+        reason: "ask_turn_api_not_found",
+        message: "The server is reachable, but /api/agi/ask/turn is not mounted.",
+        hint: readString(payload?.hint) || "Start the keyed bundle with ENABLE_AGI=1 and the Ask turn API enabled.",
+      };
+    }
+    return {
+      ok: false,
+      status: response.status,
+      reason: error || terminalError || `status_${response.status}`,
+      message: text.slice(0, 1200) || response.statusText || "Ask turn API preflight failed.",
+      hint: "Verify the operator-started keyed server exposes /api/agi/ask/turn.",
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      reason: error instanceof Error && error.name === "AbortError" ? "ask_turn_api_preflight_timeout" : "ask_turn_api_unreachable",
+      message: error instanceof Error ? error.message : String(error),
+      hint: "Start the operator-owned keyed Helix Ask server before running the tool-chain matrix probe.",
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 const getPayload = (ask: RecordLike, debug: RecordLike | null): RecordLike => {
   const debugPayload = readRecord(debug?.payload);
   if (debugPayload) return debugPayload;
@@ -178,11 +257,23 @@ const findRailTable = (ask: RecordLike, payload: RecordLike, debug: RecordLike |
 
 const railSummaryFor = (railTable: RecordLike | null): RailSummary => ({
   present: Boolean(railTable),
+  turn_id: readNullableString(railTable?.turn_id),
+  prompt: readNullableString(railTable?.prompt),
   requested_capability: readNullableString(railTable?.requested_capability),
+  visible_tool_surface: readStringArray(railTable?.visible_tool_surface),
+  visible_tool_surface_original_count:
+    typeof railTable?.visible_tool_surface_original_count === "number" && Number.isFinite(railTable.visible_tool_surface_original_count)
+      ? railTable.visible_tool_surface_original_count
+      : null,
+  visible_tool_surface_truncated:
+    typeof railTable?.visible_tool_surface_truncated === "boolean" ? railTable.visible_tool_surface_truncated : null,
   selected_capability: readNullableString(railTable?.selected_capability),
   admitted_capability: readNullableString(railTable?.admitted_capability),
+  admission_proof_source: readNullableString(railTable?.admission_proof_source),
+  admission_proven: railTable?.admission_proven === true,
   executed_capability: readNullableString(railTable?.executed_capability),
   observation_kind: readNullableString(railTable?.observation_kind),
+  observation_ref: readNullableString(railTable?.observation_ref),
   required_observation_kinds_for_requested_capability: readStringArray(railTable?.required_observation_kinds_for_requested_capability),
   observed_artifact_supports_requested_capability:
     typeof railTable?.observed_artifact_supports_requested_capability === "boolean"
@@ -202,6 +293,7 @@ const railSummaryFor = (railTable: RecordLike | null): RailSummary => ({
   first_broken_rail: readNullableString(railTable?.first_broken_rail),
   repair_target: readNullableString(railTable?.repair_target),
   codex_parity_class: readNullableString(railTable?.codex_parity_class),
+  normalized_codex_parity_classes: readStringArray(railTable?.normalized_codex_parity_classes),
   rail_status: readNullableString(railTable?.rail_status),
   rail_failure_code: readNullableString(railTable?.rail_failure_code),
 });
@@ -209,13 +301,20 @@ const railSummaryFor = (railTable: RecordLike | null): RailSummary => ({
 const collectRailTableFailures = (input: {
   railTable: RecordLike | null;
   terminalKind: string;
+  turnId: string;
 }): string[] => {
-  const { railTable, terminalKind } = input;
+  const { railTable, terminalKind, turnId } = input;
   if (!railTable) return ["codex_parity_agent_spine_rail_table_missing"];
   const failures: string[] = [];
   if (railTable.schema !== CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA) {
     failures.push(`rail_table_schema_mismatch:${readString(railTable.schema) || "missing"}`);
   }
+  if (readString(railTable.turn_id) !== turnId) {
+    failures.push(`rail_turn_id_mismatch:${readString(railTable.turn_id) || "missing"}!=${turnId || "missing"}`);
+  }
+  if (railTable.assistant_answer !== false) failures.push("rail_assistant_answer_not_false");
+  if (railTable.terminal_eligible !== false) failures.push("rail_terminal_eligible_not_false");
+  if (railTable.raw_content_included !== false) failures.push("rail_raw_content_included_not_false");
   if (!Array.isArray(railTable.visible_tool_surface)) failures.push("rail_visible_tool_surface_missing");
   for (const key of CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS) {
     const value = railTable[key];
@@ -499,6 +598,7 @@ const classifyScenario = (input: {
   visibleText: string;
   terminalWriter: RecordLike | null;
   railTable: RecordLike | null;
+  turnId: string;
   debugAvailable: boolean;
   repoPacketPresent: boolean;
 }): { verdict: Verdict; failures: string[]; warnings: string[] } => {
@@ -514,12 +614,13 @@ const classifyScenario = (input: {
     visibleText,
     terminalWriter,
     railTable,
+    turnId,
     debugAvailable,
     repoPacketPresent,
   } = input;
 
   if (!debugAvailable) warnings.push("debug_export_missing");
-  failures.push(...collectRailTableFailures({ railTable, terminalKind }));
+  failures.push(...collectRailTableFailures({ railTable, terminalKind, turnId }));
   failures.push(...completeRailEnvelopeFailures({ railTable, terminalKind, terminalError, visibleText }));
   if (!timelineEvents.length) warnings.push("causal_timeline_missing");
   if (receiptLeak(visibleText)) failures.push("receipt_framing_leaked_into_visible_answer");
@@ -660,6 +761,7 @@ const runScenario = async (scenario: ToolChainScenario, runId: string, outputDir
     visibleText,
     terminalWriter,
     railTable,
+    turnId,
     debugAvailable: Boolean(debug),
     repoPacketPresent,
   });
@@ -696,17 +798,28 @@ const runScenario = async (scenario: ToolChainScenario, runId: string, outputDir
   return result;
 };
 
-const renderMarkdownSummary = (input: { runId: string; results: RecordLike[]; outputDir: string }): string => {
+const renderMarkdownSummary = (input: {
+  runId: string;
+  results: RecordLike[];
+  outputDir: string;
+  preflight?: ToolChainPreflight;
+}): string => {
   const lines = [
     "# Helix Ask Tool Chain Matrix Probe",
     "",
     `- run_id: ${input.runId}`,
     `- base_url: ${BASE_URL}`,
     `- output_dir: ${input.outputDir}`,
+  ];
+  if (input.preflight) {
+    lines.push(`- preflight: ${input.preflight.ok ? "ok" : "blocked"} (${input.preflight.reason})`);
+    if (input.preflight.hint) lines.push(`- preflight_hint: ${input.preflight.hint}`);
+  }
+  lines.push(
     "",
     "| Verdict | Scenario | Terminal | Rail class | First rail | Repair | Error | Key findings |",
     "| --- | --- | --- | --- | --- | --- | --- | --- |",
-  ];
+  );
   for (const result of input.results) {
     const rail = readRecord(result.rail_table);
     const findings = [...readArray(result.failures), ...readArray(result.warnings)]
@@ -726,9 +839,40 @@ const renderMarkdownSummary = (input: { runId: string; results: RecordLike[]; ou
 const main = async (): Promise<void> => {
   const selected = new Set(SCENARIO_FILTER);
   const scenarios = SCENARIO_FILTER.length ? SCENARIOS.filter((scenario) => selected.has(scenario.id)) : SCENARIOS;
+
+  if (DRY_RUN) {
+    console.log(JSON.stringify({ ok: true, dry_run: true, base_url: BASE_URL, scenarios }, null, 2));
+    return;
+  }
+
   const runId = `tool-chain-${Date.now()}`;
   const outputDir = path.resolve(OUT_DIR, runId);
   await fs.mkdir(outputDir, { recursive: true });
+
+  const preflight = await probeAskTurnApi();
+  if (!preflight.ok) {
+    const summary = {
+      schema: "helix.ask_tool_chain_matrix_probe_summary.v1",
+      ok: false,
+      blocked: true,
+      blocked_reason: preflight.reason,
+      run_id: runId,
+      base_url: BASE_URL,
+      output_dir: outputDir,
+      counts: {
+        pass: 0,
+        warn: 1,
+        fail: 0,
+      },
+      preflight,
+      results: [],
+    };
+    await fs.writeFile(path.join(outputDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
+    await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, results: [], outputDir, preflight }));
+    console.log(JSON.stringify(summary, null, 2));
+    process.exitCode = 1;
+    return;
+  }
 
   const results: RecordLike[] = [];
   for (const scenario of scenarios) {
@@ -762,10 +906,11 @@ const main = async (): Promise<void> => {
       warn: warnCount,
       fail: failCount,
     },
+    preflight,
     results,
   };
   await fs.writeFile(path.join(outputDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
-  await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, results, outputDir }));
+  await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, results, outputDir, preflight }));
   console.log(JSON.stringify(summary, null, 2));
   if (!summary.ok) process.exitCode = 1;
 };

@@ -16244,6 +16244,7 @@ function copyHelixRailCriticalDebugFieldsForUi(
     "terminal_boundary_eligibility",
     "terminal_projection_guard",
     "terminal_authority_single_writer",
+    "codex_parity_agent_spine_rail_table",
     "tool_turn_chain_audit",
     "tool_rail_failure_triage",
     "tool_turn_chain_family_matrix",

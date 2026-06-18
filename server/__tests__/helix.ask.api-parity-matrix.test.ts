@@ -432,9 +432,13 @@ describe("Helix Ask API parity matrix", () => {
       terminal_authority_ok: true,
       rail_table: {
         present: true,
+        prompt: railTable.prompt,
+        visible_tool_surface: railTable.visible_tool_surface,
         codex_parity_class: railTable.codex_parity_class,
+        normalized_codex_parity_classes: railTable.normalized_codex_parity_classes,
         first_broken_rail: railTable.first_broken_rail,
         repair_target: railTable.repair_target,
+        observation_ref: railTable.observation_ref,
         selected_terminal_kind: railTable.selected_terminal_kind,
         visible_terminal_kind: railTable.visible_terminal_kind,
       },

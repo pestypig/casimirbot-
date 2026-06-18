@@ -3307,6 +3307,17 @@ function StagePlayGoalContextBoard({
     update.authority.terminalEligible === false &&
     update.authority.rawContentIncluded === false
   ).length;
+  const policyRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
+    Array.from(new Set([
+      ...update.evidenceRefs,
+      ...update.loopRefs,
+    ].filter((ref) =>
+      ref.startsWith("context_feed:") ||
+      ref.startsWith("allowed_actuator:") ||
+      ref.startsWith("workstation_context_feed:") ||
+      ref.startsWith("workstation_actuator:")
+    )));
+  const feedPolicyRefCount = updates.reduce((count, update) => count + policyRefsForUpdate(update).length, 0);
   const formatSessionCadence = (cadence: AgentGoalSessionV1["cadence"]): string => {
     if (cadence.kind === "event_accumulation") return `event accumulation / ${cadence.minUpdates} updates`;
     if (cadence.kind === "interval") return `interval / ${cadence.everyMs}ms`;
@@ -3339,6 +3350,7 @@ function StagePlayGoalContextBoard({
           <StagePlayMetricPill label="audio transcripts" value={formatStagePlayCount(audioTranscriptContextCount)} tone={audioTranscriptContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="translations" value={formatStagePlayCount(translatedTranscriptContextCount)} tone={translatedTranscriptContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="feed queries" value={formatStagePlayCount(feedQueryContextCount)} tone={feedQueryContextCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="feed policy refs" value={formatStagePlayCount(feedPolicyRefCount)} tone={feedPolicyRefCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="automations" value={formatStagePlayCount(automationContextCount)} tone={automationContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="actuator policies" value={formatStagePlayCount(actuatorPolicyCount)} tone={actuatorPolicyCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="active goals" value={formatStagePlayCount(activeSessions.length)} tone={activeSessions.length > 0 ? "good" : "default"} />
@@ -3392,11 +3404,16 @@ function StagePlayGoalContextBoard({
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Actuator policy</div>
           <div className="mt-0.5 text-slate-400">{formatStagePlayCount(actuatorPolicyCount)} allowed actuator{actuatorPolicyCount === 1 ? "" : "s"} bound to goal sessions; {formatStagePlayCount(narratorActuatorPolicyCount)} narrator output policy item{narratorActuatorPolicyCount === 1 ? "" : "s"}; {formatStagePlayCount(narratorEventFeedCount)} narrator event feed{narratorEventFeedCount === 1 ? "" : "s"}.</div>
         </div>
+        <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-feed-policy-ref-state">
+          <div className="font-semibold uppercase tracking-wide text-violet-200/80">Feed policy refs</div>
+          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(feedPolicyRefCount)} feed or actuator policy ref{feedPolicyRefCount === 1 ? "" : "s"} link feed queries to goal-session bounds.</div>
+        </div>
       </div>
       <div className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(240px,320px)]">
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
           {recentUpdates.length > 0 ? recentUpdates.map((update) => {
             const color = packetTrailColor(update.contentRef);
+            const policyRefs = policyRefsForUpdate(update);
             return (
               <div
                 key={update.updateId}
@@ -3432,6 +3449,9 @@ function StagePlayGoalContextBoard({
                   <div className="truncate">sources={update.sourceRefs.slice(0, 3).join(", ") || "none"}</div>
                   <div className="truncate">evidence={update.evidenceRefs.slice(0, 3).join(", ") || "none"}</div>
                   <div className="truncate">receipts={update.receiptRefs.slice(0, 3).join(", ") || "none"}</div>
+                  {policyRefs.length > 0 ? (
+                    <div className="truncate" data-testid="stage-play-goal-context-update-policy">policy={policyRefs.slice(0, 4).join(", ")}</div>
+                  ) : null}
                   <div className="truncate" data-testid="stage-play-goal-context-update-freshness">freshness={freshnessLabel(update)}</div>
                   {update.goalRelevance ? (
                     <div className="truncate">goal={update.goalRelevance.goalId} relevance={update.goalRelevance.relevance.toFixed(2)}</div>

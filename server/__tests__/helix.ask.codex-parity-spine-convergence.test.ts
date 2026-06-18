@@ -475,6 +475,7 @@ describe("Helix Ask Codex-parity agent spine convergence", () => {
 
     expect(turnRail.requested_capability).toBeNull();
     expect(turnRail.visible_tool_surface).toEqual(expect.arrayContaining(["model.direct_answer"]));
+    expect(turnRail.visible_tool_surface).not.toContain("scientific-calculator.solve_expression");
     expect(turnRail.visible_tool_surface).not.toContain("repo-code.search_concept");
     expect(turnRail.selected_capability).toBe("model.direct_answer");
     expect(turnRail.admitted_capability).toBe("model.direct_answer");

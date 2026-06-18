@@ -12,6 +12,7 @@ export type LiveAnswerReasoningCircuitRow = {
   loopRefs: string[];
   evidenceRefs: string[];
   receiptRefs: string[];
+  policyRefs: string[];
   dispatch: string[];
   packetColorKey: string;
   freshness: {
@@ -34,6 +35,7 @@ export type LiveAnswerReasoningCircuitSummary = {
   narratorSpeechCount: number;
   narratorBindingCount: number;
   wakeCount: number;
+  microdeckOutputCount: number;
   audioTranscriptCount: number;
   translatedTranscriptCount: number;
   packetTraceCount: number;
@@ -41,6 +43,7 @@ export type LiveAnswerReasoningCircuitSummary = {
   feedQueryCount: number;
   routeWatchCount: number;
   automationCount: number;
+  feedPolicyRefCount: number;
   actuatorPolicyCount: number;
   narratorEventFeedCount: number;
   narratorActuatorPolicyCount: number;
@@ -119,8 +122,11 @@ export function LiveAnswerReasoningCircuit({
           <span className="rounded border border-cyan-300/20 px-2 py-1 font-mono text-[10px] text-cyan-100" data-testid="live-answer-narrator-binding-count">
             {summary.narratorBindingCount} narrator bindings
           </span>
-          <span className="rounded border border-amber-300/20 px-2 py-1 font-mono text-[10px] text-amber-100">
-            {summary.wakeCount} wake
+          <span className="rounded border border-amber-300/20 px-2 py-1 font-mono text-[10px] text-amber-100" data-testid="live-answer-wake-dispatch-count">
+            {summary.wakeCount} wake dispatch{summary.wakeCount === 1 ? "" : "es"}
+          </span>
+          <span className="rounded border border-fuchsia-300/20 px-2 py-1 font-mono text-[10px] text-fuchsia-100" data-testid="live-answer-microdeck-output-count">
+            {summary.microdeckOutputCount} MicroDeck output{summary.microdeckOutputCount === 1 ? "" : "s"}
           </span>
           <span className="rounded border border-blue-300/20 px-2 py-1 font-mono text-[10px] text-blue-100" data-testid="live-answer-audio-transcript-count">
             {summary.audioTranscriptCount} audio transcripts
@@ -136,6 +142,9 @@ export function LiveAnswerReasoningCircuit({
           </span>
           <span className="rounded border border-indigo-300/20 px-2 py-1 font-mono text-[10px] text-indigo-100" data-testid="live-answer-feed-query-count">
             {summary.feedQueryCount} feed queries
+          </span>
+          <span className="rounded border border-indigo-300/20 px-2 py-1 font-mono text-[10px] text-indigo-100" data-testid="live-answer-feed-policy-ref-count">
+            {summary.feedPolicyRefCount} feed policy refs
           </span>
           <span className="rounded border border-sky-300/20 px-2 py-1 font-mono text-[10px] text-sky-100" data-testid="live-answer-route-watch-count">
             {summary.routeWatchCount} route watch
@@ -192,6 +201,7 @@ export function LiveAnswerReasoningCircuit({
                   <span className="truncate">sources={row.sourceRefs.length ? row.sourceRefs.join(", ") : "none"}</span>
                   <span className="truncate">loops={row.loopRefs.length ? row.loopRefs.join(", ") : "none"}</span>
                   <span className="truncate">evidence={row.evidenceRefs.length ? row.evidenceRefs.join(", ") : "none"}</span>
+                  <span className="truncate" data-testid="live-answer-goal-context-policy-refs">policy={row.policyRefs.length ? row.policyRefs.join(", ") : "none"}</span>
                   <span className="truncate">receipts={row.receiptRefs.length ? row.receiptRefs.join(", ") : "none"}</span>
                   <span className="truncate" data-testid="live-answer-goal-context-freshness">freshness={freshnessLabel(row.freshness)}</span>
                 </div>
@@ -224,10 +234,10 @@ export function LiveAnswerReasoningCircuit({
           <p className="text-[10px] font-semibold uppercase text-slate-300">Authority posture</p>
           <p className="mt-1 text-xs text-violet-100" data-testid="live-answer-terminal-authority-posture">{summary.terminalPosture}</p>
           <p className="mt-1 font-mono text-[10px] text-slate-400">
-            observation_only={summary.observationOnlyCount} narrator_bindings={summary.narratorBindingCount} audio_transcripts={summary.audioTranscriptCount} translations={summary.translatedTranscriptCount} packet_traces={summary.packetTraceCount} source_health={summary.sourceHealthCount} feed_queries={summary.feedQueryCount} route_watch={summary.routeWatchCount} automations={summary.automationCount} actuator_policies={summary.actuatorPolicyCount} narrator_output_policies={summary.narratorActuatorPolicyCount} narrator_event_feeds={summary.narratorEventFeedCount} trace_memory={summary.traceMemoryCount} terminal_authority_sessions={summary.terminalAuthorityRequiredCount}
+            observation_only={summary.observationOnlyCount} wake_dispatches={summary.wakeCount} microdeck_outputs={summary.microdeckOutputCount} narrator_bindings={summary.narratorBindingCount} audio_transcripts={summary.audioTranscriptCount} translations={summary.translatedTranscriptCount} packet_traces={summary.packetTraceCount} source_health={summary.sourceHealthCount} feed_queries={summary.feedQueryCount} feed_policy_refs={summary.feedPolicyRefCount} route_watch={summary.routeWatchCount} automations={summary.automationCount} actuator_policies={summary.actuatorPolicyCount} narrator_output_policies={summary.narratorActuatorPolicyCount} narrator_event_feeds={summary.narratorEventFeedCount} trace_memory={summary.traceMemoryCount} terminal_authority_sessions={summary.terminalAuthorityRequiredCount}
           </p>
           <p className="mt-1 text-[11px] leading-5 text-slate-500">
-            Receipts, MicroDeck outputs, narrator bindings, and panel projections stay evidence until the completed solver path selects a terminal answer.
+            Wake is only an interrupt dispatch. Receipts, MicroDeck outputs, narrator bindings, and panel projections stay evidence until the completed solver path selects a terminal answer.
           </p>
           <div className="mt-2 flex flex-wrap gap-1">
             {sessions.slice(0, 3).map((session: AgentGoalSessionV1) => (

@@ -164,7 +164,12 @@ describe("Stage Play world-state badge reducer", () => {
       updateId: "stage_play_goal_context_update:translation:goal-circuit",
       createdAtMs: Date.parse("2026-06-17T14:00:01.500Z"),
       sourceRefs: [sourceId, "audio_source:earbuds"],
-      loopRefs: [`thread:${threadId}`, "translation_loop:earbuds"],
+      loopRefs: [
+        `thread:${threadId}`,
+        "translation_loop:earbuds",
+        "workstation_context_feed:translated_transcripts",
+        "workstation_actuator:query_translation_segments",
+      ],
       producerKind: "translation_loop",
       updateKind: "translated_transcript",
       contentRef: "stage_play_processed_mail_packet:earbud-translation",
@@ -172,6 +177,8 @@ describe("Stage Play world-state badge reducer", () => {
       evidenceRefs: [
         "stage_play_processed_mail_packet:earbud-translation",
         "microdeck_output:earbud-translation",
+        "context_feed:translated_transcripts",
+        "allowed_actuator:query_translation_segments",
       ],
       receiptRefs: ["stage_play_context_feed_query:translated_transcripts:goal-circuit"],
       freshness: {
@@ -269,6 +276,15 @@ describe("Stage Play world-state badge reducer", () => {
     const sessionBadge = graph.badges.find((badge) => badge.kind === "agent_goal_session");
     expect(updateBadge?.admission).toBe("auto");
     expect(translationUpdateBadge?.admission).toBe("auto");
+    expect(translationUpdateBadge?.reasonCodes).toEqual(expect.arrayContaining([
+      "feed_query_policy",
+      "agent_goal_feed_policy",
+      "actuator_policy_ref",
+    ]));
+    expect(translationUpdateBadge?.dataTray?.outputRefs).toEqual(expect.arrayContaining([
+      "context_feed:translated_transcripts",
+      "allowed_actuator:query_translation_segments",
+    ]));
     expect(sessionBadge?.admission).toBe("auto");
     expect(graph.edges).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -326,6 +342,16 @@ describe("Stage Play world-state badge reducer", () => {
         from: translationUpdateBadge?.id,
         to: sessionBadge?.id,
         relation: "feeds",
+      }),
+      expect.objectContaining({
+        from: translationUpdateBadge?.id,
+        to: "workstation_state_plane.control_signals",
+        relation: "constrains",
+        reasonCodes: expect.arrayContaining(["feed_query_policy_bounds_actuator"]),
+        evidenceRefs: expect.arrayContaining([
+          "context_feed:translated_transcripts",
+          "allowed_actuator:query_translation_segments",
+        ]),
       }),
     ]));
     expect(graph.authority).toMatchObject({

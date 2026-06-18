@@ -611,6 +611,14 @@ const liveAnswerFeedQueryUpdate = (update: WorkstationGoalContextUpdateV1): bool
   );
 };
 
+const liveAnswerPolicyRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
+  Array.from(new Set([...update.evidenceRefs, ...update.loopRefs].filter((ref) =>
+    ref.startsWith("context_feed:") ||
+    ref.startsWith("allowed_actuator:") ||
+    ref.startsWith("workstation_context_feed:") ||
+    ref.startsWith("workstation_actuator:")
+  )));
+
 const liveAnswerAutomationUpdate = (update: WorkstationGoalContextUpdateV1): boolean =>
   update.producerKind === "automation" || update.updateKind === "automation_status";
 
@@ -1726,6 +1734,7 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         loopRefs: update.loopRefs,
         evidenceRefs: update.evidenceRefs,
         receiptRefs: update.receiptRefs,
+        policyRefs: liveAnswerPolicyRefsForUpdate(update),
         dispatch: update.suggestedDispatch.slice(0, 4).map(liveAnswerDispatchLabel),
         packetColorKey: liveAnswerPacketColorKey(update),
         freshness: {
@@ -1755,6 +1764,14 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       narratorSpeechCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "speak_narrator").length,
       narratorBindingCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "bind_narrator_stream").length,
       wakeCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "wake_agent").length,
+      microdeckOutputCount: goalContextUpdates.filter((update: WorkstationGoalContextUpdateV1) =>
+        update.producerKind === "microdeck" ||
+        update.contentRef.includes("microdeck") ||
+        update.evidenceRefs.some((ref) => ref.includes("microdeck") || ref.includes("micro_reasoner"))
+      ).length +
+        agentGoalSessions.filter((session: AgentGoalSessionV1) =>
+          session.contextFeeds.some((feed) => feed.sourceKind === "microdeck_outputs")
+        ).length,
       audioTranscriptCount: goalContextUpdates.filter((update: WorkstationGoalContextUpdateV1) =>
         update.producerKind === "audio_capture" ||
         update.producerKind === "transcription_loop" ||
@@ -1787,6 +1804,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         agentGoalSessions.filter((session: AgentGoalSessionV1) =>
           session.contextFeeds.some((feed) => feed.sourceKind === "automation_policies")
         ).length,
+      feedPolicyRefCount: goalContextUpdates.reduce(
+        (count: number, update: WorkstationGoalContextUpdateV1) => count + liveAnswerPolicyRefsForUpdate(update).length,
+        0,
+      ),
       actuatorPolicyCount: agentGoalSessions.reduce((count: number, session: AgentGoalSessionV1) => count + session.allowedActuators.length, 0),
       narratorEventFeedCount: goalContextUpdates.filter((update: WorkstationGoalContextUpdateV1) => update.producerKind === "narrator").length +
         agentGoalSessions.filter((session: AgentGoalSessionV1) =>

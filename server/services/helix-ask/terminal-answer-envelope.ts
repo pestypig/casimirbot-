@@ -78,29 +78,60 @@ const readValidRepoEvidenceAnswerText = (payload: Record<string, unknown>): stri
   if (readTerminalArtifactKind(payload) !== "repo_code_evidence_answer") return null;
   const answer = readRecord(payload.repo_code_evidence_answer);
   const qualityGate = readRecord(payload.repo_answer_text_quality_gate);
-  if (qualityGate?.ok !== true) return null;
-  return readString(answer?.answer_text);
+  if (qualityGate && qualityGate.ok !== true) return null;
+  if (!qualityGate && !canRecoverRepoEvidenceAnswerTerminal(payload, answer)) return null;
+  return readString(answer?.answer_text) ?? readString(answer?.text);
+};
+
+const normalizeRepoEvidenceAnswerCandidate = (
+  value: Record<string, unknown> | null,
+): Record<string, unknown> | null => {
+  if (!value) return null;
+  const answerText = readString(value.answer_text) ?? readString(value.text);
+  if (!answerText) return null;
+  return {
+    ...value,
+    schema: readString(value.schema) ?? "helix.repo_code_evidence_answer.v1",
+    artifact_id: readString(value.artifact_id) ?? readString(value.ref) ?? "repo_code_evidence_answer:recovered",
+    answer_text: answerText,
+    support_refs: [
+      ...readArray(value.support_refs),
+      ...readArray(value.source_observation_refs),
+      ...readArray(value.artifact_refs),
+      ...readArray(value.evidence_refs),
+      ...readArray(value.grounded_in_observation_refs),
+    ],
+    assistant_answer: false,
+    raw_content_included: false,
+  };
 };
 
 const readRepoEvidenceAnswerPayload = (payload: Record<string, unknown>): Record<string, unknown> | null => {
-  const topLevel = readRecord(payload.repo_code_evidence_answer);
+  const topLevel = normalizeRepoEvidenceAnswerCandidate(readRecord(payload.repo_code_evidence_answer));
   if (topLevel) return topLevel;
-  const ledgerAnswer = readArray(payload.current_turn_artifact_ledger)
+  const ledgerRecords = readArray(payload.current_turn_artifact_ledger)
     .map(readRecord)
-    .filter((artifact): artifact is Record<string, unknown> => Boolean(artifact))
+    .filter((artifact): artifact is Record<string, unknown> => Boolean(artifact));
+  const ledgerAnswer = ledgerRecords
     .filter((artifact) => readString(artifact.kind) === "repo_code_evidence_answer")
-    .map((artifact) => readRecord(artifact.payload))
+    .map((artifact) => normalizeRepoEvidenceAnswerCandidate(readRecord(artifact.payload) ?? artifact))
     .find((entry): entry is Record<string, unknown> => Boolean(entry)) ?? null;
   if (ledgerAnswer) return ledgerAnswer;
-  const draft = readRecord(payload.final_answer_draft);
+  const draft =
+    readRecord(payload.final_answer_draft) ??
+    ledgerRecords
+      .filter((artifact) => readString(artifact.kind) === "final_answer_draft")
+      .map((artifact) => readRecord(artifact.payload) ?? artifact)
+      .find((entry): entry is Record<string, unknown> => Boolean(readString(entry.text) ?? readString(entry.answer_text))) ??
+    null;
   if (
     readString(draft?.model_step_capability) === "model.synthesize_from_repo_evidence" &&
-    readString(draft?.text)
+    (readString(draft?.text) ?? readString(draft?.answer_text))
   ) {
-    return {
+    return normalizeRepoEvidenceAnswerCandidate({
       schema: "helix.repo_code_evidence_answer.v1",
       artifact_id: readString(draft?.artifact_id) ?? readString(draft?.draft_id) ?? "repo_code_evidence_answer:from_final_answer_draft",
-      answer_text: readString(draft?.text),
+      answer_text: readString(draft?.text) ?? readString(draft?.answer_text),
       support_refs: [
         ...readArray(draft?.support_refs),
         ...readArray(draft?.artifact_refs),
@@ -112,7 +143,7 @@ const readRepoEvidenceAnswerPayload = (payload: Record<string, unknown>): Record
       model_authored: readString(draft?.authority) === "llm_post_observation_composer",
       assistant_answer: false,
       raw_content_included: false,
-    };
+    });
   }
   return null;
 };
@@ -126,11 +157,14 @@ const canRecoverRepoEvidenceAnswerTerminal = (
   const goalKind = readString(canonicalGoal?.goal_kind);
   if (goalKind !== "repo_entity_definition" && goalKind !== "repo_code_evidence_question") return false;
   if (readString(canonicalGoal?.required_terminal_kind) !== "repo_code_evidence_answer") return false;
-  if (!readString(answer.answer_text)) return false;
+  if (!(readString(answer.answer_text) ?? readString(answer.text))) return false;
   const finalDraft = readRecord(payload.final_answer_draft);
   const supportRefs = [
     ...readArray(answer.support_refs),
     ...readArray(answer.source_observation_refs),
+    ...readArray(answer.artifact_refs),
+    ...readArray(answer.evidence_refs),
+    ...readArray(answer.grounded_in_observation_refs),
     ...readArray(finalDraft?.support_refs),
     ...readArray(finalDraft?.artifact_refs),
     ...readArray(payload.current_turn_artifact_ledger).flatMap((entry) => {

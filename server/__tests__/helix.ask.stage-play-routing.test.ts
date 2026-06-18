@@ -883,7 +883,7 @@ describe("Helix Ask Stage Play routing", () => {
     });
     expect(response.body?.agent_runtime_loop_admission?.reason, routeDebug).not.toBe("pending_user_input");
     expect(response.body?.route_reason_code, routeDebug).not.toBe("clarify:missing_args");
-    expect(response.body?.mandatory_next_tool?.tool_name, routeDebug).toBe("live_env.record_live_source_mail_decision");
+    expect(response.body?.mandatory_next_tool?.tool_name, routeDebug).toBe("live_env.read_processed_live_source_mail");
     expect(response.body?.agent_runtime_loop?.executed_tool_call_count ?? 0, routeDebug).toBeGreaterThan(0);
   }, 60_000);
 
@@ -2196,9 +2196,38 @@ describe("Helix Ask Stage Play routing", () => {
       canonical: response.body?.canonical_goal_frame,
       sourceTarget: response.body?.source_target_intent,
       evidenceTargetArbitration: response.body?.evidence_target_arbitration,
-      availableCapabilities: response.body?.available_capabilities,
-      runtimeLoop: response.body?.agent_runtime_loop,
+      recommendedCapability: response.body?.available_capabilities?.recommended_capability_key,
+      runtimeLoopStopReason: response.body?.agent_runtime_loop?.stop_reason,
+      runtimeLoopIterations: response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => ({
+        chosen_capability: iteration?.chosen_capability,
+        produced_artifacts: iteration?.produced_artifacts,
+        satisfaction: iteration?.satisfaction,
+        stop_reason: iteration?.stop_reason,
+      })),
       repoEvidenceRelevanceGate: response.body?.repo_evidence_relevance_gate,
+      terminalErrorCode: response.body?.terminal_error_code,
+      terminalBoundaryEligibility: response.body?.terminal_boundary_eligibility,
+      terminalAnswerEnvelope: response.body?.terminal_answer_envelope,
+      terminalAuthoritySingleWriter: response.body?.terminal_authority_single_writer,
+      projectionMismatchRepoRepairProbe: response.body?.projection_mismatch_repo_repair_probe,
+      projectionMismatchRepoRepairResult: response.body?.projection_mismatch_repo_repair_result,
+      repoCodeEvidenceAnswer: response.body?.repo_code_evidence_answer
+        ? {
+            artifact_id: response.body.repo_code_evidence_answer.artifact_id,
+            answer_text_present: Boolean(response.body.repo_code_evidence_answer.answer_text),
+            support_refs_count: Array.isArray(response.body.repo_code_evidence_answer.support_refs)
+              ? response.body.repo_code_evidence_answer.support_refs.length
+              : 0,
+          }
+        : null,
+      currentTurnArtifactKinds: Array.isArray(response.body?.current_turn_artifact_ledger)
+        ? response.body.current_turn_artifact_ledger.map((artifact: any) => ({
+            kind: artifact?.kind,
+            artifact_id: artifact?.artifact_id,
+            payload_kind: artifact?.payload?.kind,
+            payload_schema: artifact?.payload?.schema,
+          }))
+        : null,
       answer: response.body?.answer,
       terminalArtifactKind: response.body?.terminal_artifact_kind,
       finalAnswerSource: response.body?.final_answer_source,
@@ -2586,6 +2615,13 @@ describe("Helix Ask Stage Play routing", () => {
       finalAnswerSource: response.body?.final_answer_source,
       terminalArtifactKind: response.body?.terminal_artifact_kind,
       finalAnswerDraftAuthority: response.body?.final_answer_draft?.authority,
+      runtimeLoopIterations: response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => ({
+        chosen_capability: iteration?.chosen_capability,
+        executed_action_key: iteration?.executed_action_key,
+        produced_artifacts: iteration?.produced_artifacts,
+        satisfaction: iteration?.satisfaction,
+        stop_reason: iteration?.stop_reason,
+      })),
       askTurnSolverTrace: {
         completed_solver_path: response.body?.ask_turn_solver_trace?.completed_solver_path,
         final_arbitration: response.body?.ask_turn_solver_trace?.final_arbitration,
@@ -2619,7 +2655,7 @@ describe("Helix Ask Stage Play routing", () => {
     expect(response.body?.available_capabilities?.recommended_capability_key).toBe("live_env.reflect_stage_play_context");
     expect(response.body?.agent_runtime_loop?.iterations?.some((iteration: any) =>
       iteration?.chosen_capability === "live_env.reflect_stage_play_context"
-    )).toBe(true);
+    ), routeDebug).toBe(true);
     const dynamicToolActionNames = response.body?.current_turn_artifact_ledger
       ?.filter((artifact: any) => artifact?.kind === "dynamic_tool_call")
       ?.map((artifact: any) => artifact?.payload?.tool_action_name ?? artifact?.payload?.action_name ?? artifact?.payload?.name)

@@ -13,6 +13,11 @@ import {
   CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
   type CodexParityAgentSpineClass,
 } from "./codex-parity-agent-spine-contract";
+import {
+  contextualToolSuppressionBlocksFamily,
+  detectContextualToolAdmissionSuppression,
+  type HelixContextualToolAdmissionSuppression,
+} from "./contextual-tool-admission";
 
 type RecordLike = Record<string, unknown>;
 
@@ -693,6 +698,10 @@ const capabilityObservationArtifact = (
 
 const explicitObservationCoverageMode = (capability: string | null): "all" | "any" => {
   const normalized = normalize(capability);
+  const explicitContract = explicitCapabilityContractForCapability(capability);
+  if (explicitContract?.required_observation_kinds.includes("live_environment_tool_observation")) {
+    return "any";
+  }
   if (
     normalized === "image_lens_inspect" ||
     normalized === "situation_room_describe_visual_capture" ||
@@ -1476,6 +1485,7 @@ const visibleCapabilitySurface = (payload: RecordLike, artifacts: RecordLike[]):
   const capabilityPlan = readRecord(payload.capability_plan);
   const admission = readRecord(payload.tool_call_admission_decision);
   const runtimeIntent = readRecord(payload.runtime_intent_packet);
+  const contextualSuppression = detectContextualToolAdmissionSuppression(readFirstPromptText(payload) ?? "");
   const directRecords = [
     payload.available_capabilities,
     payload.initial_available_capabilities,
@@ -1495,7 +1505,22 @@ const visibleCapabilitySurface = (payload: RecordLike, artifacts: RecordLike[]):
   return unique([
     ...directRecords.flatMap(collectVisibleCapabilitySurfaceFromRecord),
     ...artifactRecords.flatMap(collectVisibleCapabilitySurfaceFromRecord),
-  ]);
+  ]).filter((capability) => !suppressedVisibleToolSurfaceCapability(capability, contextualSuppression));
+};
+
+const suppressedVisibleToolSurfaceCapability = (
+  capability: string,
+  suppression: HelixContextualToolAdmissionSuppression | null,
+): boolean => {
+  if (!suppression) return false;
+  if (normalizedEqual(capability, "model.direct_answer")) return false;
+  if (normalizedEqual(capability, "suppressed_contextual_tool_reference")) return false;
+  const family = inferToolFamilyFromToolName(capability);
+  if (!family) return false;
+  if (contextualToolSuppressionBlocksFamily(suppression, family)) return true;
+  if (family === "workstation" && contextualToolSuppressionBlocksFamily(suppression, "workstation_action")) return true;
+  if (family === "live_source_mail" && contextualToolSuppressionBlocksFamily(suppression, "live_environment")) return true;
+  return false;
 };
 
 const RAIL_TABLE_VISIBLE_SURFACE_LIMIT = 40;

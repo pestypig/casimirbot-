@@ -1757,6 +1757,15 @@ const addWorkstationStatePlaneBadges = (
       ...update.sourceRefs,
       ...update.loopRefs,
     ]);
+    const feedPolicyRefs = updateEvidenceRefs.filter((ref) =>
+      ref.startsWith("context_feed:") ||
+      ref.startsWith("allowed_actuator:") ||
+      ref.startsWith("workstation_context_feed:") ||
+      ref.startsWith("workstation_actuator:")
+    );
+    const feedPolicyReasonCodes = feedPolicyRefs.length > 0
+      ? ["feed_query_policy", "agent_goal_feed_policy", "actuator_policy_ref"]
+      : [];
     pushBadge(badges, badge({
       id: updateId,
       title: `Goal update: ${update.updateKind.replace(/_/g, " ")}`,
@@ -1782,7 +1791,13 @@ const addWorkstationStatePlaneBadges = (
       evidenceRefs: updateEvidenceRefs,
       confidence: update.freshness.status === "fresh" ? 0.82 : update.freshness.status === "blocked" ? 0.58 : 0.66,
       missingEvidence: update.freshness.status === "blocked" ? ["The update is blocked until its missing requirement is satisfied."] : [],
-      reasonCodes: ["goal_context_update", update.producerKind, update.updateKind, "observation_not_terminal_authority"],
+      reasonCodes: [
+        "goal_context_update",
+        update.producerKind,
+        update.updateKind,
+        "observation_not_terminal_authority",
+        ...feedPolicyReasonCodes,
+      ],
       dataTray: {
         title: update.updateKind.replace(/_/g, " "),
         summary: update.preview,
@@ -1793,7 +1808,7 @@ const addWorkstationStatePlaneBadges = (
         inputRefs: unique([...update.sourceRefs, ...update.loopRefs]).slice(0, 10),
         inputPreview: update.goalRelevance?.reason ?? update.contentRef,
         transformLabel: `${update.producerKind} -> ${update.updateKind}`,
-        outputRefs: unique([update.contentRef, ...dispatchKinds]).slice(0, 12),
+        outputRefs: unique([update.contentRef, ...dispatchKinds, ...feedPolicyRefs]).slice(0, 12),
         outputPreview: dispatchKinds.length > 0 ? `dispatch: ${dispatchKinds.join(", ")}` : "no dispatch suggested",
         skipped: [
           "assistant_answer=false",
@@ -1812,6 +1827,16 @@ const addWorkstationStatePlaneBadges = (
       evidenceRefs: updateEvidenceRefs,
       reasonCodes: ["goal_context_bus_contains_update"],
     });
+    if (feedPolicyRefs.length > 0) {
+      pushEdge(edges, {
+        from: updateId,
+        to: controlId,
+        relation: "constrains",
+        label: "feed query policy bounds agent actuator",
+        evidenceRefs: feedPolicyRefs,
+        reasonCodes: ["feed_query_policy_bounds_actuator", "agent_goal_feed_policy"],
+      });
+    }
     const isStreamContextUpdate =
       update.producerKind === "audio_capture" ||
       update.producerKind === "transcription_loop" ||

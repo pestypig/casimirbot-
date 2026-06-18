@@ -90,6 +90,18 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
     case "live_env.process_live_source_mail":
     case "live_env.reflect_live_source_mail_loop":
       return "live_source_mailbox_review";
+    case "live_env.reflect_stage_play_context":
+    case "live_env.narrator_say":
+    case "live_env.narrator_bind_stream":
+    case "live_env.change_workstation_preset":
+    case "live_env.bind_workstation_source":
+    case "live_env.unbind_workstation_source":
+    case "live_env.set_workstation_loop_state":
+    case "live_env.repair_workstation_source":
+    case "live_env.update_live_answer_projection":
+    case "live_env.focus_process_graph":
+    case "live_env.start_agent_goal_session":
+      return "live_environment_review";
     case "image_lens.inspect":
     case "situation-room.describe_visual_capture":
       return "visual_capture_describe";
@@ -114,6 +126,18 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
     case "live_env.process_live_source_mail":
     case "live_env.reflect_live_source_mail_loop":
       return "live_source_mail";
+    case "live_env.reflect_stage_play_context":
+    case "live_env.narrator_say":
+    case "live_env.narrator_bind_stream":
+    case "live_env.change_workstation_preset":
+    case "live_env.bind_workstation_source":
+    case "live_env.unbind_workstation_source":
+    case "live_env.set_workstation_loop_state":
+    case "live_env.repair_workstation_source":
+    case "live_env.update_live_answer_projection":
+    case "live_env.focus_process_graph":
+    case "live_env.start_agent_goal_session":
+      return "live_environment_state";
     case "image_lens.inspect":
     case "situation-room.describe_visual_capture":
       return "visual_capture";

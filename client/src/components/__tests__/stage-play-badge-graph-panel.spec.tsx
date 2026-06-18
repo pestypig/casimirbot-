@@ -2113,7 +2113,11 @@ describe("StagePlayBadgeGraphPanel", () => {
           updateId: "stage_play_goal_context_update:translation:ui",
           createdAtMs: 1780521602575,
           sourceRefs: ["source:visual-tab", "audio_source:earbuds"],
-          loopRefs: ["stage_play_translation_loop:ui"],
+          loopRefs: [
+            "stage_play_translation_loop:ui",
+            "workstation_context_feed:translated_transcripts",
+            "workstation_actuator:query_translation_segments",
+          ],
           producerKind: "translation_loop",
           updateKind: "translated_transcript",
           contentRef: "stage_play_processed_mail_packet:translation-ui",
@@ -2121,6 +2125,8 @@ describe("StagePlayBadgeGraphPanel", () => {
           evidenceRefs: [
             "stage_play_processed_mail_packet:translation-ui",
             "microdeck_output:translation-ui",
+            "context_feed:translated_transcripts",
+            "allowed_actuator:query_translation_segments",
           ],
           receiptRefs: ["stage_play_context_feed_query:translated_transcripts:ui"],
           freshness: {
@@ -2281,6 +2287,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByText(/packet color match|packet match/i).length).toBeGreaterThan(0);
     expect(screen.getByTestId("stage-play-goal-context-board")).toBeTruthy();
     expect(screen.getByText(/Goal Context Substrate/i)).toBeTruthy();
+    expect(screen.getByText(/Wake is shown only as an interrupt dispatch/i)).toBeTruthy();
     expect(screen.getByTestId("stage-play-goal-context-authority-state")).toHaveTextContent(/evidence-only, non-terminal context/i);
     expect(screen.getByTestId("stage-play-terminal-authority-state")).toHaveTextContent(/Final reports require a completed solver path/i);
     expect(screen.getByTestId("stage-play-narrator-binding-state")).toHaveTextContent(/stream binding dispatch/i);
@@ -2306,6 +2313,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/7 allowed actuators/i);
     expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/1 narrator output policy item/i);
     expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/1 narrator event feed/i);
+    expect(screen.getByTestId("stage-play-feed-policy-ref-state")).toHaveTextContent(/4 feed or actuator policy refs/i);
     expect(screen.getByText("Minecraft danger monitor")).toBeTruthy();
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/visual summaries/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/packet traces/i);
@@ -2340,6 +2348,12 @@ describe("StagePlayBadgeGraphPanel", () => {
       /evidence=stage_play_live_source_watch_job_policy:ui, stage_play_live_source_watch_job:ui/i.test(node.textContent ?? "") &&
       /receipts=stage_play_live_source_watch_job_policy:ui/i.test(node.textContent ?? "") &&
       /goal=goal:stage-play-monitor relevance=0\.82/i.test(node.textContent ?? "")
+    )).toBe(true);
+    expect(screen.getAllByTestId("stage-play-goal-context-update-policy").some((node) =>
+      /context_feed:translated_transcripts/i.test(node.textContent ?? "") &&
+      /allowed_actuator:query_translation_segments/i.test(node.textContent ?? "") &&
+      /workstation_context_feed:translated_transcripts/i.test(node.textContent ?? "") &&
+      /workstation_actuator:query_translation_segments/i.test(node.textContent ?? "")
     )).toBe(true);
     expect(screen.getAllByTestId("stage-play-goal-context-update-freshness").some((node) =>
       /freshness=fresh observed=1780521602500 staleAfter=120000ms/i.test(node.textContent ?? "")

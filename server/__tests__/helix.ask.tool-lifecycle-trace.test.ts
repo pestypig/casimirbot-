@@ -3226,6 +3226,12 @@ describe("Helix Ask tool lifecycle trace", () => {
       expect(Array.isArray(railTable.visible_tool_surface)).toBe(true);
       expect((railTable.visible_tool_surface as unknown[]).length).toBeGreaterThan(0);
       expect(railTable.selected_terminal_kind).toBe(railTable.visible_terminal_kind);
+      if (entry.coverage === "contextual_suppression") {
+        expect(railTable.visible_tool_surface).toEqual(
+          expect.arrayContaining(["suppressed_contextual_tool_reference"]),
+        );
+        expect(railTable.visible_tool_surface).not.toContain("scientific-calculator.solve_expression");
+      }
     }
 
     expect([...covered].sort()).toEqual([

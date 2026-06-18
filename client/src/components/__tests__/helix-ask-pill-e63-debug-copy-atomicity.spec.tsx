@@ -95,6 +95,59 @@ describe("Helix Ask E63 debug copy atomicity", () => {
           first_broken_rail: "visible_projection",
           repair_target: "presenter_boundary",
         },
+        codex_parity_agent_spine_rail_table: {
+          schema: "helix.codex_parity_agent_spine_rail_table.v1",
+          turn_id: "ask:test:compact-rails",
+          prompt: "Call scientific-calculator.solve_expression with this exact expression.",
+          requested_capability: "scientific-calculator.solve_expression",
+          visible_tool_surface: ["scientific-calculator.solve_expression"],
+          selected_capability: "scientific-calculator.solve_expression",
+          admitted_capability: "scientific-calculator.solve_expression",
+          admission_proof_source: "tool_call_admission_decision.admitted_capability",
+          admission_proven: true,
+          executed_capability: "scientific-calculator.solve_expression",
+          observation_kind: "workstation_tool_evaluation",
+          observation_ref: "ask:test:compact-rails:workstation_tool_evaluation",
+          required_observation_kinds_for_requested_capability: [
+            "calculator_receipt",
+            "workstation_tool_evaluation",
+          ],
+          observed_artifact_supports_requested_capability: true,
+          reentry_status: "reentered",
+          reentry_proof_source: "final_answer_draft_with_support_refs",
+          reentry_proven: true,
+          goal_satisfaction: "satisfied",
+          required_terminal_kind: "workstation_tool_evaluation",
+          selected_terminal_kind: "workstation_tool_evaluation",
+          terminal_authority_proof_source: "terminal_authority_single_writer.selected_terminal_artifact_kind",
+          terminal_authority_proven: true,
+          visible_terminal_kind: "typed_failure",
+          visible_projection_source: "payload.terminal_artifact_kind",
+          visible_projection_proven: true,
+          first_broken_rail: "visible_projection",
+          repair_target: "presenter_boundary",
+          codex_parity_class: "visible_projection_mismatch",
+          normalized_codex_parity_classes: [
+            "complete",
+            "tool_surface_missing",
+            "explicit_capability_demoted",
+            "tool_admission_rejected",
+            "selected_not_executed",
+            "observation_missing",
+            "observation_not_reentered",
+            "goal_contract_mismatch",
+            "terminal_product_not_allowed",
+            "terminal_authority_mismatch",
+            "visible_projection_mismatch",
+            "debug_mirror_stale",
+            "provider_config_missing",
+          ],
+          rail_status: "fail_closed",
+          rail_failure_code: "terminal_projection_mismatch",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
         agent_runtime_loop: {
           schema: "helix.agent_runtime_loop.v1",
           iterations: [
@@ -154,6 +207,23 @@ describe("Helix Ask E63 debug copy atomicity", () => {
       );
       expect(copied.terminal_boundary_eligibility?.checks?.selected_capability_observation).toBe(true);
       expect(copied.tool_rail_failure_triage?.first_broken_rail).toBe("visible_projection");
+      expect(copied.codex_parity_agent_spine_rail_table).toMatchObject({
+        schema: "helix.codex_parity_agent_spine_rail_table.v1",
+        requested_capability: "scientific-calculator.solve_expression",
+        selected_capability: "scientific-calculator.solve_expression",
+        admitted_capability: "scientific-calculator.solve_expression",
+        executed_capability: "scientific-calculator.solve_expression",
+        observation_ref: "ask:test:compact-rails:workstation_tool_evaluation",
+        selected_terminal_kind: "workstation_tool_evaluation",
+        visible_terminal_kind: "typed_failure",
+        codex_parity_class: "visible_projection_mismatch",
+        rail_failure_code: "terminal_projection_mismatch",
+      });
+      expect(copied.debug?.codex_parity_agent_spine_rail_table).toMatchObject({
+        requested_capability: "scientific-calculator.solve_expression",
+        first_broken_rail: "visible_projection",
+        repair_target: "presenter_boundary",
+      });
       expect(copied.debug?.agent_runtime_loop?.iteration_count).toBe(2);
     } finally {
       Object.defineProperty(globalThis, "navigator", {

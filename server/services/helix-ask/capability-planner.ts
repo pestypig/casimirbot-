@@ -359,6 +359,12 @@ const instructionRules = (instructionFrame?: RecordLike | null): string[] =>
 
 const isMutatingCapability = (family: HelixCapabilityFamily, requestedAction: string, promptText: string): boolean => {
   if (family === "workstation_action" || family === "subagent_runtime_adapter") return true;
+  if (
+    family === "live_environment" &&
+    /^live_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|start_agent_goal_session)$/i.test(requestedAction)
+  ) {
+    return true;
+  }
   if (family === "live_source" && requestedAction === "control_live_source") return true;
   if (family === "docs" && /\b(?:open|pull up|bring up)\b/i.test(promptText)) return true;
   return false;
