@@ -45,6 +45,14 @@ import {
   listStagePlayMicroReasonerRuns,
   listStagePlayProcessedMailPackets,
 } from "./stage-play-processed-mail-packet-store";
+import {
+  listStagePlayAgentGoalSessions,
+  listStagePlayGoalContextUpdates,
+} from "./stage-play-goal-context-store";
+import type {
+  AgentGoalSessionV1,
+  WorkstationGoalContextUpdateV1,
+} from "@shared/contracts/workstation-goal-context.v1";
 
 export type BuildStagePlayGraphFromWorldInput = {
   threadId: string;
@@ -1314,6 +1322,12 @@ const statePlaneDeckRunBadgeId = (runId: string): string =>
 const statePlaneDeckPromptBadgeId = (promptId: string): string =>
   `workstation_state_plane.deck_prompt.${hashShort(promptId, 12)}`;
 
+const goalContextUpdateBadgeId = (updateId: string): string =>
+  `goal_context_update.${hashShort(updateId, 12)}`;
+
+const agentGoalSessionBadgeId = (goalId: string): string =>
+  `agent_goal_session.${hashShort(goalId, 12)}`;
+
 const packetRoutesToGate = (recommendedNext: string): boolean =>
   recommendedNext === "request_more_evidence" ||
   recommendedNext === "request_stage_play_checkpoint" ||
@@ -1338,6 +1352,8 @@ const addWorkstationStatePlaneBadges = (
     generatedAt: string;
     checkpointFreshness?: StagePlayCheckpointFreshnessV1 | null;
     microReasoners: ReturnType<typeof collectMicroReasonerState>;
+    goalContextUpdates: WorkstationGoalContextUpdateV1[];
+    agentGoalSessions: AgentGoalSessionV1[];
   },
 ): void => {
   const sourceBadgeIds = badges.filter((entry) => entry.kind === "source").map((entry) => entry.id);
@@ -1371,6 +1387,8 @@ const addWorkstationStatePlaneBadges = (
   const promptRefs = input.microReasoners.prompts.map((prompt) => prompt.promptId);
   const runRefs = input.microReasoners.runs.map((run) => run.runId);
   const packetRefs = input.microReasoners.packets.map((packet) => packet.packetId);
+  const goalContextRefs = input.goalContextUpdates.map((update) => update.updateId);
+  const agentGoalRefs = input.agentGoalSessions.map((session) => session.goalId);
   const statePlaneEvidenceRefs = unique([
     input.graphId,
     ...input.evidenceRefs,
@@ -1378,6 +1396,8 @@ const addWorkstationStatePlaneBadges = (
     ...promptRefs,
     ...runRefs,
     ...packetRefs,
+    ...goalContextRefs,
+    ...agentGoalRefs,
   ]);
   const statePlaneSourceRefs = uniqueBy(
     [
@@ -1386,6 +1406,8 @@ const addWorkstationStatePlaneBadges = (
       ...promptRefs.slice(0, 8).map((id) => ({ kind: "synthetic_evidence" as const, id })),
       ...runRefs.slice(0, 8).map((id) => ({ kind: "synthetic_evidence" as const, id })),
       ...packetRefs.slice(0, 8).map((id) => ({ kind: "synthetic_evidence" as const, id })),
+      ...goalContextRefs.slice(0, 8).map((id) => ({ kind: "workstation_goal_context_update" as const, id })),
+      ...agentGoalRefs.slice(0, 6).map((id) => ({ kind: "agent_goal_session" as const, id })),
     ],
     (ref) => `${ref.kind}:${ref.id}`,
   );
@@ -1409,7 +1431,7 @@ const addWorkstationStatePlaneBadges = (
     reasonCodes: ["workstation_state_plane", "process_graph_reflection", "not_terminal_authority"],
     dataTray: {
       title: "State plane",
-      summary: `Maps ${input.sources.length} source(s), ${input.microReasoners.prompts.length} MicroDeck prompt(s), ${input.microReasoners.runs.length} run(s), and ${input.microReasoners.packets.length} packet(s).`,
+      summary: `Maps ${input.sources.length} source(s), ${input.microReasoners.prompts.length} MicroDeck prompt(s), ${input.microReasoners.runs.length} run(s), ${input.microReasoners.packets.length} packet(s), ${goalContextRefs.length} goal-context update(s), and ${agentGoalRefs.length} active goal session(s).`,
       updatedAt: input.generatedAt,
       freshness: input.sources.length > 0 ? "fresh" : "missing",
       confidence: input.sources.length > 0 ? 0.82 : 0.42,
@@ -1418,7 +1440,7 @@ const addWorkstationStatePlaneBadges = (
       inputPreview: `${activeSourceCount} active / ${selectedSourceCount} selected source(s)`,
       transformLabel: "workstation graph reducer",
       outputRefs: [input.graphId],
-      outputPreview: "evidence-only process graph overlay",
+      outputPreview: "evidence-only process graph and goal-context overlay",
     },
     admission: "auto",
   }));
@@ -1601,6 +1623,205 @@ const addWorkstationStatePlaneBadges = (
     },
     admission: "auto",
   }));
+
+  const goalContextBusId = pushBadge(badges, badge({
+    id: "workstation_state_plane.goal_context_bus",
+    title: "Goal context bus",
+    plainMeaning: "Durable goal-context updates and active goal sessions are grouped here as queryable process state.",
+    whyItMatters: "The agent can inspect continuous workstation outputs without treating receipts, projections, or MicroDeck products as final answers.",
+    kind: "workstation_state_plane",
+    status: goalContextRefs.length > 0 || agentGoalRefs.length > 0 ? "observed" : "candidate",
+    subjects: unique([...goalContextRefs.slice(0, 12), ...agentGoalRefs.slice(0, 8)]),
+    tags: ["workstation_state_plane", "goal_context_bus", "goal_context", "terminal_authority_boundary"],
+    sourceRefs: statePlaneSourceRefs,
+    evidenceRefs: statePlaneEvidenceRefs,
+    confidence: goalContextRefs.length > 0 || agentGoalRefs.length > 0 ? 0.8 : 0.46,
+    missingEvidence: goalContextRefs.length > 0 || agentGoalRefs.length > 0
+      ? []
+      : ["No goal-context updates or active goal sessions have been recorded for this thread."],
+    reasonCodes: ["goal_context_bus", "deterministic_runtime_surface", "not_terminal_authority"],
+    dataTray: {
+      title: "Goal context bus",
+      summary: `${goalContextRefs.length} update(s), ${agentGoalRefs.length} active goal session(s), all observation-only.`,
+      updatedAt: input.generatedAt,
+      freshness: goalContextRefs.length > 0 || agentGoalRefs.length > 0 ? "fresh" : "unknown",
+      confidence: goalContextRefs.length > 0 || agentGoalRefs.length > 0 ? 0.8 : 0.46,
+      evidenceRefs: unique([...goalContextRefs, ...agentGoalRefs]),
+      inputRefs: unique([...processBadgeIds.slice(0, 6), ...packetRefs.slice(0, 6), ...runRefs.slice(0, 6)]),
+      inputPreview: "GoalContextUpdate records remain non-terminal observations.",
+      transformLabel: "goal context update index",
+      outputRefs: unique([...goalContextRefs.slice(0, 12), ...agentGoalRefs.slice(0, 8)]),
+      outputPreview: "queryable context for active agent goals",
+    },
+    admission: "auto",
+  }));
+
+  const goalSessionBadgeIdsByGoalId = new Map<string, string>();
+  for (const session of input.agentGoalSessions.slice(0, 8)) {
+    const sessionId = agentGoalSessionBadgeId(session.goalId);
+    goalSessionBadgeIdsByGoalId.set(session.goalId, sessionId);
+    const latestCheckpoint = session.checkpoints.at(-1) ?? null;
+    const sessionEvidenceRefs = unique([
+      session.goalId,
+      ...session.sourceRefs,
+      ...session.loopRefs,
+      ...session.constructRefs,
+      ...(latestCheckpoint?.evidenceRefs ?? []),
+    ]);
+    pushBadge(badges, badge({
+      id: sessionId,
+      title: `Goal session: ${session.userVisibleSummary}`,
+      plainMeaning: "A durable agent goal session is tracking allowed context feeds and actuator bounds.",
+      whyItMatters: "Goal sessions let the agent inspect and steer deterministic workstation loops without becoming the long-running host.",
+      kind: "agent_goal_session",
+      status: session.status === "active" ? "observed" : session.status === "blocked" ? "blocked" : "stale",
+      subjects: unique([session.goalId, ...session.sourceRefs.slice(0, 6), ...session.loopRefs.slice(0, 6)]),
+      tags: [
+        "agent_goal_session",
+        session.status,
+        session.cadence.kind,
+        session.authority.finalReportsRequireTerminalAuthority ? "terminal_authority_required" : "terminal_authority_missing",
+      ],
+      sourceRefs: uniqueBy(
+        [
+          { kind: "agent_goal_session" as const, id: session.goalId },
+          ...session.sourceRefs.slice(0, 8).map((id) => ({ kind: "synthetic_evidence" as const, id })),
+        ],
+        (ref) => `${ref.kind}:${ref.id}`,
+      ),
+      evidenceRefs: sessionEvidenceRefs,
+      confidence: session.status === "active" ? 0.82 : session.status === "blocked" ? 0.58 : 0.5,
+      missingEvidence: session.authority.finalReportsRequireTerminalAuthority
+        ? []
+        : ["Final reports must require terminal authority."],
+      reasonCodes: ["agent_goal_session", "goal_directed_operator_context", "terminal_authority_required"],
+      dataTray: {
+        title: session.userVisibleSummary,
+        summary: `${session.contextFeeds.length} feed(s), ${session.allowedActuators.length} allowed actuator(s), ${session.checkpoints.length} checkpoint(s).`,
+        updatedAt: latestCheckpoint ? new Date(latestCheckpoint.createdAtMs).toISOString() : input.generatedAt,
+        freshness: session.status === "active" ? "fresh" : session.status === "blocked" ? "stale" : "unknown",
+        confidence: session.status === "active" ? 0.82 : session.status === "blocked" ? 0.58 : 0.5,
+        evidenceRefs: sessionEvidenceRefs,
+        inputRefs: session.contextFeeds.map((feed) => feed.sourceKind).slice(0, 10),
+        inputPreview: session.objective,
+        transformLabel: "agent goal session policy",
+        outputRefs: unique([session.goalId, ...(latestCheckpoint?.evidenceRefs ?? [])]).slice(0, 12),
+        outputPreview: latestCheckpoint?.summary ?? "awaiting first checkpoint",
+        skipped: session.stopConditions.slice(0, 4),
+        blockedUntil: session.authority.finalReportsRequireTerminalAuthority ? "completed solver path selects final report" : "terminal authority policy",
+      },
+      admission: "auto",
+    }));
+    pushEdge(edges, {
+      from: goalContextBusId,
+      to: sessionId,
+      relation: "contains",
+      label: "goal context bus contains active goal session",
+      evidenceRefs: sessionEvidenceRefs,
+      reasonCodes: ["goal_context_bus_contains_session"],
+    });
+  }
+
+  for (const update of input.goalContextUpdates.slice(0, 12)) {
+    const updateId = goalContextUpdateBadgeId(update.updateId);
+    const dispatchKinds = update.suggestedDispatch.map((action) => action.kind);
+    const updateEvidenceRefs = unique([
+      update.updateId,
+      update.contentRef,
+      ...update.evidenceRefs,
+      ...update.receiptRefs,
+      ...update.sourceRefs,
+      ...update.loopRefs,
+    ]);
+    pushBadge(badges, badge({
+      id: updateId,
+      title: `Goal update: ${update.updateKind.replace(/_/g, " ")}`,
+      plainMeaning: "A durable workstation goal-context update was recorded as evidence for future agent turns.",
+      whyItMatters: "These updates are the deterministic runtime substrate: queryable, freshness-aware, and explicitly non-terminal.",
+      kind: "goal_context_update",
+      status: update.freshness.status === "blocked" ? "blocked" : update.freshness.status === "stale" ? "stale" : "observed",
+      subjects: unique([update.updateId, update.contentRef, update.goalRelevance?.goalId, ...update.sourceRefs.slice(0, 6)].filter(isNonEmptyString)),
+      tags: [
+        "goal_context_update",
+        update.producerKind,
+        update.updateKind,
+        update.freshness.status,
+        ...dispatchKinds.map((kind) => `dispatch:${kind}`),
+      ],
+      sourceRefs: uniqueBy(
+        [
+          { kind: "workstation_goal_context_update" as const, id: update.updateId },
+          ...update.sourceRefs.slice(0, 8).map((id) => ({ kind: "synthetic_evidence" as const, id })),
+        ],
+        (ref) => `${ref.kind}:${ref.id}`,
+      ),
+      evidenceRefs: updateEvidenceRefs,
+      confidence: update.freshness.status === "fresh" ? 0.82 : update.freshness.status === "blocked" ? 0.58 : 0.66,
+      missingEvidence: update.freshness.status === "blocked" ? ["The update is blocked until its missing requirement is satisfied."] : [],
+      reasonCodes: ["goal_context_update", update.producerKind, update.updateKind, "observation_not_terminal_authority"],
+      dataTray: {
+        title: update.updateKind.replace(/_/g, " "),
+        summary: update.preview,
+        updatedAt: new Date(update.createdAtMs).toISOString(),
+        freshness: update.freshness.status,
+        confidence: update.freshness.status === "fresh" ? 0.82 : update.freshness.status === "blocked" ? 0.58 : 0.66,
+        evidenceRefs: updateEvidenceRefs,
+        inputRefs: unique([...update.sourceRefs, ...update.loopRefs]).slice(0, 10),
+        inputPreview: update.goalRelevance?.reason ?? update.contentRef,
+        transformLabel: `${update.producerKind} -> ${update.updateKind}`,
+        outputRefs: unique([update.contentRef, ...dispatchKinds]).slice(0, 12),
+        outputPreview: dispatchKinds.length > 0 ? `dispatch: ${dispatchKinds.join(", ")}` : "no dispatch suggested",
+        skipped: [
+          "assistant_answer=false",
+          "terminal_eligible=false",
+          "raw_content_included=false",
+        ],
+        blockedUntil: update.authority.postToolModelStepRequired ? "post-tool model step and terminal authority" : null,
+      },
+      admission: "auto",
+    }));
+    pushEdge(edges, {
+      from: goalContextBusId,
+      to: updateId,
+      relation: "contains",
+      label: "goal context bus contains update",
+      evidenceRefs: updateEvidenceRefs,
+      reasonCodes: ["goal_context_bus_contains_update"],
+    });
+    if (update.producerKind === "route_watch") {
+      pushEdge(edges, {
+        from: updateId,
+        to: controlId,
+        relation: "feeds",
+        label: "route-watch update feeds control signals",
+        evidenceRefs: updateEvidenceRefs,
+        reasonCodes: ["route_watch_update_feeds_control"],
+      });
+    }
+    if (dispatchKinds.includes("set_loop_state")) {
+      pushEdge(edges, {
+        from: updateId,
+        to: processLoopId,
+        relation: "feeds",
+        label: "goal-context dispatch updates process loop state",
+        evidenceRefs: updateEvidenceRefs,
+        reasonCodes: ["goal_context_dispatch_feeds_process_loop"],
+      });
+    }
+    const sessionId = update.goalRelevance?.goalId
+      ? goalSessionBadgeIdsByGoalId.get(update.goalRelevance.goalId)
+      : null;
+    if (sessionId) {
+      pushEdge(edges, {
+        from: updateId,
+        to: sessionId,
+        relation: "feeds",
+        label: "goal-context update feeds agent goal session",
+        evidenceRefs: updateEvidenceRefs,
+        reasonCodes: ["goal_context_update_feeds_session"],
+      });
+    }
+  }
 
   const runPromptIds = new Set(input.microReasoners.runs.map((run) => run.promptId).filter(isNonEmptyString));
   const circuitPrompts = uniqueBy(
@@ -1850,7 +2071,7 @@ const addWorkstationStatePlaneBadges = (
     }
   }
 
-  for (const childId of [sourceBusId, gateId, bufferId, processLoopId, outputBusId, controlId]) {
+  for (const childId of [sourceBusId, gateId, bufferId, processLoopId, outputBusId, controlId, goalContextBusId]) {
     pushEdge(edges, {
       from: rootId,
       to: childId,
@@ -2416,6 +2637,16 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     sourceWindow.environmentId ?? input.environmentId ?? null,
     input.sourceId ?? null,
   ])}`;
+  const graphGoalContextUpdates = listStagePlayGoalContextUpdates({
+    threadId: input.threadId,
+    sourceRef: input.sourceId ?? null,
+    limit: 24,
+  });
+  const graphAgentGoalSessions = listStagePlayAgentGoalSessions({
+    threadId: input.threadId,
+    sourceRef: input.sourceId ?? null,
+    limit: 12,
+  });
   const askCheckpointReceiptCandidate = input.askCheckpointReceipt ?? getLatestStagePlayAskCheckpointReceipt({
     threadId: input.threadId,
     roomId,
@@ -2533,6 +2764,8 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
       generatedAt: resolvedAt,
       checkpointFreshness,
       microReasoners: collectMicroReasonerState(sourceWindow.sources),
+      goalContextUpdates: graphGoalContextUpdates,
+      agentGoalSessions: graphAgentGoalSessions,
     });
     applyStagePlayProcessingSummaryTrays(missingBadges, {
       graphId,
@@ -3631,6 +3864,8 @@ export function buildStagePlayGraphFromWorld(input: BuildStagePlayGraphFromWorld
     generatedAt: resolvedAt,
     checkpointFreshness,
     microReasoners: collectMicroReasonerState(sourceWindow.sources),
+    goalContextUpdates: graphGoalContextUpdates,
+    agentGoalSessions: graphAgentGoalSessions,
   });
   applyStagePlayProcessingSummaryTrays(badges, {
     graphId,

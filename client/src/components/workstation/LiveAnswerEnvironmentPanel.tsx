@@ -79,6 +79,10 @@ import {
   type DisplayAudioTranscriptChunk,
 } from "@/lib/helix/display-audio-capture";
 import { postAudioTranscriptLiveSourceDescriptor } from "@/lib/helix/liveSourceDescriptorClient";
+import {
+  LiveAnswerReasoningCircuit,
+  type LiveAnswerReasoningCircuitRow,
+} from "./LiveAnswerReasoningCircuit";
 
 type LiveEnvironmentTab = "present_state" | "navigation_evidence" | "worker_lanes" | "line_checks" | "interpreted_log" | "clarification" | "live_cognition" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
 type VisualCaptureRoute = "live_answer" | "image_lens" | "audio_transcript";
@@ -111,15 +115,6 @@ type LiveAnswerMicroDeckCatalogGroup = {
   phase: LiveAnswerMicroDeckCatalogPhase;
   sourceKind: StagePlayLiveSourceMailSourceKindV1;
   items: LiveAnswerMicroDeckCatalogItem[];
-};
-type LiveAnswerReasoningCircuitRow = {
-  id: string;
-  title: string;
-  producer: string;
-  status: string;
-  preview: string;
-  contentRef: string;
-  dispatch: string[];
 };
 const VISUAL_CAPTURE_ROUTE_STORAGE_KEY = "helix.liveAnswer.visualCaptureRoutes.v1";
 const VISUAL_CAPTURE_ROUTE_SYNC_EVENT = "helix:live-answer:visual-capture-routes";
@@ -1669,6 +1664,9 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         status: update.freshness.status,
         preview: update.preview,
         contentRef: update.contentRef,
+        sourceRefs: update.sourceRefs,
+        loopRefs: update.loopRefs,
+        evidenceRefs: update.evidenceRefs,
         dispatch: update.suggestedDispatch.slice(0, 4).map(liveAnswerDispatchLabel),
       })),
     [goalContextUpdates],
@@ -4378,95 +4376,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             Client actions: {clientActions.length} pending; latest action {latestClientAction?.action ?? "none"}; latest adoption {latestClientAdoption?.ok ? "adopted" : latestClientAdoption ? "failed" : "none"}; stream {latestClientObserved.client_stream_confirmed === true ? "active" : latestClientObserved.client_stream_confirmed === false ? "missing" : "unknown"}; interval {latestClientObserved.interval_active === true ? "active" : latestClientObserved.interval_active === false ? "inactive" : "unknown"}; chunk {typeof latestClientObserved.latest_chunk_id === "string" ? latestClientObserved.latest_chunk_id : "none"}.
           </p>
         ) : null}
-        <div className="order-13 mt-3 rounded border border-violet-300/20 bg-violet-950/10 px-2 py-2" data-testid="live-answer-reasoning-circuit">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase text-violet-100">Reasoning circuit</p>
-              <p className="mt-0.5 text-[11px] text-slate-400">
-                Stage Play goal context mirrored into Live Answer as observation state.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              <span className="rounded border border-violet-300/20 px-2 py-1 font-mono text-[10px] text-violet-100">
-                {liveAnswerCircuitSummary.updateCount} updates
-              </span>
-              <span className="rounded border border-emerald-300/20 px-2 py-1 font-mono text-[10px] text-emerald-100">
-                {liveAnswerCircuitSummary.activeGoalCount} goals
-              </span>
-              <span className="rounded border border-cyan-300/20 px-2 py-1 font-mono text-[10px] text-cyan-100">
-                {liveAnswerCircuitSummary.narratorSpeechCount} narrator speech
-              </span>
-              <span className="rounded border border-cyan-300/20 px-2 py-1 font-mono text-[10px] text-cyan-100" data-testid="live-answer-narrator-binding-count">
-                {liveAnswerCircuitSummary.narratorBindingCount} narrator bindings
-              </span>
-              <span className="rounded border border-amber-300/20 px-2 py-1 font-mono text-[10px] text-amber-100">
-                {liveAnswerCircuitSummary.wakeCount} wake
-              </span>
-              <span className="rounded border border-violet-300/20 px-2 py-1 font-mono text-[10px] text-violet-100" data-testid="live-answer-observation-authority-count">
-                {liveAnswerCircuitSummary.observationOnlyCount} observation-only
-              </span>
-              <span className="rounded border border-rose-300/20 px-2 py-1 font-mono text-[10px] text-rose-100" data-testid="live-answer-terminal-authority-count">
-                {liveAnswerCircuitSummary.terminalAuthorityRequiredCount} terminal authority
-              </span>
-            </div>
-          </div>
-          <div className="mt-2 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(220px,280px)]">
-            <div className="grid gap-1.5 md:grid-cols-2 xl:grid-cols-3">
-              {liveAnswerCircuitRows.length > 0 ? liveAnswerCircuitRows.map((row: LiveAnswerReasoningCircuitRow) => (
-                <div key={row.id} className="min-w-0 rounded border border-violet-300/15 bg-black/25 px-2 py-1.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-[11px] font-semibold text-violet-50">{row.title}</span>
-                    <span className="shrink-0 font-mono text-[10px] text-violet-200/70">{row.status}</span>
-                  </div>
-                  <p className="mt-0.5 truncate font-mono text-[10px] text-slate-500">{row.producer} / {row.contentRef}</p>
-                  <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-300">{row.preview}</p>
-                  <div className="mt-1.5 flex flex-wrap gap-1" data-testid="live-answer-goal-context-authority-chips">
-                    <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">assistant=false</span>
-                    <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">terminal=false</span>
-                    <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">raw=false</span>
-                  </div>
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {row.dispatch.length > 0 ? row.dispatch.map((dispatch: string) => (
-                      <span key={`${row.id}:${dispatch}`} className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-300">
-                        {dispatch}
-                      </span>
-                    )) : (
-                      <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">
-                        no dispatch
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )) : (
-                <p className="rounded border border-white/10 bg-black/20 px-2 py-2 text-[11px] text-slate-500">
-                  No goal-context updates have been mirrored yet.
-                </p>
-              )}
-            </div>
-            <div className="rounded border border-white/10 bg-black/20 p-2">
-              <p className="text-[10px] font-semibold uppercase text-slate-300">Authority posture</p>
-              <p className="mt-1 text-xs text-violet-100">{liveAnswerCircuitSummary.terminalPosture}</p>
-              <p className="mt-1 font-mono text-[10px] text-slate-400">
-                observation_only={liveAnswerCircuitSummary.observationOnlyCount} narrator_bindings={liveAnswerCircuitSummary.narratorBindingCount} terminal_authority_sessions={liveAnswerCircuitSummary.terminalAuthorityRequiredCount}
-              </p>
-              <p className="mt-1 text-[11px] leading-5 text-slate-500">
-                Receipts, MicroDeck outputs, narrator bindings, and panel projections stay evidence until the completed solver path selects a terminal answer.
-              </p>
-              <div className="mt-2 flex flex-wrap gap-1">
-                {agentGoalSessions.slice(0, 3).map((session: AgentGoalSessionV1) => (
-                  <span key={session.goalId} className="rounded border border-violet-300/15 px-1.5 py-0.5 font-mono text-[10px] text-violet-100">
-                    {compactLabel(session.status)} / {session.contextFeeds.length} feeds
-                  </span>
-                ))}
-                {agentGoalSessions.length === 0 ? (
-                  <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">
-                    no active session
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        </div>
+        <LiveAnswerReasoningCircuit
+          rows={liveAnswerCircuitRows}
+          summary={liveAnswerCircuitSummary}
+          sessions={agentGoalSessions}
+        />
       </div>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {tabs.map((tab: { id: LiveEnvironmentTab; label: string }) => (

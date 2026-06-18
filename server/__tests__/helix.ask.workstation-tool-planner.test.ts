@@ -924,6 +924,7 @@ describe("Helix Ask workstation tool planner", () => {
           "query_microdeck_outputs",
           "query_live_answer_state",
           "query_source_health",
+          "configure_route_watch",
           "set_audio_preset",
           "set_visual_preset",
           "change_preset",
@@ -1032,6 +1033,19 @@ describe("Helix Ask workstation tool planner", () => {
   });
 
   it("routes feed-specific workstation context prompts to the matching live-env query", () => {
+    const visualPlan = planWorkstationToolUse(
+      "Read the latest visual summaries for the active live source.",
+      { threadId: "thread:visual-feed", turnId: "turn:visual-feed" },
+    );
+    expect(visualPlan.intent).toBe("workstation_goal_context");
+    expect(visualPlan.tool_plan?.steps[0]).toMatchObject({
+      step_id: "query_visual_summaries",
+      kind: "run_ask_tool",
+      tool_id: "live_env.query_visual_summaries",
+      expected_receipt_kind: "stage_play_workstation_context_feed_query_result",
+      required: true,
+    });
+
     const audioPlan = planWorkstationToolUse(
       "Read the latest audio transcripts for the active live source.",
       { threadId: "thread:audio-feed", turnId: "turn:audio-feed" },
@@ -1045,6 +1059,19 @@ describe("Helix Ask workstation tool planner", () => {
       required: true,
     });
 
+    const translationPlan = planWorkstationToolUse(
+      "Show translated transcript segments for the earbuds source.",
+      { threadId: "thread:translation-feed", turnId: "turn:translation-feed" },
+    );
+    expect(translationPlan.intent).toBe("workstation_goal_context");
+    expect(translationPlan.tool_plan?.steps[0]).toMatchObject({
+      step_id: "query_translation_segments",
+      kind: "run_ask_tool",
+      tool_id: "live_env.query_translation_segments",
+      expected_receipt_kind: "stage_play_workstation_context_feed_query_result",
+      required: true,
+    });
+
     const microDeckPlan = planWorkstationToolUse(
       "Show MicroDeck outputs for the frog-classification goal context.",
       { threadId: "thread:microdeck-feed", turnId: "turn:microdeck-feed" },
@@ -1054,6 +1081,19 @@ describe("Helix Ask workstation tool planner", () => {
       step_id: "query_microdeck_outputs",
       kind: "run_ask_tool",
       tool_id: "live_env.query_microdeck_outputs",
+      expected_receipt_kind: "stage_play_workstation_context_feed_query_result",
+      required: true,
+    });
+
+    const liveAnswerPlan = planWorkstationToolUse(
+      "Read the Live Answer state lines for the active goal.",
+      { threadId: "thread:live-answer-feed", turnId: "turn:live-answer-feed" },
+    );
+    expect(liveAnswerPlan.intent).toBe("workstation_goal_context");
+    expect(liveAnswerPlan.tool_plan?.steps[0]).toMatchObject({
+      step_id: "query_live_answer_state",
+      kind: "run_ask_tool",
+      tool_id: "live_env.query_live_answer_state",
       expected_receipt_kind: "stage_play_workstation_context_feed_query_result",
       required: true,
     });
@@ -1077,45 +1117,104 @@ describe("Helix Ask workstation tool planner", () => {
   });
 
   it("routes affirmative workstation control prompts to governed control receipts", () => {
-    const presetPlan = planWorkstationToolUse(
-      "Run live_env.change_workstation_preset goal_id=goal:frog target_ref=source:visual:active preset_id=preset:frog-classifier",
-      { threadId: "thread:workstation-control", turnId: "turn:workstation-control" },
-    );
-    expect(presetPlan.intent).toBe("workstation_control");
-    expect(presetPlan.should_use_tool).toBe(true);
-    expect(presetPlan.missing_required_args).toEqual([]);
-    expect(presetPlan.tool_plan?.steps.map((step) => step.tool_id ?? `${step.panel_id}.${step.action_id}`)).toEqual([
-      "live_env.change_workstation_preset",
-      "undefined.undefined",
-    ]);
-    expect(presetPlan.tool_plan?.steps[0]).toMatchObject({
-      step_id: "change_workstation_preset",
-      kind: "run_ask_tool",
-      tool_id: "live_env.change_workstation_preset",
-      args: expect.objectContaining({
-        goal_id: "goal:frog",
-        target_ref: "source:visual:active",
-        preset_id: "preset:frog-classifier",
-      }),
-      expected_receipt_kind: "stage_play_workstation_control_receipt",
-      required: true,
-    });
+    const cases = [
+      {
+        prompt: "Run live_env.change_workstation_preset goal_id=goal:frog target_ref=source:visual:active preset_id=preset:frog-classifier",
+        turnId: "turn:change-preset",
+        stepId: "change_workstation_preset",
+        toolId: "live_env.change_workstation_preset",
+        args: {
+          goal_id: "goal:frog",
+          target_ref: "source:visual:active",
+          preset_id: "preset:frog-classifier",
+        },
+      },
+      {
+        prompt: "Run live_env.bind_workstation_source goal_id=goal:frog source_ref=source:visual:active target_ref=live-answer:visual",
+        turnId: "turn:bind-source",
+        stepId: "bind_workstation_source",
+        toolId: "live_env.bind_workstation_source",
+        args: {
+          goal_id: "goal:frog",
+          source_ref: "source:visual:active",
+          target_ref: "live-answer:visual",
+        },
+      },
+      {
+        prompt: "Run live_env.unbind_workstation_source goal_id=goal:frog source_ref=source:visual:active",
+        turnId: "turn:unbind-source",
+        stepId: "unbind_workstation_source",
+        toolId: "live_env.unbind_workstation_source",
+        args: {
+          goal_id: "goal:frog",
+          source_ref: "source:visual:active",
+        },
+      },
+      {
+        prompt: "Run live_env.set_workstation_loop_state goal_id=goal:frog loop_ref=loop:visual-mail state=paused",
+        turnId: "turn:pause-loop",
+        stepId: "set_workstation_loop_state",
+        toolId: "live_env.set_workstation_loop_state",
+        args: {
+          goal_id: "goal:frog",
+          loop_ref: "loop:visual-mail",
+          state: "paused",
+        },
+      },
+      {
+        prompt: "Run live_env.update_live_answer_projection goal_id=goal:frog line_key=translation",
+        turnId: "turn:update-live-answer",
+        stepId: "update_live_answer_projection",
+        toolId: "live_env.update_live_answer_projection",
+        args: {
+          goal_id: "goal:frog",
+          line_key: "translation",
+        },
+      },
+      {
+        prompt: "Focus the process graph node_ref=packet:visual-frog",
+        turnId: "turn:focus-process-graph",
+        stepId: "focus_process_graph",
+        toolId: "live_env.focus_process_graph",
+        args: {
+          node_ref: "packet:visual-frog",
+        },
+      },
+    ];
 
-    const focusPlan = planWorkstationToolUse(
-      "Focus the process graph node_ref=packet:visual-frog",
-      { threadId: "thread:workstation-control", turnId: "turn:focus-process-graph" },
-    );
-    expect(focusPlan.intent).toBe("workstation_control");
-    expect(focusPlan.tool_plan?.steps[0]).toMatchObject({
-      step_id: "focus_process_graph",
-      kind: "run_ask_tool",
-      tool_id: "live_env.focus_process_graph",
-      args: expect.objectContaining({
-        node_ref: "packet:visual-frog",
-      }),
-      expected_receipt_kind: "stage_play_workstation_control_receipt",
-      required: true,
-    });
+    for (const testCase of cases) {
+      const plan = planWorkstationToolUse(
+        testCase.prompt,
+        { threadId: "thread:workstation-control", turnId: testCase.turnId },
+      );
+      expect(plan.intent).toBe("workstation_control");
+      expect(plan.should_use_tool).toBe(true);
+      expect(plan.missing_required_args).toEqual([]);
+      expect(plan.action).toBeNull();
+      expect(plan.tool_plan?.steps.map((step) => step.tool_id ?? `${step.panel_id}.${step.action_id}`)).toEqual([
+        testCase.toolId,
+        "undefined.undefined",
+      ]);
+      expect(plan.tool_plan?.steps[0]).toMatchObject({
+        step_id: testCase.stepId,
+        kind: "run_ask_tool",
+        tool_id: testCase.toolId,
+        args: expect.objectContaining(testCase.args),
+        expected_receipt_kind: "stage_play_workstation_control_receipt",
+        expected_state_change: {
+          store: "stage-play-goal-context",
+          proof_key: "goalContextUpdates",
+        },
+        required: true,
+      });
+      expect(plan.tool_plan?.steps[1]).toMatchObject({
+        step_id: "evaluate_workstation_control_receipt",
+        kind: "evaluate_result",
+        depends_on: [testCase.stepId],
+        expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+        required: true,
+      });
+    }
   });
 
   it("does not execute contextual, negated, or hypothetical workstation control mentions", () => {

@@ -301,6 +301,15 @@ const runtimeLoopExecutedCapability = (payload: RecordLike): string | null => {
     ? loop.iterations.map((iteration) => readRecord(iteration)).filter((iteration): iteration is RecordLike => Boolean(iteration))
     : [];
   for (const iteration of [...iterations].reverse()) {
+    const chosen = readString(iteration.chosen_capability);
+    const producedArtifacts = readStringArray(iteration.produced_artifacts);
+    if (
+      chosen &&
+      isModelAnswerCapability(chosen) &&
+      producedArtifacts.some((artifactKind) => normalizedEqual(artifactKind, "direct_answer_text"))
+    ) {
+      return chosen;
+    }
     const executed = nonModelToolCapability(iteration.executed_action_key);
     if (executed) return executed;
   }
@@ -857,9 +866,15 @@ const buildToolTurnChainAudit = (input: {
   const visibleTerminal = visibleTerminalKind(input.payload);
   const staleDebugMirrors = staleTerminalDebugMirrors(input.payload, authorityTerminal);
   const finalDraftRef = finalAnswerDraftRef(input.payload, input.artifacts);
+  const modelDirectAnswerMaterialized = Boolean(
+    normalizedEqual(selectedCapability, "model.direct_answer") &&
+      input.artifacts.some((artifact) => observationKindMatches(artifact, "direct_answer_text")) &&
+      (!requiredTerminal || normalizedEqual(requiredTerminal, "direct_answer_text")),
+  );
   const reentryExecuted =
     readString(input.lifecycleTrace?.lifecycle_stage) === "reentered_solver" ||
     readBoolean(input.followupDecision?.evidence_reentered) ||
+    modelDirectAnswerMaterialized ||
     Boolean(observationRef && supportCount > 0 && finalDraftRef);
   const expectedReentry = expectedReentryCapability(
     input.contract,

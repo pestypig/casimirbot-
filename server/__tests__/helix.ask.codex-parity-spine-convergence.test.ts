@@ -181,132 +181,182 @@ beforeEach(() => {
   resetStagePlayLiveSourceMailWakeStoreForTest();
 });
 
+const EXPLICIT_CAPABILITY_SCENARIOS: ExplicitCapabilityScenario[] = [
+  {
+    id: "calculator",
+    prompt:
+      "Call scientific-calculator.solve_expression with this exact expression: 2 + 2. Wait for calculator_receipt and answer from workstation_tool_evaluation.",
+    requestedCapability: "scientific-calculator.solve_expression",
+    expected: {
+      visibleToolSurface: ["scientific-calculator.solve_expression"],
+      executedCapability: "scientific-calculator.solve_expression",
+      observationKind: "calculator_receipt",
+      reentryStatus: "reentered",
+      goalSatisfaction: "satisfied",
+      requiredTerminalKind: "workstation_tool_evaluation",
+      selectedTerminalKind: "workstation_tool_evaluation",
+      visibleTerminalKind: "workstation_tool_evaluation",
+      railStatus: "complete",
+      codexParityClass: "complete",
+      railFailureCode: null,
+      firstBrokenRail: null,
+      repairTarget: null,
+    },
+  },
+  {
+    id: "workspace_status",
+    prompt: "Use workspace_os.status to inspect workstation status.",
+    requestedCapability: "workspace_os.status",
+    expected: {
+      visibleToolSurface: ["workspace_os.status"],
+      executedCapability: "workspace_os.status",
+      observationKind: "workspace_os_status_observation",
+      reentryStatus: "reentered",
+      goalSatisfaction: "satisfied",
+      requiredTerminalKind: "model_synthesized_answer",
+      selectedTerminalKind: "model_synthesized_answer",
+      visibleTerminalKind: "model_synthesized_answer",
+      railStatus: "complete",
+      codexParityClass: "complete",
+      railFailureCode: null,
+      firstBrokenRail: null,
+      repairTarget: null,
+    },
+  },
+  {
+    id: "docs_locate",
+    prompt: "Use docs-viewer.locate_in_doc to locate the rule of thumb in docs/helix-ask-codex-loop-discipline.md.",
+    requestedCapability: "docs-viewer.locate_in_doc",
+    expected: {
+      visibleToolSurface: ["docs-viewer.locate_in_doc"],
+      executedCapability: "docs-viewer.locate_in_doc",
+      observationKind: "doc_location_matches",
+      reentryStatus: "reentered",
+      goalSatisfaction: "satisfied",
+      requiredTerminalKind: "doc_location_matches",
+      selectedTerminalKind: "typed_failure",
+      visibleTerminalKind: "typed_failure",
+      railStatus: "fail_closed",
+      codexParityClass: "goal_contract_mismatch",
+      railFailureCode: "terminal_not_materialized",
+      firstBrokenRail: "terminal_materialization",
+      repairTarget: "terminal_materializer",
+    },
+  },
+  {
+    id: "repo_search",
+    prompt: "Use repo-code.search_concept to find where terminal authority selects the answer.",
+    requestedCapability: "repo-code.search_concept",
+    expected: {
+      visibleToolSurface: ["repo-code.search_concept"],
+      executedCapability: "repo-code.search_concept",
+      observationKind: "repo_code_evidence_observation",
+      reentryStatus: "reentered",
+      goalSatisfaction: "not_satisfied",
+      requiredTerminalKind: "repo_code_evidence_answer",
+      selectedTerminalKind: "typed_failure",
+      visibleTerminalKind: "typed_failure",
+      railStatus: "fail_closed",
+      codexParityClass: "observation_not_reentered",
+      railFailureCode: "weak_evidence_repair_loop",
+      firstBrokenRail: "evidence_reentry",
+      repairTarget: "repo_retrieval_repair_policy",
+    },
+  },
+  {
+    id: "internet_search",
+    prompt: "Use internet_search.web_research to find current public evidence about OpenAI Codex.",
+    requestedCapability: "internet_search.web_research",
+    expected: {
+      visibleToolSurface: ["internet_search.web_research"],
+      selectedCapability: "internet-search.search_web",
+      admittedCapability: "internet-search.search_web",
+      executedCapability: "internet-search.search_web",
+      observationKind: "internet_search_observation",
+      reentryStatus: "reentered",
+      goalSatisfaction: "not_satisfied",
+      requiredTerminalKind: "internet_search_answer",
+      selectedTerminalKind: "typed_failure",
+      visibleTerminalKind: "typed_failure",
+      railStatus: "fail_closed",
+      codexParityClass: "provider_config_missing",
+      railFailureCode: "config_missing",
+      firstBrokenRail: "config",
+      repairTarget: "operator_config",
+    },
+  },
+  {
+    id: "live_source_mail",
+    prompt: "Use live_env.read_processed_live_source_mail to inspect the latest processed live-source mail.",
+    requestedCapability: "live_env.read_processed_live_source_mail",
+    expected: {
+      visibleToolSurface: ["live_env.read_processed_live_source_mail"],
+      executedCapability: "live_env.read_processed_live_source_mail",
+      observationKind: "reasoning_context",
+      reentryStatus: "reentered",
+      goalSatisfaction: "not_satisfied",
+      requiredTerminalKind: "model_synthesized_answer",
+      selectedTerminalKind: "typed_failure",
+      visibleTerminalKind: "typed_failure",
+      railStatus: "fail_closed",
+      codexParityClass: "observation_missing",
+      railFailureCode: "required_observation_missing",
+      firstBrokenRail: "observation_artifact",
+      repairTarget: "observation_materializer",
+    },
+  },
+];
+
+const CONVERGENCE_COVERAGE_IDS = [
+  ...EXPLICIT_CAPABILITY_SCENARIOS.map((scenario) => scenario.id),
+  "capability_catalog",
+  "negated_contextual_tool_mentions",
+  "visual_capture",
+  "image_lens",
+] as const;
+
 describe("Helix Ask Codex-parity agent spine convergence", () => {
-  it.each<ExplicitCapabilityScenario>([
-    {
-      id: "calculator",
-      prompt:
-        "Call scientific-calculator.solve_expression with this exact expression: 2 + 2. Wait for calculator_receipt and answer from workstation_tool_evaluation.",
-      requestedCapability: "scientific-calculator.solve_expression",
-      expected: {
-        visibleToolSurface: ["scientific-calculator.solve_expression"],
-        executedCapability: "scientific-calculator.solve_expression",
-        observationKind: "calculator_receipt",
-        reentryStatus: "reentered",
-        goalSatisfaction: "satisfied",
-        requiredTerminalKind: "workstation_tool_evaluation",
-        selectedTerminalKind: "workstation_tool_evaluation",
-        visibleTerminalKind: "workstation_tool_evaluation",
-        railStatus: "complete",
-        codexParityClass: "complete",
-        railFailureCode: null,
-        firstBrokenRail: null,
-        repairTarget: null,
-      },
-    },
-    {
-      id: "workspace_status",
-      prompt: "Use workspace_os.status to inspect workstation status.",
-      requestedCapability: "workspace_os.status",
-      expected: {
-        visibleToolSurface: ["workspace_os.status"],
-        executedCapability: "workspace_os.status",
-        observationKind: "workspace_os_status_observation",
-        reentryStatus: "reentered",
-        goalSatisfaction: "satisfied",
-        requiredTerminalKind: "model_synthesized_answer",
-        selectedTerminalKind: "model_synthesized_answer",
-        visibleTerminalKind: "model_synthesized_answer",
-        railStatus: "complete",
-        codexParityClass: "complete",
-        railFailureCode: null,
-        firstBrokenRail: null,
-        repairTarget: null,
-      },
-    },
-    {
-      id: "docs_locate",
-      prompt: "Use docs-viewer.locate_in_doc to locate the rule of thumb in docs/helix-ask-codex-loop-discipline.md.",
-      requestedCapability: "docs-viewer.locate_in_doc",
-      expected: {
-        visibleToolSurface: ["docs-viewer.locate_in_doc"],
-        executedCapability: "docs-viewer.locate_in_doc",
-        observationKind: "doc_location_matches",
-        reentryStatus: "reentered",
-        goalSatisfaction: "satisfied",
-        requiredTerminalKind: "doc_location_matches",
-        selectedTerminalKind: "typed_failure",
-        visibleTerminalKind: "typed_failure",
-        railStatus: "fail_closed",
-        codexParityClass: "goal_contract_mismatch",
-        railFailureCode: "terminal_not_materialized",
-        firstBrokenRail: "terminal_materialization",
-        repairTarget: "terminal_materializer",
-      },
-    },
-    {
-      id: "repo_search",
-      prompt: "Use repo-code.search_concept to find where terminal authority selects the answer.",
-      requestedCapability: "repo-code.search_concept",
-      expected: {
-        visibleToolSurface: ["repo-code.search_concept"],
-        executedCapability: "repo-code.search_concept",
-        observationKind: "repo_code_evidence_observation",
-        reentryStatus: "reentered",
-        goalSatisfaction: "not_satisfied",
-        requiredTerminalKind: "repo_code_evidence_answer",
-        selectedTerminalKind: "typed_failure",
-        visibleTerminalKind: "typed_failure",
-        railStatus: "fail_closed",
-        codexParityClass: "observation_not_reentered",
-        railFailureCode: "weak_evidence_repair_loop",
-        firstBrokenRail: "evidence_reentry",
-        repairTarget: "repo_retrieval_repair_policy",
-      },
-    },
-    {
-      id: "internet_search",
-      prompt: "Use internet_search.web_research to find current public evidence about OpenAI Codex.",
-      requestedCapability: "internet_search.web_research",
-      expected: {
-        visibleToolSurface: ["internet_search.web_research"],
-        selectedCapability: "internet-search.search_web",
-        admittedCapability: "internet-search.search_web",
-        executedCapability: "internet-search.search_web",
-        observationKind: "internet_search_observation",
-        reentryStatus: "reentered",
-        goalSatisfaction: "not_satisfied",
-        requiredTerminalKind: "internet_search_answer",
-        selectedTerminalKind: "typed_failure",
-        visibleTerminalKind: "typed_failure",
-        railStatus: "fail_closed",
-        codexParityClass: "provider_config_missing",
-        railFailureCode: "config_missing",
-        firstBrokenRail: "config",
-        repairTarget: "operator_config",
-      },
-    },
-    {
-      id: "live_source_mail",
-      prompt: "Use live_env.read_processed_live_source_mail to inspect the latest processed live-source mail.",
-      requestedCapability: "live_env.read_processed_live_source_mail",
-      expected: {
-        visibleToolSurface: ["live_env.read_processed_live_source_mail"],
-        executedCapability: "live_env.read_processed_live_source_mail",
-        observationKind: "reasoning_context",
-        reentryStatus: "reentered",
-        goalSatisfaction: "not_satisfied",
-        requiredTerminalKind: "model_synthesized_answer",
-        selectedTerminalKind: "typed_failure",
-        visibleTerminalKind: "typed_failure",
-        railStatus: "fail_closed",
-        codexParityClass: "observation_missing",
-        railFailureCode: "required_observation_missing",
-        firstBrokenRail: "observation_artifact",
-        repairTarget: "observation_materializer",
-      },
-    },
-  ])("$id explicit capability is reflected in the API/debug rail table", async (scenario) => {
+  it("keeps explicit convergence coverage for required tool families and failure classes", () => {
+    expect([...CONVERGENCE_COVERAGE_IDS]).toEqual(
+      expect.arrayContaining([
+        "calculator",
+        "workspace_status",
+        "docs_locate",
+        "repo_search",
+        "internet_search",
+        "live_source_mail",
+        "capability_catalog",
+        "negated_contextual_tool_mentions",
+        "visual_capture",
+        "image_lens",
+      ]),
+    );
+
+    const requestedCapabilities = EXPLICIT_CAPABILITY_SCENARIOS.map((scenario) => scenario.requestedCapability);
+    expect(requestedCapabilities).toEqual(
+      expect.arrayContaining([
+        "scientific-calculator.solve_expression",
+        "workspace_os.status",
+        "docs-viewer.locate_in_doc",
+        "repo-code.search_concept",
+        "internet_search.web_research",
+        "live_env.read_processed_live_source_mail",
+      ]),
+    );
+
+    const expectedClasses = Array.from(new Set(EXPLICIT_CAPABILITY_SCENARIOS.map((scenario) => scenario.expected.codexParityClass)));
+    expect(expectedClasses).toEqual(
+      expect.arrayContaining([
+        "complete",
+        "goal_contract_mismatch",
+        "observation_not_reentered",
+        "provider_config_missing",
+        "observation_missing",
+      ]),
+    );
+  });
+
+  it.each<ExplicitCapabilityScenario>(EXPLICIT_CAPABILITY_SCENARIOS)("$id explicit capability is reflected in the API/debug rail table", async (scenario) => {
     const { turnRail } = await fetchRailTable({
       app: createApp(),
       prompt: scenario.prompt,
@@ -360,11 +410,32 @@ describe("Helix Ask Codex-parity agent spine convergence", () => {
     expect(turnRail.visible_tool_surface).toEqual(expect.arrayContaining(["model.direct_answer"]));
     expect(turnRail.visible_tool_surface).not.toContain("repo-code.search_concept");
     expect(turnRail.selected_capability).toBe("model.direct_answer");
-    expect(turnRail.admitted_capability).toBe("model_only");
-    expect(turnRail.executed_capability).not.toBe("scientific-calculator.solve_expression");
-    expect(turnRail.executed_capability).not.toBe("repo-code.search_concept");
+    expect(turnRail.admitted_capability).toBe("model.direct_answer");
+    expect(turnRail.executed_capability).toBe("model.direct_answer");
     expect(turnRail.required_terminal_kind).toBe("direct_answer_text");
-    expect(turnRail.rail_failure_code).not.toBe("tool_admission_drift");
+    expect(turnRail.selected_terminal_kind).toBe("direct_answer_text");
+    expect(turnRail.visible_terminal_kind).toBe("direct_answer_text");
+    expect(turnRail.codex_parity_class).toBe("complete");
+  }, 60_000);
+
+  it("does not let a negated calculator reference suppress an explicit repo capability", async () => {
+    const { turnRail } = await fetchRailTable({
+      app: createApp(),
+      prompt:
+        "Do not call scientific-calculator.solve_expression. Use repo-code.search_concept to find where terminal authority selects the answer.",
+      sessionId: `helix-ask:spine-convergence:negated-calculator-explicit-repo:${Date.now()}`,
+    });
+
+    expect(turnRail.requested_capability).toBe("repo-code.search_concept");
+    expect(turnRail.visible_tool_surface).toEqual(expect.arrayContaining(["repo-code.search_concept"]));
+    expect(turnRail.selected_capability).toBe("repo-code.search_concept");
+    expect(turnRail.admitted_capability).toBe("repo-code.search_concept");
+    expect(turnRail.executed_capability).toBe("repo-code.search_concept");
+    expect(turnRail.executed_capability).not.toBe("scientific-calculator.solve_expression");
+    expect(turnRail.observation_kind).toBe("repo_code_evidence_observation");
+    expect(turnRail.required_terminal_kind).toBe("repo_code_evidence_answer");
+    expect(turnRail.codex_parity_class).not.toBe("explicit_capability_demoted");
+    expect(turnRail.codex_parity_class).not.toBe("tool_admission_rejected");
   }, 60_000);
 
   it("routes current-screen visual questions through visual capture evidence", async () => {

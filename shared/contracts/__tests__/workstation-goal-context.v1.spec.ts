@@ -1,14 +1,33 @@
 import { describe, expect, it } from "vitest";
 import {
+  WORKSTATION_AGENT_GOAL_ACTUATORS,
+  WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS,
   WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
+  WORKSTATION_GOAL_CONTEXT_PRODUCER_KINDS,
   WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
+  WORKSTATION_GOAL_CONTEXT_UPDATE_KINDS,
   type AgentGoalSessionV1,
+  type GoalContextProducerKindV1,
+  type GoalContextUpdateKindV1,
   type WorkstationGoalContextUpdateV1,
   validateAgentGoalSessionV1,
   validateWorkstationGoalContextUpdateV1,
 } from "../workstation-goal-context.v1";
 
 describe("workstation goal context contract", () => {
+  const canonicalUpdateKindByProducer: Record<GoalContextProducerKindV1, GoalContextUpdateKindV1> = {
+    visual_capture: "visual_observation",
+    audio_capture: "summary",
+    transcription_loop: "transcript_window",
+    translation_loop: "translated_transcript",
+    microdeck: "classification",
+    reflection: "reflection",
+    live_answer: "summary",
+    source_health: "source_status",
+    route_watch: "route_evidence",
+    narrator: "suggested_action",
+  };
+
   const update: WorkstationGoalContextUpdateV1 = {
     schemaVersion: WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
     updateId: "goal_context_update:visual:1",
@@ -72,6 +91,7 @@ describe("workstation goal context contract", () => {
       "query_microdeck_outputs",
       "query_live_answer_state",
       "query_source_health",
+      "configure_route_watch",
       "set_visual_preset",
       "bind_source",
       "unbind_source",
@@ -103,6 +123,36 @@ describe("workstation goal context contract", () => {
 
   it("accepts goal-context updates as non-terminal workstation evidence", () => {
     expect(validateWorkstationGoalContextUpdateV1(update)).toEqual([]);
+  });
+
+  it("accepts every deterministic producer as source-linked non-terminal goal context", () => {
+    for (const producerKind of WORKSTATION_GOAL_CONTEXT_PRODUCER_KINDS) {
+      expect(validateWorkstationGoalContextUpdateV1({
+        ...update,
+        updateId: `goal_context_update:${producerKind}:1`,
+        producerKind,
+        updateKind: canonicalUpdateKindByProducer[producerKind],
+        contentRef: `${producerKind}:content:1`,
+        sourceRefs: [`${producerKind}:source:1`],
+        loopRefs: [`${producerKind}:loop:1`],
+        evidenceRefs: [`${producerKind}:evidence:1`],
+        receiptRefs: [`${producerKind}:receipt:1`],
+        preview: `${producerKind} produced an observation for the active goal.`,
+      })).toEqual([]);
+    }
+  });
+
+  it("keeps the full update-kind vocabulary valid for observation records", () => {
+    for (const updateKind of WORKSTATION_GOAL_CONTEXT_UPDATE_KINDS) {
+      expect(validateWorkstationGoalContextUpdateV1({
+        ...update,
+        updateId: `goal_context_update:${updateKind}:1`,
+        updateKind,
+        contentRef: `${updateKind}:content:1`,
+        evidenceRefs: [`${updateKind}:evidence:1`],
+        preview: `${updateKind} observation for the workstation reasoning circuit.`,
+      })).toEqual([]);
+    }
   });
 
   it("rejects goal-context updates that try to become terminal answers", () => {
@@ -142,6 +192,18 @@ describe("workstation goal context contract", () => {
     expect(validateAgentGoalSessionV1(goal)).toEqual([]);
   });
 
+  it("accepts the complete query and actuator vocabulary for durable goal sessions", () => {
+    expect(validateAgentGoalSessionV1({
+      ...goal,
+      contextFeeds: WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS.map((sourceKind) => ({
+        feedId: `feed:${sourceKind}`,
+        sourceKind,
+        freshnessMs: 30_000,
+      })),
+      allowedActuators: [...WORKSTATION_AGENT_GOAL_ACTUATORS],
+    })).toEqual([]);
+  });
+
   it("rejects goal sessions with unknown context feeds, actuator names, or invalid feed freshness", () => {
     expect(validateAgentGoalSessionV1({
       ...goal,
@@ -160,7 +222,7 @@ describe("workstation goal context contract", () => {
     })).toEqual(expect.arrayContaining([
       "contextFeeds[1].sourceKind is invalid",
       "contextFeeds[1].freshnessMs must be a positive number",
-      "allowedActuators[16] is invalid",
+      "allowedActuators[17] is invalid",
     ]));
   });
 

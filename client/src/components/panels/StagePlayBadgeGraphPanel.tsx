@@ -1387,7 +1387,9 @@ function laneForBadge(badge: StagePlayBadgeV1): StagePlayLaneId {
     badge.kind === "compact_observation" ||
     badge.kind === "fusion" ||
     badge.kind === "interpreter" ||
-    badge.kind === "workstation_state_plane"
+    badge.kind === "workstation_state_plane" ||
+    badge.kind === "goal_context_update" ||
+    badge.kind === "agent_goal_session"
   ) {
     return "compact_observation";
   }
@@ -1565,6 +1567,8 @@ function badgeActionLine(badge: StagePlayBadgeV1): string {
   if (badge.kind === "observer") return "Source custody and routing";
   if (badge.kind === "source") return "Routed live source";
   if (badge.kind === "workstation_state_plane") return "Workstation state plane";
+  if (badge.kind === "goal_context_update") return "Goal context update";
+  if (badge.kind === "agent_goal_session") return "Agent goal session";
   if (badge.kind === "compact_observation") return "Compact source window";
   if (badge.kind === "stage_interpretation") return "Current interpreted stage bounds";
   if (badge.kind === "ask_checkpoint" || badge.kind === "helix_ask_checkpoint") return "Model checkpoint boundary";
@@ -1587,6 +1591,8 @@ function selectedNodeConsoleTitle(badge: StagePlayBadgeV1 | null): string {
   if (badge.kind === "observer") return "Observer Source Setup";
   if (badge.kind === "source") return "Source Routing";
   if (badge.kind === "workstation_state_plane") return "Workstation State Plane";
+  if (badge.kind === "goal_context_update") return "Goal Context Update";
+  if (badge.kind === "agent_goal_session") return "Agent Goal Session";
   if (badge.kind === "compact_observation") return "Compact Observation Evidence";
   if (badge.kind === "procedural_binding") return "Procedural Binding";
   if (badge.kind === "ask_checkpoint" || badge.kind === "helix_ask_checkpoint") return "Helix Ask Checkpoint";
@@ -1606,6 +1612,8 @@ function selectedNodeConsoleDescription(badge: StagePlayBadgeV1 | null): string 
   if (badge.kind === "observer") return "Configure source custody, routing, cadence, and audit buffers.";
   if (badge.kind === "source") return "Route this source into Stage Play and inspect its evidence custody.";
   if (badge.kind === "workstation_state_plane") return "Inspect deterministic workstation process state without granting answer or action authority.";
+  if (badge.kind === "goal_context_update") return "Inspect a durable, non-terminal workstation context update and its dispatch suggestions.";
+  if (badge.kind === "agent_goal_session") return "Inspect the active goal session feeds, actuator bounds, checkpoints, and terminal authority requirement.";
   if (badge.kind === "compact_observation") return "Inspect compact facts, evidence refs, and raw-buffer audit links.";
   if (badge.kind === "procedural_binding") return "Inspect the expression and badges that support this procedure.";
   if (badge.kind === "ask_checkpoint" || badge.kind === "helix_ask_checkpoint") return "Inspect Ask turn refs, tool observation refs, and solver/debug status.";

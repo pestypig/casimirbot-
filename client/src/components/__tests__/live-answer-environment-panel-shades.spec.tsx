@@ -8,6 +8,12 @@ const panelSource = () =>
     "utf8",
   );
 
+const circuitSource = () =>
+  fs.readFileSync(
+    path.resolve(__dirname, "../workstation/LiveAnswerReasoningCircuit.tsx"),
+    "utf8",
+  );
+
 const producerSource = () =>
   fs.readFileSync(
     path.resolve(__dirname, "../../lib/helix/visualFrameProducer.ts"),
@@ -116,7 +122,7 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
   });
 
   it("mirrors Stage Play goal-context updates as a non-terminal reasoning circuit", () => {
-    const source = panelSource();
+    const source = `${panelSource()}\n${circuitSource()}`;
 
     expect(source).toContain("@shared/contracts/workstation-goal-context.v1");
     expect(source).toContain("/api/helix/stage-play/goal-context?threadId=");
@@ -128,9 +134,17 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain('data-testid="live-answer-narrator-binding-count"');
     expect(source).toContain('data-testid="live-answer-observation-authority-count"');
     expect(source).toContain('data-testid="live-answer-terminal-authority-count"');
+    expect(source).toContain('data-testid="live-answer-terminal-authority-posture"');
+    expect(source).toContain('data-testid="live-answer-goal-context-row"');
+    expect(source).toContain('data-testid="live-answer-goal-context-refs"');
     expect(source).toContain('data-testid="live-answer-goal-context-authority-chips"');
+    expect(source).toContain('data-testid="live-answer-goal-context-dispatch"');
+    expect(source).toContain('data-testid="live-answer-agent-goal-session"');
     expect(source).toContain("Reasoning circuit");
     expect(source).toContain("Stage Play goal context mirrored into Live Answer as observation state.");
+    expect(source).toContain("sourceRefs: update.sourceRefs");
+    expect(source).toContain("loopRefs: update.loopRefs");
+    expect(source).toContain("evidenceRefs: update.evidenceRefs");
     expect(source).toContain("wake interrupt");
     expect(source).toContain("narrator bind");
     expect(source).toContain("narrator bindings");

@@ -205,7 +205,8 @@ describe("Helix capability plan contract", () => {
 
       expect(plan).toMatchObject({
         capability_family: "debug_export",
-        requested_action: "suppressed_contextual_tool_reference",
+        requested_action: "model.direct_answer",
+        selected_capability: "model.direct_answer",
         source_target: "model_only",
         mutating: false,
         operator_command_required: false,
@@ -777,8 +778,8 @@ describe("Helix capability plan contract", () => {
     expect(plan).toMatchObject({
       capability_family: "debug_export",
       source_target: "model_only",
-      requested_action: "suppressed_contextual_tool_reference",
-      selected_capability: "suppressed_contextual_tool_reference",
+      requested_action: "model.direct_answer",
+      selected_capability: "model.direct_answer",
       goal_kind: "model_only_concept",
       required_terminal_kind: "direct_answer_text",
       tool_admission_suppressed: true,

@@ -34,6 +34,19 @@ export type GoalContextProducerKindV1 =
   | "route_watch"
   | "narrator";
 
+export const WORKSTATION_GOAL_CONTEXT_PRODUCER_KINDS: readonly GoalContextProducerKindV1[] = [
+  "visual_capture",
+  "audio_capture",
+  "transcription_loop",
+  "translation_loop",
+  "microdeck",
+  "reflection",
+  "live_answer",
+  "source_health",
+  "route_watch",
+  "narrator",
+];
+
 export type GoalContextUpdateKindV1 =
   | "summary"
   | "transcript_window"
@@ -46,6 +59,20 @@ export type GoalContextUpdateKindV1 =
   | "reflection"
   | "error"
   | "suggested_action";
+
+export const WORKSTATION_GOAL_CONTEXT_UPDATE_KINDS: readonly GoalContextUpdateKindV1[] = [
+  "summary",
+  "transcript_window",
+  "translated_transcript",
+  "visual_observation",
+  "classification",
+  "route_evidence",
+  "source_status",
+  "preset_state",
+  "reflection",
+  "error",
+  "suggested_action",
+];
 
 export type WorkstationGoalContextUpdateV1 = {
   schemaVersion: typeof WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA;
@@ -88,6 +115,17 @@ export type AgentGoalContextFeedKindV1 =
   | "trace_memory"
   | "route_evidence";
 
+export const WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS: readonly AgentGoalContextFeedKindV1[] = [
+  "visual_summaries",
+  "audio_transcripts",
+  "translated_transcripts",
+  "microdeck_outputs",
+  "live_answer_lines",
+  "source_health",
+  "trace_memory",
+  "route_evidence",
+];
+
 export type AgentGoalActuatorV1 =
   | "query_visual_summaries"
   | "query_audio_transcripts"
@@ -95,6 +133,7 @@ export type AgentGoalActuatorV1 =
   | "query_microdeck_outputs"
   | "query_live_answer_state"
   | "query_source_health"
+  | "configure_route_watch"
   | "set_audio_preset"
   | "set_visual_preset"
   | "change_preset"
@@ -111,6 +150,32 @@ export type AgentGoalActuatorV1 =
   | "focus_process_graph"
   | "repair_source"
   | "ask_user";
+
+export const WORKSTATION_AGENT_GOAL_ACTUATORS: readonly AgentGoalActuatorV1[] = [
+  "query_visual_summaries",
+  "query_audio_transcripts",
+  "query_translation_segments",
+  "query_microdeck_outputs",
+  "query_live_answer_state",
+  "query_source_health",
+  "configure_route_watch",
+  "set_audio_preset",
+  "set_visual_preset",
+  "change_preset",
+  "bind_source",
+  "unbind_source",
+  "bind_narrator",
+  "narrator_bind_stream",
+  "narrator_say",
+  "update_live_answer",
+  "query_trace_memory",
+  "pause_loop",
+  "resume_loop",
+  "set_loop_state",
+  "focus_process_graph",
+  "repair_source",
+  "ask_user",
+];
 
 export type AgentGoalSessionV1 = {
   schemaVersion: typeof WORKSTATION_AGENT_GOAL_SESSION_SCHEMA;
@@ -187,32 +252,9 @@ export type NarratorBindStreamRequestV1 = {
   raw_content_included: false;
 };
 
-const producerKinds = new Set<GoalContextProducerKindV1>([
-  "visual_capture",
-  "audio_capture",
-  "transcription_loop",
-  "translation_loop",
-  "microdeck",
-  "reflection",
-  "live_answer",
-  "source_health",
-  "route_watch",
-  "narrator",
-]);
+const producerKinds = new Set<GoalContextProducerKindV1>(WORKSTATION_GOAL_CONTEXT_PRODUCER_KINDS);
 
-const updateKinds = new Set<GoalContextUpdateKindV1>([
-  "summary",
-  "transcript_window",
-  "translated_transcript",
-  "visual_observation",
-  "classification",
-  "route_evidence",
-  "source_status",
-  "preset_state",
-  "reflection",
-  "error",
-  "suggested_action",
-]);
+const updateKinds = new Set<GoalContextUpdateKindV1>(WORKSTATION_GOAL_CONTEXT_UPDATE_KINDS);
 
 const freshnessStatuses = new Set<WorkstationGoalContextUpdateV1["freshness"]["status"]>([
   "fresh",
@@ -231,41 +273,9 @@ const goalStatuses = new Set<AgentGoalSessionV1["status"]>([
   "failed",
 ]);
 
-const agentGoalContextFeedKinds = new Set<AgentGoalContextFeedKindV1>([
-  "visual_summaries",
-  "audio_transcripts",
-  "translated_transcripts",
-  "microdeck_outputs",
-  "live_answer_lines",
-  "source_health",
-  "trace_memory",
-  "route_evidence",
-]);
+const agentGoalContextFeedKinds = new Set<AgentGoalContextFeedKindV1>(WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS);
 
-const agentGoalActuators = new Set<AgentGoalActuatorV1>([
-  "query_visual_summaries",
-  "query_audio_transcripts",
-  "query_translation_segments",
-  "query_microdeck_outputs",
-  "query_live_answer_state",
-  "query_source_health",
-  "set_audio_preset",
-  "set_visual_preset",
-  "change_preset",
-  "bind_source",
-  "unbind_source",
-  "bind_narrator",
-  "narrator_bind_stream",
-  "narrator_say",
-  "update_live_answer",
-  "query_trace_memory",
-  "pause_loop",
-  "resume_loop",
-  "set_loop_state",
-  "focus_process_graph",
-  "repair_source",
-  "ask_user",
-]);
+const agentGoalActuators = new Set<AgentGoalActuatorV1>(WORKSTATION_AGENT_GOAL_ACTUATORS);
 
 const stringArrayIssue = (value: unknown, field: string, options: { requireNonEmpty?: boolean } = {}): string[] => {
   if (!Array.isArray(value)) return [`${field} must be an array`];

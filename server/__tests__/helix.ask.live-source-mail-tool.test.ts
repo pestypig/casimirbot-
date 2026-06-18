@@ -1283,6 +1283,185 @@ describe("live-source mail live environment tools", () => {
     expect(routeWatchUpdate?.suggestedDispatch.map((action) => action.kind)).not.toContain("wake_agent");
   });
 
+  it("checkpoints goal-scoped route-watch automation when the goal allows configuration", () => {
+    const sessionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        goal_id: "goal:route-watch-config",
+        objective: "Monitor the visual source with a governed route-watch loop.",
+        context_feeds: ["route_evidence", "visual_summaries"],
+        allowed_actuators: ["configure_route_watch", "query_visual_summaries"],
+      },
+    });
+    expect(sessionObservation.ok).toBe(true);
+    const initialCheckpointCount = ((sessionObservation.observation as any).session.checkpoints ?? []).length;
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.configure_live_source_watch_job",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        goal_id: "goal:route-watch-config",
+        objective: "Watch visual packets and record route evidence for this goal.",
+        decision_policy_prompt: "Record route evidence for new visual summaries without answering directly.",
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation).toMatchObject({
+      tool_name: "live_env.configure_live_source_watch_job",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      artifactId: "stage_play_live_source_watch_job_policy_config_result",
+      status: "configured",
+      goalId: "goal:route-watch-config",
+      goalSessionFound: true,
+      requiredActuator: "configure_route_watch",
+      actuatorAllowed: true,
+      missingRequirements: [],
+      policy: expect.objectContaining({
+        objectiveText: "Watch visual packets and record route evidence for this goal.",
+        assistant_answer: false,
+        terminal_eligible: false,
+      }),
+      jobState: expect.objectContaining({
+        nextLoopState: "armed_for_next_summary",
+      }),
+      goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:route_watch:/),
+      agentGoalSession: expect.objectContaining({
+        goalId: "goal:route-watch-config",
+        authority: {
+          assistantAnswer: false,
+          finalReportsRequireTerminalAuthority: true,
+        },
+      }),
+      post_tool_model_step_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(payload.agentGoalSession.checkpoints).toHaveLength(initialCheckpointCount + 1);
+    expect(payload.agentGoalSession.checkpoints.at(-1)).toMatchObject({
+      summary: "Configured route-watch automation for this goal session.",
+      actionsTaken: expect.arrayContaining(["configure_route_watch", "live_env.configure_live_source_watch_job"]),
+      evidenceRefs: expect.arrayContaining([
+        payload.goalContextUpdateId,
+        payload.policy.policyId,
+        payload.jobState.jobId,
+      ]),
+      nextStep: "continue",
+    });
+
+    const storedSession = listStagePlayAgentGoalSessions({
+      threadId,
+      goalId: "goal:route-watch-config",
+      limit: 1,
+    })[0];
+    expect(storedSession?.checkpoints).toHaveLength(initialCheckpointCount + 1);
+    expect(storedSession?.checkpoints.at(-1)).toMatchObject({
+      summary: "Configured route-watch automation for this goal session.",
+      actionsTaken: expect.arrayContaining(["configure_route_watch", "live_env.configure_live_source_watch_job"]),
+      evidenceRefs: expect.arrayContaining([
+        payload.goalContextUpdateId,
+        payload.policy.policyId,
+        payload.jobState.jobId,
+      ]),
+    });
+  });
+
+  it("blocks goal-scoped route-watch automation when the goal omits the configure actuator", () => {
+    const sessionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        goal_id: "goal:route-watch-query-only",
+        objective: "Read route evidence without changing workstation loops.",
+        context_feeds: ["route_evidence"],
+        allowed_actuators: ["query_visual_summaries"],
+      },
+    });
+    expect(sessionObservation.ok).toBe(true);
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.configure_live_source_watch_job",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        goal_id: "goal:route-watch-query-only",
+        objective: "Try to arm a route-watch loop without permission.",
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation).toMatchObject({
+      tool_name: "live_env.configure_live_source_watch_job",
+      ok: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      artifactId: "stage_play_live_source_watch_job_policy_config_result",
+      status: "blocked",
+      policy: null,
+      jobState: null,
+      policyCount: 0,
+      goalId: "goal:route-watch-query-only",
+      goalSessionFound: true,
+      requiredActuator: "configure_route_watch",
+      actuatorAllowed: false,
+      missingRequirements: ["allowed_actuator:configure_route_watch"],
+      goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:route_watch:/),
+      post_tool_model_step_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(observation.summary).toContain("Cannot configure live-source watch job");
+    expect(observation.producedRefs).toEqual(expect.arrayContaining([payload.goalContextUpdateId]));
+
+    const updates = listStagePlayGoalContextUpdates({
+      threadId,
+      producerKind: "route_watch",
+    });
+    const blockedUpdate = updates.find((update) => update.updateId === payload.goalContextUpdateId);
+    expect(blockedUpdate).toMatchObject({
+      contentRef: expect.stringMatching(/^stage_play_live_source_watch_job_policy_config_blocked:/),
+      producerKind: "route_watch",
+      updateKind: "source_status",
+      sourceRefs: expect.arrayContaining([sourceId]),
+      freshness: expect.objectContaining({ status: "blocked" }),
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+      goalRelevance: expect.objectContaining({
+        goalId: "goal:route-watch-query-only",
+      }),
+    });
+    expect(blockedUpdate?.suggestedDispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "log_receipt" }),
+      expect.objectContaining({ kind: "update_panel", panelId: "stage-play-badge-graph" }),
+    ]));
+    expect(blockedUpdate?.suggestedDispatch.map((action) => action.kind)).not.toContain("set_loop_state");
+    expect(blockedUpdate?.suggestedDispatch.map((action) => action.kind)).not.toContain("wake_agent");
+  });
+
   it("generates a strong default decision policy for describe-each-batch visual watch jobs", () => {
     const observation = executeLiveEnvironmentTool({
       tool_name: "live_env.configure_live_source_watch_job",
@@ -1583,6 +1762,7 @@ describe("live-source mail live environment tools", () => {
           "query_visual_summaries",
           "query_translation_segments",
           "query_source_health",
+          "configure_route_watch",
           "set_visual_preset",
           "bind_source",
           "bind_narrator",
@@ -1639,6 +1819,7 @@ describe("live-source mail live environment tools", () => {
           "query_visual_summaries",
           "query_translation_segments",
           "query_source_health",
+          "configure_route_watch",
           "set_visual_preset",
           "bind_source",
           "bind_narrator",
@@ -1832,6 +2013,7 @@ describe("live-source mail live environment tools", () => {
       tool_name: "live_env.query_visual_summaries",
       ok: true,
       assistant_answer: false,
+      terminal_eligible: false,
       raw_content_included: false,
       context_role: "tool_evidence",
       ask_context_policy: "evidence_only",
@@ -2289,6 +2471,7 @@ describe("live-source mail live environment tools", () => {
       tool_name: "live_env.change_workstation_preset",
       ok: true,
       assistant_answer: false,
+      terminal_eligible: false,
       raw_content_included: false,
       context_role: "tool_evidence",
       ask_context_policy: "evidence_only",
@@ -2367,6 +2550,7 @@ describe("live-source mail live environment tools", () => {
       tool_name: "live_env.change_workstation_preset",
       ok: false,
       assistant_answer: false,
+      terminal_eligible: false,
       raw_content_included: false,
       context_role: "tool_evidence",
       ask_context_policy: "evidence_only",
@@ -2427,6 +2611,7 @@ describe("live-source mail live environment tools", () => {
     expect(observation).toMatchObject({
       tool_name: "live_env.bind_workstation_source",
       assistant_answer: false,
+      terminal_eligible: false,
       raw_content_included: false,
       context_role: "tool_evidence",
       ask_context_policy: "evidence_only",
@@ -2764,6 +2949,7 @@ describe("live-source mail live environment tools", () => {
       tool_name: "live_env.narrator_bind_stream",
       ok: true,
       assistant_answer: false,
+      terminal_eligible: false,
       raw_content_included: false,
     });
     expect(preparedPayload).toMatchObject({
@@ -2844,6 +3030,7 @@ describe("live-source mail live environment tools", () => {
       tool_name: "live_env.query_source_health",
       ok: true,
       assistant_answer: false,
+      terminal_eligible: false,
       raw_content_included: false,
       context_role: "tool_evidence",
       ask_context_policy: "evidence_only",
@@ -3336,6 +3523,124 @@ describe("live-source mail live environment tools", () => {
       payload.goalContextUpdateId,
       trace.trace_id,
     ]));
+  });
+
+  it("appends agent goal session checkpoints when querying allowed trace memory", () => {
+    const trace = recordWorkstationReasoningTrace({
+      schema: "helix.workstation_reasoning_trace.v1",
+      trace_id: "workstation_trace:goal-memory",
+      thread_id: threadId,
+      turn_id: "turn:goal-memory",
+      source_family: "multimodal",
+      user_goal: "Reuse prior visual reasoning as compact context.",
+      route_reason_code: "visual_to_calculator",
+      input_item_refs: ["visual_evidence:goal-memory"],
+      evidence_refs: ["visual_evidence:goal-memory", "derived_equation:goal-memory"],
+      tool_receipt_ids: ["calculator_receipt:goal-memory"],
+      lifecycle_event_refs: ["tool_lifecycle:goal-memory"],
+      artifacts: {
+        visual_extraction_id: "visual_extraction:goal-memory",
+        derived_equation_id: "derived_equation:goal-memory",
+      },
+      requested_extraction_scope: "hotbar",
+      actual_extraction_scope: "hotbar",
+      scope_match: "exact",
+      proof_status: "complete",
+      compact_steps: [
+        {
+          label: "Visual extraction",
+          summary: "Captured compact prior reasoning for goal context.",
+          artifact_ref: "visual_extraction:goal-memory",
+          status: "completed",
+        },
+      ],
+      caveats: [],
+      final_answer_snapshot: "Prior compact trace remains observation-only.",
+      assistant_answer: false,
+      raw_content_included: false,
+      context_policy: "compact_context_pack_only",
+      created_at: "2026-06-17T15:02:00.000Z",
+    });
+
+    const sessionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        goal_id: "goal:trace-memory-watch",
+        objective: "Use compact trace memory while monitoring visual reasoning.",
+        context_feeds: ["trace_memory"],
+        allowed_actuators: ["query_trace_memory"],
+      },
+    });
+    expect(sessionObservation.ok).toBe(true);
+    const initialCheckpointCount = ((sessionObservation.observation as any).session.checkpoints ?? []).length;
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_trace_memory",
+      thread_id: threadId,
+      args: {
+        goal_id: "goal:trace-memory-watch",
+        trace_id: trace.trace_id,
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation).toMatchObject({
+      tool_name: "live_env.query_trace_memory",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schema: "helix.workstation_reasoning_trace_query_result.v1",
+      trace_id: trace.trace_id,
+      trace_count: 1,
+      status: "read",
+      goalId: "goal:trace-memory-watch",
+      feedAllowed: true,
+      actuatorAllowed: true,
+      requiredActuator: "query_trace_memory",
+      selectedTrace: {
+        trace_id: trace.trace_id,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:route_watch:/),
+      post_tool_model_step_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      agentGoalSession: expect.objectContaining({
+        goalId: "goal:trace-memory-watch",
+        authority: {
+          assistantAnswer: false,
+          finalReportsRequireTerminalAuthority: true,
+        },
+      }),
+    });
+    expect(payload.agentGoalSession.checkpoints).toHaveLength(initialCheckpointCount + 1);
+    expect(payload.agentGoalSession.checkpoints.at(-1)).toMatchObject({
+      summary: "Queried trace memory and read 1 compact trace(s) for this goal session.",
+      actionsTaken: expect.arrayContaining(["query_trace_memory", "live_env.query_trace_memory"]),
+      evidenceRefs: expect.arrayContaining([payload.goalContextUpdateId, payload.resultId, trace.trace_id]),
+      nextStep: "continue",
+    });
+
+    const storedSession = listStagePlayAgentGoalSessions({
+      threadId,
+      goalId: "goal:trace-memory-watch",
+      limit: 1,
+    })[0];
+    expect(storedSession?.checkpoints).toHaveLength(initialCheckpointCount + 1);
+    expect(storedSession?.checkpoints.at(-1)).toMatchObject({
+      summary: "Queried trace memory and read 1 compact trace(s) for this goal session.",
+      actionsTaken: expect.arrayContaining(["query_trace_memory", "live_env.query_trace_memory"]),
+      evidenceRefs: expect.arrayContaining([payload.goalContextUpdateId, payload.resultId, trace.trace_id]),
+    });
   });
 
   it("blocks trace-memory queries outside an explicit goal session context-feed policy", () => {

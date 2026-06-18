@@ -941,6 +941,7 @@ const AGENT_GOAL_ACTUATORS = new Set<AgentGoalActuatorV1>([
   "query_microdeck_outputs",
   "query_live_answer_state",
   "query_source_health",
+  "configure_route_watch",
   "set_audio_preset",
   "set_visual_preset",
   "change_preset",
@@ -2892,6 +2893,7 @@ const makeObservation = (input: {
     context_role: "tool_evidence",
     ask_context_policy: "evidence_only",
     assistant_answer: false,
+    terminal_eligible: false,
     raw_content_included: false,
     created_at: new Date().toISOString(),
   };
@@ -5639,6 +5641,27 @@ export function executeLiveEnvironmentTool(
         { kind: "update_panel", panelId: "stage-play-badge-graph" },
       ],
     });
+    const checkpointedGoalSession = ok && goalSession
+      ? appendAgentGoalSessionCheckpoint({
+          session: goalSession,
+          threadId: input.thread_id,
+          roomId,
+          sourceRefs: uniqueStrings([
+            input.thread_id,
+            selectedTrace?.source_family,
+            ...traceRefs,
+          ]),
+          loopRefs: uniqueStrings([
+            resultId,
+            ...traces.map((trace) => trace.turn_id),
+            ...traces.flatMap((trace) => trace.lifecycle_event_refs),
+          ]),
+          evidenceRefs: uniqueStrings([goalContextUpdateId, resultId, ...evidenceRefs]).slice(0, 80),
+          actionsTaken: ["query_trace_memory", input.tool_name],
+          summary: `Queried trace memory and read ${traces.length} compact trace(s) for this goal session.`,
+          nextStep: traces.length > 0 ? "continue" : "ask_user",
+        })
+      : goalSession;
     return makeObservation({
       threadId: input.thread_id,
       environmentId: input.environment_id,
@@ -5673,6 +5696,8 @@ export function executeLiveEnvironmentTool(
         required_actuator: "query_trace_memory",
         actuatorAllowed,
         actuator_allowed: actuatorAllowed,
+        agentGoalSession: checkpointedGoalSession,
+        agent_goal_session: checkpointedGoalSession,
         goalContextUpdateId,
         goal_context_update_id: goalContextUpdateId,
         post_tool_model_step_required: true,
@@ -6752,6 +6777,116 @@ export function executeLiveEnvironmentTool(
       ...readStringArray(args.source_ids ?? args.sourceIds),
       readString(args.source_id) ?? readString(args.sourceId) ?? explicitSourceId,
     ].filter((entry): entry is string => Boolean(entry));
+    const goalId =
+      readString(args.goal_id) ??
+      readString(args.goalId) ??
+      readString(args.agent_goal_id) ??
+      readString(args.agentGoalId);
+    const goalSession = goalId
+      ? listStagePlayAgentGoalSessions({
+          threadId: mailboxThreadResolution.mailboxThreadId,
+          goalId,
+          limit: 1,
+        })[0] ?? null
+      : null;
+    const actuatorAllowed = !goalId || goalSessionActuatorAllowed(goalSession, "configure_route_watch");
+    const missingRequirements = goalId
+      ? goalSession
+        ? actuatorAllowed
+          ? []
+          : ["allowed_actuator:configure_route_watch"]
+        : ["goal_session"]
+      : [];
+    if (missingRequirements.length > 0) {
+      const blockedReceiptId = `stage_play_live_source_watch_job_policy_config_blocked:${hashShort([
+        input.thread_id,
+        mailboxThreadResolution.mailboxThreadId,
+        goalId,
+        sourceIds,
+        policyDefaults.objectiveText,
+        missingRequirements,
+      ])}`;
+      const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+        threadId: input.thread_id,
+        mailboxThreadId: mailboxThreadResolution.mailboxThreadId,
+        roomId,
+        producerKind: "route_watch",
+        updateKind: "source_status",
+        contentRef: blockedReceiptId,
+        preview: `Blocked live-source watch job configuration; missing ${missingRequirements.join(", ")}.`,
+        sourceRefs: uniqueStrings([
+          ...sourceIds,
+          mailboxThreadResolution.mailboxThreadId,
+        ]),
+        loopRefs: uniqueStrings([
+          `watch_job_config:${mailboxThreadResolution.mailboxThreadId}`,
+          `route_watch:${goalId ?? input.thread_id}`,
+        ]),
+        evidenceRefs: uniqueStrings([
+          blockedReceiptId,
+          mailboxThreadResolution.mailboxThreadId,
+          ...sourceIds,
+        ]),
+        receiptRefs: [blockedReceiptId],
+        freshnessStatus: "blocked",
+        staleAfterMs: 120_000,
+        goalId,
+        goalRelevanceReason: goalId
+          ? "Watch-job automation policy requires explicit goal actuator authorization."
+          : null,
+        suggestedDispatch: [
+          { kind: "log_receipt", receiptRef: blockedReceiptId },
+          { kind: "update_panel", panelId: "stage-play-badge-graph" },
+        ],
+      });
+      const result = {
+        artifactId: "stage_play_live_source_watch_job_policy_config_result",
+        schema: STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA,
+        schemaVersion: STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA,
+        policy: null,
+        jobState: null,
+        transcriptRows: [],
+        policyCount: 0,
+        watchJobPolicyRef: null,
+        watch_job_policy_ref: null,
+        askThreadId: input.thread_id,
+        ask_thread_id: input.thread_id,
+        mailboxThreadId: mailboxThreadResolution.mailboxThreadId,
+        mailbox_thread_id: mailboxThreadResolution.mailboxThreadId,
+        mailboxThreadResolution,
+        mailbox_thread_resolution: mailboxThreadResolution,
+        goalId,
+        goal_id: goalId,
+        status: "blocked",
+        missingRequirements,
+        missing_requirements: missingRequirements,
+        goalSessionFound: goalId ? Boolean(goalSession) : null,
+        goal_session_found: goalId ? Boolean(goalSession) : null,
+        requiredActuator: "configure_route_watch",
+        required_actuator: "configure_route_watch",
+        actuatorAllowed,
+        actuator_allowed: actuatorAllowed,
+        goalContextUpdateId,
+        goal_context_update_id: goalContextUpdateId,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      };
+      return makeObservation({
+        threadId: input.thread_id,
+        environmentId: environment?.environment_id ?? input.environment_id,
+        toolName: input.tool_name,
+        ok: false,
+        summary: `Cannot configure live-source watch job; missing ${missingRequirements.join(", ")}.`,
+        observation: result,
+        evidenceRefs: [blockedReceiptId, goalContextUpdateId, mailboxThreadResolution.mailboxThreadId, ...sourceIds],
+        producedRefs: [blockedReceiptId, goalContextUpdateId],
+        forceNormalizedRefs: true,
+      });
+    }
     const configured = configureStagePlayLiveSourceWatchJobPolicy({
       threadId: mailboxThreadResolution.mailboxThreadId,
       roomId,
@@ -6796,11 +6931,6 @@ export function executeLiveEnvironmentTool(
     const transcriptRows = buildWatchJobConfiguredTranscriptRows({
       policy: configured.policy,
     });
-    const goalId =
-      readString(args.goal_id) ??
-      readString(args.goalId) ??
-      readString(args.agent_goal_id) ??
-      readString(args.agentGoalId);
     const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
       threadId: input.thread_id,
       mailboxThreadId: mailboxThreadResolution.mailboxThreadId,
@@ -6840,6 +6970,35 @@ export function executeLiveEnvironmentTool(
         { kind: "set_loop_state", loopRef: configured.jobState.jobId, state: "running" },
       ],
     });
+    const checkpointedGoalSession = goalSession
+      ? appendAgentGoalSessionCheckpoint({
+          session: goalSession,
+          threadId: mailboxThreadResolution.mailboxThreadId,
+          roomId,
+          sourceRefs: uniqueStrings([
+            ...configured.policy.sourceIds,
+            ...sourceIds,
+            configured.policy.environmentId,
+            mailboxThreadResolution.mailboxThreadId,
+          ]),
+          loopRefs: uniqueStrings([
+            configured.jobState.jobId,
+            configured.policy.policyId,
+            `watch_job:${configured.jobState.jobId}`,
+            `watch_policy:${configured.policy.policyId}`,
+          ]),
+          evidenceRefs: uniqueStrings([
+            goalContextUpdateId,
+            configured.policy.policyId,
+            configured.jobState.jobId,
+            mailboxThreadResolution.mailboxThreadId,
+            ...configured.policy.evidenceRefs,
+          ]).slice(0, 80),
+          actionsTaken: ["configure_route_watch", input.tool_name],
+          summary: "Configured route-watch automation for this goal session.",
+          nextStep: "continue",
+        })
+      : goalSession;
     const result = {
       artifactId: "stage_play_live_source_watch_job_policy_config_result",
       schema: STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA,
@@ -6856,6 +7015,19 @@ export function executeLiveEnvironmentTool(
       mailbox_thread_id: mailboxThreadResolution.mailboxThreadId,
       mailboxThreadResolution,
       mailbox_thread_resolution: mailboxThreadResolution,
+      goalId,
+      goal_id: goalId,
+      status: "configured",
+      missingRequirements,
+      missing_requirements: missingRequirements,
+      goalSessionFound: goalId ? Boolean(goalSession) : null,
+      goal_session_found: goalId ? Boolean(goalSession) : null,
+      requiredActuator: "configure_route_watch",
+      required_actuator: "configure_route_watch",
+      actuatorAllowed,
+      actuator_allowed: actuatorAllowed,
+      agentGoalSession: checkpointedGoalSession,
+      agent_goal_session: checkpointedGoalSession,
       goalContextUpdateId,
       goal_context_update_id: goalContextUpdateId,
       post_tool_model_step_required: true,

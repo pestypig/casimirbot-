@@ -31,6 +31,27 @@ describe("Helix Ask operational constraints", () => {
     expect(packet.assistant_answer).toBe(false);
   });
 
+  it("keeps a negated tool clause from forbidding a later explicit repo command", () => {
+    const promptText =
+      "Do not call scientific-calculator.solve_expression. Use repo-code.search_concept to find where terminal authority selects the answer.";
+    const packet = buildTurnOperationalConstraints({
+      turnId: "ask:test:mixed-negated-calculator-repo",
+      promptText,
+    });
+    const admission = buildToolCallAdmissionDecision({
+      turnId: "ask:test:mixed-negated-calculator-repo",
+      promptText,
+      sourceTargetIntent: {
+        target_source: "repo_code",
+        target_kind: "repo_code",
+      },
+    });
+
+    expect(packet.forbidden_tool_families).not.toContain("repo_code");
+    expect(admission.admitted_tool_families).toContain("repo_code");
+    expect(admission.forbidden_tool_families).not.toContain("repo_code");
+  });
+
   it("tracks Chrome extension localhost as a required operational surface", () => {
     const packet = buildTurnOperationalConstraints({
       turnId: "ask:test:chrome",

@@ -194,11 +194,10 @@ export const extractExplicitCapabilityContract = (
 ): ExplicitCapabilityContract | null => {
   const prompt = String(promptText ?? "").trim();
   if (!prompt) return null;
-  const contract = explicitCapabilityContracts.find((entry: ExplicitCapabilityContract) =>
+  const contracts = explicitCapabilityContracts.filter((entry: ExplicitCapabilityContract) =>
     commandMentionsContract(prompt, entry)
   );
-  if (!contract) return null;
-  return familySuppressed(prompt, contract) ? null : contract;
+  return contracts.find((contract: ExplicitCapabilityContract) => !familySuppressed(prompt, contract)) ?? null;
 };
 
 export const explicitCapabilityMatches = (

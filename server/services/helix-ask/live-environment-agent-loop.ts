@@ -271,6 +271,7 @@ const makeMandatoryMailboxFailureObservation = (input: {
   context_role: "tool_evidence",
   ask_context_policy: "evidence_only",
   assistant_answer: false,
+  terminal_eligible: false,
   raw_content_included: false,
   created_at: new Date().toISOString(),
 });

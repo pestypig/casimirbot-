@@ -1623,6 +1623,7 @@ function buildWorkstationGoalContextPlan(
       "query_microdeck_outputs",
       "query_live_answer_state",
       "query_source_health",
+      "configure_route_watch",
       "set_audio_preset",
       "set_visual_preset",
       "change_preset",

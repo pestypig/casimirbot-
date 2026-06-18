@@ -810,6 +810,7 @@ describe("Helix Ask live environment agent loop", () => {
     expect(loop.iterations[0]?.tool_observation).toMatchObject({
       ok: false,
       tool_name: "live_env.not_registered_for_phase",
+      terminal_eligible: false,
       summary: expect.stringContaining("missing_required_mailbox_tool_execution"),
       observation: expect.objectContaining({
         failure_code: "missing_required_mailbox_tool_execution",
@@ -868,6 +869,7 @@ describe("Helix Ask live environment agent loop", () => {
     expect(loop.iterations[0]?.tool_observation).toMatchObject({
       ok: false,
       tool_name: "live_env.request_interim_voice_callout",
+      terminal_eligible: false,
       summary: expect.stringContaining("missing_voice_callout_draft"),
       observation: expect.objectContaining({
         failure_code: "missing_voice_callout_draft",

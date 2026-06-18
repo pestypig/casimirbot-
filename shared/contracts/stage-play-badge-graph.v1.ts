@@ -41,6 +41,8 @@ export const STAGE_PLAY_BADGE_KINDS = [
   "live_output",
   "voice_output",
   "workstation_state_plane",
+  "goal_context_update",
+  "agent_goal_session",
   "perturbation",
   "checkpoint_request",
 ] as const;
@@ -113,6 +115,8 @@ export const STAGE_PLAY_SOURCE_REF_KINDS = [
   "stage_play_compact_observation",
   "stage_play_perturbation_event",
   "stage_play_checkpoint_request",
+  "workstation_goal_context_update",
+  "agent_goal_session",
   "synthetic_evidence",
 ] as const;
 

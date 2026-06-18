@@ -52,6 +52,12 @@ import {
   recordStagePlayProcessedMailPacket,
   resetStagePlayProcessedMailPacketStoreForTest,
 } from "../services/stage-play/stage-play-processed-mail-packet-store";
+import {
+  ensureStagePlayAgentGoalSession,
+  recordStagePlayGoalContextUpdate,
+  resetStagePlayGoalContextStoreForTest,
+} from "../services/stage-play/stage-play-goal-context-store";
+import { WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA } from "../../shared/contracts/workstation-goal-context.v1";
 
 const threadId = "thread:stage-play-reducer";
 const roomId = "room:minecraft-stage-play-reducer";
@@ -73,10 +79,170 @@ beforeEach(() => {
   resetStagePlayPerturbationEventsForTest();
   resetStagePlayCheckpointQueueForTest();
   resetStagePlayProcessedMailPacketStoreForTest();
+  resetStagePlayGoalContextStoreForTest();
   clearEventJournalForTest();
 });
 
 describe("Stage Play world-state badge reducer", () => {
+  it("projects goal-context updates and active goal sessions into the graph circuit", () => {
+    const sourceId = "visual_source:live-answer";
+    const loopRef = "stage_play_live_source_watch_job:goal-circuit";
+    const goalId = "goal:stage-play-circuit";
+    ensureStagePlayAgentGoalSession({
+      threadId,
+      roomId,
+      objectiveId: goalId,
+      objectiveText: "Monitor visual packets and route-watch automation as graph-native goal context.",
+      sourceRefs: [sourceId],
+      loopRefs: [loopRef],
+      constructRefs: ["stage_play_badge_graph:goal-circuit"],
+      contextFeeds: [
+        {
+          feedId: "feed:visual",
+          sourceKind: "visual_summaries",
+          freshnessMs: 30000,
+        },
+        {
+          feedId: "feed:route",
+          sourceKind: "route_evidence",
+          freshnessMs: 120000,
+        },
+      ],
+      allowedActuators: ["query_visual_summaries", "configure_route_watch", "focus_process_graph"],
+      cadence: { kind: "event_accumulation", minUpdates: 2 },
+      checkpoint: {
+        summary: "Route-watch automation attached to goal-context circuit.",
+        evidenceRefs: ["stage_play_goal_context_update:route_watch:goal-circuit"],
+        actionsTaken: ["configure_route_watch"],
+      },
+      nowMs: Date.parse("2026-06-17T14:00:00.000Z"),
+    });
+    recordStagePlayGoalContextUpdate({
+      schemaVersion: WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
+      updateId: "stage_play_goal_context_update:route_watch:goal-circuit",
+      createdAtMs: Date.parse("2026-06-17T14:00:01.000Z"),
+      sourceRefs: [sourceId],
+      loopRefs: [`thread:${threadId}`, loopRef],
+      producerKind: "route_watch",
+      updateKind: "source_status",
+      contentRef: "stage_play_live_source_watch_job_policy:goal-circuit",
+      preview: "Configured route-watch automation as deterministic goal-context evidence.",
+      evidenceRefs: [
+        "stage_play_live_source_watch_job_policy:goal-circuit",
+        loopRef,
+      ],
+      receiptRefs: ["stage_play_live_source_watch_job_policy:goal-circuit"],
+      freshness: {
+        observedAtMs: Date.parse("2026-06-17T14:00:01.000Z"),
+        staleAfterMs: 120000,
+        status: "fresh",
+      },
+      goalRelevance: {
+        goalId,
+        relevance: 0.82,
+        reason: "Route-watch automation contributes deterministic process state for this goal.",
+      },
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: "stage_play_live_source_watch_job_policy:goal-circuit" },
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+        { kind: "set_loop_state", loopRef, state: "running" },
+      ],
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+
+    const graph = buildStagePlayGraphFromWorld({
+      threadId,
+      sourceId,
+      objective: "Inspect the workstation reasoning circuit.",
+      now: new Date("2026-06-17T14:00:02.000Z"),
+      readOnly: true,
+    });
+
+    expect(validateStagePlayBadgeGraphV1(graph)).toEqual([]);
+    expect(graph.badges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "workstation_state_plane.goal_context_bus",
+        kind: "workstation_state_plane",
+        status: "observed",
+        reasonCodes: expect.arrayContaining(["goal_context_bus", "not_terminal_authority"]),
+        dataTray: expect.objectContaining({
+          transformLabel: "goal context update index",
+          outputRefs: expect.arrayContaining([
+            "stage_play_goal_context_update:route_watch:goal-circuit",
+            goalId,
+          ]),
+        }),
+      }),
+      expect.objectContaining({
+        kind: "agent_goal_session",
+        status: "observed",
+        sourceRefs: expect.arrayContaining([
+          expect.objectContaining({ kind: "agent_goal_session", id: goalId }),
+        ]),
+        reasonCodes: expect.arrayContaining(["terminal_authority_required"]),
+        dataTray: expect.objectContaining({
+          transformLabel: "agent goal session policy",
+          blockedUntil: "completed solver path selects final report",
+        }),
+      }),
+      expect.objectContaining({
+        kind: "goal_context_update",
+        status: "observed",
+        sourceRefs: expect.arrayContaining([
+          expect.objectContaining({
+            kind: "workstation_goal_context_update",
+            id: "stage_play_goal_context_update:route_watch:goal-circuit",
+          }),
+        ]),
+        reasonCodes: expect.arrayContaining([
+          "goal_context_update",
+          "route_watch",
+          "observation_not_terminal_authority",
+        ]),
+        dataTray: expect.objectContaining({
+          transformLabel: "route_watch -> source_status",
+          outputPreview: expect.stringContaining("set_loop_state"),
+          skipped: expect.arrayContaining([
+            "assistant_answer=false",
+            "terminal_eligible=false",
+            "raw_content_included=false",
+          ]),
+        }),
+      }),
+    ]));
+    const updateBadge = graph.badges.find((badge) => badge.kind === "goal_context_update");
+    const sessionBadge = graph.badges.find((badge) => badge.kind === "agent_goal_session");
+    expect(updateBadge?.admission).toBe("auto");
+    expect(sessionBadge?.admission).toBe("auto");
+    expect(graph.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        from: "workstation_state_plane.current",
+        to: "workstation_state_plane.goal_context_bus",
+        relation: "contains",
+      }),
+      expect.objectContaining({
+        from: updateBadge?.id,
+        to: sessionBadge?.id,
+        relation: "feeds",
+      }),
+      expect.objectContaining({
+        from: updateBadge?.id,
+        to: "workstation_state_plane.process_loop",
+        relation: "feeds",
+      }),
+    ]));
+    expect(graph.authority).toMatchObject({
+      assistant_answer: false,
+      terminal_eligible: false,
+      agent_executable: false,
+    });
+  });
+
   it("renders thread-only visual producers in Observer source custody before a room is bound", () => {
     const producer = upsertLiveSourceProducer({
       sourceId: "visual_source:live-answer",
