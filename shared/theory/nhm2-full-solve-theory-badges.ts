@@ -22,6 +22,8 @@ const NHM2_COUPLED_CLOSURE_PASS_CANDIDATE =
   `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-coupled-closure-pass-candidate.json`;
 const NHM2_REGIONAL_TENSOR_PASS_PATH_HARNESS =
   `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-regional-tensor-pass-path-harness.json`;
+const NHM2_TIME_DEPENDENT_SOURCE_CAMPAIGN =
+  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-time-dependent-source-campaign.json`;
 const NHM2_TRIP_CLOCKING_PROFILE_INDEX =
   "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-trip-clocking-profile-index-latest.json";
 
@@ -814,6 +816,90 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_FULL_SOLVE_WHITEPAPER,
       ],
       equationFamilies: ["regional_tensor_pass_path_harness", "closure_stack"],
+      simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.dynamic.time_dependent_source_campaign",
+    title: "Time-Dependent Source Campaign",
+    plainMeaning:
+      "Freezes the next dynamic proof campaign: independent source tensor, switching conservation, frequency convergence, dynamic/effective geometry agreement, full tensor closure, observer families, QEI receipts, and stability checks.",
+    whyItMatters:
+      "It prevents static or scalar pass-path progress from being read as a time-dependent physical-source result.",
+    subjects: ["nhm2", "time_dependent_source", "dynamic_campaign", "proof_stack", "artifact_governance"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    equationFamilies: ["time_dependent_source_campaign", "closure_stack"],
+    tags: ["time_dependent_campaign", "runtime_artifact", "noncomputable_reference", "blocks_promotion"],
+    equations: [
+      {
+        id: "time_dependent_source_campaign_gate",
+        role: "noncomputable_reference",
+        displayLatex:
+          "campaign=source_{ind}\\land \\nabla_\\mu T^{\\mu\\nu}(t)\\land f\\!:\\!2f\\!:\\!4f\\land \\langle g(t)\\rangle\\land T_{full}\\land observer\\land QEI\\land stability",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: [
+          "source_ind",
+          "T_mu_nu(t)",
+          "frequency_ladder",
+          "dynamic_geometry",
+          "T_full",
+          "observer",
+          "QEI",
+          "stability",
+        ],
+        outputSymbols: ["campaignPass"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Static pass-path artifacts cannot substitute for frequency, switching, time-averaging, backreaction, or stability evidence.",
+      "The current campaign artifact is expected to report missing/review blockers until dynamic evidence exists.",
+      "Even a campaign pass would be diagnostic/reduced-order evidence, not transport, route ETA, propulsion, or physical viability validation.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef(
+        "shared/contracts/nhm2-time-dependent-source-campaign.v1.ts",
+        "nhm2-time-dependent-source-campaign-contract",
+        "Typed frozen time-dependent source campaign contract.",
+      ),
+      artifactRef(
+        "tools/nhm2/build-time-dependent-source-campaign.ts",
+        "nhm2-time-dependent-source-campaign-builder",
+        "Builder that fails closed when dynamic evidence is missing.",
+      ),
+      artifactRef(
+        NHM2_TIME_DEPENDENT_SOURCE_CAMPAIGN,
+        "sha256:b191d63ea3bf78281873630e61c07d1416a012e5558fd94f2e3d2d5e82bcee12",
+        "Pinned local smoke-chain campaign artifact: campaignPass=false; firstBlocker=switching_conservation_evidence_missing.",
+      ),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "time-dependent-source-campaign-target",
+        "Whitepaper dynamic campaign target note.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "time_dependent_source", "dynamic_campaign", "proof_stack", "artifact_governance"],
+      symbols: [
+        "source_ind",
+        "T_mu_nu(t)",
+        "frequency_ladder",
+        "dynamic_geometry",
+        "campaignPass",
+      ],
+      unitSignatures: [],
+      repoPaths: [
+        "shared/contracts/nhm2-time-dependent-source-campaign.v1.ts",
+        "tools/nhm2/build-time-dependent-source-campaign.ts",
+        NHM2_TIME_DEPENDENT_SOURCE_CAMPAIGN,
+        NHM2_FULL_SOLVE_WHITEPAPER,
+      ],
+      equationFamilies: ["time_dependent_source_campaign", "closure_stack"],
       simulationOwners: ["NHM2", "general_relativity", "casimir"],
     },
   }),
@@ -2251,6 +2337,22 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "blocks",
     label: "The regional pass-path harness keeps NHM2 in diagnostic/reduced-order wording until all gates pass together.",
     claimBoundaryNote: "Numerical pass-path readiness cannot grant physical or transport claims.",
+  },
+  {
+    id: "regional_pass_path_harness_feeds_time_dependent_campaign",
+    from: "nhm2.closure.regional_tensor_pass_path_harness",
+    to: "nhm2.dynamic.time_dependent_source_campaign",
+    relation: "requires",
+    label: "The frozen time-dependent campaign is stricter than the static regional pass-path harness and consumes it as one diagnostic prerequisite.",
+    claimBoundaryNote: "Static readiness cannot substitute for dynamic frequency, switching, backreaction, and stability receipts.",
+  },
+  {
+    id: "time_dependent_campaign_blocks_diagnostic_boundary",
+    from: "nhm2.dynamic.time_dependent_source_campaign",
+    to: "nhm2.claim_boundary.diagnostic_only",
+    relation: "blocks",
+    label: "The time-dependent source campaign keeps NHM2 behind diagnostic-only language until dynamic gates pass together.",
+    claimBoundaryNote: "A campaign artifact cannot grant transport, route ETA, propulsion, or physical viability claims.",
   },
   {
     id: "natario_invariants_document_observer_authority",

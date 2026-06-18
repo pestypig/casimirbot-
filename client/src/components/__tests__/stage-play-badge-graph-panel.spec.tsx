@@ -2313,7 +2313,8 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/7 allowed actuators/i);
     expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/1 narrator output policy item/i);
     expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/1 narrator event feed/i);
-    expect(screen.getByTestId("stage-play-feed-policy-ref-state")).toHaveTextContent(/4 feed or actuator policy refs/i);
+    expect(screen.getByTestId("stage-play-feed-policy-ref-state")).toHaveTextContent(/2 context-feed policy refs/i);
+    expect(screen.getByTestId("stage-play-feed-policy-ref-state")).toHaveTextContent(/2 actuator policy refs/i);
     expect(screen.getByText("Minecraft danger monitor")).toBeTruthy();
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/visual summaries/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/packet traces/i);
@@ -2322,6 +2323,10 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/automation policies/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/translated transcripts/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/narrator events/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-actuators")).toHaveTextContent(/query visual summaries/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-actuators")).toHaveTextContent(/query packet traces/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-actuators")).toHaveTextContent(/narrator bind stream/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-loops")).toHaveTextContent(/loop:visual-capture/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-cadence")).toHaveTextContent(/event accumulation \/ 2 updates/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-stop-conditions")).toHaveTextContent(/Terminal authority produces a final report/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-checkpoint")).toHaveTextContent(/Queried visual summaries feed/i);
@@ -2354,6 +2359,10 @@ describe("StagePlayBadgeGraphPanel", () => {
       /allowed_actuator:query_translation_segments/i.test(node.textContent ?? "") &&
       /workstation_context_feed:translated_transcripts/i.test(node.textContent ?? "") &&
       /workstation_actuator:query_translation_segments/i.test(node.textContent ?? "")
+    )).toBe(true);
+    expect(screen.getAllByTestId("stage-play-goal-context-update-policy-split").some((node) =>
+      /feeds=context_feed:translated_transcripts, workstation_context_feed:translated_transcripts/i.test(node.textContent ?? "") &&
+      /actuators=allowed_actuator:query_translation_segments, workstation_actuator:query_translation_segments/i.test(node.textContent ?? "")
     )).toBe(true);
     expect(screen.getAllByTestId("stage-play-goal-context-update-freshness").some((node) =>
       /freshness=fresh observed=1780521602500 staleAfter=120000ms/i.test(node.textContent ?? "")

@@ -42,6 +42,7 @@ const LIVE_ENV_TOOLS: Array<{
   { tool_id: "live_env.query_translation_segments", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.query_microdeck_outputs", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.query_live_answer_state", requires_user_confirmation: false, can_run_automatically: true },
+  { tool_id: "live_env.query_narrator_events", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.query_route_evidence", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.query_automation_policies", requires_user_confirmation: false, can_run_automatically: true },
   { tool_id: "live_env.change_workstation_preset", requires_user_confirmation: true, can_run_automatically: false },

@@ -146,7 +146,8 @@ describe("LiveAnswerReasoningCircuit", () => {
           feedQueryCount: 7,
           routeWatchCount: 0,
           automationCount: 2,
-          feedPolicyRefCount: 4,
+          feedPolicyRefCount: 2,
+          actuatorPolicyRefCount: 2,
           actuatorPolicyCount: 5,
           narratorEventFeedCount: 1,
           narratorActuatorPolicyCount: 1,
@@ -168,6 +169,9 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getAllByTestId("live-answer-goal-context-policy-refs")[0]).toHaveTextContent("policy=context_feed:visual_summaries, allowed_actuator:query_visual_summaries");
     expect(screen.getAllByTestId("live-answer-goal-context-policy-refs")[1]).toHaveTextContent("policy=none");
     expect(screen.getAllByTestId("live-answer-goal-context-policy-refs")[2]).toHaveTextContent("policy=workstation_context_feed:automation_policies, workstation_actuator:set_loop_state");
+    expect(screen.getAllByTestId("live-answer-goal-context-policy-split")[0]).toHaveTextContent("feeds=context_feed:visual_summaries; actuators=allowed_actuator:query_visual_summaries");
+    expect(screen.getAllByTestId("live-answer-goal-context-policy-split")[1]).toHaveTextContent("feeds=none; actuators=none");
+    expect(screen.getAllByTestId("live-answer-goal-context-policy-split")[2]).toHaveTextContent("feeds=workstation_context_feed:automation_policies; actuators=workstation_actuator:set_loop_state");
     expect(screen.getAllByTestId("live-answer-goal-context-freshness")[0]).toHaveTextContent("freshness=fresh observed=1781736210000 staleAfter=30000ms");
     expect(screen.getAllByTestId("live-answer-goal-context-freshness")[1]).toHaveTextContent("freshness=blocked observed=1781736211000 staleAfter=unbounded");
     expect(screen.getAllByTestId("live-answer-goal-context-freshness")[2]).toHaveTextContent("freshness=fresh observed=1781736212000 staleAfter=120000ms");
@@ -199,7 +203,8 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getByTestId("live-answer-packet-trace-count")).toHaveTextContent("2 packet traces");
     expect(screen.getByTestId("live-answer-source-health-count")).toHaveTextContent("2 source health");
     expect(screen.getByTestId("live-answer-feed-query-count")).toHaveTextContent("7 feed queries");
-    expect(screen.getByTestId("live-answer-feed-policy-ref-count")).toHaveTextContent("4 feed policy refs");
+    expect(screen.getByTestId("live-answer-feed-policy-ref-count")).toHaveTextContent("2 feed policy refs");
+    expect(screen.getByTestId("live-answer-actuator-policy-ref-count")).toHaveTextContent("2 actuator policy refs");
     expect(screen.getByTestId("live-answer-route-watch-count")).toHaveTextContent("0 route watch");
     expect(screen.getByTestId("live-answer-automation-count")).toHaveTextContent("2 automations");
     expect(screen.getByTestId("live-answer-actuator-policy-count")).toHaveTextContent("5 actuator policies");
@@ -221,7 +226,8 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("packet_traces=2");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("source_health=2");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("feed_queries=7");
-    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("feed_policy_refs=4");
+    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("feed_policy_refs=2");
+    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("actuator_policy_refs=2");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("trace_memory=2");
     expect(screen.getByTestId("live-answer-agent-goal-session")).toHaveTextContent("active / 6 feeds");
     expect(screen.getByTestId("live-answer-agent-goal-policy")).toHaveTextContent("Monitor visual and translated audio feeds.");

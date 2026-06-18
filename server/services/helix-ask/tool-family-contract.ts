@@ -603,6 +603,25 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
     ],
   }),
   contract({
+    toolName: "live_env.query_narrator_events",
+    toolFamily: "live_source_mail",
+    authority: "evidence_only",
+    mutating: false,
+    requiredObservationKinds: [
+      "stage_play_workstation_context_feed_query_result",
+      "helix.workstation_goal_context_update.v1",
+    ],
+    allowedTerminalKinds: [...evidenceOnlyTerminalKinds],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+    aliases: [
+      "narrator_events",
+      "narrator_bindings",
+      "narrator_streams",
+      "stage_play_workstation_context_feed_query_result/v1",
+    ],
+  }),
+  contract({
     toolName: "live_env.query_route_evidence",
     toolFamily: "live_source_mail",
     authority: "evidence_only",

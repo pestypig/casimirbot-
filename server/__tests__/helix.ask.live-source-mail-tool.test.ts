@@ -265,6 +265,13 @@ describe("live-source mail live environment tools", () => {
         can_run_automatically: true,
       }),
       expect.objectContaining({
+        tool_id: "live_env.query_narrator_events",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
         tool_id: "live_env.query_route_evidence",
         family: "live_env",
         creates_assistant_answer: false,
@@ -2203,6 +2210,7 @@ describe("live-source mail live environment tools", () => {
       traceCount: 1,
       requiredFeed: "packet_traces",
       requiredActuator: "query_packet_traces",
+      policyEvidenceRefs: ["context_feed:packet_traces", "allowed_actuator:query_packet_traces"],
       post_tool_model_step_required: true,
       assistant_answer: false,
       terminal_eligible: false,
@@ -2244,8 +2252,16 @@ describe("live-source mail live environment tools", () => {
     });
     expect(payload.agentGoalSession.checkpoints.at(-1)).toMatchObject({
       actionsTaken: expect.arrayContaining(["query_packet_traces", "live_env.query_packet_traces"]),
+      evidenceRefs: expect.arrayContaining([
+        "context_feed:packet_traces",
+        "allowed_actuator:query_packet_traces",
+      ]),
       nextStep: "continue",
     });
+    expect(payload.agentGoalSession.loopRefs).toEqual(expect.arrayContaining([
+      "workstation_context_feed:packet_traces",
+      "workstation_actuator:query_packet_traces",
+    ]));
     const routeUpdate = listStagePlayGoalContextUpdates({
       threadId,
       contentRef: payload.resultId,
@@ -2261,7 +2277,19 @@ describe("live-source mail live environment tools", () => {
         postToolModelStepRequired: true,
       },
     });
+    expect(routeUpdate.evidenceRefs).toEqual(expect.arrayContaining([
+      "context_feed:packet_traces",
+      "allowed_actuator:query_packet_traces",
+    ]));
+    expect(routeUpdate.loopRefs).toEqual(expect.arrayContaining([
+      "workstation_context_feed:packet_traces",
+      "workstation_actuator:query_packet_traces",
+    ]));
     expect(routeUpdate.suggestedDispatch.map((action) => action.kind)).not.toContain("wake_agent");
+    expect(queryObservation.evidence_refs).toEqual(expect.arrayContaining([
+      "context_feed:packet_traces",
+      "allowed_actuator:query_packet_traces",
+    ]));
     expect(queryObservation.producedRefs).toEqual(expect.arrayContaining([
       payload.goalContextUpdateId,
       payload.resultId,
@@ -2682,6 +2710,10 @@ describe("live-source mail live environment tools", () => {
       queryPayload.goalContextUpdateId,
       queryPayload.resultId,
       queryPayload.goalContextUpdates[0].updateId,
+    ]));
+    expect(queryPayload.agentGoalSession.loopRefs).toEqual(expect.arrayContaining([
+      "workstation_context_feed:visual_summaries",
+      "workstation_actuator:query_visual_summaries",
     ]));
 
     const storedSession = listStagePlayAgentGoalSessions({
@@ -3997,7 +4029,7 @@ describe("live-source mail live environment tools", () => {
         goal_id: "goal:narrator-context-query",
         objective: "Monitor translated transcript routing through Narrator.",
         context_feeds: [{ source_kind: "translation" }, { source_kind: "narrator" }],
-        allowed_actuators: ["narrator_bind_stream", "query_translation_segments"],
+        allowed_actuators: ["narrator_bind_stream", "query_translation_segments", "query_narrator_events"],
       },
     });
     expect(sessionObservation.ok).toBe(true);
@@ -4017,26 +4049,34 @@ describe("live-source mail live environment tools", () => {
     expect(prepared.ok).toBe(true);
 
     const queryObservation = executeLiveEnvironmentTool({
-      tool_name: "live_env.query_workstation_goal_context",
+      tool_name: "live_env.query_narrator_events",
       thread_id: threadId,
       args: {
         room_id: roomId,
         source_id: "source:browser-audio",
         goal_id: "goal:narrator-context-query",
-        producer_kind: "narrator",
-        update_kind: "suggested_action",
       },
     });
     const queryPayload = queryObservation.observation as any;
 
     expect(queryObservation).toMatchObject({
-      tool_name: "live_env.query_workstation_goal_context",
+      tool_name: "live_env.query_narrator_events",
       ok: true,
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
       context_role: "tool_evidence",
       ask_context_policy: "evidence_only",
+    });
+    expect(queryPayload).toMatchObject({
+      schema: "stage_play_workstation_context_feed_query_result/v1",
+      feedKind: "narrator_events",
+      requiredActuator: "query_narrator_events",
+      policyEvidenceRefs: ["context_feed:narrator_events", "allowed_actuator:query_narrator_events"],
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
     });
     expect(queryPayload.goalContextUpdates).toEqual([
       expect.objectContaining({
@@ -4049,7 +4089,11 @@ describe("live-source mail live environment tools", () => {
           reason: "Narrator stream binding was prepared for the active workstation goal.",
         }),
         sourceRefs: expect.arrayContaining(["source:browser-audio", "translated_transcript"]),
-        evidenceRefs: expect.arrayContaining([preparedPayload.requestId, "allowed_actuator:narrator_bind_stream", "source:browser-audio"]),
+        evidenceRefs: expect.arrayContaining([
+          preparedPayload.requestId,
+          "allowed_actuator:narrator_bind_stream",
+          "source:browser-audio",
+        ]),
         loopRefs: expect.arrayContaining(["workstation_actuator:narrator_bind_stream"]),
         receiptRefs: [preparedPayload.requestId],
         authority: {
@@ -4060,6 +4104,17 @@ describe("live-source mail live environment tools", () => {
         },
       }),
     ]);
+    const queryUpdate = listStagePlayGoalContextUpdates({
+      threadId,
+      contentRef: queryPayload.resultId,
+      limit: 1,
+    })[0];
+    expect(queryUpdate).toMatchObject({
+      producerKind: "route_watch",
+      updateKind: "route_evidence",
+      evidenceRefs: expect.arrayContaining(["context_feed:narrator_events", "allowed_actuator:query_narrator_events"]),
+      loopRefs: expect.arrayContaining(["workstation_context_feed:narrator_events", "workstation_actuator:query_narrator_events"]),
+    });
     expect(queryPayload.agentGoalSessions).toEqual(expect.arrayContaining([
       expect.objectContaining({
         goalId: "goal:narrator-context-query",
@@ -4067,6 +4122,8 @@ describe("live-source mail live environment tools", () => {
           expect.objectContaining({ sourceKind: "translated_transcripts" }),
           expect.objectContaining({ sourceKind: "narrator_events" }),
         ]),
+        allowedActuators: expect.arrayContaining(["query_narrator_events"]),
+        loopRefs: expect.arrayContaining(["workstation_context_feed:narrator_events", "workstation_actuator:query_narrator_events"]),
       }),
     ]));
     expect(queryPayload.authoritySummary).toMatchObject({

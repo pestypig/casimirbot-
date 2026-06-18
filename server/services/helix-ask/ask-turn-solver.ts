@@ -467,6 +467,44 @@ const committedModelOnlyDirectAnswerPathSatisfied = (input: {
   );
 };
 
+const capabilityHelpTerminalPathMaterialized = (input: {
+  payload: RecordLike;
+  terminalArtifactKind: string;
+  finalAnswerSource: string;
+}): boolean => {
+  const terminalUsesCapabilityHelp =
+    input.terminalArtifactKind === "capability_help_summary" ||
+    input.finalAnswerSource === "capability_help_summary";
+  if (!terminalUsesCapabilityHelp) return false;
+  if (!terminalMatchesCanonicalGoalContract(input.payload, "capability_help_summary")) return false;
+  if (!ledgerHasArtifactKind(input.payload, "capability_registry")) return false;
+  if (!ledgerHasArtifactKind(input.payload, "capability_help_summary")) return false;
+
+  const terminalAuthority = readRecord(input.payload.terminal_answer_authority);
+  const terminalWriter = readRecord(input.payload.terminal_authority_single_writer);
+  const terminalPresentation = readRecord(input.payload.terminal_presentation);
+  const resolvedSummary = readRecord(input.payload.resolved_turn_summary);
+  const authorityKind = readString(terminalAuthority?.terminal_artifact_kind);
+  const authoritySource = readString(terminalAuthority?.final_answer_source);
+  const writerKind =
+    readString(terminalWriter?.selected_terminal_artifact_kind) ||
+    readString(terminalWriter?.terminal_artifact_kind) ||
+    readString(terminalWriter?.selectedArtifactKind);
+  const presentationKind = readString(terminalPresentation?.terminal_artifact_kind);
+  const resolvedKind = readString(resolvedSummary?.terminal_artifact_kind);
+
+  return (
+    readBoolean(terminalAuthority?.server_authoritative) &&
+    (
+      authorityKind === "capability_help_summary" ||
+      authoritySource === "capability_help_summary" ||
+      writerKind === "capability_help_summary" ||
+      presentationKind === "capability_help_summary" ||
+      resolvedKind === "capability_help_summary"
+    )
+  );
+};
+
 const terminalAllowedByCanonicalOrCompliantConstraintPolicy = (input: {
   payload: RecordLike;
   terminalArtifactKind: string;
@@ -608,6 +646,9 @@ const sourceTargetFromPayload = (payload: RecordLike): { sourceTarget: string; t
   const sourceTargetIntent = readRecord(payload.source_target_intent);
   const routeContract = readRecord(payload.route_product_contract);
   const canonicalGoalFrame = readRecord(payload.canonical_goal_frame);
+  const contractArbitration = readRecord(payload.capability_contract_arbitration);
+  const capabilityPlan = readRecord(payload.capability_plan);
+  const toolCallAdmission = readRecord(payload.tool_call_admission_decision);
   if (readString(canonicalGoalFrame?.goal_kind) === "note_mutation") {
     return {
       sourceTarget: "active_note",
@@ -616,11 +657,28 @@ const sourceTargetFromPayload = (payload: RecordLike): { sourceTarget: string; t
       strength: "hard",
     };
   }
+  const effectiveSourceTarget =
+    readString(contractArbitration?.selected_source_target) ||
+    readString(capabilityPlan?.source_target) ||
+    readString(toolCallAdmission?.source_target) ||
+    readString(sourceTargetIntent?.target_source) ||
+    readString(routeContract?.source_target) ||
+    "unknown";
+  const effectiveTargetKind =
+    readString(sourceTargetIntent?.target_kind) ||
+    readString(sourceTargetIntent?.target_source) ||
+    readString(routeContract?.source_target) ||
+    effectiveSourceTarget;
   return {
-    sourceTarget: readString(sourceTargetIntent?.target_source) || readString(routeContract?.source_target) || "unknown",
-    targetKind: readString(sourceTargetIntent?.target_kind) || readString(sourceTargetIntent?.target_source) || readString(routeContract?.source_target) || "unknown",
-    reason: readString(sourceTargetIntent?.precedence_reason) || readString(routeContract?.precedence_reason) || "source_target_admission_trace",
-    strength: readString(sourceTargetIntent?.strength) || "unknown",
+    sourceTarget: effectiveSourceTarget,
+    targetKind: effectiveTargetKind,
+    reason:
+      readString(contractArbitration?.demotion_reason) ||
+      readString(toolCallAdmission?.reason) ||
+      readString(sourceTargetIntent?.precedence_reason) ||
+      readString(routeContract?.precedence_reason) ||
+      "source_target_admission_trace",
+    strength: readString(sourceTargetIntent?.strength) || readString(contractArbitration?.contract_state) || "unknown",
   };
 };
 
@@ -1242,6 +1300,12 @@ export function buildAskTurnSolverTrace(input: {
     readRecord(input.payload.poison_audit) &&
     readRecord(input.payload.terminal_answer_authority)
   );
+  const capabilityHelpFinalArbitrationMaterialized = capabilityHelpTerminalPathMaterialized({
+    payload: input.payload,
+    terminalArtifactKind,
+    finalAnswerSource,
+  });
+  const effectiveFinalArbitrationRan = finalArbitrationRan || capabilityHelpFinalArbitrationMaterialized;
   const evidenceReentryGate = buildEvidenceReentryGate({
     turnId: input.turnId,
     payload: input.payload,
@@ -1249,7 +1313,7 @@ export function buildAskTurnSolverTrace(input: {
     primaryIntent: primary,
     terminalArtifactKind,
     finalAnswerSource,
-    finalArbitrationRan,
+    finalArbitrationRan: effectiveFinalArbitrationRan,
     sourceEvidenceRequired: evidenceRequired,
     allowedTerminalProducts: committedAskRoute.canonical_goal.allowed_terminal_artifact_kinds,
     toolUseRestatement,
@@ -1262,7 +1326,7 @@ export function buildAskTurnSolverTrace(input: {
     terminalArtifactKind,
     selectedEvidenceCount: evidenceReentryGate.selected_evidence_refs.length,
     conflictingHypotheses: intentHypotheses.length > 1 && secondary.length > 0,
-    finalArbitrationRan,
+    finalArbitrationRan: effectiveFinalArbitrationRan,
   });
   const routeAuthorityOk = readBoolean(loopTrace?.route_authority_ok) || readBoolean(readRecord(input.payload.route_authority_audit)?.route_authority_ok);
   const poisonAuditOk = readBoolean(loopTrace?.poison_audit_ok) || readBoolean(readRecord(input.payload.poison_audit)?.ok);
@@ -1352,7 +1416,7 @@ export function buildAskTurnSolverTrace(input: {
     evidenceReentryCompleted: effectiveEvidenceReentryGate.completed,
     followupRequired: effectiveFollowupReasoningGate.required,
     followupCompleted: effectiveFollowupReasoningGate.completed,
-    finalArbitrationRan,
+    finalArbitrationRan: effectiveFinalArbitrationRan,
     routeAuthorityOk,
     terminalAuthorityOk,
     evidenceReentryViolationCodes: effectiveEvidenceReentryGate.violation_codes,
@@ -1363,7 +1427,7 @@ export function buildAskTurnSolverTrace(input: {
     liveSourceIdentityTerminalAllowed,
   });
   const completedSolverPath =
-    finalArbitrationRan &&
+    effectiveFinalArbitrationRan &&
     (routeAuthorityOk || canonicalTerminalAllowed) &&
     poisonAuditOk &&
     terminalAuthorityOk &&

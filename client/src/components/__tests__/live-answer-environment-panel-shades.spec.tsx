@@ -134,12 +134,14 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain('data-testid="live-answer-narrator-binding-count"');
     expect(source).toContain('data-testid="live-answer-microdeck-output-count"');
     expect(source).toContain('data-testid="live-answer-feed-policy-ref-count"');
+    expect(source).toContain('data-testid="live-answer-actuator-policy-ref-count"');
     expect(source).toContain('data-testid="live-answer-observation-authority-count"');
     expect(source).toContain('data-testid="live-answer-terminal-authority-count"');
     expect(source).toContain('data-testid="live-answer-terminal-authority-posture"');
     expect(source).toContain('data-testid="live-answer-goal-context-row"');
     expect(source).toContain('data-testid="live-answer-goal-context-refs"');
     expect(source).toContain('data-testid="live-answer-goal-context-policy-refs"');
+    expect(source).toContain('data-testid="live-answer-goal-context-policy-split"');
     expect(source).toContain('data-testid="live-answer-goal-context-authority-chips"');
     expect(source).toContain('data-testid="live-answer-goal-context-dispatch"');
     expect(source).toContain('data-testid="live-answer-agent-goal-session"');
@@ -154,7 +156,9 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain('ref.startsWith("workstation_context_feed:")');
     expect(source).toContain('ref.startsWith("workstation_actuator:")');
     expect(source).toContain("feedPolicyRefCount");
+    expect(source).toContain("actuatorPolicyRefCount");
     expect(source).toContain("feed_policy_refs");
+    expect(source).toContain("actuator_policy_refs");
     expect(source).toContain("wake interrupt");
     expect(source).toContain("narrator bind");
     expect(source).toContain("narrator bindings");

@@ -969,6 +969,7 @@ describe("Helix Ask workstation tool planner", () => {
           "query_microdeck_outputs",
           "query_live_answer_state",
           "query_source_health",
+          "query_narrator_events",
           "configure_route_watch",
           "set_audio_preset",
           "set_visual_preset",
@@ -1182,6 +1183,19 @@ describe("Helix Ask workstation tool planner", () => {
       step_id: "query_live_answer_state",
       kind: "run_ask_tool",
       tool_id: "live_env.query_live_answer_state",
+      expected_receipt_kind: "stage_play_workstation_context_feed_query_result",
+      required: true,
+    });
+
+    const narratorEventsPlan = planWorkstationToolUse(
+      "Show narrator events for the translated transcript stream.",
+      { threadId: "thread:narrator-events-feed", turnId: "turn:narrator-events-feed" },
+    );
+    expect(narratorEventsPlan.intent).toBe("workstation_goal_context");
+    expect(narratorEventsPlan.tool_plan?.steps[0]).toMatchObject({
+      step_id: "query_narrator_events",
+      kind: "run_ask_tool",
+      tool_id: "live_env.query_narrator_events",
       expected_receipt_kind: "stage_play_workstation_context_feed_query_result",
       required: true,
     });

@@ -165,6 +165,7 @@ export type AgentGoalActuatorV1 =
   | "query_microdeck_outputs"
   | "query_live_answer_state"
   | "query_source_health"
+  | "query_narrator_events"
   | "query_packet_traces"
   | "query_route_evidence"
   | "query_automation_policies"
@@ -193,6 +194,7 @@ export const WORKSTATION_AGENT_GOAL_ACTUATORS: readonly AgentGoalActuatorV1[] = 
   "query_microdeck_outputs",
   "query_live_answer_state",
   "query_source_health",
+  "query_narrator_events",
   "query_packet_traces",
   "query_route_evidence",
   "query_automation_policies",
@@ -230,6 +232,7 @@ export const WORKSTATION_AGENT_GOAL_ACTUATOR_ALIASES: Readonly<Record<string, Ag
   live_env_query_micro_reasoner_outputs: "query_microdeck_outputs",
   live_env_query_live_answer_state: "query_live_answer_state",
   live_env_query_source_health: "query_source_health",
+  live_env_query_narrator_events: "query_narrator_events",
   live_env_query_packet_traces: "query_packet_traces",
   live_env_query_route_evidence: "query_route_evidence",
   live_env_query_automation_policies: "query_automation_policies",

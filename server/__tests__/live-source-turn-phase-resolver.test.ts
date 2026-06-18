@@ -64,6 +64,30 @@ describe("resolveLiveSourceTurnPhase", () => {
       "live_env.process_live_source_mail",
       "final_answer",
     ]));
+    for (const [phaseName, toolName] of [
+      ["query_visual_summaries", "live_env.query_visual_summaries"],
+      ["query_audio_transcripts", "live_env.query_audio_transcripts"],
+      ["query_translation_segments", "live_env.query_translation_segments"],
+      ["query_microdeck_outputs", "live_env.query_microdeck_outputs"],
+      ["query_live_answer_state", "live_env.query_live_answer_state"],
+      ["query_source_health", "live_env.query_source_health"],
+    ] as const) {
+      expect(LIVE_SOURCE_TURN_PHASE_TABLE[phaseName]).toMatchObject({
+        allowedTools: [toolName],
+        fallbackTools: [],
+        requiredEvidence: ["stage_play_workstation_context_feed_query_result"],
+        completionEvidence: ["stage_play_workstation_context_feed_query_result"],
+        next: "terminal_checkpoint",
+      });
+      expect(LIVE_SOURCE_TURN_PHASE_TABLE[phaseName].forbiddenTools).toEqual(expect.arrayContaining([
+        "live_env.query_workstation_goal_context",
+        "live_env.query_trace_memory",
+        "live_env.query_packet_traces",
+        "live_env.read_processed_live_source_mail",
+        "live_env.process_live_source_mail",
+        "final_answer",
+      ]));
+    }
     expect(LIVE_SOURCE_TURN_PHASE_TABLE.query_route_evidence).toMatchObject({
       allowedTools: ["live_env.query_route_evidence"],
       fallbackTools: [],
@@ -93,6 +117,55 @@ describe("resolveLiveSourceTurnPhase", () => {
       "live_env.query_route_evidence",
       "live_env.read_processed_live_source_mail",
       "live_env.process_live_source_mail",
+      "final_answer",
+    ]));
+    expect(LIVE_SOURCE_TURN_PHASE_TABLE.query_narrator_events).toMatchObject({
+      allowedTools: ["live_env.query_narrator_events"],
+      fallbackTools: [],
+      requiredEvidence: ["stage_play_workstation_context_feed_query_result"],
+      completionEvidence: ["stage_play_workstation_context_feed_query_result"],
+      next: "terminal_checkpoint",
+    });
+    expect(LIVE_SOURCE_TURN_PHASE_TABLE.query_narrator_events.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.query_workstation_goal_context",
+      "live_env.query_trace_memory",
+      "live_env.query_packet_traces",
+      "live_env.query_route_evidence",
+      "live_env.query_automation_policies",
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "final_answer",
+    ]));
+    expect(LIVE_SOURCE_TURN_PHASE_TABLE.dispatch_workstation_control).toMatchObject({
+      allowedTools: expect.arrayContaining([
+        "live_env.change_workstation_preset",
+        "live_env.bind_workstation_source",
+        "live_env.unbind_workstation_source",
+        "live_env.set_workstation_loop_state",
+        "live_env.repair_workstation_source",
+        "live_env.update_live_answer_projection",
+        "live_env.focus_process_graph",
+        "live_env.narrator_say",
+        "live_env.narrator_bind_stream",
+      ]),
+      fallbackTools: [],
+      requiredEvidence: expect.arrayContaining([
+        "stage_play_workstation_control_receipt",
+        "helix.narrator_say_request",
+        "helix.narrator_bind_stream_request",
+      ]),
+      completionEvidence: expect.arrayContaining([
+        "stage_play_workstation_control_receipt",
+        "helix.narrator_say_request",
+        "helix.narrator_bind_stream_request",
+      ]),
+      next: "terminal_checkpoint",
+    });
+    expect(LIVE_SOURCE_TURN_PHASE_TABLE.dispatch_workstation_control.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.record_live_source_mail_decision",
+      "live_env.request_interim_voice_callout",
       "final_answer",
     ]));
     expect(LIVE_SOURCE_TURN_PHASE_TABLE.reflect_mail_loop).toMatchObject({
@@ -230,6 +303,127 @@ describe("resolveLiveSourceTurnPhase", () => {
     expect(mandatoryToolForPhase(phase)).toBeNull();
   });
 
+  it("routes feed-specific workstation prompts to read-only context feed queries", () => {
+    for (const entry of [
+      {
+        prompt: "Show visual summaries for the active visual source.",
+        phaseName: "query_visual_summaries",
+        toolName: "live_env.query_visual_summaries",
+      },
+      {
+        prompt: "Inspect audio transcripts for the earbud source.",
+        phaseName: "query_audio_transcripts",
+        toolName: "live_env.query_audio_transcripts",
+      },
+      {
+        prompt: "Show translation segments for the translated transcript stream.",
+        phaseName: "query_translation_segments",
+        toolName: "live_env.query_translation_segments",
+      },
+      {
+        prompt: "Inspect MicroDeck outputs for the frog visual packet.",
+        phaseName: "query_microdeck_outputs",
+        toolName: "live_env.query_microdeck_outputs",
+      },
+      {
+        prompt: "Show Live Answer state for the active projection.",
+        phaseName: "query_live_answer_state",
+        toolName: "live_env.query_live_answer_state",
+      },
+      {
+        prompt: "Check source health for the visual capture source.",
+        phaseName: "query_source_health",
+        toolName: "live_env.query_source_health",
+      },
+    ] as const) {
+      const phase = resolveLiveSourceTurnPhase({
+        prompt: entry.prompt,
+        selectedTargetSource: "live_source_mailbox",
+      });
+
+      expect(phase.phase).toBe(entry.phaseName);
+      expect(phase.canonicalGoal).toBe("workstation_goal_context");
+      expect(phase.allowedTools).toEqual([entry.toolName]);
+      expect(phase.forbiddenTools).toEqual(expect.arrayContaining([
+        "live_env.query_workstation_goal_context",
+        "live_env.query_trace_memory",
+        "live_env.query_packet_traces",
+        "live_env.read_processed_live_source_mail",
+        "live_env.process_live_source_mail",
+        "live_env.record_live_source_mail_decision",
+        "live_env.request_interim_voice_callout",
+        "final_answer",
+      ]));
+      expect(phase.phaseLock).toMatchObject({
+        locked: true,
+        reason: expect.stringContaining("read-only workstation evidence query"),
+      });
+      expect(mandatoryToolForPhase(phase)).toBe(entry.toolName);
+    }
+  });
+
+  it("terminalizes feed-specific workstation query receipts before any answer authority", () => {
+    for (const entry of [
+      {
+        prompt: "Show visual summaries for the active visual source.",
+        toolName: "live_env.query_visual_summaries",
+        feedKind: "visual_summaries",
+      },
+      {
+        prompt: "Inspect audio transcripts for the earbud source.",
+        toolName: "live_env.query_audio_transcripts",
+        feedKind: "audio_transcripts",
+      },
+      {
+        prompt: "Show translation segments for the translated transcript stream.",
+        toolName: "live_env.query_translation_segments",
+        feedKind: "translated_transcripts",
+      },
+      {
+        prompt: "Inspect MicroDeck outputs for the frog visual packet.",
+        toolName: "live_env.query_microdeck_outputs",
+        feedKind: "microdeck_outputs",
+      },
+      {
+        prompt: "Show Live Answer state for the active projection.",
+        toolName: "live_env.query_live_answer_state",
+        feedKind: "live_answer_lines",
+      },
+      {
+        prompt: "Check source health for the visual capture source.",
+        toolName: "live_env.query_source_health",
+        feedKind: "source_health",
+      },
+    ] as const) {
+      const phase = resolveLiveSourceTurnPhase({
+        prompt: entry.prompt,
+        selectedTargetSource: "live_source_mailbox",
+        selectedCapability: entry.toolName,
+        latestToolReceipts: [{
+          toolName: entry.toolName,
+          observation: {
+            schema: "stage_play_workstation_context_feed_query_result/v1",
+            feed_kind: entry.feedKind,
+            artifactId: "stage_play_workstation_context_feed_query_result",
+            feedId: `stage_play_workstation_context_feed:${entry.feedKind}`,
+          },
+        }],
+      });
+
+      expect(phase).toMatchObject({
+        phase: "terminal_checkpoint",
+        allowedTools: [],
+        requiredEvidence: ["stage_play_workstation_context_feed_query_result"],
+        completionEvidence: ["model_synthesized_answer"],
+        phaseLock: {
+          locked: true,
+          reason: expect.stringContaining("require model re-entry and terminal authority"),
+        },
+      });
+      expect(mandatoryToolForPhase(phase)).toBeNull();
+    }
+  });
+
   it("routes route-evidence prompts to read-only route evidence feed query", () => {
     const phase = resolveLiveSourceTurnPhase({
       prompt: "Show route-watch evidence for goal_id=goal:frog-monitor.",
@@ -341,12 +535,220 @@ describe("resolveLiveSourceTurnPhase", () => {
     expect(mandatoryToolForPhase(phase)).toBeNull();
   });
 
+  it("routes narrator-event prompts to read-only narrator event feed query", () => {
+    const phase = resolveLiveSourceTurnPhase({
+      prompt: "Show narrator events for the translated transcript stream.",
+      selectedTargetSource: "live_source_mailbox",
+    });
+
+    expect(phase.phase).toBe("query_narrator_events");
+    expect(phase.canonicalGoal).toBe("workstation_goal_context");
+    expect(phase.allowedTools).toEqual(["live_env.query_narrator_events"]);
+    expect(phase.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.query_workstation_goal_context",
+      "live_env.query_trace_memory",
+      "live_env.query_packet_traces",
+      "live_env.query_route_evidence",
+      "live_env.query_automation_policies",
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.record_live_source_mail_decision",
+      "live_env.request_interim_voice_callout",
+      "final_answer",
+    ]));
+    expect(phase.phaseLock).toMatchObject({
+      locked: true,
+      reason: "Narrator-event inspection is a read-only workstation evidence query, not mailbox processing or wake dispatch.",
+    });
+    expect(mandatoryToolForPhase(phase)).toBe("live_env.query_narrator_events");
+  });
+
+  it("terminalizes narrator-event receipts before any answer authority", () => {
+    const phase = resolveLiveSourceTurnPhase({
+      prompt: "Show narrator events for the translated transcript stream.",
+      selectedTargetSource: "live_source_mailbox",
+      selectedCapability: "live_env.query_narrator_events",
+      latestToolReceipts: [{
+        toolName: "live_env.query_narrator_events",
+        observation: {
+          schema: "stage_play_workstation_context_feed_query_result/v1",
+          feed_kind: "narrator_events",
+          artifactId: "stage_play_workstation_context_feed_query_result",
+          feedId: "stage_play_workstation_context_feed:narrator-events",
+        },
+      }],
+    });
+
+    expect(phase).toMatchObject({
+      phase: "terminal_checkpoint",
+      allowedTools: [],
+      requiredEvidence: ["stage_play_workstation_context_feed_query_result"],
+      completionEvidence: ["model_synthesized_answer"],
+      phaseLock: {
+        locked: true,
+        reason: "Narrator-event observations require model re-entry and terminal authority before any answer.",
+      },
+    });
+    expect(mandatoryToolForPhase(phase)).toBeNull();
+  });
+
+  it("routes explicit workstation control prompts to a single non-terminal dispatch phase", () => {
+    for (const entry of [
+      {
+        prompt: "Run live_env.change_workstation_preset goal_id=goal:frog target_ref=source:visual preset_id=preset:frog.",
+        toolName: "live_env.change_workstation_preset",
+      },
+      {
+        prompt: "Run live_env.bind_workstation_source goal_id=goal:frog source_ref=source:visual target_ref=live-answer:visual.",
+        toolName: "live_env.bind_workstation_source",
+      },
+      {
+        prompt: "Run live_env.unbind_workstation_source goal_id=goal:frog source_ref=source:visual.",
+        toolName: "live_env.unbind_workstation_source",
+      },
+      {
+        prompt: "Run live_env.set_workstation_loop_state goal_id=goal:frog loop_ref=loop:visual state=paused.",
+        toolName: "live_env.set_workstation_loop_state",
+      },
+      {
+        prompt: "Run live_env.repair_workstation_source goal_id=goal:frog loop_ref=loop:visual.",
+        toolName: "live_env.repair_workstation_source",
+      },
+      {
+        prompt: "Run live_env.update_live_answer_projection goal_id=goal:frog line_key=translation.",
+        toolName: "live_env.update_live_answer_projection",
+      },
+      {
+        prompt: "Run live_env.focus_process_graph goal_id=goal:frog node_ref=packet:visual.",
+        toolName: "live_env.focus_process_graph",
+      },
+      {
+        prompt: "Run live_env.narrator_say goal_id=goal:frog text='Translation ready.'",
+        toolName: "live_env.narrator_say",
+      },
+      {
+        prompt: "Run live_env.narrator_bind_stream goal_id=goal:frog source_ref=source:audio stream_kind=translated_transcript.",
+        toolName: "live_env.narrator_bind_stream",
+      },
+    ] as const) {
+      const phase = resolveLiveSourceTurnPhase({
+        prompt: entry.prompt,
+        selectedTargetSource: "live_source_mailbox",
+      });
+
+      expect(phase.phase).toBe("dispatch_workstation_control");
+      expect(phase.canonicalGoal).toBe("workstation_goal_context");
+      expect(phase.allowedTools).toEqual([entry.toolName]);
+      expect(phase.forbiddenTools).toEqual(expect.arrayContaining([
+        "live_env.read_processed_live_source_mail",
+        "live_env.process_live_source_mail",
+        "live_env.record_live_source_mail_decision",
+        "live_env.request_interim_voice_callout",
+        "final_answer",
+      ]));
+      expect(phase.phaseLock).toMatchObject({
+        locked: true,
+        reason: expect.stringContaining("non-terminal evidence"),
+      });
+      expect(mandatoryToolForPhase(phase)).toBe(entry.toolName);
+    }
+  });
+
+  it("terminalizes workstation control receipts before answer authority", () => {
+    for (const entry of [
+      {
+        toolName: "live_env.change_workstation_preset",
+        observation: {
+          schema: "stage_play_workstation_control_receipt/v1",
+          controlKind: "change_preset",
+          requiredActuator: "change_preset",
+        },
+      },
+      {
+        toolName: "live_env.focus_process_graph",
+        observation: {
+          schema: "stage_play_workstation_control_receipt/v1",
+          controlKind: "focus_process_graph",
+          requiredActuator: "focus_process_graph",
+        },
+      },
+      {
+        toolName: "live_env.narrator_say",
+        observation: {
+          schema: "helix.narrator_say_request.v1",
+          requestId: "helix:narrator:say:1",
+        },
+      },
+      {
+        toolName: "live_env.narrator_bind_stream",
+        observation: {
+          schema: "helix.narrator_bind_stream_request.v1",
+          requestId: "helix:narrator:bind:1",
+        },
+      },
+    ] as const) {
+      const phase = resolveLiveSourceTurnPhase({
+        prompt: `Run ${entry.toolName} goal_id=goal:frog.`,
+        selectedTargetSource: "live_source_mailbox",
+        selectedCapability: entry.toolName,
+        latestToolReceipts: [{
+          toolName: entry.toolName,
+          observation: entry.observation,
+        }],
+      });
+
+      expect(phase).toMatchObject({
+        phase: "terminal_checkpoint",
+        allowedTools: [],
+        requiredEvidence: expect.arrayContaining(["stage_play_workstation_control_receipt"]),
+        completionEvidence: ["model_synthesized_answer"],
+        phaseLock: {
+          locked: true,
+          reason: expect.stringContaining("terminal authority"),
+        },
+      });
+      expect(mandatoryToolForPhase(phase)).toBeNull();
+    }
+  });
+
+  it("does not dispatch workstation controls from contextual control mentions", () => {
+    for (const prompt of [
+      "Do not run live_env.change_workstation_preset; explain what evidence would be needed.",
+      'The UI label says "live_env.focus_process_graph"; summarize it.',
+      "Could we run live_env.repair_workstation_source later?",
+      "Previously you used live_env.narrator_say; what did it do?",
+    ]) {
+      const phase = resolveLiveSourceTurnPhase({
+        prompt,
+        selectedTargetSource: "live_source_mailbox",
+      });
+
+      expect(phase.phase).not.toBe("dispatch_workstation_control");
+      expect(phase.allowedTools).not.toEqual(expect.arrayContaining([
+        "live_env.change_workstation_preset",
+        "live_env.focus_process_graph",
+        "live_env.repair_workstation_source",
+        "live_env.narrator_say",
+      ]));
+    }
+  });
+
   it("does not route contextual goal-context mentions into live-env tool execution", () => {
     for (const prompt of [
       "Do not query workstation goal context; explain the architecture.",
       'The UI label says "workstation goal context updates"; what does that mean?',
       "Could we inspect per-packet traces later?",
       "Do not query trace memory; explain the architecture.",
+      'The UI label says "live_env.query_narrator_events"; what does it mean?',
+      "Could we inspect narrator events later?",
+      'The UI label says "live_env.query_visual_summaries"; what does it mean?',
+      'The UI label says "live_env.query_audio_transcripts"; what does it mean?',
+      'The UI label says "live_env.query_translation_segments"; what does it mean?',
+      'The UI label says "live_env.query_microdeck_outputs"; what does it mean?',
+      'The UI label says "live_env.query_live_answer_state"; what does it mean?',
+      'The UI label says "live_env.query_source_health"; what does it mean?',
+      "Could we inspect visual summaries later?",
+      "Do not query MicroDeck outputs; explain the architecture.",
       'The UI label says "live_env.query_route_evidence"; what does it mean?',
       'The UI label says "live_env.query_automation_policies"; what does it mean?',
       "Could we inspect route-watch evidence later?",
@@ -358,10 +760,24 @@ describe("resolveLiveSourceTurnPhase", () => {
       });
       expect(phase.phase).not.toBe("query_workstation_goal_context");
       expect(phase.phase).not.toBe("query_packet_traces");
+      expect(phase.phase).not.toBe("query_visual_summaries");
+      expect(phase.phase).not.toBe("query_audio_transcripts");
+      expect(phase.phase).not.toBe("query_translation_segments");
+      expect(phase.phase).not.toBe("query_microdeck_outputs");
+      expect(phase.phase).not.toBe("query_live_answer_state");
+      expect(phase.phase).not.toBe("query_source_health");
+      expect(phase.phase).not.toBe("query_narrator_events");
       expect(phase.phase).not.toBe("query_route_evidence");
       expect(phase.phase).not.toBe("query_automation_policies");
       expect(phase.allowedTools).not.toContain("live_env.query_workstation_goal_context");
       expect(phase.allowedTools).not.toContain("live_env.query_packet_traces");
+      expect(phase.allowedTools).not.toContain("live_env.query_visual_summaries");
+      expect(phase.allowedTools).not.toContain("live_env.query_audio_transcripts");
+      expect(phase.allowedTools).not.toContain("live_env.query_translation_segments");
+      expect(phase.allowedTools).not.toContain("live_env.query_microdeck_outputs");
+      expect(phase.allowedTools).not.toContain("live_env.query_live_answer_state");
+      expect(phase.allowedTools).not.toContain("live_env.query_source_health");
+      expect(phase.allowedTools).not.toContain("live_env.query_narrator_events");
       expect(phase.allowedTools).not.toContain("live_env.query_route_evidence");
       expect(phase.allowedTools).not.toContain("live_env.query_automation_policies");
     }

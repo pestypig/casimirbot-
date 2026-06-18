@@ -3317,7 +3317,18 @@ function StagePlayGoalContextBoard({
       ref.startsWith("workstation_context_feed:") ||
       ref.startsWith("workstation_actuator:")
     )));
-  const feedPolicyRefCount = updates.reduce((count, update) => count + policyRefsForUpdate(update).length, 0);
+  const contextFeedPolicyRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
+    policyRefsForUpdate(update).filter((ref) =>
+      ref.startsWith("context_feed:") ||
+      ref.startsWith("workstation_context_feed:")
+    );
+  const actuatorPolicyRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
+    policyRefsForUpdate(update).filter((ref) =>
+      ref.startsWith("allowed_actuator:") ||
+      ref.startsWith("workstation_actuator:")
+    );
+  const feedPolicyRefCount = updates.reduce((count, update) => count + contextFeedPolicyRefsForUpdate(update).length, 0);
+  const actuatorPolicyRefCount = updates.reduce((count, update) => count + actuatorPolicyRefsForUpdate(update).length, 0);
   const formatSessionCadence = (cadence: AgentGoalSessionV1["cadence"]): string => {
     if (cadence.kind === "event_accumulation") return `event accumulation / ${cadence.minUpdates} updates`;
     if (cadence.kind === "interval") return `interval / ${cadence.everyMs}ms`;
@@ -3406,7 +3417,7 @@ function StagePlayGoalContextBoard({
         </div>
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-feed-policy-ref-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Feed policy refs</div>
-          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(feedPolicyRefCount)} feed or actuator policy ref{feedPolicyRefCount === 1 ? "" : "s"} link feed queries to goal-session bounds.</div>
+          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(feedPolicyRefCount)} context-feed policy ref{feedPolicyRefCount === 1 ? "" : "s"} and {formatStagePlayCount(actuatorPolicyRefCount)} actuator policy ref{actuatorPolicyRefCount === 1 ? "" : "s"} link feed inputs to controlled workstation outputs.</div>
         </div>
       </div>
       <div className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(240px,320px)]">
@@ -3414,6 +3425,8 @@ function StagePlayGoalContextBoard({
           {recentUpdates.length > 0 ? recentUpdates.map((update) => {
             const color = packetTrailColor(update.contentRef);
             const policyRefs = policyRefsForUpdate(update);
+            const contextFeedPolicyRefs = contextFeedPolicyRefsForUpdate(update);
+            const actuatorPolicyRefs = actuatorPolicyRefsForUpdate(update);
             return (
               <div
                 key={update.updateId}
@@ -3452,6 +3465,11 @@ function StagePlayGoalContextBoard({
                   {policyRefs.length > 0 ? (
                     <div className="truncate" data-testid="stage-play-goal-context-update-policy">policy={policyRefs.slice(0, 4).join(", ")}</div>
                   ) : null}
+                  {contextFeedPolicyRefs.length > 0 || actuatorPolicyRefs.length > 0 ? (
+                    <div className="truncate" data-testid="stage-play-goal-context-update-policy-split">
+                      feeds={contextFeedPolicyRefs.slice(0, 3).join(", ") || "none"}; actuators={actuatorPolicyRefs.slice(0, 3).join(", ") || "none"}
+                    </div>
+                  ) : null}
                   <div className="truncate" data-testid="stage-play-goal-context-update-freshness">freshness={freshnessLabel(update)}</div>
                   {update.goalRelevance ? (
                     <div className="truncate">goal={update.goalRelevance.goalId} relevance={update.goalRelevance.relevance.toFixed(2)}</div>
@@ -3487,6 +3505,12 @@ function StagePlayGoalContextBoard({
                 <div className="mt-2 grid gap-1 font-mono text-[9px] text-slate-400" data-testid="stage-play-agent-goal-session-contract">
                   <div data-testid="stage-play-agent-goal-session-feeds">
                     feeds={session.contextFeeds.slice(0, 8).map((feed) => labelize(feed.sourceKind)).join(", ") || "none"}
+                  </div>
+                  <div data-testid="stage-play-agent-goal-session-actuators">
+                    actuators={session.allowedActuators.slice(0, 8).map((actuator) => labelize(actuator)).join(", ") || "none"}
+                  </div>
+                  <div data-testid="stage-play-agent-goal-session-loops">
+                    loops={session.loopRefs.slice(0, 4).join(", ") || "none"}
                   </div>
                   <div data-testid="stage-play-agent-goal-session-cadence">
                     cadence={formatSessionCadence(session.cadence)}

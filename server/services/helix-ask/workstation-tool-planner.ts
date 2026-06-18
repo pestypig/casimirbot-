@@ -1241,9 +1241,9 @@ function makeOpenStep(panelId: string, depends_on: string[] = []): HelixWorkstat
 }
 
 const GOAL_CONTEXT_OBJECT_PATTERN =
-  "(?:workstation\\s+goal\\s+context|goal\\s+context\\s+updates?|active\\s+goal\\s+sessions?|agent\\s+goal\\s+sessions?|goal\\s+sessions?|per[-\\s]?packet\\s+traces?|packet\\s+traces?|trace\\s+memory|reasoning\\s+circuit|process\\s+graph\\s+traces?|visual\\s+summaries|audio\\s+transcripts?|translation\\s+segments?|translated\\s+transcripts?|micro[-\\s]?deck\\s+outputs?|live\\s+answer\\s+state|live\\s+answer\\s+lines?|source\\s+health|source\\s+status|source\\s+capability\\s+state|route\\s+evidence|route[-\\s]?watch\\s+evidence|route[-\\s]?watch\\s+updates?|automation\\s+polic(?:y|ies)|workstation\\s+automations?)";
+  "(?:workstation\\s+goal\\s+context|goal\\s+context\\s+updates?|active\\s+goal\\s+sessions?|agent\\s+goal\\s+sessions?|goal\\s+sessions?|per[-\\s]?packet\\s+traces?|packet\\s+traces?|trace\\s+memory|reasoning\\s+circuit|process\\s+graph\\s+traces?|visual\\s+summaries|audio\\s+transcripts?|translation\\s+segments?|translated\\s+transcripts?|micro[-\\s]?deck\\s+outputs?|live\\s+answer\\s+state|live\\s+answer\\s+lines?|source\\s+health|source\\s+status|source\\s+capability\\s+state|narrator\\s+events?|narrator\\s+bindings?|narrator\\s+streams?|route\\s+evidence|route[-\\s]?watch\\s+evidence|route[-\\s]?watch\\s+updates?|automation\\s+polic(?:y|ies)|workstation\\s+automations?)";
 const GOAL_CONTEXT_TOOL_PATTERN =
-  "live_env\\.(?:query_workstation_goal_context|start_agent_goal_session|query_trace_memory|query_packet_traces|query_visual_summaries|query_audio_transcripts|query_translation_segments|query_microdeck_outputs|query_live_answer_state|query_source_health|query_route_evidence|query_automation_policies)";
+  "live_env\\.(?:query_workstation_goal_context|start_agent_goal_session|query_trace_memory|query_packet_traces|query_visual_summaries|query_audio_transcripts|query_translation_segments|query_microdeck_outputs|query_live_answer_state|query_source_health|query_narrator_events|query_route_evidence|query_automation_policies)";
 
 type WorkstationContextFeedTool =
   | "live_env.query_packet_traces"
@@ -1253,6 +1253,7 @@ type WorkstationContextFeedTool =
   | "live_env.query_microdeck_outputs"
   | "live_env.query_live_answer_state"
   | "live_env.query_source_health"
+  | "live_env.query_narrator_events"
   | "live_env.query_route_evidence"
   | "live_env.query_automation_policies";
 
@@ -1551,7 +1552,7 @@ function wantsQueryWorkstationGoalContext(prompt: string): boolean {
   return (
     /\blive_env\.query_workstation_goal_context\b/i.test(prompt) ||
     /\blive_env\.query_trace_memory\b/i.test(prompt) ||
-    /\blive_env\.(?:query_packet_traces|query_visual_summaries|query_audio_transcripts|query_translation_segments|query_microdeck_outputs|query_live_answer_state|query_source_health|query_route_evidence|query_automation_policies)\b/i.test(prompt) ||
+    /\blive_env\.(?:query_packet_traces|query_visual_summaries|query_audio_transcripts|query_translation_segments|query_microdeck_outputs|query_live_answer_state|query_source_health|query_narrator_events|query_route_evidence|query_automation_policies)\b/i.test(prompt) ||
     new RegExp(`\\b(?:query|view|inspect|show|list|get|check|read|retrieve|summari[sz]e)\\b[\\s\\S]{0,140}\\b${GOAL_CONTEXT_OBJECT_PATTERN}\\b`, "i").test(prompt) ||
     new RegExp(`\\b${GOAL_CONTEXT_OBJECT_PATTERN}\\b[\\s\\S]{0,140}\\b(?:query|view|inspect|show|list|get|check|read|retrieve|latest|active|available|known)\\b`, "i").test(prompt)
   );
@@ -1576,6 +1577,9 @@ function selectWorkstationContextFeedTool(prompt: string): WorkstationContextFee
   }
   if (/\blive_env\.query_audio_transcripts\b/i.test(prompt) || /\baudio\s+transcripts?\b/i.test(prompt)) {
     return "live_env.query_audio_transcripts";
+  }
+  if (/\blive_env\.query_narrator_events\b/i.test(prompt) || /\b(?:narrator\s+events?|narrator\s+bindings?|narrator\s+streams?)\b/i.test(prompt)) {
+    return "live_env.query_narrator_events";
   }
   if (
     /\blive_env\.query_translation_segments\b/i.test(prompt) ||

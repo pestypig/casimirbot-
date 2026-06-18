@@ -619,6 +619,18 @@ const liveAnswerPolicyRefsForUpdate = (update: WorkstationGoalContextUpdateV1): 
     ref.startsWith("workstation_actuator:")
   )));
 
+const liveAnswerContextFeedPolicyRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
+  liveAnswerPolicyRefsForUpdate(update).filter((ref) =>
+    ref.startsWith("context_feed:") ||
+    ref.startsWith("workstation_context_feed:")
+  );
+
+const liveAnswerActuatorPolicyRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
+  liveAnswerPolicyRefsForUpdate(update).filter((ref) =>
+    ref.startsWith("allowed_actuator:") ||
+    ref.startsWith("workstation_actuator:")
+  );
+
 const liveAnswerAutomationUpdate = (update: WorkstationGoalContextUpdateV1): boolean =>
   update.producerKind === "automation" || update.updateKind === "automation_status";
 
@@ -1805,7 +1817,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           session.contextFeeds.some((feed) => feed.sourceKind === "automation_policies")
         ).length,
       feedPolicyRefCount: goalContextUpdates.reduce(
-        (count: number, update: WorkstationGoalContextUpdateV1) => count + liveAnswerPolicyRefsForUpdate(update).length,
+        (count: number, update: WorkstationGoalContextUpdateV1) => count + liveAnswerContextFeedPolicyRefsForUpdate(update).length,
+        0,
+      ),
+      actuatorPolicyRefCount: goalContextUpdates.reduce(
+        (count: number, update: WorkstationGoalContextUpdateV1) => count + liveAnswerActuatorPolicyRefsForUpdate(update).length,
         0,
       ),
       actuatorPolicyCount: agentGoalSessions.reduce((count: number, session: AgentGoalSessionV1) => count + session.allowedActuators.length, 0),

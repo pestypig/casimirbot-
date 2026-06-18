@@ -242,6 +242,29 @@ const collectInternetSearchEvidenceRefs = (input: {
     .filter(Boolean);
 };
 
+const collectCapabilityHelpEvidenceRefs = (input: {
+  payload: RecordLike;
+  terminalArtifactKind: string;
+  finalAnswerSource: string;
+}): string[] => {
+  const terminalUsesCapabilityHelp =
+    /capability_help_summary/i.test(input.terminalArtifactKind) ||
+    /capability_help_summary/i.test(input.finalAnswerSource);
+  if (!terminalUsesCapabilityHelp) return [];
+  const ledger = Array.isArray(input.payload.current_turn_artifact_ledger)
+    ? input.payload.current_turn_artifact_ledger
+    : [];
+  return ledger
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry))
+    .filter((entry) => {
+      const kind = readString(entry.kind);
+      return kind === "capability_registry" || kind === "capability_help_summary";
+    })
+    .map((entry) => readString(entry.artifact_id))
+    .filter(Boolean);
+};
+
 const collectCapabilityItineraryEvidenceRefs = (payload: RecordLike): string[] => {
   const itinerary = readRecord(payload.capability_itinerary);
   const executionState = readRecord(itinerary?.execution_state);
@@ -411,6 +434,11 @@ export function buildEvidenceReentryGate(input: {
       finalAnswerSource: input.finalAnswerSource,
     }),
     ...collectInternetSearchEvidenceRefs({
+      payload: input.payload,
+      terminalArtifactKind: input.terminalArtifactKind,
+      finalAnswerSource: input.finalAnswerSource,
+    }),
+    ...collectCapabilityHelpEvidenceRefs({
       payload: input.payload,
       terminalArtifactKind: input.terminalArtifactKind,
       finalAnswerSource: input.finalAnswerSource,

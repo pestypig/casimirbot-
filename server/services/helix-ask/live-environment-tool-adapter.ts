@@ -2299,6 +2299,13 @@ const WORKSTATION_CONTEXT_FEED_QUERY_SPECS: Partial<Record<HelixLiveEnvironmentT
     producerKinds: ["live_answer"],
     updateKinds: ["summary", "preset_state", "source_status", "route_evidence"],
   },
+  "live_env.query_narrator_events": {
+    feedKind: "narrator_events",
+    actuator: "query_narrator_events",
+    label: "narrator events",
+    producerKinds: ["narrator"],
+    updateKinds: ["suggested_action", "automation_status", "route_evidence"],
+  },
   "live_env.query_route_evidence": {
     feedKind: "route_evidence",
     actuator: "query_route_evidence",
@@ -5467,6 +5474,11 @@ export function executeLiveEnvironmentTool(
           ]
         : ["goal_session"]
       : [];
+    const policyEvidenceRefs = uniqueStrings([
+      "context_feed:packet_traces",
+      "allowed_actuator:query_packet_traces",
+      ...missingRequirements,
+    ]);
     const ok = missingRequirements.length === 0;
     const mailItems = listStagePlayLiveSourceMailItems({
       threadId: scope.mailboxThreadResolution.mailboxThreadId,
@@ -5611,6 +5623,7 @@ export function executeLiveEnvironmentTool(
     ])}`;
     const evidenceRefs = uniqueStrings([
       resultId,
+      ...policyEvidenceRefs,
       scope.mailboxThreadResolution.mailboxThreadId,
       ...packetTraces.flatMap((trace) => trace.evidenceRefs),
       ...goalContextUpdates.flatMap((update) => [update.updateId, update.contentRef, ...update.evidenceRefs, ...update.receiptRefs]),
@@ -5633,6 +5646,8 @@ export function executeLiveEnvironmentTool(
         ...processedMailPackets.map((packet) => packet.sourceId),
       ]),
       loopRefs: uniqueStrings([
+        "workstation_context_feed:packet_traces",
+        "workstation_actuator:query_packet_traces",
         `packet_trace_query:${scope.mailboxThreadResolution.mailboxThreadId}`,
         ...processedMailPackets.flatMap((packet) => [
           packet.packetId,
@@ -5660,6 +5675,8 @@ export function executeLiveEnvironmentTool(
           roomId,
           sourceRefs: uniqueStrings([sourceRef, scope.sourceId, ...processedMailPackets.map((packet) => packet.sourceId)]),
           loopRefs: uniqueStrings([
+            "workstation_context_feed:packet_traces",
+            "workstation_actuator:query_packet_traces",
             `packet_trace_query:${scope.mailboxThreadResolution.mailboxThreadId}`,
             ...processedMailPackets.flatMap((packet) => [packet.packetId, packet.jobId, packet.causalTrace?.traceId]),
           ]),
@@ -5698,6 +5715,8 @@ export function executeLiveEnvironmentTool(
         status: ok ? "read" : "blocked",
         missingRequirements,
         missing_requirements: missingRequirements,
+        policyEvidenceRefs,
+        policy_evidence_refs: policyEvidenceRefs,
         goalSessionFound: goalId ? Boolean(goalSession) : null,
         goal_session_found: goalId ? Boolean(goalSession) : null,
         feedAllowed,
@@ -5915,6 +5934,7 @@ export function executeLiveEnvironmentTool(
           loopRefs: uniqueStrings([
             ...goalContextUpdates.flatMap((update) => update.loopRefs),
             `workstation_context_feed:${feedQuerySpec.feedKind}`,
+            `workstation_actuator:${feedQuerySpec.actuator}`,
           ]),
           evidenceRefs: uniqueStrings([goalContextUpdateId, ...evidenceRefs]).slice(0, 80),
           actionsTaken: [feedQuerySpec.actuator, input.tool_name],
@@ -5964,6 +5984,8 @@ export function executeLiveEnvironmentTool(
         actuator_allowed: actuatorAllowed,
         agentGoalSession: checkpointedGoalSession,
         agent_goal_session: checkpointedGoalSession,
+        agentGoalSessions: checkpointedGoalSession ? [checkpointedGoalSession] : [],
+        agent_goal_sessions: checkpointedGoalSession ? [checkpointedGoalSession] : [],
         goalContextUpdates,
         goal_context_updates: goalContextUpdates,
         authoritySummary,

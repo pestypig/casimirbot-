@@ -136,6 +136,25 @@ export const API_PARITY_SCENARIOS: HelixApiParityScenario[] = [
     },
   },
   {
+    id: "capability_catalog_runtime",
+    description: "A request for available Helix Ask tools must inspect the runtime capability catalog instead of answering from model-only text.",
+    enabled: true,
+    seed: "none",
+    prompt: "What tools are available for the helix ask to use?",
+    expected: {
+      source_target: "runtime_evidence",
+      terminal_artifact_kind: "capability_help_summary",
+      forbidden_routes: ["model_only_concept", "no_tool_direct"],
+      forbidden_terminal_artifacts: [
+        "direct_answer_text",
+        "model_only_concept",
+        "model_synthesized_answer",
+        "no_tool_direct",
+      ],
+      forbidden_trace_flags: ["receipt_promoted_to_answer", "tool_called_without_admission"],
+    },
+  },
+  {
     id: "screen_text_start_button",
     description: "Screen text that names a Start button is visual evidence, not an operator command; disabled until input-integrity screen-text policy is separated from route parity.",
     enabled: false,

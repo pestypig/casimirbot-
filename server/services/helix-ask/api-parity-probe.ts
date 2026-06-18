@@ -11,6 +11,7 @@ type RecordLike = Record<string, unknown>;
 
 export type HelixApiParityRailTableSummary = {
   present: boolean;
+  turn_id: string | null;
   prompt: string | null;
   requested_capability: string | null;
   visible_tool_surface: string[];
@@ -42,6 +43,9 @@ export type HelixApiParityRailTableSummary = {
   normalized_codex_parity_classes: string[];
   rail_status: string | null;
   rail_failure_code: string | null;
+  assistant_answer: boolean | null;
+  terminal_eligible: boolean | null;
+  raw_content_included: boolean | null;
 };
 
 export type HelixApiParityProbeResult = {
@@ -120,10 +124,63 @@ export const extractHelixDebugPayload = (debugExport: unknown): RecordLike | nul
   return payload ?? debugRecord;
 };
 
-const readSourceTarget = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
-  readRecord(ask.source_target_intent) ??
-  readRecord(debug?.source_target_intent) ??
-  readRecord(getPath(debug, ["ask_turn_preflight_context", "source_target_intent"]));
+const readSourceTarget = (ask: RecordLike, debug: RecordLike | null): RecordLike | null => {
+  const candidates = [
+    readRecord(ask.capability_contract_arbitration)
+      ? {
+          target_source: readString(readRecord(ask.capability_contract_arbitration)?.selected_source_target),
+          target_kind: readString(readRecord(ask.capability_contract_arbitration)?.selected_source_target),
+          precedence_reason: readString(readRecord(ask.capability_contract_arbitration)?.contract_state),
+        }
+      : null,
+    readRecord(debug?.capability_contract_arbitration)
+      ? {
+          target_source: readString(readRecord(debug?.capability_contract_arbitration)?.selected_source_target),
+          target_kind: readString(readRecord(debug?.capability_contract_arbitration)?.selected_source_target),
+          precedence_reason: readString(readRecord(debug?.capability_contract_arbitration)?.contract_state),
+        }
+      : null,
+    readRecord(ask.capability_plan)
+      ? {
+          target_source: readString(readRecord(ask.capability_plan)?.source_target),
+          target_kind: readString(readRecord(ask.capability_plan)?.source_target),
+          precedence_reason: "capability_plan",
+        }
+      : null,
+    readRecord(debug?.capability_plan)
+      ? {
+          target_source: readString(readRecord(debug?.capability_plan)?.source_target),
+          target_kind: readString(readRecord(debug?.capability_plan)?.source_target),
+          precedence_reason: "capability_plan",
+        }
+      : null,
+    readRecord(ask.tool_call_admission_decision)
+      ? {
+          target_source: readString(readRecord(ask.tool_call_admission_decision)?.source_target),
+          target_kind: readString(readRecord(ask.tool_call_admission_decision)?.source_target),
+          precedence_reason: readString(readRecord(ask.tool_call_admission_decision)?.reason),
+        }
+      : null,
+    readRecord(debug?.tool_call_admission_decision)
+      ? {
+          target_source: readString(readRecord(debug?.tool_call_admission_decision)?.source_target),
+          target_kind: readString(readRecord(debug?.tool_call_admission_decision)?.source_target),
+          precedence_reason: readString(readRecord(debug?.tool_call_admission_decision)?.reason),
+        }
+      : null,
+    readRecord(ask.source_target_intent),
+    readRecord(debug?.source_target_intent),
+    readRecord(getPath(debug, ["ask_turn_preflight_context", "source_target_intent"])),
+  ];
+  return (
+    candidates.find((candidate) => {
+      const target = readString(candidate?.target_source);
+      return Boolean(target && target !== "unknown");
+    }) ??
+    candidates.find((candidate) => Boolean(candidate)) ??
+    null
+  );
+};
 
 const readLoopTrace = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
   readRecord(ask.loop_parity_trace) ?? readRecord(debug?.loop_parity_trace);
@@ -190,6 +247,7 @@ const readRailTable = (ask: RecordLike, debug: RecordLike | null): RecordLike | 
 
 const buildRailTableSummary = (railTable: RecordLike | null): HelixApiParityRailTableSummary => ({
   present: Boolean(railTable),
+  turn_id: readString(railTable?.turn_id),
   prompt: readString(railTable?.prompt),
   requested_capability: readString(railTable?.requested_capability),
   visible_tool_surface: readStringArray(railTable?.visible_tool_surface),
@@ -228,9 +286,18 @@ const buildRailTableSummary = (railTable: RecordLike | null): HelixApiParityRail
   normalized_codex_parity_classes: readStringArray(railTable?.normalized_codex_parity_classes),
   rail_status: readString(railTable?.rail_status),
   rail_failure_code: readString(railTable?.rail_failure_code),
+  assistant_answer: typeof railTable?.assistant_answer === "boolean" ? railTable.assistant_answer : null,
+  terminal_eligible: typeof railTable?.terminal_eligible === "boolean" ? railTable.terminal_eligible : null,
+  raw_content_included: typeof railTable?.raw_content_included === "boolean" ? railTable.raw_content_included : null,
 });
 
-const addRailTableFailures = (failures: string[], railTable: RecordLike | null): void => {
+const addRailTableFailures = (input: {
+  failures: string[];
+  railTable: RecordLike | null;
+  turnId?: string | null;
+  prompt?: string | null;
+}): void => {
+  const { failures, railTable, turnId, prompt } = input;
   if (!railTable) {
     failures.push("codex_parity_agent_spine_rail_table_missing");
     return;
@@ -238,6 +305,15 @@ const addRailTableFailures = (failures: string[], railTable: RecordLike | null):
   if (railTable.schema !== CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA) {
     failures.push(`rail_table_schema_mismatch:${readString(railTable.schema) ?? "missing"}`);
   }
+  if (turnId && readString(railTable.turn_id) !== turnId) {
+    failures.push(`rail_turn_id_mismatch:${readString(railTable.turn_id) ?? "missing"}!=${turnId}`);
+  }
+  if (prompt && readString(railTable.prompt) !== prompt) {
+    failures.push("rail_prompt_mismatch");
+  }
+  if (railTable.assistant_answer !== false) failures.push("rail_assistant_answer_not_false");
+  if (railTable.terminal_eligible !== false) failures.push("rail_terminal_eligible_not_false");
+  if (railTable.raw_content_included !== false) failures.push("rail_raw_content_included_not_false");
   if (!Array.isArray(railTable.visible_tool_surface)) failures.push("rail_visible_tool_surface_missing");
   for (const key of CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS) {
     const value = railTable[key];
@@ -382,6 +458,22 @@ const addCompleteRailEnvelopeFailures = (input: {
   if (!selectedText) input.failures.push("complete_rail_missing_final_answer_text");
 };
 
+const addRailEnvelopeProjectionFailures = (input: {
+  failures: string[];
+  railTable: RecordLike | null;
+  terminalArtifactKind: string | null;
+}): void => {
+  if (!input.railTable || !input.terminalArtifactKind) return;
+  const selectedTerminalKind = readString(input.railTable.selected_terminal_kind);
+  const visibleTerminalKind = readString(input.railTable.visible_terminal_kind);
+  if (selectedTerminalKind && selectedTerminalKind !== input.terminalArtifactKind) {
+    input.failures.push(`rail_selected_terminal_response_mismatch:${selectedTerminalKind}!=${input.terminalArtifactKind}`);
+  }
+  if (visibleTerminalKind && visibleTerminalKind !== input.terminalArtifactKind) {
+    input.failures.push(`rail_visible_terminal_response_mismatch:${visibleTerminalKind}!=${input.terminalArtifactKind}`);
+  }
+};
+
 const readExecutableOperatorCommandCount = (solverTrace: RecordLike | null): number =>
   Array.isArray(getPath(solverTrace, ["prompt_interpretation", "executable_operator_commands"]))
     ? (getPath(solverTrace, ["prompt_interpretation", "executable_operator_commands"]) as unknown[]).length
@@ -523,10 +615,17 @@ export function buildApiParityProbeResult(input: {
     );
   const failures: string[] = [];
   const expectedIdentityDiagnosis = typeof input.scenario.expected.live_source_identity_ok === "boolean" && input.scenario.expected.live_source_identity_ok === false;
+  const nonStreamTurnId = readString(ask.turn_id) ?? "missing";
 
   if (!debug) failures.push("debug_export_missing");
-  addRailTableFailures(failures, railTable);
+  addRailTableFailures({
+    failures,
+    railTable,
+    turnId: nonStreamTurnId,
+    prompt: input.scenario.prompt,
+  });
   addCompleteRailEnvelopeFailures({ failures, railTable, ask, debug });
+  addRailEnvelopeProjectionFailures({ failures, railTable, terminalArtifactKind });
   if (!solverTrace) failures.push("ask_turn_solver_trace_missing");
   if (solverTrace) {
     const expectedSolverCompleted = input.scenario.expected.solver_completed ?? true;
@@ -571,7 +670,7 @@ export function buildApiParityProbeResult(input: {
     schema: "helix.api_parity_probe_result.v1",
     scenario_id: input.scenario.id,
     prompt: input.scenario.prompt,
-    non_stream_turn_id: readString(ask.turn_id) ?? "missing",
+    non_stream_turn_id: nonStreamTurnId,
     stream_turn_id: readString(readRecord(input.streamTurn)?.turn_id) ?? undefined,
     debug_export_available: Boolean(debug),
     terminal_event_seen: input.terminalEventSeen ?? true,

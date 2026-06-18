@@ -432,6 +432,7 @@ describe("Helix Ask API parity matrix", () => {
       terminal_authority_ok: true,
       rail_table: {
         present: true,
+        turn_id: railTable.turn_id,
         prompt: railTable.prompt,
         visible_tool_surface: railTable.visible_tool_surface,
         codex_parity_class: railTable.codex_parity_class,
@@ -441,6 +442,9 @@ describe("Helix Ask API parity matrix", () => {
         observation_ref: railTable.observation_ref,
         selected_terminal_kind: railTable.selected_terminal_kind,
         visible_terminal_kind: railTable.visible_terminal_kind,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
       },
       procedural_ok: true,
       failures: [],
@@ -563,6 +567,110 @@ describe("Helix Ask API parity matrix", () => {
         "complete_rail_terminal_error:terminal_kind_not_required",
         "complete_rail_typed_failure_terminal",
         "complete_rail_non_final_response:final_failure/final_failure",
+      ]),
+    );
+  });
+
+  it("rejects stale or answer-like rail table mirrors", () => {
+    const scenario: HelixApiParityScenario = {
+      id: "rail_table_debug_identity_stale",
+      description: "A successful-looking answer cannot hide a stale or answer-bearing rail mirror.",
+      enabled: true,
+      seed: "none",
+      prompt: "What tools are available for the helix ask to use?",
+      expected: {},
+    };
+    const actualTurnId = "ask:test:actual-rail-debug-identity";
+    const railTable = {
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      turn_id: "ask:test:stale-rail-debug-identity",
+      prompt: scenario.prompt,
+      requested_capability: "helix_ask.inspect_capability_catalog",
+      visible_tool_surface: ["helix_ask.inspect_capability_catalog"],
+      selected_capability: "helix_ask.inspect_capability_catalog",
+      admitted_capability: "helix_ask.inspect_capability_catalog",
+      admission_proof_source: "tool_call_admission_decision.admitted_capability",
+      admission_proven: true,
+      executed_capability: "helix_ask.inspect_capability_catalog",
+      observation_kind: "capability_registry",
+      observation_ref: "capability_catalog_observation",
+      required_observation_kinds_for_requested_capability: ["capability_registry"],
+      observed_artifact_supports_requested_capability: true,
+      reentry_status: "reentered",
+      reentry_proof_source: "tool_followup_decision.evidence_reentered",
+      reentry_proven: true,
+      goal_satisfaction: "satisfied",
+      required_terminal_kind: "capability_help_summary",
+      selected_terminal_kind: "capability_help_summary",
+      terminal_authority_proof_source: "terminal_answer_authority.terminal_artifact_kind",
+      terminal_authority_proven: true,
+      visible_terminal_kind: "capability_help_summary",
+      visible_projection_source: "payload.terminal_artifact_kind",
+      visible_projection_proven: true,
+      first_broken_rail: null,
+      repair_target: null,
+      codex_parity_class: "complete",
+      normalized_codex_parity_classes: [...CODEX_PARITY_CLASSES],
+      rail_status: "complete",
+      rail_failure_code: null,
+      assistant_answer: true,
+      terminal_eligible: true,
+      raw_content_included: true,
+    };
+    const askTurn = {
+      turn_id: actualTurnId,
+      final_status: "final_answer",
+      response_type: "final_answer",
+      final_answer_source: "capability_help_summary",
+      terminal_artifact_kind: "capability_help_summary",
+      selected_final_answer: "The available Helix Ask tools are exposed through the runtime capability catalog.",
+      codex_parity_agent_spine_rail_table: railTable,
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        selected_primary_intent: "capability_help",
+        solver_short_circuit_flags: [],
+      },
+      loop_parity_trace: {
+        admitted_tool_families: ["capability_catalog"],
+        actual_tool_calls: [],
+        unexpected_tool_calls: [],
+        short_circuit_risk_flags: [],
+      },
+      route_authority_audit: {
+        route_authority_ok: true,
+        violation_codes: [],
+      },
+      poison_audit: {
+        ok: true,
+      },
+      terminal_answer_authority: {
+        server_authoritative: true,
+        final_answer_source: "capability_help_summary",
+        terminal_artifact_kind: "capability_help_summary",
+      },
+    };
+
+    const probe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: { payload: askTurn },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(probe.procedural_ok).toBe(false);
+    expect(probe.rail_table).toMatchObject({
+      turn_id: railTable.turn_id,
+      assistant_answer: true,
+      terminal_eligible: true,
+      raw_content_included: true,
+    });
+    expect(probe.failures).toEqual(
+      expect.arrayContaining([
+        `rail_turn_id_mismatch:${railTable.turn_id}!=${actualTurnId}`,
+        "rail_assistant_answer_not_false",
+        "rail_terminal_eligible_not_false",
+        "rail_raw_content_included_not_false",
       ]),
     );
   });

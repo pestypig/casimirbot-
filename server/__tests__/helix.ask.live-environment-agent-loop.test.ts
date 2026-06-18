@@ -147,6 +147,7 @@ describe("Helix Ask live environment agent loop", () => {
       "live_env.query_microdeck_outputs",
       "live_env.query_live_answer_state",
       "live_env.query_source_health",
+      "live_env.query_narrator_events",
       "live_env.query_route_evidence",
       "live_env.query_automation_policies",
     ];

@@ -423,6 +423,9 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   if (/live_env[-_.:]query_live_answer_state|live_answer_state|live_answer_lines/.test(haystack)) {
     return "live_env.query_live_answer_state";
   }
+  if (/live_env[-_.:]query_narrator_events|narrator_events|narrator_bindings|narrator_streams|helix\.narrator_bind_stream_request|helix\.narrator_say_request/.test(haystack)) {
+    return "live_env.query_narrator_events";
+  }
   if (/live_env[-_.:]change_workstation_preset|change_workstation_preset|apply_workstation_preset/.test(haystack)) {
     return "live_env.change_workstation_preset";
   }

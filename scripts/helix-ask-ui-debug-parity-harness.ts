@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { chromium, type Page } from "@playwright/test";
 import {
   CODEX_PARITY_AGENT_SPINE_CLASSES,
@@ -70,15 +71,22 @@ const findRailTable = (debugExport: Record<string, unknown> | null): Record<stri
   asRecord(getPath(debugExport, ["artifact_query_index", "codex_parity_agent_spine_rail_table"])) ??
   asRecord(getPath(debugExport, ["debug", "artifact_query_index", "codex_parity_agent_spine_rail_table"]));
 
-const collectRailTableViolations = (
+export const collectRailTableViolations = (
   railTable: Record<string, unknown> | null,
   terminalAuthority: Record<string, unknown> | null,
+  turnId?: string | null,
 ): string[] => {
   if (!railTable) return ["codex_parity_agent_spine_rail_table_missing"];
   const violations: string[] = [];
   if (railTable.schema !== CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA) {
     violations.push("codex_parity_agent_spine_rail_table_schema_mismatch");
   }
+  if (turnId && readString(railTable.turn_id) !== turnId) {
+    violations.push(`rail_turn_id_mismatch:${readString(railTable.turn_id) || "missing"}!=${turnId}`);
+  }
+  if (railTable.assistant_answer !== false) violations.push("rail_assistant_answer_not_false");
+  if (railTable.terminal_eligible !== false) violations.push("rail_terminal_eligible_not_false");
+  if (railTable.raw_content_included !== false) violations.push("rail_raw_content_included_not_false");
   if (!Array.isArray(railTable.visible_tool_surface)) {
     violations.push("rail_visible_tool_surface_missing");
   }
@@ -297,6 +305,10 @@ async function runPrompt(page: Page, item: HarnessPrompt): Promise<HarnessResult
   const debugExport = await collectDebugExport(page);
   const terminalAuthority = asRecord(debugExport?.terminal_answer_authority);
   const railTable = findRailTable(debugExport);
+  const turnId =
+    readString(debugExport?.turn_id) ||
+    readString(debugExport?.active_turn_id) ||
+    readString(getPath(debugExport, ["payload", "turn_id"]));
   const terminalAuthorityText = readString(terminalAuthority?.terminal_text_preview);
   const selectedFinalAnswer = readString(debugExport?.selected_final_answer);
   const coverageArtifacts = collectCoverageArtifacts(debugExport);
@@ -305,7 +317,7 @@ async function runPrompt(page: Page, item: HarnessPrompt): Promise<HarnessResult
   const violations: string[] = [];
 
   if (!debugExport) violations.push("debug_export_missing");
-  violations.push(...collectRailTableViolations(railTable, terminalAuthority));
+  violations.push(...collectRailTableViolations(railTable, terminalAuthority, turnId || null));
   violations.push(...completeRailEnvelopeViolations({ railTable, debugExport, visibleFinalAnswer }));
   if (!visibleFinalAnswer) violations.push("visible_final_answer_missing");
   if (terminalAuthorityText && visibleFinalAnswer !== terminalAuthorityText) {
@@ -374,7 +386,13 @@ async function main(): Promise<void> {
   }
 }
 
-void main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+const invokedAsCli = process.argv[1]
+  ? import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href
+  : false;
+
+if (invokedAsCli) {
+  void main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

@@ -96,6 +96,7 @@ describe("workstation goal context contract", () => {
       "query_microdeck_outputs",
       "query_live_answer_state",
       "query_source_health",
+      "query_narrator_events",
       "configure_route_watch",
       "set_visual_preset",
       "bind_source",
@@ -220,6 +221,7 @@ describe("workstation goal context contract", () => {
     expect(normalizeAgentGoalActuatorV1("live_env.update_live_answer_projection")).toBe("update_live_answer");
     expect(normalizeAgentGoalActuatorV1("live_env.narrator_bind_stream")).toBe("narrator_bind_stream");
     expect(normalizeAgentGoalActuatorV1("live_env.query_automation_policies")).toBe("query_automation_policies");
+    expect(normalizeAgentGoalActuatorV1("live_env.query_narrator_events")).toBe("query_narrator_events");
     expect(normalizeAgentGoalActuatorV1("pause workstation loop")).toBe("pause_loop");
     expect(normalizeAgentGoalActuatorV1("wake_agent")).toBeNull();
   });

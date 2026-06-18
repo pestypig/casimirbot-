@@ -517,6 +517,7 @@ Pinned local artifact hashes for the smoke-chain rows are:
 | `nhm2-qei-worldline-dossier.json` | `b7c719032fcda7c10cd0c730f3ae8b20364d1b3580e5f66908d37bc6a191760f` |
 | `nhm2-observer-robust-energy-conditions.json` | `a40ae1b20f47be183b65054d0abf1d55a62467aee445f4448f7dfcd58f775e99` |
 | `nhm2-tile-counterpart-conservation.json` | `de16c4746ef180df25e2fd13b7e4e83bf89a1bdd3fa7a507ada9ae26eb8e36d9` |
+| `nhm2-time-dependent-source-campaign.json` | `b191d63ea3bf78281873630e61c07d1416a012e5558fd94f2e3d2d5e82bcee12` |
 
 | Gate | June pass-path / smoke-chain state | Claim boundary |
 |---|---|---|
@@ -530,6 +531,12 @@ Pinned local artifact hashes for the smoke-chain rows are:
 | Metric-required full tensor route | Metric-required full tensor generation is available/capable, but residual evidence and downstream harnesses still need synchronized readiness and basis metadata so `T0i` and off-diagonal `Tij` are consumed consistently. | Not the conceptual blocker; still a wiring/readiness blocker in this artifact set. |
 | Material credibility | Declared material receipt can support diagnostic source admission. | Not experimental material validation and not physical mechanism proof. |
 | Claim admission | Physical and transport claims remain forbidden. | Diagnostic / reduced-order review language only. |
+
+#### Time-dependent source campaign target
+
+The next-tier physical-pass campaign target is now machine-readable as `nhm2_time_dependent_source_campaign/v1`. This artifact is stricter than the static regional pass-path harness. It asks whether a frozen time-dependent tile/material source campaign can supply an independently derived `T_mu_nu(t)`, conserve covariantly across regional supports and sector switching, converge under a fixed-cycle-average frequency ladder `f, 2f, 4f, 8f, ...`, agree with the proposed effective-source geometry after time averaging, close full regional `T00`, `T0i`, diagonal `Tij`, and off-diagonal `Tij`, and carry observer-family, QEI-worldline, horizon, blueshift, particle-accumulation, and perturbative-stability receipts.
+
+Current static smoke-chain evidence cannot pass that campaign by itself. Missing frequency convergence, switching conservation, dynamic/effective geometry agreement, backreaction, and stability receipts should therefore appear as explicit missing or review blockers. This is a falsification ledger for the next frozen dynamic run, not a physical viability claim, route ETA claim, propulsion claim, or transport certificate.
 
 ### 4.9 Quantum-spacetime proxy lane
 
