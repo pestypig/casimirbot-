@@ -128,6 +128,20 @@ const environmentPolicyBadges = (environment: LiveAnswerEnvironment): Array<{ la
   ];
 };
 
+const liveAnswerAuthorityBadges = (environment: LiveAnswerEnvironment): Array<{ label: string; value: string }> => [
+  {
+    label: "Authority",
+    value: environment.context_role === "observation_not_assistant_answer" ||
+      environment.deterministic_content_role === "observation_not_assistant_answer"
+      ? "observation-only"
+      : "unknown",
+  },
+  { label: "assistant", value: environment.assistant_answer === false ? "false" : "unknown" },
+  { label: "terminal", value: environment.terminal_eligible === false ? "false" : "unknown" },
+  { label: "raw", value: environment.raw_content_included === false ? "false" : "unknown" },
+  { label: "model step", value: environment.post_tool_model_step_required === true ? "required" : "unknown" },
+];
+
 const copyDebugSummary = (environment: LiveAnswerEnvironment, deltas: LiveAnswerEnvironmentDelta[]) => {
   const lines = Array.isArray(environment.lines) ? environment.lines : [];
   const text = JSON.stringify({
@@ -268,6 +282,7 @@ export function LiveAnswerEnvironmentCard({
     "raw payloads excluded",
   ].join(" / ");
   const policyBadges = environmentPolicyBadges(environment);
+  const authorityBadges = liveAnswerAuthorityBadges(environment);
   const selectedRehearsalSpace = rehearsalCatalog.spaces.find((space: HelixRehearsalSpace) => space.space_id === selectedRehearsalSpaceId) ??
     rehearsalCatalog.spaces.find((space: HelixRehearsalSpace) => space.space_id === rehearsalCatalog.selected_space_id) ??
     null;
@@ -296,6 +311,21 @@ export function LiveAnswerEnvironmentCard({
               {badge.label}: {badge.value}
             </span>
           ))}
+        </div>
+        <div
+          className="rounded border border-cyan-300/15 bg-black/10 px-2 py-1"
+          data-testid="live-answer-card-authority"
+        >
+          <div className="flex flex-wrap gap-1">
+            {authorityBadges.map((badge: { label: string; value: string }) => (
+              <span key={badge.label} className="rounded border border-cyan-300/20 bg-cyan-300/5 px-1.5 py-0.5 text-[10px] text-cyan-100">
+                {badge.label}: {badge.value}
+              </span>
+            ))}
+          </div>
+          <p className="mt-1 text-[10px] text-cyan-50/65">
+            Live Answer projections are goal-context evidence until terminal authority selects a final answer.
+          </p>
         </div>
         {visibleLines.map((line: HelixPresentStateCardLine) => (
           <p key={line.key}>

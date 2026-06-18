@@ -672,6 +672,39 @@ describe("Helix capability plan contract", () => {
     });
   });
 
+  it("maps explicit ImageLens inspection to the governed visual-capture runtime capability", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:image-lens-explicit",
+      promptText: "Use image_lens.inspect to inspect the current ImageLens visual source.",
+      sourceTargetIntent: baseSourceTarget("model_only", "general_background"),
+      toolCallAdmissionDecision: toolAdmission("model_only", ["model_only"]),
+      canonicalGoalFrame: canonicalGoal("model_only_concept", "direct_answer_text"),
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "visual_capture",
+      source_target: "visual_capture",
+      requested_capability: "image_lens.inspect",
+      requested_action: "situation-room.describe_visual_capture",
+      selected_capability: "situation-room.describe_visual_capture",
+      goal_kind: "visual_capture_describe",
+      required_terminal_kind: "model_synthesized_answer",
+    });
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "explicit_capability_command",
+      requested_capability: "image_lens.inspect",
+      selected_source_target: "visual_capture",
+      selected_plan_family: "visual_capture",
+      canonical_goal_kind: "visual_capture_describe",
+      required_observation_kinds: expect.arrayContaining([
+        "visual_frame_evidence",
+        "situation_context_pack",
+        "visual_capture_coverage",
+      ]),
+      required_terminal_kind: "model_synthesized_answer",
+    });
+  });
+
   it("lets explicit docs locate capability beat stale panel-control canonical goal", () => {
     const plan = buildCapabilityPlan({
       turnId: "ask:docs-locate-explicit",

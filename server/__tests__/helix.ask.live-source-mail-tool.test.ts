@@ -1627,6 +1627,20 @@ describe("live-source mail live environment tools", () => {
   it("queries synced workstation goal context through live_env.query_workstation_goal_context", () => {
     seedVisualSummaryText("ImageLens shows a frog image ready for classification.", "goal-context");
 
+    const sessionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        goal_id: "goal:context-query",
+        objective: "Inspect visual goal-context updates and session controls.",
+        context_feeds: ["visual_summaries", "microdeck_outputs", "trace_memory"],
+        allowed_actuators: ["query_visual_summaries", "query_microdeck_outputs", "query_trace_memory"],
+      },
+    });
+    expect(sessionObservation.ok).toBe(true);
+
     const processObservation = executeLiveEnvironmentTool({
       tool_name: "live_env.process_live_source_mail",
       thread_id: threadId,
@@ -1673,6 +1687,15 @@ describe("live-source mail live environment tools", () => {
         processedPacketCount: 1,
       },
     });
+    expect(queryPayload.agentGoalSessions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        goalId: "goal:context-query",
+        authority: {
+          assistantAnswer: false,
+          finalReportsRequireTerminalAuthority: true,
+        },
+      }),
+    ]));
     expect(queryPayload.goalContextUpdates).toHaveLength(2);
     const processedUpdate = queryPayload.goalContextUpdates.find((update: any) => update.contentRef === processPayload.packets[0].packetId);
     expect(processedUpdate).toMatchObject({
@@ -1699,8 +1722,10 @@ describe("live-source mail live environment tools", () => {
       "update_panel",
     ]));
     expect(queryObservation.producedRefs).toContain(processedUpdate.updateId);
+    expect(queryObservation.producedRefs).toContain("goal:context-query");
     expect(queryObservation.evidence_refs).toEqual(expect.arrayContaining([
       processPayload.packets[0].packetId,
+      "goal:context-query",
       sourceId,
     ]));
   });

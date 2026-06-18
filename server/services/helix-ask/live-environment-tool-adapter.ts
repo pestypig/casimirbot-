@@ -5166,7 +5166,10 @@ export function executeLiveEnvironmentTool(
         ask_context_policy: "evidence_only",
       },
       evidenceRefs,
-      producedRefs: goalContextUpdates.map((update) => update.updateId),
+      producedRefs: [
+        ...goalContextUpdates.map((update) => update.updateId),
+        ...agentGoalSessions.map((session) => session.goalId),
+      ],
       forceNormalizedRefs: true,
     });
   }

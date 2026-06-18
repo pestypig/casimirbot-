@@ -3204,6 +3204,11 @@ function StagePlayGoalContextBoard({
     update.authority.terminalEligible === false &&
     update.authority.rawContentIncluded === false
   ).length;
+  const formatSessionCadence = (cadence: AgentGoalSessionV1["cadence"]): string => {
+    if (cadence.kind === "event_accumulation") return `event accumulation / ${cadence.minUpdates} updates`;
+    if (cadence.kind === "interval") return `interval / ${cadence.everyMs}ms`;
+    return labelize(cadence.kind);
+  };
   return (
     <div className="rounded-md border border-violet-900/60 bg-violet-950/10 p-3" data-testid="stage-play-goal-context-board">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -3297,6 +3302,20 @@ function StagePlayGoalContextBoard({
                 <div className="mt-1 line-clamp-2 text-[10px] text-slate-400">{session.objective}</div>
                 <div className="mt-2 rounded border border-slate-800 bg-slate-950/70 px-2 py-1 font-mono text-[9px] text-slate-400">
                   final_reports_require_terminal_authority={String(session.authority.finalReportsRequireTerminalAuthority)}
+                </div>
+                <div className="mt-2 grid gap-1 font-mono text-[9px] text-slate-400" data-testid="stage-play-agent-goal-session-contract">
+                  <div data-testid="stage-play-agent-goal-session-feeds">
+                    feeds={session.contextFeeds.slice(0, 4).map((feed) => labelize(feed.sourceKind)).join(", ") || "none"}
+                  </div>
+                  <div data-testid="stage-play-agent-goal-session-cadence">
+                    cadence={formatSessionCadence(session.cadence)}
+                  </div>
+                  <div data-testid="stage-play-agent-goal-session-stop-conditions">
+                    stop={session.stopConditions.slice(0, 2).join(" | ") || "none"}
+                  </div>
+                  <div data-testid="stage-play-agent-goal-session-checkpoint">
+                    checkpoint={session.checkpoints.at(-1)?.summary ?? "none"}
+                  </div>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1">
                   {session.allowedActuators.slice(0, 4).map((actuator) => (

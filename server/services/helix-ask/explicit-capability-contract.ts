@@ -132,6 +132,20 @@ const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
     allowed_substitutions: [],
     forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
   },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: "image_lens.inspect",
+    runtime_capability: "situation-room.describe_visual_capture",
+    aliases: ["image_lens", "image-lens", "visual_capture", "situation-room.describe_visual_capture"],
+    capability_family: "visual_capture",
+    plan_family: "visual_capture",
+    source_target: "visual_capture",
+    admission_families: ["situation_run"],
+    required_observation_kinds: ["visual_frame_evidence", "situation_context_pack", "visual_capture_coverage"],
+    required_terminal_kind: "model_synthesized_answer",
+    allowed_substitutions: ["situation-room.describe_visual_capture"],
+    forbidden_nearby_capabilities: ["docs-viewer.locate_in_doc", "repo-code.search_concept", "model.direct_answer"],
+  },
 ];
 
 const commandVerb = String.raw`(?:call|use|run|invoke|execute|inspect\s+using|locate\s+(?:in\s+doc\s+)?using|find\s+using)`;

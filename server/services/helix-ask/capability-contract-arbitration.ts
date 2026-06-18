@@ -75,6 +75,9 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
     case "live_env.process_live_source_mail":
     case "live_env.reflect_live_source_mail_loop":
       return "live_source_mailbox_review";
+    case "image_lens.inspect":
+    case "situation-room.describe_visual_capture":
+      return "visual_capture_describe";
     default:
       return null;
   }
@@ -96,6 +99,9 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
     case "live_env.process_live_source_mail":
     case "live_env.reflect_live_source_mail_loop":
       return "live_source_mail";
+    case "image_lens.inspect":
+    case "situation-room.describe_visual_capture":
+      return "visual_capture";
     default:
       return "workspace_state";
   }

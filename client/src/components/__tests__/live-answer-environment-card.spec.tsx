@@ -52,6 +52,11 @@ const environment: LiveAnswerEnvironment = {
   raw_transcript_included: false,
   raw_audio_included: false,
   deterministic_content_role: "observation_not_assistant_answer",
+  context_role: "observation_not_assistant_answer",
+  terminal_eligible: false,
+  post_tool_model_step_required: true,
+  assistant_answer: false,
+  raw_content_included: false,
 };
 
 const delta: LiveAnswerEnvironmentDelta = {
@@ -90,6 +95,20 @@ describe("LiveAnswerEnvironmentCard", () => {
     render(<LiveAnswerEnvironmentCard environment={environment} onAskHelix={onAskHelix} />);
     fireEvent.click(screen.getByRole("button", { name: "Ask about this" }));
     expect(onAskHelix).toHaveBeenCalledWith(expect.stringContaining("live answer environment"));
+  });
+
+  it("renders Live Answer projection authority as non-terminal goal-context evidence", () => {
+    render(<LiveAnswerEnvironmentCard environment={environment} />);
+
+    const authority = screen.getByTestId("live-answer-card-authority");
+    expect(authority).toHaveTextContent("Authority: observation-only");
+    expect(authority).toHaveTextContent("assistant: false");
+    expect(authority).toHaveTextContent("terminal: false");
+    expect(authority).toHaveTextContent("raw: false");
+    expect(authority).toHaveTextContent("model step: required");
+    expect(authority).toHaveTextContent(
+      "Live Answer projections are goal-context evidence until terminal authority selects a final answer.",
+    );
   });
 
   it("prefers Stage Play answer lines over generic visual present-state lines", async () => {

@@ -845,7 +845,10 @@ const buildToolTurnChainAudit = (input: {
     input.artifacts.some((artifact) =>
       requestedObservationKinds.some((kind) => observationKindMatches(artifact, kind)),
     );
-  const requiredTerminal = requiredTerminalKind(input.payload, input.contract);
+  const requiredTerminal =
+    requestedCapabilityContract?.capability === "image_lens.inspect"
+      ? requestedCapabilityContract.required_terminal_kind
+      : requiredTerminalKind(input.payload, input.contract);
   const supportCount = supportRefsCount(input.payload, input.artifacts);
   const materializedTerminal = materializedTerminalKind(input.payload);
   const authorityTerminal = terminalAuthorityKind(input.payload);

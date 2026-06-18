@@ -2034,6 +2034,56 @@ describe("StagePlayBadgeGraphPanel", () => {
         interpreterProfiles: [],
         interpreterProfileComparisons: [],
         voiceSteeringDebug: null,
+        agentGoalSessions: [{
+          schemaVersion: "helix.agent_goal_session.v1",
+          goalId: "goal:stage-play-monitor",
+          threadId: "helix-ask:desktop",
+          roomId: "room:minecraft",
+          objective: "Monitor visual packets and narrator bindings for Minecraft danger.",
+          userVisibleSummary: "Minecraft danger monitor",
+          status: "active",
+          sourceRefs: ["source:visual-tab"],
+          loopRefs: ["loop:visual-capture"],
+          constructRefs: ["stage_play_badge_graph:ui"],
+          contextFeeds: [
+            {
+              feedId: "feed:visual",
+              sourceKind: "visual_summaries",
+              freshnessMs: 30000,
+              relevancePolicy: "same-source-or-goal-id",
+            },
+            {
+              feedId: "feed:microdeck",
+              sourceKind: "microdeck_outputs",
+              freshnessMs: 30000,
+              relevancePolicy: "same-source-or-goal-id",
+            },
+            {
+              feedId: "feed:trace",
+              sourceKind: "trace_memory",
+              freshnessMs: 120000,
+              relevancePolicy: "same-thread-or-turn",
+            },
+          ],
+          allowedActuators: ["query_visual_summaries", "query_microdeck_outputs", "narrator_bind_stream", "focus_process_graph"],
+          cadence: { kind: "event_accumulation", minUpdates: 2 },
+          stopConditions: [
+            "User stops monitoring",
+            "Terminal authority produces a final report",
+          ],
+          checkpoints: [{
+            checkpointId: "checkpoint:stage-play-monitor",
+            createdAtMs: 1780521603000,
+            summary: "Visual packet and narrator stream are attached.",
+            evidenceRefs: ["stage_play_processed_mail_packet:minimal-ui"],
+            actionsTaken: ["query_visual_summaries", "narrator_bind_stream"],
+            nextStep: "continue",
+          }],
+          authority: {
+            assistantAnswer: false,
+            finalReportsRequireTerminalAuthority: true,
+          },
+        }],
         assistant_answer: false,
         terminal_eligible: false,
         context_role: "tool_evidence",
@@ -2057,6 +2107,12 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-goal-context-authority-state")).toHaveTextContent(/evidence-only, non-terminal context/i);
     expect(screen.getByTestId("stage-play-terminal-authority-state")).toHaveTextContent(/Final reports require a completed solver path/i);
     expect(screen.getByTestId("stage-play-narrator-binding-state")).toHaveTextContent(/stream binding dispatch/i);
+    expect(screen.getByText("Minecraft danger monitor")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/visual summaries/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/microdeck outputs/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-cadence")).toHaveTextContent(/event accumulation \/ 2 updates/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-stop-conditions")).toHaveTextContent(/Terminal authority produces a final report/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-checkpoint")).toHaveTextContent(/Visual packet and narrator stream are attached/i);
     expect(screen.getAllByTestId("stage-play-goal-context-update").length).toBeGreaterThan(0);
     expect(screen.getAllByTestId("stage-play-goal-context-authority-chips").some((node) =>
       /assistant=false.*terminal=false.*raw=false/s.test(node.textContent ?? "")
