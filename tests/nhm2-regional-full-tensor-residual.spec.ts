@@ -161,4 +161,32 @@ describe("nhm2_regional_full_tensor_residual/v1", () => {
     expect(artifact.summary.firstBlocker).toBe("global:T00:full_tensor_residual_exceeded");
     expect(artifact.summary.firstBlocker).not.toContain("global:global:");
   });
+
+  it("prioritizes same-basis sample-count blockers before numeric residuals", () => {
+    const globalTensor = tensor(10);
+    globalTensor.T00 = -20;
+    const artifact = buildNhm2RegionalFullTensorResidual({
+      regionalSourceClosureEvidence: evidence({
+        global: {
+          metricRequired: {
+            ...region("global").metricRequired,
+            sampleCount: 2_097_152,
+          },
+          tileEffectiveCounterpart: {
+            ...region("global").tileEffectiveCounterpart,
+            tensor: globalTensor,
+            sampleCount: 1,
+          },
+        },
+      }),
+    });
+
+    expect(artifact.summary.firstBlocker).toBe(
+      "global:source_evidence:sample_count_mismatch",
+    );
+    expect(artifact.summary.firstBlocker).not.toBe(
+      "global:T00:full_tensor_residual_exceeded",
+    );
+    expect(artifact.summary.fullTensorResidualsPass).toBe(false);
+  });
 });

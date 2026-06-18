@@ -150,6 +150,29 @@ describe("nhm2 regional source-closure evidence contract", () => {
     expect(isNhm2RegionalSourceClosureEvidenceArtifact(evidence)).toBe(false);
   });
 
+  it("rejects same-basis comparison when finite sample counts differ", () => {
+    const evidence = artifact([
+      region("global", {
+        metricRequired: {
+          ...region("global").metricRequired,
+          sampleCount: 2_097_152,
+        },
+        tileEffectiveCounterpart: {
+          ...region("global").tileEffectiveCounterpart,
+          sampleCount: 1,
+        },
+      }),
+      region("hull"),
+      region("wall"),
+      region("exterior_shell"),
+    ]);
+
+    expect(evidence.overallState).toBe("review");
+    expect(evidence.reasonCodes).toContain("global:sample_count_mismatch");
+    expect(evidence.reasonCodes).toContain("global:same_basis_metadata_mismatch");
+    expect(isNhm2RegionalSourceClosureEvidenceArtifact(evidence)).toBe(false);
+  });
+
   it("rejects profile mismatch", () => {
     const evidence = artifact(
       [region("global"), region("hull"), region("wall"), region("exterior_shell")],

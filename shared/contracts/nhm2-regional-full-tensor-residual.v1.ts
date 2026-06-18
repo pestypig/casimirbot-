@@ -137,6 +137,27 @@ const fullTensorAuthorityBlocker = (
   return `${side}_tensor_authority_unknown`;
 };
 
+const SOURCE_EVIDENCE_PRIORITY_BLOCKERS = new Set([
+  "profile_mismatch",
+  "chart_mismatch",
+  "unit_mismatch",
+  "aggregation_mismatch",
+  "sample_count_mismatch",
+  "same_basis_metadata_mismatch",
+  "same_basis_metadata_missing",
+  "metric_aggregation_metadata_unknown",
+  "metric_sample_count_missing",
+  "tile_sample_count_missing",
+  "tile_role_not_counterpart:gr_matter_channel_observation",
+  "tile_role_not_counterpart:metric_echo_diagnostic_only",
+  "tile_role_not_counterpart:unknown",
+  "metric_echo_not_source_closure",
+]);
+
+const isPrioritySourceEvidenceBlocker = (blocker: string): boolean =>
+  SOURCE_EVIDENCE_PRIORITY_BLOCKERS.has(blocker) ||
+  blocker.startsWith("tile_role_not_counterpart:");
+
 const componentResidual = (
   regionId: Nhm2RegionalSourceClosureRegionId,
   componentId: (typeof NHM2_REGIONAL_FULL_TENSOR_RESIDUAL_REQUIRED_COMPONENTS)[number],
@@ -237,13 +258,20 @@ const buildRegion = (
     },
     null,
   );
+  const prioritySourceEvidenceBlockers = sourceRegion.blockers
+    .filter(isPrioritySourceEvidenceBlocker)
+    .map((blocker) => `source_evidence:${blocker}`);
+  const remainingSourceEvidenceBlockers = sourceRegion.blockers
+    .filter((blocker) => !isPrioritySourceEvidenceBlocker(blocker))
+    .map((blocker) => `source_evidence:${blocker}`);
   const blockers = [
+    ...prioritySourceEvidenceBlockers,
     ...(metricAuthorityBlocker == null ? [] : [metricAuthorityBlocker]),
     ...(tileAuthorityBlocker == null ? [] : [tileAuthorityBlocker]),
     ...missingMetricComponentIds.map((componentId) => `${componentId}:metric_component_missing`),
     ...missingTileComponentIds.map((componentId) => `${componentId}:tile_component_missing`),
     ...components.flatMap((component) => component.blockers),
-    ...sourceRegion.blockers.map((blocker) => `source_evidence:${blocker}`),
+    ...remainingSourceEvidenceBlockers,
   ];
   const hasMissing = components.some((component) => component.status === "missing");
   const hasFail = components.some((component) => component.status === "fail");
