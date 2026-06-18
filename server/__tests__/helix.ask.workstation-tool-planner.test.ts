@@ -981,6 +981,23 @@ describe("Helix Ask workstation tool planner", () => {
       expected_receipt_kind: "stage_play_workstation_context_feed_query_result",
       required: true,
     });
+
+    const sourceHealthPlan = planWorkstationToolUse(
+      "Check the source health for the active live source.",
+      { threadId: "thread:source-health-feed", turnId: "turn:source-health-feed" },
+    );
+    expect(sourceHealthPlan.intent).toBe("workstation_goal_context");
+    expect(sourceHealthPlan.tool_plan?.steps[0]).toMatchObject({
+      step_id: "query_source_health",
+      kind: "run_ask_tool",
+      tool_id: "live_env.query_source_health",
+      expected_receipt_kind: "helix.situation_source_capability_read.v1",
+      expected_state_change: {
+        store: "stage-play-goal-context",
+        proof_key: "goalContextUpdates",
+      },
+      required: true,
+    });
   });
 
   it("routes affirmative workstation control prompts to governed control receipts", () => {
@@ -1049,6 +1066,8 @@ describe("Helix Ask workstation tool planner", () => {
       "Do not query trace memory; explain the phrase.",
       'The UI label says "live_env.query_trace_memory"; summarize it.',
       'The UI label says "live_env.query_audio_transcripts"; summarize it.',
+      'The UI label says "live_env.query_source_health"; summarize it.',
+      "Could we check source health later after the live source is running?",
     ]) {
       const plan = planWorkstationToolUse(prompt, { threadId: "thread:goal-context-negative" });
       expect(plan.intent).toBe("direct_answer");

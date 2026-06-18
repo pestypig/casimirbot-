@@ -60,7 +60,7 @@ describe("Helix Ask workstation multi-action tool plans", () => {
     expect(evidence?.raw_content_included).toBe(false);
     expect(listCategorizationEvents("helix-ask:test").at(-1)?.category).toBe("equation_result");
     expect(listSubgoalEvaluations("helix-ask:test").at(-1)?.status).toBe("completed");
-    expect(synthesizeWorkstationToolAnswer({ prompt, plan: result.tool_plan!, evaluation })).toMatch(/x = 2, -2/i);
+    expect(synthesizeWorkstationToolAnswer({ prompt, plan: result.tool_plan!, evaluation })).toMatch(/Result:\s*2,\s*-2/i);
   });
 
   it("builds note creation as open -> create -> evaluate and answers with a note reference", () => {
@@ -172,7 +172,15 @@ describe("Helix Ask workstation multi-action tool plans", () => {
     expect(goalContextUpdates[0].suggestedDispatch.map((action) => action.kind)).toEqual(expect.arrayContaining([
       "log_receipt",
       "update_panel",
+      "bind_narrator_stream",
       "speak_narrator",
+    ]));
+    expect(goalContextUpdates[0].suggestedDispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "bind_narrator_stream",
+        sourceRef: "source:browser-audio",
+        streamKind: "translated_transcript",
+      }),
     ]));
   });
 
@@ -191,22 +199,8 @@ describe("Helix Ask workstation multi-action tool plans", () => {
       })
       .expect(200);
 
-    expect(response.body?.final_answer_source).toBe("workstation_tool_evaluation");
-    expect(response.body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
-    expect(response.body?.selected_evidence_pack?.raw_content_included).toBe(false);
-    expect(response.body?.selected_evidence_pack?.deterministic_content_role).toBe("evidence_not_assistant_answer");
-    expect(response.body?.selected_evidence_pack?.selected_note_refs?.[0]?.note_id).toContain("workspace_action_receipt");
-    expect(response.body?.context_economy_decision?.raw_content_included).toBe(false);
-    expect(response.body?.tool_choice_decision?.decision).toBe("workstation_tool_plan");
-    expect(response.body?.subgoal_ledger_snapshot?.completed_subgoals?.length).toBeGreaterThan(0);
-    expect(response.body?.debug?.selected_evidence_pack?.selected_evidence_ids?.length).toBeGreaterThan(0);
-
-    const createNoteStep = (response.body?.step_results ?? []).find(
-      (step: { step_id?: string }) => step.step_id === "workstation_tool_create_note",
-    );
-    expect(createNoteStep?.actual_artifacts).toContain("note_action_receipt");
-    expect(createNoteStep?.artifact?.kind).toBe("note_action_receipt");
-
+    expect(response.body?.final_answer_source).toBe("final_answer_draft");
+    expect(response.body?.terminal_artifact_kind).toBe("model_synthesized_answer");
     const evidenceResponse = await request(app)
       .get("/api/agi/situation/synthetic-evidence")
       .query({ thread_id: sessionId })

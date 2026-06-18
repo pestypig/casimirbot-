@@ -24,6 +24,7 @@ import {
   isStagePlayReflectionPrompt,
 } from "./stage-play-prompt-intent";
 import { isWorkspaceOsStatusPrompt } from "./workspace-os-status-intent";
+import { isAskCapabilityCatalogPrompt } from "./capability-catalog-intent";
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
 
@@ -113,6 +114,7 @@ const HELIX_TOOL_CALL_ADMISSION_FAMILIES = new Set<string>([
   "theory_locator",
   "runtime_evidence",
   "workspace_diagnostic",
+  "capability_catalog",
   "live_environment",
   "live_pipeline",
   "process_graph",
@@ -135,6 +137,9 @@ const sourceTargetToolFamilies = (
   if (sourceTarget === "scholarly_research") return ["scholarly_research"];
   if (sourceTarget === "internet_search") return ["internet_search"];
   if (sourceTarget === "repo_code") return ["repo_code"];
+  if (sourceTarget === "runtime_evidence" && isAskCapabilityCatalogPrompt(promptText)) {
+    return ["capability_catalog", "runtime_evidence"];
+  }
   if (sourceTarget === "live_environment" || sourceTarget === "live_source_mailbox") return ["live_environment"];
   if (sourceTarget === "active_note") return ["notes"];
   if (sourceTarget === "calculator" || sourceTarget === "calculator_solve" || sourceTarget === "calculator_stream") {
@@ -592,10 +597,15 @@ export function buildToolCallAdmissionDecision(input: {
     extraForbiddenRoutes = ["process_graph_overview", "live_environment_binding_diagnosis", "model_only_concept", "no_tool_direct"];
     reason = "visual_scene_memory_requires_scene_memory_path";
   } else if (sourceTarget === "repo_code" || sourceTarget === "runtime_evidence") {
-    admittedToolFamilies = sourceTarget === "runtime_evidence" ? ["repo_code", "runtime_evidence"] : ["repo_code"];
+    const capabilityCatalogPrompt = sourceTarget === "runtime_evidence" && isAskCapabilityCatalogPrompt(promptText);
+    admittedToolFamilies = capabilityCatalogPrompt
+      ? ["capability_catalog", "runtime_evidence"]
+      : sourceTarget === "runtime_evidence" ? ["repo_code", "runtime_evidence"] : ["repo_code"];
     extraForbiddenTerminalKinds = ["direct_answer_text", "no_tool_direct", "model_only_concept", "process_graph_overview", "situation_context_pack"];
     extraForbiddenRoutes = ["situation_context_question", "process_graph_overview", "model_only_concept"];
-    reason = "repo_code_requires_repo_evidence_path";
+    reason = capabilityCatalogPrompt
+      ? "capability_catalog_prompt_requires_runtime_catalog_observation"
+      : "repo_code_requires_repo_evidence_path";
   } else if (sourceTarget === "live_pipeline") {
     admittedToolFamilies = ["live_pipeline"];
     extraForbiddenTerminalKinds = ["situation_context_pack", "doc_summary", "active_doc_identity", "no_tool_direct", "model_only_concept"];

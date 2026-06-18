@@ -65,7 +65,24 @@ describe("workstation goal context contract", () => {
         relevancePolicy: "append matching summaries",
       },
     ],
-    allowedActuators: ["set_visual_preset", "bind_narrator", "narrator_bind_stream", "narrator_say", "query_trace_memory"],
+    allowedActuators: [
+      "query_visual_summaries",
+      "query_audio_transcripts",
+      "query_translation_segments",
+      "query_microdeck_outputs",
+      "query_live_answer_state",
+      "query_source_health",
+      "set_visual_preset",
+      "bind_source",
+      "unbind_source",
+      "bind_narrator",
+      "narrator_bind_stream",
+      "narrator_say",
+      "query_trace_memory",
+      "resume_loop",
+      "set_loop_state",
+      "focus_process_graph",
+    ],
     cadence: { kind: "event_accumulation", minUpdates: 2 },
     stopConditions: ["user stops the goal", "visual source disconnects"],
     checkpoints: [
@@ -102,8 +119,49 @@ describe("workstation goal context contract", () => {
     ]));
   });
 
+  it("rejects goal-context updates that are not source-linked, evidence-backed, or freshness-valid", () => {
+    expect(validateWorkstationGoalContextUpdateV1({
+      ...update,
+      sourceRefs: [],
+      evidenceRefs: [],
+      freshness: {
+        observedAtMs: 0,
+        staleAfterMs: 0,
+        status: "expired" as WorkstationGoalContextUpdateV1["freshness"]["status"],
+      },
+    })).toEqual(expect.arrayContaining([
+      "sourceRefs must include at least one reference",
+      "evidenceRefs must include at least one reference",
+      "freshness.observedAtMs must be a positive timestamp",
+      "freshness.staleAfterMs must be a positive number",
+      "freshness.status is invalid",
+    ]));
+  });
+
   it("accepts durable goal sessions with explicit context feeds and actuators", () => {
     expect(validateAgentGoalSessionV1(goal)).toEqual([]);
+  });
+
+  it("rejects goal sessions with unknown context feeds, actuator names, or invalid feed freshness", () => {
+    expect(validateAgentGoalSessionV1({
+      ...goal,
+      contextFeeds: [
+        ...goal.contextFeeds,
+        {
+          feedId: "feed:unknown",
+          sourceKind: "wake_candidates" as AgentGoalSessionV1["contextFeeds"][number]["sourceKind"],
+          freshnessMs: 0,
+        },
+      ],
+      allowedActuators: [
+        ...goal.allowedActuators,
+        "wake_agent" as AgentGoalSessionV1["allowedActuators"][number],
+      ],
+    })).toEqual(expect.arrayContaining([
+      "contextFeeds[1].sourceKind is invalid",
+      "contextFeeds[1].freshnessMs must be a positive number",
+      "allowedActuators[16] is invalid",
+    ]));
   });
 
   it("rejects goal sessions that do not require terminal authority for reports", () => {

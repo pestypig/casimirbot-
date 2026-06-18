@@ -193,14 +193,26 @@ describe("stage-play goal context store", () => {
         expect.objectContaining({ sourceKind: "route_evidence" }),
       ]),
       allowedActuators: expect.arrayContaining([
+        "query_visual_summaries",
+        "query_audio_transcripts",
+        "query_translation_segments",
+        "query_microdeck_outputs",
+        "query_live_answer_state",
+        "query_source_health",
         "set_audio_preset",
         "set_visual_preset",
+        "change_preset",
+        "bind_source",
+        "unbind_source",
         "bind_narrator",
         "narrator_bind_stream",
         "narrator_say",
         "update_live_answer",
         "query_trace_memory",
         "pause_loop",
+        "resume_loop",
+        "set_loop_state",
+        "focus_process_graph",
         "repair_source",
         "ask_user",
       ]),
@@ -383,6 +395,59 @@ describe("stage-play goal context store", () => {
     ]);
   });
 
+  it("keeps ordinary wake receipts from becoming agent interrupts", () => {
+    const wakeRequest: StagePlayLiveSourceMailWakeRequestV1 = {
+      artifactId: "stage_play_live_source_mail_wake_request",
+      schemaVersion: "stage_play_live_source_mail_wake_request/v1",
+      wakeRequestId: "stage_play_live_source_mail_wake_request:ordinary",
+      threadId,
+      roomId: "room:stage-play",
+      environmentId: "env:desktop",
+      jobId: "stage_play_live_source_job:frog",
+      mailIds: ["stage_play_live_source_mail:visual-1"],
+      sourceIds: ["visual_source:screen"],
+      reason: "user_requested_watch",
+      wakeIntent: "ask_from_processed_packet",
+      status: "queued",
+      decisionIds: [],
+      attemptCount: 0,
+      lifecycleStage: "queued",
+      packetIds: ["stage_play_processed_mail_packet:frog-1"],
+      evidenceRefs: ["stage_play_processed_mail_packet:frog-1"],
+      queuedAt: now,
+      updatedAt: now,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    };
+
+    const [update] = syncStagePlayGoalContextFromMailbox({
+      threadId,
+      roomId: "room:stage-play",
+      mailItems: [mailFixture()],
+      processedMailPackets: [packetFixture()],
+      microReasonerRuns: [runFixture()],
+      wakeRequests: [wakeRequest],
+      nowMs: Date.parse("2026-06-17T14:00:03.000Z"),
+    });
+
+    expect(update.contentRef).toBe("stage_play_processed_mail_packet:frog-1");
+    expect(update.receiptRefs).toContain("stage_play_live_source_mail_wake_request:ordinary");
+    expect(update.suggestedDispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "log_receipt", receiptRef: "stage_play_processed_mail_packet:frog-1" }),
+      expect.objectContaining({ kind: "append_goal_context" }),
+      expect.objectContaining({ kind: "update_panel", panelId: "stage-play-badge-graph" }),
+    ]));
+    expect(update.suggestedDispatch.map((action) => action.kind)).not.toContain("wake_agent");
+    expect(update.authority).toEqual({
+      assistantAnswer: false,
+      terminalEligible: false,
+      rawContentIncluded: false,
+      postToolModelStepRequired: true,
+    });
+  });
+
   it("keeps wake as a dispatch action instead of answer authority", () => {
     const wakeRequest: StagePlayLiveSourceMailWakeRequestV1 = {
       artifactId: "stage_play_live_source_mail_wake_request",
@@ -469,7 +534,17 @@ describe("stage-play goal context store", () => {
           freshnessMs: 120_000,
         },
       ],
-      allowedActuators: ["set_visual_preset", "bind_narrator", "narrator_bind_stream", "query_trace_memory"],
+      allowedActuators: [
+        "query_visual_summaries",
+        "query_translation_segments",
+        "set_visual_preset",
+        "bind_source",
+        "bind_narrator",
+        "narrator_bind_stream",
+        "query_trace_memory",
+        "set_loop_state",
+        "focus_process_graph",
+      ],
       cadence: { kind: "event_accumulation", minUpdates: 3 },
       stopConditions: ["frog species reported through terminal authority"],
       checkpoint: {
@@ -498,7 +573,17 @@ describe("stage-play goal context store", () => {
           freshnessMs: 120000,
         }),
       ]),
-      allowedActuators: expect.arrayContaining(["set_visual_preset", "bind_narrator", "narrator_bind_stream", "query_trace_memory"]),
+      allowedActuators: expect.arrayContaining([
+        "query_visual_summaries",
+        "query_translation_segments",
+        "set_visual_preset",
+        "bind_source",
+        "bind_narrator",
+        "narrator_bind_stream",
+        "query_trace_memory",
+        "set_loop_state",
+        "focus_process_graph",
+      ]),
       cadence: { kind: "event_accumulation", minUpdates: 3 },
       stopConditions: expect.arrayContaining(["frog species reported through terminal authority"]),
       authority: {

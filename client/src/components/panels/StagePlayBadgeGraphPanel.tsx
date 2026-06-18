@@ -3194,6 +3194,16 @@ function StagePlayGoalContextBoard({
     (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "speak_narrator" || action.kind === "bind_narrator_stream").length,
     0,
   );
+  const narratorBindingCount = updates.reduce(
+    (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "bind_narrator_stream").length,
+    0,
+  );
+  const terminalAuthorityRequiredCount = activeSessions.filter((session) => session.authority.finalReportsRequireTerminalAuthority).length;
+  const observationOnlyUpdateCount = updates.filter((update) =>
+    update.authority.assistantAnswer === false &&
+    update.authority.terminalEligible === false &&
+    update.authority.rawContentIncluded === false
+  ).length;
   return (
     <div className="rounded-md border border-violet-900/60 bg-violet-950/10 p-3" data-testid="stage-play-goal-context-board">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -3207,7 +3217,23 @@ function StagePlayGoalContextBoard({
           <StagePlayMetricPill label="updates" value={formatStagePlayCount(updates.length)} />
           <StagePlayMetricPill label="wake interrupts" value={formatStagePlayCount(wakeInterruptCount)} tone={wakeInterruptCount > 0 ? "warn" : "default"} />
           <StagePlayMetricPill label="narrator dispatch" value={formatStagePlayCount(narratorDispatchCount)} tone={narratorDispatchCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="narrator bindings" value={formatStagePlayCount(narratorBindingCount)} tone={narratorBindingCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="active goals" value={formatStagePlayCount(activeSessions.length)} tone={activeSessions.length > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="terminal authority" value={`${terminalAuthorityRequiredCount}/${activeSessions.length}`} tone={terminalAuthorityRequiredCount > 0 ? "warn" : "default"} />
+        </div>
+      </div>
+      <div className="mt-3 grid gap-2 text-[10px] md:grid-cols-3">
+        <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-goal-context-authority-state">
+          <div className="font-semibold uppercase tracking-wide text-violet-200/80">Observation authority</div>
+          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(observationOnlyUpdateCount)} updates are evidence-only, non-terminal context.</div>
+        </div>
+        <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-terminal-authority-state">
+          <div className="font-semibold uppercase tracking-wide text-violet-200/80">Terminal authority</div>
+          <div className="mt-0.5 text-slate-400">Final reports require a completed solver path for {formatStagePlayCount(terminalAuthorityRequiredCount)} active goal session{terminalAuthorityRequiredCount === 1 ? "" : "s"}.</div>
+        </div>
+        <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-narrator-binding-state">
+          <div className="font-semibold uppercase tracking-wide text-violet-200/80">Narrator bindings</div>
+          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(narratorBindingCount)} stream binding dispatch{narratorBindingCount === 1 ? "" : "es"} visible beside narrator speech requests.</div>
         </div>
       </div>
       <div className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(240px,320px)]">
@@ -3229,6 +3255,11 @@ function StagePlayGoalContextBoard({
                   <span className="font-mono text-[9px] text-violet-200/70">{labelize(update.producerKind)}</span>
                 </div>
                 <div className="mt-1 line-clamp-2 text-[10px] leading-snug text-slate-300">{update.preview}</div>
+                <div className="mt-2 flex flex-wrap gap-1" data-testid="stage-play-goal-context-authority-chips">
+                  <span className="rounded border border-slate-700 bg-slate-950 px-1.5 py-0.5 font-mono text-[9px] text-slate-400">assistant=false</span>
+                  <span className="rounded border border-slate-700 bg-slate-950 px-1.5 py-0.5 font-mono text-[9px] text-slate-400">terminal=false</span>
+                  <span className="rounded border border-slate-700 bg-slate-950 px-1.5 py-0.5 font-mono text-[9px] text-slate-400">raw=false</span>
+                </div>
                 <div className="mt-2 flex flex-wrap gap-1">
                   {update.suggestedDispatch.slice(0, 4).map((action, index) => (
                     <span
@@ -3264,6 +3295,9 @@ function StagePlayGoalContextBoard({
                   <span className="font-mono text-[9px] text-violet-200/70">{labelize(session.status)}</span>
                 </div>
                 <div className="mt-1 line-clamp-2 text-[10px] text-slate-400">{session.objective}</div>
+                <div className="mt-2 rounded border border-slate-800 bg-slate-950/70 px-2 py-1 font-mono text-[9px] text-slate-400">
+                  final_reports_require_terminal_authority={String(session.authority.finalReportsRequireTerminalAuthority)}
+                </div>
                 <div className="mt-2 flex flex-wrap gap-1">
                   {session.allowedActuators.slice(0, 4).map((actuator) => (
                     <span key={`${session.goalId}:${actuator}`} className="rounded border border-slate-700 bg-slate-950 px-1.5 py-0.5 font-mono text-[9px] text-slate-300">

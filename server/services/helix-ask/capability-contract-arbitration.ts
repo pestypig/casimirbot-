@@ -70,6 +70,10 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
       return "workspace_directory_resolution";
     case "internet_search.web_research":
       return "internet_search_lookup";
+    case "live_env.read_processed_live_source_mail":
+    case "live_env.process_live_source_mail":
+    case "live_env.reflect_live_source_mail_loop":
+      return "live_source_mailbox_review";
     default:
       return null;
   }
@@ -86,6 +90,10 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
       return "current_turn_doc";
     case "internet_search.web_research":
       return "external_internet_search";
+    case "live_env.read_processed_live_source_mail":
+    case "live_env.process_live_source_mail":
+    case "live_env.reflect_live_source_mail_loop":
+      return "live_source_mail";
     default:
       return "workspace_state";
   }

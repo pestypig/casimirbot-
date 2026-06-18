@@ -14,6 +14,7 @@ import type {
 import type { HelixCalculatorSetupContext } from "../../../shared/helix-calculator-setup-context";
 import {
   WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
+  type NarratorBindStreamRequestV1,
   type WorkstationDispatchActionV1,
 } from "../../../shared/contracts/workstation-goal-context.v1";
 import { planContextEconomy } from "./context-economy-planner";
@@ -41,6 +42,22 @@ const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
+const narratorStreamKinds = new Set<NarratorBindStreamRequestV1["streamKind"]>([
+  "transcript_stream",
+  "translated_transcript",
+  "translated_speech",
+  "typed_commentary",
+  "route_evidence",
+  "source_health_status",
+]);
+
+const readNarratorStreamKind = (value: unknown): NarratorBindStreamRequestV1["streamKind"] | null => {
+  const raw = readString(value);
+  return raw && narratorStreamKinds.has(raw as NarratorBindStreamRequestV1["streamKind"])
+    ? raw as NarratorBindStreamRequestV1["streamKind"]
+    : null;
+};
+
 function mapIntentToCategorization(intent: HelixWorkstationToolPlan["intent"]): {
   source_family: HelixCategorizationSourceFamily;
   category: HelixCategorizationCategory;
@@ -65,6 +82,13 @@ function mapIntentToCategorization(intent: HelixWorkstationToolPlan["intent"]): 
       source_family: "live_environment",
       category: "context_reference",
       produced_by: "deterministic_reducer",
+    };
+  }
+  if (intent === "ideology_compare") {
+    return {
+      source_family: "ideology",
+      category: "motive_framework",
+      produced_by: "ideology",
     };
   }
   if (intent === "zen_graph_reflection") {
@@ -138,6 +162,7 @@ function maybeRecordNarratorGoalContextUpdate(input: {
     readString(args.source_id) ??
     readString(args.sourceId) ??
     "narrator:workstation";
+  const streamKind = readNarratorStreamKind(args.stream_kind ?? args.streamKind);
   const receiptRef = input.receiptIds[0] ?? input.syntheticEvidenceId;
   const dispatch: WorkstationDispatchActionV1[] = [
     { kind: "log_receipt", receiptRef },
@@ -145,6 +170,9 @@ function maybeRecordNarratorGoalContextUpdate(input: {
     { kind: "update_panel", panelId: "stage-play-badge-graph" },
   ];
   if (actionStep?.action_id === "narrator.bind_stream") {
+    if (streamKind) {
+      dispatch.push({ kind: "bind_narrator_stream", sourceRef, streamKind });
+    }
     dispatch.push({ kind: "speak_narrator", mode: "confirm" });
   }
 
@@ -154,8 +182,7 @@ function maybeRecordNarratorGoalContextUpdate(input: {
     createdAtMs: Date.now(),
     sourceRefs: uniqueStrings([
       sourceRef,
-      readString(args.stream_kind),
-      readString(args.streamKind),
+      streamKind,
       ...input.evidenceRefs,
     ]),
     loopRefs: uniqueStrings([

@@ -2054,7 +2054,13 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByText(/packet color match|packet match/i).length).toBeGreaterThan(0);
     expect(screen.getByTestId("stage-play-goal-context-board")).toBeTruthy();
     expect(screen.getByText(/Goal Context Substrate/i)).toBeTruthy();
+    expect(screen.getByTestId("stage-play-goal-context-authority-state")).toHaveTextContent(/evidence-only, non-terminal context/i);
+    expect(screen.getByTestId("stage-play-terminal-authority-state")).toHaveTextContent(/Final reports require a completed solver path/i);
+    expect(screen.getByTestId("stage-play-narrator-binding-state")).toHaveTextContent(/stream binding dispatch/i);
     expect(screen.getAllByTestId("stage-play-goal-context-update").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("stage-play-goal-context-authority-chips").some((node) =>
+      /assistant=false.*terminal=false.*raw=false/s.test(node.textContent ?? "")
+    )).toBe(true);
     expect(screen.getAllByTestId("stage-play-goal-context-dispatch").some((node) =>
       /Goal context|Panel|Narrator|Wake interrupt/i.test(node.textContent ?? "")
     )).toBe(true);

@@ -56,14 +56,26 @@ const agentGoalFeedKinds = new Set<AgentGoalContextFeedKindV1>([
 ]);
 
 const agentGoalActuators = new Set<AgentGoalActuatorV1>([
+  "query_visual_summaries",
+  "query_audio_transcripts",
+  "query_translation_segments",
+  "query_microdeck_outputs",
+  "query_live_answer_state",
+  "query_source_health",
   "set_audio_preset",
   "set_visual_preset",
+  "change_preset",
+  "bind_source",
+  "unbind_source",
   "bind_narrator",
   "narrator_bind_stream",
   "narrator_say",
   "update_live_answer",
   "query_trace_memory",
   "pause_loop",
+  "resume_loop",
+  "set_loop_state",
+  "focus_process_graph",
   "repair_source",
   "ask_user",
 ]);
@@ -120,14 +132,26 @@ const defaultContextFeeds = (goalId: string): AgentGoalSessionV1["contextFeeds"]
 ];
 
 const defaultAllowedActuators = (): AgentGoalActuatorV1[] => [
+  "query_visual_summaries",
+  "query_audio_transcripts",
+  "query_translation_segments",
+  "query_microdeck_outputs",
+  "query_live_answer_state",
+  "query_source_health",
   "set_audio_preset",
   "set_visual_preset",
+  "change_preset",
+  "bind_source",
+  "unbind_source",
   "bind_narrator",
   "narrator_bind_stream",
   "narrator_say",
   "update_live_answer",
   "query_trace_memory",
   "pause_loop",
+  "resume_loop",
+  "set_loop_state",
+  "focus_process_graph",
   "repair_source",
   "ask_user",
 ];
@@ -137,11 +161,12 @@ const mergeContextFeeds = (
   existing: AgentGoalSessionV1["contextFeeds"] | undefined,
   supplied: AgentGoalSessionV1["contextFeeds"] | undefined,
 ): AgentGoalSessionV1["contextFeeds"] => {
-  const byId = new Map<string, AgentGoalSessionV1["contextFeeds"][number]>();
-  for (const feed of [...(existing ?? defaultContextFeeds(goalId)), ...(supplied ?? [])]) {
-    if (!agentGoalFeedKinds.has(feed.sourceKind)) continue;
+  const normalizeFeed = (
+    feed: AgentGoalSessionV1["contextFeeds"][number],
+  ): AgentGoalSessionV1["contextFeeds"][number] | null => {
+    if (!agentGoalFeedKinds.has(feed.sourceKind)) return null;
     const feedId = normalize(feed.feedId) ?? `stage_play_goal_feed:${hashShort([goalId, feed.sourceKind, feed.query ?? ""], 12)}`;
-    byId.set(feedId, {
+    return {
       feedId,
       sourceKind: feed.sourceKind,
       ...(normalize(feed.query) ? { query: normalize(feed.query)! } : {}),
@@ -149,7 +174,19 @@ const mergeContextFeeds = (
         ? { freshnessMs: Math.max(1_000, Math.floor(feed.freshnessMs)) }
         : {}),
       ...(normalize(feed.relevancePolicy) ? { relevancePolicy: normalize(feed.relevancePolicy)! } : {}),
-    });
+    };
+  };
+  const suppliedValid = (supplied ?? [])
+    .map(normalizeFeed)
+    .filter((feed): feed is AgentGoalSessionV1["contextFeeds"][number] => Boolean(feed));
+  if (!existing && suppliedValid.length > 0) {
+    return suppliedValid.slice(0, 24);
+  }
+  const byId = new Map<string, AgentGoalSessionV1["contextFeeds"][number]>();
+  for (const feed of [...(existing ?? defaultContextFeeds(goalId)), ...suppliedValid]) {
+    const normalized = normalizeFeed(feed);
+    if (!normalized) continue;
+    byId.set(normalized.feedId, normalized);
   }
   return Array.from(byId.values()).slice(0, 24);
 };
@@ -158,7 +195,12 @@ const mergeAllowedActuators = (
   existing: AgentGoalActuatorV1[] | undefined,
   supplied: AgentGoalActuatorV1[] | undefined,
 ): AgentGoalActuatorV1[] => {
-  const merged = [...(existing ?? defaultAllowedActuators()), ...(supplied ?? [])]
+  const suppliedValid = (supplied ?? [])
+    .filter((actuator): actuator is AgentGoalActuatorV1 => agentGoalActuators.has(actuator));
+  if (!existing && suppliedValid.length > 0) {
+    return Array.from(new Set(suppliedValid));
+  }
+  const merged = [...(existing ?? defaultAllowedActuators()), ...suppliedValid]
     .filter((actuator): actuator is AgentGoalActuatorV1 => agentGoalActuators.has(actuator));
   return Array.from(new Set(merged));
 };
@@ -241,6 +283,45 @@ const dispatchActionsForMail = (mail: StagePlayLiveSourceMailItemV1): Workstatio
   { kind: "update_panel", panelId: "stage-play-badge-graph" },
 ];
 
+const wakeInterruptReason = (input: {
+  packet: StagePlayProcessedMailPacketV1;
+  wakeRequests: StagePlayLiveSourceMailWakeRequestV1[];
+  wakeResults: StagePlayLiveSourceMailWakeResultV1[];
+}): string | null => {
+  if (input.packet.salience.level === "urgent") {
+    return input.packet.arbiter?.reason ?? "urgent packet salience qualifies as an operator interrupt";
+  }
+  if (input.packet.arbiter?.wakeAsk && input.packet.resolutionState === "ask_decision_needed") {
+    return input.packet.arbiter.reason ?? "arbiter policy marked this packet as Ask-interrupt eligible";
+  }
+  if (input.packet.uncertainties.length > 0 && input.packet.observedFacts.length === 0) {
+    return "packet processing is blocked and needs operator or agent repair";
+  }
+  const matchingRequests = input.wakeRequests.filter((wake) => wake.packetIds?.includes(input.packet.packetId));
+  const matchingResults = input.wakeResults.filter((result) => result.packetIds?.includes(input.packet.packetId));
+  if (
+    matchingRequests.some((wake) =>
+      wake.status === "waiting_for_ui_handoff" ||
+      wake.status === "deferred_for_pressure" ||
+      wake.status === "failed_retryable" ||
+      wake.lifecycleStage === "pressure_deferred" ||
+      wake.lifecycleStage === "voice_blocked"
+    )
+  ) {
+    return "wake receipt is blocked, pressure-deferred, or waiting for UI handoff";
+  }
+  if (
+    matchingResults.some((result) =>
+      result.status === "deferred_for_pressure" ||
+      result.status === "failed_retryable" ||
+      result.lifecycleStage === "voice_blocked"
+    )
+  ) {
+    return "wake result reports blocked or pressure-deferred follow-up";
+  }
+  return null;
+};
+
 const buildDispatchActions = (input: {
   packet: StagePlayProcessedMailPacketV1;
   primaryMail: StagePlayLiveSourceMailItemV1 | null;
@@ -262,14 +343,15 @@ const buildDispatchActions = (input: {
     input.packet.voiceCalloutMatches.length > 0 ||
     input.decisions.some((decision) => decision.voiceCalloutDraft?.voiceEligible);
   if (shouldSpeak) dispatch.push({ kind: "speak_narrator", mode: "confirm" });
-  const hasWakeReceipt =
-    input.packet.arbiter?.wakeAsk ||
-    input.wakeRequests.some((wake) => wake.packetIds?.includes(input.packet.packetId)) ||
-    input.wakeResults.some((result) => result.packetIds?.includes(input.packet.packetId));
-  if (hasWakeReceipt) {
+  const interruptReason = wakeInterruptReason({
+    packet: input.packet,
+    wakeRequests: input.wakeRequests,
+    wakeResults: input.wakeResults,
+  });
+  if (interruptReason) {
     dispatch.push({
       kind: "wake_agent",
-      reason: input.packet.arbiter?.reason ?? "packet references an interrupt-capable wake receipt",
+      reason: interruptReason,
     });
   }
   return dispatch;

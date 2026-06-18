@@ -14,6 +14,7 @@ export type HelixCapabilityFamily =
   | "process_graph"
   | "debug_export"
   | "context_reflection"
+  | "capability_catalog"
   | "workspace_diagnostic"
   | "subagent_runtime_adapter";
 

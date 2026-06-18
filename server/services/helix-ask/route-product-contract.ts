@@ -7,6 +7,7 @@ import {
 import { isSceneEpochReplayPrompt } from "./scene-epoch-replay-intent";
 import { matchProcedureRecallPrompt } from "./procedure-memory-recall-router";
 import { hasUnknownSourceArtifactDiscoveryIntent } from "./tool-call-admission";
+import { isAskCapabilityCatalogPrompt } from "./capability-catalog-intent";
 import {
   isCurrentOpenDocsViewerSummaryPrompt,
   isExplicitDocsPathComparePrompt,
@@ -236,26 +237,6 @@ const isLiveAnswerEnvironmentStatePrompt = (promptText: string): boolean => {
   if (!mentionsLiveAnswer) return false;
   return /\b(?:latest|current|result|value|equation|line|quiet|silent|threshold|cross(?:ed|es|ing)?|changed|state|status|why)\b/i.test(
     promptText,
-  );
-};
-
-const isAskCapabilityCatalogPrompt = (promptText: string): boolean => {
-  const normalized = promptText.trim().toLowerCase().replace(/[?!.]+$/g, "").replace(/\s+/g, " ");
-  if (!normalized) return false;
-  const mentionsAskSurface = /\b(?:helix\s+ask|ask\s+turn|this\s+agent|the\s+agent)\b/i.test(normalized);
-  return (
-    /\bwhat\s+tools\s+are\s+available\s+for\s+(?:the\s+)?helix\s+ask\s+to\s+use\b/i.test(normalized) ||
-    (
-      mentionsAskSurface &&
-      (
-        /\bwhat\s+can\s+i\s+do\s+with\s+helix\s+ask\b/i.test(normalized) ||
-        /\bwhat\s+can\s+(?:helix\s+ask|ask|this\s+agent|the\s+agent)\s+do\b/i.test(normalized) ||
-        /\bhow\s+can\s+(?:helix\s+ask|ask|this\s+agent|the\s+agent)\s+help\b/i.test(normalized) ||
-        /\bwhat\s+(?:tools?|tool\s+calls?|capabilities)\s+(?:are\s+)?(?:available|visible|admissible)\b/i.test(normalized) ||
-        /\bwhat\s+(?:tools?|tool\s+calls?|capabilities)\s+can\s+(?:helix\s+ask|ask|agent)\s+(?:use|call|run|see|access)\b/i.test(normalized) ||
-        /\b(?:list|show|inspect|tell\s+me)\b[\s\S]{0,60}\b(?:tools?|tool\s+calls?|capabilities)\b/i.test(normalized)
-      )
-    )
   );
 };
 

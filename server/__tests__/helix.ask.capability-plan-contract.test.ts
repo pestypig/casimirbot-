@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildCapabilityPlan } from "../services/helix-ask/capability-planner";
 import { buildCapabilityResultGate } from "../services/helix-ask/capability-result-gate";
+import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
+import { isAskCapabilityCatalogPrompt } from "../services/helix-ask/capability-catalog-intent";
 
 const baseSourceTarget = (target_source: string, target_kind = target_source) => ({
   schema: "helix.ask_source_target_intent.v1",
@@ -175,7 +177,7 @@ describe("Helix capability plan contract", () => {
 
     expect(plan).toMatchObject({
       capability_family: "visual_capture",
-      requested_action: "review_current_visual_state",
+      requested_action: "situation-room.describe_visual_capture",
       mutating: false,
       operator_command_required: false,
       operator_command_present: false,
@@ -280,6 +282,86 @@ describe("Helix capability plan contract", () => {
       source_target: "runtime_evidence",
     });
     expect(plan.capability_family).not.toBe("live_source");
+  });
+
+  it("routes Helix Ask tool availability prompts through the capability catalog contract", () => {
+    for (const promptText of [
+      "What tools are available for the helix ask to use?",
+      "Could you tell me what tools Helix Ask can use?",
+      "Can you show what capabilities this agent can access?",
+    ]) {
+      const admission = buildToolCallAdmissionDecision({
+        turnId: "ask:capability-catalog",
+        promptText,
+        sourceTargetIntent: baseSourceTarget("runtime_evidence", "runtime_evidence"),
+        canonicalGoalFrame: canonicalGoal("capability_help", "capability_help_summary"),
+      });
+
+      expect(admission).toMatchObject({
+        source_target: "runtime_evidence",
+        admitted_tool_families: expect.arrayContaining(["capability_catalog", "runtime_evidence"]),
+        reason: "capability_catalog_prompt_requires_runtime_catalog_observation",
+      });
+      expect(admission.admitted_tool_families).not.toContain("model_only");
+
+      const plan = buildCapabilityPlan({
+        turnId: "ask:capability-catalog",
+        promptText,
+        sourceTargetIntent: baseSourceTarget("runtime_evidence", "runtime_evidence"),
+        toolCallAdmissionDecision: admission,
+        canonicalGoalFrame: canonicalGoal("capability_help", "capability_help_summary"),
+      });
+
+      expect(plan).toMatchObject({
+        capability_family: "capability_catalog",
+        requested_action: "helix_ask.inspect_capability_catalog",
+        selected_capability: "helix_ask.inspect_capability_catalog",
+        mutating: false,
+        operator_command_required: false,
+        operator_command_present: false,
+        source_target: "runtime_evidence",
+        goal_kind: "capability_help",
+        required_terminal_kind: "capability_help_summary",
+        admission_status: "needs_evidence",
+        capability_contract_arbitration: expect.objectContaining({
+          contract_state: "classifier_hypothesis",
+          selected_source_target: "runtime_evidence",
+          selected_plan_family: "capability_catalog",
+          canonical_goal_kind: "capability_help",
+          required_terminal_kind: "capability_help_summary",
+        }),
+      });
+    }
+  });
+
+  it("does not execute capability catalog routing from contextual tool availability mentions", () => {
+    const contextualPrompts = [
+      'The document says "what tools are available for the helix ask to use"; summarize that label.',
+      "Could we ask what tools Helix Ask can use later?",
+      "The screen shows text saying what capabilities the agent can use.",
+      "Do not list Helix Ask tools for now; just explain why that would be useful.",
+    ];
+
+    for (const promptText of contextualPrompts) {
+      expect(isAskCapabilityCatalogPrompt(promptText)).toBe(false);
+      const admission = buildToolCallAdmissionDecision({
+        turnId: "ask:contextual-capability-catalog",
+        promptText,
+        sourceTargetIntent: baseSourceTarget("runtime_evidence", "runtime_evidence"),
+        canonicalGoalFrame: canonicalGoal("debug_diagnosis", "repo_code_evidence_answer"),
+      });
+      expect(admission.admitted_tool_families).not.toContain("capability_catalog");
+
+      const plan = buildCapabilityPlan({
+        turnId: "ask:contextual-capability-catalog",
+        promptText,
+        sourceTargetIntent: baseSourceTarget("runtime_evidence", "runtime_evidence"),
+        toolCallAdmissionDecision: admission,
+        canonicalGoalFrame: canonicalGoal("debug_diagnosis", "repo_code_evidence_answer"),
+      });
+      expect(plan.capability_family).not.toBe("capability_catalog");
+      expect(plan.selected_capability).not.toBe("helix_ask.inspect_capability_catalog");
+    }
   });
 
   it("repairs forbidden live-source mailbox reads to the phase-allowed decision tool", () => {

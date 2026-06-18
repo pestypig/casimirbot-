@@ -1677,9 +1677,16 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     const dispatches = goalContextUpdates.flatMap((update: WorkstationGoalContextUpdateV1) => update.suggestedDispatch);
     return {
       updateCount: goalContextUpdates.length,
+      observationOnlyCount: goalContextUpdates.filter((update: WorkstationGoalContextUpdateV1) =>
+        update.authority.assistantAnswer === false &&
+        update.authority.terminalEligible === false &&
+        update.authority.rawContentIncluded === false
+      ).length,
       activeGoalCount: agentGoalSessions.filter((session: AgentGoalSessionV1) => session.status === "active" || session.status === "blocked").length,
-      narratorCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "speak_narrator" || action.kind === "bind_narrator_stream").length,
+      narratorSpeechCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "speak_narrator").length,
+      narratorBindingCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "bind_narrator_stream").length,
       wakeCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "wake_agent").length,
+      terminalAuthorityRequiredCount: agentGoalSessions.filter((session: AgentGoalSessionV1) => session.authority.finalReportsRequireTerminalAuthority).length,
       terminalPosture: agentGoalSessions.some((session: AgentGoalSessionV1) => session.authority.finalReportsRequireTerminalAuthority)
         ? "terminal authority required"
         : "observation only",
@@ -4387,10 +4394,19 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                 {liveAnswerCircuitSummary.activeGoalCount} goals
               </span>
               <span className="rounded border border-cyan-300/20 px-2 py-1 font-mono text-[10px] text-cyan-100">
-                {liveAnswerCircuitSummary.narratorCount} narrator
+                {liveAnswerCircuitSummary.narratorSpeechCount} narrator speech
+              </span>
+              <span className="rounded border border-cyan-300/20 px-2 py-1 font-mono text-[10px] text-cyan-100" data-testid="live-answer-narrator-binding-count">
+                {liveAnswerCircuitSummary.narratorBindingCount} narrator bindings
               </span>
               <span className="rounded border border-amber-300/20 px-2 py-1 font-mono text-[10px] text-amber-100">
                 {liveAnswerCircuitSummary.wakeCount} wake
+              </span>
+              <span className="rounded border border-violet-300/20 px-2 py-1 font-mono text-[10px] text-violet-100" data-testid="live-answer-observation-authority-count">
+                {liveAnswerCircuitSummary.observationOnlyCount} observation-only
+              </span>
+              <span className="rounded border border-rose-300/20 px-2 py-1 font-mono text-[10px] text-rose-100" data-testid="live-answer-terminal-authority-count">
+                {liveAnswerCircuitSummary.terminalAuthorityRequiredCount} terminal authority
               </span>
             </div>
           </div>
@@ -4404,6 +4420,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                   </div>
                   <p className="mt-0.5 truncate font-mono text-[10px] text-slate-500">{row.producer} / {row.contentRef}</p>
                   <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-300">{row.preview}</p>
+                  <div className="mt-1.5 flex flex-wrap gap-1" data-testid="live-answer-goal-context-authority-chips">
+                    <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">assistant=false</span>
+                    <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">terminal=false</span>
+                    <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">raw=false</span>
+                  </div>
                   <div className="mt-1.5 flex flex-wrap gap-1">
                     {row.dispatch.length > 0 ? row.dispatch.map((dispatch: string) => (
                       <span key={`${row.id}:${dispatch}`} className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-300">
@@ -4425,6 +4446,9 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             <div className="rounded border border-white/10 bg-black/20 p-2">
               <p className="text-[10px] font-semibold uppercase text-slate-300">Authority posture</p>
               <p className="mt-1 text-xs text-violet-100">{liveAnswerCircuitSummary.terminalPosture}</p>
+              <p className="mt-1 font-mono text-[10px] text-slate-400">
+                observation_only={liveAnswerCircuitSummary.observationOnlyCount} narrator_bindings={liveAnswerCircuitSummary.narratorBindingCount} terminal_authority_sessions={liveAnswerCircuitSummary.terminalAuthorityRequiredCount}
+              </p>
               <p className="mt-1 text-[11px] leading-5 text-slate-500">
                 Receipts, MicroDeck outputs, narrator bindings, and panel projections stay evidence until the completed solver path selects a terminal answer.
               </p>

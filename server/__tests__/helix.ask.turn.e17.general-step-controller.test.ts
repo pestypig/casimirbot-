@@ -256,6 +256,37 @@ describe("helix ask turn e17 general step controller", () => {
     ]);
     expect(response.body?.step_results?.some((step: any) => step?.actual_artifacts?.includes("capability_registry"))).toBe(true);
     expect(response.body?.step_results?.some((step: any) => step?.actual_artifacts?.includes("capability_help_summary"))).toBe(true);
+    expect(response.body?.tool_call_admission_decision).toMatchObject({
+      source_target: "runtime_evidence",
+      admitted_tool_families: expect.arrayContaining(["capability_catalog", "runtime_evidence"]),
+      reason: "capability_catalog_prompt_requires_runtime_catalog_observation",
+    });
+    expect(response.body?.canonical_goal_frame).toMatchObject({
+      required_terminal_kind: "capability_help_summary",
+      classifier_reasons: expect.arrayContaining(["capability_help_catalog_request", "capability_catalog_precedence"]),
+    });
+    expect(response.body?.initial_available_capabilities).toMatchObject({
+      recommended_capability_key: "helix_ask.inspect_capability_catalog",
+    });
+    expect(response.body?.capability_plan).toMatchObject({
+      capability_family: "capability_catalog",
+      requested_action: "helix_ask.inspect_capability_catalog",
+      selected_capability: "helix_ask.inspect_capability_catalog",
+      source_target: "runtime_evidence",
+      goal_kind: "capability_help",
+      required_terminal_kind: "capability_help_summary",
+    });
+    expect(response.body?.codex_parity_agent_spine_rail_table).toMatchObject({
+      selected_capability: "helix_ask.inspect_capability_catalog",
+      executed_capability: "helix_ask.inspect_capability_catalog",
+      observation_kind: "capability_registry",
+      required_terminal_kind: "capability_help_summary",
+      selected_terminal_kind: "capability_help_summary",
+      visible_terminal_kind: "capability_help_summary",
+      first_broken_rail: null,
+      codex_parity_class: "complete",
+      rail_status: "complete",
+    });
     expect(response.body?.final_answer_contract_family).toBe("capability_help");
     expect(response.body?.final_answer_contract_pass).toBe(true);
     expect(response.body?.terminal_artifact_kind).toBe("capability_help_summary");

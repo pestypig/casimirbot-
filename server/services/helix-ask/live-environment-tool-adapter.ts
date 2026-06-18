@@ -934,14 +934,26 @@ const AGENT_GOAL_FEED_KIND_ALIASES: Record<string, AgentGoalContextFeedKindV1> =
 };
 
 const AGENT_GOAL_ACTUATORS = new Set<AgentGoalActuatorV1>([
+  "query_visual_summaries",
+  "query_audio_transcripts",
+  "query_translation_segments",
+  "query_microdeck_outputs",
+  "query_live_answer_state",
+  "query_source_health",
   "set_audio_preset",
   "set_visual_preset",
+  "change_preset",
+  "bind_source",
+  "unbind_source",
   "bind_narrator",
   "narrator_bind_stream",
   "narrator_say",
   "update_live_answer",
   "query_trace_memory",
   "pause_loop",
+  "resume_loop",
+  "set_loop_state",
+  "focus_process_graph",
   "repair_source",
   "ask_user",
 ]);
@@ -2157,6 +2169,11 @@ const readWorkstationContextFeedQuerySpec = (
   toolName: HelixLiveEnvironmentToolName,
 ): WorkstationContextFeedQuerySpec | null => WORKSTATION_CONTEXT_FEED_QUERY_SPECS[toolName] ?? null;
 
+const goalSessionFeedAllowed = (
+  session: AgentGoalSessionV1 | null,
+  feedKind: WorkstationContextFeedQuerySpec["feedKind"],
+): boolean => Boolean(session?.contextFeeds.some((feed) => feed.sourceKind === feedKind));
+
 type WorkstationControlSpec = {
   controlKind:
     | "change_preset"
@@ -2205,6 +2222,18 @@ const WORKSTATION_CONTROL_SPECS: Partial<Record<HelixLiveEnvironmentToolName, Wo
 const readWorkstationControlSpec = (
   toolName: HelixLiveEnvironmentToolName,
 ): WorkstationControlSpec | null => WORKSTATION_CONTROL_SPECS[toolName] ?? null;
+
+const workstationControlActuator = (spec: WorkstationControlSpec): AgentGoalActuatorV1 => spec.controlKind;
+
+const filterDeniedControlDispatch = (
+  dispatch: WorkstationDispatchActionV1[],
+  spec: WorkstationControlSpec,
+): WorkstationDispatchActionV1[] =>
+  dispatch.filter((action) => {
+    if (action.kind === spec.controlKind) return false;
+    if (spec.controlKind === "set_loop_state" && action.kind === "repair_loop") return false;
+    return true;
+  });
 
 const normalizeLoopState = (value: unknown): "paused" | "running" | "repaired" => {
   const normalized = readString(value)?.toLowerCase();
@@ -2413,6 +2442,12 @@ const buildNarratorDispatch = (input: {
         : "visible_only",
   },
 ];
+
+const narratorControlActuator = (kind: NarratorControlKind): AgentGoalActuatorV1 =>
+  kind === "bind_stream" ? "narrator_bind_stream" : "narrator_say";
+
+const filterDeniedNarratorDispatch = (dispatch: WorkstationDispatchActionV1[]): WorkstationDispatchActionV1[] =>
+  dispatch.filter((action) => action.kind !== "speak_narrator" && action.kind !== "bind_narrator_stream");
 
 const processLiveSourceMailItemsForTool = (input: {
   args: Record<string, unknown>;
@@ -2855,7 +2890,25 @@ export function executeLiveEnvironmentTool(
           ...(sourceRef ? [] : ["source_ref"]),
           ...(streamKind ? [] : ["stream_kind"]),
         ];
-    const ok = missingRequirements.length === 0;
+    const goalId = readString(args.goal_id) ?? readString(args.goalId);
+    const actuator = narratorControlActuator(narratorKind);
+    const goalSession = goalId
+      ? listStagePlayAgentGoalSessions({
+          threadId: input.thread_id,
+          goalId,
+          limit: 1,
+        })[0] ?? null
+      : null;
+    const actuatorAllowed = !goalId || Boolean(goalSession?.allowedActuators.includes(actuator));
+    const authorizationMissing = goalId
+      ? goalSession
+        ? actuatorAllowed
+          ? []
+          : [`allowed_actuator:${actuator}`]
+        : ["goal_session"]
+      : [];
+    const effectiveMissingRequirements = [...missingRequirements, ...authorizationMissing];
+    const ok = effectiveMissingRequirements.length === 0;
     const requestId = `helix_narrator_${narratorKind}_request:${hashShort([
       input.thread_id,
       input.tool_name,
@@ -2866,13 +2919,14 @@ export function executeLiveEnvironmentTool(
       deliveryMode,
       evidenceRefs,
     ])}`;
-    const dispatch = buildNarratorDispatch({
+    const rawDispatch = buildNarratorDispatch({
       kind: narratorKind,
       receiptRef: requestId,
       sourceRef: sourceRef ?? "narrator:source_missing",
       streamKind,
       deliveryMode,
     });
+    const dispatch = ok ? rawDispatch : filterDeniedNarratorDispatch(rawDispatch);
     const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
       threadId: input.thread_id,
       mailboxThreadId: input.thread_id,
@@ -2884,7 +2938,7 @@ export function executeLiveEnvironmentTool(
         ? narratorKind === "say"
           ? "Prepared narrator say request as governed non-terminal speech evidence."
           : `Prepared narrator stream binding for ${streamKind}.`
-        : `Blocked narrator ${narratorKind} request; missing ${missingRequirements.join(", ")}.`,
+        : `Blocked narrator ${narratorKind} request; missing ${effectiveMissingRequirements.join(", ")}.`,
       sourceRefs: uniqueStrings([sourceRef, sourceKind, streamKind]),
       loopRefs: uniqueStrings([`narrator:${narratorKind}`, `thread:${input.thread_id}`]),
       evidenceRefs: uniqueStrings([requestId, ...evidenceRefs]),
@@ -2896,8 +2950,16 @@ export function executeLiveEnvironmentTool(
       requestId,
       request_id: requestId,
       status: ok ? "prepared" : "blocked",
-      missingRequirements,
-      missing_requirements: missingRequirements,
+      missingRequirements: effectiveMissingRequirements,
+      missing_requirements: effectiveMissingRequirements,
+      goalId,
+      goal_id: goalId,
+      goalSessionFound: goalId ? Boolean(goalSession) : null,
+      goal_session_found: goalId ? Boolean(goalSession) : null,
+      requiredActuator: actuator,
+      required_actuator: actuator,
+      actuatorAllowed,
+      actuator_allowed: actuatorAllowed,
       sourceRef,
       source_ref: sourceRef,
       deliveryMode,
@@ -2925,7 +2987,7 @@ export function executeLiveEnvironmentTool(
         ? narratorKind === "say"
           ? "Prepared narrator say request as non-terminal tool evidence."
           : "Prepared narrator stream binding request as non-terminal tool evidence."
-        : `Cannot prepare narrator ${narratorKind} request; missing ${missingRequirements.join(", ")}.`,
+        : `Cannot prepare narrator ${narratorKind} request; missing ${effectiveMissingRequirements.join(", ")}.`,
       observation: narratorKind === "say"
         ? {
             schema: WORKSTATION_NARRATOR_SAY_REQUEST_SCHEMA,
@@ -2983,7 +3045,25 @@ export function executeLiveEnvironmentTool(
       loopRef: controlDispatch.loopRef,
       lineKey: controlDispatch.lineKey,
     });
-    const ok = missingRequirements.length === 0;
+    const goalId = readString(args.goal_id) ?? readString(args.goalId);
+    const actuator = workstationControlActuator(workstationControlSpec);
+    const goalSession = goalId
+      ? listStagePlayAgentGoalSessions({
+          threadId: scope.mailboxThreadResolution.mailboxThreadId,
+          goalId,
+          limit: 1,
+        })[0] ?? null
+      : null;
+    const actuatorAllowed = !goalId || Boolean(goalSession?.allowedActuators.includes(actuator));
+    const authorizationMissing = goalId
+      ? goalSession
+        ? actuatorAllowed
+          ? []
+          : [`allowed_actuator:${actuator}`]
+        : ["goal_session"]
+      : [];
+    const effectiveMissingRequirements = [...missingRequirements, ...authorizationMissing];
+    const ok = effectiveMissingRequirements.length === 0;
     const reason = readString(args.reason) ?? readString(args.summary) ?? null;
     const receiptId = `stage_play_workstation_control_receipt:${workstationControlSpec.controlKind}:${hashShort([
       input.thread_id,
@@ -2997,7 +3077,8 @@ export function executeLiveEnvironmentTool(
       controlDispatch.nodeRef,
       reason,
     ])}`;
-    const dispatch = controlDispatch.dispatch.map((action) =>
+    const rawDispatch = ok ? controlDispatch.dispatch : filterDeniedControlDispatch(controlDispatch.dispatch, workstationControlSpec);
+    const dispatch = rawDispatch.map((action) =>
       action.kind === "log_receipt" && !action.receiptRef
         ? { ...action, receiptRef: receiptId }
         : action
@@ -3029,7 +3110,7 @@ export function executeLiveEnvironmentTool(
       contentRef: receiptId,
       preview: ok
         ? `Prepared workstation control dispatch: ${workstationControlSpec.label}.`
-        : `Blocked workstation control dispatch: ${workstationControlSpec.label} is missing ${missingRequirements.join(", ")}.`,
+        : `Blocked workstation control dispatch: ${workstationControlSpec.label} is missing ${effectiveMissingRequirements.join(", ")}.`,
       sourceRefs,
       loopRefs,
       evidenceRefs,
@@ -3044,7 +3125,7 @@ export function executeLiveEnvironmentTool(
       ok,
       summary: ok
         ? `Prepared ${workstationControlSpec.label} dispatch as non-terminal workstation control evidence.`
-        : `Cannot prepare ${workstationControlSpec.label}; missing ${missingRequirements.join(", ")}.`,
+        : `Cannot prepare ${workstationControlSpec.label}; missing ${effectiveMissingRequirements.join(", ")}.`,
       observation: {
         schema: "stage_play_workstation_control_receipt/v1",
         receiptId,
@@ -3054,8 +3135,16 @@ export function executeLiveEnvironmentTool(
         label: workstationControlSpec.label,
         ok,
         status: ok ? "prepared" : "blocked",
-        missingRequirements,
-        missing_requirements: missingRequirements,
+        missingRequirements: effectiveMissingRequirements,
+        missing_requirements: effectiveMissingRequirements,
+        goalId,
+        goal_id: goalId,
+        goalSessionFound: goalId ? Boolean(goalSession) : null,
+        goal_session_found: goalId ? Boolean(goalSession) : null,
+        requiredActuator: actuator,
+        required_actuator: actuator,
+        actuatorAllowed,
+        actuator_allowed: actuatorAllowed,
         targetRef: controlDispatch.targetRef,
         target_ref: controlDispatch.targetRef,
         sourceRef: controlDispatch.sourceRef,
@@ -3100,6 +3189,53 @@ export function executeLiveEnvironmentTool(
     const selectedLines = environment?.lines.filter((line) =>
       lineKeys.length === 0 || lineKeys.includes(line.key)
     ) ?? [];
+    const resultId = `live_answer_card_read:${hashShort([
+      input.thread_id,
+      environment?.environment_id ?? input.environment_id ?? null,
+      selectedLines.map((line) => [line.key, line.updated_at, line.evidence_refs]),
+    ])}`;
+    const selectedLineKeys = selectedLines.map((line) => line.key);
+    const observedAtMs = Date.parse(environment?.updated_at ?? "");
+    const evidenceRefs = uniqueStrings([
+      resultId,
+      environment?.environment_id,
+      ...(environment?.evidence_refs ?? []),
+      ...selectedLines.flatMap((line) => line.evidence_refs),
+    ]);
+    const goalContextUpdateId = environment
+      ? recordLiveEnvironmentGoalContextUpdate({
+          threadId: input.thread_id,
+          mailboxThreadId: environment.thread_id ?? input.thread_id,
+          roomId,
+          producerKind: "live_answer",
+          updateKind: "summary",
+          contentRef: resultId,
+          preview: selectedLines.length > 0
+            ? `Read ${selectedLines.length} Live Answer projection line(s): ${selectedLines.map((line) => line.label).join(", ")}.`
+            : "Read Live Answer card; no selected projection lines matched the query.",
+          sourceRefs: uniqueStrings([
+            environment.environment_id,
+            ...environment.source_ids,
+            ...selectedLineKeys.map((lineKey) => `live_answer_line:${lineKey}`),
+          ]),
+          loopRefs: uniqueStrings([
+            environment.environment_id,
+            `live_answer_environment:${environment.environment_id}`,
+            `live_answer_card_read:${input.thread_id}`,
+          ]),
+          evidenceRefs,
+          receiptRefs: [resultId],
+          observedAtMs: Number.isFinite(observedAtMs) ? observedAtMs : Date.now(),
+          staleAfterMs: 45_000,
+          freshnessStatus: selectedLines.length > 0 ? "fresh" : "unknown",
+          suggestedDispatch: [
+            { kind: "log_receipt", receiptRef: resultId },
+            ...selectedLineKeys.map((lineKey): WorkstationDispatchActionV1 => ({ kind: "update_live_answer", lineKey })),
+            { kind: "update_panel", panelId: "live-answer-environment" },
+            { kind: "update_panel", panelId: "stage-play-badge-graph" },
+          ],
+        })
+      : null;
     return makeObservation({
       threadId: input.thread_id,
       environmentId: input.environment_id,
@@ -3123,13 +3259,25 @@ export function executeLiveEnvironmentTool(
               ui_summary_only: true,
               assistant_answer: false,
             })),
+            goalContextUpdateId,
+            goal_context_update_id: goalContextUpdateId,
             assistant_answer: false,
+            terminal_eligible: false,
+            post_tool_model_step_required: true,
             raw_content_included: false,
             context_role: "tool_evidence",
             ask_context_policy: "evidence_only",
           }
         : null,
-      evidenceRefs: selectedLines.flatMap((line) => line.evidence_refs),
+      evidenceRefs: uniqueStrings([
+        ...(goalContextUpdateId ? [goalContextUpdateId] : []),
+        ...evidenceRefs,
+      ]),
+      producedRefs: uniqueStrings([
+        ...(goalContextUpdateId ? [goalContextUpdateId] : []),
+        resultId,
+      ]),
+      forceNormalizedRefs: true,
     });
   }
 
@@ -5015,6 +5163,22 @@ export function executeLiveEnvironmentTool(
     const goalId = readString(args.goal_id) ?? readString(args.goalId);
     const limit = Math.max(1, Math.min(readNumber(args.limit, 24), 80));
     const mailLimit = Math.max(1, Math.min(readNumber(args.mail_limit ?? args.mailLimit, 32), 100));
+    const goalSession = goalId
+      ? listStagePlayAgentGoalSessions({
+          threadId: scope.mailboxThreadResolution.mailboxThreadId,
+          goalId,
+          limit: 1,
+        })[0] ?? null
+      : null;
+    const feedAllowed = !goalId || goalSessionFeedAllowed(goalSession, feedQuerySpec.feedKind);
+    const feedMissingRequirements = goalId
+      ? goalSession
+        ? feedAllowed
+          ? []
+          : [`context_feed:${feedQuerySpec.feedKind}`]
+        : ["goal_session"]
+      : [];
+    const ok = feedMissingRequirements.length === 0;
     const mailItems = listStagePlayLiveSourceMailItems({
       threadId: scope.mailboxThreadResolution.mailboxThreadId,
       roomId,
@@ -5074,7 +5238,7 @@ export function executeLiveEnvironmentTool(
         feedQuerySpec.producerKinds.includes(update.producerKind) ||
         feedQuerySpec.updateKinds.includes(update.updateKind)
       )
-      .slice(0, limit);
+      .slice(0, ok ? limit : 0);
     const resultId = `stage_play_context_feed_query:${feedQuerySpec.feedKind}:${hashShort([
       input.thread_id,
       sourceRef,
@@ -5092,7 +5256,7 @@ export function executeLiveEnvironmentTool(
     ]);
     const dispatch: WorkstationDispatchActionV1[] = [
       { kind: "log_receipt", receiptRef: resultId },
-      ...(goalId ? [{ kind: "append_goal_context" as const, goalId }] : []),
+      ...(goalId && ok ? [{ kind: "append_goal_context" as const, goalId }] : []),
       { kind: "update_panel", panelId: "stage-play-badge-graph" },
       { kind: "update_panel", panelId: "live-answer-environment" },
     ];
@@ -5103,9 +5267,11 @@ export function executeLiveEnvironmentTool(
       producerKind: "route_watch",
       updateKind: "route_evidence",
       contentRef: resultId,
-      preview: goalContextUpdates.length > 0
-        ? `Queried ${goalContextUpdates.length} ${feedQuerySpec.label} update(s) from workstation goal context.`
-        : `No ${feedQuerySpec.label} updates are currently available for this workstation scope.`,
+      preview: ok
+        ? goalContextUpdates.length > 0
+          ? `Queried ${goalContextUpdates.length} ${feedQuerySpec.label} update(s) from workstation goal context.`
+          : `No ${feedQuerySpec.label} updates are currently available for this workstation scope.`
+        : `Blocked ${feedQuerySpec.label} feed query; missing ${feedMissingRequirements.join(", ")}.`,
       sourceRefs: uniqueStrings([
         sourceRef,
         scope.sourceId,
@@ -5117,7 +5283,7 @@ export function executeLiveEnvironmentTool(
       ]),
       evidenceRefs,
       receiptRefs: [resultId],
-      freshnessStatus: goalContextUpdates.length > 0 ? "fresh" : "unknown",
+      freshnessStatus: ok ? (goalContextUpdates.length > 0 ? "fresh" : "unknown") : "blocked",
       goalId,
       goalRelevanceReason: `The agent queried ${feedQuerySpec.label} as a feed-specific goal-context input.`,
       suggestedDispatch: dispatch,
@@ -5126,8 +5292,10 @@ export function executeLiveEnvironmentTool(
       threadId: input.thread_id,
       environmentId,
       toolName: input.tool_name,
-      ok: true,
-      summary: `Read ${goalContextUpdates.length} ${feedQuerySpec.label} goal-context update(s).`,
+      ok,
+      summary: ok
+        ? `Read ${goalContextUpdates.length} ${feedQuerySpec.label} goal-context update(s).`
+        : `Cannot read ${feedQuerySpec.label}; missing ${feedMissingRequirements.join(", ")}.`,
       observation: {
         schema: "stage_play_workstation_context_feed_query_result/v1",
         resultId,
@@ -5143,6 +5311,13 @@ export function executeLiveEnvironmentTool(
         source_ref: sourceRef,
         goalId,
         goal_id: goalId,
+        status: ok ? "read" : "blocked",
+        missingRequirements: feedMissingRequirements,
+        missing_requirements: feedMissingRequirements,
+        goalSessionFound: goalId ? Boolean(goalSession) : null,
+        goal_session_found: goalId ? Boolean(goalSession) : null,
+        feedAllowed,
+        feed_allowed: feedAllowed,
         goalContextUpdates,
         goal_context_updates: goalContextUpdates,
         updateCount: goalContextUpdates.length,

@@ -897,7 +897,7 @@ describe("Helix Ask tool lifecycle trace", () => {
     });
   });
 
-  it("does not report observation_missing when explicit docs locate produced location matches", () => {
+  it("does not report observation_missing when docs locate observed matches but terminal authority failed closed", () => {
     const payload: Record<string, unknown> = {
       canonical_goal_frame: {
         schema: "helix.canonical_goal_frame.v1",
@@ -1005,13 +1005,32 @@ describe("Helix Ask tool lifecycle trace", () => {
       executed_capability: "docs-viewer.locate_in_doc",
       observation_artifact_kind: "doc_location_matches",
       observed_artifact_supports_requested_capability: true,
-      rail_failure_code: null,
+      materialized_terminal_artifact_kind: "typed_failure",
+      terminal_authority_kind: "typed_failure",
+      visible_terminal_kind: "typed_failure",
+      rail_status: "fail_closed",
+      rail_failure_code: "terminal_not_materialized",
     });
     expect(index.tool_rail_failure_triage).toMatchObject({
       requested_capability: "docs-viewer.locate_in_doc",
       executed_capability: "docs-viewer.locate_in_doc",
-      first_broken_rail: null,
-      rail_failure_code: null,
+      first_broken_rail: "terminal_materialization",
+      failure_bucket: "E_terminal_materializer_gap",
+      rail_failure_code: "terminal_not_materialized",
+      repair_target: "terminal_materializer",
+    });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      requested_capability: "docs-viewer.locate_in_doc",
+      selected_capability: "docs-viewer.locate_in_doc",
+      executed_capability: "docs-viewer.locate_in_doc",
+      observation_kind: "doc_location_matches",
+      goal_satisfaction: null,
+      required_terminal_kind: "doc_evidence_synthesis_answer",
+      selected_terminal_kind: "typed_failure",
+      visible_terminal_kind: "typed_failure",
+      first_broken_rail: "terminal_materialization",
+      repair_target: "terminal_materializer",
+      codex_parity_class: "goal_contract_mismatch",
     });
   });
 

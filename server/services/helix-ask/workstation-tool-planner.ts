@@ -38,6 +38,7 @@ export type WorkstationToolIntent =
   | "workstation_control"
   | "theory_context_reflection"
   | "physics_calculation_context"
+  | "ideology_compare"
   | "zen_graph_reflection"
   | "theory_ideology_bridge_reflection"
   | "civilization_bounds_reflection"
@@ -522,7 +523,7 @@ function isNoteAppendPrompt(prompt: string): boolean {
 function isIdeologyComparePrompt(prompt: string): boolean {
   return (
     /\b(?:compare|check|evaluate|review|analy[sz]e)\b[\s\S]{0,100}\b(?:motive|intent|intention|goal|behavior|decision|action)\b[\s\S]{0,140}\b(?:zen|ethos|ideology|mission\s+ethos)\b/i.test(prompt) ||
-    /\b(?:zen|ethos|ideology|mission\s+ethos)\b[\s\S]{0,100}\b(?:compare|check|evaluate|review|analy[sz]e)\b/i.test(prompt)
+    /\b(?:zen|ethos|ideology|mission\s+ethos)\b[\s\S]{0,100}\b(?:compare|check|evaluate|review|analy[sz]e)\b[\s\S]{0,100}\b(?:motive|intent|intention|goal|behavior|decision|action)\b/i.test(prompt)
   );
 }
 
@@ -1226,16 +1227,17 @@ function makeOpenStep(panelId: string, depends_on: string[] = []): HelixWorkstat
 }
 
 const GOAL_CONTEXT_OBJECT_PATTERN =
-  "(?:workstation\\s+goal\\s+context|goal\\s+context\\s+updates?|active\\s+goal\\s+sessions?|agent\\s+goal\\s+sessions?|goal\\s+sessions?|per[-\\s]?packet\\s+traces?|packet\\s+traces?|trace\\s+memory|reasoning\\s+circuit|process\\s+graph\\s+traces?|visual\\s+summaries|audio\\s+transcripts?|translation\\s+segments?|translated\\s+transcripts?|micro[-\\s]?deck\\s+outputs?|live\\s+answer\\s+state|live\\s+answer\\s+lines?)";
+  "(?:workstation\\s+goal\\s+context|goal\\s+context\\s+updates?|active\\s+goal\\s+sessions?|agent\\s+goal\\s+sessions?|goal\\s+sessions?|per[-\\s]?packet\\s+traces?|packet\\s+traces?|trace\\s+memory|reasoning\\s+circuit|process\\s+graph\\s+traces?|visual\\s+summaries|audio\\s+transcripts?|translation\\s+segments?|translated\\s+transcripts?|micro[-\\s]?deck\\s+outputs?|live\\s+answer\\s+state|live\\s+answer\\s+lines?|source\\s+health|source\\s+status|source\\s+capability\\s+state)";
 const GOAL_CONTEXT_TOOL_PATTERN =
-  "live_env\\.(?:query_workstation_goal_context|start_agent_goal_session|query_trace_memory|query_visual_summaries|query_audio_transcripts|query_translation_segments|query_microdeck_outputs|query_live_answer_state)";
+  "live_env\\.(?:query_workstation_goal_context|start_agent_goal_session|query_trace_memory|query_visual_summaries|query_audio_transcripts|query_translation_segments|query_microdeck_outputs|query_live_answer_state|query_source_health)";
 
 type WorkstationContextFeedTool =
   | "live_env.query_visual_summaries"
   | "live_env.query_audio_transcripts"
   | "live_env.query_translation_segments"
   | "live_env.query_microdeck_outputs"
-  | "live_env.query_live_answer_state";
+  | "live_env.query_live_answer_state"
+  | "live_env.query_source_health";
 
 type WorkstationControlTool =
   | "live_env.change_workstation_preset"
@@ -1421,7 +1423,7 @@ function wantsQueryWorkstationGoalContext(prompt: string): boolean {
   return (
     /\blive_env\.query_workstation_goal_context\b/i.test(prompt) ||
     /\blive_env\.query_trace_memory\b/i.test(prompt) ||
-    /\blive_env\.(?:query_visual_summaries|query_audio_transcripts|query_translation_segments|query_microdeck_outputs|query_live_answer_state)\b/i.test(prompt) ||
+    /\blive_env\.(?:query_visual_summaries|query_audio_transcripts|query_translation_segments|query_microdeck_outputs|query_live_answer_state|query_source_health)\b/i.test(prompt) ||
     new RegExp(`\\b(?:query|view|inspect|show|list|get|check|read|retrieve|summari[sz]e)\\b[\\s\\S]{0,140}\\b${GOAL_CONTEXT_OBJECT_PATTERN}\\b`, "i").test(prompt) ||
     new RegExp(`\\b${GOAL_CONTEXT_OBJECT_PATTERN}\\b[\\s\\S]{0,140}\\b(?:query|view|inspect|show|list|get|check|read|retrieve|latest|active|available|known)\\b`, "i").test(prompt)
   );
@@ -1455,6 +1457,9 @@ function selectWorkstationContextFeedTool(prompt: string): WorkstationContextFee
   }
   if (/\blive_env\.query_live_answer_state\b/i.test(prompt) || /\blive\s+answer\s+(?:state|lines?)\b/i.test(prompt)) {
     return "live_env.query_live_answer_state";
+  }
+  if (/\blive_env\.query_source_health\b/i.test(prompt) || /\b(?:source\s+health|source\s+status|source\s+capability\s+state)\b/i.test(prompt)) {
+    return "live_env.query_source_health";
   }
   return null;
 }
@@ -1561,6 +1566,8 @@ function buildWorkstationGoalContextPlan(
       depends_on: startSession ? ["start_agent_goal_session"] : [],
       expected_receipt_kind: traceMemory
         ? "helix.workstation_reasoning_trace_query_result"
+        : feedTool === "live_env.query_source_health"
+          ? "helix.situation_source_capability_read.v1"
         : feedTool
           ? "stage_play_workstation_context_feed_query_result"
           : "stage_play_workstation_goal_context_read_result",
@@ -2399,11 +2406,67 @@ export function planWorkstationToolUse(
     };
   }
 
+  if (isIdeologyComparePrompt(normalized)) {
+    const motive = extractIdeologyMotive(normalized) ?? normalized;
+    const action = {
+      panel_id: "mission-ethos",
+      action_id: "compare_motive_to_zen",
+      args: {
+        motive,
+        framework: "zen",
+      },
+    };
+    const steps: HelixWorkstationToolPlanStep[] = [
+      makeOpenStep("mission-ethos"),
+      {
+        step_id: "compare_motive_to_zen",
+        kind: "run_panel_action",
+        panel_id: "mission-ethos",
+        action_id: "compare_motive_to_zen",
+        args: action.args,
+        depends_on: ["open_mission_ethos"],
+        expected_receipt_kind: "mission_ethos_compare_receipt",
+        expected_state_change: { store: "mission-ethos", proof_key: "comparison" },
+        required: true,
+      },
+      {
+        step_id: "evaluate_ideology_compare",
+        kind: "evaluate_result",
+        depends_on: ["compare_motive_to_zen"],
+        expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+        required: true,
+      },
+    ];
+    pushScore({
+      affordance_id: "mission-ethos.compare_motive_to_zen",
+      panel_id: "mission-ethos",
+      action_id: "compare_motive_to_zen",
+      score: 0.88,
+      reason: "Prompt asks to compare a motive or action against Zen/mission ethos guidance.",
+      required_args_missing: [],
+    });
+    return {
+      intent: "ideology_compare",
+      action,
+      tool_plan: buildToolPlan({
+        prompt: normalized,
+        intent: "ideology_compare",
+        missing: [],
+        options,
+        steps,
+      }),
+      scores,
+      should_use_tool: true,
+      reason: "Prompt asks for a mission-ethos motive comparison; run the governed panel action and evaluate its receipt.",
+      missing_required_args: [],
+    };
+  }
+
   if (isZenGraphReflectionPrompt(normalized)) {
     const wantsVisibleZenGraph = userExplicitlyRequestsZenGraphPanel(normalized);
     const wantsFruitionPanel = userExplicitlyRequestsFruitionPanel(normalized) || /\bfruition\b/i.test(normalized);
     const steps: HelixWorkstationToolPlanStep[] = [
-      ...(wantsVisibleZenGraph ? [makeOpenStep("zen-graph")] : []),
+      ...(wantsVisibleZenGraph ? [makeOpenStep("zen-badge-graph")] : []),
       makeZenGraphReflectionAskToolStep(normalized),
       ...(wantsFruitionPanel ? [makeOpenStep("fruition-calculator", ["reflect_zen_graph_context"])] : []),
       {

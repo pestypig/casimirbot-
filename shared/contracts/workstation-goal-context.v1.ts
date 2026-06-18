@@ -89,14 +89,26 @@ export type AgentGoalContextFeedKindV1 =
   | "route_evidence";
 
 export type AgentGoalActuatorV1 =
+  | "query_visual_summaries"
+  | "query_audio_transcripts"
+  | "query_translation_segments"
+  | "query_microdeck_outputs"
+  | "query_live_answer_state"
+  | "query_source_health"
   | "set_audio_preset"
   | "set_visual_preset"
+  | "change_preset"
+  | "bind_source"
+  | "unbind_source"
   | "bind_narrator"
   | "narrator_bind_stream"
   | "narrator_say"
   | "update_live_answer"
   | "query_trace_memory"
   | "pause_loop"
+  | "resume_loop"
+  | "set_loop_state"
+  | "focus_process_graph"
   | "repair_source"
   | "ask_user";
 
@@ -202,6 +214,13 @@ const updateKinds = new Set<GoalContextUpdateKindV1>([
   "suggested_action",
 ]);
 
+const freshnessStatuses = new Set<WorkstationGoalContextUpdateV1["freshness"]["status"]>([
+  "fresh",
+  "stale",
+  "blocked",
+  "unknown",
+]);
+
 const goalStatuses = new Set<AgentGoalSessionV1["status"]>([
   "draft",
   "active",
@@ -212,20 +231,72 @@ const goalStatuses = new Set<AgentGoalSessionV1["status"]>([
   "failed",
 ]);
 
+const agentGoalContextFeedKinds = new Set<AgentGoalContextFeedKindV1>([
+  "visual_summaries",
+  "audio_transcripts",
+  "translated_transcripts",
+  "microdeck_outputs",
+  "live_answer_lines",
+  "source_health",
+  "trace_memory",
+  "route_evidence",
+]);
+
+const agentGoalActuators = new Set<AgentGoalActuatorV1>([
+  "query_visual_summaries",
+  "query_audio_transcripts",
+  "query_translation_segments",
+  "query_microdeck_outputs",
+  "query_live_answer_state",
+  "query_source_health",
+  "set_audio_preset",
+  "set_visual_preset",
+  "change_preset",
+  "bind_source",
+  "unbind_source",
+  "bind_narrator",
+  "narrator_bind_stream",
+  "narrator_say",
+  "update_live_answer",
+  "query_trace_memory",
+  "pause_loop",
+  "resume_loop",
+  "set_loop_state",
+  "focus_process_graph",
+  "repair_source",
+  "ask_user",
+]);
+
+const stringArrayIssue = (value: unknown, field: string, options: { requireNonEmpty?: boolean } = {}): string[] => {
+  if (!Array.isArray(value)) return [`${field} must be an array`];
+  const issues: string[] = [];
+  if (options.requireNonEmpty && value.length === 0) issues.push(`${field} must include at least one reference`);
+  value.forEach((entry, index) => {
+    if (typeof entry !== "string" || !entry.trim()) issues.push(`${field}[${index}] must be a non-empty string`);
+  });
+  return issues;
+};
+
 export function validateWorkstationGoalContextUpdateV1(value: WorkstationGoalContextUpdateV1): string[] {
   const issues: string[] = [];
   if (value.schemaVersion !== WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA) issues.push("schemaVersion must match goal context update schema");
   if (!value.updateId) issues.push("updateId is required");
   if (!Number.isFinite(value.createdAtMs) || value.createdAtMs <= 0) issues.push("createdAtMs must be a positive timestamp");
-  if (!Array.isArray(value.sourceRefs)) issues.push("sourceRefs must be an array");
-  if (!Array.isArray(value.loopRefs)) issues.push("loopRefs must be an array");
+  issues.push(...stringArrayIssue(value.sourceRefs, "sourceRefs", { requireNonEmpty: true }));
+  issues.push(...stringArrayIssue(value.loopRefs, "loopRefs"));
   if (!producerKinds.has(value.producerKind)) issues.push("producerKind is invalid");
   if (!updateKinds.has(value.updateKind)) issues.push("updateKind is invalid");
   if (!value.contentRef) issues.push("contentRef is required");
   if (!value.preview.trim()) issues.push("preview is required");
-  if (!Array.isArray(value.evidenceRefs)) issues.push("evidenceRefs must be an array");
-  if (!Array.isArray(value.receiptRefs)) issues.push("receiptRefs must be an array");
-  if (!value.freshness || !Number.isFinite(value.freshness.observedAtMs)) issues.push("freshness.observedAtMs is required");
+  issues.push(...stringArrayIssue(value.evidenceRefs, "evidenceRefs", { requireNonEmpty: true }));
+  issues.push(...stringArrayIssue(value.receiptRefs, "receiptRefs"));
+  if (!value.freshness || !Number.isFinite(value.freshness.observedAtMs) || value.freshness.observedAtMs <= 0) {
+    issues.push("freshness.observedAtMs must be a positive timestamp");
+  }
+  if (value.freshness?.staleAfterMs !== undefined && (!Number.isFinite(value.freshness.staleAfterMs) || value.freshness.staleAfterMs <= 0)) {
+    issues.push("freshness.staleAfterMs must be a positive number");
+  }
+  if (!freshnessStatuses.has(value.freshness?.status)) issues.push("freshness.status is invalid");
   if (!Array.isArray(value.suggestedDispatch)) issues.push("suggestedDispatch must be an array");
   if (value.authority?.assistantAnswer !== false) issues.push("goal context updates must not be assistant answers");
   if (value.authority?.terminalEligible !== false) issues.push("goal context updates must not be terminal eligible");
@@ -245,7 +316,21 @@ export function validateAgentGoalSessionV1(value: AgentGoalSessionV1): string[] 
   if (!Array.isArray(value.sourceRefs)) issues.push("sourceRefs must be an array");
   if (!Array.isArray(value.loopRefs)) issues.push("loopRefs must be an array");
   if (!Array.isArray(value.contextFeeds)) issues.push("contextFeeds must be an array");
+  if (Array.isArray(value.contextFeeds)) {
+    value.contextFeeds.forEach((feed, index) => {
+      if (!feed?.feedId) issues.push(`contextFeeds[${index}].feedId is required`);
+      if (!agentGoalContextFeedKinds.has(feed?.sourceKind)) issues.push(`contextFeeds[${index}].sourceKind is invalid`);
+      if (feed?.freshnessMs !== undefined && (!Number.isFinite(feed.freshnessMs) || feed.freshnessMs <= 0)) {
+        issues.push(`contextFeeds[${index}].freshnessMs must be a positive number`);
+      }
+    });
+  }
   if (!Array.isArray(value.allowedActuators)) issues.push("allowedActuators must be an array");
+  if (Array.isArray(value.allowedActuators)) {
+    value.allowedActuators.forEach((actuator, index) => {
+      if (!agentGoalActuators.has(actuator)) issues.push(`allowedActuators[${index}] is invalid`);
+    });
+  }
   if (!Array.isArray(value.stopConditions)) issues.push("stopConditions must be an array");
   if (value.authority?.assistantAnswer !== false) issues.push("goal sessions must not be assistant answers");
   if (value.authority?.finalReportsRequireTerminalAuthority !== true) issues.push("goal sessions require terminal authority for final reports");

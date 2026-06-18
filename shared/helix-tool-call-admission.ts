@@ -13,6 +13,7 @@ export type HelixToolCallAdmissionFamily =
   | "theory_locator"
   | "runtime_evidence"
   | "context_reflection"
+  | "capability_catalog"
   | "workspace_diagnostic"
   | "live_environment"
   | "live_pipeline"

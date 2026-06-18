@@ -125,11 +125,21 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain("liveAnswerCircuitRows");
     expect(source).toContain("liveAnswerCircuitSummary");
     expect(source).toContain('data-testid="live-answer-reasoning-circuit"');
+    expect(source).toContain('data-testid="live-answer-narrator-binding-count"');
+    expect(source).toContain('data-testid="live-answer-observation-authority-count"');
+    expect(source).toContain('data-testid="live-answer-terminal-authority-count"');
+    expect(source).toContain('data-testid="live-answer-goal-context-authority-chips"');
     expect(source).toContain("Reasoning circuit");
     expect(source).toContain("Stage Play goal context mirrored into Live Answer as observation state.");
     expect(source).toContain("wake interrupt");
     expect(source).toContain("narrator bind");
+    expect(source).toContain("narrator bindings");
+    expect(source).toContain("observation-only");
+    expect(source).toContain("assistant=false");
+    expect(source).toContain("terminal=false");
+    expect(source).toContain("raw=false");
     expect(source).toContain("terminal authority required");
+    expect(source).toContain("terminal_authority_sessions");
     expect(source).toContain("Receipts, MicroDeck outputs, narrator bindings, and panel projections stay evidence until the completed solver path selects a terminal answer.");
   });
 

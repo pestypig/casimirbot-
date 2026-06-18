@@ -371,6 +371,9 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   if (/docs[-_]viewer[-_.:]doc[-_]equation[-_]context|doc_equation_context/.test(haystack)) {
     return "docs-viewer.doc_equation_context";
   }
+  if (/helix_ask[-_.:]inspect_capability_catalog|capability_catalog_observation|capability_registry|helix\.capability_catalog_observation\.v1/.test(haystack)) {
+    return "helix_ask.inspect_capability_catalog";
+  }
   if (/repo[-_]code[-_.:]search[-_]concept|repo_code_search|repo_code_evidence/.test(haystack)) {
     return "repo-code.search_concept";
   }
@@ -777,7 +780,11 @@ const buildToolTurnChainAudit = (input: {
   const operationalTrace = readRecord(input.payload.operational_capability_trace);
   const runtimeToolCall = readRecord(input.payload.runtime_tool_call);
   const toolExecutionRejected = runtimeToolExecutionRejected(input.payload, input.artifacts);
+  const capabilityCatalogArtifact = input.artifacts.find((artifact) => observationKindMatches(artifact, "capability_registry")) ?? null;
   const rawExecutedCapability = firstString(
+    selectedCapability === "helix_ask.inspect_capability_catalog" && capabilityCatalogArtifact
+      ? "helix_ask.inspect_capability_catalog"
+      : null,
     runtimeLoopExecutedCapability(input.payload),
     nonModelToolCapability(input.lifecycleTrace?.executed_capability),
     nonModelToolCapability(operationalTrace?.executed_capability),
@@ -815,6 +822,8 @@ const buildToolTurnChainAudit = (input: {
   const observationArtifactKind =
     toolExecutionRejected
       ? null
+      : selectedCapability === "helix_ask.inspect_capability_catalog" && capabilityCatalogArtifact
+        ? "capability_registry"
       : readString(observationCoverage?.kind) ||
         input.artifacts
           .map((artifact) => readString(artifact.kind) || readString(artifact.schema))
@@ -823,6 +832,8 @@ const buildToolTurnChainAudit = (input: {
   const observationRef =
     toolExecutionRejected
       ? null
+      : selectedCapability === "helix_ask.inspect_capability_catalog" && capabilityCatalogArtifact
+        ? artifactRef(capabilityCatalogArtifact)
       : readStringArray(observationCoverage?.artifact_refs)[0] ||
         (observationArtifactKind ? artifactRef(artifactForKind(input.artifacts, observationArtifactKind) ?? {}) : null);
   const requestedObservationKinds = unique([
@@ -900,6 +911,18 @@ const buildToolTurnChainAudit = (input: {
       const payload = artifactPayload(artifact);
       return readString(payload?.error_code) === "repo_evidence_weak_after_repair";
     });
+  const terminalErrorCode = readString(input.payload.terminal_error_code);
+  const typedFailureSelected = Boolean(
+    normalizedEqual(materializedTerminal, "typed_failure") ||
+      normalizedEqual(authorityTerminal, "typed_failure") ||
+      normalizedEqual(visibleTerminal, "typed_failure"),
+  );
+  const typedFailureInsteadOfRequiredTerminal = Boolean(
+    terminalErrorCode &&
+      typedFailureSelected &&
+      requiredTerminal &&
+      !normalizedEqual(requiredTerminal, "typed_failure"),
+  );
   const draftNeedsSupport =
     Boolean(finalDraftRef) &&
     Boolean(materializedTerminal) &&
@@ -931,7 +954,9 @@ const buildToolTurnChainAudit = (input: {
                           ? "reentry_step_not_executed"
                           : draftNeedsSupport && supportCount === 0
                             ? "support_refs_missing"
-                            : terminalProductMismatch
+                            : typedFailureInsteadOfRequiredTerminal
+                              ? "terminal_not_materialized"
+                              : terminalProductMismatch
                               ? "terminal_product_mismatch"
                               : !materializedTerminal
                                 ? "terminal_not_materialized"
@@ -1286,6 +1311,41 @@ const visibleCapabilitySurface = (payload: RecordLike, artifacts: RecordLike[]):
   ]);
 };
 
+const RAIL_TABLE_VISIBLE_SURFACE_LIMIT = 40;
+
+const railTableVisibleCapabilitySurface = (input: {
+  payload: RecordLike;
+  artifacts: RecordLike[];
+  audit: RecordLike;
+  lifecycleTrace: RecordLike | null;
+}): {
+  visibleSurface: string[];
+  originalCount: number;
+  truncated: boolean;
+} => {
+  const admittedCapability = readAdmittedCapability(input.payload, input.audit, input.lifecycleTrace);
+  const rawSurface = visibleCapabilitySurface(input.payload, input.artifacts);
+  if (rawSurface.length === 0) {
+    return {
+      visibleSurface: [],
+      originalCount: 0,
+      truncated: false,
+    };
+  }
+  const prioritized = unique([
+    readString(input.audit.requested_capability),
+    readString(input.audit.selected_capability),
+    admittedCapability,
+    readString(input.audit.executed_capability),
+    ...rawSurface,
+  ].filter((entry: string | null): entry is string => Boolean(entry)));
+  return {
+    visibleSurface: prioritized.slice(0, RAIL_TABLE_VISIBLE_SURFACE_LIMIT),
+    originalCount: prioritized.length,
+    truncated: prioritized.length > RAIL_TABLE_VISIBLE_SURFACE_LIMIT,
+  };
+};
+
 const readAdmittedCapability = (
   payload: RecordLike,
   audit: RecordLike,
@@ -1369,7 +1429,13 @@ const buildCodexParityAgentSpineRailTable = (input: {
   audit: RecordLike;
   triage: RecordLike;
 }): RecordLike => {
-  const visibleSurface = visibleCapabilitySurface(input.payload, input.artifacts);
+  const visibleSurfaceProjection = railTableVisibleCapabilitySurface({
+    payload: input.payload,
+    artifacts: input.artifacts,
+    audit: input.audit,
+    lifecycleTrace: input.lifecycleTrace,
+  });
+  const visibleSurface = visibleSurfaceProjection.visibleSurface;
   const codexParityClass = codexParityClassFromAudit({
     audit: input.audit,
     triage: input.triage,
@@ -1381,6 +1447,8 @@ const buildCodexParityAgentSpineRailTable = (input: {
     prompt: readFirstPromptText(input.payload),
     requested_capability: readNullableString(input.audit.requested_capability),
     visible_tool_surface: visibleSurface,
+    visible_tool_surface_original_count: visibleSurfaceProjection.originalCount,
+    visible_tool_surface_truncated: visibleSurfaceProjection.truncated,
     selected_capability: readNullableString(input.audit.selected_capability),
     admitted_capability: readAdmittedCapability(input.payload, input.audit, input.lifecycleTrace),
     executed_capability: readNullableString(input.audit.executed_capability),

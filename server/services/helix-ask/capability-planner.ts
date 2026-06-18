@@ -33,6 +33,7 @@ import {
   extractExplicitCapabilityContract,
 } from "./explicit-capability-contract";
 import { resolveAskCapabilityContractArbitration } from "./capability-contract-arbitration";
+import { isAskCapabilityCatalogPrompt } from "./capability-catalog-intent";
 
 type RecordLike = Record<string, unknown>;
 
@@ -78,6 +79,15 @@ const classifySourceFamily = (input: {
     isWorkspaceOsStatusPrompt(input.promptText)
   ) {
     return "workspace_diagnostic";
+  }
+  if (
+    input.sourceTarget === "runtime_evidence" &&
+    (
+      input.admittedFamilies.includes("capability_catalog") ||
+      isAskCapabilityCatalogPrompt(input.promptText)
+    )
+  ) {
+    return "capability_catalog";
   }
   if (
     input.sourceTarget === "unknown" &&
@@ -222,7 +232,7 @@ const requestedActionFor = (
     }
     return "query_live_environment";
   }
-  if (family === "visual_capture") return "review_current_visual_state";
+  if (family === "visual_capture") return "situation-room.describe_visual_capture";
   if (family === "procedure_memory") return "retrieve_procedure_evidence";
   if (family === "repo_evidence") return "repo-code.search_concept";
   if (family === "scholarly_research") {
@@ -233,6 +243,7 @@ const requestedActionFor = (
   if (family === "internet_search") return HELIX_INTERNET_SEARCH_CAPABILITY;
   if (family === "process_graph") return "inspect_process_graph";
   if (family === "workspace_diagnostic") return HELIX_WORKSPACE_OS_STATUS_CAPABILITY;
+  if (family === "capability_catalog") return "helix_ask.inspect_capability_catalog";
   if (family === "subagent_runtime_adapter") return "delegate_subagent_runtime";
   if (family === "context_reflection") return "helix_ask.reflect_context_attachments";
   return "diagnose_debug_or_runtime_evidence";
@@ -379,6 +390,7 @@ const allowedFamilyByToolAdmission = (family: HelixCapabilityFamily, admittedFam
       admittedFamilies.includes("workstation_panel");
   }
   if (family === "workspace_diagnostic") return admittedFamilies.includes("workspace_diagnostic");
+  if (family === "capability_catalog") return admittedFamilies.includes("capability_catalog");
   if (family === "process_graph") return admittedFamilies.includes("process_graph");
   if (family === "live_environment") return admittedFamilies.includes("live_environment");
   if (family === "live_source") return admittedFamilies.includes("live_pipeline");
@@ -444,6 +456,7 @@ const admissionFor = (input: {
     input.family === "procedure_memory" ||
     input.family === "debug_export" ||
     input.family === "context_reflection" ||
+    input.family === "capability_catalog" ||
     input.family === "workspace_diagnostic" ||
     input.family === "workspace_directory" ||
     input.family === "live_environment" ||
@@ -495,6 +508,9 @@ export const buildCapabilityPlan = (input: {
     !contextualToolSuppressionBlocksFamily(contextualSuppression, "internet_search") &&
     !requiresRepoConceptEvidence &&
     toolUseRestatement.requiredToolFamilies.includes("internet_search");
+  const requiresCapabilityCatalog =
+    !hardLiveSourceMailboxRoute &&
+    isAskCapabilityCatalogPrompt(input.promptText);
   const requiresDocsViewerEvidence =
     !hardLiveSourceMailboxRoute &&
     !contextualToolSuppressionBlocksFamily(contextualSuppression, "docs_viewer") &&
@@ -506,6 +522,7 @@ export const buildCapabilityPlan = (input: {
     (requestedCapabilityContract?.source_target ?? "") ||
     (requiresDocsViewerEvidence ? "docs_viewer" : "") ||
     (requiresInternetEvidence ? "internet_search" : "") ||
+    (requiresCapabilityCatalog ? "runtime_evidence" : "") ||
     (requiresRepoConceptEvidence ? "repo_code" : "") ||
     (explicitDocsPathOperation ? "" : routeMetadataSourceTarget(routeMetadata)) ||
     readString(sourceTargetIntent?.target_source) ||
@@ -524,6 +541,8 @@ export const buildCapabilityPlan = (input: {
   });
   const fallbackFamily: HelixCapabilityFamily = hardLiveSourceMailboxRoute
     ? "live_environment"
+    : requiresCapabilityCatalog
+    ? "capability_catalog"
     : requestedCapabilityContract
     ? requestedCapabilityContract.plan_family
     : requiresDocsViewerEvidence
@@ -539,6 +558,8 @@ export const buildCapabilityPlan = (input: {
           : classifiedFamily;
   const fallbackGoalKind = requiresRepoConceptEvidence
     ? "repo_concept_explanation"
+    : requiresCapabilityCatalog
+    ? "capability_help"
     : requiresDocsViewerEvidence
       ? "doc_open_best"
     : requiresInternetEvidence
@@ -546,6 +567,8 @@ export const buildCapabilityPlan = (input: {
       : originalCanonicalGoalKind || "unknown";
   const fallbackRequiredTerminalKind = requiresRepoConceptEvidence
     ? "repo_code_evidence_answer"
+    : requiresCapabilityCatalog
+      ? "capability_help_summary"
     : requiresInternetEvidence
       ? "internet_search_answer"
       : readString(canonicalGoalFrame?.required_terminal_kind) || null;
