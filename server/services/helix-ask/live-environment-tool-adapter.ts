@@ -48,6 +48,7 @@ import type {
   HelixLiveEnvironmentCommentarySubject,
 } from "@shared/helix-live-environment-commentary";
 import {
+  WORKSTATION_AGENT_GOAL_ACTUATORS,
   WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
   WORKSTATION_NARRATOR_BIND_STREAM_REQUEST_SCHEMA,
   WORKSTATION_NARRATOR_SAY_REQUEST_SCHEMA,
@@ -934,31 +935,7 @@ const AGENT_GOAL_FEED_KIND_ALIASES: Record<string, AgentGoalContextFeedKindV1> =
   route_evidence: "route_evidence",
 };
 
-const AGENT_GOAL_ACTUATORS = new Set<AgentGoalActuatorV1>([
-  "query_visual_summaries",
-  "query_audio_transcripts",
-  "query_translation_segments",
-  "query_microdeck_outputs",
-  "query_live_answer_state",
-  "query_source_health",
-  "configure_route_watch",
-  "set_audio_preset",
-  "set_visual_preset",
-  "change_preset",
-  "bind_source",
-  "unbind_source",
-  "bind_narrator",
-  "narrator_bind_stream",
-  "narrator_say",
-  "update_live_answer",
-  "query_trace_memory",
-  "pause_loop",
-  "resume_loop",
-  "set_loop_state",
-  "focus_process_graph",
-  "repair_source",
-  "ask_user",
-]);
+const AGENT_GOAL_ACTUATORS = new Set<AgentGoalActuatorV1>(WORKSTATION_AGENT_GOAL_ACTUATORS);
 
 function normalizeAgentGoalFeedKind(value: unknown): AgentGoalContextFeedKindV1 | null {
   const key = readString(value)?.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");

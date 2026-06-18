@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   WORKSTATION_AGENT_GOAL_ACTUATORS,
   WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS,
+  WORKSTATION_AGENT_GOAL_DEFAULT_CONTEXT_FEEDS,
   WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
   WORKSTATION_GOAL_CONTEXT_PRODUCER_KINDS,
   WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
@@ -199,6 +200,25 @@ describe("workstation goal context contract", () => {
         feedId: `feed:${sourceKind}`,
         sourceKind,
         freshnessMs: 30_000,
+      })),
+      allowedActuators: [...WORKSTATION_AGENT_GOAL_ACTUATORS],
+    })).toEqual([]);
+  });
+
+  it("keeps default goal-context feeds complete, fresh, and session-valid", () => {
+    expect(WORKSTATION_AGENT_GOAL_DEFAULT_CONTEXT_FEEDS.map((feed) => feed.sourceKind).sort()).toEqual(
+      [...WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS].sort(),
+    );
+    expect(WORKSTATION_AGENT_GOAL_DEFAULT_CONTEXT_FEEDS.every((feed) =>
+      feed.freshnessMs > 0 && feed.relevancePolicy.trim().length > 0
+    )).toBe(true);
+    expect(validateAgentGoalSessionV1({
+      ...goal,
+      contextFeeds: WORKSTATION_AGENT_GOAL_DEFAULT_CONTEXT_FEEDS.map((feed) => ({
+        feedId: `feed:${feed.sourceKind}`,
+        sourceKind: feed.sourceKind,
+        freshnessMs: feed.freshnessMs,
+        relevancePolicy: feed.relevancePolicy,
       })),
       allowedActuators: [...WORKSTATION_AGENT_GOAL_ACTUATORS],
     })).toEqual([]);

@@ -97,6 +97,7 @@ const expectCodexParityRailTableShape = (railTable: Record<string, unknown>, tur
     schema: "helix.codex_parity_agent_spine_rail_table.v1",
     turn_id: turnId,
     assistant_answer: false,
+    terminal_eligible: false,
     raw_content_included: false,
   });
   expectNullableStringField(railTable, "prompt");
@@ -121,6 +122,7 @@ const expectCodexParityRailTableShape = (railTable: Record<string, unknown>, tur
   expect(["reentered", "not_reentered", "no_observation"]).toContain(railTable.reentry_status);
   expect(["complete", "broken", "fail_closed"]).toContain(railTable.rail_status);
   expect(CODEX_PARITY_CLASSES).toContain(railTable.codex_parity_class);
+  expect(railTable.normalized_codex_parity_classes).toEqual([...CODEX_PARITY_CLASSES]);
   if (railTable.codex_parity_class === "complete" || railTable.rail_status === "complete") {
     expect(railTable.first_broken_rail).toBeNull();
     expect(railTable.rail_failure_code).toBeNull();

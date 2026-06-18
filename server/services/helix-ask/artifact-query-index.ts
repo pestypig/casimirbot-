@@ -1031,6 +1031,7 @@ const buildToolTurnChainAudit = (input: {
     rail_failure_code: railFailureCode,
     normalized_failure_codes: TOOL_TURN_CHAIN_FAILURE_CODES,
     assistant_answer: false,
+    terminal_eligible: false,
     raw_content_included: false,
   };
 };
@@ -1260,6 +1261,7 @@ const buildToolRailFailureTriage = (input: {
     rail_failure_code: readNullableString(input.audit.rail_failure_code),
     repair_target: triage.repair_target,
     assistant_answer: false,
+    terminal_eligible: false,
     raw_content_included: false,
   };
 };
@@ -1490,6 +1492,7 @@ const buildCodexParityAgentSpineRailTable = (input: {
     rail_status: readString(input.audit.rail_status) || "broken",
     rail_failure_code: readNullableString(input.audit.rail_failure_code),
     assistant_answer: false,
+    terminal_eligible: false,
     raw_content_included: false,
   };
 };
@@ -1638,6 +1641,7 @@ export const buildArtifactQueryIndex = (input: {
     tool_rail_failure_triage: toolRailFailureTriage,
     tool_turn_chain_family_matrix: buildToolTurnChainFamilyMatrix(toolTurnChainAudit),
     assistant_answer: false,
+    terminal_eligible: false,
     raw_content_included: false,
   };
 };

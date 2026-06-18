@@ -51,6 +51,7 @@ const expectCodexParityRailTableShape = (railTable: Record<string, unknown>, tur
     schema: "helix.codex_parity_agent_spine_rail_table.v1",
     turn_id: turnId,
     assistant_answer: false,
+    terminal_eligible: false,
     raw_content_included: false,
   });
   expectNullableStringField(railTable, "prompt");
@@ -119,6 +120,7 @@ describe("helix ask E68 debug export endpoint", () => {
       schema: "helix.artifact_query_index.v1",
       turn_id: turnId,
       assistant_answer: false,
+      terminal_eligible: false,
       raw_content_included: false,
     });
     const indexedRailTable = debugExport.body?.payload?.artifact_query_index?.codex_parity_agent_spine_rail_table;

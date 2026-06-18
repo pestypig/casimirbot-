@@ -1668,6 +1668,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         loopRefs: update.loopRefs,
         evidenceRefs: update.evidenceRefs,
         dispatch: update.suggestedDispatch.slice(0, 4).map(liveAnswerDispatchLabel),
+        authority: {
+          assistantAnswer: update.authority.assistantAnswer,
+          terminalEligible: update.authority.terminalEligible,
+          rawContentIncluded: update.authority.rawContentIncluded,
+        },
       })),
     [goalContextUpdates],
   );

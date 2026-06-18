@@ -126,6 +126,23 @@ export const WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS: readonly AgentGoalContex
   "route_evidence",
 ];
 
+export type AgentGoalDefaultContextFeedSpecV1 = {
+  sourceKind: AgentGoalContextFeedKindV1;
+  freshnessMs: number;
+  relevancePolicy: string;
+};
+
+export const WORKSTATION_AGENT_GOAL_DEFAULT_CONTEXT_FEEDS: readonly AgentGoalDefaultContextFeedSpecV1[] = [
+  { sourceKind: "visual_summaries", freshnessMs: 30_000, relevancePolicy: "same-source-or-goal-id" },
+  { sourceKind: "audio_transcripts", freshnessMs: 30_000, relevancePolicy: "same-source-or-goal-id" },
+  { sourceKind: "translated_transcripts", freshnessMs: 45_000, relevancePolicy: "same-source-or-goal-id" },
+  { sourceKind: "microdeck_outputs", freshnessMs: 30_000, relevancePolicy: "same-source-or-goal-id" },
+  { sourceKind: "live_answer_lines", freshnessMs: 45_000, relevancePolicy: "same-goal-or-active-line" },
+  { sourceKind: "source_health", freshnessMs: 60_000, relevancePolicy: "same-source" },
+  { sourceKind: "trace_memory", freshnessMs: 120_000, relevancePolicy: "same-thread-or-turn" },
+  { sourceKind: "route_evidence", freshnessMs: 60_000, relevancePolicy: "same-goal-or-route" },
+];
+
 export type AgentGoalActuatorV1 =
   | "query_visual_summaries"
   | "query_audio_transcripts"

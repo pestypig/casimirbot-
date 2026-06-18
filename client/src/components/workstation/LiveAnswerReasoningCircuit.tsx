@@ -12,6 +12,11 @@ export type LiveAnswerReasoningCircuitRow = {
   loopRefs: string[];
   evidenceRefs: string[];
   dispatch: string[];
+  authority: {
+    assistantAnswer: boolean;
+    terminalEligible: boolean;
+    rawContentIncluded: boolean;
+  };
 };
 
 export type LiveAnswerReasoningCircuitSummary = {
@@ -27,6 +32,11 @@ export type LiveAnswerReasoningCircuitSummary = {
 
 const compactLabel = (value: string): string =>
   value.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim() || "unknown";
+
+const authorityChipClass = (flag: boolean): string =>
+  flag
+    ? "rounded border border-rose-300/30 bg-rose-950/20 px-1.5 py-0.5 font-mono text-[10px] text-rose-100"
+    : "rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400";
 
 export function LiveAnswerReasoningCircuit({
   rows,
@@ -86,9 +96,9 @@ export function LiveAnswerReasoningCircuit({
                 <span className="truncate">evidence={row.evidenceRefs.length ? row.evidenceRefs.join(", ") : "none"}</span>
               </div>
               <div className="mt-1.5 flex flex-wrap gap-1" data-testid="live-answer-goal-context-authority-chips">
-                <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">assistant=false</span>
-                <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">terminal=false</span>
-                <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">raw=false</span>
+                <span className={authorityChipClass(row.authority.assistantAnswer)}>assistant={String(row.authority.assistantAnswer)}</span>
+                <span className={authorityChipClass(row.authority.terminalEligible)}>terminal={String(row.authority.terminalEligible)}</span>
+                <span className={authorityChipClass(row.authority.rawContentIncluded)}>raw={String(row.authority.rawContentIncluded)}</span>
               </div>
               <div className="mt-1.5 flex flex-wrap gap-1">
                 {row.dispatch.length > 0 ? row.dispatch.map((dispatch: string) => (

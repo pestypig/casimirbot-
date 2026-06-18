@@ -149,9 +149,12 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain("narrator bind");
     expect(source).toContain("narrator bindings");
     expect(source).toContain("observation-only");
-    expect(source).toContain("assistant=false");
-    expect(source).toContain("terminal=false");
-    expect(source).toContain("raw=false");
+    expect(source).toContain("assistantAnswer: update.authority.assistantAnswer");
+    expect(source).toContain("terminalEligible: update.authority.terminalEligible");
+    expect(source).toContain("rawContentIncluded: update.authority.rawContentIncluded");
+    expect(source).toContain("assistant={String(row.authority.assistantAnswer)}");
+    expect(source).toContain("terminal={String(row.authority.terminalEligible)}");
+    expect(source).toContain("raw={String(row.authority.rawContentIncluded)}");
     expect(source).toContain("terminal authority required");
     expect(source).toContain("terminal_authority_sessions");
     expect(source).toContain("Receipts, MicroDeck outputs, narrator bindings, and panel projections stay evidence until the completed solver path selects a terminal answer.");

@@ -10,6 +10,9 @@ import type {
   StagePlayLiveSourceMailWakeResultV1,
 } from "@shared/contracts/stage-play-live-source-mail-wake.v1";
 import {
+  WORKSTATION_AGENT_GOAL_ACTUATORS,
+  WORKSTATION_AGENT_GOAL_DEFAULT_CONTEXT_FEEDS,
+  WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS,
   WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
   WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
   validateAgentGoalSessionV1,
@@ -44,119 +47,19 @@ const previewText = (value: string, limit = 240): string => {
   return normalized.length > limit ? `${normalized.slice(0, Math.max(0, limit - 3)).trimEnd()}...` : normalized;
 };
 
-const agentGoalFeedKinds = new Set<AgentGoalContextFeedKindV1>([
-  "visual_summaries",
-  "audio_transcripts",
-  "translated_transcripts",
-  "microdeck_outputs",
-  "live_answer_lines",
-  "source_health",
-  "trace_memory",
-  "route_evidence",
-]);
+const agentGoalFeedKinds = new Set<AgentGoalContextFeedKindV1>(WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS);
 
-const agentGoalActuators = new Set<AgentGoalActuatorV1>([
-  "query_visual_summaries",
-  "query_audio_transcripts",
-  "query_translation_segments",
-  "query_microdeck_outputs",
-  "query_live_answer_state",
-  "query_source_health",
-  "configure_route_watch",
-  "set_audio_preset",
-  "set_visual_preset",
-  "change_preset",
-  "bind_source",
-  "unbind_source",
-  "bind_narrator",
-  "narrator_bind_stream",
-  "narrator_say",
-  "update_live_answer",
-  "query_trace_memory",
-  "pause_loop",
-  "resume_loop",
-  "set_loop_state",
-  "focus_process_graph",
-  "repair_source",
-  "ask_user",
-]);
+const agentGoalActuators = new Set<AgentGoalActuatorV1>(WORKSTATION_AGENT_GOAL_ACTUATORS);
 
-const defaultContextFeeds = (goalId: string): AgentGoalSessionV1["contextFeeds"] => [
-  {
-    feedId: `stage_play_goal_feed:${hashShort([goalId, "visual_summaries"], 12)}`,
-    sourceKind: "visual_summaries",
-    freshnessMs: 30_000,
-    relevancePolicy: "same-source-or-goal-id",
-  },
-  {
-    feedId: `stage_play_goal_feed:${hashShort([goalId, "audio_transcripts"], 12)}`,
-    sourceKind: "audio_transcripts",
-    freshnessMs: 30_000,
-    relevancePolicy: "same-source-or-goal-id",
-  },
-  {
-    feedId: `stage_play_goal_feed:${hashShort([goalId, "translated_transcripts"], 12)}`,
-    sourceKind: "translated_transcripts",
-    freshnessMs: 45_000,
-    relevancePolicy: "same-source-or-goal-id",
-  },
-  {
-    feedId: `stage_play_goal_feed:${hashShort([goalId, "microdeck_outputs"], 12)}`,
-    sourceKind: "microdeck_outputs",
-    freshnessMs: 30_000,
-    relevancePolicy: "same-source-or-goal-id",
-  },
-  {
-    feedId: `stage_play_goal_feed:${hashShort([goalId, "live_answer_lines"], 12)}`,
-    sourceKind: "live_answer_lines",
-    freshnessMs: 45_000,
-    relevancePolicy: "same-goal-or-active-line",
-  },
-  {
-    feedId: `stage_play_goal_feed:${hashShort([goalId, "source_health"], 12)}`,
-    sourceKind: "source_health",
-    freshnessMs: 60_000,
-    relevancePolicy: "same-source",
-  },
-  {
-    feedId: `stage_play_goal_feed:${hashShort([goalId, "trace_memory"], 12)}`,
-    sourceKind: "trace_memory",
-    freshnessMs: 120_000,
-    relevancePolicy: "same-thread-or-turn",
-  },
-  {
-    feedId: `stage_play_goal_feed:${hashShort([goalId, "route_evidence"], 12)}`,
-    sourceKind: "route_evidence",
-    freshnessMs: 60_000,
-    relevancePolicy: "same-goal-or-route",
-  },
-];
+const defaultContextFeeds = (goalId: string): AgentGoalSessionV1["contextFeeds"] =>
+  WORKSTATION_AGENT_GOAL_DEFAULT_CONTEXT_FEEDS.map((feed) => ({
+    feedId: `stage_play_goal_feed:${hashShort([goalId, feed.sourceKind], 12)}`,
+    sourceKind: feed.sourceKind,
+    freshnessMs: feed.freshnessMs,
+    relevancePolicy: feed.relevancePolicy,
+  }));
 
-const defaultAllowedActuators = (): AgentGoalActuatorV1[] => [
-  "query_visual_summaries",
-  "query_audio_transcripts",
-  "query_translation_segments",
-  "query_microdeck_outputs",
-  "query_live_answer_state",
-  "query_source_health",
-  "configure_route_watch",
-  "set_audio_preset",
-  "set_visual_preset",
-  "change_preset",
-  "bind_source",
-  "unbind_source",
-  "bind_narrator",
-  "narrator_bind_stream",
-  "narrator_say",
-  "update_live_answer",
-  "query_trace_memory",
-  "pause_loop",
-  "resume_loop",
-  "set_loop_state",
-  "focus_process_graph",
-  "repair_source",
-  "ask_user",
-];
+const defaultAllowedActuators = (): AgentGoalActuatorV1[] => [...WORKSTATION_AGENT_GOAL_ACTUATORS];
 
 const mergeContextFeeds = (
   goalId: string,

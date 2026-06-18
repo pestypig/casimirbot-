@@ -21,6 +21,10 @@ import {
   cancelVoiceInterpretationContext,
   upsertVoiceInterpretationContext,
 } from "../voice/voice-interpretation-context-store";
+import {
+  WORKSTATION_AGENT_GOAL_ACTUATORS,
+  WORKSTATION_AGENT_GOAL_DEFAULT_CONTEXT_FEEDS,
+} from "../../../shared/contracts/workstation-goal-context.v1";
 
 export type WorkstationToolIntent =
   | "calculator_verify"
@@ -1606,41 +1610,12 @@ function buildWorkstationGoalContextPlan(
     goal_id: goalId,
     objective,
     ...(sourceId ? { source_refs: [sourceId] } : {}),
-    context_feeds: [
-      { source_kind: "visual_summaries", freshness_ms: 30_000, relevance_policy: "same-source-or-goal-id" },
-      { source_kind: "audio_transcripts", freshness_ms: 30_000, relevance_policy: "same-source-or-goal-id" },
-      { source_kind: "translated_transcripts", freshness_ms: 45_000, relevance_policy: "same-source-or-goal-id" },
-      { source_kind: "microdeck_outputs", freshness_ms: 30_000, relevance_policy: "same-source-or-goal-id" },
-      { source_kind: "live_answer_lines", freshness_ms: 45_000, relevance_policy: "same-goal-or-active-line" },
-      { source_kind: "source_health", freshness_ms: 60_000, relevance_policy: "same-source" },
-      { source_kind: "trace_memory", freshness_ms: 120_000, relevance_policy: "same-thread-or-turn" },
-      { source_kind: "route_evidence", freshness_ms: 60_000, relevance_policy: "same-goal-or-route" },
-    ],
-    allowed_actuators: [
-      "query_visual_summaries",
-      "query_audio_transcripts",
-      "query_translation_segments",
-      "query_microdeck_outputs",
-      "query_live_answer_state",
-      "query_source_health",
-      "configure_route_watch",
-      "set_audio_preset",
-      "set_visual_preset",
-      "change_preset",
-      "bind_source",
-      "unbind_source",
-      "bind_narrator",
-      "narrator_bind_stream",
-      "narrator_say",
-      "update_live_answer",
-      "query_trace_memory",
-      "pause_loop",
-      "resume_loop",
-      "set_loop_state",
-      "focus_process_graph",
-      "repair_source",
-      "ask_user",
-    ],
+    context_feeds: WORKSTATION_AGENT_GOAL_DEFAULT_CONTEXT_FEEDS.map((feed) => ({
+      source_kind: feed.sourceKind,
+      freshness_ms: feed.freshnessMs,
+      relevance_policy: feed.relevancePolicy,
+    })),
+    allowed_actuators: [...WORKSTATION_AGENT_GOAL_ACTUATORS],
     cadence: /\b(?:continuous|continuously|ongoing|keep\s+(?:watching|checking|tracking)|monitor)\b/i.test(normalized)
       ? { kind: "event_accumulation", min_updates: 2 }
       : { kind: "user_turn_only" },

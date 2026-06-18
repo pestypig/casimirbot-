@@ -3226,6 +3226,10 @@ function StagePlayGoalContextBoard({
     if (cadence.kind === "interval") return `interval / ${cadence.everyMs}ms`;
     return labelize(cadence.kind);
   };
+  const authorityChipClass = (flag: boolean): string =>
+    flag
+      ? "rounded border border-rose-400/40 bg-rose-950/25 px-1.5 py-0.5 font-mono text-[9px] text-rose-100"
+      : "rounded border border-slate-700 bg-slate-950 px-1.5 py-0.5 font-mono text-[9px] text-slate-400";
   return (
     <div className="rounded-md border border-violet-900/60 bg-violet-950/10 p-3" data-testid="stage-play-goal-context-board">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -3283,9 +3287,9 @@ function StagePlayGoalContextBoard({
                 </div>
                 <div className="mt-1 line-clamp-2 text-[10px] leading-snug text-slate-300">{update.preview}</div>
                 <div className="mt-2 flex flex-wrap gap-1" data-testid="stage-play-goal-context-authority-chips">
-                  <span className="rounded border border-slate-700 bg-slate-950 px-1.5 py-0.5 font-mono text-[9px] text-slate-400">assistant=false</span>
-                  <span className="rounded border border-slate-700 bg-slate-950 px-1.5 py-0.5 font-mono text-[9px] text-slate-400">terminal=false</span>
-                  <span className="rounded border border-slate-700 bg-slate-950 px-1.5 py-0.5 font-mono text-[9px] text-slate-400">raw=false</span>
+                  <span className={authorityChipClass(update.authority.assistantAnswer)}>assistant={String(update.authority.assistantAnswer)}</span>
+                  <span className={authorityChipClass(update.authority.terminalEligible)}>terminal={String(update.authority.terminalEligible)}</span>
+                  <span className={authorityChipClass(update.authority.rawContentIncluded)}>raw={String(update.authority.rawContentIncluded)}</span>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1">
                   {update.suggestedDispatch.slice(0, 4).map((action, index) => (

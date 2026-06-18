@@ -88,6 +88,7 @@ const expectRailTableShape = (railTable: RecordLike, turnId: string): void => {
     schema: "helix.codex_parity_agent_spine_rail_table.v1",
     turn_id: turnId,
     assistant_answer: false,
+    terminal_eligible: false,
     raw_content_included: false,
   });
   expect(Array.isArray(railTable.visible_tool_surface)).toBe(true);
@@ -113,6 +114,7 @@ const expectRailTableShape = (railTable: RecordLike, turnId: string): void => {
   expect(["reentered", "not_reentered", "no_observation"]).toContain(railTable.reentry_status);
   expect(["complete", "broken", "fail_closed"]).toContain(railTable.rail_status);
   expect(CODEX_PARITY_CLASSES).toContain(railTable.codex_parity_class);
+  expect(railTable.normalized_codex_parity_classes).toEqual([...CODEX_PARITY_CLASSES]);
   if (railTable.rail_status === "complete" || railTable.codex_parity_class === "complete") {
     expect(railTable.first_broken_rail).toBeNull();
     expect(railTable.rail_failure_code).toBeNull();

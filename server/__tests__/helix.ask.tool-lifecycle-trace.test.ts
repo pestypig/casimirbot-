@@ -302,6 +302,7 @@ describe("Helix Ask tool lifecycle trace", () => {
       capability: "scientific-calculator.solve_expression",
       artifact_count: 3,
       assistant_answer: false,
+      terminal_eligible: false,
       raw_content_included: false,
       reentry_status: {
         evidence_reentered: true,
@@ -330,6 +331,7 @@ describe("Helix Ask tool lifecycle trace", () => {
       rail_status: "complete",
       rail_failure_code: null,
       assistant_answer: false,
+      terminal_eligible: false,
       raw_content_included: false,
     });
     expect(index.tool_rail_failure_triage).toMatchObject({
@@ -346,6 +348,7 @@ describe("Helix Ask tool lifecycle trace", () => {
       rail_failure_code: null,
       repair_target: null,
       assistant_answer: false,
+      terminal_eligible: false,
       raw_content_included: false,
     });
     expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
@@ -366,6 +369,7 @@ describe("Helix Ask tool lifecycle trace", () => {
       rail_status: "complete",
       rail_failure_code: null,
       assistant_answer: false,
+      terminal_eligible: false,
       raw_content_included: false,
     });
     expect(index.codex_parity_agent_spine_rail_table.normalized_codex_parity_classes).toEqual([

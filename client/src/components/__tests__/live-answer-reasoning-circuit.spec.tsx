@@ -49,10 +49,32 @@ describe("LiveAnswerReasoningCircuit", () => {
             loopRefs: ["loop:visual-mail"],
             evidenceRefs: ["frame:frog-001", "microdeck-run:frog-classifier"],
             dispatch: ["narrator bind translated transcript", "wake interrupt"],
+            authority: {
+              assistantAnswer: false,
+              terminalEligible: false,
+              rawContentIncluded: false,
+            },
+          },
+          {
+            id: "goal-update:bad-terminal-projection",
+            title: "projection warning",
+            producer: "live answer",
+            status: "blocked",
+            preview: "Malformed projection tried to act terminal before solver authority.",
+            contentRef: "live-answer-projection:bad-terminal",
+            sourceRefs: ["live-answer:desktop"],
+            loopRefs: ["loop:projection"],
+            evidenceRefs: ["projection:bad-terminal"],
+            dispatch: ["update live answer"],
+            authority: {
+              assistantAnswer: true,
+              terminalEligible: true,
+              rawContentIncluded: true,
+            },
           },
         ]}
         summary={{
-          updateCount: 1,
+          updateCount: 2,
           observationOnlyCount: 1,
           activeGoalCount: 1,
           narratorSpeechCount: 0,
@@ -66,17 +88,21 @@ describe("LiveAnswerReasoningCircuit", () => {
     );
 
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("Reasoning circuit");
-    expect(screen.getByTestId("live-answer-goal-context-row")).toHaveTextContent("visual observation");
-    expect(screen.getByTestId("live-answer-goal-context-row")).toHaveTextContent("microdeck-output:frog-classifier");
-    expect(screen.getByTestId("live-answer-goal-context-refs")).toHaveTextContent("sources=visual:screen-share");
-    expect(screen.getByTestId("live-answer-goal-context-refs")).toHaveTextContent("loops=loop:visual-mail");
-    expect(screen.getByTestId("live-answer-goal-context-refs")).toHaveTextContent("evidence=frame:frog-001, microdeck-run:frog-classifier");
-    expect(screen.getByTestId("live-answer-goal-context-authority-chips")).toHaveTextContent("assistant=false");
-    expect(screen.getByTestId("live-answer-goal-context-authority-chips")).toHaveTextContent("terminal=false");
-    expect(screen.getByTestId("live-answer-goal-context-authority-chips")).toHaveTextContent("raw=false");
+    expect(screen.getAllByTestId("live-answer-goal-context-row")[0]).toHaveTextContent("visual observation");
+    expect(screen.getAllByTestId("live-answer-goal-context-row")[0]).toHaveTextContent("microdeck-output:frog-classifier");
+    expect(screen.getAllByTestId("live-answer-goal-context-refs")[0]).toHaveTextContent("sources=visual:screen-share");
+    expect(screen.getAllByTestId("live-answer-goal-context-refs")[0]).toHaveTextContent("loops=loop:visual-mail");
+    expect(screen.getAllByTestId("live-answer-goal-context-refs")[0]).toHaveTextContent("evidence=frame:frog-001, microdeck-run:frog-classifier");
+    expect(screen.getAllByTestId("live-answer-goal-context-authority-chips")[0]).toHaveTextContent("assistant=false");
+    expect(screen.getAllByTestId("live-answer-goal-context-authority-chips")[0]).toHaveTextContent("terminal=false");
+    expect(screen.getAllByTestId("live-answer-goal-context-authority-chips")[0]).toHaveTextContent("raw=false");
+    expect(screen.getAllByTestId("live-answer-goal-context-authority-chips")[1]).toHaveTextContent("assistant=true");
+    expect(screen.getAllByTestId("live-answer-goal-context-authority-chips")[1]).toHaveTextContent("terminal=true");
+    expect(screen.getAllByTestId("live-answer-goal-context-authority-chips")[1]).toHaveTextContent("raw=true");
     expect(screen.getAllByTestId("live-answer-goal-context-dispatch").map((node) => node.textContent)).toEqual([
       "narrator bind translated transcript",
       "wake interrupt",
+      "update live answer",
     ]);
     expect(screen.getByTestId("live-answer-narrator-binding-count")).toHaveTextContent("1 narrator bindings");
     expect(screen.getByTestId("live-answer-observation-authority-count")).toHaveTextContent("1 observation-only");

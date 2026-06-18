@@ -2073,6 +2073,32 @@ describe("StagePlayBadgeGraphPanel", () => {
             rawContentIncluded: false,
             postToolModelStepRequired: true,
           },
+        }, {
+          schemaVersion: "helix.workstation_goal_context_update.v1",
+          updateId: "stage_play_goal_context_update:bad_projection:ui",
+          createdAtMs: 1780521602600,
+          sourceRefs: ["live-answer:desktop"],
+          loopRefs: ["loop:projection"],
+          producerKind: "live_answer",
+          updateKind: "summary",
+          contentRef: "live_answer_projection:bad_terminal",
+          preview: "Malformed Live Answer projection attempted to become terminal before solver authority.",
+          evidenceRefs: ["live_answer_projection:bad_terminal"],
+          receiptRefs: ["live_answer_projection:bad_terminal"],
+          freshness: {
+            observedAtMs: 1780521602600,
+            staleAfterMs: 30000,
+            status: "blocked",
+          },
+          suggestedDispatch: [
+            { kind: "update_panel", panelId: "live-answer-environment" },
+          ],
+          authority: {
+            assistantAnswer: true,
+            terminalEligible: true,
+            rawContentIncluded: true,
+            postToolModelStepRequired: true,
+          },
         }],
         agentGoalSessions: [{
           schemaVersion: "helix.agent_goal_session.v1",
@@ -2179,6 +2205,9 @@ describe("StagePlayBadgeGraphPanel", () => {
     )).toBe(true);
     expect(screen.getAllByTestId("stage-play-goal-context-authority-chips").some((node) =>
       /assistant=false.*terminal=false.*raw=false/s.test(node.textContent ?? "")
+    )).toBe(true);
+    expect(screen.getAllByTestId("stage-play-goal-context-authority-chips").some((node) =>
+      /assistant=true.*terminal=true.*raw=true/s.test(node.textContent ?? "")
     )).toBe(true);
     expect(screen.getAllByTestId("stage-play-goal-context-dispatch").some((node) =>
       /Goal context|Panel|Narrator|Wake interrupt|Loop: running/i.test(node.textContent ?? "")
