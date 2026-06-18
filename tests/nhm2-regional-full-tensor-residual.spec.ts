@@ -162,6 +162,43 @@ describe("nhm2_regional_full_tensor_residual/v1", () => {
     expect(artifact.summary.firstBlocker).not.toContain("global:global:");
   });
 
+  it("uses the worst component residual as the first blocker after metadata and structural checks pass", () => {
+    const globalTensor = tensor(10);
+    globalTensor.T00 = -20;
+    const hullTensor = tensor(10);
+    hullTensor.T13 = 50;
+    const artifact = buildNhm2RegionalFullTensorResidual({
+      regionalSourceClosureEvidence: evidence({
+        global: {
+          tileEffectiveCounterpart: {
+            ...region("global").tileEffectiveCounterpart,
+            tensor: globalTensor,
+          },
+        },
+        hull: {
+          tileEffectiveCounterpart: {
+            ...region("hull").tileEffectiveCounterpart,
+            tensor: hullTensor,
+          },
+        },
+      }),
+    });
+
+    expect(artifact.summary.worstRegionId).toBe("hull");
+    expect(artifact.summary.worstComponentId).toBe("T13");
+    expect(artifact.summary.worstResidualFamily).toBe("off_diagonal_tij");
+    expect(artifact.summary.firstBlocker).toBe("hull:T13:full_tensor_residual_exceeded");
+    expect(artifact.summary.firstBlockerFamily).toBe("off_diagonal_tij");
+
+    const hull = artifact.regions.find((entry) => entry.regionId === "hull");
+    const offDiagonal = hull?.familyResiduals.find(
+      (entry) => entry.family === "off_diagonal_tij",
+    );
+    expect(offDiagonal?.status).toBe("fail");
+    expect(offDiagonal?.worstComponentId).toBe("T13");
+    expect(offDiagonal?.failingComponentIds).toContain("T13");
+  });
+
   it("prioritizes same-basis sample-count blockers before numeric residuals", () => {
     const globalTensor = tensor(10);
     globalTensor.T00 = -20;
@@ -184,6 +221,7 @@ describe("nhm2_regional_full_tensor_residual/v1", () => {
     expect(artifact.summary.firstBlocker).toBe(
       "global:source_evidence:sample_count_mismatch",
     );
+    expect(artifact.summary.firstBlockerFamily).toBeNull();
     expect(artifact.summary.firstBlocker).not.toBe(
       "global:T00:full_tensor_residual_exceeded",
     );

@@ -4,7 +4,10 @@ import type {
   StagePlayMicroReasonerRunV1,
   StagePlayProcessedMailPacketV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
-import type { StagePlayLiveSourceMailWakeRequestV1 } from "@shared/contracts/stage-play-live-source-mail-wake.v1";
+import type {
+  StagePlayLiveSourceMailWakeRequestV1,
+  StagePlayLiveSourceMailWakeResultV1,
+} from "@shared/contracts/stage-play-live-source-mail-wake.v1";
 import { WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS } from "@shared/contracts/workstation-goal-context.v1";
 import {
   ensureStagePlayAgentGoalSession,
@@ -151,6 +154,9 @@ describe("stage-play goal context store", () => {
       producerKind: "microdeck",
       updateKind: "visual_observation",
       contentRef: "stage_play_processed_mail_packet:frog-1",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
       authority: {
         assistantAnswer: false,
         terminalEligible: false,
@@ -170,6 +176,9 @@ describe("stage-play goal context store", () => {
       producerKind: "visual_capture",
       updateKind: "visual_observation",
       contentRef: "stage_play_live_source_mail:visual-1",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
       authority: {
         assistantAnswer: false,
         terminalEligible: false,
@@ -466,6 +475,70 @@ describe("stage-play goal context store", () => {
       expect.objectContaining({ kind: "update_panel", panelId: "stage-play-badge-graph" }),
     ]));
     expect(update.suggestedDispatch.map((action) => action.kind)).not.toContain("wake_agent");
+    expect(update.authority).toEqual({
+      assistantAnswer: false,
+      terminalEligible: false,
+      rawContentIncluded: false,
+      postToolModelStepRequired: true,
+    });
+  });
+
+  it("uses pressure-deferred wake results as narrow interrupt dispatches", () => {
+    const wakeResult: StagePlayLiveSourceMailWakeResultV1 = {
+      artifactId: "stage_play_live_source_mail_wake_result",
+      schemaVersion: "stage_play_live_source_mail_wake_result/v1",
+      wakeResultId: "stage_play_live_source_mail_wake_result:pressure-deferred",
+      wakeRequestId: "stage_play_live_source_mail_wake_request:pressure-deferred",
+      threadId,
+      roomId: "room:stage-play",
+      environmentId: "env:desktop",
+      status: "deferred_for_pressure",
+      askTurnId: null,
+      decisionIds: [],
+      voiceCheckpointRefs: [],
+      wakeIntent: "ask_from_processed_packet",
+      lifecycleStage: "pressure_deferred",
+      lifecycleReason: "runtime_memory_queue_deferrable",
+      packetIds: ["stage_play_processed_mail_packet:frog-1"],
+      evidenceRefs: ["stage_play_processed_mail_packet:frog-1"],
+      createdAt: now,
+      assistant_answer: false,
+      terminal_eligible: false,
+      context_role: "tool_evidence",
+      raw_content_included: false,
+    };
+
+    const [update] = syncStagePlayGoalContextFromMailbox({
+      threadId,
+      roomId: "room:stage-play",
+      mailItems: [mailFixture()],
+      processedMailPackets: [
+        packetFixture({
+          arbiter: undefined,
+          salience: {
+            level: "medium",
+            reasons: ["visual classification requested"],
+            voiceCandidate: false,
+          },
+          uncertainties: [],
+          resolutionState: "processed_packet_ready",
+        }),
+      ],
+      microReasonerRuns: [runFixture()],
+      wakeResults: [wakeResult],
+      nowMs: Date.parse("2026-06-17T14:00:03.000Z"),
+    });
+
+    expect(update.contentRef).toBe("stage_play_processed_mail_packet:frog-1");
+    expect(update.receiptRefs).toContain("stage_play_live_source_mail_wake_result:pressure-deferred");
+    expect(update.suggestedDispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "wake_agent",
+        reason: "wake result reports blocked or pressure-deferred follow-up",
+      }),
+      expect.objectContaining({ kind: "log_receipt", receiptRef: "stage_play_processed_mail_packet:frog-1" }),
+      expect.objectContaining({ kind: "append_goal_context" }),
+    ]));
     expect(update.authority).toEqual({
       assistantAnswer: false,
       terminalEligible: false,

@@ -95,6 +95,7 @@ export const planReferenceValidationChain = (
     "observer-robust-energy-conditions",
   );
   const sourceInput = asOptionalString(args, "source-input");
+  const regionalSamplePlan = asOptionalString(args, "regional-sample-plan");
   const inputConservation = asOptionalString(args, "conservation");
   const inputTransitionKernel = asOptionalString(args, "regional-source-transition-kernel");
   const buildRegionalSourceTransitionKernel =
@@ -385,6 +386,7 @@ export const planReferenceValidationChain = (
       referenceRun,
       "--source-input",
       sourceInput,
+      ...(regionalSamplePlan == null ? [] : ["--regional-sample-plan", regionalSamplePlan]),
       ...(qeiDossier == null ? [] : ["--qei-dossier", qeiDossier]),
       "--out",
       sourceTensor,

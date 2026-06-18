@@ -1915,6 +1915,27 @@ describe("StagePlayBadgeGraphPanel", () => {
           assistant_answer: false,
           terminal_eligible: false,
           context_role: "tool_policy",
+        }, {
+          artifactId: "stage_play_micro_reasoner_prompt_preset",
+          schemaVersion: "stage_play_micro_reasoner_prompt_preset/v1",
+          presetId: "stage_play_micro_reasoner_prompt_preset:earbud_translation:v1",
+          title: "Earbud Translation Deck",
+          description: "Routes translated transcript packets into Live Answer and Narrator output.",
+          domain: "audio_translation",
+          sourceKinds: ["audio_transcript"],
+          sourceIds: ["audio_source:earbuds"],
+          rolePromptIds: {
+            hypothesis_arbiter: "stage_play_micro_reasoner_prompt:earbud_translation_arbiter:v1",
+          },
+          promptedRoles: ["hypothesis_arbiter"],
+          deckRunPlan: "translation_prompted_arbiter",
+          outputPolicy: "earbud_translation",
+          active: true,
+          createdAt: "2026-06-02T00:00:01.000Z",
+          updatedAt: "2026-06-02T00:00:02.000Z",
+          assistant_answer: false,
+          terminal_eligible: false,
+          context_role: "tool_policy",
         }],
         activeMicroReasonerPromptPreset: {
           artifactId: "stage_play_micro_reasoner_prompt_preset",
@@ -2142,7 +2163,7 @@ describe("StagePlayBadgeGraphPanel", () => {
           suggestedDispatch: [
             { kind: "update_live_answer", lineKey: "live_answer_projection:translation-ui" },
             { kind: "bind_narrator_stream", sourceRef: "stage_play_translation_loop:ui", streamKind: "translated_transcript" },
-            { kind: "change_preset", targetRef: "live-answer:desktop", presetId: "stage_play_micro_reasoner_prompt_preset:minecraft_minimal_operator:v1" },
+            { kind: "change_preset", targetRef: "live-answer:desktop", presetId: "stage_play_micro_reasoner_prompt_preset:earbud_translation:v1" },
             { kind: "bind_source", sourceRef: "source:visual-tab", targetRef: "live-answer:desktop" },
             { kind: "focus_process_graph", nodeRef: "stage_play_processed_mail_packet:translation-ui" },
           ],
@@ -2286,7 +2307,11 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-packet-inspector-deck-plan")).toHaveTextContent("minimal_prompted_arbiter");
     expect(screen.getByTestId("stage-play-packet-inspector-coalescing")).toHaveTextContent("superseded 2 older wakes");
     expect(screen.getByTestId("stage-play-applied-microdeck-checklist")).toBeTruthy();
-    expect(screen.getAllByTestId("stage-play-applied-microdeck-chip").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("stage-play-applied-microdeck-chip").length).toBeGreaterThan(1);
+    expect(screen.getAllByText("Earbud Translation Deck").length).toBeGreaterThan(0);
+    expect(screen.getByRole("option", { name: /\[applied\] Minecraft Minimal Operator/i })).toBeTruthy();
+    expect(screen.getByRole("option", { name: /\[applied\] Earbud Translation Deck/i })).toBeTruthy();
+    expect(screen.getAllByText("goal dispatch deck").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/packet color match|packet match/i).length).toBeGreaterThan(0);
     expect(screen.getByTestId("stage-play-goal-context-board")).toBeTruthy();
     expect(screen.getByText(/Goal Context Substrate/i)).toBeTruthy();
@@ -2296,6 +2321,8 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-narrator-binding-state")).toHaveTextContent(/stream binding dispatch/i);
     expect(screen.getByTestId("stage-play-packet-trace-state")).toHaveTextContent(/3 packet trace context items/i);
     expect(screen.getByTestId("stage-play-packet-trace-state")).toHaveTextContent(/per-packet travel visible as evidence/i);
+    expect(screen.getByTestId("stage-play-visual-summary-state")).toHaveTextContent(/1 visual summary context item/i);
+    expect(screen.getByTestId("stage-play-visual-summary-state")).toHaveTextContent(/screen\/image observations queryable before agent reasoning/i);
     expect(screen.getByTestId("stage-play-source-health-state")).toHaveTextContent(/2 source-health context items/i);
     expect(screen.getByTestId("stage-play-source-health-state")).toHaveTextContent(/loop\/source status queryable before agent reasoning/i);
     expect(screen.getByTestId("stage-play-trace-memory-state")).toHaveTextContent(/1 trace-memory context item/i);

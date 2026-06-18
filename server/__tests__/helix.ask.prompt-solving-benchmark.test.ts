@@ -30,6 +30,7 @@ import { resetVisualSnapshotStoreForTest } from "../services/situation-room/visu
 import { resetVoiceLiveHandoffsForTest } from "../services/situation-room/voice-live-handoff-router";
 import {
   expectAnswerMentionsAny,
+  expectCodexParityRailTable,
   expectContextualToolMention,
   expectNegativeConstraint,
   expectNoMutatingToolCalls,
@@ -41,6 +42,8 @@ import {
   expectSolverTrace,
   expectTerminalAuthorityOk,
 } from "./helpers/expect-helix-solver-trace";
+import { resetHelixAskTurnAdmissionForTests } from "../services/helix-ask/ask-turn-admission";
+import { runtimeMemoryGovernor } from "../services/runtime/runtime-memory-governor";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -48,6 +51,8 @@ const createApp = (): express.Express => {
   app.use("/api/agi", planRouter);
   return app;
 };
+
+const TEST_MIB = 1024 * 1024;
 
 const resetAll = (): void => {
   resetLiveAnswerEnvironments();
@@ -75,6 +80,21 @@ const resetAll = (): void => {
   resetClientCapabilityActionsForTest();
   resetClientCapabilityAdoptionsForTest();
   resetReceiptPresentationSnapshotsForTest();
+  resetHelixAskTurnAdmissionForTests();
+  runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests({
+    memoryReader: () => ({
+      rss: 512 * TEST_MIB,
+      heapTotal: 256 * TEST_MIB,
+      heapUsed: 128 * TEST_MIB,
+      external: 8 * TEST_MIB,
+      arrayBuffers: 1 * TEST_MIB,
+    }),
+    hostMemoryReader: () => ({
+      freeMiB: 8192,
+      totalMiB: 16384,
+      freeRatio: 0.5,
+    }),
+  });
 };
 
 type BenchmarkCase = {
@@ -290,6 +310,7 @@ describe("Helix Ask prompt-only adversarial problem-solving benchmark", () => {
       .expect(200);
 
     expectSolverTrace(response.body);
+    expectCodexParityRailTable(response.body);
     expectPrimaryIntent(response.body, scenario.primary);
     expectNoMutatingToolCalls(response.body);
     expectNoTerminalArtifact(response.body, scenario.forbidArtifacts ?? forbiddenControlArtifacts);

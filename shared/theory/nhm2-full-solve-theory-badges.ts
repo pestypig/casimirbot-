@@ -1158,8 +1158,8 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
       artifactRef(
         NHM2_TIME_DEPENDENT_SOURCE_CAMPAIGN,
-        "sha256:ffbf9c9d2bc5fd4bea731e9d0f3d023c78b32ccaf4661c5d831806d878bb6108",
-        "Pinned local smoke-chain campaign artifact: campaignPass=false; firstBlocker=global:T00:full_tensor_residual_exceeded.",
+        "sha256:ecb241e233aa68162f89be8f7c7ee2263d95173ccf582bf2a2083234b2f27cb3",
+        "Pinned local smoke-chain campaign artifact: campaignPass=false; firstBlocker=hull:T13:full_tensor_residual_exceeded; residual family=off_diagonal_tij.",
       ),
       docRef(
         NHM2_FULL_SOLVE_WHITEPAPER,

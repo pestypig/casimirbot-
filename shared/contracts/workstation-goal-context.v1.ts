@@ -108,6 +108,9 @@ export type WorkstationGoalContextUpdateV1 = {
     reason: string;
   } | null;
   suggestedDispatch: WorkstationDispatchActionV1[];
+  assistant_answer?: false;
+  terminal_eligible?: false;
+  raw_content_included?: false;
   authority: {
     assistantAnswer: false;
     terminalEligible: false;
@@ -242,6 +245,8 @@ export const WORKSTATION_AGENT_GOAL_ACTUATOR_ALIASES: Readonly<Record<string, Ag
   live_env_query_route_evidence: "query_route_evidence",
   live_env_query_automation_policies: "query_automation_policies",
   live_env_configure_route_watch: "configure_route_watch",
+  live_env_set_audio_preset: "set_audio_preset",
+  live_env_set_visual_preset: "set_visual_preset",
   live_env_change_workstation_preset: "change_preset",
   live_env_bind_workstation_source: "bind_source",
   live_env_unbind_workstation_source: "unbind_source",
@@ -256,6 +261,10 @@ export const WORKSTATION_AGENT_GOAL_ACTUATOR_ALIASES: Readonly<Record<string, Ag
   live_env_query_trace_memory: "query_trace_memory",
   narrator_say_request: "narrator_say",
   narrator_bind_stream_request: "narrator_bind_stream",
+  set_audio_preset: "set_audio_preset",
+  set_visual_preset: "set_visual_preset",
+  audio_preset: "set_audio_preset",
+  visual_preset: "set_visual_preset",
   pause_workstation_loop: "pause_loop",
   resume_workstation_loop: "resume_loop",
   repair_workstation_loop: "repair_source",
@@ -493,6 +502,9 @@ export function validateWorkstationGoalContextUpdateV1(value: WorkstationGoalCon
   }
   if (!freshnessStatuses.has(value.freshness?.status)) issues.push("freshness.status is invalid");
   if (!Array.isArray(value.suggestedDispatch)) issues.push("suggestedDispatch must be an array");
+  if (value.assistant_answer !== false) issues.push("goal context updates must expose assistant_answer=false");
+  if (value.terminal_eligible !== false) issues.push("goal context updates must expose terminal_eligible=false");
+  if (value.raw_content_included !== false) issues.push("goal context updates must expose raw_content_included=false");
   if (value.authority?.assistantAnswer !== false) issues.push("goal context updates must not be assistant answers");
   if (value.authority?.terminalEligible !== false) issues.push("goal context updates must not be terminal eligible");
   if (value.authority?.rawContentIncluded !== false) issues.push("goal context updates must not include raw content");

@@ -508,6 +508,21 @@ describe("NHM2 reference validation chain planner", () => {
     );
   });
 
+  it("passes a regional sample plan into tile full-tensor source generation", () => {
+    const plan = planReferenceValidationChain({
+      ...baseArgs(),
+      "source-input": "fixtures/nhm2/source-input.json",
+      "regional-sample-plan":
+        "artifacts/reference/nhm2-metric-required-regional-tensor-receipt.json",
+    });
+    const source = findCommand(plan, "nhm2:publish-tile-effective-full-tensor-source");
+
+    expect(source.args).toContain("--regional-sample-plan");
+    expect(source.args).toContain(
+      "artifacts/reference/nhm2-metric-required-regional-tensor-receipt.json",
+    );
+  });
+
   it("generates a regional support-function atlas and passes it to closure consumers", () => {
     const plan = planReferenceValidationChain({
       ...baseArgs(),

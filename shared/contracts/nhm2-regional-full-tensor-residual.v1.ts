@@ -23,14 +23,30 @@ export const NHM2_REGIONAL_FULL_TENSOR_RESIDUAL_REQUIRED_COMPONENTS = [
   "T33",
 ] as const satisfies readonly Nhm2TensorComponent[];
 
+export type Nhm2RegionalFullTensorResidualComponentFamily =
+  | "t00"
+  | "momentum_t0i"
+  | "diagonal_tij"
+  | "off_diagonal_tij";
+
 export type Nhm2RegionalFullTensorResidualComponentV1 = {
   componentId: (typeof NHM2_REGIONAL_FULL_TENSOR_RESIDUAL_REQUIRED_COMPONENTS)[number];
+  family: Nhm2RegionalFullTensorResidualComponentFamily;
   metricRequired: number | null;
   tileEffectiveCounterpart: number | null;
   absResidual: number | null;
   relResidual: number | null;
   status: "pass" | "fail" | "missing";
   blockers: string[];
+};
+
+export type Nhm2RegionalFullTensorResidualFamilySummaryV1 = {
+  family: Nhm2RegionalFullTensorResidualComponentFamily;
+  status: "pass" | "fail" | "missing";
+  worstComponentId: Nhm2TensorComponent | null;
+  worstRelResidual: number | null;
+  failingComponentIds: Nhm2TensorComponent[];
+  missingComponentIds: Nhm2TensorComponent[];
 };
 
 export type Nhm2RegionalFullTensorResidualRegionV1 = {
@@ -43,6 +59,7 @@ export type Nhm2RegionalFullTensorResidualRegionV1 = {
   missingMetricComponentIds: Nhm2TensorComponent[];
   missingTileComponentIds: Nhm2TensorComponent[];
   componentResiduals: Nhm2RegionalFullTensorResidualComponentV1[];
+  familyResiduals: Nhm2RegionalFullTensorResidualFamilySummaryV1[];
   t00RelResidual: number | null;
   fullRelLInf: number | null;
   fullAbsLInf: number | null;
@@ -73,8 +90,10 @@ export type Nhm2RegionalFullTensorResidualArtifactV1 = {
     anyAtlasMismatch: boolean;
     worstRegionId: Nhm2RegionalSourceClosureRegionId | null;
     worstComponentId: Nhm2TensorComponent | null;
+    worstResidualFamily: Nhm2RegionalFullTensorResidualComponentFamily | null;
     worstRelResidual: number | null;
     firstBlocker: string | null;
+    firstBlockerFamily: Nhm2RegionalFullTensorResidualComponentFamily | null;
     blockerCount: number;
   };
   claimBoundary: {
@@ -123,6 +142,19 @@ const missingComponents = (tensor: Nhm2RegionalTensor): Nhm2TensorComponent[] =>
     (componentId) => finiteTensorValue(tensor, componentId) == null,
   );
 
+export const componentFamily = (
+  componentId: Nhm2TensorComponent,
+): Nhm2RegionalFullTensorResidualComponentFamily => {
+  if (componentId === "T00") return "t00";
+  if (componentId === "T01" || componentId === "T02" || componentId === "T03") {
+    return "momentum_t0i";
+  }
+  if (componentId === "T11" || componentId === "T22" || componentId === "T33") {
+    return "diagonal_tij";
+  }
+  return "off_diagonal_tij";
+};
+
 const fullTensorAuthorityBlocker = (
   authority: Nhm2TensorAuthorityMode,
   side: "metric" | "tile",
@@ -158,6 +190,12 @@ const isPrioritySourceEvidenceBlocker = (blocker: string): boolean =>
   SOURCE_EVIDENCE_PRIORITY_BLOCKERS.has(blocker) ||
   blocker.startsWith("tile_role_not_counterpart:");
 
+const isResidualBlocker = (blocker: string): boolean =>
+  blocker.endsWith(":full_tensor_residual_exceeded");
+
+const isSourceEvidenceBlocker = (blocker: string): boolean =>
+  blocker.includes(":source_evidence:");
+
 const componentResidual = (
   regionId: Nhm2RegionalSourceClosureRegionId,
   componentId: (typeof NHM2_REGIONAL_FULL_TENSOR_RESIDUAL_REQUIRED_COMPONENTS)[number],
@@ -173,6 +211,7 @@ const componentResidual = (
   if (metricRequired == null || tileEffectiveCounterpart == null) {
     return {
       componentId,
+      family: componentFamily(componentId),
       metricRequired,
       tileEffectiveCounterpart,
       absResidual: null,
@@ -189,6 +228,7 @@ const componentResidual = (
   }
   return {
     componentId,
+    family: componentFamily(componentId),
     metricRequired,
     tileEffectiveCounterpart,
     absResidual,
@@ -196,6 +236,59 @@ const componentResidual = (
     status: relResidual <= toleranceRelLInf ? "pass" : "fail",
     blockers,
   };
+};
+
+const buildFamilyResiduals = (
+  components: Nhm2RegionalFullTensorResidualComponentV1[],
+): Nhm2RegionalFullTensorResidualFamilySummaryV1[] => {
+  const families: Nhm2RegionalFullTensorResidualComponentFamily[] = [
+    "t00",
+    "momentum_t0i",
+    "diagonal_tij",
+    "off_diagonal_tij",
+  ];
+  return families.map((family) => {
+    const familyComponents = components.filter((component) => component.family === family);
+    if (familyComponents.length === 0) {
+      return {
+        family,
+        status: "missing",
+        worstComponentId: null,
+        worstRelResidual: null,
+        failingComponentIds: [],
+        missingComponentIds: NHM2_REGIONAL_FULL_TENSOR_RESIDUAL_REQUIRED_COMPONENTS.filter(
+          (componentId) => componentFamily(componentId) === family,
+        ),
+      };
+    }
+    const failingComponentIds = familyComponents
+      .filter((component) => component.status === "fail")
+      .map((component) => component.componentId);
+    const missingComponentIds = familyComponents
+      .filter((component) => component.status === "missing")
+      .map((component) => component.componentId);
+    const worst = familyComponents.reduce<Nhm2RegionalFullTensorResidualComponentV1 | null>(
+      (current, next) => {
+        if (next.relResidual == null) return current;
+        if (current == null || current.relResidual == null) return next;
+        return next.relResidual > current.relResidual ? next : current;
+      },
+      null,
+    );
+    return {
+      family,
+      status:
+        missingComponentIds.length > 0
+          ? "missing"
+          : failingComponentIds.length > 0
+            ? "fail"
+            : "pass",
+      worstComponentId: worst?.componentId ?? null,
+      worstRelResidual: worst?.relResidual ?? null,
+      failingComponentIds,
+      missingComponentIds,
+    };
+  });
 };
 
 const buildRegion = (
@@ -215,6 +308,7 @@ const buildRegion = (
       missingMetricComponentIds: [...NHM2_REGIONAL_FULL_TENSOR_RESIDUAL_REQUIRED_COMPONENTS],
       missingTileComponentIds: [...NHM2_REGIONAL_FULL_TENSOR_RESIDUAL_REQUIRED_COMPONENTS],
       componentResiduals: [],
+      familyResiduals: buildFamilyResiduals([]),
       t00RelResidual: null,
       fullRelLInf: null,
       fullAbsLInf: null,
@@ -275,6 +369,7 @@ const buildRegion = (
   ];
   const hasMissing = components.some((component) => component.status === "missing");
   const hasFail = components.some((component) => component.status === "fail");
+  const familyResiduals = buildFamilyResiduals(components);
   return {
     regionId,
     status: hasMissing ? "missing" : hasFail || blockers.length > 0 ? "fail" : "pass",
@@ -285,6 +380,7 @@ const buildRegion = (
     missingMetricComponentIds,
     missingTileComponentIds,
     componentResiduals: components,
+    familyResiduals,
     t00RelResidual:
       components.find((component) => component.componentId === "T00")?.relResidual ?? null,
     fullRelLInf: relResiduals.length === 0 ? null : Math.max(...relResiduals),
@@ -344,6 +440,28 @@ export const buildNhm2RegionalFullTensorResidual = (
       blocker.startsWith(`${region.regionId}:`) ? blocker : `${region.regionId}:${blocker}`,
     ),
   );
+  const prioritySourceEvidenceBlocker = blockers.find((blocker) => {
+    const marker = ":source_evidence:";
+    const markerIndex = blocker.indexOf(marker);
+    if (markerIndex < 0) return false;
+    return isPrioritySourceEvidenceBlocker(blocker.slice(markerIndex + marker.length));
+  });
+  const structuralBlocker = blockers.find(
+    (blocker) => !isResidualBlocker(blocker) && !isSourceEvidenceBlocker(blocker),
+  );
+  const worstResidualBlocker =
+    worstRegion?.worstComponentId == null
+      ? null
+      : `${worstRegion.regionId}:${worstRegion.worstComponentId}:full_tensor_residual_exceeded`;
+  const firstBlocker =
+    prioritySourceEvidenceBlocker ??
+    structuralBlocker ??
+    (worstResidualBlocker != null && blockers.includes(worstResidualBlocker)
+      ? worstResidualBlocker
+      : blockers[0] ?? null);
+  const firstBlockerComponent = firstBlocker?.match(
+    /^[^:]+:(T00|T01|T02|T03|T11|T12|T13|T22|T23|T33):/,
+  )?.[1] as Nhm2TensorComponent | undefined;
   return {
     contractVersion: NHM2_REGIONAL_FULL_TENSOR_RESIDUAL_CONTRACT_VERSION,
     generatedAt: input.generatedAt ?? new Date().toISOString(),
@@ -366,8 +484,14 @@ export const buildNhm2RegionalFullTensorResidual = (
       anyAtlasMismatch: atlasMismatch,
       worstRegionId: worstRegion?.regionId ?? null,
       worstComponentId: worstRegion?.worstComponentId ?? null,
+      worstResidualFamily:
+        worstRegion?.worstComponentId == null
+          ? null
+          : componentFamily(worstRegion.worstComponentId),
       worstRelResidual: worstRegion?.worstComponentRelResidual ?? null,
-      firstBlocker: blockers[0] ?? null,
+      firstBlocker,
+      firstBlockerFamily:
+        firstBlockerComponent == null ? null : componentFamily(firstBlockerComponent),
       blockerCount: blockers.length,
     },
     claimBoundary: {
@@ -401,6 +525,14 @@ const isAuthority = (value: unknown): value is Nhm2TensorAuthorityMode =>
 const isStatus = (value: unknown): value is "pass" | "fail" | "missing" =>
   value === "pass" || value === "fail" || value === "missing";
 
+const isComponentFamily = (
+  value: unknown,
+): value is Nhm2RegionalFullTensorResidualComponentFamily =>
+  value === "t00" ||
+  value === "momentum_t0i" ||
+  value === "diagonal_tij" ||
+  value === "off_diagonal_tij";
+
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every(isText);
 
@@ -414,12 +546,30 @@ const isComponent = (
   return (
     record != null &&
     isComponentId(record.componentId) &&
+    isComponentFamily(record.family) &&
     isNullableNumber(record.metricRequired) &&
     isNullableNumber(record.tileEffectiveCounterpart) &&
     isNullableNumber(record.absResidual) &&
     isNullableNumber(record.relResidual) &&
     isStatus(record.status) &&
     isStringArray(record.blockers)
+  );
+};
+
+const isFamilyResidual = (
+  value: unknown,
+): value is Nhm2RegionalFullTensorResidualFamilySummaryV1 => {
+  const record = isRecord(value) ? value : null;
+  return (
+    record != null &&
+    isComponentFamily(record.family) &&
+    isStatus(record.status) &&
+    (record.worstComponentId === null || isComponentId(record.worstComponentId)) &&
+    isNullableNumber(record.worstRelResidual) &&
+    Array.isArray(record.failingComponentIds) &&
+    record.failingComponentIds.every(isComponentId) &&
+    Array.isArray(record.missingComponentIds) &&
+    record.missingComponentIds.every(isComponentId)
   );
 };
 
@@ -441,6 +591,9 @@ const isRegion = (value: unknown): value is Nhm2RegionalFullTensorResidualRegion
     record.componentResiduals.length ===
       NHM2_REGIONAL_FULL_TENSOR_RESIDUAL_REQUIRED_COMPONENTS.length &&
     record.componentResiduals.every(isComponent) &&
+    Array.isArray(record.familyResiduals) &&
+    record.familyResiduals.length === 4 &&
+    record.familyResiduals.every(isFamilyResidual) &&
     isNullableNumber(record.t00RelResidual) &&
     isNullableNumber(record.fullRelLInf) &&
     isNullableNumber(record.fullAbsLInf) &&
@@ -488,8 +641,10 @@ export const isNhm2RegionalFullTensorResidual = (
     typeof summary.anyAtlasMismatch === "boolean" &&
     (summary.worstRegionId === null || isRegionId(summary.worstRegionId)) &&
     (summary.worstComponentId === null || isComponentId(summary.worstComponentId)) &&
+    (summary.worstResidualFamily === null || isComponentFamily(summary.worstResidualFamily)) &&
     isNullableNumber(summary.worstRelResidual) &&
     (summary.firstBlocker === null || isText(summary.firstBlocker)) &&
+    (summary.firstBlockerFamily === null || isComponentFamily(summary.firstBlockerFamily)) &&
     isFiniteNumber(summary.blockerCount) &&
     claimBoundary?.diagnosticOnly === true &&
     claimBoundary?.fullTensorResidualDoesNotValidatePhysicalSource === true &&

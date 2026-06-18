@@ -1,5 +1,16 @@
 import { expect } from "vitest";
 
+import {
+  CODEX_PARITY_AGENT_SPINE_CLASSES,
+  CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS,
+  CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES,
+  CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES,
+  CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
+  CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES,
+  CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS,
+  CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS,
+} from "../../services/helix-ask/codex-parity-agent-spine-contract";
+
 type RecordLike = Record<string, unknown>;
 
 const readRecord = (value: unknown): RecordLike | null =>
@@ -31,6 +42,62 @@ export const expectSolverTrace = (body: unknown): RecordLike => {
   expect(readRecord(trace?.evidence_reentry_gate), "evidence re-entry failure: evidence_reentry_gate missing").toBeTruthy();
   expect(readRecord(trace?.followup_reasoning_gate), "follow-up reasoning failure: followup_reasoning_gate missing").toBeTruthy();
   return trace as RecordLike;
+};
+
+export const expectCodexParityRailTable = (body: unknown): RecordLike => {
+  const railTable = readRecord(getPath(body, ["codex_parity_agent_spine_rail_table"]));
+  expect(railTable, "Codex parity failure: codex_parity_agent_spine_rail_table missing").toBeTruthy();
+  expect(railTable?.schema, "Codex parity failure: wrong rail table schema").toBe(CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA);
+  expect(railTable?.assistant_answer, "terminal authority failure: rail table must not be an assistant answer").toBe(false);
+  expect(railTable?.terminal_eligible, "terminal authority failure: rail table must not be terminal eligible").toBe(false);
+  expect(railTable?.raw_content_included, "terminal authority failure: rail table must not include raw content").toBe(false);
+  for (const key of CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS) {
+    expect(railTable, `Codex parity failure: rail table field ${key} missing`).toHaveProperty(key);
+    expect(
+      railTable?.[key] === null || typeof railTable?.[key] === "string",
+      `Codex parity failure: rail table field ${key} must be string or null`,
+    ).toBe(true);
+  }
+  expect(Array.isArray(railTable?.visible_tool_surface), "Codex parity failure: visible_tool_surface missing").toBe(true);
+  expect(
+    (railTable?.visible_tool_surface as unknown[]).every((entry) => typeof entry === "string" && entry.trim().length > 0),
+    "Codex parity failure: visible_tool_surface contains non-string entries",
+  ).toBe(true);
+  expect(railTable?.normalized_codex_parity_classes).toEqual([...CODEX_PARITY_AGENT_SPINE_CLASSES]);
+  expect(CODEX_PARITY_AGENT_SPINE_CLASSES).toContain(railTable?.codex_parity_class as never);
+  expect(CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES).toContain(railTable?.reentry_status as never);
+  expect(CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES).toContain(railTable?.rail_status as never);
+  expect(railTable?.rail_status === "complete").toBe(railTable?.codex_parity_class === "complete");
+  if (railTable?.rail_status === "complete") {
+    expect(railTable.first_broken_rail).toBeNull();
+    expect(railTable.rail_failure_code).toBeNull();
+    expect(railTable.repair_target).toBeNull();
+  } else {
+    expect(CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS).toContain(railTable?.first_broken_rail as never);
+    expect(CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES).toContain(railTable?.rail_failure_code as never);
+    expect(CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS).toContain(railTable?.repair_target as never);
+  }
+  if (railTable?.selected_capability || railTable?.executed_capability) {
+    expect(typeof railTable.admitted_capability, "Codex parity failure: selected/executed capability lacks admission proof").toBe("string");
+    expect(String(railTable.admitted_capability).length).toBeGreaterThan(0);
+    expect(railTable.admission_proven, "Codex parity failure: selected/executed capability was not admission-proven").toBe(true);
+  }
+  if (railTable?.reentry_status === "reentered") {
+    expect(railTable.reentry_proven).toBe(true);
+    expect(typeof railTable.reentry_proof_source).toBe("string");
+    expect(String(railTable.reentry_proof_source).length).toBeGreaterThan(0);
+  }
+  if (railTable?.selected_terminal_kind) {
+    expect(railTable.terminal_authority_proven).toBe(true);
+    expect(typeof railTable.terminal_authority_proof_source).toBe("string");
+    expect(String(railTable.terminal_authority_proof_source).length).toBeGreaterThan(0);
+  }
+  if (railTable?.visible_terminal_kind) {
+    expect(railTable.visible_projection_proven).toBe(true);
+    expect(typeof railTable.visible_projection_source).toBe("string");
+    expect(String(railTable.visible_projection_source).length).toBeGreaterThan(0);
+  }
+  return railTable as RecordLike;
 };
 
 export const expectPrimaryIntent = (body: unknown, oneOfKinds: string[]): void => {

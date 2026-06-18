@@ -415,6 +415,22 @@ const CONVERGENCE_COVERAGE_IDS = [
 
 describe("Helix Ask Codex-parity agent spine convergence", () => {
   it("keeps explicit convergence coverage for required tool families and failure classes", () => {
+    expect(CODEX_PARITY_CLASSES).toEqual([
+      "complete",
+      "tool_surface_missing",
+      "explicit_capability_demoted",
+      "tool_admission_rejected",
+      "selected_not_executed",
+      "observation_missing",
+      "observation_not_reentered",
+      "goal_contract_mismatch",
+      "terminal_product_not_allowed",
+      "terminal_authority_mismatch",
+      "visible_projection_mismatch",
+      "debug_mirror_stale",
+      "provider_config_missing",
+    ]);
+
     expect([...CONVERGENCE_COVERAGE_IDS]).toEqual(
       expect.arrayContaining([
         "calculator",

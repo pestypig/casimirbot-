@@ -3191,6 +3191,106 @@ describe("live-source mail live environment tools", () => {
     expect(observation.producedRefs).toEqual(expect.arrayContaining([payload.receiptId, payload.goalContextUpdateId]));
   });
 
+  it("allows visual preset changes through a modality-specific goal actuator", () => {
+    const sessionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        goal_id: "goal:visual-preset-only",
+        objective: "Apply visual shade presets for frog classification.",
+        allowed_actuators: ["set_visual_preset", "query_visual_summaries"],
+      },
+    });
+    expect(sessionObservation.ok).toBe(true);
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.change_workstation_preset",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        goal_id: "goal:visual-preset-only",
+        target_ref: "source:visual:active",
+        preset_id: "preset:frog-classifier",
+        reason: "Apply the frog classifier visual shade for this goal.",
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation).toMatchObject({
+      tool_name: "live_env.change_workstation_preset",
+      ok: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schema: "stage_play_workstation_control_receipt/v1",
+      controlKind: "change_preset",
+      status: "prepared",
+      goalId: "goal:visual-preset-only",
+      goalSessionFound: true,
+      requiredActuator: "change_preset",
+      actuatorAllowed: true,
+      targetRef: "source:visual:active",
+      presetId: "preset:frog-classifier",
+      contractValid: true,
+      contractValidationIssues: [],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(payload.policyEvidenceRefs).toEqual(expect.arrayContaining([
+      "allowed_actuator:change_preset",
+      "allowed_actuator:set_visual_preset",
+    ]));
+    expect(payload.missingRequirements).toEqual([]);
+    expect(payload.dispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "change_preset", targetRef: "source:visual:active", presetId: "preset:frog-classifier" }),
+    ]));
+    expect(payload.agentGoalSession.checkpoints.at(-1)).toMatchObject({
+      actionsTaken: expect.arrayContaining([
+        "change_preset",
+        "set_visual_preset",
+        "live_env.change_workstation_preset",
+      ]),
+    });
+
+    const updates = listStagePlayGoalContextUpdates({
+      threadId,
+      producerKind: "route_watch",
+      updateKind: "suggested_action",
+    });
+    const controlUpdate = updates.find((update) => update.updateId === payload.goalContextUpdateId);
+    expect(controlUpdate).toMatchObject({
+      contentRef: payload.receiptId,
+      evidenceRefs: expect.arrayContaining([
+        "allowed_actuator:change_preset",
+        "allowed_actuator:set_visual_preset",
+      ]),
+      loopRefs: expect.arrayContaining([
+        "workstation_actuator:change_preset",
+        "workstation_actuator:set_visual_preset",
+      ]),
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+  });
+
   it("records Live Answer projection controls as queryable Live Answer goal context", () => {
     const liveAnswerSourceId = "visual_source:live-answer-projection-control";
     const { environment } = createLiveAnswerEnvironment({

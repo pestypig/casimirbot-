@@ -150,6 +150,7 @@ describe("LiveAnswerReasoningCircuit", () => {
           loopDispatchCount: 1,
           liveAnswerDispatchCount: 1,
           processGraphDispatchCount: 1,
+          visualSummaryCount: 2,
           microdeckOutputCount: 1,
           audioTranscriptCount: 0,
           translatedTranscriptCount: 1,
@@ -214,6 +215,7 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getByTestId("live-answer-wake-dispatch-count")).toHaveTextContent("1 wake dispatch");
     expect(screen.getByTestId("live-answer-control-dispatch-count")).toHaveTextContent("6 non-wake control dispatches");
     expect(screen.getByTestId("live-answer-microdeck-output-count")).toHaveTextContent("1 MicroDeck output");
+    expect(screen.getByTestId("live-answer-visual-summary-count")).toHaveTextContent("2 visual summaries");
     expect(screen.getByTestId("live-answer-audio-transcript-count")).toHaveTextContent("0 audio transcripts");
     expect(screen.getByTestId("live-answer-translated-transcript-count")).toHaveTextContent("1 translations");
     expect(screen.getByTestId("live-answer-packet-trace-count")).toHaveTextContent("2 packet traces");
@@ -233,6 +235,7 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("route_watch=0");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("wake_dispatches=1");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("microdeck_outputs=1");
+    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("visual_summaries=2");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("automations=2");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("actuator_policies=5");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("narrator_output_policies=1");

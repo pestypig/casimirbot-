@@ -8,6 +8,10 @@ import {
   type Nhm2RegionalMaterialSourceTensorModelV1,
 } from "../../shared/contracts/nhm2-regional-material-source-tensor-model.v1";
 import {
+  isNhm2MetricRequiredRegionalTensorReceipt,
+  type Nhm2MetricRequiredRegionalTensorReceiptRegionV1,
+} from "../../shared/contracts/nhm2-metric-required-regional-tensor-receipt.v1";
+import {
   NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS,
   NHM2_TENSOR_COMPONENTS,
   type Nhm2RegionalSourceClosureRegionId,
@@ -365,6 +369,7 @@ export const publishTileEffectiveFullTensorSource = (args: {
   outPath: string;
   qeiDossierPath?: string | null;
   conservationPath?: string | null;
+  regionalSamplePlanPath?: string | null;
   auditOnly?: boolean;
 }): Nhm2TileEffectiveFullTensorSourceArtifact => {
   const paths = [
@@ -372,6 +377,7 @@ export const publishTileEffectiveFullTensorSource = (args: {
     args.sourceInputPath,
     args.qeiDossierPath,
     args.conservationPath,
+    args.regionalSamplePlanPath,
   ];
   if (!args.auditOnly && paths.some(pathUsesLatestAlias)) {
     throw new Error("latest aliases are forbidden unless --audit-only is passed");
@@ -403,12 +409,33 @@ export const publishTileEffectiveFullTensorSource = (args: {
     args.conservationPath != null && existsSync(resolvePath(args.repoRoot, args.conservationPath))
       ? readJson(resolvePath(args.repoRoot, args.conservationPath))
       : null;
+  const regionalSamplePlan =
+    args.regionalSamplePlanPath != null &&
+    existsSync(resolvePath(args.repoRoot, args.regionalSamplePlanPath))
+      ? readJson(resolvePath(args.repoRoot, args.regionalSamplePlanPath))
+      : null;
+  if (
+    regionalSamplePlan != null &&
+    !isNhm2MetricRequiredRegionalTensorReceipt(regionalSamplePlan)
+  ) {
+    throw new Error(
+      "regional sample plan must be nhm2_metric_required_regional_tensor_receipt/v1",
+    );
+  }
   const qeiPass = qeiDossierPasses(qei);
   const conservationArtifact = isNhm2TileCounterpartConservationArtifact(conservation)
     ? conservation
     : null;
   const conservationRegionMap = new Map(
     conservationArtifact?.regions.map((region) => [region.regionId, region]) ?? [],
+  );
+  const samplePlanRegionMap = new Map<
+    Nhm2RegionalSourceClosureRegionId,
+    Nhm2MetricRequiredRegionalTensorReceiptRegionV1
+  >(
+    isNhm2MetricRequiredRegionalTensorReceipt(regionalSamplePlan)
+      ? regionalSamplePlan.regions.map((region) => [region.regionId, region])
+      : [],
   );
   const conservationBlockerForRegion = (
     regionId: Nhm2RegionalSourceClosureRegionId,
@@ -438,6 +465,7 @@ export const publishTileEffectiveFullTensorSource = (args: {
   const regions = NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS.map((regionId) => {
     const sourceRegion = sourceRegionMap.get(regionId);
     if (sourceRegion == null) return missingRegion(regionId);
+    const samplePlanRegion = samplePlanRegionMap.get(regionId);
     const authority = inferAuthority(
       sourceRegion.tensor,
       sourceRegion.symmetry,
@@ -476,10 +504,11 @@ export const publishTileEffectiveFullTensorSource = (args: {
       },
       chartRef: sourceRegion.chartRef ?? "comoving_cartesian",
       unitsRef: sourceRegion.unitsRef ?? "J/m^3",
-      regionMaskRef: sourceRegion.regionMaskRef ?? null,
-      aggregationMode: sourceRegion.aggregationMode ?? "unknown",
-      normalizationBasis: sourceRegion.normalizationBasis ?? "unknown",
-      sampleCount: sourceRegion.sampleCount ?? null,
+      regionMaskRef: samplePlanRegion?.regionMaskRef ?? sourceRegion.regionMaskRef ?? null,
+      aggregationMode: samplePlanRegion?.aggregationMode ?? sourceRegion.aggregationMode ?? "unknown",
+      normalizationBasis:
+        samplePlanRegion?.normalizationBasis ?? sourceRegion.normalizationBasis ?? "unknown",
+      sampleCount: samplePlanRegion?.sampleCount ?? sourceRegion.sampleCount ?? null,
       sourceSupport: {
         supportKernelId: sourceRegion.supportKernelId ?? null,
         cycleAverageStatus: sourceRegion.cycleAverageStatus ?? "unknown",
@@ -497,7 +526,12 @@ export const publishTileEffectiveFullTensorSource = (args: {
               : "source_model_reconstituted_full_tensor"
             : sourceRegion.derivationMode,
         inputRefs: sourceRegion.inputRefs ?? [],
-        preAggregationValueRefs: sourceRegion.preAggregationValueRefs ?? [],
+        preAggregationValueRefs: [
+          ...(sourceRegion.preAggregationValueRefs ?? []),
+          ...(samplePlanRegion == null || args.regionalSamplePlanPath == null
+            ? []
+            : [`${args.regionalSamplePlanPath}#sample-plan/${regionId}`]),
+        ],
         notDerivedFromMetricRequiredTensor,
       },
       blockers,
@@ -524,7 +558,10 @@ export const publishTileEffectiveFullTensorSource = (args: {
       sourceSideOnly,
       notDerivedFromMetricRequiredTensor,
       metricRequiredInputRefs,
-      sourceInputRefs: [args.sourceInputPath],
+      sourceInputRefs: [
+        args.sourceInputPath,
+        ...(args.regionalSamplePlanPath == null ? [] : [args.regionalSamplePlanPath]),
+      ],
       qeiDossierRef: args.qeiDossierPath ?? null,
       conservationRef: args.conservationPath ?? null,
     },
@@ -552,6 +589,7 @@ const main = (): void => {
     sourceInputPath,
     qeiDossierPath: asString(args["qei-dossier"]),
     conservationPath: asString(args.conservation),
+    regionalSamplePlanPath: asString(args["regional-sample-plan"]),
     outPath,
     auditOnly: args["audit-only"] === true,
   });

@@ -298,13 +298,19 @@ const trimThreadSessions = (threadId: string): void => {
 export function recordStagePlayGoalContextUpdate(
   update: WorkstationGoalContextUpdateV1,
 ): WorkstationGoalContextUpdateV1 {
-  const issues = validateWorkstationGoalContextUpdateV1(update);
+  const normalizedUpdate: WorkstationGoalContextUpdateV1 = {
+    ...update,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+  const issues = validateWorkstationGoalContextUpdateV1(normalizedUpdate);
   if (issues.length > 0) {
     throw new Error(`Invalid Stage Play goal-context update: ${issues.join("; ")}`);
   }
-  updatesById.set(update.updateId, update);
-  trimThreadUpdates(update.loopRefs.find((ref) => ref.startsWith("thread:"))?.slice("thread:".length) ?? "");
-  return update;
+  updatesById.set(normalizedUpdate.updateId, normalizedUpdate);
+  trimThreadUpdates(normalizedUpdate.loopRefs.find((ref) => ref.startsWith("thread:"))?.slice("thread:".length) ?? "");
+  return normalizedUpdate;
 }
 
 export function listStagePlayGoalContextUpdates(input: {

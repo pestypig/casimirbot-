@@ -133,6 +133,7 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain('data-testid="live-answer-reasoning-circuit"');
     expect(source).toContain('data-testid="live-answer-narrator-binding-count"');
     expect(source).toContain('data-testid="live-answer-microdeck-output-count"');
+    expect(source).toContain('data-testid="live-answer-visual-summary-count"');
     expect(source).toContain('data-testid="live-answer-feed-policy-ref-count"');
     expect(source).toContain('data-testid="live-answer-actuator-policy-ref-count"');
     expect(source).toContain('data-testid="live-answer-observation-authority-count"');
@@ -163,6 +164,11 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain("narrator bind");
     expect(source).toContain("narrator bindings");
     expect(source).toContain("microdeck_outputs");
+    expect(source).toContain("visual_summaries");
+    expect(source).toContain("liveAnswerVisualSummaryUpdate");
+    expect(source).toContain('update.producerKind === "visual_capture"');
+    expect(source).toContain('update.updateKind === "visual_observation"');
+    expect(source).not.toContain('update.updateKind === "visual_capture"');
     expect(source).toContain("producerKind === \"microdeck\"");
     expect(source).toContain("observation-only");
     expect(source).toContain("assistantAnswer: update.authority.assistantAnswer");

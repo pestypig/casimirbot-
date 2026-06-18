@@ -91,10 +91,15 @@ agent shell may not have the provider keys, tenant headers, auth state, browser
 state, or workstation bindings needed to exercise the same model path as the
 user's normal session.
 
-Operator-started server example:
+Operator-started server examples:
 
 ```powershell
+# Current desktop/in-app keyed bundle used for Helix Ask live-spine smoke:
+$env:HELIX_ASK_BASE_URL="http://localhost:1498"
+
+# Older explicit AGI dev server path, when the operator chooses to run it:
 $env:ENABLE_HELIX_TEST_HARNESS="1"; npm run dev:agi:5050
+$env:HELIX_ASK_BASE_URL="http://127.0.0.1:5050"
 ```
 
 After the server is running, the agent may run:
@@ -106,6 +111,7 @@ npm run helix:ask:api-parity
 For the cross-tool Codex-parity agent-spine rail smoke, run:
 
 ```bash
+HELIX_ASK_BASE_URL=http://localhost:1498
 npm run helix:ask:live-spine-smoke
 ```
 
@@ -192,7 +198,8 @@ may still run without a live server when they do not require provider secrets.
 Useful environment variables:
 
 ```txt
-HELIX_ASK_BASE_URL=http://127.0.0.1:5050
+HELIX_ASK_BASE_URL=http://localhost:1498
+# Use http://127.0.0.1:5050 instead when the operator explicitly starts dev:agi:5050.
 HELIX_ASK_API_PARITY_OUT=artifacts/helix-ask-api-parity
 HELIX_ASK_API_PARITY_SCENARIOS=visual_content_negated_cadence,affirmative_cadence_control
 HELIX_ASK_API_PARITY_INCLUDE_DISABLED=1

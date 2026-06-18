@@ -358,6 +358,32 @@ describe("publish regional source-closure evidence", () => {
       expect(isNhm2RegionalSourceClosureEvidenceArtifact(artifact)).toBe(true);
     }));
 
+  it("does not force global same-basis status when sample counts differ", () =>
+    withTemp((root) => {
+      writeArtifacts(root, sourceClosure("tile_effective_counterpart"));
+      writeFileSync(
+        join(root, "counterpart.json"),
+        JSON.stringify(tileCounterpart()),
+        "utf8",
+      );
+
+      const artifact = publishRegionalSourceClosureEvidence({
+        repoRoot: root,
+        referenceRunPath: "reference.json",
+        sourceClosurePath: "source.json",
+        tileEffectiveCounterpartPath: "counterpart.json",
+        outPath: "evidence.json",
+      });
+      const global = artifact.regions.find((region) => region.regionId === "global");
+
+      expect(global?.metricRequired.sampleCount).toBe(10);
+      expect(global?.tileEffectiveCounterpart.sampleCount).toBe(1);
+      expect(global?.comparisonBasisStatus).toBe("sample_count_mismatch");
+      expect(global?.blockers).toContain("sample_count_mismatch");
+      expect(artifact.reasonCodes).toContain("global:sample_count_mismatch");
+      expect(isNhm2RegionalSourceClosureEvidenceArtifact(artifact)).toBe(true);
+    }));
+
   it("uses metric-required receipt metadata before stale regional metric accounting", () =>
     withTemp((root) => {
       const closure = sourceClosure("tile_effective_counterpart");

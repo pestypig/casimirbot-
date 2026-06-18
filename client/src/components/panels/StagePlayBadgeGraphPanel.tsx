@@ -3242,6 +3242,23 @@ function StagePlayGoalContextBoard({
     ];
     return refs.some((ref) => ref.includes("trace_memory") || ref.includes("trace-memory"));
   };
+  const isVisualSummaryUpdate = (update: WorkstationGoalContextUpdateV1): boolean => {
+    if (update.producerKind === "visual_capture" || update.updateKind === "visual_observation") return true;
+    const refs = [
+      update.contentRef,
+      ...update.evidenceRefs,
+      ...update.receiptRefs,
+      ...update.loopRefs,
+      ...update.sourceRefs,
+    ];
+    return refs.some((ref) =>
+      ref.includes("visual_summary") ||
+      ref.includes("visual_summaries") ||
+      ref.includes("visual_frame") ||
+      ref.includes("visual_capture") ||
+      ref.includes("screen_summary")
+    );
+  };
   const recentUpdates = updates.slice(0, 6);
   const activeSessions = sessions.filter((session) => session.status === "active" || session.status === "blocked").slice(0, 3);
   const wakeInterruptCount = updates.reduce(
@@ -3265,6 +3282,8 @@ function StagePlayGoalContextBoard({
   ).length;
   const packetTraceContextCount = updates.filter(isPacketTraceUpdate).length +
     activeSessions.filter((session) => session.contextFeeds.some((feed) => feed.sourceKind === "packet_traces")).length;
+  const visualSummaryContextCount = updates.filter(isVisualSummaryUpdate).length +
+    activeSessions.filter((session) => session.contextFeeds.some((feed) => feed.sourceKind === "visual_summaries")).length;
   const sourceHealthContextCount = updates.filter((update) => update.producerKind === "source_health" || update.updateKind === "source_status").length +
     activeSessions.filter((session) => session.contextFeeds.some((feed) => feed.sourceKind === "source_health")).length;
   const traceMemoryContextCount = updates.filter(isTraceMemoryUpdate).length +
@@ -3386,6 +3405,7 @@ function StagePlayGoalContextBoard({
           <StagePlayMetricPill label="narrator dispatch" value={formatStagePlayCount(narratorDispatchCount)} tone={narratorDispatchCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="narrator bindings" value={formatStagePlayCount(narratorBindingCount)} tone={narratorBindingCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="narrator events" value={formatStagePlayCount(narratorEventFeedCount)} tone={narratorEventFeedCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="visual summaries" value={formatStagePlayCount(visualSummaryContextCount)} tone={visualSummaryContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="packet traces" value={formatStagePlayCount(packetTraceContextCount)} tone={packetTraceContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="source health" value={formatStagePlayCount(sourceHealthContextCount)} tone={sourceHealthContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="trace memory" value={formatStagePlayCount(traceMemoryContextCount)} tone={traceMemoryContextCount > 0 ? "good" : "default"} />
@@ -3415,6 +3435,10 @@ function StagePlayGoalContextBoard({
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-packet-trace-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Packet traces</div>
           <div className="mt-0.5 text-slate-400">{formatStagePlayCount(packetTraceContextCount)} packet trace context item{packetTraceContextCount === 1 ? "" : "s"} keep per-packet travel visible as evidence.</div>
+        </div>
+        <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-visual-summary-state">
+          <div className="font-semibold uppercase tracking-wide text-violet-200/80">Visual summaries</div>
+          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(visualSummaryContextCount)} visual summary context item{visualSummaryContextCount === 1 ? "" : "s"} keep screen/image observations queryable before agent reasoning.</div>
         </div>
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-source-health-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Source health</div>
@@ -5558,10 +5582,16 @@ function StagePlayMailLoopLiveOverview({
     for (const wake of wakeRequests) {
       if (wake.deckPresetId) ids.add(wake.deckPresetId);
     }
+    for (const update of mailbox?.goalContextUpdates ?? []) {
+      for (const action of update.suggestedDispatch) {
+        if (action.kind === "change_preset" && action.presetId) ids.add(action.presetId);
+      }
+    }
     if (mailbox?.mailLoopWorkBudget?.selectedDeck?.presetId) ids.add(mailbox.mailLoopWorkBudget.selectedDeck.presetId);
     return ids;
   }, [
     activeMicroReasonerPromptPreset?.presetId,
+    mailbox?.goalContextUpdates,
     mailbox?.mailLoopWorkBudget?.selectedDeck?.presetId,
     packets,
     runs,
@@ -5613,10 +5643,23 @@ function StagePlayMailLoopLiveOverview({
         reason: "wake deck",
       });
     }
+    for (const update of (mailbox?.goalContextUpdates ?? []).slice(-12)) {
+      for (const action of update.suggestedDispatch) {
+        if (action.kind !== "change_preset" || !action.presetId) continue;
+        put({
+          presetId: action.presetId,
+          title: presetsById.get(action.presetId)?.title ?? action.presetId,
+          sourceId: update.sourceRefs[0] ?? action.targetRef ?? null,
+          colorKey: update.contentRef || update.updateId,
+          reason: "goal dispatch deck",
+        });
+      }
+    }
     return Array.from(entries.values()).slice(-10).reverse();
   }, [
     activeMicroReasonerPromptPreset,
     latestPacket,
+    mailbox?.goalContextUpdates,
     microDeckSourceId,
     microReasonerPromptPresets,
     packets,

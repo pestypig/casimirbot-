@@ -2450,6 +2450,23 @@ const workstationControlFallbackActuator = (
 ): AgentGoalActuatorV1 | null =>
   spec.controlKind === "set_loop_state" && actuator !== "set_loop_state" ? "set_loop_state" : null;
 
+const workstationPresetModalityActuators = (input: {
+  spec: WorkstationControlSpec;
+  targetRef: string | null;
+  sourceRef: string | null;
+  presetId: string | null;
+}): AgentGoalActuatorV1[] => {
+  if (input.spec.controlKind !== "change_preset") return [];
+  const haystack = [input.targetRef, input.sourceRef, input.presetId]
+    .filter((entry): entry is string => Boolean(entry))
+    .join(" ")
+    .toLowerCase();
+  return uniqueStrings([
+    /\b(?:audio|earbud|transcript|translation|speech|mic|microphone)\b/.test(haystack) ? "set_audio_preset" : null,
+    /\b(?:visual|screen|image|lens|camera|frame|capture)\b/.test(haystack) ? "set_visual_preset" : null,
+  ]) as AgentGoalActuatorV1[];
+};
+
 const workstationControlProducerKind = (
   spec: WorkstationControlSpec,
 ): GoalContextProducerKindV1 =>
@@ -3354,6 +3371,17 @@ export function executeLiveEnvironmentTool(
     const goalId = readString(args.goal_id) ?? readString(args.goalId);
     const actuator = workstationControlActuator(workstationControlSpec, controlDispatch.loopState);
     const fallbackActuator = workstationControlFallbackActuator(workstationControlSpec, actuator);
+    const modalityActuators = workstationPresetModalityActuators({
+      spec: workstationControlSpec,
+      targetRef: controlDispatch.targetRef,
+      sourceRef: controlDispatch.sourceRef,
+      presetId: controlDispatch.presetId,
+    });
+    const policyActuators = uniqueStrings([
+      actuator,
+      fallbackActuator,
+      ...modalityActuators,
+    ]) as AgentGoalActuatorV1[];
     const goalSession = goalId
       ? listStagePlayAgentGoalSessions({
           threadId: scope.mailboxThreadResolution.mailboxThreadId,
@@ -3361,10 +3389,10 @@ export function executeLiveEnvironmentTool(
           limit: 1,
         })[0] ?? null
       : null;
-    const actuatorAllowed = !goalId || Boolean(
-      goalSession?.allowedActuators.includes(actuator) ||
-      (fallbackActuator && goalSession?.allowedActuators.includes(fallbackActuator))
-    );
+    const matchedPolicyActuator = goalSession
+      ? policyActuators.find((candidate) => goalSession.allowedActuators.includes(candidate)) ?? null
+      : null;
+    const actuatorAllowed = !goalId || Boolean(matchedPolicyActuator);
     const authorizationMissing = goalId
       ? goalSession
         ? actuatorAllowed
@@ -3403,6 +3431,9 @@ export function executeLiveEnvironmentTool(
     const policyEvidenceRefs = uniqueStrings([
       `allowed_actuator:${actuator}`,
       fallbackActuator ? `allowed_actuator:${fallbackActuator}` : null,
+      matchedPolicyActuator && matchedPolicyActuator !== actuator && matchedPolicyActuator !== fallbackActuator
+        ? `allowed_actuator:${matchedPolicyActuator}`
+        : null,
       ...authorizationMissing,
     ]);
     const loopRefs = uniqueStrings([
@@ -3411,6 +3442,9 @@ export function executeLiveEnvironmentTool(
       `workstation_control:${workstationControlSpec.controlKind}`,
       `workstation_actuator:${actuator}`,
       fallbackActuator ? `workstation_actuator:${fallbackActuator}` : null,
+      matchedPolicyActuator && matchedPolicyActuator !== actuator && matchedPolicyActuator !== fallbackActuator
+        ? `workstation_actuator:${matchedPolicyActuator}`
+        : null,
     ]);
     const evidenceRefs = uniqueStrings([
       receiptId,
@@ -3445,7 +3479,7 @@ export function executeLiveEnvironmentTool(
           sourceRefs,
           loopRefs,
           evidenceRefs: uniqueStrings([goalContextUpdateId, ...evidenceRefs]).slice(0, 80),
-          actionsTaken: uniqueStrings([actuator, fallbackActuator, input.tool_name]),
+          actionsTaken: uniqueStrings([actuator, fallbackActuator, matchedPolicyActuator, input.tool_name]),
           summary: `Prepared ${workstationControlSpec.label} control dispatch for this goal session.`,
           nextStep: "continue",
         })

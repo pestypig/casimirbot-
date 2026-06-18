@@ -137,9 +137,54 @@ describe("Helix Ask terminal authority contracts", () => {
   it("rejects reasoning-circuit observation surfaces as terminal artifacts before solver authority", () => {
     const observationSurfaces = [
       {
+        terminalArtifactKind: "helix.agent_goal_session.v1",
+        finalAnswerSource: "helix.agent_goal_session.v1",
+        text: "The active goal session is monitoring frog classification.",
+      },
+      {
+        terminalArtifactKind: "helix.narrator_say_request.v1",
+        finalAnswerSource: "helix.narrator_say_request.v1",
+        text: "Narrator was asked to speak the translated segment.",
+      },
+      {
+        terminalArtifactKind: "helix.narrator_bind_stream_request.v1",
+        finalAnswerSource: "helix.narrator_bind_stream_request.v1",
+        text: "Narrator was bound to the translation stream.",
+      },
+      {
+        terminalArtifactKind: "helix.narrator_event/v1",
+        finalAnswerSource: "helix.narrator_event",
+        text: "Narrator emitted a spoken translation event.",
+      },
+      {
         terminalArtifactKind: "helix.workstation_goal_context_update.v1",
         finalAnswerSource: "helix.workstation_goal_context_update.v1",
         text: "Goal context says the frog deck produced a candidate classification.",
+      },
+      {
+        terminalArtifactKind: "stage_play_workstation_goal_context_read_result/v1",
+        finalAnswerSource: "stage_play_workstation_goal_context_read_result",
+        text: "Goal context read returned the latest visual and audio loop updates.",
+      },
+      {
+        terminalArtifactKind: "stage_play_workstation_context_feed_query_result/v1",
+        finalAnswerSource: "stage_play_workstation_context_feed_query_result",
+        text: "The feed query returned two visual summaries.",
+      },
+      {
+        terminalArtifactKind: "stage_play_packet_trace_query_result.v1",
+        finalAnswerSource: "stage_play_packet_trace_query_result",
+        text: "Packet trace says the visual source arrived at a microdeck output.",
+      },
+      {
+        terminalArtifactKind: "live_source_causal_trace/v1",
+        finalAnswerSource: "live_source_causal_trace",
+        text: "The causal trace linked an audio packet to a translation deck.",
+      },
+      {
+        terminalArtifactKind: "helix.workstation_reasoning_trace_query_result.v1",
+        finalAnswerSource: "helix.workstation_reasoning_trace_query_result",
+        text: "Trace memory returned a route-watch checkpoint.",
       },
       {
         terminalArtifactKind: "microdeck_output",
@@ -147,9 +192,24 @@ describe("Helix Ask terminal authority contracts", () => {
         text: "MicroDeck output says the frog might be a tree frog.",
       },
       {
+        terminalArtifactKind: "microdeck_outputs",
+        finalAnswerSource: "microdeck_outputs",
+        text: "MicroDeck outputs include classification and comparison lanes.",
+      },
+      {
+        terminalArtifactKind: "stage_play_microdeck_output",
+        finalAnswerSource: "stage_play_microdeck_output",
+        text: "Stage Play shows the active frog classifier deck output.",
+      },
+      {
         terminalArtifactKind: "live_answer_projection",
         finalAnswerSource: "live_answer_projection",
         text: "Live Answer projection displayed the translated audio line.",
+      },
+      {
+        terminalArtifactKind: "stage_play_live_answer_projection",
+        finalAnswerSource: "stage_play_live_answer_projection",
+        text: "Stage Play projected the latest Live Answer shade output.",
       },
       {
         terminalArtifactKind: "panel_projection",
@@ -157,9 +217,59 @@ describe("Helix Ask terminal authority contracts", () => {
         text: "The panel projection showed the packet was routed to Narrator.",
       },
       {
-        terminalArtifactKind: "stage_play_workstation_context_feed_query_result/v1",
-        finalAnswerSource: "stage_play_workstation_context_feed_query_result",
-        text: "The feed query returned two visual summaries.",
+        terminalArtifactKind: "visual_summaries",
+        finalAnswerSource: "visual_summaries",
+        text: "Visual summaries mention a frog-like animal in the image.",
+      },
+      {
+        terminalArtifactKind: "audio_transcripts",
+        finalAnswerSource: "audio_transcripts",
+        text: "Audio transcripts captured the spoken phrase.",
+      },
+      {
+        terminalArtifactKind: "translated_transcripts",
+        finalAnswerSource: "translated_transcripts",
+        text: "Translated transcripts produced the English line.",
+      },
+      {
+        terminalArtifactKind: "narrator_events",
+        finalAnswerSource: "narrator_events",
+        text: "Narrator events show that the translation was spoken.",
+      },
+      {
+        terminalArtifactKind: "narrator_bindings",
+        finalAnswerSource: "narrator_bindings",
+        text: "Narrator bindings show the stream is connected.",
+      },
+      {
+        terminalArtifactKind: "source_health",
+        finalAnswerSource: "source_health",
+        text: "Source health says the visual source is fresh.",
+      },
+      {
+        terminalArtifactKind: "automation_policies",
+        finalAnswerSource: "automation_policies",
+        text: "Automation policies allow route-watch polling.",
+      },
+      {
+        terminalArtifactKind: "automation_status",
+        finalAnswerSource: "automation_status",
+        text: "Automation status says the loop is paused.",
+      },
+      {
+        terminalArtifactKind: "trace_memory",
+        finalAnswerSource: "trace_memory",
+        text: "Trace memory contains the previous packet route.",
+      },
+      {
+        terminalArtifactKind: "packet_traces",
+        finalAnswerSource: "packet_traces",
+        text: "Packet traces show separate audio and visual lanes.",
+      },
+      {
+        terminalArtifactKind: "route_evidence",
+        finalAnswerSource: "route_evidence",
+        text: "Route evidence contains a non-terminal checkpoint.",
       },
     ];
 

@@ -725,7 +725,12 @@ const fullTensorGate = (
           ? "fail"
           : "blocked",
     blockers,
-    primaryMetric: `worstRelResidual=${residual.summary.worstRelResidual ?? "missing"}`,
+    primaryMetric: [
+      `worstRelResidual=${residual.summary.worstRelResidual ?? "missing"}`,
+      `family=${residual.summary.worstResidualFamily ?? "missing"}`,
+      `component=${residual.summary.worstComponentId ?? "missing"}`,
+      `region=${residual.summary.worstRegionId ?? "missing"}`,
+    ].join(";"),
   });
 };
 

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { buildCasimirMaterialReceipt } from "../shared/contracts/casimir-material-receipt.v1";
+import { buildNhm2MetricRequiredRegionalTensorReceiptArtifact } from "../shared/contracts/nhm2-metric-required-regional-tensor-receipt.v1";
 import { buildNhm2ReferenceRunArtifact } from "../shared/contracts/nhm2-reference-run.v1";
 import type { Nhm2RegionalTensor } from "../shared/contracts/nhm2-regional-source-closure-evidence.v1";
 import {
@@ -122,6 +123,51 @@ const materialRegion = (value: number) => ({
   sampleCount: 16,
   basisRef: "same_basis",
 });
+
+const samplePlan = () =>
+  buildNhm2MetricRequiredRegionalTensorReceiptArtifact({
+    generatedAt,
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId: profile,
+    chartId: "comoving_cartesian",
+    metricFamily: "nhm2_shift_lapse",
+    sourceArtifactRefs: ["sample-plan-only"],
+    regions: [
+      ["global", 64],
+      ["hull", 40],
+      ["wall", 12],
+      ["exterior_shell", 12],
+    ].map(([regionId, sampleCount]) => ({
+      regionId: regionId as "global" | "hull" | "wall" | "exterior_shell",
+      status: "computed" as const,
+      tensor: symmetricTensor(1),
+      tensorAuthorityMode: "symmetric_full_tensor" as const,
+      componentStatus: {
+        T00: "computed" as const,
+        T01: "computed" as const,
+        T02: "computed" as const,
+        T03: "computed" as const,
+        T11: "computed" as const,
+        T12: "computed" as const,
+        T13: "computed" as const,
+        T22: "computed" as const,
+        T23: "computed" as const,
+        T33: "computed" as const,
+      },
+      missingComponentIds: [],
+      chartRef: "comoving_cartesian",
+      basisRef: "same_basis",
+      unitsRef: "J/m^3",
+      regionMaskRef: `sample-plan.mask.${regionId}`,
+      aggregationMode: "mean" as const,
+      normalizationBasis: "sample_count" as const,
+      sampleCount: sampleCount as number,
+      tensorRef: `sample-plan.metric.${regionId}`,
+      derivationMode: "einstein_tensor_geometry_fd4_v1" as const,
+      blockers: [],
+      warnings: ["sample plan fixture: tensor values must not be consumed by source publisher"],
+    })),
+  });
 
 const withTemp = (fn: (root: string) => void) => {
   const root = mkdtempSync(join(tmpdir(), "nhm2-tile-full-tensor-source-"));
@@ -274,12 +320,14 @@ describe("nhm2 tile-effective full-tensor source contract", () => {
       });
       writeFileSync(join(root, "receipt.json"), JSON.stringify(receipt), "utf8");
       writeFileSync(join(root, "regional-model.json"), JSON.stringify(regionalModel), "utf8");
+      writeFileSync(join(root, "sample-plan.json"), JSON.stringify(samplePlan()), "utf8");
       writeFileSync(join(root, "source-closure.json"), JSON.stringify({}), "utf8");
 
       const source = publishTileEffectiveFullTensorSource({
         repoRoot: root,
         referenceRunPath: "reference.json",
         sourceInputPath: "regional-model.json",
+        regionalSamplePlanPath: "sample-plan.json",
         outPath: "tile-full-tensor-source.json",
       });
       const counterpart = publishTileEffectiveCounterpart({
@@ -305,6 +353,15 @@ describe("nhm2 tile-effective full-tensor source contract", () => {
       );
       expect(source.sourceModel.metricRequiredInputRefs).toEqual([]);
       expect(source.overallState).toBe("review");
+      expect(source.regions.find((region) => region.regionId === "global")?.sampleCount).toBe(64);
+      expect(source.regions.find((region) => region.regionId === "global")?.regionMaskRef).toBe(
+        "sample-plan.mask.global",
+      );
+      expect(
+        source.regions
+          .find((region) => region.regionId === "global")
+          ?.provenance.preAggregationValueRefs,
+      ).toContain("sample-plan.json#sample-plan/global");
       expect(sourceWall?.tensorAuthorityMode).toBe("symmetric_full_tensor");
       expect(sourceWall?.provenance.derivationMode).toBe("source_model_direct_full_tensor");
       expect(sourceWall?.blockers).not.toContain("full_tensor_components_missing");

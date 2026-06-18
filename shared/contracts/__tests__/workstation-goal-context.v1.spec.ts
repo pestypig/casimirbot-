@@ -67,6 +67,9 @@ describe("workstation goal context contract", () => {
       { kind: "speak_narrator", mode: "confirm" },
       { kind: "wake_agent", reason: "urgent operator interruption" },
     ],
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
     authority: {
       assistantAnswer: false,
       terminalEligible: false,
@@ -181,6 +184,11 @@ describe("workstation goal context contract", () => {
 
   it("accepts goal-context updates as non-terminal workstation evidence", () => {
     expect(validateWorkstationGoalContextUpdateV1(update)).toEqual([]);
+    expect(update).toMatchObject({
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
   });
 
   it("accepts every deterministic producer as source-linked non-terminal goal context", () => {
@@ -224,6 +232,16 @@ describe("workstation goal context contract", () => {
     })).toEqual(expect.arrayContaining([
       "goal context updates must not be assistant answers",
       "goal context updates must not be terminal eligible",
+    ]));
+    expect(validateWorkstationGoalContextUpdateV1({
+      ...update,
+      assistant_answer: true as false,
+      terminal_eligible: true as false,
+      raw_content_included: true as false,
+    })).toEqual(expect.arrayContaining([
+      "goal context updates must expose assistant_answer=false",
+      "goal context updates must expose terminal_eligible=false",
+      "goal context updates must expose raw_content_included=false",
     ]));
   });
 
@@ -270,6 +288,10 @@ describe("workstation goal context contract", () => {
     expect(normalizeAgentGoalActuatorV1("live_env.repair_workstation_source")).toBe("repair_source");
     expect(normalizeAgentGoalActuatorV1("live_env.update_live_answer_projection")).toBe("update_live_answer");
     expect(normalizeAgentGoalActuatorV1("live_env.narrator_bind_stream")).toBe("narrator_bind_stream");
+    expect(normalizeAgentGoalActuatorV1("live_env.set_visual_preset")).toBe("set_visual_preset");
+    expect(normalizeAgentGoalActuatorV1("live_env.set_audio_preset")).toBe("set_audio_preset");
+    expect(normalizeAgentGoalActuatorV1("visual preset")).toBe("set_visual_preset");
+    expect(normalizeAgentGoalActuatorV1("audio preset")).toBe("set_audio_preset");
     expect(normalizeAgentGoalActuatorV1("live_env.query_automation_policies")).toBe("query_automation_policies");
     expect(normalizeAgentGoalActuatorV1("live_env.query_narrator_events")).toBe("query_narrator_events");
     expect(normalizeAgentGoalActuatorV1("pause workstation loop")).toBe("pause_loop");

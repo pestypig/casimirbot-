@@ -596,6 +596,24 @@ const liveAnswerTraceMemoryUpdate = (update: WorkstationGoalContextUpdateV1): bo
   return refs.some((ref) => ref.includes("trace_memory") || ref.includes("trace-memory"));
 };
 
+const liveAnswerVisualSummaryUpdate = (update: WorkstationGoalContextUpdateV1): boolean => {
+  if (update.producerKind === "visual_capture" || update.updateKind === "visual_observation") return true;
+  const refs = [
+    update.contentRef,
+    ...update.evidenceRefs,
+    ...update.receiptRefs,
+    ...update.loopRefs,
+    ...update.sourceRefs,
+  ];
+  return refs.some((ref) =>
+    ref.includes("visual_summary") ||
+    ref.includes("visual_summaries") ||
+    ref.includes("visual_frame") ||
+    ref.includes("visual_capture") ||
+    ref.includes("screen_summary")
+  );
+};
+
 const liveAnswerPacketTraceUpdate = (update: WorkstationGoalContextUpdateV1): boolean => {
   const refs = [
     update.contentRef,
@@ -1800,6 +1818,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       ).length +
         agentGoalSessions.filter((session: AgentGoalSessionV1) =>
           session.contextFeeds.some((feed) => feed.sourceKind === "microdeck_outputs")
+        ).length,
+      visualSummaryCount: goalContextUpdates.filter(liveAnswerVisualSummaryUpdate).length +
+        agentGoalSessions.filter((session: AgentGoalSessionV1) =>
+          session.contextFeeds.some((feed) => feed.sourceKind === "visual_summaries")
         ).length,
       audioTranscriptCount: goalContextUpdates.filter((update: WorkstationGoalContextUpdateV1) =>
         update.producerKind === "audio_capture" ||
