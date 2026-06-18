@@ -2140,8 +2140,11 @@ describe("StagePlayBadgeGraphPanel", () => {
             reason: "Translation loop contributes queryable transcript evidence for Live Answer and Narrator wiring.",
           },
           suggestedDispatch: [
-            { kind: "update_live_answer", targetRef: "live-answer:desktop" },
-            { kind: "bind_narrator_stream", streamRef: "stage_play_translation_loop:ui" },
+            { kind: "update_live_answer", lineKey: "live_answer_projection:translation-ui" },
+            { kind: "bind_narrator_stream", sourceRef: "stage_play_translation_loop:ui", streamKind: "translated_transcript" },
+            { kind: "change_preset", targetRef: "live-answer:desktop", presetId: "stage_play_micro_reasoner_prompt_preset:minecraft_minimal_operator:v1" },
+            { kind: "bind_source", sourceRef: "source:visual-tab", targetRef: "live-answer:desktop" },
+            { kind: "focus_process_graph", nodeRef: "stage_play_processed_mail_packet:translation-ui" },
           ],
           authority: {
             assistantAnswer: false,
@@ -2303,13 +2306,21 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-translation-state")).toHaveTextContent(/translation output visible as evidence/i);
     expect(screen.getByTestId("stage-play-route-watch-automation-state")).toHaveTextContent(/1 automation status update/i);
     expect(screen.getByTestId("stage-play-route-watch-automation-state")).toHaveTextContent(/1 running loop dispatch/i);
-    expect(screen.getByTestId("stage-play-dispatch-mix-state")).toHaveTextContent(/15 dispatch suggestions/i);
+    expect(screen.getByTestId("stage-play-dispatch-mix-state")).toHaveTextContent(/18 dispatch suggestions/i);
     expect(screen.getByTestId("stage-play-dispatch-mix-state")).toHaveTextContent(/2 wake interrupts/i);
     expect(screen.getByTestId("stage-play-dispatch-mix-state")).toHaveTextContent(/4 panel updates/i);
     expect(screen.getByTestId("stage-play-dispatch-mix-state")).toHaveTextContent(/2 narrator outputs/i);
     expect(screen.getByTestId("stage-play-dispatch-mix-state")).toHaveTextContent(/1 loop action/i);
     expect(screen.getByTestId("stage-play-dispatch-mix-state")).toHaveTextContent(/2 goal-context appends/i);
     expect(screen.getByTestId("stage-play-dispatch-mix-state")).toHaveTextContent(/3 receipt logs/i);
+    expect(screen.getByTestId("stage-play-control-dispatch-state")).toHaveTextContent(/7 non-wake control dispatches/i);
+    expect(screen.getByTestId("stage-play-control-dispatch-state")).toHaveTextContent(/1 preset/i);
+    expect(screen.getByTestId("stage-play-control-dispatch-state")).toHaveTextContent(/1 source binding/i);
+    expect(screen.getByTestId("stage-play-control-dispatch-state")).toHaveTextContent(/1 loop/i);
+    expect(screen.getByTestId("stage-play-control-dispatch-state")).toHaveTextContent(/1 Live Answer/i);
+    expect(screen.getByTestId("stage-play-control-dispatch-state")).toHaveTextContent(/1 graph/i);
+    expect(screen.getByTestId("stage-play-control-dispatch-state")).toHaveTextContent(/2 narrator/i);
+    expect(screen.getByTestId("stage-play-control-dispatch-state")).toHaveTextContent(/Wake remains 2 interrupt dispatches/i);
     expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/7 allowed actuators/i);
     expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/1 narrator output policy item/i);
     expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/1 narrator event feed/i);

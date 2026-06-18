@@ -11,6 +11,8 @@ describe("NHM2 full-solve theory badges", () => {
     "nhm2.closure.wall_t00_source_residual",
     "nhm2.closure.coupled_pass_candidate",
     "nhm2.closure.regional_tensor_pass_path_harness",
+    "nhm2.dynamic.switching_covariant_conservation",
+    "nhm2.dynamic.frequency_convergence",
     "nhm2.dynamic.time_dependent_source_campaign",
     "nhm2.energy_condition.observer_robust_gate",
     "nhm2.qei.worldline_dossier",
@@ -51,6 +53,8 @@ describe("NHM2 full-solve theory badges", () => {
     expect(ids).toContain("nhm2.closure.same_basis_regional_residual");
     expect(ids).toContain("nhm2.closure.coupled_pass_candidate");
     expect(ids).toContain("nhm2.closure.regional_tensor_pass_path_harness");
+    expect(ids).toContain("nhm2.dynamic.switching_covariant_conservation");
+    expect(ids).toContain("nhm2.dynamic.frequency_convergence");
     expect(ids).toContain("nhm2.dynamic.time_dependent_source_campaign");
     expect(ids).toContain("nhm2.energy_condition.wec_nec_sec_dec_family");
     expect(ids).toContain("nhm2.energy_condition.observer_robust_gate");
@@ -138,6 +142,16 @@ describe("NHM2 full-solve theory badges", () => {
           relation: "requires",
         }),
         expect.objectContaining({
+          from: "nhm2.dynamic.switching_covariant_conservation",
+          to: "nhm2.dynamic.time_dependent_source_campaign",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.dynamic.frequency_convergence",
+          to: "nhm2.dynamic.time_dependent_source_campaign",
+          relation: "requires",
+        }),
+        expect.objectContaining({
           from: "nhm2.dynamic.time_dependent_source_campaign",
           to: "nhm2.claim_boundary.diagnostic_only",
           relation: "blocks",
@@ -154,6 +168,8 @@ describe("NHM2 full-solve theory badges", () => {
       "nhm2.source.same_basis_tensor_authority",
       "nhm2.closure.coupled_pass_candidate",
       "nhm2.closure.regional_tensor_pass_path_harness",
+      "nhm2.dynamic.switching_covariant_conservation",
+      "nhm2.dynamic.frequency_convergence",
       "nhm2.dynamic.time_dependent_source_campaign",
       "nhm2.energy_condition.observer_robust_gate",
       "nhm2.qei.worldline_dossier",
@@ -236,6 +252,8 @@ describe("NHM2 full-solve theory badges", () => {
         "nhm2.closure.same_basis_regional_residual",
         "nhm2.closure.coupled_pass_candidate",
         "nhm2.closure.regional_tensor_pass_path_harness",
+        "nhm2.dynamic.switching_covariant_conservation",
+        "nhm2.dynamic.frequency_convergence",
         "nhm2.dynamic.time_dependent_source_campaign",
         "nhm2.qei.worldline_dossier",
         "nhm2.natario.curvature_invariants",

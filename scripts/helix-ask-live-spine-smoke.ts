@@ -201,6 +201,9 @@ const SCENARIOS: LiveSpineScenario[] = [
       admittedCapability: "helix_ask.inspect_capability_catalog",
       executedCapability: "helix_ask.inspect_capability_catalog",
       observationKind: "capability_registry",
+      requiredTerminalKind: "capability_help_summary",
+      selectedTerminalKind: "capability_help_summary",
+      visibleTerminalKind: "capability_help_summary",
       reentryStatus: "reentered",
       goalSatisfaction: "satisfied",
       railStatus: "complete",
@@ -448,10 +451,20 @@ const expectField = (failures: string[], rail: RecordLike, key: string, expected
   }
 };
 
-const shapeFailures = (rail: RecordLike, turnId: string): string[] => {
+const terminalArtifactKindFor = (ask: RecordLike, debugExport: unknown): string | null => {
+  const payload = extractPayload(debugExport);
+  return (
+    readString(ask.terminal_artifact_kind) ??
+    readString(payload?.terminal_artifact_kind) ??
+    readString(getPath(payload, ["terminal_answer_authority", "terminal_artifact_kind"]))
+  );
+};
+
+const shapeFailures = (rail: RecordLike, turnId: string, prompt: string): string[] => {
   const failures: string[] = [];
   if (rail.schema !== CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA) failures.push("rail_schema_mismatch");
   if (rail.turn_id !== turnId) failures.push(`rail_turn_id_mismatch:${String(rail.turn_id ?? "missing")}!=${turnId}`);
+  if (readString(rail.prompt) !== prompt) failures.push("rail_prompt_mismatch");
   if (rail.assistant_answer !== false) failures.push("rail_assistant_answer_not_false");
   if (rail.terminal_eligible !== false) failures.push("rail_terminal_eligible_not_false");
   if (rail.raw_content_included !== false) failures.push("rail_raw_content_included_not_false");
@@ -591,12 +604,13 @@ const classify = (scenario: LiveSpineScenario, ask: RecordLike, debugExport: unk
   const rails = railCandidates(ask, debugExport);
   const rail = rails[0];
   const errorCode = terminalErrorCode(ask, debugExport);
+  const terminalArtifactKind = terminalArtifactKindFor(ask, debugExport);
 
   if (!debugExport) failures.push("debug_export_missing");
   if (!rail) {
     failures.push("codex_parity_agent_spine_rail_table_missing");
   } else {
-    failures.push(...shapeFailures(rail, turnId), ...compareRailMirrors(rails));
+    failures.push(...shapeFailures(rail, turnId, scenario.prompt), ...compareRailMirrors(rails));
     expectField(failures, rail, "requested_capability", scenario.expected.requestedCapability);
     expectField(failures, rail, "selected_capability", scenario.expected.selectedCapability);
     expectField(failures, rail, "admitted_capability", scenario.expected.admittedCapability);
@@ -617,6 +631,12 @@ const classify = (scenario: LiveSpineScenario, ask: RecordLike, debugExport: unk
       failures.push(
         `terminal_projection_mismatch:${String(rail.selected_terminal_kind ?? "null")}!=${String(rail.visible_terminal_kind ?? "null")}`,
       );
+    }
+    if (terminalArtifactKind && rail.selected_terminal_kind && rail.selected_terminal_kind !== terminalArtifactKind) {
+      failures.push(`rail_selected_terminal_response_mismatch:${String(rail.selected_terminal_kind)}!=${terminalArtifactKind}`);
+    }
+    if (terminalArtifactKind && rail.visible_terminal_kind && rail.visible_terminal_kind !== terminalArtifactKind) {
+      failures.push(`rail_visible_terminal_response_mismatch:${String(rail.visible_terminal_kind)}!=${terminalArtifactKind}`);
     }
     failures.push(...completeRailEnvelopeFailures({ rail, ask, debugExport }));
 
@@ -647,7 +667,7 @@ const classify = (scenario: LiveSpineScenario, ask: RecordLike, debugExport: unk
     failures,
     warnings,
     terminal_error_code: errorCode,
-    terminal_artifact_kind: readString(ask.terminal_artifact_kind) ?? null,
+    terminal_artifact_kind: terminalArtifactKind,
     final_answer_source: readString(ask.final_answer_source) ?? null,
     selected_final_answer_excerpt: selectedFinalText(ask, debugExport).slice(0, 500),
     rail_table: rail

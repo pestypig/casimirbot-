@@ -24,6 +24,10 @@ const NHM2_REGIONAL_TENSOR_PASS_PATH_HARNESS =
   `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-regional-tensor-pass-path-harness.json`;
 const NHM2_TIME_DEPENDENT_SOURCE_CAMPAIGN =
   `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-time-dependent-source-campaign.json`;
+const NHM2_SWITCHING_COVARIANT_CONSERVATION_EVIDENCE =
+  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-switching-covariant-conservation-evidence.json`;
+const NHM2_FREQUENCY_CONVERGENCE_EVIDENCE =
+  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-frequency-convergence-evidence.json`;
 const NHM2_TRIP_CLOCKING_PROFILE_INDEX =
   "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-trip-clocking-profile-index-latest.json";
 
@@ -820,6 +824,130 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   nhm2FullSolveBadge({
+    id: "nhm2.dynamic.switching_covariant_conservation",
+    title: "Switching Covariant Conservation",
+    plainMeaning:
+      "Records whether the dynamic source campaign includes regional-support, sector-boundary, time-derivative, and transition-kernel conservation terms.",
+    whyItMatters:
+      "It prevents static covariant conservation from being mistaken for conservation of a sector-switched time-dependent source.",
+    subjects: ["nhm2", "dynamic_campaign", "switching", "covariant_conservation"],
+    level: "diagnostic_gate",
+    status: "diagnostic",
+    simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    equationFamilies: ["switching_covariant_conservation", "time_dependent_source_campaign"],
+    tags: ["switching_conservation", "runtime_artifact", "noncomputable_reference"],
+    equations: [
+      {
+        id: "switching_covariant_conservation_gate",
+        role: "noncomputable_reference",
+        displayLatex:
+          "\\nabla_\\mu T^{\\mu\\nu}(t)=terms(W_R)+terms(sector)+terms(\\partial_t)+terms(kernel)",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["W_R", "sector", "partial_t", "kernel", "T_mu_nu(t)"],
+        outputSymbols: ["switchingConservationPass"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Static covariant conservation cannot substitute for switching-sector conservation.",
+      "This row is runtime evidence and has no calculator payload.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef(
+        "shared/contracts/nhm2-time-dependent-source-campaign.v1.ts",
+        "nhm2-switching-covariant-conservation-evidence-contract",
+        "Typed switching conservation evidence contract.",
+      ),
+      artifactRef(
+        "tools/nhm2/build-switching-covariant-conservation-evidence.ts",
+        "nhm2-switching-covariant-conservation-evidence-builder",
+        "Builder for declared/frozen switching conservation terms.",
+      ),
+      artifactRef(
+        NHM2_SWITCHING_COVARIANT_CONSERVATION_EVIDENCE,
+        "sha256:3fad6ae8f58fd4c6648ac78a1756c02b7902f69b25ffee0eeafaeca99dee2b34",
+        "Pinned smoke-chain switching evidence: conservationStatus=pass; overallResidualLInf=0.045.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "dynamic_campaign", "switching", "covariant_conservation"],
+      symbols: ["W_R", "sector", "partial_t", "kernel", "T_mu_nu(t)", "switchingConservationPass"],
+      unitSignatures: [],
+      repoPaths: [
+        "shared/contracts/nhm2-time-dependent-source-campaign.v1.ts",
+        "tools/nhm2/build-switching-covariant-conservation-evidence.ts",
+        NHM2_SWITCHING_COVARIANT_CONSERVATION_EVIDENCE,
+      ],
+      equationFamilies: ["switching_covariant_conservation", "time_dependent_source_campaign"],
+      simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.dynamic.frequency_convergence",
+    title: "Frequency Convergence",
+    plainMeaning:
+      "Records whether a frozen frequency ladder converges at fixed cycle-average source over f, 2f, 4f, and 8f.",
+    whyItMatters:
+      "It distinguishes a single-frequency artifact from an effective-source limit that remains stable as switching frequency increases.",
+    subjects: ["nhm2", "dynamic_campaign", "frequency_ladder", "cycle_average"],
+    level: "diagnostic_gate",
+    status: "diagnostic",
+    simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    equationFamilies: ["frequency_convergence", "time_dependent_source_campaign"],
+    tags: ["frequency_convergence", "runtime_artifact", "noncomputable_reference"],
+    equations: [
+      {
+        id: "frequency_convergence_gate",
+        role: "noncomputable_reference",
+        displayLatex: "f,2f,4f,8f\\quad\\mathrm{at\\ fixed\\ cycle\\ average}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["f", "cycleAverageSource", "residualLInf"],
+        outputSymbols: ["frequencyConvergencePass"],
+      },
+    ],
+    units: [{ symbol: "f", unit: "Hz", quantity: "switching_frequency", dimensionSignature: "T^-1" }],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "A single-frequency result fails closed.",
+      "Cycle-average source must remain fixed across the ladder.",
+      "This row is runtime evidence and has no calculator payload.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef(
+        "shared/contracts/nhm2-time-dependent-source-campaign.v1.ts",
+        "nhm2-frequency-convergence-evidence-contract",
+        "Typed frequency convergence evidence contract.",
+      ),
+      artifactRef(
+        "tools/nhm2/build-frequency-convergence-evidence.ts",
+        "nhm2-frequency-convergence-evidence-builder",
+        "Builder for declared/frozen frequency ladder residuals.",
+      ),
+      artifactRef(
+        NHM2_FREQUENCY_CONVERGENCE_EVIDENCE,
+        "sha256:653026c32333e63143c5f0da967f527720185776cefbaeb907a3d83a7043a743",
+        "Pinned smoke-chain frequency evidence: f,2f,4f,8f pass at fixed cycle-average source.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "dynamic_campaign", "frequency_ladder", "cycle_average"],
+      symbols: ["f", "cycleAverageSource", "residualLInf", "frequencyConvergencePass"],
+      unitSignatures: ["T^-1"],
+      repoPaths: [
+        "shared/contracts/nhm2-time-dependent-source-campaign.v1.ts",
+        "tools/nhm2/build-frequency-convergence-evidence.ts",
+        NHM2_FREQUENCY_CONVERGENCE_EVIDENCE,
+      ],
+      equationFamilies: ["frequency_convergence", "time_dependent_source_campaign"],
+      simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
     id: "nhm2.dynamic.time_dependent_source_campaign",
     title: "Time-Dependent Source Campaign",
     plainMeaning:
@@ -874,8 +1002,8 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
       artifactRef(
         NHM2_TIME_DEPENDENT_SOURCE_CAMPAIGN,
-        "sha256:b191d63ea3bf78281873630e61c07d1416a012e5558fd94f2e3d2d5e82bcee12",
-        "Pinned local smoke-chain campaign artifact: campaignPass=false; firstBlocker=switching_conservation_evidence_missing.",
+        "sha256:b012bbcb8e4b9ec3f0754973e63fa388e39e0a9c97918015a9dcd43ccd535dc9",
+        "Pinned local smoke-chain campaign artifact: campaignPass=false; firstBlocker=dynamic_effective_geometry_evidence_missing.",
       ),
       docRef(
         NHM2_FULL_SOLVE_WHITEPAPER,
@@ -2345,6 +2473,30 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "requires",
     label: "The frozen time-dependent campaign is stricter than the static regional pass-path harness and consumes it as one diagnostic prerequisite.",
     claimBoundaryNote: "Static readiness cannot substitute for dynamic frequency, switching, backreaction, and stability receipts.",
+  },
+  {
+    id: "regional_pass_path_harness_feeds_switching_conservation",
+    from: "nhm2.closure.regional_tensor_pass_path_harness",
+    to: "nhm2.dynamic.switching_covariant_conservation",
+    relation: "documents",
+    label: "The static regional harness supplies upstream context, but switching conservation must carry its own dynamic terms.",
+    claimBoundaryNote: "Static conservation context cannot substitute for sector-switching conservation evidence.",
+  },
+  {
+    id: "switching_conservation_feeds_time_dependent_campaign",
+    from: "nhm2.dynamic.switching_covariant_conservation",
+    to: "nhm2.dynamic.time_dependent_source_campaign",
+    relation: "requires",
+    label: "The time-dependent campaign requires switching conservation evidence across support, sector, time-derivative, and transition-kernel terms.",
+    claimBoundaryNote: "A switching pass is still diagnostic and does not clear dynamic geometry, observer, tensor, or stability gates.",
+  },
+  {
+    id: "frequency_convergence_feeds_time_dependent_campaign",
+    from: "nhm2.dynamic.frequency_convergence",
+    to: "nhm2.dynamic.time_dependent_source_campaign",
+    relation: "requires",
+    label: "The time-dependent campaign requires fixed-cycle-average convergence over the frequency ladder.",
+    claimBoundaryNote: "A frequency pass is still diagnostic and cannot imply physical viability.",
   },
   {
     id: "time_dependent_campaign_blocks_diagnostic_boundary",

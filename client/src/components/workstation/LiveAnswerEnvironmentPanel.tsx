@@ -556,6 +556,17 @@ const liveAnswerDispatchLabel = (action: WorkstationDispatchActionV1): string =>
   return compactLabel(action.kind);
 };
 
+const isLiveAnswerWorkstationControlDispatch = (action: WorkstationDispatchActionV1): boolean =>
+  action.kind === "change_preset" ||
+  action.kind === "bind_source" ||
+  action.kind === "unbind_source" ||
+  action.kind === "set_loop_state" ||
+  action.kind === "repair_loop" ||
+  action.kind === "update_live_answer" ||
+  action.kind === "focus_process_graph" ||
+  action.kind === "speak_narrator" ||
+  action.kind === "bind_narrator_stream";
+
 const liveAnswerPacketColorKey = (update: WorkstationGoalContextUpdateV1): string => {
   const refs = [
     update.contentRef,
@@ -1776,6 +1787,12 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       narratorSpeechCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "speak_narrator").length,
       narratorBindingCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "bind_narrator_stream").length,
       wakeCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "wake_agent").length,
+      workstationControlDispatchCount: dispatches.filter(isLiveAnswerWorkstationControlDispatch).length,
+      presetDispatchCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "change_preset").length,
+      sourceBindingDispatchCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "bind_source" || action.kind === "unbind_source").length,
+      loopDispatchCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "set_loop_state" || action.kind === "repair_loop").length,
+      liveAnswerDispatchCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "update_live_answer").length,
+      processGraphDispatchCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "focus_process_graph").length,
       microdeckOutputCount: goalContextUpdates.filter((update: WorkstationGoalContextUpdateV1) =>
         update.producerKind === "microdeck" ||
         update.contentRef.includes("microdeck") ||

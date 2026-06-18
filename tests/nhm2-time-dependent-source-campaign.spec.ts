@@ -5,7 +5,11 @@ import type { Nhm2QeiWorldlineDossierV1 } from "../shared/contracts/nhm2-qei-wor
 import type { Nhm2RegionalFullTensorResidualArtifactV1 } from "../shared/contracts/nhm2-regional-full-tensor-residual.v1";
 import type { Nhm2SourceComponentAuthorityLedgerArtifactV1 } from "../shared/contracts/nhm2-source-component-authority-ledger.v1";
 import {
+  buildNhm2FrequencyConvergenceEvidence,
+  buildNhm2SwitchingConservationEvidence,
   buildNhm2TimeDependentSourceCampaign,
+  isNhm2FrequencyConvergenceEvidence,
+  isNhm2SwitchingConservationEvidence,
   isNhm2TimeDependentSourceCampaignArtifact,
   type Nhm2CampaignStabilityEvidenceV1,
   type Nhm2DynamicEffectiveGeometryEvidenceV1,
@@ -161,6 +165,7 @@ const frequencyEvidence = (): Nhm2FrequencyConvergenceEvidenceV1 => ({
   contractVersion: "nhm2_frequency_convergence_evidence/v1",
   generatedAt: "2026-06-18T00:00:00.000Z",
   baseFrequencyHz: 1,
+  toleranceLInf: 0.1,
   fixedCycleAverageSource: true,
   multipliers: [1, 2, 4, 8],
   entries: [1, 2, 4, 8].map((multiplier) => ({
@@ -178,12 +183,50 @@ const frequencyEvidence = (): Nhm2FrequencyConvergenceEvidenceV1 => ({
 const switchingEvidence = (): Nhm2SwitchingConservationEvidenceV1 => ({
   contractVersion: "nhm2_switching_covariant_conservation_evidence/v1",
   generatedAt: "2026-06-18T00:00:00.000Z",
+  staticCovariantConservationRef: "static-conservation.json",
   scheduleRef: "schedule.json",
   sectorBoundaryRef: "sector-boundary.json",
   switchingFunctionRef: "switching.json",
   includesRegionalSupportDerivatives: true,
   includesSectorBoundaryTerms: true,
   includesTimeDerivativeTerms: true,
+  includesTransitionKernelTerms: true,
+  toleranceLInf: 0.1,
+  overallResidualLInf: 0.04,
+  terms: [
+    {
+      termId: "regional_support_derivative",
+      included: true,
+      residualLInf: 0.01,
+      toleranceLInf: 0.1,
+      pass: true,
+      blockers: [],
+    },
+    {
+      termId: "sector_boundary",
+      included: true,
+      residualLInf: 0.02,
+      toleranceLInf: 0.1,
+      pass: true,
+      blockers: [],
+    },
+    {
+      termId: "time_derivative",
+      included: true,
+      residualLInf: 0.03,
+      toleranceLInf: 0.1,
+      pass: true,
+      blockers: [],
+    },
+    {
+      termId: "transition_kernel",
+      included: true,
+      residualLInf: 0.04,
+      toleranceLInf: 0.1,
+      pass: true,
+      blockers: [],
+    },
+  ],
   conservationStatus: "pass",
   blockers: [],
 });
@@ -214,6 +257,62 @@ const stabilityEvidence = (): Nhm2CampaignStabilityEvidenceV1 => ({
 });
 
 describe("NHM2 time-dependent source campaign", () => {
+  it("builds switching conservation evidence that fails closed without dynamic terms", () => {
+    const evidence = buildNhm2SwitchingConservationEvidence({
+      staticCovariantConservationRef: "static-conservation.json",
+      scheduleRef: "schedule.json",
+      sectorBoundaryRef: "sector-boundary.json",
+      switchingFunctionRef: "switching.json",
+      terms: {
+        regional_support_derivative: 0.01,
+      },
+    });
+
+    expect(isNhm2SwitchingConservationEvidence(evidence)).toBe(true);
+    expect(evidence.conservationStatus).toBe("fail");
+    expect(evidence.blockers).toEqual(
+      expect.arrayContaining([
+        "sector_boundary:sector_boundary_term_missing",
+        "time_derivative:time_derivative_term_missing",
+        "transition_kernel:transition_kernel_term_missing",
+      ]),
+    );
+  });
+
+  it("builds frequency convergence evidence that fails closed for a single frequency", () => {
+    const evidence = buildNhm2FrequencyConvergenceEvidence({
+      baseFrequencyHz: 1,
+      fixedCycleAverageSource: true,
+      entries: [{ multiplier: 1, frequencyHz: 1, residualLInf: 0.01, residualL2: 0.005 }],
+    });
+
+    expect(isNhm2FrequencyConvergenceEvidence(evidence)).toBe(true);
+    expect(evidence.convergenceStatus).toBe("fail");
+    expect(evidence.blockers).toEqual(
+      expect.arrayContaining([
+        "frequency_multiplier_missing:2",
+        "frequency_multiplier_missing:4",
+        "frequency_ladder_too_short",
+      ]),
+    );
+  });
+
+  it("builds frequency convergence evidence that fails when cycle-average source is not fixed", () => {
+    const evidence = buildNhm2FrequencyConvergenceEvidence({
+      baseFrequencyHz: 1,
+      fixedCycleAverageSource: false,
+      entries: [1, 2, 4].map((multiplier) => ({
+        multiplier,
+        frequencyHz: multiplier,
+        residualLInf: 0.01,
+        residualL2: 0.005,
+      })),
+    });
+
+    expect(evidence.convergenceStatus).toBe("fail");
+    expect(evidence.blockers).toContain("cycle_average_source_not_fixed");
+  });
+
   it("emits a valid fail-closed artifact when evidence is missing", () => {
     const artifact = buildNhm2TimeDependentSourceCampaign({
       generatedAt: "2026-06-18T00:00:00.000Z",
@@ -241,6 +340,20 @@ describe("NHM2 time-dependent source campaign", () => {
     expect(artifact.summary.campaignPass).toBe(false);
     expect(artifact.summary.firstBlocker).toBe("switching_conservation_evidence_missing");
     expect(artifact.frequencyLadder.blockers).toContain("frequency_convergence_evidence_missing");
+  });
+
+  it("moves the first blocker past switching when valid switching evidence is supplied", () => {
+    const artifact = buildNhm2TimeDependentSourceCampaign({
+      sourceComponentAuthorityLedger: completeLedger(),
+      regionalFullTensorResidual: fullTensorResidual(),
+      qeiWorldlineDossier: qeiDossier(),
+      observerRobustEnergyConditions: observerArtifact(),
+      switchingConservation: switchingEvidence(),
+    });
+
+    expect(artifact.summary.switchingConservationPass).toBe(true);
+    expect(artifact.summary.campaignPass).toBe(false);
+    expect(artifact.summary.firstBlocker).toBe("frequency_convergence_evidence_missing");
   });
 
   it("rejects source target echo as source independence failure", () => {

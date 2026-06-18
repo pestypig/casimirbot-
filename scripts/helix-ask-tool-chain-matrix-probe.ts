@@ -302,8 +302,9 @@ const collectRailTableFailures = (input: {
   railTable: RecordLike | null;
   terminalKind: string;
   turnId: string;
+  prompt: string;
 }): string[] => {
-  const { railTable, terminalKind, turnId } = input;
+  const { railTable, terminalKind, turnId, prompt } = input;
   if (!railTable) return ["codex_parity_agent_spine_rail_table_missing"];
   const failures: string[] = [];
   if (railTable.schema !== CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA) {
@@ -311,6 +312,9 @@ const collectRailTableFailures = (input: {
   }
   if (readString(railTable.turn_id) !== turnId) {
     failures.push(`rail_turn_id_mismatch:${readString(railTable.turn_id) || "missing"}!=${turnId || "missing"}`);
+  }
+  if (readString(railTable.prompt) !== prompt) {
+    failures.push("rail_prompt_mismatch");
   }
   if (railTable.assistant_answer !== false) failures.push("rail_assistant_answer_not_false");
   if (railTable.terminal_eligible !== false) failures.push("rail_terminal_eligible_not_false");
@@ -411,6 +415,9 @@ const collectRailTableFailures = (input: {
   }
   if (selectedTerminalKind && visibleTerminalKind && selectedTerminalKind !== visibleTerminalKind) {
     failures.push(`rail_selected_visible_terminal_kind_mismatch:${selectedTerminalKind}!=${visibleTerminalKind}`);
+  }
+  if (terminalKind && selectedTerminalKind && terminalKind !== selectedTerminalKind) {
+    failures.push(`rail_selected_terminal_kind_payload_mismatch:${selectedTerminalKind}!=${terminalKind}`);
   }
   if (terminalKind && visibleTerminalKind && terminalKind !== visibleTerminalKind) {
     failures.push(`rail_visible_terminal_kind_payload_mismatch:${visibleTerminalKind}!=${terminalKind}`);
@@ -620,7 +627,7 @@ const classifyScenario = (input: {
   } = input;
 
   if (!debugAvailable) warnings.push("debug_export_missing");
-  failures.push(...collectRailTableFailures({ railTable, terminalKind, turnId }));
+  failures.push(...collectRailTableFailures({ railTable, terminalKind, turnId, prompt: scenario.prompt }));
   failures.push(...completeRailEnvelopeFailures({ railTable, terminalKind, terminalError, visibleText }));
   if (!timelineEvents.length) warnings.push("causal_timeline_missing");
   if (receiptLeak(visibleText)) failures.push("receipt_framing_leaked_into_visible_answer");

@@ -5,6 +5,8 @@ import {
   WORKSTATION_AGENT_GOAL_DEFAULT_CONTEXT_FEEDS,
   WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
   WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
+  WORKSTATION_NARRATOR_BIND_STREAM_REQUEST_SCHEMA,
+  WORKSTATION_NARRATOR_SAY_REQUEST_SCHEMA,
   WORKSTATION_GOAL_CONTEXT_PRODUCER_KINDS,
   WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
   WORKSTATION_GOAL_CONTEXT_UPDATE_KINDS,
@@ -12,8 +14,12 @@ import {
   type AgentGoalSessionV1,
   type GoalContextProducerKindV1,
   type GoalContextUpdateKindV1,
+  type NarratorBindStreamRequestV1,
+  type NarratorSayRequestV1,
   type WorkstationGoalContextUpdateV1,
   validateAgentGoalSessionV1,
+  validateNarratorBindStreamRequestV1,
+  validateNarratorSayRequestV1,
   validateWorkstationGoalContextUpdateV1,
 } from "../workstation-goal-context.v1";
 
@@ -129,6 +135,36 @@ describe("workstation goal context contract", () => {
       finalReportsRequireTerminalAuthority: true,
       finalReportRequirements: WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
     },
+  };
+
+  const narratorSayRequest: NarratorSayRequestV1 = {
+    schemaVersion: WORKSTATION_NARRATOR_SAY_REQUEST_SCHEMA,
+    requestId: "helix:narrator:say:1",
+    text: "Translation stream is ready.",
+    sourceKind: "live_answer",
+    sourceId: "live-answer:translation",
+    evidenceRefs: ["translation_segment:latest", "allowed_actuator:narrator_say"],
+    deliveryMode: "confirm_to_speak",
+    priority: "normal",
+    language: "en",
+    dedupeKey: "goal:translation:narrator:say",
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+
+  const narratorBindStreamRequest: NarratorBindStreamRequestV1 = {
+    schemaVersion: WORKSTATION_NARRATOR_BIND_STREAM_REQUEST_SCHEMA,
+    requestId: "helix:narrator:bind:1",
+    sourceRef: "source:browser-audio",
+    streamKind: "translated_transcript",
+    presetId: "preset:translation-visible",
+    deliveryMode: "visible_only",
+    voicePolicy: "confirm_speak_required",
+    evidenceThreshold: "observed",
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
   };
 
   it("accepts goal-context updates as non-terminal workstation evidence", () => {
@@ -302,6 +338,47 @@ describe("workstation goal context contract", () => {
       "final report requirements must require route authority",
       "final report requirements must require terminal authority single writer",
       "authority.finalReportRequirements.requiredEvidenceKinds must include at least one reference",
+    ]));
+  });
+
+  it("accepts narrator control request artifacts as non-terminal workstation observations", () => {
+    expect(validateNarratorSayRequestV1(narratorSayRequest)).toEqual([]);
+    expect(validateNarratorBindStreamRequestV1(narratorBindStreamRequest)).toEqual([]);
+  });
+
+  it("rejects narrator say requests that try to become answer authority or raw terminal text", () => {
+    expect(validateNarratorSayRequestV1({
+      ...narratorSayRequest,
+      evidenceRefs: [],
+      deliveryMode: "hidden" as NarratorSayRequestV1["deliveryMode"],
+      assistant_answer: true as false,
+      terminal_eligible: true as false,
+      raw_content_included: true as false,
+    })).toEqual(expect.arrayContaining([
+      "evidenceRefs must include at least one reference",
+      "deliveryMode must be visible_only, confirm_to_speak, or auto_speak",
+      "narrator say requests must not be assistant answers",
+      "narrator say requests must not be terminal eligible",
+      "narrator say requests must not include raw content",
+    ]));
+  });
+
+  it("rejects narrator stream bindings that try to become answer authority or hidden terminal routes", () => {
+    expect(validateNarratorBindStreamRequestV1({
+      ...narratorBindStreamRequest,
+      streamKind: "final_answer_stream" as NarratorBindStreamRequestV1["streamKind"],
+      deliveryMode: "hidden" as NarratorBindStreamRequestV1["deliveryMode"],
+      voicePolicy: "always_terminal" as NarratorBindStreamRequestV1["voicePolicy"],
+      assistant_answer: true as false,
+      terminal_eligible: true as false,
+      raw_content_included: true as false,
+    })).toEqual(expect.arrayContaining([
+      "streamKind is invalid",
+      "deliveryMode must be visible_only, confirm_to_speak, or auto_speak",
+      "voicePolicy is invalid",
+      "narrator bind stream requests must not be assistant answers",
+      "narrator bind stream requests must not be terminal eligible",
+      "narrator bind stream requests must not include raw content",
     ]));
   });
 });

@@ -65,7 +65,13 @@ describe("LiveAnswerReasoningCircuit", () => {
             evidenceRefs: ["frame:frog-001", "microdeck-run:frog-classifier"],
             receiptRefs: ["receipt:frog-classifier"],
             policyRefs: ["context_feed:visual_summaries", "allowed_actuator:query_visual_summaries"],
-            dispatch: ["narrator bind translated transcript", "wake interrupt"],
+            dispatch: [
+              "narrator bind translated transcript",
+              "wake interrupt",
+              "preset frog classifier",
+              "bind source",
+              "focus graph",
+            ],
             packetColorKey: "stage_play_processed_mail_packet:frog-001",
             freshness: {
               observedAtMs: 1781736210000,
@@ -138,6 +144,12 @@ describe("LiveAnswerReasoningCircuit", () => {
           narratorSpeechCount: 0,
           narratorBindingCount: 1,
           wakeCount: 1,
+          workstationControlDispatchCount: 6,
+          presetDispatchCount: 1,
+          sourceBindingDispatchCount: 1,
+          loopDispatchCount: 1,
+          liveAnswerDispatchCount: 1,
+          processGraphDispatchCount: 1,
           microdeckOutputCount: 1,
           audioTranscriptCount: 0,
           translatedTranscriptCount: 1,
@@ -192,11 +204,15 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getAllByTestId("live-answer-goal-context-dispatch").map((node) => node.textContent)).toEqual([
       "narrator bind translated transcript",
       "wake interrupt",
+      "preset frog classifier",
+      "bind source",
+      "focus graph",
       "update live answer",
       "set loop state running",
     ]);
     expect(screen.getByTestId("live-answer-narrator-binding-count")).toHaveTextContent("1 narrator bindings");
     expect(screen.getByTestId("live-answer-wake-dispatch-count")).toHaveTextContent("1 wake dispatch");
+    expect(screen.getByTestId("live-answer-control-dispatch-count")).toHaveTextContent("6 non-wake control dispatches");
     expect(screen.getByTestId("live-answer-microdeck-output-count")).toHaveTextContent("1 MicroDeck output");
     expect(screen.getByTestId("live-answer-audio-transcript-count")).toHaveTextContent("0 audio transcripts");
     expect(screen.getByTestId("live-answer-translated-transcript-count")).toHaveTextContent("1 translations");
@@ -229,6 +245,14 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("feed_policy_refs=2");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("actuator_policy_refs=2");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("trace_memory=2");
+    expect(screen.getByTestId("live-answer-control-dispatch-breakdown")).toHaveTextContent("control_dispatches=6");
+    expect(screen.getByTestId("live-answer-control-dispatch-breakdown")).toHaveTextContent("preset=1");
+    expect(screen.getByTestId("live-answer-control-dispatch-breakdown")).toHaveTextContent("source_binding=1");
+    expect(screen.getByTestId("live-answer-control-dispatch-breakdown")).toHaveTextContent("loop=1");
+    expect(screen.getByTestId("live-answer-control-dispatch-breakdown")).toHaveTextContent("live_answer=1");
+    expect(screen.getByTestId("live-answer-control-dispatch-breakdown")).toHaveTextContent("graph=1");
+    expect(screen.getByTestId("live-answer-control-dispatch-breakdown")).toHaveTextContent("narrator=1");
+    expect(screen.getByTestId("live-answer-control-dispatch-breakdown")).toHaveTextContent("wake_interrupts=1");
     expect(screen.getByTestId("live-answer-agent-goal-session")).toHaveTextContent("active / 6 feeds");
     expect(screen.getByTestId("live-answer-agent-goal-policy")).toHaveTextContent("Monitor visual and translated audio feeds.");
     expect(screen.getByTestId("live-answer-agent-goal-final-authority")).toHaveTextContent("finalAuthority=true");

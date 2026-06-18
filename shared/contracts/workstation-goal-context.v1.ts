@@ -1,4 +1,9 @@
-import type { NarratorDeliveryMode, NarratorSourceKind } from "./narrator-event.v1";
+import {
+  NARRATOR_DELIVERY_MODES,
+  NARRATOR_SOURCE_KINDS,
+  type NarratorDeliveryMode,
+  type NarratorSourceKind,
+} from "./narrator-event.v1";
 
 export const WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA = "helix.workstation_goal_context_update.v1" as const;
 export const WORKSTATION_AGENT_GOAL_SESSION_SCHEMA = "helix.agent_goal_session.v1" as const;
@@ -371,6 +376,28 @@ export type NarratorBindStreamRequestV1 = {
   raw_content_included: false;
 };
 
+export const WORKSTATION_NARRATOR_STREAM_KINDS: readonly NarratorBindStreamRequestV1["streamKind"][] = [
+  "transcript_stream",
+  "translated_transcript",
+  "translated_speech",
+  "typed_commentary",
+  "route_evidence",
+  "source_health_status",
+];
+
+export const WORKSTATION_NARRATOR_VOICE_POLICIES: readonly NarratorBindStreamRequestV1["voicePolicy"][] = [
+  "muted",
+  "propose_only",
+  "confirm_speak_required",
+  "automatic_when_policy_allows",
+];
+
+export const WORKSTATION_NARRATOR_PRIORITIES: readonly NarratorSayRequestV1["priority"][] = [
+  "low",
+  "normal",
+  "high",
+];
+
 const producerKinds = new Set<GoalContextProducerKindV1>(WORKSTATION_GOAL_CONTEXT_PRODUCER_KINDS);
 
 const updateKinds = new Set<GoalContextUpdateKindV1>(WORKSTATION_GOAL_CONTEXT_UPDATE_KINDS);
@@ -395,6 +422,18 @@ const goalStatuses = new Set<AgentGoalSessionV1["status"]>([
 const agentGoalContextFeedKinds = new Set<AgentGoalContextFeedKindV1>(WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS);
 
 const agentGoalActuators = new Set<AgentGoalActuatorV1>(WORKSTATION_AGENT_GOAL_ACTUATORS);
+
+const narratorSourceKinds = new Set<string>(NARRATOR_SOURCE_KINDS);
+
+const narratorVisibleDeliveryModes = new Set<string>(
+  NARRATOR_DELIVERY_MODES.filter((mode) => mode !== "hidden"),
+);
+
+const narratorStreamKinds = new Set<string>(WORKSTATION_NARRATOR_STREAM_KINDS);
+
+const narratorVoicePolicies = new Set<string>(WORKSTATION_NARRATOR_VOICE_POLICIES);
+
+const narratorPriorities = new Set<string>(WORKSTATION_NARRATOR_PRIORITIES);
 
 const stringArrayIssue = (value: unknown, field: string, options: { requireNonEmpty?: boolean } = {}): string[] => {
   if (!Array.isArray(value)) return [`${field} must be an array`];
@@ -475,5 +514,35 @@ export function validateAgentGoalSessionV1(value: AgentGoalSessionV1): string[] 
     issues.push(...stringArrayIssue(requirements.requiredEvidenceKinds, "authority.finalReportRequirements.requiredEvidenceKinds", { requireNonEmpty: true }));
     issues.push(...stringArrayIssue(requirements.prohibitedReportSources, "authority.finalReportRequirements.prohibitedReportSources", { requireNonEmpty: true }));
   }
+  return issues;
+}
+
+export function validateNarratorSayRequestV1(value: NarratorSayRequestV1): string[] {
+  const issues: string[] = [];
+  if (value.schemaVersion !== WORKSTATION_NARRATOR_SAY_REQUEST_SCHEMA) issues.push("schemaVersion must match narrator say request schema");
+  if (!value.requestId) issues.push("requestId is required");
+  if (!value.text.trim()) issues.push("text is required");
+  if (!narratorSourceKinds.has(value.sourceKind)) issues.push("sourceKind is invalid");
+  if (!value.sourceId) issues.push("sourceId is required");
+  issues.push(...stringArrayIssue(value.evidenceRefs, "evidenceRefs", { requireNonEmpty: true }));
+  if (!narratorVisibleDeliveryModes.has(value.deliveryMode)) issues.push("deliveryMode must be visible_only, confirm_to_speak, or auto_speak");
+  if (!narratorPriorities.has(value.priority)) issues.push("priority is invalid");
+  if (value.assistant_answer !== false) issues.push("narrator say requests must not be assistant answers");
+  if (value.terminal_eligible !== false) issues.push("narrator say requests must not be terminal eligible");
+  if (value.raw_content_included !== false) issues.push("narrator say requests must not include raw content");
+  return issues;
+}
+
+export function validateNarratorBindStreamRequestV1(value: NarratorBindStreamRequestV1): string[] {
+  const issues: string[] = [];
+  if (value.schemaVersion !== WORKSTATION_NARRATOR_BIND_STREAM_REQUEST_SCHEMA) issues.push("schemaVersion must match narrator bind stream request schema");
+  if (!value.requestId) issues.push("requestId is required");
+  if (!value.sourceRef) issues.push("sourceRef is required");
+  if (!narratorStreamKinds.has(value.streamKind)) issues.push("streamKind is invalid");
+  if (!narratorVisibleDeliveryModes.has(value.deliveryMode)) issues.push("deliveryMode must be visible_only, confirm_to_speak, or auto_speak");
+  if (!narratorVoicePolicies.has(value.voicePolicy)) issues.push("voicePolicy is invalid");
+  if (value.assistant_answer !== false) issues.push("narrator bind stream requests must not be assistant answers");
+  if (value.terminal_eligible !== false) issues.push("narrator bind stream requests must not be terminal eligible");
+  if (value.raw_content_included !== false) issues.push("narrator bind stream requests must not include raw content");
   return issues;
 }

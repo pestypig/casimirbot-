@@ -50,6 +50,7 @@ export type Nhm2FrequencyConvergenceEvidenceV1 = {
   contractVersion: "nhm2_frequency_convergence_evidence/v1";
   generatedAt: string;
   baseFrequencyHz: number | null;
+  toleranceLInf: number;
   fixedCycleAverageSource: boolean;
   multipliers: number[];
   entries: Array<{
@@ -64,15 +65,39 @@ export type Nhm2FrequencyConvergenceEvidenceV1 = {
   blockers: string[];
 };
 
+export const NHM2_SWITCHING_CONSERVATION_TERM_IDS = [
+  "regional_support_derivative",
+  "sector_boundary",
+  "time_derivative",
+  "transition_kernel",
+] as const;
+
+export type Nhm2SwitchingConservationTermId =
+  (typeof NHM2_SWITCHING_CONSERVATION_TERM_IDS)[number];
+
+export type Nhm2SwitchingConservationTermV1 = {
+  termId: Nhm2SwitchingConservationTermId;
+  included: boolean;
+  residualLInf: number | null;
+  toleranceLInf: number;
+  pass: boolean | null;
+  blockers: string[];
+};
+
 export type Nhm2SwitchingConservationEvidenceV1 = {
   contractVersion: "nhm2_switching_covariant_conservation_evidence/v1";
   generatedAt: string;
+  staticCovariantConservationRef: string | null;
   scheduleRef: string | null;
   sectorBoundaryRef: string | null;
   switchingFunctionRef: string | null;
   includesRegionalSupportDerivatives: boolean;
   includesSectorBoundaryTerms: boolean;
   includesTimeDerivativeTerms: boolean;
+  includesTransitionKernelTerms: boolean;
+  toleranceLInf: number;
+  overallResidualLInf: number | null;
+  terms: Nhm2SwitchingConservationTermV1[];
   conservationStatus: Nhm2TimeDependentSourceCampaignStatus;
   blockers: string[];
 };
@@ -142,6 +167,7 @@ export type Nhm2TimeDependentSourceCampaignArtifactV1 = {
   };
   frequencyLadder: {
     baseFrequencyHz: number | null;
+    toleranceLInf: number | null;
     multipliers: number[];
     fixedCycleAverageSource: boolean | null;
     entries: Nhm2FrequencyConvergenceEvidenceV1["entries"];
@@ -155,6 +181,10 @@ export type Nhm2TimeDependentSourceCampaignArtifactV1 = {
     includesRegionalSupportDerivatives: boolean | null;
     includesSectorBoundaryTerms: boolean | null;
     includesTimeDerivativeTerms: boolean | null;
+    includesTransitionKernelTerms: boolean | null;
+    toleranceLInf: number | null;
+    overallResidualLInf: number | null;
+    terms: Nhm2SwitchingConservationTermV1[];
     conservationStatus: Nhm2TimeDependentSourceCampaignStatus;
     blockers: string[];
   };
@@ -226,6 +256,33 @@ export type BuildNhm2TimeDependentSourceCampaignInput = {
   campaignStability?: Nhm2CampaignStabilityEvidenceV1 | null;
 };
 
+export type BuildNhm2FrequencyConvergenceEvidenceInput = {
+  generatedAt?: string | null;
+  baseFrequencyHz?: number | null;
+  toleranceLInf?: number | null;
+  fixedCycleAverageSource?: boolean | null;
+  entries?: Array<{
+    multiplier?: number | null;
+    frequencyHz?: number | null;
+    residualLInf?: number | null;
+    residualL2?: number | null;
+    blockers?: string[] | null;
+  }> | null;
+  blockers?: string[] | null;
+};
+
+export type BuildNhm2SwitchingConservationEvidenceInput = {
+  generatedAt?: string | null;
+  staticCovariantConservationRef?: string | null;
+  scheduleRef?: string | null;
+  sectorBoundaryRef?: string | null;
+  switchingFunctionRef?: string | null;
+  toleranceLInf?: number | null;
+  terms?: Partial<Record<Nhm2SwitchingConservationTermId, number | null>> | null;
+  includedTerms?: Partial<Record<Nhm2SwitchingConservationTermId, boolean | null>> | null;
+  blockers?: string[] | null;
+};
+
 const asText = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
@@ -237,6 +294,141 @@ const uniqueText = (values: Array<string | null | undefined>): string[] =>
         .filter((value): value is string => value != null),
     ),
   );
+
+const toFinite = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const DEFAULT_DYNAMIC_TOLERANCE_LINF = 0.1;
+
+const maxFinite = (values: Array<number | null | undefined>): number | null => {
+  const finite = values.filter(
+    (value): value is number => typeof value === "number" && Number.isFinite(value),
+  );
+  return finite.length === 0 ? null : Math.max(...finite);
+};
+
+export const buildNhm2FrequencyConvergenceEvidence = (
+  input: BuildNhm2FrequencyConvergenceEvidenceInput,
+): Nhm2FrequencyConvergenceEvidenceV1 => {
+  const tolerance = input.toleranceLInf ?? DEFAULT_DYNAMIC_TOLERANCE_LINF;
+  const entries = (input.entries ?? [])
+    .map((entry) => {
+      const multiplier = toFinite(entry.multiplier);
+      if (multiplier == null) return null;
+      const residualLInf = toFinite(entry.residualLInf);
+      const explicitBlockers = uniqueText(entry.blockers ?? []);
+      const blockers = uniqueText([
+        ...explicitBlockers,
+        residualLInf == null ? "frequency_residual_linf_missing" : null,
+        residualLInf != null && residualLInf > tolerance
+          ? "frequency_residual_linf_exceeds_tolerance"
+          : null,
+      ]);
+      return {
+        multiplier,
+        frequencyHz: toFinite(entry.frequencyHz),
+        residualLInf,
+        residualL2: toFinite(entry.residualL2),
+        pass: blockers.length === 0,
+        blockers,
+      };
+    })
+    .filter(
+      (entry): entry is Nhm2FrequencyConvergenceEvidenceV1["entries"][number] =>
+        entry != null,
+    );
+  const multipliers = Array.from(
+    new Set(entries.map((entry) => entry.multiplier)),
+  ).sort((a, b) => a - b);
+  const requiredMultipliers = [1, 2, 4];
+  const blockers = uniqueText([
+    ...(input.blockers ?? []),
+    input.fixedCycleAverageSource === true ? null : "cycle_average_source_not_fixed",
+    ...requiredMultipliers.map((multiplier) =>
+      multipliers.includes(multiplier)
+        ? null
+        : `frequency_multiplier_missing:${multiplier}`,
+    ),
+    entries.length < requiredMultipliers.length
+      ? "frequency_ladder_too_short"
+      : null,
+    ...entries.flatMap((entry) =>
+      entry.pass === true
+        ? []
+        : entry.blockers.map((blocker) => `${entry.multiplier}:${blocker}`),
+    ),
+  ]);
+  return {
+    contractVersion: "nhm2_frequency_convergence_evidence/v1",
+    generatedAt: input.generatedAt ?? new Date().toISOString(),
+    baseFrequencyHz: input.baseFrequencyHz ?? null,
+    toleranceLInf: tolerance,
+    fixedCycleAverageSource: input.fixedCycleAverageSource === true,
+    multipliers,
+    entries,
+    convergenceStatus: blockers.length === 0 ? "pass" : "fail",
+    blockers,
+  };
+};
+
+export const buildNhm2SwitchingConservationEvidence = (
+  input: BuildNhm2SwitchingConservationEvidenceInput,
+): Nhm2SwitchingConservationEvidenceV1 => {
+  const tolerance = input.toleranceLInf ?? DEFAULT_DYNAMIC_TOLERANCE_LINF;
+  const terms = NHM2_SWITCHING_CONSERVATION_TERM_IDS.map((termId) => {
+    const residualLInf = toFinite(input.terms?.[termId]);
+    const included = input.includedTerms?.[termId] ?? residualLInf != null;
+    const blockers = uniqueText([
+      included ? null : `${termId}_term_missing`,
+      residualLInf == null ? `${termId}_residual_linf_missing` : null,
+      residualLInf != null && residualLInf > tolerance
+        ? `${termId}_residual_linf_exceeds_tolerance`
+        : null,
+    ]);
+    return {
+      termId,
+      included: included === true,
+      residualLInf,
+      toleranceLInf: tolerance,
+      pass: blockers.length === 0,
+      blockers,
+    };
+  });
+  const overallResidualLInf = maxFinite(terms.map((term) => term.residualLInf));
+  const blockers = uniqueText([
+    ...(input.blockers ?? []),
+    input.scheduleRef == null ? "switching_schedule_ref_missing" : null,
+    input.sectorBoundaryRef == null ? "sector_boundary_ref_missing" : null,
+    input.switchingFunctionRef == null ? "switching_function_ref_missing" : null,
+    input.staticCovariantConservationRef == null
+      ? "static_covariant_conservation_ref_missing"
+      : null,
+    ...terms.flatMap((term) =>
+      term.pass === true
+        ? []
+        : term.blockers.map((blocker) => `${term.termId}:${blocker}`),
+    ),
+  ]);
+  const hasTerm = (termId: Nhm2SwitchingConservationTermId) =>
+    terms.find((term) => term.termId === termId)?.included === true;
+  return {
+    contractVersion: "nhm2_switching_covariant_conservation_evidence/v1",
+    generatedAt: input.generatedAt ?? new Date().toISOString(),
+    staticCovariantConservationRef: input.staticCovariantConservationRef ?? null,
+    scheduleRef: input.scheduleRef ?? null,
+    sectorBoundaryRef: input.sectorBoundaryRef ?? null,
+    switchingFunctionRef: input.switchingFunctionRef ?? null,
+    includesRegionalSupportDerivatives: hasTerm("regional_support_derivative"),
+    includesSectorBoundaryTerms: hasTerm("sector_boundary"),
+    includesTimeDerivativeTerms: hasTerm("time_derivative"),
+    includesTransitionKernelTerms: hasTerm("transition_kernel"),
+    toleranceLInf: tolerance,
+    overallResidualLInf,
+    terms,
+    conservationStatus: blockers.length === 0 ? "pass" : "fail",
+    blockers,
+  };
+};
 
 const refs = (
   input: Partial<Nhm2TimeDependentSourceCampaignArtifactRefsV1> | null | undefined,
@@ -373,6 +565,7 @@ const switchingGate = (
       : "regional_support_derivative_terms_missing",
     evidence.includesSectorBoundaryTerms ? null : "sector_boundary_terms_missing",
     evidence.includesTimeDerivativeTerms ? null : "time_derivative_terms_missing",
+    evidence.includesTransitionKernelTerms ? null : "transition_kernel_terms_missing",
     ...evidence.blockers,
   ]);
   return gate({
@@ -384,7 +577,7 @@ const switchingGate = (
           ? "fail"
           : "review",
     blockers,
-    primaryMetric: `conservationStatus=${evidence.conservationStatus}`,
+    primaryMetric: `overallResidualLInf=${evidence.overallResidualLInf ?? "missing"}`,
   });
 };
 
@@ -629,6 +822,7 @@ export const buildNhm2TimeDependentSourceCampaign = (
     },
     frequencyLadder: {
       baseFrequencyHz: frequency?.baseFrequencyHz ?? null,
+      toleranceLInf: frequency?.toleranceLInf ?? null,
       multipliers: frequency?.multipliers ?? [],
       fixedCycleAverageSource: frequency?.fixedCycleAverageSource ?? null,
       entries: frequency?.entries ?? [],
@@ -645,6 +839,10 @@ export const buildNhm2TimeDependentSourceCampaign = (
         switching?.includesRegionalSupportDerivatives ?? null,
       includesSectorBoundaryTerms: switching?.includesSectorBoundaryTerms ?? null,
       includesTimeDerivativeTerms: switching?.includesTimeDerivativeTerms ?? null,
+      includesTransitionKernelTerms: switching?.includesTransitionKernelTerms ?? null,
+      toleranceLInf: switching?.toleranceLInf ?? null,
+      overallResidualLInf: switching?.overallResidualLInf ?? null,
+      terms: switching?.terms ?? [],
       conservationStatus: switching?.conservationStatus ?? "missing",
       blockers:
         gateById.get("switching_covariant_conservation")?.blockers ??
@@ -783,6 +981,24 @@ const isFrequencyEntry = (
   );
 };
 
+const isSwitchingTerm = (
+  value: unknown,
+): value is Nhm2SwitchingConservationTermV1 => {
+  const record = isRecord(value) ? value : null;
+  return (
+    record != null &&
+    NHM2_SWITCHING_CONSERVATION_TERM_IDS.includes(
+      record.termId as Nhm2SwitchingConservationTermId,
+    ) &&
+    typeof record.included === "boolean" &&
+    isNullableNumber(record.residualLInf) &&
+    typeof record.toleranceLInf === "number" &&
+    Number.isFinite(record.toleranceLInf) &&
+    (record.pass === null || typeof record.pass === "boolean") &&
+    isStringArray(record.blockers)
+  );
+};
+
 export const isNhm2FrequencyConvergenceEvidence = (
   value: unknown,
 ): value is Nhm2FrequencyConvergenceEvidenceV1 => {
@@ -792,6 +1008,8 @@ export const isNhm2FrequencyConvergenceEvidence = (
     record.contractVersion === "nhm2_frequency_convergence_evidence/v1" &&
     typeof record.generatedAt === "string" &&
     isNullableNumber(record.baseFrequencyHz) &&
+    typeof record.toleranceLInf === "number" &&
+    Number.isFinite(record.toleranceLInf) &&
     typeof record.fixedCycleAverageSource === "boolean" &&
     isNumberArray(record.multipliers) &&
     Array.isArray(record.entries) &&
@@ -809,12 +1027,19 @@ export const isNhm2SwitchingConservationEvidence = (
     record != null &&
     record.contractVersion === "nhm2_switching_covariant_conservation_evidence/v1" &&
     typeof record.generatedAt === "string" &&
+    isNullableText(record.staticCovariantConservationRef) &&
     isNullableText(record.scheduleRef) &&
     isNullableText(record.sectorBoundaryRef) &&
     isNullableText(record.switchingFunctionRef) &&
     typeof record.includesRegionalSupportDerivatives === "boolean" &&
     typeof record.includesSectorBoundaryTerms === "boolean" &&
     typeof record.includesTimeDerivativeTerms === "boolean" &&
+    typeof record.includesTransitionKernelTerms === "boolean" &&
+    typeof record.toleranceLInf === "number" &&
+    Number.isFinite(record.toleranceLInf) &&
+    isNullableNumber(record.overallResidualLInf) &&
+    Array.isArray(record.terms) &&
+    record.terms.every(isSwitchingTerm) &&
     isStatus(record.conservationStatus) &&
     isStringArray(record.blockers)
   );
@@ -899,6 +1124,7 @@ export const isNhm2TimeDependentSourceCampaignArtifact = (
     isStringArray(sourceIndependence.blockers) &&
     frequencyLadder != null &&
     isNullableNumber(frequencyLadder.baseFrequencyHz) &&
+    isNullableNumber(frequencyLadder.toleranceLInf) &&
     isNumberArray(frequencyLadder.multipliers) &&
     (frequencyLadder.fixedCycleAverageSource === null ||
       typeof frequencyLadder.fixedCycleAverageSource === "boolean") &&
@@ -916,6 +1142,12 @@ export const isNhm2TimeDependentSourceCampaignArtifact = (
       typeof switchingSchedule.includesSectorBoundaryTerms === "boolean") &&
     (switchingSchedule.includesTimeDerivativeTerms === null ||
       typeof switchingSchedule.includesTimeDerivativeTerms === "boolean") &&
+    (switchingSchedule.includesTransitionKernelTerms === null ||
+      typeof switchingSchedule.includesTransitionKernelTerms === "boolean") &&
+    isNullableNumber(switchingSchedule.toleranceLInf) &&
+    isNullableNumber(switchingSchedule.overallResidualLInf) &&
+    Array.isArray(switchingSchedule.terms) &&
+    switchingSchedule.terms.every(isSwitchingTerm) &&
     isStatus(switchingSchedule.conservationStatus) &&
     isStringArray(switchingSchedule.blockers) &&
     timeAveraging != null &&

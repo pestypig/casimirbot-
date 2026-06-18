@@ -246,6 +246,8 @@
     "nhm2:build-coupled-closure-pass-candidate": "tsx tools/nhm2/build-coupled-closure-pass-candidate.ts",
     "nhm2:build-regional-tensor-pass-path-harness": "tsx tools/nhm2/build-regional-tensor-pass-path-harness.ts",
     "nhm2:build-time-dependent-source-campaign": "tsx tools/nhm2/build-time-dependent-source-campaign.ts",
+    "nhm2:build-switching-covariant-conservation-evidence": "tsx tools/nhm2/build-switching-covariant-conservation-evidence.ts",
+    "nhm2:build-frequency-convergence-evidence": "tsx tools/nhm2/build-frequency-convergence-evidence.ts",
     "nhm2:build-reference-run-blocker-ledger": "tsx tools/nhm2/build-reference-run-blocker-ledger.ts",
     "nhm2:build-full-solve-claim-admission": "tsx tools/nhm2/build-full-solve-claim-admission.ts",
     "nhm2:render-reference-run-blocker-ledger": "tsx tools/nhm2/render-reference-run-blocker-ledger.ts",

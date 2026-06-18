@@ -53,11 +53,15 @@ import {
   WORKSTATION_NARRATOR_BIND_STREAM_REQUEST_SCHEMA,
   WORKSTATION_NARRATOR_SAY_REQUEST_SCHEMA,
   normalizeAgentGoalActuatorV1,
+  validateNarratorBindStreamRequestV1,
+  validateNarratorSayRequestV1,
   type AgentGoalActuatorV1,
   type AgentGoalContextFeedKindV1,
   type AgentGoalSessionV1,
   type GoalContextProducerKindV1,
   type GoalContextUpdateKindV1,
+  type NarratorBindStreamRequestV1,
+  type NarratorSayRequestV1,
   type WorkstationDispatchActionV1,
   type WorkstationGoalContextUpdateV1,
 } from "@shared/contracts/workstation-goal-context.v1";
@@ -3214,43 +3218,59 @@ export function executeLiveEnvironmentTool(
       context_role: "tool_evidence",
       ask_context_policy: "evidence_only",
     };
+    const narratorPayload = narratorKind === "say"
+      ? {
+          schema: WORKSTATION_NARRATOR_SAY_REQUEST_SCHEMA,
+          schemaVersion: WORKSTATION_NARRATOR_SAY_REQUEST_SCHEMA,
+          ...common,
+          text: text ?? "",
+          sourceKind,
+          source_kind: sourceKind,
+          sourceId: sourceRef ?? "helix_ask:narrator.say",
+          source_id: sourceRef ?? "helix_ask:narrator.say",
+          priority: narratorRequestPriority(args.priority),
+          language: readString(args.language) ?? undefined,
+          dedupeKey: readString(args.dedupe_key ?? args.dedupeKey) ?? undefined,
+        }
+      : {
+          schema: WORKSTATION_NARRATOR_BIND_STREAM_REQUEST_SCHEMA,
+          schemaVersion: WORKSTATION_NARRATOR_BIND_STREAM_REQUEST_SCHEMA,
+          ...common,
+          streamKind,
+          stream_kind: streamKind,
+          presetId: readString(args.preset_id ?? args.presetId) ?? null,
+          preset_id: readString(args.preset_id ?? args.presetId) ?? null,
+          voicePolicy: narratorVoicePolicy(args.voice_policy ?? args.voicePolicy),
+          voice_policy: narratorVoicePolicy(args.voice_policy ?? args.voicePolicy),
+          evidenceThreshold: readString(args.evidence_threshold ?? args.evidenceThreshold) ?? undefined,
+          evidence_threshold: readString(args.evidence_threshold ?? args.evidenceThreshold) ?? undefined,
+        };
+    const contractValidationIssues = narratorKind === "say"
+      ? validateNarratorSayRequestV1(narratorPayload as NarratorSayRequestV1)
+      : validateNarratorBindStreamRequestV1(narratorPayload as NarratorBindStreamRequestV1);
+    const contractValid = contractValidationIssues.length === 0;
+    const resultOk = ok && contractValid;
+    const finalPayload = {
+      ...narratorPayload,
+      status: resultOk ? "prepared" : "blocked",
+      contractValid,
+      contract_valid: contractValid,
+      contractValidationIssues,
+      contract_validation_issues: contractValidationIssues,
+    };
     return makeObservation({
       threadId: input.thread_id,
       environmentId,
       toolName: input.tool_name,
-      ok,
-      summary: ok
+      ok: resultOk,
+      summary: resultOk
         ? narratorKind === "say"
           ? "Prepared narrator say request as non-terminal tool evidence."
           : "Prepared narrator stream binding request as non-terminal tool evidence."
-        : `Cannot prepare narrator ${narratorKind} request; missing ${effectiveMissingRequirements.join(", ")}.`,
-      observation: narratorKind === "say"
-        ? {
-            schema: WORKSTATION_NARRATOR_SAY_REQUEST_SCHEMA,
-            schemaVersion: WORKSTATION_NARRATOR_SAY_REQUEST_SCHEMA,
-            ...common,
-            text: text ?? "",
-            sourceKind,
-            source_kind: sourceKind,
-            sourceId: sourceRef ?? "helix_ask:narrator.say",
-            source_id: sourceRef ?? "helix_ask:narrator.say",
-            priority: narratorRequestPriority(args.priority),
-            language: readString(args.language) ?? undefined,
-            dedupeKey: readString(args.dedupe_key ?? args.dedupeKey) ?? undefined,
-          }
-        : {
-            schema: WORKSTATION_NARRATOR_BIND_STREAM_REQUEST_SCHEMA,
-            schemaVersion: WORKSTATION_NARRATOR_BIND_STREAM_REQUEST_SCHEMA,
-            ...common,
-            streamKind,
-            stream_kind: streamKind,
-            presetId: readString(args.preset_id ?? args.presetId) ?? null,
-            preset_id: readString(args.preset_id ?? args.presetId) ?? null,
-            voicePolicy: narratorVoicePolicy(args.voice_policy ?? args.voicePolicy),
-            voice_policy: narratorVoicePolicy(args.voice_policy ?? args.voicePolicy),
-            evidenceThreshold: readString(args.evidence_threshold ?? args.evidenceThreshold) ?? undefined,
-            evidence_threshold: readString(args.evidence_threshold ?? args.evidenceThreshold) ?? undefined,
-          },
+        : !ok
+          ? `Cannot prepare narrator ${narratorKind} request; missing ${effectiveMissingRequirements.join(", ")}.`
+          : `Cannot prepare narrator ${narratorKind} request; contract validation failed: ${contractValidationIssues.join("; ")}.`,
+      observation: finalPayload,
       evidenceRefs: uniqueStrings([goalContextUpdateId, requestId, ...evidenceRefs]),
       producedRefs: [requestId, goalContextUpdateId],
       forceNormalizedRefs: true,
