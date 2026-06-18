@@ -2556,6 +2556,17 @@ const stagePlayDispatchTone = (action: WorkstationDispatchActionV1): "default" |
   return "default";
 };
 
+const isStagePlayWorkstationControlDispatch = (action: WorkstationDispatchActionV1): boolean =>
+  action.kind === "change_preset" ||
+  action.kind === "bind_source" ||
+  action.kind === "unbind_source" ||
+  action.kind === "set_loop_state" ||
+  action.kind === "repair_loop" ||
+  action.kind === "update_live_answer" ||
+  action.kind === "focus_process_graph" ||
+  action.kind === "speak_narrator" ||
+  action.kind === "bind_narrator_stream";
+
 const stagePlayTrafficStatusClass = (status: StagePlayPacketTrafficStationStatus): string => {
   if (status === "complete") return "border-emerald-800/60 bg-emerald-950/20 text-emerald-100";
   if (status === "running") return "border-cyan-600/70 bg-cyan-950/25 text-cyan-100";
