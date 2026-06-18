@@ -25,6 +25,7 @@ import { resetStagePlayVisualObserverProfileStoreForTest } from "../services/sta
 import {
   listStagePlayAgentGoalSessions,
   listStagePlayGoalContextUpdates,
+  recordStagePlayGoalContextUpdate,
   resetStagePlayGoalContextStoreForTest,
 } from "../services/stage-play/stage-play-goal-context-store";
 import {
@@ -2586,7 +2587,7 @@ describe("live-source mail live environment tools", () => {
       feedKind: "visual_summaries",
       sourceRef: sourceId,
       goalId: null,
-      updateCount: 2,
+      updateCount: 1,
       policyEvidenceRefs: expect.arrayContaining([
         "context_feed:visual_summaries",
         "allowed_actuator:query_visual_summaries",
@@ -2600,8 +2601,8 @@ describe("live-source mail live environment tools", () => {
     });
     expect(queryPayload.authoritySummary).toMatchObject({
       schema: "helix.workstation_goal_context_authority_summary.v1",
-      updateCount: 2,
-      observationOnlyUpdateCount: 2,
+      updateCount: 1,
+      observationOnlyUpdateCount: 1,
       assistantAnswerCount: 0,
       terminalEligibleCount: 0,
       rawContentIncludedCount: 0,
@@ -2613,18 +2614,6 @@ describe("live-source mail live environment tools", () => {
       raw_content_included: false,
     });
     expect(queryPayload.goalContextUpdates[0]).toMatchObject({
-      producerKind: "microdeck",
-      updateKind: "visual_observation",
-      contentRef: processPayload.packets[0].packetId,
-      sourceRefs: expect.arrayContaining([sourceId]),
-      authority: {
-        assistantAnswer: false,
-        terminalEligible: false,
-        rawContentIncluded: false,
-        postToolModelStepRequired: true,
-      },
-    });
-    expect(queryPayload.goalContextUpdates[1]).toMatchObject({
       producerKind: "visual_capture",
       updateKind: "visual_observation",
       contentRef: expect.stringMatching(/^stage_play_live_source_mail:/),
@@ -2660,7 +2649,97 @@ describe("live-source mail live environment tools", () => {
       queryPayload.goalContextUpdateId,
       queryPayload.resultId,
       queryPayload.goalContextUpdates[0].updateId,
-      queryPayload.goalContextUpdates[1].updateId,
+    ]));
+    expect(queryPayload.goalContextUpdates.some((update: any) => update.producerKind === "microdeck")).toBe(false);
+  });
+
+  it("queries MicroDeck outputs through a feed-specific non-terminal tool result", () => {
+    seedVisualSummaryText("ImageLens visual summary: frog sitting on a green leaf.", "microdeck-feed");
+
+    const processObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.process_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        source_kind: "visual_frame",
+      },
+    });
+    const processPayload = processObservation.observation as any;
+
+    const queryObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_microdeck_outputs",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        source_kind: "visual_frame",
+      },
+    });
+
+    const queryPayload = queryObservation.observation as any;
+    expect(queryObservation).toMatchObject({
+      schema: "helix.live_environment_tool_observation.v1",
+      tool_name: "live_env.query_microdeck_outputs",
+      ok: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(queryPayload).toMatchObject({
+      schema: "stage_play_workstation_context_feed_query_result/v1",
+      contractValid: true,
+      contractValidationIssues: [],
+      feedKind: "microdeck_outputs",
+      sourceRef: sourceId,
+      policyEvidenceRefs: expect.arrayContaining([
+        "context_feed:microdeck_outputs",
+        "allowed_actuator:query_microdeck_outputs",
+      ]),
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(queryPayload.updateCount).toBe(queryPayload.goalContextUpdates.length);
+    expect(queryPayload.goalContextUpdates.length).toBeGreaterThanOrEqual(1);
+    expect(queryPayload.goalContextUpdates.every((update: any) =>
+      update.authority?.assistantAnswer === false &&
+      update.authority?.terminalEligible === false &&
+      update.authority?.rawContentIncluded === false &&
+      update.authority?.postToolModelStepRequired === true
+    )).toBe(true);
+    const packetMicrodeckUpdate = queryPayload.goalContextUpdates.find((update: any) =>
+      update.producerKind === "microdeck" &&
+      update.updateKind === "visual_observation" &&
+      update.contentRef === processPayload.packets[0].packetId
+    );
+    expect(packetMicrodeckUpdate).toMatchObject({
+      producerKind: "microdeck",
+      updateKind: "visual_observation",
+      contentRef: processPayload.packets[0].packetId,
+      sourceRefs: expect.arrayContaining([sourceId]),
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    expect(queryPayload.goalContextUpdateId).toMatch(/^stage_play_goal_context_update:route_watch:/);
+    expect(queryObservation.producedRefs).toEqual(expect.arrayContaining([
+      queryPayload.goalContextUpdateId,
+      queryPayload.resultId,
+      packetMicrodeckUpdate.updateId,
+    ]));
+    expect(queryObservation.evidence_refs).toEqual(expect.arrayContaining([
+      processPayload.packets[0].packetId,
+      "context_feed:microdeck_outputs",
+      "allowed_actuator:query_microdeck_outputs",
     ]));
   });
 
@@ -2729,8 +2808,9 @@ describe("live-source mail live environment tools", () => {
       raw_content_included: false,
     });
     expect(queryPayload.agentGoalSession.checkpoints.length).toBe(startingCheckpointCount + 1);
+    const expectedSummary = `Queried visual summaries feed and read ${queryPayload.goalContextUpdates.length} update(s) for this goal session.`;
     expect(queryPayload.agentGoalSession.checkpoints.at(-1)).toMatchObject({
-      summary: "Queried visual summaries feed and read 2 update(s) for this goal session.",
+      summary: expectedSummary,
       actionsTaken: expect.arrayContaining([
         "query_visual_summaries",
         "live_env.query_visual_summaries",
@@ -2753,7 +2833,7 @@ describe("live-source mail live environment tools", () => {
       limit: 1,
     })[0];
     expect(storedSession?.checkpoints.length).toBe(startingCheckpointCount + 1);
-    expect(storedSession?.checkpoints.at(-1)?.summary).toBe("Queried visual summaries feed and read 2 update(s) for this goal session.");
+    expect(storedSession?.checkpoints.at(-1)?.summary).toBe(expectedSummary);
     expect(queryObservation.producedRefs).toEqual(expect.arrayContaining([
       queryPayload.goalContextUpdateId,
       queryPayload.resultId,
@@ -3146,6 +3226,14 @@ describe("live-source mail live environment tools", () => {
       targetRef: "source:visual:active",
       presetId: "preset:frog-classifier",
       policyEvidenceRefs: ["allowed_actuator:change_preset"],
+      sourceRefs: expect.arrayContaining([sourceId, "source:visual:active"]),
+      loopRefs: expect.arrayContaining(["workstation_control:change_preset", "workstation_actuator:change_preset"]),
+      evidenceRefs: expect.arrayContaining([
+        "allowed_actuator:change_preset",
+        sourceId,
+        "source:visual:active",
+      ]),
+      producedRefs: expect.arrayContaining([payload.receiptId, payload.goalContextUpdateId]),
       contractValid: true,
       contractValidationIssues: [],
       terminalAuthority: {
@@ -3189,6 +3277,13 @@ describe("live-source mail live environment tools", () => {
       expect.objectContaining({ kind: "change_preset", targetRef: "source:visual:active", presetId: "preset:frog-classifier" }),
     ]));
     expect(observation.producedRefs).toEqual(expect.arrayContaining([payload.receiptId, payload.goalContextUpdateId]));
+    expect(observation.evidence_refs).toEqual(expect.arrayContaining([
+      payload.goalContextUpdateId,
+      payload.receiptId,
+      "allowed_actuator:change_preset",
+      sourceId,
+      "source:visual:active",
+    ]));
   });
 
   it("allows visual preset changes through a modality-specific goal actuator", () => {
@@ -3291,6 +3386,107 @@ describe("live-source mail live environment tools", () => {
     });
   });
 
+  it("allows audio preset changes through a modality-specific goal actuator", () => {
+    const sessionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: "source:browser-audio",
+        goal_id: "goal:audio-preset-only",
+        objective: "Route earbud translation packets through an audio preset.",
+        allowed_actuators: ["set_audio_preset", "query_translation_segments"],
+      },
+    });
+    expect(sessionObservation.ok).toBe(true);
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.change_workstation_preset",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: "source:browser-audio",
+        goal_id: "goal:audio-preset-only",
+        target_ref: "source:audio:active",
+        preset_id: "preset:earbud-translation",
+        reason: "Apply the audio translation preset for the earbud stream.",
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation).toMatchObject({
+      tool_name: "live_env.change_workstation_preset",
+      ok: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schema: "stage_play_workstation_control_receipt/v1",
+      controlKind: "change_preset",
+      status: "prepared",
+      goalId: "goal:audio-preset-only",
+      goalSessionFound: true,
+      requiredActuator: "change_preset",
+      actuatorAllowed: true,
+      targetRef: "source:audio:active",
+      presetId: "preset:earbud-translation",
+      contractValid: true,
+      contractValidationIssues: [],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(payload.policyEvidenceRefs).toEqual(expect.arrayContaining([
+      "allowed_actuator:change_preset",
+      "allowed_actuator:set_audio_preset",
+    ]));
+    expect(payload.policyEvidenceRefs).not.toContain("allowed_actuator:set_visual_preset");
+    expect(payload.missingRequirements).toEqual([]);
+    expect(payload.dispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "change_preset", targetRef: "source:audio:active", presetId: "preset:earbud-translation" }),
+    ]));
+    expect(payload.agentGoalSession.checkpoints.at(-1)).toMatchObject({
+      actionsTaken: expect.arrayContaining([
+        "change_preset",
+        "set_audio_preset",
+        "live_env.change_workstation_preset",
+      ]),
+    });
+
+    const updates = listStagePlayGoalContextUpdates({
+      threadId,
+      producerKind: "route_watch",
+      updateKind: "suggested_action",
+    });
+    const controlUpdate = updates.find((update) => update.updateId === payload.goalContextUpdateId);
+    expect(controlUpdate).toMatchObject({
+      contentRef: payload.receiptId,
+      evidenceRefs: expect.arrayContaining([
+        "allowed_actuator:change_preset",
+        "allowed_actuator:set_audio_preset",
+      ]),
+      loopRefs: expect.arrayContaining([
+        "workstation_actuator:change_preset",
+        "workstation_actuator:set_audio_preset",
+      ]),
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+  });
+
   it("records Live Answer projection controls as queryable Live Answer goal context", () => {
     const liveAnswerSourceId = "visual_source:live-answer-projection-control";
     const { environment } = createLiveAnswerEnvironment({
@@ -3379,6 +3575,38 @@ describe("live-source mail live environment tools", () => {
         postToolModelStepRequired: true,
       },
     });
+    const routeWatchUpdate = recordStagePlayGoalContextUpdate({
+      schemaVersion: "helix.workstation_goal_context_update.v1",
+      updateId: "stage_play_goal_context_update:route-watch:live-answer-leak-guard",
+      createdAtMs: Date.parse("2026-06-17T16:00:00.000Z"),
+      sourceRefs: [liveAnswerSourceId],
+      loopRefs: ["workstation_context_feed:route_evidence", "workstation_actuator:query_route_evidence"],
+      producerKind: "route_watch",
+      updateKind: "route_evidence",
+      contentRef: "route_watch_evidence:live-answer-leak-guard",
+      preview: "Route-watch evidence for the same source must not appear in the Live Answer state feed.",
+      evidenceRefs: ["route_watch_evidence:live-answer-leak-guard", liveAnswerSourceId],
+      receiptRefs: ["route_watch_evidence:live-answer-leak-guard"],
+      freshness: {
+        observedAtMs: Date.parse("2026-06-17T16:00:00.000Z"),
+        staleAfterMs: 60_000,
+        status: "fresh",
+      },
+      goalRelevance: null,
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: "route_watch_evidence:live-answer-leak-guard" },
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+      ],
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
 
     const queryObservation = executeLiveEnvironmentTool({
       tool_name: "live_env.query_live_answer_state",
@@ -3411,6 +3639,7 @@ describe("live-source mail live environment tools", () => {
         postToolModelStepRequired: true,
       },
     });
+    expect(queryPayload.goalContextUpdates.map((update: any) => update.updateId)).not.toContain(routeWatchUpdate.updateId);
   });
 
   it("blocks workstation controls that are outside an explicit goal session actuator policy", () => {
@@ -3549,6 +3778,152 @@ describe("live-source mail live environment tools", () => {
     expect(updates).toHaveLength(1);
     expect(updates[0].freshness.status).toBe("blocked");
     expect(updates[0].suggestedDispatch.map((action) => action.kind)).not.toContain("bind_source");
+  });
+
+  it("blocks source binding controls without a source endpoint", () => {
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.bind_workstation_source",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        target_ref: "live-answer:audio",
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation.ok).toBe(false);
+    expect(observation).toMatchObject({
+      tool_name: "live_env.bind_workstation_source",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schema: "stage_play_workstation_control_receipt/v1",
+      controlKind: "bind_source",
+      status: "blocked",
+      missingRequirements: ["source_ref"],
+      sourceRef: null,
+      targetRef: "live-answer:audio",
+      contractValid: true,
+      contractValidationIssues: [],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    const updates = listStagePlayGoalContextUpdates({
+      threadId,
+      producerKind: "route_watch",
+      updateKind: "suggested_action",
+    });
+    expect(updates).toHaveLength(1);
+    expect(updates[0].freshness.status).toBe("blocked");
+    expect(updates[0].suggestedDispatch.map((action) => action.kind)).not.toContain("bind_source");
+  });
+
+  it("prepares source binding as a non-terminal goal-session control", () => {
+    const session = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        goal_id: "goal:source-binding-control",
+        objective: "Let the agent bind the visual source into the Live Answer lane.",
+        allowed_actuators: ["bind_source", "query_source_health"],
+      },
+    });
+    expect(session.ok).toBe(true);
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.bind_workstation_source",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        goal_id: "goal:source-binding-control",
+        source_ref: "source:visual:active",
+        target_ref: "live-answer:visual",
+        reason: "Attach the visual source to Live Answer for this goal.",
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation).toMatchObject({
+      tool_name: "live_env.bind_workstation_source",
+      ok: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schema: "stage_play_workstation_control_receipt/v1",
+      controlKind: "bind_source",
+      status: "prepared",
+      goalId: "goal:source-binding-control",
+      requiredActuator: "bind_source",
+      actuatorAllowed: true,
+      policyEvidenceRefs: ["allowed_actuator:bind_source"],
+      sourceRef: "source:visual:active",
+      targetRef: "live-answer:visual",
+      contractValid: true,
+      contractValidationIssues: [],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(payload.dispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "log_receipt", receiptRef: payload.receiptId }),
+      expect.objectContaining({ kind: "update_panel", panelId: "live-answer-environment" }),
+      expect.objectContaining({ kind: "bind_source", sourceRef: "source:visual:active", targetRef: "live-answer:visual" }),
+    ]));
+    expect(payload.agentGoalSession.checkpoints.at(-1)).toMatchObject({
+      summary: "Prepared bind workstation source control dispatch for this goal session.",
+      actionsTaken: expect.arrayContaining(["bind_source", "live_env.bind_workstation_source"]),
+      evidenceRefs: expect.arrayContaining([payload.goalContextUpdateId, payload.receiptId]),
+      nextStep: "continue",
+    });
+
+    const updates = listStagePlayGoalContextUpdates({
+      threadId,
+      producerKind: "route_watch",
+      updateKind: "suggested_action",
+    });
+    const bindUpdate = updates.find((update) => update.updateId === payload.goalContextUpdateId);
+    expect(bindUpdate).toMatchObject({
+      contentRef: payload.receiptId,
+      sourceRefs: expect.arrayContaining(["source:visual:active", "live-answer:visual"]),
+      evidenceRefs: expect.arrayContaining(["allowed_actuator:bind_source"]),
+      loopRefs: expect.arrayContaining(["workstation_control:bind_source", "workstation_actuator:bind_source"]),
+      freshness: expect.objectContaining({ status: "fresh" }),
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    expect(bindUpdate?.suggestedDispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "bind_source", sourceRef: "source:visual:active", targetRef: "live-answer:visual" }),
+    ]));
   });
 
   it("prepares source unbinding and process-graph focus as non-terminal goal-session controls", () => {
@@ -3734,6 +4109,86 @@ describe("live-source mail live environment tools", () => {
     expect(storedSession?.checkpoints.at(-1)).toMatchObject({
       actionsTaken: expect.arrayContaining(["focus_process_graph", "live_env.focus_process_graph"]),
     });
+  });
+
+  it("blocks process-graph focus controls without a target node", () => {
+    const session = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        goal_id: "goal:focus-requires-node",
+        objective: "Let the agent inspect a specific packet node in the process graph.",
+        allowed_actuators: ["focus_process_graph"],
+      },
+    });
+    expect(session.ok).toBe(true);
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.focus_process_graph",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        goal_id: "goal:focus-requires-node",
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation).toMatchObject({
+      tool_name: "live_env.focus_process_graph",
+      ok: false,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schema: "stage_play_workstation_control_receipt/v1",
+      controlKind: "focus_process_graph",
+      status: "blocked",
+      goalId: "goal:focus-requires-node",
+      requiredActuator: "focus_process_graph",
+      actuatorAllowed: true,
+      missingRequirements: ["node_ref"],
+      nodeRef: null,
+      contractValid: true,
+      contractValidationIssues: [],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(payload.dispatch.map((action: any) => action.kind)).not.toContain("focus_process_graph");
+    expect(payload.suggestedDispatch.map((action: any) => action.kind)).not.toContain("focus_process_graph");
+
+    const updates = listStagePlayGoalContextUpdates({
+      threadId,
+      producerKind: "route_watch",
+      updateKind: "suggested_action",
+    });
+    const focusUpdate = updates.find((update) => update.updateId === payload.goalContextUpdateId);
+    expect(focusUpdate).toMatchObject({
+      contentRef: payload.receiptId,
+      freshness: expect.objectContaining({ status: "blocked" }),
+      evidenceRefs: expect.arrayContaining(["allowed_actuator:focus_process_graph"]),
+      loopRefs: expect.arrayContaining(["workstation_actuator:focus_process_graph"]),
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    expect(focusUpdate?.suggestedDispatch.map((action) => action.kind)).not.toContain("focus_process_graph");
   });
 
   it("governs loop state controls with state-specific goal actuators and a generic override", () => {
@@ -4018,6 +4473,13 @@ describe("live-source mail live environment tools", () => {
       sourceId: "helix_ask:translation",
       deliveryMode: "confirm_to_speak",
       policyEvidenceRefs: ["allowed_actuator:narrator_say"],
+      sourceRefs: expect.arrayContaining(["helix_ask:translation", "helix_console"]),
+      loopRefs: expect.arrayContaining(["narrator:say", "workstation_actuator:narrator_say"]),
+      evidenceRefs: expect.arrayContaining([
+        "translation_segment:latest",
+        "allowed_actuator:narrator_say",
+      ]),
+      producedRefs: expect.arrayContaining([payload.requestId, payload.goalContextUpdateId]),
       post_tool_model_step_required: true,
       contractValid: true,
       contractValidationIssues: [],
@@ -4036,6 +4498,8 @@ describe("live-source mail live environment tools", () => {
       expect.objectContaining({ kind: "update_panel", panelId: "narrator" }),
       expect.objectContaining({ kind: "speak_narrator", mode: "confirm" }),
     ]));
+    expect(payload.evidenceRefs).toContain(payload.requestId);
+    expect(observation.producedRefs).toEqual(expect.arrayContaining([payload.requestId, payload.goalContextUpdateId]));
     const updates = listStagePlayGoalContextUpdates({
       threadId,
       producerKind: "narrator",
@@ -4182,6 +4646,14 @@ describe("live-source mail live environment tools", () => {
       schema: "helix.narrator_bind_stream_request.v1",
       streamKind: "translated_transcript",
       sourceRef: "source:browser-audio",
+      sourceRefs: expect.arrayContaining(["source:browser-audio", "translated_transcript"]),
+      loopRefs: expect.arrayContaining(["narrator:bind_stream", "workstation_actuator:narrator_bind_stream"]),
+      evidenceRefs: expect.arrayContaining([
+        preparedPayload.requestId,
+        "source:browser-audio",
+        "allowed_actuator:narrator_bind_stream",
+      ]),
+      producedRefs: expect.arrayContaining([preparedPayload.requestId, preparedPayload.goalContextUpdateId]),
       deliveryMode: "visible_only",
       voicePolicy: "confirm_speak_required",
       policyEvidenceRefs: ["allowed_actuator:narrator_bind_stream"],
@@ -4446,7 +4918,16 @@ describe("live-source mail live environment tools", () => {
       "log_receipt",
       "update_panel",
     ]));
-    expect(observation.producedRefs).toEqual([payload.goalContextUpdateId]);
+    expect(observation.evidence_refs).toEqual(expect.arrayContaining([
+      payload.goalContextUpdateId,
+      payload.resultId,
+      "context_feed:source_health",
+      "allowed_actuator:query_source_health",
+    ]));
+    expect(observation.producedRefs).toEqual(expect.arrayContaining([
+      payload.goalContextUpdateId,
+      payload.resultId,
+    ]));
   });
 
   it("appends agent goal session checkpoints when querying allowed source health", () => {
@@ -4514,8 +4995,18 @@ describe("live-source mail live environment tools", () => {
     expect(payload.agentGoalSession.checkpoints.at(-1)).toMatchObject({
       summary: expect.stringMatching(/^Queried source health and read \d+ capability state\(s\) for this goal session\.$/),
       actionsTaken: expect.arrayContaining(["query_source_health", "live_env.query_source_health"]),
-      evidenceRefs: expect.arrayContaining([payload.goalContextUpdateId, "context_feed:source_health", "allowed_actuator:query_source_health"]),
+      evidenceRefs: expect.arrayContaining([payload.goalContextUpdateId, payload.resultId, "context_feed:source_health", "allowed_actuator:query_source_health"]),
     });
+    expect(observation.evidence_refs).toEqual(expect.arrayContaining([
+      payload.goalContextUpdateId,
+      payload.resultId,
+      "context_feed:source_health",
+      "allowed_actuator:query_source_health",
+    ]));
+    expect(observation.producedRefs).toEqual(expect.arrayContaining([
+      payload.goalContextUpdateId,
+      payload.resultId,
+    ]));
 
     const storedSession = listStagePlayAgentGoalSessions({
       threadId,
@@ -4606,6 +5097,16 @@ describe("live-source mail live environment tools", () => {
       },
     });
     expect(sourceHealthUpdate?.suggestedDispatch.map((action) => action.kind)).not.toContain("repair_loop");
+    expect(observation.evidence_refs).toEqual(expect.arrayContaining([
+      payload.goalContextUpdateId,
+      payload.resultId,
+      "context_feed:source_health",
+      "allowed_actuator:query_source_health",
+    ]));
+    expect(observation.producedRefs).toEqual(expect.arrayContaining([
+      payload.goalContextUpdateId,
+      payload.resultId,
+    ]));
   });
 
   it("records current live-source state queries as Live Answer goal-context updates", () => {

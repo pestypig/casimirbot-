@@ -161,6 +161,41 @@ describe("NHM2 regional material source tensor model", () => {
     expect(counterpart.regions.find((region) => region.regionId === "global")?.status).toBe("pass");
     expect(authority.summary.hasWallAuthority).toBe(true);
     expect(authority.summary.allRequiredRegionsAuthoritative).toBe(true);
+    expect(
+      regionalModel.regions.find((region) => region.regionId === "wall")
+        ?.componentAuthority.T13,
+    ).toBe("constitutive_model");
+  });
+
+  it("keeps declared research tensors at source-model authority even with a Lifshitz receipt", () => {
+    const receipt = materialReceipt();
+    const regionalModel = buildRegionalMaterialSourceTensorModel({
+      generatedAt,
+      materialReceipt: receipt,
+      materialReceiptRef: "receipt.json",
+      componentModel: {
+        modelKind: "declared_research_tensor",
+        selectedProfileId: profile,
+        regions: {
+          global: componentRegion(symmetricTensor(5.8e7)),
+          hull: componentRegion(symmetricTensor(7.3e8)),
+          wall: componentRegion(symmetricTensor(1.7e9)),
+          exterior_shell: componentRegion(symmetricTensor(1.69e9)),
+        },
+      },
+    });
+    const wall = regionalModel.regions.find((region) => region.regionId === "wall");
+
+    expect(regionalModel.materialReceiptTier).toBe("lifshitz_material_receipt");
+    expect(regionalModel.summary.allRequiredRegionsMaterialReceipted).toBe(true);
+    expect(regionalModel.summary.allRequiredRegionsComponentAuthoritative).toBe(true);
+    expect(wall?.materialReceiptStatus).toBe("material_receipted");
+    expect(wall?.componentAuthority.T00).toBe("source_model");
+    expect(wall?.componentAuthority.T13).toBe("source_model");
+    expect(wall?.componentAuthority.T13).not.toBe("constitutive_model");
+    expect(wall?.warnings).toContain(
+      "declared_research_tensor_material_receipt_is_qc_only",
+    );
   });
 
   it("does not let a wall-only regional tensor become global source authority", () => {

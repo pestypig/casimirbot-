@@ -257,6 +257,7 @@ const buildDispatchActions = (input: {
   if (interruptReason) {
     dispatch.push({
       kind: "wake_agent",
+      interruptKind: interruptReason.includes("blocked") || interruptReason.includes("deferred") ? "blocked" : "urgent",
       reason: interruptReason,
     });
   }
@@ -613,6 +614,30 @@ export function syncStagePlayGoalContextFromMailbox(input: {
         updateKind: "transcript_window",
         contentRef: packet.packetId,
         preview: previewText(`Transcript packet processed before downstream deck output: ${packetPreview}`),
+        evidenceRefs: packetEvidenceRefs,
+        receiptRefs: packetReceiptRefs,
+        freshness: packetFreshness,
+        goalRelevance: packetGoalRelevance,
+        suggestedDispatch: packetDispatch,
+        authority: {
+          assistantAnswer: false,
+          terminalEligible: false,
+          rawContentIncluded: false,
+          postToolModelStepRequired: true,
+        },
+      });
+    }
+    if (packet.microReasonerRunRefs.length > 0 && packetProducer !== "microdeck") {
+      recordStagePlayGoalContextUpdate({
+        schemaVersion: WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
+        updateId: `stage_play_goal_context_update:microdeck:${hashShort([input.threadId, packet.packetId, packet.microReasonerRunRefs, packet.createdAt], 18)}`,
+        createdAtMs: nowMs,
+        sourceRefs,
+        loopRefs: uniqueStrings([...loopRefs, "microdeck_output_loop"]),
+        producerKind: "microdeck",
+        updateKind: packetUpdateKind,
+        contentRef: packet.packetId,
+        preview: previewText(`MicroDeck output available for packet trace: ${packetPreview}`),
         evidenceRefs: packetEvidenceRefs,
         receiptRefs: packetReceiptRefs,
         freshness: packetFreshness,

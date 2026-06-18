@@ -83,6 +83,18 @@ const deliveryModes = new Set<string>(NARRATOR_DELIVERY_MODES);
 const authorities = new Set<string>(NARRATOR_AUTHORITIES);
 const certainties = new Set<string>(["low", "medium", "high"]);
 
+const stringArrayIssues = (value: unknown, field: string, options: { requireNonEmpty?: boolean } = {}): string[] => {
+  if (!Array.isArray(value)) return [`${field} must be an array`];
+  const issues: string[] = [];
+  if (options.requireNonEmpty && value.length === 0) issues.push(`${field} must include at least one reference`);
+  value.forEach((entry, index) => {
+    if (typeof entry !== "string" || entry.trim().length === 0) {
+      issues.push(`${field}[${index}] must be a non-empty string`);
+    }
+  });
+  return issues;
+};
+
 export function validateNarratorEventV1(value: NarratorEventV1): string[] {
   const issues: string[] = [];
   if (value.schemaVersion !== NARRATOR_EVENT_SCHEMA) issues.push("schemaVersion must match narrator event schema");
@@ -91,7 +103,7 @@ export function validateNarratorEventV1(value: NarratorEventV1): string[] {
   if (!value.sourceId) issues.push("sourceId is required");
   if (!value.text.trim()) issues.push("text is required");
   if (!authorities.has(value.authority)) issues.push("authority is invalid");
-  if (!Array.isArray(value.evidenceRefs)) issues.push("evidenceRefs must be an array");
+  issues.push(...stringArrayIssues(value.evidenceRefs, "evidenceRefs", { requireNonEmpty: true }));
   if (!deliveryModes.has(value.requestedDeliveryMode)) issues.push("requestedDeliveryMode is invalid");
   if (!deliveryModes.has(value.defaultDeliveryMode)) issues.push("defaultDeliveryMode is invalid");
   if (!value.dedupeKey) issues.push("dedupeKey is required");
@@ -107,6 +119,7 @@ export function validateNarratorEventV1(value: NarratorEventV1): string[] {
   } else {
     if (value.assistant_answer !== false) issues.push("non-final narrator events must not be assistant answers");
     if (value.terminal_eligible !== false) issues.push("non-final narrator events must not be terminal eligible");
+    if (value.rawContentIncluded !== false) issues.push("non-final narrator events must not include raw content");
   }
 
   if (value.authority === "inspection_hint" && value.terminal_eligible !== false) {

@@ -53,9 +53,26 @@ describe("narrator event contract", () => {
       ...event,
       assistant_answer: true,
       terminal_eligible: true,
+      rawContentIncluded: true,
     })).toEqual(expect.arrayContaining([
       "non-final narrator events must not be assistant answers",
       "non-final narrator events must not be terminal eligible",
+      "non-final narrator events must not include raw content",
+    ]));
+  });
+
+  it("requires narrator observations to carry evidence refs", () => {
+    expect(validateNarratorEventV1({
+      ...event,
+      evidenceRefs: [],
+    })).toEqual(expect.arrayContaining([
+      "evidenceRefs must include at least one reference",
+    ]));
+    expect(validateNarratorEventV1({
+      ...event,
+      evidenceRefs: ["valid-ref", ""],
+    })).toEqual(expect.arrayContaining([
+      "evidenceRefs[1] must be a non-empty string",
     ]));
   });
 

@@ -1000,6 +1000,77 @@ describe("Helix Ask workstation tool planner", () => {
     });
   });
 
+  it("assembles goal-session narrator and graph controls before querying the updated circuit", () => {
+    const plan = planWorkstationToolUse(
+      "Start an agent goal session goal_id=goal:translate source_id=source:browser-audio objective=\"Monitor translated transcript output.\" Turn on narrator for the translated transcript stream and focus the process graph node_ref=stage_play_processed_mail_packet:latest.",
+      { threadId: "thread:goal-operator", turnId: "turn:goal-operator" },
+    );
+
+    expect(plan.intent).toBe("workstation_goal_context");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.action).toBeNull();
+    expect(plan.tool_plan?.steps.map((step) => step.tool_id ?? `${step.panel_id}.${step.action_id}`)).toEqual([
+      "live_env.start_agent_goal_session",
+      "live_env.narrator_bind_stream",
+      "live_env.focus_process_graph",
+      "live_env.query_workstation_goal_context",
+      "undefined.undefined",
+    ]);
+    expect(plan.tool_plan?.steps[1]).toMatchObject({
+      step_id: "bind_narrator_stream",
+      kind: "run_ask_tool",
+      tool_id: "live_env.narrator_bind_stream",
+      args: expect.objectContaining({
+        goal_id: "goal:translate",
+        source_ref: "source:browser-audio",
+        stream_kind: "translated_transcript",
+        delivery_mode: "visible_only",
+        voice_policy: "confirm_speak_required",
+      }),
+      depends_on: ["start_agent_goal_session"],
+      expected_receipt_kind: "helix.narrator_bind_stream_request.v1",
+      expected_state_change: {
+        store: "stage-play-goal-context",
+        proof_key: "goalContextUpdates",
+      },
+      required: true,
+    });
+    expect(plan.tool_plan?.steps[2]).toMatchObject({
+      step_id: "focus_process_graph",
+      kind: "run_ask_tool",
+      tool_id: "live_env.focus_process_graph",
+      args: expect.objectContaining({
+        goal_id: "goal:translate",
+        node_ref: "stage_play_processed_mail_packet:latest",
+      }),
+      depends_on: ["start_agent_goal_session"],
+      expected_receipt_kind: "stage_play_workstation_control_receipt",
+      expected_state_change: {
+        store: "stage-play-goal-context",
+        proof_key: "goalContextUpdates",
+      },
+      required: true,
+    });
+    expect(plan.tool_plan?.steps[3]).toMatchObject({
+      step_id: "query_workstation_goal_context",
+      kind: "run_ask_tool",
+      tool_id: "live_env.query_workstation_goal_context",
+      args: expect.objectContaining({
+        goal_id: "goal:translate",
+      }),
+      depends_on: ["start_agent_goal_session", "bind_narrator_stream", "focus_process_graph"],
+      expected_receipt_kind: "stage_play_workstation_goal_context_read_result",
+      required: true,
+    });
+    expect(plan.tool_plan?.steps[4]).toMatchObject({
+      step_id: "evaluate_workstation_goal_context",
+      kind: "evaluate_result",
+      depends_on: ["query_workstation_goal_context"],
+      expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+      required: true,
+    });
+  });
+
   it("routes affirmative live-source watch-job automation setup through route-watch goal context", () => {
     const plan = planWorkstationToolUse(
       'Run live_env.configure_live_source_watch_job goal_id=goal:frog-monitor source_id=source:visual-tab objective="Watch visual frames for frog classification evidence." decision_policy_prompt="Describe each batch and keep route-watch receipts evidence-only."',
@@ -1376,6 +1447,24 @@ describe("Helix Ask workstation tool planner", () => {
         required: true,
       });
     }
+  });
+
+  it("keeps process-graph focus admitted but incomplete when node_ref is missing", () => {
+    const plan = planWorkstationToolUse(
+      "Focus the process graph for the current packet.",
+      { threadId: "thread:workstation-control", turnId: "turn:focus-process-graph-missing-node" },
+    );
+
+    expect(plan.intent).toBe("workstation_control");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.missing_required_args).toEqual(["node_ref"]);
+    expect(plan.tool_plan?.steps[0]).toMatchObject({
+      step_id: "focus_process_graph",
+      kind: "run_ask_tool",
+      tool_id: "live_env.focus_process_graph",
+      expected_receipt_kind: "stage_play_workstation_control_receipt",
+      required: true,
+    });
   });
 
   it("does not execute contextual, negated, or hypothetical workstation control mentions", () => {

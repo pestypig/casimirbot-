@@ -106,6 +106,11 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain("CheckCircle2");
     expect(source).toContain("checked applied");
     expect(source).toContain("} applied");
+    expect(source).toContain("liveAnswerMicroDeckColorKey");
+    expect(source).toContain("liveAnswerMicroDeckSwatch");
+    expect(source).toContain("colorKey:");
+    expect(source).toContain('data-testid="live-answer-microdeck-color-key"');
+    expect(source).toContain("color={item.colorKey}");
     expect(source).toContain("Visual Capture Decks");
     expect(source).toContain("Visual Mail Decks");
     expect(source).toContain("Audio Transcript Decks");
@@ -143,6 +148,7 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain('data-testid="live-answer-goal-context-refs"');
     expect(source).toContain('data-testid="live-answer-goal-context-policy-refs"');
     expect(source).toContain('data-testid="live-answer-goal-context-policy-split"');
+    expect(source).toContain('data-testid="live-answer-goal-context-circuit-route"');
     expect(source).toContain('data-testid="live-answer-goal-context-authority-chips"');
     expect(source).toContain('data-testid="live-answer-goal-context-dispatch"');
     expect(source).toContain('data-testid="live-answer-agent-goal-session"');
@@ -160,6 +166,10 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain("actuatorPolicyRefCount");
     expect(source).toContain("feed_policy_refs");
     expect(source).toContain("actuator_policy_refs");
+    expect(source).toContain("liveAnswerCircuitHops");
+    expect(source).toContain("circuitDestinationLabel");
+    expect(source).toContain("blocked terminal claim");
+    expect(source).toContain("evidence only");
     expect(source).toContain("wake interrupt");
     expect(source).toContain("narrator bind");
     expect(source).toContain("narrator bindings");

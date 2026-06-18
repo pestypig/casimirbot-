@@ -9,6 +9,7 @@ import {
   CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS,
   CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS,
 } from "./codex-parity-agent-spine-contract";
+import { HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION } from "./terminal-rail-failure-reconciliation";
 
 type RecordLike = Record<string, unknown>;
 
@@ -96,6 +97,11 @@ export type HelixApiParityProbeResult = {
   };
   poison_audit_ok: boolean;
   terminal_authority_ok: boolean;
+  terminal_failure_reconciliation_runtime: {
+    available: boolean;
+    version: string | null;
+    current: boolean;
+  };
   rail_table: HelixApiParityRailTableSummary;
   solver_continuation_count?: number;
   solver_continuation_observation?: {
@@ -210,6 +216,11 @@ const readPoisonAudit = (ask: RecordLike, debug: RecordLike | null): RecordLike 
 
 const readTerminalAuthority = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
   readRecord(ask.terminal_answer_authority) ?? readRecord(debug?.terminal_answer_authority);
+
+const readTerminalFailureReconciliationRuntime = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
+  readRecord(ask.tool_rail_terminal_failure_reconciliation_runtime) ??
+  readRecord(debug?.tool_rail_terminal_failure_reconciliation_runtime) ??
+  readRecord(getPath(debug, ["debug", "tool_rail_terminal_failure_reconciliation_runtime"]));
 
 const readCapabilitySelectionResult = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
   readRecord(ask.capability_selection_result) ?? readRecord(debug?.capability_selection_result);
@@ -533,6 +544,58 @@ const addCompleteRailEnvelopeFailures = (input: {
   if (!selectedText) input.failures.push("complete_rail_missing_final_answer_text");
 };
 
+const addFailClosedRailEnvelopeFailures = (input: {
+  failures: string[];
+  railTable: RecordLike | null;
+  ask: RecordLike;
+  debug: RecordLike | null;
+}): void => {
+  if (!input.railTable) return;
+  const railComplete =
+    readString(input.railTable.codex_parity_class) === "complete" ||
+    readString(input.railTable.rail_status) === "complete";
+  if (railComplete) return;
+
+  const railStatus = readString(input.railTable.rail_status);
+  const railFailureCode = readString(input.railTable.rail_failure_code);
+  if (railStatus !== "fail_closed" || !railFailureCode) return;
+
+  const terminalErrorCode =
+    readString(input.ask.terminal_error_code) ??
+    readString(input.debug?.terminal_error_code) ??
+    readString(getPath(input.debug, ["resolved_turn_summary", "terminal_error_code"]));
+  const finalStatus = readString(input.ask.final_status) ?? readString(input.debug?.final_status);
+  const responseType = readString(input.ask.response_type) ?? readString(input.debug?.response_type);
+  const finalAnswerSource =
+    readString(input.ask.final_answer_source) ??
+    readString(input.debug?.final_answer_source) ??
+    readString(getPath(input.debug, ["terminal_answer_authority", "final_answer_source"]));
+  const terminalArtifactKind =
+    readString(input.ask.terminal_artifact_kind) ??
+    readString(input.debug?.terminal_artifact_kind) ??
+    readString(getPath(input.debug, ["terminal_answer_authority", "terminal_artifact_kind"]));
+  const selectedText =
+    readString(input.ask.selected_final_answer) ??
+    readString(input.ask.answer) ??
+    readString(input.ask.text) ??
+    readString(input.debug?.selected_final_answer) ??
+    readString(input.debug?.answer) ??
+    "";
+
+  if (!terminalErrorCode) input.failures.push("fail_closed_rail_missing_terminal_error_code");
+  if (finalAnswerSource !== "typed_failure" && terminalArtifactKind !== "typed_failure") {
+    input.failures.push(`fail_closed_rail_not_typed_failure:${finalAnswerSource ?? "missing"}/${terminalArtifactKind ?? "missing"}`);
+  }
+  if ((finalStatus && finalStatus !== "final_failure") || (responseType && responseType !== "final_failure")) {
+    input.failures.push(`fail_closed_rail_non_failure_response:${finalStatus ?? "missing"}/${responseType ?? "missing"}`);
+  }
+  if (!selectedText) input.failures.push("fail_closed_rail_missing_failure_text");
+
+  if (terminalErrorCode === "agent_loop_budget_exhausted" || terminalErrorCode === "max_tool_calls_budget_exhausted") {
+    input.failures.push(`fail_closed_rail_stale_budget_exhaustion:${terminalErrorCode}`);
+  }
+};
+
 const addRailEnvelopeProjectionFailures = (input: {
   failures: string[];
   railTable: RecordLike | null;
@@ -649,6 +712,11 @@ export function buildApiParityProbeResult(input: {
   const routeAuthority = readRouteAuthority(ask, debug);
   const poisonAudit = readPoisonAudit(ask, debug);
   const terminalAuthority = readTerminalAuthority(ask, debug);
+  const terminalFailureReconciliationRuntime = readTerminalFailureReconciliationRuntime(ask, debug);
+  const terminalFailureReconciliationRuntimeVersion = readString(terminalFailureReconciliationRuntime?.version);
+  const terminalFailureReconciliationRuntimeCurrent =
+    terminalFailureReconciliationRuntime?.available === true &&
+    terminalFailureReconciliationRuntimeVersion === HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION;
   const railTable = readRailTable(ask, debug);
   const capabilitySelectionResult = readCapabilitySelectionResult(ask, debug);
   const selectedCapabilities = [
@@ -693,6 +761,13 @@ export function buildApiParityProbeResult(input: {
   const nonStreamTurnId = readString(ask.turn_id) ?? "missing";
 
   if (!debug) failures.push("debug_export_missing");
+  if (!terminalFailureReconciliationRuntime) {
+    failures.push("debug_mirror_stale:tool_rail_terminal_failure_reconciliation_runtime_missing");
+  } else if (!terminalFailureReconciliationRuntimeCurrent) {
+    failures.push(
+      `debug_mirror_stale:tool_rail_terminal_failure_reconciliation_runtime_version:${terminalFailureReconciliationRuntimeVersion ?? "missing"}!=${HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION}`,
+    );
+  }
   addRailTableFailures({
     failures,
     railTable,
@@ -700,6 +775,7 @@ export function buildApiParityProbeResult(input: {
     prompt: input.scenario.prompt,
   });
   addCompleteRailEnvelopeFailures({ failures, railTable, ask, debug });
+  addFailClosedRailEnvelopeFailures({ failures, railTable, ask, debug });
   addRailEnvelopeProjectionFailures({ failures, railTable, terminalArtifactKind });
   if (!solverTrace) failures.push("ask_turn_solver_trace_missing");
   if (solverTrace) {
@@ -786,6 +862,11 @@ export function buildApiParityProbeResult(input: {
     },
     poison_audit_ok: poisonAuditOk,
     terminal_authority_ok: terminalAuthorityOk,
+    terminal_failure_reconciliation_runtime: {
+      available: terminalFailureReconciliationRuntime?.available === true,
+      version: terminalFailureReconciliationRuntimeVersion,
+      current: terminalFailureReconciliationRuntimeCurrent,
+    },
     rail_table: buildRailTableSummary(railTable),
     solver_continuation_count: Number(ask.solver_continuation_count ?? debug?.solver_continuation_count ?? 0),
     solver_continuation_observation: solverContinuation

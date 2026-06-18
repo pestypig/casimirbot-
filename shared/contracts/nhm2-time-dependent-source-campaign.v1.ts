@@ -9,6 +9,7 @@ import type { Nhm2RegionalSupportFunctionAtlasV1 } from "./nhm2-regional-support
 import { getNhm2RegionalSupportFunctionAtlasHash } from "./nhm2-regional-support-function-atlas.v1";
 import type { Nhm2RegionalTensorPassPathHarnessArtifactV1 } from "./nhm2-regional-tensor-pass-path-harness.v1";
 import type { Nhm2SourceComponentAuthorityLedgerArtifactV1 } from "./nhm2-source-component-authority-ledger.v1";
+import type { Nhm2SourceOffDiagonalShearAuditArtifactV1 } from "./nhm2-source-off-diagonal-shear-audit.v1";
 
 export const NHM2_TIME_DEPENDENT_SOURCE_CAMPAIGN_CONTRACT_VERSION =
   "nhm2_time_dependent_source_campaign/v1";
@@ -131,6 +132,7 @@ export type Nhm2CampaignStabilityEvidenceV1 = {
 export type Nhm2TimeDependentSourceCampaignArtifactRefsV1 = {
   sourceComponentAuthorityLedger: string | null;
   regionalFullTensorResidual: string | null;
+  sourceOffDiagonalShearAudit: string | null;
   covariantConservationDiagnostic: string | null;
   qeiWorldlineDossier: string | null;
   observerRobustEnergyConditions: string | null;
@@ -243,6 +245,7 @@ export type BuildNhm2TimeDependentSourceCampaignInput = {
   artifactRefs?: Partial<Nhm2TimeDependentSourceCampaignArtifactRefsV1> | null;
   sourceComponentAuthorityLedger?: Nhm2SourceComponentAuthorityLedgerArtifactV1 | null;
   regionalFullTensorResidual?: Nhm2RegionalFullTensorResidualArtifactV1 | null;
+  sourceOffDiagonalShearAudit?: Nhm2SourceOffDiagonalShearAuditArtifactV1 | null;
   covariantConservationDiagnostic?: Nhm2CovariantConservationDiagnosticArtifactV1 | null;
   qeiWorldlineDossier?: Nhm2QeiWorldlineDossierV1 | null;
   observerRobustEnergyConditions?: Nhm2ObserverRobustEnergyConditionArtifactV1 | null;
@@ -510,6 +513,7 @@ const refs = (
 ): Nhm2TimeDependentSourceCampaignArtifactRefsV1 => ({
   sourceComponentAuthorityLedger: input?.sourceComponentAuthorityLedger ?? null,
   regionalFullTensorResidual: input?.regionalFullTensorResidual ?? null,
+  sourceOffDiagonalShearAudit: input?.sourceOffDiagonalShearAudit ?? null,
   covariantConservationDiagnostic: input?.covariantConservationDiagnostic ?? null,
   qeiWorldlineDossier: input?.qeiWorldlineDossier ?? null,
   observerRobustEnergyConditions: input?.observerRobustEnergyConditions ?? null,
@@ -689,6 +693,7 @@ const dynamicGeometryGate = (
 
 const fullTensorGate = (
   residual: Nhm2RegionalFullTensorResidualArtifactV1 | null | undefined,
+  shearAudit: Nhm2SourceOffDiagonalShearAuditArtifactV1 | null | undefined,
 ): Nhm2TimeDependentSourceCampaignGateV1 => {
   if (residual == null) {
     return gate({
@@ -705,7 +710,20 @@ const fullTensorGate = (
       (componentId) => `${region.regionId}:${componentId}:tile_component_missing`,
     ),
   ]);
+  const shearAuditBlockers = uniqueText([
+    shearAudit?.summary.currentDeclaredSourceModelFalsified
+      ? "source_off_diagonal_current_declared_model_falsified"
+      : null,
+    shearAudit?.summary.falsifierCandidate &&
+    !shearAudit.summary.currentDeclaredSourceModelFalsified
+      ? "source_off_diagonal_shear_falsifier_candidate"
+      : null,
+    shearAudit?.summary.anyShearMechanismMissing
+      ? "source_off_diagonal_shear_mechanism_missing"
+      : null,
+  ]);
   const blockers = uniqueText([
+    ...shearAuditBlockers,
     residual.summary.allRequiredComponentsPresent
       ? null
       : "regional_full_tensor_components_missing",
@@ -714,6 +732,18 @@ const fullTensorGate = (
       : residual.summary.firstBlocker ?? "regional_full_tensor_residual_not_pass",
     ...missingComponentBlockers,
   ]);
+  const warnings = uniqueText([
+    shearAudit == null ? "source_off_diagonal_shear_audit_missing" : null,
+    shearAudit?.summary.uniformFractionalShearAnsatzDetected
+      ? "source_off_diagonal_uniform_fractional_shear_ansatz"
+      : null,
+  ]);
+  const worstRegion = residual.regions.find(
+    (region) => region.regionId === residual.summary.worstRegionId,
+  );
+  const worstFamily = worstRegion?.familyResiduals?.find(
+    (family) => family.family === residual.summary.worstResidualFamily,
+  );
   return gate({
     gateId: "full_regional_tensor_closure",
     status:
@@ -730,7 +760,11 @@ const fullTensorGate = (
       `family=${residual.summary.worstResidualFamily ?? "missing"}`,
       `component=${residual.summary.worstComponentId ?? "missing"}`,
       `region=${residual.summary.worstRegionId ?? "missing"}`,
+      `currentToAllowedMagnitudeRatio=${worstFamily?.maxCurrentToAllowedMagnitudeRatio ?? "missing"}`,
+      `shearAuditWorstRatio=${shearAudit?.summary.worstCurrentToAllowedMagnitudeRatio ?? "missing"}`,
+      `shearAuditWorstSuppression=${shearAudit?.summary.worstFractionalSuppressionToRequirement ?? "missing"}`,
     ].join(";"),
+    warnings,
   });
 };
 
@@ -848,7 +882,7 @@ export const buildNhm2TimeDependentSourceCampaign = (
     switchingGate(input.switchingConservation, input.covariantConservationDiagnostic),
     frequencyGate(input.frequencyConvergence),
     dynamicGeometryGate(input.dynamicEffectiveGeometry),
-    fullTensorGate(input.regionalFullTensorResidual),
+    fullTensorGate(input.regionalFullTensorResidual, input.sourceOffDiagonalShearAudit),
     observerGate(input.observerRobustEnergyConditions),
     qeiGate(input.qeiWorldlineDossier),
     stabilityGate(input.campaignStability, input.natarioInvariantAudit),
@@ -1026,6 +1060,7 @@ const isArtifactRefs = (
     record != null &&
     isNullableText(record.sourceComponentAuthorityLedger) &&
     isNullableText(record.regionalFullTensorResidual) &&
+    isNullableText(record.sourceOffDiagonalShearAudit) &&
     isNullableText(record.covariantConservationDiagnostic) &&
     isNullableText(record.qeiWorldlineDossier) &&
     isNullableText(record.observerRobustEnergyConditions) &&

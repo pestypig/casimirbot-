@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   CODEX_PARITY_AGENT_SPINE_CLASSES,
   CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS,
@@ -10,12 +11,13 @@ import {
   CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS,
   CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS,
 } from "../server/services/helix-ask/codex-parity-agent-spine-contract";
+import { HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION } from "../server/services/helix-ask/terminal-rail-failure-reconciliation";
 
 type RecordLike = Record<string, unknown>;
 
 type Verdict = "PASS" | "FAIL";
 type ExpectedValue = string | null | Array<string | null>;
-type LiveSpineCoverage =
+export type LiveSpineCoverage =
   | "calculator"
   | "docs"
   | "repo_code"
@@ -27,6 +29,19 @@ type LiveSpineCoverage =
   | "capability_catalog"
   | "negated_contextual_tool_mentions";
 
+export const REQUIRED_LIVE_SPINE_COVERAGE: LiveSpineCoverage[] = [
+  "calculator",
+  "docs",
+  "repo_code",
+  "workspace_status",
+  "live_source_mail",
+  "internet_search",
+  "visual_capture",
+  "image_lens",
+  "capability_catalog",
+  "negated_contextual_tool_mentions",
+];
+
 type LiveSmokePreflight = {
   ok: boolean;
   status: number;
@@ -35,7 +50,20 @@ type LiveSmokePreflight = {
   hint?: string;
 };
 
-type LiveSpineScenario = {
+export type LiveSpineScenarioSelection = {
+  scenarios: LiveSpineScenario[];
+  requestedIds: string[];
+  unknownIds: string[];
+};
+
+export type LiveSpineCoverageSummary = {
+  required: LiveSpineCoverage[];
+  covered: LiveSpineCoverage[];
+  missing: LiveSpineCoverage[];
+  complete: boolean;
+};
+
+export type LiveSpineScenario = {
   id: string;
   prompt: string;
   coverage: LiveSpineCoverage[];
@@ -74,7 +102,7 @@ const SCENARIO_FILTER = (process.env.HELIX_ASK_LIVE_SPINE_SCENARIOS ?? "")
   .map((entry) => entry.trim())
   .filter(Boolean);
 
-const SCENARIOS: LiveSpineScenario[] = [
+export const LIVE_SPINE_SMOKE_SCENARIOS: LiveSpineScenario[] = [
   {
     id: "calculator_explicit",
     coverage: ["calculator"],
@@ -273,6 +301,41 @@ const SCENARIOS: LiveSpineScenario[] = [
   },
 ];
 
+const SCENARIOS = LIVE_SPINE_SMOKE_SCENARIOS;
+
+export const selectLiveSpineSmokeScenarios = (
+  requestedIds: string[] = SCENARIO_FILTER,
+): LiveSpineScenarioSelection => {
+  const normalizedRequestedIds = Array.from(new Set(requestedIds.map((entry) => entry.trim()).filter(Boolean)));
+  if (normalizedRequestedIds.length === 0) {
+    return {
+      scenarios: LIVE_SPINE_SMOKE_SCENARIOS,
+      requestedIds: [],
+      unknownIds: [],
+    };
+  }
+
+  const knownIds = new Set(LIVE_SPINE_SMOKE_SCENARIOS.map((scenario) => scenario.id));
+  return {
+    scenarios: LIVE_SPINE_SMOKE_SCENARIOS.filter((scenario) => normalizedRequestedIds.includes(scenario.id)),
+    requestedIds: normalizedRequestedIds,
+    unknownIds: normalizedRequestedIds.filter((id) => !knownIds.has(id)),
+  };
+};
+
+export const summarizeLiveSpineSmokeCoverage = (
+  scenarios: LiveSpineScenario[] = LIVE_SPINE_SMOKE_SCENARIOS,
+): LiveSpineCoverageSummary => {
+  const covered = Array.from(new Set(scenarios.flatMap((scenario) => scenario.coverage))).sort() as LiveSpineCoverage[];
+  const missing = REQUIRED_LIVE_SPINE_COVERAGE.filter((required) => !covered.includes(required));
+  return {
+    required: [...REQUIRED_LIVE_SPINE_COVERAGE],
+    covered,
+    missing,
+    complete: missing.length === 0,
+  };
+};
+
 const readRecord = (value: unknown): RecordLike | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as RecordLike) : null;
 
@@ -400,6 +463,15 @@ const terminalErrorCode = (ask: RecordLike, debugExport: unknown): string | null
   );
 };
 
+const terminalFailureReconciliationRuntime = (ask: RecordLike, debugExport: unknown): RecordLike | null => {
+  const payload = extractPayload(debugExport);
+  return (
+    readRecord(ask.tool_rail_terminal_failure_reconciliation_runtime) ??
+    readRecord(payload?.tool_rail_terminal_failure_reconciliation_runtime) ??
+    readRecord(getPath(payload, ["debug", "tool_rail_terminal_failure_reconciliation_runtime"]))
+  );
+};
+
 const selectedFinalText = (ask: RecordLike, debugExport: unknown): string => {
   const payload = extractPayload(debugExport);
   return (
@@ -442,6 +514,40 @@ const completeRailEnvelopeFailures = (input: {
     failures.push(`complete_rail_non_final_response:${finalStatus ?? "missing"}/${responseType ?? "missing"}`);
   }
   if (!text) failures.push("complete_rail_missing_final_answer_text");
+  return failures;
+};
+
+const failClosedRailEnvelopeFailures = (input: {
+  rail: RecordLike | null;
+  ask: RecordLike;
+  debugExport: unknown;
+}): string[] => {
+  if (!input.rail) return [];
+  const railStatus = readString(input.rail.rail_status);
+  const parityClass = readString(input.rail.codex_parity_class);
+  if (railStatus !== "fail_closed" && parityClass === "complete") return [];
+  if (railStatus !== "fail_closed") return [];
+
+  const failures: string[] = [];
+  const payload = extractPayload(input.debugExport);
+  const errorCode = terminalErrorCode(input.ask, input.debugExport);
+  const finalStatus = readString(input.ask.final_status) ?? readString(payload?.final_status);
+  const responseType = readString(input.ask.response_type) ?? readString(payload?.response_type);
+  const finalAnswerSource = readString(input.ask.final_answer_source) ?? readString(payload?.final_answer_source);
+  const terminalArtifactKind =
+    readString(input.ask.terminal_artifact_kind) ??
+    readString(payload?.terminal_artifact_kind) ??
+    readString(getPath(payload, ["terminal_answer_authority", "terminal_artifact_kind"]));
+  const text = selectedFinalText(input.ask, input.debugExport);
+
+  if (!errorCode) failures.push("fail_closed_rail_missing_terminal_error_code");
+  if (finalAnswerSource !== "typed_failure" && terminalArtifactKind !== "typed_failure") {
+    failures.push(`fail_closed_rail_not_typed_failure:${finalAnswerSource ?? "missing"}/${terminalArtifactKind ?? "missing"}`);
+  }
+  if ((finalStatus && finalStatus !== "final_failure") || (responseType && responseType !== "final_failure")) {
+    failures.push(`fail_closed_rail_non_failure_response:${finalStatus ?? "missing"}/${responseType ?? "missing"}`);
+  }
+  if (!text) failures.push("fail_closed_rail_missing_failure_text");
   return failures;
 };
 
@@ -672,7 +778,11 @@ const compareRailMirrors = (rails: RecordLike[]): string[] => {
   return failures;
 };
 
-const classify = (scenario: LiveSpineScenario, ask: RecordLike, debugExport: unknown): RecordLike => {
+export const classifyLiveSpineSmokeResult = (
+  scenario: LiveSpineScenario,
+  ask: RecordLike,
+  debugExport: unknown,
+): RecordLike => {
   const failures: string[] = [];
   const warnings: string[] = [];
   const turnId = readString(ask.turn_id) ?? "missing";
@@ -680,6 +790,16 @@ const classify = (scenario: LiveSpineScenario, ask: RecordLike, debugExport: unk
   const rail = rails[0];
   const errorCode = terminalErrorCode(ask, debugExport);
   const terminalArtifactKind = terminalArtifactKindFor(ask, debugExport);
+  const reconciliationRuntime = terminalFailureReconciliationRuntime(ask, debugExport);
+  const reconciliationRuntimeVersion = readString(reconciliationRuntime?.version);
+
+  if (!reconciliationRuntime) {
+    failures.push("server_runtime_marker_missing:tool_rail_terminal_failure_reconciliation");
+  } else if (reconciliationRuntimeVersion !== HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION) {
+    failures.push(
+      `server_runtime_marker_version_mismatch:${String(reconciliationRuntimeVersion ?? "null")}!=${HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION}`,
+    );
+  }
 
   if (!debugExport) failures.push("debug_export_missing");
   if (!rail) {
@@ -714,6 +834,7 @@ const classify = (scenario: LiveSpineScenario, ask: RecordLike, debugExport: unk
       failures.push(`rail_visible_terminal_response_mismatch:${String(rail.visible_terminal_kind)}!=${terminalArtifactKind}`);
     }
     failures.push(...completeRailEnvelopeFailures({ rail, ask, debugExport }));
+    failures.push(...failClosedRailEnvelopeFailures({ rail, ask, debugExport }));
 
     const visibleToolSurface = readStringArray(rail.visible_tool_surface);
     for (const required of scenario.expected.visibleToolSurfaceIncludes ?? []) {
@@ -744,6 +865,12 @@ const classify = (scenario: LiveSpineScenario, ask: RecordLike, debugExport: unk
     terminal_error_code: errorCode,
     terminal_artifact_kind: terminalArtifactKind,
     final_answer_source: readString(ask.final_answer_source) ?? null,
+    tool_rail_terminal_failure_reconciliation_runtime: reconciliationRuntime
+      ? {
+          version: reconciliationRuntimeVersion,
+          available: reconciliationRuntime.available === true,
+        }
+      : null,
     selected_final_answer_excerpt: selectedFinalText(ask, debugExport).slice(0, 500),
     rail_table: rail
       ? {
@@ -819,7 +946,7 @@ const runScenario = async (scenario: LiveSpineScenario, runId: string, outputDir
   const debug = turnId
     ? await fetchJson<RecordLike>(`${BASE_URL}/api/agi/ask/turn/${encodeURIComponent(turnId)}/debug-export`)
     : null;
-  const result = classify(scenario, ask, debug);
+  const result = classifyLiveSpineSmokeResult(scenario, ask, debug);
 
   await fs.writeFile(path.join(scenarioDir, "ask-response.json"), `${JSON.stringify(ask, null, 2)}\n`);
   await fs.writeFile(path.join(scenarioDir, "debug-export.json"), `${JSON.stringify(debug, null, 2)}\n`);
@@ -832,6 +959,9 @@ const renderMarkdownSummary = (input: {
   outputDir: string;
   results: RecordLike[];
   preflight?: LiveSmokePreflight;
+  coverageSummary?: LiveSpineCoverageSummary;
+  requestedScenarioIds?: string[];
+  selectedScenarioIds?: string[];
 }): string => {
   const lines = [
     "# Helix Ask Live Spine Smoke",
@@ -840,9 +970,15 @@ const renderMarkdownSummary = (input: {
     `- base_url: ${BASE_URL}`,
     `- output_dir: ${input.outputDir}`,
   ];
+  if (input.requestedScenarioIds?.length) lines.push(`- requested_scenarios: ${input.requestedScenarioIds.join(", ")}`);
+  if (input.selectedScenarioIds?.length) lines.push(`- selected_scenarios: ${input.selectedScenarioIds.join(", ")}`);
   if (input.preflight) {
     lines.push(`- preflight: ${input.preflight.ok ? "ok" : "blocked"} (${input.preflight.reason})`);
     if (input.preflight.hint) lines.push(`- preflight_hint: ${input.preflight.hint}`);
+  }
+  if (input.coverageSummary) {
+    lines.push(`- coverage_complete: ${input.coverageSummary.complete ? "yes" : "no"}`);
+    if (input.coverageSummary.missing.length) lines.push(`- coverage_missing: ${input.coverageSummary.missing.join(", ")}`);
   }
   lines.push(
     "",
@@ -861,17 +997,93 @@ const renderMarkdownSummary = (input: {
 };
 
 const main = async (): Promise<void> => {
-  const selected = new Set(SCENARIO_FILTER);
-  const scenarios = SCENARIO_FILTER.length ? SCENARIOS.filter((scenario) => selected.has(scenario.id)) : SCENARIOS;
+  const selection = selectLiveSpineSmokeScenarios();
+  const scenarios = selection.scenarios;
+  const selectedScenarioIds = scenarios.map((scenario) => scenario.id);
+  const coverageSummary = summarizeLiveSpineSmokeCoverage(scenarios);
 
   if (DRY_RUN) {
-    console.log(JSON.stringify({ ok: true, dry_run: true, base_url: BASE_URL, scenarios }, null, 2));
+    if (selection.unknownIds.length || scenarios.length === 0) {
+      console.log(
+        JSON.stringify(
+          {
+            ok: false,
+            dry_run: true,
+            base_url: BASE_URL,
+            requested_scenarios: selection.requestedIds,
+            selected_scenarios: selectedScenarioIds,
+            unknown_scenarios: selection.unknownIds,
+            available_scenarios: SCENARIOS.map((scenario) => scenario.id),
+            coverage_summary: coverageSummary,
+            scenarios,
+          },
+          null,
+          2,
+        ),
+      );
+      process.exitCode = 1;
+      return;
+    }
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          dry_run: true,
+          base_url: BASE_URL,
+          requested_scenarios: selection.requestedIds,
+          selected_scenarios: selectedScenarioIds,
+          available_scenarios: SCENARIOS.map((scenario) => scenario.id),
+          coverage_summary: coverageSummary,
+          scenarios,
+        },
+        null,
+        2,
+      ),
+    );
     return;
   }
 
   const runId = `live-spine-${Date.now()}`;
   const outputDir = path.resolve(OUT_DIR, runId);
   await fs.mkdir(outputDir, { recursive: true });
+
+  if (selection.unknownIds.length || scenarios.length === 0) {
+    const summary = {
+      schema: "helix.ask_live_spine_smoke_summary.v1",
+      ok: false,
+      blocked: true,
+      blocked_reason: selection.unknownIds.length ? "unknown_scenario_filter" : "no_scenarios_selected",
+      run_id: runId,
+      base_url: BASE_URL,
+      output_dir: outputDir,
+      requested_scenarios: selection.requestedIds,
+      selected_scenarios: selectedScenarioIds,
+      unknown_scenarios: selection.unknownIds,
+      available_scenarios: SCENARIOS.map((scenario) => scenario.id),
+      coverage_summary: coverageSummary,
+      counts: {
+        pass: 0,
+        fail: 0,
+        warn: 1,
+      },
+      results: [],
+    };
+    await fs.writeFile(path.join(outputDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
+    await fs.writeFile(
+      path.join(outputDir, "summary.md"),
+      renderMarkdownSummary({
+        runId,
+        outputDir,
+        results: [],
+        coverageSummary,
+        requestedScenarioIds: selection.requestedIds,
+        selectedScenarioIds,
+      }),
+    );
+    console.log(JSON.stringify(summary, null, 2));
+    process.exitCode = 1;
+    return;
+  }
 
   const preflight = await probeAskTurnApi();
   if (!preflight.ok) {
@@ -883,6 +1095,10 @@ const main = async (): Promise<void> => {
       run_id: runId,
       base_url: BASE_URL,
       output_dir: outputDir,
+      requested_scenarios: selection.requestedIds,
+      selected_scenarios: selectedScenarioIds,
+      available_scenarios: SCENARIOS.map((scenario) => scenario.id),
+      coverage_summary: coverageSummary,
       counts: {
         pass: 0,
         fail: 0,
@@ -892,7 +1108,18 @@ const main = async (): Promise<void> => {
       results: [],
     };
     await fs.writeFile(path.join(outputDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
-    await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, outputDir, results: [], preflight }));
+    await fs.writeFile(
+      path.join(outputDir, "summary.md"),
+      renderMarkdownSummary({
+        runId,
+        outputDir,
+        results: [],
+        preflight,
+        coverageSummary,
+        requestedScenarioIds: selection.requestedIds,
+        selectedScenarioIds,
+      }),
+    );
     console.log(JSON.stringify(summary, null, 2));
     process.exitCode = 1;
     return;
@@ -924,6 +1151,10 @@ const main = async (): Promise<void> => {
     run_id: runId,
     base_url: BASE_URL,
     output_dir: outputDir,
+    requested_scenarios: selection.requestedIds,
+    selected_scenarios: selectedScenarioIds,
+    available_scenarios: SCENARIOS.map((scenario) => scenario.id),
+    coverage_summary: coverageSummary,
     counts: {
       pass: results.filter((result) => result.verdict === "PASS").length,
       fail: failCount,
@@ -933,12 +1164,31 @@ const main = async (): Promise<void> => {
     results,
   };
   await fs.writeFile(path.join(outputDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
-  await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, outputDir, results, preflight }));
+  await fs.writeFile(
+    path.join(outputDir, "summary.md"),
+    renderMarkdownSummary({
+      runId,
+      outputDir,
+      results,
+      preflight,
+      coverageSummary,
+      requestedScenarioIds: selection.requestedIds,
+      selectedScenarioIds,
+    }),
+  );
   console.log(JSON.stringify(summary, null, 2));
   if (!summary.ok) process.exitCode = 1;
 };
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});
+const isDirectRun = (): boolean => {
+  const entrypoint = process.argv[1];
+  if (!entrypoint) return false;
+  return import.meta.url === pathToFileURL(path.resolve(entrypoint)).href;
+};
+
+if (isDirectRun()) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  });
+}

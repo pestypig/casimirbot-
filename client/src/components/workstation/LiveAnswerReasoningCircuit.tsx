@@ -60,8 +60,23 @@ export type LiveAnswerReasoningCircuitSummary = {
   terminalPosture: string;
 };
 
+type LiveAnswerCircuitHop = {
+  key: string;
+  label: string;
+  value: string;
+};
+
 const compactLabel = (value: string): string =>
   value.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim() || "unknown";
+
+const compactCircuitRef = (value: string): string =>
+  compactLabel(
+    value
+      .replace(/^stage_play_/i, "")
+      .replace(/^workstation_/i, "")
+      .replace(/^live_answer_/i, "live_answer:")
+      .replace(/^source:/i, "source:"),
+  );
 
 const authorityChipClass = (flag: boolean): string =>
   flag
@@ -97,6 +112,75 @@ const cadenceLabel = (cadence: AgentGoalSessionV1["cadence"]): string => {
 const freshnessLabel = (freshness: LiveAnswerReasoningCircuitRow["freshness"]): string => {
   const staleAfter = freshness.staleAfterMs === undefined ? "unbounded" : `${freshness.staleAfterMs}ms`;
   return `${freshness.status} observed=${freshness.observedAtMs} staleAfter=${staleAfter}`;
+};
+
+const firstCircuitRef = (
+  refs: string[],
+  match: (ref: string) => boolean,
+  fallback: string,
+): string => refs.find(match) ?? refs[0] ?? fallback;
+
+const circuitDestinationLabel = (dispatch: string): string => {
+  const normalized = dispatch.trim();
+  if (/wake/i.test(normalized)) return "wake interrupt";
+  if (/narrator bind/i.test(normalized)) return normalized.replace(/^narrator bind\s*/i, "narrator:");
+  if (/narrator/i.test(normalized)) return "narrator output";
+  if (/preset/i.test(normalized)) return normalized.replace(/^preset\s*/i, "preset:");
+  if (/bind source/i.test(normalized)) return "source binding";
+  if (/unbind source/i.test(normalized)) return "source unbinding";
+  if (/focus graph/i.test(normalized)) return "process graph focus";
+  if (/update live answer/i.test(normalized)) return "live answer projection";
+  if (/set loop state/i.test(normalized)) return "loop control";
+  if (/repair loop/i.test(normalized)) return "loop repair";
+  if (/ask user/i.test(normalized)) return "operator";
+  return normalized || "destination pending";
+};
+
+const primaryCircuitDispatch = (dispatches: string[]): string =>
+  dispatches.find((dispatch) => !/receipt|append goal context|update panel/i.test(dispatch)) ??
+  dispatches[0] ??
+  "no dispatch";
+
+const liveAnswerCircuitHops = (row: LiveAnswerReasoningCircuitRow): LiveAnswerCircuitHop[] => {
+  const allRefs = Array.from(new Set([
+    row.contentRef,
+    ...row.sourceRefs,
+    ...row.loopRefs,
+    ...row.evidenceRefs,
+    ...row.receiptRefs,
+  ].filter(Boolean)));
+  const source = firstCircuitRef(
+    row.sourceRefs,
+    (ref) => /source|visual|audio|frame|transcript|lens|screen/i.test(ref),
+    "source pending",
+  );
+  const loop = firstCircuitRef(
+    row.loopRefs,
+    (ref) => /loop|mail|translation|transcription|health|automation|route|watch/i.test(ref),
+    row.producer,
+  );
+  const deck = allRefs.find((ref) =>
+    /microdeck|micro_reasoner|prompt_preset|deck/i.test(ref)
+  ) ?? allRefs.find((ref) =>
+    /translated_transcript|translation|transcript/i.test(ref)
+  ) ?? row.contentRef ?? row.title;
+  const destination = Array.from(new Set(row.dispatch.map(circuitDestinationLabel)))
+    .slice(0, 4)
+    .map(compactCircuitRef)
+    .join(" | ") || "destination pending";
+  const authority = row.authority.terminalEligible === false &&
+    row.authority.assistantAnswer === false &&
+    row.authority.rawContentIncluded === false
+      ? "evidence only"
+      : "blocked terminal claim";
+  return [
+    { key: "source", label: "Source", value: compactCircuitRef(source) },
+    { key: "loop", label: "Loop", value: compactCircuitRef(loop) },
+    { key: "deck", label: "Deck", value: compactCircuitRef(deck) },
+    { key: "dispatch", label: "Dispatch", value: compactLabel(primaryCircuitDispatch(row.dispatch)) },
+    { key: "destination", label: "Destination", value: destination },
+    { key: "authority", label: "Authority", value: authority },
+  ];
 };
 
 const contextFeedPolicyRefs = (refs: string[]): string[] =>
@@ -207,6 +291,7 @@ export function LiveAnswerReasoningCircuit({
             const color = packetTrailColor(row.packetColorKey);
             const feedPolicyRefs = contextFeedPolicyRefs(row.policyRefs);
             const outputPolicyRefs = actuatorPolicyRefs(row.policyRefs);
+            const circuitHops = liveAnswerCircuitHops(row);
             return (
               <div
                 key={row.id}
@@ -238,6 +323,13 @@ export function LiveAnswerReasoningCircuit({
                   </span>
                   <span className="truncate">receipts={row.receiptRefs.length ? row.receiptRefs.join(", ") : "none"}</span>
                   <span className="truncate" data-testid="live-answer-goal-context-freshness">freshness={freshnessLabel(row.freshness)}</span>
+                </div>
+                <div className="mt-1.5 grid grid-cols-2 gap-1 rounded border border-white/10 bg-black/20 p-1 font-mono text-[10px] text-slate-400" data-testid="live-answer-goal-context-circuit-route">
+                  {circuitHops.map((hop: LiveAnswerCircuitHop) => (
+                    <span key={`${row.id}:${hop.key}`} className="min-w-0 truncate">
+                      <span className="text-slate-500">{hop.label}</span> {hop.value}
+                    </span>
+                  ))}
                 </div>
                 <div className="mt-1.5 flex flex-wrap gap-1" data-testid="live-answer-goal-context-authority-chips">
                   <span className={authorityChipClass(row.authority.assistantAnswer)}>assistant={String(row.authority.assistantAnswer)}</span>

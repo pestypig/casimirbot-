@@ -78,6 +78,7 @@ import {
 import {
   WORKSTATION_CONTEXT_FEED_QUERY_RESULT_SCHEMA,
   validateWorkstationContextFeedQueryResultV1,
+  workstationContextFeedUpdateMatchesV1,
   type WorkstationContextFeedQueryResultV1,
 } from "@shared/contracts/workstation-context-feed-query-result.v1";
 import {
@@ -2109,6 +2110,8 @@ const summarizeGoalContextAuthority = (input: {
     session.authority.finalReportsRequireTerminalAuthority === true
   ).length;
   const dispatchCountsObject = Object.fromEntries(Array.from(dispatchCounts.entries()).sort(([left], [right]) => left.localeCompare(right)));
+  const goalContextUpdateRefs = uniqueStrings(input.updates.map((update) => update.updateId));
+  const activeGoalSessionRefs = uniqueStrings(activeSessions.map((session) => session.goalId));
   const assistantAnswerCount = input.updates.filter((update) => update.authority.assistantAnswer !== false).length;
   const terminalEligibleCount = input.updates.filter((update) => update.authority.terminalEligible !== false).length;
   const rawContentIncludedCount = input.updates.filter((update) => update.authority.rawContentIncluded !== false).length;
@@ -2121,6 +2124,8 @@ const summarizeGoalContextAuthority = (input: {
     schema: "helix.workstation_goal_context_authority_summary.v1",
     updateCount: input.updates.length,
     update_count: input.updates.length,
+    goalContextUpdateRefs,
+    goal_context_update_refs: goalContextUpdateRefs,
     observationOnlyUpdateCount: observationOnlyCount,
     observation_only_update_count: observationOnlyCount,
     assistantAnswerCount,
@@ -2133,6 +2138,8 @@ const summarizeGoalContextAuthority = (input: {
     post_tool_model_step_required_count: postToolModelStepRequiredCount,
     activeGoalSessionCount: activeSessions.length,
     active_goal_session_count: activeSessions.length,
+    goalSessionRefs: activeGoalSessionRefs,
+    goal_session_refs: activeGoalSessionRefs,
     finalReportsRequireTerminalAuthorityCount: terminalAuthoritySessionCount,
     final_reports_require_terminal_authority_count: terminalAuthoritySessionCount,
     dispatchCounts: dispatchCountsObject,
@@ -2288,8 +2295,6 @@ type WorkstationContextFeedQuerySpec = {
   feedKind: AgentGoalContextFeedKindV1;
   actuator: AgentGoalActuatorV1;
   label: string;
-  producerKinds: GoalContextProducerKindV1[];
-  updateKinds: GoalContextUpdateKindV1[];
 };
 
 const WORKSTATION_CONTEXT_FEED_QUERY_SPECS: Partial<Record<HelixLiveEnvironmentToolName, WorkstationContextFeedQuerySpec>> = {
@@ -2297,57 +2302,41 @@ const WORKSTATION_CONTEXT_FEED_QUERY_SPECS: Partial<Record<HelixLiveEnvironmentT
     feedKind: "visual_summaries",
     actuator: "query_visual_summaries",
     label: "visual summaries",
-    producerKinds: ["visual_capture"],
-    updateKinds: ["visual_observation", "classification", "summary"],
   },
   "live_env.query_audio_transcripts": {
     feedKind: "audio_transcripts",
     actuator: "query_audio_transcripts",
     label: "audio transcripts",
-    producerKinds: ["audio_capture", "transcription_loop"],
-    updateKinds: ["transcript_window"],
   },
   "live_env.query_translation_segments": {
     feedKind: "translated_transcripts",
     actuator: "query_translation_segments",
     label: "translation segments",
-    producerKinds: ["translation_loop"],
-    updateKinds: ["translated_transcript"],
   },
   "live_env.query_microdeck_outputs": {
     feedKind: "microdeck_outputs",
     actuator: "query_microdeck_outputs",
     label: "MicroDeck outputs",
-    producerKinds: ["microdeck"],
-    updateKinds: ["summary", "visual_observation", "classification", "translated_transcript", "route_evidence", "reflection"],
   },
   "live_env.query_live_answer_state": {
     feedKind: "live_answer_lines",
     actuator: "query_live_answer_state",
     label: "Live Answer state",
-    producerKinds: ["live_answer"],
-    updateKinds: ["summary", "preset_state", "source_status", "route_evidence"],
   },
   "live_env.query_narrator_events": {
     feedKind: "narrator_events",
     actuator: "query_narrator_events",
     label: "narrator events",
-    producerKinds: ["narrator"],
-    updateKinds: ["suggested_action", "automation_status", "route_evidence"],
   },
   "live_env.query_route_evidence": {
     feedKind: "route_evidence",
     actuator: "query_route_evidence",
     label: "route evidence",
-    producerKinds: ["route_watch", "automation"],
-    updateKinds: ["route_evidence", "suggested_action", "source_status", "automation_status"],
   },
   "live_env.query_automation_policies": {
     feedKind: "automation_policies",
     actuator: "query_automation_policies",
     label: "automation policies",
-    producerKinds: ["automation", "route_watch"],
-    updateKinds: ["automation_status"],
   },
 };
 
@@ -2594,6 +2583,7 @@ const missingWorkstationControlRequirements = (input: {
   presetId: string | null;
   loopRef: string | null;
   lineKey: string | null;
+  nodeRef: string | null;
 }): string[] => {
   switch (input.spec.controlKind) {
     case "change_preset":
@@ -2615,7 +2605,7 @@ const missingWorkstationControlRequirements = (input: {
     case "update_live_answer":
       return input.lineKey ? [] : ["line_key"];
     case "focus_process_graph":
-      return [];
+      return input.nodeRef ? [] : ["node_ref"];
     default:
       return [];
   }
@@ -3187,6 +3177,13 @@ export function executeLiveEnvironmentTool(
       deliveryMode,
       evidenceRefs,
     ])}`;
+    const sourceRefs = uniqueStrings([sourceRef, sourceKind, streamKind]);
+    const loopRefs = uniqueStrings([
+      `narrator:${narratorKind}`,
+      `thread:${input.thread_id}`,
+      `workstation_actuator:${actuator}`,
+    ]);
+    const narratorEvidenceRefs = uniqueStrings([requestId, ...policyEvidenceRefs, ...evidenceRefs]);
     const rawDispatch = buildNarratorDispatch({
       kind: narratorKind,
       receiptRef: requestId,
@@ -3207,13 +3204,9 @@ export function executeLiveEnvironmentTool(
           ? "Prepared narrator say request as governed non-terminal speech evidence."
           : `Prepared narrator stream binding for ${streamKind}.`
         : `Blocked narrator ${narratorKind} request; missing ${effectiveMissingRequirements.join(", ")}.`,
-      sourceRefs: uniqueStrings([sourceRef, sourceKind, streamKind]),
-      loopRefs: uniqueStrings([
-        `narrator:${narratorKind}`,
-        `thread:${input.thread_id}`,
-        `workstation_actuator:${actuator}`,
-      ]),
-      evidenceRefs: uniqueStrings([requestId, ...policyEvidenceRefs, ...evidenceRefs]),
+      sourceRefs,
+      loopRefs,
+      evidenceRefs: narratorEvidenceRefs,
       receiptRefs: [requestId],
       freshnessStatus: ok ? "fresh" : "blocked",
       goalId,
@@ -3222,14 +3215,15 @@ export function executeLiveEnvironmentTool(
         : "Narrator stream binding was prepared for the active workstation goal.",
       suggestedDispatch: dispatch,
     });
+    const producedRefs = [requestId, goalContextUpdateId];
     const checkpointedGoalSession = ok && goalSession
       ? appendAgentGoalSessionCheckpoint({
           session: goalSession,
           threadId: input.thread_id,
           roomId,
-          sourceRefs: uniqueStrings([sourceRef, sourceKind, streamKind]),
-          loopRefs: uniqueStrings([`narrator:${narratorKind}`, `thread:${input.thread_id}`, `workstation_actuator:${actuator}`]),
-          evidenceRefs: uniqueStrings([goalContextUpdateId, requestId, ...policyEvidenceRefs, ...evidenceRefs]).slice(0, 80),
+          sourceRefs,
+          loopRefs,
+          evidenceRefs: uniqueStrings([goalContextUpdateId, ...narratorEvidenceRefs]).slice(0, 80),
           actionsTaken: uniqueStrings([actuator, input.tool_name]),
           summary: narratorKind === "say"
             ? "Prepared narrator say request for this goal session."
@@ -3253,14 +3247,20 @@ export function executeLiveEnvironmentTool(
       actuator_allowed: actuatorAllowed,
       policyEvidenceRefs,
       policy_evidence_refs: policyEvidenceRefs,
+      sourceRefs,
+      source_refs: sourceRefs,
+      loopRefs,
+      loop_refs: loopRefs,
+      evidenceRefs: narratorEvidenceRefs,
+      evidence_refs: narratorEvidenceRefs,
+      producedRefs,
+      produced_refs: producedRefs,
       agentGoalSession: checkpointedGoalSession,
       agent_goal_session: checkpointedGoalSession,
       sourceRef,
       source_ref: sourceRef,
       deliveryMode,
       delivery_mode: deliveryMode,
-      evidenceRefs,
-      evidence_refs: evidenceRefs,
       dispatch,
       suggestedDispatch: dispatch,
       suggested_dispatch: dispatch,
@@ -3338,8 +3338,8 @@ export function executeLiveEnvironmentTool(
           ? `Cannot prepare narrator ${narratorKind} request; missing ${effectiveMissingRequirements.join(", ")}.`
           : `Cannot prepare narrator ${narratorKind} request; contract validation failed: ${contractValidationIssues.join("; ")}.`,
       observation: finalPayload,
-      evidenceRefs: uniqueStrings([goalContextUpdateId, requestId, ...evidenceRefs]),
-      producedRefs: [requestId, goalContextUpdateId],
+      evidenceRefs: uniqueStrings([goalContextUpdateId, ...narratorEvidenceRefs]),
+      producedRefs,
       forceNormalizedRefs: true,
     });
   }
@@ -3367,6 +3367,7 @@ export function executeLiveEnvironmentTool(
       presetId: controlDispatch.presetId,
       loopRef: controlDispatch.loopRef,
       lineKey: controlDispatch.lineKey,
+      nodeRef: controlDispatch.nodeRef,
     });
     const goalId = readString(args.goal_id) ?? readString(args.goalId);
     const actuator = workstationControlActuator(workstationControlSpec, controlDispatch.loopState);
@@ -3505,6 +3506,14 @@ export function executeLiveEnvironmentTool(
       actuator_allowed: actuatorAllowed,
       policyEvidenceRefs,
       policy_evidence_refs: policyEvidenceRefs,
+      sourceRefs,
+      source_refs: sourceRefs,
+      loopRefs,
+      loop_refs: loopRefs,
+      evidenceRefs,
+      evidence_refs: evidenceRefs,
+      producedRefs: [receiptId, goalContextUpdateId],
+      produced_refs: [receiptId, goalContextUpdateId],
       agentGoalSession: checkpointedGoalSession,
       agent_goal_session: checkpointedGoalSession,
       targetRef: controlDispatch.targetRef,
@@ -6013,10 +6022,7 @@ export function executeLiveEnvironmentTool(
       goalId: goalSession ? null : goalId,
       limit: 200,
     })
-      .filter((update) =>
-        feedQuerySpec.producerKinds.includes(update.producerKind) ||
-        feedQuerySpec.updateKinds.includes(update.updateKind)
-      )
+      .filter((update) => workstationContextFeedUpdateMatchesV1(feedQuerySpec.feedKind, update))
       .slice(0, ok ? limit : 0);
     const resultId = `stage_play_context_feed_query:${feedQuerySpec.feedKind}:${hashShort([
       input.thread_id,
@@ -9021,8 +9027,8 @@ export function executeLiveEnvironmentTool(
         contractValidationIssues,
         contract_validation_issues: contractValidationIssues,
       },
-      evidenceRefs: uniqueStrings([goalContextUpdateId, ...policyEvidenceRefs, ...sourceRefs]),
-      producedRefs: [goalContextUpdateId],
+      evidenceRefs: uniqueStrings([goalContextUpdateId, contentRef, ...policyEvidenceRefs, ...sourceRefs]),
+      producedRefs: [goalContextUpdateId, contentRef, ...sourceRefs],
       forceNormalizedRefs: true,
     });
   }

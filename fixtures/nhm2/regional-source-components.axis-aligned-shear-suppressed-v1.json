@@ -1,0 +1,133 @@
+{
+  "modelKind": "declared_research_tensor",
+  "selectedProfileId": "stage1_centerline_alpha_0p995_v1",
+  "chartId": "comoving_cartesian",
+  "sourceModelRef": "declared:nhm2.axis_aligned_constitutive_shear_suppressed_tensor_v1",
+  "materialReceiptStatus": "material_receipted",
+  "regions": {
+    "global": {
+      "status": "material_receipted",
+      "basisRef": "same_basis",
+      "aggregationMode": "representative_sector_bin",
+      "normalizationBasis": "sample_count",
+      "sampleCount": 1,
+      "regionMaskRef": "declared-mask:global:nhm2_axis_aligned_shear_suppressed_v1",
+      "provenanceRef": "declared-source:global:axis_aligned_constitutive_shear_suppression-v1",
+      "tensor": {
+        "T00": -58267451,
+        "T01": 58.267451,
+        "T02": -29.1337255,
+        "T03": 11.6534902,
+        "T10": 58.267451,
+        "T11": 58267450.98955891,
+        "T12": 0,
+        "T13": 0,
+        "T20": -29.1337255,
+        "T21": 0,
+        "T22": 58267450.98955891,
+        "T23": 0,
+        "T30": 11.6534902,
+        "T31": 0,
+        "T32": 0,
+        "T33": 58267450.98955891
+      },
+      "warnings": [
+        "declared_research_tensor_not_experimental_material_validation",
+        "axis_aligned_shear_suppression_is_declared_constitutive_hypothesis"
+      ]
+    },
+    "hull": {
+      "status": "material_receipted",
+      "basisRef": "same_basis",
+      "aggregationMode": "representative_sector_bin",
+      "normalizationBasis": "sample_count",
+      "sampleCount": 1,
+      "regionMaskRef": "declared-mask:hull:nhm2_axis_aligned_shear_suppressed_v1",
+      "provenanceRef": "declared-source:hull:axis_aligned_constitutive_shear_suppression-v1",
+      "tensor": {
+        "T00": -680000000,
+        "T01": 680,
+        "T02": -340,
+        "T03": 136,
+        "T10": 680,
+        "T11": 733553902.6786809,
+        "T12": 0,
+        "T13": 0,
+        "T20": -340,
+        "T21": 0,
+        "T22": 733553902.6786809,
+        "T23": 0,
+        "T30": 136,
+        "T31": 0,
+        "T32": 0,
+        "T33": 733553902.6786809
+      },
+      "warnings": [
+        "declared_research_tensor_not_experimental_material_validation",
+        "axis_aligned_shear_suppression_is_declared_constitutive_hypothesis"
+      ]
+    },
+    "wall": {
+      "status": "material_receipted",
+      "basisRef": "same_basis",
+      "aggregationMode": "representative_sector_bin",
+      "normalizationBasis": "sample_count",
+      "sampleCount": 1,
+      "regionMaskRef": "declared-mask:wall:nhm2_axis_aligned_shear_suppressed_v1",
+      "provenanceRef": "declared-source:wall:axis_aligned_constitutive_shear_suppression-v1",
+      "tensor": {
+        "T00": -1850000000,
+        "T01": 1850,
+        "T02": -925,
+        "T03": 370,
+        "T10": 1850,
+        "T11": 1699539201.2526472,
+        "T12": 0,
+        "T13": 0,
+        "T20": -925,
+        "T21": 0,
+        "T22": 1699539201.2526472,
+        "T23": 0,
+        "T30": 370,
+        "T31": 0,
+        "T32": 0,
+        "T33": 1699539201.2526472
+      },
+      "warnings": [
+        "declared_research_tensor_not_experimental_material_validation",
+        "axis_aligned_shear_suppression_is_declared_constitutive_hypothesis"
+      ]
+    },
+    "exterior_shell": {
+      "status": "material_receipted",
+      "basisRef": "same_basis",
+      "aggregationMode": "representative_sector_bin",
+      "normalizationBasis": "sample_count",
+      "sampleCount": 1,
+      "regionMaskRef": "declared-mask:exterior_shell:nhm2_axis_aligned_shear_suppressed_v1",
+      "provenanceRef": "declared-source:exterior_shell:axis_aligned_constitutive_shear_suppression-v1",
+      "tensor": {
+        "T00": -1820000000,
+        "T01": 1820,
+        "T02": -910,
+        "T03": 364,
+        "T10": 1820,
+        "T11": 1699157799.1011546,
+        "T12": 0,
+        "T13": 0,
+        "T20": -910,
+        "T21": 0,
+        "T22": 1699157799.1011546,
+        "T23": 0,
+        "T30": 364,
+        "T31": 0,
+        "T32": 0,
+        "T33": 1699157799.1011546
+      },
+      "warnings": [
+        "declared_research_tensor_not_experimental_material_validation",
+        "axis_aligned_shear_suppression_is_declared_constitutive_hypothesis"
+      ]
+    }
+  }
+}

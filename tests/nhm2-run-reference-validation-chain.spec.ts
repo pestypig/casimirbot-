@@ -294,6 +294,32 @@ describe("NHM2 reference validation chain planner", () => {
     );
   });
 
+  it("uses the generated metric-required receipt as the tile source regional sample plan", () => {
+    const plan = planReferenceValidationChain({
+      ...baseArgs(),
+      "source-input": "fixtures/nhm2/source-input.json",
+      "generate-metric-required-full-tensor-source": true,
+      "metric-runtime-artifact": "artifacts/reference/nhm2-runtime-artifact.json",
+    });
+    const scripts = plan.map((command) => command.script);
+    const metricReceipt = findCommand(
+      plan,
+      "nhm2:publish-metric-required-regional-tensor-receipt",
+    );
+    const source = findCommand(plan, "nhm2:publish-tile-effective-full-tensor-source");
+
+    expect(scripts.indexOf("nhm2:publish-metric-required-regional-tensor-receipt")).toBeLessThan(
+      scripts.indexOf("nhm2:publish-tile-effective-full-tensor-source"),
+    );
+    expect(metricReceipt.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-metric-required-regional-tensor-receipt.json",
+    );
+    expect(source.args).toContain("--regional-sample-plan");
+    expect(source.args).toContain(
+      "artifacts/research/full-solve/reference/run-1/nhm2-metric-required-regional-tensor-receipt.json",
+    );
+  });
+
   it("freezes current runtime source closure before generating metric-required full tensor source", () => {
     const plan = planReferenceValidationChain({
       ...baseArgsWithoutSourceClosure(),

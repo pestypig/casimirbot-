@@ -148,6 +148,27 @@ const defaultRegionMetadata = (): RegionMetadata => ({
   sampleCount: null,
 });
 
+const mergeRegionMetadata = (...entries: RegionMetadata[]): RegionMetadata => ({
+  regionMaskRef:
+    entries.map((entry) => entry.regionMaskRef).find((value) => value != null) ?? null,
+  aggregationMode:
+    entries
+      .map((entry) => entry.aggregationMode)
+      .find((value) => value !== "unknown") ?? "unknown",
+  normalizationBasis:
+    entries
+      .map((entry) => entry.normalizationBasis)
+      .find((value) => value !== "unknown") ?? "unknown",
+  sampleCount:
+    entries.map((entry) => entry.sampleCount).find((value) => value != null) ?? null,
+});
+
+const metadataComplete = (metadata: RegionMetadata): boolean =>
+  metadata.regionMaskRef != null &&
+  metadata.aggregationMode !== "unknown" &&
+  metadata.normalizationBasis !== "unknown" &&
+  metadata.sampleCount != null;
+
 const sourceClosureRegions = (
   sourceClosure: Record<string, unknown> | null,
 ): Map<Nhm2RegionalSourceClosureRegionId, Record<string, unknown>> => {
@@ -164,53 +185,13 @@ const sourceClosureRegions = (
   return regions;
 };
 
-const metadataFromSourceClosure = (
-  sourceClosure: Record<string, unknown> | null,
-  regionId: Nhm2RegionalSourceClosureRegionId,
+const metadataFromRegionRecord = (
+  region: Record<string, unknown> | null,
 ): RegionMetadata => {
-  if (sourceClosure == null) return defaultRegionMetadata();
-  if (regionId === "global") {
-    const region = sourceClosureRegions(sourceClosure).get("global") ?? null;
-    if (region != null) {
-      const diagnostics = asRecord(region.metricT00Diagnostics);
-      const trace = asRecord(diagnostics?.trace);
-      const accounting = asRecord(region.metricAccounting);
-      return {
-        regionMaskRef:
-          asString(trace?.regionMaskRef) ??
-          asString(accounting?.regionMaskRef) ??
-          null,
-        aggregationMode: knownAggregationMode(
-          trace?.aggregationMode,
-          diagnostics?.aggregationMode,
-          accounting?.aggregationMode,
-        ),
-        normalizationBasis: knownNormalizationBasis(
-          trace?.normalizationBasis,
-          diagnostics?.normalizationBasis,
-          accounting?.normalizationBasis,
-        ),
-        sampleCount: knownNumber(
-          trace?.sampleCount,
-          diagnostics?.sampleCount,
-          accounting?.sampleCount,
-        ),
-      };
-    }
-    const globalAccounting = asRecord(sourceClosure.globalAccounting);
-    const metricAccounting =
-      asRecord(sourceClosure.metricAccounting) ?? asRecord(globalAccounting?.metric);
-    return {
-      regionMaskRef: asString(metricAccounting?.regionMaskRef),
-      aggregationMode: normalizeAggregationMode(metricAccounting?.aggregationMode),
-      normalizationBasis: normalizeNormalizationBasis(metricAccounting?.normalizationBasis),
-      sampleCount: asNumber(metricAccounting?.sampleCount),
-    };
-  }
-  const region = sourceClosureRegions(sourceClosure).get(regionId) ?? null;
-  const diagnostics = asRecord(region?.metricT00Diagnostics);
+  if (region == null) return defaultRegionMetadata();
+  const diagnostics = asRecord(region.metricT00Diagnostics);
   const trace = asRecord(diagnostics?.trace);
-  const accounting = asRecord(region?.metricAccounting);
+  const accounting = asRecord(region.metricAccounting);
   return {
     regionMaskRef:
       asString(trace?.regionMaskRef) ??
@@ -226,8 +207,36 @@ const metadataFromSourceClosure = (
       diagnostics?.normalizationBasis,
       accounting?.normalizationBasis,
     ),
-    sampleCount: knownNumber(trace?.sampleCount, diagnostics?.sampleCount, accounting?.sampleCount),
+    sampleCount: knownNumber(
+      trace?.sampleCount,
+      diagnostics?.sampleCount,
+      accounting?.sampleCount,
+      region.sampleCount,
+    ),
   };
+};
+
+const metadataFromSourceClosure = (
+  sourceClosure: Record<string, unknown> | null,
+  regionId: Nhm2RegionalSourceClosureRegionId,
+): RegionMetadata => {
+  if (sourceClosure == null) return defaultRegionMetadata();
+  if (regionId === "global") {
+    const region = sourceClosureRegions(sourceClosure).get("global") ?? null;
+    if (region != null) {
+      return metadataFromRegionRecord(region);
+    }
+    const globalAccounting = asRecord(sourceClosure.globalAccounting);
+    const metricAccounting =
+      asRecord(sourceClosure.metricAccounting) ?? asRecord(globalAccounting?.metric);
+    return {
+      regionMaskRef: asString(metricAccounting?.regionMaskRef),
+      aggregationMode: normalizeAggregationMode(metricAccounting?.aggregationMode),
+      normalizationBasis: normalizeNormalizationBasis(metricAccounting?.normalizationBasis),
+      sampleCount: asNumber(metricAccounting?.sampleCount),
+    };
+  }
+  return metadataFromRegionRecord(sourceClosureRegions(sourceClosure).get(regionId) ?? null);
 };
 
 const tensorSourceRank = (source: Nhm2SameChartFullTensorProvenanceSource): number => {
@@ -296,6 +305,21 @@ const candidateRegionLists = (
   getNested(sourceClosure, ["regionComparisons", "regions"]),
 ];
 
+const findRegionRecord = (
+  runtimeArtifact: unknown,
+  sourceClosure: Record<string, unknown> | null,
+  regionId: Nhm2RegionalSourceClosureRegionId,
+): Record<string, unknown> | null => {
+  for (const list of candidateRegionLists(runtimeArtifact, sourceClosure)) {
+    if (!Array.isArray(list)) continue;
+    for (const entry of list) {
+      const record = asRecord(entry);
+      if (asString(record?.regionId) === regionId) return record;
+    }
+  }
+  return null;
+};
+
 const findRegionalSameChartTensors = (
   runtimeArtifact: unknown,
   sourceClosure: Record<string, unknown> | null,
@@ -314,6 +338,70 @@ const findRegionalSameChartTensors = (
     }
   }
   return byRegion;
+};
+
+const parseTensorAssumptionMetadata = (
+  tensor: Nhm2SameChartFullTensorArtifactV1 | null,
+  regionId: Nhm2RegionalSourceClosureRegionId,
+): RegionMetadata => {
+  if (tensor == null) return defaultRegionMetadata();
+  const assumptions = tensor.components.flatMap((component) => component.assumptions);
+  const matchingRegion = assumptions.some((assumption) => assumption === `regionId=${regionId}`);
+  if (!matchingRegion) return defaultRegionMetadata();
+  const sampleCountAssumption = assumptions
+    .map((assumption) => /^sampleCount=(\d+)$/.exec(assumption)?.[1])
+    .find((value): value is string => value != null);
+  const maskAssumption = assumptions.find((assumption) => assumption.startsWith("brick_mask="));
+  const averagedOverMask = assumptions.some((assumption) =>
+    /averaged over .*brick mask/i.test(assumption),
+  );
+  const artifactRef =
+    tensor.components
+      .map((component) => component.provenance.artifactRef)
+      .find((value): value is string => value != null && value.trim().length > 0) ?? null;
+  return {
+    regionMaskRef:
+      maskAssumption == null
+        ? null
+        : artifactRef == null
+          ? `metric_required.region.${regionId}.brick_mask`
+          : `${artifactRef}#brick_mask`,
+    aggregationMode: averagedOverMask ? "mean" : "unknown",
+    normalizationBasis: sampleCountAssumption == null ? "unknown" : "sample_count",
+    sampleCount: sampleCountAssumption == null ? null : Number.parseInt(sampleCountAssumption, 10),
+  };
+};
+
+const metadataForRegion = (args: {
+  runtimeArtifact: unknown;
+  sourceClosure: Record<string, unknown> | null;
+  regionId: Nhm2RegionalSourceClosureRegionId;
+  tensor: Nhm2SameChartFullTensorArtifactV1 | null;
+}): { metadata: RegionMetadata; warnings: string[] } => {
+  const sourceClosureMetadata = metadataFromSourceClosure(args.sourceClosure, args.regionId);
+  if (metadataComplete(sourceClosureMetadata)) {
+    return { metadata: sourceClosureMetadata, warnings: [] };
+  }
+  const runtimeRegionMetadata = metadataFromRegionRecord(
+    findRegionRecord(args.runtimeArtifact, null, args.regionId),
+  );
+  const tensorAssumptionMetadata = parseTensorAssumptionMetadata(args.tensor, args.regionId);
+  const metadata = mergeRegionMetadata(
+    sourceClosureMetadata,
+    runtimeRegionMetadata,
+    tensorAssumptionMetadata,
+  );
+  const warnings: string[] = [];
+  if (!metadataComplete(sourceClosureMetadata) && metadataComplete(runtimeRegionMetadata)) {
+    warnings.push("metric_required_region_metadata_consumed_from_runtime_region_evidence");
+  } else if (
+    !metadataComplete(sourceClosureMetadata) &&
+    !metadataComplete(runtimeRegionMetadata) &&
+    metadataComplete(tensorAssumptionMetadata)
+  ) {
+    warnings.push("metric_required_region_metadata_inferred_from_same_chart_tensor_assumptions");
+  }
+  return { metadata, warnings };
 };
 
 const statusFromSameChartTensor = (
@@ -403,26 +491,49 @@ export const buildMetricRequiredRegionalFullTensorSourceFromRuntime = (args: {
   const chartId = representativeTensor?.chartId ?? "comoving_cartesian";
   const metricFamily = representativeTensor?.metricFamily ?? "nhm2_shift_lapse";
   const regions = NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS.map((regionId) => {
-    const metadata = metadataFromSourceClosure(sourceClosure, regionId);
     const regionalTensor = regionalTensors.get(regionId);
     if (regionalTensor != null) {
+      const { metadata, warnings: metadataWarnings } = metadataForRegion({
+        runtimeArtifact: args.runtimeArtifact,
+        sourceClosure,
+        regionId,
+        tensor: regionalTensor,
+      });
       return buildRegion({
         regionId,
         tensor: regionalTensor,
         runtimeArtifactRef: args.runtimeArtifactRef,
         metadata,
-        warnings: ["metric_required_regional_same_chart_full_tensor_source_consumed"],
+        warnings: [
+          "metric_required_regional_same_chart_full_tensor_source_consumed",
+          ...metadataWarnings,
+        ],
       });
     }
     if (regionId === "global" && globalTensor != null) {
+      const { metadata, warnings: metadataWarnings } = metadataForRegion({
+        runtimeArtifact: args.runtimeArtifact,
+        sourceClosure,
+        regionId,
+        tensor: globalTensor,
+      });
       return buildRegion({
         regionId,
         tensor: globalTensor,
         runtimeArtifactRef: args.runtimeArtifactRef,
         metadata,
-        warnings: ["metric_required_global_same_chart_full_tensor_source_consumed"],
+        warnings: [
+          "metric_required_global_same_chart_full_tensor_source_consumed",
+          ...metadataWarnings,
+        ],
       });
     }
+    const { metadata, warnings: metadataWarnings } = metadataForRegion({
+      runtimeArtifact: args.runtimeArtifact,
+      sourceClosure,
+      regionId,
+      tensor: null,
+    });
     const blocker =
       globalTensor != null
         ? "metric_required_region_full_tensor_aggregation_missing"
@@ -443,8 +554,8 @@ export const buildMetricRequiredRegionalFullTensorSourceFromRuntime = (args: {
       blockers: [blocker],
       warnings:
         globalTensor != null
-          ? ["global_same_chart_tensor_not_reused_as_regional_tensor"]
-          : ["metric_required_same_chart_full_tensor_source_missing"],
+          ? ["global_same_chart_tensor_not_reused_as_regional_tensor", ...metadataWarnings]
+          : ["metric_required_same_chart_full_tensor_source_missing", ...metadataWarnings],
     });
   });
 

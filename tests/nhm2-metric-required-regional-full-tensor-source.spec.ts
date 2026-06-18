@@ -55,7 +55,7 @@ const referenceRun = () =>
     },
   });
 
-const sameChartFullTensor = (value: number) =>
+const sameChartFullTensor = (value: number, defaultAssumptions: string[] = []) =>
   buildNhm2SameChartFullTensorArtifact({
     generatedAt: "2026-05-05T00:00:00.000Z",
     laneId: "nhm2_shift_lapse",
@@ -76,6 +76,7 @@ const sameChartFullTensor = (value: number) =>
       T23: 0,
       T33: value,
     },
+    defaultAssumptions,
     componentStatuses: {
       T00: "derived_same_chart",
       T0x: "derived_same_chart",
@@ -126,6 +127,36 @@ const sourceClosure = () => ({
           aggregationMode: "mean",
           normalizationBasis: "sample_count",
           sampleCount: regionId === "global" ? 512 : 144,
+        },
+      },
+    })),
+  },
+});
+
+const sourceClosureWithoutGlobalMetadata = () => ({
+  artifactId: "nhm2_source_closure",
+  schemaVersion: "nhm2_source_closure/v2",
+  tensors: {
+    metricRequired: { T00: -1, T11: 1, T22: 1, T33: 1 },
+  },
+  tensorRefs: {
+    metricRequired: "metric.global",
+  },
+  regionComparisons: {
+    regions: ["hull", "wall", "exterior_shell"].map((regionId) => ({
+      regionId,
+      metricAccounting: {
+        aggregationMode: "mean",
+        normalizationBasis: "sample_count",
+        sampleCount: 144,
+        regionMaskRef: `metric.mask.${regionId}`,
+      },
+      metricT00Diagnostics: {
+        trace: {
+          regionMaskRef: `metric.mask.${regionId}`,
+          aggregationMode: "mean",
+          normalizationBasis: "sample_count",
+          sampleCount: 144,
         },
       },
     })),
@@ -227,6 +258,176 @@ describe("NHM2 metric-required regional full tensor source", () => {
       expect(wall?.sampleCount).toBe(144);
       expect(wall?.sameChartFullTensor.completeness.fullTensorComplete).toBe(true);
       expect(wall?.blockers).toEqual([]);
+    }));
+
+  it("fills missing global metric aggregation metadata from runtime regional evidence", () =>
+    withTemp((root) => {
+      writeFileSync(join(root, "reference.json"), JSON.stringify(referenceRun()), "utf8");
+      writeFileSync(
+        join(root, "source.json"),
+        JSON.stringify(sourceClosureWithoutGlobalMetadata()),
+        "utf8",
+      );
+      writeFileSync(
+        join(root, "runtime.json"),
+        JSON.stringify({
+          regionComparisons: {
+            regions: [
+              {
+                regionId: "global",
+                sameChartFullTensor: sameChartFullTensor(10),
+                metricAccounting: {
+                  aggregationMode: "mean",
+                  normalizationBasis: "sample_count",
+                  sampleCount: 512,
+                  regionMaskRef: "runtime.metric.mask.global",
+                },
+                metricT00Diagnostics: {
+                  trace: {
+                    aggregationMode: "mean",
+                    normalizationBasis: "sample_count",
+                    sampleCount: 512,
+                    regionMaskRef: "runtime.metric.mask.global",
+                  },
+                },
+              },
+              ...["hull", "wall", "exterior_shell"].map((regionId, index) => ({
+                regionId,
+                sameChartFullTensor: sameChartFullTensor(20 + index),
+              })),
+            ],
+          },
+        }),
+        "utf8",
+      );
+
+      const artifact = publishMetricRequiredFullTensorSource({
+        repoRoot: root,
+        referenceRunPath: "reference.json",
+        runtimeArtifactPath: "runtime.json",
+        sourceClosurePath: "source.json",
+        outPath: "full-tensor-source.json",
+      });
+      const global = artifact.regions.find((region) => region.regionId === "global");
+
+      expect(global?.status).toBe("computed");
+      expect(global?.regionMaskRef).toBe("runtime.metric.mask.global");
+      expect(global?.aggregationMode).toBe("mean");
+      expect(global?.normalizationBasis).toBe("sample_count");
+      expect(global?.sampleCount).toBe(512);
+      expect(global?.blockers).not.toContain("metric_required_region_mask_ref_missing");
+      expect(global?.blockers).not.toContain(
+        "metric_required_region_full_tensor_aggregation_missing",
+      );
+      expect(global?.blockers).not.toContain(
+        "metric_required_region_full_tensor_normalization_missing",
+      );
+      expect(global?.blockers).not.toContain(
+        "metric_required_region_full_tensor_sample_count_missing",
+      );
+      expect(global?.warnings).toContain(
+        "metric_required_region_metadata_consumed_from_runtime_region_evidence",
+      );
+    }));
+
+  it("can infer global metric aggregation metadata from complete same-chart tensor assumptions", () =>
+    withTemp((root) => {
+      writeFileSync(join(root, "reference.json"), JSON.stringify(referenceRun()), "utf8");
+      writeFileSync(
+        join(root, "source.json"),
+        JSON.stringify(sourceClosureWithoutGlobalMetadata()),
+        "utf8",
+      );
+      writeFileSync(
+        join(root, "runtime.json"),
+        JSON.stringify({
+          regionComparisons: {
+            regions: [
+              {
+                regionId: "global",
+                sameChartFullTensor: sameChartFullTensor(10, [
+                  "regional tensor components are averaged over the source-closure brick mask",
+                  "regionId=global",
+                  "sampleCount=512",
+                  "brick_mask=ellipsoid_axes_m(1.000000,1.000000,1.000000)",
+                ]),
+              },
+              ...["hull", "wall", "exterior_shell"].map((regionId, index) => ({
+                regionId,
+                sameChartFullTensor: sameChartFullTensor(20 + index),
+              })),
+            ],
+          },
+        }),
+        "utf8",
+      );
+
+      const artifact = publishMetricRequiredFullTensorSource({
+        repoRoot: root,
+        referenceRunPath: "reference.json",
+        runtimeArtifactPath: "runtime.json",
+        sourceClosurePath: "source.json",
+        outPath: "full-tensor-source.json",
+      });
+      const global = artifact.regions.find((region) => region.regionId === "global");
+
+      expect(global?.status).toBe("computed");
+      expect(global?.regionMaskRef).toBe("metric_required.region.global.brick_mask");
+      expect(global?.aggregationMode).toBe("mean");
+      expect(global?.normalizationBasis).toBe("sample_count");
+      expect(global?.sampleCount).toBe(512);
+      expect(global?.warnings).toContain(
+        "metric_required_region_metadata_inferred_from_same_chart_tensor_assumptions",
+      );
+    }));
+
+  it("keeps global metric aggregation blocked when runtime evidence lacks metadata", () =>
+    withTemp((root) => {
+      writeFileSync(join(root, "reference.json"), JSON.stringify(referenceRun()), "utf8");
+      writeFileSync(
+        join(root, "source.json"),
+        JSON.stringify(sourceClosureWithoutGlobalMetadata()),
+        "utf8",
+      );
+      writeFileSync(
+        join(root, "runtime.json"),
+        JSON.stringify({
+          regionComparisons: {
+            regions: [
+              {
+                regionId: "global",
+                sameChartFullTensor: sameChartFullTensor(10, [
+                  "regional tensor components are averaged over the source-closure brick mask",
+                  "regionId=global",
+                ]),
+              },
+              ...["hull", "wall", "exterior_shell"].map((regionId, index) => ({
+                regionId,
+                sameChartFullTensor: sameChartFullTensor(20 + index),
+              })),
+            ],
+          },
+        }),
+        "utf8",
+      );
+
+      const artifact = publishMetricRequiredFullTensorSource({
+        repoRoot: root,
+        referenceRunPath: "reference.json",
+        runtimeArtifactPath: "runtime.json",
+        sourceClosurePath: "source.json",
+        outPath: "full-tensor-source.json",
+      });
+      const global = artifact.regions.find((region) => region.regionId === "global");
+
+      expect(global?.blockers).toContain("metric_required_region_mask_ref_missing");
+      expect(global?.blockers).toContain(
+        "metric_required_region_full_tensor_normalization_missing",
+      );
+      expect(global?.blockers).toContain(
+        "metric_required_region_full_tensor_sample_count_missing",
+      );
+      expect(artifact.summary.allAggregationMetadataKnown).toBe(false);
     }));
 
   it("feeds the generated source into the metric-required receipt path", () =>

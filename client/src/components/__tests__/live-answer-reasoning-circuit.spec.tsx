@@ -191,6 +191,18 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getAllByTestId("live-answer-packet-color-key")[0]).toHaveTextContent("packet-color=stage_play_processed_mail_packet:frog-001");
     expect(screen.getAllByTestId("live-answer-packet-color-key")[1]).toHaveTextContent("packet-color=live-answer-projection:bad-terminal");
     expect(screen.getAllByTestId("live-answer-packet-color-key")[2]).toHaveTextContent("packet-color=stage_play_live_source_watch_job_policy:ui");
+    expect(screen.getAllByTestId("live-answer-goal-context-circuit-route")[0]).toHaveTextContent("Source visual:screen share");
+    expect(screen.getAllByTestId("live-answer-goal-context-circuit-route")[0]).toHaveTextContent("Loop loop:visual mail");
+    expect(screen.getAllByTestId("live-answer-goal-context-circuit-route")[0]).toHaveTextContent("Deck microdeck output:frog classifier");
+    expect(screen.getAllByTestId("live-answer-goal-context-circuit-route")[0]).toHaveTextContent("Dispatch narrator bind translated transcript");
+    expect(screen.getAllByTestId("live-answer-goal-context-circuit-route")[0]).toHaveTextContent("Destination narrator:translated transcript | wake interrupt | preset:frog classifier | source binding");
+    expect(screen.getAllByTestId("live-answer-goal-context-circuit-route")[0]).toHaveTextContent("Authority evidence only");
+    expect(screen.getAllByTestId("live-answer-goal-context-circuit-route")[1]).toHaveTextContent("Destination live answer projection");
+    expect(screen.getAllByTestId("live-answer-goal-context-circuit-route")[1]).toHaveTextContent("Authority blocked terminal claim");
+    expect(screen.getAllByTestId("live-answer-goal-context-circuit-route")[2]).toHaveTextContent("Source visual:screen share");
+    expect(screen.getAllByTestId("live-answer-goal-context-circuit-route")[2]).toHaveTextContent("Loop live source watch job:ui");
+    expect(screen.getAllByTestId("live-answer-goal-context-circuit-route")[2]).toHaveTextContent("Destination loop control");
+    expect(screen.getAllByTestId("live-answer-goal-context-circuit-route")[2]).toHaveTextContent("Authority evidence only");
     expect(screen.getAllByTestId("live-answer-goal-context-authority-chips")[0]).toHaveTextContent("assistant=false");
     expect(screen.getAllByTestId("live-answer-goal-context-authority-chips")[0]).toHaveTextContent("terminal=false");
     expect(screen.getAllByTestId("live-answer-goal-context-authority-chips")[0]).toHaveTextContent("raw=false");

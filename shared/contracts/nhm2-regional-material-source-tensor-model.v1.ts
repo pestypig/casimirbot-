@@ -279,7 +279,15 @@ const componentAuthorityFor = (
     status: Nhm2RegionalMaterialSourceTensorRegionV1["status"];
   },
 ): Nhm2RegionalMaterialSourceComponentAuthority => {
-  if (args.explicitAuthority != null) return args.explicitAuthority;
+  if (args.explicitAuthority != null) {
+    if (
+      args.modelKind === "declared_research_tensor" &&
+      args.explicitAuthority === "constitutive_model"
+    ) {
+      return "source_model";
+    }
+    return args.explicitAuthority;
+  }
   if (args.tensor[args.component] == null) return "missing";
   if (args.status === "proxy" || args.tensorAuthorityMode === "proxy") {
     return "scalar_proxy";
@@ -287,16 +295,18 @@ const componentAuthorityFor = (
   if (args.tensorAuthorityMode === "diagonal_reduced_order") {
     return "reduced_order_declared";
   }
+  if (args.modelKind === "declared_research_tensor") {
+    return "source_model";
+  }
   if (
+    (args.modelKind === "lifshitz_regional_tensor" ||
+      args.modelKind === "measured_material_tensor") &&
     args.materialReceiptStatus === "material_receipted" &&
     (args.materialReceiptTier === "lifshitz_material_receipt" ||
       args.materialReceiptTier === "measured_material_receipt" ||
       args.materialReceiptTier === "simulated_material_receipt")
   ) {
     return "constitutive_model";
-  }
-  if (args.modelKind === "declared_research_tensor") {
-    return "source_model";
   }
   if (
     args.modelKind === "lifshitz_regional_tensor" ||
@@ -402,12 +412,20 @@ const normalizeRegion = (
       blockers.add(`${component}:${blocker}`);
     }
   }
+  const warnings = new Set(region.warnings);
+  if (
+    modelKind === "declared_research_tensor" &&
+    region.materialReceiptStatus === "material_receipted"
+  ) {
+    warnings.add("declared_research_tensor_material_receipt_is_qc_only");
+  }
   return {
     ...region,
     componentAuthority,
     tensorAuthorityMode,
     missingComponentIds,
     blockers: Array.from(blockers),
+    warnings: Array.from(warnings),
   };
 };
 

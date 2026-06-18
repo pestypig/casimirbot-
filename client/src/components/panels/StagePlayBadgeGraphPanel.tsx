@@ -2543,7 +2543,10 @@ const stagePlayDispatchActionLabel = (action: WorkstationDispatchActionV1): stri
   if (action.kind === "focus_process_graph") return `Focus: ${action.nodeRef ?? "graph"}`;
   if (action.kind === "update_panel") return `Panel: ${action.panelId}`;
   if (action.kind === "repair_loop") return `Repair: ${action.loopRef}`;
-  if (action.kind === "wake_agent") return `Wake interrupt${action.reason ? `: ${compactStagePlayText(action.reason, "wake", 42)}` : ""}`;
+  if (action.kind === "wake_agent") {
+    const interruptKind = "interruptKind" in action && action.interruptKind ? ` (${action.interruptKind})` : "";
+    return `Wake interrupt${interruptKind}${action.reason ? `: ${compactStagePlayText(action.reason, "wake", 42)}` : ""}`;
+  }
   if (action.kind === "log_receipt") return `Receipt: ${action.receiptRef ?? "latest"}`;
   if (action.kind === "ask_user") return "Ask user";
   return "No dispatch";
@@ -2554,6 +2557,94 @@ const stagePlayDispatchTone = (action: WorkstationDispatchActionV1): "default" |
   if (action.kind === "repair_loop") return "blocked";
   if (action.kind === "append_goal_context" || action.kind === "update_live_answer" || action.kind === "bind_narrator_stream" || action.kind === "speak_narrator" || action.kind === "set_loop_state") return "good";
   return "default";
+};
+
+type StagePlayGoalContextCircuitHop = {
+  key: string;
+  label: string;
+  value: string;
+};
+
+const firstStagePlayGoalContextRef = (
+  refs: string[],
+  match: (ref: string) => boolean,
+  fallback: string,
+): string => refs.find(match) ?? refs[0] ?? fallback;
+
+const compactStagePlayCircuitRef = (value: string): string =>
+  compactStagePlayText(
+    value
+      .replace(/^stage_play_/i, "")
+      .replace(/^workstation_/i, "")
+      .replace(/^live_answer_/i, "live_answer:")
+      .replace(/^source:/i, "source:"),
+    value,
+    42,
+  );
+
+const stagePlayDispatchDestinationLabel = (action: WorkstationDispatchActionV1): string | null => {
+  if (action.kind === "update_live_answer") return action.lineKey;
+  if (action.kind === "bind_narrator_stream") return `narrator:${action.streamKind}`;
+  if (action.kind === "speak_narrator") return `narrator:${action.mode}`;
+  if (action.kind === "change_preset") return action.targetRef;
+  if (action.kind === "bind_source") return action.targetRef;
+  if (action.kind === "unbind_source") return action.targetRef ?? action.sourceRef;
+  if (action.kind === "set_loop_state" || action.kind === "repair_loop") return action.loopRef;
+  if (action.kind === "focus_process_graph") return action.nodeRef ?? "stage-play-badge-graph";
+  if (action.kind === "wake_agent") return "wake interrupt";
+  if (action.kind === "ask_user") return "operator";
+  return null;
+};
+
+const stagePlayGoalContextCircuitHops = (
+  update: WorkstationGoalContextUpdateV1,
+): StagePlayGoalContextCircuitHop[] => {
+  const allRefs = Array.from(new Set([
+    update.contentRef,
+    ...update.sourceRefs,
+    ...update.loopRefs,
+    ...update.evidenceRefs,
+    ...update.receiptRefs,
+  ].filter(Boolean)));
+  const source = firstStagePlayGoalContextRef(
+    update.sourceRefs,
+    (ref) => /source|visual|audio|frame|transcript|lens|screen/i.test(ref),
+    "source pending",
+  );
+  const loop = firstStagePlayGoalContextRef(
+    update.loopRefs,
+    (ref) => /loop|mail|translation|transcription|health|automation|route|watch/i.test(ref),
+    update.producerKind,
+  );
+  const deck = allRefs.find((ref) =>
+    /microdeck|micro_reasoner|prompt_preset|deck/i.test(ref)
+  ) ?? allRefs.find((ref) =>
+    /translated_transcript|translation/i.test(ref)
+  ) ?? update.updateKind;
+  const dispatch = update.suggestedDispatch.find((action) =>
+    action.kind !== "log_receipt" &&
+    action.kind !== "append_goal_context" &&
+    action.kind !== "update_panel"
+  ) ?? update.suggestedDispatch[0] ?? { kind: "none" as const };
+  const destination = Array.from(new Set(update.suggestedDispatch
+    .map(stagePlayDispatchDestinationLabel)
+    .filter((value): value is string => Boolean(value))))
+    .slice(0, 4)
+    .map(compactStagePlayCircuitRef)
+    .join(" | ") || update.contentRef;
+  const authority = update.authority.terminalEligible === false &&
+    update.authority.assistantAnswer === false &&
+    update.authority.rawContentIncluded === false
+      ? "evidence only"
+      : "blocked terminal claim";
+  return [
+    { key: "source", label: "Source", value: compactStagePlayCircuitRef(source) },
+    { key: "loop", label: "Loop", value: compactStagePlayCircuitRef(loop) },
+    { key: "deck", label: "Deck", value: compactStagePlayCircuitRef(deck) },
+    { key: "dispatch", label: "Dispatch", value: compactStagePlayText(stagePlayDispatchActionLabel(dispatch), "none", 42) },
+    { key: "destination", label: "Destination", value: compactStagePlayText(destination, "destination pending", 96) },
+    { key: "authority", label: "Authority", value: authority },
+  ];
 };
 
 const isStagePlayWorkstationControlDispatch = (action: WorkstationDispatchActionV1): boolean =>
@@ -3488,6 +3579,7 @@ function StagePlayGoalContextBoard({
             const policyRefs = policyRefsForUpdate(update);
             const contextFeedPolicyRefs = contextFeedPolicyRefsForUpdate(update);
             const actuatorPolicyRefs = actuatorPolicyRefsForUpdate(update);
+            const circuitHops = stagePlayGoalContextCircuitHops(update);
             return (
               <div
                 key={update.updateId}
@@ -3503,6 +3595,17 @@ function StagePlayGoalContextBoard({
                   <span className="font-mono text-[9px] text-violet-200/70">{labelize(update.producerKind)}</span>
                 </div>
                 <div className="mt-1 line-clamp-2 text-[10px] leading-snug text-slate-300">{update.preview}</div>
+                <div
+                  className="mt-2 grid gap-1 rounded border border-slate-800 bg-black/25 p-1.5 sm:grid-cols-3"
+                  data-testid="stage-play-goal-context-circuit-route"
+                >
+                  {circuitHops.map((hop) => (
+                    <div key={`${update.updateId}:circuit:${hop.key}`} className="min-w-0">
+                      <div className="text-[8px] font-semibold uppercase tracking-wide text-violet-200/60">{hop.label}</div>
+                      <div className="mt-0.5 truncate font-mono text-[9px] text-slate-300">{hop.value}</div>
+                    </div>
+                  ))}
+                </div>
                 <div className="mt-2 flex flex-wrap gap-1" data-testid="stage-play-goal-context-authority-chips">
                   <span className={authorityChipClass(update.authority.assistantAnswer)}>assistant={String(update.authority.assistantAnswer)}</span>
                   <span className={authorityChipClass(update.authority.terminalEligible)}>terminal={String(update.authority.terminalEligible)}</span>
@@ -6320,6 +6423,7 @@ function StagePlayMailLoopLiveOverview({
     if (packet.arbiter?.wakeAsk) {
       packetDispatchActions.push({
         kind: "wake_agent",
+        interruptKind: "urgent",
         reason: packet.arbiter.reason ?? "micro-reasoner marked this packet as interruption-worthy",
       });
     }

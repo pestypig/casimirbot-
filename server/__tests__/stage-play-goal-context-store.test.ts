@@ -407,6 +407,33 @@ describe("stage-play goal context store", () => {
         },
       }),
     ]);
+    expect(listStagePlayGoalContextUpdates({ producerKind: "microdeck" })).toEqual([
+      expect.objectContaining({
+        updateKind: "translated_transcript",
+        contentRef: "stage_play_processed_mail_packet:earbud-translation",
+        preview: expect.stringContaining("MicroDeck output available for packet trace"),
+        sourceRefs: expect.arrayContaining([
+          "audio_source:earbuds",
+          "stage_play_live_source_mail:audio-translation-1",
+          "microdeck_output:earbud-translation",
+        ]),
+        loopRefs: expect.arrayContaining([
+          "stage_play_micro_reasoner_prompt_preset:earbud-translate-english:v1",
+          "stage_play_micro_reasoner_run:earbud-translation",
+          "microdeck_output_loop",
+        ]),
+        evidenceRefs: expect.arrayContaining([
+          "stage_play_processed_mail_packet:earbud-translation",
+          "microdeck_output:earbud-translation",
+        ]),
+        authority: {
+          assistantAnswer: false,
+          terminalEligible: false,
+          rawContentIncluded: false,
+          postToolModelStepRequired: true,
+        },
+      }),
+    ]);
     expect(listStagePlayGoalContextUpdates({ producerKind: "transcription_loop" })).toEqual([
       expect.objectContaining({
         updateKind: "transcript_window",
@@ -534,6 +561,7 @@ describe("stage-play goal context store", () => {
     expect(update.suggestedDispatch).toEqual(expect.arrayContaining([
       expect.objectContaining({
         kind: "wake_agent",
+        interruptKind: "blocked",
         reason: "wake result reports blocked or pressure-deferred follow-up",
       }),
       expect.objectContaining({ kind: "log_receipt", receiptRef: "stage_play_processed_mail_packet:frog-1" }),
@@ -603,7 +631,13 @@ describe("stage-play goal context store", () => {
     });
 
     expect(update.updateKind).toBe("suggested_action");
-    expect(update.suggestedDispatch.map((action) => action.kind)).toContain("wake_agent");
+    expect(update.suggestedDispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "wake_agent",
+        interruptKind: "urgent",
+        reason: "User asked the agent to monitor this image classification goal.",
+      }),
+    ]));
     expect(update.suggestedDispatch.map((action) => action.kind)).toContain("speak_narrator");
     expect(update.authority.assistantAnswer).toBe(false);
     expect(update.authority.terminalEligible).toBe(false);

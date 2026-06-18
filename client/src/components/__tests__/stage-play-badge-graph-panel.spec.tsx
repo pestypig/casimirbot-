@@ -2087,7 +2087,7 @@ describe("StagePlayBadgeGraphPanel", () => {
           suggestedDispatch: [
             { kind: "log_receipt", receiptRef: "stage_play_live_source_watch_job_policy:ui" },
             { kind: "update_panel", panelId: "stage-play-badge-graph" },
-            { kind: "wake_agent", reason: "urgent operator interruption" },
+            { kind: "wake_agent", interruptKind: "urgent", reason: "urgent operator interruption" },
             { kind: "append_goal_context", goalId: "goal:stage-play-monitor" },
             { kind: "set_loop_state", loopRef: "stage_play_live_source_watch_job:ui", state: "running" },
           ],
@@ -2405,6 +2405,21 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByTestId("stage-play-goal-context-update-freshness").some((node) =>
       /freshness=fresh observed=1780521602500 staleAfter=120000ms/i.test(node.textContent ?? "")
     )).toBe(true);
+    expect(screen.getAllByTestId("stage-play-goal-context-circuit-route").some((node) =>
+      /Source\s*source:visual-tab/i.test(node.textContent ?? "") &&
+      /Loop\s*translation_loop:ui/i.test(node.textContent ?? "") &&
+      /Deck\s*microdeck_output:translation-ui/i.test(node.textContent ?? "") &&
+      /Dispatch\s*Live Answer:/i.test(node.textContent ?? "") &&
+      /Destination\s*live_answer:projection:translation-ui.*narrator:translated_transcript/s.test(node.textContent ?? "") &&
+      /Authority\s*evidence only/i.test(node.textContent ?? "")
+    )).toBe(true);
+    expect(screen.getAllByTestId("stage-play-goal-context-circuit-route").some((node) =>
+      /Destination\s*wake interrupt/i.test(node.textContent ?? "") &&
+      /Authority\s*evidence only/i.test(node.textContent ?? "")
+    )).toBe(true);
+    expect(screen.getAllByTestId("stage-play-goal-context-circuit-route").some((node) =>
+      /Authority\s*blocked terminal claim/i.test(node.textContent ?? "")
+    )).toBe(true);
     expect(screen.getAllByTestId("stage-play-goal-context-authority-chips").some((node) =>
       /assistant=false.*terminal=false.*raw=false/s.test(node.textContent ?? "")
     )).toBe(true);
@@ -2415,7 +2430,7 @@ describe("StagePlayBadgeGraphPanel", () => {
       /Goal context|Panel|Narrator|Wake interrupt|Loop: running/i.test(node.textContent ?? "")
     )).toBe(true);
     expect(screen.getAllByTestId("stage-play-goal-context-dispatch").some((node) =>
-      /Wake interrupt: urgent operator interruption/i.test(node.textContent ?? "")
+      /Wake interrupt \(urgent\): urgent operator interruption/i.test(node.textContent ?? "")
     )).toBe(true);
     const arbiterRole = screen.getAllByTestId("stage-play-microdeck-role-square").find((node: HTMLElement) =>
       node.textContent?.includes("Hypothesis Arbiter")

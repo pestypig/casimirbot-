@@ -29,6 +29,24 @@ export type Nhm2RegionalFullTensorResidualComponentFamily =
   | "diagonal_tij"
   | "off_diagonal_tij";
 
+export type Nhm2RegionalFullTensorResidualPassWindowV1 = {
+  minCounterpartForPassSI: number;
+  maxCounterpartForPassSI: number;
+  toleranceAbsSI: number;
+  derivedFromMetricRequiredTensor: true;
+  sourceModelInputAllowed: false;
+};
+
+export type Nhm2RegionalFullTensorResidualCorrectionHintV1 = {
+  status:
+    | "already_within_tolerance"
+    | "reduce_magnitude_or_reorient"
+    | "increase_magnitude"
+    | "missing";
+  signedDeltaToNearestPassSI: number | null;
+  currentToAllowedMagnitudeRatio: number | null;
+};
+
 export type Nhm2RegionalFullTensorResidualComponentV1 = {
   componentId: (typeof NHM2_REGIONAL_FULL_TENSOR_RESIDUAL_REQUIRED_COMPONENTS)[number];
   family: Nhm2RegionalFullTensorResidualComponentFamily;
@@ -36,6 +54,8 @@ export type Nhm2RegionalFullTensorResidualComponentV1 = {
   tileEffectiveCounterpart: number | null;
   absResidual: number | null;
   relResidual: number | null;
+  passWindow: Nhm2RegionalFullTensorResidualPassWindowV1 | null;
+  correctionHint: Nhm2RegionalFullTensorResidualCorrectionHintV1;
   status: "pass" | "fail" | "missing";
   blockers: string[];
 };
@@ -45,6 +65,7 @@ export type Nhm2RegionalFullTensorResidualFamilySummaryV1 = {
   status: "pass" | "fail" | "missing";
   worstComponentId: Nhm2TensorComponent | null;
   worstRelResidual: number | null;
+  maxCurrentToAllowedMagnitudeRatio: number | null;
   failingComponentIds: Nhm2TensorComponent[];
   missingComponentIds: Nhm2TensorComponent[];
 };
@@ -169,6 +190,63 @@ const fullTensorAuthorityBlocker = (
   return `${side}_tensor_authority_unknown`;
 };
 
+const passWindow = (
+  metricRequired: number,
+  toleranceRelLInf: number,
+): Nhm2RegionalFullTensorResidualPassWindowV1 => {
+  const toleranceAbsSI =
+    Math.abs(metricRequired) > 0 ? toleranceRelLInf * Math.abs(metricRequired) : toleranceRelLInf;
+  return {
+    minCounterpartForPassSI: metricRequired - toleranceAbsSI,
+    maxCounterpartForPassSI: metricRequired + toleranceAbsSI,
+    toleranceAbsSI,
+    derivedFromMetricRequiredTensor: true,
+    sourceModelInputAllowed: false,
+  };
+};
+
+const correctionHint = (
+  tileEffectiveCounterpart: number | null,
+  window: Nhm2RegionalFullTensorResidualPassWindowV1 | null,
+): Nhm2RegionalFullTensorResidualCorrectionHintV1 => {
+  if (tileEffectiveCounterpart == null || window == null) {
+    return {
+      status: "missing",
+      signedDeltaToNearestPassSI: null,
+      currentToAllowedMagnitudeRatio: null,
+    };
+  }
+  if (
+    tileEffectiveCounterpart >= window.minCounterpartForPassSI &&
+    tileEffectiveCounterpart <= window.maxCounterpartForPassSI
+  ) {
+    return {
+      status: "already_within_tolerance",
+      signedDeltaToNearestPassSI: 0,
+      currentToAllowedMagnitudeRatio: null,
+    };
+  }
+  const nearestPassValue =
+    tileEffectiveCounterpart < window.minCounterpartForPassSI
+      ? window.minCounterpartForPassSI
+      : window.maxCounterpartForPassSI;
+  const allowedMagnitude = Math.max(
+    Math.abs(window.minCounterpartForPassSI),
+    Math.abs(window.maxCounterpartForPassSI),
+  );
+  const currentMagnitude = Math.abs(tileEffectiveCounterpart);
+  const currentToAllowedMagnitudeRatio =
+    allowedMagnitude > 0 ? currentMagnitude / allowedMagnitude : null;
+  return {
+    status:
+      currentToAllowedMagnitudeRatio != null && currentToAllowedMagnitudeRatio > 1
+        ? "reduce_magnitude_or_reorient"
+        : "increase_magnitude",
+    signedDeltaToNearestPassSI: nearestPassValue - tileEffectiveCounterpart,
+    currentToAllowedMagnitudeRatio,
+  };
+};
+
 const SOURCE_EVIDENCE_PRIORITY_BLOCKERS = new Set([
   "profile_mismatch",
   "chart_mismatch",
@@ -216,10 +294,16 @@ const componentResidual = (
       tileEffectiveCounterpart,
       absResidual: null,
       relResidual: null,
+      passWindow: metricRequired == null ? null : passWindow(metricRequired, toleranceRelLInf),
+      correctionHint: correctionHint(
+        tileEffectiveCounterpart,
+        metricRequired == null ? null : passWindow(metricRequired, toleranceRelLInf),
+      ),
       status: "missing",
       blockers,
     };
   }
+  const window = passWindow(metricRequired, toleranceRelLInf);
   const absResidual = Math.abs(metricRequired - tileEffectiveCounterpart);
   const relResidual =
     Math.abs(metricRequired) > 0 ? absResidual / Math.abs(metricRequired) : absResidual;
@@ -233,6 +317,8 @@ const componentResidual = (
     tileEffectiveCounterpart,
     absResidual,
     relResidual,
+    passWindow: window,
+    correctionHint: correctionHint(tileEffectiveCounterpart, window),
     status: relResidual <= toleranceRelLInf ? "pass" : "fail",
     blockers,
   };
@@ -255,6 +341,7 @@ const buildFamilyResiduals = (
         status: "missing",
         worstComponentId: null,
         worstRelResidual: null,
+        maxCurrentToAllowedMagnitudeRatio: null,
         failingComponentIds: [],
         missingComponentIds: NHM2_REGIONAL_FULL_TENSOR_RESIDUAL_REQUIRED_COMPONENTS.filter(
           (componentId) => componentFamily(componentId) === family,
@@ -275,6 +362,9 @@ const buildFamilyResiduals = (
       },
       null,
     );
+    const currentToAllowedRatios = familyComponents
+      .map((component) => component.correctionHint.currentToAllowedMagnitudeRatio)
+      .filter((value): value is number => value != null);
     return {
       family,
       status:
@@ -285,6 +375,8 @@ const buildFamilyResiduals = (
             : "pass",
       worstComponentId: worst?.componentId ?? null,
       worstRelResidual: worst?.relResidual ?? null,
+      maxCurrentToAllowedMagnitudeRatio:
+        currentToAllowedRatios.length === 0 ? null : Math.max(...currentToAllowedRatios),
       failingComponentIds,
       missingComponentIds,
     };
@@ -551,6 +643,20 @@ const isComponent = (
     isNullableNumber(record.tileEffectiveCounterpart) &&
     isNullableNumber(record.absResidual) &&
     isNullableNumber(record.relResidual) &&
+    (record.passWindow === null ||
+      (isRecord(record.passWindow) &&
+        isFiniteNumber(record.passWindow.minCounterpartForPassSI) &&
+        isFiniteNumber(record.passWindow.maxCounterpartForPassSI) &&
+        isFiniteNumber(record.passWindow.toleranceAbsSI) &&
+        record.passWindow.derivedFromMetricRequiredTensor === true &&
+        record.passWindow.sourceModelInputAllowed === false)) &&
+    isRecord(record.correctionHint) &&
+    (record.correctionHint.status === "already_within_tolerance" ||
+      record.correctionHint.status === "reduce_magnitude_or_reorient" ||
+      record.correctionHint.status === "increase_magnitude" ||
+      record.correctionHint.status === "missing") &&
+    isNullableNumber(record.correctionHint.signedDeltaToNearestPassSI) &&
+    isNullableNumber(record.correctionHint.currentToAllowedMagnitudeRatio) &&
     isStatus(record.status) &&
     isStringArray(record.blockers)
   );
@@ -566,6 +672,7 @@ const isFamilyResidual = (
     isStatus(record.status) &&
     (record.worstComponentId === null || isComponentId(record.worstComponentId)) &&
     isNullableNumber(record.worstRelResidual) &&
+    isNullableNumber(record.maxCurrentToAllowedMagnitudeRatio) &&
     Array.isArray(record.failingComponentIds) &&
     record.failingComponentIds.every(isComponentId) &&
     Array.isArray(record.missingComponentIds) &&

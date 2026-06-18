@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { WorkstationGoalContextUpdateV1 } from "../workstation-goal-context.v1";
+import {
+  WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
+  WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
+  type AgentGoalSessionV1,
+  type WorkstationGoalContextUpdateV1,
+} from "../workstation-goal-context.v1";
 import {
   WORKSTATION_CONTEXT_FEED_QUERY_RESULT_SCHEMA,
   validateWorkstationContextFeedQueryResultV1,
@@ -35,6 +40,9 @@ const updateFixture = (
     { kind: "append_goal_context", goalId: "goal:frog" },
     { kind: "update_panel", panelId: "stage-play-badge-graph" },
   ],
+  assistant_answer: false,
+  terminal_eligible: false,
+  raw_content_included: false,
   authority: {
     assistantAnswer: false,
     terminalEligible: false,
@@ -48,6 +56,73 @@ const resultFixture = (
   overrides: Partial<WorkstationContextFeedQueryResultV1> = {},
 ): WorkstationContextFeedQueryResultV1 => {
   const update = updateFixture();
+  const agentGoalSession: AgentGoalSessionV1 = {
+    schemaVersion: WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
+    goalId: "goal:frog",
+    threadId: "helix-ask:desktop",
+    roomId: "room:desktop",
+    objective: "Identify frog images from ImageLens visual summaries.",
+    userVisibleSummary: "Identifying frog imagery.",
+    status: "active",
+    sourceRefs: ["visual_source:image-lens"],
+    loopRefs: ["thread:helix-ask:desktop", "stage_play_mail_loop:helix-ask:desktop"],
+    constructRefs: ["image-lens", "live-answer-environment"],
+    contextFeeds: [{
+      feedId: "feed:visual-summaries",
+      sourceKind: "visual_summaries",
+      freshnessMs: 30_000,
+      relevancePolicy: "same-source-or-goal-id",
+    }],
+    allowedActuators: ["query_visual_summaries"],
+    cadence: { kind: "user_turn_only" },
+    stopConditions: ["user stops the goal", "visual source disconnects"],
+    checkpoints: [{
+      checkpointId: "goal_checkpoint:frog:1",
+      createdAtMs: 1_780_000_000_000,
+      summary: "Visual summaries queried for frog evidence.",
+      evidenceRefs: ["stage_play_goal_context_update:visual:1"],
+      actionsTaken: ["query_visual_summaries"],
+      nextStep: "continue",
+    }],
+    authority: {
+      assistantAnswer: false,
+      finalReportsRequireTerminalAuthority: true,
+      finalReportRequirements: WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
+    },
+  };
+  const goalContextUpdates = overrides.goalContextUpdates ?? [update];
+  const agentGoalSessions = overrides.agentGoalSessions ?? [agentGoalSession];
+  const validGoalSessions = agentGoalSessions
+    .filter((entry): entry is AgentGoalSessionV1 =>
+      typeof entry === "object" && entry !== null && "goalId" in entry,
+    );
+  const authoritySummary = overrides.authoritySummary ?? {
+    answerAuthority: "completed_solver_path_required",
+    updateCount: goalContextUpdates.length,
+    observationOnlyUpdateCount: goalContextUpdates.filter((entry) =>
+      entry.authority.assistantAnswer === false &&
+      entry.authority.terminalEligible === false &&
+      entry.authority.rawContentIncluded === false
+    ).length,
+    assistantAnswerCount: goalContextUpdates.filter((entry) => entry.authority.assistantAnswer !== false).length,
+    terminalEligibleCount: goalContextUpdates.filter((entry) => entry.authority.terminalEligible !== false).length,
+    rawContentIncludedCount: goalContextUpdates.filter((entry) => entry.authority.rawContentIncluded !== false).length,
+    postToolModelStepRequiredCount: goalContextUpdates.filter((entry) => entry.authority.postToolModelStepRequired === true).length,
+    activeGoalSessionCount: validGoalSessions.filter((entry) =>
+      entry.status === "active" ||
+      entry.status === "blocked" ||
+      entry.status === "paused"
+    ).length,
+    finalReportsRequireTerminalAuthorityCount: validGoalSessions.filter((entry) =>
+      entry.authority?.finalReportsRequireTerminalAuthority === true
+    ).length,
+    goalContextUpdateRefs: goalContextUpdates.map((entry) => entry.updateId),
+    goalSessionRefs: validGoalSessions.map((entry) => entry.goalId),
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+    post_tool_model_step_required: true,
+  };
   return {
     schema: WORKSTATION_CONTEXT_FEED_QUERY_RESULT_SCHEMA,
     resultId: "stage_play_context_feed_query:visual_summaries:frog",
@@ -64,17 +139,11 @@ const resultFixture = (
     feedAllowed: true,
     requiredActuator: "query_visual_summaries",
     actuatorAllowed: true,
-    agentGoalSession: null,
-    agentGoalSessions: [],
-    goalContextUpdates: [update],
-    authoritySummary: {
-      answerAuthority: "completed_solver_path_required",
-      assistant_answer: false,
-      terminal_eligible: false,
-      raw_content_included: false,
-      post_tool_model_step_required: true,
-    },
-    updateCount: 1,
+    agentGoalSession,
+    agentGoalSessions,
+    goalContextUpdates,
+    authoritySummary,
+    updateCount: overrides.updateCount ?? goalContextUpdates.length,
     syncedWindow: {
       mailItemCount: 1,
       processedPacketCount: 0,
@@ -96,6 +165,226 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
     expect(validateWorkstationContextFeedQueryResultV1(resultFixture())).toEqual([]);
   });
 
+  it("requires feed query results to carry both feed and actuator policy refs", () => {
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      policyEvidenceRefs: ["context_feed:visual_summaries"],
+    }))).toEqual(expect.arrayContaining([
+      "policyEvidenceRefs must include actuator policy ref",
+    ]));
+
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      policyEvidenceRefs: ["allowed_actuator:query_visual_summaries"],
+    }))).toEqual(expect.arrayContaining([
+      "policyEvidenceRefs must include context feed policy ref",
+    ]));
+  });
+
+  it("requires read results to be admitted and blocked results to suppress updates", () => {
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      feedAllowed: false,
+      actuatorAllowed: false,
+    }))).toEqual(expect.arrayContaining([
+      "read feed query results must have feedAllowed=true",
+      "read feed query results must have actuatorAllowed=true",
+    ]));
+
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      status: "blocked",
+      missingRequirements: ["context_feed:visual_summaries"],
+      feedAllowed: false,
+    }))).toEqual(expect.arrayContaining([
+      "blocked feed query results must not include goalContextUpdates",
+    ]));
+  });
+
+  it("rejects feed query results that claim a found goal session without session evidence", () => {
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      goalSessionFound: true,
+      agentGoalSession: null,
+      agentGoalSessions: [],
+    }))).toEqual(expect.arrayContaining([
+      "goalSessionFound=true requires agentGoalSession",
+      "goalSessionFound=true requires at least one agentGoalSessions entry",
+    ]));
+  });
+
+  it("rejects feed query results whose session evidence is malformed or for another goal", () => {
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      agentGoalSession: {
+        goalId: "goal:wrong",
+        threadId: "helix-ask:desktop",
+      },
+      agentGoalSessions: [{
+        goalId: "goal:wrong",
+        threadId: "helix-ask:desktop",
+      }],
+    }))).toEqual(expect.arrayContaining([
+      "agentGoalSession.schemaVersion must match agent goal session schema",
+      "agentGoalSession.goalId must match goalId",
+      "agentGoalSessions[0].schemaVersion must match agent goal session schema",
+      "agentGoalSessions[0].goalId must match goalId",
+    ]));
+  });
+
+  it("rejects authority summaries that do not cite the summarized update and session refs", () => {
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      authoritySummary: {
+        answerAuthority: "completed_solver_path_required",
+        goalContextUpdateRefs: [],
+        goalSessionRefs: [],
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        post_tool_model_step_required: true,
+      },
+    }))).toEqual(expect.arrayContaining([
+      "authoritySummary.goalContextUpdateRefs must include every goalContextUpdates updateId",
+      "authoritySummary.goalSessionRefs must include every agentGoalSessions goalId",
+    ]));
+  });
+
+  it("rejects authority summaries whose counts do not match embedded evidence", () => {
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      authoritySummary: {
+        answerAuthority: "completed_solver_path_required",
+        updateCount: 0,
+        observationOnlyUpdateCount: 0,
+        assistantAnswerCount: 1,
+        terminalEligibleCount: 1,
+        rawContentIncludedCount: 1,
+        postToolModelStepRequiredCount: 0,
+        activeGoalSessionCount: 0,
+        finalReportsRequireTerminalAuthorityCount: 0,
+        goalContextUpdateRefs: ["stage_play_goal_context_update:visual:1"],
+        goalSessionRefs: ["goal:frog"],
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        post_tool_model_step_required: true,
+      },
+    }))).toEqual(expect.arrayContaining([
+      "authoritySummary.updateCount must match goalContextUpdates length",
+      "authoritySummary.observationOnlyUpdateCount must match observation-only updates",
+      "authoritySummary.assistantAnswerCount must match assistant-answer updates",
+      "authoritySummary.terminalEligibleCount must match terminal-eligible updates",
+      "authoritySummary.rawContentIncludedCount must match raw-content updates",
+      "authoritySummary.postToolModelStepRequiredCount must match post-tool update count",
+      "authoritySummary.activeGoalSessionCount must match active goal sessions",
+      "authoritySummary.finalReportsRequireTerminalAuthorityCount must match authority-bound sessions",
+    ]));
+  });
+
+  it("accepts MicroDeck updates only on the MicroDeck feed lane", () => {
+    const microdeckUpdate = updateFixture({
+      updateId: "stage_play_goal_context_update:microdeck:1",
+      producerKind: "microdeck",
+      updateKind: "classification",
+      contentRef: "stage_play_processed_mail_packet:frog",
+      preview: "MicroDeck classified the packet as amphibian visual evidence.",
+      evidenceRefs: ["stage_play_processed_mail_packet:frog"],
+      receiptRefs: ["stage_play_processed_mail_packet:frog"],
+    });
+
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      resultId: "stage_play_context_feed_query:microdeck_outputs:frog",
+      feedKind: "microdeck_outputs",
+      label: "MicroDeck outputs",
+      policyEvidenceRefs: ["context_feed:microdeck_outputs", "allowed_actuator:query_microdeck_outputs"],
+      requiredActuator: "query_microdeck_outputs",
+      goalContextUpdates: [microdeckUpdate],
+      updateCount: 1,
+    }))).toEqual([]);
+  });
+
+  it("rejects visual feed query results carrying MicroDeck updates", () => {
+    const microdeckUpdate = updateFixture({
+      updateId: "stage_play_goal_context_update:microdeck:wrong-lane",
+      producerKind: "microdeck",
+      updateKind: "classification",
+      contentRef: "stage_play_processed_mail_packet:frog",
+      preview: "MicroDeck classified the packet as amphibian visual evidence.",
+      evidenceRefs: ["stage_play_processed_mail_packet:frog"],
+      receiptRefs: ["stage_play_processed_mail_packet:frog"],
+    });
+
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      goalContextUpdates: [microdeckUpdate],
+      updateCount: 1,
+    }))).toEqual(expect.arrayContaining([
+      "goalContextUpdates[0] does not match feedKind visual_summaries",
+    ]));
+  });
+
+  it("rejects Live Answer feed query results carrying route-watch evidence", () => {
+    const routeWatchUpdate = updateFixture({
+      updateId: "stage_play_goal_context_update:route_watch:wrong-lane",
+      producerKind: "route_watch",
+      updateKind: "route_evidence",
+      contentRef: "stage_play_context_feed_query:visual_summaries:frog",
+      preview: "Route watch recorded that a visual summaries query happened.",
+      evidenceRefs: ["context_feed:visual_summaries"],
+      receiptRefs: ["stage_play_context_feed_query:visual_summaries:frog"],
+    });
+
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      resultId: "stage_play_context_feed_query:live_answer_lines:frog",
+      feedKind: "live_answer_lines",
+      label: "Live Answer state",
+      policyEvidenceRefs: ["context_feed:live_answer_lines", "allowed_actuator:query_live_answer_state"],
+      requiredActuator: "query_live_answer_state",
+      goalContextUpdates: [routeWatchUpdate],
+      updateCount: 1,
+    }))).toEqual(expect.arrayContaining([
+      "goalContextUpdates[0] does not match feedKind live_answer_lines",
+    ]));
+  });
+
+  it("accepts route evidence feed results carrying route-watch automation status", () => {
+    const automationUpdate = updateFixture({
+      updateId: "stage_play_goal_context_update:automation:route-watch-policy",
+      producerKind: "automation",
+      updateKind: "automation_status",
+      contentRef: "stage_play_live_source_watch_job_policy:route-watch",
+      preview: "Route-watch automation policy is armed for source packets.",
+      evidenceRefs: ["stage_play_live_source_watch_job_policy:route-watch"],
+      receiptRefs: ["stage_play_live_source_watch_job_policy:route-watch"],
+    });
+
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      resultId: "stage_play_context_feed_query:route_evidence:frog",
+      feedKind: "route_evidence",
+      label: "route evidence",
+      policyEvidenceRefs: ["context_feed:route_evidence", "allowed_actuator:query_route_evidence"],
+      requiredActuator: "query_route_evidence",
+      goalContextUpdates: [automationUpdate],
+      updateCount: 1,
+    }))).toEqual([]);
+  });
+
+  it("rejects automation policy feed results carrying route-watch evidence records", () => {
+    const routeWatchUpdate = updateFixture({
+      updateId: "stage_play_goal_context_update:route_watch:automation-wrong-lane",
+      producerKind: "route_watch",
+      updateKind: "route_evidence",
+      contentRef: "route_watch_evidence:frog",
+      preview: "Route-watch query evidence should not appear in automation policy feeds.",
+      evidenceRefs: ["route_watch_evidence:frog"],
+      receiptRefs: ["route_watch_evidence:frog"],
+    });
+
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      resultId: "stage_play_context_feed_query:automation_policies:frog",
+      feedKind: "automation_policies",
+      label: "automation policies",
+      policyEvidenceRefs: ["context_feed:automation_policies", "allowed_actuator:query_automation_policies"],
+      requiredActuator: "query_automation_policies",
+      goalContextUpdates: [routeWatchUpdate],
+      updateCount: 1,
+    }))).toEqual(expect.arrayContaining([
+      "goalContextUpdates[0] does not match feedKind automation_policies",
+    ]));
+  });
+
   it("accepts blocked feed query results when no updates are returned", () => {
     expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
       status: "blocked",
@@ -113,6 +402,9 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
 
   it("rejects feed query results that carry terminalizing updates", () => {
     const invalidUpdate = updateFixture({
+      assistant_answer: true as false,
+      terminal_eligible: true as false,
+      raw_content_included: true as false,
       authority: {
         assistantAnswer: true as false,
         terminalEligible: true as false,
@@ -134,6 +426,9 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
         post_tool_model_step_required: false,
       },
     } as Partial<WorkstationContextFeedQueryResultV1>))).toEqual(expect.arrayContaining([
+      "goalContextUpdates[0].goal context updates must expose assistant_answer=false",
+      "goalContextUpdates[0].goal context updates must expose terminal_eligible=false",
+      "goalContextUpdates[0].goal context updates must expose raw_content_included=false",
       "goalContextUpdates[0].goal context updates must not be assistant answers",
       "goalContextUpdates[0].goal context updates must not be terminal eligible",
       "goalContextUpdates[0].goal context updates must not include raw content",

@@ -18,6 +18,7 @@ import {
 import { resetConversationalAnswerDistillationsForTest } from "../services/helix-ask/conversational-answer-distillation-store";
 import { resetLiveSourcePipelinesForTest } from "../services/helix-ask/live-source-pipeline-executor";
 import { resetReceiptPresentationSnapshotsForTest } from "../services/helix-ask/receipt-presentation-snapshot-store";
+import { HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION } from "../services/helix-ask/terminal-rail-failure-reconciliation";
 import { resetClientCapabilityActionsForTest } from "../services/client-capabilities/client-action-queue";
 import { resetClientCapabilityAdoptionsForTest } from "../services/client-capabilities/client-adoption-store";
 import { resetLiveAnswerEnvironments } from "../services/situation-room/live-answer-environment-store";
@@ -397,6 +398,93 @@ const seedScenario = async (
 
 const enabledParityScenarios = API_PARITY_SCENARIOS.filter((scenario) => scenario.enabled);
 
+const buildCompleteCapabilityCatalogRailTable = (
+  turnId: string,
+  prompt: string,
+): Record<string, unknown> => ({
+  schema: CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
+  turn_id: turnId,
+  prompt,
+  requested_capability: null,
+  visible_tool_surface: ["helix_ask.inspect_capability_catalog"],
+  visible_tool_surface_original_count: 1,
+  visible_tool_surface_truncated: false,
+  selected_capability: "helix_ask.inspect_capability_catalog",
+  admitted_capability: "helix_ask.inspect_capability_catalog",
+  admission_proof_source: "operational_capability_trace.policy_admitted_capability",
+  admission_proven: true,
+  executed_capability: "helix_ask.inspect_capability_catalog",
+  observation_kind: "capability_registry",
+  observation_ref: `${turnId}:capability_registry_inspect:capability_registry:1`,
+  required_observation_kinds_for_requested_capability: [],
+  observed_artifact_supports_requested_capability: null,
+  reentry_status: "reentered",
+  reentry_proof_source: "capability_help_summary_materialized_from_catalog_observation",
+  reentry_proven: true,
+  goal_satisfaction: "satisfied",
+  required_terminal_kind: "capability_help_summary",
+  selected_terminal_kind: "capability_help_summary",
+  terminal_authority_proof_source: "terminal_answer_authority.terminal_artifact_kind",
+  terminal_authority_proven: true,
+  visible_terminal_kind: "capability_help_summary",
+  visible_projection_source: "terminal_presentation.terminal_artifact_kind",
+  visible_projection_proven: true,
+  first_broken_rail: null,
+  repair_target: null,
+  codex_parity_class: "complete",
+  normalized_codex_parity_classes: [...CODEX_PARITY_CLASSES],
+  rail_status: "complete",
+  rail_failure_code: null,
+  assistant_answer: false,
+  terminal_eligible: false,
+  raw_content_included: false,
+});
+
+const buildCompleteCapabilityCatalogAskTurn = (railTable: Record<string, unknown>): Record<string, unknown> => ({
+  turn_id: railTable.turn_id,
+  final_status: "final_answer",
+  response_type: "final_answer",
+  final_answer_source: "capability_help_summary",
+  terminal_artifact_kind: "capability_help_summary",
+  selected_final_answer: "Helix Ask can use capability catalog tools.",
+  codex_parity_agent_spine_rail_table: railTable,
+  terminal_answer_authority: {
+    server_authoritative: true,
+    terminal_artifact_kind: "capability_help_summary",
+    final_answer_source: "capability_help_summary",
+  },
+  route_authority_audit: {
+    route_authority_ok: true,
+    violation_codes: [],
+  },
+  poison_audit: {
+    ok: true,
+  },
+  loop_parity_trace: {
+    admitted_tool_families: ["capability_catalog"],
+    actual_tool_calls: [{ tool_id: "helix_ask.inspect_capability_catalog", family: "capability_catalog" }],
+    unexpected_tool_calls: [],
+    observations_created: [{ kind: "capability_registry" }],
+    evidence_selected_for_answer: [{ kind: "capability_registry" }],
+    short_circuit_risk_flags: [],
+  },
+  ask_turn_solver_trace: {
+    completed_solver_path: true,
+    selected_primary_intent: "capability_catalog",
+    primary_intent: { route: "capability_catalog" },
+    prompt_interpretation: {
+      prompt_shape: "capability_catalog",
+      contextual_tool_mentions: [],
+      executable_operator_commands: [],
+    },
+    solver_short_circuit_flags: [],
+  },
+  capability_selection_result: {
+    capability_id: "helix_ask.inspect_capability_catalog",
+  },
+  capability_selection_trace: [{ selected_capability: "helix_ask.inspect_capability_catalog" }],
+});
+
 describe("Helix Ask API parity matrix", () => {
   beforeEach(resetAll);
 
@@ -464,6 +552,11 @@ describe("Helix Ask API parity matrix", () => {
       scenario_id: scenario.id,
       debug_export_available: true,
       terminal_authority_ok: true,
+      terminal_failure_reconciliation_runtime: {
+        available: true,
+        version: HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION,
+        current: true,
+      },
       rail_table: {
         present: true,
         turn_id: railTable.turn_id,
@@ -709,6 +802,62 @@ describe("Helix Ask API parity matrix", () => {
     );
   });
 
+  it("rejects API/debug bundles without a current terminal failure reconciliation runtime marker", () => {
+    const scenario: HelixApiParityScenario = {
+      id: "terminal_failure_reconciliation_runtime_marker_stale",
+      description: "The API probe must identify stale server bundles that predate rail-terminal reconciliation.",
+      enabled: true,
+      seed: "none",
+      prompt: "What tools are available for the helix ask to use?",
+      expected: {},
+    };
+    const railTable = buildCompleteCapabilityCatalogRailTable(
+      "ask:test:terminal-failure-reconciliation-marker",
+      scenario.prompt,
+    );
+    const askTurn = buildCompleteCapabilityCatalogAskTurn(railTable);
+
+    const missingMarkerProbe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: { payload: askTurn },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(missingMarkerProbe.procedural_ok).toBe(false);
+    expect(missingMarkerProbe.failures).toContain(
+      "debug_mirror_stale:tool_rail_terminal_failure_reconciliation_runtime_missing",
+    );
+
+    const staleMarkerProbe = buildApiParityProbeResult({
+      scenario,
+      askTurn: {
+        ...askTurn,
+        tool_rail_terminal_failure_reconciliation_runtime: {
+          schema: "helix.tool_rail_terminal_failure_reconciliation.runtime.v1",
+          version: "stale.localhost.bundle",
+          available: true,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      debugExport: { payload: askTurn },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(staleMarkerProbe.procedural_ok).toBe(false);
+    expect(staleMarkerProbe.failures).toContain(
+      `debug_mirror_stale:tool_rail_terminal_failure_reconciliation_runtime_version:stale.localhost.bundle!=${HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION}`,
+    );
+    expect(staleMarkerProbe.terminal_failure_reconciliation_runtime).toMatchObject({
+      available: true,
+      version: "stale.localhost.bundle",
+      current: false,
+    });
+  });
+
   it("rejects a rail table whose normalized parity-class contract drifted", () => {
     const scenario: HelixApiParityScenario = {
       id: "rail_table_class_contract_drift",
@@ -950,6 +1099,217 @@ describe("Helix Ask API parity matrix", () => {
 
     expect(emptyObservationContractProbe.procedural_ok).toBe(false);
     expect(emptyObservationContractProbe.failures).toContain("rail_requested_observation_kinds_empty");
+  });
+
+  it("rejects stale budget exhaustion when a fail-closed rail already names the missing observation", () => {
+    const scenario: HelixApiParityScenario = {
+      id: "fail_closed_rail_stale_budget_exhaustion",
+      description: "A fail-closed observation rail must not leave the public envelope on generic budget exhaustion.",
+      enabled: true,
+      seed: "none",
+      prompt: "Use live_env.read_processed_live_source_mail to inspect the latest processed live-source mail.",
+      expected: {
+        solver_completed: false,
+      },
+    };
+    const railTable = {
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      turn_id: "ask:test:stale-budget-fail-closed-rail",
+      prompt: scenario.prompt,
+      requested_capability: "live_env.read_processed_live_source_mail",
+      visible_tool_surface: ["live_env.read_processed_live_source_mail"],
+      visible_tool_surface_original_count: 1,
+      visible_tool_surface_truncated: false,
+      selected_capability: "live_env.read_processed_live_source_mail",
+      admitted_capability: "live_env.read_processed_live_source_mail",
+      admission_proof_source: "tool_call_admission_decision.selected_capability",
+      admission_proven: true,
+      executed_capability: "live_env.read_processed_live_source_mail",
+      observation_kind: "reasoning_context",
+      observation_ref: "ask:test:reasoning_context:1",
+      required_observation_kinds_for_requested_capability: ["stage_play_processed_mail_packet"],
+      observed_artifact_supports_requested_capability: false,
+      reentry_status: "reentered",
+      reentry_proof_source: "tool_lifecycle_trace.lifecycle_stage",
+      reentry_proven: true,
+      goal_satisfaction: "not_satisfied",
+      required_terminal_kind: "model_synthesized_answer",
+      selected_terminal_kind: "typed_failure",
+      terminal_authority_proof_source: "terminal_answer_authority.terminal_artifact_kind",
+      terminal_authority_proven: true,
+      visible_terminal_kind: "typed_failure",
+      visible_projection_source: "terminal_presentation.terminal_artifact_kind",
+      visible_projection_proven: true,
+      first_broken_rail: "observation_artifact",
+      repair_target: "observation_materializer",
+      codex_parity_class: "observation_missing",
+      normalized_codex_parity_classes: [...CODEX_PARITY_CLASSES],
+      rail_status: "fail_closed",
+      rail_failure_code: "required_observation_missing",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const askTurn = {
+      turn_id: railTable.turn_id,
+      final_status: "final_failure",
+      response_type: "final_failure",
+      terminal_error_code: "agent_loop_budget_exhausted",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      selected_final_answer:
+        "I could not complete this turn because the agent loop exhausted its max tool calls budget before satisfying the goal.",
+      codex_parity_agent_spine_rail_table: railTable,
+      ask_turn_solver_trace: {
+        completed_solver_path: false,
+        selected_primary_intent: "live_source_mailbox",
+        solver_short_circuit_flags: [],
+      },
+      loop_parity_trace: {
+        admitted_tool_families: ["live_environment"],
+        actual_tool_calls: ["live_env.read_processed_live_source_mail"],
+        unexpected_tool_calls: [],
+        short_circuit_risk_flags: [],
+      },
+      route_authority_audit: {
+        route_authority_ok: true,
+        violation_codes: [],
+      },
+      poison_audit: {
+        ok: true,
+      },
+      terminal_answer_authority: {
+        server_authoritative: true,
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "agent_loop_budget_exhausted",
+      },
+      terminal_presentation: {
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "agent_loop_budget_exhausted",
+      },
+    };
+
+    const probe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: { payload: askTurn },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(probe.procedural_ok).toBe(false);
+    expect(probe.failures).toContain("fail_closed_rail_stale_budget_exhaustion:agent_loop_budget_exhausted");
+  });
+
+  it("rejects fail-closed rails that project as normal final answers", () => {
+    const scenario: HelixApiParityScenario = {
+      id: "fail_closed_rail_normal_answer_projection",
+      description: "A fail-closed rail must project as a typed failure, not as a normal final answer.",
+      enabled: true,
+      seed: "none",
+      prompt: "Use live_env.read_processed_live_source_mail to inspect the latest processed live-source mail.",
+      expected: {
+        solver_completed: false,
+      },
+    };
+    const railTable = {
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      turn_id: "ask:test:fail-closed-normal-answer-projection",
+      prompt: scenario.prompt,
+      requested_capability: "live_env.read_processed_live_source_mail",
+      visible_tool_surface: ["live_env.read_processed_live_source_mail"],
+      visible_tool_surface_original_count: 1,
+      visible_tool_surface_truncated: false,
+      selected_capability: "live_env.read_processed_live_source_mail",
+      admitted_capability: "live_env.read_processed_live_source_mail",
+      admission_proof_source: "tool_call_admission_decision.selected_capability",
+      admission_proven: true,
+      executed_capability: "live_env.read_processed_live_source_mail",
+      observation_kind: "reasoning_context",
+      observation_ref: "ask:test:reasoning_context:1",
+      required_observation_kinds_for_requested_capability: ["stage_play_processed_mail_packet"],
+      observed_artifact_supports_requested_capability: false,
+      reentry_status: "reentered",
+      reentry_proof_source: "tool_lifecycle_trace.lifecycle_stage",
+      reentry_proven: true,
+      goal_satisfaction: "not_satisfied",
+      required_terminal_kind: "model_synthesized_answer",
+      selected_terminal_kind: "model_synthesized_answer",
+      terminal_authority_proof_source: "terminal_answer_authority.terminal_artifact_kind",
+      terminal_authority_proven: true,
+      visible_terminal_kind: "model_synthesized_answer",
+      visible_projection_source: "terminal_presentation.terminal_artifact_kind",
+      visible_projection_proven: true,
+      first_broken_rail: "observation_artifact",
+      repair_target: "observation_materializer",
+      codex_parity_class: "observation_missing",
+      normalized_codex_parity_classes: [...CODEX_PARITY_CLASSES],
+      rail_status: "fail_closed",
+      rail_failure_code: "required_observation_missing",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const askTurn = {
+      turn_id: railTable.turn_id,
+      final_status: "final_answer",
+      response_type: "final_answer",
+      final_answer_source: "model_synthesized_answer",
+      terminal_artifact_kind: "model_synthesized_answer",
+      selected_final_answer: "Here is a normal-looking answer without the required mailbox observation.",
+      codex_parity_agent_spine_rail_table: railTable,
+      tool_rail_terminal_failure_reconciliation_runtime: {
+        schema: "helix.tool_rail_terminal_failure_reconciliation.runtime.v1",
+        version: HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION,
+        available: true,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      ask_turn_solver_trace: {
+        completed_solver_path: false,
+        selected_primary_intent: "live_source_mailbox",
+        solver_short_circuit_flags: [],
+      },
+      loop_parity_trace: {
+        admitted_tool_families: ["live_environment"],
+        actual_tool_calls: ["live_env.read_processed_live_source_mail"],
+        unexpected_tool_calls: [],
+        short_circuit_risk_flags: [],
+      },
+      route_authority_audit: {
+        route_authority_ok: true,
+        violation_codes: [],
+      },
+      poison_audit: {
+        ok: true,
+      },
+      terminal_answer_authority: {
+        server_authoritative: true,
+        final_answer_source: "model_synthesized_answer",
+        terminal_artifact_kind: "model_synthesized_answer",
+      },
+      terminal_presentation: {
+        terminal_artifact_kind: "model_synthesized_answer",
+      },
+    };
+
+    const probe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: { payload: askTurn },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(probe.procedural_ok).toBe(false);
+    expect(probe.failures).toEqual(
+      expect.arrayContaining([
+        "fail_closed_rail_missing_terminal_error_code",
+        "fail_closed_rail_not_typed_failure:model_synthesized_answer/model_synthesized_answer",
+        "fail_closed_rail_non_failure_response:final_answer/final_answer",
+      ]),
+    );
   });
 
   it("rejects selected or executed capability progress without admission proof", () => {

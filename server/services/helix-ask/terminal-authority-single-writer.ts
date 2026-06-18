@@ -117,6 +117,59 @@ const toolRailFailureTerminalText = (
   return `I could not produce a terminal answer because the requested tool rail did not complete. Cause: ${failure.railFailureCode}.`;
 };
 
+const workstationTerminalCanRepairToolRailFailure = (input: {
+  payload: Record<string, unknown>;
+  failure: TerminalBlockingToolRailFailure | null;
+  terminal: { artifact: ArtifactLike; kind: "workstation_tool_evaluation"; text: string; ref: string | null } | null;
+  workstationTerminalMaterialized: boolean;
+}): boolean => {
+  if (!input.failure || !input.terminal || !input.workstationTerminalMaterialized) return false;
+  const requiredTerminal = readString(readRecord(input.payload.canonical_goal_frame)?.required_terminal_kind);
+  if (requiredTerminal !== "workstation_tool_evaluation") return false;
+  if (input.terminal.kind !== "workstation_tool_evaluation") return false;
+  const repairableFailure =
+    input.failure.railFailureCode === "terminal_not_materialized" ||
+    input.failure.railFailureCode === "terminal_projection_mismatch" ||
+    input.failure.railFailureCode === "debug_mirror_stale" ||
+    input.failure.railFailureCode === "terminal_authority_missing";
+  if (!repairableFailure) return false;
+  return (
+    input.failure.firstBrokenRail === "terminal_materialization" ||
+    input.failure.firstBrokenRail === "terminal_authority" ||
+    input.failure.firstBrokenRail === "visible_projection"
+  );
+};
+
+const syncWorkstationTerminalMaterializationMirrors = (input: {
+  payload: Record<string, unknown>;
+  terminalArtifactRef: string | null;
+}): void => {
+  const draftSelection = readRecord(input.payload.final_answer_draft_selection);
+  if (!draftSelection) return;
+  const previousKind = readString(draftSelection.materialized_terminal_artifact_kind);
+  const previousRef = readString(draftSelection.materialized_terminal_artifact_ref);
+  const syncedDraftSelection = {
+    ...draftSelection,
+    materialized_terminal_artifact_kind: "workstation_tool_evaluation",
+    materialized_terminal_artifact_ref: input.terminalArtifactRef,
+    selected_terminal_artifact_kind: "workstation_tool_evaluation",
+    selected_terminal_artifact_ref: input.terminalArtifactRef,
+    superseded_materialized_terminal_artifact_kind:
+      previousKind && previousKind !== "workstation_tool_evaluation"
+        ? previousKind
+        : readString(draftSelection.superseded_materialized_terminal_artifact_kind) ?? null,
+    superseded_materialized_terminal_artifact_ref:
+      previousRef && previousRef !== input.terminalArtifactRef
+        ? previousRef
+        : readString(draftSelection.superseded_materialized_terminal_artifact_ref) ?? null,
+  };
+  input.payload.final_answer_draft_selection = syncedDraftSelection;
+  const debug = readRecord(input.payload.debug);
+  if (debug) {
+    debug.final_answer_draft_selection = syncedDraftSelection;
+  }
+};
+
 const typedFailureAuthorityApplies = (authority: Record<string, unknown> | null): boolean =>
   readString(authority?.terminal_artifact_kind) === "typed_failure" ||
   readString(authority?.final_answer_source) === "typed_failure" ||
@@ -534,6 +587,37 @@ export const applyTerminalProjectionKindGuard = (
       assistant_answer: false,
       raw_content_included: false,
     };
+    const summary = readRecord(payload.resolved_turn_summary);
+    payload.resolved_turn_summary = {
+      ...(summary ?? {}),
+      turn_id: result.turn_id,
+      final_status: "final_answer",
+      response_type: "final_answer",
+      final_answer_source: result.source,
+      terminal_kind: "final_answer",
+      terminal_artifact_kind: authorityKind,
+      terminal_error_code: null,
+      pending_server_request_present: false,
+    };
+    const debug = readRecord(payload.debug);
+    if (debug) {
+      debug.ok = true;
+      debug.status = "final_answer";
+      debug.final_status = "final_answer";
+      debug.response_type = "final_answer";
+      debug.terminal_artifact_kind = authorityKind;
+      debug.final_answer_source = result.source;
+      debug.selected_final_answer = result.visible_text;
+      debug.answer = result.visible_text;
+      debug.text = result.visible_text;
+      debug.assistant_answer = result.visible_text;
+      debug.terminal_presentation = payload.terminal_presentation;
+      debug.terminal_answer_authority = payload.terminal_answer_authority;
+      debug.resolved_turn_summary = payload.resolved_turn_summary;
+      delete debug.terminal_error_code;
+      delete debug.terminal_failure_text;
+      delete debug.typed_failure;
+    }
     return {
       ...result,
       writes: {
@@ -2184,8 +2268,14 @@ export function applyHelixTerminalAuthoritySingleWriter(
     Boolean(noteUpdateReceiptSatisfied && latestDraftForContinuation);
   const repoDraftSupersedesToolRailFailure =
     repoDraftMaterializationMatchesRequiredGoal && goalAllowsTerminal;
+  const workstationTerminalSupersedesToolRailFailure = workstationTerminalCanRepairToolRailFailure({
+    payload: input.payload,
+    failure: rawTerminalBlockingToolRailFailure,
+    terminal: selectedWorkstationToolEvaluation,
+    workstationTerminalMaterialized,
+  });
   const terminalBlockingToolRailFailure =
-    noteMutationDraftSupersedesToolRailFailure || repoDraftSupersedesToolRailFailure
+    noteMutationDraftSupersedesToolRailFailure || repoDraftSupersedesToolRailFailure || workstationTerminalSupersedesToolRailFailure
       ? null
       : rawTerminalBlockingToolRailFailure?.railFailureCode === "terminal_projection_mismatch" &&
     (
@@ -2397,6 +2487,10 @@ export function applyHelixTerminalAuthoritySingleWriter(
     selectedArtifactRef = selectedWorkstationToolEvaluation.ref;
     selectedArtifactKind = "workstation_tool_evaluation";
     selectedSource = "workstation_tool_evaluation";
+    syncWorkstationTerminalMaterializationMirrors({
+      payload: input.payload,
+      terminalArtifactRef: selectedWorkstationToolEvaluation.ref,
+    });
     quarantineStaleRequestUserInput(input.payload);
     input.payload.ok = true;
     input.payload.response_type = "final_answer";
@@ -2990,8 +3084,10 @@ export function applyHelixTerminalAuthoritySingleWriter(
       selected_over_direct_answer_text: usableDraftMaterialization && latestDirectAnswerSequence(artifacts) >= 0,
       final_answer_draft_quality_ok: draftMaterialization?.final_answer_draft_quality_gate.ok,
       final_answer_draft_quality_violations: draftMaterialization?.final_answer_draft_quality_gate.violations,
-      materialized_terminal_artifact_kind: draftMaterialization?.materialized_terminal_artifact_kind ?? null,
-      materialized_terminal_artifact_ref: draftMaterialization?.materialized_terminal_artifact_ref ?? null,
+      materialized_terminal_artifact_kind:
+        selectedTerminalArtifactKind ?? draftMaterialization?.materialized_terminal_artifact_kind ?? null,
+      materialized_terminal_artifact_ref:
+        selectedArtifactRefForResult ?? draftMaterialization?.materialized_terminal_artifact_ref ?? null,
       materialization_blocked_reason: draftMaterialization?.blocked_reason ?? null,
       itinerary_observation_criteria_satisfied: itineraryObservationCriteriaSatisfied,
       missing_itinerary_families: missingItineraryFamilies,

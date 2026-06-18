@@ -16,6 +16,8 @@ const NHM2_FULL_SOLVE_REFERENCE_CAPSULE =
   "docs/audits/research/warp-full-solve-reference-capsule-latest.md";
 const NHM2_QEI_RECEIPTED_SMOKE_ROOT =
   "artifacts/research/full-solve/validation-chain/qei-worldline-receipted-smoke-v1";
+const NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT =
+  "artifacts/research/full-solve/validation-chain/axis-aligned-shear-suppressed-smoke-v1";
 const NHM2_SOURCE_COMPONENT_AUTHORITY_LEDGER =
   `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-source-component-authority-ledger.json`;
 const NHM2_COUPLED_CLOSURE_PASS_CANDIDATE =
@@ -24,6 +26,14 @@ const NHM2_REGIONAL_TENSOR_PASS_PATH_HARNESS =
   `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-regional-tensor-pass-path-harness.json`;
 const NHM2_TIME_DEPENDENT_SOURCE_CAMPAIGN =
   `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-time-dependent-source-campaign.json`;
+const NHM2_SOURCE_OFF_DIAGONAL_SHEAR_AUDIT =
+  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-source-off-diagonal-shear-audit.json`;
+const NHM2_AXIS_ALIGNED_SOURCE_OFF_DIAGONAL_SHEAR_AUDIT =
+  `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-source-off-diagonal-shear-audit.json`;
+const NHM2_AXIS_ALIGNED_TIME_DEPENDENT_SOURCE_CAMPAIGN =
+  `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-time-dependent-source-campaign.json`;
+const NHM2_AXIS_ALIGNED_REGIONAL_MATERIAL_SOURCE_TENSOR_MODEL =
+  `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-regional-material-source-tensor-model.json`;
 const NHM2_SWITCHING_COVARIANT_CONSERVATION_EVIDENCE =
   `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-switching-covariant-conservation-evidence.json`;
 const NHM2_FREQUENCY_CONVERGENCE_EVIDENCE =
@@ -1104,6 +1114,77 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   nhm2FullSolveBadge({
+    id: "nhm2.source.off_diagonal_shear_audit",
+    title: "Off-Diagonal Shear Audit",
+    plainMeaning:
+      "Checks whether source-side off-diagonal spatial-stress components have documented shear or anisotropic mechanism evidence.",
+    whyItMatters:
+      "It separates a declared full tensor from a physically interpretable source model for T12, T13, and T23.",
+    subjects: ["nhm2", "source_tensor", "off_diagonal_stress", "shear", "dynamic_campaign"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
+    tags: ["runtime_artifact", "off_diagonal_tij", "shear_mechanism", "falsifier_candidate"],
+    equations: [
+      {
+        id: "off_diagonal_shear_audit_gate",
+        role: "noncomputable_reference",
+        displayLatex:
+          "\\mathrm{shearAudit}=\\{T_{12},T_{13},T_{23}\\}_{source}\\land mechanism_{shear}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["T12", "T13", "T23", "mechanism_shear"],
+        outputSymbols: ["source_off_diagonal_shear_status"],
+      },
+    ],
+    units: [
+      { symbol: "Tij", unit: "Pa", quantity: "off_diagonal_spatial_stress", dimensionSignature: "M L^-1 T^-2" },
+    ],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "A generic declared source tensor is not enough to document a shear or anisotropic mechanism.",
+      "A shear-audit sidecar sharpens the blocker but does not validate a physical source.",
+      "Pass-window values are derived from metric-required residual checks and cannot be used as source-model inputs.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef(
+        "shared/contracts/nhm2-source-off-diagonal-shear-audit.v1.ts",
+        "nhm2-source-off-diagonal-shear-audit-contract",
+        "Typed audit for source-side off-diagonal spatial-stress mechanism evidence.",
+      ),
+      artifactRef(
+        "tools/nhm2/build-source-off-diagonal-shear-audit.ts",
+        "nhm2-source-off-diagonal-shear-audit-builder",
+        "Builder that compares source component authority against regional full-tensor residuals.",
+      ),
+      artifactRef(
+        NHM2_SOURCE_OFF_DIAGONAL_SHEAR_AUDIT,
+        "sha256:42b544f4e6d209f4107724ea853075d5e6aaebe4a3e962a361d61519b10ca52f",
+        "Pinned local smoke-chain shear audit: currentDeclaredSourceModelFalsified=true; falsifierScope=current_declared_source_model; worst=hull:T13; current-to-allowed magnitude ratio about 1.49e15; uniform fractional shear ansatz detected; worst required suppression about 5.83e15.",
+      ),
+      artifactRef(
+        NHM2_AXIS_ALIGNED_SOURCE_OFF_DIAGONAL_SHEAR_AUDIT,
+        "sha256:a6cdf1bca25d7526086284adfb45da412e73b1b72df2b6186319bc18fb5a7ed1",
+        "Axis-aligned shear-suppressed candidate audit: off-diagonal mechanism evidence is documented and currentDeclaredSourceModelFalsified=false, but nonzero metric-required off-diagonal residuals still fail with source fractions equal to zero.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "source_tensor", "off_diagonal_stress", "shear", "dynamic_campaign"],
+      symbols: ["T12", "T13", "T23", "mechanism_shear", "source_off_diagonal_shear_status"],
+      unitSignatures: ["M L^-1 T^-2"],
+      repoPaths: [
+        "shared/contracts/nhm2-source-off-diagonal-shear-audit.v1.ts",
+        "tools/nhm2/build-source-off-diagonal-shear-audit.ts",
+        NHM2_SOURCE_OFF_DIAGONAL_SHEAR_AUDIT,
+        NHM2_AXIS_ALIGNED_SOURCE_OFF_DIAGONAL_SHEAR_AUDIT,
+      ],
+      equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
+      simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
     id: "nhm2.dynamic.time_dependent_source_campaign",
     title: "Time-Dependent Source Campaign",
     plainMeaning:
@@ -1158,8 +1239,18 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
       artifactRef(
         NHM2_TIME_DEPENDENT_SOURCE_CAMPAIGN,
-        "sha256:ecb241e233aa68162f89be8f7c7ee2263d95173ccf582bf2a2083234b2f27cb3",
-        "Pinned local smoke-chain campaign artifact: campaignPass=false; firstBlocker=hull:T13:full_tensor_residual_exceeded; residual family=off_diagonal_tij.",
+        "sha256:64ec03bacd7b16b9895d78b2f8d53a54023d564ba98d7143576d10231bcb4f33",
+        "Pinned local smoke-chain campaign artifact: campaignPass=false; firstBlocker=source_off_diagonal_current_declared_model_falsified; full tensor gate reports off_diagonal_tij worst=hull:T13 with current-to-allowed magnitude ratio about 1.49e15; shear audit blocks closure because the current declared source model is falsified by missing mechanism evidence and uniform fractional shear ansatz.",
+      ),
+      artifactRef(
+        NHM2_AXIS_ALIGNED_TIME_DEPENDENT_SOURCE_CAMPAIGN,
+        "sha256:a42d6e122b77d117093c9dc68a7997f7739b66c91c5acbca8d2506e3f7479928",
+        "Axis-aligned shear-suppressed candidate campaign: campaignPass=false; firstBlocker=hull:T01:full_tensor_residual_exceeded; it removes the current-declared-source-model shear falsifier but exposes momentum-density closure as the next source-side failure.",
+      ),
+      artifactRef(
+        NHM2_AXIS_ALIGNED_REGIONAL_MATERIAL_SOURCE_TENSOR_MODEL,
+        "sha256:09435701740169acb8dbdb61962441990c38de753c1a32bf809220b500a52c13",
+        "Source-side declared tensor candidate with axis-aligned off-diagonal shear suppression; diagnostic QC only and not physical material validation.",
       ),
       docRef(
         NHM2_FULL_SOLVE_WHITEPAPER,
@@ -1180,7 +1271,11 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       repoPaths: [
         "shared/contracts/nhm2-time-dependent-source-campaign.v1.ts",
         "tools/nhm2/build-time-dependent-source-campaign.ts",
+        NHM2_SOURCE_OFF_DIAGONAL_SHEAR_AUDIT,
         NHM2_TIME_DEPENDENT_SOURCE_CAMPAIGN,
+        NHM2_AXIS_ALIGNED_SOURCE_OFF_DIAGONAL_SHEAR_AUDIT,
+        NHM2_AXIS_ALIGNED_TIME_DEPENDENT_SOURCE_CAMPAIGN,
+        NHM2_AXIS_ALIGNED_REGIONAL_MATERIAL_SOURCE_TENSOR_MODEL,
         NHM2_FULL_SOLVE_WHITEPAPER,
       ],
       equationFamilies: ["time_dependent_source_campaign", "closure_stack"],
@@ -2661,6 +2756,14 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "requires",
     label: "The time-dependent campaign requires dynamic/effective geometry agreement and bounded backreaction evidence.",
     claimBoundaryNote: "A dynamic/effective geometry receipt is diagnostic and cannot grant route, propulsion, or physical viability claims.",
+  },
+  {
+    id: "source_off_diagonal_shear_audit_feeds_time_dependent_campaign",
+    from: "nhm2.source.off_diagonal_shear_audit",
+    to: "nhm2.dynamic.time_dependent_source_campaign",
+    relation: "documents",
+    label: "The source-side shear audit sharpens off-diagonal Tij failures inside the frozen time-dependent campaign.",
+    claimBoundaryNote: "Missing shear-mechanism evidence is a diagnostic falsifier candidate, not a physical-source validation result.",
   },
   {
     id: "time_dependent_campaign_blocks_diagnostic_boundary",

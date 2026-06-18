@@ -1,6 +1,8 @@
 import {
   WORKSTATION_AGENT_GOAL_ACTUATORS,
+  validateAgentGoalSessionV1,
   type AgentGoalActuatorV1,
+  type AgentGoalSessionV1,
   type WorkstationDispatchActionV1,
 } from "./workstation-goal-context.v1";
 
@@ -35,6 +37,10 @@ export type WorkstationControlReceiptV1 = {
   requiredActuator: AgentGoalActuatorV1;
   actuatorAllowed: boolean;
   policyEvidenceRefs: string[];
+  sourceRefs: string[];
+  loopRefs: string[];
+  evidenceRefs: string[];
+  producedRefs: string[];
   agentGoalSession: unknown | null;
   targetRef?: string | null;
   sourceRef?: string | null;
@@ -91,8 +97,7 @@ const stringArrayIssues = (value: unknown, field: string, options: { requireNonE
 const dispatchIssues = (
   value: unknown,
   field: string,
-  controlKind: unknown,
-  status: unknown,
+  receipt: WorkstationControlReceiptV1,
 ): string[] => {
   if (!Array.isArray(value)) return [`${field} must be an array`];
   const issues: string[] = [];
@@ -110,18 +115,21 @@ const dispatchIssues = (
     if (action.kind === "log_receipt" && isNonEmptyString(action.receiptRef)) {
       logReceiptFound = true;
     }
-    if (status === "blocked") {
-      if (action.kind === controlKind) blockedMutationFound = true;
-      if (controlKind === "set_loop_state" && (action.kind === "set_loop_state" || action.kind === "repair_loop")) {
+    if (receipt.status === "blocked") {
+      if (action.kind === receipt.controlKind) blockedMutationFound = true;
+      if (receipt.controlKind === "set_loop_state" && (action.kind === "set_loop_state" || action.kind === "repair_loop")) {
         blockedMutationFound = true;
       }
-      if (controlKind === "repair_source" && (action.kind === "set_loop_state" || action.kind === "repair_loop")) {
+      if (receipt.controlKind === "repair_source" && (action.kind === "set_loop_state" || action.kind === "repair_loop")) {
         blockedMutationFound = true;
       }
     }
   });
   if (!logReceiptFound) issues.push(`${field} must include a log_receipt action with receiptRef`);
   if (blockedMutationFound) issues.push(`${field} must not include mutating control dispatch while blocked`);
+  if (receipt.status === "prepared" && !preparedControlDispatchFound(receipt, value)) {
+    issues.push(`${field} must include prepared ${receipt.controlKind} dispatch`);
+  }
   return issues;
 };
 
@@ -137,6 +145,108 @@ const terminalAuthorityIssues = (value: unknown): string[] => {
     issues.push("terminalAuthority.terminalAuthoritySingleWriterRequired must be true");
   }
   return issues;
+};
+
+const goalSessionIssues = (
+  value: unknown,
+  field: string,
+  expectedGoalId: string | null | undefined,
+): string[] => {
+  if (!isRecord(value)) return [`${field} must be an object`];
+  const issues = validateAgentGoalSessionV1(value as AgentGoalSessionV1)
+    .map((issue) => `${field}.${issue}`);
+  if (isNonEmptyString(expectedGoalId) && value.goalId !== expectedGoalId) {
+    issues.push(`${field}.goalId must match goalId`);
+  }
+  return issues;
+};
+
+const preparedControlFieldIssues = (value: WorkstationControlReceiptV1): string[] => {
+  if (value.status !== "prepared") return [];
+  switch (value.controlKind) {
+    case "change_preset":
+      return [
+        ...(isNonEmptyString(value.targetRef) ? [] : ["prepared change_preset receipts must include targetRef"]),
+        ...(isNonEmptyString(value.presetId) ? [] : ["prepared change_preset receipts must include presetId"]),
+      ];
+    case "bind_source":
+      return [
+        ...(isNonEmptyString(value.sourceRef) ? [] : ["prepared bind_source receipts must include sourceRef"]),
+        ...(isNonEmptyString(value.targetRef) ? [] : ["prepared bind_source receipts must include targetRef"]),
+      ];
+    case "unbind_source":
+      return isNonEmptyString(value.sourceRef) ? [] : ["prepared unbind_source receipts must include sourceRef"];
+    case "set_loop_state":
+      return [
+        ...(isNonEmptyString(value.loopRef) ? [] : ["prepared set_loop_state receipts must include loopRef"]),
+        ...(value.loopState === "paused" || value.loopState === "running" || value.loopState === "repaired"
+          ? []
+          : ["prepared set_loop_state receipts must include loopState"]),
+      ];
+    case "repair_source":
+      return isNonEmptyString(value.loopRef) ? [] : ["prepared repair_source receipts must include loopRef"];
+    case "update_live_answer":
+      return isNonEmptyString(value.lineKey) ? [] : ["prepared update_live_answer receipts must include lineKey"];
+    case "focus_process_graph":
+      return isNonEmptyString(value.nodeRef) ? [] : ["prepared focus_process_graph receipts must include nodeRef"];
+    default:
+      return [];
+  }
+};
+
+const fieldEquals = (left: unknown, right: unknown): boolean =>
+  isNonEmptyString(left) && isNonEmptyString(right) && left === right;
+
+const preparedControlDispatchFound = (
+  receipt: WorkstationControlReceiptV1,
+  actions: WorkstationDispatchActionV1[],
+): boolean => {
+  switch (receipt.controlKind) {
+    case "change_preset":
+      return actions.some((action) =>
+        action.kind === "change_preset" &&
+        fieldEquals(action.targetRef, receipt.targetRef) &&
+        fieldEquals(action.presetId, receipt.presetId)
+      );
+    case "bind_source":
+      return actions.some((action) =>
+        action.kind === "bind_source" &&
+        fieldEquals(action.sourceRef, receipt.sourceRef) &&
+        fieldEquals(action.targetRef, receipt.targetRef)
+      );
+    case "unbind_source":
+      return actions.some((action) =>
+        action.kind === "unbind_source" &&
+        fieldEquals(action.sourceRef, receipt.sourceRef)
+      );
+    case "set_loop_state":
+      return actions.some((action) =>
+        action.kind === "set_loop_state" &&
+        fieldEquals(action.loopRef, receipt.loopRef) &&
+        action.state === receipt.loopState
+      );
+    case "repair_source":
+      return actions.some((action) =>
+        action.kind === "set_loop_state" &&
+        fieldEquals(action.loopRef, receipt.loopRef) &&
+        action.state === "repaired"
+      ) && actions.some((action) =>
+        action.kind === "repair_loop" &&
+        fieldEquals(action.loopRef, receipt.loopRef)
+      );
+    case "update_live_answer":
+      return actions.some((action) =>
+        action.kind === "update_live_answer" &&
+        fieldEquals(action.lineKey, receipt.lineKey)
+      );
+    case "focus_process_graph":
+      return actions.some((action) =>
+        action.kind === "focus_process_graph" &&
+        fieldEquals(action.nodeRef, receipt.nodeRef)
+      );
+    default:
+      return false;
+  }
 };
 
 export function validateWorkstationControlReceiptV1(value: WorkstationControlReceiptV1): string[] {
@@ -162,16 +272,47 @@ export function validateWorkstationControlReceiptV1(value: WorkstationControlRec
   }
   if (!agentGoalActuators.has(value.requiredActuator)) issues.push("requiredActuator is invalid");
   if (typeof value.actuatorAllowed !== "boolean") issues.push("actuatorAllowed must be boolean");
+  if (value.status === "prepared" && value.actuatorAllowed !== true) {
+    issues.push("prepared receipts must have actuatorAllowed=true");
+  }
   issues.push(...stringArrayIssues(value.policyEvidenceRefs, "policyEvidenceRefs", { requireNonEmpty: true }));
+  if (
+    Array.isArray(value.policyEvidenceRefs) &&
+    agentGoalActuators.has(value.requiredActuator) &&
+    !value.policyEvidenceRefs.includes(`allowed_actuator:${value.requiredActuator}`)
+  ) {
+    issues.push("policyEvidenceRefs must include required actuator policy ref");
+  }
+  if (value.goalSessionFound === true) {
+    issues.push(...goalSessionIssues(value.agentGoalSession, "agentGoalSession", value.goalId));
+  }
+  issues.push(...stringArrayIssues(value.sourceRefs, "sourceRefs", { requireNonEmpty: true }));
+  issues.push(...stringArrayIssues(value.loopRefs, "loopRefs", { requireNonEmpty: true }));
+  issues.push(...stringArrayIssues(value.evidenceRefs, "evidenceRefs", { requireNonEmpty: true }));
+  issues.push(...stringArrayIssues(value.producedRefs, "producedRefs", { requireNonEmpty: true }));
   if (!isNonEmptyString(value.panelId)) issues.push("panelId must be a non-empty string");
   if (value.loopState != null && value.loopState !== "paused" && value.loopState !== "running" && value.loopState !== "repaired") {
     issues.push("loopState is invalid");
   }
+  issues.push(...preparedControlFieldIssues(value));
   if (!isNonEmptyString(value.mailboxThreadId)) issues.push("mailboxThreadId must be a non-empty string");
   if (!isRecord(value.mailboxThreadResolution)) issues.push("mailboxThreadResolution must be an object");
-  issues.push(...dispatchIssues(value.dispatch, "dispatch", value.controlKind, value.status));
-  issues.push(...dispatchIssues(value.suggestedDispatch, "suggestedDispatch", value.controlKind, value.status));
+  issues.push(...dispatchIssues(value.dispatch, "dispatch", value));
+  issues.push(...dispatchIssues(value.suggestedDispatch, "suggestedDispatch", value));
   if (!isNonEmptyString(value.goalContextUpdateId)) issues.push("goalContextUpdateId must be a non-empty string");
+  if (Array.isArray(value.evidenceRefs) && isNonEmptyString(value.receiptId) && !value.evidenceRefs.includes(value.receiptId)) {
+    issues.push("evidenceRefs must include receiptId");
+  }
+  if (Array.isArray(value.producedRefs) && isNonEmptyString(value.receiptId) && !value.producedRefs.includes(value.receiptId)) {
+    issues.push("producedRefs must include receiptId");
+  }
+  if (
+    Array.isArray(value.producedRefs) &&
+    isNonEmptyString(value.goalContextUpdateId) &&
+    !value.producedRefs.includes(value.goalContextUpdateId)
+  ) {
+    issues.push("producedRefs must include goalContextUpdateId");
+  }
   issues.push(...terminalAuthorityIssues(value.terminalAuthority));
   if (value.post_tool_model_step_required !== true) issues.push("post_tool_model_step_required must be true");
   if (value.assistant_answer !== false) issues.push("assistant_answer must be false");

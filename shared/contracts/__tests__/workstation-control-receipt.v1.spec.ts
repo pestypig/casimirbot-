@@ -20,6 +20,21 @@ const receiptFixture = (
   requiredActuator: "change_preset",
   actuatorAllowed: true,
   policyEvidenceRefs: ["allowed_actuator:change_preset"],
+  sourceRefs: ["visual_source:image-lens", "source:visual:active"],
+  loopRefs: ["helix-ask:desktop", "workstation_control:change_preset", "workstation_actuator:change_preset"],
+  evidenceRefs: [
+    "stage_play_workstation_control_receipt:change_preset:frog",
+    "allowed_actuator:change_preset",
+    "visual_source:image-lens",
+    "source:visual:active",
+    "helix-ask:desktop",
+    "workstation_control:change_preset",
+    "workstation_actuator:change_preset",
+  ],
+  producedRefs: [
+    "stage_play_workstation_control_receipt:change_preset:frog",
+    "stage_play_goal_context_update:control:frog",
+  ],
   agentGoalSession: null,
   targetRef: "source:visual:active",
   sourceRef: "visual_source:image-lens",
@@ -65,6 +80,24 @@ describe("stage_play_workstation_control_receipt/v1", () => {
     expect(validateWorkstationControlReceiptV1(receiptFixture())).toEqual([]);
   });
 
+  it("requires prepared receipts to include their matching control dispatch", () => {
+    const receipt = receiptFixture({
+      dispatch: [
+        { kind: "log_receipt", receiptRef: "stage_play_workstation_control_receipt:change_preset:frog" },
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+      ],
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: "stage_play_workstation_control_receipt:change_preset:frog" },
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+      ],
+    });
+
+    expect(validateWorkstationControlReceiptV1(receipt)).toEqual(expect.arrayContaining([
+      "dispatch must include prepared change_preset dispatch",
+      "suggestedDispatch must include prepared change_preset dispatch",
+    ]));
+  });
+
   it("accepts blocked receipts only when mutating dispatches are suppressed", () => {
     const receipt = receiptFixture({
       ok: false,
@@ -84,6 +117,115 @@ describe("stage_play_workstation_control_receipt/v1", () => {
     expect(validateWorkstationControlReceiptV1(receipt)).toEqual([]);
   });
 
+  it("requires prepared process-graph focus receipts to name a node", () => {
+    expect(validateWorkstationControlReceiptV1(receiptFixture({
+      receiptId: "stage_play_workstation_control_receipt:focus_process_graph:frog",
+      controlKind: "focus_process_graph",
+      label: "focus process graph",
+      requiredActuator: "focus_process_graph",
+      policyEvidenceRefs: ["allowed_actuator:focus_process_graph"],
+      loopRefs: ["helix-ask:desktop", "workstation_control:focus_process_graph", "workstation_actuator:focus_process_graph"],
+      evidenceRefs: [
+        "stage_play_workstation_control_receipt:focus_process_graph:frog",
+        "allowed_actuator:focus_process_graph",
+        "visual_source:image-lens",
+        "packet:frog",
+        "helix-ask:desktop",
+        "workstation_control:focus_process_graph",
+        "workstation_actuator:focus_process_graph",
+      ],
+      producedRefs: [
+        "stage_play_workstation_control_receipt:focus_process_graph:frog",
+        "stage_play_goal_context_update:control:frog",
+      ],
+      targetRef: null,
+      presetId: null,
+      nodeRef: "packet:frog",
+      dispatch: [
+        { kind: "log_receipt", receiptRef: "stage_play_workstation_control_receipt:focus_process_graph:frog" },
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+        { kind: "focus_process_graph", nodeRef: "packet:frog" },
+      ],
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: "stage_play_workstation_control_receipt:focus_process_graph:frog" },
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+        { kind: "focus_process_graph", nodeRef: "packet:frog" },
+      ],
+    }))).toEqual([]);
+
+    expect(validateWorkstationControlReceiptV1(receiptFixture({
+      controlKind: "focus_process_graph",
+      label: "focus process graph",
+      requiredActuator: "focus_process_graph",
+      policyEvidenceRefs: ["allowed_actuator:focus_process_graph"],
+      nodeRef: null,
+    }))).toEqual(expect.arrayContaining([
+      "prepared focus_process_graph receipts must include nodeRef",
+    ]));
+  });
+
+  it("requires prepared source binding and loop receipts to name their targets", () => {
+    expect(validateWorkstationControlReceiptV1(receiptFixture({
+      receiptId: "stage_play_workstation_control_receipt:bind_source:frog",
+      controlKind: "bind_source",
+      label: "bind workstation source",
+      requiredActuator: "bind_source",
+      policyEvidenceRefs: ["allowed_actuator:bind_source"],
+      sourceRef: "source:visual:active",
+      targetRef: "live-answer:visual",
+      presetId: null,
+      loopRefs: ["helix-ask:desktop", "workstation_control:bind_source", "workstation_actuator:bind_source"],
+      evidenceRefs: [
+        "stage_play_workstation_control_receipt:bind_source:frog",
+        "allowed_actuator:bind_source",
+        "source:visual:active",
+        "live-answer:visual",
+        "helix-ask:desktop",
+        "workstation_control:bind_source",
+        "workstation_actuator:bind_source",
+      ],
+      producedRefs: [
+        "stage_play_workstation_control_receipt:bind_source:frog",
+        "stage_play_goal_context_update:control:frog",
+      ],
+      dispatch: [
+        { kind: "log_receipt", receiptRef: "stage_play_workstation_control_receipt:bind_source:frog" },
+        { kind: "update_panel", panelId: "live-answer-environment" },
+        { kind: "bind_source", sourceRef: "source:visual:active", targetRef: "live-answer:visual" },
+      ],
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: "stage_play_workstation_control_receipt:bind_source:frog" },
+        { kind: "update_panel", panelId: "live-answer-environment" },
+        { kind: "bind_source", sourceRef: "source:visual:active", targetRef: "live-answer:visual" },
+      ],
+    }))).toEqual([]);
+
+    expect(validateWorkstationControlReceiptV1(receiptFixture({
+      controlKind: "bind_source",
+      label: "bind workstation source",
+      requiredActuator: "bind_source",
+      policyEvidenceRefs: ["allowed_actuator:bind_source"],
+      sourceRef: "source:visual:active",
+      targetRef: null,
+      presetId: null,
+    }))).toEqual(expect.arrayContaining([
+      "prepared bind_source receipts must include targetRef",
+    ]));
+
+    expect(validateWorkstationControlReceiptV1(receiptFixture({
+      controlKind: "set_loop_state",
+      label: "set workstation loop state",
+      requiredActuator: "pause_loop",
+      policyEvidenceRefs: ["allowed_actuator:pause_loop"],
+      targetRef: null,
+      presetId: null,
+      loopRef: null,
+      loopState: "paused",
+    }))).toEqual(expect.arrayContaining([
+      "prepared set_loop_state receipts must include loopRef",
+    ]));
+  });
+
   it("rejects blocked or terminalizing workstation control receipts", () => {
     const invalid = {
       ...receiptFixture({
@@ -95,6 +237,8 @@ describe("stage_play_workstation_control_receipt/v1", () => {
       assistant_answer: true,
       terminal_eligible: true,
       raw_content_included: true,
+      evidenceRefs: ["allowed_actuator:change_preset"],
+      producedRefs: ["stage_play_goal_context_update:control:frog"],
       terminalAuthority: {
         status: "terminal",
         finalAnswerEligible: true,
@@ -106,6 +250,8 @@ describe("stage_play_workstation_control_receipt/v1", () => {
     expect(validateWorkstationControlReceiptV1(invalid)).toEqual(expect.arrayContaining([
       "dispatch must not include mutating control dispatch while blocked",
       "suggestedDispatch must not include mutating control dispatch while blocked",
+      "evidenceRefs must include receiptId",
+      "producedRefs must include receiptId",
       "terminalAuthority.status must be not_terminal",
       "terminalAuthority.finalAnswerEligible must be false",
       "terminalAuthority.completedSolverPathRequired must be true",

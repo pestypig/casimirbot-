@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { __testHelixAskOutputContract } from "../routes/agi.plan";
+import { HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION } from "../services/helix-ask/terminal-rail-failure-reconciliation";
 
 describe("Helix Ask response-boundary terminal mirrors", () => {
   it("projects workstation terminal authority over stale model-synthesized debug mirrors", () => {
@@ -424,5 +425,92 @@ describe("Helix Ask response-boundary terminal mirrors", () => {
       reason: "terminal authority superseded an earlier fail-closed coverage gate after the compound solver path allowed the answer",
     });
     expect(envelope.compound_prompt_coverage_gate.resolutions.map((entry: any) => entry.status)).not.toContain("failed_closed");
+  });
+
+  it("exports terminal rail reconciliation runtime marker on complete ask-turn envelopes", () => {
+    const answerText = "Helix Ask can use the runtime capability catalog.";
+    const payload = {
+      turn_id: "ask:test-terminal-rail-reconciliation-runtime-marker",
+      ok: true,
+      response_type: "final_answer",
+      final_status: "final_answer",
+      status: "final_answer",
+      terminal_artifact_kind: "capability_help_summary",
+      final_answer_source: "capability_help_summary",
+      selected_final_answer: answerText,
+      answer: answerText,
+      text: answerText,
+      canonical_goal_frame: {
+        goal_kind: "capability_catalog_help",
+        required_terminal_kind: "capability_help_summary",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "ask:test-terminal-rail-reconciliation-runtime-marker:capability_registry:1",
+          kind: "capability_registry",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.capability_catalog_observation.v1",
+            selected_capability: "helix_ask.inspect_capability_catalog",
+          },
+        },
+        {
+          artifact_id: "ask:test-terminal-rail-reconciliation-runtime-marker:capability_help_summary:1",
+          kind: "capability_help_summary",
+          source_scope: "current_turn",
+          payload: {
+            schema: "helix.capability_help_summary.v1",
+            text: answerText,
+          },
+        },
+      ],
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        terminal_kind: "answer",
+        terminal_artifact_kind: "capability_help_summary",
+        final_answer_source: "capability_help_summary",
+        terminal_text_preview: answerText,
+        server_authoritative: true,
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "capability_help_summary",
+        concise_text: answerText,
+      },
+      resolved_turn_summary: {
+        final_status: "final_answer",
+        resolved_route_label: "capability_catalog / capability_help_summary",
+        terminal_artifact_kind: "capability_help_summary",
+        final_answer_source: "capability_help_summary",
+      },
+      codex_parity_agent_spine_rail_table: {
+        rail_status: "complete",
+        first_broken_rail: null,
+        rail_failure_code: null,
+      },
+      debug: {},
+    };
+
+    const envelope = __testHelixAskOutputContract.buildHelixDebugExportEnvelope({
+      payload,
+      prompt: "What tools are available for the helix ask to use?",
+      sessionId: "test-session",
+    }) as Record<string, any>;
+
+    expect((payload as Record<string, any>).tool_rail_terminal_failure_reconciliation_runtime).toMatchObject({
+      schema: HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION,
+      version: HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION,
+      available: true,
+    });
+    expect(envelope.tool_rail_terminal_failure_reconciliation_runtime).toMatchObject({
+      schema: HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION,
+      version: HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION,
+      available: true,
+    });
+    expect(envelope.debug.tool_rail_terminal_failure_reconciliation_runtime).toMatchObject({
+      schema: HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION,
+      version: HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION,
+      available: true,
+    });
   });
 });

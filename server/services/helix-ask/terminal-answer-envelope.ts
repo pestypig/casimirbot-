@@ -569,6 +569,41 @@ const directAnswerContractSatisfied = (payload: Record<string, unknown>): boolea
   return requiredDirectAnswer && Boolean(readDirectAnswerArtifactText(payload));
 };
 
+const workstationToolEvaluationTerminalContractSatisfied = (payload: Record<string, unknown>): boolean => {
+  const terminalArtifactKind = readTerminalArtifactKind(payload);
+  const finalAnswerSource = readFinalAnswerSource(payload);
+  if (terminalArtifactKind !== "workstation_tool_evaluation" && finalAnswerSource !== "workstation_tool_evaluation") {
+    return false;
+  }
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  const goal = readRecord(payload.goal_satisfaction_evaluation);
+  const routeProductContract = readRecord(payload.route_product_contract);
+  const requiredTerminalKinds = [
+    readString(canonicalGoal?.required_terminal_kind),
+    ...readArray(canonicalGoal?.required_terminal_kinds).map(readString),
+    readString(goal?.required_terminal_kind),
+    readString(goal?.terminal_artifact_kind),
+    ...readArray(routeProductContract?.required_terminal_kinds).map(readString),
+    readString(routeProductContract?.required_terminal_kind),
+  ].filter((entry): entry is string => Boolean(entry));
+  const allowedTerminalKinds = [
+    ...readArray(routeProductContract?.allowed_terminal_artifact_kinds).map(readString),
+    ...readArray(routeProductContract?.allowed_terminal_kinds).map(readString),
+  ].filter((entry): entry is string => Boolean(entry));
+  const forbiddenTerminalKinds = readArray(routeProductContract?.forbidden_terminal_artifact_kinds)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  if (forbiddenTerminalKinds.includes("workstation_tool_evaluation")) return false;
+  const workstationRequired =
+    requiredTerminalKinds.includes("workstation_tool_evaluation") ||
+    allowedTerminalKinds.includes("workstation_tool_evaluation");
+  if (!workstationRequired) return false;
+  if (readString(goal?.satisfaction) !== "satisfied" && readString(goal?.next_decision) !== "allow_terminal") {
+    return false;
+  }
+  return Boolean(readTerminalPresentationText(payload) ?? readString(payload.selected_final_answer));
+};
+
 const applySatisfiedDirectAnswerTerminalCandidate = (
   payload: Record<string, unknown>,
 ): { applied: boolean; text: string | null } => {
@@ -721,7 +756,8 @@ export function resolveTerminalAnswerEnvelope(
   }
   if (
     isWorkstationObservationTerminalKind(terminalArtifactKind) &&
-    !directAnswerContractSatisfied(payload)
+    !directAnswerContractSatisfied(payload) &&
+    !workstationToolEvaluationTerminalContractSatisfied(payload)
   ) {
     payload.workstation_observation_terminal_rejection = {
       schema: "helix.workstation_observation_terminal_rejection.v1",
@@ -753,7 +789,7 @@ export function resolveTerminalAnswerEnvelope(
     committedRoute: readCommittedAskRoute(payload),
     terminalArtifactKind,
     finalAnswerSource,
-  }) && !directAnswerContractSatisfied(payload)) {
+  }) && !directAnswerContractSatisfied(payload) && !workstationToolEvaluationTerminalContractSatisfied(payload)) {
     payload.committed_route_terminal_rejection = {
       schema: "helix.committed_route_terminal_rejection.v1",
       turn_id: turnId,

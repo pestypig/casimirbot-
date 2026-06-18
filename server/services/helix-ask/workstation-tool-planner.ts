@@ -1358,6 +1358,7 @@ function workstationControlMissingRequirements(toolId: WorkstationControlTool, a
   ) return has("loop_ref") ? [] : ["loop_ref"];
   if (toolId === "live_env.repair_workstation_source") return has("loop_ref") ? [] : ["loop_ref"];
   if (toolId === "live_env.update_live_answer_projection") return has("line_key") ? [] : ["line_key"];
+  if (toolId === "live_env.focus_process_graph") return has("node_ref") ? [] : ["node_ref"];
   return [];
 }
 
@@ -1553,7 +1554,8 @@ function buildWatchJobAutomationPlan(
 }
 
 function wantsStartAgentGoalSession(prompt: string): boolean {
-  if (hasContextualWorkstationGoalContextCue(prompt)) return false;
+  const contextPrompt = prompt.replace(/\bobjective\s*=\s*["'`][^"'`]+["'`]/gi, "objective=<objective>");
+  if (hasContextualWorkstationGoalContextCue(contextPrompt)) return false;
   return (
     /\blive_env\.start_agent_goal_session\b/i.test(prompt) ||
     /\b(?:start|create|open|begin|set\s+up|setup|launch|track|monitor)\b[\s\S]{0,160}\b(?:agent\s+goal\s+session|goal\s+session|durable\s+goal|goal-directed\s+(?:monitor|session)|standing\s+agent\s+goal|agent\s+objective)\b/i.test(prompt) ||
@@ -1626,6 +1628,17 @@ function extractGoalContextObjective(prompt: string): string {
   return stripOuterPunctuation(explicit ?? prompt).slice(0, 280) || "Monitor workstation goal context from live source evidence.";
 }
 
+function wantsGoalSessionNarratorBinding(prompt: string): boolean {
+  return (
+    /\b(?:turn\s+on|enable|bind|route|attach)\b[\s\S]{0,120}\b(?:narrator|narration|read[-\s]?aloud)\b/i.test(prompt) ||
+    /\b(?:narrator|narration|read[-\s]?aloud)\b[\s\S]{0,120}\b(?:translation|translated\s+transcript|audio\s+transcript|live\s+answer|goal\s+context|source\s+health|route\s+evidence)\b/i.test(prompt)
+  );
+}
+
+function wantsGoalSessionGraphFocus(prompt: string): boolean {
+  return /\b(?:focus|show|select|highlight|open)\b[\s\S]{0,140}\b(?:process\s+graph|stage\s+play\s+graph|reasoning\s+circuit|packet\s+trace)\b/i.test(prompt);
+}
+
 function buildWorkstationGoalContextPlan(
   normalized: string,
   options: PlanWorkstationToolUseOptions,
@@ -1657,6 +1670,64 @@ function buildWorkstationGoalContextPlan(
     goal_id: extractNamedArg(normalized, ["goal_id", "goal id"]) ?? undefined,
     limit: 24,
   };
+  const postSessionControlSteps: HelixWorkstationToolPlanStep[] = [];
+  const postSessionControlStepIds: string[] = [];
+  if (startSession && wantsGoalSessionNarratorBinding(normalized)) {
+    const streamKind = inferNarratorStreamKind(normalized);
+    const sourceRef = sourceId ?? extractNamedArg(normalized, ["source_ref", "source ref"]) ?? defaultNarratorSourceRef(streamKind);
+    const stepId = "bind_narrator_stream";
+    postSessionControlStepIds.push(stepId);
+    postSessionControlSteps.push({
+      step_id: stepId,
+      kind: "run_ask_tool",
+      tool_id: "live_env.narrator_bind_stream",
+      args: {
+        goal_id: goalId,
+        source_ref: sourceRef,
+        stream_kind: streamKind,
+        delivery_mode: extractNamedArg(normalized, ["delivery_mode", "delivery mode"]) ?? "visible_only",
+        voice_policy: extractNamedArg(normalized, ["voice_policy", "voice policy"]) ?? "confirm_speak_required",
+      },
+      depends_on: ["start_agent_goal_session"],
+      expected_receipt_kind: "helix.narrator_bind_stream_request.v1",
+      expected_state_change: { store: "stage-play-goal-context", proof_key: "goalContextUpdates" },
+      required: true,
+    });
+    scores.push({
+      affordance_id: "live_env.narrator_bind_stream",
+      panel_id: "helix_ask",
+      action_id: "live_env.narrator_bind_stream",
+      score: 0.89,
+      reason: "goal-session setup prompt also asks to bind Narrator to a live workstation stream",
+      required_args_missing: [],
+    });
+  }
+  if (startSession && wantsGoalSessionGraphFocus(normalized)) {
+    const stepId = "focus_process_graph";
+    postSessionControlStepIds.push(stepId);
+    postSessionControlSteps.push({
+      step_id: stepId,
+      kind: "run_ask_tool",
+      tool_id: "live_env.focus_process_graph",
+      args: {
+        goal_id: goalId,
+        node_ref: extractNamedArg(normalized, ["node_ref", "node ref", "node_id", "node id"]) ?? sourceId ?? goalId,
+        reason: "Focus the Stage Play process graph on the active goal session circuit.",
+      },
+      depends_on: ["start_agent_goal_session"],
+      expected_receipt_kind: "stage_play_workstation_control_receipt",
+      expected_state_change: { store: "stage-play-goal-context", proof_key: "goalContextUpdates" },
+      required: true,
+    });
+    scores.push({
+      affordance_id: "live_env.focus_process_graph",
+      panel_id: "helix_ask",
+      action_id: "live_env.focus_process_graph",
+      score: 0.87,
+      reason: "goal-session setup prompt also asks to focus the Stage Play reasoning circuit",
+      required_args_missing: [],
+    });
+  }
   const sessionArgs = {
     ...queryArgs,
     goal_id: goalId,
@@ -1694,6 +1765,7 @@ function buildWorkstationGoalContextPlan(
           required: true,
         }]
       : []),
+    ...postSessionControlSteps,
     {
       step_id: traceMemory
         ? "query_trace_memory"
@@ -1703,7 +1775,7 @@ function buildWorkstationGoalContextPlan(
       kind: "run_ask_tool",
       tool_id: traceMemory ? "live_env.query_trace_memory" : feedTool ?? "live_env.query_workstation_goal_context",
       args: traceMemory ? traceQueryArgs : feedTool ? feedQueryArgs : startSession ? { ...queryArgs, goal_id: goalId } : queryArgs,
-      depends_on: startSession ? ["start_agent_goal_session"] : [],
+      depends_on: startSession ? ["start_agent_goal_session", ...postSessionControlStepIds] : [],
       expected_receipt_kind: traceMemory
         ? "helix.workstation_reasoning_trace_query_result"
         : feedTool === "live_env.query_packet_traces"
@@ -2116,6 +2188,10 @@ export function planWorkstationToolUse(
     return buildNarratorDebugProbePlan(normalized, options, scores);
   }
 
+  if (wantsStartAgentGoalSession(normalized)) {
+    return buildWorkstationGoalContextPlan(normalized, options, scores);
+  }
+
   if (isNarratorControlPrompt(normalized)) {
     return buildNarratorControlPlan(normalized, options, scores);
   }
@@ -2129,7 +2205,7 @@ export function planWorkstationToolUse(
     return buildWatchJobAutomationPlan(normalized, options, scores);
   }
 
-  if (wantsStartAgentGoalSession(normalized) || wantsQueryWorkstationGoalContext(normalized)) {
+  if (wantsQueryWorkstationGoalContext(normalized)) {
     return buildWorkstationGoalContextPlan(normalized, options, scores);
   }
 

@@ -49,7 +49,7 @@ describe("workstation goal context contract", () => {
     updateKind: "visual_observation",
     contentRef: "stage_play_processed_mail_packet:1",
     preview: "Visual source packet classified a fresh danger cue.",
-    evidenceRefs: ["visual_frame:1", "stage_play_micro_reasoner_run:1"],
+    evidenceRefs: ["stage_play_processed_mail_packet:1", "visual_frame:1", "stage_play_micro_reasoner_run:1"],
     receiptRefs: ["stage_play_live_source_mail:1"],
     freshness: {
       observedAtMs: 1_700_000_000_000,
@@ -65,7 +65,7 @@ describe("workstation goal context contract", () => {
       { kind: "log_receipt", receiptRef: "stage_play_live_source_mail:1" },
       { kind: "append_goal_context", goalId: "goal:monitor-screen" },
       { kind: "speak_narrator", mode: "confirm" },
-      { kind: "wake_agent", reason: "urgent operator interruption" },
+      { kind: "wake_agent", interruptKind: "urgent", reason: "urgent operator interruption" },
     ],
     assistant_answer: false,
     terminal_eligible: false,
@@ -146,7 +146,15 @@ describe("workstation goal context contract", () => {
     text: "Translation stream is ready.",
     sourceKind: "live_answer",
     sourceId: "live-answer:translation",
-    evidenceRefs: ["translation_segment:latest", "allowed_actuator:narrator_say"],
+    sourceRefs: ["live-answer:translation", "live_answer"],
+    loopRefs: ["narrator:say", "thread:helix-ask:desktop", "workstation_actuator:narrator_say"],
+    evidenceRefs: [
+      "helix:narrator:say:1",
+      "translation_segment:latest",
+      "allowed_actuator:narrator_say",
+    ],
+    producedRefs: ["helix:narrator:say:1", "stage_play_goal_context_update:narrator:say"],
+    goalContextUpdateId: "stage_play_goal_context_update:narrator:say",
     deliveryMode: "confirm_to_speak",
     priority: "normal",
     language: "en",
@@ -166,6 +174,15 @@ describe("workstation goal context contract", () => {
     schemaVersion: WORKSTATION_NARRATOR_BIND_STREAM_REQUEST_SCHEMA,
     requestId: "helix:narrator:bind:1",
     sourceRef: "source:browser-audio",
+    sourceRefs: ["source:browser-audio", "translated_transcript"],
+    loopRefs: ["narrator:bind_stream", "thread:helix-ask:desktop", "workstation_actuator:narrator_bind_stream"],
+    evidenceRefs: [
+      "helix:narrator:bind:1",
+      "source:browser-audio",
+      "allowed_actuator:narrator_bind_stream",
+    ],
+    producedRefs: ["helix:narrator:bind:1", "stage_play_goal_context_update:narrator:bind"],
+    goalContextUpdateId: "stage_play_goal_context_update:narrator:bind",
     streamKind: "translated_transcript",
     presetId: "preset:translation-visible",
     deliveryMode: "visible_only",
@@ -201,7 +218,7 @@ describe("workstation goal context contract", () => {
         contentRef: `${producerKind}:content:1`,
         sourceRefs: [`${producerKind}:source:1`],
         loopRefs: [`${producerKind}:loop:1`],
-        evidenceRefs: [`${producerKind}:evidence:1`],
+        evidenceRefs: [`${producerKind}:content:1`, `${producerKind}:evidence:1`],
         receiptRefs: [`${producerKind}:receipt:1`],
         preview: `${producerKind} produced an observation for the active goal.`,
       })).toEqual([]);
@@ -215,7 +232,7 @@ describe("workstation goal context contract", () => {
         updateId: `goal_context_update:${updateKind}:1`,
         updateKind,
         contentRef: `${updateKind}:content:1`,
-        evidenceRefs: [`${updateKind}:evidence:1`],
+        evidenceRefs: [`${updateKind}:content:1`, `${updateKind}:evidence:1`],
         preview: `${updateKind} observation for the workstation reasoning circuit.`,
       })).toEqual([]);
     }
@@ -258,9 +275,65 @@ describe("workstation goal context contract", () => {
     })).toEqual(expect.arrayContaining([
       "sourceRefs must include at least one reference",
       "evidenceRefs must include at least one reference",
+      "evidenceRefs must include contentRef",
       "freshness.observedAtMs must be a positive timestamp",
       "freshness.staleAfterMs must be a positive number",
       "freshness.status is invalid",
+    ]));
+  });
+
+  it("rejects goal-context updates whose evidence does not cite the content ref", () => {
+    expect(validateWorkstationGoalContextUpdateV1({
+      ...update,
+      evidenceRefs: ["visual_frame:1"],
+    })).toEqual(expect.arrayContaining([
+      "evidenceRefs must include contentRef",
+    ]));
+  });
+
+  it("keeps wake demoted to a classified interrupt dispatch", () => {
+    expect(validateWorkstationGoalContextUpdateV1({
+      ...update,
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: "stage_play_live_source_mail:1" },
+        { kind: "wake_agent", reason: "legacy unclassified wake" } as WorkstationGoalContextUpdateV1["suggestedDispatch"][number],
+      ],
+    })).toEqual(expect.arrayContaining([
+      "wake_agent dispatch must include interruptKind urgent, blocked, or policy_triggered",
+    ]));
+    expect(validateWorkstationGoalContextUpdateV1({
+      ...update,
+      suggestedDispatch: [
+        { kind: "wake_agent", interruptKind: "blocked", reason: "source loop blocked and needs operator review" },
+      ],
+    })).toEqual([]);
+  });
+
+  it("rejects goal-context dispatch actions without auditable targets", () => {
+    expect(validateWorkstationGoalContextUpdateV1({
+      ...update,
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: "" },
+        { kind: "append_goal_context", goalId: "" },
+        { kind: "update_panel", panelId: "" },
+        { kind: "update_live_answer", lineKey: "" },
+        { kind: "speak_narrator", mode: "hidden" as WorkstationGoalContextUpdateV1["suggestedDispatch"][number]["kind"] },
+        { kind: "bind_narrator_stream", sourceRef: "", streamKind: "final_answer_stream" as never, deliveryMode: "hidden" as never },
+        { kind: "set_loop_state", loopRef: "", state: "stopped" as never },
+        { kind: "repair_loop", loopRef: "" },
+      ] as WorkstationGoalContextUpdateV1["suggestedDispatch"],
+    })).toEqual(expect.arrayContaining([
+      "suggestedDispatch[0].log_receipt must include receiptRef",
+      "suggestedDispatch[1].append_goal_context must include goalId",
+      "suggestedDispatch[2].update_panel must include panelId",
+      "suggestedDispatch[3].update_live_answer must include lineKey",
+      "suggestedDispatch[4].speak_narrator mode is invalid",
+      "suggestedDispatch[5].bind_narrator_stream must include sourceRef",
+      "suggestedDispatch[5].bind_narrator_stream streamKind is invalid",
+      "suggestedDispatch[5].bind_narrator_stream deliveryMode is invalid",
+      "suggestedDispatch[6].set_loop_state must include loopRef",
+      "suggestedDispatch[6].set_loop_state state is invalid",
+      "suggestedDispatch[7].repair_loop must include loopRef",
     ]));
   });
 
@@ -340,6 +413,67 @@ describe("workstation goal context contract", () => {
     expect(issues.some((issue) => /^allowedActuators\[\d+\] is invalid$/.test(issue))).toBe(true);
   });
 
+  it("rejects goal sessions that are not wired to any feeds or actuators", () => {
+    expect(validateAgentGoalSessionV1({
+      ...goal,
+      contextFeeds: [],
+      allowedActuators: [],
+    })).toEqual(expect.arrayContaining([
+      "contextFeeds must include at least one feed",
+      "allowedActuators must include at least one actuator",
+    ]));
+  });
+
+  it("rejects goal sessions with weak cadence, stop conditions, or checkpoint traces", () => {
+    expect(validateAgentGoalSessionV1({
+      ...goal,
+      sourceRefs: ["visual_source:screen", ""],
+      loopRefs: ["thread:helix-ask:desktop", ""],
+      constructRefs: ["microdeck:frog", ""],
+      contextFeeds: [
+        {
+          feedId: "feed:visual",
+          sourceKind: "visual_summaries",
+          query: "",
+          relevancePolicy: "",
+        },
+      ],
+      cadence: { kind: "interval", everyMs: 0 },
+      stopConditions: [""],
+      checkpoints: [
+        {
+          checkpointId: "",
+          createdAtMs: 0,
+          summary: "",
+          evidenceRefs: [],
+          actionsTaken: [],
+          nextStep: "wake_agent" as AgentGoalSessionV1["checkpoints"][number]["nextStep"],
+        },
+      ],
+    })).toEqual(expect.arrayContaining([
+      "sourceRefs[1] must be a non-empty string",
+      "loopRefs[1] must be a non-empty string",
+      "constructRefs[1] must be a non-empty string",
+      "contextFeeds[0].query must be a non-empty string",
+      "contextFeeds[0].relevancePolicy must be a non-empty string",
+      "cadence.everyMs must be a positive number",
+      "stopConditions[0] must be a non-empty string",
+      "checkpoints[0].checkpointId is required",
+      "checkpoints[0].createdAtMs must be a positive timestamp",
+      "checkpoints[0].summary is required",
+      "checkpoints[0].evidenceRefs must include at least one reference",
+      "checkpoints[0].actionsTaken must include at least one reference",
+      "checkpoints[0].nextStep is invalid",
+    ]));
+
+    expect(validateAgentGoalSessionV1({
+      ...goal,
+      cadence: { kind: "event_accumulation", minUpdates: 0 },
+    })).toEqual(expect.arrayContaining([
+      "cadence.minUpdates must be a positive number",
+    ]));
+  });
+
   it("rejects goal sessions that do not require terminal authority for reports", () => {
     expect(validateAgentGoalSessionV1({
       ...goal,
@@ -385,7 +519,10 @@ describe("workstation goal context contract", () => {
   it("rejects narrator say requests that try to become answer authority or raw terminal text", () => {
     expect(validateNarratorSayRequestV1({
       ...narratorSayRequest,
-      evidenceRefs: [],
+      sourceRefs: [],
+      loopRefs: [],
+      evidenceRefs: ["translation_segment:latest"],
+      producedRefs: [],
       deliveryMode: "hidden" as NarratorSayRequestV1["deliveryMode"],
       terminalAuthority: {
         status: "terminal",
@@ -397,7 +534,11 @@ describe("workstation goal context contract", () => {
       terminal_eligible: true as false,
       raw_content_included: true as false,
     })).toEqual(expect.arrayContaining([
-      "evidenceRefs must include at least one reference",
+      "sourceRefs must include at least one reference",
+      "loopRefs must include at least one reference",
+      "producedRefs must include at least one reference",
+      "evidenceRefs must include requestId",
+      "producedRefs must include goalContextUpdateId",
       "deliveryMode must be visible_only, confirm_to_speak, or auto_speak",
       "terminalAuthority.status must be not_terminal",
       "terminalAuthority.finalAnswerEligible must be false",
@@ -412,6 +553,8 @@ describe("workstation goal context contract", () => {
   it("rejects narrator stream bindings that try to become answer authority or hidden terminal routes", () => {
     expect(validateNarratorBindStreamRequestV1({
       ...narratorBindStreamRequest,
+      evidenceRefs: ["source:browser-audio"],
+      producedRefs: ["stage_play_goal_context_update:narrator:other"],
       streamKind: "final_answer_stream" as NarratorBindStreamRequestV1["streamKind"],
       deliveryMode: "hidden" as NarratorBindStreamRequestV1["deliveryMode"],
       voicePolicy: "always_terminal" as NarratorBindStreamRequestV1["voicePolicy"],
@@ -425,6 +568,9 @@ describe("workstation goal context contract", () => {
       terminal_eligible: true as false,
       raw_content_included: true as false,
     })).toEqual(expect.arrayContaining([
+      "evidenceRefs must include requestId",
+      "producedRefs must include requestId",
+      "producedRefs must include goalContextUpdateId",
       "streamKind is invalid",
       "deliveryMode must be visible_only, confirm_to_speak, or auto_speak",
       "voicePolicy is invalid",

@@ -43,6 +43,10 @@ import {
   type Nhm2SourceComponentAuthorityLedgerArtifactV1,
 } from "../../shared/contracts/nhm2-source-component-authority-ledger.v1";
 import {
+  isNhm2SourceOffDiagonalShearAudit,
+  type Nhm2SourceOffDiagonalShearAuditArtifactV1,
+} from "../../shared/contracts/nhm2-source-off-diagonal-shear-audit.v1";
+import {
   buildNhm2TimeDependentSourceCampaign,
   isNhm2CampaignStabilityEvidence,
   isNhm2DynamicEffectiveGeometryEvidence,
@@ -109,6 +113,7 @@ export const runNhm2TimeDependentSourceCampaign = (args: {
   chartId?: string | null;
   sourceComponentAuthorityLedgerPath?: string | null;
   regionalFullTensorResidualPath?: string | null;
+  sourceOffDiagonalShearAuditPath?: string | null;
   covariantConservationDiagnosticPath?: string | null;
   qeiWorldlineDossierPath?: string | null;
   observerRobustEnergyConditionsPath?: string | null;
@@ -139,6 +144,13 @@ export const runNhm2TimeDependentSourceCampaign = (args: {
       args.regionalFullTensorResidualPath ?? null,
       isNhm2RegionalFullTensorResidual,
       "regional full tensor residual",
+    );
+  const sourceOffDiagonalShearAudit =
+    readOptional<Nhm2SourceOffDiagonalShearAuditArtifactV1>(
+      args.repoRoot,
+      args.sourceOffDiagonalShearAuditPath ?? null,
+      isNhm2SourceOffDiagonalShearAudit,
+      "source off-diagonal shear audit",
     );
   const covariantConservationDiagnostic =
     readOptional<Nhm2CovariantConservationDiagnosticArtifactV1>(
@@ -227,6 +239,7 @@ export const runNhm2TimeDependentSourceCampaign = (args: {
     artifactRefs: {
       sourceComponentAuthorityLedger: args.sourceComponentAuthorityLedgerPath ?? null,
       regionalFullTensorResidual: args.regionalFullTensorResidualPath ?? null,
+      sourceOffDiagonalShearAudit: args.sourceOffDiagonalShearAuditPath ?? null,
       covariantConservationDiagnostic:
         args.covariantConservationDiagnosticPath ?? null,
       qeiWorldlineDossier: args.qeiWorldlineDossierPath ?? null,
@@ -248,6 +261,7 @@ export const runNhm2TimeDependentSourceCampaign = (args: {
     },
     sourceComponentAuthorityLedger,
     regionalFullTensorResidual,
+    sourceOffDiagonalShearAudit,
     covariantConservationDiagnostic,
     qeiWorldlineDossier,
     observerRobustEnergyConditions,
@@ -289,6 +303,9 @@ if (normalize(process.argv[1] ?? "") === normalize(fileURLToPath(import.meta.url
       args["source-component-authority-ledger"],
     ),
     regionalFullTensorResidualPath: asString(args["regional-full-tensor-residual"]),
+    sourceOffDiagonalShearAuditPath: asString(
+      args["source-off-diagonal-shear-audit"],
+    ),
     covariantConservationDiagnosticPath: asString(
       args["covariant-conservation-diagnostic"],
     ),

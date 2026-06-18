@@ -24,6 +24,7 @@ import {
 import { buildNhm2TileEffectiveFullTensorSourceArtifact } from "../shared/contracts/nhm2-tile-effective-full-tensor-source.v1";
 import type { Nhm2RegionalFullTensorResidualArtifactV1 } from "../shared/contracts/nhm2-regional-full-tensor-residual.v1";
 import type { Nhm2SourceComponentAuthorityLedgerArtifactV1 } from "../shared/contracts/nhm2-source-component-authority-ledger.v1";
+import type { Nhm2SourceOffDiagonalShearAuditArtifactV1 } from "../shared/contracts/nhm2-source-off-diagonal-shear-audit.v1";
 import {
   buildNhm2DynamicEffectiveGeometryEvidence,
   buildNhm2FrequencyConvergenceEvidence,
@@ -211,6 +212,46 @@ const fullTensorResidual = (
         missingMetricComponentIds: [],
         missingTileComponentIds,
         componentResiduals: [],
+        familyResiduals: [
+          {
+            family: "t00",
+            status: missingTileComponentIds.length > 0 ? "missing" : "pass",
+            worstComponentId: "T00",
+            worstRelResidual: 0.05,
+            maxCurrentToAllowedMagnitudeRatio: 1,
+            failingComponentIds: [],
+            missingComponentIds: [],
+          },
+          {
+            family: "momentum_t0i",
+            status: "pass",
+            worstComponentId: null,
+            worstRelResidual: null,
+            maxCurrentToAllowedMagnitudeRatio: null,
+            failingComponentIds: [],
+            missingComponentIds: [],
+          },
+          {
+            family: "diagonal_tij",
+            status: "pass",
+            worstComponentId: null,
+            worstRelResidual: null,
+            maxCurrentToAllowedMagnitudeRatio: null,
+            failingComponentIds: [],
+            missingComponentIds: [],
+          },
+          {
+            family: "off_diagonal_tij",
+            status: missingTileComponentIds.length > 0 ? "missing" : "pass",
+            worstComponentId: missingTileComponentIds.includes("T12") ? "T12" : null,
+            worstRelResidual: missingTileComponentIds.includes("T12") ? null : 0,
+            maxCurrentToAllowedMagnitudeRatio: missingTileComponentIds.includes("T12") ? 5 : null,
+            failingComponentIds: [],
+            missingComponentIds: missingTileComponentIds.filter((component) =>
+              ["T12", "T13", "T23"].includes(component),
+            ) as Array<"T12" | "T13" | "T23">,
+          },
+        ],
         t00RelResidual: 0.05,
         fullRelLInf: missingTileComponentIds.length > 0 ? null : 0.05,
         fullAbsLInf: missingTileComponentIds.length > 0 ? null : 0.05,
@@ -228,11 +269,13 @@ const fullTensorResidual = (
       anyAtlasMismatch: false,
       worstRegionId: "wall",
       worstComponentId: "T00",
+      worstResidualFamily: "t00",
       worstRelResidual: 0.05,
       firstBlocker:
         missingTileComponentIds.length === 0
           ? null
           : `${missingTileComponentIds[0]}:tile_component_missing`,
+      firstBlockerFamily: null,
       blockerCount: missingTileComponentIds.length,
       ...summary,
     },
@@ -263,6 +306,47 @@ const qeiDossier = (): Nhm2QeiWorldlineDossierV1 =>
       scalarMarginCannotSubstituteForDossier: true,
     },
   }) as Nhm2QeiWorldlineDossierV1;
+
+const shearAudit = (): Nhm2SourceOffDiagonalShearAuditArtifactV1 =>
+  ({
+    contractVersion: "nhm2_source_off_diagonal_shear_audit/v1",
+    generatedAt: "2026-06-18T00:00:00.000Z",
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+    runId: "campaign-test",
+    sourceComponentAuthorityLedgerRef: "authority.json",
+    regionalFullTensorResidualRef: "residual.json",
+    regions: [],
+    summary: {
+      allOffDiagonalComponentsPresent: true,
+      allOffDiagonalWithinTolerance: false,
+      anyShearMechanismMissing: true,
+      worstRegionId: "hull",
+      worstComponentId: "T13",
+      worstCurrentToAllowedMagnitudeRatio: 1.49e15,
+      uniformFractionalShearAnsatzDetected: true,
+      sourceFractionByComponent: {
+        T12: 0.001,
+        T13: 0.0005,
+        T23: 0.0003,
+      },
+      worstFractionalSuppressionToRequirement: 5.83e15,
+      firstBlocker: "hull:T13:off_diagonal_component_residual_exceeded",
+      falsifierCandidate: true,
+      currentDeclaredSourceModelFalsified: true,
+      falsifierScope: "current_declared_source_model",
+      falsifierReason:
+        "declared_uniform_fractional_off_diagonal_shear_without_mechanism_exceeds_required_suppression",
+      blockerCount: 24,
+    },
+    claimBoundary: {
+      diagnosticOnly: true,
+      shearAuditDoesNotValidatePhysicalSource: true,
+      passWindowCannotBeUsedAsSourceModelInput: true,
+      missingShearMechanismBlocksClosure: true,
+      currentModelFalsifierDoesNotProveUniversalSourceImpossibility: true,
+    },
+  }) as Nhm2SourceOffDiagonalShearAuditArtifactV1;
 
 const observerArtifact = (): Nhm2ObserverRobustEnergyConditionArtifactV1 =>
   ({
@@ -949,6 +1033,7 @@ describe("NHM2 time-dependent source campaign", () => {
         {
           allRequiredComponentsPresent: false,
           fullTensorResidualsPass: false,
+          worstResidualFamily: "off_diagonal_tij",
           firstBlocker: "T01:tile_component_missing",
           blockerCount: 2,
         },
@@ -973,7 +1058,54 @@ describe("NHM2 time-dependent source campaign", () => {
         "wall:T12:tile_component_missing",
       ]),
     );
+    expect(
+      artifact.gates.find((gate) => gate.gateId === "full_regional_tensor_closure")
+        ?.primaryMetric,
+    ).toContain("family=off_diagonal_tij");
     expect(artifact.summary.campaignPass).toBe(false);
+  });
+
+  it("surfaces off-diagonal fractional shear ansatz evidence in the full tensor campaign gate", () => {
+    const artifact = buildNhm2TimeDependentSourceCampaign({
+      sourceComponentAuthorityLedger: completeLedger(),
+      regionalFullTensorResidual: fullTensorResidual({
+        fullTensorResidualsPass: false,
+        worstRegionId: "hull",
+        worstComponentId: "T13",
+        worstResidualFamily: "off_diagonal_tij",
+        worstRelResidual: 1.64e15,
+        firstBlocker: "hull:T13:full_tensor_residual_exceeded",
+        blockerCount: 1,
+      }),
+      sourceOffDiagonalShearAudit: shearAudit(),
+      frequencyConvergence: frequencyEvidence(),
+      switchingConservation: switchingEvidence(),
+      dynamicEffectiveGeometry: dynamicGeometryEvidence(),
+      qeiWorldlineDossier: qeiDossier(),
+      observerRobustEnergyConditions: observerArtifact(),
+      campaignStability: stabilityEvidence(),
+    });
+    const gate = artifact.gates.find(
+      (entry) => entry.gateId === "full_regional_tensor_closure",
+    );
+
+    expect(gate?.status).toBe("fail");
+    expect(gate?.blockers).toEqual(
+      expect.arrayContaining([
+        "source_off_diagonal_current_declared_model_falsified",
+        "source_off_diagonal_shear_mechanism_missing",
+        "hull:T13:full_tensor_residual_exceeded",
+      ]),
+    );
+    expect(gate?.warnings).toEqual(
+      expect.arrayContaining([
+        "source_off_diagonal_uniform_fractional_shear_ansatz",
+      ]),
+    );
+    expect(gate?.primaryMetric).toContain("shearAuditWorstSuppression=5830000000000000");
+    expect(artifact.summary.firstBlocker).toBe(
+      "source_off_diagonal_current_declared_model_falsified",
+    );
   });
 
   it("can pass only when explicit dynamic, tensor, observer, QEI, and stability evidence pass together", () => {

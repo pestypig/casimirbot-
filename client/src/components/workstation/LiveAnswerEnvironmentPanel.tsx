@@ -98,6 +98,7 @@ type LiveAnswerMicroDeckCatalogItem =
       phase: "capture_prompt";
       sourceKind: "visual_frame";
       applied: boolean;
+      colorKey: string;
     }
   | {
       kind: "micro_reasoner_preset";
@@ -109,6 +110,7 @@ type LiveAnswerMicroDeckCatalogItem =
       sourceKind: StagePlayLiveSourceMailSourceKindV1;
       outputPolicy: string;
       applied: boolean;
+      colorKey: string;
     };
 type LiveAnswerMicroDeckCatalogGroup = {
   title: LiveAnswerMicroDeckCatalogItem["groupTitle"];
@@ -539,7 +541,10 @@ const compactLabel = (value: string): string =>
   value.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim() || "unknown";
 
 const liveAnswerDispatchLabel = (action: WorkstationDispatchActionV1): string => {
-  if (action.kind === "wake_agent") return "wake interrupt";
+  if (action.kind === "wake_agent") {
+    const interruptKind = "interruptKind" in action && action.interruptKind ? `:${action.interruptKind}` : "";
+    return `wake interrupt${interruptKind}`;
+  }
   if (action.kind === "speak_narrator") return `narrator ${action.mode}`;
   if (action.kind === "bind_narrator_stream") return `narrator bind ${compactLabel(action.streamKind)}`;
   if (action.kind === "update_live_answer") return `live answer ${action.lineKey}`;
@@ -852,6 +857,29 @@ const liveAnswerMicroDeckSourceLabel = (sourceKind: StagePlayLiveSourceMailSourc
   if (sourceKind === "audio_transcript") return "audio_transcript";
   if (sourceKind === "document_markdown") return "document_markdown";
   return sourceKind;
+};
+
+const liveAnswerMicroDeckColorKey = (input: {
+  sourceKind: StagePlayLiveSourceMailSourceKindV1;
+  sourceId?: string | null;
+  deckId: string;
+}): string => [
+  "microdeck",
+  input.sourceKind,
+  input.sourceId || "source-pending",
+  input.deckId,
+].join(":");
+
+const liveAnswerMicroDeckSwatch = (colorKey: string): { backgroundColor: string; borderColor: string } => {
+  let hash = 0;
+  for (const char of colorKey || "microdeck") {
+    hash = ((hash << 5) - hash + char.charCodeAt(0)) | 0;
+  }
+  const hue = Math.abs(hash) % 360;
+  return {
+    backgroundColor: `hsl(${hue} 84% 62%)`,
+    borderColor: `hsl(${hue} 78% 52%)`,
+  };
 };
 
 const sortLiveAnswerMicroDeckCatalogItems = (
@@ -1366,6 +1394,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       phase: "capture_prompt",
       sourceKind: "visual_frame",
       applied: activeVisualObserverProfile?.profileId === profile.profileId,
+      colorKey: liveAnswerMicroDeckColorKey({
+        sourceKind: "visual_frame",
+        sourceId: activeVisualSourceId,
+        deckId: profile.profileId,
+      }),
     }));
     const visualReasoningDecks: LiveAnswerMicroDeckCatalogItem[] = microReasonerPromptPresets.map((preset: StagePlayMicroReasonerPromptPresetV1) => ({
       kind: "micro_reasoner_preset",
@@ -1377,6 +1410,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       sourceKind: "visual_frame",
       outputPolicy: preset.outputPolicy,
       applied: activeMicroReasonerPromptPreset?.presetId === preset.presetId,
+      colorKey: liveAnswerMicroDeckColorKey({
+        sourceKind: "visual_frame",
+        sourceId: activeVisualSourceId,
+        deckId: preset.presetId,
+      }),
     }));
     const audioTranscriptDecks: LiveAnswerMicroDeckCatalogItem[] = earbudMicroReasonerPromptPresets.map((preset: StagePlayMicroReasonerPromptPresetV1) => ({
       kind: "micro_reasoner_preset",
@@ -1392,6 +1430,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           activeAudioTranscriptSourceId &&
           preset.sourceIds.includes(activeAudioTranscriptSourceId),
       ),
+      colorKey: liveAnswerMicroDeckColorKey({
+        sourceKind: "audio_transcript",
+        sourceId: activeAudioTranscriptSourceId ?? `audio_transcript:${threadId}`,
+        deckId: preset.presetId,
+      }),
     }));
     const documentMarkdownDecks: LiveAnswerMicroDeckCatalogItem[] = documentMicroReasonerPromptPresets.map((preset: StagePlayMicroReasonerPromptPresetV1) => ({
       kind: "micro_reasoner_preset",
@@ -1406,6 +1449,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         activeDocumentMicroReasonerPromptPreset?.presetId === preset.presetId &&
           preset.sourceIds.includes(activeDocumentMarkdownSourceId),
       ),
+      colorKey: liveAnswerMicroDeckColorKey({
+        sourceKind: "document_markdown",
+        sourceId: activeDocumentMarkdownSourceId,
+        deckId: preset.presetId,
+      }),
     }));
     return [
       {
@@ -4283,48 +4331,59 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
                       No catalog items loaded.
                     </p>
                   ) : (
-                    group.items.map((item: LiveAnswerMicroDeckCatalogItem) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => selectMicroDeckCatalogItem(item)}
-                        className={`w-full rounded border px-2 py-1.5 text-left hover:bg-white/5 ${
-                          item.applied
-                            ? "border-emerald-300/35 bg-emerald-400/10"
-                            : "border-white/10 bg-slate-950/50"
-                        }`}
-                        aria-pressed={item.applied}
-                      >
-                        <span className="flex min-w-0 items-center gap-1.5">
-                          {item.applied ? (
-                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-300" aria-hidden="true" />
-                          ) : (
-                            <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-white/10" aria-hidden="true" />
-                          )}
-                          <span className="block truncate text-[11px] font-semibold text-slate-100">{item.title}</span>
-                        </span>
-                        <span className="mt-0.5 flex flex-wrap gap-1">
-                          <span className="rounded border border-cyan-300/15 px-1.5 py-0.5 font-mono text-[10px] text-cyan-100">
-                            {liveAnswerMicroDeckPhaseLabel(item.phase)}
+                    group.items.map((item: LiveAnswerMicroDeckCatalogItem) => {
+                      const swatch = liveAnswerMicroDeckSwatch(item.colorKey);
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => selectMicroDeckCatalogItem(item)}
+                          className={`w-full rounded border px-2 py-1.5 text-left hover:bg-white/5 ${
+                            item.applied
+                              ? "border-emerald-300/35 bg-emerald-400/10"
+                              : "border-white/10 bg-slate-950/50"
+                          }`}
+                          aria-pressed={item.applied}
+                        >
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            {item.applied ? (
+                              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-300" aria-hidden="true" />
+                            ) : (
+                              <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-white/10" aria-hidden="true" />
+                            )}
+                            <span
+                              className="h-3.5 w-3.5 shrink-0 rounded-full border"
+                              aria-hidden="true"
+                              style={swatch}
+                            />
+                            <span className="block truncate text-[11px] font-semibold text-slate-100">{item.title}</span>
                           </span>
-                          <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">
-                            {liveAnswerMicroDeckSourceLabel(item.sourceKind)}
-                          </span>
-                          {item.kind === "micro_reasoner_preset" ? (
+                          <span className="mt-0.5 flex flex-wrap gap-1">
+                            <span className="rounded border border-cyan-300/15 px-1.5 py-0.5 font-mono text-[10px] text-cyan-100">
+                              {liveAnswerMicroDeckPhaseLabel(item.phase)}
+                            </span>
                             <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">
-                              {item.outputPolicy}
+                              {liveAnswerMicroDeckSourceLabel(item.sourceKind)}
                             </span>
-                          ) : null}
-                          {item.applied ? (
-                            <span className="inline-flex items-center gap-1 rounded border border-emerald-300/20 px-1.5 py-0.5 text-[10px] text-emerald-100">
-                              <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
-                              checked applied
+                            <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400" data-testid="live-answer-microdeck-color-key">
+                              color={item.colorKey}
                             </span>
-                          ) : null}
-                        </span>
-                        <span className="mt-1 line-clamp-2 text-[10px] leading-4 text-slate-500">{item.description}</span>
-                      </button>
-                    ))
+                            {item.kind === "micro_reasoner_preset" ? (
+                              <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">
+                                {item.outputPolicy}
+                              </span>
+                            ) : null}
+                            {item.applied ? (
+                              <span className="inline-flex items-center gap-1 rounded border border-emerald-300/20 px-1.5 py-0.5 text-[10px] text-emerald-100">
+                                <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                                checked applied
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className="mt-1 line-clamp-2 text-[10px] leading-4 text-slate-500">{item.description}</span>
+                        </button>
+                      );
+                    })
                   )}
                 </div>
               </div>

@@ -196,7 +196,21 @@ describe("nhm2_regional_full_tensor_residual/v1", () => {
     );
     expect(offDiagonal?.status).toBe("fail");
     expect(offDiagonal?.worstComponentId).toBe("T13");
+    expect(offDiagonal?.maxCurrentToAllowedMagnitudeRatio).toBe(500);
     expect(offDiagonal?.failingComponentIds).toContain("T13");
+
+    const t13 = hull?.componentResiduals.find((entry) => entry.componentId === "T13");
+    expect(t13?.passWindow).toMatchObject({
+      minCounterpartForPassSI: -0.1,
+      maxCounterpartForPassSI: 0.1,
+      derivedFromMetricRequiredTensor: true,
+      sourceModelInputAllowed: false,
+    });
+    expect(t13?.correctionHint).toMatchObject({
+      status: "reduce_magnitude_or_reorient",
+      signedDeltaToNearestPassSI: -49.9,
+      currentToAllowedMagnitudeRatio: 500,
+    });
   });
 
   it("prioritizes same-basis sample-count blockers before numeric residuals", () => {

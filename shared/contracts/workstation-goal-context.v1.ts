@@ -25,7 +25,7 @@ export type WorkstationDispatchActionV1 =
   | { kind: "focus_process_graph"; nodeRef?: string | null }
   | { kind: "repair_loop"; loopRef: string }
   | { kind: "ask_user" }
-  | { kind: "wake_agent"; reason?: string | null };
+  | { kind: "wake_agent"; interruptKind: "urgent" | "blocked" | "policy_triggered"; reason: string };
 
 export type GoalContextProducerKindV1 =
   | "visual_capture"
@@ -357,7 +357,11 @@ export type NarratorSayRequestV1 = {
   text: string;
   sourceKind: NarratorSourceKind;
   sourceId: string;
+  sourceRefs: string[];
+  loopRefs: string[];
   evidenceRefs: string[];
+  producedRefs: string[];
+  goalContextUpdateId: string;
   deliveryMode: Exclude<NarratorDeliveryMode, "hidden">;
   priority: "low" | "normal" | "high";
   language?: string;
@@ -377,6 +381,11 @@ export type NarratorBindStreamRequestV1 = {
   schemaVersion: typeof WORKSTATION_NARRATOR_BIND_STREAM_REQUEST_SCHEMA;
   requestId: string;
   sourceRef: string;
+  sourceRefs: string[];
+  loopRefs: string[];
+  evidenceRefs: string[];
+  producedRefs: string[];
+  goalContextUpdateId: string;
   streamKind:
     | "transcript_stream"
     | "translated_transcript"
@@ -481,6 +490,134 @@ const stringArrayIssue = (value: unknown, field: string, options: { requireNonEm
   return issues;
 };
 
+const dispatchActionIssues = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return ["suggestedDispatch must be an array"];
+  const issues: string[] = [];
+  value.forEach((action, index) => {
+    if (typeof action !== "object" || action === null || Array.isArray(action)) {
+      issues.push(`suggestedDispatch[${index}] must be an object`);
+      return;
+    }
+    const record = action as Record<string, unknown>;
+    if (typeof record.kind !== "string" || !record.kind.trim()) {
+      issues.push(`suggestedDispatch[${index}].kind must be a non-empty string`);
+      return;
+    }
+    if (record.kind === "log_receipt" && (typeof record.receiptRef !== "string" || !record.receiptRef.trim())) {
+      issues.push(`suggestedDispatch[${index}].log_receipt must include receiptRef`);
+    }
+    if (record.kind === "append_goal_context" && (typeof record.goalId !== "string" || !record.goalId.trim())) {
+      issues.push(`suggestedDispatch[${index}].append_goal_context must include goalId`);
+    }
+    if (record.kind === "update_panel" && (typeof record.panelId !== "string" || !record.panelId.trim())) {
+      issues.push(`suggestedDispatch[${index}].update_panel must include panelId`);
+    }
+    if (record.kind === "update_live_answer" && (typeof record.lineKey !== "string" || !record.lineKey.trim())) {
+      issues.push(`suggestedDispatch[${index}].update_live_answer must include lineKey`);
+    }
+    if (record.kind === "speak_narrator") {
+      if (record.mode !== "confirm" && record.mode !== "auto" && record.mode !== "visible_only") {
+        issues.push(`suggestedDispatch[${index}].speak_narrator mode is invalid`);
+      }
+    }
+    if (record.kind === "bind_narrator_stream") {
+      if (typeof record.sourceRef !== "string" || !record.sourceRef.trim()) {
+        issues.push(`suggestedDispatch[${index}].bind_narrator_stream must include sourceRef`);
+      }
+      if (!narratorStreamKinds.has(record.streamKind as string)) {
+        issues.push(`suggestedDispatch[${index}].bind_narrator_stream streamKind is invalid`);
+      }
+      if (
+        record.deliveryMode !== undefined &&
+        record.deliveryMode !== null &&
+        !narratorVisibleDeliveryModes.has(record.deliveryMode as string)
+      ) {
+        issues.push(`suggestedDispatch[${index}].bind_narrator_stream deliveryMode is invalid`);
+      }
+    }
+    if (record.kind === "set_loop_state") {
+      if (typeof record.loopRef !== "string" || !record.loopRef.trim()) {
+        issues.push(`suggestedDispatch[${index}].set_loop_state must include loopRef`);
+      }
+      if (record.state !== "paused" && record.state !== "running" && record.state !== "repaired") {
+        issues.push(`suggestedDispatch[${index}].set_loop_state state is invalid`);
+      }
+    }
+    if (record.kind === "repair_loop" && (typeof record.loopRef !== "string" || !record.loopRef.trim())) {
+      issues.push(`suggestedDispatch[${index}].repair_loop must include loopRef`);
+    }
+    if (record.kind === "wake_agent") {
+      if (
+        record.interruptKind !== "urgent" &&
+        record.interruptKind !== "blocked" &&
+        record.interruptKind !== "policy_triggered"
+      ) {
+        issues.push("wake_agent dispatch must include interruptKind urgent, blocked, or policy_triggered");
+      }
+      if (typeof record.reason !== "string" || !record.reason.trim()) {
+        issues.push("wake_agent dispatch must include a non-empty reason");
+      }
+    }
+  });
+  return issues;
+};
+
+const goalSessionCadenceIssues = (value: unknown): string[] => {
+  const issues: string[] = [];
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return ["cadence must be an object"];
+  const cadence = value as Partial<AgentGoalSessionV1["cadence"]>;
+  if (
+    cadence.kind !== "manual" &&
+    cadence.kind !== "interval" &&
+    cadence.kind !== "event_accumulation" &&
+    cadence.kind !== "user_turn_only"
+  ) {
+    issues.push("cadence.kind is invalid");
+  }
+  if (cadence.kind === "interval" && (!Number.isFinite(cadence.everyMs) || cadence.everyMs <= 0)) {
+    issues.push("cadence.everyMs must be a positive number");
+  }
+  if (cadence.kind === "event_accumulation" && (!Number.isFinite(cadence.minUpdates) || cadence.minUpdates <= 0)) {
+    issues.push("cadence.minUpdates must be a positive number");
+  }
+  return issues;
+};
+
+const checkpointNextSteps = new Set<AgentGoalSessionV1["checkpoints"][number]["nextStep"]>([
+  "continue",
+  "ask_user",
+  "repair",
+  "report",
+  "stop",
+]);
+
+const goalSessionCheckpointIssues = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return ["checkpoints must be an array"];
+  const issues: string[] = [];
+  value.forEach((checkpoint, index) => {
+    if (typeof checkpoint !== "object" || checkpoint === null || Array.isArray(checkpoint)) {
+      issues.push(`checkpoints[${index}] must be an object`);
+      return;
+    }
+    const entry = checkpoint as AgentGoalSessionV1["checkpoints"][number];
+    if (typeof entry.checkpointId !== "string" || !entry.checkpointId.trim()) {
+      issues.push(`checkpoints[${index}].checkpointId is required`);
+    }
+    if (!Number.isFinite(entry.createdAtMs) || entry.createdAtMs <= 0) {
+      issues.push(`checkpoints[${index}].createdAtMs must be a positive timestamp`);
+    }
+    if (typeof entry.summary !== "string" || !entry.summary.trim()) {
+      issues.push(`checkpoints[${index}].summary is required`);
+    }
+    issues.push(...stringArrayIssue(entry.evidenceRefs, `checkpoints[${index}].evidenceRefs`, { requireNonEmpty: true }));
+    issues.push(...stringArrayIssue(entry.actionsTaken, `checkpoints[${index}].actionsTaken`, { requireNonEmpty: true }));
+    if (!checkpointNextSteps.has(entry.nextStep)) {
+      issues.push(`checkpoints[${index}].nextStep is invalid`);
+    }
+  });
+  return issues;
+};
+
 export function validateWorkstationGoalContextUpdateV1(value: WorkstationGoalContextUpdateV1): string[] {
   const issues: string[] = [];
   if (value.schemaVersion !== WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA) issues.push("schemaVersion must match goal context update schema");
@@ -493,6 +630,9 @@ export function validateWorkstationGoalContextUpdateV1(value: WorkstationGoalCon
   if (!value.contentRef) issues.push("contentRef is required");
   if (!value.preview.trim()) issues.push("preview is required");
   issues.push(...stringArrayIssue(value.evidenceRefs, "evidenceRefs", { requireNonEmpty: true }));
+  if (Array.isArray(value.evidenceRefs) && value.contentRef && !value.evidenceRefs.includes(value.contentRef)) {
+    issues.push("evidenceRefs must include contentRef");
+  }
   issues.push(...stringArrayIssue(value.receiptRefs, "receiptRefs"));
   if (!value.freshness || !Number.isFinite(value.freshness.observedAtMs) || value.freshness.observedAtMs <= 0) {
     issues.push("freshness.observedAtMs must be a positive timestamp");
@@ -501,7 +641,7 @@ export function validateWorkstationGoalContextUpdateV1(value: WorkstationGoalCon
     issues.push("freshness.staleAfterMs must be a positive number");
   }
   if (!freshnessStatuses.has(value.freshness?.status)) issues.push("freshness.status is invalid");
-  if (!Array.isArray(value.suggestedDispatch)) issues.push("suggestedDispatch must be an array");
+  issues.push(...dispatchActionIssues(value.suggestedDispatch));
   if (value.assistant_answer !== false) issues.push("goal context updates must expose assistant_answer=false");
   if (value.terminal_eligible !== false) issues.push("goal context updates must expose terminal_eligible=false");
   if (value.raw_content_included !== false) issues.push("goal context updates must expose raw_content_included=false");
@@ -517,28 +657,41 @@ export function validateAgentGoalSessionV1(value: AgentGoalSessionV1): string[] 
   if (value.schemaVersion !== WORKSTATION_AGENT_GOAL_SESSION_SCHEMA) issues.push("schemaVersion must match agent goal session schema");
   if (!value.goalId) issues.push("goalId is required");
   if (!value.threadId) issues.push("threadId is required");
-  if (!value.objective.trim()) issues.push("objective is required");
-  if (!value.userVisibleSummary.trim()) issues.push("userVisibleSummary is required");
+  if (typeof value.objective !== "string" || !value.objective.trim()) issues.push("objective is required");
+  if (typeof value.userVisibleSummary !== "string" || !value.userVisibleSummary.trim()) {
+    issues.push("userVisibleSummary is required");
+  }
   if (!goalStatuses.has(value.status)) issues.push("status is invalid");
-  if (!Array.isArray(value.sourceRefs)) issues.push("sourceRefs must be an array");
-  if (!Array.isArray(value.loopRefs)) issues.push("loopRefs must be an array");
+  issues.push(...stringArrayIssue(value.sourceRefs, "sourceRefs"));
+  issues.push(...stringArrayIssue(value.loopRefs, "loopRefs"));
+  issues.push(...stringArrayIssue(value.constructRefs, "constructRefs"));
   if (!Array.isArray(value.contextFeeds)) issues.push("contextFeeds must be an array");
   if (Array.isArray(value.contextFeeds)) {
+    if (value.contextFeeds.length === 0) issues.push("contextFeeds must include at least one feed");
     value.contextFeeds.forEach((feed, index) => {
       if (!feed?.feedId) issues.push(`contextFeeds[${index}].feedId is required`);
       if (!agentGoalContextFeedKinds.has(feed?.sourceKind)) issues.push(`contextFeeds[${index}].sourceKind is invalid`);
+      if (feed?.query !== undefined && (typeof feed.query !== "string" || !feed.query.trim())) {
+        issues.push(`contextFeeds[${index}].query must be a non-empty string`);
+      }
       if (feed?.freshnessMs !== undefined && (!Number.isFinite(feed.freshnessMs) || feed.freshnessMs <= 0)) {
         issues.push(`contextFeeds[${index}].freshnessMs must be a positive number`);
+      }
+      if (feed?.relevancePolicy !== undefined && (typeof feed.relevancePolicy !== "string" || !feed.relevancePolicy.trim())) {
+        issues.push(`contextFeeds[${index}].relevancePolicy must be a non-empty string`);
       }
     });
   }
   if (!Array.isArray(value.allowedActuators)) issues.push("allowedActuators must be an array");
   if (Array.isArray(value.allowedActuators)) {
+    if (value.allowedActuators.length === 0) issues.push("allowedActuators must include at least one actuator");
     value.allowedActuators.forEach((actuator, index) => {
       if (!agentGoalActuators.has(actuator)) issues.push(`allowedActuators[${index}] is invalid`);
     });
   }
-  if (!Array.isArray(value.stopConditions)) issues.push("stopConditions must be an array");
+  issues.push(...goalSessionCadenceIssues(value.cadence));
+  issues.push(...stringArrayIssue(value.stopConditions, "stopConditions", { requireNonEmpty: true }));
+  issues.push(...goalSessionCheckpointIssues(value.checkpoints));
   if (value.authority?.assistantAnswer !== false) issues.push("goal sessions must not be assistant answers");
   if (value.authority?.finalReportsRequireTerminalAuthority !== true) issues.push("goal sessions require terminal authority for final reports");
   const requirements = value.authority?.finalReportRequirements;
@@ -563,7 +716,24 @@ export function validateNarratorSayRequestV1(value: NarratorSayRequestV1): strin
   if (!value.text.trim()) issues.push("text is required");
   if (!narratorSourceKinds.has(value.sourceKind)) issues.push("sourceKind is invalid");
   if (!value.sourceId) issues.push("sourceId is required");
+  issues.push(...stringArrayIssue(value.sourceRefs, "sourceRefs", { requireNonEmpty: true }));
+  issues.push(...stringArrayIssue(value.loopRefs, "loopRefs", { requireNonEmpty: true }));
   issues.push(...stringArrayIssue(value.evidenceRefs, "evidenceRefs", { requireNonEmpty: true }));
+  issues.push(...stringArrayIssue(value.producedRefs, "producedRefs", { requireNonEmpty: true }));
+  if (Array.isArray(value.evidenceRefs) && value.requestId && !value.evidenceRefs.includes(value.requestId)) {
+    issues.push("evidenceRefs must include requestId");
+  }
+  if (Array.isArray(value.producedRefs) && value.requestId && !value.producedRefs.includes(value.requestId)) {
+    issues.push("producedRefs must include requestId");
+  }
+  if (!value.goalContextUpdateId) issues.push("goalContextUpdateId is required");
+  if (
+    Array.isArray(value.producedRefs) &&
+    value.goalContextUpdateId &&
+    !value.producedRefs.includes(value.goalContextUpdateId)
+  ) {
+    issues.push("producedRefs must include goalContextUpdateId");
+  }
   if (!narratorVisibleDeliveryModes.has(value.deliveryMode)) issues.push("deliveryMode must be visible_only, confirm_to_speak, or auto_speak");
   if (!narratorPriorities.has(value.priority)) issues.push("priority is invalid");
   issues.push(...terminalAuthorityIssue(value.terminalAuthority, "terminalAuthority"));
@@ -578,6 +748,24 @@ export function validateNarratorBindStreamRequestV1(value: NarratorBindStreamReq
   if (value.schemaVersion !== WORKSTATION_NARRATOR_BIND_STREAM_REQUEST_SCHEMA) issues.push("schemaVersion must match narrator bind stream request schema");
   if (!value.requestId) issues.push("requestId is required");
   if (!value.sourceRef) issues.push("sourceRef is required");
+  issues.push(...stringArrayIssue(value.sourceRefs, "sourceRefs", { requireNonEmpty: true }));
+  issues.push(...stringArrayIssue(value.loopRefs, "loopRefs", { requireNonEmpty: true }));
+  issues.push(...stringArrayIssue(value.evidenceRefs, "evidenceRefs", { requireNonEmpty: true }));
+  issues.push(...stringArrayIssue(value.producedRefs, "producedRefs", { requireNonEmpty: true }));
+  if (Array.isArray(value.evidenceRefs) && value.requestId && !value.evidenceRefs.includes(value.requestId)) {
+    issues.push("evidenceRefs must include requestId");
+  }
+  if (Array.isArray(value.producedRefs) && value.requestId && !value.producedRefs.includes(value.requestId)) {
+    issues.push("producedRefs must include requestId");
+  }
+  if (!value.goalContextUpdateId) issues.push("goalContextUpdateId is required");
+  if (
+    Array.isArray(value.producedRefs) &&
+    value.goalContextUpdateId &&
+    !value.producedRefs.includes(value.goalContextUpdateId)
+  ) {
+    issues.push("producedRefs must include goalContextUpdateId");
+  }
   if (!narratorStreamKinds.has(value.streamKind)) issues.push("streamKind is invalid");
   if (!narratorVisibleDeliveryModes.has(value.deliveryMode)) issues.push("deliveryMode must be visible_only, confirm_to_speak, or auto_speak");
   if (!narratorVoicePolicies.has(value.voicePolicy)) issues.push("voicePolicy is invalid");
