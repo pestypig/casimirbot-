@@ -14,6 +14,8 @@ import {
   WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
   validateAgentGoalSessionV1,
   validateWorkstationGoalContextUpdateV1,
+  type AgentGoalActuatorV1,
+  type AgentGoalContextFeedKindV1,
   type AgentGoalSessionV1,
   type GoalContextProducerKindV1,
   type GoalContextUpdateKindV1,
@@ -40,6 +42,123 @@ const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
 const previewText = (value: string, limit = 240): string => {
   const normalized = value.replace(/\s+/g, " ").trim();
   return normalized.length > limit ? `${normalized.slice(0, Math.max(0, limit - 3)).trimEnd()}...` : normalized;
+};
+
+const agentGoalFeedKinds = new Set<AgentGoalContextFeedKindV1>([
+  "visual_summaries",
+  "audio_transcripts",
+  "translated_transcripts",
+  "microdeck_outputs",
+  "live_answer_lines",
+  "source_health",
+  "trace_memory",
+  "route_evidence",
+]);
+
+const agentGoalActuators = new Set<AgentGoalActuatorV1>([
+  "set_audio_preset",
+  "set_visual_preset",
+  "bind_narrator",
+  "narrator_say",
+  "update_live_answer",
+  "query_trace_memory",
+  "pause_loop",
+  "repair_source",
+  "ask_user",
+]);
+
+const defaultContextFeeds = (goalId: string): AgentGoalSessionV1["contextFeeds"] => [
+  {
+    feedId: `stage_play_goal_feed:${hashShort([goalId, "visual_summaries"], 12)}`,
+    sourceKind: "visual_summaries",
+    freshnessMs: 30_000,
+    relevancePolicy: "same-source-or-goal-id",
+  },
+  {
+    feedId: `stage_play_goal_feed:${hashShort([goalId, "audio_transcripts"], 12)}`,
+    sourceKind: "audio_transcripts",
+    freshnessMs: 30_000,
+    relevancePolicy: "same-source-or-goal-id",
+  },
+  {
+    feedId: `stage_play_goal_feed:${hashShort([goalId, "translated_transcripts"], 12)}`,
+    sourceKind: "translated_transcripts",
+    freshnessMs: 45_000,
+    relevancePolicy: "same-source-or-goal-id",
+  },
+  {
+    feedId: `stage_play_goal_feed:${hashShort([goalId, "microdeck_outputs"], 12)}`,
+    sourceKind: "microdeck_outputs",
+    freshnessMs: 30_000,
+    relevancePolicy: "same-source-or-goal-id",
+  },
+  {
+    feedId: `stage_play_goal_feed:${hashShort([goalId, "live_answer_lines"], 12)}`,
+    sourceKind: "live_answer_lines",
+    freshnessMs: 45_000,
+    relevancePolicy: "same-goal-or-active-line",
+  },
+  {
+    feedId: `stage_play_goal_feed:${hashShort([goalId, "source_health"], 12)}`,
+    sourceKind: "source_health",
+    freshnessMs: 60_000,
+    relevancePolicy: "same-source",
+  },
+  {
+    feedId: `stage_play_goal_feed:${hashShort([goalId, "trace_memory"], 12)}`,
+    sourceKind: "trace_memory",
+    freshnessMs: 120_000,
+    relevancePolicy: "same-thread-or-turn",
+  },
+  {
+    feedId: `stage_play_goal_feed:${hashShort([goalId, "route_evidence"], 12)}`,
+    sourceKind: "route_evidence",
+    freshnessMs: 60_000,
+    relevancePolicy: "same-goal-or-route",
+  },
+];
+
+const defaultAllowedActuators = (): AgentGoalActuatorV1[] => [
+  "set_audio_preset",
+  "set_visual_preset",
+  "bind_narrator",
+  "narrator_say",
+  "update_live_answer",
+  "query_trace_memory",
+  "pause_loop",
+  "repair_source",
+  "ask_user",
+];
+
+const mergeContextFeeds = (
+  goalId: string,
+  existing: AgentGoalSessionV1["contextFeeds"] | undefined,
+  supplied: AgentGoalSessionV1["contextFeeds"] | undefined,
+): AgentGoalSessionV1["contextFeeds"] => {
+  const byId = new Map<string, AgentGoalSessionV1["contextFeeds"][number]>();
+  for (const feed of [...(existing ?? defaultContextFeeds(goalId)), ...(supplied ?? [])]) {
+    if (!agentGoalFeedKinds.has(feed.sourceKind)) continue;
+    const feedId = normalize(feed.feedId) ?? `stage_play_goal_feed:${hashShort([goalId, feed.sourceKind, feed.query ?? ""], 12)}`;
+    byId.set(feedId, {
+      feedId,
+      sourceKind: feed.sourceKind,
+      ...(normalize(feed.query) ? { query: normalize(feed.query)! } : {}),
+      ...(typeof feed.freshnessMs === "number" && Number.isFinite(feed.freshnessMs)
+        ? { freshnessMs: Math.max(1_000, Math.floor(feed.freshnessMs)) }
+        : {}),
+      ...(normalize(feed.relevancePolicy) ? { relevancePolicy: normalize(feed.relevancePolicy)! } : {}),
+    });
+  }
+  return Array.from(byId.values()).slice(0, 24);
+};
+
+const mergeAllowedActuators = (
+  existing: AgentGoalActuatorV1[] | undefined,
+  supplied: AgentGoalActuatorV1[] | undefined,
+): AgentGoalActuatorV1[] => {
+  const merged = [...(existing ?? defaultAllowedActuators()), ...(supplied ?? [])]
+    .filter((actuator): actuator is AgentGoalActuatorV1 => agentGoalActuators.has(actuator));
+  return Array.from(new Set(merged));
 };
 
 const readTimeMs = (value: string | null | undefined, fallbackMs: number): number => {
@@ -216,6 +335,17 @@ export function ensureStagePlayAgentGoalSession(input: {
   objectiveText?: string | null;
   sourceRefs?: string[];
   loopRefs?: string[];
+  constructRefs?: string[];
+  contextFeeds?: AgentGoalSessionV1["contextFeeds"];
+  allowedActuators?: AgentGoalActuatorV1[];
+  cadence?: AgentGoalSessionV1["cadence"];
+  stopConditions?: string[];
+  checkpoint?: {
+    summary?: string | null;
+    evidenceRefs?: string[];
+    actionsTaken?: string[];
+    nextStep?: AgentGoalSessionV1["checkpoints"][number]["nextStep"];
+  };
   nowMs?: number;
 }): AgentGoalSessionV1 | null {
   const objectiveText = normalize(input.objectiveText);
@@ -224,7 +354,20 @@ export function ensureStagePlayAgentGoalSession(input: {
   const existing = sessionsById.get(goalId);
   const sourceRefs = uniqueStrings([...(existing?.sourceRefs ?? []), ...(input.sourceRefs ?? [])]);
   const loopRefs = uniqueStrings([...(existing?.loopRefs ?? []), ...(input.loopRefs ?? [])]);
+  const constructRefs = uniqueStrings([...(existing?.constructRefs ?? []), ...(input.constructRefs ?? [])]);
   const nowMs = input.nowMs ?? Date.now();
+  const checkpointSummary =
+    normalize(input.checkpoint?.summary) ??
+    (existing ? "Goal session refreshed workstation context feeds." : "Goal session started workstation context feeds.");
+  const checkpointEvidenceRefs = uniqueStrings([
+    ...(input.checkpoint?.evidenceRefs ?? []),
+    ...sourceRefs.slice(0, 12),
+    ...loopRefs.slice(0, 12),
+  ]).slice(0, 24);
+  const checkpointActions = uniqueStrings([
+    ...(input.checkpoint?.actionsTaken ?? []),
+    existing ? "refresh_goal_context_feeds" : "start_agent_goal_session",
+  ]).slice(0, 12);
   return upsertStagePlayAgentGoalSession({
     schemaVersion: WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
     goalId,
@@ -235,47 +378,27 @@ export function ensureStagePlayAgentGoalSession(input: {
     status: existing?.status ?? "active",
     sourceRefs,
     loopRefs,
-    constructRefs: existing?.constructRefs ?? [],
-    contextFeeds: existing?.contextFeeds ?? [
-      {
-        feedId: `stage_play_goal_feed:${hashShort([goalId, "microdeck_outputs"], 12)}`,
-        sourceKind: "microdeck_outputs",
-        freshnessMs: 30_000,
-        relevancePolicy: "same-source-or-goal-id",
-      },
-      {
-        feedId: `stage_play_goal_feed:${hashShort([goalId, "source_health"], 12)}`,
-        sourceKind: "source_health",
-        freshnessMs: 60_000,
-        relevancePolicy: "same-source",
-      },
-    ],
-    allowedActuators: existing?.allowedActuators ?? [
-      "set_audio_preset",
-      "set_visual_preset",
-      "bind_narrator",
-      "narrator_say",
-      "update_live_answer",
-      "query_trace_memory",
-      "pause_loop",
-      "repair_source",
-      "ask_user",
-    ],
-    cadence: existing?.cadence ?? { kind: "user_turn_only" },
-    stopConditions: existing?.stopConditions ?? [
+    constructRefs,
+    contextFeeds: mergeContextFeeds(goalId, existing?.contextFeeds, input.contextFeeds),
+    allowedActuators: mergeAllowedActuators(existing?.allowedActuators, input.allowedActuators),
+    cadence: input.cadence ?? existing?.cadence ?? { kind: "user_turn_only" },
+    stopConditions: uniqueStrings([
+      ...(existing?.stopConditions ?? [
       "User stops monitoring",
       "Source feed ends or becomes unavailable",
       "Terminal authority produces a final report",
-    ],
+      ]),
+      ...(input.stopConditions ?? []),
+    ]).slice(0, 20),
     checkpoints: [
       ...(existing?.checkpoints ?? []),
       {
         checkpointId: `stage_play_goal_checkpoint:${hashShort([goalId, nowMs], 12)}`,
         createdAtMs: nowMs,
-        summary: "Goal session observed Stage Play mailbox context.",
-        evidenceRefs: sourceRefs.slice(0, 12),
-        actionsTaken: ["append_goal_context"],
-        nextStep: "continue",
+        summary: checkpointSummary,
+        evidenceRefs: checkpointEvidenceRefs,
+        actionsTaken: checkpointActions,
+        nextStep: input.checkpoint?.nextStep ?? "continue",
       },
     ].slice(-20),
     authority: {

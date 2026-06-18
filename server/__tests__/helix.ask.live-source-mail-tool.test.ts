@@ -16,7 +16,14 @@ import { resetStagePlayLiveSourceNarrativeStoreForTest } from "../services/stage
 import { resetStagePlayLiveSourceInterpreterProfileStoreForTest } from "../services/stage-play/stage-play-live-source-interpreter-profile-store";
 import { resetStagePlayProcessedMailPacketStoreForTest } from "../services/stage-play/stage-play-processed-mail-packet-store";
 import { resetStagePlayVisualObserverProfileStoreForTest } from "../services/stage-play/stage-play-visual-observer-profile-store";
-import { resetStagePlayGoalContextStoreForTest } from "../services/stage-play/stage-play-goal-context-store";
+import {
+  listStagePlayGoalContextUpdates,
+  resetStagePlayGoalContextStoreForTest,
+} from "../services/stage-play/stage-play-goal-context-store";
+import {
+  clearWorkstationReasoningTracesForTest,
+  recordWorkstationReasoningTrace,
+} from "../services/helix-ask/workstation-reasoning-trace-store";
 
 const threadId = "thread:helix-ask-live-source-mail-tool";
 const roomId = "room:helix-ask-live-source-mail-tool";
@@ -30,6 +37,7 @@ beforeEach(() => {
   resetStagePlayProcessedMailPacketStoreForTest();
   resetStagePlayVisualObserverProfileStoreForTest();
   resetStagePlayGoalContextStoreForTest();
+  clearWorkstationReasoningTracesForTest();
   resetVisualSnapshotStoreForTest();
 });
 
@@ -181,6 +189,13 @@ describe("live-source mail live environment tools", () => {
       }),
       expect.objectContaining({
         tool_id: "live_env.start_agent_goal_session",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.query_trace_memory",
         family: "live_env",
         creates_assistant_answer: false,
         requires_user_confirmation: false,
@@ -1404,6 +1419,385 @@ describe("live-source mail live environment tools", () => {
     expect(readPayload.fallbackTool).toBeNull();
     expect(readPayload.assistant_answer).toBe(false);
     expect(readPayload.terminal_eligible).toBe(false);
+  });
+
+  it("starts an agent goal session through live_env.start_agent_goal_session as non-terminal tool evidence", () => {
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        goal_id: "goal:frog-classification",
+        objective: "Monitor the image source and prepare frog classification evidence.",
+        construct_refs: ["live_answer_environment:frog"],
+        context_feeds: [
+          { source_kind: "visual", freshness_ms: 15_000, relevance_policy: "frog classification" },
+          { source_kind: "translation", query: "species hints" },
+          { source_kind: "trace_memory" },
+        ],
+        allowed_actuators: ["set_visual_preset", "bind_narrator", "query_trace_memory"],
+        cadence: { kind: "event_accumulation", min_updates: 3 },
+        stop_conditions: ["frog classified with terminal authority"],
+        checkpoint_summary: "Goal session initialized from ImageLens frog classification prompt.",
+        actions_taken: ["bind_visual_source"],
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation).toMatchObject({
+      schema: "helix.live_environment_tool_observation.v1",
+      tool_name: "live_env.start_agent_goal_session",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      instruction_authority: "none",
+      ask_instruction_authority: "none",
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schema: "stage_play_agent_goal_session_tool_result/v1",
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+      session: {
+        goalId: "goal:frog-classification",
+        objective: "Monitor the image source and prepare frog classification evidence.",
+        sourceRefs: expect.arrayContaining([sourceId]),
+        constructRefs: ["live_answer_environment:frog"],
+        contextFeeds: expect.arrayContaining([
+          expect.objectContaining({
+            sourceKind: "visual_summaries",
+            freshnessMs: 15000,
+            relevancePolicy: "frog classification",
+          }),
+          expect.objectContaining({
+            sourceKind: "translated_transcripts",
+            query: "species hints",
+          }),
+          expect.objectContaining({ sourceKind: "trace_memory" }),
+        ]),
+        allowedActuators: expect.arrayContaining(["set_visual_preset", "bind_narrator", "query_trace_memory"]),
+        cadence: { kind: "event_accumulation", minUpdates: 3 },
+        stopConditions: expect.arrayContaining(["frog classified with terminal authority"]),
+        checkpoints: expect.arrayContaining([
+          expect.objectContaining({
+            summary: "Goal session initialized from ImageLens frog classification prompt.",
+            actionsTaken: expect.arrayContaining(["bind_visual_source", "start_agent_goal_session"]),
+            nextStep: "continue",
+          }),
+        ]),
+        authority: {
+          assistantAnswer: false,
+          finalReportsRequireTerminalAuthority: true,
+        },
+      },
+    });
+    expect(observation.producedRefs).toEqual(["goal:frog-classification"]);
+    expect(observation.evidence_refs).toEqual(expect.arrayContaining([
+      "goal:frog-classification",
+      sourceId,
+    ]));
+  });
+
+  it("queries synced workstation goal context through live_env.query_workstation_goal_context", () => {
+    seedVisualSummaryText("ImageLens shows a frog image ready for classification.", "goal-context");
+
+    const processObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.process_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        source_kind: "visual_frame",
+      },
+    });
+    const processPayload = processObservation.observation as any;
+
+    const queryObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_workstation_goal_context",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        source_kind: "visual_frame",
+      },
+    });
+
+    const queryPayload = queryObservation.observation as any;
+    expect(queryObservation).toMatchObject({
+      schema: "helix.live_environment_tool_observation.v1",
+      tool_name: "live_env.query_workstation_goal_context",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      instruction_authority: "none",
+      ask_instruction_authority: "none",
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(queryPayload).toMatchObject({
+      schema: "stage_play_workstation_goal_context_read_result/v1",
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+      syncedWindow: {
+        mailItemCount: 1,
+        processedPacketCount: 1,
+      },
+    });
+    expect(queryPayload.goalContextUpdates).toHaveLength(1);
+    expect(queryPayload.goalContextUpdates[0]).toMatchObject({
+      contentRef: processPayload.packets[0].packetId,
+      sourceRefs: expect.arrayContaining([sourceId]),
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    expect(queryPayload.goalContextUpdates[0].suggestedDispatch.map((action: any) => action.kind)).toEqual(expect.arrayContaining([
+      "log_receipt",
+      "append_goal_context",
+      "update_panel",
+    ]));
+    expect(queryObservation.producedRefs).toContain(queryPayload.goalContextUpdates[0].updateId);
+    expect(queryObservation.evidence_refs).toEqual(expect.arrayContaining([
+      processPayload.packets[0].packetId,
+      sourceId,
+    ]));
+  });
+
+  it("records source health queries as durable non-terminal goal-context updates", () => {
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_source_health",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation).toMatchObject({
+      tool_name: "live_env.query_source_health",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schema: "helix.situation_source_capability_read.v1",
+      goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:source_health:/),
+      post_tool_model_step_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+
+    const updates = listStagePlayGoalContextUpdates({
+      threadId,
+      producerKind: "source_health",
+      updateKind: "source_status",
+    });
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({
+      updateId: payload.goalContextUpdateId,
+      producerKind: "source_health",
+      updateKind: "source_status",
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    expect(updates[0].suggestedDispatch.map((action) => action.kind)).toEqual(expect.arrayContaining([
+      "log_receipt",
+      "update_panel",
+    ]));
+    expect(observation.producedRefs).toEqual([payload.goalContextUpdateId]);
+  });
+
+  it("records current live-source state queries as Live Answer goal-context updates", () => {
+    seedVisualSummaryText("Live Answer compact state shows a frog photo in ImageLens.", "current-state");
+
+    executeLiveEnvironmentTool({
+      tool_name: "live_env.check_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        source_kind: "visual_frame",
+      },
+    });
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.summarize_live_source_current_state",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        source_kind: "visual_frame",
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation).toMatchObject({
+      tool_name: "live_env.summarize_live_source_current_state",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schemaVersion: "stage_play_live_source_current_state/v1",
+      goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:live_answer:/),
+      post_tool_model_step_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+
+    const updates = listStagePlayGoalContextUpdates({
+      threadId,
+      sourceRef: sourceId,
+      producerKind: "live_answer",
+    });
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({
+      updateId: payload.goalContextUpdateId,
+      contentRef: payload.currentStateId,
+      producerKind: "live_answer",
+      updateKind: "summary",
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    expect(updates[0].suggestedDispatch.map((action) => action.kind)).toEqual(expect.arrayContaining([
+      "log_receipt",
+      "update_live_answer",
+      "update_panel",
+    ]));
+    expect(observation.producedRefs).toEqual([payload.goalContextUpdateId]);
+  });
+
+  it("queries compact trace memory and records route-watch goal context", () => {
+    const trace = recordWorkstationReasoningTrace({
+      schema: "helix.workstation_reasoning_trace.v1",
+      trace_id: "workstation_trace:hotbar-total",
+      thread_id: threadId,
+      turn_id: "turn:hotbar-total",
+      source_family: "multimodal",
+      user_goal: "Add visible hotbar item counts.",
+      route_reason_code: "visual_to_calculator",
+      input_item_refs: ["visual_evidence:hotbar"],
+      evidence_refs: ["visual_evidence:hotbar", "derived_equation:hotbar"],
+      tool_receipt_ids: ["calculator_receipt:hotbar"],
+      lifecycle_event_refs: ["tool_lifecycle:hotbar"],
+      artifacts: {
+        visual_extraction_id: "visual_extraction:hotbar",
+        derived_equation_id: "derived_equation:hotbar",
+        workstation_tool_evaluation_id: "workstation-tool-eval:hotbar",
+        terminal_authority_hash: "hash:hotbar-total",
+      },
+      requested_extraction_scope: "hotbar",
+      actual_extraction_scope: "hotbar",
+      scope_match: "exact",
+      proof_status: "complete",
+      compact_steps: [
+        {
+          label: "Visual extraction",
+          summary: "Extracted compact hotbar counts.",
+          artifact_ref: "visual_extraction:hotbar",
+          status: "completed",
+        },
+        {
+          label: "Calculator",
+          summary: "Added 64 + 12 + 3.",
+          artifact_ref: "calculator_receipt:hotbar",
+          status: "completed",
+        },
+      ],
+      caveats: [],
+      final_answer_snapshot: "The hotbar total is 79.",
+      assistant_answer: false,
+      raw_content_included: false,
+      context_policy: "compact_context_pack_only",
+      created_at: "2026-06-17T15:00:00.000Z",
+    });
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_trace_memory",
+      thread_id: threadId,
+      args: {
+        trace_id: trace.trace_id,
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation).toMatchObject({
+      tool_name: "live_env.query_trace_memory",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schema: "helix.workstation_reasoning_trace_query_result.v1",
+      trace_id: trace.trace_id,
+      trace_count: 1,
+      selectedTrace: {
+        trace_id: trace.trace_id,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:route_watch:/),
+      post_tool_model_step_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+
+    const updates = listStagePlayGoalContextUpdates({
+      threadId,
+      producerKind: "route_watch",
+      updateKind: "route_evidence",
+    });
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({
+      updateId: payload.goalContextUpdateId,
+      contentRef: payload.resultId,
+      producerKind: "route_watch",
+      updateKind: "route_evidence",
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    expect(updates[0].suggestedDispatch.map((action) => action.kind)).toEqual(expect.arrayContaining([
+      "log_receipt",
+      "append_goal_context",
+      "update_panel",
+    ]));
+    expect(observation.producedRefs).toEqual(expect.arrayContaining([
+      payload.resultId,
+      payload.goalContextUpdateId,
+      trace.trace_id,
+    ]));
   });
 
   it("reflects live-source mail-loop causality as a read-only evidence packet", () => {

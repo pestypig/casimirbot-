@@ -7,6 +7,10 @@ import { synthesizeWorkstationToolAnswer } from "../services/helix-ask/workstati
 import { evaluateWorkstationToolPlan } from "../services/helix-ask/workstation-tool-result-evaluator";
 import { planWorkstationToolUse } from "../services/helix-ask/workstation-tool-planner";
 import { listSubgoalEvaluations } from "../services/helix-ask/subgoal-evaluator";
+import {
+  listStagePlayGoalContextUpdates,
+  resetStagePlayGoalContextStoreForTest,
+} from "../services/stage-play/stage-play-goal-context-store";
 import { listCategorizationEvents } from "../services/situation-room/categorization-bus";
 import { listSyntheticEvidence } from "../services/situation-room/synthetic-evidence-ledger";
 
@@ -114,6 +118,62 @@ describe("Helix Ask workstation multi-action tool plans", () => {
     expect(synthesizeWorkstationToolAnswer({ prompt, plan: result.tool_plan!, evaluation })).toMatch(
       /Mission Ethos|Zen|ideology comparison/i,
     );
+  });
+
+  it("evaluates narrator control receipts as non-terminal deterministic evidence", () => {
+    resetStagePlayGoalContextStoreForTest();
+    const prompt = "Turn on narrator for the translated transcript stream source_ref=source:browser-audio.";
+    const result = planWorkstationToolUse(prompt, {
+      threadId: "helix-ask:narrator-control",
+      turnId: "turn:narrator-control",
+      now: new Date("2026-05-13T00:00:00.000Z"),
+    });
+
+    expect(result.tool_plan?.intent).toBe("narrator_control");
+    expect(actionKeys(prompt)).toEqual(
+      expect.arrayContaining(["narrator.open", "narrator.narrator.bind_stream"]),
+    );
+
+    const evaluation = evaluateWorkstationToolPlan({
+      plan: result.tool_plan!,
+      receipt_ids: ["receipt:narrator-bind"],
+      evidence_refs: ["receipt:narrator-bind"],
+    });
+    expect(evaluation.schema).toBe("helix.workstation_tool_evaluation.v1");
+    expect(evaluation.deterministic).toBe(true);
+    expect(evaluation.model_invoked).toBe(false);
+    expect(evaluation.supports_goal).toBe(true);
+    const evidence = listSyntheticEvidence("helix-ask:narrator-control").find(
+      (entry) => entry.evidence_id === evaluation.synthetic_evidence_ids?.[0],
+    );
+    expect(evidence?.produced_by).toBe("deterministic_reducer");
+    expect(evidence?.assistant_answer).toBe(false);
+    expect(evidence?.raw_content_included).toBe(false);
+    expect(listCategorizationEvents("helix-ask:narrator-control").at(-1)?.category).toBe("context_reference");
+    const goalContextUpdates = listStagePlayGoalContextUpdates({
+      threadId: "helix-ask:narrator-control",
+      producerKind: "narrator",
+    });
+    expect(goalContextUpdates).toHaveLength(1);
+    expect(goalContextUpdates[0]).toMatchObject({
+      producerKind: "narrator",
+      updateKind: "suggested_action",
+      contentRef: "receipt:narrator-bind",
+      sourceRefs: expect.arrayContaining(["source:browser-audio", "translated_transcript"]),
+      evidenceRefs: expect.arrayContaining(["receipt:narrator-bind"]),
+      receiptRefs: ["receipt:narrator-bind"],
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    expect(goalContextUpdates[0].suggestedDispatch.map((action) => action.kind)).toEqual(expect.arrayContaining([
+      "log_receipt",
+      "update_panel",
+      "speak_narrator",
+    ]));
   });
 
   it("returns matching receipt artifacts from the ask/turn note path", async () => {

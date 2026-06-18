@@ -708,6 +708,188 @@ describe("Helix Ask workstation tool planner", () => {
     }
   });
 
+  it("routes explicit narrator.say commands through governed narrator control", () => {
+    const plan = planWorkstationToolUse(
+      'Run panel action panel_id=narrator action_id=narrator.say with text="Translation is now routed through Narrator." source_id=helix_ask:translation delivery_mode=confirm_to_speak.',
+      { threadId: "thread:narrator-say", turnId: "turn:narrator-say" },
+    );
+
+    expect(plan.intent).toBe("narrator_control");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.action).toEqual({
+      panel_id: "narrator",
+      action_id: "narrator.say",
+      args: expect.objectContaining({
+        text: "Translation is now routed through Narrator",
+        source_id: "helix_ask:translation",
+        delivery_mode: "confirm_to_speak",
+      }),
+    });
+    expect(plan.tool_plan?.steps.map((step) => `${step.panel_id}.${step.action_id}`)).toEqual([
+      "narrator.open",
+      "narrator.narrator.say",
+      "undefined.undefined",
+    ]);
+    expect(plan.tool_plan?.steps[1]).toMatchObject({
+      expected_receipt_kind: "narrator_say_receipt",
+      required: true,
+    });
+  });
+
+  it("routes narrator stream binding requests for translated transcripts", () => {
+    const plan = planWorkstationToolUse(
+      "Turn on narrator for the translated transcript stream source_ref=source:browser-audio delivery_mode=visible_only.",
+      { threadId: "thread:narrator-bind", turnId: "turn:narrator-bind" },
+    );
+
+    expect(plan.intent).toBe("narrator_control");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.action).toEqual({
+      panel_id: "narrator",
+      action_id: "narrator.bind_stream",
+      args: expect.objectContaining({
+        source_ref: "source:browser-audio",
+        stream_kind: "translated_transcript",
+        delivery_mode: "visible_only",
+        voice_policy: "confirm_speak_required",
+      }),
+    });
+    expect(plan.tool_plan?.steps.map((step) => `${step.panel_id}.${step.action_id}`)).toEqual([
+      "narrator.open",
+      "narrator.narrator.bind_stream",
+      "undefined.undefined",
+    ]);
+    expect(plan.tool_plan?.steps[1]).toMatchObject({
+      expected_receipt_kind: "narrator_bind_stream_receipt",
+      required: true,
+    });
+  });
+
+  it("does not execute contextual, quoted, future, or negated narrator control mentions", () => {
+    for (const prompt of [
+      "Do not run narrator.say; just explain the narrator policy.",
+      'The document says "narrator.bind_stream"; summarize that label.',
+      "Could we turn on narrator for translation later?",
+      "Previously you used narrator say; what did it do?",
+    ]) {
+      const plan = planWorkstationToolUse(prompt, { threadId: "thread:narrator-control-negative" });
+      expect(plan.intent).toBe("direct_answer");
+      expect(plan.should_use_tool).toBe(false);
+      expect(plan.action).toBeNull();
+      expect(plan.tool_plan).toBeNull();
+    }
+  });
+
+  it("routes workstation goal-context inspection to non-terminal live-env query evidence", () => {
+    const plan = planWorkstationToolUse(
+      "Show the workstation goal context updates and per-packet traces for the active visual capture.",
+      { threadId: "thread:goal-context", turnId: "turn:goal-context" },
+    );
+
+    expect(plan.intent).toBe("workstation_goal_context");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.action).toBeNull();
+    expect(plan.tool_plan?.steps.map((step) => step.tool_id ?? `${step.panel_id}.${step.action_id}`)).toEqual([
+      "live_env.query_workstation_goal_context",
+      "undefined.undefined",
+    ]);
+    expect(plan.tool_plan?.steps[0]).toMatchObject({
+      kind: "run_ask_tool",
+      tool_id: "live_env.query_workstation_goal_context",
+      expected_receipt_kind: "stage_play_workstation_goal_context_read_result",
+      required: true,
+    });
+  });
+
+  it("routes durable monitor requests through agent goal session setup before context query", () => {
+    const plan = planWorkstationToolUse(
+      "Start an agent goal session goal_id=goal:frog-monitor source_id=image-lens:latest objective=\"Monitor visual capture for frog classification evidence.\"",
+      { threadId: "thread:frog", turnId: "turn:frog" },
+    );
+
+    expect(plan.intent).toBe("workstation_goal_context");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.tool_plan?.steps.map((step) => step.tool_id ?? `${step.panel_id}.${step.action_id}`)).toEqual([
+      "live_env.start_agent_goal_session",
+      "live_env.query_workstation_goal_context",
+      "undefined.undefined",
+    ]);
+    expect(plan.tool_plan?.steps[0]).toMatchObject({
+      kind: "run_ask_tool",
+      tool_id: "live_env.start_agent_goal_session",
+      expected_receipt_kind: "stage_play_agent_goal_session_tool_result",
+      args: expect.objectContaining({
+        goal_id: "goal:frog-monitor",
+        source_id: "image-lens:latest",
+        context_feeds: expect.arrayContaining([
+          expect.objectContaining({ source_kind: "visual_summaries" }),
+          expect.objectContaining({ source_kind: "audio_transcripts" }),
+          expect.objectContaining({ source_kind: "translated_transcripts" }),
+          expect.objectContaining({ source_kind: "microdeck_outputs" }),
+          expect.objectContaining({ source_kind: "live_answer_lines" }),
+          expect.objectContaining({ source_kind: "source_health" }),
+          expect.objectContaining({ source_kind: "trace_memory" }),
+          expect.objectContaining({ source_kind: "route_evidence" }),
+        ]),
+        allowed_actuators: expect.arrayContaining([
+          "set_audio_preset",
+          "set_visual_preset",
+          "bind_narrator",
+          "narrator_say",
+          "update_live_answer",
+          "query_trace_memory",
+          "pause_loop",
+          "repair_source",
+          "ask_user",
+        ]),
+        cadence: { kind: "event_accumulation", min_updates: 2 },
+        stop_conditions: expect.arrayContaining([
+          "User stops monitoring",
+          "Source feed ends or becomes unavailable",
+          "Terminal authority produces a final report",
+        ]),
+      }),
+    });
+  });
+
+  it("routes trace-memory inspection to non-terminal trace-memory query evidence", () => {
+    const plan = planWorkstationToolUse(
+      "Show the latest workstation reasoning trace memory for this goal.",
+      { threadId: "thread:trace-memory", turnId: "turn:trace-memory" },
+    );
+
+    expect(plan.intent).toBe("workstation_goal_context");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.action).toBeNull();
+    expect(plan.tool_plan?.steps.map((step) => step.tool_id ?? `${step.panel_id}.${step.action_id}`)).toEqual([
+      "live_env.query_trace_memory",
+      "undefined.undefined",
+    ]);
+    expect(plan.tool_plan?.steps[0]).toMatchObject({
+      kind: "run_ask_tool",
+      tool_id: "live_env.query_trace_memory",
+      expected_receipt_kind: "helix.workstation_reasoning_trace_query_result",
+      required: true,
+    });
+  });
+
+  it("does not execute contextual, negated, or hypothetical goal-context mentions", () => {
+    for (const prompt of [
+      "Do not query workstation goal context; explain what the term means.",
+      'The docs say "live_env.query_workstation_goal_context"; summarize that sentence.',
+      "Could we inspect goal context updates later after the source is running?",
+      "Previously you queried per-packet traces; what did that mean?",
+      "Do not query trace memory; explain the phrase.",
+      'The UI label says "live_env.query_trace_memory"; summarize it.',
+    ]) {
+      const plan = planWorkstationToolUse(prompt, { threadId: "thread:goal-context-negative" });
+      expect(plan.intent).toBe("direct_answer");
+      expect(plan.should_use_tool).toBe(false);
+      expect(plan.action).toBeNull();
+      expect(plan.tool_plan).toBeNull();
+    }
+  });
+
   it("retires explicit Auntie Dottie observer Situation Room tool commands", () => {
     const plan = planWorkstationToolUse(
       [

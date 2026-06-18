@@ -52,6 +52,12 @@ describe("Helix Ask tool-family contract registry", () => {
     const required = [
       ["live_env.read_processed_live_source_mail", "live_source_mail", "evidence_only"],
       ["live_env.reflect_live_source_mail_loop", "live_source_mail", "evidence_only"],
+      ["live_env.query_workstation_goal_context", "live_source_mail", "evidence_only"],
+      ["live_env.start_agent_goal_session", "live_source_mail", "control_receipt"],
+      ["live_env.query_source_health", "live_source_mail", "evidence_only"],
+      ["live_env.query_live_source_quality", "live_source_mail", "evidence_only"],
+      ["live_env.summarize_live_source_current_state", "live_source_mail", "evidence_only"],
+      ["live_env.query_trace_memory", "live_source_mail", "evidence_only"],
       ["live_env.process_live_source_mail", "live_source_mail", "evidence_only"],
       ["live_env.record_live_source_mail_decision", "live_source_decision", "control_receipt"],
       ["live_env.request_interim_voice_callout", "voice_delivery", "control_receipt"],

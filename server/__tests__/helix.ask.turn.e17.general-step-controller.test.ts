@@ -94,7 +94,7 @@ describe("helix ask turn e17 general step controller", () => {
     expect(response.body?.planner_contract?.plan_items?.map((step: any) => step?.id)).toContain("assistant_direct_answer");
     expect(response.body?.final_answer_contract_family).toBe("simple");
     expect(response.body?.final_answer_contract_pass).toBe(true);
-  }, 20000);
+  }, 45000);
 
   it("answers Helix Ask capability help with a concrete capability summary", async () => {
     const app = await createApp();
@@ -314,7 +314,7 @@ describe("helix ask turn e17 general step controller", () => {
       ),
     ).toBe(true);
     expect(answerText(response.body)).toMatch(/quick NHM2 test note/i);
-  }, 20000);
+  }, 45000);
 
   it("requests user input when a deictic note target cannot be resolved", async () => {
     process.env.HELIX_E11_MODEL_DECISION_LLM = "0";

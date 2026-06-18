@@ -386,6 +386,24 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   if (/live_env[-_.:]reflect_live_source_mail_loop|stage_play_live_source_mail_loop_reflection/.test(haystack)) {
     return "live_env.reflect_live_source_mail_loop";
   }
+  if (/live_env[-_.:]query_source_health|helix\.situation_source_capability_read|source_capability_read/.test(haystack)) {
+    return "live_env.query_source_health";
+  }
+  if (/live_env[-_.:]query_live_source_quality|stage_play_live_source_quality/.test(haystack)) {
+    return "live_env.query_live_source_quality";
+  }
+  if (/live_env[-_.:]summarize_live_source_current_state|stage_play_live_source_current_state/.test(haystack)) {
+    return "live_env.summarize_live_source_current_state";
+  }
+  if (/live_env[-_.:]query_trace_memory|workstation_reasoning_trace_query|helix\.workstation_reasoning_trace_query_result|helix\.workstation_reasoning_trace\.v1/.test(haystack)) {
+    return "live_env.query_trace_memory";
+  }
+  if (/live_env[-_.:]query_workstation_goal_context|stage_play_workstation_goal_context_read_result|helix\.workstation_goal_context_update\.v1/.test(haystack)) {
+    return "live_env.query_workstation_goal_context";
+  }
+  if (/live_env[-_.:]start_agent_goal_session|stage_play_agent_goal_session_tool_result|helix\.agent_goal_session\.v1/.test(haystack)) {
+    return "live_env.start_agent_goal_session";
+  }
   return null;
 };
 

@@ -31,8 +31,10 @@ export function decideHelixToolChoice(input: DecideHelixToolChoiceInput): HelixT
       turn_id: input.turn_id,
       decision: "workstation_tool_plan",
       selected_affordance_ids: input.workstation_tool_plan.steps
-        .filter((step: HelixWorkstationToolPlan["steps"][number]) => step.panel_id && step.action_id)
-        .map((step: HelixWorkstationToolPlan["steps"][number]) => `${step.panel_id}.${step.action_id}`),
+        .map((step: HelixWorkstationToolPlan["steps"][number]) =>
+          step.tool_id ?? (step.panel_id && step.action_id ? `${step.panel_id}.${step.action_id}` : null),
+        )
+        .filter((entry): entry is string => Boolean(entry)),
       reason: "Prompt maps to a receipt-backed workstation affordance before final answer.",
       confidence: 0.88,
     };

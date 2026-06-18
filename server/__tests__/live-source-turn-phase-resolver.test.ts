@@ -36,6 +36,20 @@ describe("resolveLiveSourceTurnPhase", () => {
       "live_env.read_processed_live_source_mail",
       "live_env.process_live_source_mail",
     ]));
+    expect(LIVE_SOURCE_TURN_PHASE_TABLE.query_workstation_goal_context).toMatchObject({
+      allowedTools: ["live_env.query_workstation_goal_context"],
+      fallbackTools: [],
+      requiredEvidence: ["stage_play_workstation_goal_context_read_result"],
+      completionEvidence: ["stage_play_workstation_goal_context_read_result"],
+      next: "terminal_checkpoint",
+    });
+    expect(LIVE_SOURCE_TURN_PHASE_TABLE.query_workstation_goal_context.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.record_live_source_mail_decision",
+      "live_env.request_interim_voice_callout",
+      "final_answer",
+    ]));
     expect(LIVE_SOURCE_TURN_PHASE_TABLE.reflect_mail_loop).toMatchObject({
       allowedTools: ["live_env.reflect_live_source_mail_loop"],
       fallbackTools: [],
@@ -69,6 +83,69 @@ describe("resolveLiveSourceTurnPhase", () => {
       ],
       next: "terminal_checkpoint",
     });
+  });
+
+  it("routes goal-context prompts to read-only workstation context instead of mailbox decision flow", () => {
+    const phase = resolveLiveSourceTurnPhase({
+      prompt: "Inspect the workstation goal context updates and per-packet traces for the active visual source.",
+      selectedTargetSource: "live_source_mailbox",
+    });
+
+    expect(phase.phase).toBe("query_workstation_goal_context");
+    expect(phase.canonicalGoal).toBe("workstation_goal_context");
+    expect(phase.allowedTools).toEqual(["live_env.query_workstation_goal_context"]);
+    expect(phase.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.record_live_source_mail_decision",
+      "live_env.request_interim_voice_callout",
+      "final_answer",
+    ]));
+    expect(phase.phaseLock).toMatchObject({
+      locked: true,
+      reason: "Goal-context inspection is a read-only workstation evidence query, not mailbox processing or wake dispatch.",
+    });
+    expect(mandatoryToolForPhase(phase)).toBe("live_env.query_workstation_goal_context");
+  });
+
+  it("routes trace-memory prompts to read-only trace query evidence", () => {
+    const phase = resolveLiveSourceTurnPhase({
+      prompt: "Inspect the latest workstation reasoning trace memory for this live goal.",
+      selectedTargetSource: "live_source_mailbox",
+    });
+
+    expect(phase.phase).toBe("query_trace_memory");
+    expect(phase.canonicalGoal).toBe("workstation_goal_context");
+    expect(phase.allowedTools).toEqual(["live_env.query_trace_memory"]);
+    expect(phase.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.query_workstation_goal_context",
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.record_live_source_mail_decision",
+      "live_env.request_interim_voice_callout",
+      "final_answer",
+    ]));
+    expect(phase.phaseLock).toMatchObject({
+      locked: true,
+      reason: "Trace-memory inspection is a read-only workstation evidence query, not mailbox processing or wake dispatch.",
+    });
+    expect(mandatoryToolForPhase(phase)).toBe("live_env.query_trace_memory");
+  });
+
+  it("does not route contextual goal-context mentions into live-env tool execution", () => {
+    for (const prompt of [
+      "Do not query workstation goal context; explain the architecture.",
+      'The UI label says "workstation goal context updates"; what does that mean?',
+      "Could we inspect per-packet traces later?",
+      "Do not query trace memory; explain the architecture.",
+    ]) {
+      const phase = resolveLiveSourceTurnPhase({
+        prompt,
+        selectedTargetSource: "live_source_mailbox",
+      });
+      expect(phase.phase).not.toBe("query_workstation_goal_context");
+      expect(phase.allowedTools).not.toContain("live_env.query_workstation_goal_context");
+    }
   });
 
   it("lets Stage Play mail wake metadata force record_decision over ambiguous setup or status prompt text", () => {

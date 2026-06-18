@@ -12,10 +12,15 @@ import type {
   HelixSyntheticEvidenceSupportStatus,
 } from "../../../shared/helix-synthetic-evidence";
 import type { HelixCalculatorSetupContext } from "../../../shared/helix-calculator-setup-context";
+import {
+  WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
+  type WorkstationDispatchActionV1,
+} from "../../../shared/contracts/workstation-goal-context.v1";
 import { planContextEconomy } from "./context-economy-planner";
 import { recordSubgoalEvaluation } from "./subgoal-evaluator";
 import { recordCategorizationEvent } from "../situation-room/categorization-bus";
 import { recordSyntheticEvidence } from "../situation-room/synthetic-evidence-ledger";
+import { recordStagePlayGoalContextUpdate } from "../stage-play/stage-play-goal-context-store";
 
 export type EvaluateWorkstationToolPlanInput = {
   plan: HelixWorkstationToolPlan;
@@ -29,6 +34,12 @@ export type EvaluateWorkstationToolPlanInput = {
 function newId(prefix: string): string {
   return `${prefix}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
 }
+
+const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
+  Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)));
+
+const readString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
 function mapIntentToCategorization(intent: HelixWorkstationToolPlan["intent"]): {
   source_family: HelixCategorizationSourceFamily;
@@ -49,7 +60,7 @@ function mapIntentToCategorization(intent: HelixWorkstationToolPlan["intent"]): 
       produced_by: "workstation_note",
     };
   }
-  if (intent === "narrator_debug_probe") {
+  if (intent === "narrator_debug_probe" || intent === "narrator_control") {
     return {
       source_family: "live_environment",
       category: "context_reference",
@@ -109,6 +120,75 @@ function calculatorSetupFromPlan(plan: HelixWorkstationToolPlan): HelixCalculato
     : null;
 }
 
+function maybeRecordNarratorGoalContextUpdate(input: {
+  plan: HelixWorkstationToolPlan;
+  summary: string;
+  receiptIds: string[];
+  evidenceRefs: string[];
+  syntheticEvidenceId: string;
+}): void {
+  if (input.plan.intent !== "narrator_control" && input.plan.intent !== "narrator_debug_probe") return;
+  const actionStep = [...input.plan.steps]
+    .reverse()
+    .find((step) => step.panel_id === "narrator" && step.kind === "run_panel_action");
+  const args = actionStep?.args ?? {};
+  const sourceRef =
+    readString(args.source_ref) ??
+    readString(args.sourceRef) ??
+    readString(args.source_id) ??
+    readString(args.sourceId) ??
+    "narrator:workstation";
+  const receiptRef = input.receiptIds[0] ?? input.syntheticEvidenceId;
+  const dispatch: WorkstationDispatchActionV1[] = [
+    { kind: "log_receipt", receiptRef },
+    { kind: "update_panel", panelId: "narrator" },
+    { kind: "update_panel", panelId: "stage-play-badge-graph" },
+  ];
+  if (actionStep?.action_id === "narrator.bind_stream") {
+    dispatch.push({ kind: "speak_narrator", mode: "confirm" });
+  }
+
+  recordStagePlayGoalContextUpdate({
+    schemaVersion: WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
+    updateId: newId("stage_play_goal_context_update:narrator"),
+    createdAtMs: Date.now(),
+    sourceRefs: uniqueStrings([
+      sourceRef,
+      readString(args.stream_kind),
+      readString(args.streamKind),
+      ...input.evidenceRefs,
+    ]),
+    loopRefs: uniqueStrings([
+      `thread:${input.plan.thread_id}`,
+      input.plan.plan_id,
+      actionStep?.step_id,
+    ]),
+    producerKind: "narrator",
+    updateKind: "suggested_action",
+    contentRef: receiptRef,
+    preview: input.summary,
+    evidenceRefs: uniqueStrings([
+      input.syntheticEvidenceId,
+      ...input.evidenceRefs,
+      ...input.receiptIds,
+    ]).slice(0, 80),
+    receiptRefs: input.receiptIds.slice(0, 80),
+    freshness: {
+      observedAtMs: Date.now(),
+      staleAfterMs: 60_000,
+      status: "fresh",
+    },
+    goalRelevance: null,
+    suggestedDispatch: dispatch,
+    authority: {
+      assistantAnswer: false,
+      terminalEligible: false,
+      rawContentIncluded: false,
+      postToolModelStepRequired: true,
+    },
+  });
+}
+
 export function evaluateWorkstationToolPlan(input: EvaluateWorkstationToolPlanInput): HelixWorkstationToolEvaluation {
   const receiptIds = Array.from(new Set((input.receipt_ids ?? []).map((entry) => String(entry).trim()).filter(Boolean)));
   const evidenceRefs = Array.from(new Set((input.evidence_refs ?? receiptIds).map((entry) => String(entry).trim()).filter(Boolean)));
@@ -128,6 +208,8 @@ export function evaluateWorkstationToolPlan(input: EvaluateWorkstationToolPlanIn
         ? "Store text in workstation notes and keep compact references."
       : input.plan.intent === "narrator_debug_probe"
         ? "Publish a governed Narrator debug auto-speak probe through the workstation action lane."
+      : input.plan.intent === "narrator_control"
+        ? "Publish or bind governed Narrator output through the workstation action lane."
       : input.plan.intent === "zen_graph_reflection"
         ? "Reflect the prompt through ZenGraph and Fruition as evidence-only procedural state."
       : input.plan.intent === "dottie_observer"
@@ -198,6 +280,13 @@ export function evaluateWorkstationToolPlan(input: EvaluateWorkstationToolPlanIn
     evaluation_summary: summary,
     deterministic: input.model_invoked !== true,
     model_invoked: input.model_invoked === true,
+  });
+  maybeRecordNarratorGoalContextUpdate({
+    plan: input.plan,
+    summary,
+    receiptIds,
+    evidenceRefs,
+    syntheticEvidenceId: syntheticEvidence.evidence_id,
   });
 
   return {

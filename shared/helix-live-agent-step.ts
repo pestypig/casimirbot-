@@ -28,6 +28,7 @@ export type HelixLiveEnvironmentToolName =
   | "live_env.reflect_live_source_mail_loop"
   | "live_env.query_workstation_goal_context"
   | "live_env.start_agent_goal_session"
+  | "live_env.query_trace_memory"
   | "live_env.query_micro_reasoner_prompts"
   | "live_env.query_micro_reasoner_presets"
   | "live_env.draft_micro_reasoner_preset"

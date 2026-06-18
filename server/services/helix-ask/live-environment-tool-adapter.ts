@@ -48,6 +48,15 @@ import type {
   HelixLiveEnvironmentCommentarySubject,
 } from "@shared/helix-live-environment-commentary";
 import {
+  WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
+  type AgentGoalActuatorV1,
+  type AgentGoalContextFeedKindV1,
+  type AgentGoalSessionV1,
+  type GoalContextProducerKindV1,
+  type GoalContextUpdateKindV1,
+  type WorkstationDispatchActionV1,
+} from "@shared/contracts/workstation-goal-context.v1";
+import {
   getActiveLiveAnswerEnvironmentForSource,
   getActiveLiveAnswerEnvironmentForThread,
   getLiveAnswerEnvironment,
@@ -168,11 +177,16 @@ import {
   ensureStagePlayAgentGoalSession,
   listStagePlayAgentGoalSessions,
   listStagePlayGoalContextUpdates,
+  recordStagePlayGoalContextUpdate,
   syncStagePlayGoalContextFromMailbox,
 } from "../stage-play/stage-play-goal-context-store";
 import {
   recordInterimVoiceCalloutRequest,
 } from "./interim-voice-callout-store";
+import {
+  getWorkstationReasoningTrace,
+  listWorkstationReasoningTraces,
+} from "./workstation-reasoning-trace-store";
 import { mergeLiveSourceCausalTraces } from "../stage-play/stage-play-live-source-causal-trace";
 import {
   recordVoiceSteeringEvent,
@@ -881,6 +895,155 @@ const buildSteeringAckTranscriptRows = (input: {
 
 const readNumber = (value: unknown, fallback: number): number =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
+
+const readObject = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+
+const readOptionalNumber = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value.trim());
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const AGENT_GOAL_FEED_KIND_ALIASES: Record<string, AgentGoalContextFeedKindV1> = {
+  visual: "visual_summaries",
+  visual_summary: "visual_summaries",
+  visual_summaries: "visual_summaries",
+  screen: "visual_summaries",
+  audio: "audio_transcripts",
+  audio_transcript: "audio_transcripts",
+  audio_transcripts: "audio_transcripts",
+  transcript: "audio_transcripts",
+  translation: "translated_transcripts",
+  translated_transcript: "translated_transcripts",
+  translated_transcripts: "translated_transcripts",
+  microdeck: "microdeck_outputs",
+  micro_deck: "microdeck_outputs",
+  microdeck_output: "microdeck_outputs",
+  microdeck_outputs: "microdeck_outputs",
+  live_answer: "live_answer_lines",
+  live_answer_lines: "live_answer_lines",
+  source_health: "source_health",
+  health: "source_health",
+  trace: "trace_memory",
+  trace_memory: "trace_memory",
+  route: "route_evidence",
+  route_evidence: "route_evidence",
+};
+
+const AGENT_GOAL_ACTUATORS = new Set<AgentGoalActuatorV1>([
+  "set_audio_preset",
+  "set_visual_preset",
+  "bind_narrator",
+  "narrator_say",
+  "update_live_answer",
+  "query_trace_memory",
+  "pause_loop",
+  "repair_source",
+  "ask_user",
+]);
+
+function normalizeAgentGoalFeedKind(value: unknown): AgentGoalContextFeedKindV1 | null {
+  const key = readString(value)?.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  return key ? AGENT_GOAL_FEED_KIND_ALIASES[key] ?? null : null;
+}
+
+function readAgentGoalContextFeeds(value: unknown): AgentGoalSessionV1["contextFeeds"] | undefined {
+  const entries = Array.isArray(value) ? value : [];
+  const feeds = entries
+    .map((entry, index): AgentGoalSessionV1["contextFeeds"][number] | null => {
+      if (typeof entry === "string") {
+        const sourceKind = normalizeAgentGoalFeedKind(entry);
+        return sourceKind
+          ? {
+              feedId: `agent_goal_feed:${sourceKind}:${index + 1}`,
+              sourceKind,
+            }
+          : null;
+      }
+      const record = readObject(entry);
+      if (!record) return null;
+      const sourceKind = normalizeAgentGoalFeedKind(
+        record.sourceKind ?? record.source_kind ?? record.kind ?? record.feed_kind ?? record.feedKind,
+      );
+      if (!sourceKind) return null;
+      const freshnessMs = readOptionalNumber(record.freshnessMs ?? record.freshness_ms);
+      return {
+        feedId:
+          readString(record.feedId) ??
+          readString(record.feed_id) ??
+          `agent_goal_feed:${sourceKind}:${index + 1}`,
+        sourceKind,
+        ...(readString(record.query) ? { query: readString(record.query)! } : {}),
+        ...(freshnessMs ? { freshnessMs } : {}),
+        ...(readString(record.relevancePolicy ?? record.relevance_policy)
+          ? { relevancePolicy: readString(record.relevancePolicy ?? record.relevance_policy)! }
+          : {}),
+      };
+    })
+    .filter((entry): entry is AgentGoalSessionV1["contextFeeds"][number] => Boolean(entry));
+  return feeds.length > 0 ? feeds : undefined;
+}
+
+function readAgentGoalAllowedActuators(value: unknown): AgentGoalActuatorV1[] | undefined {
+  const actuators = readStringArray(value)
+    .map((entry) => entry.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, ""))
+    .filter((entry): entry is AgentGoalActuatorV1 => AGENT_GOAL_ACTUATORS.has(entry as AgentGoalActuatorV1));
+  return actuators.length > 0 ? Array.from(new Set(actuators)) : undefined;
+}
+
+function readAgentGoalCadence(args: Record<string, unknown>): AgentGoalSessionV1["cadence"] | undefined {
+  const cadenceRecord = readObject(args.cadence);
+  const kind = readString(cadenceRecord?.kind ?? args.cadence_kind ?? args.cadenceKind)
+    ?.toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_");
+  if (kind === "manual") return { kind: "manual" };
+  if (kind === "user_turn_only" || kind === "turn_only") return { kind: "user_turn_only" };
+  if (kind === "interval") {
+    const everyMs = readOptionalNumber(cadenceRecord?.everyMs ?? cadenceRecord?.every_ms ?? args.every_ms ?? args.everyMs);
+    return { kind: "interval", everyMs: Math.max(1_000, Math.floor(everyMs ?? 30_000)) };
+  }
+  if (kind === "event_accumulation" || kind === "accumulate") {
+    const minUpdates = readOptionalNumber(cadenceRecord?.minUpdates ?? cadenceRecord?.min_updates ?? args.min_updates ?? args.minUpdates);
+    return { kind: "event_accumulation", minUpdates: Math.max(1, Math.floor(minUpdates ?? 2)) };
+  }
+  return undefined;
+}
+
+function readAgentGoalCheckpoint(args: Record<string, unknown>): Parameters<typeof ensureStagePlayAgentGoalSession>[0]["checkpoint"] | undefined {
+  const checkpoint = readObject(args.checkpoint);
+  const summary = readString(checkpoint?.summary ?? args.checkpoint_summary ?? args.checkpointSummary);
+  const nextStep = readString(checkpoint?.nextStep ?? checkpoint?.next_step ?? args.next_step ?? args.nextStep);
+  const allowedNextSteps = new Set<AgentGoalSessionV1["checkpoints"][number]["nextStep"]>([
+    "continue",
+    "ask_user",
+    "repair",
+    "report",
+    "stop",
+  ]);
+  const normalizedNextStep = nextStep?.toLowerCase().replace(/[^a-z0-9]+/g, "_") as
+    | AgentGoalSessionV1["checkpoints"][number]["nextStep"]
+    | undefined;
+  const evidenceRefs = uniqueStrings([
+    ...readStringArray(checkpoint?.evidenceRefs ?? checkpoint?.evidence_refs),
+    ...readStringArray(args.evidence_refs ?? args.evidenceRefs),
+  ]);
+  const actionsTaken = uniqueStrings([
+    ...readStringArray(checkpoint?.actionsTaken ?? checkpoint?.actions_taken),
+    ...readStringArray(args.actions_taken ?? args.actionsTaken),
+  ]);
+  return summary || evidenceRefs.length > 0 || actionsTaken.length > 0 || normalizedNextStep
+    ? {
+        summary,
+        evidenceRefs,
+        actionsTaken,
+        nextStep: normalizedNextStep && allowedNextSteps.has(normalizedNextStep) ? normalizedNextStep : undefined,
+      }
+    : undefined;
+}
 
 const readDelegationCandidatePrompts = (value: unknown): StagePlayMicroReasonerPromptDelegationCandidateV1[] => {
   const entries = Array.isArray(value) ? value : [];
@@ -1858,6 +2021,97 @@ const readCheckpointRequestReason = (value: unknown): StagePlayCheckpointRequest
 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.filter((entry): entry is string => Boolean(entry))));
+
+const compactGoalContextPreview = (value: string, limit = 260): string => {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized.length > limit ? `${normalized.slice(0, Math.max(0, limit - 3)).trimEnd()}...` : normalized;
+};
+
+const goalContextFreshnessStatus = (
+  value: string | null | undefined,
+): "fresh" | "stale" | "blocked" | "unknown" => {
+  if (value === "fresh" || value === "active" || value === "good") return "fresh";
+  if (value === "stale") return "stale";
+  if (
+    value === "blocked" ||
+    value === "configured_missing" ||
+    value === "permission_required" ||
+    value === "error" ||
+    value === "stopped" ||
+    value === "insufficient"
+  ) return "blocked";
+  return "unknown";
+};
+
+const recordLiveEnvironmentGoalContextUpdate = (input: {
+  threadId: string;
+  mailboxThreadId?: string | null;
+  roomId?: string | null;
+  producerKind: GoalContextProducerKindV1;
+  updateKind: GoalContextUpdateKindV1;
+  contentRef: string;
+  preview: string;
+  sourceRefs?: string[];
+  loopRefs?: string[];
+  evidenceRefs?: string[];
+  receiptRefs?: string[];
+  observedAtMs?: number | null;
+  staleAfterMs?: number | null;
+  freshnessStatus?: "fresh" | "stale" | "blocked" | "unknown";
+  goalId?: string | null;
+  goalRelevanceReason?: string | null;
+  suggestedDispatch?: WorkstationDispatchActionV1[];
+}): string => {
+  const nowMs = Date.now();
+  const mailboxThreadId = input.mailboxThreadId ?? input.threadId;
+  const receiptRefs = uniqueStrings(input.receiptRefs ?? [input.contentRef]);
+  const evidenceRefs = uniqueStrings([input.contentRef, ...(input.evidenceRefs ?? []), ...receiptRefs]);
+  const dispatch: WorkstationDispatchActionV1[] = input.suggestedDispatch ?? [
+    { kind: "log_receipt", receiptRef: receiptRefs[0] ?? input.contentRef },
+    { kind: "update_panel", panelId: "stage-play-badge-graph" },
+  ];
+  const update = recordStagePlayGoalContextUpdate({
+    schemaVersion: WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
+    updateId: `stage_play_goal_context_update:${input.producerKind}:${hashShort([
+      mailboxThreadId,
+      input.contentRef,
+      nowMs,
+    ], 18)}`,
+    createdAtMs: nowMs,
+    sourceRefs: uniqueStrings(input.sourceRefs ?? []),
+    loopRefs: uniqueStrings([
+      `thread:${mailboxThreadId}`,
+      `stage_play_mail_loop:${mailboxThreadId}`,
+      ...(input.loopRefs ?? []),
+    ]),
+    producerKind: input.producerKind,
+    updateKind: input.updateKind,
+    contentRef: input.contentRef,
+    preview: compactGoalContextPreview(input.preview || "Live environment query produced goal-context evidence."),
+    evidenceRefs: evidenceRefs.slice(0, 80),
+    receiptRefs: receiptRefs.slice(0, 80),
+    freshness: {
+      observedAtMs: input.observedAtMs ?? nowMs,
+      staleAfterMs: input.staleAfterMs ?? 60_000,
+      status: input.freshnessStatus ?? "unknown",
+    },
+    goalRelevance: input.goalId
+      ? {
+          goalId: input.goalId,
+          relevance: 0.7,
+          reason: input.goalRelevanceReason ?? "Live environment query contributes to the active workstation goal.",
+        }
+      : null,
+    suggestedDispatch: dispatch,
+    authority: {
+      assistantAnswer: false,
+      terminalEligible: false,
+      rawContentIncluded: false,
+      postToolModelStepRequired: true,
+    },
+  });
+  return update.updateId;
+};
 
 const processLiveSourceMailItemsForTool = (input: {
   args: Record<string, unknown>;
@@ -4009,6 +4263,12 @@ export function executeLiveEnvironmentTool(
           `stage_play_mail_loop:${scope.mailboxThreadResolution.mailboxThreadId}`,
           ...readStringArray(args.loop_refs ?? args.loopRefs),
         ]),
+        constructRefs: readStringArray(args.construct_refs ?? args.constructRefs),
+        contextFeeds: readAgentGoalContextFeeds(args.context_feeds ?? args.contextFeeds),
+        allowedActuators: readAgentGoalAllowedActuators(args.allowed_actuators ?? args.allowedActuators),
+        cadence: readAgentGoalCadence(args),
+        stopConditions: readStringArray(args.stop_conditions ?? args.stopConditions),
+        checkpoint: readAgentGoalCheckpoint(args),
       });
       return makeObservation({
         threadId: input.thread_id,
@@ -4161,6 +4421,97 @@ export function executeLiveEnvironmentTool(
       },
       evidenceRefs,
       producedRefs: goalContextUpdates.map((update) => update.updateId),
+      forceNormalizedRefs: true,
+    });
+  }
+
+  if (input.tool_name === "live_env.query_trace_memory") {
+    const limit = Math.max(1, Math.min(readNumber(args.limit, 12), 50));
+    const traceId =
+      readString(args.trace_id) ??
+      readString(args.traceId) ??
+      readString(args.target_trace_id) ??
+      readString(args.targetTraceId);
+    const turnId = readString(args.turn_id) ?? readString(args.turnId);
+    const traceById = traceId ? getWorkstationReasoningTrace(traceId) : null;
+    const traces = traceId
+      ? (traceById ? [traceById] : [])
+      : listWorkstationReasoningTraces({ threadId: input.thread_id, limit })
+          .filter((trace) => !turnId || trace.turn_id === turnId)
+          .slice(-limit);
+    const selectedTrace = traces.at(-1) ?? null;
+    const traceRefs = traces.map((trace) => trace.trace_id);
+    const evidenceRefs = uniqueStrings([
+      ...traceRefs,
+      ...(selectedTrace?.evidence_refs ?? []),
+      ...(selectedTrace?.tool_receipt_ids ?? []),
+      ...(selectedTrace?.lifecycle_event_refs ?? []),
+    ]);
+    const resultId = `helix_workstation_reasoning_trace_query:${hashShort([
+      input.thread_id,
+      traceId ?? null,
+      turnId ?? null,
+      traceRefs,
+    ])}`;
+    const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+      threadId: input.thread_id,
+      mailboxThreadId: input.thread_id,
+      roomId,
+      producerKind: "route_watch",
+      updateKind: "route_evidence",
+      contentRef: resultId,
+      preview: selectedTrace
+        ? `Trace memory selected ${selectedTrace.trace_id}; proof ${selectedTrace.proof_status}, scope ${selectedTrace.scope_match}.`
+        : "Trace memory query found no workstation reasoning traces for this scope.",
+      sourceRefs: uniqueStrings([
+        input.thread_id,
+        selectedTrace?.source_family,
+        ...traceRefs,
+      ]),
+      loopRefs: uniqueStrings([
+        resultId,
+        ...traces.map((trace) => trace.turn_id),
+        ...traces.flatMap((trace) => trace.lifecycle_event_refs),
+      ]),
+      evidenceRefs,
+      receiptRefs: [resultId, ...traceRefs],
+      freshnessStatus: traces.length > 0 ? "fresh" : "unknown",
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: resultId },
+        { kind: "append_goal_context", goalId: `trace_memory:${input.thread_id}` },
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+      ],
+    });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: input.environment_id,
+      toolName: input.tool_name,
+      ok: true,
+      summary: selectedTrace
+        ? `Read ${traces.length} compact workstation reasoning trace(s); selected ${selectedTrace.trace_id}.`
+        : "No compact workstation reasoning traces were found for this scope.",
+      observation: {
+        schema: "helix.workstation_reasoning_trace_query_result.v1",
+        resultId,
+        result_id: resultId,
+        thread_id: input.thread_id,
+        trace_id: traceId ?? null,
+        turn_id: turnId ?? null,
+        traces,
+        selectedTrace,
+        selected_trace: selectedTrace,
+        trace_count: traces.length,
+        goalContextUpdateId,
+        goal_context_update_id: goalContextUpdateId,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      },
+      evidenceRefs: uniqueStrings([goalContextUpdateId, resultId, ...evidenceRefs]),
+      producedRefs: [resultId, goalContextUpdateId, ...traceRefs],
       forceNormalizedRefs: true,
     });
   }
@@ -6420,14 +6771,57 @@ export function executeLiveEnvironmentTool(
       threadId: input.thread_id,
       roomId,
     });
+    const sourceRefs = result.capabilities.map((capability) => capability.source_id);
+    const blockedCapabilities = result.capabilities.filter((capability) => capability.status !== "active");
+    const contentRef = `stage_play_source_health:${hashShort([
+      input.thread_id,
+      roomId ?? null,
+      sourceRefs,
+      result.capabilities.map((capability) => capability.status),
+    ])}`;
+    const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+      threadId: input.thread_id,
+      mailboxThreadId: input.thread_id,
+      roomId,
+      producerKind: "source_health",
+      updateKind: "source_status",
+      contentRef,
+      preview: result.capabilities.length > 0
+        ? `Source health read ${result.capabilities.length} capability state(s): ${result.capabilities
+            .slice(0, 4)
+            .map((capability) => `${capability.modality} ${capability.status}`)
+            .join("; ")}.`
+        : "Source health read found no registered source capability state.",
+      sourceRefs,
+      loopRefs: sourceRefs.map((sourceRef) => `source_health:${sourceRef}`),
+      evidenceRefs: sourceRefs,
+      receiptRefs: [contentRef],
+      freshnessStatus: blockedCapabilities.length > 0 ? "blocked" : "fresh",
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: contentRef },
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+        ...blockedCapabilities.slice(0, 2).map((capability): WorkstationDispatchActionV1 => ({
+          kind: "repair_loop",
+          loopRef: `source_health:${capability.source_id}`,
+        })),
+      ],
+    });
     return makeObservation({
       threadId: input.thread_id,
       environmentId: input.environment_id,
       toolName: input.tool_name,
       ok: true,
       summary: `Read ${result.capabilities.length} source capability state(s).`,
-      observation: result,
-      evidenceRefs: result.capabilities.map((capability) => capability.source_id),
+      observation: {
+        ...result,
+        goalContextUpdateId,
+        goal_context_update_id: goalContextUpdateId,
+        post_tool_model_step_required: true,
+        terminal_eligible: false,
+      },
+      evidenceRefs: uniqueStrings([goalContextUpdateId, ...sourceRefs]),
+      producedRefs: [goalContextUpdateId],
+      forceNormalizedRefs: true,
     });
   }
 
@@ -6452,6 +6846,36 @@ export function executeLiveEnvironmentTool(
       sourceKind: readString(args.source_kind) ?? readString(args.sourceKind),
       expectedCadenceMs: readNumber(args.expected_cadence_ms ?? args.expectedCadenceMs, 0) || null,
     });
+    const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+      threadId: input.thread_id,
+      mailboxThreadId: mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      producerKind: "source_health",
+      updateKind: "source_status",
+      contentRef: quality.qualityId,
+      preview: `Live source quality is ${quality.quality}; freshness is ${quality.freshness}. ${quality.limitations[0] ?? ""}`,
+      sourceRefs: uniqueStrings([
+        quality.sourceId,
+        ...quality.evidenceRefs.filter((ref) => ref.startsWith("visual_source:") || ref.startsWith("missing:")),
+      ]),
+      loopRefs: uniqueStrings([
+        `live_source_quality:${quality.sourceId ?? "all"}`,
+        quality.latestRefs.wakeRequestId,
+        quality.latestRefs.decisionId,
+        quality.latestRefs.narrativeStateId,
+      ]),
+      evidenceRefs: quality.evidenceRefs,
+      receiptRefs: [quality.qualityId],
+      observedAtMs: Date.parse(quality.createdAt),
+      freshnessStatus: goalContextFreshnessStatus(quality.freshness),
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: quality.qualityId },
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+        ...(quality.quality === "stale" || quality.quality === "degraded" || quality.quality === "insufficient"
+          ? [{ kind: "repair_loop", loopRef: `live_source_quality:${quality.sourceId ?? "all"}` } as WorkstationDispatchActionV1]
+          : []),
+      ],
+    });
     return makeObservation({
       threadId: input.thread_id,
       environmentId: input.environment_id,
@@ -6467,6 +6891,8 @@ export function executeLiveEnvironmentTool(
         mailboxThreadResolution,
         mailbox_thread_resolution: mailboxThreadResolution,
         post_tool_model_step_required: true,
+        goalContextUpdateId,
+        goal_context_update_id: goalContextUpdateId,
         assistant_answer: false,
         terminal_eligible: false,
         raw_content_included: false,
@@ -6474,10 +6900,13 @@ export function executeLiveEnvironmentTool(
         ask_context_policy: "evidence_only",
       },
       evidenceRefs: [
+        goalContextUpdateId,
         quality.qualityId,
         ...quality.evidenceRefs,
         mailboxThreadResolution.mailboxThreadId,
       ],
+      producedRefs: [goalContextUpdateId],
+      forceNormalizedRefs: true,
     });
   }
 
@@ -6503,6 +6932,32 @@ export function executeLiveEnvironmentTool(
       expectedCadenceMs: readNumber(args.expected_cadence_ms ?? args.expectedCadenceMs, 0) || null,
       limit: readNumber(args.limit, 6),
     });
+    const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+      threadId: input.thread_id,
+      mailboxThreadId: mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      producerKind: "live_answer",
+      updateKind: "summary",
+      contentRef: currentState.currentStateId,
+      preview: currentState.whatAskCanSafelySay[0] ??
+        `Current live-source state has quality ${currentState.quality.quality} and ${currentState.latestMailItems.length} compact mail item(s).`,
+      sourceRefs: currentState.sourceIds,
+      loopRefs: uniqueStrings([
+        currentState.currentStateId,
+        ...currentState.activeWatchJobs.flatMap((job) => [job.jobId, job.policyId]),
+        currentState.latestDecision?.decisionId,
+        currentState.latestNarrativeState?.narrativeStateId,
+      ]),
+      evidenceRefs: currentState.evidenceRefs,
+      receiptRefs: [currentState.currentStateId, currentState.quality.qualityId],
+      observedAtMs: Date.parse(currentState.createdAt),
+      freshnessStatus: goalContextFreshnessStatus(currentState.quality.freshness),
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: currentState.currentStateId },
+        { kind: "update_live_answer", lineKey: "live_source_current_state" },
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+      ],
+    });
     return makeObservation({
       threadId: input.thread_id,
       environmentId: input.environment_id,
@@ -6521,6 +6976,8 @@ export function executeLiveEnvironmentTool(
         mailboxThreadResolution,
         mailbox_thread_resolution: mailboxThreadResolution,
         post_tool_model_step_required: true,
+        goalContextUpdateId,
+        goal_context_update_id: goalContextUpdateId,
         assistant_answer: false,
         terminal_eligible: false,
         raw_content_included: false,
@@ -6528,10 +6985,13 @@ export function executeLiveEnvironmentTool(
         ask_context_policy: "evidence_only",
       },
       evidenceRefs: [
+        goalContextUpdateId,
         currentState.currentStateId,
         ...currentState.evidenceRefs,
         mailboxThreadResolution.mailboxThreadId,
       ],
+      producedRefs: [goalContextUpdateId],
+      forceNormalizedRefs: true,
     });
   }
 

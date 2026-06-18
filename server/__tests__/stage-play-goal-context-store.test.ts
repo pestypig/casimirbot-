@@ -6,6 +6,7 @@ import type {
 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import type { StagePlayLiveSourceMailWakeRequestV1 } from "@shared/contracts/stage-play-live-source-mail-wake.v1";
 import {
+  ensureStagePlayAgentGoalSession,
   listStagePlayAgentGoalSessions,
   listStagePlayGoalContextUpdates,
   resetStagePlayGoalContextStoreForTest,
@@ -169,6 +170,27 @@ describe("stage-play goal context store", () => {
     expect(sessions[0]).toMatchObject({
       goalId: "goal:frog-classification",
       objective: "Monitor the image source and prepare frog classification evidence.",
+      contextFeeds: expect.arrayContaining([
+        expect.objectContaining({ sourceKind: "visual_summaries" }),
+        expect.objectContaining({ sourceKind: "audio_transcripts" }),
+        expect.objectContaining({ sourceKind: "translated_transcripts" }),
+        expect.objectContaining({ sourceKind: "microdeck_outputs" }),
+        expect.objectContaining({ sourceKind: "live_answer_lines" }),
+        expect.objectContaining({ sourceKind: "source_health" }),
+        expect.objectContaining({ sourceKind: "trace_memory" }),
+        expect.objectContaining({ sourceKind: "route_evidence" }),
+      ]),
+      allowedActuators: expect.arrayContaining([
+        "set_audio_preset",
+        "set_visual_preset",
+        "bind_narrator",
+        "narrator_say",
+        "update_live_answer",
+        "query_trace_memory",
+        "pause_loop",
+        "repair_source",
+        "ask_user",
+      ]),
       authority: {
         assistantAnswer: false,
         finalReportsRequireTerminalAuthority: true,
@@ -240,5 +262,73 @@ describe("stage-play goal context store", () => {
     expect(update.authority.assistantAnswer).toBe(false);
     expect(update.authority.terminalEligible).toBe(false);
     expect(update.authority.postToolModelStepRequired).toBe(true);
+  });
+
+  it("merges explicit agent goal session feeds, actuators, cadence, and checkpoints", () => {
+    const session = ensureStagePlayAgentGoalSession({
+      threadId,
+      roomId: "room:stage-play",
+      objectiveId: "goal:frog-classification",
+      objectiveText: "Monitor visual capture, translated audio, and trace memory for frog evidence.",
+      sourceRefs: ["visual_source:screen", "audio_source:share"],
+      loopRefs: [`thread:${threadId}`, `stage_play_mail_loop:${threadId}`],
+      constructRefs: ["live_answer_environment:frog"],
+      contextFeeds: [
+        {
+          feedId: "feed:frog-visual",
+          sourceKind: "visual_summaries",
+          query: "frog morphology",
+          freshnessMs: 15_000,
+          relevancePolicy: "frog-evidence",
+        },
+        {
+          feedId: "feed:frog-trace",
+          sourceKind: "trace_memory",
+          freshnessMs: 120_000,
+        },
+      ],
+      allowedActuators: ["set_visual_preset", "bind_narrator", "query_trace_memory"],
+      cadence: { kind: "event_accumulation", minUpdates: 3 },
+      stopConditions: ["frog species reported through terminal authority"],
+      checkpoint: {
+        summary: "Started frog monitor with explicit visual and trace feeds.",
+        evidenceRefs: ["visual_frame:frog-1"],
+        actionsTaken: ["start_agent_goal_session"],
+        nextStep: "continue",
+      },
+      nowMs: Date.parse("2026-06-17T14:00:03.000Z"),
+    });
+
+    expect(session).toMatchObject({
+      goalId: "goal:frog-classification",
+      constructRefs: ["live_answer_environment:frog"],
+      contextFeeds: expect.arrayContaining([
+        expect.objectContaining({
+          feedId: "feed:frog-visual",
+          sourceKind: "visual_summaries",
+          query: "frog morphology",
+          freshnessMs: 15000,
+          relevancePolicy: "frog-evidence",
+        }),
+        expect.objectContaining({
+          feedId: "feed:frog-trace",
+          sourceKind: "trace_memory",
+          freshnessMs: 120000,
+        }),
+      ]),
+      allowedActuators: expect.arrayContaining(["set_visual_preset", "bind_narrator", "query_trace_memory"]),
+      cadence: { kind: "event_accumulation", minUpdates: 3 },
+      stopConditions: expect.arrayContaining(["frog species reported through terminal authority"]),
+      authority: {
+        assistantAnswer: false,
+        finalReportsRequireTerminalAuthority: true,
+      },
+    });
+    expect(session?.checkpoints.at(-1)).toMatchObject({
+      summary: "Started frog monitor with explicit visual and trace feeds.",
+      evidenceRefs: expect.arrayContaining(["visual_frame:frog-1", "visual_source:screen"]),
+      actionsTaken: ["start_agent_goal_session"],
+      nextStep: "continue",
+    });
   });
 });

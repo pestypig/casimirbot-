@@ -30,9 +30,11 @@ export type WorkstationToolIntent =
   | "notes_append"
   | "notes_store_large_text"
   | "narrator_debug_probe"
+  | "narrator_control"
   | "dottie_observer"
   | "live_environment_create"
   | "minecraft_live_continuation"
+  | "workstation_goal_context"
   | "theory_context_reflection"
   | "physics_calculation_context"
   | "zen_graph_reflection"
@@ -829,6 +831,153 @@ function buildNarratorDebugProbePlan(
   };
 }
 
+function isNarratorControlPrompt(prompt: string): boolean {
+  const mentionsNarratorAction =
+    /\bnarrator\.(?:say|bind_stream)\b/i.test(prompt) ||
+    /\bpanel[_\s-]?id\s*(?:=|:)\s*narrator\b[\s\S]{0,120}\baction[_\s-]?id\s*(?:=|:)\s*narrator\.(?:say|bind_stream)\b/i.test(prompt);
+  const naturalSay =
+    /\b(?:narrator\s+say|say\s+(?:this|that)?\s*(?:with|through|using)\s+(?:the\s+)?narrator|speak\s+(?:this|that)?\s*(?:with|through|using)\s+(?:the\s+)?narrator)\b/i.test(prompt);
+  const naturalBind =
+    /\b(?:turn\s+on|enable|bind|route|attach)\b[\s\S]{0,100}\b(?:narrator|narration|read[-\s]?aloud)\b[\s\S]{0,160}\b(?:translation|translated\s+transcript|translated\s+speech|transcript\s+stream|live\s+answer|micro[-\s]?deck\s+output|goal\s+context\s+updates?)\b/i.test(prompt) ||
+    /\b(?:narrator|narration)\b[\s\S]{0,120}\b(?:read|speak|announce)\b[\s\S]{0,160}\b(?:translation|translated\s+transcript|translated\s+speech|transcript\s+stream|live\s+answer|micro[-\s]?deck\s+output|goal\s+context\s+updates?)\b/i.test(prompt);
+  if (!mentionsNarratorAction && !naturalSay && !naturalBind) return false;
+
+  const negated =
+    /\b(?:do\s+not|don't|dont|without|not\s+asking\s+to|no\s+need\s+to|never|for\s+now)\b[\s\S]{0,180}\b(?:narrator\.(?:say|bind_stream)|narrator|narration|read[-\s]?aloud|speak)\b/i.test(prompt);
+  const hypothetical =
+    /\b(?:what\s+would\s+happen|what\s+happens|if\s+(?:i|we|you)|would\s+you|could\s+you|should\s+(?:we|you)|tomorrow|later|next\s+time|in\s+the\s+future|eventually)\b[\s\S]{0,180}\b(?:narrator\.(?:say|bind_stream)|narrator|narration)\b/i.test(prompt);
+  const historical =
+    /\b(?:previously|earlier|last\s+time|before|already|historically|was|were|had)\b[\s\S]{0,180}\b(?:narrator\.(?:say|bind_stream)|narrator\s+say|bind\s+narrator|narrator|narration)\b/i.test(prompt);
+  const deferred =
+    /\b(?:narrator\.(?:say|bind_stream)|narrator|narration)\b[\s\S]{0,140}\b(?:later|tomorrow|next\s+time|in\s+the\s+future|eventually)\b/i.test(prompt);
+  const quotedOnly =
+    /^["'`].*(?:narrator\.(?:say|bind_stream)|narrator\s+say|bind\s+narrator).*["'`]$/i.test(prompt) ||
+    /\b(?:the\s+text|screen|document|quote|quoted|label|ui)\b[\s\S]{0,80}\b(?:says|contains|shows|reads)\b[\s\S]{0,160}\b(?:narrator\.(?:say|bind_stream)|narrator\s+say|bind\s+narrator)\b/i.test(prompt);
+  return !negated && !hypothetical && !historical && !deferred && !quotedOnly;
+}
+
+function narratorControlKind(prompt: string): "say" | "bind_stream" {
+  if (
+    /\bnarrator\.say\b/i.test(prompt) ||
+    /\baction[_\s-]?id\s*(?:=|:)\s*narrator\.say\b/i.test(prompt) ||
+    /\bnarrator\s+say\b/i.test(prompt)
+  ) {
+    return "say";
+  }
+  if (
+    /\bnarrator\.bind_stream\b/i.test(prompt) ||
+    /\b(?:turn\s+on|enable|bind|route|attach)\b[\s\S]{0,100}\b(?:narrator|narration|read[-\s]?aloud)\b/i.test(prompt) ||
+    /\b(?:translation|translated\s+transcript|translated\s+speech|transcript\s+stream)\b[\s\S]{0,120}\b(?:narrator|narration|read[-\s]?aloud)\b/i.test(prompt)
+  ) {
+    return "bind_stream";
+  }
+  return "say";
+}
+
+function inferNarratorStreamKind(prompt: string): string {
+  if (/\btranslated\s+speech\b/i.test(prompt)) return "translated_speech";
+  if (/\b(?:translation|translated\s+transcript)\b/i.test(prompt)) return "translated_transcript";
+  if (/\btranscript\s+stream\b/i.test(prompt)) return "transcript_stream";
+  if (/\blive\s+answer\b/i.test(prompt)) return "live_answer_summary";
+  if (/\bmicro[-\s]?deck\b/i.test(prompt)) return "micro_deck_output";
+  if (/\bgoal\s+context\b/i.test(prompt)) return "goal_context_update";
+  return "translated_transcript";
+}
+
+function defaultNarratorSourceRef(streamKind: string): string {
+  return `source:${streamKind}:active`;
+}
+
+function buildNarratorControlPlan(
+  normalized: string,
+  options: PlanWorkstationToolUseOptions,
+  scores: AffordanceScore[],
+): WorkstationToolPlannerResult {
+  const kind = narratorControlKind(normalized);
+  const actionId = kind === "bind_stream" ? "narrator.bind_stream" : "narrator.say";
+  const streamKind = inferNarratorStreamKind(normalized);
+  const sourceRef =
+    extractNamedArg(normalized, ["source_ref", "source ref", "source_id", "source id"]) ??
+    defaultNarratorSourceRef(streamKind);
+  const inferredText =
+    extractNamedTextArg(normalized, ["text", "message", "say", "utterance"]) ??
+    extractQuoted(normalized) ??
+    normalized.replace(/^.*?\bnarrator\s+say\b[:\s-]*/i, "").trim();
+  const text = inferredText || "Narrator output requested from Helix Ask.";
+  const args =
+    kind === "bind_stream"
+      ? {
+          source_ref: sourceRef,
+          stream_kind: streamKind,
+          delivery_mode: extractNamedArg(normalized, ["delivery_mode", "delivery mode"]) ?? "visible_only",
+          voice_policy: extractNamedArg(normalized, ["voice_policy", "voice policy"]) ?? "confirm_speak_required",
+          ...(extractNamedArg(normalized, ["preset_id", "preset id"]) ? { preset_id: extractNamedArg(normalized, ["preset_id", "preset id"]) } : {}),
+        }
+      : {
+          text,
+          source_kind: extractNamedArg(normalized, ["source_kind", "source kind"]) ?? "helix_console",
+          source_id: extractNamedArg(normalized, ["source_id", "source id"]) ?? "helix_ask:narrator.say",
+          delivery_mode: extractNamedArg(normalized, ["delivery_mode", "delivery mode"]) ?? "confirm_to_speak",
+          evidence_refs: [options.turnId ?? "helix_ask:narrator_control"],
+        };
+  const publishStepId = kind === "bind_stream" ? "bind_narrator_stream" : "publish_narrator_say";
+  const steps: HelixWorkstationToolPlanStep[] = [
+    makeOpenStep("narrator"),
+    {
+      step_id: publishStepId,
+      kind: "run_panel_action",
+      panel_id: "narrator",
+      action_id: actionId,
+      args,
+      depends_on: ["open_narrator"],
+      expected_receipt_kind: kind === "bind_stream" ? "narrator_bind_stream_receipt" : "narrator_say_receipt",
+      expected_state_change: {
+        store: "narrator",
+        proof_key: kind === "bind_stream" ? "stream_binding" : "event_id",
+      },
+      required: true,
+    },
+    {
+      step_id: "evaluate_narrator_control_receipt",
+      kind: "evaluate_result",
+      depends_on: [publishStepId],
+      expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+      required: true,
+    },
+  ];
+  scores.push({
+    affordance_id: `narrator.${actionId}`,
+    panel_id: "narrator",
+    action_id: actionId,
+    score: 0.94,
+    reason: kind === "bind_stream"
+      ? "affirmative narrator stream-binding command should bind a live output stream through governed narrator policy"
+      : "affirmative narrator say command should publish a governed non-terminal narrator event",
+    required_args_missing: [],
+  });
+  return {
+    intent: "narrator_control",
+    action: {
+      panel_id: "narrator",
+      action_id: actionId,
+      args,
+    },
+    tool_plan: buildToolPlan({
+      prompt: normalized,
+      intent: "narrator_control",
+      missing: [],
+      options,
+      steps,
+    }),
+    scores,
+    should_use_tool: true,
+    reason: kind === "bind_stream"
+      ? "Prompt asks to bind Narrator to a workstation stream; produce a narrator binding receipt as observation evidence."
+      : "Prompt asks Narrator to publish a custom utterance; produce a narrator event receipt as observation evidence.",
+    missing_required_args: [],
+  };
+}
+
 function isDottieObserverToolPrompt(prompt: string): boolean {
   const voiceContextKind = classifyVoiceContextRequest(prompt);
   if (
@@ -1043,6 +1192,190 @@ function makeOpenStep(panelId: string, depends_on: string[] = []): HelixWorkstat
     expected_receipt_kind: "workspace_action_receipt",
     expected_state_change: { panel_id: panelId, open: true },
     required: true,
+  };
+}
+
+const GOAL_CONTEXT_OBJECT_PATTERN =
+  "(?:workstation\\s+goal\\s+context|goal\\s+context\\s+updates?|active\\s+goal\\s+sessions?|agent\\s+goal\\s+sessions?|goal\\s+sessions?|per[-\\s]?packet\\s+traces?|packet\\s+traces?|trace\\s+memory|reasoning\\s+circuit|process\\s+graph\\s+traces?)";
+
+function hasContextualWorkstationGoalContextCue(prompt: string): boolean {
+  const object = GOAL_CONTEXT_OBJECT_PATTERN;
+  return (
+    new RegExp(`["'\`][^"'\`]*(?:live_env\\.(?:query_workstation_goal_context|start_agent_goal_session|query_trace_memory)|${object})[^"'\`]*["'\`]`, "i").test(prompt) ||
+    new RegExp(`\\b(?:if|in\\s+the\\s+future|future|later|eventually|hypothetically|tomorrow|next\\s+time|would|could|might|should)\\b[\\s\\S]{0,140}\\b(?:live_env\\.(?:query_workstation_goal_context|start_agent_goal_session|query_trace_memory)|${object})\\b`, "i").test(prompt) ||
+    new RegExp(`\\b(?:previously|earlier|last\\s+time|before|already|historically|was|were|had)\\b[\\s\\S]{0,160}\\b(?:queried|started|created|viewed|inspected|showed|listed|checked|read|called|used)?\\b[\\s\\S]{0,120}\\b(?:live_env\\.(?:query_workstation_goal_context|start_agent_goal_session|query_trace_memory)|${object})\\b`, "i").test(prompt) ||
+    new RegExp(`\\b(?:screen|page|button|label|ui|text|menu|dropdown|document|quote)\\b[\\s\\S]{0,90}\\b(?:says|shows|reads|contains|labeled|labelled|called|named)\\b[\\s\\S]{0,140}\\b(?:live_env\\.(?:query_workstation_goal_context|start_agent_goal_session|query_trace_memory)|${object})\\b`, "i").test(prompt) ||
+    new RegExp(`\\b(?:do\\s+not|don't|dont|without|not\\s+asking\\s+to|no\\s+need\\s+to|for\\s+now)\\b[\\s\\S]{0,160}\\b(?:query|view|inspect|show|list|check|read|start|create|open|begin|set\\s+up|setup|monitor|use|call)?\\b[\\s\\S]{0,140}\\b(?:live_env\\.(?:query_workstation_goal_context|start_agent_goal_session|query_trace_memory)|${object})\\b`, "i").test(prompt)
+  );
+}
+
+function wantsStartAgentGoalSession(prompt: string): boolean {
+  if (hasContextualWorkstationGoalContextCue(prompt)) return false;
+  return (
+    /\blive_env\.start_agent_goal_session\b/i.test(prompt) ||
+    /\b(?:start|create|open|begin|set\s+up|setup|launch|track|monitor)\b[\s\S]{0,160}\b(?:agent\s+goal\s+session|goal\s+session|durable\s+goal|goal-directed\s+(?:monitor|session)|standing\s+agent\s+goal|agent\s+objective)\b/i.test(prompt) ||
+    /\b(?:monitor|keep\s+(?:watching|checking|tracking)|continue\s+(?:watching|checking|tracking))\b[\s\S]{0,180}\b(?:goal\s+context|trace\s+memory|packet\s+traces?|live\s+source|visual\s+capture|audio\s+capture|translation|micro[-\s]?deck)\b/i.test(prompt)
+  );
+}
+
+function wantsQueryWorkstationGoalContext(prompt: string): boolean {
+  if (hasContextualWorkstationGoalContextCue(prompt)) return false;
+  return (
+    /\blive_env\.query_workstation_goal_context\b/i.test(prompt) ||
+    /\blive_env\.query_trace_memory\b/i.test(prompt) ||
+    new RegExp(`\\b(?:query|view|inspect|show|list|get|check|read|retrieve|summari[sz]e)\\b[\\s\\S]{0,140}\\b${GOAL_CONTEXT_OBJECT_PATTERN}\\b`, "i").test(prompt) ||
+    new RegExp(`\\b${GOAL_CONTEXT_OBJECT_PATTERN}\\b[\\s\\S]{0,140}\\b(?:query|view|inspect|show|list|get|check|read|retrieve|latest|active|available|known)\\b`, "i").test(prompt)
+  );
+}
+
+function wantsTraceMemoryQuery(prompt: string): boolean {
+  if (hasContextualWorkstationGoalContextCue(prompt)) return false;
+  return (
+    /\blive_env\.query_trace_memory\b/i.test(prompt) ||
+    /\b(?:query|view|inspect|show|list|get|check|read|retrieve|summari[sz]e)\b[\s\S]{0,140}\b(?:trace\s+memory|reasoning\s+traces?|proof\s+recall\s+traces?|workstation\s+reasoning\s+traces?)\b/i.test(prompt) ||
+    /\b(?:trace\s+memory|reasoning\s+traces?|proof\s+recall\s+traces?|workstation\s+reasoning\s+traces?)\b[\s\S]{0,140}\b(?:query|view|inspect|show|list|get|check|read|retrieve|latest|available|known)\b/i.test(prompt)
+  );
+}
+
+function extractGoalContextObjective(prompt: string): string {
+  const explicit =
+    extractNamedArg(prompt, ["objective", "goal", "goal objective"]) ??
+    prompt.match(/\b(?:so|to|for)\s+(.{12,220})$/i)?.[1]?.trim();
+  return stripOuterPunctuation(explicit ?? prompt).slice(0, 280) || "Monitor workstation goal context from live source evidence.";
+}
+
+function buildWorkstationGoalContextPlan(
+  normalized: string,
+  options: PlanWorkstationToolUseOptions,
+  scores: AffordanceScore[],
+): WorkstationToolPlannerResult {
+  const startSession = wantsStartAgentGoalSession(normalized);
+  const traceMemory = !startSession && wantsTraceMemoryQuery(normalized);
+  const threadId = options.threadId ?? "helix-ask:desktop";
+  const objective = extractGoalContextObjective(normalized);
+  const sourceId = extractNamedArg(normalized, ["source_id", "source id", "source_ref", "source ref"]);
+  const goalId =
+    extractNamedArg(normalized, ["goal_id", "goal id"]) ??
+    `goal:workstation-context:${(options.turnId ?? Date.now()).toString().replace(/[^a-z0-9_-]+/gi, "_")}`;
+  const queryArgs = {
+    thread_id: threadId,
+    ...(sourceId ? { source_id: sourceId, source_ref: sourceId } : {}),
+    limit: 40,
+  };
+  const traceQueryArgs = {
+    thread_id: threadId,
+    trace_id: extractNamedArg(normalized, ["trace_id", "trace id"]) ?? undefined,
+    turn_id: extractNamedArg(normalized, ["turn_id", "turn id"]) ?? undefined,
+    limit: 12,
+  };
+  const sessionArgs = {
+    ...queryArgs,
+    goal_id: goalId,
+    objective,
+    ...(sourceId ? { source_refs: [sourceId] } : {}),
+    context_feeds: [
+      { source_kind: "visual_summaries", freshness_ms: 30_000, relevance_policy: "same-source-or-goal-id" },
+      { source_kind: "audio_transcripts", freshness_ms: 30_000, relevance_policy: "same-source-or-goal-id" },
+      { source_kind: "translated_transcripts", freshness_ms: 45_000, relevance_policy: "same-source-or-goal-id" },
+      { source_kind: "microdeck_outputs", freshness_ms: 30_000, relevance_policy: "same-source-or-goal-id" },
+      { source_kind: "live_answer_lines", freshness_ms: 45_000, relevance_policy: "same-goal-or-active-line" },
+      { source_kind: "source_health", freshness_ms: 60_000, relevance_policy: "same-source" },
+      { source_kind: "trace_memory", freshness_ms: 120_000, relevance_policy: "same-thread-or-turn" },
+      { source_kind: "route_evidence", freshness_ms: 60_000, relevance_policy: "same-goal-or-route" },
+    ],
+    allowed_actuators: [
+      "set_audio_preset",
+      "set_visual_preset",
+      "bind_narrator",
+      "narrator_say",
+      "update_live_answer",
+      "query_trace_memory",
+      "pause_loop",
+      "repair_source",
+      "ask_user",
+    ],
+    cadence: /\b(?:continuous|continuously|ongoing|keep\s+(?:watching|checking|tracking)|monitor)\b/i.test(normalized)
+      ? { kind: "event_accumulation", min_updates: 2 }
+      : { kind: "user_turn_only" },
+    stop_conditions: [
+      "User stops monitoring",
+      "Source feed ends or becomes unavailable",
+      "Terminal authority produces a final report",
+    ],
+    checkpoint: {
+      summary: "Goal session started with explicit workstation context feeds and governed actuators.",
+      actions_taken: ["start_agent_goal_session"],
+      next_step: "continue",
+    },
+  };
+  const steps: HelixWorkstationToolPlanStep[] = [
+    ...(startSession
+      ? [{
+          step_id: "start_agent_goal_session",
+          kind: "run_ask_tool" as const,
+          tool_id: "live_env.start_agent_goal_session",
+          args: sessionArgs,
+          expected_receipt_kind: "stage_play_agent_goal_session_tool_result",
+          expected_state_change: { store: "stage-play-goal-context", proof_key: "agentGoalSessions" },
+          required: true,
+        }]
+      : []),
+    {
+      step_id: traceMemory ? "query_trace_memory" : "query_workstation_goal_context",
+      kind: "run_ask_tool",
+      tool_id: traceMemory ? "live_env.query_trace_memory" : "live_env.query_workstation_goal_context",
+      args: traceMemory ? traceQueryArgs : startSession ? { ...queryArgs, goal_id: goalId } : queryArgs,
+      depends_on: startSession ? ["start_agent_goal_session"] : [],
+      expected_receipt_kind: traceMemory ? "helix.workstation_reasoning_trace_query_result" : "stage_play_workstation_goal_context_read_result",
+      expected_state_change: { store: "stage-play-goal-context", proof_key: "goalContextUpdates" },
+      required: true,
+    },
+    {
+      step_id: "evaluate_workstation_goal_context",
+      kind: "evaluate_result",
+      depends_on: [traceMemory ? "query_trace_memory" : "query_workstation_goal_context"],
+      expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+      required: true,
+    },
+  ];
+  scores.push({
+    affordance_id: startSession
+      ? "live_env.start_agent_goal_session"
+      : traceMemory
+        ? "live_env.query_trace_memory"
+        : "live_env.query_workstation_goal_context",
+    panel_id: "helix_ask",
+    action_id: startSession
+      ? "live_env.start_agent_goal_session"
+      : traceMemory
+        ? "live_env.query_trace_memory"
+        : "live_env.query_workstation_goal_context",
+    score: startSession ? 0.93 : 0.9,
+    reason: startSession
+      ? "affirmative goal-session prompt should create a durable agent goal record and then query non-terminal context"
+      : traceMemory
+        ? "trace-memory prompt should read compact workstation reasoning traces as non-terminal evidence"
+      : "goal-context inspection prompt should read workstation context updates as evidence",
+    required_args_missing: [],
+  });
+  return {
+    intent: "workstation_goal_context",
+    action: null,
+    tool_plan: buildToolPlan({
+      prompt: normalized,
+      intent: "workstation_goal_context",
+      missing: [],
+      options,
+      steps,
+    }),
+    scores,
+    should_use_tool: true,
+    reason: startSession
+      ? "Prompt asks the agent to pursue a durable workstation goal; start a goal session, then query goal-context evidence before any answer."
+      : traceMemory
+        ? "Prompt asks for trace memory; query compact workstation reasoning traces before any answer."
+      : "Prompt asks for workstation goal-context or packet trace evidence; query the goal-context feed before any answer.",
+    missing_required_args: [],
   };
 }
 
@@ -1385,6 +1718,14 @@ export function planWorkstationToolUse(
 
   if (isNarratorDebugProbeToolPrompt(normalized)) {
     return buildNarratorDebugProbePlan(normalized, options, scores);
+  }
+
+  if (isNarratorControlPrompt(normalized)) {
+    return buildNarratorControlPlan(normalized, options, scores);
+  }
+
+  if (wantsStartAgentGoalSession(normalized) || wantsQueryWorkstationGoalContext(normalized)) {
+    return buildWorkstationGoalContextPlan(normalized, options, scores);
   }
 
   const voiceContextKind = classifyVoiceContextRequest(normalized);

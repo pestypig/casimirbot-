@@ -2002,6 +2002,194 @@ describe("Helix Ask tool lifecycle trace", () => {
     );
   });
 
+  it("normalizes workstation goal-context query artifacts as live-env capability evidence", () => {
+    const payload: Record<string, unknown> = {
+      active_prompt: "Inspect workstation goal context updates for the visual source.",
+      tool_surface_packet: {
+        schema: "helix.tool_surface_packet.v1",
+        tools: [{ name: "live_env.query_workstation_goal_context" }],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        requested_capability: "live_env.query_workstation_goal_context",
+        admitted_capability: "live_env.query_workstation_goal_context",
+        decision: "admitted",
+      },
+      agent_step_decision: {
+        next_step: "call_tool",
+        chosen_capability: "live_env.query_workstation_goal_context",
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            iteration: 1,
+            chosen_capability: "live_env.query_workstation_goal_context",
+            executed_action_key: "live_env.query_workstation_goal_context",
+            observed_artifact_refs: ["stage_play_workstation_goal_context_read_result:1"],
+          },
+        ],
+        executed_tool_call_count: 1,
+      },
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        draft_id: "ask:test:goal-context:final_answer_draft",
+        support_refs: ["stage_play_workstation_goal_context_read_result:1"],
+      },
+      terminal_artifact_kind: "model_synthesized_answer",
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        selected_terminal_artifact_kind: "model_synthesized_answer",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "model_synthesized_answer",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "stage_play_workstation_goal_context_read_result:1",
+          kind: "stage_play_workstation_goal_context_read_result",
+          producer_item_id: "live_env.query_workstation_goal_context",
+          payload: {
+            schema: "stage_play_workstation_goal_context_read_result/v1",
+            tool_name: "live_env.query_workstation_goal_context",
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+          },
+        },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:goal-context", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:goal-context", payload });
+
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      selected_capability: "live_env.query_workstation_goal_context",
+      admitted_capability: "live_env.query_workstation_goal_context",
+      executed_capability: "live_env.query_workstation_goal_context",
+      observation_kind: "stage_play_workstation_goal_context_read_result",
+      observation_ref: "stage_play_workstation_goal_context_read_result:1",
+      reentry_status: "reentered",
+      selected_terminal_kind: "model_synthesized_answer",
+      first_broken_rail: null,
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
+  });
+
+  it("maps source health goal-context artifacts to the source health query tool", () => {
+    const payload: Record<string, unknown> = {
+      active_prompt: "Query source health before deciding what the workstation can monitor.",
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        requested_capability: "live_env.query_source_health",
+        requested_capability_family: "live_source_mail",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "helix.situation_source_capability_read:1",
+          kind: "helix.situation_source_capability_read",
+          producer_item_id: "live_env.query_source_health",
+          payload: {
+            schema: "helix.situation_source_capability_read.v1",
+            tool_name: "live_env.query_source_health",
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+          },
+        },
+        {
+          artifact_id: "stage_play_goal_context_update:source-health",
+          kind: "helix.workstation_goal_context_update.v1",
+          producer_item_id: "live_env.query_source_health",
+          payload: {
+            schema: "helix.workstation_goal_context_update.v1",
+            tool_name: "live_env.query_source_health",
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+          },
+        },
+      ],
+    };
+
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:source-health", payload });
+
+    expect(index).toMatchObject({
+      capability: "live_env.query_source_health",
+      tool_family: "live_source_mail",
+      tool_family_contract: {
+        tool_name: "live_env.query_source_health",
+        authority: "evidence_only",
+        required_observation_kinds: [
+          "helix.situation_source_capability_read",
+          "helix.workstation_goal_context_update.v1",
+        ],
+      },
+      missing_required_observation_kinds: [],
+    });
+  });
+
+  it("maps trace-memory goal-context artifacts to the trace memory query tool", () => {
+    const payload: Record<string, unknown> = {
+      active_prompt: "Query trace memory for the last workstation reasoning trace.",
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        requested_capability: "live_env.query_trace_memory",
+        requested_capability_family: "live_source_mail",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "helix.workstation_reasoning_trace_query_result:1",
+          kind: "helix.workstation_reasoning_trace_query_result",
+          producer_item_id: "live_env.query_trace_memory",
+          payload: {
+            schema: "helix.workstation_reasoning_trace_query_result.v1",
+            tool_name: "live_env.query_trace_memory",
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+          },
+        },
+        {
+          artifact_id: "stage_play_goal_context_update:trace-memory",
+          kind: "helix.workstation_goal_context_update.v1",
+          producer_item_id: "live_env.query_trace_memory",
+          payload: {
+            schema: "helix.workstation_goal_context_update.v1",
+            tool_name: "live_env.query_trace_memory",
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+          },
+        },
+      ],
+    };
+
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:trace-memory", payload });
+
+    expect(index).toMatchObject({
+      capability: "live_env.query_trace_memory",
+      tool_family: "live_source_mail",
+      tool_family_contract: {
+        tool_name: "live_env.query_trace_memory",
+        authority: "evidence_only",
+        required_observation_kinds: [
+          "helix.workstation_reasoning_trace_query_result",
+          "helix.workstation_goal_context_update.v1",
+        ],
+      },
+      missing_required_observation_kinds: [],
+    });
+  });
+
   it("normalizes a completed internet_search.web_research turn through the same rail table", () => {
     const payload: Record<string, unknown> = {
       active_prompt: "Use internet_search.web_research to find current source evidence.",
