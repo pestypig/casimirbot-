@@ -69,6 +69,7 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
     case "workspace-directory.resolve":
       return "workspace_directory_resolution";
     case "internet_search.web_research":
+    case "internet-search.search_web":
       return "internet_search_lookup";
     case "live_env.read_processed_live_source_mail":
     case "live_env.process_live_source_mail":
@@ -89,6 +90,7 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
     case "repo-code.search_concept":
       return "current_turn_doc";
     case "internet_search.web_research":
+    case "internet-search.search_web":
       return "external_internet_search";
     case "live_env.read_processed_live_source_mail":
     case "live_env.process_live_source_mail":

@@ -1,4 +1,5 @@
 import type { HelixCapabilityFamily } from "@shared/helix-capability-plan";
+import { HELIX_INTERNET_SEARCH_CAPABILITY } from "@shared/helix-internet-search-observation";
 import type { HelixToolCallAdmissionFamily } from "@shared/helix-tool-call-admission";
 import {
   contextualToolSuppressionBlocksFamily,
@@ -8,6 +9,8 @@ import {
 export type ExplicitCapabilityContract = {
   schema: "helix.explicit_capability_contract.v1";
   capability: string;
+  runtime_capability?: string;
+  aliases?: string[];
   capability_family: string;
   plan_family: HelixCapabilityFamily;
   source_target: string;
@@ -82,6 +85,8 @@ const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "internet_search.web_research",
+    runtime_capability: HELIX_INTERNET_SEARCH_CAPABILITY,
+    aliases: [HELIX_INTERNET_SEARCH_CAPABILITY],
     capability_family: "internet_search",
     plan_family: "internet_search",
     source_target: "internet_search",
@@ -131,11 +136,22 @@ const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
 
 const commandVerb = String.raw`(?:call|use|run|invoke|execute|inspect\s+using|locate\s+(?:in\s+doc\s+)?using|find\s+using)`;
 
+const uniqueStrings = (values: string[]): string[] => Array.from(new Set(values.filter(Boolean)));
+
 const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const commandMentionsCapability = (prompt: string, capability: string): boolean => {
   const escaped = escapeRegex(capability);
   return new RegExp(String.raw`\b${commandVerb}\b[\s\S]{0,80}\b${escaped}\b`, "i").test(prompt);
+};
+
+const commandMentionsContract = (prompt: string, contract: ExplicitCapabilityContract): boolean => {
+  const names = uniqueStrings([
+    contract.capability,
+    contract.runtime_capability ?? "",
+    ...(contract.aliases ?? []),
+  ]);
+  return names.some((name) => commandMentionsCapability(prompt, name));
 };
 
 const familySuppressed = (prompt: string, contract: ExplicitCapabilityContract): boolean => {
@@ -152,7 +168,11 @@ export const explicitCapabilityContractForCapability = (
 ): ExplicitCapabilityContract | null => {
   const normalized = String(capability ?? "").trim();
   if (!normalized) return null;
-  return explicitCapabilityContracts.find((contract: ExplicitCapabilityContract) => contract.capability === normalized) ?? null;
+  return explicitCapabilityContracts.find((contract: ExplicitCapabilityContract) =>
+    contract.capability === normalized ||
+    contract.runtime_capability === normalized ||
+    (contract.aliases ?? []).includes(normalized)
+  ) ?? null;
 };
 
 export const extractExplicitCapabilityContract = (
@@ -161,7 +181,7 @@ export const extractExplicitCapabilityContract = (
   const prompt = String(promptText ?? "").trim();
   if (!prompt) return null;
   const contract = explicitCapabilityContracts.find((entry: ExplicitCapabilityContract) =>
-    commandMentionsCapability(prompt, entry.capability)
+    commandMentionsContract(prompt, entry)
   );
   if (!contract) return null;
   return familySuppressed(prompt, contract) ? null : contract;
@@ -176,7 +196,11 @@ export const explicitCapabilityMatches = (
   if (!requested || !actual) return false;
   if (requested === actual) return true;
   const contract = explicitCapabilityContractForCapability(requested);
-  return Boolean(contract?.allowed_substitutions.includes(actual));
+  return Boolean(
+    contract?.runtime_capability === actual ||
+      contract?.allowed_substitutions.includes(actual) ||
+      contract?.aliases?.includes(actual),
+  );
 };
 
 export const explicitCapabilityContractsForTests = explicitCapabilityContracts;

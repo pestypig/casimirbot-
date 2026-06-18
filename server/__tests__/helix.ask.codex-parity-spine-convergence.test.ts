@@ -3,6 +3,7 @@ import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { planRouter } from "../routes/agi.plan";
+import { resetHelixAskTurnAdmissionForTests } from "../services/helix-ask/ask-turn-admission";
 import { runtimeMemoryGovernor } from "../services/runtime/runtime-memory-governor";
 import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../services/stage-play/stage-play-live-source-mail-wake-store";
 
@@ -85,19 +86,20 @@ const fetchRailTable = async (input: {
   debugRail: RecordLike;
 }> => {
   runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
+  resetHelixAskTurnAdmissionForTests();
   const turn = await request(input.app)
     .post("/api/agi/ask/turn")
     .send({
       sessionId: input.sessionId,
       question: input.prompt,
       mode: "read",
-      debug: true,
+      debug: false,
     })
     .expect(200);
   const turnId = readString(turn.body?.turn_id);
   expect(turnId).toBeTruthy();
   const debug = await request(input.app)
-    .get(`/api/agi/ask/turn/${encodeURIComponent(turnId as string)}/debug-export`)
+    .get(`/api/agi/ask/turn/${encodeURIComponent(turnId as string)}/debug-export?view=rail`)
     .expect(200);
   const turnRail = readRecord(turn.body?.codex_parity_agent_spine_rail_table);
   const debugRail = readRecord(debug.body?.payload?.codex_parity_agent_spine_rail_table);
@@ -106,6 +108,10 @@ const fetchRailTable = async (input: {
   expectRailTableShape(turnRail as RecordLike, turnId as string);
   expectRailTableShape(debugRail as RecordLike, turnId as string);
   expect(debugRail).toEqual(turnRail);
+  (turn as unknown as { body?: unknown }).body = undefined;
+  (debug as unknown as { body?: unknown }).body = undefined;
+  runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
+  resetHelixAskTurnAdmissionForTests();
   return { turnId: turnId as string, turnRail: turnRail as RecordLike, debugRail: debugRail as RecordLike };
 };
 
@@ -128,6 +134,7 @@ const seedVisualCapture = async (input: {
 
 beforeEach(() => {
   runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
+  resetHelixAskTurnAdmissionForTests();
   resetStagePlayLiveSourceMailWakeStoreForTest();
 });
 
@@ -158,6 +165,7 @@ describe("Helix Ask Codex-parity agent spine convergence", () => {
       id: "internet_search",
       prompt: "Use internet_search.web_research to find current public evidence about OpenAI Codex.",
       requestedCapability: "internet_search.web_research",
+      selectedCapability: "internet-search.search_web",
     },
     {
       id: "live_source_mail",
@@ -172,8 +180,8 @@ describe("Helix Ask Codex-parity agent spine convergence", () => {
     });
 
     expect(turnRail.requested_capability).toBe(scenario.requestedCapability);
-    expect(turnRail.selected_capability).toBe(scenario.requestedCapability);
-    expect(turnRail.admitted_capability).toBe(scenario.requestedCapability);
+    expect(turnRail.selected_capability).toBe(scenario.selectedCapability ?? scenario.requestedCapability);
+    expect(turnRail.admitted_capability).toBe(scenario.selectedCapability ?? scenario.requestedCapability);
     expect(turnRail.codex_parity_class).not.toBe("explicit_capability_demoted");
     if (scenario.id === "internet_search") {
       expect(turnRail.codex_parity_class).toBe("provider_config_missing");
@@ -197,6 +205,20 @@ describe("Helix Ask Codex-parity agent spine convergence", () => {
     expect(turnRail.codex_parity_class).toBe("complete");
   }, 60_000);
 
+  it("keeps negated calculator references suppressed instead of treating them as progress", async () => {
+    const { turnRail } = await fetchRailTable({
+      app: createApp(),
+      prompt:
+        "Do not call scientific-calculator.solve_expression. Explain why calculator receipts are observations rather than terminal authority.",
+      sessionId: `helix-ask:spine-convergence:negated-calculator:${Date.now()}`,
+    });
+
+    expect(turnRail.requested_capability).toBeNull();
+    expect(turnRail.selected_capability).toBe("suppressed_contextual_tool_reference");
+    expect(turnRail.executed_capability).not.toBe("scientific-calculator.solve_expression");
+    expect(turnRail.codex_parity_class).not.toBe("complete");
+  }, 60_000);
+
   it("routes current-screen visual questions through visual capture evidence", async () => {
     const app = createApp();
     const sessionId = `helix-ask:spine-convergence:visual:${Date.now()}`;
@@ -215,19 +237,5 @@ describe("Helix Ask Codex-parity agent spine convergence", () => {
     expect(turnRail.admitted_capability).toBe("situation-room.describe_visual_capture");
     expect(turnRail.executed_capability).toBe("situation-room.describe_visual_capture");
     expect(turnRail.codex_parity_class).toBe("complete");
-  }, 60_000);
-
-  it("keeps negated calculator references suppressed instead of treating them as progress", async () => {
-    const { turnRail } = await fetchRailTable({
-      app: createApp(),
-      prompt:
-        "Do not call scientific-calculator.solve_expression. Explain why calculator receipts are observations rather than terminal authority.",
-      sessionId: `helix-ask:spine-convergence:negated-calculator:${Date.now()}`,
-    });
-
-    expect(turnRail.requested_capability).toBeNull();
-    expect(turnRail.selected_capability).toBe("suppressed_contextual_tool_reference");
-    expect(turnRail.executed_capability).not.toBe("scientific-calculator.solve_expression");
-    expect(turnRail.codex_parity_class).not.toBe("complete");
   }, 60_000);
 });

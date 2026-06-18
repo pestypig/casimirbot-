@@ -30,6 +30,7 @@ import { mandatoryToolForPhase } from "./live-source-turn-phase-resolver";
 import { isExplicitDocsPathDocumentOperation } from "./docs-viewer-intent";
 import {
   explicitCapabilityContractForCapability,
+  explicitCapabilityMatches,
   extractExplicitCapabilityContract,
 } from "./explicit-capability-contract";
 import { resolveAskCapabilityContractArbitration } from "./capability-contract-arbitration";
@@ -604,7 +605,7 @@ export const buildCapabilityPlan = (input: {
     : contextualSuppressionBlocksPlan
       ? "suppressed_contextual_tool_reference"
     : requestedCapabilityContract
-      ? requestedCapabilityContract.capability
+      ? requestedCapabilityContract.runtime_capability ?? requestedCapabilityContract.capability
     : family === "live_source" &&
       rules.includes("do_not_change_cadence_without_affirmative_operator_command")
         ? "inspect_live_source"
@@ -662,7 +663,10 @@ export const buildCapabilityPlan = (input: {
           requested_capability_source:
             readString(toolCallAdmissionDecision?.requested_capability_source) || "explicit_user_command",
           requested_capability_contract_ref: requestedCapabilityContract.schema,
-          requested_selected_match: requestedAction === phaseFilteredPlan.selectedCapability,
+          requested_selected_match: explicitCapabilityMatches(
+            requestedCapabilityContract.capability,
+            phaseFilteredPlan.selectedCapability,
+          ),
         }
       : {}),
     mutating,

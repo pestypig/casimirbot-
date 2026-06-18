@@ -731,6 +731,7 @@ export function buildToolCallAdmissionDecision(input: {
     : false;
   const routeArbitrationGuardVersion = explicitCapabilityContract ? "E82" as const : "E80" as const;
   const routeArbitrationSelectedCapability =
+    explicitCapabilityContract?.runtime_capability ??
     explicitCapabilityContract?.capability ??
     mandatoryToolName ??
     (mandatoryCalculatorSolve ? "scientific-calculator.solve_expression" : null);

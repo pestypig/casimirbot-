@@ -2127,6 +2127,7 @@ const recordLiveEnvironmentGoalContextUpdate = (input: {
 
 type WorkstationContextFeedQuerySpec = {
   feedKind: "visual_summaries" | "audio_transcripts" | "translated_transcripts" | "microdeck_outputs" | "live_answer_lines";
+  actuator: AgentGoalActuatorV1;
   label: string;
   producerKinds: GoalContextProducerKindV1[];
   updateKinds: GoalContextUpdateKindV1[];
@@ -2135,30 +2136,35 @@ type WorkstationContextFeedQuerySpec = {
 const WORKSTATION_CONTEXT_FEED_QUERY_SPECS: Partial<Record<HelixLiveEnvironmentToolName, WorkstationContextFeedQuerySpec>> = {
   "live_env.query_visual_summaries": {
     feedKind: "visual_summaries",
+    actuator: "query_visual_summaries",
     label: "visual summaries",
     producerKinds: ["visual_capture"],
     updateKinds: ["visual_observation", "classification", "summary"],
   },
   "live_env.query_audio_transcripts": {
     feedKind: "audio_transcripts",
+    actuator: "query_audio_transcripts",
     label: "audio transcripts",
     producerKinds: ["audio_capture", "transcription_loop"],
     updateKinds: ["transcript_window"],
   },
   "live_env.query_translation_segments": {
     feedKind: "translated_transcripts",
+    actuator: "query_translation_segments",
     label: "translation segments",
     producerKinds: ["translation_loop"],
     updateKinds: ["translated_transcript"],
   },
   "live_env.query_microdeck_outputs": {
     feedKind: "microdeck_outputs",
+    actuator: "query_microdeck_outputs",
     label: "MicroDeck outputs",
     producerKinds: ["microdeck"],
     updateKinds: ["summary", "visual_observation", "classification", "translated_transcript", "route_evidence", "reflection"],
   },
   "live_env.query_live_answer_state": {
     feedKind: "live_answer_lines",
+    actuator: "query_live_answer_state",
     label: "Live Answer state",
     producerKinds: ["live_answer"],
     updateKinds: ["summary", "preset_state", "source_status", "route_evidence"],
@@ -2173,6 +2179,11 @@ const goalSessionFeedAllowed = (
   session: AgentGoalSessionV1 | null,
   feedKind: WorkstationContextFeedQuerySpec["feedKind"],
 ): boolean => Boolean(session?.contextFeeds.some((feed) => feed.sourceKind === feedKind));
+
+const goalSessionActuatorAllowed = (
+  session: AgentGoalSessionV1 | null,
+  actuator: AgentGoalActuatorV1,
+): boolean => Boolean(session?.allowedActuators.includes(actuator));
 
 type WorkstationControlSpec = {
   controlKind:
@@ -2223,7 +2234,22 @@ const readWorkstationControlSpec = (
   toolName: HelixLiveEnvironmentToolName,
 ): WorkstationControlSpec | null => WORKSTATION_CONTROL_SPECS[toolName] ?? null;
 
-const workstationControlActuator = (spec: WorkstationControlSpec): AgentGoalActuatorV1 => spec.controlKind;
+const workstationControlActuator = (
+  spec: WorkstationControlSpec,
+  loopState: "paused" | "running" | "repaired" | null,
+): AgentGoalActuatorV1 => {
+  if (spec.controlKind !== "set_loop_state") return spec.controlKind;
+  if (loopState === "paused") return "pause_loop";
+  if (loopState === "running") return "resume_loop";
+  if (loopState === "repaired") return "repair_source";
+  return "set_loop_state";
+};
+
+const workstationControlFallbackActuator = (
+  spec: WorkstationControlSpec,
+  actuator: AgentGoalActuatorV1,
+): AgentGoalActuatorV1 | null =>
+  spec.controlKind === "set_loop_state" && actuator !== "set_loop_state" ? "set_loop_state" : null;
 
 const filterDeniedControlDispatch = (
   dispatch: WorkstationDispatchActionV1[],
@@ -3046,7 +3072,8 @@ export function executeLiveEnvironmentTool(
       lineKey: controlDispatch.lineKey,
     });
     const goalId = readString(args.goal_id) ?? readString(args.goalId);
-    const actuator = workstationControlActuator(workstationControlSpec);
+    const actuator = workstationControlActuator(workstationControlSpec, controlDispatch.loopState);
+    const fallbackActuator = workstationControlFallbackActuator(workstationControlSpec, actuator);
     const goalSession = goalId
       ? listStagePlayAgentGoalSessions({
           threadId: scope.mailboxThreadResolution.mailboxThreadId,
@@ -3054,7 +3081,10 @@ export function executeLiveEnvironmentTool(
           limit: 1,
         })[0] ?? null
       : null;
-    const actuatorAllowed = !goalId || Boolean(goalSession?.allowedActuators.includes(actuator));
+    const actuatorAllowed = !goalId || Boolean(
+      goalSession?.allowedActuators.includes(actuator) ||
+      (fallbackActuator && goalSession?.allowedActuators.includes(fallbackActuator))
+    );
     const authorizationMissing = goalId
       ? goalSession
         ? actuatorAllowed
@@ -5171,11 +5201,13 @@ export function executeLiveEnvironmentTool(
         })[0] ?? null
       : null;
     const feedAllowed = !goalId || goalSessionFeedAllowed(goalSession, feedQuerySpec.feedKind);
+    const actuatorAllowed = !goalId || goalSessionActuatorAllowed(goalSession, feedQuerySpec.actuator);
     const feedMissingRequirements = goalId
       ? goalSession
-        ? feedAllowed
-          ? []
-          : [`context_feed:${feedQuerySpec.feedKind}`]
+        ? [
+            ...(feedAllowed ? [] : [`context_feed:${feedQuerySpec.feedKind}`]),
+            ...(actuatorAllowed ? [] : [`allowed_actuator:${feedQuerySpec.actuator}`]),
+          ]
         : ["goal_session"]
       : [];
     const ok = feedMissingRequirements.length === 0;
@@ -5318,6 +5350,10 @@ export function executeLiveEnvironmentTool(
         goal_session_found: goalId ? Boolean(goalSession) : null,
         feedAllowed,
         feed_allowed: feedAllowed,
+        requiredActuator: feedQuerySpec.actuator,
+        required_actuator: feedQuerySpec.actuator,
+        actuatorAllowed,
+        actuator_allowed: actuatorAllowed,
         goalContextUpdates,
         goal_context_updates: goalContextUpdates,
         updateCount: goalContextUpdates.length,
@@ -5349,6 +5385,25 @@ export function executeLiveEnvironmentTool(
 
   if (input.tool_name === "live_env.query_trace_memory") {
     const limit = Math.max(1, Math.min(readNumber(args.limit, 12), 50));
+    const goalId = readString(args.goal_id) ?? readString(args.goalId);
+    const goalSession = goalId
+      ? listStagePlayAgentGoalSessions({
+          threadId: input.thread_id,
+          goalId,
+          limit: 1,
+        })[0] ?? null
+      : null;
+    const feedAllowed = !goalId || goalSessionFeedAllowed(goalSession, "trace_memory");
+    const actuatorAllowed = !goalId || goalSessionActuatorAllowed(goalSession, "query_trace_memory");
+    const feedMissingRequirements = goalId
+      ? goalSession
+        ? [
+            ...(feedAllowed ? [] : ["context_feed:trace_memory"]),
+            ...(actuatorAllowed ? [] : ["allowed_actuator:query_trace_memory"]),
+          ]
+        : ["goal_session"]
+      : [];
+    const ok = feedMissingRequirements.length === 0;
     const traceId =
       readString(args.trace_id) ??
       readString(args.traceId) ??
@@ -5356,11 +5411,11 @@ export function executeLiveEnvironmentTool(
       readString(args.targetTraceId);
     const turnId = readString(args.turn_id) ?? readString(args.turnId);
     const traceById = traceId ? getWorkstationReasoningTrace(traceId) : null;
-    const traces = traceId
+    const traces = ok ? (traceId
       ? (traceById ? [traceById] : [])
       : listWorkstationReasoningTraces({ threadId: input.thread_id, limit })
           .filter((trace) => !turnId || trace.turn_id === turnId)
-          .slice(-limit);
+          .slice(-limit)) : [];
     const selectedTrace = traces.at(-1) ?? null;
     const traceRefs = traces.map((trace) => trace.trace_id);
     const evidenceRefs = uniqueStrings([
@@ -5382,9 +5437,11 @@ export function executeLiveEnvironmentTool(
       producerKind: "route_watch",
       updateKind: "route_evidence",
       contentRef: resultId,
-      preview: selectedTrace
-        ? `Trace memory selected ${selectedTrace.trace_id}; proof ${selectedTrace.proof_status}, scope ${selectedTrace.scope_match}.`
-        : "Trace memory query found no workstation reasoning traces for this scope.",
+      preview: ok
+        ? selectedTrace
+          ? `Trace memory selected ${selectedTrace.trace_id}; proof ${selectedTrace.proof_status}, scope ${selectedTrace.scope_match}.`
+          : "Trace memory query found no workstation reasoning traces for this scope."
+        : `Blocked trace memory query; missing ${feedMissingRequirements.join(", ")}.`,
       sourceRefs: uniqueStrings([
         input.thread_id,
         selectedTrace?.source_family,
@@ -5397,10 +5454,10 @@ export function executeLiveEnvironmentTool(
       ]),
       evidenceRefs,
       receiptRefs: [resultId, ...traceRefs],
-      freshnessStatus: traces.length > 0 ? "fresh" : "unknown",
+      freshnessStatus: ok ? (traces.length > 0 ? "fresh" : "unknown") : "blocked",
       suggestedDispatch: [
         { kind: "log_receipt", receiptRef: resultId },
-        { kind: "append_goal_context", goalId: `trace_memory:${input.thread_id}` },
+        ...(ok ? [{ kind: "append_goal_context" as const, goalId: goalId ?? `trace_memory:${input.thread_id}` }] : []),
         { kind: "update_panel", panelId: "stage-play-badge-graph" },
       ],
     });
@@ -5408,10 +5465,12 @@ export function executeLiveEnvironmentTool(
       threadId: input.thread_id,
       environmentId: input.environment_id,
       toolName: input.tool_name,
-      ok: true,
-      summary: selectedTrace
-        ? `Read ${traces.length} compact workstation reasoning trace(s); selected ${selectedTrace.trace_id}.`
-        : "No compact workstation reasoning traces were found for this scope.",
+      ok,
+      summary: ok
+        ? selectedTrace
+          ? `Read ${traces.length} compact workstation reasoning trace(s); selected ${selectedTrace.trace_id}.`
+          : "No compact workstation reasoning traces were found for this scope."
+        : `Cannot read trace memory; missing ${feedMissingRequirements.join(", ")}.`,
       observation: {
         schema: "helix.workstation_reasoning_trace_query_result.v1",
         resultId,
@@ -5423,6 +5482,19 @@ export function executeLiveEnvironmentTool(
         selectedTrace,
         selected_trace: selectedTrace,
         trace_count: traces.length,
+        goalId,
+        goal_id: goalId,
+        status: ok ? "read" : "blocked",
+        missingRequirements: feedMissingRequirements,
+        missing_requirements: feedMissingRequirements,
+        goalSessionFound: goalId ? Boolean(goalSession) : null,
+        goal_session_found: goalId ? Boolean(goalSession) : null,
+        feedAllowed,
+        feed_allowed: feedAllowed,
+        requiredActuator: "query_trace_memory",
+        required_actuator: "query_trace_memory",
+        actuatorAllowed,
+        actuator_allowed: actuatorAllowed,
         goalContextUpdateId,
         goal_context_update_id: goalContextUpdateId,
         post_tool_model_step_required: true,
@@ -7689,11 +7761,31 @@ export function executeLiveEnvironmentTool(
   }
 
   if (input.tool_name === "live_env.query_source_health") {
+    const goalId = readString(args.goal_id) ?? readString(args.goalId);
+    const goalSession = goalId
+      ? listStagePlayAgentGoalSessions({
+          threadId: input.thread_id,
+          goalId,
+          limit: 1,
+        })[0] ?? null
+      : null;
+    const feedAllowed = !goalId || goalSessionFeedAllowed(goalSession, "source_health");
+    const actuatorAllowed = !goalId || goalSessionActuatorAllowed(goalSession, "query_source_health");
+    const feedMissingRequirements = goalId
+      ? goalSession
+        ? [
+            ...(feedAllowed ? [] : ["context_feed:source_health"]),
+            ...(actuatorAllowed ? [] : ["allowed_actuator:query_source_health"]),
+          ]
+        : ["goal_session"]
+      : [];
+    const ok = feedMissingRequirements.length === 0;
     const result = readSituationSourceCapabilities({
       threadId: input.thread_id,
       roomId,
     });
     const sourceRefs = result.capabilities.map((capability) => capability.source_id);
+    const visibleResult = ok ? result : { ...result, capabilities: [] };
     const blockedCapabilities = result.capabilities.filter((capability) => capability.status !== "active");
     const contentRef = `stage_play_source_health:${hashShort([
       input.thread_id,
@@ -7708,34 +7800,51 @@ export function executeLiveEnvironmentTool(
       producerKind: "source_health",
       updateKind: "source_status",
       contentRef,
-      preview: result.capabilities.length > 0
-        ? `Source health read ${result.capabilities.length} capability state(s): ${result.capabilities
-            .slice(0, 4)
-            .map((capability) => `${capability.modality} ${capability.status}`)
-            .join("; ")}.`
-        : "Source health read found no registered source capability state.",
-      sourceRefs,
-      loopRefs: sourceRefs.map((sourceRef) => `source_health:${sourceRef}`),
-      evidenceRefs: sourceRefs,
+      preview: ok
+        ? result.capabilities.length > 0
+          ? `Source health read ${result.capabilities.length} capability state(s): ${result.capabilities
+              .slice(0, 4)
+              .map((capability) => `${capability.modality} ${capability.status}`)
+              .join("; ")}.`
+          : "Source health read found no registered source capability state."
+        : `Blocked source health query; missing ${feedMissingRequirements.join(", ")}.`,
+      sourceRefs: ok ? sourceRefs : [input.thread_id],
+      loopRefs: ok ? sourceRefs.map((sourceRef) => `source_health:${sourceRef}`) : [`source_health:${input.thread_id}`],
+      evidenceRefs: ok ? sourceRefs : [contentRef, input.thread_id],
       receiptRefs: [contentRef],
-      freshnessStatus: blockedCapabilities.length > 0 ? "blocked" : "fresh",
+      freshnessStatus: ok ? (blockedCapabilities.length > 0 ? "blocked" : "fresh") : "blocked",
       suggestedDispatch: [
         { kind: "log_receipt", receiptRef: contentRef },
         { kind: "update_panel", panelId: "stage-play-badge-graph" },
-        ...blockedCapabilities.slice(0, 2).map((capability): WorkstationDispatchActionV1 => ({
+        ...(ok ? blockedCapabilities.slice(0, 2).map((capability): WorkstationDispatchActionV1 => ({
           kind: "repair_loop",
           loopRef: `source_health:${capability.source_id}`,
-        })),
+        })) : []),
       ],
     });
     return makeObservation({
       threadId: input.thread_id,
       environmentId: input.environment_id,
       toolName: input.tool_name,
-      ok: true,
-      summary: `Read ${result.capabilities.length} source capability state(s).`,
+      ok,
+      summary: ok
+        ? `Read ${result.capabilities.length} source capability state(s).`
+        : `Cannot read source health; missing ${feedMissingRequirements.join(", ")}.`,
       observation: {
-        ...result,
+        ...visibleResult,
+        goalId,
+        goal_id: goalId,
+        status: ok ? "read" : "blocked",
+        missingRequirements: feedMissingRequirements,
+        missing_requirements: feedMissingRequirements,
+        goalSessionFound: goalId ? Boolean(goalSession) : null,
+        goal_session_found: goalId ? Boolean(goalSession) : null,
+        feedAllowed,
+        feed_allowed: feedAllowed,
+        requiredActuator: "query_source_health",
+        required_actuator: "query_source_health",
+        actuatorAllowed,
+        actuator_allowed: actuatorAllowed,
         goalContextUpdateId,
         goal_context_update_id: goalContextUpdateId,
         post_tool_model_step_required: true,

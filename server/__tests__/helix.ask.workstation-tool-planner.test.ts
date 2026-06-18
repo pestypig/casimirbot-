@@ -789,7 +789,7 @@ describe("Helix Ask workstation tool planner", () => {
 
   it("routes explicit live_env narrator.say through ask-tool goal-context receipts", () => {
     const plan = planWorkstationToolUse(
-      'Run live_env.narrator_say text="Translation is now routed through Narrator." source_id=helix_ask:translation delivery_mode=confirm_to_speak.',
+      'Run live_env.narrator_say goal_id=goal:translate text="Translation is now routed through Narrator." source_id=helix_ask:translation delivery_mode=confirm_to_speak.',
       { threadId: "thread:narrator-live-say", turnId: "turn:narrator-live-say" },
     );
 
@@ -803,6 +803,10 @@ describe("Helix Ask workstation tool planner", () => {
     expect(plan.tool_plan?.steps[0]).toMatchObject({
       kind: "run_ask_tool",
       tool_id: "live_env.narrator_say",
+      args: expect.objectContaining({
+        goal_id: "goal:translate",
+        source_id: "helix_ask:translation",
+      }),
       expected_receipt_kind: "helix.narrator_say_request.v1",
       expected_state_change: {
         store: "stage-play-goal-context",
@@ -814,7 +818,7 @@ describe("Helix Ask workstation tool planner", () => {
 
   it("routes explicit live_env narrator.bind_stream through ask-tool goal-context receipts", () => {
     const plan = planWorkstationToolUse(
-      "Run live_env.narrator_bind_stream source_ref=source:browser-audio stream_kind=translated_transcript delivery_mode=visible_only.",
+      "Run live_env.narrator_bind_stream goal_id=goal:translate source_ref=source:browser-audio stream_kind=translated_transcript delivery_mode=visible_only.",
       { threadId: "thread:narrator-live-bind", turnId: "turn:narrator-live-bind" },
     );
 
@@ -829,6 +833,7 @@ describe("Helix Ask workstation tool planner", () => {
       kind: "run_ask_tool",
       tool_id: "live_env.narrator_bind_stream",
       args: expect.objectContaining({
+        goal_id: "goal:translate",
         source_ref: "source:browser-audio",
         stream_kind: "translated_transcript",
         delivery_mode: "visible_only",
@@ -913,14 +918,26 @@ describe("Helix Ask workstation tool planner", () => {
           expect.objectContaining({ source_kind: "route_evidence" }),
         ]),
         allowed_actuators: expect.arrayContaining([
+          "query_visual_summaries",
+          "query_audio_transcripts",
+          "query_translation_segments",
+          "query_microdeck_outputs",
+          "query_live_answer_state",
+          "query_source_health",
           "set_audio_preset",
           "set_visual_preset",
+          "change_preset",
+          "bind_source",
+          "unbind_source",
           "bind_narrator",
           "narrator_bind_stream",
           "narrator_say",
           "update_live_answer",
           "query_trace_memory",
           "pause_loop",
+          "resume_loop",
+          "set_loop_state",
+          "focus_process_graph",
           "repair_source",
           "ask_user",
         ]),
@@ -936,7 +953,7 @@ describe("Helix Ask workstation tool planner", () => {
 
   it("routes trace-memory inspection to non-terminal trace-memory query evidence", () => {
     const plan = planWorkstationToolUse(
-      "Show the latest workstation reasoning trace memory for this goal.",
+      "Show trace memory goal_id=goal:frog-monitor trace_id=trace:frog.",
       { threadId: "thread:trace-memory", turnId: "turn:trace-memory" },
     );
 
@@ -950,6 +967,10 @@ describe("Helix Ask workstation tool planner", () => {
     expect(plan.tool_plan?.steps[0]).toMatchObject({
       kind: "run_ask_tool",
       tool_id: "live_env.query_trace_memory",
+      args: expect.objectContaining({
+        goal_id: "goal:frog-monitor",
+        trace_id: "trace:frog",
+      }),
       expected_receipt_kind: "helix.workstation_reasoning_trace_query_result",
       required: true,
     });
@@ -1002,7 +1023,7 @@ describe("Helix Ask workstation tool planner", () => {
 
   it("routes affirmative workstation control prompts to governed control receipts", () => {
     const presetPlan = planWorkstationToolUse(
-      "Run live_env.change_workstation_preset target_ref=source:visual:active preset_id=preset:frog-classifier",
+      "Run live_env.change_workstation_preset goal_id=goal:frog target_ref=source:visual:active preset_id=preset:frog-classifier",
       { threadId: "thread:workstation-control", turnId: "turn:workstation-control" },
     );
     expect(presetPlan.intent).toBe("workstation_control");
@@ -1017,6 +1038,7 @@ describe("Helix Ask workstation tool planner", () => {
       kind: "run_ask_tool",
       tool_id: "live_env.change_workstation_preset",
       args: expect.objectContaining({
+        goal_id: "goal:frog",
         target_ref: "source:visual:active",
         preset_id: "preset:frog-classifier",
       }),

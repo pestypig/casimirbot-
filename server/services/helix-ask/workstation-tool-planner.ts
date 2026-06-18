@@ -914,6 +914,7 @@ function buildNarratorControlPlan(
   const args =
     kind === "bind_stream"
       ? {
+          ...(extractNamedArg(normalized, ["goal_id", "goal id"]) ? { goal_id: extractNamedArg(normalized, ["goal_id", "goal id"]) } : {}),
           source_ref: sourceRef,
           stream_kind: streamKind,
           delivery_mode: extractNamedArg(normalized, ["delivery_mode", "delivery mode"]) ?? "visible_only",
@@ -921,6 +922,7 @@ function buildNarratorControlPlan(
           ...(extractNamedArg(normalized, ["preset_id", "preset id"]) ? { preset_id: extractNamedArg(normalized, ["preset_id", "preset id"]) } : {}),
         }
       : {
+          ...(extractNamedArg(normalized, ["goal_id", "goal id"]) ? { goal_id: extractNamedArg(normalized, ["goal_id", "goal id"]) } : {}),
           text,
           source_kind: extractNamedArg(normalized, ["source_kind", "source kind"]) ?? "helix_console",
           source_id: extractNamedArg(normalized, ["source_id", "source id"]) ?? "helix_ask:narrator.say",
@@ -1327,6 +1329,7 @@ function workstationControlMissingRequirements(toolId: WorkstationControlTool, a
 }
 
 function buildWorkstationControlArgs(prompt: string, toolId: WorkstationControlTool): Record<string, unknown> {
+  const goalId = extractNamedArg(prompt, ["goal_id", "goal id"]);
   const targetRef = extractNamedArg(prompt, ["target_ref", "target ref", "target_id", "target id", "panel_id", "panel id"]);
   const sourceRef = extractNamedArg(prompt, ["source_ref", "source ref", "source_id", "source id"]);
   const presetId = extractNamedArg(prompt, ["preset_id", "preset id", "preset"]);
@@ -1335,6 +1338,7 @@ function buildWorkstationControlArgs(prompt: string, toolId: WorkstationControlT
   const panelId = extractNamedArg(prompt, ["panel_id", "panel id"]);
   const nodeRef = extractNamedArg(prompt, ["node_ref", "node ref", "node_id", "node id"]);
   return {
+    ...(goalId ? { goal_id: goalId } : {}),
     ...(targetRef ? { target_ref: targetRef } : {}),
     ...(sourceRef ? { source_ref: sourceRef } : {}),
     ...(presetId ? { preset_id: presetId } : {}),
@@ -1492,6 +1496,7 @@ function buildWorkstationGoalContextPlan(
   };
   const traceQueryArgs = {
     thread_id: threadId,
+    goal_id: extractNamedArg(normalized, ["goal_id", "goal id"]) ?? undefined,
     trace_id: extractNamedArg(normalized, ["trace_id", "trace id"]) ?? undefined,
     turn_id: extractNamedArg(normalized, ["turn_id", "turn id"]) ?? undefined,
     limit: 12,
@@ -1517,14 +1522,26 @@ function buildWorkstationGoalContextPlan(
       { source_kind: "route_evidence", freshness_ms: 60_000, relevance_policy: "same-goal-or-route" },
     ],
     allowed_actuators: [
+      "query_visual_summaries",
+      "query_audio_transcripts",
+      "query_translation_segments",
+      "query_microdeck_outputs",
+      "query_live_answer_state",
+      "query_source_health",
       "set_audio_preset",
       "set_visual_preset",
+      "change_preset",
+      "bind_source",
+      "unbind_source",
       "bind_narrator",
       "narrator_bind_stream",
       "narrator_say",
       "update_live_answer",
       "query_trace_memory",
       "pause_loop",
+      "resume_loop",
+      "set_loop_state",
+      "focus_process_graph",
       "repair_source",
       "ask_user",
     ],
