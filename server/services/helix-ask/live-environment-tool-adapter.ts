@@ -5237,6 +5237,7 @@ export function executeLiveEnvironmentTool(
         allowedActuators: readAgentGoalAllowedActuators(args.allowed_actuators ?? args.allowedActuators),
         cadence: readAgentGoalCadence(args),
         stopConditions: readStringArray(args.stop_conditions ?? args.stopConditions),
+        finalReportRequirements: readAgentGoalFinalReportRequirements(args),
         checkpoint: readAgentGoalCheckpoint(args),
       });
       return makeObservation({
