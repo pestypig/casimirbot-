@@ -103,28 +103,33 @@ describe("Stage Play world-state badge reducer", () => {
           freshnessMs: 30000,
         },
         {
-          feedId: "feed:route",
-          sourceKind: "route_evidence",
+          feedId: "feed:automation",
+          sourceKind: "automation_policies",
           freshnessMs: 120000,
         },
+        {
+          feedId: "feed:translation",
+          sourceKind: "translated_transcripts",
+          freshnessMs: 45000,
+        },
       ],
-      allowedActuators: ["query_visual_summaries", "configure_route_watch", "focus_process_graph"],
+      allowedActuators: ["query_visual_summaries", "query_translation_segments", "configure_route_watch", "focus_process_graph", "narrator_bind_stream"],
       cadence: { kind: "event_accumulation", minUpdates: 2 },
       checkpoint: {
         summary: "Route-watch automation attached to goal-context circuit.",
-        evidenceRefs: ["stage_play_goal_context_update:route_watch:goal-circuit"],
+        evidenceRefs: ["stage_play_goal_context_update:automation:goal-circuit"],
         actionsTaken: ["configure_route_watch"],
       },
       nowMs: Date.parse("2026-06-17T14:00:00.000Z"),
     });
     recordStagePlayGoalContextUpdate({
       schemaVersion: WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
-      updateId: "stage_play_goal_context_update:route_watch:goal-circuit",
+      updateId: "stage_play_goal_context_update:automation:goal-circuit",
       createdAtMs: Date.parse("2026-06-17T14:00:01.000Z"),
       sourceRefs: [sourceId],
       loopRefs: [`thread:${threadId}`, loopRef],
-      producerKind: "route_watch",
-      updateKind: "source_status",
+      producerKind: "automation",
+      updateKind: "automation_status",
       contentRef: "stage_play_live_source_watch_job_policy:goal-circuit",
       preview: "Configured route-watch automation as deterministic goal-context evidence.",
       evidenceRefs: [
@@ -140,12 +145,53 @@ describe("Stage Play world-state badge reducer", () => {
       goalRelevance: {
         goalId,
         relevance: 0.82,
-        reason: "Route-watch automation contributes deterministic process state for this goal.",
+        reason: "Automation policy contributes deterministic process state for this goal.",
       },
       suggestedDispatch: [
         { kind: "log_receipt", receiptRef: "stage_play_live_source_watch_job_policy:goal-circuit" },
         { kind: "update_panel", panelId: "stage-play-badge-graph" },
         { kind: "set_loop_state", loopRef, state: "running" },
+      ],
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    recordStagePlayGoalContextUpdate({
+      schemaVersion: WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
+      updateId: "stage_play_goal_context_update:translation:goal-circuit",
+      createdAtMs: Date.parse("2026-06-17T14:00:01.500Z"),
+      sourceRefs: [sourceId, "audio_source:earbuds"],
+      loopRefs: [`thread:${threadId}`, "translation_loop:earbuds"],
+      producerKind: "translation_loop",
+      updateKind: "translated_transcript",
+      contentRef: "stage_play_processed_mail_packet:earbud-translation",
+      preview: "Translated transcript candidate is ready for Live Answer and Narrator output.",
+      evidenceRefs: [
+        "stage_play_processed_mail_packet:earbud-translation",
+        "microdeck_output:earbud-translation",
+      ],
+      receiptRefs: ["stage_play_context_feed_query:translated_transcripts:goal-circuit"],
+      freshness: {
+        observedAtMs: Date.parse("2026-06-17T14:00:01.500Z"),
+        staleAfterMs: 45000,
+        status: "fresh",
+      },
+      goalRelevance: {
+        goalId,
+        relevance: 0.78,
+        reason: "Translated transcript feeds the goal session without becoming a terminal answer.",
+      },
+      suggestedDispatch: [
+        { kind: "update_live_answer", lineKey: "line:earbud-translation" },
+        {
+          kind: "bind_narrator_stream",
+          sourceRef: "audio_source:earbuds",
+          streamKind: "translated_transcript",
+          deliveryMode: "visible_only",
+        },
       ],
       authority: {
         assistantAnswer: false,
@@ -173,7 +219,7 @@ describe("Stage Play world-state badge reducer", () => {
         dataTray: expect.objectContaining({
           transformLabel: "goal context update index",
           outputRefs: expect.arrayContaining([
-            "stage_play_goal_context_update:route_watch:goal-circuit",
+            "stage_play_goal_context_update:automation:goal-circuit",
             goalId,
           ]),
         }),
@@ -196,16 +242,16 @@ describe("Stage Play world-state badge reducer", () => {
         sourceRefs: expect.arrayContaining([
           expect.objectContaining({
             kind: "workstation_goal_context_update",
-            id: "stage_play_goal_context_update:route_watch:goal-circuit",
+            id: "stage_play_goal_context_update:automation:goal-circuit",
           }),
         ]),
         reasonCodes: expect.arrayContaining([
           "goal_context_update",
-          "route_watch",
+          "automation",
           "observation_not_terminal_authority",
         ]),
         dataTray: expect.objectContaining({
-          transformLabel: "route_watch -> source_status",
+          transformLabel: "automation -> automation_status",
           outputPreview: expect.stringContaining("set_loop_state"),
           skipped: expect.arrayContaining([
             "assistant_answer=false",
@@ -215,9 +261,14 @@ describe("Stage Play world-state badge reducer", () => {
         }),
       }),
     ]));
-    const updateBadge = graph.badges.find((badge) => badge.kind === "goal_context_update");
+    const updateBadge = graph.badges.find((badge) => badge.kind === "goal_context_update" && badge.subjects.includes("stage_play_goal_context_update:automation:goal-circuit"));
+    const translationUpdateBadge = graph.badges.find((badge) =>
+      badge.kind === "goal_context_update" &&
+      badge.subjects.includes("stage_play_goal_context_update:translation:goal-circuit")
+    );
     const sessionBadge = graph.badges.find((badge) => badge.kind === "agent_goal_session");
     expect(updateBadge?.admission).toBe("auto");
+    expect(translationUpdateBadge?.admission).toBe("auto");
     expect(sessionBadge?.admission).toBe("auto");
     expect(graph.edges).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -226,13 +277,54 @@ describe("Stage Play world-state badge reducer", () => {
         relation: "contains",
       }),
       expect.objectContaining({
+        from: sessionBadge?.id,
+        to: "workstation_state_plane.control_signals",
+        relation: "constrains",
+        reasonCodes: expect.arrayContaining(["agent_goal_session_bounds_control_signals"]),
+      }),
+      expect.objectContaining({
+        from: sessionBadge?.id,
+        to: "workstation_state_plane.output_bus",
+        relation: "constrains",
+        reasonCodes: expect.arrayContaining(["narrator_actuator_policy"]),
+      }),
+      expect.objectContaining({
         from: updateBadge?.id,
         to: sessionBadge?.id,
         relation: "feeds",
       }),
       expect.objectContaining({
         from: updateBadge?.id,
+        to: "workstation_state_plane.control_signals",
+        relation: "feeds",
+        reasonCodes: expect.arrayContaining(["automation_update_feeds_control"]),
+      }),
+      expect.objectContaining({
+        from: updateBadge?.id,
         to: "workstation_state_plane.process_loop",
+        relation: "feeds",
+      }),
+      expect.objectContaining({
+        from: translationUpdateBadge?.id,
+        to: "workstation_state_plane.source_bus",
+        relation: "feeds",
+        reasonCodes: expect.arrayContaining(["stream_goal_context_update_feeds_source_bus", "translation_loop"]),
+      }),
+      expect.objectContaining({
+        from: translationUpdateBadge?.id,
+        to: "workstation_state_plane.process_loop",
+        relation: "feeds",
+        reasonCodes: expect.arrayContaining(["stream_goal_context_update_feeds_process_loop", "translation_loop"]),
+      }),
+      expect.objectContaining({
+        from: translationUpdateBadge?.id,
+        to: "workstation_state_plane.output_bus",
+        relation: "feeds",
+        reasonCodes: expect.arrayContaining(["goal_context_update_feeds_output_bus", "translation_loop", "translated_transcript"]),
+      }),
+      expect.objectContaining({
+        from: translationUpdateBadge?.id,
+        to: sessionBadge?.id,
         relation: "feeds",
       }),
     ]));

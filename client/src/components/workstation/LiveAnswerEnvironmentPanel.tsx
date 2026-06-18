@@ -611,6 +611,9 @@ const liveAnswerFeedQueryUpdate = (update: WorkstationGoalContextUpdateV1): bool
   );
 };
 
+const liveAnswerAutomationUpdate = (update: WorkstationGoalContextUpdateV1): boolean =>
+  update.producerKind === "automation" || update.updateKind === "automation_status";
+
 const documentMarkdownSourceIdFromLocation = (threadId: string): string => {
   if (typeof window === "undefined") return `document_markdown:${threadId}`;
   const params = new URLSearchParams(window.location.search);
@@ -1752,6 +1755,21 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       narratorSpeechCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "speak_narrator").length,
       narratorBindingCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "bind_narrator_stream").length,
       wakeCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "wake_agent").length,
+      audioTranscriptCount: goalContextUpdates.filter((update: WorkstationGoalContextUpdateV1) =>
+        update.producerKind === "audio_capture" ||
+        update.producerKind === "transcription_loop" ||
+        update.updateKind === "transcript_window"
+      ).length +
+        agentGoalSessions.filter((session: AgentGoalSessionV1) =>
+          session.contextFeeds.some((feed) => feed.sourceKind === "audio_transcripts")
+        ).length,
+      translatedTranscriptCount: goalContextUpdates.filter((update: WorkstationGoalContextUpdateV1) =>
+        update.producerKind === "translation_loop" ||
+        update.updateKind === "translated_transcript"
+      ).length +
+        agentGoalSessions.filter((session: AgentGoalSessionV1) =>
+          session.contextFeeds.some((feed) => feed.sourceKind === "translated_transcripts")
+        ).length,
       packetTraceCount: goalContextUpdates.filter(liveAnswerPacketTraceUpdate).length +
         agentGoalSessions.filter((session: AgentGoalSessionV1) =>
           session.contextFeeds.some((feed) => feed.sourceKind === "packet_traces")
@@ -1765,6 +1783,17 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       feedQueryCount: goalContextUpdates.filter(liveAnswerFeedQueryUpdate).length +
         agentGoalSessions.reduce((count: number, session: AgentGoalSessionV1) => count + session.contextFeeds.length, 0),
       routeWatchCount: goalContextUpdates.filter((update: WorkstationGoalContextUpdateV1) => update.producerKind === "route_watch").length,
+      automationCount: goalContextUpdates.filter(liveAnswerAutomationUpdate).length +
+        agentGoalSessions.filter((session: AgentGoalSessionV1) =>
+          session.contextFeeds.some((feed) => feed.sourceKind === "automation_policies")
+        ).length,
+      actuatorPolicyCount: agentGoalSessions.reduce((count: number, session: AgentGoalSessionV1) => count + session.allowedActuators.length, 0),
+      narratorActuatorPolicyCount: agentGoalSessions.reduce(
+        (count: number, session: AgentGoalSessionV1) => count + session.allowedActuators.filter((actuator) =>
+          actuator === "bind_narrator" || actuator === "narrator_bind_stream" || actuator === "narrator_say"
+        ).length,
+        0,
+      ),
       traceMemoryCount: goalContextUpdates.filter(liveAnswerTraceMemoryUpdate).length +
         agentGoalSessions.filter((session: AgentGoalSessionV1) =>
           session.contextFeeds.some((feed) => feed.sourceKind === "trace_memory")

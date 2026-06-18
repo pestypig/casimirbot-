@@ -1,6 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { chromium, type Page } from "@playwright/test";
+import {
+  CODEX_PARITY_AGENT_SPINE_CLASSES,
+  CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES,
+  CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
+  CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES,
+  CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS,
+} from "../server/services/helix-ask/codex-parity-agent-spine-contract";
 
 type HarnessPrompt = {
   prompt: string;
@@ -47,22 +54,6 @@ const getPath = (value: unknown, pathParts: string[]): unknown =>
     return (current as Record<string, unknown>)[key];
   }, value);
 
-const CODEX_PARITY_AGENT_SPINE_CLASSES = [
-  "complete",
-  "tool_surface_missing",
-  "explicit_capability_demoted",
-  "tool_admission_rejected",
-  "selected_not_executed",
-  "observation_missing",
-  "observation_not_reentered",
-  "goal_contract_mismatch",
-  "terminal_product_not_allowed",
-  "terminal_authority_mismatch",
-  "visible_projection_mismatch",
-  "debug_mirror_stale",
-  "provider_config_missing",
-] as const;
-
 const collectCoverageArtifacts = (debugExport: Record<string, unknown> | null): unknown[] => {
   if (!debugExport) return [];
   if (Array.isArray(debugExport.coverage_artifacts)) return debugExport.coverage_artifacts;
@@ -85,11 +76,23 @@ const collectRailTableViolations = (
 ): string[] => {
   if (!railTable) return ["codex_parity_agent_spine_rail_table_missing"];
   const violations: string[] = [];
-  if (railTable.schema !== "helix.codex_parity_agent_spine_rail_table.v1") {
+  if (railTable.schema !== CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA) {
     violations.push("codex_parity_agent_spine_rail_table_schema_mismatch");
   }
   if (!Array.isArray(railTable.visible_tool_surface)) {
     violations.push("rail_visible_tool_surface_missing");
+  }
+  for (const key of CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS) {
+    const value = railTable[key];
+    if (value !== null && typeof value !== "string") {
+      violations.push(`rail_string_or_null_field_invalid:${key}`);
+    }
+  }
+  if (!CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES.includes(railTable.reentry_status as never)) {
+    violations.push("rail_reentry_status_invalid");
+  }
+  if (!CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES.includes(railTable.rail_status as never)) {
+    violations.push("rail_status_invalid");
   }
   const normalizedClasses = readStringArray(railTable.normalized_codex_parity_classes);
   if (JSON.stringify(normalizedClasses) !== JSON.stringify(CODEX_PARITY_AGENT_SPINE_CLASSES)) {

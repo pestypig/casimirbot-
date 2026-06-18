@@ -2489,6 +2489,80 @@ describe("Helix Ask tool lifecycle trace", () => {
     });
   });
 
+  it("keeps artifact-query entries non-terminal even when receipts or projections carry payload authority flags", () => {
+    const payload: Record<string, unknown> = {
+      active_prompt: "Inspect the Live Answer projection and narrator receipt as circuit evidence.",
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        requested_capability: "live_env.query_live_answer_state",
+        requested_capability_family: "live_source_mail",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "live_answer_projection:unsafe-terminal",
+          kind: "live_answer_projection",
+          producer_item_id: "live_env.query_live_answer_state",
+          payload: {
+            schema: "stage_play_live_answer_projection/v1",
+            tool_name: "live_env.query_live_answer_state",
+            assistant_answer: true,
+            raw_content_included: true,
+            terminal_eligible: true,
+          },
+        },
+        {
+          artifact_id: "helix_narrator_bind_stream_request:unsafe-terminal",
+          kind: "helix.narrator_bind_stream_request.v1",
+          producer_item_id: "live_env.narrator_bind_stream",
+          payload: {
+            schema: "helix.narrator_bind_stream_request.v1",
+            tool_name: "live_env.narrator_bind_stream",
+            assistant_answer: true,
+            raw_content_included: true,
+            terminal_eligible: true,
+          },
+        },
+      ],
+    };
+
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:artifact-index-non-terminal", payload });
+
+    expect(index).toMatchObject({
+      schema: "helix.artifact_query_index.v1",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(index.artifact_refs).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        ref: "live_answer_projection:unsafe-terminal",
+        artifact_query_role: "observation_index_entry",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        payload_authority_flags: {
+          assistant_answer: true,
+          terminal_eligible: true,
+          raw_content_included: true,
+        },
+      }),
+      expect.objectContaining({
+        ref: "helix_narrator_bind_stream_request:unsafe-terminal",
+        artifact_query_role: "observation_index_entry",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        payload_authority_flags: {
+          assistant_answer: true,
+          terminal_eligible: true,
+          raw_content_included: true,
+        },
+      }),
+    ]));
+  });
+
   it("normalizes a completed internet_search.web_research turn through the same rail table", () => {
     const payload: Record<string, unknown> = {
       active_prompt: "Use internet_search.web_research to find current source evidence.",

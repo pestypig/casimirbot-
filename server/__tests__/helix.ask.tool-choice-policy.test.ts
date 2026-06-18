@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 import { decideHelixToolChoice } from "../services/helix-ask/tool-choice-policy";
 import { planWorkstationToolUse } from "../services/helix-ask/workstation-tool-planner";
@@ -23,7 +25,7 @@ describe("Helix Ask tool-choice policy", () => {
     ]);
   });
 
-  it("surfaces narrator panel action affordance ids for governed narrator control plans", () => {
+  it("surfaces live_env narrator affordance ids for governed narrator control plans", () => {
     const workstationPlan = planWorkstationToolUse(
       'Narrator say text="Translation is now routed through Narrator."',
       { threadId: "thread:narrator", turnId: "turn:narrator" },
@@ -37,8 +39,40 @@ describe("Helix Ask tool-choice policy", () => {
 
     expect(decision.decision).toBe("workstation_tool_plan");
     expect(decision.selected_affordance_ids).toEqual([
-      "narrator.open",
-      "narrator.narrator.say",
+      "live_env.narrator_say",
     ]);
+  });
+
+  it("keeps repair workstation source exposed in the top-level Ask live_env capability surface", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+    const repairCapability = "live_env.repair_workstation_source";
+
+    expect(agiPlanSource.match(new RegExp(`case "${repairCapability}"`, "g"))?.length ?? 0).toBeGreaterThanOrEqual(1);
+    expect(agiPlanSource).toContain(`"${repairCapability}",`);
+    expect(agiPlanSource).toContain(`capability_key: "${repairCapability}"`);
+    expect(agiPlanSource).toContain("Creates a governed source-repair control receipt");
+  });
+
+  it("keeps goal sessions, goal context, packet traces, and route evidence exposed in the top-level Ask live_env capability surface", () => {
+    const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
+    const capabilities = [
+      "live_env.start_agent_goal_session",
+      "live_env.query_workstation_goal_context",
+      "live_env.query_packet_traces",
+      "live_env.query_route_evidence",
+    ];
+
+    for (const capability of capabilities) {
+      expect(agiPlanSource.match(new RegExp(`case "${capability}"`, "g"))?.length ?? 0).toBeGreaterThanOrEqual(1);
+      expect(agiPlanSource).toContain(`"${capability}",`);
+      expect(agiPlanSource).toContain(`capability_key: "${capability}"`);
+    }
+
+    expect(agiPlanSource).toContain("context_feeds");
+    expect(agiPlanSource).toContain("allowed_actuators");
+    expect(agiPlanSource).toContain("producer_kind");
+    expect(agiPlanSource).toContain("update_kind");
+    expect(agiPlanSource).toContain("packet_id");
+    expect(agiPlanSource).toContain("route-watch GoalContextUpdate evidence");
   });
 });

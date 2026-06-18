@@ -8,6 +8,11 @@ import {
   explicitCapabilityContractForCapability,
   explicitCapabilityMatches,
 } from "./explicit-capability-contract";
+import {
+  CODEX_PARITY_AGENT_SPINE_CLASSES,
+  CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
+  type CodexParityAgentSpineClass,
+} from "./codex-parity-agent-spine-contract";
 
 type RecordLike = Record<string, unknown>;
 
@@ -68,20 +73,7 @@ type RepairTarget =
   | "agent_step_selection"
   | "repo_retrieval_repair_policy";
 
-type CodexParityClass =
-  | "complete"
-  | "tool_surface_missing"
-  | "explicit_capability_demoted"
-  | "tool_admission_rejected"
-  | "selected_not_executed"
-  | "observation_missing"
-  | "observation_not_reentered"
-  | "goal_contract_mismatch"
-  | "terminal_product_not_allowed"
-  | "terminal_authority_mismatch"
-  | "visible_projection_mismatch"
-  | "debug_mirror_stale"
-  | "provider_config_missing";
+type CodexParityClass = CodexParityAgentSpineClass;
 
 const TOOL_TURN_CHAIN_FAILURE_CODES: RailFailureCode[] = [
   "explicit_capability_not_selected",
@@ -112,22 +104,6 @@ const TOOL_TURN_CHAIN_MATRIX_FAMILIES = [
   "internet_search",
   "image_lens / visual_capture",
 ] as const;
-
-const CODEX_PARITY_AGENT_SPINE_CLASSES: CodexParityClass[] = [
-  "complete",
-  "tool_surface_missing",
-  "explicit_capability_demoted",
-  "tool_admission_rejected",
-  "selected_not_executed",
-  "observation_missing",
-  "observation_not_reentered",
-  "goal_contract_mismatch",
-  "terminal_product_not_allowed",
-  "terminal_authority_mismatch",
-  "visible_projection_mismatch",
-  "debug_mirror_stale",
-  "provider_config_missing",
-];
 
 const TERMINAL_RECEIPT_KINDS = new Set([
   "tool_receipt",
@@ -300,6 +276,7 @@ const runtimeLoopExecutedCapability = (payload: RecordLike): string | null => {
   const iterations = Array.isArray(loop?.iterations)
     ? loop.iterations.map((iteration) => readRecord(iteration)).filter((iteration): iteration is RecordLike => Boolean(iteration))
     : [];
+  let terminalModelCapability: string | null = null;
   for (const iteration of [...iterations].reverse()) {
     const chosen = readString(iteration.chosen_capability);
     const producedArtifacts = readStringArray(iteration.produced_artifacts);
@@ -308,12 +285,13 @@ const runtimeLoopExecutedCapability = (payload: RecordLike): string | null => {
       isModelAnswerCapability(chosen) &&
       producedArtifacts.some((artifactKind) => normalizedEqual(artifactKind, "direct_answer_text"))
     ) {
-      return chosen;
+      terminalModelCapability = terminalModelCapability ?? chosen;
+      continue;
     }
     const executed = nonModelToolCapability(iteration.executed_action_key);
     if (executed) return executed;
   }
-  return null;
+  return terminalModelCapability;
 };
 
 const capabilityFromPayload = (payload: RecordLike, lifecycleTrace: RecordLike | null): string | null => {
@@ -382,6 +360,9 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   }
   if (/helix_ask[-_.:]inspect_capability_catalog|capability_catalog_observation|capability_registry|helix\.capability_catalog_observation\.v1/.test(haystack)) {
     return "helix_ask.inspect_capability_catalog";
+  }
+  if (/situation[-_]room[-_.:]describe[-_]visual[-_]capture|situation_context_pack|helix\.situation_context_pack\.v1|visual_capture|image_lens/.test(haystack)) {
+    return "situation-room.describe_visual_capture";
   }
   if (/repo[-_]code[-_.:]search[-_]concept|repo_code_search|repo_code_evidence/.test(haystack)) {
     return "repo-code.search_concept";
@@ -598,6 +579,114 @@ const likelyInternetSearchConfigMissing = (payload: RecordLike, routeFamily: str
 
 const artifactForKind = (artifacts: RecordLike[], kind: string): RecordLike | null =>
   artifacts.find((artifact) => observationKindMatches(artifact, kind)) ?? null;
+
+const artifactSearchText = (artifact: RecordLike): string => {
+  const payload = artifactPayload(artifact);
+  return [
+    artifactRef(artifact),
+    readString(artifact.kind),
+    readString(artifact.schema),
+    readString(artifact.producer_item_id),
+    readString(artifact.source_scope),
+    readString(payload?.kind),
+    readString(payload?.schema),
+    readString(payload?.type),
+    readString(payload?.tool_name),
+    readString(payload?.capability),
+    readString(payload?.capability_key),
+  ].join("\n").toLowerCase();
+};
+
+const artifactSupportsCapabilityObservation = (artifact: RecordLike, capability: string | null): boolean => {
+  const normalizedCapability = normalize(capability);
+  if (!normalizedCapability) return false;
+  const text = artifactSearchText(artifact);
+  if (normalizedCapability === "scientific_calculator_solve_expression") {
+    return /scientific[-_]calculator[-_.:]solve[-_]expression|calculator_result|calculator_receipt|workstation_tool_evaluation/.test(text);
+  }
+  if (normalizedCapability === "docs_viewer_locate_in_doc") {
+    return /docs[-_]viewer[-_.:]locate[-_]in[-_]doc|doc_location|doc_evidence_location|agent_runtime_[^\s]*docs_viewer_locate_in_doc/.test(text);
+  }
+  if (normalizedCapability === "docs_viewer_summarize_doc") {
+    return /docs[-_]viewer[-_.:]summarize[-_]doc|doc_summary/.test(text);
+  }
+  if (normalizedCapability === "repo_code_search_concept") {
+    return /repo[-_]code[-_.:]search[-_]concept|repo_code_search|repo_code_evidence/.test(text);
+  }
+  if (normalizedCapability === "workspace_os_status") {
+    return /workspace[-_]os[-_.:]status|workspace_os_status|workspace_status|workstation_tool_evaluation/.test(text);
+  }
+  if (normalizedCapability === "workspace_directory_resolve") {
+    return /workspace[-_]directory[-_.:]resolve|workspace_directory_resolution/.test(text);
+  }
+  if (normalizedCapability === "internet_search_web_research") {
+    return /internet[-_]search[-_.:]web[-_]research|web_research_observation|internet_search_observation/.test(text);
+  }
+  if (normalizedCapability === "helix_ask_inspect_capability_catalog") {
+    return /capability_registry|capability_catalog_observation|helix\.capability_catalog_observation\.v1/.test(text);
+  }
+  if (normalizedCapability === "image_lens_inspect" || normalizedCapability === "situation_room_describe_visual_capture") {
+    return /situation_context_pack|helix\.situation_context_pack\.v1|situation[-_]room[-_.:]describe[-_]visual[-_]capture|visual_capture|image_lens/.test(text);
+  }
+  if (normalizedCapability.startsWith("live_env_")) {
+    return text.includes(normalizedCapability) || /stage_play|live_source|mail_packet|mailbox|live_env/.test(text);
+  }
+  return text.includes(normalizedCapability);
+};
+
+const artifactDisplayKind = (artifact: RecordLike): string | null =>
+  firstString(
+    artifact.kind,
+    artifact.schema,
+    artifactPayload(artifact)?.kind,
+    artifactPayload(artifact)?.schema,
+  );
+
+const capabilityObservationArtifact = (
+  artifacts: RecordLike[],
+  capability: string | null,
+  requiredKinds: string[],
+): RecordLike | null => {
+  const candidates = artifacts
+    .map((artifact, index) => {
+      const ref = artifactRef(artifact).toLowerCase();
+      const text = artifactSearchText(artifact);
+      const normalizedArtifactKind = normalize(artifact.kind);
+      const normalizedCapability = normalize(capability);
+      const requiredKindMatch = requiredKinds.some((kind) => observationKindMatches(artifact, kind));
+      const exactArtifactKindMatch = requiredKinds.some((kind) => normalizedArtifactKind === normalize(kind));
+      const capabilityMatch = artifactSupportsCapabilityObservation(artifact, capability);
+      const genericObservation = /(?:observation|evidence|result|receipt|context|trace|packet|resolution|reflection|registry|summary)/i.test(
+        artifactDisplayKind(artifact) ?? "",
+      );
+      let score = 0;
+      if (capabilityMatch) score += 100;
+      if (requiredKindMatch) score += 70;
+      if (exactArtifactKindMatch) score += 45;
+      if (genericObservation) score += 20;
+      if (normalizedCapability.startsWith("live_env_") && normalizedArtifactKind === "reasoning_context") score += 140;
+      if (ref.includes("agent_runtime")) score += 30;
+      if (ref.includes("runtime_tool_call")) score += 25;
+      if (ref.includes("model_step")) score -= 15;
+      if (/^(?:workspace_context|doc_context|active_doc_path|validation)$/.test(normalizedArtifactKind) && !exactArtifactKindMatch) score -= 25;
+      if (normalizedCapability.startsWith("live_env_") && normalizedArtifactKind === "runtime_tool_observation" && !exactArtifactKindMatch) {
+        score -= 85;
+      }
+      if (
+        normalizedCapability.startsWith("live_env_") &&
+        /^(?:runtime_tool_call|runtime_tool_call_validation)$/.test(normalizedArtifactKind) &&
+        !exactArtifactKindMatch
+      ) {
+        score -= 110;
+      }
+      if (/\bvalidation\b/.test(text) && !requiredKindMatch && !capabilityMatch) score -= 20;
+      if (normalize(artifact.kind) === "direct_answer_text" && nonModelToolCapability(capability)) score -= 100;
+      return { artifact, index, score };
+    })
+    .filter((entry) => entry.score > 0)
+    .sort((left, right) => right.score - left.score || left.index - right.index);
+  return candidates[0]?.artifact ?? null;
+};
 
 const explicitObservationCoverageMode = (capability: string | null): "all" | "any" => {
   const normalized = normalize(capability);
@@ -839,9 +928,21 @@ const buildToolTurnChainAudit = (input: {
   const runtimeToolCall = readRecord(input.payload.runtime_tool_call);
   const toolExecutionRejected = runtimeToolExecutionRejected(input.payload, input.artifacts);
   const capabilityCatalogArtifact = input.artifacts.find((artifact) => observationKindMatches(artifact, "capability_registry")) ?? null;
+  const requestedObservationKinds = unique([
+    ...readStringArray(admission?.required_observation_kinds_for_requested_capability),
+    ...(requestedCapabilityContract?.required_observation_kinds ?? []),
+  ]);
+  const selectedCapabilityObservationArtifact = capabilityObservationArtifact(
+    input.artifacts,
+    selectedCapability ?? requestedCapability ?? input.capability,
+    requestedObservationKinds,
+  );
   const rawExecutedCapability = firstString(
     selectedCapability === "helix_ask.inspect_capability_catalog" && capabilityCatalogArtifact
       ? "helix_ask.inspect_capability_catalog"
+      : null,
+    !contextualSuppression && selectedCapability && selectedCapabilityObservationArtifact && nonModelToolCapability(selectedCapability)
+      ? selectedCapability
       : null,
     runtimeLoopExecutedCapability(input.payload),
     nonModelToolCapability(input.lifecycleTrace?.executed_capability),
@@ -882,6 +983,8 @@ const buildToolTurnChainAudit = (input: {
       ? null
       : selectedCapability === "helix_ask.inspect_capability_catalog" && capabilityCatalogArtifact
         ? "capability_registry"
+      : selectedCapabilityObservationArtifact
+        ? artifactDisplayKind(selectedCapabilityObservationArtifact)
       : readString(observationCoverage?.kind) ||
         input.artifacts
           .map((artifact) => readString(artifact.kind) || readString(artifact.schema))
@@ -892,12 +995,10 @@ const buildToolTurnChainAudit = (input: {
       ? null
       : selectedCapability === "helix_ask.inspect_capability_catalog" && capabilityCatalogArtifact
         ? artifactRef(capabilityCatalogArtifact)
+      : selectedCapabilityObservationArtifact
+        ? artifactRef(selectedCapabilityObservationArtifact)
       : readStringArray(observationCoverage?.artifact_refs)[0] ||
         (observationArtifactKind ? artifactRef(artifactForKind(input.artifacts, observationArtifactKind) ?? {}) : null);
-  const requestedObservationKinds = unique([
-    ...readStringArray(admission?.required_observation_kinds_for_requested_capability),
-    ...(requestedCapabilityContract?.required_observation_kinds ?? []),
-  ]);
   const observedArtifactSupportsRequestedCapability =
     requestedObservationKinds.length === 0 ||
     input.artifacts.some((artifact) =>
@@ -1441,6 +1542,28 @@ const readAdmittedCapabilityEvidence = (
     readString(capabilityPlan?.admission_status) === "admitted" ||
     readString(capabilityPlan?.status) === "admitted" ||
     capabilityPlan?.admitted === true;
+  const auditExecutedCapability = nonModelToolCapability(audit.executed_capability);
+  const auditSelectedCapability = nonModelToolCapability(audit.selected_capability);
+  const auditObservationRef = readString(audit.observation_ref);
+  const staleModelAdmission = Boolean(
+    isModelAnswerCapability(admission?.admitted_capability) ||
+      isModelAnswerCapability(admission?.selected_capability) ||
+      isModelAnswerCapability(operationalTrace?.policy_admitted_capability),
+  );
+  if (auditExecutedCapability && staleModelAdmission) {
+    return {
+      capability: auditExecutedCapability,
+      source: "tool_turn_chain_audit.executed_capability",
+      proven: true,
+    };
+  }
+  if (auditSelectedCapability && auditObservationRef && staleModelAdmission) {
+    return {
+      capability: auditSelectedCapability,
+      source: "tool_turn_chain_audit.selected_capability_observation",
+      proven: true,
+    };
+  }
   const candidates: Array<{ capability: unknown; source: string }> = [
     { capability: admission?.admitted_capability, source: "tool_call_admission_decision.admitted_capability" },
     { capability: admission?.selected_capability, source: "tool_call_admission_decision.selected_capability" },
@@ -1549,7 +1672,7 @@ const buildCodexParityAgentSpineRailTable = (input: {
     visibleSurface,
   });
   return {
-    schema: "helix.codex_parity_agent_spine_rail_table.v1",
+    schema: CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
     turn_id: input.turnId,
     prompt: readFirstPromptText(input.payload),
     requested_capability: readNullableString(input.audit.requested_capability),
@@ -1623,9 +1746,15 @@ const buildArtifactEntry = (artifact: RecordLike): RecordLike => {
     source_scope: readString(artifact.source_scope) || null,
     producer_item_id: readString(artifact.producer_item_id) || null,
     query_keys: queryKeys,
-    assistant_answer: readBoolean(payload?.assistant_answer),
-    terminal_eligible: readBoolean(payload?.terminal_eligible),
-    raw_content_included: readBoolean(payload?.raw_content_included),
+    artifact_query_role: "observation_index_entry",
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+    payload_authority_flags: {
+      assistant_answer: readBoolean(payload?.assistant_answer),
+      terminal_eligible: readBoolean(payload?.terminal_eligible),
+      raw_content_included: readBoolean(payload?.raw_content_included),
+    },
   };
 };
 

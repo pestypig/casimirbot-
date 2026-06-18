@@ -134,6 +134,74 @@ describe("Helix Ask terminal authority contracts", () => {
     allTerminalSurfacesEqual(payload);
   });
 
+  it("rejects reasoning-circuit observation surfaces as terminal artifacts before solver authority", () => {
+    const observationSurfaces = [
+      {
+        terminalArtifactKind: "helix.workstation_goal_context_update.v1",
+        finalAnswerSource: "helix.workstation_goal_context_update.v1",
+        text: "Goal context says the frog deck produced a candidate classification.",
+      },
+      {
+        terminalArtifactKind: "microdeck_output",
+        finalAnswerSource: "microdeck_output",
+        text: "MicroDeck output says the frog might be a tree frog.",
+      },
+      {
+        terminalArtifactKind: "live_answer_projection",
+        finalAnswerSource: "live_answer_projection",
+        text: "Live Answer projection displayed the translated audio line.",
+      },
+      {
+        terminalArtifactKind: "panel_projection",
+        finalAnswerSource: "panel_projection",
+        text: "The panel projection showed the packet was routed to Narrator.",
+      },
+      {
+        terminalArtifactKind: "stage_play_workstation_context_feed_query_result/v1",
+        finalAnswerSource: "stage_play_workstation_context_feed_query_result",
+        text: "The feed query returned two visual summaries.",
+      },
+    ];
+
+    for (const { terminalArtifactKind, finalAnswerSource, text } of observationSurfaces) {
+      const payload: Record<string, unknown> = {
+        turn_id: `ask:test:${terminalArtifactKind}`,
+        thread_id: "thread:test",
+        terminal_artifact_kind: terminalArtifactKind,
+        final_answer_source: finalAnswerSource,
+        selected_final_answer: text,
+        answer: text,
+        text,
+        terminal_presentation: {
+          schema: "helix.terminal_presentation.v1",
+          concise_text: text,
+        },
+      };
+
+      const envelope = resolveTerminalAnswerEnvelope(payload);
+      applyTerminalAnswerEnvelope(payload, envelope);
+
+      expect(payload.workstation_observation_terminal_rejection).toMatchObject({
+        schema: "helix.workstation_observation_terminal_rejection.v1",
+        rejected_terminal_artifact_kind: terminalArtifactKind,
+        reason: "observation_artifact_cannot_terminalize",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      });
+      expect(payload.terminal_artifact_kind).toBe("typed_failure");
+      expect(payload.final_answer_source).toBe("typed_failure");
+      expect(payload.terminal_error_code).toBe("observation_artifact_cannot_terminalize");
+      expect(payload.selected_final_answer).not.toBe(text);
+      expect(payload.terminal_answer_authority).toMatchObject({
+        terminal_kind: "failure",
+        authority_origin: "typed_failure",
+        server_authoritative: true,
+      });
+      allTerminalSurfacesEqual(payload);
+    }
+  });
+
   it("rejects mailbox wake results as terminal artifacts before answer authority", () => {
     const payload: Record<string, unknown> = {
       turn_id: "ask:test:wake-result-terminal",

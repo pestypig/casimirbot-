@@ -34,10 +34,15 @@ export type LiveAnswerReasoningCircuitSummary = {
   narratorSpeechCount: number;
   narratorBindingCount: number;
   wakeCount: number;
+  audioTranscriptCount: number;
+  translatedTranscriptCount: number;
   packetTraceCount: number;
   sourceHealthCount: number;
   feedQueryCount: number;
   routeWatchCount: number;
+  automationCount: number;
+  actuatorPolicyCount: number;
+  narratorActuatorPolicyCount: number;
   traceMemoryCount: number;
   terminalAuthorityRequiredCount: number;
   terminalPosture: string;
@@ -116,6 +121,12 @@ export function LiveAnswerReasoningCircuit({
           <span className="rounded border border-amber-300/20 px-2 py-1 font-mono text-[10px] text-amber-100">
             {summary.wakeCount} wake
           </span>
+          <span className="rounded border border-blue-300/20 px-2 py-1 font-mono text-[10px] text-blue-100" data-testid="live-answer-audio-transcript-count">
+            {summary.audioTranscriptCount} audio transcripts
+          </span>
+          <span className="rounded border border-teal-300/20 px-2 py-1 font-mono text-[10px] text-teal-100" data-testid="live-answer-translated-transcript-count">
+            {summary.translatedTranscriptCount} translations
+          </span>
           <span className="rounded border border-teal-300/20 px-2 py-1 font-mono text-[10px] text-teal-100" data-testid="live-answer-packet-trace-count">
             {summary.packetTraceCount} packet traces
           </span>
@@ -127,6 +138,15 @@ export function LiveAnswerReasoningCircuit({
           </span>
           <span className="rounded border border-sky-300/20 px-2 py-1 font-mono text-[10px] text-sky-100" data-testid="live-answer-route-watch-count">
             {summary.routeWatchCount} route watch
+          </span>
+          <span className="rounded border border-orange-300/20 px-2 py-1 font-mono text-[10px] text-orange-100" data-testid="live-answer-automation-count">
+            {summary.automationCount} automations
+          </span>
+          <span className="rounded border border-emerald-300/20 px-2 py-1 font-mono text-[10px] text-emerald-100" data-testid="live-answer-actuator-policy-count">
+            {summary.actuatorPolicyCount} actuator polic{summary.actuatorPolicyCount === 1 ? "y" : "ies"}
+          </span>
+          <span className="rounded border border-cyan-300/20 px-2 py-1 font-mono text-[10px] text-cyan-100" data-testid="live-answer-narrator-actuator-policy-count">
+            {summary.narratorActuatorPolicyCount} narrator output polic{summary.narratorActuatorPolicyCount === 1 ? "y" : "ies"}
           </span>
           <span className="rounded border border-fuchsia-300/20 px-2 py-1 font-mono text-[10px] text-fuchsia-100" data-testid="live-answer-trace-memory-count">
             {summary.traceMemoryCount} trace memory
@@ -200,7 +220,7 @@ export function LiveAnswerReasoningCircuit({
           <p className="text-[10px] font-semibold uppercase text-slate-300">Authority posture</p>
           <p className="mt-1 text-xs text-violet-100" data-testid="live-answer-terminal-authority-posture">{summary.terminalPosture}</p>
           <p className="mt-1 font-mono text-[10px] text-slate-400">
-            observation_only={summary.observationOnlyCount} narrator_bindings={summary.narratorBindingCount} packet_traces={summary.packetTraceCount} source_health={summary.sourceHealthCount} feed_queries={summary.feedQueryCount} route_watch={summary.routeWatchCount} trace_memory={summary.traceMemoryCount} terminal_authority_sessions={summary.terminalAuthorityRequiredCount}
+            observation_only={summary.observationOnlyCount} narrator_bindings={summary.narratorBindingCount} audio_transcripts={summary.audioTranscriptCount} translations={summary.translatedTranscriptCount} packet_traces={summary.packetTraceCount} source_health={summary.sourceHealthCount} feed_queries={summary.feedQueryCount} route_watch={summary.routeWatchCount} automations={summary.automationCount} actuator_policies={summary.actuatorPolicyCount} narrator_output_policies={summary.narratorActuatorPolicyCount} trace_memory={summary.traceMemoryCount} terminal_authority_sessions={summary.terminalAuthorityRequiredCount}
           </p>
           <p className="mt-1 text-[11px] leading-5 text-slate-500">
             Receipts, MicroDeck outputs, narrator bindings, and panel projections stay evidence until the completed solver path selects a terminal answer.

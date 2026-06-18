@@ -1,10 +1,25 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import {
+  CODEX_PARITY_AGENT_SPINE_CLASSES,
+  CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES,
+  CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
+  CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES,
+  CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS,
+} from "../server/services/helix-ask/codex-parity-agent-spine-contract";
 
 type RecordLike = Record<string, unknown>;
 
 type Verdict = "PASS" | "FAIL";
 type ExpectedValue = string | null | Array<string | null>;
+
+type LiveSmokePreflight = {
+  ok: boolean;
+  status: number;
+  reason: string;
+  message: string;
+  hint?: string;
+};
 
 type LiveSpineScenario = {
   id: string;
@@ -32,21 +47,7 @@ type LiveSpineScenario = {
   };
 };
 
-const CODEX_PARITY_CLASSES = [
-  "complete",
-  "tool_surface_missing",
-  "explicit_capability_demoted",
-  "tool_admission_rejected",
-  "selected_not_executed",
-  "observation_missing",
-  "observation_not_reentered",
-  "goal_contract_mismatch",
-  "terminal_product_not_allowed",
-  "terminal_authority_mismatch",
-  "visible_projection_mismatch",
-  "debug_mirror_stale",
-  "provider_config_missing",
-] as const;
+const CODEX_PARITY_CLASSES = CODEX_PARITY_AGENT_SPINE_CLASSES;
 
 const BASE_URL = (process.env.HELIX_ASK_BASE_URL ?? "http://127.0.0.1:1498").replace(/\/+$/, "");
 const OUT_DIR = process.env.HELIX_ASK_LIVE_SPINE_OUT ?? "artifacts/helix-ask-live-spine-smoke";
@@ -279,6 +280,67 @@ const fetchJson = async <T>(url: string, init?: RequestInit): Promise<T> => {
   }
 };
 
+const parseJsonRecord = (text: string): RecordLike | null => {
+  try {
+    return readRecord(JSON.parse(text));
+  } catch {
+    return null;
+  }
+};
+
+const probeAskTurnApi = async (): Promise<LiveSmokePreflight> => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Math.min(TIMEOUT_MS, 10_000));
+  const url = `${BASE_URL}/api/agi/ask/turn/__helix_live_spine_preflight__/debug-export?view=rail`;
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json",
+      },
+    });
+    const text = await response.text();
+    const payload = parseJsonRecord(text);
+    const error = readString(payload?.error);
+    const terminalError = readString(payload?.terminal_error_code);
+    if (response.ok || error === "debug_export_not_found" || terminalError === "debug_export_turn_not_found") {
+      return {
+        ok: true,
+        status: response.status,
+        reason: response.ok ? "ask_turn_debug_export_available" : "ask_turn_routes_available",
+        message: response.ok ? "Ask turn debug-export endpoint is available." : "Ask turn routes are mounted; fake turn was not found as expected.",
+      };
+    }
+    if (error === "api_not_found") {
+      return {
+        ok: false,
+        status: response.status,
+        reason: "ask_turn_api_not_found",
+        message: "The server is reachable, but /api/agi/ask/turn is not mounted.",
+        hint: readString(payload?.hint) ?? "Start the keyed bundle with ENABLE_AGI=1 and the Ask turn API enabled.",
+      };
+    }
+    return {
+      ok: false,
+      status: response.status,
+      reason: error || terminalError || `status_${response.status}`,
+      message: text.slice(0, 1200) || response.statusText || "Ask turn API preflight failed.",
+      hint: "Verify the operator-started keyed server exposes /api/agi/ask/turn.",
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      reason: error instanceof Error && error.name === "AbortError" ? "ask_turn_api_preflight_timeout" : "ask_turn_api_unreachable",
+      message: error instanceof Error ? error.message : String(error),
+      hint: "Start the operator-owned keyed Helix Ask server before running live spine smoke.",
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 const extractPayload = (debugExport: unknown): RecordLike | null => {
   const debug = readRecord(debugExport);
   return readRecord(debug?.payload) ?? debug;
@@ -366,13 +428,17 @@ const expectField = (failures: string[], rail: RecordLike, key: string, expected
 
 const shapeFailures = (rail: RecordLike, turnId: string): string[] => {
   const failures: string[] = [];
-  if (rail.schema !== "helix.codex_parity_agent_spine_rail_table.v1") failures.push("rail_schema_mismatch");
+  if (rail.schema !== CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA) failures.push("rail_schema_mismatch");
   if (rail.turn_id !== turnId) failures.push(`rail_turn_id_mismatch:${String(rail.turn_id ?? "missing")}!=${turnId}`);
   if (rail.assistant_answer !== false) failures.push("rail_assistant_answer_not_false");
   if (rail.terminal_eligible !== false) failures.push("rail_terminal_eligible_not_false");
   if (rail.raw_content_included !== false) failures.push("rail_raw_content_included_not_false");
   if (!Array.isArray(rail.visible_tool_surface)) failures.push("visible_tool_surface_not_array");
-  if (!["reentered", "not_reentered", "no_observation"].includes(String(rail.reentry_status))) {
+  for (const key of CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS) {
+    const value = rail[key];
+    if (value !== null && typeof value !== "string") failures.push(`rail_string_or_null_field_invalid:${key}`);
+  }
+  if (!CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES.includes(rail.reentry_status as never)) {
     failures.push(`invalid_reentry_status:${String(rail.reentry_status ?? "missing")}`);
   }
   const reentryStatus = readString(rail.reentry_status);
@@ -383,7 +449,7 @@ const shapeFailures = (rail: RecordLike, turnId: string): string[] => {
   if (reentryStatus === "reentered" && rail.reentry_proven !== true) {
     failures.push("reentry_not_proven");
   }
-  if (!["complete", "broken", "fail_closed"].includes(String(rail.rail_status))) {
+  if (!CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES.includes(rail.rail_status as never)) {
     failures.push(`invalid_rail_status:${String(rail.rail_status ?? "missing")}`);
   }
   if (!CODEX_PARITY_CLASSES.includes(rail.codex_parity_class as (typeof CODEX_PARITY_CLASSES)[number])) {
@@ -627,17 +693,28 @@ const runScenario = async (scenario: LiveSpineScenario, runId: string, outputDir
   return result;
 };
 
-const renderMarkdownSummary = (input: { runId: string; outputDir: string; results: RecordLike[] }): string => {
+const renderMarkdownSummary = (input: {
+  runId: string;
+  outputDir: string;
+  results: RecordLike[];
+  preflight?: LiveSmokePreflight;
+}): string => {
   const lines = [
     "# Helix Ask Live Spine Smoke",
     "",
     `- run_id: ${input.runId}`,
     `- base_url: ${BASE_URL}`,
     `- output_dir: ${input.outputDir}`,
+  ];
+  if (input.preflight) {
+    lines.push(`- preflight: ${input.preflight.ok ? "ok" : "blocked"} (${input.preflight.reason})`);
+    if (input.preflight.hint) lines.push(`- preflight_hint: ${input.preflight.hint}`);
+  }
+  lines.push(
     "",
     "| Verdict | Scenario | Class | Rail | Repair | Terminal Error |",
     "| --- | --- | --- | --- | --- | --- |",
-  ];
+  );
   for (const result of input.results) {
     const rail = readRecord(result.rail_table);
     lines.push(
@@ -661,6 +738,31 @@ const main = async (): Promise<void> => {
   const runId = `live-spine-${Date.now()}`;
   const outputDir = path.resolve(OUT_DIR, runId);
   await fs.mkdir(outputDir, { recursive: true });
+
+  const preflight = await probeAskTurnApi();
+  if (!preflight.ok) {
+    const summary = {
+      schema: "helix.ask_live_spine_smoke_summary.v1",
+      ok: false,
+      blocked: true,
+      blocked_reason: preflight.reason,
+      run_id: runId,
+      base_url: BASE_URL,
+      output_dir: outputDir,
+      counts: {
+        pass: 0,
+        fail: 0,
+        warn: 1,
+      },
+      preflight,
+      results: [],
+    };
+    await fs.writeFile(path.join(outputDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
+    await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, outputDir, results: [], preflight }));
+    console.log(JSON.stringify(summary, null, 2));
+    process.exitCode = 1;
+    return;
+  }
 
   const results: RecordLike[] = [];
   for (const scenario of scenarios) {
@@ -693,10 +795,11 @@ const main = async (): Promise<void> => {
       fail: failCount,
       warn: warnCount,
     },
+    preflight,
     results,
   };
   await fs.writeFile(path.join(outputDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
-  await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, outputDir, results }));
+  await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, outputDir, results, preflight }));
   console.log(JSON.stringify(summary, null, 2));
   if (!summary.ok) process.exitCode = 1;
 };

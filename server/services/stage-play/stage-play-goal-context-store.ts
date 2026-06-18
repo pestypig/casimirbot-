@@ -12,6 +12,7 @@ import type {
 import {
   WORKSTATION_AGENT_GOAL_ACTUATORS,
   WORKSTATION_AGENT_GOAL_DEFAULT_CONTEXT_FEEDS,
+  WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
   WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS,
   WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
   WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
@@ -376,6 +377,7 @@ export function ensureStagePlayAgentGoalSession(input: {
   allowedActuators?: AgentGoalActuatorV1[];
   cadence?: AgentGoalSessionV1["cadence"];
   stopConditions?: string[];
+  finalReportRequirements?: AgentGoalSessionV1["authority"]["finalReportRequirements"];
   checkpoint?: {
     summary?: string | null;
     evidenceRefs?: string[];
@@ -440,6 +442,10 @@ export function ensureStagePlayAgentGoalSession(input: {
     authority: {
       assistantAnswer: false,
       finalReportsRequireTerminalAuthority: true,
+      finalReportRequirements:
+        input.finalReportRequirements ??
+        existing?.authority.finalReportRequirements ??
+        WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
     },
   });
 }

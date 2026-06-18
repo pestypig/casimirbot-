@@ -5,6 +5,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { planRouter } from "../routes/agi.plan";
 import { API_PARITY_SCENARIOS, type HelixApiParityScenario } from "../services/helix-ask/api-parity-matrix";
 import { buildApiParityProbeResult } from "../services/helix-ask/api-parity-probe";
+import {
+  CODEX_PARITY_AGENT_SPINE_CLASSES,
+  CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES,
+  CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
+  CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES,
+  CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS,
+} from "../services/helix-ask/codex-parity-agent-spine-contract";
 import { resetConversationalAnswerDistillationsForTest } from "../services/helix-ask/conversational-answer-distillation-store";
 import { resetLiveSourcePipelinesForTest } from "../services/helix-ask/live-source-pipeline-executor";
 import { resetReceiptPresentationSnapshotsForTest } from "../services/helix-ask/receipt-presentation-snapshot-store";
@@ -76,52 +83,22 @@ const expectNullableStringField = (record: Record<string, unknown>, key: string)
   expect(value === null || typeof value === "string").toBe(true);
 };
 
-const CODEX_PARITY_CLASSES = [
-  "complete",
-  "tool_surface_missing",
-  "explicit_capability_demoted",
-  "tool_admission_rejected",
-  "selected_not_executed",
-  "observation_missing",
-  "observation_not_reentered",
-  "goal_contract_mismatch",
-  "terminal_product_not_allowed",
-  "terminal_authority_mismatch",
-  "visible_projection_mismatch",
-  "debug_mirror_stale",
-  "provider_config_missing",
-];
+const CODEX_PARITY_CLASSES = [...CODEX_PARITY_AGENT_SPINE_CLASSES];
 
 const expectCodexParityRailTableShape = (railTable: Record<string, unknown>, turnId: string): void => {
   expect(railTable).toMatchObject({
-    schema: "helix.codex_parity_agent_spine_rail_table.v1",
+    schema: CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
     turn_id: turnId,
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,
   });
-  expectNullableStringField(railTable, "prompt");
   expect(Array.isArray(railTable.visible_tool_surface)).toBe(true);
-  for (const key of [
-    "requested_capability",
-    "selected_capability",
-    "admitted_capability",
-    "admission_proof_source",
-    "executed_capability",
-    "observation_kind",
-    "observation_ref",
-    "goal_satisfaction",
-    "required_terminal_kind",
-    "selected_terminal_kind",
-    "visible_terminal_kind",
-    "first_broken_rail",
-    "repair_target",
-    "rail_failure_code",
-  ]) {
+  for (const key of CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS) {
     expectNullableStringField(railTable, key);
   }
-  expect(["reentered", "not_reentered", "no_observation"]).toContain(railTable.reentry_status);
-  expect(["complete", "broken", "fail_closed"]).toContain(railTable.rail_status);
+  expect(CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES).toContain(railTable.reentry_status as never);
+  expect(CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES).toContain(railTable.rail_status as never);
   expect(railTable.rail_status === "complete").toBe(railTable.codex_parity_class === "complete");
   expect(typeof railTable.reentry_proven).toBe("boolean");
   expect(railTable.reentry_proof_source === null || typeof railTable.reentry_proof_source === "string").toBe(true);

@@ -49,6 +49,7 @@ import type {
 } from "@shared/helix-live-environment-commentary";
 import {
   WORKSTATION_AGENT_GOAL_ACTUATORS,
+  WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
   WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
   WORKSTATION_NARRATOR_BIND_STREAM_REQUEST_SCHEMA,
   WORKSTATION_NARRATOR_SAY_REQUEST_SCHEMA,
@@ -1044,6 +1045,43 @@ function readAgentGoalCheckpoint(args: Record<string, unknown>): Parameters<type
         evidenceRefs,
         actionsTaken,
         nextStep: normalizedNextStep && allowedNextSteps.has(normalizedNextStep) ? normalizedNextStep : undefined,
+      }
+    : undefined;
+}
+
+function readAgentGoalFinalReportRequirements(args: Record<string, unknown>): AgentGoalSessionV1["authority"]["finalReportRequirements"] | undefined {
+  const record = readObject(args.final_report_requirements ?? args.finalReportRequirements ?? args.authority);
+  if (!record) return undefined;
+  if (
+    record.completedSolverPathRequired === false ||
+    record.completed_solver_path_required === false ||
+    record.evidenceReentryRequired === false ||
+    record.evidence_reentry_required === false ||
+    record.routeAuthorityRequired === false ||
+    record.route_authority_required === false ||
+    record.terminalAuthoritySingleWriterRequired === false ||
+    record.terminal_authority_single_writer_required === false
+  ) {
+    return undefined;
+  }
+  const allowedTerminalArtifactKinds = readStringArray(record.allowedTerminalArtifactKinds ?? record.allowed_terminal_artifact_kinds);
+  const requiredEvidenceKinds = readStringArray(record.requiredEvidenceKinds ?? record.required_evidence_kinds);
+  const prohibitedReportSources = readStringArray(record.prohibitedReportSources ?? record.prohibited_report_sources);
+  return allowedTerminalArtifactKinds.length > 0 || requiredEvidenceKinds.length > 0 || prohibitedReportSources.length > 0
+    ? {
+        completedSolverPathRequired: true,
+        evidenceReentryRequired: true,
+        routeAuthorityRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+        allowedTerminalArtifactKinds: allowedTerminalArtifactKinds.length > 0
+          ? allowedTerminalArtifactKinds
+          : WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS.allowedTerminalArtifactKinds,
+        requiredEvidenceKinds: requiredEvidenceKinds.length > 0
+          ? requiredEvidenceKinds
+          : WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS.requiredEvidenceKinds,
+        prohibitedReportSources: prohibitedReportSources.length > 0
+          ? prohibitedReportSources
+          : WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS.prohibitedReportSources,
       }
     : undefined;
 }

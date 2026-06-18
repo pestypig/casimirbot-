@@ -3,6 +3,7 @@ import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { planRouter } from "../routes/agi.plan";
+import { helixStagePlayRouter } from "../routes/helix/stage-play";
 import {
   recordLiveSourceObservation,
   resetLiveSourceObservationStoreForTest,
@@ -42,6 +43,7 @@ import {
 import { listStagePlayLiveSourceNarrativeStates } from "../services/stage-play/stage-play-live-source-narrative-store";
 import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../services/stage-play/stage-play-live-source-mail-wake-store";
 import { resetStagePlayLiveSourceMailTranscriptStoreForTest } from "../services/stage-play/stage-play-live-source-mail-transcript-store";
+import { resetStagePlayGoalContextStoreForTest } from "../services/stage-play/stage-play-goal-context-store";
 
 const threadId = "helix-ask:desktop";
 const roomId = "room:stage-play-routing";
@@ -51,6 +53,7 @@ const createApp = (): express.Express => {
   const app = express();
   app.use(express.json({ limit: "2mb" }));
   app.use("/api/agi", planRouter);
+  app.use("/api/helix/stage-play", helixStagePlayRouter);
   return app;
 };
 
@@ -65,6 +68,100 @@ beforeEach(() => {
   resetStagePlayLiveSourceMailboxForTest();
   resetStagePlayLiveSourceMailWakeStoreForTest();
   resetStagePlayLiveSourceMailTranscriptStoreForTest();
+  resetStagePlayGoalContextStoreForTest();
+});
+
+it("starts Stage Play goal sessions with explicit context feeds and actuator policy", async () => {
+  const response = await request(createApp())
+    .post("/api/helix/stage-play/goal-session")
+    .send({
+      threadId,
+      roomId,
+      goalId: "goal:route-session-policy",
+      objective: "Monitor visual and translated transcript packets for operator evidence.",
+      sourceRefs: [sourceId, "audio_source:earbuds"],
+      loopRefs: ["stage_play_translation_loop:route"],
+      constructRefs: ["stage_play_badge_graph:route"],
+      contextFeeds: [
+        {
+          feedId: "feed:visual",
+          sourceKind: "visual_summaries",
+          freshnessMs: 15000,
+          relevancePolicy: "same-source-or-goal-id",
+        },
+        {
+          feedId: "feed:translation",
+          sourceKind: "translated_transcripts",
+          query: "operator translation",
+          freshnessMs: 45000,
+          relevancePolicy: "same-source-or-goal-id",
+        },
+        {
+          feedId: "feed:wake",
+          sourceKind: "wake_candidates",
+          freshnessMs: 1,
+        },
+      ],
+      allowedActuators: [
+        "query_visual_summaries",
+        "query_translation_segments",
+        "narrator_bind_stream",
+        "wake_agent",
+      ],
+      cadence: { kind: "event_accumulation", min_updates: 2 },
+      stopConditions: ["terminal authority produces a final report"],
+      checkpointSummary: "Goal session initialized by Stage Play route.",
+      actionsTaken: ["bind_translation_loop"],
+      evidenceRefs: ["stage_play_processed_mail_packet:translation-route"],
+    })
+    .expect(200);
+
+  expect(response.body).toMatchObject({
+    ok: true,
+    schema: "stage_play_goal_session_response/v1",
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+    session: {
+      goalId: "goal:route-session-policy",
+      objective: "Monitor visual and translated transcript packets for operator evidence.",
+      sourceRefs: expect.arrayContaining([sourceId, "audio_source:earbuds"]),
+      loopRefs: expect.arrayContaining(["stage_play_translation_loop:route"]),
+      constructRefs: ["stage_play_badge_graph:route"],
+      contextFeeds: expect.arrayContaining([
+        expect.objectContaining({
+          feedId: "feed:visual",
+          sourceKind: "visual_summaries",
+          freshnessMs: 15000,
+        }),
+        expect.objectContaining({
+          feedId: "feed:translation",
+          sourceKind: "translated_transcripts",
+          query: "operator translation",
+          freshnessMs: 45000,
+        }),
+      ]),
+      allowedActuators: expect.arrayContaining([
+        "query_visual_summaries",
+        "query_translation_segments",
+        "narrator_bind_stream",
+      ]),
+      cadence: { kind: "event_accumulation", minUpdates: 2 },
+      stopConditions: expect.arrayContaining(["terminal authority produces a final report"]),
+      authority: {
+        assistantAnswer: false,
+        finalReportsRequireTerminalAuthority: true,
+      },
+    },
+  });
+  expect(response.body.session.contextFeeds.some((feed: any) => feed.sourceKind === "wake_candidates")).toBe(false);
+  expect(response.body.session.allowedActuators).not.toContain("wake_agent");
+  expect(response.body.session.checkpoints.at(-1)).toMatchObject({
+    summary: "Goal session initialized by Stage Play route.",
+    evidenceRefs: expect.arrayContaining(["stage_play_processed_mail_packet:translation-route"]),
+    actionsTaken: expect.arrayContaining(["bind_translation_loop", "start_agent_goal_session"]),
+    nextStep: "continue",
+  });
 });
 
 afterEach(() => {

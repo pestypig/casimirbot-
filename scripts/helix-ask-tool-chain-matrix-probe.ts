@@ -1,25 +1,16 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import {
+  CODEX_PARITY_AGENT_SPINE_CLASSES,
+  CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES,
+  CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
+  CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES,
+  CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS,
+} from "../server/services/helix-ask/codex-parity-agent-spine-contract";
 
 type RecordLike = Record<string, unknown>;
 
 type Verdict = "PASS" | "WARN" | "FAIL";
-
-const CODEX_PARITY_AGENT_SPINE_CLASSES = [
-  "complete",
-  "tool_surface_missing",
-  "explicit_capability_demoted",
-  "tool_admission_rejected",
-  "selected_not_executed",
-  "observation_missing",
-  "observation_not_reentered",
-  "goal_contract_mismatch",
-  "terminal_product_not_allowed",
-  "terminal_authority_mismatch",
-  "visible_projection_mismatch",
-  "debug_mirror_stale",
-  "provider_config_missing",
-] as const;
 
 type RailSummary = {
   present: boolean;
@@ -222,11 +213,15 @@ const collectRailTableFailures = (input: {
   const { railTable, terminalKind } = input;
   if (!railTable) return ["codex_parity_agent_spine_rail_table_missing"];
   const failures: string[] = [];
-  if (railTable.schema !== "helix.codex_parity_agent_spine_rail_table.v1") {
+  if (railTable.schema !== CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA) {
     failures.push(`rail_table_schema_mismatch:${readString(railTable.schema) || "missing"}`);
   }
   if (!Array.isArray(railTable.visible_tool_surface)) failures.push("rail_visible_tool_surface_missing");
-  if (!["reentered", "not_reentered", "no_observation"].includes(readString(railTable.reentry_status))) {
+  for (const key of CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS) {
+    const value = railTable[key];
+    if (value !== null && typeof value !== "string") failures.push(`rail_string_or_null_field_invalid:${key}`);
+  }
+  if (!CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES.includes(railTable.reentry_status as never)) {
     failures.push(`rail_reentry_status_invalid:${readString(railTable.reentry_status) || "missing"}`);
   }
   const reentryStatus = readString(railTable.reentry_status);
@@ -237,7 +232,7 @@ const collectRailTableFailures = (input: {
   if (reentryStatus === "reentered" && railTable.reentry_proven !== true) {
     failures.push("rail_reentry_not_proven");
   }
-  if (!["complete", "broken", "fail_closed"].includes(readString(railTable.rail_status))) {
+  if (!CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES.includes(railTable.rail_status as never)) {
     failures.push(`rail_status_invalid:${readString(railTable.rail_status) || "missing"}`);
   }
   const codexParityClass = readString(railTable.codex_parity_class);

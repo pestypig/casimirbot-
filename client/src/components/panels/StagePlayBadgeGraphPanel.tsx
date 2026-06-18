@@ -3245,17 +3245,41 @@ function StagePlayGoalContextBoard({
     (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "bind_narrator_stream").length,
     0,
   );
-  const routeWatchAutomationCount = updates.filter((update) => update.producerKind === "route_watch").length;
+  const automationContextCount = updates.filter((update) =>
+    update.producerKind === "automation" ||
+    update.updateKind === "automation_status" ||
+    update.producerKind === "route_watch"
+  ).length;
   const packetTraceContextCount = updates.filter(isPacketTraceUpdate).length +
     activeSessions.filter((session) => session.contextFeeds.some((feed) => feed.sourceKind === "packet_traces")).length;
   const sourceHealthContextCount = updates.filter((update) => update.producerKind === "source_health" || update.updateKind === "source_status").length +
     activeSessions.filter((session) => session.contextFeeds.some((feed) => feed.sourceKind === "source_health")).length;
   const traceMemoryContextCount = updates.filter(isTraceMemoryUpdate).length +
     activeSessions.filter((session) => session.contextFeeds.some((feed) => feed.sourceKind === "trace_memory")).length;
+  const audioTranscriptContextCount = updates.filter((update) =>
+    update.producerKind === "audio_capture" ||
+    update.producerKind === "transcription_loop" ||
+    update.updateKind === "transcript_window"
+  ).length + activeSessions.filter((session) =>
+    session.contextFeeds.some((feed) => feed.sourceKind === "audio_transcripts")
+  ).length;
+  const translatedTranscriptContextCount = updates.filter((update) =>
+    update.producerKind === "translation_loop" ||
+    update.updateKind === "translated_transcript"
+  ).length + activeSessions.filter((session) =>
+    session.contextFeeds.some((feed) => feed.sourceKind === "translated_transcripts")
+  ).length;
   const feedQueryContextCount = updates.filter(isFeedQueryUpdate).length +
     activeSessions.reduce((count, session) => count + session.contextFeeds.length, 0);
   const runningAutomationCount = updates.reduce(
     (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "set_loop_state" && action.state === "running").length,
+    0,
+  );
+  const actuatorPolicyCount = activeSessions.reduce((count, session) => count + session.allowedActuators.length, 0);
+  const narratorActuatorPolicyCount = activeSessions.reduce(
+    (count, session) => count + session.allowedActuators.filter((actuator) =>
+      actuator === "bind_narrator" || actuator === "narrator_bind_stream" || actuator === "narrator_say"
+    ).length,
     0,
   );
   const terminalAuthorityRequiredCount = activeSessions.filter((session) => session.authority.finalReportsRequireTerminalAuthority).length;
@@ -3292,8 +3316,11 @@ function StagePlayGoalContextBoard({
           <StagePlayMetricPill label="packet traces" value={formatStagePlayCount(packetTraceContextCount)} tone={packetTraceContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="source health" value={formatStagePlayCount(sourceHealthContextCount)} tone={sourceHealthContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="trace memory" value={formatStagePlayCount(traceMemoryContextCount)} tone={traceMemoryContextCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="audio transcripts" value={formatStagePlayCount(audioTranscriptContextCount)} tone={audioTranscriptContextCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="translations" value={formatStagePlayCount(translatedTranscriptContextCount)} tone={translatedTranscriptContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="feed queries" value={formatStagePlayCount(feedQueryContextCount)} tone={feedQueryContextCount > 0 ? "good" : "default"} />
-          <StagePlayMetricPill label="automations" value={formatStagePlayCount(routeWatchAutomationCount)} tone={routeWatchAutomationCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="automations" value={formatStagePlayCount(automationContextCount)} tone={automationContextCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="actuator policies" value={formatStagePlayCount(actuatorPolicyCount)} tone={actuatorPolicyCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="active goals" value={formatStagePlayCount(activeSessions.length)} tone={activeSessions.length > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="terminal authority" value={`${terminalAuthorityRequiredCount}/${activeSessions.length}`} tone={terminalAuthorityRequiredCount > 0 ? "warn" : "default"} />
         </div>
@@ -3323,9 +3350,21 @@ function StagePlayGoalContextBoard({
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Trace memory</div>
           <div className="mt-0.5 text-slate-400">{formatStagePlayCount(traceMemoryContextCount)} trace-memory context item{traceMemoryContextCount === 1 ? "" : "s"} keep prior reasoning queryable without answer authority.</div>
         </div>
+        <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-audio-transcript-state">
+          <div className="font-semibold uppercase tracking-wide text-violet-200/80">Audio transcripts</div>
+          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(audioTranscriptContextCount)} audio transcript context item{audioTranscriptContextCount === 1 ? "" : "s"} keep capture speech queryable before agent reasoning.</div>
+        </div>
+        <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-translation-state">
+          <div className="font-semibold uppercase tracking-wide text-violet-200/80">Translations</div>
+          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(translatedTranscriptContextCount)} translated transcript context item{translatedTranscriptContextCount === 1 ? "" : "s"} keep translation output visible as evidence for Live Answer and Narrator.</div>
+        </div>
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-route-watch-automation-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Route-watch automations</div>
-          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(routeWatchAutomationCount)} route-watch update{routeWatchAutomationCount === 1 ? "" : "s"} with {formatStagePlayCount(runningAutomationCount)} running loop dispatch{runningAutomationCount === 1 ? "" : "es"}.</div>
+          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(automationContextCount)} automation status update{automationContextCount === 1 ? "" : "s"} with {formatStagePlayCount(runningAutomationCount)} running loop dispatch{runningAutomationCount === 1 ? "" : "es"}.</div>
+        </div>
+        <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-actuator-policy-state">
+          <div className="font-semibold uppercase tracking-wide text-violet-200/80">Actuator policy</div>
+          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(actuatorPolicyCount)} allowed actuator{actuatorPolicyCount === 1 ? "" : "s"} bound to goal sessions; {formatStagePlayCount(narratorActuatorPolicyCount)} narrator output policy item{narratorActuatorPolicyCount === 1 ? "" : "s"}.</div>
         </div>
       </div>
       <div className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(240px,320px)]">
@@ -3401,7 +3440,7 @@ function StagePlayGoalContextBoard({
                 </div>
                 <div className="mt-2 grid gap-1 font-mono text-[9px] text-slate-400" data-testid="stage-play-agent-goal-session-contract">
                   <div data-testid="stage-play-agent-goal-session-feeds">
-                    feeds={session.contextFeeds.slice(0, 4).map((feed) => labelize(feed.sourceKind)).join(", ") || "none"}
+                    feeds={session.contextFeeds.slice(0, 6).map((feed) => labelize(feed.sourceKind)).join(", ") || "none"}
                   </div>
                   <div data-testid="stage-play-agent-goal-session-cadence">
                     cadence={formatSessionCadence(session.cadence)}

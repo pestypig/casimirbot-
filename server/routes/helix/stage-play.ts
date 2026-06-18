@@ -1,6 +1,12 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { validateStagePlayBadgeGraphV1 } from "../../../shared/contracts/stage-play-badge-graph.v1";
+import type { AgentGoalActuatorV1, AgentGoalSessionV1 } from "../../../shared/contracts/workstation-goal-context.v1";
+import {
+  WORKSTATION_AGENT_GOAL_ACTUATORS,
+  WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS,
+  WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
+} from "../../../shared/contracts/workstation-goal-context.v1";
 import type {
   StagePlayLiveSourceMailInterpretationPayloadV1,
   StagePlayLiveSourceMailTranscriptEntryV1,
@@ -435,6 +441,114 @@ const readStringArray = (value: unknown): string[] =>
 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)));
+
+const stagePlayGoalFeedKinds = new Set(WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS);
+const stagePlayGoalActuators = new Set(WORKSTATION_AGENT_GOAL_ACTUATORS);
+
+const readGoalContextFeeds = (value: unknown): AgentGoalSessionV1["contextFeeds"] | undefined => {
+  if (!Array.isArray(value)) return undefined;
+  const feeds = value
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .map((entry) => {
+      const sourceKind = readQueryString(entry.sourceKind) ?? readQueryString(entry.source_kind);
+      if (!sourceKind || !stagePlayGoalFeedKinds.has(sourceKind as AgentGoalSessionV1["contextFeeds"][number]["sourceKind"])) {
+        return null;
+      }
+      const freshnessMs = readOptionalNumber(entry.freshnessMs ?? entry.freshness_ms);
+      return {
+        feedId: readQueryString(entry.feedId) ?? readQueryString(entry.feed_id) ?? `stage_play_goal_feed:${sourceKind}`,
+        sourceKind: sourceKind as AgentGoalSessionV1["contextFeeds"][number]["sourceKind"],
+        ...(readQueryString(entry.query) ? { query: readQueryString(entry.query)! } : {}),
+        ...(freshnessMs ? { freshnessMs } : {}),
+        ...(readQueryString(entry.relevancePolicy ?? entry.relevance_policy)
+          ? { relevancePolicy: readQueryString(entry.relevancePolicy ?? entry.relevance_policy)! }
+          : {}),
+      };
+    })
+    .filter((feed): feed is AgentGoalSessionV1["contextFeeds"][number] => Boolean(feed));
+  return feeds.length > 0 ? feeds : undefined;
+};
+
+const readGoalActuators = (value: unknown): AgentGoalActuatorV1[] | undefined => {
+  const actuators = readStringArray(value)
+    .filter((actuator): actuator is AgentGoalActuatorV1 => stagePlayGoalActuators.has(actuator as AgentGoalActuatorV1));
+  return actuators.length > 0 ? Array.from(new Set(actuators)) : undefined;
+};
+
+const readGoalCadence = (value: unknown): AgentGoalSessionV1["cadence"] | undefined => {
+  const record = readRecord(value);
+  if (!record) return undefined;
+  const kind = readQueryString(record.kind);
+  if (kind === "manual" || kind === "user_turn_only") return { kind };
+  if (kind === "interval") {
+    const everyMs = readOptionalNumber(record.everyMs ?? record.every_ms);
+    return everyMs && everyMs > 0 ? { kind, everyMs } : undefined;
+  }
+  if (kind === "event_accumulation") {
+    const minUpdates = readOptionalNumber(record.minUpdates ?? record.min_updates);
+    return minUpdates && minUpdates > 0 ? { kind, minUpdates } : undefined;
+  }
+  return undefined;
+};
+
+const readGoalCheckpoint = (
+  body: Record<string, unknown>,
+): Parameters<typeof ensureStagePlayAgentGoalSession>[0]["checkpoint"] | undefined => {
+  const checkpointRecord = readRecord(body.checkpoint);
+  const summary =
+    readQueryString(checkpointRecord?.summary) ??
+    readQueryString(body.checkpointSummary) ??
+    readQueryString(body.checkpoint_summary);
+  const evidenceRefs = readStringArray(checkpointRecord?.evidenceRefs ?? checkpointRecord?.evidence_refs ?? body.evidenceRefs ?? body.evidence_refs);
+  const actionsTaken = readStringArray(checkpointRecord?.actionsTaken ?? checkpointRecord?.actions_taken ?? body.actionsTaken ?? body.actions_taken);
+  const nextStep = readQueryString(checkpointRecord?.nextStep ?? checkpointRecord?.next_step ?? body.nextStep ?? body.next_step);
+  const validNextStep = nextStep === "continue" || nextStep === "ask_user" || nextStep === "repair" || nextStep === "report" || nextStep === "stop"
+    ? nextStep
+    : undefined;
+  return summary || evidenceRefs.length > 0 || actionsTaken.length > 0 || validNextStep
+    ? { summary, evidenceRefs, actionsTaken, nextStep: validNextStep }
+    : undefined;
+};
+
+const readGoalFinalReportRequirements = (
+  value: unknown,
+): AgentGoalSessionV1["authority"]["finalReportRequirements"] | undefined => {
+  const record = readRecord(value);
+  if (!record) return undefined;
+  const allowedTerminalArtifactKinds = readStringArray(record.allowedTerminalArtifactKinds ?? record.allowed_terminal_artifact_kinds);
+  const requiredEvidenceKinds = readStringArray(record.requiredEvidenceKinds ?? record.required_evidence_kinds);
+  const prohibitedReportSources = readStringArray(record.prohibitedReportSources ?? record.prohibited_report_sources);
+  if (
+    record.completedSolverPathRequired === false ||
+    record.completed_solver_path_required === false ||
+    record.evidenceReentryRequired === false ||
+    record.evidence_reentry_required === false ||
+    record.routeAuthorityRequired === false ||
+    record.route_authority_required === false ||
+    record.terminalAuthoritySingleWriterRequired === false ||
+    record.terminal_authority_single_writer_required === false
+  ) {
+    return undefined;
+  }
+  return allowedTerminalArtifactKinds.length > 0 || requiredEvidenceKinds.length > 0 || prohibitedReportSources.length > 0
+    ? {
+        completedSolverPathRequired: true,
+        evidenceReentryRequired: true,
+        routeAuthorityRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+        allowedTerminalArtifactKinds: allowedTerminalArtifactKinds.length > 0
+          ? allowedTerminalArtifactKinds
+          : WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS.allowedTerminalArtifactKinds,
+        requiredEvidenceKinds: requiredEvidenceKinds.length > 0
+          ? requiredEvidenceKinds
+          : WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS.requiredEvidenceKinds,
+        prohibitedReportSources: prohibitedReportSources.length > 0
+          ? prohibitedReportSources
+          : WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS.prohibitedReportSources,
+      }
+    : undefined;
+};
 
 const STAGE_PLAY_MICRO_REASONER_ROLES: StagePlayMicroReasonerRoleV1[] = [
   "claim_extractor",
@@ -1339,6 +1453,15 @@ helixStagePlayRouter.post("/goal-session", (req: Request, res: Response) => {
       objectiveText,
       sourceRefs: readStringArray(body.sourceRefs ?? body.source_refs ?? body.sourceIds ?? body.source_ids),
       loopRefs: readStringArray(body.loopRefs ?? body.loop_refs),
+      constructRefs: readStringArray(body.constructRefs ?? body.construct_refs),
+      contextFeeds: readGoalContextFeeds(body.contextFeeds ?? body.context_feeds),
+      allowedActuators: readGoalActuators(body.allowedActuators ?? body.allowed_actuators),
+      cadence: readGoalCadence(body.cadence),
+      stopConditions: readStringArray(body.stopConditions ?? body.stop_conditions),
+      finalReportRequirements: readGoalFinalReportRequirements(
+        body.finalReportRequirements ?? body.final_report_requirements ?? body.authority,
+      ),
+      checkpoint: readGoalCheckpoint(body),
     });
     if (!session) {
       return stagePlayJsonError(res, 400, {

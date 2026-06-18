@@ -20,6 +20,7 @@ const goalSession: AgentGoalSessionV1 = {
     { feedId: "feed:packet", sourceKind: "packet_traces", freshnessMs: 10_000 },
     { feedId: "feed:source-health", sourceKind: "source_health", freshnessMs: 60_000 },
     { feedId: "feed:translation", sourceKind: "translated_transcripts", freshnessMs: 10_000 },
+    { feedId: "feed:automation", sourceKind: "automation_policies", freshnessMs: 120_000 },
   ],
   allowedActuators: ["query_visual_summaries", "query_packet_traces", "query_source_health", "query_translation_segments", "narrator_bind_stream"],
   cadence: { kind: "user_turn_only" },
@@ -96,18 +97,48 @@ describe("LiveAnswerReasoningCircuit", () => {
               postToolModelStepRequired: false,
             },
           },
+          {
+            id: "goal-update:automation-policy",
+            title: "automation status",
+            producer: "automation",
+            status: "fresh",
+            preview: "Watch-job policy is armed for the next visual summary.",
+            contentRef: "stage_play_live_source_watch_job_policy:ui",
+            sourceRefs: ["visual:screen-share"],
+            loopRefs: ["stage_play_live_source_watch_job:ui"],
+            evidenceRefs: ["stage_play_live_source_watch_job_policy:ui"],
+            receiptRefs: ["stage_play_live_source_watch_job_policy:ui"],
+            dispatch: ["set loop state running"],
+            packetColorKey: "stage_play_live_source_watch_job_policy:ui",
+            freshness: {
+              observedAtMs: 1781736212000,
+              staleAfterMs: 120000,
+              status: "fresh",
+            },
+            authority: {
+              assistantAnswer: false,
+              terminalEligible: false,
+              rawContentIncluded: false,
+              postToolModelStepRequired: true,
+            },
+          },
         ]}
         summary={{
-          updateCount: 2,
-          observationOnlyCount: 1,
+          updateCount: 3,
+          observationOnlyCount: 2,
           activeGoalCount: 1,
           narratorSpeechCount: 0,
           narratorBindingCount: 1,
           wakeCount: 1,
+          audioTranscriptCount: 0,
+          translatedTranscriptCount: 1,
           packetTraceCount: 2,
           sourceHealthCount: 2,
-          feedQueryCount: 5,
-          routeWatchCount: 1,
+          feedQueryCount: 6,
+          routeWatchCount: 0,
+          automationCount: 2,
+          actuatorPolicyCount: 5,
+          narratorActuatorPolicyCount: 1,
           traceMemoryCount: 2,
           terminalAuthorityRequiredCount: 1,
           terminalPosture: "terminal authority required",
@@ -125,8 +156,10 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getAllByTestId("live-answer-goal-context-refs")[0]).toHaveTextContent("receipts=receipt:frog-classifier");
     expect(screen.getAllByTestId("live-answer-goal-context-freshness")[0]).toHaveTextContent("freshness=fresh observed=1781736210000 staleAfter=30000ms");
     expect(screen.getAllByTestId("live-answer-goal-context-freshness")[1]).toHaveTextContent("freshness=blocked observed=1781736211000 staleAfter=unbounded");
+    expect(screen.getAllByTestId("live-answer-goal-context-freshness")[2]).toHaveTextContent("freshness=fresh observed=1781736212000 staleAfter=120000ms");
     expect(screen.getAllByTestId("live-answer-packet-color-key")[0]).toHaveTextContent("packet-color=stage_play_processed_mail_packet:frog-001");
     expect(screen.getAllByTestId("live-answer-packet-color-key")[1]).toHaveTextContent("packet-color=live-answer-projection:bad-terminal");
+    expect(screen.getAllByTestId("live-answer-packet-color-key")[2]).toHaveTextContent("packet-color=stage_play_live_source_watch_job_policy:ui");
     expect(screen.getAllByTestId("live-answer-goal-context-authority-chips")[0]).toHaveTextContent("assistant=false");
     expect(screen.getAllByTestId("live-answer-goal-context-authority-chips")[0]).toHaveTextContent("terminal=false");
     expect(screen.getAllByTestId("live-answer-goal-context-authority-chips")[0]).toHaveTextContent("raw=false");
@@ -135,30 +168,44 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getAllByTestId("live-answer-goal-context-authority-chips")[1]).toHaveTextContent("terminal=true");
     expect(screen.getAllByTestId("live-answer-goal-context-authority-chips")[1]).toHaveTextContent("raw=true");
     expect(screen.getAllByTestId("live-answer-goal-context-authority-chips")[1]).toHaveTextContent("postToolStep=false");
+    expect(screen.getAllByTestId("live-answer-goal-context-authority-chips")[2]).toHaveTextContent("assistant=false");
+    expect(screen.getAllByTestId("live-answer-goal-context-authority-chips")[2]).toHaveTextContent("terminal=false");
+    expect(screen.getAllByTestId("live-answer-goal-context-authority-chips")[2]).toHaveTextContent("raw=false");
     expect(screen.getAllByTestId("live-answer-goal-context-dispatch").map((node) => node.textContent)).toEqual([
       "narrator bind translated transcript",
       "wake interrupt",
       "update live answer",
+      "set loop state running",
     ]);
     expect(screen.getByTestId("live-answer-narrator-binding-count")).toHaveTextContent("1 narrator bindings");
+    expect(screen.getByTestId("live-answer-audio-transcript-count")).toHaveTextContent("0 audio transcripts");
+    expect(screen.getByTestId("live-answer-translated-transcript-count")).toHaveTextContent("1 translations");
     expect(screen.getByTestId("live-answer-packet-trace-count")).toHaveTextContent("2 packet traces");
     expect(screen.getByTestId("live-answer-source-health-count")).toHaveTextContent("2 source health");
-    expect(screen.getByTestId("live-answer-feed-query-count")).toHaveTextContent("5 feed queries");
-    expect(screen.getByTestId("live-answer-route-watch-count")).toHaveTextContent("1 route watch");
+    expect(screen.getByTestId("live-answer-feed-query-count")).toHaveTextContent("6 feed queries");
+    expect(screen.getByTestId("live-answer-route-watch-count")).toHaveTextContent("0 route watch");
+    expect(screen.getByTestId("live-answer-automation-count")).toHaveTextContent("2 automations");
+    expect(screen.getByTestId("live-answer-actuator-policy-count")).toHaveTextContent("5 actuator policies");
+    expect(screen.getByTestId("live-answer-narrator-actuator-policy-count")).toHaveTextContent("1 narrator output policy");
     expect(screen.getByTestId("live-answer-trace-memory-count")).toHaveTextContent("2 trace memory");
-    expect(screen.getByTestId("live-answer-observation-authority-count")).toHaveTextContent("1 observation-only");
+    expect(screen.getByTestId("live-answer-observation-authority-count")).toHaveTextContent("2 observation-only");
     expect(screen.getByTestId("live-answer-terminal-authority-count")).toHaveTextContent("1 terminal authority");
     expect(screen.getByTestId("live-answer-terminal-authority-posture")).toHaveTextContent("terminal authority required");
-    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("route_watch=1");
+    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("route_watch=0");
+    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("automations=2");
+    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("actuator_policies=5");
+    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("narrator_output_policies=1");
+    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("audio_transcripts=0");
+    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("translations=1");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("packet_traces=2");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("source_health=2");
-    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("feed_queries=5");
+    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("feed_queries=6");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("trace_memory=2");
-    expect(screen.getByTestId("live-answer-agent-goal-session")).toHaveTextContent("active / 4 feeds");
+    expect(screen.getByTestId("live-answer-agent-goal-session")).toHaveTextContent("active / 5 feeds");
     expect(screen.getByTestId("live-answer-agent-goal-policy")).toHaveTextContent("Monitor visual and translated audio feeds.");
     expect(screen.getByTestId("live-answer-agent-goal-final-authority")).toHaveTextContent("finalAuthority=true");
     expect(screen.getByTestId("live-answer-agent-goal-cadence")).toHaveTextContent("cadence=user turn");
-    expect(screen.getByTestId("live-answer-agent-goal-feeds")).toHaveTextContent("feeds=visual summaries, packet traces, source health, translated transcripts");
+    expect(screen.getByTestId("live-answer-agent-goal-feeds")).toHaveTextContent("feeds=visual summaries, packet traces, source health, translated transcripts, automation policies");
     expect(screen.getByTestId("live-answer-agent-goal-actuators")).toHaveTextContent("actuators=query visual summaries, query packet traces, query source health, query translation segments, narrator bind stream");
     expect(screen.getByTestId("live-answer-agent-goal-stop")).toHaveTextContent("stop=operator stops monitoring");
     expect(screen.getByTestId("live-answer-agent-goal-checkpoint")).toHaveTextContent("checkpoint=Narrator stream is bound to translated transcript evidence.");

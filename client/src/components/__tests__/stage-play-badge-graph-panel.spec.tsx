@@ -2036,15 +2036,15 @@ describe("StagePlayBadgeGraphPanel", () => {
         voiceSteeringDebug: null,
         goalContextUpdates: [{
           schemaVersion: "helix.workstation_goal_context_update.v1",
-          updateId: "stage_play_goal_context_update:route_watch:ui",
+          updateId: "stage_play_goal_context_update:automation:ui",
           createdAtMs: 1780521602500,
           sourceRefs: ["source:visual-tab"],
           loopRefs: [
             "stage_play_live_source_watch_job:ui",
             "stage_play_live_source_watch_job_policy:ui",
           ],
-          producerKind: "route_watch",
-          updateKind: "source_status",
+          producerKind: "automation",
+          updateKind: "automation_status",
           contentRef: "stage_play_live_source_watch_job_policy:ui",
           preview: "Configured live-source watch job for Minecraft danger monitoring; loop is armed for the next source summary.",
           evidenceRefs: [
@@ -2060,7 +2060,7 @@ describe("StagePlayBadgeGraphPanel", () => {
           goalRelevance: {
             goalId: "goal:stage-play-monitor",
             relevance: 0.82,
-            reason: "Watch-job automation policy contributes deterministic route-watch context for this agent goal.",
+            reason: "Watch-job automation policy contributes deterministic automation context for this agent goal.",
           },
           suggestedDispatch: [
             { kind: "log_receipt", receiptRef: "stage_play_live_source_watch_job_policy:ui" },
@@ -2098,6 +2098,41 @@ describe("StagePlayBadgeGraphPanel", () => {
           suggestedDispatch: [
             { kind: "log_receipt", receiptRef: "source_health_status:visual-tab" },
             { kind: "update_panel", panelId: "stage-play-badge-graph" },
+          ],
+          authority: {
+            assistantAnswer: false,
+            terminalEligible: false,
+            rawContentIncluded: false,
+            postToolModelStepRequired: true,
+          },
+        }, {
+          schemaVersion: "helix.workstation_goal_context_update.v1",
+          updateId: "stage_play_goal_context_update:translation:ui",
+          createdAtMs: 1780521602575,
+          sourceRefs: ["source:visual-tab", "audio_source:earbuds"],
+          loopRefs: ["stage_play_translation_loop:ui"],
+          producerKind: "translation_loop",
+          updateKind: "translated_transcript",
+          contentRef: "stage_play_processed_mail_packet:translation-ui",
+          preview: "Translated transcript candidate is ready for Live Answer and Narrator output.",
+          evidenceRefs: [
+            "stage_play_processed_mail_packet:translation-ui",
+            "microdeck_output:translation-ui",
+          ],
+          receiptRefs: ["stage_play_context_feed_query:translated_transcripts:ui"],
+          freshness: {
+            observedAtMs: 1780521602575,
+            staleAfterMs: 45000,
+            status: "fresh",
+          },
+          goalRelevance: {
+            goalId: "goal:stage-play-monitor",
+            relevance: 0.78,
+            reason: "Translation loop contributes queryable transcript evidence for Live Answer and Narrator wiring.",
+          },
+          suggestedDispatch: [
+            { kind: "update_live_answer", targetRef: "live-answer:desktop" },
+            { kind: "bind_narrator_stream", streamRef: "stage_play_translation_loop:ui" },
           ],
           authority: {
             assistantAnswer: false,
@@ -2169,13 +2204,25 @@ describe("StagePlayBadgeGraphPanel", () => {
               relevancePolicy: "same-source",
             },
             {
+              feedId: "feed:automation",
+              sourceKind: "automation_policies",
+              freshnessMs: 120000,
+              relevancePolicy: "same-goal-or-loop-policy",
+            },
+            {
+              feedId: "feed:translation",
+              sourceKind: "translated_transcripts",
+              freshnessMs: 45000,
+              relevancePolicy: "same-source-or-goal-id",
+            },
+            {
               feedId: "feed:trace",
               sourceKind: "trace_memory",
               freshnessMs: 120000,
               relevancePolicy: "same-thread-or-turn",
             },
           ],
-          allowedActuators: ["query_visual_summaries", "query_packet_traces", "query_microdeck_outputs", "query_source_health", "narrator_bind_stream", "focus_process_graph"],
+          allowedActuators: ["query_visual_summaries", "query_packet_traces", "query_microdeck_outputs", "query_source_health", "query_translation_segments", "narrator_bind_stream", "focus_process_graph"],
           cadence: { kind: "event_accumulation", minUpdates: 2 },
           stopConditions: [
             "User stops monitoring",
@@ -2193,7 +2240,7 @@ describe("StagePlayBadgeGraphPanel", () => {
             createdAtMs: 1780521604500,
             summary: "Queried visual summaries feed and read 2 update(s) for this goal session.",
             evidenceRefs: [
-              "stage_play_goal_context_update:route_watch:ui",
+              "stage_play_goal_context_update:automation:ui",
               "stage_play_context_feed_query:visual_summaries:ui",
             ],
             actionsTaken: ["query_visual_summaries", "live_env.query_visual_summaries"],
@@ -2227,19 +2274,27 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-goal-context-authority-state")).toHaveTextContent(/evidence-only, non-terminal context/i);
     expect(screen.getByTestId("stage-play-terminal-authority-state")).toHaveTextContent(/Final reports require a completed solver path/i);
     expect(screen.getByTestId("stage-play-narrator-binding-state")).toHaveTextContent(/stream binding dispatch/i);
-    expect(screen.getByTestId("stage-play-packet-trace-state")).toHaveTextContent(/2 packet trace context items/i);
+    expect(screen.getByTestId("stage-play-packet-trace-state")).toHaveTextContent(/3 packet trace context items/i);
     expect(screen.getByTestId("stage-play-packet-trace-state")).toHaveTextContent(/per-packet travel visible as evidence/i);
-    expect(screen.getByTestId("stage-play-source-health-state")).toHaveTextContent(/3 source-health context items/i);
+    expect(screen.getByTestId("stage-play-source-health-state")).toHaveTextContent(/2 source-health context items/i);
     expect(screen.getByTestId("stage-play-source-health-state")).toHaveTextContent(/loop\/source status queryable before agent reasoning/i);
     expect(screen.getByTestId("stage-play-trace-memory-state")).toHaveTextContent(/1 trace-memory context item/i);
     expect(screen.getByTestId("stage-play-trace-memory-state")).toHaveTextContent(/prior reasoning queryable without answer authority/i);
-    expect(screen.getByTestId("stage-play-route-watch-automation-state")).toHaveTextContent(/1 route-watch update/i);
+    expect(screen.getByTestId("stage-play-audio-transcript-state")).toHaveTextContent(/0 audio transcript context items/i);
+    expect(screen.getByTestId("stage-play-audio-transcript-state")).toHaveTextContent(/capture speech queryable before agent reasoning/i);
+    expect(screen.getByTestId("stage-play-translation-state")).toHaveTextContent(/2 translated transcript context items/i);
+    expect(screen.getByTestId("stage-play-translation-state")).toHaveTextContent(/translation output visible as evidence/i);
+    expect(screen.getByTestId("stage-play-route-watch-automation-state")).toHaveTextContent(/1 automation status update/i);
     expect(screen.getByTestId("stage-play-route-watch-automation-state")).toHaveTextContent(/1 running loop dispatch/i);
+    expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/7 allowed actuators/i);
+    expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/1 narrator output policy item/i);
     expect(screen.getByText("Minecraft danger monitor")).toBeTruthy();
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/visual summaries/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/packet traces/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/source health/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/microdeck outputs/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/automation policies/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/translated transcripts/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-cadence")).toHaveTextContent(/event accumulation \/ 2 updates/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-stop-conditions")).toHaveTextContent(/Terminal authority produces a final report/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-checkpoint")).toHaveTextContent(/Queried visual summaries feed/i);
@@ -2252,11 +2307,14 @@ describe("StagePlayBadgeGraphPanel", () => {
       /query packet traces/i.test(node.textContent ?? "")
     )).toBe(true);
     expect(screen.getAllByTestId("stage-play-agent-goal-session-checkpoint-evidence").some((node) =>
-      /stage_play_goal_context_update:route_watch:ui/i.test(node.textContent ?? "")
+      /stage_play_goal_context_update:automation:ui/i.test(node.textContent ?? "")
     )).toBe(true);
     expect(screen.getAllByTestId("stage-play-goal-context-update").length).toBeGreaterThan(0);
     expect(screen.getAllByTestId("stage-play-goal-context-update").some((node) =>
-      /route watch/i.test(node.textContent ?? "") && /Configured live-source watch job/i.test(node.textContent ?? "")
+      /automation status/i.test(node.textContent ?? "") && /Configured live-source watch job/i.test(node.textContent ?? "")
+    )).toBe(true);
+    expect(screen.getAllByTestId("stage-play-goal-context-update").some((node) =>
+      /translated transcript/i.test(node.textContent ?? "") && /ready for Live Answer and Narrator output/i.test(node.textContent ?? "")
     )).toBe(true);
     expect(screen.getAllByTestId("stage-play-goal-context-update-custody").some((node) =>
       /sources=source:visual-tab/i.test(node.textContent ?? "") &&

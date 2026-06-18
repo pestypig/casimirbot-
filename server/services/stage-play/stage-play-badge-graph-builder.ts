@@ -1720,6 +1720,30 @@ const addWorkstationStatePlaneBadges = (
       evidenceRefs: sessionEvidenceRefs,
       reasonCodes: ["goal_context_bus_contains_session"],
     });
+    if (session.allowedActuators.length > 0) {
+      pushEdge(edges, {
+        from: sessionId,
+        to: controlId,
+        relation: "constrains",
+        label: "agent goal actuator policy bounds control signals",
+        evidenceRefs: unique([...sessionEvidenceRefs, ...session.allowedActuators]),
+        reasonCodes: ["agent_goal_session_bounds_control_signals", "agent_actuator_policy"],
+      });
+    }
+    if (
+      session.allowedActuators.includes("bind_narrator") ||
+      session.allowedActuators.includes("narrator_bind_stream") ||
+      session.allowedActuators.includes("narrator_say")
+    ) {
+      pushEdge(edges, {
+        from: sessionId,
+        to: outputBusId,
+        relation: "constrains",
+        label: "agent goal narrator actuator policy bounds output bus",
+        evidenceRefs: unique([...sessionEvidenceRefs, ...session.allowedActuators]),
+        reasonCodes: ["agent_goal_session_bounds_output_bus", "narrator_actuator_policy"],
+      });
+    }
   }
 
   for (const update of input.goalContextUpdates.slice(0, 12)) {
@@ -1788,14 +1812,66 @@ const addWorkstationStatePlaneBadges = (
       evidenceRefs: updateEvidenceRefs,
       reasonCodes: ["goal_context_bus_contains_update"],
     });
-    if (update.producerKind === "route_watch") {
+    const isStreamContextUpdate =
+      update.producerKind === "audio_capture" ||
+      update.producerKind === "transcription_loop" ||
+      update.producerKind === "translation_loop";
+    const isOutputContextUpdate =
+      update.producerKind === "translation_loop" ||
+      update.producerKind === "live_answer" ||
+      update.producerKind === "narrator" ||
+      update.updateKind === "translated_transcript" ||
+      dispatchKinds.includes("update_live_answer") ||
+      dispatchKinds.includes("speak_narrator") ||
+      dispatchKinds.includes("bind_narrator_stream");
+    if (isStreamContextUpdate) {
+      pushEdge(edges, {
+        from: updateId,
+        to: sourceBusId,
+        relation: "feeds",
+        label: "stream goal-context update feeds source bus",
+        evidenceRefs: updateEvidenceRefs,
+        reasonCodes: ["stream_goal_context_update_feeds_source_bus", update.producerKind],
+      });
+    }
+    if (isStreamContextUpdate && !dispatchKinds.includes("set_loop_state")) {
+      pushEdge(edges, {
+        from: updateId,
+        to: processLoopId,
+        relation: "feeds",
+        label: "stream goal-context update feeds process loop",
+        evidenceRefs: updateEvidenceRefs,
+        reasonCodes: ["stream_goal_context_update_feeds_process_loop", update.producerKind],
+      });
+    }
+    if (isOutputContextUpdate) {
+      pushEdge(edges, {
+        from: updateId,
+        to: outputBusId,
+        relation: "feeds",
+        label: "output goal-context update feeds output bus",
+        evidenceRefs: updateEvidenceRefs,
+        reasonCodes: ["goal_context_update_feeds_output_bus", update.producerKind, update.updateKind],
+      });
+    }
+    if (
+      update.producerKind === "route_watch" ||
+      update.producerKind === "automation" ||
+      update.updateKind === "automation_status"
+    ) {
       pushEdge(edges, {
         from: updateId,
         to: controlId,
         relation: "feeds",
-        label: "route-watch update feeds control signals",
+        label: update.producerKind === "automation" || update.updateKind === "automation_status"
+          ? "automation update feeds control signals"
+          : "route-watch update feeds control signals",
         evidenceRefs: updateEvidenceRefs,
-        reasonCodes: ["route_watch_update_feeds_control"],
+        reasonCodes: [
+          update.producerKind === "automation" || update.updateKind === "automation_status"
+            ? "automation_update_feeds_control"
+            : "route_watch_update_feeds_control",
+        ],
       });
     }
     if (dispatchKinds.includes("set_loop_state")) {

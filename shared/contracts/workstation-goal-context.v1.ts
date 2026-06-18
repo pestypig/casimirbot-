@@ -210,6 +210,38 @@ export const WORKSTATION_AGENT_GOAL_ACTUATORS: readonly AgentGoalActuatorV1[] = 
   "ask_user",
 ];
 
+export type AgentGoalFinalReportRequirementsV1 = {
+  completedSolverPathRequired: true;
+  evidenceReentryRequired: true;
+  routeAuthorityRequired: true;
+  terminalAuthoritySingleWriterRequired: true;
+  allowedTerminalArtifactKinds: string[];
+  requiredEvidenceKinds: string[];
+  prohibitedReportSources: string[];
+};
+
+export const WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS: AgentGoalFinalReportRequirementsV1 = {
+  completedSolverPathRequired: true,
+  evidenceReentryRequired: true,
+  routeAuthorityRequired: true,
+  terminalAuthoritySingleWriterRequired: true,
+  allowedTerminalArtifactKinds: ["final_answer", "typed_failure", "request_user_input"],
+  requiredEvidenceKinds: [
+    "goal_context_update",
+    "agent_step_observation_packet",
+    "route_product_contract",
+    "terminal_authority_single_writer",
+  ],
+  prohibitedReportSources: [
+    "goal_context_update",
+    "tool_receipt",
+    "panel_projection",
+    "microdeck_output",
+    "narrator_event",
+    "wake_request",
+  ],
+};
+
 export type AgentGoalSessionV1 = {
   schemaVersion: typeof WORKSTATION_AGENT_GOAL_SESSION_SCHEMA;
   goalId: string;
@@ -246,6 +278,7 @@ export type AgentGoalSessionV1 = {
   authority: {
     assistantAnswer: false;
     finalReportsRequireTerminalAuthority: true;
+    finalReportRequirements: AgentGoalFinalReportRequirementsV1;
   };
 };
 
@@ -377,5 +410,17 @@ export function validateAgentGoalSessionV1(value: AgentGoalSessionV1): string[] 
   if (!Array.isArray(value.stopConditions)) issues.push("stopConditions must be an array");
   if (value.authority?.assistantAnswer !== false) issues.push("goal sessions must not be assistant answers");
   if (value.authority?.finalReportsRequireTerminalAuthority !== true) issues.push("goal sessions require terminal authority for final reports");
+  const requirements = value.authority?.finalReportRequirements;
+  if (!requirements) {
+    issues.push("goal sessions must track final report authority requirements");
+  } else {
+    if (requirements.completedSolverPathRequired !== true) issues.push("final report requirements must require completed solver path");
+    if (requirements.evidenceReentryRequired !== true) issues.push("final report requirements must require evidence re-entry");
+    if (requirements.routeAuthorityRequired !== true) issues.push("final report requirements must require route authority");
+    if (requirements.terminalAuthoritySingleWriterRequired !== true) issues.push("final report requirements must require terminal authority single writer");
+    issues.push(...stringArrayIssue(requirements.allowedTerminalArtifactKinds, "authority.finalReportRequirements.allowedTerminalArtifactKinds", { requireNonEmpty: true }));
+    issues.push(...stringArrayIssue(requirements.requiredEvidenceKinds, "authority.finalReportRequirements.requiredEvidenceKinds", { requireNonEmpty: true }));
+    issues.push(...stringArrayIssue(requirements.prohibitedReportSources, "authority.finalReportRequirements.prohibitedReportSources", { requireNonEmpty: true }));
+  }
   return issues;
 }
