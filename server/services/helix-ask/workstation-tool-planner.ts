@@ -897,6 +897,14 @@ function defaultNarratorSourceRef(streamKind: string): string {
   return `source:${streamKind}:active`;
 }
 
+function shouldUseLiveEnvNarratorTool(prompt: string): boolean {
+  if (/\blive_env\.narrator_(?:say|bind_stream)\b/i.test(prompt)) return true;
+  const explicitPanelAction =
+    /\bpanel[_\s-]?id\s*(?:=|:)\s*narrator\b[\s\S]{0,120}\baction[_\s-]?id\s*(?:=|:)\s*narrator\.(?:say|bind_stream)\b/i.test(prompt) ||
+    /\brun\s+panel\s+action\b[\s\S]{0,160}\bnarrator\.(?:say|bind_stream)\b/i.test(prompt);
+  return !explicitPanelAction;
+}
+
 function buildNarratorControlPlan(
   normalized: string,
   options: PlanWorkstationToolUseOptions,
@@ -905,7 +913,7 @@ function buildNarratorControlPlan(
   const kind = narratorControlKind(normalized);
   const actionId = kind === "bind_stream" ? "narrator.bind_stream" : "narrator.say";
   const liveEnvToolId = kind === "bind_stream" ? "live_env.narrator_bind_stream" : "live_env.narrator_say";
-  const useLiveEnvTool = /\blive_env\.narrator_(?:say|bind_stream)\b/i.test(normalized);
+  const useLiveEnvTool = shouldUseLiveEnvNarratorTool(normalized);
   const streamKind = inferNarratorStreamKind(normalized);
   const sourceRef =
     extractNamedArg(normalized, ["source_ref", "source ref", "source_id", "source id"]) ??
@@ -1233,23 +1241,26 @@ function makeOpenStep(panelId: string, depends_on: string[] = []): HelixWorkstat
 }
 
 const GOAL_CONTEXT_OBJECT_PATTERN =
-  "(?:workstation\\s+goal\\s+context|goal\\s+context\\s+updates?|active\\s+goal\\s+sessions?|agent\\s+goal\\s+sessions?|goal\\s+sessions?|per[-\\s]?packet\\s+traces?|packet\\s+traces?|trace\\s+memory|reasoning\\s+circuit|process\\s+graph\\s+traces?|visual\\s+summaries|audio\\s+transcripts?|translation\\s+segments?|translated\\s+transcripts?|micro[-\\s]?deck\\s+outputs?|live\\s+answer\\s+state|live\\s+answer\\s+lines?|source\\s+health|source\\s+status|source\\s+capability\\s+state)";
+  "(?:workstation\\s+goal\\s+context|goal\\s+context\\s+updates?|active\\s+goal\\s+sessions?|agent\\s+goal\\s+sessions?|goal\\s+sessions?|per[-\\s]?packet\\s+traces?|packet\\s+traces?|trace\\s+memory|reasoning\\s+circuit|process\\s+graph\\s+traces?|visual\\s+summaries|audio\\s+transcripts?|translation\\s+segments?|translated\\s+transcripts?|micro[-\\s]?deck\\s+outputs?|live\\s+answer\\s+state|live\\s+answer\\s+lines?|source\\s+health|source\\s+status|source\\s+capability\\s+state|route\\s+evidence|route[-\\s]?watch\\s+evidence|route[-\\s]?watch\\s+updates?)";
 const GOAL_CONTEXT_TOOL_PATTERN =
-  "live_env\\.(?:query_workstation_goal_context|start_agent_goal_session|query_trace_memory|query_visual_summaries|query_audio_transcripts|query_translation_segments|query_microdeck_outputs|query_live_answer_state|query_source_health)";
+  "live_env\\.(?:query_workstation_goal_context|start_agent_goal_session|query_trace_memory|query_packet_traces|query_visual_summaries|query_audio_transcripts|query_translation_segments|query_microdeck_outputs|query_live_answer_state|query_source_health|query_route_evidence)";
 
 type WorkstationContextFeedTool =
+  | "live_env.query_packet_traces"
   | "live_env.query_visual_summaries"
   | "live_env.query_audio_transcripts"
   | "live_env.query_translation_segments"
   | "live_env.query_microdeck_outputs"
   | "live_env.query_live_answer_state"
-  | "live_env.query_source_health";
+  | "live_env.query_source_health"
+  | "live_env.query_route_evidence";
 
 type WorkstationControlTool =
   | "live_env.change_workstation_preset"
   | "live_env.bind_workstation_source"
   | "live_env.unbind_workstation_source"
   | "live_env.set_workstation_loop_state"
+  | "live_env.repair_workstation_source"
   | "live_env.update_live_answer_projection"
   | "live_env.focus_process_graph";
 
@@ -1267,7 +1278,7 @@ function hasContextualWorkstationGoalContextCue(prompt: string): boolean {
 const WORKSTATION_CONTROL_OBJECT_PATTERN =
   "(?:workstation\\s+presets?|presets?|sources?|source\\s+bindings?|source\\s+routes?|loops?|loop\\s+state|process\\s+loops?|live\\s+answer\\s+projection|live\\s+answer\\s+line|process\\s+graph(?:\\s+focus)?|stage\\s+play\\s+graph)";
 const WORKSTATION_CONTROL_TOOL_PATTERN =
-  "live_env\\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|set_workstation_loop_state|update_live_answer_projection|focus_process_graph)";
+  "live_env\\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph)";
 
 function hasContextualWorkstationControlCue(prompt: string): boolean {
   const object = WORKSTATION_CONTROL_OBJECT_PATTERN;
@@ -1282,7 +1293,7 @@ function hasContextualWorkstationControlCue(prompt: string): boolean {
 
 function selectWorkstationControlTool(prompt: string): WorkstationControlTool | null {
   if (hasContextualWorkstationControlCue(prompt)) return null;
-  const explicit = prompt.match(/\blive_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|set_workstation_loop_state|update_live_answer_projection|focus_process_graph)\b/i)?.[0]?.toLowerCase();
+  const explicit = prompt.match(/\blive_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph)\b/i)?.[0]?.toLowerCase();
   if (explicit) return explicit as WorkstationControlTool;
   if (/\b(?:change|set|apply|switch)\b[\s\S]{0,120}\b(?:workstation\s+)?preset\b/i.test(prompt)) {
     return "live_env.change_workstation_preset";
@@ -1295,6 +1306,9 @@ function selectWorkstationControlTool(prompt: string): WorkstationControlTool | 
   }
   if (/\b(?:pause|resume|repair|restart|set)\b[\s\S]{0,120}\b(?:loop|process\s+loop|mail\s+loop)\b/i.test(prompt)) {
     return "live_env.set_workstation_loop_state";
+  }
+  if (/\b(?:repair|restart|recover)\b[\s\S]{0,120}\b(?:source|capture|live\s+source|visual\s+source|audio\s+source)\b/i.test(prompt)) {
+    return "live_env.repair_workstation_source";
   }
   if (/\b(?:update|set|refresh)\b[\s\S]{0,120}\blive\s+answer\b[\s\S]{0,80}\b(?:projection|line)\b/i.test(prompt)) {
     return "live_env.update_live_answer_projection";
@@ -1328,6 +1342,7 @@ function workstationControlMissingRequirements(toolId: WorkstationControlTool, a
   }
   if (toolId === "live_env.unbind_workstation_source") return has("source_ref") ? [] : ["source_ref"];
   if (toolId === "live_env.set_workstation_loop_state") return has("loop_ref") ? [] : ["loop_ref"];
+  if (toolId === "live_env.repair_workstation_source") return has("loop_ref") ? [] : ["loop_ref"];
   if (toolId === "live_env.update_live_answer_projection") return has("line_key") ? [] : ["line_key"];
   return [];
 }
@@ -1350,6 +1365,7 @@ function buildWorkstationControlArgs(prompt: string, toolId: WorkstationControlT
     ...(lineKey ? { line_key: lineKey } : {}),
     ...(panelId ? { panel_id: panelId } : {}),
     ...(nodeRef ? { node_ref: nodeRef } : {}),
+    ...(toolId === "live_env.repair_workstation_source" ? { state: "repaired" } : {}),
     ...(toolId === "live_env.set_workstation_loop_state" && inferLoopState(prompt) ? { state: inferLoopState(prompt) } : {}),
     reason: "Agent-requested governed workstation control dispatch.",
   };
@@ -1419,7 +1435,7 @@ function buildWorkstationControlPlan(
 
 const WATCH_JOB_AUTOMATION_OBJECT_PATTERN =
   "(?:live[-\\s]?source\\s+watch\\s+jobs?|watch\\s+jobs?|route[-\\s]?watch\\s+loops?|source\\s+monitors?|live\\s+source\\s+monitors?|workstation\\s+automations?|automation\\s+polic(?:y|ies))";
-const WATCH_JOB_AUTOMATION_TOOL_PATTERN = "live_env\\.configure_live_source_watch_job";
+const WATCH_JOB_AUTOMATION_TOOL_PATTERN = "live_env\\.(?:configure_route_watch|configure_live_source_watch_job)";
 
 function hasContextualWatchJobAutomationCue(prompt: string): boolean {
   const object = WATCH_JOB_AUTOMATION_OBJECT_PATTERN;
@@ -1435,10 +1451,16 @@ function hasContextualWatchJobAutomationCue(prompt: string): boolean {
 function isWatchJobAutomationPrompt(prompt: string): boolean {
   if (hasContextualWatchJobAutomationCue(prompt)) return false;
   return (
-    /\blive_env\.configure_live_source_watch_job\b/i.test(prompt) ||
+    /\blive_env\.(?:configure_route_watch|configure_live_source_watch_job)\b/i.test(prompt) ||
     /\b(?:configure|set\s+up|setup|start|create|arm|enable)\b[\s\S]{0,160}\b(?:live[-\s]?source\s+watch\s+job|watch\s+job|route[-\s]?watch\s+loop|source\s+monitor|live\s+source\s+monitor|automation\s+policy)\b/i.test(prompt) ||
     /\b(?:watch|monitor|keep\s+(?:watching|checking|tracking))\b[\s\S]{0,120}\b(?:live\s+source|visual\s+source|audio\s+source|translation|screen\s+capture)\b[\s\S]{0,120}\b(?:as|with|through|using)\b[\s\S]{0,80}\b(?:automation|watch\s+job|route[-\s]?watch)\b/i.test(prompt)
   );
+}
+
+function watchJobAutomationToolId(prompt: string): "live_env.configure_route_watch" | "live_env.configure_live_source_watch_job" {
+  return /\blive_env\.configure_route_watch\b/i.test(prompt)
+    ? "live_env.configure_route_watch"
+    : "live_env.configure_live_source_watch_job";
 }
 
 function buildWatchJobAutomationArgs(prompt: string, options: PlanWorkstationToolUseOptions): Record<string, unknown> {
@@ -1470,10 +1492,12 @@ function buildWatchJobAutomationPlan(
   scores: AffordanceScore[],
 ): WorkstationToolPlannerResult {
   const args = buildWatchJobAutomationArgs(normalized, options);
+  const toolId = watchJobAutomationToolId(normalized);
+  const stepId = toolId === "live_env.configure_route_watch" ? "configure_route_watch" : "configure_live_source_watch_job";
   scores.push({
-    affordance_id: "live_env.configure_live_source_watch_job",
+    affordance_id: toolId,
     panel_id: "helix_ask",
-    action_id: "live_env.configure_live_source_watch_job",
+    action_id: toolId,
     score: 0.9,
     reason: "affirmative watch-job automation prompt should configure a deterministic route-watch policy and record goal context",
     required_args_missing: [],
@@ -1488,9 +1512,9 @@ function buildWatchJobAutomationPlan(
       options,
       steps: [
         {
-          step_id: "configure_live_source_watch_job",
+          step_id: stepId,
           kind: "run_ask_tool",
-          tool_id: "live_env.configure_live_source_watch_job",
+          tool_id: toolId,
           args,
           expected_receipt_kind: "stage_play_live_source_watch_job_policy_config_result",
           expected_state_change: { store: "stage-play-goal-context", proof_key: "goalContextUpdates" },
@@ -1499,7 +1523,7 @@ function buildWatchJobAutomationPlan(
         {
           step_id: "evaluate_live_source_watch_job_policy",
           kind: "evaluate_result",
-          depends_on: ["configure_live_source_watch_job"],
+          depends_on: [stepId],
           expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
           required: true,
         },
@@ -1526,7 +1550,7 @@ function wantsQueryWorkstationGoalContext(prompt: string): boolean {
   return (
     /\blive_env\.query_workstation_goal_context\b/i.test(prompt) ||
     /\blive_env\.query_trace_memory\b/i.test(prompt) ||
-    /\blive_env\.(?:query_visual_summaries|query_audio_transcripts|query_translation_segments|query_microdeck_outputs|query_live_answer_state|query_source_health)\b/i.test(prompt) ||
+    /\blive_env\.(?:query_packet_traces|query_visual_summaries|query_audio_transcripts|query_translation_segments|query_microdeck_outputs|query_live_answer_state|query_source_health|query_route_evidence)\b/i.test(prompt) ||
     new RegExp(`\\b(?:query|view|inspect|show|list|get|check|read|retrieve|summari[sz]e)\\b[\\s\\S]{0,140}\\b${GOAL_CONTEXT_OBJECT_PATTERN}\\b`, "i").test(prompt) ||
     new RegExp(`\\b${GOAL_CONTEXT_OBJECT_PATTERN}\\b[\\s\\S]{0,140}\\b(?:query|view|inspect|show|list|get|check|read|retrieve|latest|active|available|known)\\b`, "i").test(prompt)
   );
@@ -1543,6 +1567,9 @@ function wantsTraceMemoryQuery(prompt: string): boolean {
 
 function selectWorkstationContextFeedTool(prompt: string): WorkstationContextFeedTool | null {
   if (hasContextualWorkstationGoalContextCue(prompt)) return null;
+  if (/\blive_env\.query_packet_traces\b/i.test(prompt) || /\b(?:per[-\s]?packet\s+traces?|packet\s+traces?|packet\s+causal\s+traces?)\b/i.test(prompt)) {
+    return "live_env.query_packet_traces";
+  }
   if (/\blive_env\.query_visual_summaries\b/i.test(prompt) || /\bvisual\s+summaries\b/i.test(prompt)) {
     return "live_env.query_visual_summaries";
   }
@@ -1563,6 +1590,9 @@ function selectWorkstationContextFeedTool(prompt: string): WorkstationContextFee
   }
   if (/\blive_env\.query_source_health\b/i.test(prompt) || /\b(?:source\s+health|source\s+status|source\s+capability\s+state)\b/i.test(prompt)) {
     return "live_env.query_source_health";
+  }
+  if (/\blive_env\.query_route_evidence\b/i.test(prompt) || /\b(?:route\s+evidence|route[-\s]?watch\s+evidence|route[-\s]?watch\s+updates?)\b/i.test(prompt)) {
+    return "live_env.query_route_evidence";
   }
   return null;
 }
@@ -1654,6 +1684,8 @@ function buildWorkstationGoalContextPlan(
       depends_on: startSession ? ["start_agent_goal_session"] : [],
       expected_receipt_kind: traceMemory
         ? "helix.workstation_reasoning_trace_query_result"
+        : feedTool === "live_env.query_packet_traces"
+          ? "stage_play_packet_trace_query_result"
         : feedTool === "live_env.query_source_health"
           ? "helix.situation_source_capability_read.v1"
         : feedTool

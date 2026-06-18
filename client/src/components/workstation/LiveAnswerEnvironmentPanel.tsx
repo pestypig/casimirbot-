@@ -556,6 +556,61 @@ const liveAnswerDispatchLabel = (action: WorkstationDispatchActionV1): string =>
   return compactLabel(action.kind);
 };
 
+const liveAnswerPacketColorKey = (update: WorkstationGoalContextUpdateV1): string => {
+  const refs = [
+    update.contentRef,
+    ...update.evidenceRefs,
+    ...update.receiptRefs,
+    ...update.loopRefs,
+    ...update.sourceRefs,
+  ];
+  return refs.find((ref) => ref.includes("stage_play_processed_mail_packet:")) ??
+    refs.find((ref) => ref.includes("processed_mail_packet")) ??
+    refs.find((ref) => ref.includes("microdeck_output:")) ??
+    refs.find((ref) => ref.includes("microdeck")) ??
+    update.contentRef ??
+    update.updateId;
+};
+
+const liveAnswerTraceMemoryUpdate = (update: WorkstationGoalContextUpdateV1): boolean => {
+  if (update.producerKind === "trace_memory") return true;
+  if (update.producerKind === "reflection" || update.updateKind === "reflection") return true;
+  const refs = [
+    update.contentRef,
+    ...update.evidenceRefs,
+    ...update.receiptRefs,
+    ...update.loopRefs,
+    ...update.sourceRefs,
+  ];
+  return refs.some((ref) => ref.includes("trace_memory") || ref.includes("trace-memory"));
+};
+
+const liveAnswerPacketTraceUpdate = (update: WorkstationGoalContextUpdateV1): boolean => {
+  const refs = [
+    update.contentRef,
+    ...update.evidenceRefs,
+    ...update.receiptRefs,
+    ...update.loopRefs,
+    ...update.sourceRefs,
+  ];
+  return refs.some((ref) =>
+    ref.includes("stage_play_packet_trace_query") ||
+    ref.includes("packet_trace_query") ||
+    ref.includes("packet_traces") ||
+    ref.includes("live_source_trace:") ||
+    ref.includes("stage_play_processed_mail_packet:") ||
+    ref.includes("processed_mail_packet")
+  );
+};
+
+const liveAnswerFeedQueryUpdate = (update: WorkstationGoalContextUpdateV1): boolean => {
+  const refs = [update.contentRef, ...update.evidenceRefs, ...update.receiptRefs, ...update.loopRefs];
+  return refs.some((ref) =>
+    ref.includes("stage_play_context_feed_query:") ||
+    ref.includes("workstation_context_feed:")
+  );
+};
+
 const documentMarkdownSourceIdFromLocation = (threadId: string): string => {
   if (typeof window === "undefined") return `document_markdown:${threadId}`;
   const params = new URLSearchParams(window.location.search);
@@ -1667,11 +1722,19 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         sourceRefs: update.sourceRefs,
         loopRefs: update.loopRefs,
         evidenceRefs: update.evidenceRefs,
+        receiptRefs: update.receiptRefs,
         dispatch: update.suggestedDispatch.slice(0, 4).map(liveAnswerDispatchLabel),
+        packetColorKey: liveAnswerPacketColorKey(update),
+        freshness: {
+          observedAtMs: update.freshness.observedAtMs,
+          staleAfterMs: update.freshness.staleAfterMs,
+          status: update.freshness.status,
+        },
         authority: {
           assistantAnswer: update.authority.assistantAnswer,
           terminalEligible: update.authority.terminalEligible,
           rawContentIncluded: update.authority.rawContentIncluded,
+          postToolModelStepRequired: update.authority.postToolModelStepRequired,
         },
       })),
     [goalContextUpdates],
@@ -1689,6 +1752,23 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       narratorSpeechCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "speak_narrator").length,
       narratorBindingCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "bind_narrator_stream").length,
       wakeCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "wake_agent").length,
+      packetTraceCount: goalContextUpdates.filter(liveAnswerPacketTraceUpdate).length +
+        agentGoalSessions.filter((session: AgentGoalSessionV1) =>
+          session.contextFeeds.some((feed) => feed.sourceKind === "packet_traces")
+        ).length,
+      sourceHealthCount: goalContextUpdates.filter((update: WorkstationGoalContextUpdateV1) =>
+        update.producerKind === "source_health" || update.updateKind === "source_status"
+      ).length +
+        agentGoalSessions.filter((session: AgentGoalSessionV1) =>
+          session.contextFeeds.some((feed) => feed.sourceKind === "source_health")
+        ).length,
+      feedQueryCount: goalContextUpdates.filter(liveAnswerFeedQueryUpdate).length +
+        agentGoalSessions.reduce((count: number, session: AgentGoalSessionV1) => count + session.contextFeeds.length, 0),
+      routeWatchCount: goalContextUpdates.filter((update: WorkstationGoalContextUpdateV1) => update.producerKind === "route_watch").length,
+      traceMemoryCount: goalContextUpdates.filter(liveAnswerTraceMemoryUpdate).length +
+        agentGoalSessions.filter((session: AgentGoalSessionV1) =>
+          session.contextFeeds.some((feed) => feed.sourceKind === "trace_memory")
+        ).length,
       terminalAuthorityRequiredCount: agentGoalSessions.filter((session: AgentGoalSessionV1) => session.authority.finalReportsRequireTerminalAuthority).length,
       terminalPosture: agentGoalSessions.some((session: AgentGoalSessionV1) => session.authority.finalReportsRequireTerminalAuthority)
         ? "terminal authority required"

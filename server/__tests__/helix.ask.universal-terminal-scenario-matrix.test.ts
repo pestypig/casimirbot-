@@ -202,7 +202,7 @@ describe("Helix Ask universal terminal scenario matrix", () => {
         expect.objectContaining({ route: "active_doc_identity", reason: "explicit_visual_source_target" }),
       ]),
     );
-    expect(visual.body?.canonical_goal_frame?.goal_kind).toBe("situation_context_question");
+    expect(visual.body?.canonical_goal_frame?.goal_kind).toBe("visual_capture_describe");
     expect(String(visual.body?.selected_final_answer ?? "")).not.toContain("Active doc:");
 
     const doc = await request(app)

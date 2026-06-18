@@ -34,7 +34,7 @@ describe("narrator event contract", () => {
   });
 
   it("accepts terminal final-answer events only with final authority", () => {
-    expect(validateNarratorEventV1({
+    const finalAnswerProjection = {
       ...event,
       sourceKind: "final_answer",
       authority: "terminal_answer",
@@ -42,7 +42,10 @@ describe("narrator event contract", () => {
       terminal_eligible: true,
       requestedDeliveryMode: "auto_speak",
       defaultDeliveryMode: "auto_speak",
-    })).toEqual([]);
+    } satisfies NarratorEventV1;
+    expect(validateNarratorEventV1(finalAnswerProjection)).toEqual([]);
+    expect(finalAnswerProjection.schemaVersion).toBe("helix.narrator_event/v1");
+    expect(finalAnswerProjection.evidenceRefs).toEqual(["image_lens_focus_run:1"]);
   });
 
   it("rejects non-final events that try to become answers", () => {

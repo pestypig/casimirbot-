@@ -416,6 +416,12 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   if (/live_env[-_.:]query_visual_summaries|visual_summaries|visual_capture_summaries/.test(haystack)) {
     return "live_env.query_visual_summaries";
   }
+  if (/live_env[-_.:]query_packet_traces|packet_traces|per_packet_traces|packet_causal_trace|live_source_causal_trace/.test(haystack)) {
+    return "live_env.query_packet_traces";
+  }
+  if (/live_env[-_.:]query_route_evidence|query_route_evidence|route_evidence_feed|route_watch_evidence|automation_policies|automation_status|stage_play_workstation_context_feed_query_result[\s\S]*(?:route_evidence|automation_policies)/.test(haystack)) {
+    return "live_env.query_route_evidence";
+  }
   if (/live_env[-_.:]query_audio_transcripts|audio_transcripts|transcription_loop/.test(haystack)) {
     return "live_env.query_audio_transcripts";
   }
@@ -440,6 +446,9 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   if (/live_env[-_.:]set_workstation_loop_state|set_workstation_loop_state|pause_loop|resume_loop|repair_loop/.test(haystack)) {
     return "live_env.set_workstation_loop_state";
   }
+  if (/live_env[-_.:]repair_workstation_source|repair_workstation_source|repair_source|source_repair/.test(haystack)) {
+    return "live_env.repair_workstation_source";
+  }
   if (/live_env[-_.:]update_live_answer_projection|update_live_answer_projection|live_answer_projection/.test(haystack)) {
     return "live_env.update_live_answer_projection";
   }
@@ -451,6 +460,9 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   }
   if (/live_env[-_.:]narrator_bind_stream|narrator\.bind_stream|narrator_bind_stream_request|helix\.narrator_bind_stream_request\.v1/.test(haystack)) {
     return "live_env.narrator_bind_stream";
+  }
+  if (/live_env[-_.:]configure_route_watch|configure_route_watch|route_watch_policy|route[-_\s]?watch/.test(haystack)) {
+    return "live_env.configure_route_watch";
   }
   if (/stage_play_workstation_control_receipt/.test(haystack)) {
     return "live_env.change_workstation_preset";
@@ -678,20 +690,55 @@ const materializedTerminalKind = (payload: RecordLike): string | null => {
   );
 };
 
-const terminalAuthorityKind = (payload: RecordLike): string | null => {
+const terminalAuthorityEvidence = (payload: RecordLike): { kind: string | null; source: string | null; proven: boolean } => {
   const terminalAuthority = readRecord(payload.terminal_authority_single_writer);
   const terminalAnswerAuthority = readRecord(payload.terminal_answer_authority);
-  return firstString(
-    terminalAuthority?.selected_terminal_artifact_kind,
-    terminalAnswerAuthority?.terminal_artifact_kind,
-    terminalAuthority?.terminal_artifact_kind,
-  );
+  const candidates: Array<{ kind: unknown; source: string }> = [
+    {
+      kind: terminalAuthority?.selected_terminal_artifact_kind,
+      source: "terminal_authority_single_writer.selected_terminal_artifact_kind",
+    },
+    {
+      kind: terminalAnswerAuthority?.terminal_artifact_kind,
+      source: "terminal_answer_authority.terminal_artifact_kind",
+    },
+    {
+      kind: terminalAuthority?.terminal_artifact_kind,
+      source: "terminal_authority_single_writer.terminal_artifact_kind",
+    },
+  ];
+  for (const candidate of candidates) {
+    const kind = readString(candidate.kind);
+    if (kind) {
+      return { kind, source: candidate.source, proven: true };
+    }
+  }
+  return { kind: null, source: null, proven: false };
+};
+
+const terminalAuthorityKind = (payload: RecordLike): string | null => {
+  return terminalAuthorityEvidence(payload).kind;
+};
+
+const visibleTerminalEvidence = (payload: RecordLike): { kind: string | null; source: string | null; proven: boolean } => {
+  const presentation = readRecord(payload.terminal_presentation);
+  const resolvedSummary = readRecord(payload.resolved_turn_summary);
+  const candidates: Array<{ kind: unknown; source: string }> = [
+    { kind: presentation?.terminal_artifact_kind, source: "terminal_presentation.terminal_artifact_kind" },
+    { kind: resolvedSummary?.terminal_artifact_kind, source: "resolved_turn_summary.terminal_artifact_kind" },
+    { kind: payload.terminal_artifact_kind, source: "payload.terminal_artifact_kind" },
+  ];
+  for (const candidate of candidates) {
+    const kind = readString(candidate.kind);
+    if (kind) {
+      return { kind, source: candidate.source, proven: true };
+    }
+  }
+  return { kind: null, source: null, proven: false };
 };
 
 const visibleTerminalKind = (payload: RecordLike): string | null => {
-  const presentation = readRecord(payload.terminal_presentation);
-  const resolvedSummary = readRecord(payload.resolved_turn_summary);
-  return firstString(presentation?.terminal_artifact_kind, resolvedSummary?.terminal_artifact_kind, payload.terminal_artifact_kind);
+  return visibleTerminalEvidence(payload).kind;
 };
 
 const terminalDebugMirrorKinds = (payload: RecordLike): Array<{ source: string; terminal_kind: string }> => {
@@ -862,8 +909,10 @@ const buildToolTurnChainAudit = (input: {
       : requiredTerminalKind(input.payload, input.contract);
   const supportCount = supportRefsCount(input.payload, input.artifacts);
   const materializedTerminal = materializedTerminalKind(input.payload);
-  const authorityTerminal = terminalAuthorityKind(input.payload);
-  const visibleTerminal = visibleTerminalKind(input.payload);
+  const authorityTerminalEvidence = terminalAuthorityEvidence(input.payload);
+  const visibleTerminalProjection = visibleTerminalEvidence(input.payload);
+  const authorityTerminal = authorityTerminalEvidence.kind;
+  const visibleTerminal = visibleTerminalProjection.kind;
   const staleDebugMirrors = staleTerminalDebugMirrors(input.payload, authorityTerminal);
   const finalDraftRef = finalAnswerDraftRef(input.payload, input.artifacts);
   const modelDirectAnswerMaterialized = Boolean(
@@ -871,11 +920,17 @@ const buildToolTurnChainAudit = (input: {
       input.artifacts.some((artifact) => observationKindMatches(artifact, "direct_answer_text")) &&
       (!requiredTerminal || normalizedEqual(requiredTerminal, "direct_answer_text")),
   );
-  const reentryExecuted =
-    readString(input.lifecycleTrace?.lifecycle_stage) === "reentered_solver" ||
-    readBoolean(input.followupDecision?.evidence_reentered) ||
-    modelDirectAnswerMaterialized ||
-    Boolean(observationRef && supportCount > 0 && finalDraftRef);
+  const reentryProofSource =
+    readString(input.lifecycleTrace?.lifecycle_stage) === "reentered_solver"
+      ? "tool_lifecycle_trace.lifecycle_stage"
+      : readBoolean(input.followupDecision?.evidence_reentered)
+        ? "tool_followup_decision.evidence_reentered"
+        : modelDirectAnswerMaterialized
+          ? "direct_answer_text_materialized"
+          : observationRef && supportCount > 0 && finalDraftRef
+            ? "final_answer_draft_with_support_refs"
+            : null;
+  const reentryExecuted = Boolean(reentryProofSource);
   const expectedReentry = expectedReentryCapability(
     input.contract,
     input.artifacts,
@@ -1021,11 +1076,17 @@ const buildToolTurnChainAudit = (input: {
     required_terminal_kind: requiredTerminal,
     expected_reentry_capability: expectedReentry,
     reentry_executed: reentryExecuted,
+    reentry_proof_source: reentryProofSource,
+    reentry_proven: reentryExecuted,
     final_answer_draft_ref: finalDraftRef,
     support_refs_count: supportCount,
     materialized_terminal_artifact_kind: materializedTerminal,
     terminal_authority_kind: authorityTerminal,
+    terminal_authority_proof_source: authorityTerminalEvidence.source,
+    terminal_authority_proven: authorityTerminalEvidence.proven,
     visible_terminal_kind: visibleTerminal,
+    visible_projection_source: visibleTerminalProjection.source,
+    visible_projection_proven: visibleTerminalProjection.proven,
     stale_terminal_debug_mirrors: staleDebugMirrors,
     rail_status: railStatus,
     rail_failure_code: railFailureCode,
@@ -1368,11 +1429,11 @@ const railTableVisibleCapabilitySurface = (input: {
   };
 };
 
-const readAdmittedCapability = (
+const readAdmittedCapabilityEvidence = (
   payload: RecordLike,
   audit: RecordLike,
   lifecycleTrace: RecordLike | null,
-): string | null => {
+): { capability: string | null; source: string | null; proven: boolean } => {
   const admission = readRecord(payload.tool_call_admission_decision);
   const capabilityPlan = readRecord(payload.capability_plan);
   const operationalTrace = readRecord(payload.operational_capability_trace);
@@ -1380,15 +1441,38 @@ const readAdmittedCapability = (
     readString(capabilityPlan?.admission_status) === "admitted" ||
     readString(capabilityPlan?.status) === "admitted" ||
     capabilityPlan?.admitted === true;
-  return firstString(
-    admission?.admitted_capability,
-    admission?.selected_capability,
-    operationalTrace?.policy_admitted_capability,
-    planAdmitted ? capabilityPlan?.selected_capability : null,
-    planAdmitted ? capabilityPlan?.requested_action : null,
-    planAdmitted ? audit.selected_capability : null,
-    lifecycleTrace?.admitted_capability,
-  );
+  const candidates: Array<{ capability: unknown; source: string }> = [
+    { capability: admission?.admitted_capability, source: "tool_call_admission_decision.admitted_capability" },
+    { capability: admission?.selected_capability, source: "tool_call_admission_decision.selected_capability" },
+    { capability: operationalTrace?.policy_admitted_capability, source: "operational_capability_trace.policy_admitted_capability" },
+    { capability: planAdmitted ? capabilityPlan?.selected_capability : null, source: "capability_plan.selected_capability" },
+    { capability: planAdmitted ? capabilityPlan?.requested_action : null, source: "capability_plan.requested_action" },
+    { capability: planAdmitted ? audit.selected_capability : null, source: "capability_plan.audit_selected_capability" },
+    { capability: lifecycleTrace?.admitted_capability, source: "tool_lifecycle_trace.admitted_capability" },
+  ];
+  for (const candidate of candidates) {
+    const capability = readString(candidate.capability);
+    if (capability) {
+      return {
+        capability,
+        source: candidate.source,
+        proven: true,
+      };
+    }
+  }
+  return {
+    capability: null,
+    source: null,
+    proven: false,
+  };
+};
+
+const readAdmittedCapability = (
+  payload: RecordLike,
+  audit: RecordLike,
+  lifecycleTrace: RecordLike | null,
+): string | null => {
+  return readAdmittedCapabilityEvidence(payload, audit, lifecycleTrace).capability;
 };
 
 const normalizeGoalSatisfaction = (payload: RecordLike): string | null => {
@@ -1458,6 +1542,7 @@ const buildCodexParityAgentSpineRailTable = (input: {
     lifecycleTrace: input.lifecycleTrace,
   });
   const visibleSurface = visibleSurfaceProjection.visibleSurface;
+  const admissionProof = readAdmittedCapabilityEvidence(input.payload, input.audit, input.lifecycleTrace);
   const codexParityClass = codexParityClassFromAudit({
     audit: input.audit,
     triage: input.triage,
@@ -1472,19 +1557,33 @@ const buildCodexParityAgentSpineRailTable = (input: {
     visible_tool_surface_original_count: visibleSurfaceProjection.originalCount,
     visible_tool_surface_truncated: visibleSurfaceProjection.truncated,
     selected_capability: readNullableString(input.audit.selected_capability),
-    admitted_capability: readAdmittedCapability(input.payload, input.audit, input.lifecycleTrace),
+    admitted_capability: admissionProof.capability,
+    admission_proof_source: admissionProof.source,
+    admission_proven: admissionProof.proven,
     executed_capability: readNullableString(input.audit.executed_capability),
     observation_kind: readNullableString(input.audit.observation_artifact_kind),
     observation_ref: readNullableString(input.audit.observation_ref),
+    required_observation_kinds_for_requested_capability:
+      readStringArray(input.audit.required_observation_kinds_for_requested_capability),
+    observed_artifact_supports_requested_capability:
+      typeof input.audit.observed_artifact_supports_requested_capability === "boolean"
+        ? input.audit.observed_artifact_supports_requested_capability
+        : null,
     reentry_status: input.audit.reentry_executed === true
       ? "reentered"
       : readString(input.audit.observation_ref)
         ? "not_reentered"
         : "no_observation",
+    reentry_proof_source: readNullableString(input.audit.reentry_proof_source),
+    reentry_proven: input.audit.reentry_proven === true,
     goal_satisfaction: normalizeGoalSatisfaction(input.payload),
     required_terminal_kind: readNullableString(input.audit.required_terminal_kind),
     selected_terminal_kind: readNullableString(input.audit.terminal_authority_kind),
+    terminal_authority_proof_source: readNullableString(input.audit.terminal_authority_proof_source),
+    terminal_authority_proven: input.audit.terminal_authority_proven === true,
     visible_terminal_kind: readNullableString(input.audit.visible_terminal_kind),
+    visible_projection_source: readNullableString(input.audit.visible_projection_source),
+    visible_projection_proven: input.audit.visible_projection_proven === true,
     first_broken_rail: readNullableString(input.triage.first_broken_rail),
     repair_target: readNullableString(input.triage.repair_target),
     codex_parity_class: codexParityClass,
@@ -1510,6 +1609,8 @@ const buildArtifactEntry = (artifact: RecordLike): RecordLike => {
     schema,
     payloadKind,
     payloadSchema,
+    readString(payload?.feed_kind),
+    readString(payload?.feedKind),
     readString(artifact.producer_item_id),
     readString(artifact.source_scope),
   ]);

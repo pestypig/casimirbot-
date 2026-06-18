@@ -744,23 +744,55 @@ describe("Helix Ask workstation tool planner", () => {
 
     expect(plan.intent).toBe("narrator_control");
     expect(plan.should_use_tool).toBe(true);
-    expect(plan.action).toEqual({
-      panel_id: "narrator",
-      action_id: "narrator.bind_stream",
+    expect(plan.action).toBeNull();
+    expect(plan.tool_plan?.steps.map((step) => step.tool_id ?? `${step.panel_id}.${step.action_id}`)).toEqual([
+      "live_env.narrator_bind_stream",
+      "undefined.undefined",
+    ]);
+    expect(plan.tool_plan?.steps[0]).toMatchObject({
+      kind: "run_ask_tool",
+      tool_id: "live_env.narrator_bind_stream",
       args: expect.objectContaining({
         source_ref: "source:browser-audio",
         stream_kind: "translated_transcript",
         delivery_mode: "visible_only",
         voice_policy: "confirm_speak_required",
       }),
+      expected_receipt_kind: "helix.narrator_bind_stream_request.v1",
+      expected_state_change: {
+        store: "stage-play-goal-context",
+        proof_key: "goalContextUpdates",
+      },
+      required: true,
     });
-    expect(plan.tool_plan?.steps.map((step) => `${step.panel_id}.${step.action_id}`)).toEqual([
-      "narrator.open",
-      "narrator.narrator.bind_stream",
+  });
+
+  it("routes natural narrator say requests through durable live-env goal-context receipts", () => {
+    const plan = planWorkstationToolUse(
+      'Have Narrator say "Translation is now routed through Narrator." source_id=helix_ask:translation delivery_mode=confirm_to_speak.',
+      { threadId: "thread:narrator-natural-say", turnId: "turn:narrator-natural-say" },
+    );
+
+    expect(plan.intent).toBe("narrator_control");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.action).toBeNull();
+    expect(plan.tool_plan?.steps.map((step) => step.tool_id ?? `${step.panel_id}.${step.action_id}`)).toEqual([
+      "live_env.narrator_say",
       "undefined.undefined",
     ]);
-    expect(plan.tool_plan?.steps[1]).toMatchObject({
-      expected_receipt_kind: "narrator_bind_stream_receipt",
+    expect(plan.tool_plan?.steps[0]).toMatchObject({
+      kind: "run_ask_tool",
+      tool_id: "live_env.narrator_say",
+      args: expect.objectContaining({
+        text: "Translation is now routed through Narrator",
+        source_id: "helix_ask:translation",
+        delivery_mode: "confirm_to_speak",
+      }),
+      expected_receipt_kind: "helix.narrator_say_request.v1",
+      expected_state_change: {
+        store: "stage-play-goal-context",
+        proof_key: "goalContextUpdates",
+      },
       required: true,
     });
   });
@@ -776,14 +808,24 @@ describe("Helix Ask workstation tool planner", () => {
     );
 
     expect(liveAnswerPlan.intent).toBe("narrator_control");
-    expect(liveAnswerPlan.action?.args).toMatchObject({
+    expect(liveAnswerPlan.action).toBeNull();
+    expect(liveAnswerPlan.tool_plan?.steps[0]).toMatchObject({
+      kind: "run_ask_tool",
+      tool_id: "live_env.narrator_bind_stream",
+      args: expect.objectContaining({
       source_ref: "source:live-answer-active",
       stream_kind: "typed_commentary",
+      }),
     });
     expect(goalContextPlan.intent).toBe("narrator_control");
-    expect(goalContextPlan.action?.args).toMatchObject({
+    expect(goalContextPlan.action).toBeNull();
+    expect(goalContextPlan.tool_plan?.steps[0]).toMatchObject({
+      kind: "run_ask_tool",
+      tool_id: "live_env.narrator_bind_stream",
+      args: expect.objectContaining({
       source_ref: "source:goal-context-active",
       stream_kind: "route_evidence",
+      }),
     });
   });
 
@@ -866,7 +908,7 @@ describe("Helix Ask workstation tool planner", () => {
     }
   });
 
-  it("routes workstation goal-context inspection to non-terminal live-env query evidence", () => {
+  it("routes per-packet trace inspection to non-terminal packet trace evidence", () => {
     const plan = planWorkstationToolUse(
       "Show the workstation goal context updates and per-packet traces for the active visual capture.",
       { threadId: "thread:goal-context", turnId: "turn:goal-context" },
@@ -876,13 +918,13 @@ describe("Helix Ask workstation tool planner", () => {
     expect(plan.should_use_tool).toBe(true);
     expect(plan.action).toBeNull();
     expect(plan.tool_plan?.steps.map((step) => step.tool_id ?? `${step.panel_id}.${step.action_id}`)).toEqual([
-      "live_env.query_workstation_goal_context",
+      "live_env.query_packet_traces",
       "undefined.undefined",
     ]);
     expect(plan.tool_plan?.steps[0]).toMatchObject({
       kind: "run_ask_tool",
-      tool_id: "live_env.query_workstation_goal_context",
-      expected_receipt_kind: "stage_play_workstation_goal_context_read_result",
+      tool_id: "live_env.query_packet_traces",
+      expected_receipt_kind: "stage_play_packet_trace_query_result",
       required: true,
     });
   });
@@ -915,7 +957,9 @@ describe("Helix Ask workstation tool planner", () => {
           expect.objectContaining({ source_kind: "live_answer_lines" }),
           expect.objectContaining({ source_kind: "source_health" }),
           expect.objectContaining({ source_kind: "trace_memory" }),
+          expect.objectContaining({ source_kind: "packet_traces" }),
           expect.objectContaining({ source_kind: "route_evidence" }),
+          expect.objectContaining({ source_kind: "automation_policies" }),
         ]),
         allowed_actuators: expect.arrayContaining([
           "query_visual_summaries",
@@ -935,6 +979,7 @@ describe("Helix Ask workstation tool planner", () => {
           "narrator_say",
           "update_live_answer",
           "query_trace_memory",
+          "query_packet_traces",
           "pause_loop",
           "resume_loop",
           "set_loop_state",
@@ -991,10 +1036,38 @@ describe("Helix Ask workstation tool planner", () => {
     });
   });
 
+  it("routes explicit route-watch alias requests through live_env.configure_route_watch", () => {
+    const plan = planWorkstationToolUse(
+      'Run live_env.configure_route_watch goal_id=goal:frog-monitor source_id=source:visual-tab objective="Watch visual frames as route evidence."',
+      { threadId: "thread:route-watch-alias", turnId: "turn:route-watch-alias" },
+    );
+
+    expect(plan.intent).toBe("workstation_goal_context");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.tool_plan?.steps[0]).toMatchObject({
+      step_id: "configure_route_watch",
+      kind: "run_ask_tool",
+      tool_id: "live_env.configure_route_watch",
+      args: expect.objectContaining({
+        goal_id: "goal:frog-monitor",
+        source_id: "source:visual-tab",
+        objective: "Watch visual frames as route evidence",
+      }),
+      expected_receipt_kind: "stage_play_live_source_watch_job_policy_config_result",
+      required: true,
+    });
+    expect(plan.tool_plan?.steps[1]).toMatchObject({
+      step_id: "evaluate_live_source_watch_job_policy",
+      kind: "evaluate_result",
+      depends_on: ["configure_route_watch"],
+    });
+  });
+
   it("does not configure watch-job automations from contextual mentions", () => {
     for (const prompt of [
       "Do not configure a live-source watch job; explain what route-watch automations are.",
       'The document says "live_env.configure_live_source_watch_job"; summarize that label.',
+      'The dropdown shows "live_env.configure_route_watch"; summarize that label.',
       "Could we configure a live-source watch job later?",
       "Previously you configured a watch job; what did it do?",
       "The UI label says Configure watch job; describe the screen text.",
@@ -1033,6 +1106,19 @@ describe("Helix Ask workstation tool planner", () => {
   });
 
   it("routes feed-specific workstation context prompts to the matching live-env query", () => {
+    const packetPlan = planWorkstationToolUse(
+      "Inspect the per-packet traces for source_id=visual_source:tab-1.",
+      { threadId: "thread:packet-feed", turnId: "turn:packet-feed" },
+    );
+    expect(packetPlan.intent).toBe("workstation_goal_context");
+    expect(packetPlan.tool_plan?.steps[0]).toMatchObject({
+      step_id: "query_packet_traces",
+      kind: "run_ask_tool",
+      tool_id: "live_env.query_packet_traces",
+      expected_receipt_kind: "stage_play_packet_trace_query_result",
+      required: true,
+    });
+
     const visualPlan = planWorkstationToolUse(
       "Read the latest visual summaries for the active live source.",
       { threadId: "thread:visual-feed", turnId: "turn:visual-feed" },
@@ -1114,6 +1200,19 @@ describe("Helix Ask workstation tool planner", () => {
       },
       required: true,
     });
+
+    const routeEvidencePlan = planWorkstationToolUse(
+      "Show route-watch evidence for goal_id=goal:frog-monitor.",
+      { threadId: "thread:route-evidence-feed", turnId: "turn:route-evidence-feed" },
+    );
+    expect(routeEvidencePlan.intent).toBe("workstation_goal_context");
+    expect(routeEvidencePlan.tool_plan?.steps[0]).toMatchObject({
+      step_id: "query_route_evidence",
+      kind: "run_ask_tool",
+      tool_id: "live_env.query_route_evidence",
+      expected_receipt_kind: "stage_play_workstation_context_feed_query_result",
+      required: true,
+    });
   });
 
   it("routes affirmative workstation control prompts to governed control receipts", () => {
@@ -1159,6 +1258,17 @@ describe("Helix Ask workstation tool planner", () => {
           goal_id: "goal:frog",
           loop_ref: "loop:visual-mail",
           state: "paused",
+        },
+      },
+      {
+        prompt: "Run live_env.repair_workstation_source goal_id=goal:frog loop_ref=loop:visual-mail",
+        turnId: "turn:repair-source",
+        stepId: "repair_workstation_source",
+        toolId: "live_env.repair_workstation_source",
+        args: {
+          goal_id: "goal:frog",
+          loop_ref: "loop:visual-mail",
+          state: "repaired",
         },
       },
       {
@@ -1223,6 +1333,8 @@ describe("Helix Ask workstation tool planner", () => {
       'The UI label says "live_env.focus_process_graph"; summarize it.',
       "Could we bind the source to Live Answer later?",
       "Previously you paused the loop; what did that mean?",
+      "Do not repair workstation source; explain the repair policy.",
+      'The UI label says "live_env.repair_workstation_source"; summarize it.',
       "The screen shows a button labeled Apply preset; describe the screen text.",
     ]) {
       const plan = planWorkstationToolUse(prompt, { threadId: "thread:workstation-control-negative" });
@@ -1241,8 +1353,11 @@ describe("Helix Ask workstation tool planner", () => {
       "Previously you queried per-packet traces; what did that mean?",
       "Do not query trace memory; explain the phrase.",
       'The UI label says "live_env.query_trace_memory"; summarize it.',
+      'The UI label says "live_env.query_packet_traces"; summarize it.',
+      'The UI label says "live_env.query_route_evidence"; summarize it.',
       'The UI label says "live_env.query_audio_transcripts"; summarize it.',
       'The UI label says "live_env.query_source_health"; summarize it.',
+      "Could we query route-watch evidence later?",
       "Could we check source health later after the live source is running?",
     ]) {
       const plan = planWorkstationToolUse(prompt, { threadId: "thread:goal-context-negative" });

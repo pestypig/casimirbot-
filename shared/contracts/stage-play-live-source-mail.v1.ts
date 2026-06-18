@@ -90,6 +90,8 @@ export type LiveSourceTurnPhaseV1 =
   | "query_micro_reasoner_deck"
   | "query_workstation_goal_context"
   | "query_trace_memory"
+  | "query_packet_traces"
+  | "query_route_evidence"
   | "reflect_mail_loop"
   | "read_processed_mail"
   | "process_mail_fallback"

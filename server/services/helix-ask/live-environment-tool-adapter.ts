@@ -931,8 +931,20 @@ const AGENT_GOAL_FEED_KIND_ALIASES: Record<string, AgentGoalContextFeedKindV1> =
   health: "source_health",
   trace: "trace_memory",
   trace_memory: "trace_memory",
+  packet: "packet_traces",
+  packets: "packet_traces",
+  packet_trace: "packet_traces",
+  packet_traces: "packet_traces",
+  per_packet_trace: "packet_traces",
+  per_packet_traces: "packet_traces",
   route: "route_evidence",
   route_evidence: "route_evidence",
+  automation: "automation_policies",
+  automations: "automation_policies",
+  automation_policy: "automation_policies",
+  automation_policies: "automation_policies",
+  watch_job: "automation_policies",
+  watch_jobs: "automation_policies",
 };
 
 const AGENT_GOAL_ACTUATORS = new Set<AgentGoalActuatorV1>(WORKSTATION_AGENT_GOAL_ACTUATORS);
@@ -2213,7 +2225,7 @@ const recordLiveEnvironmentGoalContextUpdate = (input: {
 };
 
 type WorkstationContextFeedQuerySpec = {
-  feedKind: "visual_summaries" | "audio_transcripts" | "translated_transcripts" | "microdeck_outputs" | "live_answer_lines";
+  feedKind: AgentGoalContextFeedKindV1;
   actuator: AgentGoalActuatorV1;
   label: string;
   producerKinds: GoalContextProducerKindV1[];
@@ -2256,6 +2268,13 @@ const WORKSTATION_CONTEXT_FEED_QUERY_SPECS: Partial<Record<HelixLiveEnvironmentT
     producerKinds: ["live_answer"],
     updateKinds: ["summary", "preset_state", "source_status", "route_evidence"],
   },
+  "live_env.query_route_evidence": {
+    feedKind: "route_evidence",
+    actuator: "query_route_evidence",
+    label: "route evidence",
+    producerKinds: ["route_watch", "automation"],
+    updateKinds: ["route_evidence", "suggested_action", "source_status", "automation_status"],
+  },
 };
 
 const readWorkstationContextFeedQuerySpec = (
@@ -2278,6 +2297,7 @@ type WorkstationControlSpec = {
     | "bind_source"
     | "unbind_source"
     | "set_loop_state"
+    | "repair_source"
     | "update_live_answer"
     | "focus_process_graph";
   label: string;
@@ -2303,6 +2323,11 @@ const WORKSTATION_CONTROL_SPECS: Partial<Record<HelixLiveEnvironmentToolName, Wo
   "live_env.set_workstation_loop_state": {
     controlKind: "set_loop_state",
     label: "set workstation loop state",
+    defaultPanelId: "stage-play-badge-graph",
+  },
+  "live_env.repair_workstation_source": {
+    controlKind: "repair_source",
+    label: "repair workstation source",
     defaultPanelId: "stage-play-badge-graph",
   },
   "live_env.update_live_answer_projection": {
@@ -2338,6 +2363,16 @@ const workstationControlFallbackActuator = (
 ): AgentGoalActuatorV1 | null =>
   spec.controlKind === "set_loop_state" && actuator !== "set_loop_state" ? "set_loop_state" : null;
 
+const workstationControlProducerKind = (
+  spec: WorkstationControlSpec,
+): GoalContextProducerKindV1 =>
+  spec.controlKind === "update_live_answer" ? "live_answer" : "route_watch";
+
+const workstationControlUpdateKind = (
+  spec: WorkstationControlSpec,
+): GoalContextUpdateKindV1 =>
+  spec.controlKind === "update_live_answer" ? "summary" : "suggested_action";
+
 const filterDeniedControlDispatch = (
   dispatch: WorkstationDispatchActionV1[],
   spec: WorkstationControlSpec,
@@ -2345,6 +2380,7 @@ const filterDeniedControlDispatch = (
   dispatch.filter((action) => {
     if (action.kind === spec.controlKind) return false;
     if (spec.controlKind === "set_loop_state" && action.kind === "repair_loop") return false;
+    if (spec.controlKind === "repair_source" && action.kind === "repair_loop") return false;
     return true;
   });
 
@@ -2405,7 +2441,11 @@ const buildWorkstationControlDispatch = (input: {
     readString(input.args.nodeRef) ??
     readString(input.args.node_id) ??
     readString(input.args.nodeId);
-  const loopState = input.spec.controlKind === "set_loop_state" ? normalizeLoopState(input.args.state ?? input.args.loop_state ?? input.args.loopState) : null;
+  const loopState = input.spec.controlKind === "repair_source"
+    ? "repaired"
+    : input.spec.controlKind === "set_loop_state"
+      ? normalizeLoopState(input.args.state ?? input.args.loop_state ?? input.args.loopState)
+      : null;
   const dispatch: WorkstationDispatchActionV1[] = [{ kind: "log_receipt" }, { kind: "update_panel", panelId }];
   if (input.spec.controlKind === "change_preset" && targetRef && presetId) {
     dispatch.push({ kind: "change_preset", targetRef, presetId });
@@ -2419,6 +2459,10 @@ const buildWorkstationControlDispatch = (input: {
   if (input.spec.controlKind === "set_loop_state" && loopRef && loopState) {
     dispatch.push({ kind: "set_loop_state", loopRef, state: loopState });
     if (loopState === "repaired") dispatch.push({ kind: "repair_loop", loopRef });
+  }
+  if (input.spec.controlKind === "repair_source" && loopRef) {
+    dispatch.push({ kind: "set_loop_state", loopRef, state: "repaired" });
+    dispatch.push({ kind: "repair_loop", loopRef });
   }
   if (input.spec.controlKind === "update_live_answer" && lineKey) {
     dispatch.push({ kind: "update_live_answer", lineKey });
@@ -2461,6 +2505,8 @@ const missingWorkstationControlRequirements = (input: {
     case "unbind_source":
       return input.sourceRef ? [] : ["source_ref"];
     case "set_loop_state":
+      return input.loopRef ? [] : ["loop_ref"];
+    case "repair_source":
       return input.loopRef ? [] : ["loop_ref"];
     case "update_live_answer":
       return input.lineKey ? [] : ["line_key"];
@@ -3223,6 +3269,7 @@ export function executeLiveEnvironmentTool(
       controlDispatch.sourceRef,
       controlDispatch.targetRef,
       controlDispatch.nodeRef,
+      controlDispatch.lineKey ? `live_answer_line:${controlDispatch.lineKey}` : null,
     ]);
     const loopRefs = uniqueStrings([
       scope.mailboxThreadResolution.mailboxThreadId,
@@ -3240,8 +3287,8 @@ export function executeLiveEnvironmentTool(
       threadId: input.thread_id,
       mailboxThreadId: scope.mailboxThreadResolution.mailboxThreadId,
       roomId,
-      producerKind: "route_watch",
-      updateKind: "suggested_action",
+      producerKind: workstationControlProducerKind(workstationControlSpec),
+      updateKind: workstationControlUpdateKind(workstationControlSpec),
       contentRef: receiptId,
       preview: ok
         ? `Prepared workstation control dispatch: ${workstationControlSpec.label}.`
@@ -5027,6 +5074,18 @@ export function executeLiveEnvironmentTool(
       microReasonerRunRefs,
       resolutionStateSummary,
     });
+    const goalContextUpdates = packets.length > 0
+      ? syncStagePlayGoalContextFromMailbox({
+          threadId: scope.mailboxThreadResolution.mailboxThreadId,
+          roomId,
+          mailItems,
+          processedMailPackets: packets,
+          microReasonerRuns,
+        }).filter((update) =>
+          packets.some((packet) => update.contentRef === packet.packetId || packet.mailIds.includes(update.contentRef))
+        )
+      : [];
+    const goalContextUpdateIds = goalContextUpdates.map((update) => update.updateId);
     const processedPacketIds = packets.map((packet) => packet.packetId);
     const wakeRequestId = liveSourceWakeRequestIdFromArgs(args);
     const askTurnId = liveSourceAskTurnIdFromArgs(args);
@@ -5051,6 +5110,10 @@ export function executeLiveEnvironmentTool(
         micro_reasoner_run_refs: microReasonerRunRefs,
         processedPacketRefs: packets.map((packet) => packet.packetId),
         processed_packet_refs: packets.map((packet) => packet.packetId),
+        goalContextUpdates,
+        goal_context_updates: goalContextUpdates,
+        goalContextUpdateRefs: goalContextUpdateIds,
+        goal_context_update_refs: goalContextUpdateIds,
         transcriptRows,
         transcript_rows: transcriptRows,
         autoProcessMissing,
@@ -5073,13 +5136,15 @@ export function executeLiveEnvironmentTool(
       },
       evidenceRefs: uniqueStrings([
         scope.mailboxThreadResolution.mailboxThreadId,
+        ...goalContextUpdateIds,
         ...packets.flatMap((packet) => packet.evidenceRefs),
         ...microReasonerRuns.map((run) => run.runId),
         ...mailItems.map((item) => item.mailId),
       ]),
-      producedRefs: processedPacketIds,
+      producedRefs: uniqueStrings([...processedPacketIds, ...goalContextUpdateIds]),
       artifactRefs: {
         processedPacketIds,
+        goalContextUpdateIds,
         wakeRequestId,
         askTurnId,
       },
@@ -5296,6 +5361,324 @@ export function executeLiveEnvironmentTool(
         ...goalContextUpdates.map((update) => update.updateId),
         ...agentGoalSessions.map((session) => session.goalId),
       ],
+      forceNormalizedRefs: true,
+    });
+  }
+
+  if (input.tool_name === "live_env.query_packet_traces") {
+    const scope = resolveLiveSourceToolScope({
+      args,
+      threadId: input.thread_id,
+      effectiveThreadId,
+      roomId,
+      environmentThreadId: environment?.thread_id ?? null,
+      environmentId: environment?.environment_id ?? input.environment_id ?? null,
+      explicitSourceId,
+    });
+    const environmentId = environment?.environment_id ?? input.environment_id ?? null;
+    const sourceRef =
+      readString(args.source_ref) ??
+      readString(args.sourceRef) ??
+      readString(args.source_id) ??
+      readString(args.sourceId) ??
+      scope.sourceId ??
+      null;
+    const goalId = readString(args.goal_id) ?? readString(args.goalId);
+    const packetId = readString(args.packet_id) ?? readString(args.packetId);
+    const limit = Math.max(1, Math.min(readNumber(args.limit, 12), 50));
+    const mailLimit = Math.max(1, Math.min(readNumber(args.mail_limit ?? args.mailLimit, 40), 120));
+    const goalSession = goalId
+      ? listStagePlayAgentGoalSessions({
+          threadId: scope.mailboxThreadResolution.mailboxThreadId,
+          goalId,
+          limit: 1,
+        })[0] ?? null
+      : null;
+    const feedAllowed = !goalId || goalSessionFeedAllowed(goalSession, "packet_traces");
+    const actuatorAllowed = !goalId || goalSessionActuatorAllowed(goalSession, "query_packet_traces");
+    const missingRequirements = goalId
+      ? goalSession
+        ? [
+            ...(feedAllowed ? [] : ["context_feed:packet_traces"]),
+            ...(actuatorAllowed ? [] : ["allowed_actuator:query_packet_traces"]),
+          ]
+        : ["goal_session"]
+      : [];
+    const ok = missingRequirements.length === 0;
+    const mailItems = listStagePlayLiveSourceMailItems({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      sourceId: scope.sourceId,
+      sourceKind: scope.sourceKind,
+      limit: mailLimit,
+    });
+    const mailIds = new Set(mailItems.map((item) => item.mailId));
+    const processedMailPackets = listStagePlayProcessedMailPackets({
+      sourceId: scope.sourceId,
+      limit: 160,
+    })
+      .filter((packet) =>
+        (!packetId || packet.packetId === packetId) &&
+        (mailIds.size === 0 || packet.mailIds.some((mailId) => mailIds.has(mailId)))
+      )
+      .slice(-limit);
+    const microReasonerRuns = listStagePlayMicroReasonerRuns({
+      sourceId: scope.sourceId,
+      limit: 200,
+    }).filter((run) =>
+      run.mailIds.some((mailId) => mailIds.has(mailId)) ||
+      processedMailPackets.some((packet) => packet.microReasonerRunRefs.includes(run.runId))
+    );
+    const decisions = listStagePlayMailDecisions({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      limit: 80,
+    });
+    const wakeRequests = listStagePlayLiveSourceMailWakeRequests({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      limit: 80,
+    });
+    const wakeResults = listStagePlayLiveSourceMailWakeResults({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      limit: 80,
+    });
+    syncStagePlayGoalContextFromMailbox({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      mailItems,
+      processedMailPackets,
+      microReasonerRuns,
+      decisions,
+      wakeRequests,
+      wakeResults,
+    });
+    const goalContextUpdates = ok
+      ? processedMailPackets.flatMap((packet) =>
+          listStagePlayGoalContextUpdates({
+            threadId: scope.mailboxThreadResolution.mailboxThreadId,
+            contentRef: packet.packetId,
+            limit: 8,
+          })
+        )
+      : [];
+    const packetTraces = ok
+      ? processedMailPackets.map((packet) => {
+          const causalTrace = mergeLiveSourceCausalTraces([packet.causalTrace], {
+            producedRefs: [packet.packetId],
+            causedBy: packet.mailIds,
+            sourceIds: [packet.sourceId],
+            jobId: packet.jobId,
+            evidenceRefs: uniqueStrings([
+              packet.packetId,
+              ...packet.evidenceRefs,
+              ...packet.visualEvidenceRefs,
+              ...packet.microReasonerRunRefs,
+            ]),
+          });
+          const packetDecisions = decisions.filter((decision) =>
+            decision.mailIds.some((mailId) => packet.mailIds.includes(mailId))
+          );
+          const packetWakeRequests = wakeRequests.filter((wake) => wake.packetIds?.includes(packet.packetId));
+          const packetWakeResults = wakeResults.filter((result) => result.packetIds?.includes(packet.packetId));
+          return {
+            packetId: packet.packetId,
+            packet_id: packet.packetId,
+            sourceId: packet.sourceId,
+            source_id: packet.sourceId,
+            jobId: packet.jobId,
+            job_id: packet.jobId,
+            mailIds: packet.mailIds,
+            mail_ids: packet.mailIds,
+            microReasonerRunRefs: packet.microReasonerRunRefs,
+            micro_reasoner_run_refs: packet.microReasonerRunRefs,
+            recommendedNext: packet.recommendedNext,
+            recommended_next: packet.recommendedNext,
+            resolutionState: packet.resolutionState,
+            resolution_state: packet.resolutionState,
+            salienceLevel: packet.salience.level,
+            salience_level: packet.salience.level,
+            causalTrace,
+            causal_trace: causalTrace,
+            decisionRefs: packetDecisions.map((decision) => decision.decisionId),
+            decision_refs: packetDecisions.map((decision) => decision.decisionId),
+            wakeRequestRefs: packetWakeRequests.map((wake) => wake.wakeRequestId),
+            wake_request_refs: packetWakeRequests.map((wake) => wake.wakeRequestId),
+            wakeResultRefs: packetWakeResults.map((result) => result.wakeResultId),
+            wake_result_refs: packetWakeResults.map((result) => result.wakeResultId),
+            goalContextUpdateRefs: goalContextUpdates
+              .filter((update) => update.contentRef === packet.packetId)
+              .map((update) => update.updateId),
+            goal_context_update_refs: goalContextUpdates
+              .filter((update) => update.contentRef === packet.packetId)
+              .map((update) => update.updateId),
+            evidenceRefs: uniqueStrings([
+              packet.packetId,
+              ...packet.evidenceRefs,
+              ...packet.visualEvidenceRefs,
+              ...packet.microReasonerRunRefs,
+              ...packetDecisions.map((decision) => decision.decisionId),
+              ...packetWakeRequests.map((wake) => wake.wakeRequestId),
+              ...packetWakeResults.map((result) => result.wakeResultId),
+            ]),
+            evidence_refs: uniqueStrings([
+              packet.packetId,
+              ...packet.evidenceRefs,
+              ...packet.visualEvidenceRefs,
+              ...packet.microReasonerRunRefs,
+              ...packetDecisions.map((decision) => decision.decisionId),
+              ...packetWakeRequests.map((wake) => wake.wakeRequestId),
+              ...packetWakeResults.map((result) => result.wakeResultId),
+            ]),
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          };
+        })
+      : [];
+    const resultId = `stage_play_packet_trace_query:${hashShort([
+      input.thread_id,
+      sourceRef,
+      goalId,
+      packetId,
+      processedMailPackets.map((packet) => packet.packetId),
+    ])}`;
+    const evidenceRefs = uniqueStrings([
+      resultId,
+      scope.mailboxThreadResolution.mailboxThreadId,
+      ...packetTraces.flatMap((trace) => trace.evidenceRefs),
+      ...goalContextUpdates.flatMap((update) => [update.updateId, update.contentRef, ...update.evidenceRefs, ...update.receiptRefs]),
+    ]);
+    const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+      threadId: input.thread_id,
+      mailboxThreadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      producerKind: "route_watch",
+      updateKind: "route_evidence",
+      contentRef: resultId,
+      preview: ok
+        ? packetTraces.length > 0
+          ? `Queried ${packetTraces.length} packet trace(s) for workstation packet debugging.`
+          : "No packet traces are currently available for this workstation scope."
+        : `Blocked packet trace query; missing ${missingRequirements.join(", ")}.`,
+      sourceRefs: uniqueStrings([
+        sourceRef,
+        scope.sourceId,
+        ...processedMailPackets.map((packet) => packet.sourceId),
+      ]),
+      loopRefs: uniqueStrings([
+        `packet_trace_query:${scope.mailboxThreadResolution.mailboxThreadId}`,
+        ...processedMailPackets.flatMap((packet) => [
+          packet.packetId,
+          packet.jobId,
+          packet.causalTrace?.traceId,
+          packet.causalTrace?.cycleId,
+        ]),
+      ]),
+      evidenceRefs,
+      receiptRefs: [resultId],
+      freshnessStatus: ok ? (packetTraces.length > 0 ? "fresh" : "unknown") : "blocked",
+      goalId,
+      goalRelevanceReason: "The agent queried per-packet traffic as goal-context evidence.",
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: resultId },
+        ...(goalId && ok ? [{ kind: "append_goal_context" as const, goalId }] : []),
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+        { kind: "update_panel", panelId: "live-answer-environment" },
+      ],
+    });
+    const checkpointedGoalSession = ok && goalSession
+      ? appendAgentGoalSessionCheckpoint({
+          session: goalSession,
+          threadId: scope.mailboxThreadResolution.mailboxThreadId,
+          roomId,
+          sourceRefs: uniqueStrings([sourceRef, scope.sourceId, ...processedMailPackets.map((packet) => packet.sourceId)]),
+          loopRefs: uniqueStrings([
+            `packet_trace_query:${scope.mailboxThreadResolution.mailboxThreadId}`,
+            ...processedMailPackets.flatMap((packet) => [packet.packetId, packet.jobId, packet.causalTrace?.traceId]),
+          ]),
+          evidenceRefs: uniqueStrings([goalContextUpdateId, ...evidenceRefs]).slice(0, 80),
+          actionsTaken: ["query_packet_traces", input.tool_name],
+          summary: `Queried packet traces and read ${packetTraces.length} packet trace(s) for this goal session.`,
+          nextStep: packetTraces.length > 0 ? "continue" : "ask_user",
+        })
+      : goalSession;
+    const authoritySummary = summarizeGoalContextAuthority({
+      updates: goalContextUpdates,
+      sessions: checkpointedGoalSession ? [checkpointedGoalSession] : [],
+    });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId,
+      toolName: input.tool_name,
+      ok,
+      summary: ok
+        ? `Read ${packetTraces.length} packet trace(s).`
+        : `Cannot read packet traces; missing ${missingRequirements.join(", ")}.`,
+      observation: {
+        schema: "stage_play_packet_trace_query_result/v1",
+        resultId,
+        result_id: resultId,
+        mailboxThreadId: scope.mailboxThreadResolution.mailboxThreadId,
+        mailbox_thread_id: scope.mailboxThreadResolution.mailboxThreadId,
+        mailboxThreadResolution: scope.mailboxThreadResolution,
+        mailbox_thread_resolution: scope.mailboxThreadResolution,
+        sourceRef,
+        source_ref: sourceRef,
+        goalId,
+        goal_id: goalId,
+        packetId,
+        packet_id: packetId,
+        status: ok ? "read" : "blocked",
+        missingRequirements,
+        missing_requirements: missingRequirements,
+        goalSessionFound: goalId ? Boolean(goalSession) : null,
+        goal_session_found: goalId ? Boolean(goalSession) : null,
+        feedAllowed,
+        feed_allowed: feedAllowed,
+        requiredFeed: "packet_traces",
+        required_feed: "packet_traces",
+        requiredActuator: "query_packet_traces",
+        required_actuator: "query_packet_traces",
+        actuatorAllowed,
+        actuator_allowed: actuatorAllowed,
+        agentGoalSession: checkpointedGoalSession,
+        agent_goal_session: checkpointedGoalSession,
+        packetTraces,
+        packet_traces: packetTraces,
+        goalContextUpdates,
+        goal_context_updates: goalContextUpdates,
+        authoritySummary,
+        authority_summary: authoritySummary,
+        traceCount: packetTraces.length,
+        trace_count: packetTraces.length,
+        syncedWindow: {
+          mailItemCount: mailItems.length,
+          processedPacketCount: processedMailPackets.length,
+          microReasonerRunCount: microReasonerRuns.length,
+        },
+        synced_window: {
+          mail_item_count: mailItems.length,
+          processed_packet_count: processedMailPackets.length,
+          micro_reasoner_run_count: microReasonerRuns.length,
+        },
+        goalContextUpdateId,
+        goal_context_update_id: goalContextUpdateId,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      },
+      evidenceRefs: uniqueStrings([goalContextUpdateId, ...evidenceRefs]),
+      producedRefs: [goalContextUpdateId, resultId, ...processedMailPackets.map((packet) => packet.packetId)],
+      artifactRefs: {
+        processedPacketIds: processedMailPackets.map((packet) => packet.packetId),
+      },
       forceNormalizedRefs: true,
     });
   }
@@ -5591,7 +5974,7 @@ export function executeLiveEnvironmentTool(
       threadId: input.thread_id,
       mailboxThreadId: input.thread_id,
       roomId,
-      producerKind: "route_watch",
+      producerKind: "trace_memory",
       updateKind: "route_evidence",
       contentRef: resultId,
       preview: ok
@@ -6368,7 +6751,7 @@ export function executeLiveEnvironmentTool(
                   : "blocked";
     const nextUsefulTool =
       !activePolicy
-        ? "live_env.configure_live_source_watch_job"
+        ? "live_env.configure_route_watch"
         : !activeProfile
           ? "live_env.configure_interpreter_profile"
           : latestImmersionState?.prediction && quality.backlog.unreadMailCount > 0
@@ -6723,7 +7106,7 @@ export function executeLiveEnvironmentTool(
     });
   }
 
-  if (input.tool_name === "live_env.configure_live_source_watch_job") {
+  if (input.tool_name === "live_env.configure_route_watch" || input.tool_name === "live_env.configure_live_source_watch_job") {
     const mailboxThreadResolution = resolveStagePlayLiveSourceMailboxThreadId({
       askThreadId: input.thread_id,
       requestedThreadId: effectiveThreadId,
@@ -6787,8 +7170,8 @@ export function executeLiveEnvironmentTool(
         threadId: input.thread_id,
         mailboxThreadId: mailboxThreadResolution.mailboxThreadId,
         roomId,
-        producerKind: "route_watch",
-        updateKind: "source_status",
+        producerKind: "automation",
+        updateKind: "automation_status",
         contentRef: blockedReceiptId,
         preview: `Blocked live-source watch job configuration; missing ${missingRequirements.join(", ")}.`,
         sourceRefs: uniqueStrings([
@@ -6912,8 +7295,8 @@ export function executeLiveEnvironmentTool(
       threadId: input.thread_id,
       mailboxThreadId: mailboxThreadResolution.mailboxThreadId,
       roomId,
-      producerKind: "route_watch",
-      updateKind: "source_status",
+      producerKind: "automation",
+      updateKind: "automation_status",
       contentRef: configured.policy.policyId,
       preview: `Configured live-source watch job for ${policyDefaults.objectiveText}; loop is armed for the next source summary.`,
       sourceRefs: uniqueStrings([

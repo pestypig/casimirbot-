@@ -106,6 +106,7 @@ const expectCodexParityRailTableShape = (railTable: Record<string, unknown>, tur
     "requested_capability",
     "selected_capability",
     "admitted_capability",
+    "admission_proof_source",
     "executed_capability",
     "observation_kind",
     "observation_ref",
@@ -121,6 +122,56 @@ const expectCodexParityRailTableShape = (railTable: Record<string, unknown>, tur
   }
   expect(["reentered", "not_reentered", "no_observation"]).toContain(railTable.reentry_status);
   expect(["complete", "broken", "fail_closed"]).toContain(railTable.rail_status);
+  expect(railTable.rail_status === "complete").toBe(railTable.codex_parity_class === "complete");
+  expect(typeof railTable.reentry_proven).toBe("boolean");
+  expect(railTable.reentry_proof_source === null || typeof railTable.reentry_proof_source === "string").toBe(true);
+  if (railTable.reentry_status === "reentered") {
+    expect(railTable.reentry_proven).toBe(true);
+    expect(typeof railTable.reentry_proof_source).toBe("string");
+    expect(String(railTable.reentry_proof_source).length).toBeGreaterThan(0);
+  }
+  if (railTable.rail_status === "complete" || railTable.codex_parity_class === "complete") {
+    expect(railTable.reentry_status).toBe("reentered");
+  }
+  expect(typeof railTable.terminal_authority_proven).toBe("boolean");
+  expect(railTable.terminal_authority_proof_source === null || typeof railTable.terminal_authority_proof_source === "string").toBe(true);
+  if (railTable.selected_terminal_kind) {
+    expect(railTable.terminal_authority_proven).toBe(true);
+    expect(typeof railTable.terminal_authority_proof_source).toBe("string");
+    expect(String(railTable.terminal_authority_proof_source).length).toBeGreaterThan(0);
+  }
+  expect(typeof railTable.visible_projection_proven).toBe("boolean");
+  expect(railTable.visible_projection_source === null || typeof railTable.visible_projection_source === "string").toBe(true);
+  if (railTable.visible_terminal_kind) {
+    expect(railTable.visible_projection_proven).toBe(true);
+    expect(typeof railTable.visible_projection_source).toBe("string");
+    expect(String(railTable.visible_projection_source).length).toBeGreaterThan(0);
+  }
+  if (railTable.rail_status === "complete" || railTable.codex_parity_class === "complete") {
+    expect(railTable.selected_terminal_kind).toBeTruthy();
+    expect(railTable.visible_terminal_kind).toBeTruthy();
+  }
+  expect(Array.isArray(railTable.required_observation_kinds_for_requested_capability)).toBe(true);
+  expect(
+    railTable.observed_artifact_supports_requested_capability === null ||
+      typeof railTable.observed_artifact_supports_requested_capability === "boolean",
+  ).toBe(true);
+  if (railTable.requested_capability) {
+    expect(typeof railTable.observed_artifact_supports_requested_capability).toBe("boolean");
+    if (railTable.goal_satisfaction === "satisfied" || railTable.rail_status === "complete") {
+      expect(railTable.observed_artifact_supports_requested_capability).toBe(true);
+    }
+  }
+  expect(typeof railTable.admission_proven).toBe("boolean");
+  if (railTable.admitted_capability) {
+    expect(railTable.admission_proven).toBe(true);
+    expect(typeof railTable.admission_proof_source).toBe("string");
+    expect(String(railTable.admission_proof_source).length).toBeGreaterThan(0);
+  }
+  if (railTable.selected_capability || railTable.executed_capability) {
+    expect(typeof railTable.admitted_capability).toBe("string");
+    expect(String(railTable.admitted_capability).length).toBeGreaterThan(0);
+  }
   expect(CODEX_PARITY_CLASSES).toContain(railTable.codex_parity_class);
   expect(railTable.normalized_codex_parity_classes).toEqual([...CODEX_PARITY_CLASSES]);
   if (railTable.codex_parity_class === "complete" || railTable.rail_status === "complete") {
@@ -402,9 +453,24 @@ describe("Helix Ask API parity matrix", () => {
       scenario_id: scenario.id,
       debug_export_available: true,
       terminal_authority_ok: true,
+      rail_table: {
+        present: true,
+        codex_parity_class: railTable.codex_parity_class,
+        first_broken_rail: railTable.first_broken_rail,
+        repair_target: railTable.repair_target,
+        selected_terminal_kind: railTable.selected_terminal_kind,
+        visible_terminal_kind: railTable.visible_terminal_kind,
+      },
       procedural_ok: true,
       failures: [],
     });
+    expect(probe.rail_table.selected_terminal_kind).toBe(probe.rail_table.visible_terminal_kind);
+    if (probe.rail_table.codex_parity_class === "complete") {
+      expect(probe.rail_table.first_broken_rail).toBeNull();
+    } else {
+      expect(typeof probe.rail_table.first_broken_rail).toBe("string");
+      expect(probe.rail_table.first_broken_rail?.length).toBeGreaterThan(0);
+    }
     if (scenario.expected.live_source_identity_ok !== false) {
       expect(probe.route_authority.ok).toBe(true);
     }
@@ -421,4 +487,650 @@ describe("Helix Ask API parity matrix", () => {
       expect(probe.poison_audit_ok && !probe.route_authority.ok).toBe(false);
     }
   }, 60_000);
+
+  it("rejects a complete rail table when the answer envelope is still a typed failure", () => {
+    const scenario: HelixApiParityScenario = {
+      id: "complete_rail_typed_failure_envelope",
+      description: "A complete rail cannot mask a failed visible/API terminal envelope.",
+      enabled: true,
+      seed: "none",
+      prompt: "What tools are available for the helix ask to use?",
+      expected: {},
+    };
+    const railTable = {
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      turn_id: "ask:test:complete-rail-typed-failure",
+      prompt: scenario.prompt,
+      requested_capability: null,
+      visible_tool_surface: ["helix_ask.inspect_capability_catalog"],
+      selected_capability: "helix_ask.inspect_capability_catalog",
+      admitted_capability: "helix_ask.inspect_capability_catalog",
+      admission_proof_source: "tool_call_admission_decision.admitted_capability",
+      admission_proven: true,
+      executed_capability: "helix_ask.inspect_capability_catalog",
+      observation_kind: "capability_registry",
+      observation_ref: "capability_catalog_observation",
+      required_observation_kinds_for_requested_capability: [],
+      observed_artifact_supports_requested_capability: null,
+      reentry_status: "reentered",
+      reentry_proof_source: "tool_followup_decision.evidence_reentered",
+      reentry_proven: true,
+      goal_satisfaction: "satisfied",
+      required_terminal_kind: "capability_help_summary",
+      selected_terminal_kind: "capability_help_summary",
+      terminal_authority_proof_source: "terminal_answer_authority.terminal_artifact_kind",
+      terminal_authority_proven: true,
+      visible_terminal_kind: "capability_help_summary",
+      visible_projection_source: "payload.terminal_artifact_kind",
+      visible_projection_proven: true,
+      first_broken_rail: null,
+      repair_target: null,
+      codex_parity_class: "complete",
+      normalized_codex_parity_classes: [...CODEX_PARITY_CLASSES],
+      rail_status: "complete",
+      rail_failure_code: null,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const askTurn = {
+      turn_id: railTable.turn_id,
+      final_status: "final_failure",
+      response_type: "final_failure",
+      terminal_error_code: "terminal_kind_not_required",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      selected_final_answer:
+        "I could not complete this Ask turn because solver controller blocked terminal answer (terminal_kind_not_required).",
+      codex_parity_agent_spine_rail_table: railTable,
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        selected_primary_intent: "capability_help",
+        solver_short_circuit_flags: [],
+      },
+      loop_parity_trace: {
+        admitted_tool_families: ["capability_catalog"],
+        actual_tool_calls: [],
+        unexpected_tool_calls: [],
+        short_circuit_risk_flags: [],
+      },
+      route_authority_audit: {
+        route_authority_ok: true,
+        violation_codes: [],
+      },
+      poison_audit: {
+        ok: true,
+      },
+      terminal_answer_authority: {
+        server_authoritative: true,
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+      },
+    };
+
+    const probe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: { payload: askTurn },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(probe.procedural_ok).toBe(false);
+    expect(probe.failures).toEqual(
+      expect.arrayContaining([
+        "complete_rail_terminal_error:terminal_kind_not_required",
+        "complete_rail_typed_failure_terminal",
+        "complete_rail_non_final_response:final_failure/final_failure",
+      ]),
+    );
+  });
+
+  it("rejects a rail table whose normalized parity-class contract drifted", () => {
+    const scenario: HelixApiParityScenario = {
+      id: "rail_table_class_contract_drift",
+      description: "A successful-looking answer cannot hide a stale rail-class mirror.",
+      enabled: true,
+      seed: "none",
+      prompt: "What tools are available for the helix ask to use?",
+      expected: {},
+    };
+    const railTable = {
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      turn_id: "ask:test:rail-class-contract-drift",
+      prompt: scenario.prompt,
+      requested_capability: "helix_ask.inspect_capability_catalog",
+      visible_tool_surface: ["helix_ask.inspect_capability_catalog"],
+      selected_capability: "helix_ask.inspect_capability_catalog",
+      admitted_capability: "helix_ask.inspect_capability_catalog",
+      admission_proof_source: "tool_call_admission_decision.admitted_capability",
+      admission_proven: true,
+      executed_capability: "helix_ask.inspect_capability_catalog",
+      observation_kind: "capability_registry",
+      observation_ref: "capability_catalog_observation",
+      required_observation_kinds_for_requested_capability: ["capability_registry"],
+      observed_artifact_supports_requested_capability: true,
+      reentry_status: "reentered",
+      reentry_proof_source: "tool_followup_decision.evidence_reentered",
+      reentry_proven: true,
+      goal_satisfaction: "satisfied",
+      required_terminal_kind: "capability_help_summary",
+      selected_terminal_kind: "capability_help_summary",
+      terminal_authority_proof_source: "terminal_answer_authority.terminal_artifact_kind",
+      terminal_authority_proven: true,
+      visible_terminal_kind: "capability_help_summary",
+      visible_projection_source: "payload.terminal_artifact_kind",
+      visible_projection_proven: true,
+      first_broken_rail: null,
+      repair_target: null,
+      codex_parity_class: "complete",
+      normalized_codex_parity_classes: CODEX_PARITY_CLASSES.filter((entry) => entry !== "debug_mirror_stale"),
+      rail_status: "complete",
+      rail_failure_code: null,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const askTurn = {
+      turn_id: railTable.turn_id,
+      final_status: "final_answer",
+      response_type: "final_answer",
+      final_answer_source: "capability_help_summary",
+      terminal_artifact_kind: "capability_help_summary",
+      selected_final_answer: "The available Helix Ask tools are exposed through the runtime capability catalog.",
+      codex_parity_agent_spine_rail_table: railTable,
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        selected_primary_intent: "capability_help",
+        solver_short_circuit_flags: [],
+      },
+      loop_parity_trace: {
+        admitted_tool_families: ["capability_catalog"],
+        actual_tool_calls: [],
+        unexpected_tool_calls: [],
+        short_circuit_risk_flags: [],
+      },
+      route_authority_audit: {
+        route_authority_ok: true,
+        violation_codes: [],
+      },
+      poison_audit: {
+        ok: true,
+      },
+      terminal_answer_authority: {
+        server_authoritative: true,
+        final_answer_source: "capability_help_summary",
+        terminal_artifact_kind: "capability_help_summary",
+      },
+    };
+
+    const probe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: { payload: askTurn },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(probe.procedural_ok).toBe(false);
+    expect(probe.failures).toContain("rail_normalized_codex_parity_classes_mismatch");
+    expect(probe.failures).not.toContain("complete_rail_typed_failure_terminal");
+  });
+
+  it("rejects selected or executed capability progress without admission proof", () => {
+    const scenario: HelixApiParityScenario = {
+      id: "rail_table_admission_proof_missing",
+      description: "Selected/executed capability progress must be backed by an admitted capability rail.",
+      enabled: true,
+      seed: "none",
+      prompt: "Use workspace_os.status to inspect workstation status.",
+      expected: {},
+    };
+    const railTable = {
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      turn_id: "ask:test:admission-proof-missing",
+      prompt: scenario.prompt,
+      requested_capability: "workspace_os.status",
+      visible_tool_surface: ["workspace_os.status"],
+      selected_capability: "workspace_os.status",
+      admitted_capability: null,
+      admission_proof_source: null,
+      admission_proven: false,
+      executed_capability: "workspace_os.status",
+      observation_kind: "workspace_os_status_observation",
+      observation_ref: "workspace_os_status_observation:test",
+      required_observation_kinds_for_requested_capability: ["workspace_os_status_observation"],
+      observed_artifact_supports_requested_capability: true,
+      reentry_status: "reentered",
+      reentry_proof_source: "tool_followup_decision.evidence_reentered",
+      reentry_proven: true,
+      goal_satisfaction: "satisfied",
+      required_terminal_kind: "model_synthesized_answer",
+      selected_terminal_kind: "model_synthesized_answer",
+      terminal_authority_proof_source: "terminal_answer_authority.terminal_artifact_kind",
+      terminal_authority_proven: true,
+      visible_terminal_kind: "model_synthesized_answer",
+      visible_projection_source: "payload.terminal_artifact_kind",
+      visible_projection_proven: true,
+      first_broken_rail: null,
+      repair_target: null,
+      codex_parity_class: "complete",
+      normalized_codex_parity_classes: [...CODEX_PARITY_CLASSES],
+      rail_status: "complete",
+      rail_failure_code: null,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const askTurn = {
+      turn_id: railTable.turn_id,
+      final_status: "final_answer",
+      response_type: "final_answer",
+      final_answer_source: "model_synthesized_answer",
+      terminal_artifact_kind: "model_synthesized_answer",
+      selected_final_answer: "Workspace OS status returned capability records.",
+      codex_parity_agent_spine_rail_table: railTable,
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        selected_primary_intent: "workspace_status",
+        solver_short_circuit_flags: [],
+      },
+      loop_parity_trace: {
+        admitted_tool_families: ["workspace_action"],
+        actual_tool_calls: [],
+        unexpected_tool_calls: [],
+        short_circuit_risk_flags: [],
+      },
+      route_authority_audit: {
+        route_authority_ok: true,
+        violation_codes: [],
+      },
+      poison_audit: {
+        ok: true,
+      },
+      terminal_answer_authority: {
+        server_authoritative: true,
+        final_answer_source: "model_synthesized_answer",
+        terminal_artifact_kind: "model_synthesized_answer",
+      },
+    };
+
+    const probe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: { payload: askTurn },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(probe.procedural_ok).toBe(false);
+    expect(probe.failures).toContain("rail_admitted_capability_missing");
+  });
+
+  it("rejects satisfied requested-capability goals without matching observation support", () => {
+    const scenario: HelixApiParityScenario = {
+      id: "rail_table_requested_observation_support_missing",
+      description: "Goal satisfaction cannot rely on an observation that fails the requested capability contract.",
+      enabled: true,
+      seed: "none",
+      prompt: "Use docs-viewer.locate_in_doc to cite where this claim appears.",
+      expected: {},
+    };
+    const railTable = {
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      turn_id: "ask:test:requested-observation-support-missing",
+      prompt: scenario.prompt,
+      requested_capability: "docs-viewer.locate_in_doc",
+      visible_tool_surface: ["docs-viewer.locate_in_doc"],
+      selected_capability: "docs-viewer.locate_in_doc",
+      admitted_capability: "docs-viewer.locate_in_doc",
+      admission_proof_source: "tool_call_admission_decision.admitted_capability",
+      admission_proven: true,
+      executed_capability: "docs-viewer.locate_in_doc",
+      observation_kind: "doc_summary",
+      observation_ref: "doc_summary:test",
+      required_observation_kinds_for_requested_capability: ["doc_location_matches", "doc_evidence_location"],
+      observed_artifact_supports_requested_capability: false,
+      reentry_status: "reentered",
+      reentry_proof_source: "tool_followup_decision.evidence_reentered",
+      reentry_proven: true,
+      goal_satisfaction: "satisfied",
+      required_terminal_kind: "doc_location_matches",
+      selected_terminal_kind: "doc_location_matches",
+      terminal_authority_proof_source: "terminal_answer_authority.terminal_artifact_kind",
+      terminal_authority_proven: true,
+      visible_terminal_kind: "doc_location_matches",
+      visible_projection_source: "payload.terminal_artifact_kind",
+      visible_projection_proven: true,
+      first_broken_rail: null,
+      repair_target: null,
+      codex_parity_class: "complete",
+      normalized_codex_parity_classes: [...CODEX_PARITY_CLASSES],
+      rail_status: "complete",
+      rail_failure_code: null,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const askTurn = {
+      turn_id: railTable.turn_id,
+      final_status: "final_answer",
+      response_type: "final_answer",
+      final_answer_source: "doc_location_matches",
+      terminal_artifact_kind: "doc_location_matches",
+      selected_final_answer: "Located the requested claim in the current document.",
+      codex_parity_agent_spine_rail_table: railTable,
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        selected_primary_intent: "locate_in_doc",
+        solver_short_circuit_flags: [],
+      },
+      loop_parity_trace: {
+        admitted_tool_families: ["docs_viewer"],
+        actual_tool_calls: [],
+        unexpected_tool_calls: [],
+        short_circuit_risk_flags: [],
+      },
+      route_authority_audit: {
+        route_authority_ok: true,
+        violation_codes: [],
+      },
+      poison_audit: {
+        ok: true,
+      },
+      terminal_answer_authority: {
+        server_authoritative: true,
+        final_answer_source: "doc_location_matches",
+        terminal_artifact_kind: "doc_location_matches",
+      },
+    };
+
+    const probe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: { payload: askTurn },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(probe.procedural_ok).toBe(false);
+    expect(probe.failures).toContain("rail_goal_satisfied_without_requested_observation_support");
+  });
+
+  it("rejects reentered rails without re-entry proof", () => {
+    const scenario: HelixApiParityScenario = {
+      id: "rail_table_reentry_proof_missing",
+      description: "Re-entry status must say what proof made the observation model-visible again.",
+      enabled: true,
+      seed: "none",
+      prompt: "Use repo-code.search_concept to find where terminal authority selects the answer.",
+      expected: {},
+    };
+    const railTable = {
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      turn_id: "ask:test:reentry-proof-missing",
+      prompt: scenario.prompt,
+      requested_capability: "repo-code.search_concept",
+      visible_tool_surface: ["repo-code.search_concept"],
+      selected_capability: "repo-code.search_concept",
+      admitted_capability: "repo-code.search_concept",
+      admission_proof_source: "tool_call_admission_decision.admitted_capability",
+      admission_proven: true,
+      executed_capability: "repo-code.search_concept",
+      observation_kind: "repo_code_evidence_observation",
+      observation_ref: "repo_code_evidence_observation:test",
+      required_observation_kinds_for_requested_capability: ["repo_code_evidence_observation"],
+      observed_artifact_supports_requested_capability: true,
+      reentry_status: "reentered",
+      reentry_proof_source: null,
+      reentry_proven: false,
+      goal_satisfaction: "satisfied",
+      required_terminal_kind: "repo_code_evidence_answer",
+      selected_terminal_kind: "repo_code_evidence_answer",
+      terminal_authority_proof_source: "terminal_answer_authority.terminal_artifact_kind",
+      terminal_authority_proven: true,
+      visible_terminal_kind: "repo_code_evidence_answer",
+      visible_projection_source: "payload.terminal_artifact_kind",
+      visible_projection_proven: true,
+      first_broken_rail: null,
+      repair_target: null,
+      codex_parity_class: "complete",
+      normalized_codex_parity_classes: [...CODEX_PARITY_CLASSES],
+      rail_status: "complete",
+      rail_failure_code: null,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const askTurn = {
+      turn_id: railTable.turn_id,
+      final_status: "final_answer",
+      response_type: "final_answer",
+      final_answer_source: "repo_code_evidence_answer",
+      terminal_artifact_kind: "repo_code_evidence_answer",
+      selected_final_answer: "Terminal authority selection is defined in the repo evidence.",
+      codex_parity_agent_spine_rail_table: railTable,
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        selected_primary_intent: "repo_concept_explanation",
+        solver_short_circuit_flags: [],
+      },
+      loop_parity_trace: {
+        admitted_tool_families: ["repo_code"],
+        actual_tool_calls: [],
+        unexpected_tool_calls: [],
+        short_circuit_risk_flags: [],
+      },
+      route_authority_audit: {
+        route_authority_ok: true,
+        violation_codes: [],
+      },
+      poison_audit: {
+        ok: true,
+      },
+      terminal_answer_authority: {
+        server_authoritative: true,
+        final_answer_source: "repo_code_evidence_answer",
+        terminal_artifact_kind: "repo_code_evidence_answer",
+      },
+    };
+
+    const probe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: { payload: askTurn },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(probe.procedural_ok).toBe(false);
+    expect(probe.failures).toEqual(
+      expect.arrayContaining(["rail_reentry_proof_source_missing", "rail_reentry_not_proven"]),
+    );
+  });
+
+  it("rejects terminal authority without a proof source", () => {
+    const scenario: HelixApiParityScenario = {
+      id: "rail_table_terminal_authority_proof_missing",
+      description: "A selected terminal kind must cite the terminal authority writer that selected it.",
+      enabled: true,
+      seed: "none",
+      prompt: "Use workspace_os.status to inspect workstation status.",
+      expected: {},
+    };
+    const railTable = {
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      turn_id: "ask:test:terminal-authority-proof-missing",
+      prompt: scenario.prompt,
+      requested_capability: "workspace_os.status",
+      visible_tool_surface: ["workspace_os.status"],
+      selected_capability: "workspace_os.status",
+      admitted_capability: "workspace_os.status",
+      admission_proof_source: "tool_call_admission_decision.admitted_capability",
+      admission_proven: true,
+      executed_capability: "workspace_os.status",
+      observation_kind: "workspace_os_status_observation",
+      observation_ref: "workspace_os_status_observation:test",
+      required_observation_kinds_for_requested_capability: ["workspace_os_status_observation"],
+      observed_artifact_supports_requested_capability: true,
+      reentry_status: "reentered",
+      reentry_proof_source: "tool_followup_decision.evidence_reentered",
+      reentry_proven: true,
+      goal_satisfaction: "satisfied",
+      required_terminal_kind: "model_synthesized_answer",
+      selected_terminal_kind: "model_synthesized_answer",
+      terminal_authority_proof_source: null,
+      terminal_authority_proven: false,
+      visible_terminal_kind: "model_synthesized_answer",
+      visible_projection_source: "payload.terminal_artifact_kind",
+      visible_projection_proven: true,
+      first_broken_rail: null,
+      repair_target: null,
+      codex_parity_class: "complete",
+      normalized_codex_parity_classes: [...CODEX_PARITY_CLASSES],
+      rail_status: "complete",
+      rail_failure_code: null,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const askTurn = {
+      turn_id: railTable.turn_id,
+      final_status: "final_answer",
+      response_type: "final_answer",
+      final_answer_source: "model_synthesized_answer",
+      terminal_artifact_kind: "model_synthesized_answer",
+      selected_final_answer: "Workspace OS status returned capability records.",
+      codex_parity_agent_spine_rail_table: railTable,
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        selected_primary_intent: "workspace_status",
+        solver_short_circuit_flags: [],
+      },
+      loop_parity_trace: {
+        admitted_tool_families: ["workspace_action"],
+        actual_tool_calls: [],
+        unexpected_tool_calls: [],
+        short_circuit_risk_flags: [],
+      },
+      route_authority_audit: {
+        route_authority_ok: true,
+        violation_codes: [],
+      },
+      poison_audit: {
+        ok: true,
+      },
+      terminal_answer_authority: {
+        server_authoritative: true,
+        final_answer_source: "model_synthesized_answer",
+        terminal_artifact_kind: "model_synthesized_answer",
+      },
+    };
+
+    const probe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: { payload: askTurn },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(probe.procedural_ok).toBe(false);
+    expect(probe.failures).toEqual(
+      expect.arrayContaining(["rail_terminal_authority_proof_source_missing", "rail_terminal_authority_not_proven"]),
+    );
+  });
+
+  it("rejects a rail table whose status and normalized class disagree about completion", () => {
+    const scenario: HelixApiParityScenario = {
+      id: "rail_table_completion_status_class_mismatch",
+      description: "Rail status and Codex parity class must agree on whether the spine is complete.",
+      enabled: true,
+      seed: "none",
+      prompt: "Use repo-code.search_concept to find where terminal authority selects the answer.",
+      expected: {},
+    };
+    const railTable = {
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      turn_id: "ask:test:completion-status-class-mismatch",
+      prompt: scenario.prompt,
+      requested_capability: "repo-code.search_concept",
+      visible_tool_surface: ["repo-code.search_concept"],
+      selected_capability: "repo-code.search_concept",
+      admitted_capability: "repo-code.search_concept",
+      admission_proof_source: "tool_call_admission_decision.admitted_capability",
+      admission_proven: true,
+      executed_capability: "repo-code.search_concept",
+      observation_kind: "repo_code_evidence_observation",
+      observation_ref: "repo_code_evidence_observation:test",
+      required_observation_kinds_for_requested_capability: ["repo_code_evidence_observation"],
+      observed_artifact_supports_requested_capability: true,
+      reentry_status: "reentered",
+      reentry_proof_source: "tool_followup_decision.evidence_reentered",
+      reentry_proven: true,
+      goal_satisfaction: "not_satisfied",
+      required_terminal_kind: "repo_code_evidence_answer",
+      selected_terminal_kind: "typed_failure",
+      terminal_authority_proof_source: "terminal_answer_authority.terminal_artifact_kind",
+      terminal_authority_proven: true,
+      visible_terminal_kind: "typed_failure",
+      visible_projection_source: "payload.terminal_artifact_kind",
+      visible_projection_proven: true,
+      first_broken_rail: "evidence_reentry",
+      repair_target: "repo_retrieval_repair_policy",
+      codex_parity_class: "observation_not_reentered",
+      normalized_codex_parity_classes: [...CODEX_PARITY_CLASSES],
+      rail_status: "complete",
+      rail_failure_code: "repo_evidence_weak_after_repair",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const askTurn = {
+      turn_id: railTable.turn_id,
+      final_status: "final_failure",
+      response_type: "final_failure",
+      terminal_error_code: "repo_evidence_weak_after_repair",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      selected_final_answer: "I could not complete that turn. Cause: repo_evidence_weak_after_repair.",
+      codex_parity_agent_spine_rail_table: railTable,
+      ask_turn_solver_trace: {
+        completed_solver_path: true,
+        selected_primary_intent: "repo_concept_explanation",
+        solver_short_circuit_flags: [],
+      },
+      loop_parity_trace: {
+        admitted_tool_families: ["repo_code"],
+        actual_tool_calls: [],
+        unexpected_tool_calls: [],
+        short_circuit_risk_flags: [],
+      },
+      route_authority_audit: {
+        route_authority_ok: true,
+        violation_codes: [],
+      },
+      poison_audit: {
+        ok: true,
+      },
+      terminal_answer_authority: {
+        server_authoritative: true,
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+      },
+    };
+
+    const probe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: { payload: askTurn },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(probe.procedural_ok).toBe(false);
+    expect(probe.failures).toEqual(
+      expect.arrayContaining(["rail_completion_status_class_mismatch:complete/observation_not_reentered"]),
+    );
+  });
 });

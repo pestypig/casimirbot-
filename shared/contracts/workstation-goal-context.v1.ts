@@ -31,8 +31,10 @@ export type GoalContextProducerKindV1 =
   | "reflection"
   | "live_answer"
   | "source_health"
+  | "trace_memory"
   | "route_watch"
-  | "narrator";
+  | "narrator"
+  | "automation";
 
 export const WORKSTATION_GOAL_CONTEXT_PRODUCER_KINDS: readonly GoalContextProducerKindV1[] = [
   "visual_capture",
@@ -43,8 +45,10 @@ export const WORKSTATION_GOAL_CONTEXT_PRODUCER_KINDS: readonly GoalContextProduc
   "reflection",
   "live_answer",
   "source_health",
+  "trace_memory",
   "route_watch",
   "narrator",
+  "automation",
 ];
 
 export type GoalContextUpdateKindV1 =
@@ -56,6 +60,7 @@ export type GoalContextUpdateKindV1 =
   | "route_evidence"
   | "source_status"
   | "preset_state"
+  | "automation_status"
   | "reflection"
   | "error"
   | "suggested_action";
@@ -69,6 +74,7 @@ export const WORKSTATION_GOAL_CONTEXT_UPDATE_KINDS: readonly GoalContextUpdateKi
   "route_evidence",
   "source_status",
   "preset_state",
+  "automation_status",
   "reflection",
   "error",
   "suggested_action",
@@ -113,7 +119,9 @@ export type AgentGoalContextFeedKindV1 =
   | "live_answer_lines"
   | "source_health"
   | "trace_memory"
-  | "route_evidence";
+  | "packet_traces"
+  | "route_evidence"
+  | "automation_policies";
 
 export const WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS: readonly AgentGoalContextFeedKindV1[] = [
   "visual_summaries",
@@ -123,7 +131,9 @@ export const WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS: readonly AgentGoalContex
   "live_answer_lines",
   "source_health",
   "trace_memory",
+  "packet_traces",
   "route_evidence",
+  "automation_policies",
 ];
 
 export type AgentGoalDefaultContextFeedSpecV1 = {
@@ -140,7 +150,9 @@ export const WORKSTATION_AGENT_GOAL_DEFAULT_CONTEXT_FEEDS: readonly AgentGoalDef
   { sourceKind: "live_answer_lines", freshnessMs: 45_000, relevancePolicy: "same-goal-or-active-line" },
   { sourceKind: "source_health", freshnessMs: 60_000, relevancePolicy: "same-source" },
   { sourceKind: "trace_memory", freshnessMs: 120_000, relevancePolicy: "same-thread-or-turn" },
+  { sourceKind: "packet_traces", freshnessMs: 60_000, relevancePolicy: "same-source-or-packet" },
   { sourceKind: "route_evidence", freshnessMs: 60_000, relevancePolicy: "same-goal-or-route" },
+  { sourceKind: "automation_policies", freshnessMs: 120_000, relevancePolicy: "same-goal-or-loop-policy" },
 ];
 
 export type AgentGoalActuatorV1 =
@@ -150,6 +162,8 @@ export type AgentGoalActuatorV1 =
   | "query_microdeck_outputs"
   | "query_live_answer_state"
   | "query_source_health"
+  | "query_packet_traces"
+  | "query_route_evidence"
   | "configure_route_watch"
   | "set_audio_preset"
   | "set_visual_preset"
@@ -175,6 +189,8 @@ export const WORKSTATION_AGENT_GOAL_ACTUATORS: readonly AgentGoalActuatorV1[] = 
   "query_microdeck_outputs",
   "query_live_answer_state",
   "query_source_health",
+  "query_packet_traces",
+  "query_route_evidence",
   "configure_route_watch",
   "set_audio_preset",
   "set_visual_preset",

@@ -50,6 +50,14 @@ type ExplicitCapabilityScenario = {
   expected: ExpectedRailOutcome;
 };
 
+type TurnTerminalSnapshot = {
+  finalStatus: string | null;
+  responseType: string | null;
+  finalAnswerSource: string | null;
+  terminalErrorCode: string | null;
+  selectedFinalAnswer: string;
+};
+
 const createApp = (): express.Express => {
   const app = express();
   app.use(express.json({ limit: "2mb" }));
@@ -62,6 +70,25 @@ const readRecord = (value: unknown): RecordLike | null =>
 
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
+
+const terminalSnapshotFor = (body: unknown): TurnTerminalSnapshot => {
+  const record = readRecord(body);
+  return {
+    finalStatus: readString(record?.final_status),
+    responseType: readString(record?.response_type),
+    finalAnswerSource: readString(record?.final_answer_source),
+    terminalErrorCode: readString(record?.terminal_error_code),
+    selectedFinalAnswer: readString(record?.selected_final_answer) ?? readString(record?.answer) ?? readString(record?.text) ?? "",
+  };
+};
+
+const expectTerminalProjectionForCompleteRail = (terminal: TurnTerminalSnapshot): void => {
+  expect(terminal.finalStatus).toBe("final_answer");
+  expect(terminal.responseType).toBe("final_answer");
+  expect(terminal.terminalErrorCode).toBeNull();
+  expect(terminal.finalAnswerSource).not.toBe("typed_failure");
+  expect(terminal.selectedFinalAnswer.length).toBeGreaterThan(0);
+};
 
 const TEST_MIB = 1024 * 1024;
 
@@ -97,6 +124,7 @@ const expectRailTableShape = (railTable: RecordLike, turnId: string): void => {
     "requested_capability",
     "selected_capability",
     "admitted_capability",
+    "admission_proof_source",
     "executed_capability",
     "observation_kind",
     "observation_ref",
@@ -113,6 +141,56 @@ const expectRailTableShape = (railTable: RecordLike, turnId: string): void => {
   }
   expect(["reentered", "not_reentered", "no_observation"]).toContain(railTable.reentry_status);
   expect(["complete", "broken", "fail_closed"]).toContain(railTable.rail_status);
+  expect(railTable.rail_status === "complete").toBe(railTable.codex_parity_class === "complete");
+  expect(typeof railTable.reentry_proven).toBe("boolean");
+  expect(railTable.reentry_proof_source === null || typeof railTable.reentry_proof_source === "string").toBe(true);
+  if (railTable.reentry_status === "reentered") {
+    expect(railTable.reentry_proven).toBe(true);
+    expect(typeof railTable.reentry_proof_source).toBe("string");
+    expect(String(railTable.reentry_proof_source).length).toBeGreaterThan(0);
+  }
+  if (railTable.rail_status === "complete" || railTable.codex_parity_class === "complete") {
+    expect(railTable.reentry_status).toBe("reentered");
+  }
+  expect(typeof railTable.terminal_authority_proven).toBe("boolean");
+  expect(railTable.terminal_authority_proof_source === null || typeof railTable.terminal_authority_proof_source === "string").toBe(true);
+  if (railTable.selected_terminal_kind) {
+    expect(railTable.terminal_authority_proven).toBe(true);
+    expect(typeof railTable.terminal_authority_proof_source).toBe("string");
+    expect(String(railTable.terminal_authority_proof_source).length).toBeGreaterThan(0);
+  }
+  expect(typeof railTable.visible_projection_proven).toBe("boolean");
+  expect(railTable.visible_projection_source === null || typeof railTable.visible_projection_source === "string").toBe(true);
+  if (railTable.visible_terminal_kind) {
+    expect(railTable.visible_projection_proven).toBe(true);
+    expect(typeof railTable.visible_projection_source).toBe("string");
+    expect(String(railTable.visible_projection_source).length).toBeGreaterThan(0);
+  }
+  if (railTable.rail_status === "complete" || railTable.codex_parity_class === "complete") {
+    expect(railTable.selected_terminal_kind).toBeTruthy();
+    expect(railTable.visible_terminal_kind).toBeTruthy();
+  }
+  expect(Array.isArray(railTable.required_observation_kinds_for_requested_capability)).toBe(true);
+  expect(
+    railTable.observed_artifact_supports_requested_capability === null ||
+      typeof railTable.observed_artifact_supports_requested_capability === "boolean",
+  ).toBe(true);
+  if (railTable.requested_capability) {
+    expect(typeof railTable.observed_artifact_supports_requested_capability).toBe("boolean");
+    if (railTable.goal_satisfaction === "satisfied" || railTable.rail_status === "complete") {
+      expect(railTable.observed_artifact_supports_requested_capability).toBe(true);
+    }
+  }
+  expect(typeof railTable.admission_proven).toBe("boolean");
+  if (railTable.admitted_capability) {
+    expect(railTable.admission_proven).toBe(true);
+    expect(typeof railTable.admission_proof_source).toBe("string");
+    expect(String(railTable.admission_proof_source).length).toBeGreaterThan(0);
+  }
+  if (railTable.selected_capability || railTable.executed_capability) {
+    expect(typeof railTable.admitted_capability).toBe("string");
+    expect(String(railTable.admitted_capability).length).toBeGreaterThan(0);
+  }
   expect(CODEX_PARITY_CLASSES).toContain(railTable.codex_parity_class);
   expect(railTable.normalized_codex_parity_classes).toEqual([...CODEX_PARITY_CLASSES]);
   if (railTable.rail_status === "complete" || railTable.codex_parity_class === "complete") {
@@ -132,6 +210,7 @@ const fetchRailTable = async (input: {
   turnId: string;
   turnRail: RecordLike;
   debugRail: RecordLike;
+  terminal: TurnTerminalSnapshot;
 }> => {
   resetEndpointAdmissionForTests();
   const turn = await request(input.app)
@@ -145,6 +224,7 @@ const fetchRailTable = async (input: {
     .expect(200);
   const turnId = readString(turn.body?.turn_id);
   expect(turnId).toBeTruthy();
+  const terminal = terminalSnapshotFor(turn.body);
   const debug = await request(input.app)
     .get(`/api/agi/ask/turn/${encodeURIComponent(turnId as string)}/debug-export?view=rail`)
     .expect(200);
@@ -155,10 +235,13 @@ const fetchRailTable = async (input: {
   expectRailTableShape(turnRail as RecordLike, turnId as string);
   expectRailTableShape(debugRail as RecordLike, turnId as string);
   expect(debugRail).toEqual(turnRail);
+  if (turnRail?.rail_status === "complete") {
+    expectTerminalProjectionForCompleteRail(terminal);
+  }
   (turn as unknown as { body?: unknown }).body = undefined;
   (debug as unknown as { body?: unknown }).body = undefined;
   resetEndpointAdmissionForTests();
-  return { turnId: turnId as string, turnRail: turnRail as RecordLike, debugRail: debugRail as RecordLike };
+  return { turnId: turnId as string, turnRail: turnRail as RecordLike, debugRail: debugRail as RecordLike, terminal };
 };
 
 const seedVisualCapture = async (input: {
@@ -387,7 +470,7 @@ describe("Helix Ask Codex-parity agent spine convergence", () => {
   }, 60_000);
 
   it("answers capability catalog questions from runtime catalog evidence, not repo existence", async () => {
-    const { turnRail } = await fetchRailTable({
+    const { turnRail, terminal } = await fetchRailTable({
       app: createApp(),
       prompt: "What tools are available for the helix ask to use?",
       sessionId: `helix-ask:spine-convergence:catalog:${Date.now()}`,
@@ -398,6 +481,9 @@ describe("Helix Ask Codex-parity agent spine convergence", () => {
     expect(turnRail.executed_capability).toBe("helix_ask.inspect_capability_catalog");
     expect(turnRail.observation_kind).toBe("capability_registry");
     expect(turnRail.codex_parity_class).toBe("complete");
+    expect(terminal.terminalErrorCode).not.toBe("terminal_kind_not_required");
+    expect(terminal.finalAnswerSource).not.toBe("typed_failure");
+    expect(terminal.selectedFinalAnswer).toMatch(/tool|capabil/i);
   }, 60_000);
 
   it("keeps negated calculator references suppressed instead of treating them as progress", async () => {

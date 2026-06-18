@@ -127,6 +127,59 @@ describe("Helix Ask live environment agent loop", () => {
     expect(packet.recent_commentary_refs.length).toBeGreaterThan(0);
   });
 
+  it("advertises the goal-directed workstation query and control surface with governed confirmation policy", () => {
+    const environment = seedEnvironment();
+
+    const packet = buildLiveEnvironmentRuntimePacket({
+      threadId: environment.thread_id,
+      environmentId: environment.environment_id,
+      now: "2026-05-26T12:00:04.000Z",
+    });
+    const toolById = new Map(packet.available_tools.map((tool) => [tool.tool_id, tool]));
+    const queryTools = [
+      "live_env.query_workstation_goal_context",
+      "live_env.start_agent_goal_session",
+      "live_env.query_trace_memory",
+      "live_env.query_packet_traces",
+      "live_env.query_visual_summaries",
+      "live_env.query_audio_transcripts",
+      "live_env.query_translation_segments",
+      "live_env.query_microdeck_outputs",
+      "live_env.query_live_answer_state",
+      "live_env.query_source_health",
+      "live_env.query_route_evidence",
+    ];
+    const controlTools = [
+      "live_env.change_workstation_preset",
+      "live_env.bind_workstation_source",
+      "live_env.unbind_workstation_source",
+      "live_env.set_workstation_loop_state",
+      "live_env.repair_workstation_source",
+      "live_env.update_live_answer_projection",
+      "live_env.focus_process_graph",
+      "live_env.narrator_say",
+      "live_env.narrator_bind_stream",
+    ];
+
+    for (const toolId of queryTools) {
+      expect(toolById.get(toolId)).toMatchObject({
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      });
+    }
+
+    for (const toolId of controlTools) {
+      expect(toolById.get(toolId)).toMatchObject({
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: true,
+        can_run_automatically: false,
+      });
+    }
+  });
+
   it("records interim voice callout requests as provisional tool evidence", () => {
     const environment = seedEnvironment();
 

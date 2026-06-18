@@ -2,6 +2,51 @@ import type { HelixApiParityExpected, HelixApiParityScenario } from "./api-parit
 
 type RecordLike = Record<string, unknown>;
 
+const CODEX_PARITY_AGENT_SPINE_CLASSES = [
+  "complete",
+  "tool_surface_missing",
+  "explicit_capability_demoted",
+  "tool_admission_rejected",
+  "selected_not_executed",
+  "observation_missing",
+  "observation_not_reentered",
+  "goal_contract_mismatch",
+  "terminal_product_not_allowed",
+  "terminal_authority_mismatch",
+  "visible_projection_mismatch",
+  "debug_mirror_stale",
+  "provider_config_missing",
+] as const;
+
+export type HelixApiParityRailTableSummary = {
+  present: boolean;
+  requested_capability: string | null;
+  selected_capability: string | null;
+  admitted_capability: string | null;
+  admission_proof_source: string | null;
+  admission_proven: boolean;
+  executed_capability: string | null;
+  observation_kind: string | null;
+  required_observation_kinds_for_requested_capability: string[];
+  observed_artifact_supports_requested_capability: boolean | null;
+  reentry_status: string | null;
+  reentry_proof_source: string | null;
+  reentry_proven: boolean;
+  goal_satisfaction: string | null;
+  required_terminal_kind: string | null;
+  selected_terminal_kind: string | null;
+  terminal_authority_proof_source: string | null;
+  terminal_authority_proven: boolean;
+  visible_terminal_kind: string | null;
+  visible_projection_source: string | null;
+  visible_projection_proven: boolean;
+  first_broken_rail: string | null;
+  repair_target: string | null;
+  codex_parity_class: string | null;
+  rail_status: string | null;
+  rail_failure_code: string | null;
+};
+
 export type HelixApiParityProbeResult = {
   schema: "helix.api_parity_probe_result.v1";
   scenario_id: string;
@@ -47,6 +92,7 @@ export type HelixApiParityProbeResult = {
   };
   poison_audit_ok: boolean;
   terminal_authority_ok: boolean;
+  rail_table: HelixApiParityRailTableSummary;
   solver_continuation_count?: number;
   solver_continuation_observation?: {
     reason: string | null;
@@ -137,6 +183,193 @@ const readContextualToolMentionCues = (solverTrace: RecordLike | null): string[]
     .filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry))
     .map((entry: RecordLike) => `${readString(entry.verb_or_cue) ?? ""} ${readString(entry.text) ?? ""}`.trim())
     .filter(Boolean);
+
+const readRailTable = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
+  readRecord(ask.codex_parity_agent_spine_rail_table) ??
+  readRecord(debug?.codex_parity_agent_spine_rail_table) ??
+  readRecord(getPath(debug, ["debug", "codex_parity_agent_spine_rail_table"])) ??
+  readRecord(getPath(debug, ["artifact_query_index", "codex_parity_agent_spine_rail_table"])) ??
+  readRecord(getPath(debug, ["debug", "artifact_query_index", "codex_parity_agent_spine_rail_table"]));
+
+const buildRailTableSummary = (railTable: RecordLike | null): HelixApiParityRailTableSummary => ({
+  present: Boolean(railTable),
+  requested_capability: readString(railTable?.requested_capability),
+  selected_capability: readString(railTable?.selected_capability),
+  admitted_capability: readString(railTable?.admitted_capability),
+  admission_proof_source: readString(railTable?.admission_proof_source),
+  admission_proven: railTable?.admission_proven === true,
+  executed_capability: readString(railTable?.executed_capability),
+  observation_kind: readString(railTable?.observation_kind),
+  required_observation_kinds_for_requested_capability: readStringArray(railTable?.required_observation_kinds_for_requested_capability),
+  observed_artifact_supports_requested_capability:
+    typeof railTable?.observed_artifact_supports_requested_capability === "boolean"
+      ? railTable.observed_artifact_supports_requested_capability
+      : null,
+  reentry_status: readString(railTable?.reentry_status),
+  reentry_proof_source: readString(railTable?.reentry_proof_source),
+  reentry_proven: railTable?.reentry_proven === true,
+  goal_satisfaction: readString(railTable?.goal_satisfaction),
+  required_terminal_kind: readString(railTable?.required_terminal_kind),
+  selected_terminal_kind: readString(railTable?.selected_terminal_kind),
+  terminal_authority_proof_source: readString(railTable?.terminal_authority_proof_source),
+  terminal_authority_proven: railTable?.terminal_authority_proven === true,
+  visible_terminal_kind: readString(railTable?.visible_terminal_kind),
+  visible_projection_source: readString(railTable?.visible_projection_source),
+  visible_projection_proven: railTable?.visible_projection_proven === true,
+  first_broken_rail: readString(railTable?.first_broken_rail),
+  repair_target: readString(railTable?.repair_target),
+  codex_parity_class: readString(railTable?.codex_parity_class),
+  rail_status: readString(railTable?.rail_status),
+  rail_failure_code: readString(railTable?.rail_failure_code),
+});
+
+const addRailTableFailures = (failures: string[], railTable: RecordLike | null): void => {
+  if (!railTable) {
+    failures.push("codex_parity_agent_spine_rail_table_missing");
+    return;
+  }
+  if (railTable.schema !== "helix.codex_parity_agent_spine_rail_table.v1") {
+    failures.push(`rail_table_schema_mismatch:${readString(railTable.schema) ?? "missing"}`);
+  }
+  if (!Array.isArray(railTable.visible_tool_surface)) failures.push("rail_visible_tool_surface_missing");
+  if (!["reentered", "not_reentered", "no_observation"].includes(readString(railTable.reentry_status) ?? "")) {
+    failures.push(`rail_reentry_status_invalid:${readString(railTable.reentry_status) ?? "missing"}`);
+  }
+  if (!["complete", "broken", "fail_closed"].includes(readString(railTable.rail_status) ?? "")) {
+    failures.push(`rail_status_invalid:${readString(railTable.rail_status) ?? "missing"}`);
+  }
+  const parityClass = readString(railTable.codex_parity_class);
+  if (!CODEX_PARITY_AGENT_SPINE_CLASSES.includes(parityClass as (typeof CODEX_PARITY_AGENT_SPINE_CLASSES)[number])) {
+    failures.push(`rail_codex_parity_class_invalid:${parityClass ?? "missing"}`);
+  }
+  if (JSON.stringify(railTable.normalized_codex_parity_classes) !== JSON.stringify(CODEX_PARITY_AGENT_SPINE_CLASSES)) {
+    failures.push("rail_normalized_codex_parity_classes_mismatch");
+  }
+  const selectedCapability = readString(railTable.selected_capability);
+  const admittedCapability = readString(railTable.admitted_capability);
+  const executedCapability = readString(railTable.executed_capability);
+  const requestedCapability = readString(railTable.requested_capability);
+  const goalSatisfaction = readString(railTable.goal_satisfaction);
+  const railStatus = readString(railTable.rail_status);
+  const reentryStatus = readString(railTable.reentry_status);
+  const reentryProofSource = readString(railTable.reentry_proof_source);
+  const reentryProven = railTable.reentry_proven === true;
+  const requiredObservationKinds = readStringArray(railTable.required_observation_kinds_for_requested_capability);
+  const observationSupportsRequested = railTable.observed_artifact_supports_requested_capability;
+  const admissionProofSource = readString(railTable.admission_proof_source);
+  const admissionProven = railTable.admission_proven === true;
+  if ((selectedCapability || executedCapability) && !admittedCapability) {
+    failures.push("rail_admitted_capability_missing");
+  }
+  if (admittedCapability && !admissionProofSource) {
+    failures.push("rail_admission_proof_source_missing");
+  }
+  if (admittedCapability && !admissionProven) {
+    failures.push("rail_admission_not_proven");
+  }
+  if (reentryStatus === "reentered" && !reentryProofSource) {
+    failures.push("rail_reentry_proof_source_missing");
+  }
+  if (reentryStatus === "reentered" && !reentryProven) {
+    failures.push("rail_reentry_not_proven");
+  }
+  if ((railStatus === "complete" || parityClass === "complete") && reentryStatus !== "reentered") {
+    failures.push(`rail_complete_without_reentry:${reentryStatus ?? "missing"}`);
+  }
+  if ((railStatus === "complete") !== (parityClass === "complete")) {
+    failures.push(`rail_completion_status_class_mismatch:${railStatus ?? "missing"}/${parityClass ?? "missing"}`);
+  }
+  if (requestedCapability && !Array.isArray(railTable.required_observation_kinds_for_requested_capability)) {
+    failures.push("rail_requested_observation_kinds_missing");
+  }
+  if (requestedCapability && typeof observationSupportsRequested !== "boolean") {
+    failures.push("rail_observation_support_verdict_missing");
+  }
+  if (
+    requestedCapability &&
+    (goalSatisfaction === "satisfied" || railStatus === "complete" || parityClass === "complete") &&
+    requiredObservationKinds.length > 0 &&
+    observationSupportsRequested !== true
+  ) {
+    failures.push("rail_goal_satisfied_without_requested_observation_support");
+  }
+  if (parityClass === "complete" && readString(railTable.first_broken_rail)) {
+    failures.push(`rail_complete_with_first_broken_rail:${readString(railTable.first_broken_rail)}`);
+  }
+  if (parityClass !== "complete" && !readString(railTable.first_broken_rail)) {
+    failures.push("rail_non_complete_without_first_broken_rail");
+  }
+  const selectedTerminalKind = readString(railTable.selected_terminal_kind);
+  const visibleTerminalKind = readString(railTable.visible_terminal_kind);
+  const terminalAuthorityProofSource = readString(railTable.terminal_authority_proof_source);
+  const terminalAuthorityProven = railTable.terminal_authority_proven === true;
+  const visibleProjectionSource = readString(railTable.visible_projection_source);
+  const visibleProjectionProven = railTable.visible_projection_proven === true;
+  if (selectedTerminalKind && !terminalAuthorityProofSource) {
+    failures.push("rail_terminal_authority_proof_source_missing");
+  }
+  if (selectedTerminalKind && !terminalAuthorityProven) {
+    failures.push("rail_terminal_authority_not_proven");
+  }
+  if (visibleTerminalKind && !visibleProjectionSource) {
+    failures.push("rail_visible_projection_source_missing");
+  }
+  if (visibleTerminalKind && !visibleProjectionProven) {
+    failures.push("rail_visible_projection_not_proven");
+  }
+  if ((railStatus === "complete" || parityClass === "complete") && !selectedTerminalKind) {
+    failures.push("rail_complete_without_terminal_authority");
+  }
+  if ((railStatus === "complete" || parityClass === "complete") && !visibleTerminalKind) {
+    failures.push("rail_complete_without_visible_projection");
+  }
+  if (selectedTerminalKind && visibleTerminalKind && selectedTerminalKind !== visibleTerminalKind) {
+    failures.push(`rail_terminal_projection_mismatch:${selectedTerminalKind}!=${visibleTerminalKind}`);
+  }
+};
+
+const addCompleteRailEnvelopeFailures = (input: {
+  failures: string[];
+  railTable: RecordLike | null;
+  ask: RecordLike;
+  debug: RecordLike | null;
+}): void => {
+  if (!input.railTable) return;
+  const railComplete =
+    readString(input.railTable.codex_parity_class) === "complete" ||
+    readString(input.railTable.rail_status) === "complete";
+  if (!railComplete) return;
+  const terminalErrorCode =
+    readString(input.ask.terminal_error_code) ??
+    readString(input.debug?.terminal_error_code) ??
+    readString(getPath(input.debug, ["resolved_turn_summary", "terminal_error_code"]));
+  const finalStatus = readString(input.ask.final_status) ?? readString(input.debug?.final_status);
+  const responseType = readString(input.ask.response_type) ?? readString(input.debug?.response_type);
+  const finalAnswerSource =
+    readString(input.ask.final_answer_source) ??
+    readString(input.debug?.final_answer_source) ??
+    readString(getPath(input.debug, ["terminal_answer_authority", "final_answer_source"]));
+  const terminalArtifactKind =
+    readString(input.ask.terminal_artifact_kind) ??
+    readString(input.debug?.terminal_artifact_kind) ??
+    readString(getPath(input.debug, ["terminal_answer_authority", "terminal_artifact_kind"]));
+  const selectedText =
+    readString(input.ask.selected_final_answer) ??
+    readString(input.ask.answer) ??
+    readString(input.ask.text) ??
+    readString(input.debug?.selected_final_answer) ??
+    readString(input.debug?.answer) ??
+    "";
+
+  if (terminalErrorCode) input.failures.push(`complete_rail_terminal_error:${terminalErrorCode}`);
+  if (finalAnswerSource === "typed_failure" || terminalArtifactKind === "typed_failure") {
+    input.failures.push("complete_rail_typed_failure_terminal");
+  }
+  if ((finalStatus && finalStatus !== "final_answer") || (responseType && responseType !== "final_answer")) {
+    input.failures.push(`complete_rail_non_final_response:${finalStatus ?? "missing"}/${responseType ?? "missing"}`);
+  }
+  if (!selectedText) input.failures.push("complete_rail_missing_final_answer_text");
+};
 
 const readExecutableOperatorCommandCount = (solverTrace: RecordLike | null): number =>
   Array.isArray(getPath(solverTrace, ["prompt_interpretation", "executable_operator_commands"]))
@@ -238,6 +471,7 @@ export function buildApiParityProbeResult(input: {
   const routeAuthority = readRouteAuthority(ask, debug);
   const poisonAudit = readPoisonAudit(ask, debug);
   const terminalAuthority = readTerminalAuthority(ask, debug);
+  const railTable = readRailTable(ask, debug);
   const capabilitySelectionResult = readCapabilitySelectionResult(ask, debug);
   const selectedCapabilities = [
     readString(capabilitySelectionResult?.capability_id),
@@ -280,6 +514,8 @@ export function buildApiParityProbeResult(input: {
   const expectedIdentityDiagnosis = typeof input.scenario.expected.live_source_identity_ok === "boolean" && input.scenario.expected.live_source_identity_ok === false;
 
   if (!debug) failures.push("debug_export_missing");
+  addRailTableFailures(failures, railTable);
+  addCompleteRailEnvelopeFailures({ failures, railTable, ask, debug });
   if (!solverTrace) failures.push("ask_turn_solver_trace_missing");
   if (solverTrace) {
     const expectedSolverCompleted = input.scenario.expected.solver_completed ?? true;
@@ -365,6 +601,7 @@ export function buildApiParityProbeResult(input: {
     },
     poison_audit_ok: poisonAuditOk,
     terminal_authority_ok: terminalAuthorityOk,
+    rail_table: buildRailTableSummary(railTable),
     solver_continuation_count: Number(ask.solver_continuation_count ?? debug?.solver_continuation_count ?? 0),
     solver_continuation_observation: solverContinuation
       ? {

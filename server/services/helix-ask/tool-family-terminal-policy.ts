@@ -21,6 +21,7 @@ export type ToolFamilyTerminalPolicyDecision = {
     | "terminal_kind_forbidden_by_route_product_contract"
     | "terminal_kind_not_allowed_by_route_product_contract"
     | "terminal_kind_not_allowed_by_tool_family_contract"
+    | "observation_artifact_cannot_terminalize"
     | "evidence_only_tool_cannot_terminalize_receipt"
     | "control_receipt_requires_admitted_tool"
     | "control_receipt_requires_goal_satisfaction"
@@ -41,6 +42,55 @@ const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : 
 export const isReceiptTerminalKind = (kind: string): boolean =>
   /(?:^|[_\-.])(?:receipt|tool_evaluation|workstation_tool_evaluation|action_receipt|decision|callout)(?:$|[_\-.])/i.test(kind) ||
   /\b(?:tool_evaluation|workstation_tool_evaluation|action_receipt)\b/i.test(kind);
+
+const normalizeArtifactKind = (kind: string): string =>
+  kind.trim().toLowerCase().replace(/\/v(\d+)$/i, ".v$1");
+
+const WORKSTATION_OBSERVATION_TERMINAL_KINDS = new Set([
+  "helix.agent_goal_session.v1",
+  "helix.narrator_bind_stream_request.v1",
+  "helix.narrator_event.v1",
+  "helix.narrator_say_request.v1",
+  "helix.situation_source_capability_read",
+  "helix.situation_source_capability_read.v1",
+  "helix.workstation_goal_context_update.v1",
+  "helix.workstation_reasoning_trace_query_result",
+  "helix.workstation_reasoning_trace_query_result.v1",
+  "audio_transcripts",
+  "automation_policies",
+  "automation_status",
+  "live_answer_projection",
+  "live_answer_lines",
+  "live_source_causal_trace.v1",
+  "microdeck_output",
+  "microdeck_outputs",
+  "panel_projection",
+  "packet_traces",
+  "route_evidence",
+  "source_health",
+  "stage_play_live_answer_projection",
+  "stage_play_live_source_current_state",
+  "stage_play_live_source_current_state.v1",
+  "stage_play_live_source_mail_wake_request.v1",
+  "stage_play_live_source_mail_wake_result_observation.v1",
+  "stage_play_live_source_mail_wake_result_projection.v1",
+  "stage_play_live_source_mail_wake_result.v1",
+  "stage_play_live_source_quality",
+  "stage_play_live_source_quality.v1",
+  "stage_play_microdeck_output",
+  "stage_play_packet_trace_query_result",
+  "stage_play_packet_trace_query_result.v1",
+  "stage_play_workstation_context_feed_query_result",
+  "stage_play_workstation_context_feed_query_result.v1",
+  "stage_play_workstation_goal_context_read_result",
+  "stage_play_workstation_goal_context_read_result.v1",
+  "trace_memory",
+  "translated_transcripts",
+  "visual_summaries",
+]);
+
+export const isWorkstationObservationTerminalKind = (kind: string): boolean =>
+  WORKSTATION_OBSERVATION_TERMINAL_KINDS.has(normalizeArtifactKind(kind));
 
 const routeAllowsTerminalKind = (
   routeProductContract: HelixRouteProductContract | RecordLike | null | undefined,
@@ -99,6 +149,14 @@ export function evaluateToolFamilyTerminalPolicy(input: {
       ...base,
       allowed: false,
       reason: "tool_family_contract_missing",
+    };
+  }
+
+  if (isWorkstationObservationTerminalKind(terminalArtifactKind)) {
+    return {
+      ...base,
+      allowed: false,
+      reason: "observation_artifact_cannot_terminalize",
     };
   }
 

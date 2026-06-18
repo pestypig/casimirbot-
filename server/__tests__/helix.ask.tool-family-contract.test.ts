@@ -58,15 +58,20 @@ describe("Helix Ask tool-family contract registry", () => {
       ["live_env.query_live_source_quality", "live_source_mail", "evidence_only"],
       ["live_env.summarize_live_source_current_state", "live_source_mail", "evidence_only"],
       ["live_env.query_trace_memory", "live_source_mail", "evidence_only"],
+      ["live_env.query_packet_traces", "live_source_mail", "evidence_only"],
       ["live_env.query_visual_summaries", "live_source_mail", "evidence_only"],
       ["live_env.query_audio_transcripts", "live_source_mail", "evidence_only"],
       ["live_env.query_translation_segments", "live_source_mail", "evidence_only"],
       ["live_env.query_microdeck_outputs", "live_source_mail", "evidence_only"],
       ["live_env.query_live_answer_state", "live_source_mail", "evidence_only"],
+      ["live_env.query_route_evidence", "live_source_mail", "evidence_only"],
+      ["live_env.configure_route_watch", "live_source_mail", "control_receipt"],
+      ["live_env.configure_live_source_watch_job", "live_source_mail", "control_receipt"],
       ["live_env.change_workstation_preset", "live_source_mail", "control_receipt"],
       ["live_env.bind_workstation_source", "live_source_mail", "control_receipt"],
       ["live_env.unbind_workstation_source", "live_source_mail", "control_receipt"],
       ["live_env.set_workstation_loop_state", "live_source_mail", "control_receipt"],
+      ["live_env.repair_workstation_source", "live_source_mail", "control_receipt"],
       ["live_env.update_live_answer_projection", "live_source_mail", "control_receipt"],
       ["live_env.focus_process_graph", "live_source_mail", "control_receipt"],
       ["live_env.process_live_source_mail", "live_source_mail", "evidence_only"],
@@ -165,6 +170,63 @@ describe("Helix Ask tool-family contract registry", () => {
       expect(decision).toMatchObject({
         allowed: false,
         reason: "evidence_only_tool_cannot_terminalize_receipt",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      });
+    }
+  });
+
+  it("keeps workstation observation artifacts nonterminal even when a route contract names them", () => {
+    const observationCases = [
+      ["live_env.query_workstation_goal_context", "helix.workstation_goal_context_update.v1"],
+      ["live_env.query_workstation_goal_context", "helix.agent_goal_session.v1"],
+      ["live_env.query_trace_memory", "helix.workstation_reasoning_trace_query_result.v1"],
+      ["live_env.query_packet_traces", "stage_play_packet_trace_query_result.v1"],
+      ["live_env.query_packet_traces", "live_source_causal_trace/v1"],
+      ["live_env.query_visual_summaries", "stage_play_workstation_context_feed_query_result.v1"],
+      ["live_env.query_visual_summaries", "visual_summaries"],
+      ["live_env.query_audio_transcripts", "audio_transcripts"],
+      ["live_env.query_translation_segments", "translated_transcripts"],
+      ["live_env.query_microdeck_outputs", "microdeck_outputs"],
+      ["live_env.query_live_answer_state", "live_answer_lines"],
+      ["live_env.query_packet_traces", "packet_traces"],
+      ["live_env.query_workstation_goal_context", "route_evidence"],
+      ["live_env.query_route_evidence", "stage_play_workstation_context_feed_query_result.v1"],
+      ["live_env.query_route_evidence", "route_evidence"],
+      ["live_env.query_route_evidence", "automation_policies"],
+      ["live_env.query_route_evidence", "automation_status"],
+      ["live_env.query_trace_memory", "trace_memory"],
+      ["live_env.query_microdeck_outputs", "microdeck_output"],
+      ["live_env.query_live_answer_state", "live_answer_projection"],
+      ["live_env.query_source_health", "source_health"],
+      ["live_env.narrator_say", "helix.narrator_say_request.v1"],
+      ["live_env.narrator_bind_stream", "helix.narrator_bind_stream_request.v1"],
+      ["live_env.narrator_say", "helix.narrator_event/v1"],
+      ["live_env.read_processed_live_source_mail", "stage_play_live_source_mail_wake_request/v1"],
+      ["live_env.read_processed_live_source_mail", "stage_play_live_source_mail_wake_result/v1"],
+      ["live_env.read_processed_live_source_mail", "stage_play_live_source_mail_wake_result_projection/v1"],
+      ["live_env.read_processed_live_source_mail", "stage_play_live_source_mail_wake_result_observation/v1"],
+    ];
+
+    for (const [toolName, terminalArtifactKind] of observationCases) {
+      const decision = evaluateToolFamilyTerminalPolicy({
+        toolName,
+        terminalArtifactKind,
+        routeProductContract: routeContract([terminalArtifactKind, "model_synthesized_answer"]),
+        canonicalGoalFrame: {
+          goal_kind: "workstation_observation_debug",
+          required_terminal_kind: terminalArtifactKind,
+        },
+        admitted: true,
+        goalSatisfied: true,
+        operatorCommandPresent: true,
+        mutating: false,
+      });
+
+      expect(decision).toMatchObject({
+        allowed: false,
+        reason: "observation_artifact_cannot_terminalize",
         assistant_answer: false,
         terminal_eligible: false,
         raw_content_included: false,

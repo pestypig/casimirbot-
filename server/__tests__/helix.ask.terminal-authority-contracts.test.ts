@@ -27,11 +27,8 @@ const allTerminalSurfacesEqual = (body: Record<string, any>): void => {
   expect(body.terminal_presentation?.concise_text).toBe(expected);
   expect(body.terminal_answer_authority?.terminal_text_preview).toBe(expected);
   expect(terminalEvent?.text).toBe(expected);
-  if (isPendingInput) {
-    expect(body.answer ?? body.text ?? body.finalAnswer ?? "").toBe("");
-  } else {
-    expect(body.answer ?? body.text ?? body.finalAnswer).toBe(expected);
-  }
+  expect(body.answer ?? body.text ?? body.finalAnswer).toBe(expected);
+  if (isPendingInput) expect(body.assistant_answer).toBe(false);
 };
 
 describe("Helix Ask terminal authority contracts", () => {
@@ -59,6 +56,158 @@ describe("Helix Ask terminal authority contracts", () => {
     expect(audit.ok).toBe(false);
     expect(audit.terminal_authority).toBeNull();
     expect(audit.violations.map((violation) => violation.kind)).toContain("missing_terminal_authority");
+  });
+
+  it("rejects workstation observation artifacts before terminal envelope authority", () => {
+    const payload: Record<string, unknown> = {
+      turn_id: "ask:test:workstation-observation-terminal",
+      thread_id: "thread:test",
+      terminal_artifact_kind: "stage_play_packet_trace_query_result",
+      final_answer_source: "stage_play_packet_trace_query_result",
+      selected_final_answer: "Packet trace says the frog classifier ran.",
+      answer: "Packet trace says the frog classifier ran.",
+      text: "Packet trace says the frog classifier ran.",
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        concise_text: "Packet trace says the frog classifier ran.",
+      },
+    };
+
+    const envelope = resolveTerminalAnswerEnvelope(payload);
+    applyTerminalAnswerEnvelope(payload, envelope);
+
+    expect(payload.workstation_observation_terminal_rejection).toMatchObject({
+      schema: "helix.workstation_observation_terminal_rejection.v1",
+      rejected_terminal_artifact_kind: "stage_play_packet_trace_query_result",
+      reason: "observation_artifact_cannot_terminalize",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.final_answer_source).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("observation_artifact_cannot_terminalize");
+    expect(payload.selected_final_answer).not.toBe("Packet trace says the frog classifier ran.");
+    expect(payload.terminal_answer_authority).toMatchObject({
+      terminal_kind: "failure",
+      authority_origin: "typed_failure",
+      server_authoritative: true,
+    });
+    allTerminalSurfacesEqual(payload);
+  });
+
+  it("rejects narrator events as terminal artifacts before answer authority", () => {
+    const payload: Record<string, unknown> = {
+      turn_id: "ask:test:narrator-event-terminal",
+      thread_id: "thread:test",
+      terminal_artifact_kind: "helix.narrator_event/v1",
+      final_answer_source: "helix.narrator_event/v1",
+      selected_final_answer: "Narrator spoke the translated line.",
+      answer: "Narrator spoke the translated line.",
+      text: "Narrator spoke the translated line.",
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        concise_text: "Narrator spoke the translated line.",
+      },
+    };
+
+    const envelope = resolveTerminalAnswerEnvelope(payload);
+    applyTerminalAnswerEnvelope(payload, envelope);
+
+    expect(payload.workstation_observation_terminal_rejection).toMatchObject({
+      schema: "helix.workstation_observation_terminal_rejection.v1",
+      rejected_terminal_artifact_kind: "helix.narrator_event/v1",
+      reason: "observation_artifact_cannot_terminalize",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.final_answer_source).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("observation_artifact_cannot_terminalize");
+    expect(payload.selected_final_answer).not.toBe("Narrator spoke the translated line.");
+    expect(payload.terminal_answer_authority).toMatchObject({
+      terminal_kind: "failure",
+      authority_origin: "typed_failure",
+      server_authoritative: true,
+    });
+    allTerminalSurfacesEqual(payload);
+  });
+
+  it("rejects mailbox wake results as terminal artifacts before answer authority", () => {
+    const payload: Record<string, unknown> = {
+      turn_id: "ask:test:wake-result-terminal",
+      thread_id: "thread:test",
+      terminal_artifact_kind: "stage_play_live_source_mail_wake_result/v1",
+      final_answer_source: "stage_play_mailbox_wake_result",
+      selected_final_answer: "The live-source mailbox wake completed.",
+      answer: "The live-source mailbox wake completed.",
+      text: "The live-source mailbox wake completed.",
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        concise_text: "The live-source mailbox wake completed.",
+      },
+    };
+
+    const envelope = resolveTerminalAnswerEnvelope(payload);
+    applyTerminalAnswerEnvelope(payload, envelope);
+
+    expect(payload.workstation_observation_terminal_rejection).toMatchObject({
+      schema: "helix.workstation_observation_terminal_rejection.v1",
+      rejected_terminal_artifact_kind: "stage_play_live_source_mail_wake_result/v1",
+      reason: "observation_artifact_cannot_terminalize",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.final_answer_source).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("observation_artifact_cannot_terminalize");
+    expect(payload.selected_final_answer).not.toBe("The live-source mailbox wake completed.");
+    expect(payload.terminal_answer_authority).toMatchObject({
+      terminal_kind: "failure",
+      authority_origin: "typed_failure",
+      server_authoritative: true,
+    });
+    allTerminalSurfacesEqual(payload);
+  });
+
+  it("rejects mailbox wake result projections as terminal artifacts before answer authority", () => {
+    const payload: Record<string, unknown> = {
+      turn_id: "ask:test:wake-result-projection-terminal",
+      thread_id: "thread:test",
+      terminal_artifact_kind: "stage_play_live_source_mail_wake_result_projection/v1",
+      final_answer_source: "stage_play_live_source_mail_wake_result_projection",
+      selected_final_answer: "Wake projection recorded decision receipts.",
+      answer: "Wake projection recorded decision receipts.",
+      text: "Wake projection recorded decision receipts.",
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        concise_text: "Wake projection recorded decision receipts.",
+      },
+    };
+
+    const envelope = resolveTerminalAnswerEnvelope(payload);
+    applyTerminalAnswerEnvelope(payload, envelope);
+
+    expect(payload.workstation_observation_terminal_rejection).toMatchObject({
+      schema: "helix.workstation_observation_terminal_rejection.v1",
+      rejected_terminal_artifact_kind: "stage_play_live_source_mail_wake_result_projection/v1",
+      reason: "observation_artifact_cannot_terminalize",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.final_answer_source).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("observation_artifact_cannot_terminalize");
+    expect(payload.selected_final_answer).not.toBe("Wake projection recorded decision receipts.");
+    expect(payload.terminal_answer_authority).toMatchObject({
+      terminal_kind: "failure",
+      authority_origin: "typed_failure",
+      server_authoritative: true,
+    });
+    allTerminalSurfacesEqual(payload);
   });
 
   it("uses existing payload terminal authority without rebuilding it", () => {

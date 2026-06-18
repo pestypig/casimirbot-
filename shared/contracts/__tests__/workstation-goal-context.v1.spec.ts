@@ -18,15 +18,17 @@ import {
 describe("workstation goal context contract", () => {
   const canonicalUpdateKindByProducer: Record<GoalContextProducerKindV1, GoalContextUpdateKindV1> = {
     visual_capture: "visual_observation",
-    audio_capture: "summary",
+    audio_capture: "transcript_window",
     transcription_loop: "transcript_window",
     translation_loop: "translated_transcript",
     microdeck: "classification",
     reflection: "reflection",
     live_answer: "summary",
     source_health: "source_status",
+    trace_memory: "route_evidence",
     route_watch: "route_evidence",
     narrator: "suggested_action",
+    automation: "automation_status",
   };
 
   const update: WorkstationGoalContextUpdateV1 = {
@@ -100,6 +102,8 @@ describe("workstation goal context contract", () => {
       "narrator_bind_stream",
       "narrator_say",
       "query_trace_memory",
+      "query_packet_traces",
+      "query_route_evidence",
       "resume_loop",
       "set_loop_state",
       "focus_process_graph",
@@ -225,7 +229,7 @@ describe("workstation goal context contract", () => {
   });
 
   it("rejects goal sessions with unknown context feeds, actuator names, or invalid feed freshness", () => {
-    expect(validateAgentGoalSessionV1({
+    const issues = validateAgentGoalSessionV1({
       ...goal,
       contextFeeds: [
         ...goal.contextFeeds,
@@ -239,11 +243,12 @@ describe("workstation goal context contract", () => {
         ...goal.allowedActuators,
         "wake_agent" as AgentGoalSessionV1["allowedActuators"][number],
       ],
-    })).toEqual(expect.arrayContaining([
+    });
+    expect(issues).toEqual(expect.arrayContaining([
       "contextFeeds[1].sourceKind is invalid",
       "contextFeeds[1].freshnessMs must be a positive number",
-      "allowedActuators[17] is invalid",
     ]));
+    expect(issues.some((issue) => /^allowedActuators\[\d+\] is invalid$/.test(issue))).toBe(true);
   });
 
   it("rejects goal sessions that do not require terminal authority for reports", () => {

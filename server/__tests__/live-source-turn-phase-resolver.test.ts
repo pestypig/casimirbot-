@@ -50,6 +50,35 @@ describe("resolveLiveSourceTurnPhase", () => {
       "live_env.request_interim_voice_callout",
       "final_answer",
     ]));
+    expect(LIVE_SOURCE_TURN_PHASE_TABLE.query_packet_traces).toMatchObject({
+      allowedTools: ["live_env.query_packet_traces"],
+      fallbackTools: [],
+      requiredEvidence: ["stage_play_packet_trace_query_result"],
+      completionEvidence: ["stage_play_packet_trace_query_result"],
+      next: "terminal_checkpoint",
+    });
+    expect(LIVE_SOURCE_TURN_PHASE_TABLE.query_packet_traces.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.query_workstation_goal_context",
+      "live_env.query_trace_memory",
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "final_answer",
+    ]));
+    expect(LIVE_SOURCE_TURN_PHASE_TABLE.query_route_evidence).toMatchObject({
+      allowedTools: ["live_env.query_route_evidence"],
+      fallbackTools: [],
+      requiredEvidence: ["stage_play_workstation_context_feed_query_result"],
+      completionEvidence: ["stage_play_workstation_context_feed_query_result"],
+      next: "terminal_checkpoint",
+    });
+    expect(LIVE_SOURCE_TURN_PHASE_TABLE.query_route_evidence.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.query_workstation_goal_context",
+      "live_env.query_trace_memory",
+      "live_env.query_packet_traces",
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "final_answer",
+    ]));
     expect(LIVE_SOURCE_TURN_PHASE_TABLE.reflect_mail_loop).toMatchObject({
       allowedTools: ["live_env.reflect_live_source_mail_loop"],
       fallbackTools: [],
@@ -87,7 +116,7 @@ describe("resolveLiveSourceTurnPhase", () => {
 
   it("routes goal-context prompts to read-only workstation context instead of mailbox decision flow", () => {
     const phase = resolveLiveSourceTurnPhase({
-      prompt: "Inspect the workstation goal context updates and per-packet traces for the active visual source.",
+      prompt: "Inspect the workstation goal context updates and active goal sessions for the active visual source.",
       selectedTargetSource: "live_source_mailbox",
     });
 
@@ -132,19 +161,133 @@ describe("resolveLiveSourceTurnPhase", () => {
     expect(mandatoryToolForPhase(phase)).toBe("live_env.query_trace_memory");
   });
 
+  it("routes packet-trace prompts to read-only packet trace evidence", () => {
+    const phase = resolveLiveSourceTurnPhase({
+      prompt: "Show per-packet traces for the visual capture deck path and terminal destination.",
+      selectedTargetSource: "live_source_mailbox",
+    });
+
+    expect(phase.phase).toBe("query_packet_traces");
+    expect(phase.canonicalGoal).toBe("workstation_goal_context");
+    expect(phase.allowedTools).toEqual(["live_env.query_packet_traces"]);
+    expect(phase.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.query_workstation_goal_context",
+      "live_env.query_trace_memory",
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.record_live_source_mail_decision",
+      "live_env.request_interim_voice_callout",
+      "final_answer",
+    ]));
+    expect(phase.phaseLock).toMatchObject({
+      locked: true,
+      reason: "Packet trace inspection is a read-only workstation evidence query, not mailbox processing or wake dispatch.",
+    });
+    expect(mandatoryToolForPhase(phase)).toBe("live_env.query_packet_traces");
+  });
+
+  it("terminalizes packet-trace receipts before any answer authority", () => {
+    const phase = resolveLiveSourceTurnPhase({
+      prompt: "Show per-packet traces for the visual capture deck path and terminal destination.",
+      selectedTargetSource: "live_source_mailbox",
+      selectedCapability: "live_env.query_packet_traces",
+      latestToolReceipts: [{
+        toolName: "live_env.query_packet_traces",
+        observation: {
+          schema: "stage_play_packet_trace_query_result/v1",
+          artifactId: "stage_play_packet_trace_query_result",
+          packetTraceIds: ["stage_play_packet_trace:visual-1"],
+        },
+      }],
+    });
+
+    expect(phase).toMatchObject({
+      phase: "terminal_checkpoint",
+      allowedTools: [],
+      requiredEvidence: ["stage_play_packet_trace_query_result"],
+      completionEvidence: ["model_synthesized_answer"],
+      phaseLock: {
+        locked: true,
+        reason: "Packet trace observations require model re-entry and terminal authority before any answer.",
+      },
+    });
+    expect(mandatoryToolForPhase(phase)).toBeNull();
+  });
+
+  it("routes route-evidence prompts to read-only route evidence feed query", () => {
+    const phase = resolveLiveSourceTurnPhase({
+      prompt: "Show route-watch evidence for goal_id=goal:frog-monitor.",
+      selectedTargetSource: "live_source_mailbox",
+    });
+
+    expect(phase.phase).toBe("query_route_evidence");
+    expect(phase.canonicalGoal).toBe("workstation_goal_context");
+    expect(phase.allowedTools).toEqual(["live_env.query_route_evidence"]);
+    expect(phase.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.query_workstation_goal_context",
+      "live_env.query_trace_memory",
+      "live_env.query_packet_traces",
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.record_live_source_mail_decision",
+      "live_env.request_interim_voice_callout",
+      "final_answer",
+    ]));
+    expect(phase.phaseLock).toMatchObject({
+      locked: true,
+      reason: "Route-evidence inspection is a read-only workstation evidence query, not mailbox processing or wake dispatch.",
+    });
+    expect(mandatoryToolForPhase(phase)).toBe("live_env.query_route_evidence");
+  });
+
+  it("terminalizes route-evidence receipts before any answer authority", () => {
+    const phase = resolveLiveSourceTurnPhase({
+      prompt: "Show route-watch evidence for goal_id=goal:frog-monitor.",
+      selectedTargetSource: "live_source_mailbox",
+      selectedCapability: "live_env.query_route_evidence",
+      latestToolReceipts: [{
+        toolName: "live_env.query_route_evidence",
+        observation: {
+          schema: "stage_play_workstation_context_feed_query_result/v1",
+          feed_kind: "route_evidence",
+          artifactId: "stage_play_workstation_context_feed_query_result",
+          feedId: "stage_play_workstation_context_feed:route-evidence",
+        },
+      }],
+    });
+
+    expect(phase).toMatchObject({
+      phase: "terminal_checkpoint",
+      allowedTools: [],
+      requiredEvidence: ["stage_play_workstation_context_feed_query_result"],
+      completionEvidence: ["model_synthesized_answer"],
+      phaseLock: {
+        locked: true,
+        reason: "Route-evidence observations require model re-entry and terminal authority before any answer.",
+      },
+    });
+    expect(mandatoryToolForPhase(phase)).toBeNull();
+  });
+
   it("does not route contextual goal-context mentions into live-env tool execution", () => {
     for (const prompt of [
       "Do not query workstation goal context; explain the architecture.",
       'The UI label says "workstation goal context updates"; what does that mean?',
       "Could we inspect per-packet traces later?",
       "Do not query trace memory; explain the architecture.",
+      'The UI label says "live_env.query_route_evidence"; what does it mean?',
+      "Could we inspect route-watch evidence later?",
     ]) {
       const phase = resolveLiveSourceTurnPhase({
         prompt,
         selectedTargetSource: "live_source_mailbox",
       });
       expect(phase.phase).not.toBe("query_workstation_goal_context");
+      expect(phase.phase).not.toBe("query_packet_traces");
+      expect(phase.phase).not.toBe("query_route_evidence");
       expect(phase.allowedTools).not.toContain("live_env.query_workstation_goal_context");
+      expect(phase.allowedTools).not.toContain("live_env.query_packet_traces");
+      expect(phase.allowedTools).not.toContain("live_env.query_route_evidence");
     }
   });
 

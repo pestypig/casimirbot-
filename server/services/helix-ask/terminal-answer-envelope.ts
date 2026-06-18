@@ -12,6 +12,7 @@ import {
 import { liveSourceModelSynthesisMissingFailure } from "./live-source-terminal-failure-repair";
 import type { HelixTerminalAuthority } from "@shared/helix-turn-poison-guard";
 import { committedRouteAllowsTerminalKind, readCommittedAskRoute } from "./committed-ask-route";
+import { isWorkstationObservationTerminalKind } from "./tool-family-terminal-policy";
 
 export type HelixTerminalAnswerEnvelope = {
   schema: "helix.terminal_answer_envelope.v1";
@@ -85,6 +86,9 @@ const readFinalAnswerDraftText = (payload: Record<string, unknown>): string | nu
   const draft = readRecord(payload.final_answer_draft);
   return readString(draft?.text) ?? readString(draft?.answer_text);
 };
+
+const directAnswerFinalAnswerSource = (payload: Record<string, unknown>): "model_direct_answer" | "final_answer_draft" =>
+  readDirectAnswerArtifactText(payload) ? "model_direct_answer" : "final_answer_draft";
 
 const readDocOpenReceiptTerminalText = (payload: Record<string, unknown>): string | null => {
   const terminalArtifactId = readString(payload.terminal_artifact_id);
@@ -475,7 +479,7 @@ const applySatisfiedDirectAnswerTerminalCandidate = (
   if (rejectedFailure || readString(payload.terminal_error_code)) {
     payload.rejected_typed_failure = {
       ...(rejectedFailure ?? {}),
-      rejected_reason: "satisfied_direct_answer_contract_superseded_stale_failure",
+      rejected_reason: "successful_terminal_authority_superseded_failure",
       superseded_terminal_error_code: readString(payload.terminal_error_code),
       assistant_answer: false,
       raw_content_included: false,
@@ -486,7 +490,7 @@ const applySatisfiedDirectAnswerTerminalCandidate = (
   payload.final_status = "final_answer";
   payload.status = "final_answer";
   payload.terminal_artifact_kind = "direct_answer_text";
-  payload.final_answer_source = readFinalAnswerDraftText(payload) ? "final_answer_draft" : "model_direct_answer";
+  payload.final_answer_source = directAnswerFinalAnswerSource(payload);
   payload.selected_final_answer = text;
   payload.answer = text;
   payload.text = text;
@@ -587,6 +591,36 @@ export function resolveTerminalAnswerEnvelope(
   if (!terminalText) {
     terminalArtifactKind = "typed_failure";
     finalAnswerSource = "typed_failure";
+    terminalText = typedFailureText(payload);
+    authorityOrigin = "typed_failure";
+  }
+  if (
+    isWorkstationObservationTerminalKind(terminalArtifactKind) &&
+    !directAnswerContractSatisfied(payload)
+  ) {
+    payload.workstation_observation_terminal_rejection = {
+      schema: "helix.workstation_observation_terminal_rejection.v1",
+      turn_id: turnId,
+      rejected_terminal_artifact_kind: terminalArtifactKind,
+      rejected_final_answer_source: finalAnswerSource,
+      reason: "observation_artifact_cannot_terminalize",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    terminalArtifactKind = "typed_failure";
+    finalAnswerSource = "typed_failure";
+    const message =
+      "I could not produce a terminal answer because the selected workstation artifact is observation-only and must re-enter the completed solver path before any final answer.";
+    payload.terminal_error_code = "observation_artifact_cannot_terminalize";
+    payload.typed_failure = {
+      schema: "helix.typed_failure.v1",
+      error_code: "observation_artifact_cannot_terminalize",
+      message,
+      text: message,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
     terminalText = typedFailureText(payload);
     authorityOrigin = "typed_failure";
   }
@@ -915,7 +949,7 @@ export function applyTerminalAnswerEnvelope(
       if (rejectedFailure || readString(payload.terminal_error_code)) {
         payload.rejected_typed_failure = {
           ...(rejectedFailure ?? {}),
-          rejected_reason: "terminal_envelope_apply_superseded_stale_failure_with_satisfied_direct_answer",
+          rejected_reason: "successful_terminal_authority_superseded_failure",
           superseded_terminal_error_code: readString(payload.terminal_error_code),
           assistant_answer: false,
           raw_content_included: false,
@@ -927,7 +961,7 @@ export function applyTerminalAnswerEnvelope(
       envelope = {
         ...envelope,
         terminal_artifact_kind: "direct_answer_text",
-        final_answer_source: readFinalAnswerDraftText(payload) ? "final_answer_draft" : "model_direct_answer",
+        final_answer_source: directAnswerFinalAnswerSource(payload),
         terminal_text: directText,
         terminal_text_hash: hashHelixTerminalText(directText),
         terminal_kind: "answer",
@@ -990,12 +1024,12 @@ export function applyTerminalAnswerEnvelope(
       assistant_answer: false,
       raw_content_included: false,
     };
-    delete payload.selected_final_answer;
+    payload.selected_final_answer = envelope.terminal_text;
     payload.assistant_answer = false;
-    delete payload.answer;
-    delete payload.text;
-    delete payload.finalAnswer;
-    delete payload.content;
+    payload.answer = envelope.terminal_text;
+    payload.text = envelope.terminal_text;
+    payload.finalAnswer = envelope.terminal_text;
+    payload.content = envelope.terminal_text;
   } else {
     payload.selected_final_answer = envelope.terminal_text;
     payload.assistant_answer = isNonAuthoritativeToolReceiptEnvelope(envelope) ? false : envelope.terminal_text;

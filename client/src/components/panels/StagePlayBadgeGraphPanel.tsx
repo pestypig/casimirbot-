@@ -3196,6 +3196,41 @@ function StagePlayGoalContextBoard({
   updates: WorkstationGoalContextUpdateV1[];
   sessions: AgentGoalSessionV1[];
 }) {
+  const isPacketTraceUpdate = (update: WorkstationGoalContextUpdateV1): boolean => {
+    const refs = [
+      update.contentRef,
+      ...update.evidenceRefs,
+      ...update.receiptRefs,
+      ...update.loopRefs,
+      ...update.sourceRefs,
+    ];
+    return refs.some((ref) =>
+      ref.includes("stage_play_packet_trace_query") ||
+      ref.includes("packet_trace_query") ||
+      ref.includes("packet_traces") ||
+      ref.includes("live_source_trace:") ||
+      ref.includes("stage_play_processed_mail_packet:") ||
+      ref.includes("processed_mail_packet")
+    );
+  };
+  const isFeedQueryUpdate = (update: WorkstationGoalContextUpdateV1): boolean => {
+    const refs = [update.contentRef, ...update.evidenceRefs, ...update.receiptRefs, ...update.loopRefs];
+    return refs.some((ref) =>
+      ref.includes("stage_play_context_feed_query:") ||
+      ref.includes("workstation_context_feed:")
+    );
+  };
+  const isTraceMemoryUpdate = (update: WorkstationGoalContextUpdateV1): boolean => {
+    if (update.producerKind === "trace_memory") return true;
+    const refs = [
+      update.contentRef,
+      ...update.evidenceRefs,
+      ...update.receiptRefs,
+      ...update.loopRefs,
+      ...update.sourceRefs,
+    ];
+    return refs.some((ref) => ref.includes("trace_memory") || ref.includes("trace-memory"));
+  };
   const recentUpdates = updates.slice(0, 6);
   const activeSessions = sessions.filter((session) => session.status === "active" || session.status === "blocked").slice(0, 3);
   const wakeInterruptCount = updates.reduce(
@@ -3211,6 +3246,14 @@ function StagePlayGoalContextBoard({
     0,
   );
   const routeWatchAutomationCount = updates.filter((update) => update.producerKind === "route_watch").length;
+  const packetTraceContextCount = updates.filter(isPacketTraceUpdate).length +
+    activeSessions.filter((session) => session.contextFeeds.some((feed) => feed.sourceKind === "packet_traces")).length;
+  const sourceHealthContextCount = updates.filter((update) => update.producerKind === "source_health" || update.updateKind === "source_status").length +
+    activeSessions.filter((session) => session.contextFeeds.some((feed) => feed.sourceKind === "source_health")).length;
+  const traceMemoryContextCount = updates.filter(isTraceMemoryUpdate).length +
+    activeSessions.filter((session) => session.contextFeeds.some((feed) => feed.sourceKind === "trace_memory")).length;
+  const feedQueryContextCount = updates.filter(isFeedQueryUpdate).length +
+    activeSessions.reduce((count, session) => count + session.contextFeeds.length, 0);
   const runningAutomationCount = updates.reduce(
     (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "set_loop_state" && action.state === "running").length,
     0,
@@ -3230,6 +3273,8 @@ function StagePlayGoalContextBoard({
     flag
       ? "rounded border border-rose-400/40 bg-rose-950/25 px-1.5 py-0.5 font-mono text-[9px] text-rose-100"
       : "rounded border border-slate-700 bg-slate-950 px-1.5 py-0.5 font-mono text-[9px] text-slate-400";
+  const freshnessLabel = (update: WorkstationGoalContextUpdateV1): string =>
+    `${labelize(update.freshness.status)} observed=${update.freshness.observedAtMs} staleAfter=${update.freshness.staleAfterMs === undefined ? "unbounded" : `${update.freshness.staleAfterMs}ms`}`;
   return (
     <div className="rounded-md border border-violet-900/60 bg-violet-950/10 p-3" data-testid="stage-play-goal-context-board">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -3244,12 +3289,16 @@ function StagePlayGoalContextBoard({
           <StagePlayMetricPill label="wake interrupts" value={formatStagePlayCount(wakeInterruptCount)} tone={wakeInterruptCount > 0 ? "warn" : "default"} />
           <StagePlayMetricPill label="narrator dispatch" value={formatStagePlayCount(narratorDispatchCount)} tone={narratorDispatchCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="narrator bindings" value={formatStagePlayCount(narratorBindingCount)} tone={narratorBindingCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="packet traces" value={formatStagePlayCount(packetTraceContextCount)} tone={packetTraceContextCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="source health" value={formatStagePlayCount(sourceHealthContextCount)} tone={sourceHealthContextCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="trace memory" value={formatStagePlayCount(traceMemoryContextCount)} tone={traceMemoryContextCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="feed queries" value={formatStagePlayCount(feedQueryContextCount)} tone={feedQueryContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="automations" value={formatStagePlayCount(routeWatchAutomationCount)} tone={routeWatchAutomationCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="active goals" value={formatStagePlayCount(activeSessions.length)} tone={activeSessions.length > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="terminal authority" value={`${terminalAuthorityRequiredCount}/${activeSessions.length}`} tone={terminalAuthorityRequiredCount > 0 ? "warn" : "default"} />
         </div>
       </div>
-      <div className="mt-3 grid gap-2 text-[10px] md:grid-cols-4">
+      <div className="mt-3 grid gap-2 text-[10px] md:grid-cols-2 xl:grid-cols-6">
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-goal-context-authority-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Observation authority</div>
           <div className="mt-0.5 text-slate-400">{formatStagePlayCount(observationOnlyUpdateCount)} updates are evidence-only, non-terminal context.</div>
@@ -3261,6 +3310,18 @@ function StagePlayGoalContextBoard({
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-narrator-binding-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Narrator bindings</div>
           <div className="mt-0.5 text-slate-400">{formatStagePlayCount(narratorBindingCount)} stream binding dispatch{narratorBindingCount === 1 ? "" : "es"} visible beside narrator speech requests.</div>
+        </div>
+        <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-packet-trace-state">
+          <div className="font-semibold uppercase tracking-wide text-violet-200/80">Packet traces</div>
+          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(packetTraceContextCount)} packet trace context item{packetTraceContextCount === 1 ? "" : "s"} keep per-packet travel visible as evidence.</div>
+        </div>
+        <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-source-health-state">
+          <div className="font-semibold uppercase tracking-wide text-violet-200/80">Source health</div>
+          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(sourceHealthContextCount)} source-health context item{sourceHealthContextCount === 1 ? "" : "s"} keep loop/source status queryable before agent reasoning.</div>
+        </div>
+        <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-trace-memory-state">
+          <div className="font-semibold uppercase tracking-wide text-violet-200/80">Trace memory</div>
+          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(traceMemoryContextCount)} trace-memory context item{traceMemoryContextCount === 1 ? "" : "s"} keep prior reasoning queryable without answer authority.</div>
         </div>
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-route-watch-automation-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Route-watch automations</div>
@@ -3301,6 +3362,15 @@ function StagePlayGoalContextBoard({
                       {stagePlayDispatchActionLabel(action)}
                     </span>
                   ))}
+                </div>
+                <div className="mt-2 grid gap-1 border-t border-violet-900/40 pt-1.5 font-mono text-[9px] text-slate-500" data-testid="stage-play-goal-context-update-custody">
+                  <div className="truncate">sources={update.sourceRefs.slice(0, 3).join(", ") || "none"}</div>
+                  <div className="truncate">evidence={update.evidenceRefs.slice(0, 3).join(", ") || "none"}</div>
+                  <div className="truncate">receipts={update.receiptRefs.slice(0, 3).join(", ") || "none"}</div>
+                  <div className="truncate" data-testid="stage-play-goal-context-update-freshness">freshness={freshnessLabel(update)}</div>
+                  {update.goalRelevance ? (
+                    <div className="truncate">goal={update.goalRelevance.goalId} relevance={update.goalRelevance.relevance.toFixed(2)}</div>
+                  ) : null}
                 </div>
                 <div className="mt-2 truncate border-t border-violet-900/40 pt-1.5 font-mono text-[9px] text-slate-500">
                   {update.contentRef}

@@ -190,7 +190,9 @@ describe("stage-play goal context store", () => {
         expect.objectContaining({ sourceKind: "live_answer_lines" }),
         expect.objectContaining({ sourceKind: "source_health" }),
         expect.objectContaining({ sourceKind: "trace_memory" }),
+        expect.objectContaining({ sourceKind: "packet_traces" }),
         expect.objectContaining({ sourceKind: "route_evidence" }),
+        expect.objectContaining({ sourceKind: "automation_policies" }),
       ]),
       allowedActuators: expect.arrayContaining([
         "query_visual_summaries",
@@ -210,6 +212,7 @@ describe("stage-play goal context store", () => {
         "narrator_say",
         "update_live_answer",
         "query_trace_memory",
+        "query_packet_traces",
         "pause_loop",
         "resume_loop",
         "set_loop_state",
@@ -385,6 +388,27 @@ describe("stage-play goal context store", () => {
         receiptRefs: expect.arrayContaining([
           "stage_play_live_source_mail:audio-translation-1",
           "stage_play_micro_reasoner_run:earbud-translation",
+        ]),
+        authority: {
+          assistantAnswer: false,
+          terminalEligible: false,
+          rawContentIncluded: false,
+          postToolModelStepRequired: true,
+        },
+      }),
+    ]);
+    expect(listStagePlayGoalContextUpdates({ producerKind: "transcription_loop" })).toEqual([
+      expect.objectContaining({
+        updateKind: "transcript_window",
+        contentRef: "stage_play_processed_mail_packet:earbud-translation",
+        sourceRefs: expect.arrayContaining([
+          "audio_source:earbuds",
+          "stage_play_live_source_mail:audio-translation-1",
+          "microdeck_output:earbud-translation",
+        ]),
+        evidenceRefs: expect.arrayContaining([
+          "stage_play_processed_mail_packet:earbud-translation",
+          "microdeck_output:earbud-translation",
         ]),
         authority: {
           assistantAnswer: false,

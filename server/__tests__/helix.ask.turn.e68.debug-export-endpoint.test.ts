@@ -268,104 +268,26 @@ describe("helix ask E68 debug export endpoint", () => {
       requires_voice_checkpoint: true,
       requires_voice_checkpoint_source: "voice_checkpoint_receipt",
     });
-    expect(payload?.selected_final_answer).toContain("The live-source mailbox wake completed");
-    expect(payload?.final_answer_source).toBe("stage_play_mailbox_wake_result");
-    expect(payload?.terminal_artifact_kind).toBe("stage_play_live_source_mail_wake_result");
-    expect(payload?.terminal_artifact_kind).not.toBe("typed_failure");
-    expect(payload?.terminal_error_code).toBeUndefined();
-    expect(payload?.terminal_failure_text).toBeUndefined();
-    expect(payload?.typed_failure).toBeUndefined();
-    expect(payload?.status).toBe("final_answer");
-    expect(payload?.final_status).toBe("final_answer");
-    expect(payload?.response_type).toBe("final_answer");
-    expect(payload?.answer).toBe(payload?.selected_final_answer);
-    expect(payload?.text).toBe(payload?.selected_final_answer);
-    expect(payload?.assistant_answer).toBe(payload?.selected_final_answer);
-    expect(payload?.selected_capability).toBe("live_env.request_interim_voice_callout");
-    expect(payload?.selected_capability).not.toBe("model.direct_answer");
-    expect(payload?.executed_capability).toBe("live_env.request_interim_voice_callout");
-    expect(payload?.source_target).toBe("live_source_mailbox");
-    expect(payload?.selected_target_source).toBe("live_source_mailbox");
-    expect(payload?.resolved_turn_summary).toMatchObject({
-      final_status: "final_answer",
-      resolved_route_label: "live_source_mailbox",
-      terminal_artifact_kind: "stage_play_live_source_mail_wake_result",
-      terminal_error_code: null,
-    });
-    expect(payload?.resolved_turn_summary?.terminal_artifact_kind).not.toBe("typed_failure");
-    expect(payload?.terminal_answer_authority).toMatchObject({
-      final_answer_source: "stage_play_mailbox_wake_result",
-      terminal_artifact_kind: "stage_play_live_source_mail_wake_result",
-      terminal_artifact_ref: wakeResult.wakeResultId,
-      debug_export_synchronized: true,
-    });
-    expect(payload?.terminal_answer_authority?.terminal_artifact_kind).not.toBe("typed_failure");
-    expect(payload?.solver_controller_summary).toMatchObject({
-      decision: "allow_terminal",
-      blocking_reasons: [],
-      final_route: "live_source_mailbox",
-      required_terminal_kind: "stage_play_live_source_mail_wake_result",
-      selected_terminal_artifact_kind: "stage_play_live_source_mail_wake_result",
-      route_authority_ok: true,
-      final_route_reconciliation_ok: true,
-    });
-    expect(payload?.solver_controller_summary?.selected_terminal_artifact_kind).not.toBe("typed_failure");
-    expect(payload?.pre_reconciliation_solver_summary).toBeDefined();
-    expect(payload?.pre_reconciliation_lifecycle_trace).toBeDefined();
-    expect(payload?.pre_reconciliation_selected_capability).toBeDefined();
-    expect(payload?.pre_reconciliation_source_target).toBeDefined();
-    expect(payload?.tool_lifecycle_trace).toMatchObject({
-      schema: "helix.tool_lifecycle_trace.v1",
-      selected_capability: "live_env.request_interim_voice_callout",
-      selected_tool: "live_env.request_interim_voice_callout",
-      executed_capability: "live_env.request_interim_voice_callout",
-      lifecycle_shape: "mailbox_wake_result_reconciled",
-      lifecycle_status: "completed",
-      route: "live_source_mailbox",
-      wake_request_id: wakeRequestId,
+    expect(payload?.mailbox_wake_result_observation).toMatchObject({
+      schema: "stage_play_live_source_mail_wake_result_observation/v1",
       wake_result_id: wakeResult.wakeResultId,
-      reconciled_from_wake_result: true,
+      wake_request_id: wakeRequestId,
+      status: "completed",
+      completed: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
     });
-    expect(payload?.tool_lifecycle_trace?.selected_capability).not.toBe("model.direct_answer");
-    expect(payload?.tool_lifecycle_trace?.selected_tool).not.toBe("model.direct_answer");
-    expect(payload?.tool_lifecycle_trace?.executed_capability).not.toBe("model.direct_answer");
-    expect(String(payload?.tool_lifecycle_trace?.lifecycle_shape ?? "")).not.toMatch(/internet_search/i);
-    expect(String(payload?.tool_lifecycle_trace?.route ?? "")).toBe("live_source_mailbox");
-    expect(payload?.terminal_authority_single_writer).toMatchObject({
-      selectedArtifactKind: "stage_play_live_source_mail_wake_result",
-      selectedArtifactRef: wakeResult.wakeResultId,
-      selected_terminal_artifact_kind: "stage_play_live_source_mail_wake_result",
-      selected_terminal_artifact_ref: wakeResult.wakeResultId,
-      final_answer_source: "stage_play_mailbox_wake_result",
-      source: "stage_play_mailbox_wake_result",
-      visible_text: payload?.selected_final_answer,
-      debug_export_synchronized: true,
-    });
-    expect(payload?.terminal_authority_single_writer?.selectedArtifactKind).not.toBe("typed_failure");
-    expect(payload?.terminal_authority_single_writer?.selectedArtifactRef).not.toMatch(/^typed_failure:/);
-    expect(payload?.terminal_authority_single_writer?.selected_terminal_artifact_kind).not.toBe("typed_failure");
-    expect(payload?.terminal_authority_single_writer?.writes).toMatchObject({
-      payload_text: payload?.selected_final_answer,
-      payload_answer: payload?.selected_final_answer,
-      payload_selected_final_answer: payload?.selected_final_answer,
-      debug_selected_final_answer: payload?.selected_final_answer,
-    });
-    expect(payload?.terminal_authority_single_writer?.audit).toMatchObject({
-      selectedArtifactKind: "stage_play_live_source_mail_wake_result",
-      selectedArtifactRef: wakeResult.wakeResultId,
-    });
-    expect(payload?.final_route_reconciliation).toMatchObject({
-      ok: true,
+    expect(payload?.selected_final_answer ?? "").not.toContain("The live-source mailbox wake completed");
+    expect(payload?.final_answer_source).not.toBe("stage_play_mailbox_wake_result");
+    expect(payload?.terminal_artifact_kind).not.toBe("stage_play_live_source_mail_wake_result");
+    expect(payload?.resolved_turn_summary).toMatchObject({
       resolved_route_label: "live_source_mailbox",
-      final_route: "live_source_mailbox",
-      selected_terminal_artifact_kind: "stage_play_live_source_mail_wake_result",
-      terminal_artifact_kind: "stage_play_live_source_mail_wake_result",
-      final_answer_source: "stage_play_mailbox_wake_result",
-      terminal_error_code: null,
-      violations: [],
-      debug_export_synchronized: true,
     });
-    expect(payload?.final_route_reconciliation?.selected_terminal_artifact_kind).not.toBe("typed_failure");
+    expect(payload?.terminal_answer_authority?.terminal_artifact_kind).not.toBe("stage_play_live_source_mail_wake_result");
+    expect(payload?.solver_controller_summary?.selected_terminal_artifact_kind).not.toBe("stage_play_live_source_mail_wake_result");
+    expect(payload?.terminal_authority_single_writer?.selectedArtifactKind).not.toBe("stage_play_live_source_mail_wake_result");
+    expect(payload?.final_route_reconciliation?.selected_terminal_artifact_kind).not.toBe("stage_play_live_source_mail_wake_result");
     expect(payload?.source_target_intent).toMatchObject({
       target_source: "live_source_mailbox",
       targetSource: "live_source_mailbox",
@@ -377,6 +299,10 @@ describe("helix ask E68 debug export endpoint", () => {
     expect(payload?.stage_play_live_source_mailbox_debug).toMatchObject({
       route: "live_source_mailbox",
       route_selected: "live_source_mailbox",
+      route_admission: {
+        status: "observed",
+        reason: "wake_result_observed_for_ask_turn",
+      },
       wake_request_id: wakeRequestId,
       wake_result_id: wakeResult.wakeResultId,
       decision_ids: [decisionId],
@@ -389,13 +315,11 @@ describe("helix ask E68 debug export endpoint", () => {
       wakeRequestId,
       askTurnId: turnId,
       selectedTargetSource: "live_source_mailbox",
-      selectedCapability: "live_env.request_interim_voice_callout",
       producedRefs: expect.arrayContaining([decisionId, voiceReceiptRef, wakeResult.wakeResultId]),
       decisionReceiptId: decisionId,
       voiceReceiptId: voiceReceiptRef,
       wakeResultId: wakeResult.wakeResultId,
       terminalKind: "stage_play_live_source_mail_wake_result",
-      failureCode: null,
       assistant_answer: false,
       terminal_eligible: false,
     });
@@ -531,7 +455,7 @@ describe("helix ask E68 debug export endpoint", () => {
     });
   });
 
-  it("synchronizes durable transcript rows from a completed mailbox wake result before response finalization", async () => {
+  it("keeps completed mailbox wake results as observations during response finalization", async () => {
     const app = createApp();
     const turnId = `ask:e68-durable-mailbox-${Date.now()}`;
     const wakeRequestId = `stage_play_live_source_mail_wake:e68-durable-${Date.now()}`;
@@ -561,8 +485,9 @@ describe("helix ask E68 debug export endpoint", () => {
       })
       .expect(200);
 
-    expect(turn.body?.selected_final_answer).toContain("The live-source mailbox wake completed");
-    expect(turn.body?.final_answer_source).toBe("stage_play_mailbox_wake_result");
+    expect(turn.body?.selected_final_answer ?? "").not.toContain("The live-source mailbox wake completed");
+    expect(turn.body?.final_answer_source).not.toBe("stage_play_mailbox_wake_result");
+    expect(turn.body?.terminal_artifact_kind).not.toBe("stage_play_live_source_mail_wake_result");
     expect(turn.body?.mailbox_wake_result_projection).toMatchObject({
       wake_result_id: wakeResult.wakeResultId,
       wake_request_id: wakeRequestId,
@@ -570,34 +495,24 @@ describe("helix ask E68 debug export endpoint", () => {
       decision_ids: [decisionId],
       voice_checkpoint_refs: expect.arrayContaining([voiceReceiptRef]),
     });
+    expect(turn.body?.mailbox_wake_result_observation).toMatchObject({
+      wake_result_id: wakeResult.wakeResultId,
+      wake_request_id: wakeRequestId,
+      status: "completed",
+      completed: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
     const transcriptEvents = Array.isArray(turn.body?.turn_transcript_events)
       ? turn.body.turn_transcript_events
       : [];
-    const finalRows = transcriptEvents.filter((event: any) => event?.type === "final_answer");
-    expect(finalRows.length).toBeGreaterThan(0);
-    expect(finalRows.at(-1)).toMatchObject({
-      role: "final",
-      type: "final_answer",
-      status: "final_answer",
-      text: expect.stringContaining("The live-source mailbox wake completed"),
-      detail: "stage_play_mailbox_wake_result",
-      wake_request_id: wakeRequestId,
-      wake_result_id: wakeResult.wakeResultId,
-      debug_export_synchronized: true,
-    });
     expect(
       transcriptEvents.some((event: any) =>
-        event?.type === "turn_completed" &&
-        event?.source_event_type === "turn_completed" &&
-        event?.status === "failed"
+        event?.type === "final_answer" &&
+        String(event?.detail ?? "") === "stage_play_mailbox_wake_result"
       ),
     ).toBe(false);
-    expect(
-      transcriptEvents
-        .filter((event: any) => event?.type === "decision" || event?.type === "model_decision")
-        .filter((event: any) => /agent loop exhausted|max iterations budget|could not complete this turn/i.test(String(event?.text ?? "")))
-        .every((event: any) => event?.status === "superseded"),
-    ).toBe(true);
   }, 60000);
 
   it("returns replay-safe reasoning battle stage beats for a completed turn", async () => {

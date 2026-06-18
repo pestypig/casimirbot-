@@ -5,6 +5,49 @@ type RecordLike = Record<string, unknown>;
 
 type Verdict = "PASS" | "WARN" | "FAIL";
 
+const CODEX_PARITY_AGENT_SPINE_CLASSES = [
+  "complete",
+  "tool_surface_missing",
+  "explicit_capability_demoted",
+  "tool_admission_rejected",
+  "selected_not_executed",
+  "observation_missing",
+  "observation_not_reentered",
+  "goal_contract_mismatch",
+  "terminal_product_not_allowed",
+  "terminal_authority_mismatch",
+  "visible_projection_mismatch",
+  "debug_mirror_stale",
+  "provider_config_missing",
+] as const;
+
+type RailSummary = {
+  present: boolean;
+  requested_capability: string | null;
+  selected_capability: string | null;
+  admitted_capability: string | null;
+  executed_capability: string | null;
+  observation_kind: string | null;
+  required_observation_kinds_for_requested_capability: string[];
+  observed_artifact_supports_requested_capability: boolean | null;
+  reentry_status: string | null;
+  reentry_proof_source: string | null;
+  reentry_proven: boolean;
+  goal_satisfaction: string | null;
+  required_terminal_kind: string | null;
+  selected_terminal_kind: string | null;
+  terminal_authority_proof_source: string | null;
+  terminal_authority_proven: boolean;
+  visible_terminal_kind: string | null;
+  visible_projection_source: string | null;
+  visible_projection_proven: boolean;
+  first_broken_rail: string | null;
+  repair_target: string | null;
+  codex_parity_class: string | null;
+  rail_status: string | null;
+  rail_failure_code: string | null;
+};
+
 type ToolChainScenario = {
   id: string;
   prompt: string;
@@ -85,6 +128,20 @@ const readArray = (value: unknown): unknown[] => (Array.isArray(value) ? value :
 
 const readString = (value: unknown): string => (typeof value === "string" ? value : "");
 
+const readNullableString = (value: unknown): string | null => {
+  const text = readString(value).trim();
+  return text ? text : null;
+};
+
+const readStringArray = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((entry: unknown): entry is string => typeof entry === "string" && entry.trim().length > 0) : [];
+
+const getPath = (value: unknown, pathParts: string[]): unknown =>
+  pathParts.reduce<unknown>((current, key) => {
+    if (!current || typeof current !== "object") return undefined;
+    return (current as RecordLike)[key];
+  }, value);
+
 const hashText = async (text: string): Promise<string> => {
   const { createHash } = await import("node:crypto");
   return createHash("sha256").update(text).digest("hex").slice(0, 16);
@@ -117,6 +174,154 @@ const getPayload = (ask: RecordLike, debug: RecordLike | null): RecordLike => {
   const nestedPayload = readRecord(nestedDebug?.payload);
   if (nestedPayload) return nestedPayload;
   return ask;
+};
+
+const findRailTable = (ask: RecordLike, payload: RecordLike, debug: RecordLike | null): RecordLike | null =>
+  readRecord(ask.codex_parity_agent_spine_rail_table) ??
+  readRecord(payload.codex_parity_agent_spine_rail_table) ??
+  readRecord(getPath(payload, ["debug", "codex_parity_agent_spine_rail_table"])) ??
+  readRecord(getPath(payload, ["artifact_query_index", "codex_parity_agent_spine_rail_table"])) ??
+  readRecord(getPath(payload, ["debug", "artifact_query_index", "codex_parity_agent_spine_rail_table"])) ??
+  readRecord(debug?.codex_parity_agent_spine_rail_table) ??
+  readRecord(getPath(debug, ["payload", "codex_parity_agent_spine_rail_table"]));
+
+const railSummaryFor = (railTable: RecordLike | null): RailSummary => ({
+  present: Boolean(railTable),
+  requested_capability: readNullableString(railTable?.requested_capability),
+  selected_capability: readNullableString(railTable?.selected_capability),
+  admitted_capability: readNullableString(railTable?.admitted_capability),
+  executed_capability: readNullableString(railTable?.executed_capability),
+  observation_kind: readNullableString(railTable?.observation_kind),
+  required_observation_kinds_for_requested_capability: readStringArray(railTable?.required_observation_kinds_for_requested_capability),
+  observed_artifact_supports_requested_capability:
+    typeof railTable?.observed_artifact_supports_requested_capability === "boolean"
+      ? railTable.observed_artifact_supports_requested_capability
+      : null,
+  reentry_status: readNullableString(railTable?.reentry_status),
+  reentry_proof_source: readNullableString(railTable?.reentry_proof_source),
+  reentry_proven: railTable?.reentry_proven === true,
+  goal_satisfaction: readNullableString(railTable?.goal_satisfaction),
+  required_terminal_kind: readNullableString(railTable?.required_terminal_kind),
+  selected_terminal_kind: readNullableString(railTable?.selected_terminal_kind),
+  terminal_authority_proof_source: readNullableString(railTable?.terminal_authority_proof_source),
+  terminal_authority_proven: railTable?.terminal_authority_proven === true,
+  visible_terminal_kind: readNullableString(railTable?.visible_terminal_kind),
+  visible_projection_source: readNullableString(railTable?.visible_projection_source),
+  visible_projection_proven: railTable?.visible_projection_proven === true,
+  first_broken_rail: readNullableString(railTable?.first_broken_rail),
+  repair_target: readNullableString(railTable?.repair_target),
+  codex_parity_class: readNullableString(railTable?.codex_parity_class),
+  rail_status: readNullableString(railTable?.rail_status),
+  rail_failure_code: readNullableString(railTable?.rail_failure_code),
+});
+
+const collectRailTableFailures = (input: {
+  railTable: RecordLike | null;
+  terminalKind: string;
+}): string[] => {
+  const { railTable, terminalKind } = input;
+  if (!railTable) return ["codex_parity_agent_spine_rail_table_missing"];
+  const failures: string[] = [];
+  if (railTable.schema !== "helix.codex_parity_agent_spine_rail_table.v1") {
+    failures.push(`rail_table_schema_mismatch:${readString(railTable.schema) || "missing"}`);
+  }
+  if (!Array.isArray(railTable.visible_tool_surface)) failures.push("rail_visible_tool_surface_missing");
+  if (!["reentered", "not_reentered", "no_observation"].includes(readString(railTable.reentry_status))) {
+    failures.push(`rail_reentry_status_invalid:${readString(railTable.reentry_status) || "missing"}`);
+  }
+  const reentryStatus = readString(railTable.reentry_status);
+  const reentryProofSource = readString(railTable.reentry_proof_source);
+  if (reentryStatus === "reentered" && !reentryProofSource) {
+    failures.push("rail_reentry_proof_source_missing");
+  }
+  if (reentryStatus === "reentered" && railTable.reentry_proven !== true) {
+    failures.push("rail_reentry_not_proven");
+  }
+  if (!["complete", "broken", "fail_closed"].includes(readString(railTable.rail_status))) {
+    failures.push(`rail_status_invalid:${readString(railTable.rail_status) || "missing"}`);
+  }
+  const codexParityClass = readString(railTable.codex_parity_class);
+  if (!CODEX_PARITY_AGENT_SPINE_CLASSES.includes(codexParityClass as (typeof CODEX_PARITY_AGENT_SPINE_CLASSES)[number])) {
+    failures.push(`rail_codex_parity_class_invalid:${codexParityClass || "missing"}`);
+  }
+  if (JSON.stringify(readStringArray(railTable.normalized_codex_parity_classes)) !== JSON.stringify(CODEX_PARITY_AGENT_SPINE_CLASSES)) {
+    failures.push("rail_normalized_codex_parity_classes_mismatch");
+  }
+  const selectedCapability = readString(railTable.selected_capability);
+  const admittedCapability = readString(railTable.admitted_capability);
+  const executedCapability = readString(railTable.executed_capability);
+  const requestedCapability = readString(railTable.requested_capability);
+  const goalSatisfaction = readString(railTable.goal_satisfaction);
+  const requiredObservationKinds = readStringArray(railTable.required_observation_kinds_for_requested_capability);
+  const observationSupportsRequested = railTable.observed_artifact_supports_requested_capability;
+  const admissionProofSource = readString(railTable.admission_proof_source);
+  if ((selectedCapability || executedCapability) && !admittedCapability) {
+    failures.push("rail_admitted_capability_missing");
+  }
+  if (admittedCapability && !admissionProofSource) {
+    failures.push("rail_admission_proof_source_missing");
+  }
+  if (admittedCapability && railTable.admission_proven !== true) {
+    failures.push("rail_admission_not_proven");
+  }
+  if (requestedCapability && !Array.isArray(railTable.required_observation_kinds_for_requested_capability)) {
+    failures.push("rail_requested_observation_kinds_missing");
+  }
+  if (requestedCapability && typeof observationSupportsRequested !== "boolean") {
+    failures.push("rail_observation_support_verdict_missing");
+  }
+  if (
+    requestedCapability &&
+    (goalSatisfaction === "satisfied" || readString(railTable.rail_status) === "complete" || codexParityClass === "complete") &&
+    requiredObservationKinds.length > 0 &&
+    observationSupportsRequested !== true
+  ) {
+    failures.push("rail_goal_satisfied_without_requested_observation_support");
+  }
+  const selectedTerminalKind = readString(railTable.selected_terminal_kind);
+  const visibleTerminalKind = readString(railTable.visible_terminal_kind);
+  const terminalAuthorityProofSource = readString(railTable.terminal_authority_proof_source);
+  const visibleProjectionSource = readString(railTable.visible_projection_source);
+  if (selectedTerminalKind && !terminalAuthorityProofSource) {
+    failures.push("rail_terminal_authority_proof_source_missing");
+  }
+  if (selectedTerminalKind && railTable.terminal_authority_proven !== true) {
+    failures.push("rail_terminal_authority_not_proven");
+  }
+  if (visibleTerminalKind && !visibleProjectionSource) {
+    failures.push("rail_visible_projection_source_missing");
+  }
+  if (visibleTerminalKind && railTable.visible_projection_proven !== true) {
+    failures.push("rail_visible_projection_not_proven");
+  }
+  const firstBrokenRail = readString(railTable.first_broken_rail);
+  if (codexParityClass === "complete" && firstBrokenRail) {
+    failures.push(`rail_complete_with_first_broken_rail:${firstBrokenRail}`);
+  }
+  if ((codexParityClass === "complete" || readString(railTable.rail_status) === "complete") && reentryStatus !== "reentered") {
+    failures.push(`rail_complete_without_reentry:${reentryStatus || "missing"}`);
+  }
+  if ((readString(railTable.rail_status) === "complete") !== (codexParityClass === "complete")) {
+    failures.push(
+      `rail_completion_status_class_mismatch:${readString(railTable.rail_status) || "missing"}/${codexParityClass || "missing"}`,
+    );
+  }
+  if ((codexParityClass === "complete" || readString(railTable.rail_status) === "complete") && !selectedTerminalKind) {
+    failures.push("rail_complete_without_terminal_authority");
+  }
+  if ((codexParityClass === "complete" || readString(railTable.rail_status) === "complete") && !visibleTerminalKind) {
+    failures.push("rail_complete_without_visible_projection");
+  }
+  if (codexParityClass && codexParityClass !== "complete" && !firstBrokenRail) {
+    failures.push("rail_non_complete_without_first_broken_rail");
+  }
+  if (selectedTerminalKind && visibleTerminalKind && selectedTerminalKind !== visibleTerminalKind) {
+    failures.push(`rail_selected_visible_terminal_kind_mismatch:${selectedTerminalKind}!=${visibleTerminalKind}`);
+  }
+  if (terminalKind && visibleTerminalKind && terminalKind !== visibleTerminalKind) {
+    failures.push(`rail_visible_terminal_kind_payload_mismatch:${visibleTerminalKind}!=${terminalKind}`);
+  }
+  return failures;
 };
 
 const collectTimelineEvents = (payload: RecordLike, debug: RecordLike | null): RecordLike[] => {
@@ -253,6 +458,26 @@ const genericTerminalFailureVisible = (visibleText: string): boolean =>
   /I could not produce a terminal answer for this turn/i.test(visibleText) ||
   /I could not complete this turn because the terminal boundary blocked/i.test(visibleText);
 
+const completeRailEnvelopeFailures = (input: {
+  railTable: RecordLike | null;
+  terminalKind: string;
+  terminalError: string;
+  visibleText: string;
+}): string[] => {
+  const railTable = input.railTable;
+  if (!railTable) return [];
+  const railComplete =
+    readString(railTable.codex_parity_class) === "complete" ||
+    readString(railTable.rail_status) === "complete";
+  if (!railComplete) return [];
+  const failures: string[] = [];
+  if (input.terminalError) failures.push(`complete_rail_terminal_error:${input.terminalError}`);
+  if (input.terminalKind === "typed_failure") failures.push("complete_rail_typed_failure_terminal");
+  if (!input.visibleText.trim()) failures.push("complete_rail_missing_final_answer_text");
+  if (genericTerminalFailureVisible(input.visibleText)) failures.push("complete_rail_generic_failure_visible");
+  return failures;
+};
+
 const policyClaimInversionVisible = (visibleText: string): boolean =>
   /\breceipts?\b.{0,140}\b(validat(?:e|es|ing)|authoriz(?:e|es|ing)|confirm(?:s|ing)?|derive[sd]?)\b.{0,140}\bfinal answers?\b/i.test(
     visibleText,
@@ -278,6 +503,7 @@ const classifyScenario = (input: {
   timelineEvents: RecordLike[];
   visibleText: string;
   terminalWriter: RecordLike | null;
+  railTable: RecordLike | null;
   debugAvailable: boolean;
   repoPacketPresent: boolean;
 }): { verdict: Verdict; failures: string[]; warnings: string[] } => {
@@ -292,11 +518,14 @@ const classifyScenario = (input: {
     timelineEvents,
     visibleText,
     terminalWriter,
+    railTable,
     debugAvailable,
     repoPacketPresent,
   } = input;
 
   if (!debugAvailable) warnings.push("debug_export_missing");
+  failures.push(...collectRailTableFailures({ railTable, terminalKind }));
+  failures.push(...completeRailEnvelopeFailures({ railTable, terminalKind, terminalError, visibleText }));
   if (!timelineEvents.length) warnings.push("causal_timeline_missing");
   if (receiptLeak(visibleText)) failures.push("receipt_framing_leaked_into_visible_answer");
   if (genericTerminalFailureVisible(visibleText)) {
@@ -421,6 +650,7 @@ const runScenario = async (scenario: ToolChainScenario, runId: string, outputDir
   const visibleText = visibleTextOf(ask, payload, terminalWriter);
   const terminalKind = getTerminalKind(ask, payload, terminalWriter);
   const terminalError = getTerminalError(ask, payload);
+  const railTable = findRailTable(ask, payload, debug);
   const repoPacketPresent =
     Boolean(readRecord(payload.repo_docs_synthesis_packet_summary)) ||
     artifactKinds.some((kind) => kind.includes("repo_docs_synthesis_packet")) ||
@@ -434,6 +664,7 @@ const runScenario = async (scenario: ToolChainScenario, runId: string, outputDir
     timelineEvents,
     visibleText,
     terminalWriter,
+    railTable,
     debugAvailable: Boolean(debug),
     repoPacketPresent,
   });
@@ -452,6 +683,7 @@ const runScenario = async (scenario: ToolChainScenario, runId: string, outputDir
     terminal_artifact_kind: terminalKind,
     terminal_error_code: terminalError || null,
     terminal_writer_applied: terminalWriter?.applied ?? null,
+    rail_table: railSummaryFor(railTable),
     timeline_event_count: timelineEvents.length,
     timeline_stages: timelineEvents.map((event) => readString(event.stage)).filter(Boolean),
     tool_observation_seen: hasToolObservation(timelineEvents, ledger, artifactKinds),
@@ -477,15 +709,18 @@ const renderMarkdownSummary = (input: { runId: string; results: RecordLike[]; ou
     `- base_url: ${BASE_URL}`,
     `- output_dir: ${input.outputDir}`,
     "",
-    "| Verdict | Scenario | Terminal | Error | Key findings |",
-    "| --- | --- | --- | --- | --- |",
+    "| Verdict | Scenario | Terminal | Rail class | First rail | Repair | Error | Key findings |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
   ];
   for (const result of input.results) {
+    const rail = readRecord(result.rail_table);
     const findings = [...readArray(result.failures), ...readArray(result.warnings)]
       .map(String)
       .join("; ");
     lines.push(
       `| ${readString(result.verdict)} | ${readString(result.scenario_id)} | ${readString(result.terminal_artifact_kind) || "-"} | ${
+        readString(rail?.codex_parity_class) || "-"
+      } | ${readString(rail?.first_broken_rail) || "-"} | ${readString(rail?.repair_target) || "-"} | ${
         readString(result.terminal_error_code) || "-"
       } | ${findings || "none"} |`,
     );

@@ -29,11 +29,16 @@ function readTerminalAnswerEventText(value: unknown): string | null {
   if (Array.isArray(value)) {
     for (const event of [...value].reverse()) {
       const record = asRecord(event);
-      if (record?.type === "terminal_answer") return readString(record.text);
+      if (record?.type === "terminal_answer" || record?.type === "request_user_input") {
+        return readString(record.text);
+      }
     }
     return null;
   }
-  return readString(asRecord(asRecord(value)?.terminal_answer)?.text);
+  return (
+    readString(asRecord(asRecord(value)?.terminal_answer)?.text) ??
+    readString(asRecord(asRecord(value)?.request_user_input)?.text)
+  );
 }
 
 function readVisibleAnswerText(payload: Record<string, unknown>): string | null {

@@ -2075,6 +2075,38 @@ describe("StagePlayBadgeGraphPanel", () => {
           },
         }, {
           schemaVersion: "helix.workstation_goal_context_update.v1",
+          updateId: "stage_play_goal_context_update:source_health:ui",
+          createdAtMs: 1780521602550,
+          sourceRefs: ["source:visual-tab"],
+          loopRefs: ["source_health_watch:visual-tab"],
+          producerKind: "source_health",
+          updateKind: "source_status",
+          contentRef: "source_health_status:visual-tab",
+          preview: "Visual source is fresh and bound to the Stage Play mail loop.",
+          evidenceRefs: ["source:visual-tab", "source_health_status:visual-tab"],
+          receiptRefs: ["source_health_status:visual-tab"],
+          freshness: {
+            observedAtMs: 1780521602550,
+            staleAfterMs: 60000,
+            status: "fresh",
+          },
+          goalRelevance: {
+            goalId: "goal:stage-play-monitor",
+            relevance: 0.76,
+            reason: "Source-health context keeps the agent informed about whether visual packet feeds are current.",
+          },
+          suggestedDispatch: [
+            { kind: "log_receipt", receiptRef: "source_health_status:visual-tab" },
+            { kind: "update_panel", panelId: "stage-play-badge-graph" },
+          ],
+          authority: {
+            assistantAnswer: false,
+            terminalEligible: false,
+            rawContentIncluded: false,
+            postToolModelStepRequired: true,
+          },
+        }, {
+          schemaVersion: "helix.workstation_goal_context_update.v1",
           updateId: "stage_play_goal_context_update:bad_projection:ui",
           createdAtMs: 1780521602600,
           sourceRefs: ["live-answer:desktop"],
@@ -2125,13 +2157,25 @@ describe("StagePlayBadgeGraphPanel", () => {
               relevancePolicy: "same-source-or-goal-id",
             },
             {
+              feedId: "feed:packet-traces",
+              sourceKind: "packet_traces",
+              freshnessMs: 60000,
+              relevancePolicy: "same-source-or-packet",
+            },
+            {
+              feedId: "feed:source-health",
+              sourceKind: "source_health",
+              freshnessMs: 60000,
+              relevancePolicy: "same-source",
+            },
+            {
               feedId: "feed:trace",
               sourceKind: "trace_memory",
               freshnessMs: 120000,
               relevancePolicy: "same-thread-or-turn",
             },
           ],
-          allowedActuators: ["query_visual_summaries", "query_microdeck_outputs", "narrator_bind_stream", "focus_process_graph"],
+          allowedActuators: ["query_visual_summaries", "query_packet_traces", "query_microdeck_outputs", "query_source_health", "narrator_bind_stream", "focus_process_graph"],
           cadence: { kind: "event_accumulation", minUpdates: 2 },
           stopConditions: [
             "User stops monitoring",
@@ -2142,7 +2186,7 @@ describe("StagePlayBadgeGraphPanel", () => {
             createdAtMs: 1780521603000,
             summary: "Visual packet and narrator stream are attached.",
             evidenceRefs: ["stage_play_processed_mail_packet:minimal-ui"],
-            actionsTaken: ["query_visual_summaries", "narrator_bind_stream"],
+            actionsTaken: ["query_visual_summaries", "query_packet_traces", "query_source_health", "narrator_bind_stream"],
             nextStep: "continue",
           }, {
             checkpointId: "checkpoint:stage-play-monitor-feed-query",
@@ -2183,10 +2227,18 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-goal-context-authority-state")).toHaveTextContent(/evidence-only, non-terminal context/i);
     expect(screen.getByTestId("stage-play-terminal-authority-state")).toHaveTextContent(/Final reports require a completed solver path/i);
     expect(screen.getByTestId("stage-play-narrator-binding-state")).toHaveTextContent(/stream binding dispatch/i);
+    expect(screen.getByTestId("stage-play-packet-trace-state")).toHaveTextContent(/2 packet trace context items/i);
+    expect(screen.getByTestId("stage-play-packet-trace-state")).toHaveTextContent(/per-packet travel visible as evidence/i);
+    expect(screen.getByTestId("stage-play-source-health-state")).toHaveTextContent(/3 source-health context items/i);
+    expect(screen.getByTestId("stage-play-source-health-state")).toHaveTextContent(/loop\/source status queryable before agent reasoning/i);
+    expect(screen.getByTestId("stage-play-trace-memory-state")).toHaveTextContent(/1 trace-memory context item/i);
+    expect(screen.getByTestId("stage-play-trace-memory-state")).toHaveTextContent(/prior reasoning queryable without answer authority/i);
     expect(screen.getByTestId("stage-play-route-watch-automation-state")).toHaveTextContent(/1 route-watch update/i);
     expect(screen.getByTestId("stage-play-route-watch-automation-state")).toHaveTextContent(/1 running loop dispatch/i);
     expect(screen.getByText("Minecraft danger monitor")).toBeTruthy();
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/visual summaries/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/packet traces/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/source health/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/microdeck outputs/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-cadence")).toHaveTextContent(/event accumulation \/ 2 updates/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-stop-conditions")).toHaveTextContent(/Terminal authority produces a final report/i);
@@ -2196,12 +2248,24 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByTestId("stage-play-agent-goal-session-checkpoint-actions").some((node) =>
       /query visual summaries/i.test(node.textContent ?? "") && /live env query visual summaries/i.test(node.textContent ?? "")
     )).toBe(true);
+    expect(screen.getAllByTestId("stage-play-agent-goal-session-checkpoint-actions").some((node) =>
+      /query packet traces/i.test(node.textContent ?? "")
+    )).toBe(true);
     expect(screen.getAllByTestId("stage-play-agent-goal-session-checkpoint-evidence").some((node) =>
       /stage_play_goal_context_update:route_watch:ui/i.test(node.textContent ?? "")
     )).toBe(true);
     expect(screen.getAllByTestId("stage-play-goal-context-update").length).toBeGreaterThan(0);
     expect(screen.getAllByTestId("stage-play-goal-context-update").some((node) =>
       /route watch/i.test(node.textContent ?? "") && /Configured live-source watch job/i.test(node.textContent ?? "")
+    )).toBe(true);
+    expect(screen.getAllByTestId("stage-play-goal-context-update-custody").some((node) =>
+      /sources=source:visual-tab/i.test(node.textContent ?? "") &&
+      /evidence=stage_play_live_source_watch_job_policy:ui, stage_play_live_source_watch_job:ui/i.test(node.textContent ?? "") &&
+      /receipts=stage_play_live_source_watch_job_policy:ui/i.test(node.textContent ?? "") &&
+      /goal=goal:stage-play-monitor relevance=0\.82/i.test(node.textContent ?? "")
+    )).toBe(true);
+    expect(screen.getAllByTestId("stage-play-goal-context-update-freshness").some((node) =>
+      /freshness=fresh observed=1780521602500 staleAfter=120000ms/i.test(node.textContent ?? "")
     )).toBe(true);
     expect(screen.getAllByTestId("stage-play-goal-context-authority-chips").some((node) =>
       /assistant=false.*terminal=false.*raw=false/s.test(node.textContent ?? "")

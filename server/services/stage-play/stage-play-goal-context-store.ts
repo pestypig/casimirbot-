@@ -535,46 +535,54 @@ export function syncStagePlayGoalContextFromMailbox(input: {
       packet.microReasonerDeck?.presetId,
       ...(packet.microReasonerRunRefs ?? []),
     ]);
+    const packetProducer = sourceKindToPacketProducer(sourceKind, packet);
+    const packetUpdateKind = sourceKindToUpdateKind(sourceKind, packet);
+    const packetPreview = buildPacketPreview(packet, primaryRun, primaryMail);
+    const packetEvidenceRefs = uniqueStrings([
+      packet.packetId,
+      ...packet.evidenceRefs,
+      ...packet.visualEvidenceRefs,
+      ...(primaryRun?.outputRefs ?? []),
+    ]).slice(0, 80);
+    const packetReceiptRefs = uniqueStrings([
+      ...packet.mailIds,
+      ...packet.microReasonerRunRefs,
+      ...decisions.filter((decision) => decision.mailIds.some((mailId) => packet.mailIds.includes(mailId))).map((decision) => decision.decisionId),
+      ...wakeRequests.filter((wake) => wake.packetIds?.includes(packet.packetId)).map((wake) => wake.wakeRequestId),
+      ...wakeResults.filter((result) => result.packetIds?.includes(packet.packetId)).map((result) => result.wakeResultId),
+    ]).slice(0, 80);
+    const packetFreshness = {
+      observedAtMs,
+      staleAfterMs: 30_000,
+      status: primaryMail?.hints.sourceFreshness === "stale" ? "stale" as const : "fresh" as const,
+    };
+    const packetGoalRelevance = {
+      goalId,
+      relevance: packet.salience.level === "urgent" ? 1 : packet.salience.level === "high" ? 0.85 : 0.65,
+      reason: primaryMail?.objective?.text ?? packet.salience.reasons[0] ?? "Packet belongs to the Stage Play mailbox loop.",
+    };
+    const packetDispatch = buildDispatchActions({
+      packet,
+      primaryMail,
+      wakeRequests,
+      wakeResults,
+      decisions: decisions.filter((decision) => decision.mailIds.some((mailId) => packet.mailIds.includes(mailId))),
+    });
     recordStagePlayGoalContextUpdate({
       schemaVersion: WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
       updateId: `stage_play_goal_context_update:${hashShort([input.threadId, packet.packetId, packet.createdAt], 18)}`,
       createdAtMs: nowMs,
       sourceRefs,
       loopRefs,
-      producerKind: sourceKindToPacketProducer(sourceKind, packet),
-      updateKind: sourceKindToUpdateKind(sourceKind, packet),
+      producerKind: packetProducer,
+      updateKind: packetUpdateKind,
       contentRef: packet.packetId,
-      preview: buildPacketPreview(packet, primaryRun, primaryMail),
-      evidenceRefs: uniqueStrings([
-        packet.packetId,
-        ...packet.evidenceRefs,
-        ...packet.visualEvidenceRefs,
-        ...(primaryRun?.outputRefs ?? []),
-      ]).slice(0, 80),
-      receiptRefs: uniqueStrings([
-        ...packet.mailIds,
-        ...packet.microReasonerRunRefs,
-        ...decisions.filter((decision) => decision.mailIds.some((mailId) => packet.mailIds.includes(mailId))).map((decision) => decision.decisionId),
-        ...wakeRequests.filter((wake) => wake.packetIds?.includes(packet.packetId)).map((wake) => wake.wakeRequestId),
-        ...wakeResults.filter((result) => result.packetIds?.includes(packet.packetId)).map((result) => result.wakeResultId),
-      ]).slice(0, 80),
-      freshness: {
-        observedAtMs,
-        staleAfterMs: 30_000,
-        status: primaryMail?.hints.sourceFreshness === "stale" ? "stale" : "fresh",
-      },
-      goalRelevance: {
-        goalId,
-        relevance: packet.salience.level === "urgent" ? 1 : packet.salience.level === "high" ? 0.85 : 0.65,
-        reason: primaryMail?.objective?.text ?? packet.salience.reasons[0] ?? "Packet belongs to the Stage Play mailbox loop.",
-      },
-      suggestedDispatch: buildDispatchActions({
-        packet,
-        primaryMail,
-        wakeRequests,
-        wakeResults,
-        decisions: decisions.filter((decision) => decision.mailIds.some((mailId) => packet.mailIds.includes(mailId))),
-      }),
+      preview: packetPreview,
+      evidenceRefs: packetEvidenceRefs,
+      receiptRefs: packetReceiptRefs,
+      freshness: packetFreshness,
+      goalRelevance: packetGoalRelevance,
+      suggestedDispatch: packetDispatch,
       authority: {
         assistantAnswer: false,
         terminalEligible: false,
@@ -582,6 +590,30 @@ export function syncStagePlayGoalContextFromMailbox(input: {
         postToolModelStepRequired: true,
       },
     });
+    if (sourceKind === "audio_transcript" && packetProducer !== "transcription_loop") {
+      recordStagePlayGoalContextUpdate({
+        schemaVersion: WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
+        updateId: `stage_play_goal_context_update:transcription:${hashShort([input.threadId, packet.packetId, packet.createdAt], 18)}`,
+        createdAtMs: nowMs,
+        sourceRefs,
+        loopRefs: uniqueStrings([...loopRefs, "transcription_loop"]),
+        producerKind: "transcription_loop",
+        updateKind: "transcript_window",
+        contentRef: packet.packetId,
+        preview: previewText(`Transcript packet processed before downstream deck output: ${packetPreview}`),
+        evidenceRefs: packetEvidenceRefs,
+        receiptRefs: packetReceiptRefs,
+        freshness: packetFreshness,
+        goalRelevance: packetGoalRelevance,
+        suggestedDispatch: packetDispatch,
+        authority: {
+          assistantAnswer: false,
+          terminalEligible: false,
+          rawContentIncluded: false,
+          postToolModelStepRequired: true,
+        },
+      });
+    }
   }
 
   return listStagePlayGoalContextUpdates({ threadId: input.threadId, limit: 80 });

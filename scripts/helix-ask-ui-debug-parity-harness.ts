@@ -13,6 +13,7 @@ type HarnessResult = {
   visible_final_answer: string;
   debug_export: Record<string, unknown> | null;
   terminal_authority: unknown;
+  codex_parity_agent_spine_rail_table: unknown;
   goal_satisfaction: unknown;
   agent_runtime_loop: unknown;
   coverage_artifacts: unknown[];
@@ -37,6 +38,31 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 const readString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
+const readStringArray = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((entry: unknown): entry is string => typeof entry === "string" && entry.trim().length > 0) : [];
+
+const getPath = (value: unknown, pathParts: string[]): unknown =>
+  pathParts.reduce<unknown>((current, key) => {
+    if (!current || typeof current !== "object") return undefined;
+    return (current as Record<string, unknown>)[key];
+  }, value);
+
+const CODEX_PARITY_AGENT_SPINE_CLASSES = [
+  "complete",
+  "tool_surface_missing",
+  "explicit_capability_demoted",
+  "tool_admission_rejected",
+  "selected_not_executed",
+  "observation_missing",
+  "observation_not_reentered",
+  "goal_contract_mismatch",
+  "terminal_product_not_allowed",
+  "terminal_authority_mismatch",
+  "visible_projection_mismatch",
+  "debug_mirror_stale",
+  "provider_config_missing",
+] as const;
+
 const collectCoverageArtifacts = (debugExport: Record<string, unknown> | null): unknown[] => {
   if (!debugExport) return [];
   if (Array.isArray(debugExport.coverage_artifacts)) return debugExport.coverage_artifacts;
@@ -45,6 +71,151 @@ const collectCoverageArtifacts = (debugExport: Record<string, unknown> | null): 
     const kind = readString(asRecord(entry)?.kind);
     return kind === "calculator_plan_coverage" || /_coverage$/.test(kind);
   });
+};
+
+const findRailTable = (debugExport: Record<string, unknown> | null): Record<string, unknown> | null =>
+  asRecord(debugExport?.codex_parity_agent_spine_rail_table) ??
+  asRecord(getPath(debugExport, ["debug", "codex_parity_agent_spine_rail_table"])) ??
+  asRecord(getPath(debugExport, ["artifact_query_index", "codex_parity_agent_spine_rail_table"])) ??
+  asRecord(getPath(debugExport, ["debug", "artifact_query_index", "codex_parity_agent_spine_rail_table"]));
+
+const collectRailTableViolations = (
+  railTable: Record<string, unknown> | null,
+  terminalAuthority: Record<string, unknown> | null,
+): string[] => {
+  if (!railTable) return ["codex_parity_agent_spine_rail_table_missing"];
+  const violations: string[] = [];
+  if (railTable.schema !== "helix.codex_parity_agent_spine_rail_table.v1") {
+    violations.push("codex_parity_agent_spine_rail_table_schema_mismatch");
+  }
+  if (!Array.isArray(railTable.visible_tool_surface)) {
+    violations.push("rail_visible_tool_surface_missing");
+  }
+  const normalizedClasses = readStringArray(railTable.normalized_codex_parity_classes);
+  if (JSON.stringify(normalizedClasses) !== JSON.stringify(CODEX_PARITY_AGENT_SPINE_CLASSES)) {
+    violations.push("rail_normalized_codex_parity_classes_mismatch");
+  }
+  const codexParityClass = readString(railTable.codex_parity_class);
+  if (!CODEX_PARITY_AGENT_SPINE_CLASSES.includes(codexParityClass as (typeof CODEX_PARITY_AGENT_SPINE_CLASSES)[number])) {
+    violations.push("rail_codex_parity_class_invalid");
+  }
+  const selectedCapability = readString(railTable.selected_capability);
+  const admittedCapability = readString(railTable.admitted_capability);
+  const executedCapability = readString(railTable.executed_capability);
+  const requestedCapability = readString(railTable.requested_capability);
+  const goalSatisfaction = readString(railTable.goal_satisfaction);
+  const requiredObservationKinds = readStringArray(railTable.required_observation_kinds_for_requested_capability);
+  const observationSupportsRequested = railTable.observed_artifact_supports_requested_capability;
+  const admissionProofSource = readString(railTable.admission_proof_source);
+  if ((selectedCapability || executedCapability) && !admittedCapability) {
+    violations.push("rail_admitted_capability_missing");
+  }
+  if (admittedCapability && !admissionProofSource) {
+    violations.push("rail_admission_proof_source_missing");
+  }
+  if (admittedCapability && railTable.admission_proven !== true) {
+    violations.push("rail_admission_not_proven");
+  }
+  if (requestedCapability && !Array.isArray(railTable.required_observation_kinds_for_requested_capability)) {
+    violations.push("rail_requested_observation_kinds_missing");
+  }
+  if (requestedCapability && typeof observationSupportsRequested !== "boolean") {
+    violations.push("rail_observation_support_verdict_missing");
+  }
+  if (
+    requestedCapability &&
+    (goalSatisfaction === "satisfied" || readString(railTable.rail_status) === "complete" || codexParityClass === "complete") &&
+    requiredObservationKinds.length > 0 &&
+    observationSupportsRequested !== true
+  ) {
+    violations.push("rail_goal_satisfied_without_requested_observation_support");
+  }
+  const firstBrokenRail = readString(railTable.first_broken_rail);
+  const reentryStatus = readString(railTable.reentry_status);
+  const reentryProofSource = readString(railTable.reentry_proof_source);
+  if (reentryStatus === "reentered" && !reentryProofSource) {
+    violations.push("rail_reentry_proof_source_missing");
+  }
+  if (reentryStatus === "reentered" && railTable.reentry_proven !== true) {
+    violations.push("rail_reentry_not_proven");
+  }
+  if ((codexParityClass === "complete" || readString(railTable.rail_status) === "complete") && reentryStatus !== "reentered") {
+    violations.push("rail_complete_without_reentry");
+  }
+  if ((readString(railTable.rail_status) === "complete") !== (codexParityClass === "complete")) {
+    violations.push("rail_completion_status_class_mismatch");
+  }
+  if (codexParityClass === "complete" && firstBrokenRail) {
+    violations.push("rail_complete_with_first_broken_rail");
+  }
+  if (codexParityClass && codexParityClass !== "complete" && !firstBrokenRail) {
+    violations.push("rail_non_complete_without_first_broken_rail");
+  }
+  const selectedTerminalKind = readString(railTable.selected_terminal_kind);
+  const visibleTerminalKind = readString(railTable.visible_terminal_kind);
+  const terminalAuthorityProofSource = readString(railTable.terminal_authority_proof_source);
+  const visibleProjectionSource = readString(railTable.visible_projection_source);
+  if (selectedTerminalKind && !terminalAuthorityProofSource) {
+    violations.push("rail_terminal_authority_proof_source_missing");
+  }
+  if (selectedTerminalKind && railTable.terminal_authority_proven !== true) {
+    violations.push("rail_terminal_authority_not_proven");
+  }
+  if (visibleTerminalKind && !visibleProjectionSource) {
+    violations.push("rail_visible_projection_source_missing");
+  }
+  if (visibleTerminalKind && railTable.visible_projection_proven !== true) {
+    violations.push("rail_visible_projection_not_proven");
+  }
+  if ((codexParityClass === "complete" || readString(railTable.rail_status) === "complete") && !selectedTerminalKind) {
+    violations.push("rail_complete_without_terminal_authority");
+  }
+  if ((codexParityClass === "complete" || readString(railTable.rail_status) === "complete") && !visibleTerminalKind) {
+    violations.push("rail_complete_without_visible_projection");
+  }
+  if (selectedTerminalKind && visibleTerminalKind && selectedTerminalKind !== visibleTerminalKind) {
+    violations.push("rail_selected_visible_terminal_kind_mismatch");
+  }
+  const terminalAuthorityKind =
+    readString(terminalAuthority?.selected_terminal_artifact_kind) ||
+    readString(terminalAuthority?.terminal_artifact_kind);
+  if (terminalAuthorityKind && selectedTerminalKind && terminalAuthorityKind !== selectedTerminalKind) {
+    violations.push("rail_terminal_authority_kind_mismatch");
+  }
+  return violations;
+};
+
+const completeRailEnvelopeViolations = (input: {
+  railTable: Record<string, unknown> | null;
+  debugExport: Record<string, unknown> | null;
+  visibleFinalAnswer: string;
+}): string[] => {
+  const railTable = input.railTable;
+  if (!railTable) return [];
+  const railComplete =
+    readString(railTable.codex_parity_class) === "complete" ||
+    readString(railTable.rail_status) === "complete";
+  if (!railComplete) return [];
+  const violations: string[] = [];
+  const terminalErrorCode =
+    readString(input.debugExport?.terminal_error_code) ||
+    readString(getPath(input.debugExport, ["resolved_turn_summary", "terminal_error_code"]));
+  const finalStatus = readString(input.debugExport?.final_status);
+  const responseType = readString(input.debugExport?.response_type);
+  const finalAnswerSource = readString(input.debugExport?.final_answer_source);
+  const terminalKind =
+    readString(input.debugExport?.terminal_artifact_kind) ||
+    readString(getPath(input.debugExport, ["terminal_answer_authority", "terminal_artifact_kind"]));
+
+  if (terminalErrorCode) violations.push(`complete_rail_terminal_error:${terminalErrorCode}`);
+  if (finalAnswerSource === "typed_failure" || terminalKind === "typed_failure") {
+    violations.push("complete_rail_typed_failure_terminal");
+  }
+  if ((finalStatus && finalStatus !== "final_answer") || (responseType && responseType !== "final_answer")) {
+    violations.push(`complete_rail_non_final_response:${finalStatus ?? "missing"}/${responseType ?? "missing"}`);
+  }
+  if (!input.visibleFinalAnswer) violations.push("complete_rail_missing_visible_final_answer");
+  return violations;
 };
 
 async function installClipboardFailureShim(page: Page): Promise<void> {
@@ -122,6 +293,7 @@ async function runPrompt(page: Page, item: HarnessPrompt): Promise<HarnessResult
     .then((value) => value ?? "");
   const debugExport = await collectDebugExport(page);
   const terminalAuthority = asRecord(debugExport?.terminal_answer_authority);
+  const railTable = findRailTable(debugExport);
   const terminalAuthorityText = readString(terminalAuthority?.terminal_text_preview);
   const selectedFinalAnswer = readString(debugExport?.selected_final_answer);
   const coverageArtifacts = collectCoverageArtifacts(debugExport);
@@ -130,6 +302,8 @@ async function runPrompt(page: Page, item: HarnessPrompt): Promise<HarnessResult
   const violations: string[] = [];
 
   if (!debugExport) violations.push("debug_export_missing");
+  violations.push(...collectRailTableViolations(railTable, terminalAuthority));
+  violations.push(...completeRailEnvelopeViolations({ railTable, debugExport, visibleFinalAnswer }));
   if (!visibleFinalAnswer) violations.push("visible_final_answer_missing");
   if (terminalAuthorityText && visibleFinalAnswer !== terminalAuthorityText) {
     violations.push("ui_terminal_authority_text_mismatch");
@@ -156,6 +330,7 @@ async function runPrompt(page: Page, item: HarnessPrompt): Promise<HarnessResult
     visible_final_answer: visibleFinalAnswer,
     debug_export: debugExport,
     terminal_authority: terminalAuthority,
+    codex_parity_agent_spine_rail_table: railTable,
     goal_satisfaction: debugExport?.goal_satisfaction_evaluation ?? null,
     agent_runtime_loop: debugExport?.agent_runtime_loop ?? debugExport?.agent_step_loop ?? null,
     coverage_artifacts: coverageArtifacts,

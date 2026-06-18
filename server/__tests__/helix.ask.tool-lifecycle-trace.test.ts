@@ -2288,6 +2288,88 @@ describe("Helix Ask tool lifecycle trace", () => {
     });
   });
 
+  it("maps route-evidence feed artifacts to the route-evidence query tool", () => {
+    const payload: Record<string, unknown> = {
+      active_prompt: "Show route-watch evidence for the active workstation goal.",
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        requested_capability: "live_env.query_route_evidence",
+        requested_capability_family: "live_source_mail",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "stage_play_workstation_context_feed_query_result:route-evidence",
+          kind: "stage_play_workstation_context_feed_query_result",
+          producer_item_id: "live_env.query_route_evidence",
+          payload: {
+            schema: "stage_play_workstation_context_feed_query_result/v1",
+            tool_name: "live_env.query_route_evidence",
+            feed_kind: "route_evidence",
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+          },
+        },
+        {
+          artifact_id: "stage_play_goal_context_update:route-evidence-feed",
+          kind: "helix.workstation_goal_context_update.v1",
+          producer_item_id: "live_env.query_route_evidence",
+          payload: {
+            schema: "helix.workstation_goal_context_update.v1",
+            tool_name: "live_env.query_route_evidence",
+            producer_kind: "route_watch",
+            update_kind: "route_evidence",
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+          },
+        },
+        {
+          artifact_id: "stage_play_goal_context_update:automation-policy",
+          kind: "helix.workstation_goal_context_update.v1",
+          producer_item_id: "live_env.query_route_evidence",
+          payload: {
+            schema: "helix.workstation_goal_context_update.v1",
+            tool_name: "live_env.query_route_evidence",
+            producer_kind: "automation",
+            update_kind: "automation_status",
+            source_kind: "automation_policies",
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+          },
+        },
+      ],
+    };
+
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:route-evidence-feed", payload });
+
+    expect(index).toMatchObject({
+      capability: "live_env.query_route_evidence",
+      tool_family: "live_source_mail",
+      tool_family_contract: {
+        tool_name: "live_env.query_route_evidence",
+        authority: "evidence_only",
+        required_observation_kinds: [
+          "stage_play_workstation_context_feed_query_result",
+          "helix.workstation_goal_context_update.v1",
+        ],
+      },
+      missing_required_observation_kinds: [],
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(index.queryable_artifact_keys).toEqual(expect.arrayContaining([
+      "route_evidence",
+      "stage_play_workstation_context_feed_query_result:route-evidence",
+      "stage_play_goal_context_update:route-evidence-feed",
+      "stage_play_goal_context_update:automation-policy",
+    ]));
+  });
+
   it("maps workstation control receipt artifacts to the governed control tool", () => {
     const payload: Record<string, unknown> = {
       active_prompt: "Apply the frog classifier preset to the active visual source.",

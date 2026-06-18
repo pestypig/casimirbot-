@@ -14,11 +14,16 @@ const readTerminalAnswerEventText = (value: unknown): string | null => {
   if (Array.isArray(value)) {
     for (const event of [...value].reverse()) {
       const record = readRecord(event);
-      if (record?.type === "terminal_answer") return readString(record.text);
+      if (record?.type === "terminal_answer" || record?.type === "request_user_input") {
+        return readString(record.text);
+      }
     }
     return null;
   }
-  return readString(readRecord(readRecord(value)?.terminal_answer)?.text);
+  return (
+    readString(readRecord(readRecord(value)?.terminal_answer)?.text) ??
+    readString(readRecord(readRecord(value)?.request_user_input)?.text)
+  );
 };
 
 const readVisibleAnswerText = (payload: Record<string, unknown>): string | null =>
@@ -115,8 +120,6 @@ export function auditTerminalPresentationCoverage(input: {
       "tool_evaluation",
       "workstation_tool_evaluation",
       "tool_receipt",
-      "request_user_input",
-      "typed_failure",
     ]
       .includes(input.terminalArtifactKind) &&
     !receiptSnapshotId

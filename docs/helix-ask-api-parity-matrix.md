@@ -103,6 +103,53 @@ After the server is running, the agent may run:
 npm run helix:ask:api-parity
 ```
 
+For the cross-tool Codex-parity agent-spine rail smoke, run:
+
+```bash
+npm run helix:ask:live-spine-smoke
+```
+
+That probe uses the same operator-started server and writes full Ask responses,
+debug exports, and per-turn rail summaries. It checks the recurring spine
+contract:
+
+```txt
+requested/visible capability -> selected/admitted/executed capability
+-> observation -> re-entry -> goal satisfaction -> terminal authority
+-> visible projection
+```
+
+It currently covers calculator, workspace status, docs locate, repo search,
+internet search/config, live-source mail, runtime capability catalog, negated
+tool mentions, visual capture, and the image-lens visual alias.
+
+The normalized rail also records `admission_proof_source`, `admission_proven`,
+`required_observation_kinds_for_requested_capability`,
+`observed_artifact_supports_requested_capability`, `reentry_proof_source`, and
+`reentry_proven`, `terminal_authority_proof_source`,
+`terminal_authority_proven`, `visible_projection_source`, and
+`visible_projection_proven` so selected/executed capability progress cannot be
+counted unless an admission rail exists, a satisfied requested-capability goal
+cannot hide behind an unrelated observation, `reentered` means the debug mirror
+can name the proof that evidence re-entered the solver, and selected/visible
+terminal kinds cannot be counted unless their authority and projection sources
+are named. The normalized status fields must also agree: a rail is complete only
+when both `rail_status` and `codex_parity_class` say `complete`; otherwise the
+debug is classified as a stale or inconsistent mirror.
+
+The browser/UI debug parity harness also checks that copied UI debug exports
+contain the same normalized rail table and that its selected terminal kind
+matches the visible terminal kind and terminal authority with source-backed
+terminal/projection proof fields.
+
+For any rail marked `complete`, the API probe, live spine smoke, tool-chain
+matrix probe, and UI debug harness also treat the answer envelope as part of the
+same projection contract. A complete rail fails if the response still carries a
+`terminal_error_code`, a `typed_failure` terminal/source, a non-`final_answer`
+status, or no visible final answer text. This catches regressions where debug
+mirrors look complete while the user-visible/API terminal answer still says the
+turn failed.
+
 If no suitable keyed server is already running, report live parity as blocked and
 ask the user to start the normal localhost server. Static and unit parity tests
 may still run without a live server when they do not require provider secrets.
@@ -114,6 +161,8 @@ HELIX_ASK_BASE_URL=http://127.0.0.1:5050
 HELIX_ASK_API_PARITY_OUT=artifacts/helix-ask-api-parity
 HELIX_ASK_API_PARITY_SCENARIOS=visual_content_negated_cadence,affirmative_cadence_control
 HELIX_ASK_API_PARITY_INCLUDE_DISABLED=1
+HELIX_ASK_LIVE_SPINE_OUT=artifacts/helix-ask-live-spine-smoke
+HELIX_ASK_LIVE_SPINE_SCENARIOS=calculator_explicit,capability_catalog_runtime
 ```
 
 Each scenario writes:
