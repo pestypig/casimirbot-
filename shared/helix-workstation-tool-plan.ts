@@ -13,6 +13,7 @@ export type HelixWorkstationToolPlanIntent =
   | "live_environment_create"
   | "minecraft_live_continuation"
   | "workstation_goal_context"
+  | "workstation_control"
   | "theory_context_reflection"
   | "physics_calculation_context"
   | "zen_graph_reflection"

@@ -59,6 +59,7 @@ const agentGoalActuators = new Set<AgentGoalActuatorV1>([
   "set_audio_preset",
   "set_visual_preset",
   "bind_narrator",
+  "narrator_bind_stream",
   "narrator_say",
   "update_live_answer",
   "query_trace_memory",
@@ -122,6 +123,7 @@ const defaultAllowedActuators = (): AgentGoalActuatorV1[] => [
   "set_audio_preset",
   "set_visual_preset",
   "bind_narrator",
+  "narrator_bind_stream",
   "narrator_say",
   "update_live_answer",
   "query_trace_memory",
@@ -180,17 +182,64 @@ const sourceKindToProducer = (sourceKind?: string | null): GoalContextProducerKi
   return "microdeck";
 };
 
+const isTranslationPacket = (packet: StagePlayProcessedMailPacketV1): boolean =>
+  packet.microReasonerDeck?.outputPolicy === "earbud_translation" ||
+  packet.microReasonerDeck?.outputPolicy === "inline_document_translation";
+
+const sourceKindToPacketProducer = (
+  sourceKind: string | null | undefined,
+  packet: StagePlayProcessedMailPacketV1,
+): GoalContextProducerKindV1 => {
+  if (isTranslationPacket(packet)) return "translation_loop";
+  if (packet.microReasonerRunRefs.length > 0) return "microdeck";
+  return sourceKindToProducer(sourceKind);
+};
+
+const sourceKindToCaptureProducer = (sourceKind?: string | null): GoalContextProducerKindV1 => {
+  if (sourceKind === "visual_frame" || sourceKind === "screen_summary") return "visual_capture";
+  if (sourceKind === "audio_transcript") return "audio_capture";
+  if (sourceKind === "document_markdown") return "translation_loop";
+  return sourceKindToProducer(sourceKind);
+};
+
 const sourceKindToUpdateKind = (
   sourceKind: string | null | undefined,
   packet: StagePlayProcessedMailPacketV1,
 ): GoalContextUpdateKindV1 => {
   if (packet.resolutionState === "ask_decision_needed" || packet.arbiter?.wakeAsk) return "suggested_action";
   if (packet.uncertainties.length > 0 && packet.observedFacts.length === 0) return "error";
+  if (isTranslationPacket(packet)) return "translated_transcript";
   if (sourceKind === "visual_frame" || sourceKind === "screen_summary") return "visual_observation";
   if (sourceKind === "audio_transcript") return "transcript_window";
   if (sourceKind === "document_markdown") return "translated_transcript";
   return packet.objectTags.length > 0 ? "classification" : "summary";
 };
+
+const sourceKindToCaptureUpdateKind = (sourceKind?: string | null): GoalContextUpdateKindV1 => {
+  if (sourceKind === "visual_frame" || sourceKind === "screen_summary") return "visual_observation";
+  if (sourceKind === "audio_transcript") return "transcript_window";
+  if (sourceKind === "document_markdown") return "translated_transcript";
+  return "summary";
+};
+
+const sourceRefsForMail = (mail: StagePlayLiveSourceMailItemV1): string[] =>
+  uniqueStrings([
+    mail.sourceId,
+    mail.sourceRefs?.sourceId,
+    mail.sourceRefs?.frameRef,
+    mail.sourceRefs?.evidenceRef,
+    mail.sourceRefs?.observationRef,
+    ...mail.evidenceRefs,
+  ]);
+
+const dispatchActionsForMail = (mail: StagePlayLiveSourceMailItemV1): WorkstationDispatchActionV1[] => [
+  { kind: "log_receipt", receiptRef: mail.mailId },
+  {
+    kind: "append_goal_context",
+    goalId: mail.objective?.objectiveId ?? `stage_play_goal:${hashShort([mail.threadId, mail.sourceId, mail.sourceKind], 12)}`,
+  },
+  { kind: "update_panel", panelId: "stage-play-badge-graph" },
+];
 
 const buildDispatchActions = (input: {
   packet: StagePlayProcessedMailPacketV1;
@@ -427,6 +476,7 @@ export function syncStagePlayGoalContextFromMailbox(input: {
   const decisions = input.decisions ?? [];
 
   for (const mail of input.mailItems) {
+    const observedAtMs = readTimeMs(mail.updatedAt || mail.createdAt, nowMs);
     ensureStagePlayAgentGoalSession({
       threadId: input.threadId,
       roomId: input.roomId ?? mail.roomId ?? null,
@@ -434,7 +484,45 @@ export function syncStagePlayGoalContextFromMailbox(input: {
       objectiveText: mail.objective?.text,
       sourceRefs: [mail.sourceId, mail.mailId],
       loopRefs: [`thread:${input.threadId}`, `stage_play_mail_loop:${input.threadId}`, mail.mailId],
-      nowMs: readTimeMs(mail.updatedAt || mail.createdAt, nowMs),
+      nowMs: observedAtMs,
+    });
+    const sourceRefs = sourceRefsForMail(mail);
+    recordStagePlayGoalContextUpdate({
+      schemaVersion: WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
+      updateId: `stage_play_goal_context_update:mail:${hashShort([input.threadId, mail.mailId, mail.updatedAt ?? mail.createdAt], 18)}`,
+      createdAtMs: observedAtMs,
+      sourceRefs,
+      loopRefs: uniqueStrings([
+        `thread:${input.threadId}`,
+        `stage_play_mail_loop:${input.threadId}`,
+        mail.mailId,
+        mail.sourceKind,
+      ]),
+      producerKind: sourceKindToCaptureProducer(mail.sourceKind),
+      updateKind: sourceKindToCaptureUpdateKind(mail.sourceKind),
+      contentRef: mail.mailId,
+      preview: previewText(mail.summary.preview || mail.summary.text || "Live source mail item captured."),
+      evidenceRefs: uniqueStrings([mail.mailId, ...mail.evidenceRefs, ...sourceRefs]).slice(0, 80),
+      receiptRefs: [mail.mailId],
+      freshness: {
+        observedAtMs,
+        staleAfterMs: 30_000,
+        status: mail.hints.sourceFreshness === "stale" ? "stale" : "fresh",
+      },
+      goalRelevance: mail.objective?.objectiveId
+        ? {
+            goalId: mail.objective.objectiveId,
+            relevance: 0.6,
+            reason: mail.objective.text,
+          }
+        : null,
+      suggestedDispatch: dispatchActionsForMail(mail),
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
     });
   }
 
@@ -466,7 +554,7 @@ export function syncStagePlayGoalContextFromMailbox(input: {
       createdAtMs: nowMs,
       sourceRefs,
       loopRefs,
-      producerKind: packet.microReasonerRunRefs.length > 0 ? "microdeck" : sourceKindToProducer(sourceKind),
+      producerKind: sourceKindToPacketProducer(sourceKind, packet),
       updateKind: sourceKindToUpdateKind(sourceKind, packet),
       contentRef: packet.packetId,
       preview: buildPacketPreview(packet, primaryRun, primaryMail),

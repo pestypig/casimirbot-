@@ -65,7 +65,7 @@ describe("workstation goal context contract", () => {
         relevancePolicy: "append matching summaries",
       },
     ],
-    allowedActuators: ["set_visual_preset", "bind_narrator", "narrator_say", "query_trace_memory"],
+    allowedActuators: ["set_visual_preset", "bind_narrator", "narrator_bind_stream", "narrator_say", "query_trace_memory"],
     cadence: { kind: "event_accumulation", minUpdates: 2 },
     stopConditions: ["user stops the goal", "visual source disconnects"],
     checkpoints: [

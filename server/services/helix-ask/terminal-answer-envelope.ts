@@ -393,6 +393,112 @@ export const applyDocConceptExplanationTerminalCandidate = (
   return { applied: false, text: null, artifactId: null };
 };
 
+const isFailureLikeTerminalText = (text: string | null): boolean =>
+  !text ||
+  isHelixGenericTypedFailureText(text) ||
+  /\b(?:I could not|could not complete|could not produce|terminal boundary|typed failure|solver controller blocked)\b/i.test(text);
+
+const readDirectAnswerArtifactText = (payload: Record<string, unknown>): string | null => {
+  const directRecord = readRecord(payload.direct_answer_text);
+  const directRecordText = readString(directRecord?.answer_text) ?? readString(directRecord?.text);
+  if (directRecordText && !isFailureLikeTerminalText(directRecordText)) return directRecordText;
+
+  for (const entry of readArray(payload.current_turn_artifact_ledger)) {
+    const artifact = readRecord(entry);
+    const kind = readString(artifact?.kind);
+    if (kind !== "direct_answer_text" && kind !== "final_answer_draft" && kind !== "model_synthesized_answer") {
+      continue;
+    }
+    const artifactPayload = readRecord(artifact?.payload);
+    const text =
+      readString(artifactPayload?.answer_text) ??
+      readString(artifactPayload?.text) ??
+      readString(artifact?.text);
+    if (text && !isFailureLikeTerminalText(text)) return text;
+  }
+
+  const draftText = readFinalAnswerDraftText(payload);
+  if (draftText && !isFailureLikeTerminalText(draftText)) return draftText;
+
+  const selectedText = readString(payload.selected_final_answer);
+  if (selectedText && !isFailureLikeTerminalText(selectedText)) return selectedText;
+
+  const answerText =
+    readString(payload.assistant_answer) ??
+    readString(payload.answer) ??
+    readString(payload.text) ??
+    readString(payload.finalAnswer);
+  return answerText && !isFailureLikeTerminalText(answerText) ? answerText : null;
+};
+
+const directAnswerContractSatisfied = (payload: Record<string, unknown>): boolean => {
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  const goal = readRecord(payload.goal_satisfaction_evaluation);
+  const goalKind = readString(canonicalGoal?.goal_kind) ?? readString(goal?.canonical_goal_kind);
+  if (goalKind !== "model_only_concept" && goalKind !== "workspace_help" && goalKind !== "conversation") {
+    return false;
+  }
+  if (readString(goal?.satisfaction) !== "satisfied" || readString(goal?.next_decision) !== "allow_terminal") {
+    return false;
+  }
+  const requiredTerminalKinds = [
+    readString(canonicalGoal?.required_terminal_kind),
+    ...readArray(canonicalGoal?.required_terminal_kinds).map(readString),
+  ].filter((entry): entry is string => Boolean(entry));
+  const requiredDirectAnswer =
+    requiredTerminalKinds.length === 0 ||
+    requiredTerminalKinds.every((kind) => kind === "unknown") ||
+    requiredTerminalKinds.includes("direct_answer_text") ||
+    readArray(goal?.required_evidence).some((entry) => {
+      const record = readRecord(entry);
+      return readString(record?.artifact_kind) === "direct_answer_text" || readString(record?.kind) === "direct_answer_text";
+    });
+  return requiredDirectAnswer && Boolean(readDirectAnswerArtifactText(payload));
+};
+
+const applySatisfiedDirectAnswerTerminalCandidate = (
+  payload: Record<string, unknown>,
+): { applied: boolean; text: string | null } => {
+  const terminalArtifactKind = readTerminalArtifactKind(payload);
+  const finalAnswerSource = readFinalAnswerSource(payload);
+  if (
+    terminalArtifactKind !== "typed_failure" &&
+    finalAnswerSource !== "typed_failure" &&
+    !readString(payload.terminal_error_code)
+  ) {
+    return { applied: false, text: null };
+  }
+  if (!directAnswerContractSatisfied(payload)) return { applied: false, text: null };
+  const text = readDirectAnswerArtifactText(payload);
+  if (!text) return { applied: false, text: null };
+  const rejectedFailure = readRecord(payload.typed_failure);
+  if (rejectedFailure || readString(payload.terminal_error_code)) {
+    payload.rejected_typed_failure = {
+      ...(rejectedFailure ?? {}),
+      rejected_reason: "satisfied_direct_answer_contract_superseded_stale_failure",
+      superseded_terminal_error_code: readString(payload.terminal_error_code),
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+  payload.ok = true;
+  payload.response_type = "final_answer";
+  payload.final_status = "final_answer";
+  payload.status = "final_answer";
+  payload.terminal_artifact_kind = "direct_answer_text";
+  payload.final_answer_source = readFinalAnswerDraftText(payload) ? "final_answer_draft" : "model_direct_answer";
+  payload.selected_final_answer = text;
+  payload.answer = text;
+  payload.text = text;
+  payload.finalAnswer = text;
+  payload.content = text;
+  payload.assistant_answer = text;
+  delete payload.terminal_error_code;
+  delete payload.terminal_failure_text;
+  delete payload.typed_failure;
+  return { applied: true, text };
+};
+
 function terminalKindForArtifact(terminalArtifactKind: string): HelixTerminalAuthority["terminal_kind"] {
   if (terminalArtifactKind === "request_user_input") return "request_user_input";
   if (terminalArtifactKind === "typed_failure") return "failure";
@@ -432,11 +538,17 @@ export function resolveTerminalAnswerEnvelope(
   let terminalText: string | null = null;
   let authorityOrigin: HelixTerminalAnswerEnvelope["authority_origin"] = "terminal_presentation";
   const docConceptTerminal = applyDocConceptExplanationTerminalCandidate(payload);
+  const directAnswerTerminal = applySatisfiedDirectAnswerTerminalCandidate(payload);
 
   if (docConceptTerminal.applied && docConceptTerminal.text) {
     terminalArtifactKind = "doc_concept_explanation";
     finalAnswerSource = "artifact_synthesis";
     terminalText = docConceptTerminal.text;
+    authorityOrigin = "selected_final_answer";
+  } else if (directAnswerTerminal.applied && directAnswerTerminal.text) {
+    terminalArtifactKind = "direct_answer_text";
+    finalAnswerSource = readFinalAnswerSource(payload);
+    terminalText = directAnswerTerminal.text;
     authorityOrigin = "selected_final_answer";
   } else if (terminalArtifactKind === "typed_failure" || finalAnswerSource === "typed_failure") {
     terminalArtifactKind = "typed_failure";
@@ -482,7 +594,7 @@ export function resolveTerminalAnswerEnvelope(
     committedRoute: readCommittedAskRoute(payload),
     terminalArtifactKind,
     finalAnswerSource,
-  })) {
+  }) && !directAnswerContractSatisfied(payload)) {
     payload.committed_route_terminal_rejection = {
       schema: "helix.committed_route_terminal_rejection.v1",
       turn_id: turnId,
@@ -793,6 +905,36 @@ export function applyTerminalAnswerEnvelope(
   payload: Record<string, unknown>,
   envelope: HelixTerminalAnswerEnvelope,
 ): HelixTerminalAnswerEnvelope {
+  if (
+    (envelope.terminal_kind === "failure" || envelope.final_answer_source === "typed_failure") &&
+    directAnswerContractSatisfied(payload)
+  ) {
+    const directText = readDirectAnswerArtifactText(payload);
+    if (directText) {
+      const rejectedFailure = readRecord(payload.typed_failure);
+      if (rejectedFailure || readString(payload.terminal_error_code)) {
+        payload.rejected_typed_failure = {
+          ...(rejectedFailure ?? {}),
+          rejected_reason: "terminal_envelope_apply_superseded_stale_failure_with_satisfied_direct_answer",
+          superseded_terminal_error_code: readString(payload.terminal_error_code),
+          assistant_answer: false,
+          raw_content_included: false,
+        };
+      }
+      delete payload.terminal_error_code;
+      delete payload.terminal_failure_text;
+      delete payload.typed_failure;
+      envelope = {
+        ...envelope,
+        terminal_artifact_kind: "direct_answer_text",
+        final_answer_source: readFinalAnswerDraftText(payload) ? "final_answer_draft" : "model_direct_answer",
+        terminal_text: directText,
+        terminal_text_hash: hashHelixTerminalText(directText),
+        terminal_kind: "answer",
+        authority_origin: "selected_final_answer",
+      };
+    }
+  }
   if (envelope.terminal_artifact_kind === "repo_code_evidence_answer") {
     envelope = buildRepoAnswerQualityFailureEnvelope(payload, envelope);
   }

@@ -49,6 +49,8 @@ import type {
 } from "@shared/helix-live-environment-commentary";
 import {
   WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
+  WORKSTATION_NARRATOR_BIND_STREAM_REQUEST_SCHEMA,
+  WORKSTATION_NARRATOR_SAY_REQUEST_SCHEMA,
   type AgentGoalActuatorV1,
   type AgentGoalContextFeedKindV1,
   type AgentGoalSessionV1,
@@ -935,6 +937,7 @@ const AGENT_GOAL_ACTUATORS = new Set<AgentGoalActuatorV1>([
   "set_audio_preset",
   "set_visual_preset",
   "bind_narrator",
+  "narrator_bind_stream",
   "narrator_say",
   "update_live_answer",
   "query_trace_memory",
@@ -2110,6 +2113,307 @@ const recordLiveEnvironmentGoalContextUpdate = (input: {
   return update.updateId;
 };
 
+type WorkstationContextFeedQuerySpec = {
+  feedKind: "visual_summaries" | "audio_transcripts" | "translated_transcripts" | "microdeck_outputs" | "live_answer_lines";
+  label: string;
+  producerKinds: GoalContextProducerKindV1[];
+  updateKinds: GoalContextUpdateKindV1[];
+};
+
+const WORKSTATION_CONTEXT_FEED_QUERY_SPECS: Partial<Record<HelixLiveEnvironmentToolName, WorkstationContextFeedQuerySpec>> = {
+  "live_env.query_visual_summaries": {
+    feedKind: "visual_summaries",
+    label: "visual summaries",
+    producerKinds: ["visual_capture"],
+    updateKinds: ["visual_observation", "classification", "summary"],
+  },
+  "live_env.query_audio_transcripts": {
+    feedKind: "audio_transcripts",
+    label: "audio transcripts",
+    producerKinds: ["audio_capture", "transcription_loop"],
+    updateKinds: ["transcript_window"],
+  },
+  "live_env.query_translation_segments": {
+    feedKind: "translated_transcripts",
+    label: "translation segments",
+    producerKinds: ["translation_loop"],
+    updateKinds: ["translated_transcript"],
+  },
+  "live_env.query_microdeck_outputs": {
+    feedKind: "microdeck_outputs",
+    label: "MicroDeck outputs",
+    producerKinds: ["microdeck"],
+    updateKinds: ["summary", "visual_observation", "classification", "translated_transcript", "route_evidence", "reflection"],
+  },
+  "live_env.query_live_answer_state": {
+    feedKind: "live_answer_lines",
+    label: "Live Answer state",
+    producerKinds: ["live_answer"],
+    updateKinds: ["summary", "preset_state", "source_status", "route_evidence"],
+  },
+};
+
+const readWorkstationContextFeedQuerySpec = (
+  toolName: HelixLiveEnvironmentToolName,
+): WorkstationContextFeedQuerySpec | null => WORKSTATION_CONTEXT_FEED_QUERY_SPECS[toolName] ?? null;
+
+type WorkstationControlSpec = {
+  controlKind:
+    | "change_preset"
+    | "bind_source"
+    | "unbind_source"
+    | "set_loop_state"
+    | "update_live_answer"
+    | "focus_process_graph";
+  label: string;
+  defaultPanelId: string;
+};
+
+const WORKSTATION_CONTROL_SPECS: Partial<Record<HelixLiveEnvironmentToolName, WorkstationControlSpec>> = {
+  "live_env.change_workstation_preset": {
+    controlKind: "change_preset",
+    label: "change workstation preset",
+    defaultPanelId: "stage-play-badge-graph",
+  },
+  "live_env.bind_workstation_source": {
+    controlKind: "bind_source",
+    label: "bind workstation source",
+    defaultPanelId: "live-answer-environment",
+  },
+  "live_env.unbind_workstation_source": {
+    controlKind: "unbind_source",
+    label: "unbind workstation source",
+    defaultPanelId: "live-answer-environment",
+  },
+  "live_env.set_workstation_loop_state": {
+    controlKind: "set_loop_state",
+    label: "set workstation loop state",
+    defaultPanelId: "stage-play-badge-graph",
+  },
+  "live_env.update_live_answer_projection": {
+    controlKind: "update_live_answer",
+    label: "update Live Answer projection",
+    defaultPanelId: "live-answer-environment",
+  },
+  "live_env.focus_process_graph": {
+    controlKind: "focus_process_graph",
+    label: "focus process graph",
+    defaultPanelId: "stage-play-badge-graph",
+  },
+};
+
+const readWorkstationControlSpec = (
+  toolName: HelixLiveEnvironmentToolName,
+): WorkstationControlSpec | null => WORKSTATION_CONTROL_SPECS[toolName] ?? null;
+
+const normalizeLoopState = (value: unknown): "paused" | "running" | "repaired" => {
+  const normalized = readString(value)?.toLowerCase();
+  if (normalized === "pause" || normalized === "paused") return "paused";
+  if (normalized === "resume" || normalized === "run" || normalized === "running") return "running";
+  if (normalized === "repair" || normalized === "repaired") return "repaired";
+  return "running";
+};
+
+const buildWorkstationControlDispatch = (input: {
+  spec: WorkstationControlSpec;
+  args: Record<string, unknown>;
+}): {
+  dispatch: WorkstationDispatchActionV1[];
+  targetRef: string | null;
+  sourceRef: string | null;
+  presetId: string | null;
+  loopRef: string | null;
+  lineKey: string | null;
+  panelId: string;
+  nodeRef: string | null;
+  loopState: "paused" | "running" | "repaired" | null;
+} => {
+  const targetRef =
+    readString(input.args.target_ref) ??
+    readString(input.args.targetRef) ??
+    readString(input.args.target_id) ??
+    readString(input.args.targetId) ??
+    readString(input.args.panel_id) ??
+    readString(input.args.panelId);
+  const sourceRef =
+    readString(input.args.source_ref) ??
+    readString(input.args.sourceRef) ??
+    readString(input.args.source_id) ??
+    readString(input.args.sourceId);
+  const presetId =
+    readString(input.args.preset_id) ??
+    readString(input.args.presetId) ??
+    readString(input.args.preset);
+  const loopRef =
+    readString(input.args.loop_ref) ??
+    readString(input.args.loopRef) ??
+    readString(input.args.loop_id) ??
+    readString(input.args.loopId);
+  const lineKey =
+    readString(input.args.line_key) ??
+    readString(input.args.lineKey) ??
+    readString(input.args.live_answer_line_key) ??
+    readString(input.args.liveAnswerLineKey);
+  const panelId =
+    readString(input.args.panel_id) ??
+    readString(input.args.panelId) ??
+    input.spec.defaultPanelId;
+  const nodeRef =
+    readString(input.args.node_ref) ??
+    readString(input.args.nodeRef) ??
+    readString(input.args.node_id) ??
+    readString(input.args.nodeId);
+  const loopState = input.spec.controlKind === "set_loop_state" ? normalizeLoopState(input.args.state ?? input.args.loop_state ?? input.args.loopState) : null;
+  const dispatch: WorkstationDispatchActionV1[] = [{ kind: "log_receipt" }, { kind: "update_panel", panelId }];
+  if (input.spec.controlKind === "change_preset" && targetRef && presetId) {
+    dispatch.push({ kind: "change_preset", targetRef, presetId });
+  }
+  if (input.spec.controlKind === "bind_source" && sourceRef && targetRef) {
+    dispatch.push({ kind: "bind_source", sourceRef, targetRef });
+  }
+  if (input.spec.controlKind === "unbind_source" && sourceRef) {
+    dispatch.push({ kind: "unbind_source", sourceRef, targetRef });
+  }
+  if (input.spec.controlKind === "set_loop_state" && loopRef && loopState) {
+    dispatch.push({ kind: "set_loop_state", loopRef, state: loopState });
+    if (loopState === "repaired") dispatch.push({ kind: "repair_loop", loopRef });
+  }
+  if (input.spec.controlKind === "update_live_answer" && lineKey) {
+    dispatch.push({ kind: "update_live_answer", lineKey });
+  }
+  if (input.spec.controlKind === "focus_process_graph") {
+    dispatch.push({ kind: "focus_process_graph", nodeRef });
+  }
+  return {
+    dispatch,
+    targetRef,
+    sourceRef,
+    presetId,
+    loopRef,
+    lineKey,
+    panelId,
+    nodeRef,
+    loopState,
+  };
+};
+
+const missingWorkstationControlRequirements = (input: {
+  spec: WorkstationControlSpec;
+  targetRef: string | null;
+  sourceRef: string | null;
+  presetId: string | null;
+  loopRef: string | null;
+  lineKey: string | null;
+}): string[] => {
+  switch (input.spec.controlKind) {
+    case "change_preset":
+      return [
+        ...(input.targetRef ? [] : ["target_ref"]),
+        ...(input.presetId ? [] : ["preset_id"]),
+      ];
+    case "bind_source":
+      return [
+        ...(input.sourceRef ? [] : ["source_ref"]),
+        ...(input.targetRef ? [] : ["target_ref"]),
+      ];
+    case "unbind_source":
+      return input.sourceRef ? [] : ["source_ref"];
+    case "set_loop_state":
+      return input.loopRef ? [] : ["loop_ref"];
+    case "update_live_answer":
+      return input.lineKey ? [] : ["line_key"];
+    case "focus_process_graph":
+      return [];
+    default:
+      return [];
+  }
+};
+
+type NarratorControlKind = "say" | "bind_stream";
+
+const NARRATOR_SOURCE_KINDS = new Set([
+  "helix_console",
+  "live_answer",
+  "situation_room",
+  "docs_viewer",
+  "image_lens",
+  "workstation_panel",
+]);
+
+const NARRATOR_DELIVERY_MODES = new Set([
+  "visible_only",
+  "confirm_to_speak",
+  "auto_speak",
+]);
+
+const NARRATOR_STREAM_KINDS = new Set([
+  "transcript_stream",
+  "translated_transcript",
+  "translated_speech",
+  "typed_commentary",
+  "route_evidence",
+  "source_health_status",
+]);
+
+const normalizeNarratorSourceKind = (value: unknown): string => {
+  const raw = readString(value);
+  return raw && NARRATOR_SOURCE_KINDS.has(raw) ? raw : "helix_console";
+};
+
+const normalizeNarratorDeliveryMode = (value: unknown, fallback: "visible_only" | "confirm_to_speak" | "auto_speak"): "visible_only" | "confirm_to_speak" | "auto_speak" => {
+  const raw = readString(value);
+  if (raw === "hidden") return "visible_only";
+  return raw && NARRATOR_DELIVERY_MODES.has(raw) ? raw as "visible_only" | "confirm_to_speak" | "auto_speak" : fallback;
+};
+
+const normalizeNarratorStreamKind = (value: unknown): string | null => {
+  const raw = readString(value);
+  return raw && NARRATOR_STREAM_KINDS.has(raw) ? raw : null;
+};
+
+const narratorRequestPriority = (value: unknown): "low" | "normal" | "high" => {
+  const raw = readString(value);
+  return raw === "low" || raw === "normal" || raw === "high" ? raw : "normal";
+};
+
+const narratorVoicePolicy = (value: unknown): "muted" | "propose_only" | "confirm_speak_required" | "automatic_when_policy_allows" => {
+  const raw = readString(value);
+  if (
+    raw === "muted" ||
+    raw === "propose_only" ||
+    raw === "confirm_speak_required" ||
+    raw === "automatic_when_policy_allows"
+  ) return raw;
+  return "confirm_speak_required";
+};
+
+const buildNarratorDispatch = (input: {
+  kind: NarratorControlKind;
+  receiptRef: string;
+  sourceRef: string;
+  streamKind?: string | null;
+  deliveryMode: "visible_only" | "confirm_to_speak" | "auto_speak";
+}): WorkstationDispatchActionV1[] => [
+  { kind: "log_receipt", receiptRef: input.receiptRef },
+  { kind: "update_panel", panelId: "narrator" },
+  ...(input.kind === "bind_stream" && input.streamKind
+    ? [{
+        kind: "bind_narrator_stream" as const,
+        sourceRef: input.sourceRef,
+        streamKind: input.streamKind as "transcript_stream" | "translated_transcript" | "translated_speech" | "typed_commentary" | "route_evidence" | "source_health_status",
+        deliveryMode: input.deliveryMode,
+      }]
+    : []),
+  {
+    kind: "speak_narrator",
+    mode: input.deliveryMode === "auto_speak"
+      ? "auto"
+      : input.deliveryMode === "confirm_to_speak"
+        ? "confirm"
+        : "visible_only",
+  },
+];
+
 const processLiveSourceMailItemsForTool = (input: {
   args: Record<string, unknown>;
   threadId: string;
@@ -2523,6 +2827,273 @@ export function executeLiveEnvironmentTool(
     getActiveLiveAnswerEnvironmentForThread("helix-ask:desktop");
   const effectiveThreadId = environment?.thread_id ?? input.thread_id;
   const roomId = readString(args.room_id) ?? environment?.room_id ?? null;
+
+  if (input.tool_name === "live_env.narrator_say" || input.tool_name === "live_env.narrator_bind_stream") {
+    const environmentId = environment?.environment_id ?? input.environment_id ?? null;
+    const narratorKind: NarratorControlKind = input.tool_name === "live_env.narrator_bind_stream" ? "bind_stream" : "say";
+    const text = readString(args.text) ?? readString(args.message) ?? readString(args.utterance);
+    const sourceRef =
+      readString(args.source_ref) ??
+      readString(args.sourceRef) ??
+      readString(args.source_id) ??
+      readString(args.sourceId) ??
+      (narratorKind === "say" ? "helix_ask:narrator.say" : null);
+    const sourceKind = normalizeNarratorSourceKind(args.source_kind ?? args.sourceKind);
+    const streamKind = normalizeNarratorStreamKind(args.stream_kind ?? args.streamKind);
+    const deliveryMode = normalizeNarratorDeliveryMode(
+      args.delivery_mode ?? args.deliveryMode,
+      narratorKind === "say" ? "confirm_to_speak" : "visible_only",
+    );
+    const evidenceRefs = uniqueStrings([
+      ...readStringArray(args.evidence_refs),
+      ...readStringArray(args.evidenceRefs),
+      sourceRef,
+    ]);
+    const missingRequirements = narratorKind === "say"
+      ? (text ? [] : ["text"])
+      : [
+          ...(sourceRef ? [] : ["source_ref"]),
+          ...(streamKind ? [] : ["stream_kind"]),
+        ];
+    const ok = missingRequirements.length === 0;
+    const requestId = `helix_narrator_${narratorKind}_request:${hashShort([
+      input.thread_id,
+      input.tool_name,
+      text,
+      sourceRef,
+      sourceKind,
+      streamKind,
+      deliveryMode,
+      evidenceRefs,
+    ])}`;
+    const dispatch = buildNarratorDispatch({
+      kind: narratorKind,
+      receiptRef: requestId,
+      sourceRef: sourceRef ?? "narrator:source_missing",
+      streamKind,
+      deliveryMode,
+    });
+    const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+      threadId: input.thread_id,
+      mailboxThreadId: input.thread_id,
+      roomId,
+      producerKind: "narrator",
+      updateKind: "suggested_action",
+      contentRef: requestId,
+      preview: ok
+        ? narratorKind === "say"
+          ? "Prepared narrator say request as governed non-terminal speech evidence."
+          : `Prepared narrator stream binding for ${streamKind}.`
+        : `Blocked narrator ${narratorKind} request; missing ${missingRequirements.join(", ")}.`,
+      sourceRefs: uniqueStrings([sourceRef, sourceKind, streamKind]),
+      loopRefs: uniqueStrings([`narrator:${narratorKind}`, `thread:${input.thread_id}`]),
+      evidenceRefs: uniqueStrings([requestId, ...evidenceRefs]),
+      receiptRefs: [requestId],
+      freshnessStatus: ok ? "fresh" : "blocked",
+      suggestedDispatch: dispatch,
+    });
+    const common = {
+      requestId,
+      request_id: requestId,
+      status: ok ? "prepared" : "blocked",
+      missingRequirements,
+      missing_requirements: missingRequirements,
+      sourceRef,
+      source_ref: sourceRef,
+      deliveryMode,
+      delivery_mode: deliveryMode,
+      evidenceRefs,
+      evidence_refs: evidenceRefs,
+      dispatch,
+      suggestedDispatch: dispatch,
+      suggested_dispatch: dispatch,
+      goalContextUpdateId,
+      goal_context_update_id: goalContextUpdateId,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    };
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId,
+      toolName: input.tool_name,
+      ok,
+      summary: ok
+        ? narratorKind === "say"
+          ? "Prepared narrator say request as non-terminal tool evidence."
+          : "Prepared narrator stream binding request as non-terminal tool evidence."
+        : `Cannot prepare narrator ${narratorKind} request; missing ${missingRequirements.join(", ")}.`,
+      observation: narratorKind === "say"
+        ? {
+            schema: WORKSTATION_NARRATOR_SAY_REQUEST_SCHEMA,
+            schemaVersion: WORKSTATION_NARRATOR_SAY_REQUEST_SCHEMA,
+            ...common,
+            text: text ?? "",
+            sourceKind,
+            source_kind: sourceKind,
+            sourceId: sourceRef ?? "helix_ask:narrator.say",
+            source_id: sourceRef ?? "helix_ask:narrator.say",
+            priority: narratorRequestPriority(args.priority),
+            language: readString(args.language) ?? undefined,
+            dedupeKey: readString(args.dedupe_key ?? args.dedupeKey) ?? undefined,
+          }
+        : {
+            schema: WORKSTATION_NARRATOR_BIND_STREAM_REQUEST_SCHEMA,
+            schemaVersion: WORKSTATION_NARRATOR_BIND_STREAM_REQUEST_SCHEMA,
+            ...common,
+            streamKind,
+            stream_kind: streamKind,
+            presetId: readString(args.preset_id ?? args.presetId) ?? null,
+            preset_id: readString(args.preset_id ?? args.presetId) ?? null,
+            voicePolicy: narratorVoicePolicy(args.voice_policy ?? args.voicePolicy),
+            voice_policy: narratorVoicePolicy(args.voice_policy ?? args.voicePolicy),
+            evidenceThreshold: readString(args.evidence_threshold ?? args.evidenceThreshold) ?? undefined,
+            evidence_threshold: readString(args.evidence_threshold ?? args.evidenceThreshold) ?? undefined,
+          },
+      evidenceRefs: uniqueStrings([goalContextUpdateId, requestId, ...evidenceRefs]),
+      producedRefs: [requestId, goalContextUpdateId],
+      forceNormalizedRefs: true,
+    });
+  }
+
+  const workstationControlSpec = readWorkstationControlSpec(input.tool_name);
+  if (workstationControlSpec) {
+    const scope = resolveLiveSourceToolScope({
+      args,
+      threadId: input.thread_id,
+      effectiveThreadId,
+      roomId,
+      environmentThreadId: environment?.thread_id ?? null,
+      environmentId: environment?.environment_id ?? input.environment_id ?? null,
+      explicitSourceId,
+    });
+    const environmentId = environment?.environment_id ?? input.environment_id ?? null;
+    const controlDispatch = buildWorkstationControlDispatch({
+      spec: workstationControlSpec,
+      args,
+    });
+    const missingRequirements = missingWorkstationControlRequirements({
+      spec: workstationControlSpec,
+      targetRef: controlDispatch.targetRef,
+      sourceRef: controlDispatch.sourceRef,
+      presetId: controlDispatch.presetId,
+      loopRef: controlDispatch.loopRef,
+      lineKey: controlDispatch.lineKey,
+    });
+    const ok = missingRequirements.length === 0;
+    const reason = readString(args.reason) ?? readString(args.summary) ?? null;
+    const receiptId = `stage_play_workstation_control_receipt:${workstationControlSpec.controlKind}:${hashShort([
+      input.thread_id,
+      input.tool_name,
+      controlDispatch.targetRef,
+      controlDispatch.sourceRef,
+      controlDispatch.presetId,
+      controlDispatch.loopRef,
+      controlDispatch.loopState,
+      controlDispatch.lineKey,
+      controlDispatch.nodeRef,
+      reason,
+    ])}`;
+    const dispatch = controlDispatch.dispatch.map((action) =>
+      action.kind === "log_receipt" && !action.receiptRef
+        ? { ...action, receiptRef: receiptId }
+        : action
+    );
+    const sourceRefs = uniqueStrings([
+      scope.sourceId,
+      controlDispatch.sourceRef,
+      controlDispatch.targetRef,
+      controlDispatch.nodeRef,
+    ]);
+    const loopRefs = uniqueStrings([
+      scope.mailboxThreadResolution.mailboxThreadId,
+      controlDispatch.loopRef,
+      `workstation_control:${workstationControlSpec.controlKind}`,
+    ]);
+    const evidenceRefs = uniqueStrings([
+      receiptId,
+      ...sourceRefs,
+      ...loopRefs,
+      ...readStringArray(args.evidence_refs),
+      ...readStringArray(args.evidenceRefs),
+    ]);
+    const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+      threadId: input.thread_id,
+      mailboxThreadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      producerKind: "route_watch",
+      updateKind: "suggested_action",
+      contentRef: receiptId,
+      preview: ok
+        ? `Prepared workstation control dispatch: ${workstationControlSpec.label}.`
+        : `Blocked workstation control dispatch: ${workstationControlSpec.label} is missing ${missingRequirements.join(", ")}.`,
+      sourceRefs,
+      loopRefs,
+      evidenceRefs,
+      receiptRefs: [receiptId],
+      freshnessStatus: ok ? "fresh" : "blocked",
+      suggestedDispatch: dispatch,
+    });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId,
+      toolName: input.tool_name,
+      ok,
+      summary: ok
+        ? `Prepared ${workstationControlSpec.label} dispatch as non-terminal workstation control evidence.`
+        : `Cannot prepare ${workstationControlSpec.label}; missing ${missingRequirements.join(", ")}.`,
+      observation: {
+        schema: "stage_play_workstation_control_receipt/v1",
+        receiptId,
+        receipt_id: receiptId,
+        controlKind: workstationControlSpec.controlKind,
+        control_kind: workstationControlSpec.controlKind,
+        label: workstationControlSpec.label,
+        ok,
+        status: ok ? "prepared" : "blocked",
+        missingRequirements,
+        missing_requirements: missingRequirements,
+        targetRef: controlDispatch.targetRef,
+        target_ref: controlDispatch.targetRef,
+        sourceRef: controlDispatch.sourceRef,
+        source_ref: controlDispatch.sourceRef,
+        presetId: controlDispatch.presetId,
+        preset_id: controlDispatch.presetId,
+        loopRef: controlDispatch.loopRef,
+        loop_ref: controlDispatch.loopRef,
+        lineKey: controlDispatch.lineKey,
+        line_key: controlDispatch.lineKey,
+        panelId: controlDispatch.panelId,
+        panel_id: controlDispatch.panelId,
+        nodeRef: controlDispatch.nodeRef,
+        node_ref: controlDispatch.nodeRef,
+        loopState: controlDispatch.loopState,
+        loop_state: controlDispatch.loopState,
+        reason,
+        mailboxThreadId: scope.mailboxThreadResolution.mailboxThreadId,
+        mailbox_thread_id: scope.mailboxThreadResolution.mailboxThreadId,
+        mailboxThreadResolution: scope.mailboxThreadResolution,
+        mailbox_thread_resolution: scope.mailboxThreadResolution,
+        dispatch,
+        suggestedDispatch: dispatch,
+        suggested_dispatch: dispatch,
+        goalContextUpdateId,
+        goal_context_update_id: goalContextUpdateId,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      },
+      evidenceRefs: uniqueStrings([goalContextUpdateId, ...evidenceRefs]),
+      producedRefs: [receiptId, goalContextUpdateId],
+      forceNormalizedRefs: true,
+    });
+  }
 
   if (input.tool_name === "live_env.read_card") {
     const lineKeys = readStringArray(args.line_keys);
@@ -4418,6 +4989,185 @@ export function executeLiveEnvironmentTool(
       },
       evidenceRefs,
       producedRefs: goalContextUpdates.map((update) => update.updateId),
+      forceNormalizedRefs: true,
+    });
+  }
+
+  const feedQuerySpec = readWorkstationContextFeedQuerySpec(input.tool_name);
+  if (feedQuerySpec) {
+    const scope = resolveLiveSourceToolScope({
+      args,
+      threadId: input.thread_id,
+      effectiveThreadId,
+      roomId,
+      environmentThreadId: environment?.thread_id ?? null,
+      environmentId: environment?.environment_id ?? input.environment_id ?? null,
+      explicitSourceId,
+    });
+    const environmentId = environment?.environment_id ?? input.environment_id ?? null;
+    const sourceRef =
+      readString(args.source_ref) ??
+      readString(args.sourceRef) ??
+      readString(args.source_id) ??
+      readString(args.sourceId) ??
+      scope.sourceId ??
+      null;
+    const goalId = readString(args.goal_id) ?? readString(args.goalId);
+    const limit = Math.max(1, Math.min(readNumber(args.limit, 24), 80));
+    const mailLimit = Math.max(1, Math.min(readNumber(args.mail_limit ?? args.mailLimit, 32), 100));
+    const mailItems = listStagePlayLiveSourceMailItems({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      sourceId: scope.sourceId,
+      sourceKind: scope.sourceKind,
+      limit: mailLimit,
+    });
+    const mailIds = new Set(mailItems.map((item) => item.mailId));
+    const processedMailPackets = listStagePlayProcessedMailPackets({
+      sourceId: scope.sourceId,
+      limit: 120,
+    }).filter((packet) =>
+      mailIds.size === 0 ||
+      packet.mailIds.some((mailId) => mailIds.has(mailId))
+    );
+    const microReasonerRuns = listStagePlayMicroReasonerRuns({
+      sourceId: scope.sourceId,
+      limit: 160,
+    }).filter((run) =>
+      run.mailIds.some((mailId) => mailIds.has(mailId)) ||
+      processedMailPackets.some((packet) => packet.microReasonerRunRefs.includes(run.runId))
+    );
+    const decisions = listStagePlayMailDecisions({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      limit: 60,
+    });
+    const wakeRequests = listStagePlayLiveSourceMailWakeRequests({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      environmentId,
+      limit: 60,
+    });
+    const wakeResults = listStagePlayLiveSourceMailWakeResults({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      limit: 60,
+    });
+    syncStagePlayGoalContextFromMailbox({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      mailItems,
+      processedMailPackets,
+      microReasonerRuns,
+      decisions,
+      wakeRequests,
+      wakeResults,
+    });
+    const goalContextUpdates = listStagePlayGoalContextUpdates({
+      threadId: scope.mailboxThreadResolution.mailboxThreadId,
+      sourceRef,
+      goalId,
+      limit: 200,
+    })
+      .filter((update) =>
+        feedQuerySpec.producerKinds.includes(update.producerKind) ||
+        feedQuerySpec.updateKinds.includes(update.updateKind)
+      )
+      .slice(0, limit);
+    const resultId = `stage_play_context_feed_query:${feedQuerySpec.feedKind}:${hashShort([
+      input.thread_id,
+      sourceRef,
+      goalId,
+      goalContextUpdates.map((update) => update.updateId),
+    ])}`;
+    const evidenceRefs = uniqueStrings([
+      resultId,
+      ...goalContextUpdates.flatMap((update) => [
+        update.updateId,
+        update.contentRef,
+        ...update.evidenceRefs,
+        ...update.receiptRefs,
+      ]),
+    ]);
+    const dispatch: WorkstationDispatchActionV1[] = [
+      { kind: "log_receipt", receiptRef: resultId },
+      ...(goalId ? [{ kind: "append_goal_context" as const, goalId }] : []),
+      { kind: "update_panel", panelId: "stage-play-badge-graph" },
+      { kind: "update_panel", panelId: "live-answer-environment" },
+    ];
+    const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+      threadId: input.thread_id,
+      mailboxThreadId: scope.mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      producerKind: "route_watch",
+      updateKind: "route_evidence",
+      contentRef: resultId,
+      preview: goalContextUpdates.length > 0
+        ? `Queried ${goalContextUpdates.length} ${feedQuerySpec.label} update(s) from workstation goal context.`
+        : `No ${feedQuerySpec.label} updates are currently available for this workstation scope.`,
+      sourceRefs: uniqueStrings([
+        sourceRef,
+        scope.sourceId,
+        ...goalContextUpdates.flatMap((update) => update.sourceRefs),
+      ]),
+      loopRefs: uniqueStrings([
+        ...goalContextUpdates.flatMap((update) => update.loopRefs),
+        `workstation_context_feed:${feedQuerySpec.feedKind}`,
+      ]),
+      evidenceRefs,
+      receiptRefs: [resultId],
+      freshnessStatus: goalContextUpdates.length > 0 ? "fresh" : "unknown",
+      goalId,
+      goalRelevanceReason: `The agent queried ${feedQuerySpec.label} as a feed-specific goal-context input.`,
+      suggestedDispatch: dispatch,
+    });
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId,
+      toolName: input.tool_name,
+      ok: true,
+      summary: `Read ${goalContextUpdates.length} ${feedQuerySpec.label} goal-context update(s).`,
+      observation: {
+        schema: "stage_play_workstation_context_feed_query_result/v1",
+        resultId,
+        result_id: resultId,
+        feedKind: feedQuerySpec.feedKind,
+        feed_kind: feedQuerySpec.feedKind,
+        label: feedQuerySpec.label,
+        mailboxThreadId: scope.mailboxThreadResolution.mailboxThreadId,
+        mailbox_thread_id: scope.mailboxThreadResolution.mailboxThreadId,
+        mailboxThreadResolution: scope.mailboxThreadResolution,
+        mailbox_thread_resolution: scope.mailboxThreadResolution,
+        sourceRef,
+        source_ref: sourceRef,
+        goalId,
+        goal_id: goalId,
+        goalContextUpdates,
+        goal_context_updates: goalContextUpdates,
+        updateCount: goalContextUpdates.length,
+        update_count: goalContextUpdates.length,
+        syncedWindow: {
+          mailItemCount: mailItems.length,
+          processedPacketCount: processedMailPackets.length,
+          microReasonerRunCount: microReasonerRuns.length,
+        },
+        synced_window: {
+          mail_item_count: mailItems.length,
+          processed_packet_count: processedMailPackets.length,
+          micro_reasoner_run_count: microReasonerRuns.length,
+        },
+        goalContextUpdateId,
+        goal_context_update_id: goalContextUpdateId,
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      },
+      evidenceRefs: uniqueStrings([goalContextUpdateId, ...evidenceRefs]),
+      producedRefs: [goalContextUpdateId, resultId, ...goalContextUpdates.map((update) => update.updateId)],
       forceNormalizedRefs: true,
     });
   }

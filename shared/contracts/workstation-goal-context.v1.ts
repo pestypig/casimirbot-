@@ -11,8 +11,13 @@ export type WorkstationDispatchActionV1 =
   | { kind: "update_live_answer"; lineKey: string }
   | { kind: "append_goal_context"; goalId: string }
   | { kind: "speak_narrator"; mode: "confirm" | "auto" | "visible_only" }
+  | { kind: "bind_narrator_stream"; sourceRef: string; streamKind: NarratorBindStreamRequestV1["streamKind"]; deliveryMode?: Exclude<NarratorDeliveryMode, "hidden"> | null }
   | { kind: "change_preset"; targetRef: string; presetId: string }
+  | { kind: "bind_source"; sourceRef: string; targetRef: string }
+  | { kind: "unbind_source"; sourceRef: string; targetRef?: string | null }
+  | { kind: "set_loop_state"; loopRef: string; state: "paused" | "running" | "repaired" }
   | { kind: "update_panel"; panelId: string }
+  | { kind: "focus_process_graph"; nodeRef?: string | null }
   | { kind: "repair_loop"; loopRef: string }
   | { kind: "ask_user" }
   | { kind: "wake_agent"; reason?: string | null };
@@ -87,6 +92,7 @@ export type AgentGoalActuatorV1 =
   | "set_audio_preset"
   | "set_visual_preset"
   | "bind_narrator"
+  | "narrator_bind_stream"
   | "narrator_say"
   | "update_live_answer"
   | "query_trace_memory"

@@ -740,6 +740,25 @@ describe("Helix Ask tool lifecycle trace", () => {
       rail_failure_code: null,
       repair_target: null,
     });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      requested_capability: null,
+      selected_capability: "suppressed_contextual_tool_reference",
+      admitted_capability: null,
+      executed_capability: null,
+      observation_kind: "reasoning_context",
+      reentry_status: "reentered",
+      required_terminal_kind: "direct_answer_text",
+      selected_terminal_kind: "direct_answer_text",
+      visible_terminal_kind: "direct_answer_text",
+      first_broken_rail: null,
+      repair_target: null,
+      codex_parity_class: "complete",
+      rail_status: "complete",
+      rail_failure_code: null,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
   });
 
   it("preserves executed docs tool capability when a later model answer performs synthesis", () => {
@@ -2190,6 +2209,181 @@ describe("Helix Ask tool lifecycle trace", () => {
     });
   });
 
+  it("maps feed-specific goal-context artifacts to the selected workstation feed query tool", () => {
+    const payload: Record<string, unknown> = {
+      active_prompt: "Query translation segments for the active audio live source.",
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        requested_capability: "live_env.query_translation_segments",
+        requested_capability_family: "live_source_mail",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "stage_play_workstation_context_feed_query_result:translation",
+          kind: "stage_play_workstation_context_feed_query_result",
+          producer_item_id: "live_env.query_translation_segments",
+          payload: {
+            schema: "stage_play_workstation_context_feed_query_result/v1",
+            tool_name: "live_env.query_translation_segments",
+            feed_kind: "translated_transcripts",
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+          },
+        },
+        {
+          artifact_id: "stage_play_goal_context_update:translation-feed",
+          kind: "helix.workstation_goal_context_update.v1",
+          producer_item_id: "live_env.query_translation_segments",
+          payload: {
+            schema: "helix.workstation_goal_context_update.v1",
+            tool_name: "live_env.query_translation_segments",
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+          },
+        },
+      ],
+    };
+
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:translation-feed", payload });
+
+    expect(index).toMatchObject({
+      capability: "live_env.query_translation_segments",
+      tool_family: "live_source_mail",
+      tool_family_contract: {
+        tool_name: "live_env.query_translation_segments",
+        authority: "evidence_only",
+        required_observation_kinds: [
+          "stage_play_workstation_context_feed_query_result",
+          "helix.workstation_goal_context_update.v1",
+        ],
+      },
+      missing_required_observation_kinds: [],
+    });
+  });
+
+  it("maps workstation control receipt artifacts to the governed control tool", () => {
+    const payload: Record<string, unknown> = {
+      active_prompt: "Apply the frog classifier preset to the active visual source.",
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        requested_capability: "live_env.change_workstation_preset",
+        requested_capability_family: "live_source_mail",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "stage_play_workstation_control_receipt:change_preset:1",
+          kind: "stage_play_workstation_control_receipt",
+          producer_item_id: "live_env.change_workstation_preset",
+          payload: {
+            schema: "stage_play_workstation_control_receipt/v1",
+            tool_name: "live_env.change_workstation_preset",
+            control_kind: "change_preset",
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+          },
+        },
+        {
+          artifact_id: "stage_play_goal_context_update:workstation-control",
+          kind: "helix.workstation_goal_context_update.v1",
+          producer_item_id: "live_env.change_workstation_preset",
+          payload: {
+            schema: "helix.workstation_goal_context_update.v1",
+            tool_name: "live_env.change_workstation_preset",
+            update_kind: "suggested_action",
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+          },
+        },
+      ],
+    };
+
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:workstation-control", payload });
+
+    expect(index).toMatchObject({
+      capability: "live_env.change_workstation_preset",
+      tool_family: "live_source_mail",
+      tool_family_contract: {
+        tool_name: "live_env.change_workstation_preset",
+        authority: "control_receipt",
+        required_observation_kinds: [
+          "stage_play_workstation_control_receipt",
+          "helix.workstation_goal_context_update.v1",
+        ],
+      },
+      missing_required_observation_kinds: [],
+    });
+  });
+
+  it("maps narrator request artifacts to governed non-terminal voice delivery tools", () => {
+    const payload: Record<string, unknown> = {
+      active_prompt: "Run live_env.narrator_bind_stream for the translated transcript.",
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        requested_capability: "live_env.narrator_bind_stream",
+        requested_capability_family: "voice_delivery",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "helix_narrator_bind_stream_request:translated:1",
+          kind: "helix.narrator_bind_stream_request.v1",
+          producer_item_id: "live_env.narrator_bind_stream",
+          payload: {
+            schema: "helix.narrator_bind_stream_request.v1",
+            schemaVersion: "helix.narrator_bind_stream_request.v1",
+            tool_name: "live_env.narrator_bind_stream",
+            sourceRef: "source:browser-audio",
+            streamKind: "translated_transcript",
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+          },
+        },
+        {
+          artifact_id: "stage_play_goal_context_update:narrator-bind",
+          kind: "helix.workstation_goal_context_update.v1",
+          producer_item_id: "live_env.narrator_bind_stream",
+          payload: {
+            schema: "helix.workstation_goal_context_update.v1",
+            tool_name: "live_env.narrator_bind_stream",
+            producer_kind: "narrator",
+            update_kind: "suggested_action",
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+          },
+        },
+      ],
+    };
+
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:narrator-bind", payload });
+
+    expect(index).toMatchObject({
+      capability: "live_env.narrator_bind_stream",
+      tool_family: "voice_delivery",
+      tool_family_contract: {
+        tool_name: "live_env.narrator_bind_stream",
+        authority: "control_receipt",
+        required_observation_kinds: [
+          "helix.narrator_bind_stream_request.v1",
+          "helix.workstation_goal_context_update.v1",
+        ],
+      },
+      missing_required_observation_kinds: [],
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
   it("normalizes a completed internet_search.web_research turn through the same rail table", () => {
     const payload: Record<string, unknown> = {
       active_prompt: "Use internet_search.web_research to find current source evidence.",
@@ -2493,6 +2687,379 @@ describe("Helix Ask tool lifecycle trace", () => {
         expect.objectContaining({ kind: "capability_help_summary", present: true }),
       ]),
     );
+  });
+
+  it("covers the required Codex-parity spine families in one convergence matrix", () => {
+    const buildCompletePayload = (input: {
+      turnId: string;
+      prompt: string;
+      capability: string;
+      requestedCapability?: string | null;
+      capabilityFamily: string;
+      sourceTarget: string;
+      goalKind: string;
+      terminalKind: string;
+      observationKinds: string[];
+      visibleTools?: string[];
+      requestedObservationKinds?: string[];
+    }): Record<string, unknown> => {
+      const primaryObservation = input.observationKinds[0] ?? "observation";
+      const observationRefs = input.observationKinds.map((kind, index) => `${kind}:${index + 1}`);
+      return {
+        active_prompt: input.prompt,
+        tool_surface_packet: {
+          schema: "helix.tool_surface_packet.v1",
+          tools: (input.visibleTools ?? [input.capability]).map((name) => ({ name })),
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        canonical_goal_frame: {
+          schema: "helix.canonical_goal_frame.v1",
+          goal_kind: input.goalKind,
+          required_terminal_kind: input.terminalKind,
+        },
+        tool_call_admission_decision: {
+          schema: "helix.tool_call_admission_decision.v1",
+          turn_id: input.turnId,
+          source_target: input.sourceTarget,
+          required: true,
+          admitted_tool_families: [input.sourceTarget],
+          requested_capability: input.requestedCapability ?? input.capability,
+          requested_capability_family: input.sourceTarget,
+          requested_capability_source: input.requestedCapability ? "explicit_user_command" : null,
+          required_observation_kinds_for_requested_capability: input.requestedObservationKinds ?? input.observationKinds,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        capability_plan: {
+          schema: "helix.capability_plan.v1",
+          turn_id: input.turnId,
+          capability_family: input.capabilityFamily,
+          requested_action: input.capability,
+          selected_capability: input.capability,
+          requested_capability: input.requestedCapability ?? input.capability,
+          admission_status: "admitted",
+        },
+        agent_runtime_loop: {
+          schema: "helix.agent_runtime_loop.v1",
+          iterations: [
+            {
+              iteration: 1,
+              chosen_capability: input.capability,
+              executed_action_key: input.capability,
+              observed_artifact_refs: observationRefs,
+            },
+          ],
+          executed_tool_call_count: 1,
+        },
+        final_answer_draft: {
+          schema: "helix.final_answer_draft.v1",
+          draft_id: `${input.turnId}:final_answer_draft`,
+          support_refs: observationRefs,
+        },
+        terminal_artifact_kind: input.terminalKind,
+        terminal_authority_single_writer: {
+          schema: "helix.terminal_authority_single_writer_result.v1",
+          selected_terminal_artifact_kind: input.terminalKind,
+        },
+        terminal_presentation: {
+          schema: "helix.terminal_presentation.v1",
+          terminal_artifact_kind: input.terminalKind,
+        },
+        current_turn_artifact_ledger: input.observationKinds.map((kind, index) => ({
+          artifact_id: observationRefs[index],
+          kind,
+          producer_item_id: input.capability,
+          payload: {
+            schema: `helix.${kind}.v1`,
+            tool_name: input.capability,
+            assistant_answer: false,
+            raw_content_included: false,
+            terminal_eligible: false,
+          },
+        })),
+        selected_final_answer: `Completed ${primaryObservation}.`,
+      };
+    };
+
+    const buildSuppressedContextPayload = (turnId: string): Record<string, unknown> => ({
+      active_prompt: "Explain why calculator receipts are observations, but do not call the calculator.",
+      tool_surface_packet: {
+        schema: "helix.tool_surface_packet.v1",
+        tools: [
+          { name: "scientific-calculator.solve_expression" },
+          { name: "suppressed_contextual_tool_reference" },
+        ],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "model_only_concept",
+        required_terminal_kind: "direct_answer_text",
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: turnId,
+        capability_family: "model_only",
+        requested_action: "suppressed_contextual_tool_reference",
+        selected_capability: "suppressed_contextual_tool_reference",
+        admission_status: "rejected",
+        rejection_reason: "contextual_tool_reference_suppressed",
+        tool_admission_suppressed: true,
+        capability_contract_arbitration: {
+          schema: "helix.ask_capability_contract_arbitration.v1",
+          contract_state: "suppressed_contextual_reference",
+          selected_source_target: "model_only",
+          selected_plan_family: "model_only",
+          canonical_goal_kind: "model_only_concept",
+          required_terminal_kind: "direct_answer_text",
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      operational_capability_trace: {
+        schema: "helix.operational_capability_trace.v1",
+        executed_capability: "model.direct_answer",
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            iteration: 1,
+            next_step: "answer",
+            chosen_capability: "model.direct_answer",
+            executed_action_key: null,
+            stop_reason: "terminal_satisfied",
+            satisfaction: "satisfied",
+          },
+        ],
+        executed_tool_call_count: 0,
+        stop_reason: "terminal_satisfied",
+      },
+      final_answer_source: "model_direct_answer",
+      terminal_artifact_kind: "direct_answer_text",
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        final_answer_source: "model_direct_answer",
+        terminal_artifact_kind: "direct_answer_text",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "direct_answer_text",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "reasoning_context:1",
+          kind: "reasoning_context",
+          payload: {
+            schema: "helix.reasoning_context.v1",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: "direct_answer_text:1",
+          kind: "direct_answer_text",
+          payload: {
+            schema: "helix.direct_answer_text.v1",
+            text: "Receipts are observations, not terminal answers.",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: "final_answer_draft:1",
+          kind: "final_answer_draft",
+          payload: {
+            schema: "helix.final_answer_draft.v1",
+            support_refs: ["reasoning_context:1", "direct_answer_text:1"],
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+      selected_final_answer: "Receipts are observations, not terminal answers.",
+    });
+
+    const cases = [
+      {
+        coverage: "calculator",
+        payload: buildCompletePayload({
+          turnId: "ask:test:coverage-calculator",
+          prompt: "Use scientific-calculator.solve_expression for 2 + 2.",
+          capability: "scientific-calculator.solve_expression",
+          requestedCapability: "scientific-calculator.solve_expression",
+          capabilityFamily: "workstation_action",
+          sourceTarget: "calculator",
+          goalKind: "calculator_solve",
+          terminalKind: "workstation_tool_evaluation",
+          observationKinds: ["calculator_receipt"],
+        }),
+      },
+      {
+        coverage: "docs",
+        payload: buildCompletePayload({
+          turnId: "ask:test:coverage-docs",
+          prompt: "Use docs-viewer.locate_in_doc to cite the claim.",
+          capability: "docs-viewer.locate_in_doc",
+          requestedCapability: "docs-viewer.locate_in_doc",
+          capabilityFamily: "docs_viewer",
+          sourceTarget: "docs_viewer",
+          goalKind: "locate_in_doc",
+          terminalKind: "doc_location_matches",
+          observationKinds: ["doc_location_matches"],
+        }),
+      },
+      {
+        coverage: "repo_code",
+        payload: buildCompletePayload({
+          turnId: "ask:test:coverage-repo",
+          prompt: "Use repo-code.search_concept to find terminal authority evidence.",
+          capability: "repo-code.search_concept",
+          requestedCapability: "repo-code.search_concept",
+          capabilityFamily: "repo_evidence",
+          sourceTarget: "repo_code",
+          goalKind: "repo_concept_explanation",
+          terminalKind: "repo_code_evidence_answer",
+          observationKinds: ["repo_code_evidence_observation", "repo_evidence_relevance_gate"],
+        }),
+      },
+      {
+        coverage: "workspace_status",
+        payload: buildCompletePayload({
+          turnId: "ask:test:coverage-workspace-status",
+          prompt: "Use workspace_os.status to inspect workstation status.",
+          capability: "workspace_os.status",
+          requestedCapability: "workspace_os.status",
+          capabilityFamily: "workspace_diagnostic",
+          sourceTarget: "workspace_diagnostic",
+          goalKind: "workspace_status_diagnostic",
+          terminalKind: "model_synthesized_answer",
+          observationKinds: ["workspace_os_status_observation"],
+        }),
+      },
+      {
+        coverage: "live_source_mail",
+        payload: buildCompletePayload({
+          turnId: "ask:test:coverage-live-mail",
+          prompt: "Read the processed live-source mailbox packet.",
+          capability: "live_env.read_processed_live_source_mail",
+          capabilityFamily: "live_environment",
+          sourceTarget: "live_environment",
+          goalKind: "live_source_mailbox_review",
+          terminalKind: "model_synthesized_answer",
+          observationKinds: ["stage_play_processed_mail_packet"],
+        }),
+      },
+      {
+        coverage: "internet_search",
+        payload: buildCompletePayload({
+          turnId: "ask:test:coverage-internet",
+          prompt: "Use internet_search.web_research to find current source evidence.",
+          capability: "internet_search.web_research",
+          requestedCapability: "internet_search.web_research",
+          capabilityFamily: "internet_search",
+          sourceTarget: "internet_search",
+          goalKind: "internet_research",
+          terminalKind: "internet_search_answer",
+          observationKinds: ["internet_search_observation"],
+        }),
+      },
+      {
+        coverage: "visual_image_lens",
+        payload: buildCompletePayload({
+          turnId: "ask:test:coverage-visual",
+          prompt: "What is happening right now in the visual screen capture?",
+          capability: "situation-room.describe_visual_capture",
+          capabilityFamily: "visual_capture",
+          sourceTarget: "visual_capture",
+          goalKind: "visual_capture_describe",
+          terminalKind: "model_synthesized_answer",
+          observationKinds: ["visual_frame_evidence"],
+        }),
+      },
+      {
+        coverage: "capability_catalog",
+        payload: buildCompletePayload({
+          turnId: "ask:test:coverage-capability-catalog",
+          prompt: "What tools are available for Helix Ask to use?",
+          capability: "helix_ask.inspect_capability_catalog",
+          capabilityFamily: "capability_catalog",
+          sourceTarget: "runtime_evidence",
+          goalKind: "capability_help",
+          terminalKind: "model_synthesized_answer",
+          observationKinds: ["capability_registry", "capability_help_summary"],
+          visibleTools: [
+            "helix_ask.inspect_capability_catalog",
+            "repo-code.search_concept",
+            "workspace_os.status",
+            "scientific-calculator.solve_expression",
+          ],
+        }),
+      },
+      {
+        coverage: "contextual_suppression",
+        payload: buildSuppressedContextPayload("ask:test:coverage-contextual-suppression"),
+        expected: {
+          selected_capability: "suppressed_contextual_tool_reference",
+          admitted_capability: null,
+          executed_capability: null,
+          observation_kind: "reasoning_context",
+          reentry_status: "reentered",
+          required_terminal_kind: "direct_answer_text",
+          selected_terminal_kind: "direct_answer_text",
+          visible_terminal_kind: "direct_answer_text",
+          first_broken_rail: null,
+          codex_parity_class: "complete",
+          rail_status: "complete",
+          rail_failure_code: null,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+
+    const covered = new Set<string>();
+    for (const entry of cases) {
+      refreshToolLifecycleRecords({ turnId: String(entry.payload.capability_plan && (entry.payload.capability_plan as Record<string, unknown>).turn_id), payload: entry.payload });
+      const index = buildArtifactQueryIndex({
+        turnId: String(entry.payload.capability_plan && (entry.payload.capability_plan as Record<string, unknown>).turn_id),
+        payload: entry.payload,
+      });
+      const railTable = index.codex_parity_agent_spine_rail_table as Record<string, unknown>;
+      covered.add(entry.coverage);
+      expect(railTable).toMatchObject(
+        entry.expected ?? {
+          schema: "helix.codex_parity_agent_spine_rail_table.v1",
+          selected_capability: (entry.payload.capability_plan as Record<string, unknown>).selected_capability,
+          admitted_capability: (entry.payload.capability_plan as Record<string, unknown>).selected_capability,
+          executed_capability: (entry.payload.capability_plan as Record<string, unknown>).selected_capability,
+          reentry_status: "reentered",
+          first_broken_rail: null,
+          codex_parity_class: "complete",
+          rail_status: "complete",
+          rail_failure_code: null,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      );
+      expect(Array.isArray(railTable.visible_tool_surface)).toBe(true);
+      expect((railTable.visible_tool_surface as unknown[]).length).toBeGreaterThan(0);
+      expect(railTable.selected_terminal_kind).toBe(railTable.visible_terminal_kind);
+    }
+
+    expect([...covered].sort()).toEqual([
+      "calculator",
+      "capability_catalog",
+      "contextual_suppression",
+      "docs",
+      "internet_search",
+      "live_source_mail",
+      "repo_code",
+      "visual_image_lens",
+      "workspace_status",
+    ]);
   });
 
   it("keeps contextual tool mentions as follow-up reasoning, not execution", () => {

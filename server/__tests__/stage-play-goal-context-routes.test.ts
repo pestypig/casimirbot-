@@ -158,9 +158,20 @@ describe("Stage Play goal-context routes", () => {
       })
       .expect(200);
 
-    expect(response.body.goalContextUpdates).toHaveLength(1);
+    expect(response.body.goalContextUpdates).toHaveLength(2);
     expect(response.body.goalContextUpdates[0]).toMatchObject({
       contentRef: "stage_play_processed_mail_packet:frog-route",
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    expect(response.body.goalContextUpdates[1]).toMatchObject({
+      producerKind: "visual_capture",
+      updateKind: "visual_observation",
+      contentRef: expect.stringMatching(/^stage_play_live_source_mail:/),
       authority: {
         assistantAnswer: false,
         terminalEligible: false,

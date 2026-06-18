@@ -35,6 +35,7 @@ export type WorkstationToolIntent =
   | "live_environment_create"
   | "minecraft_live_continuation"
   | "workstation_goal_context"
+  | "workstation_control"
   | "theory_context_reflection"
   | "physics_calculation_context"
   | "zen_graph_reflection"
@@ -833,6 +834,7 @@ function buildNarratorDebugProbePlan(
 
 function isNarratorControlPrompt(prompt: string): boolean {
   const mentionsNarratorAction =
+    /\blive_env\.narrator_(?:say|bind_stream)\b/i.test(prompt) ||
     /\bnarrator\.(?:say|bind_stream)\b/i.test(prompt) ||
     /\bpanel[_\s-]?id\s*(?:=|:)\s*narrator\b[\s\S]{0,120}\baction[_\s-]?id\s*(?:=|:)\s*narrator\.(?:say|bind_stream)\b/i.test(prompt);
   const naturalSay =
@@ -843,21 +845,22 @@ function isNarratorControlPrompt(prompt: string): boolean {
   if (!mentionsNarratorAction && !naturalSay && !naturalBind) return false;
 
   const negated =
-    /\b(?:do\s+not|don't|dont|without|not\s+asking\s+to|no\s+need\s+to|never|for\s+now)\b[\s\S]{0,180}\b(?:narrator\.(?:say|bind_stream)|narrator|narration|read[-\s]?aloud|speak)\b/i.test(prompt);
+    /\b(?:do\s+not|don't|dont|without|not\s+asking\s+to|no\s+need\s+to|never|for\s+now)\b[\s\S]{0,180}\b(?:live_env\.narrator_(?:say|bind_stream)|narrator\.(?:say|bind_stream)|narrator|narration|read[-\s]?aloud|speak)\b/i.test(prompt);
   const hypothetical =
-    /\b(?:what\s+would\s+happen|what\s+happens|if\s+(?:i|we|you)|would\s+you|could\s+you|should\s+(?:we|you)|tomorrow|later|next\s+time|in\s+the\s+future|eventually)\b[\s\S]{0,180}\b(?:narrator\.(?:say|bind_stream)|narrator|narration)\b/i.test(prompt);
+    /\b(?:what\s+would\s+happen|what\s+happens|if\s+(?:i|we|you)|would\s+you|could\s+you|should\s+(?:we|you)|tomorrow|later|next\s+time|in\s+the\s+future|eventually)\b[\s\S]{0,180}\b(?:live_env\.narrator_(?:say|bind_stream)|narrator\.(?:say|bind_stream)|narrator|narration)\b/i.test(prompt);
   const historical =
-    /\b(?:previously|earlier|last\s+time|before|already|historically|was|were|had)\b[\s\S]{0,180}\b(?:narrator\.(?:say|bind_stream)|narrator\s+say|bind\s+narrator|narrator|narration)\b/i.test(prompt);
+    /\b(?:previously|earlier|last\s+time|before|already|historically|was|were|had)\b[\s\S]{0,180}\b(?:live_env\.narrator_(?:say|bind_stream)|narrator\.(?:say|bind_stream)|narrator\s+say|bind\s+narrator|narrator|narration)\b/i.test(prompt);
   const deferred =
-    /\b(?:narrator\.(?:say|bind_stream)|narrator|narration)\b[\s\S]{0,140}\b(?:later|tomorrow|next\s+time|in\s+the\s+future|eventually)\b/i.test(prompt);
+    /\b(?:live_env\.narrator_(?:say|bind_stream)|narrator\.(?:say|bind_stream)|narrator|narration)\b[\s\S]{0,140}\b(?:later|tomorrow|next\s+time|in\s+the\s+future|eventually)\b/i.test(prompt);
   const quotedOnly =
-    /^["'`].*(?:narrator\.(?:say|bind_stream)|narrator\s+say|bind\s+narrator).*["'`]$/i.test(prompt) ||
-    /\b(?:the\s+text|screen|document|quote|quoted|label|ui)\b[\s\S]{0,80}\b(?:says|contains|shows|reads)\b[\s\S]{0,160}\b(?:narrator\.(?:say|bind_stream)|narrator\s+say|bind\s+narrator)\b/i.test(prompt);
+    /^["'`].*(?:live_env\.narrator_(?:say|bind_stream)|narrator\.(?:say|bind_stream)|narrator\s+say|bind\s+narrator).*["'`]$/i.test(prompt) ||
+    /\b(?:the\s+text|screen|document|quote|quoted|label|ui)\b[\s\S]{0,80}\b(?:says|contains|shows|reads)\b[\s\S]{0,160}\b(?:live_env\.narrator_(?:say|bind_stream)|narrator\.(?:say|bind_stream)|narrator\s+say|bind\s+narrator)\b/i.test(prompt);
   return !negated && !hypothetical && !historical && !deferred && !quotedOnly;
 }
 
 function narratorControlKind(prompt: string): "say" | "bind_stream" {
   if (
+    /\blive_env\.narrator_say\b/i.test(prompt) ||
     /\bnarrator\.say\b/i.test(prompt) ||
     /\baction[_\s-]?id\s*(?:=|:)\s*narrator\.say\b/i.test(prompt) ||
     /\bnarrator\s+say\b/i.test(prompt)
@@ -865,6 +868,7 @@ function narratorControlKind(prompt: string): "say" | "bind_stream" {
     return "say";
   }
   if (
+    /\blive_env\.narrator_bind_stream\b/i.test(prompt) ||
     /\bnarrator\.bind_stream\b/i.test(prompt) ||
     /\b(?:turn\s+on|enable|bind|route|attach)\b[\s\S]{0,100}\b(?:narrator|narration|read[-\s]?aloud)\b/i.test(prompt) ||
     /\b(?:translation|translated\s+transcript|translated\s+speech|transcript\s+stream)\b[\s\S]{0,120}\b(?:narrator|narration|read[-\s]?aloud)\b/i.test(prompt)
@@ -878,9 +882,9 @@ function inferNarratorStreamKind(prompt: string): string {
   if (/\btranslated\s+speech\b/i.test(prompt)) return "translated_speech";
   if (/\b(?:translation|translated\s+transcript)\b/i.test(prompt)) return "translated_transcript";
   if (/\btranscript\s+stream\b/i.test(prompt)) return "transcript_stream";
-  if (/\blive\s+answer\b/i.test(prompt)) return "live_answer_summary";
-  if (/\bmicro[-\s]?deck\b/i.test(prompt)) return "micro_deck_output";
-  if (/\bgoal\s+context\b/i.test(prompt)) return "goal_context_update";
+  if (/\bsource\s+health\b/i.test(prompt)) return "source_health_status";
+  if (/\bgoal\s+context\b/i.test(prompt)) return "route_evidence";
+  if (/\b(?:live\s+answer|micro[-\s]?deck)\b/i.test(prompt)) return "typed_commentary";
   return "translated_transcript";
 }
 
@@ -895,6 +899,8 @@ function buildNarratorControlPlan(
 ): WorkstationToolPlannerResult {
   const kind = narratorControlKind(normalized);
   const actionId = kind === "bind_stream" ? "narrator.bind_stream" : "narrator.say";
+  const liveEnvToolId = kind === "bind_stream" ? "live_env.narrator_bind_stream" : "live_env.narrator_say";
+  const useLiveEnvTool = /\blive_env\.narrator_(?:say|bind_stream)\b/i.test(normalized);
   const streamKind = inferNarratorStreamKind(normalized);
   const sourceRef =
     extractNamedArg(normalized, ["source_ref", "source ref", "source_id", "source id"]) ??
@@ -921,34 +927,56 @@ function buildNarratorControlPlan(
           evidence_refs: [options.turnId ?? "helix_ask:narrator_control"],
         };
   const publishStepId = kind === "bind_stream" ? "bind_narrator_stream" : "publish_narrator_say";
-  const steps: HelixWorkstationToolPlanStep[] = [
-    makeOpenStep("narrator"),
-    {
-      step_id: publishStepId,
-      kind: "run_panel_action",
-      panel_id: "narrator",
-      action_id: actionId,
-      args,
-      depends_on: ["open_narrator"],
-      expected_receipt_kind: kind === "bind_stream" ? "narrator_bind_stream_receipt" : "narrator_say_receipt",
-      expected_state_change: {
-        store: "narrator",
-        proof_key: kind === "bind_stream" ? "stream_binding" : "event_id",
-      },
-      required: true,
-    },
-    {
-      step_id: "evaluate_narrator_control_receipt",
-      kind: "evaluate_result",
-      depends_on: [publishStepId],
-      expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
-      required: true,
-    },
-  ];
+  const steps: HelixWorkstationToolPlanStep[] = useLiveEnvTool
+    ? [
+        {
+          step_id: publishStepId,
+          kind: "run_ask_tool",
+          tool_id: liveEnvToolId,
+          args,
+          expected_receipt_kind: kind === "bind_stream" ? "helix.narrator_bind_stream_request.v1" : "helix.narrator_say_request.v1",
+          expected_state_change: {
+            store: "stage-play-goal-context",
+            proof_key: "goalContextUpdates",
+          },
+          required: true,
+        },
+        {
+          step_id: "evaluate_narrator_control_receipt",
+          kind: "evaluate_result",
+          depends_on: [publishStepId],
+          expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+          required: true,
+        },
+      ]
+    : [
+        makeOpenStep("narrator"),
+        {
+          step_id: publishStepId,
+          kind: "run_panel_action",
+          panel_id: "narrator",
+          action_id: actionId,
+          args,
+          depends_on: ["open_narrator"],
+          expected_receipt_kind: kind === "bind_stream" ? "narrator_bind_stream_receipt" : "narrator_say_receipt",
+          expected_state_change: {
+            store: "narrator",
+            proof_key: kind === "bind_stream" ? "stream_binding" : "event_id",
+          },
+          required: true,
+        },
+        {
+          step_id: "evaluate_narrator_control_receipt",
+          kind: "evaluate_result",
+          depends_on: [publishStepId],
+          expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+          required: true,
+        },
+      ];
   scores.push({
-    affordance_id: `narrator.${actionId}`,
-    panel_id: "narrator",
-    action_id: actionId,
+    affordance_id: useLiveEnvTool ? liveEnvToolId : `narrator.${actionId}`,
+    panel_id: useLiveEnvTool ? "helix_ask" : "narrator",
+    action_id: useLiveEnvTool ? liveEnvToolId : actionId,
     score: 0.94,
     reason: kind === "bind_stream"
       ? "affirmative narrator stream-binding command should bind a live output stream through governed narrator policy"
@@ -957,11 +985,13 @@ function buildNarratorControlPlan(
   });
   return {
     intent: "narrator_control",
-    action: {
-      panel_id: "narrator",
-      action_id: actionId,
-      args,
-    },
+    action: useLiveEnvTool
+      ? null
+      : {
+          panel_id: "narrator",
+          action_id: actionId,
+          args,
+        },
     tool_plan: buildToolPlan({
       prompt: normalized,
       intent: "narrator_control",
@@ -1196,17 +1226,185 @@ function makeOpenStep(panelId: string, depends_on: string[] = []): HelixWorkstat
 }
 
 const GOAL_CONTEXT_OBJECT_PATTERN =
-  "(?:workstation\\s+goal\\s+context|goal\\s+context\\s+updates?|active\\s+goal\\s+sessions?|agent\\s+goal\\s+sessions?|goal\\s+sessions?|per[-\\s]?packet\\s+traces?|packet\\s+traces?|trace\\s+memory|reasoning\\s+circuit|process\\s+graph\\s+traces?)";
+  "(?:workstation\\s+goal\\s+context|goal\\s+context\\s+updates?|active\\s+goal\\s+sessions?|agent\\s+goal\\s+sessions?|goal\\s+sessions?|per[-\\s]?packet\\s+traces?|packet\\s+traces?|trace\\s+memory|reasoning\\s+circuit|process\\s+graph\\s+traces?|visual\\s+summaries|audio\\s+transcripts?|translation\\s+segments?|translated\\s+transcripts?|micro[-\\s]?deck\\s+outputs?|live\\s+answer\\s+state|live\\s+answer\\s+lines?)";
+const GOAL_CONTEXT_TOOL_PATTERN =
+  "live_env\\.(?:query_workstation_goal_context|start_agent_goal_session|query_trace_memory|query_visual_summaries|query_audio_transcripts|query_translation_segments|query_microdeck_outputs|query_live_answer_state)";
+
+type WorkstationContextFeedTool =
+  | "live_env.query_visual_summaries"
+  | "live_env.query_audio_transcripts"
+  | "live_env.query_translation_segments"
+  | "live_env.query_microdeck_outputs"
+  | "live_env.query_live_answer_state";
+
+type WorkstationControlTool =
+  | "live_env.change_workstation_preset"
+  | "live_env.bind_workstation_source"
+  | "live_env.unbind_workstation_source"
+  | "live_env.set_workstation_loop_state"
+  | "live_env.update_live_answer_projection"
+  | "live_env.focus_process_graph";
 
 function hasContextualWorkstationGoalContextCue(prompt: string): boolean {
   const object = GOAL_CONTEXT_OBJECT_PATTERN;
   return (
-    new RegExp(`["'\`][^"'\`]*(?:live_env\\.(?:query_workstation_goal_context|start_agent_goal_session|query_trace_memory)|${object})[^"'\`]*["'\`]`, "i").test(prompt) ||
-    new RegExp(`\\b(?:if|in\\s+the\\s+future|future|later|eventually|hypothetically|tomorrow|next\\s+time|would|could|might|should)\\b[\\s\\S]{0,140}\\b(?:live_env\\.(?:query_workstation_goal_context|start_agent_goal_session|query_trace_memory)|${object})\\b`, "i").test(prompt) ||
-    new RegExp(`\\b(?:previously|earlier|last\\s+time|before|already|historically|was|were|had)\\b[\\s\\S]{0,160}\\b(?:queried|started|created|viewed|inspected|showed|listed|checked|read|called|used)?\\b[\\s\\S]{0,120}\\b(?:live_env\\.(?:query_workstation_goal_context|start_agent_goal_session|query_trace_memory)|${object})\\b`, "i").test(prompt) ||
-    new RegExp(`\\b(?:screen|page|button|label|ui|text|menu|dropdown|document|quote)\\b[\\s\\S]{0,90}\\b(?:says|shows|reads|contains|labeled|labelled|called|named)\\b[\\s\\S]{0,140}\\b(?:live_env\\.(?:query_workstation_goal_context|start_agent_goal_session|query_trace_memory)|${object})\\b`, "i").test(prompt) ||
-    new RegExp(`\\b(?:do\\s+not|don't|dont|without|not\\s+asking\\s+to|no\\s+need\\s+to|for\\s+now)\\b[\\s\\S]{0,160}\\b(?:query|view|inspect|show|list|check|read|start|create|open|begin|set\\s+up|setup|monitor|use|call)?\\b[\\s\\S]{0,140}\\b(?:live_env\\.(?:query_workstation_goal_context|start_agent_goal_session|query_trace_memory)|${object})\\b`, "i").test(prompt)
+    new RegExp(`["'\`][^"'\`]*(?:${GOAL_CONTEXT_TOOL_PATTERN}|${object})[^"'\`]*["'\`]`, "i").test(prompt) ||
+    new RegExp(`\\b(?:if|in\\s+the\\s+future|future|later|eventually|hypothetically|tomorrow|next\\s+time|would|could|might|should)\\b[\\s\\S]{0,140}\\b(?:${GOAL_CONTEXT_TOOL_PATTERN}|${object})\\b`, "i").test(prompt) ||
+    new RegExp(`\\b(?:previously|earlier|last\\s+time|before|already|historically|was|were|had)\\b[\\s\\S]{0,160}\\b(?:queried|started|created|viewed|inspected|showed|listed|checked|read|called|used)?\\b[\\s\\S]{0,120}\\b(?:${GOAL_CONTEXT_TOOL_PATTERN}|${object})\\b`, "i").test(prompt) ||
+    new RegExp(`\\b(?:screen|page|button|label|ui|text|menu|dropdown|document|quote)\\b[\\s\\S]{0,90}\\b(?:says|shows|reads|contains|labeled|labelled|called|named)\\b[\\s\\S]{0,140}\\b(?:${GOAL_CONTEXT_TOOL_PATTERN}|${object})\\b`, "i").test(prompt) ||
+    new RegExp(`\\b(?:do\\s+not|don't|dont|without|not\\s+asking\\s+to|no\\s+need\\s+to|for\\s+now)\\b[\\s\\S]{0,160}\\b(?:query|view|inspect|show|list|check|read|start|create|open|begin|set\\s+up|setup|monitor|use|call)?\\b[\\s\\S]{0,140}\\b(?:${GOAL_CONTEXT_TOOL_PATTERN}|${object})\\b`, "i").test(prompt)
   );
+}
+
+const WORKSTATION_CONTROL_OBJECT_PATTERN =
+  "(?:workstation\\s+presets?|presets?|sources?|source\\s+bindings?|source\\s+routes?|loops?|loop\\s+state|process\\s+loops?|live\\s+answer\\s+projection|live\\s+answer\\s+line|process\\s+graph(?:\\s+focus)?|stage\\s+play\\s+graph)";
+const WORKSTATION_CONTROL_TOOL_PATTERN =
+  "live_env\\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|set_workstation_loop_state|update_live_answer_projection|focus_process_graph)";
+
+function hasContextualWorkstationControlCue(prompt: string): boolean {
+  const object = WORKSTATION_CONTROL_OBJECT_PATTERN;
+  return (
+    new RegExp(`["'\`][^"'\`]*(?:${WORKSTATION_CONTROL_TOOL_PATTERN}|${object})[^"'\`]*["'\`]`, "i").test(prompt) ||
+    new RegExp(`\\b(?:if|in\\s+the\\s+future|future|later|eventually|hypothetically|tomorrow|next\\s+time|would|could|might|should)\\b[\\s\\S]{0,140}\\b(?:${WORKSTATION_CONTROL_TOOL_PATTERN}|${object})\\b`, "i").test(prompt) ||
+    new RegExp(`\\b(?:previously|earlier|last\\s+time|before|already|historically|was|were|had)\\b[\\s\\S]{0,160}\\b(?:changed|set|applied|bound|unbound|paused|resumed|repaired|focused|updated|called|used)?\\b[\\s\\S]{0,120}\\b(?:${WORKSTATION_CONTROL_TOOL_PATTERN}|${object})\\b`, "i").test(prompt) ||
+    new RegExp(`\\b(?:screen|page|button|label|ui|text|menu|dropdown|document|quote)\\b[\\s\\S]{0,90}\\b(?:says|shows|reads|contains|labeled|labelled|called|named)\\b[\\s\\S]{0,140}\\b(?:${WORKSTATION_CONTROL_TOOL_PATTERN}|${object})\\b`, "i").test(prompt) ||
+    new RegExp(`\\b(?:do\\s+not|don't|dont|without|not\\s+asking\\s+to|no\\s+need\\s+to|for\\s+now)\\b[\\s\\S]{0,160}\\b(?:change|set|apply|bind|unbind|attach|detach|route|pause|resume|repair|focus|update|use|call)?\\b[\\s\\S]{0,140}\\b(?:${WORKSTATION_CONTROL_TOOL_PATTERN}|${object})\\b`, "i").test(prompt)
+  );
+}
+
+function selectWorkstationControlTool(prompt: string): WorkstationControlTool | null {
+  if (hasContextualWorkstationControlCue(prompt)) return null;
+  const explicit = prompt.match(/\blive_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|set_workstation_loop_state|update_live_answer_projection|focus_process_graph)\b/i)?.[0]?.toLowerCase();
+  if (explicit) return explicit as WorkstationControlTool;
+  if (/\b(?:change|set|apply|switch)\b[\s\S]{0,120}\b(?:workstation\s+)?preset\b/i.test(prompt)) {
+    return "live_env.change_workstation_preset";
+  }
+  if (/\b(?:bind|attach|route|connect)\b[\s\S]{0,120}\bsource\b/i.test(prompt)) {
+    return "live_env.bind_workstation_source";
+  }
+  if (/\b(?:unbind|detach|remove|disconnect)\b[\s\S]{0,120}\bsource\b/i.test(prompt)) {
+    return "live_env.unbind_workstation_source";
+  }
+  if (/\b(?:pause|resume|repair|restart|set)\b[\s\S]{0,120}\b(?:loop|process\s+loop|mail\s+loop)\b/i.test(prompt)) {
+    return "live_env.set_workstation_loop_state";
+  }
+  if (/\b(?:update|set|refresh)\b[\s\S]{0,120}\blive\s+answer\b[\s\S]{0,80}\b(?:projection|line)\b/i.test(prompt)) {
+    return "live_env.update_live_answer_projection";
+  }
+  if (/\b(?:focus|show|select|highlight)\b[\s\S]{0,120}\bprocess\s+graph\b/i.test(prompt)) {
+    return "live_env.focus_process_graph";
+  }
+  return null;
+}
+
+function inferLoopState(prompt: string): "paused" | "running" | "repaired" | null {
+  if (/\b(?:repair|repaired|restart)\b/i.test(prompt)) return "repaired";
+  if (/\b(?:pause|paused|stop)\b/i.test(prompt)) return "paused";
+  if (/\b(?:resume|running|run)\b/i.test(prompt)) return "running";
+  return null;
+}
+
+function workstationControlMissingRequirements(toolId: WorkstationControlTool, args: Record<string, unknown>): string[] {
+  const has = (key: string) => typeof args[key] === "string" && String(args[key]).trim().length > 0;
+  if (toolId === "live_env.change_workstation_preset") {
+    return [
+      ...(has("target_ref") ? [] : ["target_ref"]),
+      ...(has("preset_id") ? [] : ["preset_id"]),
+    ];
+  }
+  if (toolId === "live_env.bind_workstation_source") {
+    return [
+      ...(has("source_ref") ? [] : ["source_ref"]),
+      ...(has("target_ref") ? [] : ["target_ref"]),
+    ];
+  }
+  if (toolId === "live_env.unbind_workstation_source") return has("source_ref") ? [] : ["source_ref"];
+  if (toolId === "live_env.set_workstation_loop_state") return has("loop_ref") ? [] : ["loop_ref"];
+  if (toolId === "live_env.update_live_answer_projection") return has("line_key") ? [] : ["line_key"];
+  return [];
+}
+
+function buildWorkstationControlArgs(prompt: string, toolId: WorkstationControlTool): Record<string, unknown> {
+  const targetRef = extractNamedArg(prompt, ["target_ref", "target ref", "target_id", "target id", "panel_id", "panel id"]);
+  const sourceRef = extractNamedArg(prompt, ["source_ref", "source ref", "source_id", "source id"]);
+  const presetId = extractNamedArg(prompt, ["preset_id", "preset id", "preset"]);
+  const loopRef = extractNamedArg(prompt, ["loop_ref", "loop ref", "loop_id", "loop id"]);
+  const lineKey = extractNamedArg(prompt, ["line_key", "line key", "live_answer_line_key", "live answer line key"]);
+  const panelId = extractNamedArg(prompt, ["panel_id", "panel id"]);
+  const nodeRef = extractNamedArg(prompt, ["node_ref", "node ref", "node_id", "node id"]);
+  return {
+    ...(targetRef ? { target_ref: targetRef } : {}),
+    ...(sourceRef ? { source_ref: sourceRef } : {}),
+    ...(presetId ? { preset_id: presetId } : {}),
+    ...(loopRef ? { loop_ref: loopRef } : {}),
+    ...(lineKey ? { line_key: lineKey } : {}),
+    ...(panelId ? { panel_id: panelId } : {}),
+    ...(nodeRef ? { node_ref: nodeRef } : {}),
+    ...(toolId === "live_env.set_workstation_loop_state" && inferLoopState(prompt) ? { state: inferLoopState(prompt) } : {}),
+    reason: "Agent-requested governed workstation control dispatch.",
+  };
+}
+
+function buildWorkstationControlPlan(
+  normalized: string,
+  options: PlanWorkstationToolUseOptions,
+  scores: AffordanceScore[],
+): WorkstationToolPlannerResult {
+  const toolId = selectWorkstationControlTool(normalized);
+  if (!toolId) {
+    return {
+      intent: "direct_answer",
+      action: null,
+      tool_plan: null,
+      scores,
+      should_use_tool: false,
+      reason: "No affirmative workstation control command was admitted.",
+      missing_required_args: [],
+    };
+  }
+  const args = buildWorkstationControlArgs(normalized, toolId);
+  const missing = workstationControlMissingRequirements(toolId, args);
+  const stepId = toolId.replace(/^live_env\./, "");
+  scores.push({
+    affordance_id: toolId,
+    panel_id: "helix_ask",
+    action_id: toolId,
+    score: 0.88,
+    reason: "affirmative workstation control prompt should prepare a governed receipt and dispatch suggestion",
+    required_args_missing: missing,
+  });
+  return {
+    intent: "workstation_control",
+    action: null,
+    tool_plan: buildToolPlan({
+      prompt: normalized,
+      intent: "workstation_control",
+      missing,
+      options,
+      steps: [
+        {
+          step_id: stepId,
+          kind: "run_ask_tool",
+          tool_id: toolId,
+          args,
+          expected_receipt_kind: "stage_play_workstation_control_receipt",
+          expected_state_change: { store: "stage-play-goal-context", proof_key: "goalContextUpdates" },
+          required: true,
+        },
+        {
+          step_id: "evaluate_workstation_control_receipt",
+          kind: "evaluate_result",
+          depends_on: [stepId],
+          expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+          required: true,
+        },
+      ],
+    }),
+    scores,
+    should_use_tool: true,
+    reason: "Prompt is an affirmative workstation control command; prepare a non-terminal control receipt before any answer.",
+    missing_required_args: missing,
+  };
 }
 
 function wantsStartAgentGoalSession(prompt: string): boolean {
@@ -1223,6 +1421,7 @@ function wantsQueryWorkstationGoalContext(prompt: string): boolean {
   return (
     /\blive_env\.query_workstation_goal_context\b/i.test(prompt) ||
     /\blive_env\.query_trace_memory\b/i.test(prompt) ||
+    /\blive_env\.(?:query_visual_summaries|query_audio_transcripts|query_translation_segments|query_microdeck_outputs|query_live_answer_state)\b/i.test(prompt) ||
     new RegExp(`\\b(?:query|view|inspect|show|list|get|check|read|retrieve|summari[sz]e)\\b[\\s\\S]{0,140}\\b${GOAL_CONTEXT_OBJECT_PATTERN}\\b`, "i").test(prompt) ||
     new RegExp(`\\b${GOAL_CONTEXT_OBJECT_PATTERN}\\b[\\s\\S]{0,140}\\b(?:query|view|inspect|show|list|get|check|read|retrieve|latest|active|available|known)\\b`, "i").test(prompt)
   );
@@ -1235,6 +1434,29 @@ function wantsTraceMemoryQuery(prompt: string): boolean {
     /\b(?:query|view|inspect|show|list|get|check|read|retrieve|summari[sz]e)\b[\s\S]{0,140}\b(?:trace\s+memory|reasoning\s+traces?|proof\s+recall\s+traces?|workstation\s+reasoning\s+traces?)\b/i.test(prompt) ||
     /\b(?:trace\s+memory|reasoning\s+traces?|proof\s+recall\s+traces?|workstation\s+reasoning\s+traces?)\b[\s\S]{0,140}\b(?:query|view|inspect|show|list|get|check|read|retrieve|latest|available|known)\b/i.test(prompt)
   );
+}
+
+function selectWorkstationContextFeedTool(prompt: string): WorkstationContextFeedTool | null {
+  if (hasContextualWorkstationGoalContextCue(prompt)) return null;
+  if (/\blive_env\.query_visual_summaries\b/i.test(prompt) || /\bvisual\s+summaries\b/i.test(prompt)) {
+    return "live_env.query_visual_summaries";
+  }
+  if (/\blive_env\.query_audio_transcripts\b/i.test(prompt) || /\baudio\s+transcripts?\b/i.test(prompt)) {
+    return "live_env.query_audio_transcripts";
+  }
+  if (
+    /\blive_env\.query_translation_segments\b/i.test(prompt) ||
+    /\b(?:translation\s+segments?|translated\s+transcripts?)\b/i.test(prompt)
+  ) {
+    return "live_env.query_translation_segments";
+  }
+  if (/\blive_env\.query_microdeck_outputs\b/i.test(prompt) || /\bmicro[-\s]?deck\s+outputs?\b/i.test(prompt)) {
+    return "live_env.query_microdeck_outputs";
+  }
+  if (/\blive_env\.query_live_answer_state\b/i.test(prompt) || /\blive\s+answer\s+(?:state|lines?)\b/i.test(prompt)) {
+    return "live_env.query_live_answer_state";
+  }
+  return null;
 }
 
 function extractGoalContextObjective(prompt: string): string {
@@ -1251,6 +1473,7 @@ function buildWorkstationGoalContextPlan(
 ): WorkstationToolPlannerResult {
   const startSession = wantsStartAgentGoalSession(normalized);
   const traceMemory = !startSession && wantsTraceMemoryQuery(normalized);
+  const feedTool = !startSession && !traceMemory ? selectWorkstationContextFeedTool(normalized) : null;
   const threadId = options.threadId ?? "helix-ask:desktop";
   const objective = extractGoalContextObjective(normalized);
   const sourceId = extractNamedArg(normalized, ["source_id", "source id", "source_ref", "source ref"]);
@@ -1267,6 +1490,11 @@ function buildWorkstationGoalContextPlan(
     trace_id: extractNamedArg(normalized, ["trace_id", "trace id"]) ?? undefined,
     turn_id: extractNamedArg(normalized, ["turn_id", "turn id"]) ?? undefined,
     limit: 12,
+  };
+  const feedQueryArgs = {
+    ...queryArgs,
+    goal_id: extractNamedArg(normalized, ["goal_id", "goal id"]) ?? undefined,
+    limit: 24,
   };
   const sessionArgs = {
     ...queryArgs,
@@ -1287,6 +1515,7 @@ function buildWorkstationGoalContextPlan(
       "set_audio_preset",
       "set_visual_preset",
       "bind_narrator",
+      "narrator_bind_stream",
       "narrator_say",
       "update_live_answer",
       "query_trace_memory",
@@ -1321,19 +1550,33 @@ function buildWorkstationGoalContextPlan(
         }]
       : []),
     {
-      step_id: traceMemory ? "query_trace_memory" : "query_workstation_goal_context",
+      step_id: traceMemory
+        ? "query_trace_memory"
+        : feedTool
+          ? feedTool.replace(/^live_env\.query_/, "query_")
+          : "query_workstation_goal_context",
       kind: "run_ask_tool",
-      tool_id: traceMemory ? "live_env.query_trace_memory" : "live_env.query_workstation_goal_context",
-      args: traceMemory ? traceQueryArgs : startSession ? { ...queryArgs, goal_id: goalId } : queryArgs,
+      tool_id: traceMemory ? "live_env.query_trace_memory" : feedTool ?? "live_env.query_workstation_goal_context",
+      args: traceMemory ? traceQueryArgs : feedTool ? feedQueryArgs : startSession ? { ...queryArgs, goal_id: goalId } : queryArgs,
       depends_on: startSession ? ["start_agent_goal_session"] : [],
-      expected_receipt_kind: traceMemory ? "helix.workstation_reasoning_trace_query_result" : "stage_play_workstation_goal_context_read_result",
+      expected_receipt_kind: traceMemory
+        ? "helix.workstation_reasoning_trace_query_result"
+        : feedTool
+          ? "stage_play_workstation_context_feed_query_result"
+          : "stage_play_workstation_goal_context_read_result",
       expected_state_change: { store: "stage-play-goal-context", proof_key: "goalContextUpdates" },
       required: true,
     },
     {
       step_id: "evaluate_workstation_goal_context",
       kind: "evaluate_result",
-      depends_on: [traceMemory ? "query_trace_memory" : "query_workstation_goal_context"],
+      depends_on: [
+        traceMemory
+          ? "query_trace_memory"
+          : feedTool
+            ? feedTool.replace(/^live_env\.query_/, "query_")
+            : "query_workstation_goal_context",
+      ],
       expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
       required: true,
     },
@@ -1343,19 +1586,21 @@ function buildWorkstationGoalContextPlan(
       ? "live_env.start_agent_goal_session"
       : traceMemory
         ? "live_env.query_trace_memory"
-        : "live_env.query_workstation_goal_context",
+        : feedTool ?? "live_env.query_workstation_goal_context",
     panel_id: "helix_ask",
     action_id: startSession
       ? "live_env.start_agent_goal_session"
       : traceMemory
         ? "live_env.query_trace_memory"
-        : "live_env.query_workstation_goal_context",
+        : feedTool ?? "live_env.query_workstation_goal_context",
     score: startSession ? 0.93 : 0.9,
     reason: startSession
       ? "affirmative goal-session prompt should create a durable agent goal record and then query non-terminal context"
       : traceMemory
         ? "trace-memory prompt should read compact workstation reasoning traces as non-terminal evidence"
-      : "goal-context inspection prompt should read workstation context updates as evidence",
+        : feedTool
+          ? "feed-specific prompt should read the requested workstation context feed as non-terminal evidence"
+        : "goal-context inspection prompt should read workstation context updates as evidence",
     required_args_missing: [],
   });
   return {
@@ -1374,6 +1619,8 @@ function buildWorkstationGoalContextPlan(
       ? "Prompt asks the agent to pursue a durable workstation goal; start a goal session, then query goal-context evidence before any answer."
       : traceMemory
         ? "Prompt asks for trace memory; query compact workstation reasoning traces before any answer."
+        : feedTool
+          ? "Prompt asks for a specific workstation context feed; query that feed before any answer."
       : "Prompt asks for workstation goal-context or packet trace evidence; query the goal-context feed before any answer.",
     missing_required_args: [],
   };
@@ -1722,6 +1969,11 @@ export function planWorkstationToolUse(
 
   if (isNarratorControlPrompt(normalized)) {
     return buildNarratorControlPlan(normalized, options, scores);
+  }
+
+  const workstationControlTool = selectWorkstationControlTool(normalized);
+  if (workstationControlTool) {
+    return buildWorkstationControlPlan(normalized, options, scores);
   }
 
   if (wantsStartAgentGoalSession(normalized) || wantsQueryWorkstationGoalContext(normalized)) {

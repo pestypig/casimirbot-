@@ -122,10 +122,105 @@ const typedFailureAuthorityApplies = (authority: Record<string, unknown> | null)
   readString(authority?.final_answer_source) === "typed_failure" ||
   readString(authority?.terminal_kind) === "failure";
 
+const failureLikeDirectAnswerText = (text: string): boolean =>
+  /\b(?:could not|cannot|can't|unable to|failed|failure|typed failure|terminal boundary|blocked terminal|missing requirements?)\b/i.test(text);
+
+const readDirectAnswerRepairText = (payload: Record<string, unknown>): string | null => {
+  const draft = readRecord(payload.final_answer_draft);
+  return (
+    readString(payload.answer) ??
+    readString(payload.text) ??
+    readString(payload.selected_final_answer) ??
+    readString(draft?.text) ??
+    readString(draft?.answer_text)
+  );
+};
+
+const simpleDirectAnswerContractRepairApplies = (payload: Record<string, unknown>): boolean => {
+  if (payload.final_answer_contract_pass !== true) return false;
+  if (payload.final_answer_contract_repair_applied !== true) return false;
+  const text = readDirectAnswerRepairText(payload);
+  if (!text || failureLikeDirectAnswerText(text)) return false;
+
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  const goalKind = readString(canonicalGoal?.goal_kind);
+  const requiredTerminalKind = readString(canonicalGoal?.required_terminal_kind);
+  const route = readString(payload.route);
+  const routeReasonCode = readString(payload.route_reason_code);
+  const dispatchPolicy = readString(payload.dispatch_policy);
+  const finalAnswerContractFamily = readString(payload.final_answer_contract_family);
+
+  return (
+    finalAnswerContractFamily === "simple" ||
+    dispatchPolicy === "direct_answer_only" ||
+    route === "conversation:simple" ||
+    routeReasonCode === "conversation:simple" ||
+    (goalKind === "model_only_concept" && (!requiredTerminalKind || requiredTerminalKind === "direct_answer_text" || requiredTerminalKind === "unknown"))
+  );
+};
+
+const applyDirectAnswerContractRepairPublicMirrors = (payload: Record<string, unknown>): boolean => {
+  if (!simpleDirectAnswerContractRepairApplies(payload)) return false;
+  const text = readDirectAnswerRepairText(payload);
+  if (!text) return false;
+  const authority = readRecord(payload.terminal_answer_authority);
+  const presentation = readRecord(payload.terminal_presentation);
+  const resolvedTurnSummary = readRecord(payload.resolved_turn_summary);
+
+  payload.ok = true;
+  payload.response_type = "final_answer";
+  payload.final_status = "final_answer";
+  payload.status = "final_answer";
+  payload.final_answer_source = "final_answer_draft";
+  payload.terminal_artifact_kind = "direct_answer_text";
+  payload.selected_final_answer = text;
+  payload.answer = text;
+  payload.text = text;
+  payload.assistant_answer = text;
+  delete payload.terminal_error_code;
+  delete payload.terminal_failure_text;
+  delete payload.typed_failure;
+
+  payload.terminal_answer_authority = {
+    ...(authority ?? {}),
+    terminal_kind: "answer",
+    final_answer_source: "final_answer_draft",
+    terminal_artifact_kind: "direct_answer_text",
+    terminal_text_preview: text,
+    terminal_text_hash: hashHelixTerminalText(text),
+    server_authoritative: authority?.server_authoritative !== false,
+  };
+
+  if (resolvedTurnSummary) {
+    payload.resolved_turn_summary = {
+      ...resolvedTurnSummary,
+      final_status: "final_answer",
+      terminal_artifact_kind: "direct_answer_text",
+      terminal_error_code: null,
+      final_answer_source: "final_answer_draft",
+    };
+  }
+
+  if (presentation) {
+    payload.terminal_presentation = {
+      ...presentation,
+      terminal_artifact_kind: "direct_answer_text",
+      concise_text: text,
+      assistant_answer: text,
+      raw_content_included: false,
+    };
+  }
+
+  return true;
+};
+
 export function syncHelixTypedFailureAuthorityPublicMirrors(
   payload: Record<string, unknown>,
 ): boolean {
   const authority = readRecord(payload.terminal_answer_authority);
+  if (typedFailureAuthorityApplies(authority) && applyDirectAnswerContractRepairPublicMirrors(payload)) {
+    return true;
+  }
   if (!typedFailureAuthorityApplies(authority)) return false;
   const compoundCoverageGate = readRecord(payload.compound_prompt_coverage_gate);
   const compoundCoverageFailedClosed = readString(compoundCoverageGate?.decision) === "FAIL_CLOSED";

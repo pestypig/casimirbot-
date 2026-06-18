@@ -144,7 +144,7 @@ describe("stage-play goal context store", () => {
       nowMs: Date.parse("2026-06-17T14:00:03.000Z"),
     });
 
-    expect(updates).toHaveLength(1);
+    expect(updates).toHaveLength(2);
     expect(updates[0]).toMatchObject({
       schemaVersion: "helix.workstation_goal_context_update.v1",
       producerKind: "microdeck",
@@ -164,6 +164,18 @@ describe("stage-play goal context store", () => {
       "append_goal_context",
       "update_panel",
     ]);
+    expect(updates[1]).toMatchObject({
+      schemaVersion: "helix.workstation_goal_context_update.v1",
+      producerKind: "visual_capture",
+      updateKind: "visual_observation",
+      contentRef: "stage_play_live_source_mail:visual-1",
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
 
     const sessions = listStagePlayAgentGoalSessions({ threadId });
     expect(sessions).toHaveLength(1);
@@ -184,6 +196,7 @@ describe("stage-play goal context store", () => {
         "set_audio_preset",
         "set_visual_preset",
         "bind_narrator",
+        "narrator_bind_stream",
         "narrator_say",
         "update_live_answer",
         "query_trace_memory",
@@ -197,8 +210,177 @@ describe("stage-play goal context store", () => {
       },
     });
 
-    expect(listStagePlayGoalContextUpdates({ sourceRef: "visual_source:screen" })).toHaveLength(1);
-    expect(listStagePlayGoalContextUpdates({ goalId: "goal:frog-classification" })).toHaveLength(1);
+    expect(listStagePlayGoalContextUpdates({ sourceRef: "visual_source:screen" })).toHaveLength(2);
+    expect(listStagePlayGoalContextUpdates({ goalId: "goal:frog-classification" })).toHaveLength(2);
+  });
+
+  it("records audio capture arrivals separately from transcript packet processing", () => {
+    const audioMail = mailFixture({
+      mailId: "stage_play_live_source_mail:audio-1",
+      sourceId: "audio_source:share",
+      sourceKind: "audio_transcript",
+      sourceRefs: {
+        sourceId: "audio_source:share",
+        evidenceRef: "audio_chunk:share-1",
+        observationRef: "audio_event:share-1",
+      },
+      summary: {
+        text: "Audio transcript chunk: la rana esta en la hoja.",
+        preview: "la rana esta en la hoja",
+        confidence: 0.88,
+        analysisState: "analysis_ready",
+      },
+      evidenceRefs: ["audio_chunk:share-1", "audio_event:share-1"],
+      objective: {
+        objectiveId: "goal:earbud-translation",
+        text: "Monitor shared audio and prepare translation evidence.",
+      },
+    });
+    const transcriptPacket = packetFixture({
+      packetId: "stage_play_processed_mail_packet:audio-1",
+      sourceId: "audio_source:share",
+      mailIds: ["stage_play_live_source_mail:audio-1"],
+      visualEvidenceRefs: [],
+      observedFacts: ["Transcript window contains a frog mention."],
+      inferredFacts: ["The audio can be routed through an earbud translation deck."],
+      objectTags: [],
+      activityTags: ["translation"],
+      microReasonerRunRefs: [],
+      evidenceRefs: ["stage_play_processed_mail_packet:audio-1", "audio_chunk:share-1"],
+    });
+
+    const updates = syncStagePlayGoalContextFromMailbox({
+      threadId,
+      roomId: "room:stage-play",
+      mailItems: [audioMail],
+      processedMailPackets: [transcriptPacket],
+      microReasonerRuns: [],
+      nowMs: Date.parse("2026-06-17T14:00:03.000Z"),
+    });
+
+    expect(updates).toHaveLength(2);
+    expect(listStagePlayGoalContextUpdates({ producerKind: "audio_capture" })).toEqual([
+      expect.objectContaining({
+        updateKind: "transcript_window",
+        contentRef: "stage_play_live_source_mail:audio-1",
+        sourceRefs: expect.arrayContaining(["audio_source:share", "audio_chunk:share-1", "audio_event:share-1"]),
+        authority: {
+          assistantAnswer: false,
+          terminalEligible: false,
+          rawContentIncluded: false,
+          postToolModelStepRequired: true,
+        },
+      }),
+    ]);
+    expect(listStagePlayGoalContextUpdates({ producerKind: "transcription_loop" })).toEqual([
+      expect.objectContaining({
+        updateKind: "transcript_window",
+        contentRef: "stage_play_processed_mail_packet:audio-1",
+        sourceRefs: expect.arrayContaining(["audio_source:share", "stage_play_live_source_mail:audio-1"]),
+        authority: {
+          assistantAnswer: false,
+          terminalEligible: false,
+          rawContentIncluded: false,
+          postToolModelStepRequired: true,
+        },
+      }),
+    ]);
+  });
+
+  it("classifies translation deck packets as translation-loop goal context", () => {
+    const audioMail = mailFixture({
+      mailId: "stage_play_live_source_mail:audio-translation-1",
+      sourceId: "audio_source:earbuds",
+      sourceKind: "audio_transcript",
+      sourceRefs: {
+        sourceId: "audio_source:earbuds",
+        evidenceRef: "audio_chunk:earbuds-1",
+        observationRef: "audio_event:earbuds-1",
+      },
+      summary: {
+        text: "Audio transcript chunk: la rana esta en la hoja.",
+        preview: "la rana esta en la hoja",
+        confidence: 0.91,
+        analysisState: "analysis_ready",
+      },
+      evidenceRefs: ["audio_chunk:earbuds-1", "audio_event:earbuds-1"],
+      objective: {
+        objectiveId: "goal:earbud-translation",
+        text: "Translate shared audio through an earbud deck.",
+      },
+    });
+    const translationRun = runFixture({
+      runId: "stage_play_micro_reasoner_run:earbud-translation",
+      deckPresetId: "stage_play_micro_reasoner_prompt_preset:earbud-translate-english:v1",
+      deckPresetTitle: "Earbud Translate To English",
+      role: "packet_composer",
+      sourceId: "audio_source:earbuds",
+      mailIds: ["stage_play_live_source_mail:audio-translation-1"],
+      inputRefs: ["stage_play_live_source_mail:audio-translation-1"],
+      outputRefs: ["microdeck_output:earbud-translation"],
+      inputPreview: "la rana esta en la hoja",
+      outputPreview: "The frog is on the leaf.",
+    });
+    const translationPacket = packetFixture({
+      packetId: "stage_play_processed_mail_packet:earbud-translation",
+      sourceId: "audio_source:earbuds",
+      mailIds: ["stage_play_live_source_mail:audio-translation-1"],
+      visualEvidenceRefs: [],
+      observedFacts: ["Spanish transcript mentions a frog on a leaf."],
+      inferredFacts: ["English translation candidate: The frog is on the leaf."],
+      objectTags: [],
+      activityTags: ["translation"],
+      microReasonerRunRefs: ["stage_play_micro_reasoner_run:earbud-translation"],
+      evidenceRefs: ["stage_play_processed_mail_packet:earbud-translation", "microdeck_output:earbud-translation"],
+      microReasonerDeck: {
+        presetId: "stage_play_micro_reasoner_prompt_preset:earbud-translate-english:v1",
+        presetTitle: "Earbud Translate To English",
+        domain: "audio_translation",
+        outputPolicy: "earbud_translation",
+        promptedRoles: ["packet_composer"],
+        rolePromptIds: {
+          packet_composer: "stage_play_micro_reasoner_prompt:earbud-translate-english:packet_composer:v1",
+        },
+        sourceId: "audio_source:earbuds",
+        appliedAt: "2026-06-17T14:00:01.000Z",
+        deckRunPlan: "baseline_plus_prompted",
+      },
+    });
+
+    syncStagePlayGoalContextFromMailbox({
+      threadId,
+      roomId: "room:stage-play",
+      mailItems: [audioMail],
+      processedMailPackets: [translationPacket],
+      microReasonerRuns: [translationRun],
+      nowMs: Date.parse("2026-06-17T14:00:03.000Z"),
+    });
+
+    expect(listStagePlayGoalContextUpdates({ producerKind: "translation_loop" })).toEqual([
+      expect.objectContaining({
+        updateKind: "translated_transcript",
+        contentRef: "stage_play_processed_mail_packet:earbud-translation",
+        sourceRefs: expect.arrayContaining([
+          "audio_source:earbuds",
+          "stage_play_live_source_mail:audio-translation-1",
+          "microdeck_output:earbud-translation",
+        ]),
+        evidenceRefs: expect.arrayContaining([
+          "stage_play_processed_mail_packet:earbud-translation",
+          "microdeck_output:earbud-translation",
+        ]),
+        receiptRefs: expect.arrayContaining([
+          "stage_play_live_source_mail:audio-translation-1",
+          "stage_play_micro_reasoner_run:earbud-translation",
+        ]),
+        authority: {
+          assistantAnswer: false,
+          terminalEligible: false,
+          rawContentIncluded: false,
+          postToolModelStepRequired: true,
+        },
+      }),
+    ]);
   });
 
   it("keeps wake as a dispatch action instead of answer authority", () => {
@@ -287,7 +469,7 @@ describe("stage-play goal context store", () => {
           freshnessMs: 120_000,
         },
       ],
-      allowedActuators: ["set_visual_preset", "bind_narrator", "query_trace_memory"],
+      allowedActuators: ["set_visual_preset", "bind_narrator", "narrator_bind_stream", "query_trace_memory"],
       cadence: { kind: "event_accumulation", minUpdates: 3 },
       stopConditions: ["frog species reported through terminal authority"],
       checkpoint: {
@@ -316,7 +498,7 @@ describe("stage-play goal context store", () => {
           freshnessMs: 120000,
         }),
       ]),
-      allowedActuators: expect.arrayContaining(["set_visual_preset", "bind_narrator", "query_trace_memory"]),
+      allowedActuators: expect.arrayContaining(["set_visual_preset", "bind_narrator", "narrator_bind_stream", "query_trace_memory"]),
       cadence: { kind: "event_accumulation", minUpdates: 3 },
       stopConditions: expect.arrayContaining(["frog species reported through terminal authority"]),
       authority: {

@@ -115,6 +115,24 @@ describe("LiveAnswerEnvironmentPanel visual observer shades controls", () => {
     expect(source).toContain("setSelectedMicroReasonerPromptPresetId(item.id)");
   });
 
+  it("mirrors Stage Play goal-context updates as a non-terminal reasoning circuit", () => {
+    const source = panelSource();
+
+    expect(source).toContain("@shared/contracts/workstation-goal-context.v1");
+    expect(source).toContain("/api/helix/stage-play/goal-context?threadId=");
+    expect(source).toContain("setGoalContextUpdates");
+    expect(source).toContain("setAgentGoalSessions");
+    expect(source).toContain("liveAnswerCircuitRows");
+    expect(source).toContain("liveAnswerCircuitSummary");
+    expect(source).toContain('data-testid="live-answer-reasoning-circuit"');
+    expect(source).toContain("Reasoning circuit");
+    expect(source).toContain("Stage Play goal context mirrored into Live Answer as observation state.");
+    expect(source).toContain("wake interrupt");
+    expect(source).toContain("narrator bind");
+    expect(source).toContain("terminal authority required");
+    expect(source).toContain("Receipts, MicroDeck outputs, narrator bindings, and panel projections stay evidence until the completed solver path selects a terminal answer.");
+  });
+
   it("mirrors visual mail deck status without duplicating Stage Play setup controls", () => {
     const source = panelSource();
 

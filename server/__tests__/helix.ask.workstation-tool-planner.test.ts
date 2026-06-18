@@ -765,12 +765,93 @@ describe("Helix Ask workstation tool planner", () => {
     });
   });
 
+  it("normalizes natural narrator bindings to canonical stream kinds", () => {
+    const liveAnswerPlan = planWorkstationToolUse(
+      "Turn on narrator for the live answer output source_ref=source:live-answer-active.",
+      { threadId: "thread:narrator-live-answer", turnId: "turn:narrator-live-answer" },
+    );
+    const goalContextPlan = planWorkstationToolUse(
+      "Enable narrator to announce goal context updates source_ref=source:goal-context-active.",
+      { threadId: "thread:narrator-goal-context", turnId: "turn:narrator-goal-context" },
+    );
+
+    expect(liveAnswerPlan.intent).toBe("narrator_control");
+    expect(liveAnswerPlan.action?.args).toMatchObject({
+      source_ref: "source:live-answer-active",
+      stream_kind: "typed_commentary",
+    });
+    expect(goalContextPlan.intent).toBe("narrator_control");
+    expect(goalContextPlan.action?.args).toMatchObject({
+      source_ref: "source:goal-context-active",
+      stream_kind: "route_evidence",
+    });
+  });
+
+  it("routes explicit live_env narrator.say through ask-tool goal-context receipts", () => {
+    const plan = planWorkstationToolUse(
+      'Run live_env.narrator_say text="Translation is now routed through Narrator." source_id=helix_ask:translation delivery_mode=confirm_to_speak.',
+      { threadId: "thread:narrator-live-say", turnId: "turn:narrator-live-say" },
+    );
+
+    expect(plan.intent).toBe("narrator_control");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.action).toBeNull();
+    expect(plan.tool_plan?.steps.map((step) => step.tool_id ?? `${step.panel_id}.${step.action_id}`)).toEqual([
+      "live_env.narrator_say",
+      "undefined.undefined",
+    ]);
+    expect(plan.tool_plan?.steps[0]).toMatchObject({
+      kind: "run_ask_tool",
+      tool_id: "live_env.narrator_say",
+      expected_receipt_kind: "helix.narrator_say_request.v1",
+      expected_state_change: {
+        store: "stage-play-goal-context",
+        proof_key: "goalContextUpdates",
+      },
+      required: true,
+    });
+  });
+
+  it("routes explicit live_env narrator.bind_stream through ask-tool goal-context receipts", () => {
+    const plan = planWorkstationToolUse(
+      "Run live_env.narrator_bind_stream source_ref=source:browser-audio stream_kind=translated_transcript delivery_mode=visible_only.",
+      { threadId: "thread:narrator-live-bind", turnId: "turn:narrator-live-bind" },
+    );
+
+    expect(plan.intent).toBe("narrator_control");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.action).toBeNull();
+    expect(plan.tool_plan?.steps.map((step) => step.tool_id ?? `${step.panel_id}.${step.action_id}`)).toEqual([
+      "live_env.narrator_bind_stream",
+      "undefined.undefined",
+    ]);
+    expect(plan.tool_plan?.steps[0]).toMatchObject({
+      kind: "run_ask_tool",
+      tool_id: "live_env.narrator_bind_stream",
+      args: expect.objectContaining({
+        source_ref: "source:browser-audio",
+        stream_kind: "translated_transcript",
+        delivery_mode: "visible_only",
+      }),
+      expected_receipt_kind: "helix.narrator_bind_stream_request.v1",
+      expected_state_change: {
+        store: "stage-play-goal-context",
+        proof_key: "goalContextUpdates",
+      },
+      required: true,
+    });
+  });
+
   it("does not execute contextual, quoted, future, or negated narrator control mentions", () => {
     for (const prompt of [
       "Do not run narrator.say; just explain the narrator policy.",
       'The document says "narrator.bind_stream"; summarize that label.',
       "Could we turn on narrator for translation later?",
       "Previously you used narrator say; what did it do?",
+      "Do not run live_env.narrator_say; just explain the narrator policy.",
+      'The document says "live_env.narrator_bind_stream"; summarize that label.',
+      "Could we run live_env.narrator_bind_stream later?",
+      "Previously you used live_env.narrator_say; what did it do?",
     ]) {
       const plan = planWorkstationToolUse(prompt, { threadId: "thread:narrator-control-negative" });
       expect(plan.intent).toBe("direct_answer");
@@ -835,6 +916,7 @@ describe("Helix Ask workstation tool planner", () => {
           "set_audio_preset",
           "set_visual_preset",
           "bind_narrator",
+          "narrator_bind_stream",
           "narrator_say",
           "update_live_answer",
           "query_trace_memory",
@@ -873,6 +955,91 @@ describe("Helix Ask workstation tool planner", () => {
     });
   });
 
+  it("routes feed-specific workstation context prompts to the matching live-env query", () => {
+    const audioPlan = planWorkstationToolUse(
+      "Read the latest audio transcripts for the active live source.",
+      { threadId: "thread:audio-feed", turnId: "turn:audio-feed" },
+    );
+    expect(audioPlan.intent).toBe("workstation_goal_context");
+    expect(audioPlan.tool_plan?.steps[0]).toMatchObject({
+      step_id: "query_audio_transcripts",
+      kind: "run_ask_tool",
+      tool_id: "live_env.query_audio_transcripts",
+      expected_receipt_kind: "stage_play_workstation_context_feed_query_result",
+      required: true,
+    });
+
+    const microDeckPlan = planWorkstationToolUse(
+      "Show MicroDeck outputs for the frog-classification goal context.",
+      { threadId: "thread:microdeck-feed", turnId: "turn:microdeck-feed" },
+    );
+    expect(microDeckPlan.intent).toBe("workstation_goal_context");
+    expect(microDeckPlan.tool_plan?.steps[0]).toMatchObject({
+      step_id: "query_microdeck_outputs",
+      kind: "run_ask_tool",
+      tool_id: "live_env.query_microdeck_outputs",
+      expected_receipt_kind: "stage_play_workstation_context_feed_query_result",
+      required: true,
+    });
+  });
+
+  it("routes affirmative workstation control prompts to governed control receipts", () => {
+    const presetPlan = planWorkstationToolUse(
+      "Run live_env.change_workstation_preset target_ref=source:visual:active preset_id=preset:frog-classifier",
+      { threadId: "thread:workstation-control", turnId: "turn:workstation-control" },
+    );
+    expect(presetPlan.intent).toBe("workstation_control");
+    expect(presetPlan.should_use_tool).toBe(true);
+    expect(presetPlan.missing_required_args).toEqual([]);
+    expect(presetPlan.tool_plan?.steps.map((step) => step.tool_id ?? `${step.panel_id}.${step.action_id}`)).toEqual([
+      "live_env.change_workstation_preset",
+      "undefined.undefined",
+    ]);
+    expect(presetPlan.tool_plan?.steps[0]).toMatchObject({
+      step_id: "change_workstation_preset",
+      kind: "run_ask_tool",
+      tool_id: "live_env.change_workstation_preset",
+      args: expect.objectContaining({
+        target_ref: "source:visual:active",
+        preset_id: "preset:frog-classifier",
+      }),
+      expected_receipt_kind: "stage_play_workstation_control_receipt",
+      required: true,
+    });
+
+    const focusPlan = planWorkstationToolUse(
+      "Focus the process graph node_ref=packet:visual-frog",
+      { threadId: "thread:workstation-control", turnId: "turn:focus-process-graph" },
+    );
+    expect(focusPlan.intent).toBe("workstation_control");
+    expect(focusPlan.tool_plan?.steps[0]).toMatchObject({
+      step_id: "focus_process_graph",
+      kind: "run_ask_tool",
+      tool_id: "live_env.focus_process_graph",
+      args: expect.objectContaining({
+        node_ref: "packet:visual-frog",
+      }),
+      expected_receipt_kind: "stage_play_workstation_control_receipt",
+      required: true,
+    });
+  });
+
+  it("does not execute contextual, negated, or hypothetical workstation control mentions", () => {
+    for (const prompt of [
+      "Do not change workstation preset; explain how presets work.",
+      'The UI label says "live_env.focus_process_graph"; summarize it.',
+      "Could we bind the source to Live Answer later?",
+      "Previously you paused the loop; what did that mean?",
+      "The screen shows a button labeled Apply preset; describe the screen text.",
+    ]) {
+      const plan = planWorkstationToolUse(prompt, { threadId: "thread:workstation-control-negative" });
+      expect(plan.intent).toBe("direct_answer");
+      expect(plan.should_use_tool).toBe(false);
+      expect(plan.action).toBeNull();
+      expect(plan.tool_plan).toBeNull();
+    }
+  });
+
   it("does not execute contextual, negated, or hypothetical goal-context mentions", () => {
     for (const prompt of [
       "Do not query workstation goal context; explain what the term means.",
@@ -881,6 +1048,7 @@ describe("Helix Ask workstation tool planner", () => {
       "Previously you queried per-packet traces; what did that mean?",
       "Do not query trace memory; explain the phrase.",
       'The UI label says "live_env.query_trace_memory"; summarize it.',
+      'The UI label says "live_env.query_audio_transcripts"; summarize it.',
     ]) {
       const plan = planWorkstationToolUse(prompt, { threadId: "thread:goal-context-negative" });
       expect(plan.intent).toBe("direct_answer");

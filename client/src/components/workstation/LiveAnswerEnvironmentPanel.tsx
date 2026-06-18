@@ -39,6 +39,11 @@ import type {
   StagePlayMicroReasonerPromptV1,
   StagePlayLiveSourceMailSourceKindV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
+import type {
+  AgentGoalSessionV1,
+  WorkstationDispatchActionV1,
+  WorkstationGoalContextUpdateV1,
+} from "@shared/contracts/workstation-goal-context.v1";
 import {
   ADAPTIVE_VISUAL_LENS_CONTROLLER_PRESET_ID,
   type StagePlayAdaptiveVisualLensApplyResultV1,
@@ -106,6 +111,15 @@ type LiveAnswerMicroDeckCatalogGroup = {
   phase: LiveAnswerMicroDeckCatalogPhase;
   sourceKind: StagePlayLiveSourceMailSourceKindV1;
   items: LiveAnswerMicroDeckCatalogItem[];
+};
+type LiveAnswerReasoningCircuitRow = {
+  id: string;
+  title: string;
+  producer: string;
+  status: string;
+  preview: string;
+  contentRef: string;
+  dispatch: string[];
 };
 const VISUAL_CAPTURE_ROUTE_STORAGE_KEY = "helix.liveAnswer.visualCaptureRoutes.v1";
 const VISUAL_CAPTURE_ROUTE_SYNC_EVENT = "helix:live-answer:visual-capture-routes";
@@ -526,6 +540,27 @@ const readTraceString = (record: Record<string, unknown>, keys: string[], fallba
   return fallback;
 };
 
+const compactLabel = (value: string): string =>
+  value.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim() || "unknown";
+
+const liveAnswerDispatchLabel = (action: WorkstationDispatchActionV1): string => {
+  if (action.kind === "wake_agent") return "wake interrupt";
+  if (action.kind === "speak_narrator") return `narrator ${action.mode}`;
+  if (action.kind === "bind_narrator_stream") return `narrator bind ${compactLabel(action.streamKind)}`;
+  if (action.kind === "update_live_answer") return `live answer ${action.lineKey}`;
+  if (action.kind === "change_preset") return `preset ${action.presetId}`;
+  if (action.kind === "bind_source") return "bind source";
+  if (action.kind === "unbind_source") return "unbind source";
+  if (action.kind === "set_loop_state") return `loop ${action.state}`;
+  if (action.kind === "focus_process_graph") return "focus graph";
+  if (action.kind === "append_goal_context") return "append context";
+  if (action.kind === "log_receipt") return "log receipt";
+  if (action.kind === "update_panel") return `panel ${action.panelId}`;
+  if (action.kind === "repair_loop") return "repair loop";
+  if (action.kind === "ask_user") return "ask user";
+  return compactLabel(action.kind);
+};
+
 const documentMarkdownSourceIdFromLocation = (threadId: string): string => {
   if (typeof window === "undefined") return `document_markdown:${threadId}`;
   const params = new URLSearchParams(window.location.search);
@@ -887,6 +922,8 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   const [documentSourceWakeRequests, setDocumentSourceWakeRequests] = useState<Array<Record<string, unknown>>>([]);
   const [documentSourceWakeResults, setDocumentSourceWakeResults] = useState<Array<Record<string, unknown>>>([]);
   const [documentSourceProcessedPackets, setDocumentSourceProcessedPackets] = useState<Array<Record<string, unknown>>>([]);
+  const [goalContextUpdates, setGoalContextUpdates] = useState<WorkstationGoalContextUpdateV1[]>([]);
+  const [agentGoalSessions, setAgentGoalSessions] = useState<AgentGoalSessionV1[]>([]);
   const [visualShadePromptDraft, setVisualShadePromptDraft] = useState<string>("");
   const [visualShadePromptBaseProfileId, setVisualShadePromptBaseProfileId] = useState<string>("");
   const [selectedVisualFrameHistoryId, setSelectedVisualFrameHistoryId] = useState<string | null>(null);
@@ -1622,6 +1659,32 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
     documentSourceWakeRequests,
     documentSourceWakeResults,
   ]);
+  const liveAnswerCircuitRows = useMemo<LiveAnswerReasoningCircuitRow[]>(() =>
+    goalContextUpdates
+      .slice(0, 6)
+      .map((update: WorkstationGoalContextUpdateV1) => ({
+        id: update.updateId,
+        title: compactLabel(update.updateKind),
+        producer: compactLabel(update.producerKind),
+        status: update.freshness.status,
+        preview: update.preview,
+        contentRef: update.contentRef,
+        dispatch: update.suggestedDispatch.slice(0, 4).map(liveAnswerDispatchLabel),
+      })),
+    [goalContextUpdates],
+  );
+  const liveAnswerCircuitSummary = useMemo(() => {
+    const dispatches = goalContextUpdates.flatMap((update: WorkstationGoalContextUpdateV1) => update.suggestedDispatch);
+    return {
+      updateCount: goalContextUpdates.length,
+      activeGoalCount: agentGoalSessions.filter((session: AgentGoalSessionV1) => session.status === "active" || session.status === "blocked").length,
+      narratorCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "speak_narrator" || action.kind === "bind_narrator_stream").length,
+      wakeCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "wake_agent").length,
+      terminalPosture: agentGoalSessions.some((session: AgentGoalSessionV1) => session.authority.finalReportsRequireTerminalAuthority)
+        ? "terminal authority required"
+        : "observation only",
+    };
+  }, [agentGoalSessions, goalContextUpdates]);
   const visualShadePromptChanged = Boolean(
     visualShadePromptDraft.trim() &&
       selectedVisualObserverProfile &&
@@ -1772,7 +1835,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       setProcedureEpochClosures(Array.isArray(procedureClosureBody.closures) ? procedureClosureBody.closures : []);
       setProcedureLedgerItems(Array.isArray(procedureLedgerBody.ledger_items) ? procedureLedgerBody.ledger_items : []);
       const sourceBindingLedgerBody = await fetch(`/api/agi/situation/source-binding-status-ledger?thread_id=${encodeURIComponent(threadId)}&limit=80`).then((response) => response.json()).catch(() => ({}));
+      const goalContextBody = await fetch(`/api/helix/stage-play/goal-context?threadId=${encodeURIComponent(threadId)}&limit=24`).then((response) => response.ok ? response.json() : {}).catch(() => ({}));
       setSourceBindingTransitions(Array.isArray(sourceBindingLedgerBody.transitions) ? sourceBindingLedgerBody.transitions : []);
+      setGoalContextUpdates(Array.isArray(goalContextBody.goalContextUpdates) ? goalContextBody.goalContextUpdates : []);
+      setAgentGoalSessions(Array.isArray(goalContextBody.agentGoalSessions) ? goalContextBody.agentGoalSessions : []);
       setHandoffConsumptions(Array.isArray(handoffConsumptionBody.handoff_consumptions) ? handoffConsumptionBody.handoff_consumptions : []);
       setPlanExecutions(Array.isArray(planExecutionBody.plan_executions) ? planExecutionBody.plan_executions : []);
       setVisualLatest(visualLatestBody ?? null);
@@ -4305,6 +4371,78 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
             Client actions: {clientActions.length} pending; latest action {latestClientAction?.action ?? "none"}; latest adoption {latestClientAdoption?.ok ? "adopted" : latestClientAdoption ? "failed" : "none"}; stream {latestClientObserved.client_stream_confirmed === true ? "active" : latestClientObserved.client_stream_confirmed === false ? "missing" : "unknown"}; interval {latestClientObserved.interval_active === true ? "active" : latestClientObserved.interval_active === false ? "inactive" : "unknown"}; chunk {typeof latestClientObserved.latest_chunk_id === "string" ? latestClientObserved.latest_chunk_id : "none"}.
           </p>
         ) : null}
+        <div className="order-13 mt-3 rounded border border-violet-300/20 bg-violet-950/10 px-2 py-2" data-testid="live-answer-reasoning-circuit">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase text-violet-100">Reasoning circuit</p>
+              <p className="mt-0.5 text-[11px] text-slate-400">
+                Stage Play goal context mirrored into Live Answer as observation state.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <span className="rounded border border-violet-300/20 px-2 py-1 font-mono text-[10px] text-violet-100">
+                {liveAnswerCircuitSummary.updateCount} updates
+              </span>
+              <span className="rounded border border-emerald-300/20 px-2 py-1 font-mono text-[10px] text-emerald-100">
+                {liveAnswerCircuitSummary.activeGoalCount} goals
+              </span>
+              <span className="rounded border border-cyan-300/20 px-2 py-1 font-mono text-[10px] text-cyan-100">
+                {liveAnswerCircuitSummary.narratorCount} narrator
+              </span>
+              <span className="rounded border border-amber-300/20 px-2 py-1 font-mono text-[10px] text-amber-100">
+                {liveAnswerCircuitSummary.wakeCount} wake
+              </span>
+            </div>
+          </div>
+          <div className="mt-2 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(220px,280px)]">
+            <div className="grid gap-1.5 md:grid-cols-2 xl:grid-cols-3">
+              {liveAnswerCircuitRows.length > 0 ? liveAnswerCircuitRows.map((row: LiveAnswerReasoningCircuitRow) => (
+                <div key={row.id} className="min-w-0 rounded border border-violet-300/15 bg-black/25 px-2 py-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-[11px] font-semibold text-violet-50">{row.title}</span>
+                    <span className="shrink-0 font-mono text-[10px] text-violet-200/70">{row.status}</span>
+                  </div>
+                  <p className="mt-0.5 truncate font-mono text-[10px] text-slate-500">{row.producer} / {row.contentRef}</p>
+                  <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-300">{row.preview}</p>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {row.dispatch.length > 0 ? row.dispatch.map((dispatch: string) => (
+                      <span key={`${row.id}:${dispatch}`} className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-300">
+                        {dispatch}
+                      </span>
+                    )) : (
+                      <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">
+                        no dispatch
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )) : (
+                <p className="rounded border border-white/10 bg-black/20 px-2 py-2 text-[11px] text-slate-500">
+                  No goal-context updates have been mirrored yet.
+                </p>
+              )}
+            </div>
+            <div className="rounded border border-white/10 bg-black/20 p-2">
+              <p className="text-[10px] font-semibold uppercase text-slate-300">Authority posture</p>
+              <p className="mt-1 text-xs text-violet-100">{liveAnswerCircuitSummary.terminalPosture}</p>
+              <p className="mt-1 text-[11px] leading-5 text-slate-500">
+                Receipts, MicroDeck outputs, narrator bindings, and panel projections stay evidence until the completed solver path selects a terminal answer.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {agentGoalSessions.slice(0, 3).map((session: AgentGoalSessionV1) => (
+                  <span key={session.goalId} className="rounded border border-violet-300/15 px-1.5 py-0.5 font-mono text-[10px] text-violet-100">
+                    {compactLabel(session.status)} / {session.contextFeeds.length} feeds
+                  </span>
+                ))}
+                {agentGoalSessions.length === 0 ? (
+                  <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">
+                    no active session
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {tabs.map((tab: { id: LiveEnvironmentTab; label: string }) => (

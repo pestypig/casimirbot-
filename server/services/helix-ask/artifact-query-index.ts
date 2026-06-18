@@ -134,6 +134,9 @@ const TERMINAL_RECEIPT_KINDS = new Set([
   "workspace_action_receipt",
   "workstation_tool_evaluation",
   "live_pipeline_receipt",
+  "stage_play_workstation_control_receipt",
+  "helix.narrator_say_request.v1",
+  "helix.narrator_bind_stream_request.v1",
   "doc_open_receipt",
   "docs_viewer_receipt",
 ]);
@@ -397,6 +400,48 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   }
   if (/live_env[-_.:]query_trace_memory|workstation_reasoning_trace_query|helix\.workstation_reasoning_trace_query_result|helix\.workstation_reasoning_trace\.v1/.test(haystack)) {
     return "live_env.query_trace_memory";
+  }
+  if (/live_env[-_.:]query_visual_summaries|visual_summaries|visual_capture_summaries/.test(haystack)) {
+    return "live_env.query_visual_summaries";
+  }
+  if (/live_env[-_.:]query_audio_transcripts|audio_transcripts|transcription_loop/.test(haystack)) {
+    return "live_env.query_audio_transcripts";
+  }
+  if (/live_env[-_.:]query_translation_segments|translation_segments|translated_transcripts/.test(haystack)) {
+    return "live_env.query_translation_segments";
+  }
+  if (/live_env[-_.:]query_microdeck_outputs|microdeck_outputs|micro_reasoner_outputs/.test(haystack)) {
+    return "live_env.query_microdeck_outputs";
+  }
+  if (/live_env[-_.:]query_live_answer_state|live_answer_state|live_answer_lines/.test(haystack)) {
+    return "live_env.query_live_answer_state";
+  }
+  if (/live_env[-_.:]change_workstation_preset|change_workstation_preset|apply_workstation_preset/.test(haystack)) {
+    return "live_env.change_workstation_preset";
+  }
+  if (/live_env[-_.:]bind_workstation_source|bind_workstation_source|source_binding/.test(haystack)) {
+    return "live_env.bind_workstation_source";
+  }
+  if (/live_env[-_.:]unbind_workstation_source|unbind_workstation_source|detach_source/.test(haystack)) {
+    return "live_env.unbind_workstation_source";
+  }
+  if (/live_env[-_.:]set_workstation_loop_state|set_workstation_loop_state|pause_loop|resume_loop|repair_loop/.test(haystack)) {
+    return "live_env.set_workstation_loop_state";
+  }
+  if (/live_env[-_.:]update_live_answer_projection|update_live_answer_projection|live_answer_projection/.test(haystack)) {
+    return "live_env.update_live_answer_projection";
+  }
+  if (/live_env[-_.:]focus_process_graph|focus_process_graph|process_graph_focus/.test(haystack)) {
+    return "live_env.focus_process_graph";
+  }
+  if (/live_env[-_.:]narrator_say|narrator\.say|narrator_say_request|helix\.narrator_say_request\.v1/.test(haystack)) {
+    return "live_env.narrator_say";
+  }
+  if (/live_env[-_.:]narrator_bind_stream|narrator\.bind_stream|narrator_bind_stream_request|helix\.narrator_bind_stream_request\.v1/.test(haystack)) {
+    return "live_env.narrator_bind_stream";
+  }
+  if (/stage_play_workstation_control_receipt/.test(haystack)) {
+    return "live_env.change_workstation_preset";
   }
   if (/live_env[-_.:]query_workstation_goal_context|stage_play_workstation_goal_context_read_result|helix\.workstation_goal_context_update\.v1/.test(haystack)) {
     return "live_env.query_workstation_goal_context";

@@ -11,6 +11,7 @@ import {
   listStagePlayLiveSourceMailItems,
   resetStagePlayLiveSourceMailboxForTest,
 } from "../services/stage-play/stage-play-live-source-mailbox-store";
+import { enqueueAudioTranscriptMailFromChunk } from "../services/stage-play/stage-play-audio-transcript-mail-ingest";
 import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../services/stage-play/stage-play-live-source-mail-wake-store";
 import { resetStagePlayLiveSourceNarrativeStoreForTest } from "../services/stage-play/stage-play-live-source-narrative-store";
 import { resetStagePlayLiveSourceInterpreterProfileStoreForTest } from "../services/stage-play/stage-play-live-source-interpreter-profile-store";
@@ -200,6 +201,97 @@ describe("live-source mail live environment tools", () => {
         creates_assistant_answer: false,
         requires_user_confirmation: false,
         can_run_automatically: true,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.query_visual_summaries",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.query_audio_transcripts",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.query_translation_segments",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.query_microdeck_outputs",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.query_live_answer_state",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: false,
+        can_run_automatically: true,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.change_workstation_preset",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: true,
+        can_run_automatically: false,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.bind_workstation_source",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: true,
+        can_run_automatically: false,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.unbind_workstation_source",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: true,
+        can_run_automatically: false,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.set_workstation_loop_state",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: true,
+        can_run_automatically: false,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.update_live_answer_projection",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: true,
+        can_run_automatically: false,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.focus_process_graph",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: true,
+        can_run_automatically: false,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.narrator_say",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: true,
+        can_run_automatically: false,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.narrator_bind_stream",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: true,
+        can_run_automatically: false,
       }),
       expect.objectContaining({
         tool_id: "live_env.query_micro_reasoner_prompts",
@@ -1436,7 +1528,7 @@ describe("live-source mail live environment tools", () => {
           { source_kind: "translation", query: "species hints" },
           { source_kind: "trace_memory" },
         ],
-        allowed_actuators: ["set_visual_preset", "bind_narrator", "query_trace_memory"],
+        allowed_actuators: ["set_visual_preset", "bind_narrator", "narrator_bind_stream", "query_trace_memory"],
         cadence: { kind: "event_accumulation", min_updates: 3 },
         stop_conditions: ["frog classified with terminal authority"],
         checkpoint_summary: "Goal session initialized from ImageLens frog classification prompt.",
@@ -1481,7 +1573,7 @@ describe("live-source mail live environment tools", () => {
           }),
           expect.objectContaining({ sourceKind: "trace_memory" }),
         ]),
-        allowedActuators: expect.arrayContaining(["set_visual_preset", "bind_narrator", "query_trace_memory"]),
+        allowedActuators: expect.arrayContaining(["set_visual_preset", "bind_narrator", "narrator_bind_stream", "query_trace_memory"]),
         cadence: { kind: "event_accumulation", minUpdates: 3 },
         stopConditions: expect.arrayContaining(["frog classified with terminal authority"]),
         checkpoints: expect.arrayContaining([
@@ -1574,6 +1666,391 @@ describe("live-source mail live environment tools", () => {
       processPayload.packets[0].packetId,
       sourceId,
     ]));
+  });
+
+  it("queries visual summaries through a feed-specific non-terminal tool result", () => {
+    seedVisualSummaryText("ImageLens visual summary: frog sitting on a green leaf.", "visual-feed");
+
+    const processObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.process_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        source_kind: "visual_frame",
+      },
+    });
+    const processPayload = processObservation.observation as any;
+
+    const queryObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_visual_summaries",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        source_kind: "visual_frame",
+      },
+    });
+
+    const queryPayload = queryObservation.observation as any;
+    expect(queryObservation).toMatchObject({
+      schema: "helix.live_environment_tool_observation.v1",
+      tool_name: "live_env.query_visual_summaries",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(queryPayload).toMatchObject({
+      schema: "stage_play_workstation_context_feed_query_result/v1",
+      feedKind: "visual_summaries",
+      sourceRef: sourceId,
+      goalId: null,
+      updateCount: 2,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(queryPayload.goalContextUpdates[0]).toMatchObject({
+      producerKind: "microdeck",
+      updateKind: "visual_observation",
+      contentRef: processPayload.packets[0].packetId,
+      sourceRefs: expect.arrayContaining([sourceId]),
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    expect(queryPayload.goalContextUpdates[1]).toMatchObject({
+      producerKind: "visual_capture",
+      updateKind: "visual_observation",
+      contentRef: expect.stringMatching(/^stage_play_live_source_mail:/),
+      sourceRefs: expect.arrayContaining([sourceId]),
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    expect(queryPayload.goalContextUpdateId).toMatch(/^stage_play_goal_context_update:route_watch:/);
+    const routeUpdates = listStagePlayGoalContextUpdates({
+      threadId,
+      producerKind: "route_watch",
+      updateKind: "route_evidence",
+    });
+    expect(routeUpdates.map((update) => update.updateId)).toContain(queryPayload.goalContextUpdateId);
+    expect(routeUpdates.find((update) => update.updateId === queryPayload.goalContextUpdateId)?.suggestedDispatch.map((action) => action.kind)).toEqual(expect.arrayContaining([
+      "log_receipt",
+      "update_panel",
+    ]));
+    expect(queryObservation.producedRefs).toEqual(expect.arrayContaining([
+      queryPayload.goalContextUpdateId,
+      queryPayload.resultId,
+      queryPayload.goalContextUpdates[0].updateId,
+      queryPayload.goalContextUpdates[1].updateId,
+    ]));
+  });
+
+  it("queries translation segments from translation-loop packet evidence", () => {
+    const audioSourceId = "audio_source:helix-ask-live-source-mail-tool";
+    enqueueAudioTranscriptMailFromChunk({
+      threadId,
+      roomId,
+      sourceId: audioSourceId,
+      transcript: "la rana esta en la hoja",
+      eventRef: "audio_event:helix-ask-live-source-mail-tool",
+      chunkRef: "audio_chunk:helix-ask-live-source-mail-tool",
+      now: "2026-06-04T12:10:00.000Z",
+    });
+
+    const processObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.process_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: audioSourceId,
+        source_kind: "audio_transcript",
+      },
+    });
+    const processPayload = processObservation.observation as any;
+
+    const queryObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_translation_segments",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: audioSourceId,
+        source_kind: "audio_transcript",
+      },
+    });
+
+    const queryPayload = queryObservation.observation as any;
+    expect(queryObservation).toMatchObject({
+      schema: "helix.live_environment_tool_observation.v1",
+      tool_name: "live_env.query_translation_segments",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(queryPayload).toMatchObject({
+      schema: "stage_play_workstation_context_feed_query_result/v1",
+      feedKind: "translated_transcripts",
+      sourceRef: audioSourceId,
+      updateCount: 1,
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(queryPayload.goalContextUpdates[0]).toMatchObject({
+      producerKind: "translation_loop",
+      updateKind: "translated_transcript",
+      contentRef: processPayload.packets[0].packetId,
+      sourceRefs: expect.arrayContaining([audioSourceId]),
+      evidenceRefs: expect.arrayContaining([processPayload.packets[0].packetId]),
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    expect(queryObservation.producedRefs).toEqual(expect.arrayContaining([
+      queryPayload.goalContextUpdateId,
+      queryPayload.resultId,
+      queryPayload.goalContextUpdates[0].updateId,
+    ]));
+  });
+
+  it("prepares workstation preset changes as governed non-terminal control receipts", () => {
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.change_workstation_preset",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        target_ref: "source:visual:active",
+        preset_id: "preset:frog-classifier",
+        reason: "Apply frog classification MicroDeck to the visual source.",
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation).toMatchObject({
+      schema: "helix.live_environment_tool_observation.v1",
+      tool_name: "live_env.change_workstation_preset",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schema: "stage_play_workstation_control_receipt/v1",
+      controlKind: "change_preset",
+      status: "prepared",
+      missingRequirements: [],
+      targetRef: "source:visual:active",
+      presetId: "preset:frog-classifier",
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload.dispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "log_receipt", receiptRef: payload.receiptId }),
+      expect.objectContaining({ kind: "update_panel", panelId: "stage-play-badge-graph" }),
+      expect.objectContaining({ kind: "change_preset", targetRef: "source:visual:active", presetId: "preset:frog-classifier" }),
+    ]));
+    const updates = listStagePlayGoalContextUpdates({
+      threadId,
+      producerKind: "route_watch",
+      updateKind: "suggested_action",
+    });
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({
+      updateId: payload.goalContextUpdateId,
+      contentRef: payload.receiptId,
+      freshness: expect.objectContaining({ status: "fresh" }),
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    expect(updates[0].suggestedDispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "change_preset", targetRef: "source:visual:active", presetId: "preset:frog-classifier" }),
+    ]));
+    expect(observation.producedRefs).toEqual(expect.arrayContaining([payload.receiptId, payload.goalContextUpdateId]));
+  });
+
+  it("blocks incomplete workstation control receipts without terminalizing them", () => {
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.bind_workstation_source",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_ref: "audio_source:earbuds",
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation.ok).toBe(false);
+    expect(observation).toMatchObject({
+      tool_name: "live_env.bind_workstation_source",
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schema: "stage_play_workstation_control_receipt/v1",
+      controlKind: "bind_source",
+      status: "blocked",
+      missingRequirements: ["target_ref"],
+      sourceRef: "audio_source:earbuds",
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    const updates = listStagePlayGoalContextUpdates({
+      threadId,
+      producerKind: "route_watch",
+      updateKind: "suggested_action",
+    });
+    expect(updates).toHaveLength(1);
+    expect(updates[0].freshness.status).toBe("blocked");
+    expect(updates[0].suggestedDispatch.map((action) => action.kind)).not.toContain("bind_source");
+  });
+
+  it("prepares narrator say requests as durable non-terminal goal-context updates", () => {
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.narrator_say",
+      thread_id: threadId,
+      args: {
+        text: "Translation is now routed through Narrator.",
+        source_kind: "helix_console",
+        source_id: "helix_ask:translation",
+        delivery_mode: "confirm_to_speak",
+        evidence_refs: ["translation_segment:latest"],
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation).toMatchObject({
+      schema: "helix.live_environment_tool_observation.v1",
+      tool_name: "live_env.narrator_say",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schema: "helix.narrator_say_request.v1",
+      schemaVersion: "helix.narrator_say_request.v1",
+      text: "Translation is now routed through Narrator.",
+      sourceKind: "helix_console",
+      sourceId: "helix_ask:translation",
+      deliveryMode: "confirm_to_speak",
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(payload.dispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "log_receipt", receiptRef: payload.requestId }),
+      expect.objectContaining({ kind: "update_panel", panelId: "narrator" }),
+      expect.objectContaining({ kind: "speak_narrator", mode: "confirm" }),
+    ]));
+    const updates = listStagePlayGoalContextUpdates({
+      threadId,
+      producerKind: "narrator",
+      updateKind: "suggested_action",
+    });
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({
+      updateId: payload.goalContextUpdateId,
+      contentRef: payload.requestId,
+      sourceRefs: expect.arrayContaining(["helix_ask:translation", "helix_console"]),
+      evidenceRefs: expect.arrayContaining([payload.requestId, "translation_segment:latest"]),
+      receiptRefs: [payload.requestId],
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+  });
+
+  it("prepares narrator stream bindings and blocks missing stream requirements", () => {
+    const prepared = executeLiveEnvironmentTool({
+      tool_name: "live_env.narrator_bind_stream",
+      thread_id: threadId,
+      args: {
+        source_ref: "source:browser-audio",
+        stream_kind: "translated_transcript",
+        delivery_mode: "visible_only",
+        voice_policy: "confirm_speak_required",
+      },
+    });
+    const preparedPayload = prepared.observation as any;
+    expect(prepared).toMatchObject({
+      tool_name: "live_env.narrator_bind_stream",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(preparedPayload).toMatchObject({
+      schema: "helix.narrator_bind_stream_request.v1",
+      streamKind: "translated_transcript",
+      sourceRef: "source:browser-audio",
+      deliveryMode: "visible_only",
+      voicePolicy: "confirm_speak_required",
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+    expect(preparedPayload.dispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "bind_narrator_stream", sourceRef: "source:browser-audio", streamKind: "translated_transcript" }),
+      expect.objectContaining({ kind: "speak_narrator", mode: "visible_only" }),
+    ]));
+
+    const blocked = executeLiveEnvironmentTool({
+      tool_name: "live_env.narrator_bind_stream",
+      thread_id: threadId,
+      args: {
+        source_ref: "source:browser-audio",
+      },
+    });
+    const blockedPayload = blocked.observation as any;
+    expect(blocked.ok).toBe(false);
+    expect(blockedPayload).toMatchObject({
+      schema: "helix.narrator_bind_stream_request.v1",
+      status: "blocked",
+      missingRequirements: ["stream_kind"],
+      terminal_eligible: false,
+      assistant_answer: false,
+    });
+    const updates = listStagePlayGoalContextUpdates({
+      threadId,
+      producerKind: "narrator",
+      updateKind: "suggested_action",
+    });
+    expect(updates.map((update) => update.freshness.status)).toEqual(expect.arrayContaining(["fresh", "blocked"]));
   });
 
   it("records source health queries as durable non-terminal goal-context updates", () => {

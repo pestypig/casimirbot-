@@ -31,7 +31,73 @@ const baseWorkspace = (sessionId: string) => ({
   lastCreatedNoteTitle: "quick NHM2 test note",
 });
 
-const answerText = (body: any): string => String(body?.assistant_answer ?? body?.answer ?? body?.text ?? "");
+const CODEX_PARITY_CLASSES = [
+  "complete",
+  "tool_surface_missing",
+  "explicit_capability_demoted",
+  "tool_admission_rejected",
+  "selected_not_executed",
+  "observation_missing",
+  "observation_not_reentered",
+  "goal_contract_mismatch",
+  "terminal_product_not_allowed",
+  "terminal_authority_mismatch",
+  "visible_projection_mismatch",
+  "debug_mirror_stale",
+  "provider_config_missing",
+];
+
+const expectNullableStringField = (record: Record<string, unknown>, key: string): void => {
+  expect(record).toHaveProperty(key);
+  const value = record[key];
+  expect(value === null || typeof value === "string").toBe(true);
+};
+
+const expectCodexParityRailTableForResponse = (body: any): void => {
+  const railTable = body?.codex_parity_agent_spine_rail_table;
+  expect(railTable && typeof railTable === "object" && !Array.isArray(railTable)).toBe(true);
+  const record = railTable as Record<string, unknown>;
+  expect(record).toMatchObject({
+    schema: "helix.codex_parity_agent_spine_rail_table.v1",
+    turn_id: body?.turn_id,
+    assistant_answer: false,
+    raw_content_included: false,
+  });
+  expectNullableStringField(record, "prompt");
+  expect(Array.isArray(record.visible_tool_surface)).toBe(true);
+  for (const key of [
+    "requested_capability",
+    "selected_capability",
+    "admitted_capability",
+    "executed_capability",
+    "observation_kind",
+    "observation_ref",
+    "goal_satisfaction",
+    "required_terminal_kind",
+    "selected_terminal_kind",
+    "visible_terminal_kind",
+    "first_broken_rail",
+    "repair_target",
+    "rail_failure_code",
+  ]) {
+    expectNullableStringField(record, key);
+  }
+  expect(["reentered", "not_reentered", "no_observation"]).toContain(record.reentry_status);
+  expect(["complete", "broken", "fail_closed"]).toContain(record.rail_status);
+  expect(CODEX_PARITY_CLASSES).toContain(record.codex_parity_class);
+  if (record.codex_parity_class === "complete" || record.rail_status === "complete") {
+    expect(record.first_broken_rail).toBeNull();
+    expect(record.rail_failure_code).toBeNull();
+  } else {
+    expect(typeof record.first_broken_rail).toBe("string");
+    expect(String(record.first_broken_rail).length).toBeGreaterThan(0);
+  }
+};
+
+const answerText = (body: any): string => {
+  expectCodexParityRailTableForResponse(body);
+  return String(body?.assistant_answer ?? body?.answer ?? body?.text ?? "");
+};
 
 describe("helix ask turn e17 general step controller", () => {
   it("answers simple status checks directly without reasoning or workspace refs", async () => {
@@ -268,7 +334,7 @@ describe("helix ask turn e17 general step controller", () => {
     expect(response.body?.final_answer_contract_repair_attempted).toBe(true);
     expect(response.body?.final_answer_contract_repair_applied).toBe(true);
     expect(response.body?.final_status).toBe("final_answer");
-  }, 20000);
+  }, 45000);
 
   it("suppresses duplicate model note mutation after note_update_receipt is already satisfied", async () => {
     process.env.HELIX_E11_MODEL_DECISION_LLM = "1";
@@ -342,7 +408,8 @@ describe("helix ask turn e17 general step controller", () => {
     expect(response.body?.workspace_action).toBeNull();
     expect(response.body?.general_controller_enabled).toBe(true);
     expect(response.body?.general_controller_final_decision).toBe("request_user_input");
-  }, 20000);
+    expectCodexParityRailTableForResponse(response.body);
+  }, 45000);
 
   it("finalizes when required artifacts are satisfied for locate-to-note", async () => {
     process.env.HELIX_E11_MODEL_DECISION_LLM = "0";

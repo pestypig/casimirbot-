@@ -2527,6 +2527,7 @@ const stagePlayDispatchActionLabel = (action: WorkstationDispatchActionV1): stri
   if (action.kind === "update_live_answer") return `Live Answer: ${action.lineKey}`;
   if (action.kind === "append_goal_context") return `Goal context: ${action.goalId}`;
   if (action.kind === "speak_narrator") return `Narrator: ${action.mode}`;
+  if (action.kind === "bind_narrator_stream") return `Narrator bind: ${action.streamKind}`;
   if (action.kind === "change_preset") return `Preset: ${action.presetId}`;
   if (action.kind === "update_panel") return `Panel: ${action.panelId}`;
   if (action.kind === "repair_loop") return `Repair: ${action.loopRef}`;
@@ -2539,7 +2540,7 @@ const stagePlayDispatchActionLabel = (action: WorkstationDispatchActionV1): stri
 const stagePlayDispatchTone = (action: WorkstationDispatchActionV1): "default" | "good" | "warn" | "blocked" => {
   if (action.kind === "wake_agent" || action.kind === "ask_user") return "warn";
   if (action.kind === "repair_loop") return "blocked";
-  if (action.kind === "append_goal_context" || action.kind === "update_live_answer") return "good";
+  if (action.kind === "append_goal_context" || action.kind === "update_live_answer" || action.kind === "bind_narrator_stream" || action.kind === "speak_narrator") return "good";
   return "default";
 };
 
@@ -3190,7 +3191,7 @@ function StagePlayGoalContextBoard({
     0,
   );
   const narratorDispatchCount = updates.reduce(
-    (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "speak_narrator").length,
+    (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "speak_narrator" || action.kind === "bind_narrator_stream").length,
     0,
   );
   return (
