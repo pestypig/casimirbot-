@@ -28,6 +28,20 @@ const NHM2_SWITCHING_COVARIANT_CONSERVATION_EVIDENCE =
   `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-switching-covariant-conservation-evidence.json`;
 const NHM2_FREQUENCY_CONVERGENCE_EVIDENCE =
   `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-frequency-convergence-evidence.json`;
+const NHM2_DYNAMIC_GEOMETRY_SAMPLES =
+  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-dynamic-geometry-samples.json`;
+const NHM2_GR_EVOLVE_DYNAMIC_GEOMETRY_SAMPLE =
+  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-gr-evolve-dynamic-geometry-sample-000.json`;
+const NHM2_EFFECTIVE_GEOMETRY_REFERENCE =
+  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-effective-geometry-reference.json`;
+const NHM2_GR_EVOLVE_EFFECTIVE_GEOMETRY_REFERENCE =
+  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-gr-evolve-effective-geometry-reference-000.json`;
+const NHM2_DYNAMIC_EFFECTIVE_GEOMETRY_EVIDENCE =
+  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-dynamic-effective-geometry-evidence.json`;
+const NHM2_AVERAGED_SOURCE_TENSOR_RECEIPT =
+  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-averaged-source-tensor-receipt.json`;
+const NHM2_BACKREACTION_RESIDUAL_RECEIPT =
+  `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-backreaction-residual-receipt.json`;
 const NHM2_TRIP_CLOCKING_PROFILE_INDEX =
   "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-trip-clocking-profile-index-latest.json";
 
@@ -948,6 +962,148 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   nhm2FullSolveBadge({
+    id: "nhm2.dynamic.effective_geometry_agreement",
+    title: "Dynamic/Effective Geometry Agreement",
+    plainMeaning:
+      "Checks whether a time-averaged dynamic source geometry agrees with the reduced-order effective-source geometry and has bounded backreaction residuals.",
+    whyItMatters:
+      "It verifies the current smoke-chain dynamic and effective geometry channels have a bounded diagnostic residual, then hands the campaign to the full regional tensor closure gate.",
+    subjects: ["nhm2", "dynamic_campaign", "effective_geometry", "backreaction", "time_averaging"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    equationFamilies: ["dynamic_effective_geometry", "time_dependent_source_campaign"],
+    tags: ["dynamic_geometry", "effective_geometry", "backreaction", "runtime_artifact", "noncomputable_reference"],
+    equations: [
+      {
+        id: "dynamic_effective_geometry_gate",
+        role: "noncomputable_reference",
+        displayLatex:
+          "\\langle g_{\\mu\\nu}(t)\\rangle_{cycle}\\stackrel{?}{\\sim}g^{eff}_{\\mu\\nu},\\quad \\|C^{backreaction}_{\\mu\\nu}\\|<\\epsilon",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["dynamicGeometryRef", "effectiveGeometryRef", "averagedSourceTensorRef"],
+        outputSymbols: ["dynamicGeometryAgreementPass"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "A static effective geometry summary cannot substitute for dynamic geometry samples.",
+      "Missing dynamic geometry, missing effective geometry, missing averaged source tensor, missing backreaction receipt, or unbounded backreaction must block this gate.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef(
+        "tools/nhm2/build-dynamic-geometry-samples.ts",
+        "nhm2-dynamic-geometry-samples-builder",
+        "Builder that emits the dynamic geometry sample receipt consumed by the dynamic/effective geometry gate.",
+      ),
+      artifactRef(
+        "tools/nhm2/capture-gr-evolve-dynamic-geometry-samples.ts",
+        "nhm2-gr-evolve-dynamic-geometry-capture",
+        "Capture tool that writes a gr-evolve-brick sample and validates the required dynamic geometry channels.",
+      ),
+      artifactRef(
+        NHM2_GR_EVOLVE_DYNAMIC_GEOMETRY_SAMPLE,
+        "sha256:fa86257dcbe43705998e8eb0de90dcc8d4070beaf371bd295762c788a3a9f51d",
+        "Pinned gr-evolve-brick dynamic geometry sample used by the smoke-chain receipt.",
+      ),
+      artifactRef(
+        NHM2_DYNAMIC_GEOMETRY_SAMPLES,
+        "sha256:9e4c0632075e682361a396140fc8a289adced8674cebf5951c6ba8dd2897bdec",
+        "Pinned smoke-chain dynamic geometry sample receipt: one computed gr-evolve-brick sample with ADM/BSSN geometry channels.",
+      ),
+      artifactRef(
+        "tools/nhm2/capture-gr-evolve-effective-geometry-reference.ts",
+        "nhm2-gr-evolve-effective-geometry-capture",
+        "Capture tool that writes a static gr-evolve-brick effective geometry reference and validates the required geometry channels.",
+      ),
+      artifactRef(
+        NHM2_GR_EVOLVE_EFFECTIVE_GEOMETRY_REFERENCE,
+        "sha256:d174fcd2fda6a4f1d58e2fded84b45fb8d480c15be8a00202ab31dbf6ce9ecb8",
+        "Pinned gr-evolve-brick effective geometry reference used by the smoke-chain receipt.",
+      ),
+      artifactRef(
+        NHM2_EFFECTIVE_GEOMETRY_REFERENCE,
+        "sha256:b5682e31389d31ebb2e091b805370d834912ead53c7716221001b0d666f6cee8",
+        "Pinned smoke-chain effective geometry reference: computed static gr-evolve-brick reference with required ADM/BSSN channels.",
+      ),
+      artifactRef(
+        "tools/nhm2/build-dynamic-effective-geometry-evidence.ts",
+        "nhm2-dynamic-effective-geometry-evidence-builder",
+        "Builder that emits a fail-closed dynamic/effective geometry receipt.",
+      ),
+      artifactRef(
+        "shared/contracts/nhm2-averaged-source-tensor-receipt.v1.ts",
+        "nhm2-averaged-source-tensor-receipt-contract",
+        "Typed receipt that admits a source-side full tensor as cycle-averaged source evidence without proving backreaction.",
+      ),
+      artifactRef(
+        "tools/nhm2/build-averaged-source-tensor-receipt.ts",
+        "nhm2-averaged-source-tensor-receipt-builder",
+        "Builder that verifies source-side full-tensor provenance, fixed cycle-average source, frequency convergence, and switching conservation.",
+      ),
+      artifactRef(
+        NHM2_AVERAGED_SOURCE_TENSOR_RECEIPT,
+        "sha256:3952a494ab657998aa69593f899a964ee67c54f124e38b140bcf74a57be39a79",
+        "Pinned averaged source tensor receipt: pass; source-side full tensor admitted for dynamic/effective evidence.",
+      ),
+      artifactRef(
+        "shared/contracts/nhm2-backreaction-residual-receipt.v1.ts",
+        "nhm2-backreaction-residual-receipt-contract",
+        "Typed receipt that compares cycle-averaged dynamic gr-evolve channels against the effective geometry reference.",
+      ),
+      artifactRef(
+        "tools/nhm2/build-backreaction-residual-receipt.ts",
+        "nhm2-backreaction-residual-receipt-builder",
+        "Builder that decodes r32f gr-evolve channel fields and computes relative L-infinity/L2 residuals.",
+      ),
+      artifactRef(
+        NHM2_BACKREACTION_RESIDUAL_RECEIPT,
+        "sha256:f3f70b36065f1138a195bd74600a34598ff5abd84df070f8386a0be577ad181b",
+        "Pinned backreaction residual receipt: bounded=true; residualLInf=0 over the compared smoke-chain channels.",
+      ),
+      artifactRef(
+        NHM2_DYNAMIC_EFFECTIVE_GEOMETRY_EVIDENCE,
+        "sha256:f43d392b011af51c11945662d315326c7b75ceefd34f7d851ce7a5a05371491d",
+        "Pinned smoke-chain dynamic/effective geometry receipt: pass; bounded diagnostic backreaction residual.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "dynamic_campaign", "effective_geometry", "backreaction"],
+      symbols: [
+        "dynamicGeometryRef",
+        "effectiveGeometryRef",
+        "averagedSourceTensorRef",
+        "backreaction",
+        "dynamicGeometryAgreementPass",
+      ],
+      unitSignatures: [],
+      repoPaths: [
+        "shared/contracts/nhm2-time-dependent-source-campaign.v1.ts",
+        "shared/contracts/nhm2-dynamic-geometry-samples.v1.ts",
+        "tools/nhm2/build-dynamic-geometry-samples.ts",
+        "tools/nhm2/capture-gr-evolve-dynamic-geometry-samples.ts",
+        NHM2_GR_EVOLVE_DYNAMIC_GEOMETRY_SAMPLE,
+        "tools/nhm2/capture-gr-evolve-effective-geometry-reference.ts",
+        NHM2_GR_EVOLVE_EFFECTIVE_GEOMETRY_REFERENCE,
+        NHM2_EFFECTIVE_GEOMETRY_REFERENCE,
+        "tools/nhm2/build-dynamic-effective-geometry-evidence.ts",
+        "shared/contracts/nhm2-averaged-source-tensor-receipt.v1.ts",
+        "tools/nhm2/build-averaged-source-tensor-receipt.ts",
+        "shared/contracts/nhm2-backreaction-residual-receipt.v1.ts",
+        "tools/nhm2/build-backreaction-residual-receipt.ts",
+        NHM2_DYNAMIC_GEOMETRY_SAMPLES,
+        NHM2_AVERAGED_SOURCE_TENSOR_RECEIPT,
+        NHM2_BACKREACTION_RESIDUAL_RECEIPT,
+        NHM2_DYNAMIC_EFFECTIVE_GEOMETRY_EVIDENCE,
+      ],
+      equationFamilies: ["dynamic_effective_geometry", "time_dependent_source_campaign"],
+      simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
     id: "nhm2.dynamic.time_dependent_source_campaign",
     title: "Time-Dependent Source Campaign",
     plainMeaning:
@@ -1002,8 +1158,8 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
       artifactRef(
         NHM2_TIME_DEPENDENT_SOURCE_CAMPAIGN,
-        "sha256:b012bbcb8e4b9ec3f0754973e63fa388e39e0a9c97918015a9dcd43ccd535dc9",
-        "Pinned local smoke-chain campaign artifact: campaignPass=false; firstBlocker=dynamic_effective_geometry_evidence_missing.",
+        "sha256:ffbf9c9d2bc5fd4bea731e9d0f3d023c78b32ccaf4661c5d831806d878bb6108",
+        "Pinned local smoke-chain campaign artifact: campaignPass=false; firstBlocker=global:T00:full_tensor_residual_exceeded.",
       ),
       docRef(
         NHM2_FULL_SOLVE_WHITEPAPER,
@@ -2497,6 +2653,14 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "requires",
     label: "The time-dependent campaign requires fixed-cycle-average convergence over the frequency ladder.",
     claimBoundaryNote: "A frequency pass is still diagnostic and cannot imply physical viability.",
+  },
+  {
+    id: "dynamic_effective_geometry_feeds_time_dependent_campaign",
+    from: "nhm2.dynamic.effective_geometry_agreement",
+    to: "nhm2.dynamic.time_dependent_source_campaign",
+    relation: "requires",
+    label: "The time-dependent campaign requires dynamic/effective geometry agreement and bounded backreaction evidence.",
+    claimBoundaryNote: "A dynamic/effective geometry receipt is diagnostic and cannot grant route, propulsion, or physical viability claims.",
   },
   {
     id: "time_dependent_campaign_blocks_diagnostic_boundary",

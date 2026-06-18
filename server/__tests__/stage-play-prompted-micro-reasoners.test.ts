@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { validateStagePlayMicroReasonerRunV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import {
   buildStagePlayProcessedMailPacket,
   buildStagePlayProcessedMailPacketWithPromptedReasoners,
@@ -373,8 +374,13 @@ describe("prompted stage-play micro-reasoners", () => {
       status: "completed",
       deckProductRole: true,
       deckExecutionMode: "uses_prior_outputs",
-      outputPreview: expect.stringContaining("translatedText"),
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "micro_reasoner_evidence",
+      outputPreview: expect.stringContaining("\"schema\":\"stage_play_document_inline_translation_output/v1\""),
     });
+    expect(validateStagePlayMicroReasonerRunV1(composer)).toEqual([]);
     expect(result.packet.microReasonerRunRefs).toContain(composer?.runId);
     const packetRunRoles = result.packet.microReasonerRunRefs
       .map((runId) => result.microReasonerRuns.find((run) => run.runId === runId)?.role)

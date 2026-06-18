@@ -34,6 +34,62 @@ export const CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES = [
 
 export type CodexParityAgentSpineRailStatus = (typeof CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES)[number];
 
+export const CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS = [
+  "route_admission",
+  "capability_execution",
+  "observation_artifact",
+  "evidence_reentry",
+  "support_backed_draft",
+  "terminal_materialization",
+  "terminal_authority",
+  "visible_projection",
+  "config",
+] as const;
+
+export type CodexParityAgentSpineFirstBrokenRail =
+  (typeof CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS)[number];
+
+export const CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS = [
+  "intent_arbitration",
+  "agent_step_selection",
+  "tool_admission",
+  "tool_execution",
+  "tool_family_contract",
+  "observation_materializer",
+  "reentry_gate",
+  "repo_retrieval_repair_policy",
+  "draft_builder",
+  "terminal_materializer",
+  "terminal_authority",
+  "presenter_boundary",
+  "operator_config",
+] as const;
+
+export type CodexParityAgentSpineRepairTarget = (typeof CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS)[number];
+
+export const CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES = [
+  "explicit_capability_not_selected",
+  "wrong_capability_executed",
+  "route_family_mismatch",
+  "tool_admission_drift",
+  "tool_execution_rejected",
+  "required_observation_missing",
+  "observation_missing",
+  "observation_not_reentered",
+  "reentry_step_not_executed",
+  "weak_evidence_repair_loop",
+  "support_refs_missing",
+  "terminal_product_mismatch",
+  "terminal_not_materialized",
+  "terminal_authority_missing",
+  "terminal_projection_mismatch",
+  "debug_mirror_stale",
+  "config_missing",
+] as const;
+
+export type CodexParityAgentSpineRailFailureCode =
+  (typeof CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES)[number];
+
 export const CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS = [
   "prompt",
   "requested_capability",

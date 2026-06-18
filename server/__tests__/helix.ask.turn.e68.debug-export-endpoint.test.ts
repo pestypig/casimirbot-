@@ -3,6 +3,16 @@ import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { planRouter } from "../routes/agi.plan";
+import {
+  CODEX_PARITY_AGENT_SPINE_CLASSES,
+  CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS,
+  CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES,
+  CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES,
+  CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
+  CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES,
+  CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS,
+  CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS,
+} from "../services/helix-ask/codex-parity-agent-spine-contract";
 import { runtimeMemoryGovernor } from "../services/runtime/runtime-memory-governor";
 import {
   listStagePlayLiveSourceMailWakeResults,
@@ -30,58 +40,62 @@ const expectNullableStringField = (record: Record<string, unknown>, key: string)
   expect(value === null || typeof value === "string").toBe(true);
 };
 
-const CODEX_PARITY_CLASSES = [
-  "complete",
-  "tool_surface_missing",
-  "explicit_capability_demoted",
-  "tool_admission_rejected",
-  "selected_not_executed",
-  "observation_missing",
-  "observation_not_reentered",
-  "goal_contract_mismatch",
-  "terminal_product_not_allowed",
-  "terminal_authority_mismatch",
-  "visible_projection_mismatch",
-  "debug_mirror_stale",
-  "provider_config_missing",
-];
+const expectNonEmptyStringArrayField = (record: Record<string, unknown>, key: string): void => {
+  expect(record).toHaveProperty(key);
+  expect(Array.isArray(record[key])).toBe(true);
+  expect((record[key] as unknown[]).every((entry) => typeof entry === "string" && entry.trim().length > 0)).toBe(true);
+};
+
+const expectVisibleToolSurfaceMetadata = (record: Record<string, unknown>): void => {
+  expect(record).toHaveProperty("visible_tool_surface_original_count");
+  expect(record).toHaveProperty("visible_tool_surface_truncated");
+  expect(typeof record.visible_tool_surface_original_count).toBe("number");
+  expect(Number.isInteger(record.visible_tool_surface_original_count)).toBe(true);
+  expect((record.visible_tool_surface_original_count as number)).toBeGreaterThanOrEqual(0);
+  expect(typeof record.visible_tool_surface_truncated).toBe("boolean");
+  const visibleSurfaceLength = Array.isArray(record.visible_tool_surface) ? record.visible_tool_surface.length : 0;
+  expect((record.visible_tool_surface_original_count as number)).toBeGreaterThanOrEqual(visibleSurfaceLength);
+  if (record.visible_tool_surface_truncated === true) {
+    expect((record.visible_tool_surface_original_count as number)).toBeGreaterThan(visibleSurfaceLength);
+  } else {
+    expect(record.visible_tool_surface_original_count).toBe(visibleSurfaceLength);
+  }
+};
 
 const expectCodexParityRailTableShape = (railTable: Record<string, unknown>, turnId: string): void => {
   expect(railTable).toMatchObject({
-    schema: "helix.codex_parity_agent_spine_rail_table.v1",
+    schema: CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
     turn_id: turnId,
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,
   });
   expectNullableStringField(railTable, "prompt");
-  expect(Array.isArray(railTable.visible_tool_surface)).toBe(true);
-  for (const key of [
-    "requested_capability",
-    "selected_capability",
-    "admitted_capability",
-    "executed_capability",
-    "observation_kind",
-    "observation_ref",
-    "goal_satisfaction",
-    "required_terminal_kind",
-    "selected_terminal_kind",
-    "visible_terminal_kind",
-    "first_broken_rail",
-    "repair_target",
-    "rail_failure_code",
-  ]) {
+  expectNonEmptyStringArrayField(railTable, "visible_tool_surface");
+  expectVisibleToolSurfaceMetadata(railTable);
+  expectNonEmptyStringArrayField(railTable, "required_observation_kinds_for_requested_capability");
+  if (railTable.requested_capability) {
+    expect((railTable.required_observation_kinds_for_requested_capability as unknown[]).length).toBeGreaterThan(0);
+  }
+  for (const key of CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS) {
     expectNullableStringField(railTable, key);
   }
-  expect(["reentered", "not_reentered", "no_observation"]).toContain(railTable.reentry_status);
-  expect(["complete", "broken", "fail_closed"]).toContain(railTable.rail_status);
-  expect(CODEX_PARITY_CLASSES).toContain(railTable.codex_parity_class);
+  expect(CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES).toContain(railTable.reentry_status as never);
+  expect(CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES).toContain(railTable.rail_status as never);
+  expect(CODEX_PARITY_AGENT_SPINE_CLASSES).toContain(railTable.codex_parity_class as never);
   if (railTable.codex_parity_class === "complete" || railTable.rail_status === "complete") {
     expect(railTable.first_broken_rail).toBeNull();
     expect(railTable.rail_failure_code).toBeNull();
   } else {
     expect(typeof railTable.first_broken_rail).toBe("string");
     expect(String(railTable.first_broken_rail).length).toBeGreaterThan(0);
+    expect(CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS).toContain(railTable.first_broken_rail as never);
+    expect(typeof railTable.rail_failure_code).toBe("string");
+    expect(String(railTable.rail_failure_code).length).toBeGreaterThan(0);
+    expect(CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES).toContain(railTable.rail_failure_code as never);
+    expect(typeof railTable.repair_target).toBe("string");
+    expect(String(railTable.repair_target).length).toBeGreaterThan(0);
+    expect(CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS).toContain(railTable.repair_target as never);
   }
 };
 

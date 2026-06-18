@@ -22,6 +22,7 @@ import {
 } from "../../shared/contracts/nhm2-tile-effective-full-tensor-source.v1";
 import { isNhm2TileCounterpartConservationArtifact } from "../../shared/contracts/nhm2-tile-counterpart-conservation.v1";
 import { isNhm2QeiDossierArtifact } from "../../shared/contracts/nhm2-qei-dossier.v1";
+import { isNhm2QeiWorldlineDossier } from "../../shared/contracts/nhm2-qei-worldline-dossier.v1";
 
 const SOURCE_LITERATURE_REFS = [
   "natario_2001_zero_expansion",
@@ -113,6 +114,21 @@ const normalizeTensor = (value: unknown): Nhm2RegionalTensor => {
     if (component in record) tensor[component] = asNumber(record[component]);
   }
   return tensor;
+};
+
+const qeiDossierPasses = (value: unknown): boolean => {
+  if (isNhm2QeiDossierArtifact(value)) {
+    return value.qeiApplicabilityStatus === "PASS";
+  }
+  if (isNhm2QeiWorldlineDossier(value)) {
+    return (
+      value.summary.dossierComplete &&
+      value.summary.hasWallWorldline &&
+      value.summary.allMarginsPass === true &&
+      !value.summary.anyProxy
+    );
+  }
+  return false;
 };
 
 const componentSet = (tensor: Nhm2RegionalTensor): Set<Nhm2TensorComponent> =>
@@ -387,7 +403,7 @@ export const publishTileEffectiveFullTensorSource = (args: {
     args.conservationPath != null && existsSync(resolvePath(args.repoRoot, args.conservationPath))
       ? readJson(resolvePath(args.repoRoot, args.conservationPath))
       : null;
-  const qeiArtifact = isNhm2QeiDossierArtifact(qei) ? qei : null;
+  const qeiPass = qeiDossierPasses(qei);
   const conservationArtifact = isNhm2TileCounterpartConservationArtifact(conservation)
     ? conservation
     : null;
@@ -432,7 +448,7 @@ export const publishTileEffectiveFullTensorSource = (args: {
     if (!sourceSideOnly) blockers.push("source_model_not_source_side_only");
     if (!notDerivedFromMetricRequiredTensor) blockers.push("metric_required_derivation_not_allowed");
     if (metricRequiredInputRefs.length > 0) blockers.push("metric_required_input_refs_present");
-    if (args.qeiDossierPath == null || qeiArtifact == null || qeiArtifact.qeiApplicabilityStatus !== "PASS") {
+    if (args.qeiDossierPath == null || !qeiPass) {
       blockers.push("qei_dossier_not_pass");
     }
     const conservationBlocker = conservationBlockerForRegion(regionId);

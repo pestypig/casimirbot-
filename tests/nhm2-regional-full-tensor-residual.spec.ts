@@ -142,4 +142,23 @@ describe("nhm2_regional_full_tensor_residual/v1", () => {
     expect(artifact.summary.worstComponentId).toBe("T12");
     expect(artifact.summary.fullTensorResidualsPass).toBe(false);
   });
+
+  it("reports component first blockers without duplicating the region prefix", () => {
+    const globalTensor = tensor(10);
+    globalTensor.T00 = -20;
+    const artifact = buildNhm2RegionalFullTensorResidual({
+      regionalSourceClosureEvidence: evidence({
+        global: {
+          tileEffectiveCounterpart: {
+            ...region("global").tileEffectiveCounterpart,
+            tensor: globalTensor,
+          },
+          blockers: ["residual_exceeded"],
+        },
+      }),
+    });
+
+    expect(artifact.summary.firstBlocker).toBe("global:T00:full_tensor_residual_exceeded");
+    expect(artifact.summary.firstBlocker).not.toContain("global:global:");
+  });
 });

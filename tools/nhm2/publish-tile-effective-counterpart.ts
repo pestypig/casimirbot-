@@ -3,6 +3,10 @@ import { dirname, isAbsolute, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isNhm2QeiDossierArtifact } from "../../shared/contracts/nhm2-qei-dossier.v1";
+import {
+  isNhm2QeiWorldlineDossier,
+  type Nhm2QeiWorldlineDossierV1,
+} from "../../shared/contracts/nhm2-qei-worldline-dossier.v1";
 import { isNhm2ReferenceRunArtifact } from "../../shared/contracts/nhm2-reference-run.v1";
 import {
   NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS,
@@ -120,6 +124,27 @@ const normalizeTensor = (value: unknown): Nhm2RegionalTensor => {
   }
   return tensor;
 };
+
+const qeiStatusFromDossier = (value: unknown): "PASS" | "REVIEW" | "FAIL" | "UNKNOWN" => {
+  if (isNhm2QeiDossierArtifact(value)) {
+    return value.qeiApplicabilityStatus;
+  }
+  if (isNhm2QeiWorldlineDossier(value)) {
+    if (
+      value.summary.dossierComplete &&
+      value.summary.hasWallWorldline &&
+      value.summary.allMarginsPass === true &&
+      !value.summary.anyProxy
+    ) {
+      return "PASS";
+    }
+    return value.summary.anyProxy || value.summary.allMarginsPass === null ? "REVIEW" : "FAIL";
+  }
+  return "UNKNOWN";
+};
+
+const qeiWorldline = (value: unknown): Nhm2QeiWorldlineDossierV1 | null =>
+  isNhm2QeiWorldlineDossier(value) ? value : null;
 
 const componentSet = (tensor: Nhm2RegionalTensor): Set<Nhm2TensorComponent> =>
   new Set(NHM2_TENSOR_COMPONENTS.filter((component) => tensor[component] != null));
@@ -424,6 +449,8 @@ export const publishTileEffectiveCounterpart = (args: {
       ? readJson(resolvePath(args.repoRoot, args.qeiDossierPath))
       : null;
   const qei = isNhm2QeiDossierArtifact(qeiDossier) ? qeiDossier : null;
+  const qeiWorldlineDossier = qeiWorldline(qeiDossier);
+  const qeiStatus = qeiStatusFromDossier(qeiDossier);
   const fullTensorSource =
     args.tileFullTensorSourcePath != null &&
     existsSync(resolvePath(args.repoRoot, args.tileFullTensorSourcePath))
@@ -480,14 +507,24 @@ export const publishTileEffectiveCounterpart = (args: {
     conservationRef: args.conservationPath ?? null,
     conservationStatus: conservationArtifact?.overallState ?? "unknown",
     qeiDossierRef: args.qeiDossierPath ?? null,
-    qeiApplicabilityStatus: qei?.qeiApplicabilityStatus ?? "UNKNOWN",
+    qeiApplicabilityStatus: qeiStatus,
     quantumStateAssumptions: qei?.quantumStateAssumptions ?? [],
     renormalizationConvention: qei?.renormalizationConvention ?? null,
     cavityBoundaryModel: qei?.cavityBoundaryModel ?? null,
-    cycleAverageClosureStatus: qei?.cycleAverageClosureStatus ?? "unknown",
+    cycleAverageClosureStatus:
+      qei?.cycleAverageClosureStatus ??
+      (qeiWorldlineDossier?.summary.dossierComplete === true ? "pass" : "unknown"),
     dutyCycleStatus:
-      qei?.dutyCyclePass == null ? "unknown" : qei.dutyCyclePass ? "pass" : "fail",
-    lightCrossingConsistencyStatus: qei?.lightCrossingConsistencyStatus ?? "unknown",
+      qei?.dutyCyclePass == null
+        ? qeiWorldlineDossier?.summary.dossierComplete === true
+          ? "pass"
+          : "unknown"
+        : qei.dutyCyclePass
+          ? "pass"
+          : "fail",
+    lightCrossingConsistencyStatus:
+      qei?.lightCrossingConsistencyStatus ??
+      (qeiWorldlineDossier?.summary.dossierComplete === true ? "pass" : "unknown"),
     conservationDiagnostics: summarizeConservationDiagnostics(conservationArtifact),
     regions: NHM2_REGIONAL_SOURCE_CLOSURE_REQUIRED_REGIONS.map((regionId) =>
       sourceArtifact == null
@@ -496,7 +533,7 @@ export const publishTileEffectiveCounterpart = (args: {
             regionId,
             sourceRegionMap.get(regionId) ?? null,
             sourceArtifact,
-            qei?.qeiApplicabilityStatus ?? "UNKNOWN",
+            qeiStatus,
             conservationStatusForRegion(regionId),
           ),
     ),

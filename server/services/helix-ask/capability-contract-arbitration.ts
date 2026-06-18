@@ -96,6 +96,8 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
     case "live_env.change_workstation_preset":
     case "live_env.bind_workstation_source":
     case "live_env.unbind_workstation_source":
+    case "live_env.pause_workstation_loop":
+    case "live_env.resume_workstation_loop":
     case "live_env.set_workstation_loop_state":
     case "live_env.repair_workstation_source":
     case "live_env.update_live_answer_projection":
@@ -132,6 +134,8 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
     case "live_env.change_workstation_preset":
     case "live_env.bind_workstation_source":
     case "live_env.unbind_workstation_source":
+    case "live_env.pause_workstation_loop":
+    case "live_env.resume_workstation_loop":
     case "live_env.set_workstation_loop_state":
     case "live_env.repair_workstation_source":
     case "live_env.update_live_answer_projection":

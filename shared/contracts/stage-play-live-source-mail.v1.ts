@@ -705,6 +705,153 @@ export type StagePlayMicroReasonerRunV1 = {
   context_role: "tool_evidence" | "micro_reasoner_evidence";
 };
 
+const STAGE_PLAY_MICRO_REASONER_RUN_ROLES = [
+  "claim_extractor",
+  "observation_classifier",
+  "effort_estimator",
+  "axiom_extractor",
+  "hypothesis_generator",
+  "profile_comparator",
+  "delta_extractor",
+  "prediction_validator",
+  "salience_scorer",
+  "hypothesis_arbiter",
+  "prompt_router",
+  "packet_composer",
+  "decision_selector",
+  "voice_callout_drafter",
+] as const;
+
+const STAGE_PLAY_MICRO_REASONER_RUN_STATUSES = [
+  "queued",
+  "running",
+  "completed",
+  "failed",
+  "skipped",
+] as const;
+
+const STAGE_PLAY_MICRO_REASONER_RUN_REASONING_MODES = [
+  "micro_live_interval",
+  "deterministic_batch",
+  "ask_review",
+] as const;
+
+const STAGE_PLAY_MICRO_REASONER_RUN_RECOMMENDED_NEXT = [
+  "wait_for_next_summary",
+  "record_interpretation",
+  "draft_text_answer",
+  "request_voice_callout",
+  "request_more_evidence",
+  "request_stage_play_checkpoint",
+] as const;
+
+const STAGE_PLAY_MICRO_REASONER_RUN_SALIENCE_LEVELS = [
+  "low",
+  "medium",
+  "high",
+  "urgent",
+] as const;
+
+const STAGE_PLAY_MICRO_REASONER_RUN_CONFIDENCE = [
+  "low",
+  "medium",
+  "high",
+] as const;
+
+const isStagePlayRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const isStagePlayNonEmptyString = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length > 0;
+
+const isStagePlayStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === "string");
+
+const stagePlayIncludes = <T extends readonly string[]>(
+  values: T,
+  value: unknown,
+): value is T[number] => typeof value === "string" && values.includes(value);
+
+export function validateStagePlayMicroReasonerRunV1(value: unknown): string[] {
+  const issues: string[] = [];
+  if (!isStagePlayRecord(value)) return ["micro reasoner run must be an object"];
+
+  if (value.artifactId !== "stage_play_micro_reasoner_run") {
+    issues.push("artifactId must be stage_play_micro_reasoner_run");
+  }
+  if (value.schemaVersion !== STAGE_PLAY_MICRO_REASONER_RUN_SCHEMA) {
+    issues.push(`schemaVersion must be ${STAGE_PLAY_MICRO_REASONER_RUN_SCHEMA}`);
+  }
+  if (!isStagePlayNonEmptyString(value.runId)) issues.push("runId must be a non-empty string");
+  if (value.promptId != null && !isStagePlayNonEmptyString(value.promptId)) {
+    issues.push("promptId must be a non-empty string or null");
+  }
+  if (value.deckPresetId != null && !isStagePlayNonEmptyString(value.deckPresetId)) {
+    issues.push("deckPresetId must be a non-empty string or null");
+  }
+  if (!stagePlayIncludes(STAGE_PLAY_MICRO_REASONER_RUN_ROLES, value.role)) {
+    issues.push("role is invalid");
+  }
+  if (!isStagePlayNonEmptyString(value.jobId)) issues.push("jobId must be a non-empty string");
+  if (!isStagePlayNonEmptyString(value.sourceId)) issues.push("sourceId must be a non-empty string");
+  if (!isStagePlayStringArray(value.mailIds)) issues.push("mailIds must be strings");
+  if (!isStagePlayStringArray(value.inputRefs)) issues.push("inputRefs must be strings");
+  if (!isStagePlayStringArray(value.outputRefs)) issues.push("outputRefs must be strings");
+  if (!isStagePlayNonEmptyString(value.inputPreview)) issues.push("inputPreview must be a non-empty string");
+  if (!isStagePlayNonEmptyString(value.outputPreview)) issues.push("outputPreview must be a non-empty string");
+  if (!stagePlayIncludes(STAGE_PLAY_MICRO_REASONER_RUN_STATUSES, value.status)) {
+    issues.push("status is invalid");
+  }
+  if (
+    value.reasoningMode != null
+    && !stagePlayIncludes(STAGE_PLAY_MICRO_REASONER_RUN_REASONING_MODES, value.reasoningMode)
+  ) {
+    issues.push("reasoningMode is invalid");
+  }
+  if (
+    value.selectedDecision != null
+    && !stagePlayIncludes(STAGE_PLAY_MICRO_REASONER_RUN_RECOMMENDED_NEXT, value.selectedDecision)
+  ) {
+    issues.push("selectedDecision is invalid");
+  }
+  if (
+    value.salienceLevel != null
+    && !stagePlayIncludes(STAGE_PLAY_MICRO_REASONER_RUN_SALIENCE_LEVELS, value.salienceLevel)
+  ) {
+    issues.push("salienceLevel is invalid");
+  }
+  if (
+    value.confidence != null
+    && !stagePlayIncludes(STAGE_PLAY_MICRO_REASONER_RUN_CONFIDENCE, value.confidence)
+  ) {
+    issues.push("confidence is invalid");
+  }
+  if (value.missingEvidence != null && !isStagePlayStringArray(value.missingEvidence)) {
+    issues.push("missingEvidence must be strings");
+  }
+  if (!isStagePlayNonEmptyString(value.startedAt)) issues.push("startedAt must be a non-empty string");
+  if (value.completedAt != null && typeof value.completedAt !== "string") {
+    issues.push("completedAt must be a string or null");
+  }
+  if (value.assistant_answer !== false) issues.push("assistant_answer must be false");
+  if (value.terminal_eligible !== false) issues.push("terminal_eligible must be false");
+  if (value.raw_content_included !== false) issues.push("raw_content_included must be false");
+  if (
+    value.context_role !== "tool_evidence"
+    && value.context_role !== "micro_reasoner_evidence"
+  ) {
+    issues.push("context_role must be tool_evidence or micro_reasoner_evidence");
+  }
+
+  return issues;
+}
+
+export function isStagePlayMicroReasonerRunV1(
+  value: unknown,
+): value is StagePlayMicroReasonerRunV1 {
+  return validateStagePlayMicroReasonerRunV1(value).length === 0;
+}
+
 export type StagePlayDocumentInlineTranslationOutputV1 = {
   schema: typeof STAGE_PLAY_DOCUMENT_INLINE_TRANSLATION_OUTPUT_SCHEMA;
   schemaVersion: typeof STAGE_PLAY_DOCUMENT_INLINE_TRANSLATION_OUTPUT_SCHEMA;

@@ -107,6 +107,17 @@ export function guardSituationRoomReceiptFactDrift(
 ): SituationRoomReceiptFactDriftGuardResult {
   const text = input.text;
   const payload = input.payload ?? null;
+  const presentation = readRecord(payload?.terminal_presentation);
+  const terminalArtifactKind =
+    readString(payload?.terminal_artifact_kind) ?? readString(presentation?.terminal_artifact_kind);
+  if (terminalArtifactKind === "capability_help_summary") {
+    return {
+      text,
+      repaired: false,
+      codes: [],
+      evidence_text: null,
+    };
+  }
   const serialized = stringifyEvidence({
     payload,
     artifacts: input.artifacts ?? [],

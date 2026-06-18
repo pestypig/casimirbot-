@@ -238,12 +238,12 @@ const buildRegion = (
     null,
   );
   const blockers = [
-    ...sourceRegion.blockers.map((blocker) => `source_evidence:${blocker}`),
     ...(metricAuthorityBlocker == null ? [] : [metricAuthorityBlocker]),
     ...(tileAuthorityBlocker == null ? [] : [tileAuthorityBlocker]),
     ...missingMetricComponentIds.map((componentId) => `${componentId}:metric_component_missing`),
     ...missingTileComponentIds.map((componentId) => `${componentId}:tile_component_missing`),
     ...components.flatMap((component) => component.blockers),
+    ...sourceRegion.blockers.map((blocker) => `source_evidence:${blocker}`),
   ];
   const hasMissing = components.some((component) => component.status === "missing");
   const hasFail = components.some((component) => component.status === "fail");
@@ -312,7 +312,9 @@ export const buildNhm2RegionalFullTensorResidual = (
     null,
   );
   const blockers = regions.flatMap((region) =>
-    region.blockers.map((blocker) => `${region.regionId}:${blocker}`),
+    region.blockers.map((blocker) =>
+      blocker.startsWith(`${region.regionId}:`) ? blocker : `${region.regionId}:${blocker}`,
+    ),
   );
   return {
     contractVersion: NHM2_REGIONAL_FULL_TENSOR_RESIDUAL_CONTRACT_VERSION,

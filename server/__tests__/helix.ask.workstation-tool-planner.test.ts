@@ -1279,6 +1279,28 @@ describe("Helix Ask workstation tool planner", () => {
         },
       },
       {
+        prompt: "Run live_env.pause_workstation_loop goal_id=goal:frog loop_ref=loop:visual-mail",
+        turnId: "turn:pause-loop-alias",
+        stepId: "pause_workstation_loop",
+        toolId: "live_env.pause_workstation_loop",
+        args: {
+          goal_id: "goal:frog",
+          loop_ref: "loop:visual-mail",
+          state: "paused",
+        },
+      },
+      {
+        prompt: "Run live_env.resume_workstation_loop goal_id=goal:frog loop_ref=loop:visual-mail",
+        turnId: "turn:resume-loop-alias",
+        stepId: "resume_workstation_loop",
+        toolId: "live_env.resume_workstation_loop",
+        args: {
+          goal_id: "goal:frog",
+          loop_ref: "loop:visual-mail",
+          state: "running",
+        },
+      },
+      {
         prompt: "Run live_env.set_workstation_loop_state goal_id=goal:frog loop_ref=loop:visual-mail state=paused",
         turnId: "turn:pause-loop",
         stepId: "set_workstation_loop_state",
@@ -1362,6 +1384,8 @@ describe("Helix Ask workstation tool planner", () => {
       'The UI label says "live_env.focus_process_graph"; summarize it.',
       "Could we bind the source to Live Answer later?",
       "Previously you paused the loop; what did that mean?",
+      'The UI label says "live_env.pause_workstation_loop"; summarize it.',
+      "If we later run live_env.resume_workstation_loop, what loop refs should we gather?",
       "Do not repair workstation source; explain the repair policy.",
       'The UI label says "live_env.repair_workstation_source"; summarize it.',
       "The screen shows a button labeled Apply preset; describe the screen text.",

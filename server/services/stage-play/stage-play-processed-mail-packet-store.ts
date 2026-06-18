@@ -11,6 +11,7 @@ import type {
 import {
   STAGE_PLAY_MICRO_REASONER_PROMPT_PRESET_SCHEMA,
   STAGE_PLAY_MICRO_REASONER_PROMPT_SCHEMA,
+  validateStagePlayMicroReasonerRunV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import {
   ADAPTIVE_VISUAL_LENS_CONTROLLER_PRESET_ID,
@@ -2046,6 +2047,10 @@ export function listStagePlayMicroReasonerPrompts(input: {
 export function recordStagePlayMicroReasonerRun(
   run: StagePlayMicroReasonerRunV1,
 ): StagePlayMicroReasonerRunV1 {
+  const validationIssues = validateStagePlayMicroReasonerRunV1(run);
+  if (validationIssues.length > 0) {
+    throw new Error(`Invalid stage play micro reasoner run: ${validationIssues.join("; ")}`);
+  }
   runsById.set(run.runId, run);
   return run;
 }

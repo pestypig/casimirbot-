@@ -1,9 +1,12 @@
 import type { HelixApiParityExpected, HelixApiParityScenario } from "./api-parity-matrix";
 import {
   CODEX_PARITY_AGENT_SPINE_CLASSES,
+  CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS,
   CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES,
+  CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES,
   CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
   CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES,
+  CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS,
   CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS,
 } from "./codex-parity-agent-spine-contract";
 
@@ -111,6 +114,12 @@ const readString = (value: unknown): string | null =>
 
 const readStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry: unknown): entry is string => typeof entry === "string" && entry.trim().length > 0) : [];
+
+const isNonEmptyStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((entry) => typeof entry === "string" && entry.trim().length > 0);
+
+const readNonNegativeInteger = (value: unknown): number | null =>
+  typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
 
 const getPath = (value: unknown, pathParts: string[]): unknown =>
   pathParts.reduce<unknown>((current: unknown, key: string) => {
@@ -314,7 +323,40 @@ const addRailTableFailures = (input: {
   if (railTable.assistant_answer !== false) failures.push("rail_assistant_answer_not_false");
   if (railTable.terminal_eligible !== false) failures.push("rail_terminal_eligible_not_false");
   if (railTable.raw_content_included !== false) failures.push("rail_raw_content_included_not_false");
-  if (!Array.isArray(railTable.visible_tool_surface)) failures.push("rail_visible_tool_surface_missing");
+  if (!Array.isArray(railTable.visible_tool_surface)) {
+    failures.push("rail_visible_tool_surface_missing");
+  } else if (!isNonEmptyStringArray(railTable.visible_tool_surface)) {
+    failures.push("rail_visible_tool_surface_entries_invalid");
+  }
+  const visibleSurfaceCount = readNonNegativeInteger(railTable.visible_tool_surface_original_count);
+  const visibleSurfaceTruncated =
+    typeof railTable.visible_tool_surface_truncated === "boolean" ? railTable.visible_tool_surface_truncated : null;
+  if (visibleSurfaceCount === null) {
+    failures.push("rail_visible_tool_surface_original_count_invalid");
+  }
+  if (visibleSurfaceTruncated === null) {
+    failures.push("rail_visible_tool_surface_truncated_invalid");
+  }
+  if (Array.isArray(railTable.visible_tool_surface) && visibleSurfaceCount !== null) {
+    const visibleSurfaceLength = railTable.visible_tool_surface.length;
+    if (visibleSurfaceCount < visibleSurfaceLength) {
+      failures.push("rail_visible_tool_surface_original_count_less_than_surface");
+    }
+    if (visibleSurfaceTruncated === true && visibleSurfaceCount <= visibleSurfaceLength) {
+      failures.push("rail_visible_tool_surface_truncated_without_hidden_entries");
+    }
+    if (visibleSurfaceTruncated === false && visibleSurfaceCount !== visibleSurfaceLength) {
+      failures.push("rail_visible_tool_surface_untruncated_count_mismatch");
+    }
+  }
+  if (!Array.isArray(railTable.required_observation_kinds_for_requested_capability)) {
+    failures.push("rail_required_observation_kinds_missing");
+  } else if (!isNonEmptyStringArray(railTable.required_observation_kinds_for_requested_capability)) {
+    failures.push("rail_required_observation_kinds_entries_invalid");
+  }
+  if (!isNonEmptyStringArray(railTable.normalized_codex_parity_classes)) {
+    failures.push("rail_normalized_codex_parity_classes_entries_invalid");
+  }
   for (const key of CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS) {
     const value = railTable[key];
     if (value !== null && typeof value !== "string") failures.push(`rail_string_or_null_field_invalid:${key}`);
@@ -324,6 +366,33 @@ const addRailTableFailures = (input: {
   }
   if (!CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES.includes(railTable.rail_status as never)) {
     failures.push(`rail_status_invalid:${readString(railTable.rail_status) ?? "missing"}`);
+  }
+  const firstBrokenRail = readString(railTable.first_broken_rail);
+  if (
+    firstBrokenRail &&
+    !CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS.includes(
+      firstBrokenRail as (typeof CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS)[number],
+    )
+  ) {
+    failures.push(`rail_first_broken_rail_invalid:${firstBrokenRail}`);
+  }
+  const repairTarget = readString(railTable.repair_target);
+  if (
+    repairTarget &&
+    !CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS.includes(
+      repairTarget as (typeof CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS)[number],
+    )
+  ) {
+    failures.push(`rail_repair_target_invalid:${repairTarget}`);
+  }
+  const railFailureCode = readString(railTable.rail_failure_code);
+  if (
+    railFailureCode &&
+    !CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES.includes(
+      railFailureCode as (typeof CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES)[number],
+    )
+  ) {
+    failures.push(`rail_failure_code_invalid:${railFailureCode}`);
   }
   const parityClass = readString(railTable.codex_parity_class);
   if (!CODEX_PARITY_AGENT_SPINE_CLASSES.includes(parityClass as (typeof CODEX_PARITY_AGENT_SPINE_CLASSES)[number])) {
@@ -366,8 +435,8 @@ const addRailTableFailures = (input: {
   if ((railStatus === "complete") !== (parityClass === "complete")) {
     failures.push(`rail_completion_status_class_mismatch:${railStatus ?? "missing"}/${parityClass ?? "missing"}`);
   }
-  if (requestedCapability && !Array.isArray(railTable.required_observation_kinds_for_requested_capability)) {
-    failures.push("rail_requested_observation_kinds_missing");
+  if (requestedCapability && requiredObservationKinds.length === 0) {
+    failures.push("rail_requested_observation_kinds_empty");
   }
   if (requestedCapability && typeof observationSupportsRequested !== "boolean") {
     failures.push("rail_observation_support_verdict_missing");
@@ -380,11 +449,17 @@ const addRailTableFailures = (input: {
   ) {
     failures.push("rail_goal_satisfied_without_requested_observation_support");
   }
-  if (parityClass === "complete" && readString(railTable.first_broken_rail)) {
-    failures.push(`rail_complete_with_first_broken_rail:${readString(railTable.first_broken_rail)}`);
+  if (parityClass === "complete" && firstBrokenRail) {
+    failures.push(`rail_complete_with_first_broken_rail:${firstBrokenRail}`);
   }
-  if (parityClass !== "complete" && !readString(railTable.first_broken_rail)) {
+  if (parityClass !== "complete" && !firstBrokenRail) {
     failures.push("rail_non_complete_without_first_broken_rail");
+  }
+  if (parityClass !== "complete" && !railFailureCode) {
+    failures.push("rail_non_complete_without_rail_failure_code");
+  }
+  if (parityClass !== "complete" && !repairTarget) {
+    failures.push("rail_non_complete_without_repair_target");
   }
   const selectedTerminalKind = readString(railTable.selected_terminal_kind);
   const visibleTerminalKind = readString(railTable.visible_terminal_kind);

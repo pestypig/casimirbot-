@@ -227,8 +227,16 @@ const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
     aliases: ["unbind_workstation_source", "unbind_source"],
   }),
   liveEnvironmentControlContract({
+    capability: "live_env.pause_workstation_loop",
+    aliases: ["pause_workstation_loop", "pause_loop"],
+  }),
+  liveEnvironmentControlContract({
+    capability: "live_env.resume_workstation_loop",
+    aliases: ["resume_workstation_loop", "resume_loop"],
+  }),
+  liveEnvironmentControlContract({
     capability: "live_env.set_workstation_loop_state",
-    aliases: ["set_workstation_loop_state", "pause_workstation_loop", "resume_workstation_loop"],
+    aliases: ["set_workstation_loop_state"],
   }),
   liveEnvironmentControlContract({
     capability: "live_env.repair_workstation_source",

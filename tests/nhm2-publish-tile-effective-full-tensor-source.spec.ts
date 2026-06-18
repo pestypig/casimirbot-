@@ -3,7 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { buildNhm2QeiWorldlineDossier } from "../shared/contracts/nhm2-qei-worldline-dossier.v1";
 import { buildNhm2ReferenceRunArtifact } from "../shared/contracts/nhm2-reference-run.v1";
+import { buildNhm2TileCounterpartConservationArtifact } from "../shared/contracts/nhm2-tile-counterpart-conservation.v1";
+import { publishTileEffectiveCounterpart } from "../tools/nhm2/publish-tile-effective-counterpart";
 import { publishTileEffectiveFullTensorSource } from "../tools/nhm2/publish-tile-effective-full-tensor-source";
 
 const profile = "stage1_centerline_alpha_0p995_v1";
@@ -61,6 +64,51 @@ const sourceInput = (overrides = {}) => ({
   ...overrides,
 });
 
+const qeiWorldlineDossier = () =>
+  buildNhm2QeiWorldlineDossier({
+    generatedAt: "2026-06-18T00:00:00.000Z",
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId: profile,
+    worldlines: [
+      {
+        worldlineId: "wall-qei",
+        regionId: "wall",
+        chartId: "comoving_cartesian",
+        samplingFunction: { kind: "lorentzian", tauSeconds: 1e-9, normalized: true },
+        sampledRho: { valueSI: -1, status: "computed" },
+        bound: { valueSI: 2, status: "literature_bound" },
+        margin: { valueSI: 3, pass: true },
+        consistency: {
+          tauVsDuty: "pass",
+          tauVsLightCrossing: "pass",
+          tauVsModulation: "pass",
+        },
+        blockers: [],
+      },
+    ],
+  });
+
+const conservation = () =>
+  buildNhm2TileCounterpartConservationArtifact({
+    runId: "run-1",
+    selectedProfileId: profile,
+    expectedProfileId: profile,
+    laneId: "nhm2_shift_lapse",
+    chartRef: "comoving_cartesian",
+    derivativeStencil: "fd4",
+    unitsRef: "J/m^3",
+    regions: ["global", "hull", "wall", "exterior_shell"].map((regionId) => ({
+      regionId: regionId as "global" | "hull" | "wall" | "exterior_shell",
+      status: "pass" as const,
+      divTResidualLInf: 0.01,
+      continuityResidualLInf: 0.01,
+      momentumResidualLInf: 0.01,
+      toleranceLInf: 0.1,
+      sampleCount: 4,
+      blockers: [],
+    })),
+  });
+
 const withTemp = (fn: (root: string) => void) => {
   const root = mkdtempSync(join(tmpdir(), "nhm2-full-tensor-source-"));
   try {
@@ -101,6 +149,37 @@ describe("publish tile-effective full-tensor source", () => {
       });
       expect(artifact.overallState).toBe("fail");
       expect(artifact.reasonCodes).toContain("metric_required_input_refs_present");
+    }));
+
+  it("accepts current QEI worldline dossiers as source-side QEI pass evidence", () =>
+    withTemp((root) => {
+      writeFileSync(join(root, "source.json"), JSON.stringify(sourceInput()), "utf8");
+      writeFileSync(join(root, "source-closure.json"), JSON.stringify({}), "utf8");
+      writeFileSync(join(root, "qei-worldline.json"), JSON.stringify(qeiWorldlineDossier()), "utf8");
+      writeFileSync(join(root, "conservation.json"), JSON.stringify(conservation()), "utf8");
+      const artifact = publishTileEffectiveFullTensorSource({
+        repoRoot: root,
+        referenceRunPath: "reference.json",
+        sourceInputPath: "source.json",
+        qeiDossierPath: "qei-worldline.json",
+        conservationPath: "conservation.json",
+        outPath: "out.json",
+      });
+      const counterpart = publishTileEffectiveCounterpart({
+        repoRoot: root,
+        referenceRunPath: "reference.json",
+        sourceClosurePath: "source-closure.json",
+        tileFullTensorSourcePath: "out.json",
+        qeiDossierPath: "qei-worldline.json",
+        conservationPath: "conservation.json",
+        outPath: "counterpart.json",
+      });
+
+      expect(artifact.overallState).toBe("pass");
+      expect(artifact.reasonCodes).not.toContain("hull:qei_dossier_not_pass");
+      expect(artifact.reasonCodes).not.toContain("hull:conservation_unknown");
+      expect(counterpart.qeiApplicabilityStatus).toBe("PASS");
+      expect(counterpart.regions.find((region) => region.regionId === "wall")?.blockers).toEqual([]);
     }));
 
   it("keeps diagonal source input in review, never pass", () =>

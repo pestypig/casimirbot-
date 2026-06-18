@@ -519,7 +519,14 @@ Pinned local artifact hashes for the smoke-chain rows are:
 | `nhm2-tile-counterpart-conservation.json` | `de16c4746ef180df25e2fd13b7e4e83bf89a1bdd3fa7a507ada9ae26eb8e36d9` |
 | `nhm2-switching-covariant-conservation-evidence.json` | `3fad6ae8f58fd4c6648ac78a1756c02b7902f69b25ffee0eeafaeca99dee2b34` |
 | `nhm2-frequency-convergence-evidence.json` | `653026c32333e63143c5f0da967f527720185776cefbaeb907a3d83a7043a743` |
-| `nhm2-time-dependent-source-campaign.json` | `b012bbcb8e4b9ec3f0754973e63fa388e39e0a9c97918015a9dcd43ccd535dc9` |
+| `nhm2-gr-evolve-dynamic-geometry-sample-000.json` | `fa86257dcbe43705998e8eb0de90dcc8d4070beaf371bd295762c788a3a9f51d` |
+| `nhm2-dynamic-geometry-samples.json` | `9e4c0632075e682361a396140fc8a289adced8674cebf5951c6ba8dd2897bdec` |
+| `nhm2-gr-evolve-effective-geometry-reference-000.json` | `d174fcd2fda6a4f1d58e2fded84b45fb8d480c15be8a00202ab31dbf6ce9ecb8` |
+| `nhm2-effective-geometry-reference.json` | `b5682e31389d31ebb2e091b805370d834912ead53c7716221001b0d666f6cee8` |
+| `nhm2-averaged-source-tensor-receipt.json` | `3952a494ab657998aa69593f899a964ee67c54f124e38b140bcf74a57be39a79` |
+| `nhm2-backreaction-residual-receipt.json` | `f3f70b36065f1138a195bd74600a34598ff5abd84df070f8386a0be577ad181b` |
+| `nhm2-dynamic-effective-geometry-evidence.json` | `f43d392b011af51c11945662d315326c7b75ceefd34f7d851ce7a5a05371491d` |
+| `nhm2-time-dependent-source-campaign.json` | `084e9deb9fa0ef634841c71fe204056b14bfe924475696d3b8bc7886016b0d75` |
 
 | Gate | June pass-path / smoke-chain state | Claim boundary |
 |---|---|---|
@@ -529,6 +536,7 @@ Pinned local artifact hashes for the smoke-chain rows are:
 | Conservation | Reduced transition-kernel diagnostic can pass, with regional `divT` rows below `0.1`. | Stricter covariant derivative support remains review in the pass-path harness. |
 | Switching conservation | Declared smoke-chain switching evidence includes regional-support, sector-boundary, time-derivative, and transition-kernel terms with `overallResidualLInf = 0.045` under `0.1`. | Dynamic-sector evidence-admission only; not a physical conservation proof. |
 | Frequency convergence | Declared smoke-chain ladder `f, 2f, 4f, 8f` passes at fixed cycle-average source, with `relLInf` decreasing from `0.08` to `0.01`. | Frequency ladder diagnostic only; not dynamic geometry agreement. |
+| Dynamic/effective geometry agreement | Fail-closed dynamic and effective geometry receipts now exist: the smoke chain has one computed dynamic `gr-evolve-brick` sample, one static/effective `gr-evolve-brick` reference, one averaged source tensor receipt with source-side full-tensor provenance, and one backreaction residual receipt. The compared ADM/BSSN channel residual is bounded in the smoke chain. | This sharpens the frontier from `backreaction_residual_not_bounded` to `regional_full_tensor_components_missing`; it is still diagnostic and does not prove physical viability. |
 | Observer robustness | Robust check is incomplete and has violations; continuous optimizer is not implemented. | Observer gate remains fail / incomplete. |
 | Coupled closure | `passCandidate = false`; first blocker is currently `basis_mismatch` in the smoke artifact. | No diagnostic closure candidate yet. |
 | Regional tensor pass-path harness | `numericalPassPathReady = false`; first blocker is `global:source_evidence:metric_required_full_tensor_authority_missing`. | Harness still blocks pass-path readiness. |
@@ -540,7 +548,7 @@ Pinned local artifact hashes for the smoke-chain rows are:
 
 The next-tier physical-pass campaign target is now machine-readable as `nhm2_time_dependent_source_campaign/v1`. This artifact is stricter than the static regional pass-path harness. It asks whether a frozen time-dependent tile/material source campaign can supply an independently derived `T_mu_nu(t)`, conserve covariantly across regional supports and sector switching, converge under a fixed-cycle-average frequency ladder `f, 2f, 4f, 8f, ...`, agree with the proposed effective-source geometry after time averaging, close full regional `T00`, `T0i`, diagonal `Tij`, and off-diagonal `Tij`, and carry observer-family, QEI-worldline, horizon, blueshift, particle-accumulation, and perturbative-stability receipts.
 
-Current static smoke-chain evidence cannot pass that campaign by itself. The June 18 dynamic-evidence sidecars move the first campaign blocker from `switching_conservation_evidence_missing` to `dynamic_effective_geometry_evidence_missing`: switching conservation and frequency convergence can now be represented as declared diagnostic receipts, while dynamic/effective geometry agreement, backreaction, full tensor closure, observer robustness, and stability still block the campaign. This is a falsification ledger for the next frozen dynamic run, not a physical viability claim, route ETA claim, propulsion claim, or transport certificate.
+Current static smoke-chain evidence cannot pass that campaign by itself. The June 18 dynamic-evidence sidecars first moved the campaign blocker from `switching_conservation_evidence_missing` to `dynamic_effective_geometry_evidence_missing`, then to `dynamic_geometry_ref_missing`, then to `dynamic_geometry_samples_missing`, then to `effective_geometry_ref_missing`, then to `averaged_source_tensor_ref_missing`, and then to `backreaction_residual_not_bounded`. The newest frontier receipts capture one `gr-evolve-brick` dynamic geometry sample, one static/effective `gr-evolve-brick` reference with the required lapse, shift, spatial metric, extrinsic curvature, and constraint channels, one averaged source tensor receipt with source-side full-tensor provenance, and one diagnostic backreaction residual receipt. This moves the first blocker to `regional_full_tensor_components_missing`: switching conservation, frequency convergence, runtime geometry references, averaged source tensor provenance, and bounded dynamic/effective channel residuals can now be represented as diagnostic receipts, but the campaign still lacks full regional tensor closure, observer robustness, and stability evidence. This is a falsification ledger for the next frozen dynamic run, not a physical viability claim, route ETA claim, propulsion claim, or transport certificate.
 
 ### 4.9 Quantum-spacetime proxy lane
 

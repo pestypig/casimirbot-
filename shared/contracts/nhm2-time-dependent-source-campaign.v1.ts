@@ -110,6 +110,7 @@ export type Nhm2DynamicEffectiveGeometryEvidenceV1 = {
   averagingWindowSeconds: number | null;
   cycleAverageSourceFixed: boolean | null;
   averagedSourceTensorRef: string | null;
+  backreactionResidualRef: string | null;
   residualLInf: number | null;
   residualL2: number | null;
   bounded: boolean | null;
@@ -283,6 +284,25 @@ export type BuildNhm2SwitchingConservationEvidenceInput = {
   blockers?: string[] | null;
 };
 
+export type BuildNhm2DynamicEffectiveGeometryEvidenceInput = {
+  generatedAt?: string | null;
+  dynamicGeometryRef?: string | null;
+  dynamicGeometryStatus?: Nhm2TimeDependentSourceCampaignStatus | null;
+  dynamicGeometryBlockers?: string[] | null;
+  effectiveGeometryRef?: string | null;
+  effectiveGeometryStatus?: Nhm2TimeDependentSourceCampaignStatus | null;
+  effectiveGeometryBlockers?: string[] | null;
+  averagingWindowSeconds?: number | null;
+  cycleAverageSourceFixed?: boolean | null;
+  averagedSourceTensorRef?: string | null;
+  backreactionResidualRef?: string | null;
+  residualLInf?: number | null;
+  residualL2?: number | null;
+  toleranceLInf?: number | null;
+  bounded?: boolean | null;
+  blockers?: string[] | null;
+};
+
 const asText = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
@@ -426,6 +446,61 @@ export const buildNhm2SwitchingConservationEvidence = (
     overallResidualLInf,
     terms,
     conservationStatus: blockers.length === 0 ? "pass" : "fail",
+    blockers,
+  };
+};
+
+export const buildNhm2DynamicEffectiveGeometryEvidence = (
+  input: BuildNhm2DynamicEffectiveGeometryEvidenceInput,
+): Nhm2DynamicEffectiveGeometryEvidenceV1 => {
+  const tolerance = input.toleranceLInf ?? DEFAULT_DYNAMIC_TOLERANCE_LINF;
+  const residualLInf = toFinite(input.residualLInf);
+  const averagingWindowSeconds = toFinite(input.averagingWindowSeconds);
+  const dynamicGeometryRef = asText(input.dynamicGeometryRef);
+  const effectiveGeometryRef = asText(input.effectiveGeometryRef);
+  const averagedSourceTensorRef = asText(input.averagedSourceTensorRef);
+  const backreactionResidualRef = asText(input.backreactionResidualRef);
+  const blockers = uniqueText([
+    ...(input.blockers ?? []),
+    dynamicGeometryRef == null ? "dynamic_geometry_ref_missing" : null,
+    dynamicGeometryRef != null && input.dynamicGeometryStatus !== "pass"
+      ? input.dynamicGeometryBlockers?.[0] ?? "dynamic_geometry_samples_not_pass"
+      : null,
+    ...(dynamicGeometryRef != null && input.dynamicGeometryStatus !== "pass"
+      ? (input.dynamicGeometryBlockers ?? []).slice(1)
+      : []),
+    effectiveGeometryRef == null ? "effective_geometry_ref_missing" : null,
+    effectiveGeometryRef != null && input.effectiveGeometryStatus === "fail"
+      ? input.effectiveGeometryBlockers?.[0] ?? "effective_geometry_not_pass"
+      : null,
+    ...(effectiveGeometryRef != null && input.effectiveGeometryStatus === "fail"
+      ? (input.effectiveGeometryBlockers ?? []).slice(1)
+      : []),
+    averagingWindowSeconds == null ? "averaging_window_seconds_missing" : null,
+    averagingWindowSeconds != null && averagingWindowSeconds <= 0
+      ? "averaging_window_seconds_nonpositive"
+      : null,
+    input.cycleAverageSourceFixed === true ? null : "cycle_average_source_not_fixed",
+    averagedSourceTensorRef == null ? "averaged_source_tensor_ref_missing" : null,
+    residualLInf == null ? "dynamic_effective_residual_linf_missing" : null,
+    residualLInf != null && residualLInf > tolerance
+      ? "dynamic_effective_residual_linf_exceeds_tolerance"
+      : null,
+    input.bounded === true ? null : "backreaction_residual_not_bounded",
+  ]);
+  return {
+    contractVersion: "nhm2_dynamic_effective_geometry_evidence/v1",
+    generatedAt: input.generatedAt ?? new Date().toISOString(),
+    dynamicGeometryRef,
+    effectiveGeometryRef,
+    averagingWindowSeconds,
+    cycleAverageSourceFixed: input.cycleAverageSourceFixed ?? null,
+    averagedSourceTensorRef,
+    backreactionResidualRef,
+    residualLInf,
+    residualL2: toFinite(input.residualL2),
+    bounded: input.bounded ?? null,
+    agreementStatus: blockers.length === 0 ? "pass" : "fail",
     blockers,
   };
 };
@@ -594,10 +669,10 @@ const dynamicGeometryGate = (
   }
   const blockers = uniqueText([
     evidence.dynamicGeometryRef == null ? "dynamic_geometry_ref_missing" : null,
+    ...evidence.blockers,
     evidence.effectiveGeometryRef == null ? "effective_geometry_ref_missing" : null,
     evidence.cycleAverageSourceFixed === true ? null : "cycle_average_source_not_fixed",
     evidence.bounded === true ? null : "backreaction_residual_not_bounded",
-    ...evidence.blockers,
   ]);
   return gate({
     gateId: "dynamic_effective_geometry_agreement",
@@ -1059,6 +1134,7 @@ export const isNhm2DynamicEffectiveGeometryEvidence = (
     (record.cycleAverageSourceFixed === null ||
       typeof record.cycleAverageSourceFixed === "boolean") &&
     isNullableText(record.averagedSourceTensorRef) &&
+    isNullableText(record.backreactionResidualRef) &&
     isNullableNumber(record.residualLInf) &&
     isNullableNumber(record.residualL2) &&
     (record.bounded === null || typeof record.bounded === "boolean") &&

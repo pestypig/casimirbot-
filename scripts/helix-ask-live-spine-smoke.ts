@@ -2,9 +2,12 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import {
   CODEX_PARITY_AGENT_SPINE_CLASSES,
+  CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS,
   CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES,
+  CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES,
   CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
   CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES,
+  CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS,
   CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS,
 } from "../server/services/helix-ask/codex-parity-agent-spine-contract";
 
@@ -279,6 +282,12 @@ const readString = (value: unknown): string | null =>
 const readStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry: unknown): entry is string => typeof entry === "string" && entry.trim().length > 0) : [];
 
+const isNonEmptyStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((entry) => typeof entry === "string" && entry.trim().length > 0);
+
+const readNonNegativeInteger = (value: unknown): number | null =>
+  typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
+
 const getPath = (value: unknown, pathParts: string[]): unknown =>
   pathParts.reduce<unknown>((current, key) => {
     if (!current || typeof current !== "object") return undefined;
@@ -468,7 +477,40 @@ const shapeFailures = (rail: RecordLike, turnId: string, prompt: string): string
   if (rail.assistant_answer !== false) failures.push("rail_assistant_answer_not_false");
   if (rail.terminal_eligible !== false) failures.push("rail_terminal_eligible_not_false");
   if (rail.raw_content_included !== false) failures.push("rail_raw_content_included_not_false");
-  if (!Array.isArray(rail.visible_tool_surface)) failures.push("visible_tool_surface_not_array");
+  if (!Array.isArray(rail.visible_tool_surface)) {
+    failures.push("visible_tool_surface_not_array");
+  } else if (!isNonEmptyStringArray(rail.visible_tool_surface)) {
+    failures.push("visible_tool_surface_entries_invalid");
+  }
+  const visibleSurfaceCount = readNonNegativeInteger(rail.visible_tool_surface_original_count);
+  const visibleSurfaceTruncated =
+    typeof rail.visible_tool_surface_truncated === "boolean" ? rail.visible_tool_surface_truncated : null;
+  if (visibleSurfaceCount === null) {
+    failures.push("visible_tool_surface_original_count_invalid");
+  }
+  if (visibleSurfaceTruncated === null) {
+    failures.push("visible_tool_surface_truncated_invalid");
+  }
+  if (Array.isArray(rail.visible_tool_surface) && visibleSurfaceCount !== null) {
+    const visibleSurfaceLength = rail.visible_tool_surface.length;
+    if (visibleSurfaceCount < visibleSurfaceLength) {
+      failures.push("visible_tool_surface_original_count_less_than_surface");
+    }
+    if (visibleSurfaceTruncated === true && visibleSurfaceCount <= visibleSurfaceLength) {
+      failures.push("visible_tool_surface_truncated_without_hidden_entries");
+    }
+    if (visibleSurfaceTruncated === false && visibleSurfaceCount !== visibleSurfaceLength) {
+      failures.push("visible_tool_surface_untruncated_count_mismatch");
+    }
+  }
+  if (!Array.isArray(rail.required_observation_kinds_for_requested_capability)) {
+    failures.push("required_observation_kinds_not_array");
+  } else if (!isNonEmptyStringArray(rail.required_observation_kinds_for_requested_capability)) {
+    failures.push("required_observation_kinds_entries_invalid");
+  }
+  if (!isNonEmptyStringArray(rail.normalized_codex_parity_classes)) {
+    failures.push("normalized_codex_parity_classes_entries_invalid");
+  }
   for (const key of CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS) {
     const value = rail[key];
     if (value !== null && typeof value !== "string") failures.push(`rail_string_or_null_field_invalid:${key}`);
@@ -486,6 +528,33 @@ const shapeFailures = (rail: RecordLike, turnId: string, prompt: string): string
   }
   if (!CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES.includes(rail.rail_status as never)) {
     failures.push(`invalid_rail_status:${String(rail.rail_status ?? "missing")}`);
+  }
+  const firstBrokenRail = readString(rail.first_broken_rail);
+  if (
+    firstBrokenRail &&
+    !CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS.includes(
+      firstBrokenRail as (typeof CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS)[number],
+    )
+  ) {
+    failures.push(`invalid_first_broken_rail:${firstBrokenRail}`);
+  }
+  const repairTarget = readString(rail.repair_target);
+  if (
+    repairTarget &&
+    !CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS.includes(
+      repairTarget as (typeof CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS)[number],
+    )
+  ) {
+    failures.push(`invalid_repair_target:${repairTarget}`);
+  }
+  const railFailureCode = readString(rail.rail_failure_code);
+  if (
+    railFailureCode &&
+    !CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES.includes(
+      railFailureCode as (typeof CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES)[number],
+    )
+  ) {
+    failures.push(`invalid_rail_failure_code:${railFailureCode}`);
   }
   if (!CODEX_PARITY_CLASSES.includes(rail.codex_parity_class as (typeof CODEX_PARITY_CLASSES)[number])) {
     failures.push(`invalid_codex_parity_class:${String(rail.codex_parity_class ?? "missing")}`);
@@ -510,8 +579,8 @@ const shapeFailures = (rail: RecordLike, turnId: string, prompt: string): string
   if (admittedCapability && rail.admission_proven !== true) {
     failures.push("admission_not_proven");
   }
-  if (requestedCapability && !Array.isArray(rail.required_observation_kinds_for_requested_capability)) {
-    failures.push("requested_observation_kinds_missing");
+  if (requestedCapability && requiredObservationKinds.length === 0) {
+    failures.push("requested_observation_kinds_empty");
   }
   if (requestedCapability && typeof observationSupportsRequested !== "boolean") {
     failures.push("observation_support_verdict_missing");
@@ -540,8 +609,8 @@ const shapeFailures = (rail: RecordLike, turnId: string, prompt: string): string
   if (visibleTerminalKind && rail.visible_projection_proven !== true) {
     failures.push("visible_projection_not_proven");
   }
-  if (rail.codex_parity_class === "complete" && rail.first_broken_rail !== null) {
-    failures.push(`complete_with_first_broken_rail:${String(rail.first_broken_rail)}`);
+  if (rail.codex_parity_class === "complete" && firstBrokenRail) {
+    failures.push(`complete_with_first_broken_rail:${firstBrokenRail}`);
   }
   if ((rail.codex_parity_class === "complete" || rail.rail_status === "complete") && reentryStatus !== "reentered") {
     failures.push(`complete_without_reentry:${reentryStatus || "missing"}`);
@@ -555,8 +624,14 @@ const shapeFailures = (rail: RecordLike, turnId: string, prompt: string): string
   if ((rail.codex_parity_class === "complete" || rail.rail_status === "complete") && !visibleTerminalKind) {
     failures.push("complete_without_visible_projection");
   }
-  if (rail.codex_parity_class !== "complete" && !readString(rail.first_broken_rail)) {
+  if (rail.codex_parity_class !== "complete" && !firstBrokenRail) {
     failures.push("non_complete_without_first_broken_rail");
+  }
+  if (rail.codex_parity_class !== "complete" && !railFailureCode) {
+    failures.push("non_complete_without_rail_failure_code");
+  }
+  if (rail.codex_parity_class !== "complete" && !repairTarget) {
+    failures.push("non_complete_without_repair_target");
   }
   return failures;
 };

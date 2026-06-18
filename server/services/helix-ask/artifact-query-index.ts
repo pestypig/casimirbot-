@@ -10,8 +10,13 @@ import {
 } from "./explicit-capability-contract";
 import {
   CODEX_PARITY_AGENT_SPINE_CLASSES,
+  CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES,
   CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
   type CodexParityAgentSpineClass,
+  type CodexParityAgentSpineFirstBrokenRail,
+  type CodexParityAgentSpineRailFailureCode,
+  type CodexParityAgentSpineRailStatus,
+  type CodexParityAgentSpineRepairTarget,
 } from "./codex-parity-agent-spine-contract";
 import {
   contextualToolSuppressionBlocksFamily,
@@ -21,37 +26,11 @@ import {
 
 type RecordLike = Record<string, unknown>;
 
-type RailFailureCode =
-  | "explicit_capability_not_selected"
-  | "wrong_capability_executed"
-  | "route_family_mismatch"
-  | "tool_admission_drift"
-  | "tool_execution_rejected"
-  | "required_observation_missing"
-  | "observation_missing"
-  | "observation_not_reentered"
-  | "reentry_step_not_executed"
-  | "weak_evidence_repair_loop"
-  | "support_refs_missing"
-  | "terminal_product_mismatch"
-  | "terminal_not_materialized"
-  | "terminal_authority_missing"
-  | "terminal_projection_mismatch"
-  | "debug_mirror_stale"
-  | "config_missing";
+type RailFailureCode = CodexParityAgentSpineRailFailureCode;
 
-type RailStatus = "complete" | "broken" | "fail_closed";
+type RailStatus = CodexParityAgentSpineRailStatus;
 
-type FirstBrokenRail =
-  | "route_admission"
-  | "capability_execution"
-  | "observation_artifact"
-  | "evidence_reentry"
-  | "support_backed_draft"
-  | "terminal_materialization"
-  | "terminal_authority"
-  | "visible_projection"
-  | "config";
+type FirstBrokenRail = CodexParityAgentSpineFirstBrokenRail;
 
 type FailureBucket =
   | "A_tool_did_not_execute"
@@ -63,42 +42,11 @@ type FailureBucket =
   | "G_config_missing"
   | "H_route_tool_family_contract_mismatch";
 
-type RepairTarget =
-  | "tool_admission"
-  | "tool_execution"
-  | "tool_family_contract"
-  | "observation_materializer"
-  | "reentry_gate"
-  | "draft_builder"
-  | "terminal_materializer"
-  | "terminal_authority"
-  | "presenter_boundary"
-  | "operator_config"
-  | "intent_arbitration"
-  | "agent_step_selection"
-  | "repo_retrieval_repair_policy";
+type RepairTarget = CodexParityAgentSpineRepairTarget;
 
 type CodexParityClass = CodexParityAgentSpineClass;
 
-const TOOL_TURN_CHAIN_FAILURE_CODES: RailFailureCode[] = [
-  "explicit_capability_not_selected",
-  "wrong_capability_executed",
-  "route_family_mismatch",
-  "tool_admission_drift",
-  "tool_execution_rejected",
-  "required_observation_missing",
-  "observation_missing",
-  "observation_not_reentered",
-  "reentry_step_not_executed",
-  "weak_evidence_repair_loop",
-  "support_refs_missing",
-  "terminal_product_mismatch",
-  "terminal_not_materialized",
-  "terminal_authority_missing",
-  "terminal_projection_mismatch",
-  "debug_mirror_stale",
-  "config_missing",
-];
+const TOOL_TURN_CHAIN_FAILURE_CODES: RailFailureCode[] = [...CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES];
 
 const TOOL_TURN_CHAIN_MATRIX_FAMILIES = [
   "docs_viewer",
@@ -432,7 +380,13 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   if (/live_env[-_.:]unbind_workstation_source|unbind_workstation_source|detach_source/.test(haystack)) {
     return "live_env.unbind_workstation_source";
   }
-  if (/live_env[-_.:]set_workstation_loop_state|set_workstation_loop_state|pause_loop|resume_loop|repair_loop/.test(haystack)) {
+  if (/live_env[-_.:]pause_workstation_loop|pause_workstation_loop|pause_loop/.test(haystack)) {
+    return "live_env.pause_workstation_loop";
+  }
+  if (/live_env[-_.:]resume_workstation_loop|resume_workstation_loop|resume_loop/.test(haystack)) {
+    return "live_env.resume_workstation_loop";
+  }
+  if (/live_env[-_.:]set_workstation_loop_state|set_workstation_loop_state|repair_loop/.test(haystack)) {
     return "live_env.set_workstation_loop_state";
   }
   if (/live_env[-_.:]repair_workstation_source|repair_workstation_source|repair_source|source_repair/.test(haystack)) {
@@ -1036,6 +990,17 @@ const buildToolTurnChainAudit = (input: {
       input.artifacts.some((artifact) => observationKindMatches(artifact, "direct_answer_text")) &&
       (!requiredTerminal || normalizedEqual(requiredTerminal, "direct_answer_text")),
   );
+  const capabilityCatalogSummaryMaterialized = Boolean(
+    normalizedEqual(selectedCapability, "helix_ask.inspect_capability_catalog") &&
+      capabilityCatalogArtifact &&
+      observationRef &&
+      normalizedEqual(requiredTerminal, "capability_help_summary") &&
+      (normalizedEqual(materializedTerminal, "capability_help_summary") ||
+        normalizedEqual(authorityTerminal, "capability_help_summary") ||
+        normalizedEqual(visibleTerminal, "capability_help_summary") ||
+        normalizedEqual(input.payload.final_answer_source, "capability_help_summary") ||
+        input.artifacts.some((artifact) => observationKindMatches(artifact, "capability_help_summary"))),
+  );
   const reentryProofSource =
     readString(input.lifecycleTrace?.lifecycle_stage) === "reentered_solver"
       ? "tool_lifecycle_trace.lifecycle_stage"
@@ -1043,6 +1008,8 @@ const buildToolTurnChainAudit = (input: {
         ? "tool_followup_decision.evidence_reentered"
         : modelDirectAnswerMaterialized
           ? "direct_answer_text_materialized"
+          : capabilityCatalogSummaryMaterialized
+            ? "capability_help_summary_materialized_from_catalog_observation"
           : observationRef && supportCount > 0 && finalDraftRef
             ? "final_answer_draft_with_support_refs"
             : null;

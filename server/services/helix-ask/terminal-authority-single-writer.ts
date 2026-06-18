@@ -1497,14 +1497,35 @@ const findGoalSatisfyingCapabilityHelpArtifact = (
   if (readString(goal?.required_terminal_kind) !== "capability_help_summary") return null;
   if (!routeContractAllowsTerminalKind(payload, "capability_help_summary")) return null;
   const goalEvaluation = readRecord(payload.goal_satisfaction_evaluation);
+  const satisfactionReport = readRecord(payload.satisfaction_report);
+  const satisfactionReportAllowsCapabilityHelp =
+    satisfactionReport?.satisfied === true ||
+    readString(satisfactionReport?.terminal_artifact_kind) === "capability_help_summary";
   if (
     readString(goalEvaluation?.satisfaction) !== "satisfied" &&
-    readString(goalEvaluation?.next_decision) !== "allow_terminal"
+    readString(goalEvaluation?.next_decision) !== "allow_terminal" &&
+    !satisfactionReportAllowsCapabilityHelp
   ) {
     return null;
   }
-  for (let index = artifacts.length - 1; index >= 0; index -= 1) {
-    const artifact = artifacts[index];
+  const stepResultCapabilityHelpArtifacts = readArray(payload.step_results)
+    .map(readRecord)
+    .filter((step): step is Record<string, unknown> => Boolean(step))
+    .map((step) => {
+      const resultArtifact = readRecord(step.result_artifact);
+      if (!resultArtifact || readString(resultArtifact.kind) !== "capability_help_summary") return null;
+      return {
+        artifact_id:
+          readString(resultArtifact.artifact_id) ??
+          `${readString(step.step_id) ?? "step_result"}:capability_help_summary`,
+        kind: "capability_help_summary",
+        payload: resultArtifact,
+      } satisfies ArtifactLike;
+    })
+    .filter((artifact): artifact is ArtifactLike => Boolean(artifact));
+  const candidates = [...artifacts, ...stepResultCapabilityHelpArtifacts];
+  for (let index = candidates.length - 1; index >= 0; index -= 1) {
+    const artifact = candidates[index];
     if (!artifact || artifactKind(artifact) !== "capability_help_summary") continue;
     const text = artifactText(artifact);
     if (!text || isStaleWorkspaceFailureText(text)) continue;
@@ -2523,6 +2544,33 @@ export function applyHelixTerminalAuthoritySingleWriter(
       turn_id: input.turnId,
       terminal_artifact_kind: "repo_code_evidence_answer",
       concise_text: repoAnswerText,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    delete input.payload.terminal_error_code;
+    delete input.payload.terminal_failure_text;
+  } else if (!solverContinuationPending && selectedGoalArtifact?.kind === "capability_help_summary") {
+    selectedArtifactRef = selectedGoalArtifact.ref;
+    selectedArtifactKind = selectedGoalArtifact.kind;
+    selectedSource = selectedGoalArtifact.kind;
+    quarantineStaleRequestUserInput(input.payload);
+    input.payload.ok = true;
+    input.payload.response_type = "final_answer";
+    input.payload.final_status = "final_answer";
+    input.payload.status = "final_answer";
+    input.payload.terminal_artifact_kind = selectedGoalArtifact.kind;
+    input.payload.final_answer_source = selectedGoalArtifact.kind;
+    input.payload.selected_final_answer = selectedGoalArtifact.text;
+    input.payload.answer = selectedGoalArtifact.text;
+    input.payload.text = selectedGoalArtifact.text;
+    input.payload.assistant_answer = selectedGoalArtifact.text;
+    input.payload.terminal_artifact_id = selectedGoalArtifact.ref ?? undefined;
+    input.payload.terminal_presentation = {
+      ...(readRecord(input.payload.terminal_presentation) ?? {}),
+      schema: "helix.terminal_presentation.v1",
+      turn_id: input.turnId,
+      terminal_artifact_kind: selectedGoalArtifact.kind,
+      concise_text: selectedGoalArtifact.text,
       assistant_answer: false,
       raw_content_included: false,
     };

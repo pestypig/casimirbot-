@@ -900,6 +900,20 @@ describe("Helix capability plan contract", () => {
       terminalKind: "stage_play_workstation_control_receipt",
     },
     {
+      label: "loop pause",
+      prompt:
+        "Run live_env.pause_workstation_loop goal_id=goal:frog loop_ref=loop:visual-mail.",
+      capability: "live_env.pause_workstation_loop",
+      terminalKind: "stage_play_workstation_control_receipt",
+    },
+    {
+      label: "loop resume",
+      prompt:
+        "Run live_env.resume_workstation_loop goal_id=goal:frog loop_ref=loop:visual-mail.",
+      capability: "live_env.resume_workstation_loop",
+      terminalKind: "stage_play_workstation_control_receipt",
+    },
+    {
       label: "loop state",
       prompt:
         "Run live_env.set_workstation_loop_state goal_id=goal:frog loop_ref=loop:visual-mail state=paused.",

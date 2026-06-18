@@ -5,9 +5,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { planRouter } from "../routes/agi.plan";
 import {
   CODEX_PARITY_AGENT_SPINE_CLASSES,
+  CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS,
   CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES,
+  CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES,
   CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
   CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES,
+  CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS,
   CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS,
   type CodexParityAgentSpineRailStatus,
   type CodexParityAgentSpineReentryStatus,
@@ -66,6 +69,28 @@ const readRecord = (value: unknown): RecordLike | null =>
 const readString = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
 
+const expectNonEmptyStringArrayField = (record: RecordLike, key: string): void => {
+  expect(record).toHaveProperty(key);
+  expect(Array.isArray(record[key])).toBe(true);
+  expect((record[key] as unknown[]).every((entry) => typeof entry === "string" && entry.trim().length > 0)).toBe(true);
+};
+
+const expectVisibleToolSurfaceMetadata = (record: RecordLike): void => {
+  expect(record).toHaveProperty("visible_tool_surface_original_count");
+  expect(record).toHaveProperty("visible_tool_surface_truncated");
+  expect(typeof record.visible_tool_surface_original_count).toBe("number");
+  expect(Number.isInteger(record.visible_tool_surface_original_count)).toBe(true);
+  expect((record.visible_tool_surface_original_count as number)).toBeGreaterThanOrEqual(0);
+  expect(typeof record.visible_tool_surface_truncated).toBe("boolean");
+  const visibleSurfaceLength = Array.isArray(record.visible_tool_surface) ? record.visible_tool_surface.length : 0;
+  expect((record.visible_tool_surface_original_count as number)).toBeGreaterThanOrEqual(visibleSurfaceLength);
+  if (record.visible_tool_surface_truncated === true) {
+    expect((record.visible_tool_surface_original_count as number)).toBeGreaterThan(visibleSurfaceLength);
+  } else {
+    expect(record.visible_tool_surface_original_count).toBe(visibleSurfaceLength);
+  }
+};
+
 const terminalSnapshotFor = (body: unknown): TurnTerminalSnapshot => {
   const record = readRecord(body);
   return {
@@ -113,7 +138,8 @@ const expectRailTableShape = (railTable: RecordLike, turnId: string): void => {
     terminal_eligible: false,
     raw_content_included: false,
   });
-  expect(Array.isArray(railTable.visible_tool_surface)).toBe(true);
+  expectNonEmptyStringArrayField(railTable, "visible_tool_surface");
+  expectVisibleToolSurfaceMetadata(railTable);
   for (const key of CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS) {
     expect(railTable).toHaveProperty(key);
     expect(railTable[key] === null || typeof railTable[key] === "string").toBe(true);
@@ -149,12 +175,13 @@ const expectRailTableShape = (railTable: RecordLike, turnId: string): void => {
     expect(railTable.selected_terminal_kind).toBeTruthy();
     expect(railTable.visible_terminal_kind).toBeTruthy();
   }
-  expect(Array.isArray(railTable.required_observation_kinds_for_requested_capability)).toBe(true);
+  expectNonEmptyStringArrayField(railTable, "required_observation_kinds_for_requested_capability");
   expect(
     railTable.observed_artifact_supports_requested_capability === null ||
       typeof railTable.observed_artifact_supports_requested_capability === "boolean",
   ).toBe(true);
   if (railTable.requested_capability) {
+    expect((railTable.required_observation_kinds_for_requested_capability as unknown[]).length).toBeGreaterThan(0);
     expect(typeof railTable.observed_artifact_supports_requested_capability).toBe("boolean");
     if (railTable.goal_satisfaction === "satisfied" || railTable.rail_status === "complete") {
       expect(railTable.observed_artifact_supports_requested_capability).toBe(true);
@@ -178,6 +205,13 @@ const expectRailTableShape = (railTable: RecordLike, turnId: string): void => {
   } else {
     expect(typeof railTable.first_broken_rail).toBe("string");
     expect(String(railTable.first_broken_rail).length).toBeGreaterThan(0);
+    expect(CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS).toContain(railTable.first_broken_rail as never);
+    expect(typeof railTable.rail_failure_code).toBe("string");
+    expect(String(railTable.rail_failure_code).length).toBeGreaterThan(0);
+    expect(CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES).toContain(railTable.rail_failure_code as never);
+    expect(typeof railTable.repair_target).toBe("string");
+    expect(String(railTable.repair_target).length).toBeGreaterThan(0);
+    expect(CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS).toContain(railTable.repair_target as never);
   }
 };
 

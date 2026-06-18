@@ -7,9 +7,12 @@ import { API_PARITY_SCENARIOS, type HelixApiParityScenario } from "../services/h
 import { buildApiParityProbeResult } from "../services/helix-ask/api-parity-probe";
 import {
   CODEX_PARITY_AGENT_SPINE_CLASSES,
+  CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS,
   CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES,
+  CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES,
   CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
   CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES,
+  CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS,
   CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS,
 } from "../services/helix-ask/codex-parity-agent-spine-contract";
 import { resetConversationalAnswerDistillationsForTest } from "../services/helix-ask/conversational-answer-distillation-store";
@@ -83,6 +86,28 @@ const expectNullableStringField = (record: Record<string, unknown>, key: string)
   expect(value === null || typeof value === "string").toBe(true);
 };
 
+const expectNonEmptyStringArrayField = (record: Record<string, unknown>, key: string): void => {
+  expect(record).toHaveProperty(key);
+  expect(Array.isArray(record[key])).toBe(true);
+  expect((record[key] as unknown[]).every((entry) => typeof entry === "string" && entry.trim().length > 0)).toBe(true);
+};
+
+const expectVisibleToolSurfaceMetadata = (record: Record<string, unknown>): void => {
+  expect(record).toHaveProperty("visible_tool_surface_original_count");
+  expect(record).toHaveProperty("visible_tool_surface_truncated");
+  expect(typeof record.visible_tool_surface_original_count).toBe("number");
+  expect(Number.isInteger(record.visible_tool_surface_original_count)).toBe(true);
+  expect((record.visible_tool_surface_original_count as number)).toBeGreaterThanOrEqual(0);
+  expect(typeof record.visible_tool_surface_truncated).toBe("boolean");
+  const visibleSurfaceLength = Array.isArray(record.visible_tool_surface) ? record.visible_tool_surface.length : 0;
+  expect((record.visible_tool_surface_original_count as number)).toBeGreaterThanOrEqual(visibleSurfaceLength);
+  if (record.visible_tool_surface_truncated === true) {
+    expect((record.visible_tool_surface_original_count as number)).toBeGreaterThan(visibleSurfaceLength);
+  } else {
+    expect(record.visible_tool_surface_original_count).toBe(visibleSurfaceLength);
+  }
+};
+
 const CODEX_PARITY_CLASSES = [...CODEX_PARITY_AGENT_SPINE_CLASSES];
 
 const expectCodexParityRailTableShape = (railTable: Record<string, unknown>, turnId: string): void => {
@@ -93,7 +118,8 @@ const expectCodexParityRailTableShape = (railTable: Record<string, unknown>, tur
     terminal_eligible: false,
     raw_content_included: false,
   });
-  expect(Array.isArray(railTable.visible_tool_surface)).toBe(true);
+  expectNonEmptyStringArrayField(railTable, "visible_tool_surface");
+  expectVisibleToolSurfaceMetadata(railTable);
   for (const key of CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS) {
     expectNullableStringField(railTable, key);
   }
@@ -128,12 +154,13 @@ const expectCodexParityRailTableShape = (railTable: Record<string, unknown>, tur
     expect(railTable.selected_terminal_kind).toBeTruthy();
     expect(railTable.visible_terminal_kind).toBeTruthy();
   }
-  expect(Array.isArray(railTable.required_observation_kinds_for_requested_capability)).toBe(true);
+  expectNonEmptyStringArrayField(railTable, "required_observation_kinds_for_requested_capability");
   expect(
     railTable.observed_artifact_supports_requested_capability === null ||
       typeof railTable.observed_artifact_supports_requested_capability === "boolean",
   ).toBe(true);
   if (railTable.requested_capability) {
+    expect((railTable.required_observation_kinds_for_requested_capability as unknown[]).length).toBeGreaterThan(0);
     expect(typeof railTable.observed_artifact_supports_requested_capability).toBe("boolean");
     if (railTable.goal_satisfaction === "satisfied" || railTable.rail_status === "complete") {
       expect(railTable.observed_artifact_supports_requested_capability).toBe(true);
@@ -157,6 +184,13 @@ const expectCodexParityRailTableShape = (railTable: Record<string, unknown>, tur
   } else {
     expect(typeof railTable.first_broken_rail).toBe("string");
     expect(String(railTable.first_broken_rail).length).toBeGreaterThan(0);
+    expect(CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS).toContain(railTable.first_broken_rail as never);
+    expect(typeof railTable.rail_failure_code).toBe("string");
+    expect(String(railTable.rail_failure_code).length).toBeGreaterThan(0);
+    expect(CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES).toContain(railTable.rail_failure_code as never);
+    expect(typeof railTable.repair_target).toBe("string");
+    expect(String(railTable.repair_target).length).toBeGreaterThan(0);
+    expect(CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS).toContain(railTable.repair_target as never);
   }
 };
 
@@ -766,6 +800,158 @@ describe("Helix Ask API parity matrix", () => {
     expect(probe.failures).not.toContain("complete_rail_typed_failure_terminal");
   });
 
+  it("rejects non-complete rails without failure and repair handles", () => {
+    const scenario: HelixApiParityScenario = {
+      id: "rail_table_broken_handles_missing",
+      description: "A fail-closed rail must expose the first broken rail, failure code, and repair target.",
+      enabled: true,
+      seed: "none",
+      prompt: "Use docs-viewer.locate_in_doc to cite where this claim appears.",
+      expected: {},
+    };
+    const railTable = {
+      schema: "helix.codex_parity_agent_spine_rail_table.v1",
+      turn_id: "ask:test:broken-handles-missing",
+      prompt: scenario.prompt,
+      requested_capability: "docs-viewer.locate_in_doc",
+      visible_tool_surface: ["docs-viewer.locate_in_doc"],
+      selected_capability: "docs-viewer.locate_in_doc",
+      admitted_capability: "docs-viewer.locate_in_doc",
+      admission_proof_source: "tool_call_admission_decision.admitted_capability",
+      admission_proven: true,
+      executed_capability: "docs-viewer.locate_in_doc",
+      observation_kind: null,
+      observation_ref: null,
+      required_observation_kinds_for_requested_capability: ["doc_location_matches"],
+      observed_artifact_supports_requested_capability: false,
+      reentry_status: "no_observation",
+      reentry_proof_source: null,
+      reentry_proven: false,
+      goal_satisfaction: "not_satisfied",
+      required_terminal_kind: "doc_location_matches",
+      selected_terminal_kind: "typed_failure",
+      terminal_authority_proof_source: "terminal_answer_authority.terminal_artifact_kind",
+      terminal_authority_proven: true,
+      visible_terminal_kind: "typed_failure",
+      visible_projection_source: "payload.terminal_artifact_kind",
+      visible_projection_proven: true,
+      first_broken_rail: "observation_artifact",
+      repair_target: null,
+      codex_parity_class: "observation_missing",
+      normalized_codex_parity_classes: [...CODEX_PARITY_CLASSES],
+      rail_status: "fail_closed",
+      rail_failure_code: null,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+    const askTurn = {
+      turn_id: railTable.turn_id,
+      final_status: "final_failure",
+      response_type: "final_failure",
+      terminal_error_code: "observation_missing",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      selected_final_answer: "I could not complete this turn because the requested observation was missing.",
+      codex_parity_agent_spine_rail_table: railTable,
+      ask_turn_solver_trace: {
+        completed_solver_path: false,
+        selected_primary_intent: "locate_in_doc",
+        solver_short_circuit_flags: [],
+      },
+      loop_parity_trace: {
+        admitted_tool_families: ["docs_viewer"],
+        actual_tool_calls: [],
+        unexpected_tool_calls: [],
+        short_circuit_risk_flags: [],
+      },
+      route_authority_audit: {
+        route_authority_ok: true,
+        violation_codes: [],
+      },
+      poison_audit: {
+        ok: true,
+      },
+      terminal_answer_authority: {
+        server_authoritative: true,
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+      },
+    };
+
+    const probe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: { payload: askTurn },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(probe.procedural_ok).toBe(false);
+    expect(probe.failures).toEqual(
+      expect.arrayContaining([
+        "rail_non_complete_without_rail_failure_code",
+        "rail_non_complete_without_repair_target",
+      ]),
+    );
+
+    const invalidVocabularyRailTable = {
+      ...railTable,
+      visible_tool_surface: ["docs-viewer.locate_in_doc", ""],
+      visible_tool_surface_original_count: 1,
+      visible_tool_surface_truncated: true,
+      required_observation_kinds_for_requested_capability: ["doc_location_matches", 7],
+      normalized_codex_parity_classes: [...CODEX_PARITY_CLASSES, 7],
+      first_broken_rail: "made_up_rail",
+      repair_target: "unknown_layer",
+      rail_failure_code: "repo_evidence_weak_after_repair",
+    };
+    const invalidVocabularyProbe = buildApiParityProbeResult({
+      scenario,
+      askTurn: {
+        ...askTurn,
+        codex_parity_agent_spine_rail_table: invalidVocabularyRailTable,
+      },
+      debugExport: { payload: { ...askTurn, codex_parity_agent_spine_rail_table: invalidVocabularyRailTable } },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(invalidVocabularyProbe.procedural_ok).toBe(false);
+    expect(invalidVocabularyProbe.failures).toEqual(
+      expect.arrayContaining([
+        "rail_first_broken_rail_invalid:made_up_rail",
+        "rail_failure_code_invalid:repo_evidence_weak_after_repair",
+        "rail_normalized_codex_parity_classes_entries_invalid",
+        "rail_repair_target_invalid:unknown_layer",
+        "rail_required_observation_kinds_entries_invalid",
+        "rail_visible_tool_surface_original_count_less_than_surface",
+        "rail_visible_tool_surface_truncated_without_hidden_entries",
+        "rail_visible_tool_surface_entries_invalid",
+      ]),
+    );
+
+    const emptyObservationContractRailTable = {
+      ...railTable,
+      repair_target: "observation_materializer",
+      rail_failure_code: "observation_missing",
+      required_observation_kinds_for_requested_capability: [],
+    };
+    const emptyObservationContractProbe = buildApiParityProbeResult({
+      scenario,
+      askTurn: {
+        ...askTurn,
+        codex_parity_agent_spine_rail_table: emptyObservationContractRailTable,
+      },
+      debugExport: { payload: { ...askTurn, codex_parity_agent_spine_rail_table: emptyObservationContractRailTable } },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(emptyObservationContractProbe.procedural_ok).toBe(false);
+    expect(emptyObservationContractProbe.failures).toContain("rail_requested_observation_kinds_empty");
+  });
+
   it("rejects selected or executed capability progress without admission proof", () => {
     const scenario: HelixApiParityScenario = {
       id: "rail_table_admission_proof_missing",
@@ -1170,7 +1356,7 @@ describe("Helix Ask API parity matrix", () => {
       codex_parity_class: "observation_not_reentered",
       normalized_codex_parity_classes: [...CODEX_PARITY_CLASSES],
       rail_status: "complete",
-      rail_failure_code: "repo_evidence_weak_after_repair",
+      rail_failure_code: "weak_evidence_repair_loop",
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,

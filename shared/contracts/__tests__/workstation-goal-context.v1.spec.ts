@@ -148,6 +148,12 @@ describe("workstation goal context contract", () => {
     priority: "normal",
     language: "en",
     dedupeKey: "goal:translation:narrator:say",
+    terminalAuthority: {
+      status: "not_terminal",
+      finalAnswerEligible: false,
+      completedSolverPathRequired: true,
+      terminalAuthoritySingleWriterRequired: true,
+    },
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,
@@ -162,6 +168,12 @@ describe("workstation goal context contract", () => {
     deliveryMode: "visible_only",
     voicePolicy: "confirm_speak_required",
     evidenceThreshold: "observed",
+    terminalAuthority: {
+      status: "not_terminal",
+      finalAnswerEligible: false,
+      completedSolverPathRequired: true,
+      terminalAuthoritySingleWriterRequired: true,
+    },
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,
@@ -252,6 +264,8 @@ describe("workstation goal context contract", () => {
 
   it("normalizes live-env tool names into AgentGoalSession actuator ids", () => {
     expect(normalizeAgentGoalActuatorV1("live_env.query_visual_summaries")).toBe("query_visual_summaries");
+    expect(normalizeAgentGoalActuatorV1("live_env.pause_workstation_loop")).toBe("pause_loop");
+    expect(normalizeAgentGoalActuatorV1("live_env.resume_workstation_loop")).toBe("resume_loop");
     expect(normalizeAgentGoalActuatorV1("live_env.set_workstation_loop_state")).toBe("set_loop_state");
     expect(normalizeAgentGoalActuatorV1("live_env.repair_workstation_source")).toBe("repair_source");
     expect(normalizeAgentGoalActuatorV1("live_env.update_live_answer_projection")).toBe("update_live_answer");
@@ -351,12 +365,22 @@ describe("workstation goal context contract", () => {
       ...narratorSayRequest,
       evidenceRefs: [],
       deliveryMode: "hidden" as NarratorSayRequestV1["deliveryMode"],
+      terminalAuthority: {
+        status: "terminal",
+        finalAnswerEligible: true,
+        completedSolverPathRequired: false,
+        terminalAuthoritySingleWriterRequired: false,
+      },
       assistant_answer: true as false,
       terminal_eligible: true as false,
       raw_content_included: true as false,
     })).toEqual(expect.arrayContaining([
       "evidenceRefs must include at least one reference",
       "deliveryMode must be visible_only, confirm_to_speak, or auto_speak",
+      "terminalAuthority.status must be not_terminal",
+      "terminalAuthority.finalAnswerEligible must be false",
+      "terminalAuthority.completedSolverPathRequired must be true",
+      "terminalAuthority.terminalAuthoritySingleWriterRequired must be true",
       "narrator say requests must not be assistant answers",
       "narrator say requests must not be terminal eligible",
       "narrator say requests must not include raw content",
@@ -369,6 +393,12 @@ describe("workstation goal context contract", () => {
       streamKind: "final_answer_stream" as NarratorBindStreamRequestV1["streamKind"],
       deliveryMode: "hidden" as NarratorBindStreamRequestV1["deliveryMode"],
       voicePolicy: "always_terminal" as NarratorBindStreamRequestV1["voicePolicy"],
+      terminalAuthority: {
+        status: "terminal",
+        finalAnswerEligible: true,
+        completedSolverPathRequired: false,
+        terminalAuthoritySingleWriterRequired: false,
+      },
       assistant_answer: true as false,
       terminal_eligible: true as false,
       raw_content_included: true as false,
@@ -376,6 +406,10 @@ describe("workstation goal context contract", () => {
       "streamKind is invalid",
       "deliveryMode must be visible_only, confirm_to_speak, or auto_speak",
       "voicePolicy is invalid",
+      "terminalAuthority.status must be not_terminal",
+      "terminalAuthority.finalAnswerEligible must be false",
+      "terminalAuthority.completedSolverPathRequired must be true",
+      "terminalAuthority.terminalAuthoritySingleWriterRequired must be true",
       "narrator bind stream requests must not be assistant answers",
       "narrator bind stream requests must not be terminal eligible",
       "narrator bind stream requests must not include raw content",

@@ -1261,6 +1261,8 @@ type WorkstationControlTool =
   | "live_env.change_workstation_preset"
   | "live_env.bind_workstation_source"
   | "live_env.unbind_workstation_source"
+  | "live_env.pause_workstation_loop"
+  | "live_env.resume_workstation_loop"
   | "live_env.set_workstation_loop_state"
   | "live_env.repair_workstation_source"
   | "live_env.update_live_answer_projection"
@@ -1280,7 +1282,7 @@ function hasContextualWorkstationGoalContextCue(prompt: string): boolean {
 const WORKSTATION_CONTROL_OBJECT_PATTERN =
   "(?:workstation\\s+presets?|presets?|sources?|source\\s+bindings?|source\\s+routes?|loops?|loop\\s+state|process\\s+loops?|live\\s+answer\\s+projection|live\\s+answer\\s+line|process\\s+graph(?:\\s+focus)?|stage\\s+play\\s+graph)";
 const WORKSTATION_CONTROL_TOOL_PATTERN =
-  "live_env\\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph)";
+  "live_env\\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph)";
 
 function hasContextualWorkstationControlCue(prompt: string): boolean {
   const object = WORKSTATION_CONTROL_OBJECT_PATTERN;
@@ -1295,7 +1297,7 @@ function hasContextualWorkstationControlCue(prompt: string): boolean {
 
 function selectWorkstationControlTool(prompt: string): WorkstationControlTool | null {
   if (hasContextualWorkstationControlCue(prompt)) return null;
-  const explicit = prompt.match(/\blive_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph)\b/i)?.[0]?.toLowerCase();
+  const explicit = prompt.match(/\blive_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph)\b/i)?.[0]?.toLowerCase();
   if (explicit) return explicit as WorkstationControlTool;
   if (/\b(?:change|set|apply|switch)\b[\s\S]{0,120}\b(?:workstation\s+)?preset\b/i.test(prompt)) {
     return "live_env.change_workstation_preset";
@@ -1306,7 +1308,13 @@ function selectWorkstationControlTool(prompt: string): WorkstationControlTool | 
   if (/\b(?:unbind|detach|remove|disconnect)\b[\s\S]{0,120}\bsource\b/i.test(prompt)) {
     return "live_env.unbind_workstation_source";
   }
-  if (/\b(?:pause|resume|repair|restart|set)\b[\s\S]{0,120}\b(?:loop|process\s+loop|mail\s+loop)\b/i.test(prompt)) {
+  if (/\bpause\b[\s\S]{0,120}\b(?:loop|process\s+loop|mail\s+loop)\b/i.test(prompt)) {
+    return "live_env.pause_workstation_loop";
+  }
+  if (/\bresume\b[\s\S]{0,120}\b(?:loop|process\s+loop|mail\s+loop)\b/i.test(prompt)) {
+    return "live_env.resume_workstation_loop";
+  }
+  if (/\b(?:repair|restart|set)\b[\s\S]{0,120}\b(?:loop|process\s+loop|mail\s+loop)\b/i.test(prompt)) {
     return "live_env.set_workstation_loop_state";
   }
   if (/\b(?:repair|restart|recover)\b[\s\S]{0,120}\b(?:source|capture|live\s+source|visual\s+source|audio\s+source)\b/i.test(prompt)) {
@@ -1343,7 +1351,11 @@ function workstationControlMissingRequirements(toolId: WorkstationControlTool, a
     ];
   }
   if (toolId === "live_env.unbind_workstation_source") return has("source_ref") ? [] : ["source_ref"];
-  if (toolId === "live_env.set_workstation_loop_state") return has("loop_ref") ? [] : ["loop_ref"];
+  if (
+    toolId === "live_env.pause_workstation_loop" ||
+    toolId === "live_env.resume_workstation_loop" ||
+    toolId === "live_env.set_workstation_loop_state"
+  ) return has("loop_ref") ? [] : ["loop_ref"];
   if (toolId === "live_env.repair_workstation_source") return has("loop_ref") ? [] : ["loop_ref"];
   if (toolId === "live_env.update_live_answer_projection") return has("line_key") ? [] : ["line_key"];
   return [];
@@ -1367,6 +1379,8 @@ function buildWorkstationControlArgs(prompt: string, toolId: WorkstationControlT
     ...(lineKey ? { line_key: lineKey } : {}),
     ...(panelId ? { panel_id: panelId } : {}),
     ...(nodeRef ? { node_ref: nodeRef } : {}),
+    ...(toolId === "live_env.pause_workstation_loop" ? { state: "paused" } : {}),
+    ...(toolId === "live_env.resume_workstation_loop" ? { state: "running" } : {}),
     ...(toolId === "live_env.repair_workstation_source" ? { state: "repaired" } : {}),
     ...(toolId === "live_env.set_workstation_loop_state" && inferLoopState(prompt) ? { state: inferLoopState(prompt) } : {}),
     reason: "Agent-requested governed workstation control dispatch.",

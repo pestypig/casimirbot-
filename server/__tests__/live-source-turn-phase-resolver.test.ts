@@ -141,6 +141,8 @@ describe("resolveLiveSourceTurnPhase", () => {
         "live_env.change_workstation_preset",
         "live_env.bind_workstation_source",
         "live_env.unbind_workstation_source",
+        "live_env.pause_workstation_loop",
+        "live_env.resume_workstation_loop",
         "live_env.set_workstation_loop_state",
         "live_env.repair_workstation_source",
         "live_env.update_live_answer_projection",
@@ -605,6 +607,14 @@ describe("resolveLiveSourceTurnPhase", () => {
       {
         prompt: "Run live_env.unbind_workstation_source goal_id=goal:frog source_ref=source:visual.",
         toolName: "live_env.unbind_workstation_source",
+      },
+      {
+        prompt: "Run live_env.pause_workstation_loop goal_id=goal:frog loop_ref=loop:visual.",
+        toolName: "live_env.pause_workstation_loop",
+      },
+      {
+        prompt: "Run live_env.resume_workstation_loop goal_id=goal:frog loop_ref=loop:visual.",
+        toolName: "live_env.resume_workstation_loop",
       },
       {
         prompt: "Run live_env.set_workstation_loop_state goal_id=goal:frog loop_ref=loop:visual state=paused.",

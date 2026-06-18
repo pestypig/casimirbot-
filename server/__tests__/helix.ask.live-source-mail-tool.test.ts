@@ -300,6 +300,20 @@ describe("live-source mail live environment tools", () => {
         can_run_automatically: false,
       }),
       expect.objectContaining({
+        tool_id: "live_env.pause_workstation_loop",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: true,
+        can_run_automatically: false,
+      }),
+      expect.objectContaining({
+        tool_id: "live_env.resume_workstation_loop",
+        family: "live_env",
+        creates_assistant_answer: false,
+        requires_user_confirmation: true,
+        can_run_automatically: false,
+      }),
+      expect.objectContaining({
         tool_id: "live_env.set_workstation_loop_state",
         family: "live_env",
         creates_assistant_answer: false,
@@ -2208,6 +2222,8 @@ describe("live-source mail live environment tools", () => {
       packetId,
       goalId: "goal:packet-trace",
       traceCount: 1,
+      contractValid: true,
+      contractValidationIssues: [],
       requiredFeed: "packet_traces",
       requiredActuator: "query_packet_traces",
       policyEvidenceRefs: ["context_feed:packet_traces", "allowed_actuator:query_packet_traces"],
@@ -2219,6 +2235,7 @@ describe("live-source mail live environment tools", () => {
       ask_context_policy: "evidence_only",
     });
     expect(payload.packetTraces[0]).toMatchObject({
+      schema: "helix.stage_play.packet_trace.v1",
       packetId,
       sourceId,
       mailIds: expect.any(Array),
@@ -2228,6 +2245,12 @@ describe("live-source mail live environment tools", () => {
         traceId: expect.any(String),
         producedRefs: expect.arrayContaining([packetId]),
       }),
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
@@ -2349,6 +2372,8 @@ describe("live-source mail live environment tools", () => {
     });
     expect(queryPayload).toMatchObject({
       schema: "stage_play_workstation_context_feed_query_result/v1",
+      contractValid: true,
+      contractValidationIssues: [],
       feedKind: "route_evidence",
       goalId: "goal:route-evidence-query",
       status: "read",
@@ -2463,6 +2488,8 @@ describe("live-source mail live environment tools", () => {
     });
     expect(queryPayload).toMatchObject({
       schema: "stage_play_workstation_context_feed_query_result/v1",
+      contractValid: true,
+      contractValidationIssues: [],
       feedKind: "automation_policies",
       goalId: "goal:automation-policy-query",
       status: "read",
@@ -2554,6 +2581,8 @@ describe("live-source mail live environment tools", () => {
     });
     expect(queryPayload).toMatchObject({
       schema: "stage_play_workstation_context_feed_query_result/v1",
+      contractValid: true,
+      contractValidationIssues: [],
       feedKind: "visual_summaries",
       sourceRef: sourceId,
       goalId: null,
@@ -2678,6 +2707,8 @@ describe("live-source mail live environment tools", () => {
     const queryPayload = queryObservation.observation as any;
     expect(queryPayload).toMatchObject({
       schema: "stage_play_workstation_context_feed_query_result/v1",
+      contractValid: true,
+      contractValidationIssues: [],
       feedKind: "visual_summaries",
       goalId: "goal:visual-checkpoint",
       status: "read",
@@ -2766,6 +2797,8 @@ describe("live-source mail live environment tools", () => {
     });
     expect(queryPayload).toMatchObject({
       schema: "stage_play_workstation_context_feed_query_result/v1",
+      contractValid: true,
+      contractValidationIssues: [],
       feedKind: "translated_transcripts",
       status: "blocked",
       goalId: "goal:visual-feed-only",
@@ -2850,6 +2883,8 @@ describe("live-source mail live environment tools", () => {
     });
     expect(queryPayload).toMatchObject({
       schema: "stage_play_workstation_context_feed_query_result/v1",
+      contractValid: true,
+      contractValidationIssues: [],
       feedKind: "visual_summaries",
       status: "blocked",
       goalId: "goal:visual-feed-no-query-action",
@@ -2904,6 +2939,8 @@ describe("live-source mail live environment tools", () => {
     });
     expect(audioQueryPayload).toMatchObject({
       schema: "stage_play_workstation_context_feed_query_result/v1",
+      contractValid: true,
+      contractValidationIssues: [],
       feedKind: "audio_transcripts",
       sourceRef: audioSourceId,
       updateCount: 1,
@@ -2995,6 +3032,8 @@ describe("live-source mail live environment tools", () => {
     const audioQueryAfterProcessPayload = audioQueryAfterProcess.observation as any;
     expect(audioQueryAfterProcessPayload).toMatchObject({
       schema: "stage_play_workstation_context_feed_query_result/v1",
+      contractValid: true,
+      contractValidationIssues: [],
       feedKind: "audio_transcripts",
       updateCount: 2,
       assistant_answer: false,
@@ -3045,6 +3084,8 @@ describe("live-source mail live environment tools", () => {
     });
     expect(queryPayload).toMatchObject({
       schema: "stage_play_workstation_context_feed_query_result/v1",
+      contractValid: true,
+      contractValidationIssues: [],
       feedKind: "translated_transcripts",
       sourceRef: audioSourceId,
       updateCount: 1,
@@ -3105,6 +3146,14 @@ describe("live-source mail live environment tools", () => {
       targetRef: "source:visual:active",
       presetId: "preset:frog-classifier",
       policyEvidenceRefs: ["allowed_actuator:change_preset"],
+      contractValid: true,
+      contractValidationIssues: [],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       post_tool_model_step_required: true,
       assistant_answer: false,
       terminal_eligible: false,
@@ -3189,6 +3238,14 @@ describe("live-source mail live environment tools", () => {
       controlKind: "update_live_answer",
       status: "prepared",
       lineKey: "classification",
+      contractValid: true,
+      contractValidationIssues: [],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       post_tool_model_step_required: true,
       assistant_answer: false,
       terminal_eligible: false,
@@ -3234,6 +3291,8 @@ describe("live-source mail live environment tools", () => {
     const queryPayload = queryObservation.observation as any;
     expect(queryPayload).toMatchObject({
       schema: "stage_play_workstation_context_feed_query_result/v1",
+      contractValid: true,
+      contractValidationIssues: [],
       feedKind: "live_answer_lines",
       updateCount: 1,
       assistant_answer: false,
@@ -3301,6 +3360,14 @@ describe("live-source mail live environment tools", () => {
       actuatorAllowed: false,
       policyEvidenceRefs: ["allowed_actuator:change_preset"],
       missingRequirements: ["allowed_actuator:change_preset"],
+      contractValid: true,
+      contractValidationIssues: [],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       targetRef: "source:visual:active",
       presetId: "preset:frog-classifier",
       post_tool_model_step_required: true,
@@ -3361,6 +3428,14 @@ describe("live-source mail live environment tools", () => {
       status: "blocked",
       missingRequirements: ["target_ref"],
       sourceRef: "audio_source:earbuds",
+      contractValid: true,
+      contractValidationIssues: [],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       post_tool_model_step_required: true,
       assistant_answer: false,
       terminal_eligible: false,
@@ -3422,6 +3497,12 @@ describe("live-source mail live environment tools", () => {
       policyEvidenceRefs: ["allowed_actuator:unbind_source"],
       sourceRef: "source:visual:active",
       targetRef: "live-answer:visual",
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       post_tool_model_step_required: true,
       assistant_answer: false,
       terminal_eligible: false,
@@ -3470,6 +3551,14 @@ describe("live-source mail live environment tools", () => {
       policyEvidenceRefs: ["allowed_actuator:focus_process_graph"],
       nodeRef: "stage_play_processed_mail_packet:frog-001",
       panelId: "stage-play-badge-graph",
+      contractValid: true,
+      contractValidationIssues: [],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       post_tool_model_step_required: true,
       assistant_answer: false,
       terminal_eligible: false,
@@ -3563,14 +3652,13 @@ describe("live-source mail live environment tools", () => {
     const initialPauseCheckpointCount = ((pauseSession.observation as any).session.checkpoints ?? []).length;
 
     const pauseObservation = executeLiveEnvironmentTool({
-      tool_name: "live_env.set_workstation_loop_state",
+      tool_name: "live_env.pause_workstation_loop",
       thread_id: threadId,
       args: {
         room_id: roomId,
         source_id: sourceId,
         goal_id: "goal:pause-only-loop",
         loop_ref: "loop:visual-capture",
-        state: "paused",
       },
     });
     const pausePayload = pauseObservation.observation as any;
@@ -3584,6 +3672,14 @@ describe("live-source mail live environment tools", () => {
       actuatorAllowed: true,
       loopRef: "loop:visual-capture",
       loopState: "paused",
+      contractValid: true,
+      contractValidationIssues: [],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       post_tool_model_step_required: true,
       assistant_answer: false,
       terminal_eligible: false,
@@ -3596,8 +3692,8 @@ describe("live-source mail live environment tools", () => {
       goalId: "goal:pause-only-loop",
       checkpoints: expect.arrayContaining([
         expect.objectContaining({
-          summary: "Prepared set workstation loop state control dispatch for this goal session.",
-          actionsTaken: expect.arrayContaining(["pause_loop", "set_loop_state", "live_env.set_workstation_loop_state"]),
+          summary: "Prepared pause workstation loop control dispatch for this goal session.",
+          actionsTaken: expect.arrayContaining(["pause_loop", "set_loop_state", "live_env.pause_workstation_loop"]),
           evidenceRefs: expect.arrayContaining([pausePayload.goalContextUpdateId, pausePayload.receiptId]),
           nextStep: "continue",
         }),
@@ -3611,20 +3707,19 @@ describe("live-source mail live environment tools", () => {
       limit: 1,
     })[0];
     expect(storedPauseSession?.checkpoints.at(-1)).toMatchObject({
-      summary: "Prepared set workstation loop state control dispatch for this goal session.",
-      actionsTaken: expect.arrayContaining(["pause_loop", "set_loop_state", "live_env.set_workstation_loop_state"]),
+      summary: "Prepared pause workstation loop control dispatch for this goal session.",
+      actionsTaken: expect.arrayContaining(["pause_loop", "set_loop_state", "live_env.pause_workstation_loop"]),
       evidenceRefs: expect.arrayContaining([pausePayload.goalContextUpdateId, pausePayload.receiptId]),
     });
 
     const resumeObservation = executeLiveEnvironmentTool({
-      tool_name: "live_env.set_workstation_loop_state",
+      tool_name: "live_env.resume_workstation_loop",
       thread_id: threadId,
       args: {
         room_id: roomId,
         source_id: sourceId,
         goal_id: "goal:pause-only-loop",
         loop_ref: "loop:visual-capture",
-        state: "running",
       },
     });
     const resumePayload = resumeObservation.observation as any;
@@ -3637,6 +3732,14 @@ describe("live-source mail live environment tools", () => {
       actuatorAllowed: false,
       missingRequirements: ["allowed_actuator:resume_loop"],
       loopState: "running",
+      contractValid: true,
+      contractValidationIssues: [],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       post_tool_model_step_required: true,
       assistant_answer: false,
       terminal_eligible: false,
@@ -3678,6 +3781,8 @@ describe("live-source mail live environment tools", () => {
       requiredActuator: "repair_source",
       actuatorAllowed: true,
       loopState: "repaired",
+      contractValid: true,
+      contractValidationIssues: [],
       post_tool_model_step_required: true,
       assistant_answer: false,
       terminal_eligible: false,
@@ -3725,6 +3830,8 @@ describe("live-source mail live environment tools", () => {
       actuatorAllowed: true,
       loopRef: "loop:visual-capture",
       loopState: "repaired",
+      contractValid: true,
+      contractValidationIssues: [],
       post_tool_model_step_required: true,
       assistant_answer: false,
       terminal_eligible: false,
@@ -3771,6 +3878,8 @@ describe("live-source mail live environment tools", () => {
       requiredActuator: "repair_source",
       actuatorAllowed: false,
       missingRequirements: ["allowed_actuator:repair_source"],
+      contractValid: true,
+      contractValidationIssues: [],
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
@@ -3812,6 +3921,12 @@ describe("live-source mail live environment tools", () => {
       post_tool_model_step_required: true,
       contractValid: true,
       contractValidationIssues: [],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
@@ -3891,6 +4006,12 @@ describe("live-source mail live environment tools", () => {
       post_tool_model_step_required: true,
       contractValid: true,
       contractValidationIssues: [],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
@@ -3966,6 +4087,12 @@ describe("live-source mail live environment tools", () => {
       policyEvidenceRefs: ["allowed_actuator:narrator_bind_stream"],
       contractValid: true,
       contractValidationIssues: [],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       terminal_eligible: false,
       assistant_answer: false,
     });
@@ -4016,6 +4143,12 @@ describe("live-source mail live environment tools", () => {
       missingRequirements: ["stream_kind"],
       contractValid: false,
       contractValidationIssues: ["streamKind is invalid"],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       terminal_eligible: false,
       assistant_answer: false,
     });
@@ -4078,6 +4211,8 @@ describe("live-source mail live environment tools", () => {
     });
     expect(queryPayload).toMatchObject({
       schema: "stage_play_workstation_context_feed_query_result/v1",
+      contractValid: true,
+      contractValidationIssues: [],
       feedKind: "narrator_events",
       requiredActuator: "query_narrator_events",
       policyEvidenceRefs: ["context_feed:narrator_events", "allowed_actuator:query_narrator_events"],
@@ -4171,11 +4306,21 @@ describe("live-source mail live environment tools", () => {
     });
     expect(payload).toMatchObject({
       schema: "helix.situation_source_capability_read.v1",
+      contractValid: true,
+      contractValidationIssues: [],
       goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:source_health:/),
       policyEvidenceRefs: ["context_feed:source_health", "allowed_actuator:query_source_health"],
+      capabilityCount: expect.any(Number),
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       post_tool_model_step_required: true,
       terminal_eligible: false,
       assistant_answer: false,
+      raw_content_included: false,
     });
 
     const updates = listStagePlayGoalContextUpdates({
@@ -4240,6 +4385,8 @@ describe("live-source mail live environment tools", () => {
     });
     expect(payload).toMatchObject({
       schema: "helix.situation_source_capability_read.v1",
+      contractValid: true,
+      contractValidationIssues: [],
       status: "read",
       goalId: "goal:source-health-watch",
       goalSessionFound: true,
@@ -4248,6 +4395,13 @@ describe("live-source mail live environment tools", () => {
       requiredActuator: "query_source_health",
       policyEvidenceRefs: ["context_feed:source_health", "allowed_actuator:query_source_health"],
       goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:source_health:/),
+      capabilityCount: expect.any(Number),
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       terminal_eligible: false,
       assistant_answer: false,
       raw_content_included: false,
@@ -4310,6 +4464,8 @@ describe("live-source mail live environment tools", () => {
     });
     expect(payload).toMatchObject({
       schema: "helix.situation_source_capability_read.v1",
+      contractValid: true,
+      contractValidationIssues: [],
       status: "blocked",
       goalId: "goal:no-source-health",
       goalSessionFound: true,
@@ -4317,6 +4473,13 @@ describe("live-source mail live environment tools", () => {
       missingRequirements: ["context_feed:source_health"],
       policyEvidenceRefs: ["context_feed:source_health", "allowed_actuator:query_source_health"],
       capabilities: [],
+      capabilityCount: 0,
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:source_health:/),
       post_tool_model_step_required: true,
       terminal_eligible: false,
@@ -4619,6 +4782,8 @@ describe("live-source mail live environment tools", () => {
     });
     expect(payload).toMatchObject({
       schema: "helix.workstation_reasoning_trace_query_result.v1",
+      contractValid: true,
+      contractValidationIssues: [],
       trace_id: trace.trace_id,
       trace_count: 1,
       selectedTrace: {
@@ -4628,6 +4793,12 @@ describe("live-source mail live environment tools", () => {
       },
       goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:trace_memory:/),
       policyEvidenceRefs: ["context_feed:trace_memory", "allowed_actuator:query_trace_memory"],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       post_tool_model_step_required: true,
       terminal_eligible: false,
       assistant_answer: false,
@@ -4738,6 +4909,8 @@ describe("live-source mail live environment tools", () => {
     });
     expect(payload).toMatchObject({
       schema: "helix.workstation_reasoning_trace_query_result.v1",
+      contractValid: true,
+      contractValidationIssues: [],
       trace_id: trace.trace_id,
       trace_count: 1,
       status: "read",
@@ -4746,6 +4919,12 @@ describe("live-source mail live environment tools", () => {
       actuatorAllowed: true,
       requiredActuator: "query_trace_memory",
       policyEvidenceRefs: ["context_feed:trace_memory", "allowed_actuator:query_trace_memory"],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       selectedTrace: {
         trace_id: trace.trace_id,
         assistant_answer: false,
@@ -4843,6 +5022,8 @@ describe("live-source mail live environment tools", () => {
     });
     expect(payload).toMatchObject({
       schema: "helix.workstation_reasoning_trace_query_result.v1",
+      contractValid: true,
+      contractValidationIssues: [],
       trace_id: trace.trace_id,
       goalId: "goal:visual-no-trace",
       status: "blocked",
@@ -4850,6 +5031,12 @@ describe("live-source mail live environment tools", () => {
       feedAllowed: false,
       missingRequirements: ["context_feed:trace_memory"],
       policyEvidenceRefs: ["context_feed:trace_memory", "allowed_actuator:query_trace_memory"],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       traces: [],
       trace_count: 0,
       selectedTrace: null,
@@ -4942,6 +5129,8 @@ describe("live-source mail live environment tools", () => {
     });
     expect(payload).toMatchObject({
       schema: "helix.workstation_reasoning_trace_query_result.v1",
+      contractValid: true,
+      contractValidationIssues: [],
       trace_id: trace.trace_id,
       goalId: "goal:trace-feed-no-query-action",
       status: "blocked",
@@ -4951,6 +5140,12 @@ describe("live-source mail live environment tools", () => {
       actuatorAllowed: false,
       missingRequirements: ["allowed_actuator:query_trace_memory"],
       policyEvidenceRefs: ["context_feed:trace_memory", "allowed_actuator:query_trace_memory"],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       traces: [],
       trace_count: 0,
       selectedTrace: null,

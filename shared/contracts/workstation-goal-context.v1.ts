@@ -245,6 +245,8 @@ export const WORKSTATION_AGENT_GOAL_ACTUATOR_ALIASES: Readonly<Record<string, Ag
   live_env_change_workstation_preset: "change_preset",
   live_env_bind_workstation_source: "bind_source",
   live_env_unbind_workstation_source: "unbind_source",
+  live_env_pause_workstation_loop: "pause_loop",
+  live_env_resume_workstation_loop: "resume_loop",
   live_env_set_workstation_loop_state: "set_loop_state",
   live_env_repair_workstation_source: "repair_source",
   live_env_update_live_answer_projection: "update_live_answer",
@@ -351,6 +353,12 @@ export type NarratorSayRequestV1 = {
   priority: "low" | "normal" | "high";
   language?: string;
   dedupeKey?: string;
+  terminalAuthority: {
+    status: "not_terminal";
+    finalAnswerEligible: false;
+    completedSolverPathRequired: true;
+    terminalAuthoritySingleWriterRequired: true;
+  };
   assistant_answer: false;
   terminal_eligible: false;
   raw_content_included: false;
@@ -371,6 +379,12 @@ export type NarratorBindStreamRequestV1 = {
   deliveryMode: Exclude<NarratorDeliveryMode, "hidden">;
   voicePolicy: "muted" | "propose_only" | "confirm_speak_required" | "automatic_when_policy_allows";
   evidenceThreshold?: "observed" | "likely" | "confirmed";
+  terminalAuthority: {
+    status: "not_terminal";
+    finalAnswerEligible: false;
+    completedSolverPathRequired: true;
+    terminalAuthoritySingleWriterRequired: true;
+  };
   assistant_answer: false;
   terminal_eligible: false;
   raw_content_included: false;
@@ -434,6 +448,19 @@ const narratorStreamKinds = new Set<string>(WORKSTATION_NARRATOR_STREAM_KINDS);
 const narratorVoicePolicies = new Set<string>(WORKSTATION_NARRATOR_VOICE_POLICIES);
 
 const narratorPriorities = new Set<string>(WORKSTATION_NARRATOR_PRIORITIES);
+
+const terminalAuthorityIssue = (value: unknown, field: string): string[] => {
+  const issues: string[] = [];
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return [`${field} must be an object`];
+  const record = value as Record<string, unknown>;
+  if (record.status !== "not_terminal") issues.push(`${field}.status must be not_terminal`);
+  if (record.finalAnswerEligible !== false) issues.push(`${field}.finalAnswerEligible must be false`);
+  if (record.completedSolverPathRequired !== true) issues.push(`${field}.completedSolverPathRequired must be true`);
+  if (record.terminalAuthoritySingleWriterRequired !== true) {
+    issues.push(`${field}.terminalAuthoritySingleWriterRequired must be true`);
+  }
+  return issues;
+};
 
 const stringArrayIssue = (value: unknown, field: string, options: { requireNonEmpty?: boolean } = {}): string[] => {
   if (!Array.isArray(value)) return [`${field} must be an array`];
@@ -527,6 +554,7 @@ export function validateNarratorSayRequestV1(value: NarratorSayRequestV1): strin
   issues.push(...stringArrayIssue(value.evidenceRefs, "evidenceRefs", { requireNonEmpty: true }));
   if (!narratorVisibleDeliveryModes.has(value.deliveryMode)) issues.push("deliveryMode must be visible_only, confirm_to_speak, or auto_speak");
   if (!narratorPriorities.has(value.priority)) issues.push("priority is invalid");
+  issues.push(...terminalAuthorityIssue(value.terminalAuthority, "terminalAuthority"));
   if (value.assistant_answer !== false) issues.push("narrator say requests must not be assistant answers");
   if (value.terminal_eligible !== false) issues.push("narrator say requests must not be terminal eligible");
   if (value.raw_content_included !== false) issues.push("narrator say requests must not include raw content");
@@ -541,6 +569,7 @@ export function validateNarratorBindStreamRequestV1(value: NarratorBindStreamReq
   if (!narratorStreamKinds.has(value.streamKind)) issues.push("streamKind is invalid");
   if (!narratorVisibleDeliveryModes.has(value.deliveryMode)) issues.push("deliveryMode must be visible_only, confirm_to_speak, or auto_speak");
   if (!narratorVoicePolicies.has(value.voicePolicy)) issues.push("voicePolicy is invalid");
+  issues.push(...terminalAuthorityIssue(value.terminalAuthority, "terminalAuthority"));
   if (value.assistant_answer !== false) issues.push("narrator bind stream requests must not be assistant answers");
   if (value.terminal_eligible !== false) issues.push("narrator bind stream requests must not be terminal eligible");
   if (value.raw_content_included !== false) issues.push("narrator bind stream requests must not include raw content");

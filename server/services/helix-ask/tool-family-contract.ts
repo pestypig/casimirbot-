@@ -718,6 +718,40 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
     aliases: ["unbind_workstation_source", "unbind_source", "detach_source"],
   }),
   contract({
+    toolName: "live_env.pause_workstation_loop",
+    toolFamily: "live_source_mail",
+    authority: "control_receipt",
+    mutating: true,
+    requiredObservationKinds: [
+      "stage_play_workstation_control_receipt",
+      "helix.workstation_goal_context_update.v1",
+    ],
+    allowedTerminalKinds: [
+      "stage_play_workstation_control_receipt",
+      ...evidenceOnlyTerminalKinds,
+    ],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+    aliases: ["pause_workstation_loop", "pause_loop"],
+  }),
+  contract({
+    toolName: "live_env.resume_workstation_loop",
+    toolFamily: "live_source_mail",
+    authority: "control_receipt",
+    mutating: true,
+    requiredObservationKinds: [
+      "stage_play_workstation_control_receipt",
+      "helix.workstation_goal_context_update.v1",
+    ],
+    allowedTerminalKinds: [
+      "stage_play_workstation_control_receipt",
+      ...evidenceOnlyTerminalKinds,
+    ],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+    aliases: ["resume_workstation_loop", "resume_loop"],
+  }),
+  contract({
     toolName: "live_env.set_workstation_loop_state",
     toolFamily: "live_source_mail",
     authority: "control_receipt",
@@ -732,7 +766,7 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
     ],
     requiredReentry: true,
     requiresGoalSatisfaction: true,
-    aliases: ["set_workstation_loop_state", "pause_loop", "resume_loop", "repair_loop"],
+    aliases: ["set_workstation_loop_state", "repair_loop"],
   }),
   contract({
     toolName: "live_env.update_live_answer_projection",

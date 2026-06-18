@@ -1,13 +1,35 @@
 import { describe, expect, it } from "vitest";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
+import {
+  buildNhm2DynamicGeometrySamples,
+  isNhm2DynamicGeometrySamplesArtifact,
+} from "../shared/contracts/nhm2-dynamic-geometry-samples.v1";
 import type { Nhm2ObserverRobustEnergyConditionArtifactV1 } from "../shared/contracts/nhm2-observer-robust-energy-conditions.v1";
 import type { Nhm2QeiWorldlineDossierV1 } from "../shared/contracts/nhm2-qei-worldline-dossier.v1";
+import {
+  buildNhm2EffectiveGeometryReference,
+  isNhm2EffectiveGeometryReference,
+} from "../shared/contracts/nhm2-effective-geometry-reference.v1";
+import {
+  buildNhm2AveragedSourceTensorReceipt,
+  isNhm2AveragedSourceTensorReceipt,
+} from "../shared/contracts/nhm2-averaged-source-tensor-receipt.v1";
+import {
+  buildNhm2BackreactionResidualReceipt,
+  isNhm2BackreactionResidualReceipt,
+} from "../shared/contracts/nhm2-backreaction-residual-receipt.v1";
+import { buildNhm2TileEffectiveFullTensorSourceArtifact } from "../shared/contracts/nhm2-tile-effective-full-tensor-source.v1";
 import type { Nhm2RegionalFullTensorResidualArtifactV1 } from "../shared/contracts/nhm2-regional-full-tensor-residual.v1";
 import type { Nhm2SourceComponentAuthorityLedgerArtifactV1 } from "../shared/contracts/nhm2-source-component-authority-ledger.v1";
 import {
+  buildNhm2DynamicEffectiveGeometryEvidence,
   buildNhm2FrequencyConvergenceEvidence,
   buildNhm2SwitchingConservationEvidence,
   buildNhm2TimeDependentSourceCampaign,
+  isNhm2DynamicEffectiveGeometryEvidence,
   isNhm2FrequencyConvergenceEvidence,
   isNhm2SwitchingConservationEvidence,
   isNhm2TimeDependentSourceCampaignArtifact,
@@ -16,6 +38,114 @@ import {
   type Nhm2FrequencyConvergenceEvidenceV1,
   type Nhm2SwitchingConservationEvidenceV1,
 } from "../shared/contracts/nhm2-time-dependent-source-campaign.v1";
+import { runNhm2DynamicGeometrySamples } from "../tools/nhm2/build-dynamic-geometry-samples";
+import { runNhm2DynamicEffectiveGeometryEvidence } from "../tools/nhm2/build-dynamic-effective-geometry-evidence";
+import { runNhm2BackreactionResidualReceipt } from "../tools/nhm2/build-backreaction-residual-receipt";
+
+const encodedR32 = (values: number[]): string => {
+  const bytes = Buffer.alloc(values.length * 4);
+  values.forEach((value, index) => bytes.writeFloatLE(value, index * 4));
+  return bytes.toString("base64");
+};
+
+const writeBrick = (
+  repoRoot: string,
+  path: string,
+  channelValues: Record<string, number[]>,
+) => {
+  const firstChannel = Object.values(channelValues)[0] ?? [0];
+  writeFileSync(
+    join(repoRoot, path),
+    `${JSON.stringify({
+      kind: "gr-evolve-brick",
+      dims: [firstChannel.length, 1, 1],
+      format: "r32f",
+      channelOrder: Object.keys(channelValues),
+      channels: Object.fromEntries(
+        Object.entries(channelValues).map(([channelId, values]) => [
+          channelId,
+          { data: encodedR32(values), min: Math.min(...values), max: Math.max(...values) },
+        ]),
+      ),
+    })}\n`,
+    "utf8",
+  );
+};
+
+const fullSourceTensor = {
+  T00: -1,
+  T01: 0,
+  T02: 0,
+  T03: 0,
+  T10: 0,
+  T11: 1,
+  T12: 0,
+  T13: 0,
+  T20: 0,
+  T21: 0,
+  T22: 1,
+  T23: 0,
+  T30: 0,
+  T31: 0,
+  T32: 0,
+  T33: 1,
+};
+
+const sourceRegion = (regionId: "global" | "hull" | "wall" | "exterior_shell") => ({
+  regionId,
+  status: "review" as const,
+  tensorAuthorityMode: "full_tensor" as const,
+  tensor: fullSourceTensor,
+  symmetry: { declared: false, kind: "none" as const, lowerComponentsDerivedBySymmetry: false },
+  chartRef: "comoving_cartesian",
+  unitsRef: "J/m^3",
+  regionMaskRef: `mask:${regionId}`,
+  aggregationMode: "mean" as const,
+  normalizationBasis: "sample_count" as const,
+  sampleCount: 1,
+  sourceSupport: {
+    supportKernelId: `support:${regionId}`,
+    cycleAverageStatus: "pass" as const,
+    dutyCycleStatus: "pass" as const,
+    lightCrossingConsistencyStatus: "review" as const,
+  },
+  provenance: {
+    producerModule: "source-test",
+    producerFunction: "emit",
+    derivationMode: "source_model_direct_full_tensor" as const,
+    inputRefs: [`source:${regionId}`],
+    preAggregationValueRefs: [`pre:${regionId}`],
+    notDerivedFromMetricRequiredTensor: true,
+  },
+  blockers: ["qei_dossier_not_pass", "conservation_unknown"],
+});
+
+const averagedSourceTensor = () =>
+  buildNhm2TileEffectiveFullTensorSourceArtifact({
+    generatedAt: "2026-06-18T00:00:00.000Z",
+    runId: "campaign-test",
+    selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+    expectedProfileId: "stage1_centerline_alpha_0p995_v1",
+    laneId: "nhm2_shift_lapse",
+    sourceModel: {
+      sourceModelId: "source-test",
+      sourceModelVersion: "v1",
+      sourceModelClass: "cycle_averaged_tile_model",
+      sourceSideOnly: true,
+      notDerivedFromMetricRequiredTensor: true,
+      metricRequiredInputRefs: [],
+      sourceInputRefs: ["source-input.json"],
+      qeiDossierRef: null,
+      conservationRef: null,
+    },
+    regions: [
+      sourceRegion("global"),
+      sourceRegion("hull"),
+      sourceRegion("wall"),
+      sourceRegion("exterior_shell"),
+    ],
+    literatureRefs: ["fewster_thompson_2023_stationary_worldline_qei"],
+  });
 
 const completeLedger = (
   summary?: Partial<Nhm2SourceComponentAuthorityLedgerArtifactV1["summary"]>,
@@ -313,6 +443,387 @@ describe("NHM2 time-dependent source campaign", () => {
     expect(evidence.blockers).toContain("cycle_average_source_not_fixed");
   });
 
+  it("builds dynamic/effective geometry evidence that fails closed without dynamic refs", () => {
+    const evidence = buildNhm2DynamicEffectiveGeometryEvidence({
+      cycleAverageSourceFixed: true,
+      residualLInf: 0.01,
+      bounded: true,
+    });
+
+    expect(isNhm2DynamicEffectiveGeometryEvidence(evidence)).toBe(true);
+    expect(evidence.agreementStatus).toBe("fail");
+    expect(evidence.blockers).toEqual(
+      expect.arrayContaining([
+        "dynamic_geometry_ref_missing",
+        "effective_geometry_ref_missing",
+        "averaging_window_seconds_missing",
+        "averaged_source_tensor_ref_missing",
+      ]),
+    );
+  });
+
+  it("builds dynamic/effective geometry evidence that names residual and backreaction blockers", () => {
+    const evidence = buildNhm2DynamicEffectiveGeometryEvidence({
+      dynamicGeometryRef: "dynamic-geometry.json",
+      effectiveGeometryRef: "effective-geometry.json",
+      averagingWindowSeconds: 1,
+      cycleAverageSourceFixed: true,
+      averagedSourceTensorRef: "averaged-source.json",
+      residualLInf: 0.12,
+      residualL2: 0.04,
+      toleranceLInf: 0.1,
+      bounded: false,
+    });
+
+    expect(evidence.agreementStatus).toBe("fail");
+    expect(evidence.blockers).toEqual(
+      expect.arrayContaining([
+        "dynamic_effective_residual_linf_exceeds_tolerance",
+        "backreaction_residual_not_bounded",
+      ]),
+    );
+  });
+
+  it("builds dynamic geometry sample receipts that distinguish missing samples from a missing ref", () => {
+    const samples = buildNhm2DynamicGeometrySamples({
+      fixedCycleAverageSource: true,
+      averagingWindowSeconds: 1,
+    });
+
+    expect(isNhm2DynamicGeometrySamplesArtifact(samples)).toBe(true);
+    expect(samples.summary.dynamicGeometrySamplesAvailable).toBe(false);
+    expect(samples.summary.firstBlocker).toBe("dynamic_geometry_samples_missing");
+  });
+
+  it("rejects computed dynamic geometry samples without ADM geometry channels", () => {
+    const samples = buildNhm2DynamicGeometrySamples({
+      fixedCycleAverageSource: true,
+      averagingWindowSeconds: 1,
+      samples: [
+        {
+          sampleId: "bad-sample",
+          geometryRef: "gr-evolve-brick.json",
+          sourceKind: "gr_evolve_brick",
+          requiredChannels: ["alpha", "K_xx"],
+          availableChannels: ["alpha"],
+          status: "computed",
+        },
+      ],
+    });
+
+    expect(samples.summary.dynamicGeometrySamplesAvailable).toBe(false);
+    expect(samples.samples[0]?.missingChannels).toContain("K_xx");
+    expect(samples.samples[0]?.blockers).toContain(
+      "dynamic_geometry_required_channels_missing",
+    );
+  });
+
+  it("validates gr-evolve-brick refs before marking dynamic geometry samples computed", () => {
+    const repoRoot = mkdtempSync(join(tmpdir(), "nhm2-gr-evolve-sample-"));
+    const brickPath = "brick.json";
+    const requiredChannels = [
+      "alpha",
+      "beta_x",
+      "beta_y",
+      "beta_z",
+      "gamma_xx",
+      "gamma_yy",
+      "gamma_zz",
+      "gamma_xy",
+      "gamma_xz",
+      "gamma_yz",
+      "K_xx",
+      "K_yy",
+      "K_zz",
+      "K_xy",
+      "K_xz",
+      "K_yz",
+      "H_constraint",
+      "M_constraint_x",
+      "M_constraint_y",
+      "M_constraint_z",
+    ];
+    writeFileSync(
+      join(repoRoot, brickPath),
+      `${JSON.stringify({
+        kind: "gr-evolve-brick",
+        time_s: 0,
+        channels: Object.fromEntries(requiredChannels.map((channel) => [channel, {}])),
+      })}\n`,
+      "utf8",
+    );
+
+    const artifact = runNhm2DynamicGeometrySamples({
+      repoRoot,
+      outPath: "samples.json",
+      fixedCycleAverageSource: true,
+      averagingWindowSeconds: 1,
+      grEvolveBrickRefs: [brickPath],
+    });
+
+    expect(artifact.summary.dynamicGeometrySamplesAvailable).toBe(true);
+    expect(artifact.samples[0]?.sourceKind).toBe("gr_evolve_brick");
+    expect(artifact.samples[0]?.missingChannels).toEqual([]);
+    expect(readFileSync(join(repoRoot, "samples.json"), "utf8")).toContain(
+      "nhm2_dynamic_geometry_samples/v1",
+    );
+  });
+
+  it("requires effective geometry references to expose ADM geometry channels", () => {
+    const artifact = buildNhm2EffectiveGeometryReference({
+      effectiveGeometryRef: "effective-brick.json",
+      sourceKind: "gr_evolve_brick_static_reference",
+      requiredChannels: ["alpha", "K_xx"],
+      availableChannels: ["alpha"],
+      status: "computed",
+    });
+
+    expect(isNhm2EffectiveGeometryReference(artifact)).toBe(true);
+    expect(artifact.summary.effectiveGeometryAvailable).toBe(false);
+    expect(artifact.missingChannels).toContain("K_xx");
+    expect(artifact.blockers).toContain("effective_geometry_required_channels_missing");
+  });
+
+  it("moves dynamic/effective evidence past missing effective geometry when a valid reference is present", () => {
+    const repoRoot = mkdtempSync(join(tmpdir(), "nhm2-effective-geometry-"));
+    const dynamicSamples = buildNhm2DynamicGeometrySamples({
+      fixedCycleAverageSource: true,
+      averagingWindowSeconds: 1,
+      samples: [
+        {
+          sampleId: "dynamic",
+          geometryRef: "dynamic-brick.json",
+          sourceKind: "gr_evolve_brick",
+          requiredChannels: ["alpha"],
+          availableChannels: ["alpha"],
+          status: "computed",
+        },
+      ],
+    });
+    const effectiveReference = buildNhm2EffectiveGeometryReference({
+      effectiveGeometryRef: "effective-brick.json",
+      sourceKind: "gr_evolve_brick_static_reference",
+      requiredChannels: ["alpha"],
+      availableChannels: ["alpha"],
+      status: "computed",
+    });
+    writeFileSync(
+      join(repoRoot, "dynamic-samples.json"),
+      `${JSON.stringify(dynamicSamples, null, 2)}\n`,
+      "utf8",
+    );
+    writeFileSync(
+      join(repoRoot, "effective-reference.json"),
+      `${JSON.stringify(effectiveReference, null, 2)}\n`,
+      "utf8",
+    );
+
+    const evidence = runNhm2DynamicEffectiveGeometryEvidence({
+      repoRoot,
+      outPath: "dynamic-effective.json",
+      dynamicGeometrySamplesPath: "dynamic-samples.json",
+      effectiveGeometryReferencePath: "effective-reference.json",
+      averagingWindowSeconds: 1,
+      cycleAverageSourceFixed: true,
+      residualLInf: 0.01,
+      bounded: false,
+    });
+
+    expect(evidence.blockers).not.toContain("effective_geometry_ref_missing");
+    expect(evidence.blockers).toEqual(
+      expect.arrayContaining([
+        "averaged_source_tensor_ref_missing",
+        "backreaction_residual_not_bounded",
+      ]),
+    );
+    expect(evidence.effectiveGeometryRef).toBe("effective-reference.json");
+  });
+
+  it("admits a source-side full tensor as averaged source evidence without proving backreaction", () => {
+    const receipt = buildNhm2AveragedSourceTensorReceipt({
+      sourceTensorRef: "source.json",
+      sourceTensor: averagedSourceTensor(),
+      frequencyConvergenceRef: "frequency.json",
+      frequencyConvergence: frequencyEvidence(),
+      switchingConservationRef: "switching.json",
+      switchingConservation: switchingEvidence(),
+      averagingWindowSeconds: 1,
+      cycleAverageSourceFixed: true,
+    });
+
+    expect(isNhm2AveragedSourceTensorReceipt(receipt)).toBe(true);
+    expect(receipt.summary.averagedSourceTensorAvailable).toBe(true);
+    expect(receipt.status).toBe("pass");
+    expect(receipt.claimBoundary.averagedSourceDoesNotBoundBackreaction).toBe(true);
+  });
+
+  it("moves dynamic/effective evidence past averaged source missing when receipt is valid", () => {
+    const repoRoot = mkdtempSync(join(tmpdir(), "nhm2-averaged-source-"));
+    const dynamicSamples = buildNhm2DynamicGeometrySamples({
+      fixedCycleAverageSource: true,
+      averagingWindowSeconds: 1,
+      samples: [
+        {
+          sampleId: "dynamic",
+          geometryRef: "dynamic-brick.json",
+          sourceKind: "gr_evolve_brick",
+          requiredChannels: ["alpha"],
+          availableChannels: ["alpha"],
+          status: "computed",
+        },
+      ],
+    });
+    const effectiveReference = buildNhm2EffectiveGeometryReference({
+      effectiveGeometryRef: "effective-brick.json",
+      sourceKind: "gr_evolve_brick_static_reference",
+      requiredChannels: ["alpha"],
+      availableChannels: ["alpha"],
+      status: "computed",
+    });
+    const averagedSource = buildNhm2AveragedSourceTensorReceipt({
+      sourceTensorRef: "source.json",
+      sourceTensor: averagedSourceTensor(),
+      frequencyConvergenceRef: "frequency.json",
+      frequencyConvergence: frequencyEvidence(),
+      switchingConservationRef: "switching.json",
+      switchingConservation: switchingEvidence(),
+      averagingWindowSeconds: 1,
+      cycleAverageSourceFixed: true,
+    });
+    writeFileSync(
+      join(repoRoot, "dynamic-samples.json"),
+      `${JSON.stringify(dynamicSamples, null, 2)}\n`,
+      "utf8",
+    );
+    writeFileSync(
+      join(repoRoot, "effective-reference.json"),
+      `${JSON.stringify(effectiveReference, null, 2)}\n`,
+      "utf8",
+    );
+    writeFileSync(
+      join(repoRoot, "averaged-source.json"),
+      `${JSON.stringify(averagedSource, null, 2)}\n`,
+      "utf8",
+    );
+
+    const evidence = runNhm2DynamicEffectiveGeometryEvidence({
+      repoRoot,
+      outPath: "dynamic-effective.json",
+      dynamicGeometrySamplesPath: "dynamic-samples.json",
+      effectiveGeometryReferencePath: "effective-reference.json",
+      averagedSourceTensorReceiptPath: "averaged-source.json",
+      averagingWindowSeconds: 1,
+      cycleAverageSourceFixed: true,
+      residualLInf: 0.01,
+      bounded: false,
+    });
+
+    expect(evidence.blockers).not.toContain("averaged_source_tensor_ref_missing");
+    expect(evidence.blockers).toEqual(["backreaction_residual_not_bounded"]);
+    expect(evidence.averagedSourceTensorRef).toBe("averaged-source.json");
+  });
+
+  it("bounds backreaction residuals from dynamic and effective gr-evolve channel data", () => {
+    const receipt = buildNhm2BackreactionResidualReceipt({
+      dynamicGeometrySamplesRef: "dynamic-samples.json",
+      effectiveGeometryReferenceRef: "effective-reference.json",
+      averagedSourceTensorRef: "averaged-source.json",
+      toleranceLInf: 0.1,
+      channels: [
+        {
+          channelId: "alpha",
+          sampleCount: 1,
+          dynamicLInf: 1,
+          effectiveLInf: 1,
+          absoluteLInf: 0.01,
+          relativeLInf: 0.01,
+          relativeL2: 0.01,
+        },
+      ],
+    });
+
+    expect(isNhm2BackreactionResidualReceipt(receipt)).toBe(true);
+    expect(receipt.summary.bounded).toBe(true);
+    expect(receipt.claimBoundary.physicalViabilityClaimAllowed).toBe(false);
+  });
+
+  it("feeds a bounded backreaction receipt into dynamic/effective evidence", () => {
+    const repoRoot = mkdtempSync(join(tmpdir(), "nhm2-backreaction-"));
+    const dynamicSamples = buildNhm2DynamicGeometrySamples({
+      fixedCycleAverageSource: true,
+      averagingWindowSeconds: 1,
+      samples: [
+        {
+          sampleId: "dynamic",
+          geometryRef: "dynamic-brick.json",
+          sourceKind: "gr_evolve_brick",
+          requiredChannels: ["alpha"],
+          availableChannels: ["alpha"],
+          status: "computed",
+        },
+      ],
+    });
+    const effectiveReference = buildNhm2EffectiveGeometryReference({
+      effectiveGeometryRef: "effective-brick.json",
+      sourceKind: "gr_evolve_brick_static_reference",
+      requiredChannels: ["alpha"],
+      availableChannels: ["alpha"],
+      status: "computed",
+    });
+    const averagedSource = buildNhm2AveragedSourceTensorReceipt({
+      sourceTensorRef: "source.json",
+      sourceTensor: averagedSourceTensor(),
+      frequencyConvergenceRef: "frequency.json",
+      frequencyConvergence: frequencyEvidence(),
+      switchingConservationRef: "switching.json",
+      switchingConservation: switchingEvidence(),
+      averagingWindowSeconds: 1,
+      cycleAverageSourceFixed: true,
+    });
+    writeFileSync(
+      join(repoRoot, "dynamic-samples.json"),
+      `${JSON.stringify(dynamicSamples, null, 2)}\n`,
+      "utf8",
+    );
+    writeFileSync(
+      join(repoRoot, "effective-reference.json"),
+      `${JSON.stringify(effectiveReference, null, 2)}\n`,
+      "utf8",
+    );
+    writeFileSync(
+      join(repoRoot, "averaged-source.json"),
+      `${JSON.stringify(averagedSource, null, 2)}\n`,
+      "utf8",
+    );
+    writeBrick(repoRoot, "dynamic-brick.json", { alpha: [1, 1.01] });
+    writeBrick(repoRoot, "effective-brick.json", { alpha: [1, 1] });
+
+    const backreaction = runNhm2BackreactionResidualReceipt({
+      repoRoot,
+      outPath: "backreaction.json",
+      dynamicGeometrySamplesPath: "dynamic-samples.json",
+      effectiveGeometryReferencePath: "effective-reference.json",
+      averagedSourceTensorReceiptPath: "averaged-source.json",
+      channels: ["alpha"],
+      toleranceLInf: 0.1,
+    });
+    const evidence = runNhm2DynamicEffectiveGeometryEvidence({
+      repoRoot,
+      outPath: "dynamic-effective.json",
+      dynamicGeometrySamplesPath: "dynamic-samples.json",
+      effectiveGeometryReferencePath: "effective-reference.json",
+      averagedSourceTensorReceiptPath: "averaged-source.json",
+      backreactionResidualReceiptPath: "backreaction.json",
+      averagingWindowSeconds: 1,
+      cycleAverageSourceFixed: true,
+    });
+
+    expect(backreaction.summary.bounded).toBe(true);
+    expect(evidence.blockers).toEqual([]);
+    expect(evidence.agreementStatus).toBe("pass");
+    expect(evidence.backreactionResidualRef).toBe("backreaction.json");
+  });
+
   it("emits a valid fail-closed artifact when evidence is missing", () => {
     const artifact = buildNhm2TimeDependentSourceCampaign({
       generatedAt: "2026-06-18T00:00:00.000Z",
@@ -354,6 +865,64 @@ describe("NHM2 time-dependent source campaign", () => {
     expect(artifact.summary.switchingConservationPass).toBe(true);
     expect(artifact.summary.campaignPass).toBe(false);
     expect(artifact.summary.firstBlocker).toBe("frequency_convergence_evidence_missing");
+  });
+
+  it("moves the first blocker from missing dynamic evidence to typed dynamic blockers", () => {
+    const artifact = buildNhm2TimeDependentSourceCampaign({
+      sourceComponentAuthorityLedger: completeLedger(),
+      regionalFullTensorResidual: fullTensorResidual(),
+      qeiWorldlineDossier: qeiDossier(),
+      observerRobustEnergyConditions: observerArtifact(),
+      frequencyConvergence: frequencyEvidence(),
+      switchingConservation: switchingEvidence(),
+      dynamicEffectiveGeometry: buildNhm2DynamicEffectiveGeometryEvidence({
+        cycleAverageSourceFixed: true,
+        residualLInf: 0.01,
+        bounded: true,
+      }),
+    });
+
+    expect(artifact.summary.dynamicGeometryAgreementPass).toBe(false);
+    expect(artifact.summary.campaignPass).toBe(false);
+    expect(artifact.summary.firstBlocker).toBe("dynamic_geometry_ref_missing");
+    expect(artifact.claimBoundary).toMatchObject({
+      physicalViabilityClaimAllowed: false,
+      transportClaimAllowed: false,
+      routeEtaClaimAllowed: false,
+      propulsionClaimAllowed: false,
+    });
+  });
+
+  it("moves the first blocker from a missing dynamic ref to missing dynamic samples", () => {
+    const dynamicSamples = buildNhm2DynamicGeometrySamples({
+      fixedCycleAverageSource: true,
+      averagingWindowSeconds: 1,
+    });
+    const artifact = buildNhm2TimeDependentSourceCampaign({
+      sourceComponentAuthorityLedger: completeLedger(),
+      regionalFullTensorResidual: fullTensorResidual(),
+      qeiWorldlineDossier: qeiDossier(),
+      observerRobustEnergyConditions: observerArtifact(),
+      frequencyConvergence: frequencyEvidence(),
+      switchingConservation: switchingEvidence(),
+      dynamicEffectiveGeometry: buildNhm2DynamicEffectiveGeometryEvidence({
+        dynamicGeometryRef: "dynamic-geometry-samples.json",
+        dynamicGeometryStatus: dynamicSamples.summary.dynamicGeometrySamplesAvailable
+          ? "pass"
+          : "missing",
+        dynamicGeometryBlockers:
+          dynamicSamples.summary.firstBlocker == null
+            ? []
+            : [dynamicSamples.summary.firstBlocker],
+        cycleAverageSourceFixed: true,
+        residualLInf: 0.01,
+        bounded: true,
+      }),
+    });
+
+    expect(artifact.summary.dynamicGeometryAgreementPass).toBe(false);
+    expect(artifact.summary.campaignPass).toBe(false);
+    expect(artifact.summary.firstBlocker).toBe("dynamic_geometry_samples_missing");
   });
 
   it("rejects source target echo as source independence failure", () => {
