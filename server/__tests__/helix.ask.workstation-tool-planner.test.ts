@@ -951,6 +951,61 @@ describe("Helix Ask workstation tool planner", () => {
     });
   });
 
+  it("routes affirmative live-source watch-job automation setup through route-watch goal context", () => {
+    const plan = planWorkstationToolUse(
+      'Run live_env.configure_live_source_watch_job goal_id=goal:frog-monitor source_id=source:visual-tab objective="Watch visual frames for frog classification evidence." decision_policy_prompt="Describe each batch and keep route-watch receipts evidence-only."',
+      { threadId: "thread:watch-job", turnId: "turn:watch-job" },
+    );
+
+    expect(plan.intent).toBe("workstation_goal_context");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.action).toBeNull();
+    expect(plan.tool_plan?.steps.map((step) => step.tool_id ?? `${step.panel_id}.${step.action_id}`)).toEqual([
+      "live_env.configure_live_source_watch_job",
+      "undefined.undefined",
+    ]);
+    expect(plan.tool_plan?.steps[0]).toMatchObject({
+      step_id: "configure_live_source_watch_job",
+      kind: "run_ask_tool",
+      tool_id: "live_env.configure_live_source_watch_job",
+      args: expect.objectContaining({
+        goal_id: "goal:frog-monitor",
+        source_id: "source:visual-tab",
+        objective: "Watch visual frames for frog classification evidence",
+        decision_policy_prompt: "Describe each batch and keep route-watch receipts evidence-only",
+      }),
+      expected_receipt_kind: "stage_play_live_source_watch_job_policy_config_result",
+      expected_state_change: {
+        store: "stage-play-goal-context",
+        proof_key: "goalContextUpdates",
+      },
+      required: true,
+    });
+    expect(plan.tool_plan?.steps[1]).toMatchObject({
+      step_id: "evaluate_live_source_watch_job_policy",
+      kind: "evaluate_result",
+      depends_on: ["configure_live_source_watch_job"],
+      expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+      required: true,
+    });
+  });
+
+  it("does not configure watch-job automations from contextual mentions", () => {
+    for (const prompt of [
+      "Do not configure a live-source watch job; explain what route-watch automations are.",
+      'The document says "live_env.configure_live_source_watch_job"; summarize that label.',
+      "Could we configure a live-source watch job later?",
+      "Previously you configured a watch job; what did it do?",
+      "The UI label says Configure watch job; describe the screen text.",
+    ]) {
+      const plan = planWorkstationToolUse(prompt, { threadId: "thread:watch-job-negative" });
+      expect(plan.intent).toBe("direct_answer");
+      expect(plan.should_use_tool).toBe(false);
+      expect(plan.action).toBeNull();
+      expect(plan.tool_plan).toBeNull();
+    }
+  });
+
   it("routes trace-memory inspection to non-terminal trace-memory query evidence", () => {
     const plan = planWorkstationToolUse(
       "Show trace memory goal_id=goal:frog-monitor trace_id=trace:frog.",

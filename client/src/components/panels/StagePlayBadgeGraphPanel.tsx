@@ -2529,6 +2529,10 @@ const stagePlayDispatchActionLabel = (action: WorkstationDispatchActionV1): stri
   if (action.kind === "speak_narrator") return `Narrator: ${action.mode}`;
   if (action.kind === "bind_narrator_stream") return `Narrator bind: ${action.streamKind}`;
   if (action.kind === "change_preset") return `Preset: ${action.presetId}`;
+  if (action.kind === "bind_source") return `Bind: ${action.sourceRef}`;
+  if (action.kind === "unbind_source") return `Unbind: ${action.sourceRef}`;
+  if (action.kind === "set_loop_state") return `Loop: ${action.state}`;
+  if (action.kind === "focus_process_graph") return `Focus: ${action.nodeRef ?? "graph"}`;
   if (action.kind === "update_panel") return `Panel: ${action.panelId}`;
   if (action.kind === "repair_loop") return `Repair: ${action.loopRef}`;
   if (action.kind === "wake_agent") return `Wake interrupt${action.reason ? `: ${compactStagePlayText(action.reason, "wake", 42)}` : ""}`;
@@ -2540,7 +2544,7 @@ const stagePlayDispatchActionLabel = (action: WorkstationDispatchActionV1): stri
 const stagePlayDispatchTone = (action: WorkstationDispatchActionV1): "default" | "good" | "warn" | "blocked" => {
   if (action.kind === "wake_agent" || action.kind === "ask_user") return "warn";
   if (action.kind === "repair_loop") return "blocked";
-  if (action.kind === "append_goal_context" || action.kind === "update_live_answer" || action.kind === "bind_narrator_stream" || action.kind === "speak_narrator") return "good";
+  if (action.kind === "append_goal_context" || action.kind === "update_live_answer" || action.kind === "bind_narrator_stream" || action.kind === "speak_narrator" || action.kind === "set_loop_state") return "good";
   return "default";
 };
 
@@ -3198,6 +3202,11 @@ function StagePlayGoalContextBoard({
     (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "bind_narrator_stream").length,
     0,
   );
+  const routeWatchAutomationCount = updates.filter((update) => update.producerKind === "route_watch").length;
+  const runningAutomationCount = updates.reduce(
+    (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "set_loop_state" && action.state === "running").length,
+    0,
+  );
   const terminalAuthorityRequiredCount = activeSessions.filter((session) => session.authority.finalReportsRequireTerminalAuthority).length;
   const observationOnlyUpdateCount = updates.filter((update) =>
     update.authority.assistantAnswer === false &&
@@ -3223,11 +3232,12 @@ function StagePlayGoalContextBoard({
           <StagePlayMetricPill label="wake interrupts" value={formatStagePlayCount(wakeInterruptCount)} tone={wakeInterruptCount > 0 ? "warn" : "default"} />
           <StagePlayMetricPill label="narrator dispatch" value={formatStagePlayCount(narratorDispatchCount)} tone={narratorDispatchCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="narrator bindings" value={formatStagePlayCount(narratorBindingCount)} tone={narratorBindingCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="automations" value={formatStagePlayCount(routeWatchAutomationCount)} tone={routeWatchAutomationCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="active goals" value={formatStagePlayCount(activeSessions.length)} tone={activeSessions.length > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="terminal authority" value={`${terminalAuthorityRequiredCount}/${activeSessions.length}`} tone={terminalAuthorityRequiredCount > 0 ? "warn" : "default"} />
         </div>
       </div>
-      <div className="mt-3 grid gap-2 text-[10px] md:grid-cols-3">
+      <div className="mt-3 grid gap-2 text-[10px] md:grid-cols-4">
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-goal-context-authority-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Observation authority</div>
           <div className="mt-0.5 text-slate-400">{formatStagePlayCount(observationOnlyUpdateCount)} updates are evidence-only, non-terminal context.</div>
@@ -3239,6 +3249,10 @@ function StagePlayGoalContextBoard({
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-narrator-binding-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Narrator bindings</div>
           <div className="mt-0.5 text-slate-400">{formatStagePlayCount(narratorBindingCount)} stream binding dispatch{narratorBindingCount === 1 ? "" : "es"} visible beside narrator speech requests.</div>
+        </div>
+        <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-route-watch-automation-state">
+          <div className="font-semibold uppercase tracking-wide text-violet-200/80">Route-watch automations</div>
+          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(routeWatchAutomationCount)} route-watch update{routeWatchAutomationCount === 1 ? "" : "s"} with {formatStagePlayCount(runningAutomationCount)} running loop dispatch{runningAutomationCount === 1 ? "" : "es"}.</div>
         </div>
       </div>
       <div className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(240px,320px)]">
@@ -3316,6 +3330,35 @@ function StagePlayGoalContextBoard({
                   <div data-testid="stage-play-agent-goal-session-checkpoint">
                     checkpoint={session.checkpoints.at(-1)?.summary ?? "none"}
                   </div>
+                </div>
+                <div className="mt-2 space-y-1.5" data-testid="stage-play-agent-goal-session-checkpoint-trail">
+                  {session.checkpoints.slice(-3).reverse().map((checkpoint) => (
+                    <div
+                      key={checkpoint.checkpointId}
+                      className="rounded border border-slate-800 bg-slate-950/60 px-2 py-1.5"
+                      data-testid="stage-play-agent-goal-session-checkpoint-item"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="line-clamp-2 text-[10px] leading-snug text-slate-300">{checkpoint.summary}</div>
+                        <span className="font-mono text-[9px] text-violet-200/70">{labelize(checkpoint.nextStep)}</span>
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-1" data-testid="stage-play-agent-goal-session-checkpoint-actions">
+                        {checkpoint.actionsTaken.slice(0, 3).map((action) => (
+                          <span key={`${checkpoint.checkpointId}:action:${action}`} className="rounded border border-violet-900/50 bg-violet-950/20 px-1.5 py-0.5 font-mono text-[9px] text-violet-100/80">
+                            {labelize(action)}
+                          </span>
+                        ))}
+                        {checkpoint.actionsTaken.length > 3 ? (
+                          <span className="rounded border border-slate-700 bg-slate-950 px-1.5 py-0.5 font-mono text-[9px] text-slate-400">
+                            +{checkpoint.actionsTaken.length - 3}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="mt-1 truncate font-mono text-[9px] text-slate-500" data-testid="stage-play-agent-goal-session-checkpoint-evidence">
+                        evidence={checkpoint.evidenceRefs.slice(0, 2).join(", ") || "none"}
+                      </div>
+                    </div>
+                  ))}
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1">
                   {session.allowedActuators.slice(0, 4).map((actuator) => (

@@ -42,6 +42,13 @@ const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
 const NEGATIVE_MODEL_ONLY_RE =
   /\b(?:background\s+only|background\s+mode|concept\s+background\s+only|concept\s+check\s+only|general\s+concept\s+only|general\s+reasoning|general\s+explanation\s+only|just\s+answer\s+from\s+general\s+reasoning|no\s+workspace\s+lookup|do\s+not\s+use\s+(?:the\s+)?(?:repo|repository|code|source|workspace)|not\s+(?:code|repo|repository|source|implementation)[-\s]?(?:specific|based|grounded|level)?)\b/i;
 
+const EXPLICIT_REPO_EVIDENCE_REQUEST_RE =
+  /\b(?:repo-code\.search_concept|repo\s*\/\s*code|repo(?:sitory)?|codebase|source\s+code|source\s+files?|code\s+evidence|file\s+paths?|paths?\s+and\s+line(?:s| numbers)?|line[-\s]?backed|where\s+in\s+(?:the\s+)?(?:code|repo|repository|codebase)|implementation\s+(?:path|file|location|evidence)|implemented\s+(?:in|by)|grep|repo\s+grep|rg\s+search|server\/|client\/|shared\/|\.tsx?\b|\.jsx?\b|\.md\b)\b/i;
+
+export function hasExplicitRepoEvidenceRequest(promptText: string): boolean {
+  return EXPLICIT_REPO_EVIDENCE_REQUEST_RE.test(promptText.trim());
+}
+
 const HARD_REPO_CODE_SPECS: RepoCodeIntentSpec[] = [
   {
     reason: "repo_code_evidence_only",
@@ -118,6 +125,16 @@ const HARD_REPO_CODE_SPECS: RepoCodeIntentSpec[] = [
 export function detectRepoCodeEvidenceIntent(promptText: string): HelixRepoCodeEvidenceIntent {
   const prompt = promptText.trim();
   const contextualSuppression = detectContextualToolAdmissionSuppression(prompt);
+  const explicitRepoEvidenceRequest = hasExplicitRepoEvidenceRequest(prompt);
+  if (contextualSuppression && !explicitRepoEvidenceRequest) {
+    return {
+      repoEvidenceRequested: false,
+      strength: "none",
+      reasons: ["contextual_tool_reference_suppressed_incidental_repo_evidence"],
+      requestedOutputs: [],
+      projectEntity: null,
+    };
+  }
   if (contextualToolSuppressionBlocksFamily(contextualSuppression, "repo_code")) {
     return {
       repoEvidenceRequested: false,

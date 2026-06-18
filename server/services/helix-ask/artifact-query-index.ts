@@ -581,6 +581,8 @@ const artifactForKind = (artifacts: RecordLike[], kind: string): RecordLike | nu
 const explicitObservationCoverageMode = (capability: string | null): "all" | "any" => {
   const normalized = normalize(capability);
   if (
+    normalized === "image_lens_inspect" ||
+    normalized === "situation_room_describe_visual_capture" ||
     normalized === "docs_viewer_locate_in_doc" ||
     normalized === "scientific_calculator_solve_expression"
   ) {

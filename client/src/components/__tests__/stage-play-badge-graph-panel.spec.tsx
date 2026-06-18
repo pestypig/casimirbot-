@@ -2034,6 +2034,46 @@ describe("StagePlayBadgeGraphPanel", () => {
         interpreterProfiles: [],
         interpreterProfileComparisons: [],
         voiceSteeringDebug: null,
+        goalContextUpdates: [{
+          schemaVersion: "helix.workstation_goal_context_update.v1",
+          updateId: "stage_play_goal_context_update:route_watch:ui",
+          createdAtMs: 1780521602500,
+          sourceRefs: ["source:visual-tab"],
+          loopRefs: [
+            "stage_play_live_source_watch_job:ui",
+            "stage_play_live_source_watch_job_policy:ui",
+          ],
+          producerKind: "route_watch",
+          updateKind: "source_status",
+          contentRef: "stage_play_live_source_watch_job_policy:ui",
+          preview: "Configured live-source watch job for Minecraft danger monitoring; loop is armed for the next source summary.",
+          evidenceRefs: [
+            "stage_play_live_source_watch_job_policy:ui",
+            "stage_play_live_source_watch_job:ui",
+          ],
+          receiptRefs: ["stage_play_live_source_watch_job_policy:ui"],
+          freshness: {
+            observedAtMs: 1780521602500,
+            staleAfterMs: 120000,
+            status: "fresh",
+          },
+          goalRelevance: {
+            goalId: "goal:stage-play-monitor",
+            relevance: 0.82,
+            reason: "Watch-job automation policy contributes deterministic route-watch context for this agent goal.",
+          },
+          suggestedDispatch: [
+            { kind: "log_receipt", receiptRef: "stage_play_live_source_watch_job_policy:ui" },
+            { kind: "update_panel", panelId: "stage-play-badge-graph" },
+            { kind: "set_loop_state", loopRef: "stage_play_live_source_watch_job:ui", state: "running" },
+          ],
+          authority: {
+            assistantAnswer: false,
+            terminalEligible: false,
+            rawContentIncluded: false,
+            postToolModelStepRequired: true,
+          },
+        }],
         agentGoalSessions: [{
           schemaVersion: "helix.agent_goal_session.v1",
           goalId: "goal:stage-play-monitor",
@@ -2078,6 +2118,16 @@ describe("StagePlayBadgeGraphPanel", () => {
             evidenceRefs: ["stage_play_processed_mail_packet:minimal-ui"],
             actionsTaken: ["query_visual_summaries", "narrator_bind_stream"],
             nextStep: "continue",
+          }, {
+            checkpointId: "checkpoint:stage-play-monitor-feed-query",
+            createdAtMs: 1780521604500,
+            summary: "Queried visual summaries feed and read 2 update(s) for this goal session.",
+            evidenceRefs: [
+              "stage_play_goal_context_update:route_watch:ui",
+              "stage_play_context_feed_query:visual_summaries:ui",
+            ],
+            actionsTaken: ["query_visual_summaries", "live_env.query_visual_summaries"],
+            nextStep: "continue",
           }],
           authority: {
             assistantAnswer: false,
@@ -2107,18 +2157,31 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-goal-context-authority-state")).toHaveTextContent(/evidence-only, non-terminal context/i);
     expect(screen.getByTestId("stage-play-terminal-authority-state")).toHaveTextContent(/Final reports require a completed solver path/i);
     expect(screen.getByTestId("stage-play-narrator-binding-state")).toHaveTextContent(/stream binding dispatch/i);
+    expect(screen.getByTestId("stage-play-route-watch-automation-state")).toHaveTextContent(/1 route-watch update/i);
+    expect(screen.getByTestId("stage-play-route-watch-automation-state")).toHaveTextContent(/1 running loop dispatch/i);
     expect(screen.getByText("Minecraft danger monitor")).toBeTruthy();
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/visual summaries/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/microdeck outputs/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-cadence")).toHaveTextContent(/event accumulation \/ 2 updates/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-stop-conditions")).toHaveTextContent(/Terminal authority produces a final report/i);
-    expect(screen.getByTestId("stage-play-agent-goal-session-checkpoint")).toHaveTextContent(/Visual packet and narrator stream are attached/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-checkpoint")).toHaveTextContent(/Queried visual summaries feed/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-checkpoint-trail")).toHaveTextContent(/Visual packet and narrator stream are attached/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-checkpoint-trail")).toHaveTextContent(/Queried visual summaries feed and read 2 update/i);
+    expect(screen.getAllByTestId("stage-play-agent-goal-session-checkpoint-actions").some((node) =>
+      /query visual summaries/i.test(node.textContent ?? "") && /live env query visual summaries/i.test(node.textContent ?? "")
+    )).toBe(true);
+    expect(screen.getAllByTestId("stage-play-agent-goal-session-checkpoint-evidence").some((node) =>
+      /stage_play_goal_context_update:route_watch:ui/i.test(node.textContent ?? "")
+    )).toBe(true);
     expect(screen.getAllByTestId("stage-play-goal-context-update").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("stage-play-goal-context-update").some((node) =>
+      /route watch/i.test(node.textContent ?? "") && /Configured live-source watch job/i.test(node.textContent ?? "")
+    )).toBe(true);
     expect(screen.getAllByTestId("stage-play-goal-context-authority-chips").some((node) =>
       /assistant=false.*terminal=false.*raw=false/s.test(node.textContent ?? "")
     )).toBe(true);
     expect(screen.getAllByTestId("stage-play-goal-context-dispatch").some((node) =>
-      /Goal context|Panel|Narrator|Wake interrupt/i.test(node.textContent ?? "")
+      /Goal context|Panel|Narrator|Wake interrupt|Loop: running/i.test(node.textContent ?? "")
     )).toBe(true);
     const arbiterRole = screen.getAllByTestId("stage-play-microdeck-role-square").find((node: HTMLElement) =>
       node.textContent?.includes("Hypothesis Arbiter")

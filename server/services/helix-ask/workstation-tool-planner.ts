@@ -1413,6 +1413,101 @@ function buildWorkstationControlPlan(
   };
 }
 
+const WATCH_JOB_AUTOMATION_OBJECT_PATTERN =
+  "(?:live[-\\s]?source\\s+watch\\s+jobs?|watch\\s+jobs?|route[-\\s]?watch\\s+loops?|source\\s+monitors?|live\\s+source\\s+monitors?|workstation\\s+automations?|automation\\s+polic(?:y|ies))";
+const WATCH_JOB_AUTOMATION_TOOL_PATTERN = "live_env\\.configure_live_source_watch_job";
+
+function hasContextualWatchJobAutomationCue(prompt: string): boolean {
+  const object = WATCH_JOB_AUTOMATION_OBJECT_PATTERN;
+  return (
+    new RegExp(`["'\`][^"'\`]*(?:${WATCH_JOB_AUTOMATION_TOOL_PATTERN}|${object})[^"'\`]*["'\`]`, "i").test(prompt) ||
+    new RegExp(`\\b(?:if|in\\s+the\\s+future|future|later|eventually|hypothetically|tomorrow|next\\s+time|would|could|might|should)\\b[\\s\\S]{0,160}\\b(?:${WATCH_JOB_AUTOMATION_TOOL_PATTERN}|${object})\\b`, "i").test(prompt) ||
+    new RegExp(`\\b(?:previously|earlier|last\\s+time|before|already|historically|was|were|had)\\b[\\s\\S]{0,180}\\b(?:configured|started|created|armed|used|called)?\\b[\\s\\S]{0,140}\\b(?:${WATCH_JOB_AUTOMATION_TOOL_PATTERN}|${object})\\b`, "i").test(prompt) ||
+    new RegExp(`\\b(?:screen|page|button|label|ui|text|menu|dropdown|document|quote)\\b[\\s\\S]{0,100}\\b(?:says|shows|reads|contains|labeled|labelled|called|named)\\b[\\s\\S]{0,160}\\b(?:${WATCH_JOB_AUTOMATION_TOOL_PATTERN}|${object})\\b`, "i").test(prompt) ||
+    new RegExp(`\\b(?:do\\s+not|don't|dont|without|not\\s+asking\\s+to|no\\s+need\\s+to|for\\s+now|not\\s+yet)\\b[\\s\\S]{0,180}\\b(?:configure|set\\s+up|setup|start|create|arm|enable|use|call)?\\b[\\s\\S]{0,160}\\b(?:${WATCH_JOB_AUTOMATION_TOOL_PATTERN}|${object})\\b`, "i").test(prompt)
+  );
+}
+
+function isWatchJobAutomationPrompt(prompt: string): boolean {
+  if (hasContextualWatchJobAutomationCue(prompt)) return false;
+  return (
+    /\blive_env\.configure_live_source_watch_job\b/i.test(prompt) ||
+    /\b(?:configure|set\s+up|setup|start|create|arm|enable)\b[\s\S]{0,160}\b(?:live[-\s]?source\s+watch\s+job|watch\s+job|route[-\s]?watch\s+loop|source\s+monitor|live\s+source\s+monitor|automation\s+policy)\b/i.test(prompt) ||
+    /\b(?:watch|monitor|keep\s+(?:watching|checking|tracking))\b[\s\S]{0,120}\b(?:live\s+source|visual\s+source|audio\s+source|translation|screen\s+capture)\b[\s\S]{0,120}\b(?:as|with|through|using)\b[\s\S]{0,80}\b(?:automation|watch\s+job|route[-\s]?watch)\b/i.test(prompt)
+  );
+}
+
+function buildWatchJobAutomationArgs(prompt: string, options: PlanWorkstationToolUseOptions): Record<string, unknown> {
+  const sourceId = extractNamedArg(prompt, ["source_id", "source id", "source_ref", "source ref"]);
+  const roomId = extractNamedArg(prompt, ["room_id", "room id"]);
+  const environmentId = extractNamedArg(prompt, ["environment_id", "environment id"]);
+  const goalId = extractNamedArg(prompt, ["goal_id", "goal id", "agent_goal_id", "agent goal id"]);
+  const objective =
+    extractNamedTextArg(prompt, ["objective", "objective_text", "objective text", "goal"]) ??
+    extractQuoted(prompt) ??
+    stripOuterPunctuation(prompt);
+  const decisionPolicyPrompt =
+    extractNamedTextArg(prompt, ["decision_policy_prompt", "decision policy prompt", "policy", "decision policy"]) ??
+    "Record route-watch context for new source mail; keep receipts evidence-only and require terminal authority for final answers.";
+  return {
+    ...(goalId ? { goal_id: goalId } : {}),
+    ...(roomId ? { room_id: roomId } : {}),
+    ...(environmentId ? { environment_id: environmentId } : {}),
+    ...(sourceId ? { source_id: sourceId } : {}),
+    objective,
+    decision_policy_prompt: decisionPolicyPrompt,
+    evidence_refs: Array.from(new Set([options.turnId ?? null, sourceId ?? null].filter((entry): entry is string => Boolean(entry)))),
+  };
+}
+
+function buildWatchJobAutomationPlan(
+  normalized: string,
+  options: PlanWorkstationToolUseOptions,
+  scores: AffordanceScore[],
+): WorkstationToolPlannerResult {
+  const args = buildWatchJobAutomationArgs(normalized, options);
+  scores.push({
+    affordance_id: "live_env.configure_live_source_watch_job",
+    panel_id: "helix_ask",
+    action_id: "live_env.configure_live_source_watch_job",
+    score: 0.9,
+    reason: "affirmative watch-job automation prompt should configure a deterministic route-watch policy and record goal context",
+    required_args_missing: [],
+  });
+  return {
+    intent: "workstation_goal_context",
+    action: null,
+    tool_plan: buildToolPlan({
+      prompt: normalized,
+      intent: "workstation_goal_context",
+      missing: [],
+      options,
+      steps: [
+        {
+          step_id: "configure_live_source_watch_job",
+          kind: "run_ask_tool",
+          tool_id: "live_env.configure_live_source_watch_job",
+          args,
+          expected_receipt_kind: "stage_play_live_source_watch_job_policy_config_result",
+          expected_state_change: { store: "stage-play-goal-context", proof_key: "goalContextUpdates" },
+          required: true,
+        },
+        {
+          step_id: "evaluate_live_source_watch_job_policy",
+          kind: "evaluate_result",
+          depends_on: ["configure_live_source_watch_job"],
+          expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+          required: true,
+        },
+      ],
+    }),
+    scores,
+    should_use_tool: true,
+    reason: "Prompt asks to configure a deterministic live-source watch job; create a non-terminal route-watch receipt before any answer.",
+    missing_required_args: [],
+  };
+}
+
 function wantsStartAgentGoalSession(prompt: string): boolean {
   if (hasContextualWorkstationGoalContextCue(prompt)) return false;
   return (
@@ -1998,6 +2093,10 @@ export function planWorkstationToolUse(
   const workstationControlTool = selectWorkstationControlTool(normalized);
   if (workstationControlTool) {
     return buildWorkstationControlPlan(normalized, options, scores);
+  }
+
+  if (isWatchJobAutomationPrompt(normalized)) {
+    return buildWatchJobAutomationPlan(normalized, options, scores);
   }
 
   if (wantsStartAgentGoalSession(normalized) || wantsQueryWorkstationGoalContext(normalized)) {

@@ -688,7 +688,7 @@ describe("Helix capability plan contract", () => {
       requested_action: "situation-room.describe_visual_capture",
       selected_capability: "situation-room.describe_visual_capture",
       goal_kind: "visual_capture_describe",
-      required_terminal_kind: "model_synthesized_answer",
+      required_terminal_kind: "situation_context_pack",
     });
     expect(plan.capability_contract_arbitration).toMatchObject({
       contract_state: "explicit_capability_command",
@@ -701,7 +701,7 @@ describe("Helix capability plan contract", () => {
         "situation_context_pack",
         "visual_capture_coverage",
       ]),
-      required_terminal_kind: "model_synthesized_answer",
+      required_terminal_kind: "situation_context_pack",
     });
   });
 

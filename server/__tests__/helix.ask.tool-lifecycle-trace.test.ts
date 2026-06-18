@@ -2994,8 +2994,8 @@ describe("Helix Ask tool lifecycle trace", () => {
           capabilityFamily: "visual_capture",
           sourceTarget: "visual_capture",
           goalKind: "visual_capture_describe",
-          terminalKind: "model_synthesized_answer",
-          observationKinds: ["visual_frame_evidence"],
+          terminalKind: "situation_context_pack",
+          observationKinds: ["situation_context_pack"],
         }),
       },
       {

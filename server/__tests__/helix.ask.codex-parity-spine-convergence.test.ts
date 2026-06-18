@@ -357,9 +357,14 @@ describe("Helix Ask Codex-parity agent spine convergence", () => {
     });
 
     expect(turnRail.requested_capability).toBeNull();
-    expect(turnRail.selected_capability).toBe("suppressed_contextual_tool_reference");
+    expect(turnRail.visible_tool_surface).toEqual(expect.arrayContaining(["model.direct_answer"]));
+    expect(turnRail.visible_tool_surface).not.toContain("repo-code.search_concept");
+    expect(turnRail.selected_capability).toBe("model.direct_answer");
+    expect(turnRail.admitted_capability).toBe("model_only");
     expect(turnRail.executed_capability).not.toBe("scientific-calculator.solve_expression");
-    expect(turnRail.codex_parity_class).not.toBe("complete");
+    expect(turnRail.executed_capability).not.toBe("repo-code.search_concept");
+    expect(turnRail.required_terminal_kind).toBe("direct_answer_text");
+    expect(turnRail.rail_failure_code).not.toBe("tool_admission_drift");
   }, 60_000);
 
   it("routes current-screen visual questions through visual capture evidence", async () => {
@@ -382,7 +387,7 @@ describe("Helix Ask Codex-parity agent spine convergence", () => {
     expect(turnRail.codex_parity_class).toBe("complete");
   }, 60_000);
 
-  it("fails closed when an image lens request reaches visual capture but does not execute", async () => {
+  it("executes an image lens alias through visual capture evidence", async () => {
     const app = createApp();
     const sessionId = `helix-ask:spine-convergence:image-lens:${Date.now()}`;
     await seedVisualCapture({ app, sessionId });
@@ -398,16 +403,16 @@ describe("Helix Ask Codex-parity agent spine convergence", () => {
     );
     expect(turnRail.selected_capability).toBe("situation-room.describe_visual_capture");
     expect(turnRail.admitted_capability).toBe("situation-room.describe_visual_capture");
-    expect(turnRail.executed_capability).toBeNull();
-    expect(turnRail.observation_kind).toBe("tool_observation");
+    expect(turnRail.executed_capability).toBe("situation-room.describe_visual_capture");
+    expect(["visual_frame_evidence", "situation_context_pack", "visual_context_pack"]).toContain(turnRail.observation_kind);
     expect(turnRail.reentry_status).toBe("reentered");
-    expect(turnRail.goal_satisfaction).toBe("not_satisfied");
-    expect(turnRail.required_terminal_kind).toBe("model_synthesized_answer");
-    expect(turnRail.selected_terminal_kind).toBe("typed_failure");
-    expect(turnRail.visible_terminal_kind).toBe("typed_failure");
-    expect(turnRail.first_broken_rail).toBe("capability_execution");
-    expect(turnRail.repair_target).toBe("tool_execution");
-    expect(turnRail.rail_failure_code).toBe("required_observation_missing");
-    expect(turnRail.codex_parity_class).toBe("selected_not_executed");
+    expect(turnRail.goal_satisfaction).toBe("satisfied");
+    expect(turnRail.required_terminal_kind).toBe("situation_context_pack");
+    expect(turnRail.selected_terminal_kind).not.toBe("typed_failure");
+    expect(turnRail.visible_terminal_kind).not.toBe("typed_failure");
+    expect(turnRail.first_broken_rail).toBeNull();
+    expect(turnRail.repair_target).toBeNull();
+    expect(turnRail.rail_failure_code).toBeNull();
+    expect(turnRail.codex_parity_class).toBe("complete");
   }, 60_000);
 });

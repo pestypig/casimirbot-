@@ -57,6 +57,7 @@ import {
   type GoalContextProducerKindV1,
   type GoalContextUpdateKindV1,
   type WorkstationDispatchActionV1,
+  type WorkstationGoalContextUpdateV1,
 } from "@shared/contracts/workstation-goal-context.v1";
 import {
   getActiveLiveAnswerEnvironmentForSource,
@@ -2034,6 +2035,114 @@ const readCheckpointRequestReason = (value: unknown): StagePlayCheckpointRequest
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.filter((entry): entry is string => Boolean(entry))));
 
+const summarizeGoalContextAuthority = (input: {
+  updates: WorkstationGoalContextUpdateV1[];
+  sessions: AgentGoalSessionV1[];
+}) => {
+  const dispatchActions = input.updates.flatMap((update) => update.suggestedDispatch);
+  const dispatchCounts = new Map<string, number>();
+  for (const action of dispatchActions) {
+    dispatchCounts.set(action.kind, (dispatchCounts.get(action.kind) ?? 0) + 1);
+  }
+  const activeSessions = input.sessions.filter((session) =>
+    session.status === "active" ||
+    session.status === "blocked" ||
+    session.status === "paused"
+  );
+  const allowedActuators = uniqueStrings(activeSessions.flatMap((session) => session.allowedActuators));
+  const observationOnlyCount = input.updates.filter((update) =>
+    update.authority.assistantAnswer === false &&
+    update.authority.terminalEligible === false &&
+    update.authority.rawContentIncluded === false
+  ).length;
+  const terminalAuthoritySessionCount = activeSessions.filter((session) =>
+    session.authority.finalReportsRequireTerminalAuthority === true
+  ).length;
+  const dispatchCountsObject = Object.fromEntries(Array.from(dispatchCounts.entries()).sort(([left], [right]) => left.localeCompare(right)));
+  const assistantAnswerCount = input.updates.filter((update) => update.authority.assistantAnswer !== false).length;
+  const terminalEligibleCount = input.updates.filter((update) => update.authority.terminalEligible !== false).length;
+  const rawContentIncludedCount = input.updates.filter((update) => update.authority.rawContentIncluded !== false).length;
+  const postToolModelStepRequiredCount = input.updates.filter((update) => update.authority.postToolModelStepRequired === true).length;
+  const narratorDispatchCount = (dispatchCounts.get("speak_narrator") ?? 0) + (dispatchCounts.get("bind_narrator_stream") ?? 0);
+  const runningLoopDispatchCount = dispatchActions.filter((action) =>
+    action.kind === "set_loop_state" && action.state === "running"
+  ).length;
+  return {
+    schema: "helix.workstation_goal_context_authority_summary.v1",
+    updateCount: input.updates.length,
+    update_count: input.updates.length,
+    observationOnlyUpdateCount: observationOnlyCount,
+    observation_only_update_count: observationOnlyCount,
+    assistantAnswerCount,
+    assistant_answer_count: assistantAnswerCount,
+    terminalEligibleCount,
+    terminal_eligible_count: terminalEligibleCount,
+    rawContentIncludedCount,
+    raw_content_included_count: rawContentIncludedCount,
+    postToolModelStepRequiredCount,
+    post_tool_model_step_required_count: postToolModelStepRequiredCount,
+    activeGoalSessionCount: activeSessions.length,
+    active_goal_session_count: activeSessions.length,
+    finalReportsRequireTerminalAuthorityCount: terminalAuthoritySessionCount,
+    final_reports_require_terminal_authority_count: terminalAuthoritySessionCount,
+    dispatchCounts: dispatchCountsObject,
+    dispatch_counts: dispatchCountsObject,
+    wakeInterruptCount: dispatchCounts.get("wake_agent") ?? 0,
+    wake_interrupt_count: dispatchCounts.get("wake_agent") ?? 0,
+    narratorDispatchCount,
+    narrator_dispatch_count: narratorDispatchCount,
+    runningLoopDispatchCount,
+    running_loop_dispatch_count: runningLoopDispatchCount,
+    allowedActuators,
+    allowed_actuators: allowedActuators,
+    answerAuthority: "completed_solver_path_required",
+    answer_authority: "completed_solver_path_required",
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+    post_tool_model_step_required: true,
+  };
+};
+
+const appendAgentGoalSessionCheckpoint = (input: {
+  session: AgentGoalSessionV1 | null;
+  threadId: string;
+  roomId?: string | null;
+  sourceRefs?: string[];
+  loopRefs?: string[];
+  evidenceRefs: string[];
+  actionsTaken: string[];
+  summary: string;
+  nextStep?: AgentGoalSessionV1["checkpoints"][number]["nextStep"];
+}): AgentGoalSessionV1 | null => {
+  if (!input.session) return null;
+  return ensureStagePlayAgentGoalSession({
+    threadId: input.threadId,
+    roomId: input.roomId ?? input.session.roomId ?? null,
+    objectiveId: input.session.goalId,
+    objectiveText: input.session.objective,
+    sourceRefs: uniqueStrings([
+      ...input.session.sourceRefs,
+      ...(input.sourceRefs ?? []),
+    ]),
+    loopRefs: uniqueStrings([
+      ...input.session.loopRefs,
+      ...(input.loopRefs ?? []),
+    ]),
+    constructRefs: input.session.constructRefs,
+    contextFeeds: input.session.contextFeeds,
+    allowedActuators: input.session.allowedActuators,
+    cadence: input.session.cadence,
+    stopConditions: input.session.stopConditions,
+    checkpoint: {
+      summary: input.summary,
+      evidenceRefs: input.evidenceRefs,
+      actionsTaken: input.actionsTaken,
+      nextStep: input.nextStep ?? "continue",
+    },
+  });
+};
+
 const compactGoalContextPreview = (value: string, limit = 260): string => {
   const normalized = value.replace(/\s+/g, " ").trim();
   return normalized.length > limit ? `${normalized.slice(0, Math.max(0, limit - 3)).trimEnd()}...` : normalized;
@@ -2972,6 +3081,21 @@ export function executeLiveEnvironmentTool(
       freshnessStatus: ok ? "fresh" : "blocked",
       suggestedDispatch: dispatch,
     });
+    const checkpointedGoalSession = ok && goalSession
+      ? appendAgentGoalSessionCheckpoint({
+          session: goalSession,
+          threadId: input.thread_id,
+          roomId,
+          sourceRefs: uniqueStrings([sourceRef, sourceKind, streamKind]),
+          loopRefs: uniqueStrings([`narrator:${narratorKind}`, `thread:${input.thread_id}`]),
+          evidenceRefs: uniqueStrings([goalContextUpdateId, requestId, ...evidenceRefs]).slice(0, 80),
+          actionsTaken: uniqueStrings([actuator, input.tool_name]),
+          summary: narratorKind === "say"
+            ? "Prepared narrator say request for this goal session."
+            : `Prepared narrator ${streamKind ?? "stream"} binding for this goal session.`,
+          nextStep: "continue",
+        })
+      : goalSession;
     const common = {
       requestId,
       request_id: requestId,
@@ -2986,6 +3110,8 @@ export function executeLiveEnvironmentTool(
       required_actuator: actuator,
       actuatorAllowed,
       actuator_allowed: actuatorAllowed,
+      agentGoalSession: checkpointedGoalSession,
+      agent_goal_session: checkpointedGoalSession,
       sourceRef,
       source_ref: sourceRef,
       deliveryMode,
@@ -3148,6 +3274,19 @@ export function executeLiveEnvironmentTool(
       freshnessStatus: ok ? "fresh" : "blocked",
       suggestedDispatch: dispatch,
     });
+    const checkpointedGoalSession = ok && goalSession
+      ? appendAgentGoalSessionCheckpoint({
+          session: goalSession,
+          threadId: scope.mailboxThreadResolution.mailboxThreadId,
+          roomId,
+          sourceRefs,
+          loopRefs,
+          evidenceRefs: uniqueStrings([goalContextUpdateId, ...evidenceRefs]).slice(0, 80),
+          actionsTaken: uniqueStrings([actuator, fallbackActuator, input.tool_name]),
+          summary: `Prepared ${workstationControlSpec.label} control dispatch for this goal session.`,
+          nextStep: "continue",
+        })
+      : goalSession;
     return makeObservation({
       threadId: input.thread_id,
       environmentId,
@@ -3175,6 +3314,8 @@ export function executeLiveEnvironmentTool(
         required_actuator: actuator,
         actuatorAllowed,
         actuator_allowed: actuatorAllowed,
+        agentGoalSession: checkpointedGoalSession,
+        agent_goal_session: checkpointedGoalSession,
         targetRef: controlDispatch.targetRef,
         target_ref: controlDispatch.targetRef,
         sourceRef: controlDispatch.sourceRef,
@@ -5119,6 +5260,10 @@ export function executeLiveEnvironmentTool(
       status: readString(args.status),
       limit: Math.min(updateLimit, 50),
     });
+    const authoritySummary = summarizeGoalContextAuthority({
+      updates: goalContextUpdates,
+      sessions: agentGoalSessions,
+    });
     const evidenceRefs = uniqueStrings([
       scope.mailboxThreadResolution.mailboxThreadId,
       ...mailItems.map((item) => item.mailId),
@@ -5148,6 +5293,8 @@ export function executeLiveEnvironmentTool(
         goal_context_updates: goalContextUpdates,
         agentGoalSessions,
         agent_goal_sessions: agentGoalSessions,
+        authoritySummary,
+        authority_summary: authoritySummary,
         syncedWindow: {
           mailItemCount: mailItems.length,
           processedPacketCount: processedMailPackets.length,
@@ -5266,7 +5413,7 @@ export function executeLiveEnvironmentTool(
     const goalContextUpdates = listStagePlayGoalContextUpdates({
       threadId: scope.mailboxThreadResolution.mailboxThreadId,
       sourceRef,
-      goalId,
+      goalId: goalSession ? null : goalId,
       limit: 200,
     })
       .filter((update) =>
@@ -5323,6 +5470,30 @@ export function executeLiveEnvironmentTool(
       goalRelevanceReason: `The agent queried ${feedQuerySpec.label} as a feed-specific goal-context input.`,
       suggestedDispatch: dispatch,
     });
+    const checkpointedGoalSession = ok && goalSession
+      ? appendAgentGoalSessionCheckpoint({
+          session: goalSession,
+          threadId: scope.mailboxThreadResolution.mailboxThreadId,
+          roomId,
+          sourceRefs: uniqueStrings([
+            sourceRef,
+            scope.sourceId,
+            ...goalContextUpdates.flatMap((update) => update.sourceRefs),
+          ]),
+          loopRefs: uniqueStrings([
+            ...goalContextUpdates.flatMap((update) => update.loopRefs),
+            `workstation_context_feed:${feedQuerySpec.feedKind}`,
+          ]),
+          evidenceRefs: uniqueStrings([goalContextUpdateId, ...evidenceRefs]).slice(0, 80),
+          actionsTaken: [feedQuerySpec.actuator, input.tool_name],
+          summary: `Queried ${feedQuerySpec.label} feed and read ${goalContextUpdates.length} update(s) for this goal session.`,
+          nextStep: goalContextUpdates.length > 0 ? "continue" : "ask_user",
+        })
+      : goalSession;
+    const authoritySummary = summarizeGoalContextAuthority({
+      updates: goalContextUpdates,
+      sessions: checkpointedGoalSession ? [checkpointedGoalSession] : [],
+    });
     return makeObservation({
       threadId: input.thread_id,
       environmentId,
@@ -5357,8 +5528,12 @@ export function executeLiveEnvironmentTool(
         required_actuator: feedQuerySpec.actuator,
         actuatorAllowed,
         actuator_allowed: actuatorAllowed,
+        agentGoalSession: checkpointedGoalSession,
+        agent_goal_session: checkpointedGoalSession,
         goalContextUpdates,
         goal_context_updates: goalContextUpdates,
+        authoritySummary,
+        authority_summary: authoritySummary,
         updateCount: goalContextUpdates.length,
         update_count: goalContextUpdates.length,
         syncedWindow: {
@@ -6621,6 +6796,50 @@ export function executeLiveEnvironmentTool(
     const transcriptRows = buildWatchJobConfiguredTranscriptRows({
       policy: configured.policy,
     });
+    const goalId =
+      readString(args.goal_id) ??
+      readString(args.goalId) ??
+      readString(args.agent_goal_id) ??
+      readString(args.agentGoalId);
+    const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+      threadId: input.thread_id,
+      mailboxThreadId: mailboxThreadResolution.mailboxThreadId,
+      roomId,
+      producerKind: "route_watch",
+      updateKind: "source_status",
+      contentRef: configured.policy.policyId,
+      preview: `Configured live-source watch job for ${policyDefaults.objectiveText}; loop is armed for the next source summary.`,
+      sourceRefs: uniqueStrings([
+        ...configured.policy.sourceIds,
+        ...sourceIds,
+        configured.policy.environmentId,
+        mailboxThreadResolution.mailboxThreadId,
+      ]),
+      loopRefs: uniqueStrings([
+        configured.jobState.jobId,
+        configured.policy.policyId,
+        `watch_job:${configured.jobState.jobId}`,
+        `watch_policy:${configured.policy.policyId}`,
+      ]),
+      evidenceRefs: uniqueStrings([
+        configured.policy.policyId,
+        configured.jobState.jobId,
+        mailboxThreadResolution.mailboxThreadId,
+        ...configured.policy.evidenceRefs,
+      ]),
+      receiptRefs: [configured.policy.policyId],
+      freshnessStatus: "fresh",
+      staleAfterMs: 120_000,
+      goalId,
+      goalRelevanceReason: goalId
+        ? "Watch-job automation policy contributes deterministic route-watch context for this agent goal."
+        : null,
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: configured.policy.policyId },
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+        { kind: "set_loop_state", loopRef: configured.jobState.jobId, state: "running" },
+      ],
+    });
     const result = {
       artifactId: "stage_play_live_source_watch_job_policy_config_result",
       schema: STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA,
@@ -6637,6 +6856,8 @@ export function executeLiveEnvironmentTool(
       mailbox_thread_id: mailboxThreadResolution.mailboxThreadId,
       mailboxThreadResolution,
       mailbox_thread_resolution: mailboxThreadResolution,
+      goalContextUpdateId,
+      goal_context_update_id: goalContextUpdateId,
       post_tool_model_step_required: true,
       assistant_answer: false,
       terminal_eligible: false,
@@ -6656,6 +6877,11 @@ export function executeLiveEnvironmentTool(
         configured.jobState.jobId,
         mailboxThreadResolution.mailboxThreadId,
         ...configured.policy.evidenceRefs,
+      ],
+      producedRefs: [
+        configured.policy.policyId,
+        configured.jobState.jobId,
+        goalContextUpdateId,
       ],
     });
   }
@@ -7825,6 +8051,23 @@ export function executeLiveEnvironmentTool(
         })) : []),
       ],
     });
+    const checkpointedGoalSession = ok && goalSession
+      ? appendAgentGoalSessionCheckpoint({
+          session: goalSession,
+          threadId: input.thread_id,
+          roomId,
+          sourceRefs: uniqueStrings(sourceRefs.length > 0 ? sourceRefs : [input.thread_id]),
+          loopRefs: uniqueStrings(
+            sourceRefs.length > 0
+              ? sourceRefs.map((sourceRef) => `source_health:${sourceRef}`)
+              : [`source_health:${input.thread_id}`],
+          ),
+          evidenceRefs: uniqueStrings([goalContextUpdateId, contentRef, ...sourceRefs]).slice(0, 80),
+          actionsTaken: ["query_source_health", input.tool_name],
+          summary: `Queried source health and read ${visibleResult.capabilities.length} capability state(s) for this goal session.`,
+          nextStep: blockedCapabilities.length > 0 ? "repair" : "continue",
+        })
+      : goalSession;
     return makeObservation({
       threadId: input.thread_id,
       environmentId: input.environment_id,
@@ -7848,6 +8091,8 @@ export function executeLiveEnvironmentTool(
         required_actuator: "query_source_health",
         actuatorAllowed,
         actuator_allowed: actuatorAllowed,
+        agentGoalSession: checkpointedGoalSession,
+        agent_goal_session: checkpointedGoalSession,
         goalContextUpdateId,
         goal_context_update_id: goalContextUpdateId,
         post_tool_model_step_required: true,

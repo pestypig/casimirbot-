@@ -35,6 +35,7 @@ import {
 } from "./explicit-capability-contract";
 import { resolveAskCapabilityContractArbitration } from "./capability-contract-arbitration";
 import { isAskCapabilityCatalogPrompt } from "./capability-catalog-intent";
+import { hasExplicitRepoEvidenceRequest } from "./repo-code-intent-detector";
 
 type RecordLike = Record<string, unknown>;
 
@@ -500,9 +501,15 @@ export const buildCapabilityPlan = (input: {
   const contextualSuppression = detectContextualToolAdmissionSuppression(input.promptText);
   const toolUseRestatement = buildToolUseRestatement(input.promptText);
   const repoConceptDetection = detectRepoConcept(input.promptText);
+  const explicitRepoEvidenceRequest = hasExplicitRepoEvidenceRequest(input.promptText);
+  const contextualSuppressionBlocksIncidentalRepoEvidence =
+    Boolean(contextualSuppression) &&
+    !contextualToolSuppressionBlocksFamily(contextualSuppression, "repo_code") &&
+    !explicitRepoEvidenceRequest;
   const requiresRepoConceptEvidence =
     !hardLiveSourceMailboxRoute &&
     !contextualToolSuppressionBlocksFamily(contextualSuppression, "repo_code") &&
+    !contextualSuppressionBlocksIncidentalRepoEvidence &&
     repoConceptDetection.require_repo_evidence === true;
   const requiresInternetEvidence =
     !hardLiveSourceMailboxRoute &&
@@ -603,7 +610,9 @@ export const buildCapabilityPlan = (input: {
   const plannedRequestedAction = contractArbitration.contract_state === "hard_live_source_phase"
     ? (mandatoryPhaseTool ?? "live_env.read_processed_live_source_mail")
     : contextualSuppressionBlocksPlan
-      ? "suppressed_contextual_tool_reference"
+      ? contractArbitration.contract_state === "suppressed_contextual_reference" || sourceTarget === "model_only"
+        ? "model.direct_answer"
+        : "suppressed_contextual_tool_reference"
     : requestedCapabilityContract
       ? requestedCapabilityContract.runtime_capability ?? requestedCapabilityContract.capability
     : family === "live_source" &&

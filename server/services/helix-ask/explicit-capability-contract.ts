@@ -142,7 +142,7 @@ const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
     source_target: "visual_capture",
     admission_families: ["situation_run"],
     required_observation_kinds: ["visual_frame_evidence", "situation_context_pack", "visual_capture_coverage"],
-    required_terminal_kind: "model_synthesized_answer",
+    required_terminal_kind: "situation_context_pack",
     allowed_substitutions: ["situation-room.describe_visual_capture"],
     forbidden_nearby_capabilities: ["docs-viewer.locate_in_doc", "repo-code.search_concept", "model.direct_answer"],
   },
