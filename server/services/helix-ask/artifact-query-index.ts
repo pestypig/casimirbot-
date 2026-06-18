@@ -423,9 +423,6 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   if (/live_env[-_.:]query_live_answer_state|live_answer_state|live_answer_lines/.test(haystack)) {
     return "live_env.query_live_answer_state";
   }
-  if (/live_env[-_.:]query_narrator_events|narrator_events|narrator_bindings|narrator_streams|helix\.narrator_bind_stream_request|helix\.narrator_say_request/.test(haystack)) {
-    return "live_env.query_narrator_events";
-  }
   if (/live_env[-_.:]change_workstation_preset|change_workstation_preset|apply_workstation_preset/.test(haystack)) {
     return "live_env.change_workstation_preset";
   }
@@ -452,6 +449,9 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   }
   if (/live_env[-_.:]narrator_bind_stream|narrator\.bind_stream|narrator_bind_stream_request|helix\.narrator_bind_stream_request\.v1/.test(haystack)) {
     return "live_env.narrator_bind_stream";
+  }
+  if (/live_env[-_.:]query_narrator_events|narrator_events|narrator_bindings|narrator_streams/.test(haystack)) {
+    return "live_env.query_narrator_events";
   }
   if (/live_env[-_.:]configure_route_watch|configure_route_watch|route_watch_policy|route[-_\s]?watch/.test(haystack)) {
     return "live_env.configure_route_watch";

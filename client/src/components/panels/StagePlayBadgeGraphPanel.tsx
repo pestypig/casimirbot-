@@ -3289,6 +3289,26 @@ function StagePlayGoalContextBoard({
     0,
   );
   const totalDispatchCount = updates.reduce((count, update) => count + update.suggestedDispatch.length, 0);
+  const workstationControlDispatchCount = updates.reduce(
+    (count, update) => count + update.suggestedDispatch.filter(isStagePlayWorkstationControlDispatch).length,
+    0,
+  );
+  const presetDispatchCount = updates.reduce(
+    (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "change_preset").length,
+    0,
+  );
+  const sourceBindingDispatchCount = updates.reduce(
+    (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "bind_source" || action.kind === "unbind_source").length,
+    0,
+  );
+  const liveAnswerDispatchCount = updates.reduce(
+    (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "update_live_answer").length,
+    0,
+  );
+  const processGraphDispatchCount = updates.reduce(
+    (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "focus_process_graph").length,
+    0,
+  );
   const panelDispatchCount = updates.reduce(
     (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "update_panel").length,
     0,
@@ -3420,6 +3440,12 @@ function StagePlayGoalContextBoard({
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Dispatch mix</div>
           <div className="mt-0.5 text-slate-400">
             {formatStagePlayCount(totalDispatchCount)} dispatch suggestion{totalDispatchCount === 1 ? "" : "s"}: {formatStagePlayCount(wakeInterruptCount)} wake interrupt{wakeInterruptCount === 1 ? "" : "s"}, {formatStagePlayCount(panelDispatchCount)} panel update{panelDispatchCount === 1 ? "" : "s"}, {formatStagePlayCount(narratorDispatchCount)} narrator output{narratorDispatchCount === 1 ? "" : "s"}, {formatStagePlayCount(loopDispatchCount)} loop action{loopDispatchCount === 1 ? "" : "s"}, {formatStagePlayCount(goalContextDispatchCount)} goal-context append{goalContextDispatchCount === 1 ? "" : "s"}, {formatStagePlayCount(receiptDispatchCount)} receipt log{receiptDispatchCount === 1 ? "" : "s"}.
+          </div>
+        </div>
+        <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-control-dispatch-state">
+          <div className="font-semibold uppercase tracking-wide text-violet-200/80">Workstation controls</div>
+          <div className="mt-0.5 text-slate-400">
+            {formatStagePlayCount(workstationControlDispatchCount)} non-wake control dispatch{workstationControlDispatchCount === 1 ? "" : "es"}: {formatStagePlayCount(presetDispatchCount)} preset, {formatStagePlayCount(sourceBindingDispatchCount)} source binding, {formatStagePlayCount(loopDispatchCount)} loop, {formatStagePlayCount(liveAnswerDispatchCount)} Live Answer, {formatStagePlayCount(processGraphDispatchCount)} graph, {formatStagePlayCount(narratorDispatchCount)} narrator. Wake remains {formatStagePlayCount(wakeInterruptCount)} interrupt dispatch{wakeInterruptCount === 1 ? "" : "es"}.
           </div>
         </div>
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-actuator-policy-state">
