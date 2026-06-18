@@ -49,6 +49,7 @@ export type Nhm2ComparisonBasisStatus =
   | "chart_mismatch"
   | "unit_mismatch"
   | "aggregation_mismatch"
+  | "sample_count_mismatch"
   | "unknown";
 
 export type Nhm2RegionalSourceClosureEvidenceRegion = {
@@ -171,10 +172,11 @@ const isBasisStatus = (value: unknown): value is Nhm2ComparisonBasisStatus =>
   value === "diagnostic_only" ||
   value === "counterpart_missing" ||
   value === "profile_mismatch" ||
-  value === "chart_mismatch" ||
-  value === "unit_mismatch" ||
-  value === "aggregation_mismatch" ||
-  value === "unknown";
+    value === "chart_mismatch" ||
+    value === "unit_mismatch" ||
+    value === "aggregation_mismatch" ||
+    value === "sample_count_mismatch" ||
+    value === "unknown";
 
 const isRegionStatus = (
   value: unknown,
@@ -287,11 +289,22 @@ const isRegion = (
       metric.chartRef === tile.chartRef &&
       metric.unitsRef === tile.unitsRef &&
       metric.aggregationMode === tile.aggregationMode &&
-      metric.normalizationBasis === tile.normalizationBasis
+      metric.normalizationBasis === tile.normalizationBasis &&
+      (metric.sampleCount == null ||
+        tile.sampleCount == null ||
+        metric.sampleCount === tile.sampleCount)
     );
   }
   return true;
 };
+
+const hasFiniteSampleCountMismatch = (
+  metric: Nhm2RegionalSourceClosureEvidenceRegion["metricRequired"],
+  tile: Nhm2RegionalSourceClosureEvidenceRegion["tileEffectiveCounterpart"],
+): boolean =>
+  metric.sampleCount != null &&
+  tile.sampleCount != null &&
+  metric.sampleCount !== tile.sampleCount;
 
 export const deriveNhm2RegionalSourceClosureRegionBlockers = (
   region: Nhm2RegionalSourceClosureEvidenceRegion,
@@ -309,12 +322,16 @@ export const deriveNhm2RegionalSourceClosureRegionBlockers = (
   ) {
     blockers.add("aggregation_mismatch");
   }
+  if (hasFiniteSampleCountMismatch(metric, tile)) {
+    blockers.add("sample_count_mismatch");
+  }
   if (
     region.comparisonBasisStatus === "same_basis" &&
     (metric.chartRef !== tile.chartRef ||
       metric.unitsRef !== tile.unitsRef ||
       metric.aggregationMode !== tile.aggregationMode ||
       metric.normalizationBasis !== tile.normalizationBasis ||
+      hasFiniteSampleCountMismatch(metric, tile) ||
       !profileMatch)
   ) {
     blockers.add("same_basis_metadata_mismatch");
@@ -357,6 +374,7 @@ export const deriveNhm2RegionalSourceClosureRegionBlockers = (
     blockers.add("metric_aggregation_metadata_unknown");
   }
   if (metric.sampleCount == null) blockers.add("metric_sample_count_missing");
+  if (tile.sampleCount == null) blockers.add("tile_sample_count_missing");
   if (
     metric.tensorAuthorityMode === "proxy" ||
     tile.tensorAuthorityMode === "proxy"

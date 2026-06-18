@@ -304,6 +304,13 @@ const basisStatusFor = (
   ) {
     return "aggregation_mismatch";
   }
+  if (
+    metricMeta.sampleCount != null &&
+    tileMeta.sampleCount != null &&
+    metricMeta.sampleCount !== tileMeta.sampleCount
+  ) {
+    return "sample_count_mismatch";
+  }
   if (comparisonRole !== "tile_effective_counterpart") {
     return comparisonRole === "gr_matter_channel_observation"
       ? "diagnostic_only"
