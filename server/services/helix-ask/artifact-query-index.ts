@@ -400,7 +400,10 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   if (/live_env[-_.:]query_packet_traces|packet_traces|per_packet_traces|packet_causal_trace|live_source_causal_trace/.test(haystack)) {
     return "live_env.query_packet_traces";
   }
-  if (/live_env[-_.:]query_route_evidence|query_route_evidence|route_evidence_feed|route_watch_evidence|automation_policies|automation_status|stage_play_workstation_context_feed_query_result[\s\S]*(?:route_evidence|automation_policies)/.test(haystack)) {
+  if (/live_env[-_.:]query_automation_policies|query_automation_policies|automation_policies|automation_policy|automation_status|stage_play_workstation_context_feed_query_result[\s\S]*automation_policies/.test(haystack)) {
+    return "live_env.query_automation_policies";
+  }
+  if (/live_env[-_.:]query_route_evidence|query_route_evidence|route_evidence_feed|route_watch_evidence|stage_play_workstation_context_feed_query_result[\s\S]*route_evidence/.test(haystack)) {
     return "live_env.query_route_evidence";
   }
   if (/live_env[-_.:]query_audio_transcripts|audio_transcripts|transcription_loop/.test(haystack)) {

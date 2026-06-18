@@ -624,6 +624,26 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
     ],
   }),
   contract({
+    toolName: "live_env.query_automation_policies",
+    toolFamily: "live_source_mail",
+    authority: "evidence_only",
+    mutating: false,
+    requiredObservationKinds: [
+      "stage_play_workstation_context_feed_query_result",
+      "helix.workstation_goal_context_update.v1",
+    ],
+    allowedTerminalKinds: [...evidenceOnlyTerminalKinds],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+    aliases: [
+      "automation_policies",
+      "automation_policy",
+      "workstation_automations",
+      "automation_status",
+      "stage_play_workstation_context_feed_query_result/v1",
+    ],
+  }),
+  contract({
     toolName: "live_env.change_workstation_preset",
     toolFamily: "live_source_mail",
     authority: "control_receipt",

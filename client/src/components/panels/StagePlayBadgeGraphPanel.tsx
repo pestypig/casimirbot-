@@ -3245,6 +3245,8 @@ function StagePlayGoalContextBoard({
     (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "bind_narrator_stream").length,
     0,
   );
+  const narratorEventFeedCount = updates.filter((update) => update.producerKind === "narrator").length +
+    activeSessions.filter((session) => session.contextFeeds.some((feed) => feed.sourceKind === "narrator_events")).length;
   const automationContextCount = updates.filter((update) =>
     update.producerKind === "automation" ||
     update.updateKind === "automation_status" ||
@@ -3273,6 +3275,23 @@ function StagePlayGoalContextBoard({
     activeSessions.reduce((count, session) => count + session.contextFeeds.length, 0);
   const runningAutomationCount = updates.reduce(
     (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "set_loop_state" && action.state === "running").length,
+    0,
+  );
+  const totalDispatchCount = updates.reduce((count, update) => count + update.suggestedDispatch.length, 0);
+  const panelDispatchCount = updates.reduce(
+    (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "update_panel").length,
+    0,
+  );
+  const goalContextDispatchCount = updates.reduce(
+    (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "append_goal_context").length,
+    0,
+  );
+  const loopDispatchCount = updates.reduce(
+    (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "set_loop_state" || action.kind === "repair_loop").length,
+    0,
+  );
+  const receiptDispatchCount = updates.reduce(
+    (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "log_receipt").length,
     0,
   );
   const actuatorPolicyCount = activeSessions.reduce((count, session) => count + session.allowedActuators.length, 0);
@@ -3313,6 +3332,7 @@ function StagePlayGoalContextBoard({
           <StagePlayMetricPill label="wake interrupts" value={formatStagePlayCount(wakeInterruptCount)} tone={wakeInterruptCount > 0 ? "warn" : "default"} />
           <StagePlayMetricPill label="narrator dispatch" value={formatStagePlayCount(narratorDispatchCount)} tone={narratorDispatchCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="narrator bindings" value={formatStagePlayCount(narratorBindingCount)} tone={narratorBindingCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="narrator events" value={formatStagePlayCount(narratorEventFeedCount)} tone={narratorEventFeedCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="packet traces" value={formatStagePlayCount(packetTraceContextCount)} tone={packetTraceContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="source health" value={formatStagePlayCount(sourceHealthContextCount)} tone={sourceHealthContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="trace memory" value={formatStagePlayCount(traceMemoryContextCount)} tone={traceMemoryContextCount > 0 ? "good" : "default"} />
@@ -3362,9 +3382,15 @@ function StagePlayGoalContextBoard({
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Route-watch automations</div>
           <div className="mt-0.5 text-slate-400">{formatStagePlayCount(automationContextCount)} automation status update{automationContextCount === 1 ? "" : "s"} with {formatStagePlayCount(runningAutomationCount)} running loop dispatch{runningAutomationCount === 1 ? "" : "es"}.</div>
         </div>
+        <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-dispatch-mix-state">
+          <div className="font-semibold uppercase tracking-wide text-violet-200/80">Dispatch mix</div>
+          <div className="mt-0.5 text-slate-400">
+            {formatStagePlayCount(totalDispatchCount)} dispatch suggestion{totalDispatchCount === 1 ? "" : "s"}: {formatStagePlayCount(wakeInterruptCount)} wake interrupt{wakeInterruptCount === 1 ? "" : "s"}, {formatStagePlayCount(panelDispatchCount)} panel update{panelDispatchCount === 1 ? "" : "s"}, {formatStagePlayCount(narratorDispatchCount)} narrator output{narratorDispatchCount === 1 ? "" : "s"}, {formatStagePlayCount(loopDispatchCount)} loop action{loopDispatchCount === 1 ? "" : "s"}, {formatStagePlayCount(goalContextDispatchCount)} goal-context append{goalContextDispatchCount === 1 ? "" : "s"}, {formatStagePlayCount(receiptDispatchCount)} receipt log{receiptDispatchCount === 1 ? "" : "s"}.
+          </div>
+        </div>
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-actuator-policy-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Actuator policy</div>
-          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(actuatorPolicyCount)} allowed actuator{actuatorPolicyCount === 1 ? "" : "s"} bound to goal sessions; {formatStagePlayCount(narratorActuatorPolicyCount)} narrator output policy item{narratorActuatorPolicyCount === 1 ? "" : "s"}.</div>
+          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(actuatorPolicyCount)} allowed actuator{actuatorPolicyCount === 1 ? "" : "s"} bound to goal sessions; {formatStagePlayCount(narratorActuatorPolicyCount)} narrator output policy item{narratorActuatorPolicyCount === 1 ? "" : "s"}; {formatStagePlayCount(narratorEventFeedCount)} narrator event feed{narratorEventFeedCount === 1 ? "" : "s"}.</div>
         </div>
       </div>
       <div className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(240px,320px)]">
@@ -3436,11 +3462,11 @@ function StagePlayGoalContextBoard({
                 </div>
                 <div className="mt-1 line-clamp-2 text-[10px] text-slate-400">{session.objective}</div>
                 <div className="mt-2 rounded border border-slate-800 bg-slate-950/70 px-2 py-1 font-mono text-[9px] text-slate-400">
-                  final_reports_require_terminal_authority={String(session.authority.finalReportsRequireTerminalAuthority)}
+                  final_reports_require_terminal_authority={String(session.authority.finalReportsRequireTerminalAuthority)} required_evidence={session.authority.finalReportRequirements?.requiredEvidenceKinds?.length ?? 0} prohibited_sources={session.authority.finalReportRequirements?.prohibitedReportSources?.length ?? 0}
                 </div>
                 <div className="mt-2 grid gap-1 font-mono text-[9px] text-slate-400" data-testid="stage-play-agent-goal-session-contract">
                   <div data-testid="stage-play-agent-goal-session-feeds">
-                    feeds={session.contextFeeds.slice(0, 6).map((feed) => labelize(feed.sourceKind)).join(", ") || "none"}
+                    feeds={session.contextFeeds.slice(0, 8).map((feed) => labelize(feed.sourceKind)).join(", ") || "none"}
                   </div>
                   <div data-testid="stage-play-agent-goal-session-cadence">
                     cadence={formatSessionCadence(session.cadence)}

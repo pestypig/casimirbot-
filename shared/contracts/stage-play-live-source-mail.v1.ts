@@ -92,6 +92,7 @@ export type LiveSourceTurnPhaseV1 =
   | "query_trace_memory"
   | "query_packet_traces"
   | "query_route_evidence"
+  | "query_automation_policies"
   | "reflect_mail_loop"
   | "read_processed_mail"
   | "process_mail_fallback"

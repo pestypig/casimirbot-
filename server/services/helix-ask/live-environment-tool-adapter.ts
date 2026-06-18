@@ -48,11 +48,11 @@ import type {
   HelixLiveEnvironmentCommentarySubject,
 } from "@shared/helix-live-environment-commentary";
 import {
-  WORKSTATION_AGENT_GOAL_ACTUATORS,
   WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
   WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
   WORKSTATION_NARRATOR_BIND_STREAM_REQUEST_SCHEMA,
   WORKSTATION_NARRATOR_SAY_REQUEST_SCHEMA,
+  normalizeAgentGoalActuatorV1,
   type AgentGoalActuatorV1,
   type AgentGoalContextFeedKindV1,
   type AgentGoalSessionV1,
@@ -930,6 +930,13 @@ const AGENT_GOAL_FEED_KIND_ALIASES: Record<string, AgentGoalContextFeedKindV1> =
   live_answer_lines: "live_answer_lines",
   source_health: "source_health",
   health: "source_health",
+  narrator: "narrator_events",
+  narrator_event: "narrator_events",
+  narrator_events: "narrator_events",
+  narrator_binding: "narrator_events",
+  narrator_bindings: "narrator_events",
+  narrator_stream: "narrator_events",
+  narrator_streams: "narrator_events",
   trace: "trace_memory",
   trace_memory: "trace_memory",
   packet: "packet_traces",
@@ -947,8 +954,6 @@ const AGENT_GOAL_FEED_KIND_ALIASES: Record<string, AgentGoalContextFeedKindV1> =
   watch_job: "automation_policies",
   watch_jobs: "automation_policies",
 };
-
-const AGENT_GOAL_ACTUATORS = new Set<AgentGoalActuatorV1>(WORKSTATION_AGENT_GOAL_ACTUATORS);
 
 function normalizeAgentGoalFeedKind(value: unknown): AgentGoalContextFeedKindV1 | null {
   const key = readString(value)?.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
@@ -994,8 +999,8 @@ function readAgentGoalContextFeeds(value: unknown): AgentGoalSessionV1["contextF
 
 function readAgentGoalAllowedActuators(value: unknown): AgentGoalActuatorV1[] | undefined {
   const actuators = readStringArray(value)
-    .map((entry) => entry.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, ""))
-    .filter((entry): entry is AgentGoalActuatorV1 => AGENT_GOAL_ACTUATORS.has(entry as AgentGoalActuatorV1));
+    .map((entry) => normalizeAgentGoalActuatorV1(entry))
+    .filter((entry): entry is AgentGoalActuatorV1 => Boolean(entry));
   return actuators.length > 0 ? Array.from(new Set(actuators)) : undefined;
 }
 
@@ -1052,18 +1057,6 @@ function readAgentGoalCheckpoint(args: Record<string, unknown>): Parameters<type
 function readAgentGoalFinalReportRequirements(args: Record<string, unknown>): AgentGoalSessionV1["authority"]["finalReportRequirements"] | undefined {
   const record = readObject(args.final_report_requirements ?? args.finalReportRequirements ?? args.authority);
   if (!record) return undefined;
-  if (
-    record.completedSolverPathRequired === false ||
-    record.completed_solver_path_required === false ||
-    record.evidenceReentryRequired === false ||
-    record.evidence_reentry_required === false ||
-    record.routeAuthorityRequired === false ||
-    record.route_authority_required === false ||
-    record.terminalAuthoritySingleWriterRequired === false ||
-    record.terminal_authority_single_writer_required === false
-  ) {
-    return undefined;
-  }
   const allowedTerminalArtifactKinds = readStringArray(record.allowedTerminalArtifactKinds ?? record.allowed_terminal_artifact_kinds);
   const requiredEvidenceKinds = readStringArray(record.requiredEvidenceKinds ?? record.required_evidence_kinds);
   const prohibitedReportSources = readStringArray(record.prohibitedReportSources ?? record.prohibited_report_sources);
@@ -2313,6 +2306,13 @@ const WORKSTATION_CONTEXT_FEED_QUERY_SPECS: Partial<Record<HelixLiveEnvironmentT
     producerKinds: ["route_watch", "automation"],
     updateKinds: ["route_evidence", "suggested_action", "source_status", "automation_status"],
   },
+  "live_env.query_automation_policies": {
+    feedKind: "automation_policies",
+    actuator: "query_automation_policies",
+    label: "automation policies",
+    producerKinds: ["automation", "route_watch"],
+    updateKinds: ["automation_status"],
+  },
 };
 
 const readWorkstationContextFeedQuerySpec = (
@@ -3142,6 +3142,10 @@ export function executeLiveEnvironmentTool(
       evidenceRefs: uniqueStrings([requestId, ...evidenceRefs]),
       receiptRefs: [requestId],
       freshnessStatus: ok ? "fresh" : "blocked",
+      goalId,
+      goalRelevanceReason: narratorKind === "say"
+        ? "Narrator speech request was prepared for the active workstation goal."
+        : "Narrator stream binding was prepared for the active workstation goal.",
       suggestedDispatch: dispatch,
     });
     const checkpointedGoalSession = ok && goalSession
@@ -8081,6 +8085,22 @@ export function executeLiveEnvironmentTool(
         : processedPacketJobId
           ? listStagePlayLiveSourceWatchJobPolicies({ threadId: input.thread_id, jobId: processedPacketJobId, limit: 1 }).at(-1) ?? null
           : null;
+    const processedPolicyWantsTextForEveryMailBatch = (() => {
+      if (!processedPacketPolicy) return false;
+      if (processedPacketPolicy.interpretationMode) {
+        return processedPacketPolicy.interpretationMode === "latest_scene_answer";
+      }
+      const policyText = [
+        processedPacketPolicy.objectiveText,
+        processedPacketPolicy.decisionPolicyPrompt,
+        ...(processedPacketPolicy.importanceCriteria ?? []),
+      ].join("\n");
+      return (
+        /\beach\s+(?:new\s+)?(?:visual-summary\s+)?mail\s+batch\b/i.test(policyText) ||
+        /\bany\s+new\s+visual-summary\s+mail\s+batch\b/i.test(policyText) ||
+        /\brecord\s+draft_text_answer\b/i.test(policyText)
+      );
+    })();
     const processedPolicyAllowsVoice = processedPacketPolicy?.outputPolicy.allowVoiceCallout === true;
     const processedPolicyRequiresConfirmation = processedPacketPolicy?.outputPolicy.confirmationRequired === true;
     const effectiveVoiceEnabled =
@@ -8102,6 +8122,15 @@ export function executeLiveEnvironmentTool(
         (!outputIntentWantsInterpretationOnly || processedPolicyAllowsVoice)
       ) {
         decision = decisionSelectorRun.selectedDecision as Parameters<typeof recordLiveSourceMailDecisionForAsk>[0]["decision"];
+      } else if (
+        decision === "wait_for_next_summary" &&
+        (
+          processedPolicyWantsTextForEveryMailBatch ||
+          outputIntentWantsTextAnswer ||
+          processedPacketRecommendedNext === "draft_text_answer"
+        )
+      ) {
+        decision = "draft_text_answer";
       } else if (decision === "request_voice_callout" && outputIntentWantsInterpretationOnly && !processedPolicyAllowsVoice) {
         decision = "record_interpretation";
       } else if (decision === "wait_for_next_summary" && outputIntentWantsInterpretationOnly && !processedPolicyAllowsVoice) {
@@ -8119,8 +8148,6 @@ export function executeLiveEnvironmentTool(
         decision = "request_voice_callout";
       } else if (decision === "wait_for_next_summary" && (outputIntentWantsInterpretation || processedPacketRecommendedNext === "record_interpretation")) {
         decision = "record_interpretation";
-      } else if (decision === "wait_for_next_summary" && (outputIntentWantsTextAnswer || processedPacketRecommendedNext === "draft_text_answer")) {
-        decision = "draft_text_answer";
       } else if (decision === "wait_for_next_summary" && (
         processedPacketRecommendedNext === "request_more_evidence" ||
         processedPacketRecommendedNext === "request_stage_play_checkpoint" ||

@@ -457,7 +457,8 @@ export function materializeFinalAnswerDraftTerminal(input: {
       text: draft.text,
       answer_text: draft.text,
       support_refs: supportRefs,
-      model_authored: true,
+      model_authored: draftAuthority !== "deterministic_repo_evidence_synthesis",
+      synthesis_mode: draftAuthority ?? "unknown",
       synthesis_attempt_ref:
         readString(artifactLedger.find((artifact) =>
           artifactKind(artifact) === "repo_evidence_synthesis_attempt" ||
@@ -467,6 +468,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
         readString(draftPayload?.model_step_capability) ??
         "model.synthesize_from_repo_evidence",
       final_answer_draft_ref: draft.ref,
+      final_answer_draft_authority: draftAuthority,
       assistant_answer: false,
       raw_content_included: false,
     };

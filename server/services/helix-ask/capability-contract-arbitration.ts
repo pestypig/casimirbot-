@@ -56,6 +56,21 @@ const firstString = (...values: unknown[]): string | null => {
   return null;
 };
 
+const isLiveSourceMailboxGoalKind = (value: string | null | undefined): boolean =>
+  /^(?:live_source_processed_mail_interpretation|live_source_mailbox_review|live_environment_review|processed_mail_interpretation|processed_mail_voice_decision)$/.test(
+    String(value ?? "").trim(),
+  );
+
+const liveSourceMailboxGoalKindFromRouteMetadata = (
+  routeMetadata: RecordLike | null,
+  fallbackGoalKind: string,
+): string => {
+  if (isLiveSourceMailboxGoalKind(fallbackGoalKind)) return fallbackGoalKind;
+  const requiredCanonicalGoal = firstString(routeMetadata?.requiredCanonicalGoal, routeMetadata?.required_canonical_goal);
+  if (isLiveSourceMailboxGoalKind(requiredCanonicalGoal)) return requiredCanonicalGoal;
+  return "live_source_processed_mail_interpretation";
+};
+
 export const canonicalGoalKindForExplicitCapability = (capability: string | null | undefined): string | null => {
   switch (capability) {
     case "scientific-calculator.solve_expression":
@@ -249,6 +264,7 @@ export const resolveAskCapabilityContractArbitration = (input: {
   }
 
   if (hardLiveSourceMailboxRoute) {
+    const liveSourceGoalKind = liveSourceMailboxGoalKindFromRouteMetadata(routeMetadata, input.fallbackGoalKind);
     return {
       schema: "helix.ask_capability_contract_arbitration.v1",
       turn_id: input.turnId,
@@ -256,9 +272,12 @@ export const resolveAskCapabilityContractArbitration = (input: {
       requested_capability: null,
       selected_source_target: "live_source_mailbox",
       selected_plan_family: "live_environment",
-      canonical_goal_kind: input.fallbackGoalKind,
-      required_observation_kinds: readStringArray(routeMetadata?.requiredEvidence),
-      required_terminal_kind: fallbackRequiredTerminalKind,
+      canonical_goal_kind: liveSourceGoalKind,
+      required_observation_kinds: readStringArray(routeMetadata?.requiredEvidence ?? routeMetadata?.required_evidence),
+      required_terminal_kind:
+        isLiveSourceMailboxGoalKind(liveSourceGoalKind) && !isLiveSourceMailboxGoalKind(input.fallbackGoalKind)
+          ? "model_synthesized_answer"
+          : fallbackRequiredTerminalKind,
       allow_phase_repair: true,
       route_metadata_demoted: false,
       assistant_answer: false,

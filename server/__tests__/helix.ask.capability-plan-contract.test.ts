@@ -531,6 +531,111 @@ describe("Helix capability plan contract", () => {
     expect(plan.selected_capability).not.toBe("repo-code.search_concept");
   });
 
+  it("does not inherit repo terminal contracts for hard mailbox wake route metadata", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:mailbox-hard-route-repo-terminal-bait",
+      promptText:
+        "Search the latest internet update, inspect repo-code.search_concept, describe the visual capture, or answer directly. Use the structured mailbox route metadata attached to this wake.",
+      sourceTargetIntent: baseSourceTarget("live_source_mailbox", "live_source_mailbox"),
+      toolCallAdmissionDecision: toolAdmission("live_source_mailbox", ["live_environment"]),
+      canonicalGoalFrame: canonicalGoal("repo_concept_explanation", "repo_code_evidence_answer"),
+      routeMetadata: {
+        schema: "helix.ask.route_metadata.v1",
+        invocationKind: "stage_play_mail_wake",
+        wakeRequestId: "stage_play_live_source_mail_wake:test-repo-bait",
+        mailboxThreadId: "helix-ask:desktop",
+        sourceTarget: "live_source_mailbox",
+        requiredCanonicalGoal: "processed_mail_interpretation",
+        requiredPhase: "read_mailbox",
+        evidenceRefs: ["stage_play_processed_mail_packet:test-repo-bait"],
+      },
+      liveSourceTurnPhaseResolution: {
+        artifactId: "live_source_turn_phase_resolution",
+        schemaVersion: "live_source_turn_phase_resolution/v1",
+        phase: "read_processed_mail",
+        canonicalGoal: "processed_mail_interpretation",
+        allowedTools: ["live_env.read_processed_live_source_mail"],
+        forbiddenTools: ["repo-code.search_concept", "internet-search.search_web", "final_answer"],
+        requiredEvidence: ["stage_play_processed_mail_packet"],
+        completionEvidence: ["stage_play_processed_mail_packet"],
+        phaseLock: {
+          locked: true,
+          reason: "Mailbox wake metadata requires the mailbox read phase.",
+        },
+      },
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "live_environment",
+      source_target: "live_source_mailbox",
+      selected_capability: "live_env.read_processed_live_source_mail",
+      goal_kind: "processed_mail_interpretation",
+      required_terminal_kind: "model_synthesized_answer",
+      admission_status: "needs_evidence",
+    });
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "hard_live_source_phase",
+      selected_source_target: "live_source_mailbox",
+      selected_plan_family: "live_environment",
+      canonical_goal_kind: "processed_mail_interpretation",
+      required_terminal_kind: "model_synthesized_answer",
+    });
+    expect(plan.required_terminal_kind).not.toBe("repo_code_evidence_answer");
+  });
+
+  it("does not inherit process graph or panel receipt terminal contracts for hard mailbox wake route metadata", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:mailbox-hard-route-process-graph-terminal-bait",
+      promptText:
+        "The Stage Play graph shows a process graph focus and a workspace action receipt, but use the structured mailbox route metadata attached to this wake.",
+      sourceTargetIntent: baseSourceTarget("live_source_mailbox", "live_source_mailbox"),
+      toolCallAdmissionDecision: toolAdmission("live_source_mailbox", ["live_environment"]),
+      canonicalGoalFrame: canonicalGoal("panel_control", "workspace_action_receipt"),
+      routeMetadata: {
+        schema: "helix.ask.route_metadata.v1",
+        invocationKind: "stage_play_mail_wake",
+        wakeRequestId: "stage_play_live_source_mail_wake:test-process-graph-bait",
+        mailboxThreadId: "helix-ask:desktop",
+        sourceTarget: "live_source_mailbox",
+        requiredCanonicalGoal: "processed_mail_interpretation",
+        requiredPhase: "read_processed_mail",
+        evidenceRefs: ["stage_play_processed_mail_packet:test-process-graph-bait"],
+      },
+      liveSourceTurnPhaseResolution: {
+        artifactId: "live_source_turn_phase_resolution",
+        schemaVersion: "live_source_turn_phase_resolution/v1",
+        phase: "read_processed_mail",
+        canonicalGoal: "processed_mail_interpretation",
+        allowedTools: ["live_env.read_processed_live_source_mail"],
+        forbiddenTools: ["live_env.focus_process_graph", "workspace.click", "final_answer"],
+        requiredEvidence: ["stage_play_processed_mail_packet"],
+        completionEvidence: ["stage_play_processed_mail_packet"],
+        phaseLock: {
+          locked: true,
+          reason: "Mailbox wake metadata requires mailbox evidence before any process-graph projection can inform the answer.",
+        },
+      },
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "live_environment",
+      source_target: "live_source_mailbox",
+      selected_capability: "live_env.read_processed_live_source_mail",
+      goal_kind: "processed_mail_interpretation",
+      required_terminal_kind: "model_synthesized_answer",
+      admission_status: "needs_evidence",
+    });
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "hard_live_source_phase",
+      selected_source_target: "live_source_mailbox",
+      selected_plan_family: "live_environment",
+      canonical_goal_kind: "processed_mail_interpretation",
+      required_terminal_kind: "model_synthesized_answer",
+    });
+    expect(plan.required_terminal_kind).not.toBe("workspace_action_receipt");
+    expect(plan.selected_capability).not.toBe("live_env.focus_process_graph");
+  });
+
   it("defaults hard mailbox wakes without a phase tool to processed mailbox reads", () => {
     const plan = buildCapabilityPlan({
       turnId: "ask:mailbox-hard-route-default-read",

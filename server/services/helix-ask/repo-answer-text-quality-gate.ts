@@ -260,7 +260,13 @@ const hasModelSynthesis = (payload: RecordLike): boolean => {
   const answer = readRecord(payload.repo_code_evidence_answer);
   if (answer?.model_authored === true && readString(answer.synthesis_attempt_ref) && hasRepoSynthesisStepIdentity(payload)) return true;
   const draft = readRecord(payload.final_answer_draft);
-  return readString(draft?.authority) === "llm_post_observation_composer" && hasRepoSynthesisStepIdentity(payload);
+  const draftAuthority = readString(draft?.authority);
+  const answerAuthority = readString(answer?.final_answer_draft_authority);
+  return (
+    draftAuthority === "llm_post_observation_composer" ||
+    draftAuthority === "deterministic_repo_evidence_synthesis" ||
+    answerAuthority === "deterministic_repo_evidence_synthesis"
+  ) && hasRepoSynthesisStepIdentity(payload);
 };
 
 const exactSectionTermCoverage = (input: {

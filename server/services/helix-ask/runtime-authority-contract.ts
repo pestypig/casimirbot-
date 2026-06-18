@@ -971,6 +971,24 @@ export function goalSatisfactionAllowsTerminal(payload: Record<string, unknown>)
   ) {
     return true;
   }
+  const repoEvidenceAnswer = readRecord(payload.repo_code_evidence_answer);
+  const repoQualityGate = readRecord(payload.repo_answer_text_quality_gate);
+  const repoRelevanceGate = readRecord(payload.repo_evidence_relevance_gate);
+  if (
+    terminalKind === "repo_code_evidence_answer" &&
+    (
+      readString(canonicalGoal?.goal_kind) === "repo_entity_definition" ||
+      readString(canonicalGoal?.goal_kind) === "repo_code_evidence_question"
+    ) &&
+    readString(canonicalGoal?.required_terminal_kind) === "repo_code_evidence_answer" &&
+    readString(repoEvidenceAnswer?.answer_text) &&
+    readArray(repoEvidenceAnswer?.support_refs).length > 0 &&
+    readBoolean(repoQualityGate?.ok) !== false &&
+    readBoolean(repoQualityGate?.terminal_allowed) !== false &&
+    readBoolean(repoRelevanceGate?.terminal_allowed) !== false
+  ) {
+    return true;
+  }
   const bridge = readRecord(payload.post_tool_authority_bridge);
   if (
     terminalKind === "model_synthesized_answer" &&

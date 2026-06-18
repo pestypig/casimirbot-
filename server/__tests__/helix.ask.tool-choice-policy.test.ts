@@ -53,13 +53,14 @@ describe("Helix Ask tool-choice policy", () => {
     expect(agiPlanSource).toContain("Creates a governed source-repair control receipt");
   });
 
-  it("keeps goal sessions, goal context, packet traces, and route evidence exposed in the top-level Ask live_env capability surface", () => {
+  it("keeps goal sessions, goal context, packet traces, route evidence, and automation policies exposed in the top-level Ask live_env capability surface", () => {
     const agiPlanSource = readFileSync(resolve(__dirname, "../routes/agi.plan.ts"), "utf8");
     const capabilities = [
       "live_env.start_agent_goal_session",
       "live_env.query_workstation_goal_context",
       "live_env.query_packet_traces",
       "live_env.query_route_evidence",
+      "live_env.query_automation_policies",
     ];
 
     for (const capability of capabilities) {

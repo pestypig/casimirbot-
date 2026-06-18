@@ -36,6 +36,7 @@ export type HelixLiveEnvironmentToolName =
   | "live_env.query_microdeck_outputs"
   | "live_env.query_live_answer_state"
   | "live_env.query_route_evidence"
+  | "live_env.query_automation_policies"
   | "live_env.change_workstation_preset"
   | "live_env.bind_workstation_source"
   | "live_env.unbind_workstation_source"

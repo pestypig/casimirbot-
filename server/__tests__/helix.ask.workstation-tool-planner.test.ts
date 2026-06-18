@@ -957,6 +957,7 @@ describe("Helix Ask workstation tool planner", () => {
           expect.objectContaining({ source_kind: "live_answer_lines" }),
           expect.objectContaining({ source_kind: "source_health" }),
           expect.objectContaining({ source_kind: "trace_memory" }),
+          expect.objectContaining({ source_kind: "narrator_events" }),
           expect.objectContaining({ source_kind: "packet_traces" }),
           expect.objectContaining({ source_kind: "route_evidence" }),
           expect.objectContaining({ source_kind: "automation_policies" }),
@@ -980,6 +981,7 @@ describe("Helix Ask workstation tool planner", () => {
           "update_live_answer",
           "query_trace_memory",
           "query_packet_traces",
+          "query_automation_policies",
           "pause_loop",
           "resume_loop",
           "set_loop_state",
@@ -1213,6 +1215,19 @@ describe("Helix Ask workstation tool planner", () => {
       expected_receipt_kind: "stage_play_workstation_context_feed_query_result",
       required: true,
     });
+
+    const automationPoliciesPlan = planWorkstationToolUse(
+      "Show automation policies for goal_id=goal:frog-monitor.",
+      { threadId: "thread:automation-policy-feed", turnId: "turn:automation-policy-feed" },
+    );
+    expect(automationPoliciesPlan.intent).toBe("workstation_goal_context");
+    expect(automationPoliciesPlan.tool_plan?.steps[0]).toMatchObject({
+      step_id: "query_automation_policies",
+      kind: "run_ask_tool",
+      tool_id: "live_env.query_automation_policies",
+      expected_receipt_kind: "stage_play_workstation_context_feed_query_result",
+      required: true,
+    });
   });
 
   it("routes affirmative workstation control prompts to governed control receipts", () => {
@@ -1355,9 +1370,11 @@ describe("Helix Ask workstation tool planner", () => {
       'The UI label says "live_env.query_trace_memory"; summarize it.',
       'The UI label says "live_env.query_packet_traces"; summarize it.',
       'The UI label says "live_env.query_route_evidence"; summarize it.',
+      'The UI label says "live_env.query_automation_policies"; summarize it.',
       'The UI label says "live_env.query_audio_transcripts"; summarize it.',
       'The UI label says "live_env.query_source_health"; summarize it.',
       "Could we query route-watch evidence later?",
+      "Could we query automation policies later?",
       "Could we check source health later after the live source is running?",
     ]) {
       const plan = planWorkstationToolUse(prompt, { threadId: "thread:goal-context-negative" });

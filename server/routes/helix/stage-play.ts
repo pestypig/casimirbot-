@@ -3,9 +3,9 @@ import type { Request, Response } from "express";
 import { validateStagePlayBadgeGraphV1 } from "../../../shared/contracts/stage-play-badge-graph.v1";
 import type { AgentGoalActuatorV1, AgentGoalSessionV1 } from "../../../shared/contracts/workstation-goal-context.v1";
 import {
-  WORKSTATION_AGENT_GOAL_ACTUATORS,
   WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS,
   WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
+  normalizeAgentGoalActuatorV1,
 } from "../../../shared/contracts/workstation-goal-context.v1";
 import type {
   StagePlayLiveSourceMailInterpretationPayloadV1,
@@ -443,7 +443,6 @@ const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)));
 
 const stagePlayGoalFeedKinds = new Set(WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS);
-const stagePlayGoalActuators = new Set(WORKSTATION_AGENT_GOAL_ACTUATORS);
 
 const readGoalContextFeeds = (value: unknown): AgentGoalSessionV1["contextFeeds"] | undefined => {
   if (!Array.isArray(value)) return undefined;
@@ -472,7 +471,8 @@ const readGoalContextFeeds = (value: unknown): AgentGoalSessionV1["contextFeeds"
 
 const readGoalActuators = (value: unknown): AgentGoalActuatorV1[] | undefined => {
   const actuators = readStringArray(value)
-    .filter((actuator): actuator is AgentGoalActuatorV1 => stagePlayGoalActuators.has(actuator as AgentGoalActuatorV1));
+    .map((actuator) => normalizeAgentGoalActuatorV1(actuator))
+    .filter((actuator): actuator is AgentGoalActuatorV1 => Boolean(actuator));
   return actuators.length > 0 ? Array.from(new Set(actuators)) : undefined;
 };
 
@@ -519,18 +519,6 @@ const readGoalFinalReportRequirements = (
   const allowedTerminalArtifactKinds = readStringArray(record.allowedTerminalArtifactKinds ?? record.allowed_terminal_artifact_kinds);
   const requiredEvidenceKinds = readStringArray(record.requiredEvidenceKinds ?? record.required_evidence_kinds);
   const prohibitedReportSources = readStringArray(record.prohibitedReportSources ?? record.prohibited_report_sources);
-  if (
-    record.completedSolverPathRequired === false ||
-    record.completed_solver_path_required === false ||
-    record.evidenceReentryRequired === false ||
-    record.evidence_reentry_required === false ||
-    record.routeAuthorityRequired === false ||
-    record.route_authority_required === false ||
-    record.terminalAuthoritySingleWriterRequired === false ||
-    record.terminal_authority_single_writer_required === false
-  ) {
-    return undefined;
-  }
   return allowedTerminalArtifactKinds.length > 0 || requiredEvidenceKinds.length > 0 || prohibitedReportSources.length > 0
     ? {
         completedSolverPathRequired: true,

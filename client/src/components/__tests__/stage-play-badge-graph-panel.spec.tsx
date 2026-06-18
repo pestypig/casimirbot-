@@ -12,6 +12,7 @@ import {
   type StagePlayBadgeGraphV1,
   type StagePlayBadgeV1,
 } from "@shared/contracts/stage-play-badge-graph.v1";
+import { WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS } from "@shared/contracts/workstation-goal-context.v1";
 
 const visualProducerMock = vi.hoisted(() => ({
   getActiveVisualFrameStream: vi.fn(() => null),
@@ -2065,6 +2066,8 @@ describe("StagePlayBadgeGraphPanel", () => {
           suggestedDispatch: [
             { kind: "log_receipt", receiptRef: "stage_play_live_source_watch_job_policy:ui" },
             { kind: "update_panel", panelId: "stage-play-badge-graph" },
+            { kind: "wake_agent", reason: "urgent operator interruption" },
+            { kind: "append_goal_context", goalId: "goal:stage-play-monitor" },
             { kind: "set_loop_state", loopRef: "stage_play_live_source_watch_job:ui", state: "running" },
           ],
           authority: {
@@ -2221,6 +2224,12 @@ describe("StagePlayBadgeGraphPanel", () => {
               freshnessMs: 120000,
               relevancePolicy: "same-thread-or-turn",
             },
+            {
+              feedId: "feed:narrator-events",
+              sourceKind: "narrator_events",
+              freshnessMs: 60000,
+              relevancePolicy: "same-goal-or-stream-binding",
+            },
           ],
           allowedActuators: ["query_visual_summaries", "query_packet_traces", "query_microdeck_outputs", "query_source_health", "query_translation_segments", "narrator_bind_stream", "focus_process_graph"],
           cadence: { kind: "event_accumulation", minUpdates: 2 },
@@ -2249,6 +2258,7 @@ describe("StagePlayBadgeGraphPanel", () => {
           authority: {
             assistantAnswer: false,
             finalReportsRequireTerminalAuthority: true,
+            finalReportRequirements: WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
           },
         }],
         assistant_answer: false,
@@ -2286,8 +2296,16 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-translation-state")).toHaveTextContent(/translation output visible as evidence/i);
     expect(screen.getByTestId("stage-play-route-watch-automation-state")).toHaveTextContent(/1 automation status update/i);
     expect(screen.getByTestId("stage-play-route-watch-automation-state")).toHaveTextContent(/1 running loop dispatch/i);
+    expect(screen.getByTestId("stage-play-dispatch-mix-state")).toHaveTextContent(/15 dispatch suggestions/i);
+    expect(screen.getByTestId("stage-play-dispatch-mix-state")).toHaveTextContent(/2 wake interrupts/i);
+    expect(screen.getByTestId("stage-play-dispatch-mix-state")).toHaveTextContent(/4 panel updates/i);
+    expect(screen.getByTestId("stage-play-dispatch-mix-state")).toHaveTextContent(/2 narrator outputs/i);
+    expect(screen.getByTestId("stage-play-dispatch-mix-state")).toHaveTextContent(/1 loop action/i);
+    expect(screen.getByTestId("stage-play-dispatch-mix-state")).toHaveTextContent(/2 goal-context appends/i);
+    expect(screen.getByTestId("stage-play-dispatch-mix-state")).toHaveTextContent(/3 receipt logs/i);
     expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/7 allowed actuators/i);
     expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/1 narrator output policy item/i);
+    expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/1 narrator event feed/i);
     expect(screen.getByText("Minecraft danger monitor")).toBeTruthy();
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/visual summaries/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/packet traces/i);
@@ -2295,6 +2313,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/microdeck outputs/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/automation policies/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/translated transcripts/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/narrator events/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-cadence")).toHaveTextContent(/event accumulation \/ 2 updates/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-stop-conditions")).toHaveTextContent(/Terminal authority produces a final report/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-checkpoint")).toHaveTextContent(/Queried visual summaries feed/i);
@@ -2333,6 +2352,9 @@ describe("StagePlayBadgeGraphPanel", () => {
     )).toBe(true);
     expect(screen.getAllByTestId("stage-play-goal-context-dispatch").some((node) =>
       /Goal context|Panel|Narrator|Wake interrupt|Loop: running/i.test(node.textContent ?? "")
+    )).toBe(true);
+    expect(screen.getAllByTestId("stage-play-goal-context-dispatch").some((node) =>
+      /Wake interrupt: urgent operator interruption/i.test(node.textContent ?? "")
     )).toBe(true);
     const arbiterRole = screen.getAllByTestId("stage-play-microdeck-role-square").find((node: HTMLElement) =>
       node.textContent?.includes("Hypothesis Arbiter")

@@ -5,6 +5,7 @@ import type {
   StagePlayProcessedMailPacketV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import type { StagePlayLiveSourceMailWakeRequestV1 } from "@shared/contracts/stage-play-live-source-mail-wake.v1";
+import { WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS } from "@shared/contracts/workstation-goal-context.v1";
 import {
   ensureStagePlayAgentGoalSession,
   listStagePlayAgentGoalSessions,
@@ -572,6 +573,19 @@ describe("stage-play goal context store", () => {
       ],
       cadence: { kind: "event_accumulation", minUpdates: 3 },
       stopConditions: ["frog species reported through terminal authority"],
+      finalReportRequirements: {
+        ...WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
+        requiredEvidenceKinds: [
+          "goal_context_update",
+          "packet_trace",
+          "terminal_authority_single_writer",
+        ],
+        prohibitedReportSources: [
+          "tool_receipt",
+          "panel_projection",
+          "microdeck_output",
+        ],
+      },
       checkpoint: {
         summary: "Started frog monitor with explicit visual and trace feeds.",
         evidenceRefs: ["visual_frame:frog-1"],
@@ -614,6 +628,22 @@ describe("stage-play goal context store", () => {
       authority: {
         assistantAnswer: false,
         finalReportsRequireTerminalAuthority: true,
+        finalReportRequirements: expect.objectContaining({
+          completedSolverPathRequired: true,
+          evidenceReentryRequired: true,
+          routeAuthorityRequired: true,
+          terminalAuthoritySingleWriterRequired: true,
+          requiredEvidenceKinds: expect.arrayContaining([
+            "goal_context_update",
+            "packet_trace",
+            "terminal_authority_single_writer",
+          ]),
+          prohibitedReportSources: expect.arrayContaining([
+            "tool_receipt",
+            "panel_projection",
+            "microdeck_output",
+          ]),
+        }),
       },
     });
     expect(session?.checkpoints.at(-1)).toMatchObject({

@@ -79,6 +79,22 @@ describe("resolveLiveSourceTurnPhase", () => {
       "live_env.process_live_source_mail",
       "final_answer",
     ]));
+    expect(LIVE_SOURCE_TURN_PHASE_TABLE.query_automation_policies).toMatchObject({
+      allowedTools: ["live_env.query_automation_policies"],
+      fallbackTools: [],
+      requiredEvidence: ["stage_play_workstation_context_feed_query_result"],
+      completionEvidence: ["stage_play_workstation_context_feed_query_result"],
+      next: "terminal_checkpoint",
+    });
+    expect(LIVE_SOURCE_TURN_PHASE_TABLE.query_automation_policies.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.query_workstation_goal_context",
+      "live_env.query_trace_memory",
+      "live_env.query_packet_traces",
+      "live_env.query_route_evidence",
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "final_answer",
+    ]));
     expect(LIVE_SOURCE_TURN_PHASE_TABLE.reflect_mail_loop).toMatchObject({
       allowedTools: ["live_env.reflect_live_source_mail_loop"],
       fallbackTools: [],
@@ -269,6 +285,62 @@ describe("resolveLiveSourceTurnPhase", () => {
     expect(mandatoryToolForPhase(phase)).toBeNull();
   });
 
+  it("routes automation-policy prompts to read-only automation policy feed query", () => {
+    const phase = resolveLiveSourceTurnPhase({
+      prompt: "Show automation policies for goal_id=goal:frog-monitor.",
+      selectedTargetSource: "live_source_mailbox",
+    });
+
+    expect(phase.phase).toBe("query_automation_policies");
+    expect(phase.canonicalGoal).toBe("workstation_goal_context");
+    expect(phase.allowedTools).toEqual(["live_env.query_automation_policies"]);
+    expect(phase.forbiddenTools).toEqual(expect.arrayContaining([
+      "live_env.query_workstation_goal_context",
+      "live_env.query_trace_memory",
+      "live_env.query_packet_traces",
+      "live_env.query_route_evidence",
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.record_live_source_mail_decision",
+      "live_env.request_interim_voice_callout",
+      "final_answer",
+    ]));
+    expect(phase.phaseLock).toMatchObject({
+      locked: true,
+      reason: "Automation-policy inspection is a read-only workstation evidence query, not mailbox processing or wake dispatch.",
+    });
+    expect(mandatoryToolForPhase(phase)).toBe("live_env.query_automation_policies");
+  });
+
+  it("terminalizes automation-policy receipts before any answer authority", () => {
+    const phase = resolveLiveSourceTurnPhase({
+      prompt: "Show automation policies for goal_id=goal:frog-monitor.",
+      selectedTargetSource: "live_source_mailbox",
+      selectedCapability: "live_env.query_automation_policies",
+      latestToolReceipts: [{
+        toolName: "live_env.query_automation_policies",
+        observation: {
+          schema: "stage_play_workstation_context_feed_query_result/v1",
+          feed_kind: "automation_policies",
+          artifactId: "stage_play_workstation_context_feed_query_result",
+          feedId: "stage_play_workstation_context_feed:automation-policies",
+        },
+      }],
+    });
+
+    expect(phase).toMatchObject({
+      phase: "terminal_checkpoint",
+      allowedTools: [],
+      requiredEvidence: ["stage_play_workstation_context_feed_query_result"],
+      completionEvidence: ["model_synthesized_answer"],
+      phaseLock: {
+        locked: true,
+        reason: "Automation-policy observations require model re-entry and terminal authority before any answer.",
+      },
+    });
+    expect(mandatoryToolForPhase(phase)).toBeNull();
+  });
+
   it("does not route contextual goal-context mentions into live-env tool execution", () => {
     for (const prompt of [
       "Do not query workstation goal context; explain the architecture.",
@@ -276,7 +348,9 @@ describe("resolveLiveSourceTurnPhase", () => {
       "Could we inspect per-packet traces later?",
       "Do not query trace memory; explain the architecture.",
       'The UI label says "live_env.query_route_evidence"; what does it mean?',
+      'The UI label says "live_env.query_automation_policies"; what does it mean?',
       "Could we inspect route-watch evidence later?",
+      "Could we inspect automation policies later?",
     ]) {
       const phase = resolveLiveSourceTurnPhase({
         prompt,
@@ -285,9 +359,11 @@ describe("resolveLiveSourceTurnPhase", () => {
       expect(phase.phase).not.toBe("query_workstation_goal_context");
       expect(phase.phase).not.toBe("query_packet_traces");
       expect(phase.phase).not.toBe("query_route_evidence");
+      expect(phase.phase).not.toBe("query_automation_policies");
       expect(phase.allowedTools).not.toContain("live_env.query_workstation_goal_context");
       expect(phase.allowedTools).not.toContain("live_env.query_packet_traces");
       expect(phase.allowedTools).not.toContain("live_env.query_route_evidence");
+      expect(phase.allowedTools).not.toContain("live_env.query_automation_policies");
     }
   });
 

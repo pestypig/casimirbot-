@@ -1788,6 +1788,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
           session.contextFeeds.some((feed) => feed.sourceKind === "automation_policies")
         ).length,
       actuatorPolicyCount: agentGoalSessions.reduce((count: number, session: AgentGoalSessionV1) => count + session.allowedActuators.length, 0),
+      narratorEventFeedCount: goalContextUpdates.filter((update: WorkstationGoalContextUpdateV1) => update.producerKind === "narrator").length +
+        agentGoalSessions.filter((session: AgentGoalSessionV1) =>
+          session.contextFeeds.some((feed) => feed.sourceKind === "narrator_events")
+        ).length,
       narratorActuatorPolicyCount: agentGoalSessions.reduce(
         (count: number, session: AgentGoalSessionV1) => count + session.allowedActuators.filter((actuator) =>
           actuator === "bind_narrator" || actuator === "narrator_bind_stream" || actuator === "narrator_say"

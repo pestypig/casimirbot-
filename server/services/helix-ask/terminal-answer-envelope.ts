@@ -82,6 +82,81 @@ const readValidRepoEvidenceAnswerText = (payload: Record<string, unknown>): stri
   return readString(answer?.answer_text);
 };
 
+const readRepoEvidenceAnswerPayload = (payload: Record<string, unknown>): Record<string, unknown> | null => {
+  const topLevel = readRecord(payload.repo_code_evidence_answer);
+  if (topLevel) return topLevel;
+  const ledgerAnswer = readArray(payload.current_turn_artifact_ledger)
+    .map(readRecord)
+    .filter((artifact): artifact is Record<string, unknown> => Boolean(artifact))
+    .filter((artifact) => readString(artifact.kind) === "repo_code_evidence_answer")
+    .map((artifact) => readRecord(artifact.payload))
+    .find((entry): entry is Record<string, unknown> => Boolean(entry)) ?? null;
+  if (ledgerAnswer) return ledgerAnswer;
+  const draft = readRecord(payload.final_answer_draft);
+  if (
+    readString(draft?.model_step_capability) === "model.synthesize_from_repo_evidence" &&
+    readString(draft?.text)
+  ) {
+    return {
+      schema: "helix.repo_code_evidence_answer.v1",
+      artifact_id: readString(draft?.artifact_id) ?? readString(draft?.draft_id) ?? "repo_code_evidence_answer:from_final_answer_draft",
+      answer_text: readString(draft?.text),
+      support_refs: [
+        ...readArray(draft?.support_refs),
+        ...readArray(draft?.artifact_refs),
+        ...readArray(draft?.grounded_in_observation_refs),
+      ],
+      final_answer_draft_ref: readString(draft?.artifact_id) ?? readString(draft?.draft_id),
+      final_answer_draft_authority: readString(draft?.authority),
+      model_step_capability: readString(draft?.model_step_capability),
+      model_authored: readString(draft?.authority) === "llm_post_observation_composer",
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+  }
+  return null;
+};
+
+const canRecoverRepoEvidenceAnswerTerminal = (
+  payload: Record<string, unknown>,
+  answer: Record<string, unknown> | null,
+): answer is Record<string, unknown> => {
+  if (!answer) return false;
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  const goalKind = readString(canonicalGoal?.goal_kind);
+  if (goalKind !== "repo_entity_definition" && goalKind !== "repo_code_evidence_question") return false;
+  if (readString(canonicalGoal?.required_terminal_kind) !== "repo_code_evidence_answer") return false;
+  if (!readString(answer.answer_text)) return false;
+  const finalDraft = readRecord(payload.final_answer_draft);
+  const supportRefs = [
+    ...readArray(answer.support_refs),
+    ...readArray(answer.source_observation_refs),
+    ...readArray(finalDraft?.support_refs),
+    ...readArray(finalDraft?.artifact_refs),
+    ...readArray(payload.current_turn_artifact_ledger).flatMap((entry) => {
+      const artifact = readRecord(entry);
+      const payloadRecord = readRecord(artifact?.payload);
+      if (!/repo_code_evidence_observation|repo_docs_synthesis_packet/i.test([
+        readString(artifact?.kind),
+        readString(payloadRecord?.schema),
+      ].join(" "))) {
+        return [];
+      }
+      return [
+        readString(artifact?.artifact_id),
+        ...readArray(payloadRecord?.evidence_refs).map(readString),
+        ...readArray(payloadRecord?.support_refs).map(readString),
+      ];
+    }),
+  ].filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
+  if (supportRefs.length === 0) return false;
+  const qualityGate = readRecord(payload.repo_answer_text_quality_gate);
+  if (qualityGate && qualityGate.ok !== true) return false;
+  const relevanceGate = readRecord(payload.repo_evidence_relevance_gate);
+  if (relevanceGate && relevanceGate.terminal_allowed === false) return false;
+  return true;
+};
+
 const readFinalAnswerDraftText = (payload: Record<string, unknown>): string | null => {
   const draft = readRecord(payload.final_answer_draft);
   return readString(draft?.text) ?? readString(draft?.answer_text);
@@ -543,6 +618,22 @@ export function resolveTerminalAnswerEnvelope(
   let authorityOrigin: HelixTerminalAnswerEnvelope["authority_origin"] = "terminal_presentation";
   const docConceptTerminal = applyDocConceptExplanationTerminalCandidate(payload);
   const directAnswerTerminal = applySatisfiedDirectAnswerTerminalCandidate(payload);
+  const recoverableRepoAnswer = readRepoEvidenceAnswerPayload(payload);
+
+  if (
+    (terminalArtifactKind === "typed_failure" || finalAnswerSource === "typed_failure") &&
+    canRecoverRepoEvidenceAnswerTerminal(payload, recoverableRepoAnswer)
+  ) {
+    payload.repo_code_evidence_answer = recoverableRepoAnswer;
+    terminalArtifactKind = "repo_code_evidence_answer";
+    finalAnswerSource = "repo_code_evidence_answer";
+    payload.terminal_artifact_kind = terminalArtifactKind;
+    payload.final_answer_source = finalAnswerSource;
+    payload.terminal_artifact_id = readString(recoverableRepoAnswer.artifact_id) ?? `${turnId}:repo_code_evidence_answer`;
+    delete payload.terminal_error_code;
+    delete payload.terminal_failure_text;
+    delete payload.typed_failure;
+  }
 
   if (docConceptTerminal.applied && docConceptTerminal.text) {
     terminalArtifactKind = "doc_concept_explanation";

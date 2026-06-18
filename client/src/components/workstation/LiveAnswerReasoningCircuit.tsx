@@ -42,6 +42,7 @@ export type LiveAnswerReasoningCircuitSummary = {
   routeWatchCount: number;
   automationCount: number;
   actuatorPolicyCount: number;
+  narratorEventFeedCount: number;
   narratorActuatorPolicyCount: number;
   traceMemoryCount: number;
   terminalAuthorityRequiredCount: number;
@@ -148,6 +149,9 @@ export function LiveAnswerReasoningCircuit({
           <span className="rounded border border-cyan-300/20 px-2 py-1 font-mono text-[10px] text-cyan-100" data-testid="live-answer-narrator-actuator-policy-count">
             {summary.narratorActuatorPolicyCount} narrator output polic{summary.narratorActuatorPolicyCount === 1 ? "y" : "ies"}
           </span>
+          <span className="rounded border border-cyan-300/20 px-2 py-1 font-mono text-[10px] text-cyan-100" data-testid="live-answer-narrator-event-feed-count">
+            {summary.narratorEventFeedCount} narrator event feeds
+          </span>
           <span className="rounded border border-fuchsia-300/20 px-2 py-1 font-mono text-[10px] text-fuchsia-100" data-testid="live-answer-trace-memory-count">
             {summary.traceMemoryCount} trace memory
           </span>
@@ -220,7 +224,7 @@ export function LiveAnswerReasoningCircuit({
           <p className="text-[10px] font-semibold uppercase text-slate-300">Authority posture</p>
           <p className="mt-1 text-xs text-violet-100" data-testid="live-answer-terminal-authority-posture">{summary.terminalPosture}</p>
           <p className="mt-1 font-mono text-[10px] text-slate-400">
-            observation_only={summary.observationOnlyCount} narrator_bindings={summary.narratorBindingCount} audio_transcripts={summary.audioTranscriptCount} translations={summary.translatedTranscriptCount} packet_traces={summary.packetTraceCount} source_health={summary.sourceHealthCount} feed_queries={summary.feedQueryCount} route_watch={summary.routeWatchCount} automations={summary.automationCount} actuator_policies={summary.actuatorPolicyCount} narrator_output_policies={summary.narratorActuatorPolicyCount} trace_memory={summary.traceMemoryCount} terminal_authority_sessions={summary.terminalAuthorityRequiredCount}
+            observation_only={summary.observationOnlyCount} narrator_bindings={summary.narratorBindingCount} audio_transcripts={summary.audioTranscriptCount} translations={summary.translatedTranscriptCount} packet_traces={summary.packetTraceCount} source_health={summary.sourceHealthCount} feed_queries={summary.feedQueryCount} route_watch={summary.routeWatchCount} automations={summary.automationCount} actuator_policies={summary.actuatorPolicyCount} narrator_output_policies={summary.narratorActuatorPolicyCount} narrator_event_feeds={summary.narratorEventFeedCount} trace_memory={summary.traceMemoryCount} terminal_authority_sessions={summary.terminalAuthorityRequiredCount}
           </p>
           <p className="mt-1 text-[11px] leading-5 text-slate-500">
             Receipts, MicroDeck outputs, narrator bindings, and panel projections stay evidence until the completed solver path selects a terminal answer.
@@ -240,6 +244,7 @@ export function LiveAnswerReasoningCircuit({
           <div className="mt-2 grid gap-2">
             {sessions.slice(0, 2).map((session: AgentGoalSessionV1) => {
               const latestCheckpoint = session.checkpoints.at(-1);
+              const finalReportRequirementCount = session.authority.finalReportRequirements?.requiredEvidenceKinds?.length ?? 0;
               return (
                 <div key={`${session.goalId}:policy`} className="rounded border border-violet-300/15 bg-violet-950/10 p-2" data-testid="live-answer-agent-goal-policy">
                   <div className="flex items-start justify-between gap-2">
@@ -248,7 +253,7 @@ export function LiveAnswerReasoningCircuit({
                       <p className="mt-0.5 truncate font-mono text-[10px] text-slate-500">{session.goalId}</p>
                     </div>
                     <span className="shrink-0 rounded border border-rose-300/20 px-1.5 py-0.5 font-mono text-[10px] text-rose-100" data-testid="live-answer-agent-goal-final-authority">
-                      finalAuthority={String(session.authority.finalReportsRequireTerminalAuthority)}
+                      finalAuthority={String(session.authority.finalReportsRequireTerminalAuthority)} / requirements={finalReportRequirementCount}
                     </span>
                   </div>
                   <div className="mt-1 grid gap-1 font-mono text-[10px] text-slate-400">

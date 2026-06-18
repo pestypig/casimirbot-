@@ -3,10 +3,12 @@ import {
   WORKSTATION_AGENT_GOAL_ACTUATORS,
   WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS,
   WORKSTATION_AGENT_GOAL_DEFAULT_CONTEXT_FEEDS,
+  WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
   WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
   WORKSTATION_GOAL_CONTEXT_PRODUCER_KINDS,
   WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
   WORKSTATION_GOAL_CONTEXT_UPDATE_KINDS,
+  normalizeAgentGoalActuatorV1,
   type AgentGoalSessionV1,
   type GoalContextProducerKindV1,
   type GoalContextUpdateKindV1,
@@ -104,6 +106,7 @@ describe("workstation goal context contract", () => {
       "query_trace_memory",
       "query_packet_traces",
       "query_route_evidence",
+      "query_automation_policies",
       "resume_loop",
       "set_loop_state",
       "focus_process_graph",
@@ -123,6 +126,7 @@ describe("workstation goal context contract", () => {
     authority: {
       assistantAnswer: false,
       finalReportsRequireTerminalAuthority: true,
+      finalReportRequirements: WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
     },
   };
 
@@ -209,6 +213,17 @@ describe("workstation goal context contract", () => {
     })).toEqual([]);
   });
 
+  it("normalizes live-env tool names into AgentGoalSession actuator ids", () => {
+    expect(normalizeAgentGoalActuatorV1("live_env.query_visual_summaries")).toBe("query_visual_summaries");
+    expect(normalizeAgentGoalActuatorV1("live_env.set_workstation_loop_state")).toBe("set_loop_state");
+    expect(normalizeAgentGoalActuatorV1("live_env.repair_workstation_source")).toBe("repair_source");
+    expect(normalizeAgentGoalActuatorV1("live_env.update_live_answer_projection")).toBe("update_live_answer");
+    expect(normalizeAgentGoalActuatorV1("live_env.narrator_bind_stream")).toBe("narrator_bind_stream");
+    expect(normalizeAgentGoalActuatorV1("live_env.query_automation_policies")).toBe("query_automation_policies");
+    expect(normalizeAgentGoalActuatorV1("pause workstation loop")).toBe("pause_loop");
+    expect(normalizeAgentGoalActuatorV1("wake_agent")).toBeNull();
+  });
+
   it("keeps default goal-context feeds complete, fresh, and session-valid", () => {
     expect(WORKSTATION_AGENT_GOAL_DEFAULT_CONTEXT_FEEDS.map((feed) => feed.sourceKind).sort()).toEqual(
       [...WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS].sort(),
@@ -257,9 +272,34 @@ describe("workstation goal context contract", () => {
       authority: {
         assistantAnswer: false,
         finalReportsRequireTerminalAuthority: false as true,
+        finalReportRequirements: WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
       },
     })).toEqual(expect.arrayContaining([
       "goal sessions require terminal authority for final reports",
+    ]));
+  });
+
+  it("rejects goal sessions that weaken final-report authority requirements", () => {
+    expect(validateAgentGoalSessionV1({
+      ...goal,
+      authority: {
+        assistantAnswer: false,
+        finalReportsRequireTerminalAuthority: true,
+        finalReportRequirements: {
+          ...WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
+          completedSolverPathRequired: false as true,
+          evidenceReentryRequired: false as true,
+          routeAuthorityRequired: false as true,
+          terminalAuthoritySingleWriterRequired: false as true,
+          requiredEvidenceKinds: [],
+        },
+      },
+    })).toEqual(expect.arrayContaining([
+      "final report requirements must require completed solver path",
+      "final report requirements must require evidence re-entry",
+      "final report requirements must require route authority",
+      "final report requirements must require terminal authority single writer",
+      "authority.finalReportRequirements.requiredEvidenceKinds must include at least one reference",
     ]));
   });
 });

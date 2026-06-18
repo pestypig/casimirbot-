@@ -33,6 +33,7 @@ import {
 import { arbitrateAskSourceTarget } from "../services/helix-ask/ask-source-target-arbitrator";
 import { STAGE_PLAY_LIVE_ANSWER_LINE_SCHEMA } from "../services/stage-play/stage-play-output-lane-reducer";
 import { evaluateTerminalBoundaryEligibility } from "../services/helix-ask/runtime-authority-contract";
+import { WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS } from "@shared/contracts/workstation-goal-context.v1";
 import { buildStagePlayGraphFromWorld } from "../services/stage-play/stage-play-badge-graph-builder";
 import { resetStagePlayAskCheckpointReceiptsForTest } from "../services/stage-play/stage-play-ask-checkpoint-store";
 import { resetStagePlayCheckpointQueueForTest } from "../services/stage-play/stage-play-checkpoint-queue";
@@ -44,10 +45,24 @@ import { listStagePlayLiveSourceNarrativeStates } from "../services/stage-play/s
 import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../services/stage-play/stage-play-live-source-mail-wake-store";
 import { resetStagePlayLiveSourceMailTranscriptStoreForTest } from "../services/stage-play/stage-play-live-source-mail-transcript-store";
 import { resetStagePlayGoalContextStoreForTest } from "../services/stage-play/stage-play-goal-context-store";
+import { resetHelixAskTurnAdmissionForTests } from "../services/helix-ask/ask-turn-admission";
+import { resetRuntimeMemoryGovernorForTests } from "../services/runtime/runtime-memory-governor";
 
 const threadId = "helix-ask:desktop";
 const roomId = "room:stage-play-routing";
 const sourceId = "visual_source:stage_play_visual_tab";
+const lowPressureMemoryUsage = (): NodeJS.MemoryUsage => ({
+  rss: 128 * 1024 * 1024,
+  heapTotal: 96 * 1024 * 1024,
+  heapUsed: 48 * 1024 * 1024,
+  external: 8 * 1024 * 1024,
+  arrayBuffers: 2 * 1024 * 1024,
+});
+const lowPressureHostMemory = () => ({
+  freeMiB: 16_384,
+  totalMiB: 32_768,
+  freeRatio: 0.5,
+});
 
 const createApp = (): express.Express => {
   const app = express();
@@ -58,6 +73,11 @@ const createApp = (): express.Express => {
 };
 
 beforeEach(() => {
+  resetHelixAskTurnAdmissionForTests();
+  resetRuntimeMemoryGovernorForTests({
+    memoryReader: lowPressureMemoryUsage,
+    hostMemoryReader: lowPressureHostMemory,
+  });
   resetLiveAnswerEnvironments();
   resetLiveSourceObservationStoreForTest();
   resetLiveSourceDescriptorsForTest();
@@ -110,6 +130,15 @@ it("starts Stage Play goal sessions with explicit context feeds and actuator pol
       ],
       cadence: { kind: "event_accumulation", min_updates: 2 },
       stopConditions: ["terminal authority produces a final report"],
+      finalReportRequirements: {
+        ...WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
+        completedSolverPathRequired: false,
+        requiredEvidenceKinds: [
+          "goal_context_update",
+          "translated_transcript",
+          "terminal_authority_single_writer",
+        ],
+      },
       checkpointSummary: "Goal session initialized by Stage Play route.",
       actionsTaken: ["bind_translation_loop"],
       evidenceRefs: ["stage_play_processed_mail_packet:translation-route"],
@@ -151,9 +180,22 @@ it("starts Stage Play goal sessions with explicit context feeds and actuator pol
       authority: {
         assistantAnswer: false,
         finalReportsRequireTerminalAuthority: true,
+        finalReportRequirements: expect.objectContaining({
+          completedSolverPathRequired: true,
+          evidenceReentryRequired: true,
+          routeAuthorityRequired: true,
+          terminalAuthoritySingleWriterRequired: true,
+        }),
       },
     },
   });
+  expect(response.body.session.authority.finalReportRequirements.requiredEvidenceKinds).toEqual(
+    expect.arrayContaining([
+      "goal_context_update",
+      "translated_transcript",
+      "terminal_authority_single_writer",
+    ]),
+  );
   expect(response.body.session.contextFeeds.some((feed: any) => feed.sourceKind === "wake_candidates")).toBe(false);
   expect(response.body.session.allowedActuators).not.toContain("wake_agent");
   expect(response.body.session.checkpoints.at(-1)).toMatchObject({
@@ -1800,7 +1842,7 @@ describe("Helix Ask Stage Play routing", () => {
       target_source: "live_source_mailbox",
       target_kind: "live_source_mailbox",
     });
-    expect(response.body?.available_capabilities?.recommended_capability_key, routeDebug).toBe("live_env.read_live_source_mail");
+    expect(response.body?.available_capabilities?.recommended_capability_key, routeDebug).toBe("live_env.read_processed_live_source_mail");
     expect(decisionArtifact?.payload?.observation, routeDebug).toMatchObject({
       artifactId: "stage_play_live_source_mail_decision",
       decision: "record_interpretation",

@@ -12,6 +12,7 @@ import {
   resetStagePlayProcessedMailPacketStoreForTest,
 } from "../services/stage-play/stage-play-processed-mail-packet-store";
 import { resetStagePlayGoalContextStoreForTest } from "../services/stage-play/stage-play-goal-context-store";
+import { WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS } from "@shared/contracts/workstation-goal-context.v1";
 
 const makeApp = () => {
   const app = express();
@@ -38,6 +39,15 @@ describe("Stage Play goal-context routes", () => {
         objective: "Monitor the image source and prepare frog classification evidence.",
         sourceRefs: ["visual_source:image-lens"],
         loopRefs: ["stage_play_mail_loop:helix-ask:desktop"],
+        allowedActuators: [
+          "live_env.query_visual_summaries",
+          "live_env.set_workstation_loop_state",
+          "live_env.narrator_bind_stream",
+        ],
+        finalReportRequirements: {
+          ...WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
+          requiredEvidenceKinds: ["goal_context_update", "terminal_authority_single_writer"],
+        },
       })
       .expect(200);
 
@@ -56,9 +66,21 @@ describe("Stage Play goal-context routes", () => {
     });
     expect(response.body.agentGoalSessions[0]).toMatchObject({
       goalId: "goal:frog-classification",
+      allowedActuators: [
+        "query_visual_summaries",
+        "set_loop_state",
+        "narrator_bind_stream",
+      ],
       authority: {
         assistantAnswer: false,
         finalReportsRequireTerminalAuthority: true,
+        finalReportRequirements: expect.objectContaining({
+          completedSolverPathRequired: true,
+          evidenceReentryRequired: true,
+          routeAuthorityRequired: true,
+          terminalAuthoritySingleWriterRequired: true,
+          requiredEvidenceKinds: expect.arrayContaining(["goal_context_update", "terminal_authority_single_writer"]),
+        }),
       },
     });
   });

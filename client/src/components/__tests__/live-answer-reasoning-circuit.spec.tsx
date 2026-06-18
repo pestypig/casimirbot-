@@ -3,7 +3,10 @@ import React from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { LiveAnswerReasoningCircuit } from "@/components/workstation/LiveAnswerReasoningCircuit";
-import type { AgentGoalSessionV1 } from "@shared/contracts/workstation-goal-context.v1";
+import {
+  WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
+  type AgentGoalSessionV1,
+} from "@shared/contracts/workstation-goal-context.v1";
 
 const goalSession: AgentGoalSessionV1 = {
   schemaVersion: "helix.agent_goal_session.v1",
@@ -20,6 +23,7 @@ const goalSession: AgentGoalSessionV1 = {
     { feedId: "feed:packet", sourceKind: "packet_traces", freshnessMs: 10_000 },
     { feedId: "feed:source-health", sourceKind: "source_health", freshnessMs: 60_000 },
     { feedId: "feed:translation", sourceKind: "translated_transcripts", freshnessMs: 10_000 },
+    { feedId: "feed:narrator-events", sourceKind: "narrator_events", freshnessMs: 60_000 },
     { feedId: "feed:automation", sourceKind: "automation_policies", freshnessMs: 120_000 },
   ],
   allowedActuators: ["query_visual_summaries", "query_packet_traces", "query_source_health", "query_translation_segments", "narrator_bind_stream"],
@@ -36,6 +40,7 @@ const goalSession: AgentGoalSessionV1 = {
   authority: {
     assistantAnswer: false,
     finalReportsRequireTerminalAuthority: true,
+    finalReportRequirements: WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
   },
 };
 
@@ -134,10 +139,11 @@ describe("LiveAnswerReasoningCircuit", () => {
           translatedTranscriptCount: 1,
           packetTraceCount: 2,
           sourceHealthCount: 2,
-          feedQueryCount: 6,
+          feedQueryCount: 7,
           routeWatchCount: 0,
           automationCount: 2,
           actuatorPolicyCount: 5,
+          narratorEventFeedCount: 1,
           narratorActuatorPolicyCount: 1,
           traceMemoryCount: 2,
           terminalAuthorityRequiredCount: 1,
@@ -182,11 +188,12 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getByTestId("live-answer-translated-transcript-count")).toHaveTextContent("1 translations");
     expect(screen.getByTestId("live-answer-packet-trace-count")).toHaveTextContent("2 packet traces");
     expect(screen.getByTestId("live-answer-source-health-count")).toHaveTextContent("2 source health");
-    expect(screen.getByTestId("live-answer-feed-query-count")).toHaveTextContent("6 feed queries");
+    expect(screen.getByTestId("live-answer-feed-query-count")).toHaveTextContent("7 feed queries");
     expect(screen.getByTestId("live-answer-route-watch-count")).toHaveTextContent("0 route watch");
     expect(screen.getByTestId("live-answer-automation-count")).toHaveTextContent("2 automations");
     expect(screen.getByTestId("live-answer-actuator-policy-count")).toHaveTextContent("5 actuator policies");
     expect(screen.getByTestId("live-answer-narrator-actuator-policy-count")).toHaveTextContent("1 narrator output policy");
+    expect(screen.getByTestId("live-answer-narrator-event-feed-count")).toHaveTextContent("1 narrator event feeds");
     expect(screen.getByTestId("live-answer-trace-memory-count")).toHaveTextContent("2 trace memory");
     expect(screen.getByTestId("live-answer-observation-authority-count")).toHaveTextContent("2 observation-only");
     expect(screen.getByTestId("live-answer-terminal-authority-count")).toHaveTextContent("1 terminal authority");
@@ -195,17 +202,18 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("automations=2");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("actuator_policies=5");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("narrator_output_policies=1");
+    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("narrator_event_feeds=1");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("audio_transcripts=0");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("translations=1");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("packet_traces=2");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("source_health=2");
-    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("feed_queries=6");
+    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("feed_queries=7");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("trace_memory=2");
-    expect(screen.getByTestId("live-answer-agent-goal-session")).toHaveTextContent("active / 5 feeds");
+    expect(screen.getByTestId("live-answer-agent-goal-session")).toHaveTextContent("active / 6 feeds");
     expect(screen.getByTestId("live-answer-agent-goal-policy")).toHaveTextContent("Monitor visual and translated audio feeds.");
     expect(screen.getByTestId("live-answer-agent-goal-final-authority")).toHaveTextContent("finalAuthority=true");
     expect(screen.getByTestId("live-answer-agent-goal-cadence")).toHaveTextContent("cadence=user turn");
-    expect(screen.getByTestId("live-answer-agent-goal-feeds")).toHaveTextContent("feeds=visual summaries, packet traces, source health, translated transcripts, automation policies");
+    expect(screen.getByTestId("live-answer-agent-goal-feeds")).toHaveTextContent("feeds=visual summaries, packet traces, source health, translated transcripts, narrator events, automation policies");
     expect(screen.getByTestId("live-answer-agent-goal-actuators")).toHaveTextContent("actuators=query visual summaries, query packet traces, query source health, query translation segments, narrator bind stream");
     expect(screen.getByTestId("live-answer-agent-goal-stop")).toHaveTextContent("stop=operator stops monitoring");
     expect(screen.getByTestId("live-answer-agent-goal-checkpoint")).toHaveTextContent("checkpoint=Narrator stream is bound to translated transcript evidence.");

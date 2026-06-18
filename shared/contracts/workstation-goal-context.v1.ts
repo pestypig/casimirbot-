@@ -119,6 +119,7 @@ export type AgentGoalContextFeedKindV1 =
   | "live_answer_lines"
   | "source_health"
   | "trace_memory"
+  | "narrator_events"
   | "packet_traces"
   | "route_evidence"
   | "automation_policies";
@@ -131,6 +132,7 @@ export const WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS: readonly AgentGoalContex
   "live_answer_lines",
   "source_health",
   "trace_memory",
+  "narrator_events",
   "packet_traces",
   "route_evidence",
   "automation_policies",
@@ -150,6 +152,7 @@ export const WORKSTATION_AGENT_GOAL_DEFAULT_CONTEXT_FEEDS: readonly AgentGoalDef
   { sourceKind: "live_answer_lines", freshnessMs: 45_000, relevancePolicy: "same-goal-or-active-line" },
   { sourceKind: "source_health", freshnessMs: 60_000, relevancePolicy: "same-source" },
   { sourceKind: "trace_memory", freshnessMs: 120_000, relevancePolicy: "same-thread-or-turn" },
+  { sourceKind: "narrator_events", freshnessMs: 60_000, relevancePolicy: "same-goal-or-stream-binding" },
   { sourceKind: "packet_traces", freshnessMs: 60_000, relevancePolicy: "same-source-or-packet" },
   { sourceKind: "route_evidence", freshnessMs: 60_000, relevancePolicy: "same-goal-or-route" },
   { sourceKind: "automation_policies", freshnessMs: 120_000, relevancePolicy: "same-goal-or-loop-policy" },
@@ -164,6 +167,7 @@ export type AgentGoalActuatorV1 =
   | "query_source_health"
   | "query_packet_traces"
   | "query_route_evidence"
+  | "query_automation_policies"
   | "configure_route_watch"
   | "set_audio_preset"
   | "set_visual_preset"
@@ -191,6 +195,7 @@ export const WORKSTATION_AGENT_GOAL_ACTUATORS: readonly AgentGoalActuatorV1[] = 
   "query_source_health",
   "query_packet_traces",
   "query_route_evidence",
+  "query_automation_policies",
   "configure_route_watch",
   "set_audio_preset",
   "set_visual_preset",
@@ -209,6 +214,51 @@ export const WORKSTATION_AGENT_GOAL_ACTUATORS: readonly AgentGoalActuatorV1[] = 
   "repair_source",
   "ask_user",
 ];
+
+const normalizeWorkstationGoalToken = (value: unknown): string | null => {
+  const normalized = typeof value === "string"
+    ? value.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "")
+    : "";
+  return normalized || null;
+};
+
+export const WORKSTATION_AGENT_GOAL_ACTUATOR_ALIASES: Readonly<Record<string, AgentGoalActuatorV1>> = {
+  live_env_query_visual_summaries: "query_visual_summaries",
+  live_env_query_audio_transcripts: "query_audio_transcripts",
+  live_env_query_translation_segments: "query_translation_segments",
+  live_env_query_microdeck_outputs: "query_microdeck_outputs",
+  live_env_query_micro_reasoner_outputs: "query_microdeck_outputs",
+  live_env_query_live_answer_state: "query_live_answer_state",
+  live_env_query_source_health: "query_source_health",
+  live_env_query_packet_traces: "query_packet_traces",
+  live_env_query_route_evidence: "query_route_evidence",
+  live_env_query_automation_policies: "query_automation_policies",
+  live_env_configure_route_watch: "configure_route_watch",
+  live_env_change_workstation_preset: "change_preset",
+  live_env_bind_workstation_source: "bind_source",
+  live_env_unbind_workstation_source: "unbind_source",
+  live_env_set_workstation_loop_state: "set_loop_state",
+  live_env_repair_workstation_source: "repair_source",
+  live_env_update_live_answer_projection: "update_live_answer",
+  live_env_focus_process_graph: "focus_process_graph",
+  live_env_narrator_say: "narrator_say",
+  live_env_narrator_bind_stream: "narrator_bind_stream",
+  live_env_query_trace_memory: "query_trace_memory",
+  narrator_say_request: "narrator_say",
+  narrator_bind_stream_request: "narrator_bind_stream",
+  pause_workstation_loop: "pause_loop",
+  resume_workstation_loop: "resume_loop",
+  repair_workstation_loop: "repair_source",
+};
+
+export function normalizeAgentGoalActuatorV1(value: unknown): AgentGoalActuatorV1 | null {
+  const key = normalizeWorkstationGoalToken(value);
+  if (!key) return null;
+  if ((WORKSTATION_AGENT_GOAL_ACTUATORS as readonly string[]).includes(key)) {
+    return key as AgentGoalActuatorV1;
+  }
+  return WORKSTATION_AGENT_GOAL_ACTUATOR_ALIASES[key] ?? null;
+}
 
 export type AgentGoalFinalReportRequirementsV1 = {
   completedSolverPathRequired: true;

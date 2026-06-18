@@ -148,6 +148,7 @@ describe("Helix Ask live environment agent loop", () => {
       "live_env.query_live_answer_state",
       "live_env.query_source_health",
       "live_env.query_route_evidence",
+      "live_env.query_automation_policies",
     ];
     const controlTools = [
       "live_env.change_workstation_preset",
