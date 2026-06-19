@@ -468,6 +468,107 @@ describe("Helix capability plan contract", () => {
     });
   });
 
+  it("preserves the route-watch alias when a watch setup phase is locked", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:route-watch-alias-phase",
+      promptText: "Run live_env.configure_route_watch goal_id=goal:frog source_id=source:visual.",
+      sourceTargetIntent: baseSourceTarget("live_source_mailbox", "live_source_mailbox"),
+      toolCallAdmissionDecision: toolAdmission("live_source_mailbox", ["live_environment"]),
+      canonicalGoalFrame: canonicalGoal("configure_watch_job", "workstation_tool_evaluation"),
+      liveSourceTurnPhaseResolution: {
+        artifactId: "live_source_turn_phase_resolution",
+        schemaVersion: "live_source_turn_phase_resolution/v1",
+        phase: "configure_watch_job",
+        canonicalGoal: "configure_watch_job",
+        allowedTools: ["live_env.configure_live_source_watch_job"],
+        forbiddenTools: [
+          "live_env.read_processed_live_source_mail",
+          "live_env.process_live_source_mail",
+          "live_env.read_live_source_mail",
+          "live_env.record_live_source_mail_decision",
+          "live_env.request_interim_voice_callout",
+        ],
+        requiredEvidence: ["live_env.configure_live_source_watch_job"],
+        completionEvidence: ["stage_play_live_source_watch_job_policy"],
+        phaseLock: {
+          locked: true,
+          reason: "Standing watch prompts create policy; mail evidence is handled by later wake cycles.",
+        },
+      },
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "live_environment",
+      requested_action: "live_env.configure_route_watch",
+      selected_capability: "live_env.configure_route_watch",
+      mutating: true,
+      source_target: "live_environment",
+      required_terminal_kind: "workstation_tool_evaluation",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(plan.phase_repaired).not.toBe(true);
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "explicit_capability_command",
+      requested_capability: "live_env.configure_route_watch",
+      selected_source_target: "live_environment",
+      required_observation_kinds: expect.arrayContaining([
+        "stage_play_live_source_watch_job_policy_config_result",
+        "helix.workstation_goal_context_update.v1",
+      ]),
+    });
+  });
+
+  it("treats the legacy live-source watch-job spelling as a governed route-watch control", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:legacy-watch-job-control",
+      promptText: "Run live_env.configure_live_source_watch_job goal_id=goal:frog source_id=source:visual.",
+      sourceTargetIntent: baseSourceTarget("live_source_mailbox", "live_source_mailbox"),
+      toolCallAdmissionDecision: toolAdmission("live_source_mailbox", ["live_environment"]),
+      canonicalGoalFrame: canonicalGoal("configure_watch_job", "workstation_tool_evaluation"),
+      liveSourceTurnPhaseResolution: {
+        artifactId: "live_source_turn_phase_resolution",
+        schemaVersion: "live_source_turn_phase_resolution/v1",
+        phase: "configure_watch_job",
+        canonicalGoal: "configure_watch_job",
+        allowedTools: ["live_env.configure_live_source_watch_job"],
+        forbiddenTools: [
+          "live_env.read_processed_live_source_mail",
+          "live_env.process_live_source_mail",
+          "live_env.read_live_source_mail",
+          "live_env.record_live_source_mail_decision",
+          "live_env.request_interim_voice_callout",
+        ],
+        requiredEvidence: ["live_env.configure_live_source_watch_job"],
+        completionEvidence: ["stage_play_live_source_watch_job_policy"],
+        phaseLock: {
+          locked: true,
+          reason: "Standing watch prompts create policy; mail evidence is handled by later wake cycles.",
+        },
+      },
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "live_environment",
+      requested_action: "live_env.configure_live_source_watch_job",
+      selected_capability: "live_env.configure_live_source_watch_job",
+      mutating: true,
+      source_target: "live_environment",
+      required_terminal_kind: "workstation_tool_evaluation",
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "explicit_capability_command",
+      requested_capability: "live_env.configure_live_source_watch_job",
+      selected_source_target: "live_environment",
+      required_observation_kinds: expect.arrayContaining([
+        "stage_play_live_source_watch_job_policy_config_result",
+        "helix.workstation_goal_context_update.v1",
+      ]),
+    });
+  });
+
   it("plans the read-only live-source mail-loop reflection tool for mailbox causality prompts", () => {
     const plan = buildCapabilityPlan({
       turnId: "ask:mail-loop-reflection",
@@ -849,7 +950,7 @@ describe("Helix capability plan contract", () => {
       requested_action: "live_env.narrator_say",
       selected_capability: "live_env.narrator_say",
       goal_kind: "live_environment_review",
-      required_terminal_kind: "helix.narrator_say_request.v1",
+      required_terminal_kind: "workstation_tool_evaluation",
       mutating: true,
       operator_command_required: true,
       operator_command_present: true,
@@ -890,7 +991,7 @@ describe("Helix capability plan contract", () => {
       requested_action: "live_env.narrator_bind_stream",
       selected_capability: "live_env.narrator_bind_stream",
       goal_kind: "live_environment_review",
-      required_terminal_kind: "helix.narrator_bind_stream_request.v1",
+      required_terminal_kind: "workstation_tool_evaluation",
       mutating: true,
       operator_command_present: true,
       admission_status: "needs_evidence",
@@ -920,7 +1021,7 @@ describe("Helix capability plan contract", () => {
       requested_action: "live_env.evaluate_goal_satisfaction",
       selected_capability: "live_env.evaluate_goal_satisfaction",
       goal_kind: "live_environment_review",
-      required_terminal_kind: "helix.live_environment_goal_satisfaction.v1",
+      required_terminal_kind: "model_synthesized_answer",
       mutating: false,
       admission_status: "needs_evidence",
     });
@@ -1071,93 +1172,106 @@ describe("Helix capability plan contract", () => {
       prompt:
         "Run live_env.change_workstation_preset goal_id=goal:frog target_ref=source:visual:active preset_id=preset:frog-classifier.",
       capability: "live_env.change_workstation_preset",
-      terminalKind: "stage_play_workstation_control_receipt",
+      observationKind: "stage_play_workstation_control_receipt",
+      terminalKind: "workstation_tool_evaluation",
     },
     {
       label: "visual preset change",
       prompt:
         "Run live_env.set_visual_preset goal_id=goal:frog target_ref=source:visual:active preset_id=preset:frog-classifier.",
       capability: "live_env.set_visual_preset",
-      terminalKind: "stage_play_workstation_control_receipt",
+      observationKind: "stage_play_workstation_control_receipt",
+      terminalKind: "workstation_tool_evaluation",
     },
     {
       label: "audio preset change",
       prompt:
         "Run live_env.set_audio_preset goal_id=goal:translate target_ref=source:audio:active preset_id=preset:earbud-translation.",
       capability: "live_env.set_audio_preset",
-      terminalKind: "stage_play_workstation_control_receipt",
+      observationKind: "stage_play_workstation_control_receipt",
+      terminalKind: "workstation_tool_evaluation",
     },
     {
       label: "source bind",
       prompt:
         "Run live_env.bind_workstation_source goal_id=goal:frog source_ref=source:visual:active target_ref=live-answer:visual.",
       capability: "live_env.bind_workstation_source",
-      terminalKind: "stage_play_workstation_control_receipt",
+      observationKind: "stage_play_workstation_control_receipt",
+      terminalKind: "workstation_tool_evaluation",
     },
     {
       label: "source unbind",
       prompt:
         "Run live_env.unbind_workstation_source goal_id=goal:frog source_ref=source:visual:active.",
       capability: "live_env.unbind_workstation_source",
-      terminalKind: "stage_play_workstation_control_receipt",
+      observationKind: "stage_play_workstation_control_receipt",
+      terminalKind: "workstation_tool_evaluation",
     },
     {
       label: "loop pause",
       prompt:
         "Run live_env.pause_workstation_loop goal_id=goal:frog loop_ref=loop:visual-mail.",
       capability: "live_env.pause_workstation_loop",
-      terminalKind: "stage_play_workstation_control_receipt",
+      observationKind: "stage_play_workstation_control_receipt",
+      terminalKind: "workstation_tool_evaluation",
     },
     {
       label: "loop resume",
       prompt:
         "Run live_env.resume_workstation_loop goal_id=goal:frog loop_ref=loop:visual-mail.",
       capability: "live_env.resume_workstation_loop",
-      terminalKind: "stage_play_workstation_control_receipt",
+      observationKind: "stage_play_workstation_control_receipt",
+      terminalKind: "workstation_tool_evaluation",
     },
     {
       label: "loop state",
       prompt:
         "Run live_env.set_workstation_loop_state goal_id=goal:frog loop_ref=loop:visual-mail state=paused.",
       capability: "live_env.set_workstation_loop_state",
-      terminalKind: "stage_play_workstation_control_receipt",
+      observationKind: "stage_play_workstation_control_receipt",
+      terminalKind: "workstation_tool_evaluation",
     },
     {
       label: "loop repair",
       prompt:
         "Run live_env.repair_loop goal_id=goal:frog loop_ref=loop:visual-mail.",
       capability: "live_env.repair_loop",
-      terminalKind: "stage_play_workstation_control_receipt",
+      observationKind: "stage_play_workstation_control_receipt",
+      terminalKind: "workstation_tool_evaluation",
     },
     {
       label: "source repair",
       prompt:
         "Run live_env.repair_workstation_source goal_id=goal:frog loop_ref=loop:visual-mail.",
       capability: "live_env.repair_workstation_source",
-      terminalKind: "stage_play_workstation_control_receipt",
+      observationKind: "stage_play_workstation_control_receipt",
+      terminalKind: "workstation_tool_evaluation",
     },
     {
       label: "Live Answer projection",
       prompt:
         "Run live_env.update_live_answer_projection goal_id=goal:frog line_key=translation.",
       capability: "live_env.update_live_answer_projection",
-      terminalKind: "stage_play_workstation_control_receipt",
+      observationKind: "stage_play_workstation_control_receipt",
+      terminalKind: "workstation_tool_evaluation",
     },
     {
       label: "process graph focus",
       prompt:
         "Run live_env.focus_process_graph goal_id=goal:frog node_ref=packet:visual-shade.",
       capability: "live_env.focus_process_graph",
-      terminalKind: "stage_play_workstation_control_receipt",
+      observationKind: "stage_play_workstation_control_receipt",
+      terminalKind: "workstation_tool_evaluation",
     },
     {
       label: "agent goal session",
       prompt:
         "Run live_env.start_agent_goal_session goal_id=goal:frog objective=\"Monitor visual frog classification.\"",
       capability: "live_env.start_agent_goal_session",
-      terminalKind: "stage_play_agent_goal_session_tool_result",
+      observationKind: "stage_play_agent_goal_session_tool_result",
+      terminalKind: "workstation_tool_evaluation",
     },
-  ])("routes explicit workstation control contract: $label", ({ prompt, capability, terminalKind }) => {
+  ])("routes explicit workstation control contract: $label", ({ prompt, capability, observationKind, terminalKind }) => {
     const plan = buildCapabilityPlan({
       turnId: `ask:${capability.replace(/[^a-z0-9]+/gi, "-")}`,
       promptText: prompt,
@@ -1186,7 +1300,8 @@ describe("Helix capability plan contract", () => {
       selected_plan_family: "live_environment",
       required_observation_kinds: expect.arrayContaining([
         "live_environment_tool_observation",
-        terminalKind,
+        observationKind,
+        "helix.workstation_goal_context_update.v1",
       ]),
       required_terminal_kind: terminalKind,
     });

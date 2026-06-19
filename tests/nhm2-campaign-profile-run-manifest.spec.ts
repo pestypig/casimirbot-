@@ -113,6 +113,7 @@ describe("nhm2_campaign_profile_run_manifest/v1", () => {
     expect(queued?.nextCommand).toContain("--selected-profile-id");
     expect(queued?.requiredEvidence.every((entry) => entry.status === "required_missing")).toBe(true);
     expect(queued?.requiredEvidence.map((entry) => entry.evidenceId)).toEqual([
+      "candidate_metric_profile_spec",
       "metric_required_full_regional_tensor",
       "projected_momentum_demand_audit",
       "metric_momentum_remediation_targets",
@@ -132,7 +133,7 @@ describe("nhm2_campaign_profile_run_manifest/v1", () => {
       rejectedCandidateCount: 1,
       nextCandidateProfileId:
         "stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1",
-      firstBlocker: "candidate_frozen_campaign_evidence_missing",
+      firstBlocker: "candidate_metric_profile_spec_missing_for_frozen_campaign_run",
       manifestComplete: false,
     });
     expect(manifest.claimBoundary).toMatchObject({
@@ -179,6 +180,10 @@ describe("nhm2_campaign_profile_run_manifest/v1", () => {
       profileSearch: search,
       candidateEvidenceRefs: {
         [candidateProfileId]: {
+          candidate_metric_profile_spec: {
+            artifactRef: "candidate/nhm2-candidate-metric-profile-spec.json",
+            blockers: ["candidate_executable_shift_field_evaluator_missing"],
+          },
           metric_required_full_regional_tensor: {
             artifactRef: "candidate/nhm2-metric-required-full-regional-tensor.json",
             blockers: ["candidate_metric_required_full_tensor_screen_not_full_adm_route"],
@@ -192,6 +197,15 @@ describe("nhm2_campaign_profile_run_manifest/v1", () => {
     });
     const candidate = manifest.candidates[0];
 
+    expect(
+      candidate.requiredEvidence.find(
+        (entry) => entry.evidenceId === "candidate_metric_profile_spec",
+      ),
+    ).toMatchObject({
+      status: "provided_blocked",
+      artifactRef: "candidate/nhm2-candidate-metric-profile-spec.json",
+      blockers: ["candidate_executable_shift_field_evaluator_missing"],
+    });
     expect(
       candidate.requiredEvidence.find(
         (entry) => entry.evidenceId === "metric_required_full_regional_tensor",
@@ -226,7 +240,7 @@ describe("nhm2_campaign_profile_run_manifest/v1", () => {
     ).toBe("required_missing");
     expect(manifest.summary).toMatchObject({
       queuedCandidateCount: 1,
-      firstBlocker: "candidate_frozen_campaign_evidence_missing",
+      firstBlocker: "candidate_executable_shift_field_evaluator_missing",
       manifestComplete: false,
     });
     expect(manifest.claimBoundary.transportClaimAllowed).toBe(false);

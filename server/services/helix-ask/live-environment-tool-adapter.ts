@@ -48,6 +48,7 @@ import {
   type StagePlayLiveSourceInterpreterProfileVoiceStyleV1,
 } from "@shared/contracts/stage-play-live-source-interpreter-profile.v1";
 import type {
+  HelixLiveEnvironmentCommentary,
   HelixLiveEnvironmentCommentaryKind,
   HelixLiveEnvironmentCommentaryStatus,
   HelixLiveEnvironmentCommentarySubject,
@@ -87,6 +88,8 @@ import {
   validateWorkstationTraceMemoryQueryResultV1,
   type WorkstationTraceMemoryQueryResultV1,
 } from "@shared/contracts/workstation-trace-memory-query-result.v1";
+import type { HelixSituationSourceCapability } from "@shared/helix-situation-source-capability";
+import type { HelixSituationConstruct } from "@shared/helix-situation-construct";
 import {
   WORKSTATION_SOURCE_HEALTH_QUERY_RESULT_SCHEMA,
   validateWorkstationSourceHealthQueryResultV1,
@@ -229,6 +232,7 @@ import {
   getWorkstationReasoningTrace,
   listWorkstationReasoningTraces,
 } from "./workstation-reasoning-trace-store";
+import type { HelixWorkstationReasoningTrace } from "@shared/helix-workstation-reasoning-trace";
 import { mergeLiveSourceCausalTraces } from "../stage-play/stage-play-live-source-causal-trace";
 import {
   recordVoiceSteeringEvent,
@@ -2415,12 +2419,325 @@ const goalEvidenceKindSatisfied = (input: {
   return haystack.includes(kind);
 };
 
+const goalContextUpdateMatchesGoalSessionScope = (
+  update: WorkstationGoalContextUpdateV1,
+  session: AgentGoalSessionV1 | null,
+): boolean => {
+  if (!session) return true;
+  if (update.goalRelevance?.goalId === session.goalId) return true;
+  const sourceScope = new Set(uniqueStrings([
+    ...session.sourceRefs,
+    ...session.constructRefs,
+  ]));
+  const loopScope = new Set(uniqueStrings(session.loopRefs).filter((ref) => !ref.startsWith("thread:")));
+  return update.sourceRefs.some((ref) => sourceScope.has(ref)) ||
+    update.loopRefs.some((ref) => loopScope.has(ref));
+};
+
+const workstationTraceMatchesGoalSessionScope = (
+  trace: HelixWorkstationReasoningTrace,
+  session: AgentGoalSessionV1 | null,
+): boolean => {
+  if (!session) return true;
+  const sourceScope = new Set(uniqueStrings([
+    ...session.sourceRefs,
+    ...session.constructRefs,
+  ]));
+  const loopScope = new Set(uniqueStrings(session.loopRefs).filter((ref) => !ref.startsWith("thread:")));
+  if (sourceScope.size === 0 && loopScope.size === 0) return false;
+  const traceRefs = uniqueStrings([
+    trace.trace_id,
+    trace.turn_id,
+    trace.source_family,
+    trace.user_goal,
+    trace.route_reason_code,
+    ...trace.input_item_refs,
+    ...trace.evidence_refs,
+    ...trace.tool_receipt_ids,
+    ...trace.lifecycle_event_refs,
+    ...Object.values(trace.artifacts).filter((value): value is string => typeof value === "string"),
+  ]);
+  return traceRefs.some((ref) => sourceScope.has(ref) || loopScope.has(ref));
+};
+
+const sourceCapabilityMatchesGoalSessionScope = (
+  capability: HelixSituationSourceCapability,
+  session: AgentGoalSessionV1 | null,
+): boolean => {
+  if (!session) return true;
+  const sourceScope = new Set(uniqueStrings([
+    ...session.sourceRefs,
+    ...session.constructRefs,
+  ]));
+  const loopScope = new Set(uniqueStrings(session.loopRefs).filter((ref) => !ref.startsWith("thread:")));
+  if (sourceScope.size === 0 && loopScope.size === 0) return false;
+  const capabilityRefs = uniqueStrings([
+    capability.source_id,
+    capability.thread_id,
+    capability.room_id,
+    capability.participant_id,
+    capability.modality,
+    capability.status,
+    capability.contribution,
+    capability.next_required_action,
+    `source_health:${capability.source_id}`,
+  ]);
+  return capabilityRefs.some((ref) => sourceScope.has(ref) || loopScope.has(ref));
+};
+
+const liveSourceMailItemMatchesGoalSessionScope = (
+  mail: StagePlayLiveSourceMailItemV1,
+  session: AgentGoalSessionV1 | null,
+): boolean => {
+  if (!session) return true;
+  const sourceScope = new Set(uniqueStrings([
+    ...session.sourceRefs,
+    ...session.constructRefs,
+  ]));
+  const loopScope = new Set(uniqueStrings(session.loopRefs).filter((ref) => !ref.startsWith("thread:")));
+  if (sourceScope.size === 0 && loopScope.size === 0) return false;
+  const mailRefs = uniqueStrings([
+    mail.mailId,
+    mail.sourceId,
+    mail.sourceKind,
+    mail.sourceRefs?.sourceId,
+    mail.sourceRefs?.frameRef,
+    mail.sourceRefs?.evidenceRef,
+    mail.sourceRefs?.observationRef,
+    ...mail.evidenceRefs,
+    mail.causalTrace?.traceId,
+    mail.causalTrace?.cycleId,
+  ]);
+  return mailRefs.some((ref) => sourceScope.has(ref) || loopScope.has(ref));
+};
+
+const processedMailPacketMatchesGoalSessionScope = (
+  packet: StagePlayProcessedMailPacketV1,
+  session: AgentGoalSessionV1 | null,
+): boolean => {
+  if (!session) return true;
+  const sourceScope = new Set(uniqueStrings([
+    ...session.sourceRefs,
+    ...session.constructRefs,
+  ]));
+  const loopScope = new Set(uniqueStrings(session.loopRefs).filter((ref) => !ref.startsWith("thread:")));
+  if (sourceScope.size === 0 && loopScope.size === 0) return false;
+  const packetRefs = uniqueStrings([
+    packet.packetId,
+    packet.jobId,
+    packet.sourceId,
+    packet.profileRef,
+    packet.priorPredictionRef,
+    packet.microReasonerDeck?.presetId,
+    ...packet.mailIds,
+    ...packet.visualEvidenceRefs,
+    ...packet.microReasonerRunRefs,
+    ...packet.evidenceRefs,
+    packet.causalTrace?.traceId,
+    packet.causalTrace?.cycleId,
+    packet.causalTrace?.jobId,
+    packet.causalTrace?.policyId,
+    packet.causalTrace?.profileId,
+    ...(packet.causalTrace?.sourceIds ?? []),
+    ...(packet.causalTrace?.producedRefs ?? []),
+    ...(packet.causalTrace?.causedBy ?? []),
+    ...(packet.causalTrace?.evidenceRefs ?? []),
+  ]);
+  return packetRefs.some((ref) => sourceScope.has(ref) || loopScope.has(ref));
+};
+
+const interpretedEventMatchesGoalSessionScope = (
+  event: { event_id: string; source_family?: string | null; evidence_refs: string[]; source_event_ids?: string[]; related_artifact_ids?: string[]; related_job_ids?: string[] },
+  session: AgentGoalSessionV1 | null,
+): boolean => {
+  if (!session) return true;
+  const sourceScope = new Set(uniqueStrings([
+    ...session.sourceRefs,
+    ...session.constructRefs,
+  ]));
+  const loopScope = new Set(uniqueStrings(session.loopRefs).filter((ref) => !ref.startsWith("thread:")));
+  if (sourceScope.size === 0 && loopScope.size === 0) return false;
+  const eventRefs = uniqueStrings([
+    event.event_id,
+    event.source_family,
+    ...event.evidence_refs,
+    ...(event.source_event_ids ?? []),
+    ...(event.related_artifact_ids ?? []),
+    ...(event.related_job_ids ?? []),
+  ]);
+  return eventRefs.some((ref) => sourceScope.has(ref) || loopScope.has(ref));
+};
+
+const commentaryMatchesGoalSessionScope = (
+  commentary: HelixLiveEnvironmentCommentary,
+  session: AgentGoalSessionV1 | null,
+): boolean => {
+  if (!session) return true;
+  const sourceScope = new Set(uniqueStrings([
+    ...session.sourceRefs,
+    ...session.constructRefs,
+  ]));
+  const loopScope = new Set(uniqueStrings(session.loopRefs).filter((ref) => !ref.startsWith("thread:")));
+  if (sourceScope.size === 0 && loopScope.size === 0) return false;
+  const commentaryRefs = uniqueStrings([
+    commentary.commentary_id,
+    commentary.environment_id,
+    commentary.subject,
+    commentary.kind,
+    commentary.status,
+    ...commentary.evidence_refs,
+    ...commentary.related_artifact_ids,
+    ...(commentary.related_worker_ids ?? []),
+    ...(commentary.related_perturbation_ids ?? []),
+  ]);
+  return commentaryRefs.some((ref) => sourceScope.has(ref) || loopScope.has(ref));
+};
+
+const situationConstructMatchesGoalSessionScope = (
+  construct: HelixSituationConstruct,
+  session: AgentGoalSessionV1 | null,
+): boolean => {
+  if (!session) return true;
+  if (session.constructRefs.includes(construct.construct_id)) return true;
+  const sourceScope = new Set(uniqueStrings([
+    ...session.sourceRefs,
+    ...session.constructRefs,
+  ]));
+  const loopScope = new Set(uniqueStrings(session.loopRefs).filter((ref) => !ref.startsWith("thread:")));
+  if (sourceScope.size === 0 && loopScope.size === 0) return false;
+  const constructRefs = uniqueStrings([
+    construct.construct_id,
+    construct.type,
+    construct.status,
+    construct.environment_id,
+    ...construct.source_ids,
+    ...construct.parent_construct_ids,
+    ...construct.child_construct_ids,
+    ...construct.artifact_refs,
+    ...construct.receipt_refs,
+    ...construct.commentary_refs,
+    ...construct.evidence_refs,
+    ...construct.output_bindings.map((binding) => binding.artifact_ref),
+    ...construct.policy.allowed_tools,
+  ]);
+  return constructRefs.some((ref) => sourceScope.has(ref) || loopScope.has(ref));
+};
+
+const liveAnswersEvidenceRefs = (result: ReturnType<typeof queryLiveAnswersEvidence>): string[] =>
+  uniqueStrings([
+    ...result.source_observations.map((entry) => entry.observation_id),
+    ...result.source_observations.map((entry) => entry.source_id),
+    ...result.source_observations.flatMap((entry) => entry.job_contract_ids ?? []),
+    ...result.source_observations.flatMap((entry) => entry.evidence_refs),
+    ...result.policy_observations.map((entry) => entry.observation_id),
+    ...result.policy_observations.map((entry) => entry.contract_id),
+    ...result.policy_observations.flatMap((entry) => entry.source_observation_refs),
+    ...result.live_answers_projections.map((entry) => entry.projection_id),
+    ...result.live_answers_projections.map((entry) => entry.contract_id),
+    ...result.live_answers_projections.flatMap((entry) => entry.source_observation_refs),
+    ...result.live_answers_projections.flatMap((entry) => entry.policy_observation_refs),
+    ...result.live_answers_projections.flatMap((entry) => entry.voice_proposal_refs),
+    ...result.voice_proposals.map((entry) => entry.proposal_id),
+    ...result.voice_proposals.flatMap((entry) => entry.source_observation_refs),
+  ]);
+
+const liveAnswersEvidenceRefMatchesGoalSessionScope = (
+  refs: string[],
+  session: AgentGoalSessionV1 | null,
+): boolean => {
+  if (!session) return true;
+  const sourceScope = new Set(uniqueStrings([
+    ...session.sourceRefs,
+    ...session.constructRefs,
+  ]));
+  const loopScope = new Set(uniqueStrings(session.loopRefs).filter((ref) => !ref.startsWith("thread:")));
+  if (sourceScope.size === 0 && loopScope.size === 0) return false;
+  return uniqueStrings(refs).some((ref) => sourceScope.has(ref) || loopScope.has(ref));
+};
+
+const liveAnswersEvidenceMatchesGoalSessionScope = (
+  result: ReturnType<typeof queryLiveAnswersEvidence>,
+  session: AgentGoalSessionV1 | null,
+): ReturnType<typeof queryLiveAnswersEvidence> => {
+  if (!session) return result;
+  const sourceObservations = result.source_observations.filter((entry) =>
+    liveAnswersEvidenceRefMatchesGoalSessionScope([
+      entry.observation_id,
+      entry.source_id,
+      ...(entry.job_contract_ids ?? []),
+      ...entry.evidence_refs,
+    ], session)
+  );
+  const sourceObservationIds = new Set(sourceObservations.map((entry) => entry.observation_id));
+  const contractIds = new Set(uniqueStrings([
+    ...sourceObservations.flatMap((entry) => entry.job_contract_ids ?? []),
+    ...session.loopRefs,
+    ...session.sourceRefs,
+    ...session.constructRefs,
+  ]));
+  const policyObservations = result.policy_observations.filter((entry) =>
+    contractIds.has(entry.contract_id) ||
+    entry.source_observation_refs.some((ref) => sourceObservationIds.has(ref)) ||
+    liveAnswersEvidenceRefMatchesGoalSessionScope([
+      entry.observation_id,
+      entry.contract_id,
+      ...entry.source_observation_refs,
+    ], session)
+  );
+  const policyObservationIds = new Set(policyObservations.map((entry) => entry.observation_id));
+  const projections = result.live_answers_projections.filter((entry) =>
+    (entry.contract_id ? contractIds.has(entry.contract_id) : false) ||
+    entry.source_observation_refs.some((ref) => sourceObservationIds.has(ref)) ||
+    entry.policy_observation_refs.some((ref) => policyObservationIds.has(ref)) ||
+    liveAnswersEvidenceRefMatchesGoalSessionScope([
+      entry.projection_id,
+      entry.contract_id,
+      ...entry.source_observation_refs,
+      ...entry.policy_observation_refs,
+      ...entry.voice_proposal_refs,
+    ], session)
+  );
+  const projectionVoiceRefs = new Set(projections.flatMap((entry) => entry.voice_proposal_refs));
+  const voiceProposals = result.voice_proposals.filter((entry) =>
+    projectionVoiceRefs.has(entry.proposal_id) ||
+    entry.source_observation_refs.some((ref) => sourceObservationIds.has(ref) || policyObservationIds.has(ref)) ||
+    liveAnswersEvidenceRefMatchesGoalSessionScope([
+      entry.proposal_id,
+      ...entry.source_observation_refs,
+    ], session)
+  );
+  const scoped: ReturnType<typeof queryLiveAnswersEvidence> = {
+    ...result,
+    live_answers_projections: projections,
+    source_observations: sourceObservations,
+    policy_observations: policyObservations,
+    voice_proposals: voiceProposals,
+    current_state: sourceObservations.length > 0 || policyObservations.length > 0 || projections.length > 0 || voiceProposals.length > 0
+      ? result.current_state
+      : {
+          job_status: "unknown",
+          route_state: "unknown",
+          source_freshness: "unknown",
+          last_trigger: null,
+          last_suppression_reason: null,
+          voice_policy: null,
+          spoken: false,
+        },
+    evidence_refs: [],
+  };
+  return {
+    ...scoped,
+    evidence_refs: liveAnswersEvidenceRefs(scoped),
+  };
+};
+
 type WorkstationControlSpec = {
   controlKind:
     | "change_preset"
     | "bind_source"
     | "unbind_source"
     | "set_loop_state"
+    | "repair_loop"
     | "repair_source"
     | "update_live_answer"
     | "focus_process_graph";
@@ -2476,7 +2793,7 @@ const WORKSTATION_CONTROL_SPECS: Partial<Record<HelixLiveEnvironmentToolName, Wo
     defaultPanelId: "stage-play-badge-graph",
   },
   "live_env.repair_loop": {
-    controlKind: "repair_source",
+    controlKind: "repair_loop",
     label: "repair workstation loop",
     defaultPanelId: "stage-play-badge-graph",
   },
@@ -2509,7 +2826,7 @@ const workstationControlActuator = (
   if (spec.controlKind !== "set_loop_state") return spec.controlKind;
   if (loopState === "paused") return "pause_loop";
   if (loopState === "running") return "resume_loop";
-  if (loopState === "repaired") return "repair_source";
+  if (loopState === "repaired") return "repair_loop";
   return "set_loop_state";
 };
 
@@ -2557,7 +2874,7 @@ const filterDeniedControlDispatch = (
   dispatch.filter((action) => {
     if (action.kind === spec.controlKind) return false;
     if (spec.controlKind === "set_loop_state" && action.kind === "repair_loop") return false;
-    if (spec.controlKind === "repair_source" && (action.kind === "set_loop_state" || action.kind === "repair_loop")) return false;
+    if ((spec.controlKind === "repair_loop" || spec.controlKind === "repair_source") && (action.kind === "set_loop_state" || action.kind === "repair_loop")) return false;
     return true;
   });
 
@@ -2618,7 +2935,7 @@ const buildWorkstationControlDispatch = (input: {
     readString(input.args.nodeRef) ??
     readString(input.args.node_id) ??
     readString(input.args.nodeId);
-  const loopState = input.spec.controlKind === "repair_source"
+  const loopState = input.spec.controlKind === "repair_loop" || input.spec.controlKind === "repair_source"
     ? "repaired"
     : input.spec.controlKind === "set_loop_state"
       ? normalizeLoopState(input.args.state ?? input.args.loop_state ?? input.args.loopState ?? input.spec.defaultLoopState)
@@ -2637,7 +2954,7 @@ const buildWorkstationControlDispatch = (input: {
     dispatch.push({ kind: "set_loop_state", loopRef, state: loopState });
     if (loopState === "repaired") dispatch.push({ kind: "repair_loop", loopRef });
   }
-  if (input.spec.controlKind === "repair_source" && loopRef) {
+  if ((input.spec.controlKind === "repair_loop" || input.spec.controlKind === "repair_source") && loopRef) {
     dispatch.push({ kind: "set_loop_state", loopRef, state: "repaired" });
     dispatch.push({ kind: "repair_loop", loopRef });
   }
@@ -2683,6 +3000,8 @@ const missingWorkstationControlRequirements = (input: {
     case "unbind_source":
       return input.sourceRef ? [] : ["source_ref"];
     case "set_loop_state":
+      return input.loopRef ? [] : ["loop_ref"];
+    case "repair_loop":
       return input.loopRef ? [] : ["loop_ref"];
     case "repair_source":
       return input.loopRef ? [] : ["loop_ref"];
@@ -3719,22 +4038,71 @@ export function executeLiveEnvironmentTool(
   }
 
   if (input.tool_name === "live_env.read_card") {
+    const goalId = readString(args.goal_id) ?? readString(args.goalId);
+    const goalSession = goalId
+      ? listStagePlayAgentGoalSessions({
+          threadId: input.thread_id,
+          goalId,
+          limit: 1,
+        })[0] ?? null
+      : null;
+    const matchedContextFeeds = matchedGoalSessionContextFeeds(goalSession, "live_answer_lines");
+    const matchedContextFeedRefs = matchedContextFeeds.map((feed) => feed.feedId);
+    const matchedAllowedActuators = goalSessionActuatorAllowed(goalSession, "query_live_answer_state")
+      ? ["query_live_answer_state" as const]
+      : [];
+    const matchedAllowedActuatorRefs = matchedAllowedActuators.map((actuator) =>
+      `agent_goal_allowed_actuator:${actuator}`
+    );
+    const feedAllowed = !goalId || matchedContextFeeds.length > 0;
+    const actuatorAllowed = !goalId || matchedAllowedActuators.length > 0;
+    const missingRequirements = uniqueStrings([
+      ...(goalId && !goalSession ? ["goal_session"] : []),
+      ...(goalId && goalSession && !feedAllowed ? ["context_feed:live_answer_lines"] : []),
+      ...(goalId && goalSession && !actuatorAllowed ? ["allowed_actuator:query_live_answer_state"] : []),
+      ...(!environment ? ["live_answer_environment"] : []),
+    ]);
+    const ok = missingRequirements.length === 0;
+    const policyEvidenceRefs = uniqueStrings([
+      "context_feed:live_answer_lines",
+      "allowed_actuator:query_live_answer_state",
+      ...matchedContextFeedRefs.map((feedRef) => `agent_goal_context_feed:${feedRef}`),
+      ...matchedAllowedActuatorRefs,
+      ...missingRequirements.filter((requirement) => requirement.startsWith("context_feed:") || requirement.startsWith("allowed_actuator:")),
+    ]);
     const lineKeys = readStringArray(args.line_keys);
-    const selectedLines = environment?.lines.filter((line) =>
+    const selectedLines = ok ? environment?.lines.filter((line) =>
       lineKeys.length === 0 || lineKeys.includes(line.key)
-    ) ?? [];
+    ) ?? [] : [];
     const resultId = `live_answer_card_read:${hashShort([
       input.thread_id,
       environment?.environment_id ?? input.environment_id ?? null,
+      goalId ?? null,
       selectedLines.map((line) => [line.key, line.updated_at, line.evidence_refs]),
+      missingRequirements,
     ])}`;
     const selectedLineKeys = selectedLines.map((line) => line.key);
     const observedAtMs = Date.parse(environment?.updated_at ?? "");
     const evidenceRefs = uniqueStrings([
       resultId,
+      ...policyEvidenceRefs,
+      ...matchedContextFeedRefs,
+      ...matchedAllowedActuatorRefs,
       environment?.environment_id,
-      ...(environment?.evidence_refs ?? []),
-      ...selectedLines.flatMap((line) => line.evidence_refs),
+      ...(ok ? environment?.evidence_refs ?? [] : []),
+      ...(ok ? selectedLines.flatMap((line) => line.evidence_refs) : []),
+    ]);
+    const sourceRefs = uniqueStrings([
+      environment?.environment_id,
+      ...(environment?.source_ids ?? []),
+      ...selectedLineKeys.map((lineKey) => `live_answer_line:${lineKey}`),
+    ]);
+    const loopRefs = uniqueStrings([
+      environment?.environment_id,
+      environment ? `live_answer_environment:${environment.environment_id}` : null,
+      `live_answer_card_read:${input.thread_id}`,
+      "workstation_context_feed:live_answer_lines",
+      "workstation_actuator:query_live_answer_state",
     ]);
     const goalContextUpdateId = environment
       ? recordLiveEnvironmentGoalContextUpdate({
@@ -3742,54 +4110,87 @@ export function executeLiveEnvironmentTool(
           mailboxThreadId: environment.thread_id ?? input.thread_id,
           roomId,
           producerKind: "live_answer",
-          updateKind: "summary",
+          updateKind: ok ? "summary" : "error",
           contentRef: resultId,
-          preview: selectedLines.length > 0
-            ? `Read ${selectedLines.length} Live Answer projection line(s): ${selectedLines.map((line) => line.label).join(", ")}.`
-            : "Read Live Answer card; no selected projection lines matched the query.",
-          sourceRefs: uniqueStrings([
-            environment.environment_id,
-            ...environment.source_ids,
-            ...selectedLineKeys.map((lineKey) => `live_answer_line:${lineKey}`),
-          ]),
-          loopRefs: uniqueStrings([
-            environment.environment_id,
-            `live_answer_environment:${environment.environment_id}`,
-            `live_answer_card_read:${input.thread_id}`,
-          ]),
+          preview: ok
+            ? selectedLines.length > 0
+              ? `Read ${selectedLines.length} Live Answer projection line(s): ${selectedLines.map((line) => line.label).join(", ")}.`
+              : "Read Live Answer card; no selected projection lines matched the query."
+            : `Blocked Live Answer card read; missing ${missingRequirements.join(", ")}.`,
+          sourceRefs,
+          loopRefs,
           evidenceRefs,
           receiptRefs: [resultId],
           observedAtMs: Number.isFinite(observedAtMs) ? observedAtMs : Date.now(),
           staleAfterMs: 45_000,
-          freshnessStatus: selectedLines.length > 0 ? "fresh" : "unknown",
+          freshnessStatus: ok ? selectedLines.length > 0 ? "fresh" : "unknown" : "blocked",
+          goalId,
+          goalRelevanceReason: "The agent read Live Answer projection lines as goal-context input.",
           toolIdentity: {
             requestedToolName: input.tool_name,
             canonicalToolName,
-            matchedAllowedActuators: [],
-            matchedAllowedActuatorRefs: [],
+            matchedAllowedActuators,
+            matchedAllowedActuatorRefs,
           },
           suggestedDispatch: [
             { kind: "log_receipt", receiptRef: resultId },
-            ...selectedLineKeys.map((lineKey): WorkstationDispatchActionV1 => ({ kind: "update_live_answer", lineKey })),
+            ...(ok ? selectedLineKeys.map((lineKey): WorkstationDispatchActionV1 => ({ kind: "update_live_answer", lineKey })) : []),
+            ...(ok && goalId ? [{ kind: "append_goal_context", goalId } as WorkstationDispatchActionV1] : []),
             { kind: "update_panel", panelId: "live-answer-environment" },
             { kind: "update_panel", panelId: "stage-play-badge-graph" },
           ],
         })
       : null;
+    const checkpointedGoalSession = ok && goalSession
+      ? appendAgentGoalSessionCheckpoint({
+          session: goalSession,
+          threadId: input.thread_id,
+          roomId,
+          sourceRefs,
+          loopRefs,
+          evidenceRefs: uniqueStrings([...(goalContextUpdateId ? [goalContextUpdateId] : []), ...evidenceRefs]).slice(0, 80),
+          actionsTaken: ["query_live_answer_state", input.tool_name],
+          summary: `Read ${selectedLines.length} Live Answer projection line(s) for this goal session.`,
+          nextStep: selectedLines.length > 0 ? "continue" : "ask_user",
+        })
+      : goalSession;
     return makeObservation({
       threadId: input.thread_id,
       environmentId: input.environment_id,
       toolName: input.tool_name,
-      ok: Boolean(environment),
-      summary: environment
+      ok,
+      summary: ok
         ? `Read ${selectedLines.length} live card line(s); line text is UI projection only.`
-        : "No live answer environment was found for the requested card.",
+        : `Cannot read Live Answer card; missing ${missingRequirements.join(", ")}.`,
       observation: environment
         ? {
             schema: "helix.live_environment_card_read.v1",
             environment_id: environment.environment_id,
             thread_id: environment.thread_id,
             room_id: environment.room_id ?? null,
+            goalId,
+            goal_id: goalId,
+            status: ok ? "read" : "blocked",
+            missingRequirements,
+            missing_requirements: missingRequirements,
+            policyEvidenceRefs,
+            policy_evidence_refs: policyEvidenceRefs,
+            feedAllowed,
+            feed_allowed: feedAllowed,
+            actuatorAllowed,
+            actuator_allowed: actuatorAllowed,
+            requiredActuator: "query_live_answer_state",
+            required_actuator: "query_live_answer_state",
+            matchedContextFeeds,
+            matched_context_feeds: matchedContextFeeds,
+            matchedContextFeedRefs,
+            matched_context_feed_refs: matchedContextFeedRefs,
+            matchedAllowedActuators,
+            matched_allowed_actuators: matchedAllowedActuators,
+            matchedAllowedActuatorRefs,
+            matched_allowed_actuator_refs: matchedAllowedActuatorRefs,
+            agentGoalSession: checkpointedGoalSession,
+            agent_goal_session: checkpointedGoalSession,
             lines: selectedLines.map((line) => ({
               key: line.key,
               label: line.label,
@@ -3801,6 +4202,18 @@ export function executeLiveEnvironmentTool(
             })),
             goalContextUpdateId,
             goal_context_update_id: goalContextUpdateId,
+            terminalAuthority: {
+              status: "not_terminal",
+              finalAnswerEligible: false,
+              completedSolverPathRequired: true,
+              terminalAuthoritySingleWriterRequired: true,
+            },
+            terminal_authority: {
+              status: "not_terminal",
+              final_answer_eligible: false,
+              completed_solver_path_required: true,
+              terminal_authority_single_writer_required: true,
+            },
             assistant_answer: false,
             terminal_eligible: false,
             post_tool_model_step_required: true,
@@ -3822,46 +4235,232 @@ export function executeLiveEnvironmentTool(
   }
 
   if (input.tool_name === "live_env.query_event_log") {
-    const events = listInterpretedEvents({
+    const goalId = readString(args.goal_id) ?? readString(args.goalId);
+    const limit = readNumber(args.limit, 50);
+    const goalSession = goalId
+      ? listStagePlayAgentGoalSessions({
+          threadId: input.thread_id,
+          goalId,
+          limit: 1,
+        })[0] ?? null
+      : null;
+    const matchedContextFeeds = matchedGoalSessionContextFeeds(goalSession, "route_evidence");
+    const matchedContextFeedRefs = matchedContextFeeds.map((feed) => feed.feedId);
+    const matchedAllowedActuators = goalSessionActuatorAllowed(goalSession, "query_route_evidence")
+      ? ["query_route_evidence" as const]
+      : [];
+    const matchedAllowedActuatorRefs = matchedAllowedActuators.map((actuator) =>
+      `agent_goal_allowed_actuator:${actuator}`
+    );
+    const feedAllowed = !goalId || matchedContextFeeds.length > 0;
+    const actuatorAllowed = !goalId || matchedAllowedActuators.length > 0;
+    const missingRequirements = goalId
+      ? goalSession
+        ? [
+            ...(feedAllowed ? [] : ["context_feed:route_evidence"]),
+            ...(actuatorAllowed ? [] : ["allowed_actuator:query_route_evidence"]),
+          ]
+        : ["goal_session"]
+      : [];
+    const ok = missingRequirements.length === 0;
+    const policyEvidenceRefs = uniqueStrings([
+      "context_feed:route_evidence",
+      "allowed_actuator:query_route_evidence",
+      ...matchedContextFeedRefs.map((feedRef) => `agent_goal_context_feed:${feedRef}`),
+      ...matchedAllowedActuatorRefs,
+      ...missingRequirements,
+    ]);
+    const candidateEvents = listInterpretedEvents({
       threadId: input.thread_id,
       roomId,
-      limit: readNumber(args.limit, 50),
+      limit: goalSession ? Math.max(limit * 4, 120) : limit,
     });
-    const typedCommentary = args.include_typed_commentary === true
+    const candidateTypedCommentary = args.include_typed_commentary === true
       ? listLiveEnvironmentCommentary({
           threadId: input.thread_id,
           roomId,
           environmentId: input.environment_id,
           subject: readString(args.commentary_subject),
           kind: readString(args.commentary_kind),
-          limit: readNumber(args.limit, 50),
+          limit: goalSession ? Math.max(limit * 4, 120) : limit,
         })
       : [];
+    const events = ok
+      ? candidateEvents
+          .filter((event) => interpretedEventMatchesGoalSessionScope(event, goalSession))
+          .slice(-limit)
+      : [];
+    const typedCommentary = ok
+      ? candidateTypedCommentary
+          .filter((commentary) => commentaryMatchesGoalSessionScope(commentary, goalSession))
+          .slice(-limit)
+      : [];
+    const resultId = `interpreted_event_log_query:${hashShort([
+      input.thread_id,
+      roomId ?? null,
+      goalId ?? null,
+      args.include_typed_commentary === true,
+      events.map((event) => event.event_id),
+      typedCommentary.map((commentary) => commentary.commentary_id),
+      missingRequirements,
+    ])}`;
+    const eventEvidenceRefs = uniqueStrings([
+      ...events.flatMap((event) => [event.event_id, ...event.evidence_refs, ...(event.source_event_ids ?? []), ...(event.related_artifact_ids ?? []), ...(event.related_job_ids ?? [])]),
+      ...typedCommentary.flatMap((commentary) => [
+        commentary.commentary_id,
+        commentary.environment_id,
+        ...commentary.evidence_refs,
+        ...commentary.related_artifact_ids,
+        ...(commentary.related_worker_ids ?? []),
+        ...(commentary.related_perturbation_ids ?? []),
+      ]),
+    ]);
+    const resultSourceRefs = uniqueStrings([
+      input.thread_id,
+      roomId,
+      input.environment_id,
+      ...events.map((event) => event.source_family),
+      ...eventEvidenceRefs,
+    ]);
+    const resultLoopRefs = uniqueStrings([
+      "workstation_context_feed:route_evidence",
+      "workstation_actuator:query_route_evidence",
+      `interpreted_event_log:${input.thread_id}`,
+      ...events.map((event) => event.kind),
+      ...typedCommentary.map((commentary) => commentary.kind),
+    ]);
+    const evidenceRefs = uniqueStrings([
+      resultId,
+      ...policyEvidenceRefs,
+      ...matchedContextFeedRefs,
+      ...matchedAllowedActuatorRefs,
+      ...resultSourceRefs,
+      ...resultLoopRefs,
+      ...eventEvidenceRefs,
+    ]);
+    const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+      threadId: input.thread_id,
+      mailboxThreadId: input.thread_id,
+      roomId,
+      producerKind: "route_watch",
+      updateKind: ok ? "route_evidence" : "error",
+      contentRef: resultId,
+      preview: ok
+        ? args.include_typed_commentary === true
+          ? `Read ${events.length} interpreted event(s) and ${typedCommentary.length} typed commentary record(s) as route evidence.`
+          : `Read ${events.length} interpreted event(s) as route evidence.`
+        : `Blocked interpreted event-log read; missing ${missingRequirements.join(", ")}.`,
+      sourceRefs: resultSourceRefs,
+      loopRefs: resultLoopRefs,
+      evidenceRefs,
+      receiptRefs: [resultId],
+      freshnessStatus: ok ? (events.length > 0 || typedCommentary.length > 0 ? "fresh" : "unknown") : "blocked",
+      goalId,
+      goalRelevanceReason: "The agent queried compact interpreted event-log evidence for route-watch context.",
+      toolIdentity: {
+        requestedToolName: input.tool_name,
+        canonicalToolName: "live_env.query_event_log",
+        matchedAllowedActuators,
+        matchedAllowedActuatorRefs,
+      },
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: resultId },
+        ...(goalId && ok ? [{ kind: "append_goal_context" as const, goalId }] : []),
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+        { kind: "update_panel", panelId: "live-answer-environment" },
+      ],
+    });
+    const checkpointedGoalSession = ok && goalSession
+      ? appendAgentGoalSessionCheckpoint({
+          session: goalSession,
+          threadId: input.thread_id,
+          roomId,
+          sourceRefs: resultSourceRefs,
+          loopRefs: resultLoopRefs,
+          evidenceRefs: uniqueStrings([goalContextUpdateId, ...evidenceRefs]).slice(0, 80),
+          actionsTaken: ["query_route_evidence", input.tool_name],
+          summary: `Queried interpreted event-log route evidence and read ${events.length + typedCommentary.length} compact record(s) for this goal session.`,
+          nextStep: events.length > 0 || typedCommentary.length > 0 ? "continue" : "ask_user",
+        })
+      : goalSession;
     return makeObservation({
       threadId: input.thread_id,
       environmentId: input.environment_id,
       toolName: input.tool_name,
-      ok: true,
-      summary: args.include_typed_commentary === true
+      ok,
+      summary: ok
+        ? args.include_typed_commentary === true
         ? `Retrieved ${events.length} compact interpreted event(s) and ${typedCommentary.length} typed commentary record(s).`
-        : `Retrieved ${events.length} compact interpreted event(s).`,
+        : `Retrieved ${events.length} compact interpreted event(s).`
+        : `Cannot read interpreted event log; missing ${missingRequirements.join(", ")}.`,
       observation: {
         schema: "helix.interpreted_log_read.v1",
         thread_id: input.thread_id,
         room_id: roomId,
+        resultId,
+        result_id: resultId,
+        goalId,
+        goal_id: goalId,
+        status: ok ? "read" : "blocked",
+        missingRequirements,
+        missing_requirements: missingRequirements,
+        policyEvidenceRefs,
+        policy_evidence_refs: policyEvidenceRefs,
+        goalSessionFound: goalId ? Boolean(goalSession) : null,
+        goal_session_found: goalId ? Boolean(goalSession) : null,
+        feedAllowed,
+        feed_allowed: feedAllowed,
+        requiredFeed: "route_evidence",
+        required_feed: "route_evidence",
+        actuatorAllowed,
+        actuator_allowed: actuatorAllowed,
+        requiredActuator: "query_route_evidence",
+        required_actuator: "query_route_evidence",
+        matchedContextFeeds,
+        matched_context_feeds: matchedContextFeeds,
+        matchedContextFeedRefs,
+        matched_context_feed_refs: matchedContextFeedRefs,
+        matchedAllowedActuators,
+        matched_allowed_actuators: matchedAllowedActuators,
+        matchedAllowedActuatorRefs,
+        matched_allowed_actuator_refs: matchedAllowedActuatorRefs,
+        agentGoalSession: checkpointedGoalSession,
+        agent_goal_session: checkpointedGoalSession,
+        sourceRefs: resultSourceRefs,
+        source_refs: resultSourceRefs,
+        loopRefs: resultLoopRefs,
+        loop_refs: resultLoopRefs,
+        evidenceRefs,
+        evidence_refs: evidenceRefs,
         events,
         interpreted_events: events,
         typed_commentary: typedCommentary,
+        goalContextUpdateId,
+        goal_context_update_id: goalContextUpdateId,
+        terminalAuthority: {
+          status: "not_terminal",
+          finalAnswerEligible: false,
+          completedSolverPathRequired: true,
+          terminalAuthoritySingleWriterRequired: true,
+        },
+        terminal_authority: {
+          status: "not_terminal",
+          final_answer_eligible: false,
+          completed_solver_path_required: true,
+          terminal_authority_single_writer_required: true,
+        },
         raw_logs_included: false,
         deterministic_content_role: "evidence_not_assistant_answer",
         context_role: "tool_evidence",
         ask_context_policy: "evidence_only",
         assistant_answer: false,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
+        raw_content_included: false,
       },
-      evidenceRefs: [
-        ...events.flatMap((event) => [event.event_id, ...event.evidence_refs]),
-        ...typedCommentary.flatMap((commentary) => [commentary.commentary_id, ...commentary.evidence_refs]),
-      ],
+      evidenceRefs: uniqueStrings([goalContextUpdateId, ...evidenceRefs]),
+      producedRefs: uniqueStrings([goalContextUpdateId, resultId, ...events.map((event) => event.event_id), ...typedCommentary.map((commentary) => commentary.commentary_id)]),
+      forceNormalizedRefs: true,
     });
   }
 
@@ -5838,30 +6437,37 @@ export function executeLiveEnvironmentTool(
       ...missingRequirements,
     ]);
     const ok = missingRequirements.length === 0;
-    const mailItems = listStagePlayLiveSourceMailItems({
+    const candidateMailItems = listStagePlayLiveSourceMailItems({
       threadId: scope.mailboxThreadResolution.mailboxThreadId,
       roomId,
       environmentId,
       sourceId: scope.sourceId,
       sourceKind: scope.sourceKind,
-      limit: mailLimit,
+      limit: goalSession ? Math.max(mailLimit, 240) : mailLimit,
     });
-    const mailIds = new Set(mailItems.map((item) => item.mailId));
+    const goalScopedMailItems = candidateMailItems.filter((mail) =>
+      liveSourceMailItemMatchesGoalSessionScope(mail, goalSession)
+    );
+    const mailIds = new Set(goalScopedMailItems.map((item) => item.mailId));
     const processedMailPackets = listStagePlayProcessedMailPackets({
       sourceId: scope.sourceId,
-      limit: 160,
+      limit: goalSession ? 500 : 160,
     })
       .filter((packet) =>
         (!packetId || packet.packetId === packetId) &&
-        (mailIds.size === 0 || packet.mailIds.some((mailId) => mailIds.has(mailId)))
+        (mailIds.size === 0 || packet.mailIds.some((mailId) => mailIds.has(mailId))) &&
+        processedMailPacketMatchesGoalSessionScope(packet, goalSession)
       )
       .slice(-limit);
+    const processedPacketMailIds = new Set(processedMailPackets.flatMap((packet) => packet.mailIds));
+    const processedPacketRunIds = new Set(processedMailPackets.flatMap((packet) => packet.microReasonerRunRefs));
+    const mailItems = goalScopedMailItems.filter((item) => processedPacketMailIds.has(item.mailId));
     const microReasonerRuns = listStagePlayMicroReasonerRuns({
       sourceId: scope.sourceId,
-      limit: 200,
+      limit: goalSession ? 500 : 200,
     }).filter((run) =>
-      run.mailIds.some((mailId) => mailIds.has(mailId)) ||
-      processedMailPackets.some((packet) => packet.microReasonerRunRefs.includes(run.runId))
+      processedPacketRunIds.has(run.runId) ||
+      run.mailIds.some((mailId) => processedPacketMailIds.has(mailId))
     );
     const decisions = listStagePlayMailDecisions({
       threadId: scope.mailboxThreadResolution.mailboxThreadId,
@@ -6277,6 +6883,7 @@ export function executeLiveEnvironmentTool(
       freshnessStatus: requestedFreshnessStatus,
       limit: 200,
     })
+      .filter((update) => goalContextUpdateMatchesGoalSessionScope(update, goalSession))
       .filter((update) => workstationContextFeedUpdateMatchesV1(feedQuerySpec.feedKind, update))
       .slice(0, ok ? limit : 0);
     const resultId = `stage_play_context_feed_query:${feedQuerySpec.feedKind}:${hashShort([
@@ -6572,8 +7179,9 @@ export function executeLiveEnvironmentTool(
     const traceById = traceId ? getWorkstationReasoningTrace(traceId) : null;
     const traces = ok ? (traceId
       ? (traceById ? [traceById] : [])
-      : listWorkstationReasoningTraces({ threadId: input.thread_id, limit })
+      : listWorkstationReasoningTraces({ threadId: input.thread_id, limit: Math.min(200, Math.max(limit * 4, limit)) })
           .filter((trace) => !turnId || trace.turn_id === turnId)
+          .filter((trace) => workstationTraceMatchesGoalSessionScope(trace, goalSession))
           .slice(-limit)) : [];
     const selectedTrace = traces.at(-1) ?? null;
     const traceRefs = traces.map((trace) => trace.trace_id);
@@ -9311,14 +9919,17 @@ export function executeLiveEnvironmentTool(
       threadId: input.thread_id,
       roomId,
     });
-    const sourceRefs = result.capabilities.map((capability) => capability.source_id);
-    const visibleResult = ok ? result : { ...result, capabilities: [] };
-    const blockedCapabilities = result.capabilities.filter((capability) => capability.status !== "active");
+    const scopedCapabilities = result.capabilities
+      .filter((capability) => !explicitSourceId || capability.source_id === explicitSourceId)
+      .filter((capability) => sourceCapabilityMatchesGoalSessionScope(capability, goalSession));
+    const sourceRefs = scopedCapabilities.map((capability) => capability.source_id);
+    const visibleResult = ok ? { ...result, capabilities: scopedCapabilities } : { ...result, capabilities: [] };
+    const blockedCapabilities = visibleResult.capabilities.filter((capability) => capability.status !== "active");
     const contentRef = `stage_play_source_health:${hashShort([
       input.thread_id,
       roomId ?? null,
       sourceRefs,
-      result.capabilities.map((capability) => capability.status),
+      scopedCapabilities.map((capability) => capability.status),
       matchedContextFeedRefs,
     ])}`;
     const resultSourceRefs = ok
@@ -9336,10 +9947,10 @@ export function executeLiveEnvironmentTool(
       ...policyEvidenceRefs,
       ...matchedContextFeedRefs,
       ...matchedAllowedActuatorRefs,
-      ...(ok ? sourceRefs : [input.thread_id]),
+      ...resultSourceRefs,
       ...resultLoopRefs,
     ]);
-    const freshnessStatus = ok ? (result.capabilities.length > 0 ? "fresh" : "unknown") : "blocked";
+    const freshnessStatus = ok ? (visibleResult.capabilities.length > 0 ? "fresh" : "unknown") : "blocked";
     const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
       threadId: input.thread_id,
       mailboxThreadId: input.thread_id,
@@ -9348,8 +9959,8 @@ export function executeLiveEnvironmentTool(
       updateKind: "source_status",
       contentRef,
       preview: ok
-        ? result.capabilities.length > 0
-          ? `Source health read ${result.capabilities.length} capability state(s): ${result.capabilities
+        ? visibleResult.capabilities.length > 0
+          ? `Source health read ${visibleResult.capabilities.length} capability state(s): ${visibleResult.capabilities
               .slice(0, 4)
               .map((capability) => `${capability.modality} ${capability.status}`)
               .join("; ")}.`
@@ -9438,7 +10049,7 @@ export function executeLiveEnvironmentTool(
       toolName: input.tool_name,
       ok: resultOk,
       summary: resultOk
-        ? `Read ${result.capabilities.length} source capability state(s).`
+        ? `Read ${visibleResult.capabilities.length} source capability state(s).`
         : !ok
           ? `Cannot read source health; missing ${feedMissingRequirements.join(", ")}.`
           : `Cannot read source health; contract validation failed: ${contractValidationIssues.join("; ")}.`,
@@ -9667,58 +10278,434 @@ export function executeLiveEnvironmentTool(
   }
 
   if (input.tool_name === "live_env.query_constructs") {
-    const constructs = listSituationConstructs({
+    const goalId = readString(args.goal_id) ?? readString(args.goalId);
+    const limit = readNumber(args.limit, 50);
+    const goalSession = goalId
+      ? listStagePlayAgentGoalSessions({
+          threadId: input.thread_id,
+          goalId,
+          limit: 1,
+        })[0] ?? null
+      : null;
+    const matchedContextFeeds = matchedGoalSessionContextFeeds(goalSession, "route_evidence");
+    const matchedContextFeedRefs = matchedContextFeeds.map((feed) => feed.feedId);
+    const matchedAllowedActuators = goalSessionActuatorAllowed(goalSession, "query_route_evidence")
+      ? ["query_route_evidence" as const]
+      : [];
+    const matchedAllowedActuatorRefs = matchedAllowedActuators.map((actuator) =>
+      `agent_goal_allowed_actuator:${actuator}`
+    );
+    const feedAllowed = !goalId || matchedContextFeeds.length > 0;
+    const actuatorAllowed = !goalId || matchedAllowedActuators.length > 0;
+    const missingRequirements = goalId
+      ? goalSession
+        ? [
+            ...(feedAllowed ? [] : ["context_feed:route_evidence"]),
+            ...(actuatorAllowed ? [] : ["allowed_actuator:query_route_evidence"]),
+          ]
+        : ["goal_session"]
+      : [];
+    const ok = missingRequirements.length === 0;
+    const policyEvidenceRefs = uniqueStrings([
+      "context_feed:route_evidence",
+      "allowed_actuator:query_route_evidence",
+      ...matchedContextFeedRefs.map((feedRef) => `agent_goal_context_feed:${feedRef}`),
+      ...matchedAllowedActuatorRefs,
+      ...missingRequirements,
+    ]);
+    const candidateConstructs = listSituationConstructs({
       threadId: input.thread_id,
       roomId,
       type: readString(args.type),
       status: readString(args.status),
-      limit: readNumber(args.limit, 50),
+      limit: goalSession ? Math.max(limit * 4, 120) : limit,
     });
+    const constructs = ok
+      ? candidateConstructs
+          .filter((construct) => situationConstructMatchesGoalSessionScope(construct, goalSession))
+          .slice(-limit)
+      : [];
+    const resultId = `situation_construct_query:${hashShort([
+      input.thread_id,
+      roomId ?? null,
+      goalId ?? null,
+      readString(args.type),
+      readString(args.status),
+      constructs.map((construct) => construct.construct_id),
+      missingRequirements,
+    ])}`;
+    const constructEvidenceRefs = uniqueStrings(constructs.flatMap((construct) => [
+      construct.construct_id,
+      construct.environment_id,
+      ...construct.source_ids,
+      ...construct.parent_construct_ids,
+      ...construct.child_construct_ids,
+      ...construct.artifact_refs,
+      ...construct.receipt_refs,
+      ...construct.commentary_refs,
+      ...construct.evidence_refs,
+      ...construct.output_bindings.map((binding) => binding.artifact_ref),
+      ...construct.policy.allowed_tools,
+    ]));
+    const resultSourceRefs = uniqueStrings([
+      input.thread_id,
+      roomId,
+      input.environment_id,
+      ...constructEvidenceRefs,
+    ]);
+    const resultLoopRefs = uniqueStrings([
+      "workstation_context_feed:route_evidence",
+      "workstation_actuator:query_route_evidence",
+      `situation_construct_query:${input.thread_id}`,
+      ...constructs.map((construct) => `situation_construct_type:${construct.type}`),
+      ...constructs.flatMap((construct) => construct.policy.allowed_tools),
+    ]);
+    const evidenceRefs = uniqueStrings([
+      resultId,
+      ...policyEvidenceRefs,
+      ...matchedContextFeedRefs,
+      ...matchedAllowedActuatorRefs,
+      ...resultSourceRefs,
+      ...resultLoopRefs,
+      ...constructEvidenceRefs,
+    ]);
+    const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+      threadId: input.thread_id,
+      mailboxThreadId: input.thread_id,
+      roomId,
+      producerKind: "route_watch",
+      updateKind: ok ? "route_evidence" : "error",
+      contentRef: resultId,
+      preview: ok
+        ? `Read ${constructs.length} Situation Room construct record(s) as route evidence.`
+        : `Blocked Situation Room construct read; missing ${missingRequirements.join(", ")}.`,
+      sourceRefs: resultSourceRefs,
+      loopRefs: resultLoopRefs,
+      evidenceRefs,
+      receiptRefs: [resultId],
+      freshnessStatus: ok ? (constructs.length > 0 ? "fresh" : "unknown") : "blocked",
+      goalId,
+      goalRelevanceReason: "The agent queried Situation Room constructs as workstation route evidence.",
+      toolIdentity: {
+        requestedToolName: input.tool_name,
+        canonicalToolName: "live_env.query_constructs",
+        matchedAllowedActuators,
+        matchedAllowedActuatorRefs,
+      },
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: resultId },
+        ...(goalId && ok ? [{ kind: "append_goal_context" as const, goalId }] : []),
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+        { kind: "update_panel", panelId: "live-answer-environment" },
+      ],
+    });
+    const checkpointedGoalSession = ok && goalSession
+      ? appendAgentGoalSessionCheckpoint({
+          session: goalSession,
+          threadId: input.thread_id,
+          roomId,
+          sourceRefs: resultSourceRefs,
+          loopRefs: resultLoopRefs,
+          evidenceRefs: uniqueStrings([goalContextUpdateId, ...evidenceRefs]).slice(0, 80),
+          actionsTaken: ["query_route_evidence", input.tool_name],
+          summary: `Queried Situation Room construct route evidence and read ${constructs.length} construct record(s) for this goal session.`,
+          nextStep: constructs.length > 0 ? "continue" : "ask_user",
+        })
+      : goalSession;
     return makeObservation({
       threadId: input.thread_id,
       environmentId: input.environment_id,
       toolName: input.tool_name,
-      ok: true,
-      summary: `Retrieved ${constructs.length} Situation Room construct record(s).`,
+      ok,
+      summary: ok
+        ? `Retrieved ${constructs.length} Situation Room construct record(s).`
+        : `Cannot read Situation Room constructs; missing ${missingRequirements.join(", ")}.`,
       observation: {
         schema: "helix.situation_construct_query_result.v1",
         thread_id: input.thread_id,
         room_id: roomId,
         type: readString(args.type),
         status: readString(args.status),
+        resultId,
+        result_id: resultId,
+        goalId,
+        goal_id: goalId,
+        readStatus: ok ? "read" : "blocked",
+        read_status: ok ? "read" : "blocked",
+        missingRequirements,
+        missing_requirements: missingRequirements,
+        policyEvidenceRefs,
+        policy_evidence_refs: policyEvidenceRefs,
+        goalSessionFound: goalId ? Boolean(goalSession) : null,
+        goal_session_found: goalId ? Boolean(goalSession) : null,
+        feedAllowed,
+        feed_allowed: feedAllowed,
+        requiredFeed: "route_evidence",
+        required_feed: "route_evidence",
+        actuatorAllowed,
+        actuator_allowed: actuatorAllowed,
+        requiredActuator: "query_route_evidence",
+        required_actuator: "query_route_evidence",
+        matchedContextFeeds,
+        matched_context_feeds: matchedContextFeeds,
+        matchedContextFeedRefs,
+        matched_context_feed_refs: matchedContextFeedRefs,
+        matchedAllowedActuators,
+        matched_allowed_actuators: matchedAllowedActuators,
+        matchedAllowedActuatorRefs,
+        matched_allowed_actuator_refs: matchedAllowedActuatorRefs,
+        agentGoalSession: checkpointedGoalSession,
+        agent_goal_session: checkpointedGoalSession,
+        sourceRefs: resultSourceRefs,
+        source_refs: resultSourceRefs,
+        loopRefs: resultLoopRefs,
+        loop_refs: resultLoopRefs,
+        evidenceRefs,
+        evidence_refs: evidenceRefs,
         constructs,
         count: constructs.length,
+        goalContextUpdateId,
+        goal_context_update_id: goalContextUpdateId,
+        terminalAuthority: {
+          status: "not_terminal",
+          finalAnswerEligible: false,
+          completedSolverPathRequired: true,
+          terminalAuthoritySingleWriterRequired: true,
+        },
+        terminal_authority: {
+          status: "not_terminal",
+          final_answer_eligible: false,
+          completed_solver_path_required: true,
+          terminal_authority_single_writer_required: true,
+        },
         assistant_answer: false,
+        terminal_eligible: false,
+        post_tool_model_step_required: true,
         raw_content_included: false,
         context_role: "tool_evidence",
         ask_context_policy: "evidence_only",
       },
-      evidenceRefs: constructs.flatMap((construct) => [
-        construct.construct_id,
-        ...construct.source_ids,
-        ...construct.artifact_refs,
-        ...construct.receipt_refs,
-        ...construct.commentary_refs,
-        ...construct.evidence_refs,
-      ]),
+      evidenceRefs: uniqueStrings([goalContextUpdateId, ...evidenceRefs]),
+      producedRefs: uniqueStrings([goalContextUpdateId, resultId, ...constructs.map((construct) => construct.construct_id)]),
+      forceNormalizedRefs: true,
     });
   }
 
   if (input.tool_name === "live_env.query_job_evidence") {
-    const result = queryLiveAnswersEvidence({
+    const goalId = readString(args.goal_id) ?? readString(args.goalId);
+    const limit = readNumber(args.limit, 50);
+    const goalSession = goalId
+      ? listStagePlayAgentGoalSessions({
+          threadId: input.thread_id,
+          goalId,
+          limit: 1,
+        })[0] ?? null
+      : null;
+    const matchedContextFeeds = matchedGoalSessionContextFeeds(goalSession, "route_evidence");
+    const matchedContextFeedRefs = matchedContextFeeds.map((feed) => feed.feedId);
+    const matchedAllowedActuators = goalSessionActuatorAllowed(goalSession, "query_route_evidence")
+      ? ["query_route_evidence" as const]
+      : [];
+    const matchedAllowedActuatorRefs = matchedAllowedActuators.map((actuator) =>
+      `agent_goal_allowed_actuator:${actuator}`
+    );
+    const feedAllowed = !goalId || matchedContextFeeds.length > 0;
+    const actuatorAllowed = !goalId || matchedAllowedActuators.length > 0;
+    const missingRequirements = goalId
+      ? goalSession
+        ? [
+            ...(feedAllowed ? [] : ["context_feed:route_evidence"]),
+            ...(actuatorAllowed ? [] : ["allowed_actuator:query_route_evidence"]),
+          ]
+        : ["goal_session"]
+      : [];
+    const ok = missingRequirements.length === 0;
+    const policyEvidenceRefs = uniqueStrings([
+      "context_feed:route_evidence",
+      "allowed_actuator:query_route_evidence",
+      ...matchedContextFeedRefs.map((feedRef) => `agent_goal_context_feed:${feedRef}`),
+      ...matchedAllowedActuatorRefs,
+      ...missingRequirements,
+    ]);
+    const rawResult = queryLiveAnswersEvidence({
       query: readString(args.query),
       contractId: readString(args.contract_id),
       threadId: input.thread_id,
-      limit: readNumber(args.limit, 50),
+      limit: goalSession ? Math.max(limit * 4, 120) : limit,
     });
+    const scopedResult = ok
+      ? liveAnswersEvidenceMatchesGoalSessionScope(rawResult, goalSession)
+      : {
+          ...rawResult,
+          evidence_refs: [],
+          live_answers_projections: [],
+          source_observations: [],
+          policy_observations: [],
+          voice_proposals: [],
+          current_state: {
+            job_status: "unknown" as const,
+            route_state: "unknown" as const,
+            source_freshness: "unknown" as const,
+            last_trigger: null,
+            last_suppression_reason: null,
+            voice_policy: null,
+            spoken: false as const,
+          },
+        };
+    const resultId = `live_job_evidence_query:${hashShort([
+      input.thread_id,
+      goalId ?? null,
+      readString(args.contract_id),
+      readString(args.query),
+      scopedResult.evidence_refs,
+      missingRequirements,
+    ])}`;
+    const resultSourceRefs = uniqueStrings([
+      input.thread_id,
+      roomId,
+      input.environment_id,
+      readString(args.contract_id),
+      ...scopedResult.source_observations.map((entry) => entry.source_id),
+      ...scopedResult.source_observations.flatMap((entry) => entry.job_contract_ids ?? []),
+      ...scopedResult.evidence_refs,
+    ]);
+    const resultLoopRefs = uniqueStrings([
+      "workstation_context_feed:route_evidence",
+      "workstation_actuator:query_route_evidence",
+      `live_job_evidence:${input.thread_id}`,
+      readString(args.contract_id),
+      ...scopedResult.policy_observations.map((entry) => entry.contract_id),
+      ...scopedResult.live_answers_projections.map((entry) => entry.contract_id),
+    ]);
+    const evidenceRefs = uniqueStrings([
+      resultId,
+      ...policyEvidenceRefs,
+      ...matchedContextFeedRefs,
+      ...matchedAllowedActuatorRefs,
+      ...resultSourceRefs,
+      ...resultLoopRefs,
+      ...scopedResult.evidence_refs,
+    ]);
+    const recordCount =
+      scopedResult.source_observations.length +
+      scopedResult.policy_observations.length +
+      scopedResult.live_answers_projections.length +
+      scopedResult.voice_proposals.length;
+    const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+      threadId: input.thread_id,
+      mailboxThreadId: input.thread_id,
+      roomId,
+      producerKind: "route_watch",
+      updateKind: ok ? "route_evidence" : "error",
+      contentRef: resultId,
+      preview: ok
+        ? `Read live job evidence with ${recordCount} compact record(s) and ${scopedResult.evidence_refs.length} evidence ref(s).`
+        : `Blocked live job evidence read; missing ${missingRequirements.join(", ")}.`,
+      sourceRefs: resultSourceRefs,
+      loopRefs: resultLoopRefs,
+      evidenceRefs,
+      receiptRefs: [resultId],
+      freshnessStatus: ok ? (scopedResult.evidence_refs.length > 0 ? "fresh" : "unknown") : "blocked",
+      goalId,
+      goalRelevanceReason: "The agent queried live job evidence as route evidence for the active workstation goal.",
+      toolIdentity: {
+        requestedToolName: input.tool_name,
+        canonicalToolName: "live_env.query_job_evidence",
+        matchedAllowedActuators,
+        matchedAllowedActuatorRefs,
+      },
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: resultId },
+        ...(goalId && ok ? [{ kind: "append_goal_context" as const, goalId }] : []),
+        { kind: "update_panel", panelId: "live-answer-environment" },
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+      ],
+    });
+    const checkpointedGoalSession = ok && goalSession
+      ? appendAgentGoalSessionCheckpoint({
+          session: goalSession,
+          threadId: input.thread_id,
+          roomId,
+          sourceRefs: resultSourceRefs,
+          loopRefs: resultLoopRefs,
+          evidenceRefs: uniqueStrings([goalContextUpdateId, ...evidenceRefs]).slice(0, 80),
+          actionsTaken: ["query_route_evidence", input.tool_name],
+          summary: `Queried live job evidence and read ${recordCount} compact record(s) for this goal session.`,
+          nextStep: scopedResult.evidence_refs.length > 0 ? "continue" : "ask_user",
+        })
+      : goalSession;
     return makeObservation({
       threadId: input.thread_id,
       environmentId: input.environment_id,
       toolName: input.tool_name,
-      ok: true,
-      summary: `Retrieved live job evidence with ${result.evidence_refs.length} evidence ref(s).`,
-      observation: result,
-      evidenceRefs: result.evidence_refs,
+      ok,
+      summary: ok
+        ? `Retrieved live job evidence with ${scopedResult.evidence_refs.length} evidence ref(s).`
+        : `Cannot read live job evidence; missing ${missingRequirements.join(", ")}.`,
+      observation: {
+        ...scopedResult,
+        resultId,
+        result_id: resultId,
+        goalId,
+        goal_id: goalId,
+        readStatus: ok ? "read" : "blocked",
+        read_status: ok ? "read" : "blocked",
+        missingRequirements,
+        missing_requirements: missingRequirements,
+        policyEvidenceRefs,
+        policy_evidence_refs: policyEvidenceRefs,
+        goalSessionFound: goalId ? Boolean(goalSession) : null,
+        goal_session_found: goalId ? Boolean(goalSession) : null,
+        feedAllowed,
+        feed_allowed: feedAllowed,
+        requiredFeed: "route_evidence",
+        required_feed: "route_evidence",
+        actuatorAllowed,
+        actuator_allowed: actuatorAllowed,
+        requiredActuator: "query_route_evidence",
+        required_actuator: "query_route_evidence",
+        matchedContextFeeds,
+        matched_context_feeds: matchedContextFeeds,
+        matchedContextFeedRefs,
+        matched_context_feed_refs: matchedContextFeedRefs,
+        matchedAllowedActuators,
+        matched_allowed_actuators: matchedAllowedActuators,
+        matchedAllowedActuatorRefs,
+        matched_allowed_actuator_refs: matchedAllowedActuatorRefs,
+        agentGoalSession: checkpointedGoalSession,
+        agent_goal_session: checkpointedGoalSession,
+        sourceRefs: resultSourceRefs,
+        source_refs: resultSourceRefs,
+        loopRefs: resultLoopRefs,
+        loop_refs: resultLoopRefs,
+        evidenceRefs,
+        goalContextUpdateId,
+        goal_context_update_id: goalContextUpdateId,
+        recordCount,
+        record_count: recordCount,
+        terminalAuthority: {
+          status: "not_terminal",
+          finalAnswerEligible: false,
+          completedSolverPathRequired: true,
+          terminalAuthoritySingleWriterRequired: true,
+        },
+        terminal_authority: {
+          status: "not_terminal",
+          final_answer_eligible: false,
+          completed_solver_path_required: true,
+          terminal_authority_single_writer_required: true,
+        },
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+        context_policy: "compact_context_pack_only",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        post_tool_model_step_required: true,
+      },
+      evidenceRefs: uniqueStrings([goalContextUpdateId, ...evidenceRefs]),
+      producedRefs: uniqueStrings([goalContextUpdateId, resultId, ...scopedResult.evidence_refs]),
+      forceNormalizedRefs: true,
     });
   }
 
@@ -9836,6 +10823,7 @@ export function executeLiveEnvironmentTool(
     ]);
     const resultLoopRefs = uniqueStrings([
       ...(goalSession?.loopRefs ?? []),
+      "workstation_context_feed:trace_memory",
       "workstation_actuator:evaluate_goal_satisfaction",
     ]);
     const satisfied = missingRequirements.length === 0 && (candidateEvidenceRefs.length > 0 || updates.length > 0);

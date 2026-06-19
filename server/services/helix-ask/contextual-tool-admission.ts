@@ -56,7 +56,7 @@ const EXTERNAL_READONLY_TOOL_RE =
 const MUTATING_WRITE_NEGATION_RE =
   /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no)\s+(?:write|create|edit|modify|save|append|update|delete|remove|commit|stage)\s+(?:any\s+)?(?:files?|notes?|docs?|documents?|repo|repository|workspace|disk)\b/gi;
 const LIVE_ENV_CONTEXT_FEED_QUERY_TOOL_PATTERN = WORKSTATION_CONTEXT_FEED_QUERY_ACTUATORS.join("|");
-const LIVE_ENV_WORKSTATION_TOOL_PATTERN = String.raw`(?:${LIVE_ENV_CONTEXT_FEED_QUERY_TOOL_PATTERN}|change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|start_agent_goal_session|evaluate_goal_satisfaction)`;
+const LIVE_ENV_WORKSTATION_TOOL_PATTERN = String.raw`(?:${LIVE_ENV_CONTEXT_FEED_QUERY_TOOL_PATTERN}|configure_route_watch|change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|start_agent_goal_session|evaluate_goal_satisfaction)`;
 const LIVE_ENV_CONTROL_CUE_RE = new RegExp(
   String.raw`\blive_env\.${LIVE_ENV_WORKSTATION_TOOL_PATTERN}\b|\bnarrator\.(?:say|bind_stream)\b`,
   "i",

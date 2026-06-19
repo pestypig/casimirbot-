@@ -11,6 +11,8 @@ import {
 } from "../shared/contracts/nhm2-regional-support-function-atlas.v1";
 import type { Nhm2RegionalTensor } from "../shared/contracts/nhm2-regional-source-closure-evidence.v1";
 import { buildNhm2TileEffectiveFullTensorSourceArtifact } from "../shared/contracts/nhm2-tile-effective-full-tensor-source.v1";
+import { buildNhm2CandidateCampaignGrid } from "../shared/contracts/nhm2-candidate-campaign-grid.v1";
+import type { Nhm2CandidateMetricProfileSpecV1 } from "../shared/contracts/nhm2-candidate-metric-profile-spec.v1";
 import { buildRegionalSupportFunctionAtlas } from "../tools/nhm2/build-regional-support-function-atlas";
 
 const profile = "stage1_centerline_alpha_0p995_v1";
@@ -184,6 +186,71 @@ const supportDerivativeReceipt = (
     ],
   });
 
+const candidateProfileSpec = (): Nhm2CandidateMetricProfileSpecV1 => ({
+  contractVersion: "nhm2_candidate_metric_profile_spec/v1",
+  generatedAt: "2026-06-19T00:00:00.000Z",
+  laneId: "nhm2_shift_lapse",
+  candidateProfileId:
+    "stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1",
+  parentProfileId: profile,
+  alphaCenterline: 0.9,
+  subjectiveEfficiencyProxy: 1 / 0.9,
+  proposalKind: "combined_metric_redesign",
+  sourceProfileSearchRef: "profile-search.json",
+  profileDefinition: {
+    lapseDepthScale: 1,
+    shiftAmplitudeScale: 1e-10,
+    wallThicknessScale: 10,
+    smoothingWidthScale: 20,
+    transitionKernel: "compact_bump",
+    projectedT0iSuppressionFactor: 5e16,
+    sourceTensorCopiedFromMetric: false,
+    silentlyZeroesT0i: false,
+    silentlyZeroesOffDiagonalTij: false,
+    usesScalarT00Only: false,
+  },
+  tripClockingDiagnostic: {
+    properTimeRatio: 0.9,
+    subjectiveEfficiencyProxy: 1 / 0.9,
+    formula: "tau = alpha_centerline * T_coordinate",
+    coordinateTimeSeconds: 100,
+    shipProperTimeSeconds: 90,
+    clockSavingSeconds: 10,
+    routeEtaCertified: false,
+  },
+  executableGeometry: {
+    runtimeProfileId: "stage1_centerline_alpha_0p9000_v1",
+    runtimeProfileRef: "runtime-profile.json",
+    runtimeProfileRegistered: true,
+    runtimeProfileMatchesCandidateLevers: true,
+    supportedCandidateLevers: ["lapse_depth_scale", "transition_kernel"],
+    unsupportedCandidateLevers: [],
+    candidateGeometryAdapterStatus: "available",
+    transitionKernelAdapterRef: "atlas-builder#compact_bump",
+    shiftFieldEvaluatorStatus: "available",
+    shiftFieldEvaluatorRef: "shift-field.ts#evaluateShiftVector",
+    regionalSupportAtlasRef: null,
+    gridRef: null,
+    admRouteReady: false,
+    blockers: ["candidate_regional_support_atlas_ref_missing"],
+  },
+  campaignReadiness: {
+    canEnterFullAdmMetricTensorRoute: false,
+    needsFrozenCampaignRun: true,
+    firstBlocker: "candidate_regional_support_atlas_ref_missing",
+    blockers: ["candidate_regional_support_atlas_ref_missing"],
+  },
+  claimBoundary: {
+    diagnosticOnly: true,
+    profileSpecDoesNotValidateProfile: true,
+    tripClockingDoesNotCertifyRouteEta: true,
+    physicalViabilityClaimAllowed: false,
+    transportClaimAllowed: false,
+    routeEtaClaimAllowed: false,
+    propulsionClaimAllowed: false,
+  },
+});
+
 const withTemp = (fn: (root: string) => void) => {
   const root = mkdtempSync(join(tmpdir(), "nhm2-support-atlas-"));
   try {
@@ -192,6 +259,18 @@ const withTemp = (fn: (root: string) => void) => {
     writeFileSync(
       join(root, "support-derivatives.json"),
       JSON.stringify(supportDerivativeReceipt()),
+      "utf8",
+    );
+    const candidate = candidateProfileSpec();
+    writeFileSync(join(root, "candidate-spec.json"), JSON.stringify(candidate), "utf8");
+    writeFileSync(
+      join(root, "candidate-grid.json"),
+      JSON.stringify(
+        buildNhm2CandidateCampaignGrid({
+          candidateProfileSpec: candidate,
+          candidateProfileSpecRef: "candidate-spec.json",
+        }),
+      ),
       "utf8",
     );
     fn(root);
@@ -254,6 +333,57 @@ describe("nhm2 regional support-function atlas", () => {
       ]);
       expect(atlas.provenance.generatedFrom).toContain("support-derivatives.json");
       expect(atlas.provenance.inputHashes["support-derivatives.json"]).toMatch(/^[a-f0-9]{64}$/);
+    }));
+
+  it("can emit compact-bump transition kernels without pretending derivative terms exist", () =>
+    withTemp((root) => {
+      const atlas = buildRegionalSupportFunctionAtlas({
+        repoRoot: root,
+        referenceRunPath: "reference.json",
+        tileFullTensorSourcePath: "source.json",
+        transitionKernelKind: "compact_bump",
+        outPath: "atlas.json",
+      });
+
+      expect(isNhm2RegionalSupportFunctionAtlas(atlas)).toBe(true);
+      expect(atlas.transitionKernels.map((kernel) => kernel.kernelId)).toEqual([
+        "kernel:hull_wall:compact_bump",
+        "kernel:wall_exterior:compact_bump",
+      ]);
+      expect(atlas.transitionKernels.every((kernel) => kernel.kernelKind === "compact_bump")).toBe(true);
+      expect(atlas.transitionKernels.every((kernel) => kernel.smoothnessClass === "Cinf")).toBe(true);
+      expect(atlas.transitionKernels.every((kernel) => !kernel.derivativeTermsAvailable)).toBe(true);
+      expect(atlas.derivativeSupport.covariantDerivativeSupportAvailable).toBe(false);
+      expect(atlas.claimBoundary.physicalTransportClaimAllowed).toBe(false);
+    }));
+
+  it("can build a candidate-specific compact-bump atlas from candidate profile/grid receipts", () =>
+    withTemp((root) => {
+      const atlas = buildRegionalSupportFunctionAtlas({
+        repoRoot: root,
+        candidateProfileSpecPath: "candidate-spec.json",
+        candidateCampaignGridPath: "candidate-grid.json",
+        transitionKernelKind: "compact_bump",
+        outPath: "atlas.json",
+      });
+
+      expect(isNhm2RegionalSupportFunctionAtlas(atlas)).toBe(true);
+      expect(atlas.runIdentity.profileId).toBe(
+        "stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1",
+      );
+      expect(atlas.runIdentity.gridRef).toBe("candidate-grid.json");
+      expect(atlas.runIdentity.samplePlanRef).toBe("candidate-grid.json");
+      expect(atlas.regions.wall.maskRef).toContain(".mask.wall");
+      expect(atlas.regions.wall.sampleCount).toBe(24);
+      expect(atlas.transitionKernels.map((kernel) => kernel.kernelKind)).toEqual([
+        "compact_bump",
+        "compact_bump",
+      ]);
+      expect(atlas.provenance.generatedFrom).toEqual([
+        "candidate-spec.json",
+        "candidate-grid.json",
+      ]);
+      expect(atlas.claimBoundary.physicalTransportClaimAllowed).toBe(false);
     }));
 
   it("rejects derivative receipts from another run identity", () =>

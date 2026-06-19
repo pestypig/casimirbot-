@@ -1611,4 +1611,343 @@ describe("Helix terminal authority single writer", () => {
     });
     expect(payload.selected_final_answer).not.toBe(draftText);
   });
+
+  it("blocks compound final drafts that omit a satisfied subgoal observation ref", () => {
+    const turnId = "ask:test:compound-draft-missing-subgoal-support";
+    const workspaceSubgoalId = `${turnId}:compound_capability_subgoal:1:workspace_os_status`;
+    const docsSubgoalId = `${turnId}:compound_capability_subgoal:2:docs-viewer_locate_in_doc`;
+    const workspaceObservationRef = `${turnId}:workspace_os_status_observation`;
+    const docsObservationRef = `${turnId}:doc_location_matches`;
+    const draftText = "Workspace status was available, and the requested document anchor was located in the audit notes.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:runtime_tool_call:1`,
+        kind: "runtime_tool_call",
+        payload: {
+          call_id: `${turnId}:runtime_tool_call:1`,
+          capability_key: "workspace_os.status",
+          compound_subgoal_id: workspaceSubgoalId,
+          args: {},
+        },
+      },
+      {
+        artifact_id: `${turnId}:runtime_tool_call:1:runtime_tool_observation`,
+        kind: "runtime_tool_observation",
+        payload: {
+          call_id: `${turnId}:runtime_tool_call:1`,
+          capability_key: "workspace_os.status",
+          compound_subgoal_id: workspaceSubgoalId,
+          status: "completed",
+        },
+      },
+      {
+        artifact_id: workspaceObservationRef,
+        kind: "workspace_os_status_observation",
+        payload: {
+          schema: "helix.workspace_os_status_observation.v1",
+          capability_key: "workspace_os.status",
+          compound_subgoal_id: workspaceSubgoalId,
+          summary: { available: 18, degraded: 1 },
+        },
+      },
+      {
+        artifact_id: `${turnId}:runtime_tool_call:2`,
+        kind: "runtime_tool_call",
+        payload: {
+          call_id: `${turnId}:runtime_tool_call:2`,
+          capability_key: "docs-viewer.locate_in_doc",
+          compound_subgoal_id: docsSubgoalId,
+          args: { query: "terminal authority" },
+        },
+      },
+      {
+        artifact_id: `${turnId}:runtime_tool_call:2:runtime_tool_observation`,
+        kind: "runtime_tool_observation",
+        payload: {
+          call_id: `${turnId}:runtime_tool_call:2`,
+          capability_key: "docs-viewer.locate_in_doc",
+          compound_subgoal_id: docsSubgoalId,
+          status: "completed",
+        },
+      },
+      {
+        artifact_id: docsObservationRef,
+        kind: "doc_location_matches",
+        payload: {
+          schema: "helix.doc_location_matches.v1",
+          capability_key: "docs-viewer.locate_in_doc",
+          compound_subgoal_id: docsSubgoalId,
+          matches: [{ path: "docs/audits/research/helix-ask-codex-parity-model-turn-fidelity-audit-2026-06-12.md", line: 12 }],
+        },
+      },
+      {
+        artifact_id: `${turnId}:final_answer_draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: draftText,
+          support_refs: [workspaceObservationRef],
+          artifact_refs: [workspaceObservationRef],
+          authority: "llm_post_observation_composer",
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt: "Use workspace_os.status, then use docs-viewer.locate_in_doc for terminal authority.",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "model_only",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+        forbidden_terminal_artifact_kinds: ["workspace_action_receipt", "agent_step_observation_packet"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        goal_kind: "compound_tool",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+        prompt_shape: "compound_tool",
+        relevant_tool_families: ["workspace_diagnostic", "docs_viewer"],
+        terminal_success_criteria: {
+          required_observation_families: ["workspace_diagnostic", "docs_viewer"],
+          required_capabilities: ["workspace_os.status", "docs-viewer.locate_in_doc"],
+          requires_post_observation_synthesis: true,
+        },
+        compound_capability_contract: {
+          schema: "helix.compound_capability_contract.v1",
+          turn_id: turnId,
+          prompt_shape: "compound_capability",
+          requires_all_subgoals: true,
+          terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          subgoals: [
+            {
+              subgoal_id: workspaceSubgoalId,
+              order: 1,
+              requested_capability: "workspace_os.status",
+              runtime_capability: "workspace_os.status",
+              required_observation_kinds: ["workspace_os_status_observation"],
+              allowed_substitutions: [],
+              args_hint: {},
+            },
+            {
+              subgoal_id: docsSubgoalId,
+              order: 2,
+              requested_capability: "docs-viewer.locate_in_doc",
+              runtime_capability: "docs-viewer.locate_in_doc",
+              required_observation_kinds: ["doc_location_matches"],
+              allowed_substitutions: [],
+              args_hint: { query: "terminal authority" },
+            },
+          ],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: draftText,
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("compound_subgoal_support_refs_missing");
+    expect(payload.selected_final_answer).toContain(docsObservationRef);
+    expect(payload.compound_subgoal_draft_support_coverage).toMatchObject({
+      applies: true,
+      ok: false,
+      required_observation_refs: [workspaceObservationRef, docsObservationRef],
+      draft_support_refs: [workspaceObservationRef],
+      missing_observation_refs: [docsObservationRef],
+    });
+    expect(result.rejected_candidates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "model_synthesized_answer",
+        source: "final_answer_draft",
+        reason: "missing_required_observation",
+      }),
+    ]));
+  });
+
+  it("allows compound final drafts grounded in every satisfied subgoal observation", () => {
+    const turnId = "ask:test:compound-draft-complete-subgoal-support";
+    const workspaceSubgoalId = `${turnId}:compound_capability_subgoal:1:workspace_os_status`;
+    const docsSubgoalId = `${turnId}:compound_capability_subgoal:2:docs-viewer_locate_in_doc`;
+    const workspaceObservationRef = `${turnId}:workspace_os_status_observation`;
+    const docsObservationRef = `${turnId}:doc_location_matches`;
+    const draftText = "Workspace status was available, and the requested document anchor was located in the audit notes.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:runtime_tool_call:1`,
+        kind: "runtime_tool_call",
+        payload: {
+          call_id: `${turnId}:runtime_tool_call:1`,
+          capability_key: "workspace_os.status",
+          compound_subgoal_id: workspaceSubgoalId,
+          args: {},
+        },
+      },
+      {
+        artifact_id: `${turnId}:runtime_tool_call:1:runtime_tool_observation`,
+        kind: "runtime_tool_observation",
+        payload: {
+          call_id: `${turnId}:runtime_tool_call:1`,
+          capability_key: "workspace_os.status",
+          compound_subgoal_id: workspaceSubgoalId,
+          status: "completed",
+        },
+      },
+      {
+        artifact_id: workspaceObservationRef,
+        kind: "workspace_os_status_observation",
+        payload: {
+          schema: "helix.workspace_os_status_observation.v1",
+          capability_key: "workspace_os.status",
+          compound_subgoal_id: workspaceSubgoalId,
+          summary: { available: 18, degraded: 1 },
+        },
+      },
+      {
+        artifact_id: `${turnId}:runtime_tool_call:2`,
+        kind: "runtime_tool_call",
+        payload: {
+          call_id: `${turnId}:runtime_tool_call:2`,
+          capability_key: "docs-viewer.locate_in_doc",
+          compound_subgoal_id: docsSubgoalId,
+          args: { query: "terminal authority" },
+        },
+      },
+      {
+        artifact_id: `${turnId}:runtime_tool_call:2:runtime_tool_observation`,
+        kind: "runtime_tool_observation",
+        payload: {
+          call_id: `${turnId}:runtime_tool_call:2`,
+          capability_key: "docs-viewer.locate_in_doc",
+          compound_subgoal_id: docsSubgoalId,
+          status: "completed",
+        },
+      },
+      {
+        artifact_id: docsObservationRef,
+        kind: "doc_location_matches",
+        payload: {
+          schema: "helix.doc_location_matches.v1",
+          capability_key: "docs-viewer.locate_in_doc",
+          compound_subgoal_id: docsSubgoalId,
+          matches: [{ path: "docs/audits/research/helix-ask-codex-parity-model-turn-fidelity-audit-2026-06-12.md", line: 12 }],
+        },
+      },
+      {
+        artifact_id: `${turnId}:final_answer_draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: draftText,
+          support_refs: [workspaceObservationRef, docsObservationRef],
+          artifact_refs: [workspaceObservationRef, docsObservationRef],
+          authority: "llm_post_observation_composer",
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt: "Use workspace_os.status, then use docs-viewer.locate_in_doc for terminal authority.",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "model_only",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+        forbidden_terminal_artifact_kinds: ["workspace_action_receipt", "agent_step_observation_packet"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        goal_kind: "compound_tool",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+        prompt_shape: "compound_tool",
+        relevant_tool_families: ["workspace_diagnostic", "docs_viewer"],
+        terminal_success_criteria: {
+          required_observation_families: ["workspace_diagnostic", "docs_viewer"],
+          required_capabilities: ["workspace_os.status", "docs-viewer.locate_in_doc"],
+          requires_post_observation_synthesis: true,
+        },
+        compound_capability_contract: {
+          schema: "helix.compound_capability_contract.v1",
+          turn_id: turnId,
+          prompt_shape: "compound_capability",
+          requires_all_subgoals: true,
+          terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          subgoals: [
+            {
+              subgoal_id: workspaceSubgoalId,
+              order: 1,
+              requested_capability: "workspace_os.status",
+              runtime_capability: "workspace_os.status",
+              required_observation_kinds: ["workspace_os_status_observation"],
+              allowed_substitutions: [],
+              args_hint: {},
+            },
+            {
+              subgoal_id: docsSubgoalId,
+              order: 2,
+              requested_capability: "docs-viewer.locate_in_doc",
+              runtime_capability: "docs-viewer.locate_in_doc",
+              required_observation_kinds: ["doc_location_matches"],
+              allowed_substitutions: [],
+              args_hint: { query: "terminal authority" },
+            },
+          ],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: draftText,
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(result.visible_text).toBe(draftText);
+    expect(payload.compound_subgoal_draft_support_coverage).toMatchObject({
+      applies: true,
+      ok: true,
+      required_observation_refs: [workspaceObservationRef, docsObservationRef],
+      draft_support_refs: [workspaceObservationRef, docsObservationRef],
+      missing_observation_refs: [],
+    });
+    expect(payload.final_answer_source).toBe("final_answer_draft");
+  });
 });

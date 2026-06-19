@@ -1038,6 +1038,7 @@ describe("Helix Ask workstation tool planner", () => {
           "pause_loop",
           "resume_loop",
           "set_loop_state",
+          "repair_loop",
           "focus_process_graph",
           "repair_source",
           "ask_user",

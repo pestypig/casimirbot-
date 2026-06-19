@@ -246,6 +246,7 @@ describe("Helix Ask tool-family contract registry", () => {
     const observationCases = [
       ["live_env.query_workstation_goal_context", "helix.workstation_goal_context_update.v1"],
       ["live_env.query_workstation_goal_context", "helix.agent_goal_session.v1"],
+      ["live_env.start_agent_goal_session", "stage_play_agent_goal_session_tool_result/v1"],
       ["live_env.query_trace_memory", "helix.workstation_reasoning_trace_query_result.v1"],
       ["live_env.query_packet_traces", "stage_play_packet_trace_query_result.v1"],
       ["live_env.query_packet_traces", "live_source_causal_trace/v1"],
@@ -278,6 +279,7 @@ describe("Helix Ask tool-family contract registry", () => {
       ["live_env.narrator_say", "helix.narrator_say_request.v1"],
       ["live_env.narrator_bind_stream", "helix.narrator_bind_stream_request.v1"],
       ["live_env.narrator_say", "helix.narrator_event/v1"],
+      ["live_env.change_workstation_preset", "stage_play_workstation_control_receipt/v1"],
       ["live_env.read_processed_live_source_mail", "stage_play_live_source_mail_wake_request/v1"],
       ["live_env.read_processed_live_source_mail", "stage_play_live_source_mail_wake_result/v1"],
       ["live_env.read_processed_live_source_mail", "stage_play_live_source_mail_wake_result_projection/v1"],
@@ -330,9 +332,12 @@ describe("Helix Ask tool-family contract registry", () => {
         mutating: entry.mutating,
       });
 
+      const expectedReason = /^stage_play_(?:workstation_control_receipt|agent_goal_session_tool_result)/.test(receiptKind)
+        ? "observation_artifact_cannot_terminalize"
+        : "terminal_kind_forbidden_by_route_product_contract";
       expect(decision).toMatchObject({
         allowed: false,
-        reason: "terminal_kind_forbidden_by_route_product_contract",
+        reason: expectedReason,
         assistant_answer: false,
         terminal_eligible: false,
         raw_content_included: false,

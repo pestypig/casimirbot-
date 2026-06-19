@@ -368,6 +368,49 @@ describe("stage_play_workstation_control_receipt/v1", () => {
     }))).toEqual(expect.arrayContaining([
       "prepared set_loop_state receipts must include loopRef",
     ]));
+
+    expect(validateWorkstationControlReceiptV1(receiptFixture({
+      receiptId: "stage_play_workstation_control_receipt:repair_loop:frog",
+      requestedToolName: "live_env.repair_loop",
+      canonicalToolName: "live_env.repair_loop",
+      controlKind: "repair_loop",
+      label: "repair workstation loop",
+      requiredActuator: "repair_loop",
+      matchedAllowedActuators: ["repair_loop"],
+      matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:repair_loop"],
+      policyEvidenceRefs: ["allowed_actuator:repair_loop", "agent_goal_allowed_actuator:repair_loop"],
+      targetRef: null,
+      presetId: null,
+      loopRef: "loop:visual-capture",
+      loopState: "repaired",
+      loopRefs: ["helix-ask:desktop", "workstation_control:repair_loop", "workstation_actuator:repair_loop"],
+      evidenceRefs: [
+        "stage_play_workstation_control_receipt:repair_loop:frog",
+        "allowed_actuator:repair_loop",
+        "agent_goal_allowed_actuator:repair_loop",
+        "visual_source:image-lens",
+        "source:visual:active",
+        "helix-ask:desktop",
+        "workstation_control:repair_loop",
+        "workstation_actuator:repair_loop",
+      ],
+      producedRefs: [
+        "stage_play_workstation_control_receipt:repair_loop:frog",
+        "stage_play_goal_context_update:control:frog",
+      ],
+      dispatch: [
+        { kind: "log_receipt", receiptRef: "stage_play_workstation_control_receipt:repair_loop:frog" },
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+        { kind: "set_loop_state", loopRef: "loop:visual-capture", state: "repaired" },
+        { kind: "repair_loop", loopRef: "loop:visual-capture" },
+      ],
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: "stage_play_workstation_control_receipt:repair_loop:frog" },
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+        { kind: "set_loop_state", loopRef: "loop:visual-capture", state: "repaired" },
+        { kind: "repair_loop", loopRef: "loop:visual-capture" },
+      ],
+    }))).toEqual([]);
   });
 
   it("rejects blocked or terminalizing workstation control receipts", () => {

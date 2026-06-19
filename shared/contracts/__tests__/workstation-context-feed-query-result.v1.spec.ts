@@ -577,6 +577,43 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
     }))).toEqual([]);
   });
 
+  it("accepts goal-satisfaction reflections on the trace-memory feed lane", () => {
+    const reflectionUpdate = updateFixture({
+      updateId: "stage_play_goal_context_update:reflection:goal-satisfaction",
+      producerKind: "reflection",
+      updateKind: "summary",
+      contentRef: "helix_goal_satisfaction:frog",
+      preview: "Goal evidence is sufficient for final-report preparation; terminal authority remains required.",
+      sourceRefs: ["visual_source:image-lens", "source:visual:active"],
+      loopRefs: ["thread:helix-ask:desktop", "workstation_context_feed:trace_memory", "workstation_actuator:evaluate_goal_satisfaction"],
+      evidenceRefs: [
+        "helix_goal_satisfaction:frog",
+        "visual_source:image-lens",
+        "source:visual:active",
+        "thread:helix-ask:desktop",
+        "workstation_context_feed:trace_memory",
+        "workstation_actuator:evaluate_goal_satisfaction",
+        "terminal_authority_required",
+      ],
+      receiptRefs: ["helix_goal_satisfaction:frog"],
+    });
+
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      resultId: "stage_play_context_feed_query:trace_memory:goal-satisfaction",
+      feedKind: "trace_memory",
+      label: "Trace memory",
+      policyEvidenceRefs: [
+        "context_feed:trace_memory",
+        "allowed_actuator:query_trace_memory",
+        "agent_goal_context_feed:feed:trace_memory",
+        "agent_goal_allowed_actuator:query_trace_memory",
+      ],
+      requiredActuator: "query_trace_memory",
+      goalContextUpdates: [reflectionUpdate],
+      updateCount: 1,
+    }))).toEqual([]);
+  });
+
   it("rejects visual feed query results carrying MicroDeck updates", () => {
     const microdeckUpdate = updateFixture({
       updateId: "stage_play_goal_context_update:microdeck:wrong-lane",

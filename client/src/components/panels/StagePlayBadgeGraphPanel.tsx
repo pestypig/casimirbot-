@@ -69,6 +69,7 @@ import {
   STAGE_PLAY_LIVE_SOURCE_MAIL_REFRESH_EVENT,
   type StagePlayLiveSourceMailRefreshEventDetail,
 } from "@/lib/helix/liveSourceMailRefreshEvent";
+import { workstationCircuitColor } from "@/lib/workstation/reasoningCircuitColor";
 import { recordWorkstationCommandLifecycle } from "@/lib/workstation/performance/workstationCommandReceipts";
 import { useWorkstationPerformanceStore } from "@/store/useWorkstationPerformanceStore";
 import { useHelixStartSettings } from "@/hooks/useHelixStartSettings";
@@ -282,7 +283,7 @@ const buildMicroDeckEvidenceWiringWidgets = (
         countLine,
         "- Use packet.actionPredictions as tentative hypotheses; verify their basis, disconfirmers, frameIntervalRefs, lensRefs, and sourceSliceRefs.",
         "- Separate surface cues, goal-object reasoning, belief state, perceptual access, and tool affordance before selecting recommendedNext.",
-        "- If the prediction has decisive uncertainties, choose evidence pursuit or record_interpretation instead of overconfident Ask wake shaping.",
+        "- If the prediction has decisive uncertainties, choose evidence pursuit or record_interpretation instead of overconfident Ask interrupt shaping.",
       ].join("\n"),
     },
     {
@@ -1358,7 +1359,7 @@ function formatStagePlayDeckVerdictForOverview(
   }
   if (arbiter?.reason) segments.push(`Reason: ${arbiter.reason}.`);
 
-  return compactStagePlayText(segments.join(" "), "Micro-reasoner deck has not produced a wake verdict yet.", 420);
+  return compactStagePlayText(segments.join(" "), "Micro-reasoner deck has not produced an interrupt verdict yet.", 420);
 }
 
 function statusTone(status: string): string {
@@ -2538,17 +2539,7 @@ const STAGE_PLAY_PACKET_TRAFFIC_STATIONS: Array<{
 ];
 
 const packetTrailColor = (value: string): { hsl: string; border: string; background: string; glow: string } => {
-  let hash = 0;
-  for (const char of value || "packet") {
-    hash = ((hash << 5) - hash + char.charCodeAt(0)) | 0;
-  }
-  const hue = Math.abs(hash) % 360;
-  return {
-    hsl: `hsl(${hue} 84% 62%)`,
-    border: `hsl(${hue} 78% 52%)`,
-    background: `hsl(${hue} 72% 24% / 0.28)`,
-    glow: `0 0 0 1px hsl(${hue} 78% 52% / 0.45), 0 0 18px hsl(${hue} 84% 62% / 0.22)`,
-  };
+  return workstationCircuitColor(value, "packet");
 };
 
 const stagePlayAppliedDeckKey = (presetId: string, sourceId: string | null, reason: string): string =>
@@ -3351,7 +3342,7 @@ function StagePlayPacketTrafficBoard({
               tone={stagePlayBudgetTone(null, selected.metrics.activePacketLoad)}
             />
             <StagePlayMetricPill
-              label="wake queue"
+              label="interrupt queue"
               value={formatStagePlayBudgetRatio(selected.metrics.queueLoad)}
               tone={stagePlayBudgetTone(null, selected.metrics.queueLoad)}
             />
@@ -4351,12 +4342,12 @@ const MICRO_REASONER_DISPLAY: Record<StagePlayMicroReasonerRoleV1, {
   },
   salience_scorer: {
     title: "Salience / Voice Candidate",
-    subtitle: "wake + voice scoring",
+    subtitle: "interrupt + voice scoring",
     missingPreview: "waiting for salience score",
   },
   hypothesis_arbiter: {
     title: "Hypothesis Arbiter",
-    subtitle: "council -> wake verdict",
+    subtitle: "council -> interrupt verdict",
     missingPreview: "waiting for arbiter verdict",
   },
   prompt_router: {
@@ -5203,7 +5194,7 @@ function buildObserverMailLoopNodes(input: {
         },
       ],
       edgeToNext: {
-        label: displayWake ? "wake queued" : visualMail ? "needs wake" : "mail missing",
+        label: displayWake ? "interrupt queued" : visualMail ? "needs interrupt" : "mail missing",
         tone: displayWake ? "connected" : visualMail ? "pending" : "blocked",
       },
       inputLabel: "Input",
@@ -5396,7 +5387,7 @@ function buildObserverMailLoopNodes(input: {
                 voiceRefs: completedWakeVoiceRefs,
                 failureReason: latestCompletedWakeResult.lifecycleReason,
               })}; ${completedWakeDecisionIds.length} decision${completedWakeDecisionIds.length === 1 ? "" : "s"}`
-            : "No completed Ask wake yet.",
+            : "No completed Ask interrupt yet.",
           tone: latestCompletedWakeResult ? "good" : "default",
         },
         {
@@ -5410,7 +5401,7 @@ function buildObserverMailLoopNodes(input: {
                 nextRetryAt: latestPendingWake.nextRetryAt,
                 failureReason: pendingWakeLifecycleReason ?? pendingWakeFailureReason,
               })}; ${latestPendingWake.mailIds.length} mail`
-            : "No current pending/deferred wake.",
+            : "No current pending/deferred interrupt.",
           tone: latestPendingWake ? stagePlayWakeLifecycleTone(pendingWakeLifecycleStage, pendingWakeStatus ?? latestPendingWake.status) : "default",
         },
         {
@@ -6083,17 +6074,17 @@ function StagePlayMailLoopLiveOverview({
     ? "backend wake admission deferred for pressure, opening visible Helix Ask wake as a manual override"
     : wakeStatus === "failed_retryable"
       ? "backend wake attempt failed retryably, opening visible Helix Ask wake"
-      : "micro-reasoner wake candidate ready for Helix Ask";
+      : "micro-reasoner interrupt candidate ready for Helix Ask";
   const wakeBridgeButtonLabel = wakeStatus === "deferred_for_pressure"
     ? "Open pressure-deferred wake in Helix Ask"
     : wakeStatus === "failed_retryable"
       ? "Retry wake in Helix Ask"
-      : "Open queued wake in Helix Ask";
+      : "Open queued interrupt in Helix Ask";
   const wakeBridgeButtonTitle = wakeBridgeEligible
     ? wakeStatus === "deferred_for_pressure"
       ? "Open and auto-submit this pressure-deferred mailbox wake in Helix Ask as a visible manual override."
-      : "Open and auto-submit this constrained mailbox wake in Helix Ask."
-    : "No eligible unresolved wake candidate is ready.";
+      : "Open and auto-submit this constrained mailbox interrupt in Helix Ask."
+    : "No eligible unresolved interrupt candidate is ready.";
   const packetChars = latestPacket ? jsonCharCount(latestPacket) : 0;
   const runChars = jsonCharCount(latestPacketRuns.length > 0 ? latestPacketRuns : runs);
   const compactPacketChars = latestPacket ? jsonCharCount({
@@ -6247,9 +6238,9 @@ function StagePlayMailLoopLiveOverview({
   }));
   const recentWakePayloads: StagePlayMailJourneyPayload[] = wakeRequests.slice(-6).reverse().map((wake) => ({
     id: wake.wakeRequestId,
-    label: wake.wakeRequestId.split(":").at(-1)?.slice(0, 8) ?? "wake",
+    label: wake.wakeRequestId.split(":").at(-1)?.slice(0, 8) ?? "interrupt",
     status: labelize(wake.lifecycleStage ?? wake.status),
-    preview: compactStagePlayText(wake.failureReason ?? `${wake.mailIds.length} mail item(s), ${wake.decisionIds.length} decision(s).`, "Wake queued.", 120),
+    preview: compactStagePlayText(wake.failureReason ?? `${wake.mailIds.length} mail item(s), ${wake.decisionIds.length} decision(s).`, "Interrupt queued.", 120),
     meta: wake.askTurnId ? "ask" : formatStagePlayClock(wake.updatedAt),
     state: wake.status === "completed"
       ? "done"
@@ -6277,7 +6268,7 @@ function StagePlayMailLoopLiveOverview({
     id: result.wakeResultId,
     label: result.wakeResultId.split(":").at(-1)?.slice(0, 8) ?? "result",
     status: labelize(result.lifecycleStage ?? result.status),
-    preview: compactStagePlayText(result.failedReason ?? result.skippedReason ?? `${result.decisionIds.length} decision(s), ${result.voiceCheckpointRefs?.length ?? 0} voice checkpoint(s).`, "Wake result pending.", 120),
+    preview: compactStagePlayText(result.failedReason ?? result.skippedReason ?? `${result.decisionIds.length} decision(s), ${result.voiceCheckpointRefs?.length ?? 0} voice checkpoint(s).`, "Interrupt result pending.", 120),
     meta: formatStagePlayClock(result.createdAt),
     state: result.status === "completed"
       ? "done"
@@ -7026,8 +7017,8 @@ function StagePlayMailLoopLiveOverview({
     })),
     ...wakeRequests.slice(-6).reverse().map((wake): StagePlayTrafficDetail => ({
       id: wake.wakeRequestId,
-      label: wake.wakeRequestId.split(":").at(-1)?.slice(0, 12) ?? "wake",
-      station: "Wake queue",
+      label: wake.wakeRequestId.split(":").at(-1)?.slice(0, 12) ?? "interrupt",
+      station: "Interrupt queue",
       status: labelize(wake.lifecycleStage ?? wake.status),
       state: wake.status === "completed"
         ? "done"
@@ -7036,7 +7027,7 @@ function StagePlayMailLoopLiveOverview({
           : wake.status === "running"
             ? "active"
             : "pending",
-      summary: compactStagePlayText(wake.failureReason ?? wake.reason, "Wake is queued for Ask admission.", 900),
+      summary: compactStagePlayText(wake.failureReason ?? wake.reason, "Interrupt is queued for Ask admission.", 900),
       meta: `${formatStagePlayClock(wake.updatedAt)} | ${wake.askTurnId ?? "no Ask turn"}`,
       rows: [
         { label: "status", value: labelize(wake.status), tone: wake.status === "deferred_for_pressure" ? "blocked" : "default" },
@@ -7060,10 +7051,10 @@ function StagePlayMailLoopLiveOverview({
         state: wake.askTurnId ? "done" : "active",
         summary: wake.askTurnId
           ? "Structured mailbox route metadata is attached to the Ask turn."
-          : "Wake is running but the Ask turn id is not visible yet.",
+          : "Interrupt dispatch is running but the Ask turn id is not visible yet.",
         meta: wake.askTurnId ?? wake.wakeRequestId,
         rows: [
-          { label: "wake", value: wake.wakeRequestId },
+          { label: "interrupt", value: wake.wakeRequestId },
           { label: "Ask id", value: wake.askTurnId ?? "none", tone: wake.askTurnId ? "good" : "warn" },
           { label: "required source", value: "live_source_mailbox" },
           { label: "required tool", value: "live_env.read_live_source_mail" },
@@ -7082,7 +7073,7 @@ function StagePlayMailLoopLiveOverview({
           : "pending",
       summary: compactStagePlayText(
         result.failedReason ?? result.skippedReason ?? `${result.decisionIds.length} decision(s), ${result.voiceCheckpointRefs?.length ?? 0} voice checkpoint ref(s).`,
-        "Wake result pending.",
+        "Interrupt result pending.",
         900,
       ),
       meta: `${formatStagePlayClock(result.createdAt)} | ${result.askTurnId ?? "no Ask turn"}`,
@@ -7212,7 +7203,7 @@ function StagePlayMailLoopLiveOverview({
       mailItems,
       processedPacket: latestPacket,
       wakeResult: latestWakeResult,
-      bridgeReason: "operator opened queued wake from Stage Play mail-loop UI",
+      bridgeReason: "operator opened queued interrupt from Stage Play mail-loop UI",
     });
     const memory = readStagePlayWakeBridgeMemory();
     writeStagePlayWakeBridgeMemory(markStagePlayWakeBridgeLaunched(memory, latestWake.wakeRequestId, Date.now()));
@@ -7356,8 +7347,8 @@ function StagePlayMailLoopLiveOverview({
                   onClick={() => void handleDismissWake(latestWake.wakeRequestId)}
                   disabled={dismissingWakeId === latestWake.wakeRequestId}
                   className="inline-flex h-7 w-7 items-center justify-center rounded border border-slate-700 bg-slate-950 text-slate-400 hover:border-rose-500 hover:text-rose-200 disabled:cursor-not-allowed disabled:opacity-45"
-                  aria-label="Dismiss queued wake"
-                  title="Dismiss this queued wake"
+                  aria-label="Dismiss queued interrupt"
+                  title="Dismiss this queued interrupt"
                   data-testid="stage-play-dismiss-latest-wake"
                 >
                   <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -7902,27 +7893,27 @@ function StagePlayMailLoopLiveOverview({
               </div>
             </div>
             <div className="rounded-md border border-emerald-900/60 bg-emerald-950/15 p-3">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-200">Last completed wake</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-200">Last completed interrupt</div>
               <div className="mt-1 text-sm font-semibold text-emerald-50">
                 {liveOverviewCompletedWake
                   ? labelize(liveOverviewCompletedWakeResult?.lifecycleStage ?? liveOverviewCompletedWake.lifecycleStage ?? liveOverviewCompletedWakeResult?.status ?? liveOverviewCompletedWake.status)
                   : "none yet"}
               </div>
               <div className="mt-1 truncate font-mono text-[10px] text-emerald-200/70">
-                {liveOverviewCompletedWake?.wakeRequestId ?? "no completed wake receipt"}
+                {liveOverviewCompletedWake?.wakeRequestId ?? "no completed interrupt receipt"}
               </div>
             </div>
             <div className="rounded-md border border-amber-900/60 bg-amber-950/15 p-3">
               <div className="flex items-center justify-between gap-2">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-amber-200">Current pending/deferred wake</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-amber-200">Current pending/deferred interrupt</div>
                 {isDismissibleStagePlayWakeRequest(liveOverviewPendingWake) ? (
                   <button
                     type="button"
                     onClick={() => void handleDismissWake(liveOverviewPendingWake.wakeRequestId)}
                     disabled={dismissingWakeId === liveOverviewPendingWake.wakeRequestId}
                     className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-amber-700/50 bg-amber-950/30 text-amber-100 hover:border-rose-400 hover:text-rose-100 disabled:cursor-not-allowed disabled:opacity-45"
-                    aria-label="Dismiss pending wake"
-                    title="Dismiss this pending wake"
+                    aria-label="Dismiss pending interrupt"
+                    title="Dismiss this pending interrupt"
                     data-testid="stage-play-dismiss-pending-wake"
                   >
                     <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -7935,14 +7926,14 @@ function StagePlayMailLoopLiveOverview({
                   : "clear"}
               </div>
               <div className="mt-1 truncate font-mono text-[10px] text-amber-200/70">
-                {liveOverviewPendingWake?.wakeRequestId ?? "no unresolved wake"}
+                {liveOverviewPendingWake?.wakeRequestId ?? "no unresolved interrupt"}
               </div>
             </div>
           </div>
           {dismissibleWakeRequests.length > 0 ? (
             <div className="mt-3 rounded-md border border-slate-800 bg-slate-950/55 p-2.5" data-testid="stage-play-dismissible-wake-list">
               <div className="mb-2 flex items-center justify-between gap-2">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Queued wake controls</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Queued interrupt controls</div>
                 <div className="font-mono text-[9px] text-slate-500">{dismissibleWakeRequests.length} clearable</div>
               </div>
               <div className="space-y-1.5">
@@ -7959,8 +7950,8 @@ function StagePlayMailLoopLiveOverview({
                       onClick={() => void handleDismissWake(wake.wakeRequestId)}
                       disabled={dismissingWakeId === wake.wakeRequestId}
                       className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-slate-700 bg-slate-950 text-slate-400 hover:border-rose-500 hover:text-rose-200 disabled:cursor-not-allowed disabled:opacity-45"
-                      aria-label={`Dismiss wake ${wake.wakeRequestId}`}
-                      title="Dismiss this queued wake"
+                      aria-label={`Dismiss interrupt ${wake.wakeRequestId}`}
+                      title="Dismiss this queued interrupt"
                       data-testid="stage-play-dismiss-queued-wake"
                     >
                       <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -8059,35 +8050,35 @@ function StagePlayMailLoopLiveOverview({
 
       <div className="grid gap-3 lg:grid-cols-2">
         <div className="rounded-md border border-emerald-900/60 bg-emerald-950/15 p-3">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-200">Last completed wake</div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-200">Last completed interrupt</div>
           <div className="mt-1 text-sm font-semibold text-emerald-50">
             {liveOverviewCompletedWake
               ? labelize(liveOverviewCompletedWakeResult?.lifecycleStage ?? liveOverviewCompletedWake.lifecycleStage ?? liveOverviewCompletedWakeResult?.status ?? liveOverviewCompletedWake.status)
               : "none yet"}
           </div>
           <div className="mt-1 font-mono text-[10px] text-emerald-200/70">
-            {liveOverviewCompletedWake?.wakeRequestId ?? "no completed wake receipt"}
+            {liveOverviewCompletedWake?.wakeRequestId ?? "no completed interrupt receipt"}
           </div>
           <div className="mt-2 text-xs leading-relaxed text-emerald-100/80">
             {liveOverviewCompletedWake
               ? `Ask ${liveOverviewCompletedWakeResult?.askTurnId ?? liveOverviewCompletedWake.askTurnId ?? "not recorded"}; decisions ${(liveOverviewCompletedWakeResult?.decisionIds ?? liveOverviewCompletedWake.decisionIds).length}; evidence ${(liveOverviewCompletedWakeResult?.evidenceRefs ?? liveOverviewCompletedWake.evidenceRefs).length}.`
-              : "No wake has completed with a decision/voice/hold/block checkpoint in this mailbox view."}
+              : "No interrupt has completed with a decision/voice/hold/block checkpoint in this mailbox view."}
           </div>
         </div>
         <div className="rounded-md border border-amber-900/60 bg-amber-950/15 p-3">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-amber-200">Current pending/deferred wake</div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-amber-200">Current pending/deferred interrupt</div>
           <div className="mt-1 text-sm font-semibold text-amber-50">
             {liveOverviewPendingWake
               ? labelize(liveOverviewPendingWakeResult?.lifecycleStage ?? liveOverviewPendingWake.lifecycleStage ?? liveOverviewPendingWakeResult?.status ?? liveOverviewPendingWake.status)
               : "clear"}
           </div>
           <div className="mt-1 font-mono text-[10px] text-amber-200/70">
-            {liveOverviewPendingWake?.wakeRequestId ?? "no unresolved wake"}
+            {liveOverviewPendingWake?.wakeRequestId ?? "no unresolved interrupt"}
           </div>
           <div className="mt-2 text-xs leading-relaxed text-amber-100/80">
             {liveOverviewPendingWake
               ? `${labelize(liveOverviewPendingWakeResult?.status ?? liveOverviewPendingWake.status)}${liveOverviewPendingWakeResult?.failedReason || liveOverviewPendingWake.failureReason ? `; ${liveOverviewPendingWakeResult?.failedReason ?? liveOverviewPendingWake.failureReason}` : ""}${liveOverviewPendingWake.nextRetryAt ? `; retry ${formatStagePlayClock(liveOverviewPendingWake.nextRetryAt)}` : ""}.`
-              : "No queued, running, retryable, or pressure-deferred wake is currently blocking the lane."}
+              : "No queued, running, retryable, or pressure-deferred interrupt is currently blocking the lane."}
           </div>
         </div>
       </div>

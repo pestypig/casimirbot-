@@ -194,6 +194,7 @@ export const LIVE_SOURCE_TURN_PHASE_TABLE: Record<LiveSourceTurnPhaseV1, LiveSou
       "live_env.pause_workstation_loop",
       "live_env.resume_workstation_loop",
       "live_env.set_workstation_loop_state",
+      "live_env.repair_loop",
       "live_env.repair_workstation_source",
       "live_env.update_live_answer_projection",
       "live_env.focus_process_graph",
@@ -501,6 +502,7 @@ const hasWatchPolicyReceipt = (receipts: RecordLike[]): boolean =>
     const observation = receiptObservation(receipt);
     return (
       receiptToolName(receipt) === "live_env.configure_live_source_watch_job" ||
+      receiptToolName(receipt) === "live_env.configure_route_watch" ||
       readString(observation?.artifactId) === "stage_play_live_source_watch_job_policy" ||
       readString(observation?.schema) === "stage_play_live_source_watch_job_policy_config_result/v1" ||
       Boolean(readString(observation?.watchJobPolicyRef ?? observation?.watch_job_policy_ref ?? observation?.policyId))
@@ -758,7 +760,7 @@ const WORKSTATION_CONTROL_PHASE_SPECS: WorkstationControlPhaseSpec[] = [
   },
   {
     toolName: "live_env.repair_loop",
-    actuator: "repair_source",
+    actuator: "repair_loop",
     label: "workstation loop repair",
     receiptKinds: ["stage_play_workstation_control_receipt/v1", "stage_play_workstation_control_receipt"],
   },
@@ -795,11 +797,11 @@ const WORKSTATION_CONTROL_PHASE_SPECS: WorkstationControlPhaseSpec[] = [
 ];
 
 const hasContextualWorkstationControlCue = (prompt: string): boolean =>
-  /\b(?:do\s+not|don't|dont|without|not\s+asking\s+to|no\s+need\s+to|for\s+now)\b[\s\S]{0,160}\b(?:run|call|execute|use|change|bind|unbind|pause|resume|repair|focus|say|speak|evaluate)?\b[\s\S]{0,160}\blive_env\.(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|evaluate_goal_satisfaction)\b/i.test(prompt) ||
-  /\b(?:if|in\s+the\s+future|future|later|eventually|hypothetically|tomorrow|next\s+time|would|could|might|should)\b[\s\S]{0,160}\blive_env\.(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|evaluate_goal_satisfaction)\b/i.test(prompt) ||
-  /\b(?:previously|earlier|last\s+time|before|already|historically|was|were|had)\b[\s\S]{0,180}\blive_env\.(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|evaluate_goal_satisfaction)\b/i.test(prompt) ||
-  /["'`][^"'`]*live_env\.(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|evaluate_goal_satisfaction)[^"'`]*["'`]/i.test(prompt) ||
-  /\b(?:screen|page|button|label|ui|text|menu|dropdown|document|quote)\b[\s\S]{0,90}\b(?:says|shows|reads|contains|labeled|labelled|called|named)\b[\s\S]{0,140}\blive_env\.(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|evaluate_goal_satisfaction)\b/i.test(prompt);
+  /\b(?:do\s+not|don't|dont|without|not\s+asking\s+to|no\s+need\s+to|for\s+now)\b[\s\S]{0,160}\b(?:run|call|execute|use|change|bind|unbind|pause|resume|repair|focus|say|speak|evaluate|configure)?\b[\s\S]{0,160}\blive_env\.(?:configure_route_watch|configure_live_source_watch_job|change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|evaluate_goal_satisfaction)\b/i.test(prompt) ||
+  /\b(?:if|in\s+the\s+future|future|later|eventually|hypothetically|tomorrow|next\s+time|would|could|might|should)\b[\s\S]{0,160}\blive_env\.(?:configure_route_watch|configure_live_source_watch_job|change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|evaluate_goal_satisfaction)\b/i.test(prompt) ||
+  /\b(?:previously|earlier|last\s+time|before|already|historically|was|were|had)\b[\s\S]{0,180}\blive_env\.(?:configure_route_watch|configure_live_source_watch_job|change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|evaluate_goal_satisfaction)\b/i.test(prompt) ||
+  /["'`][^"'`]*live_env\.(?:configure_route_watch|configure_live_source_watch_job|change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|evaluate_goal_satisfaction)[^"'`]*["'`]/i.test(prompt) ||
+  /\b(?:screen|page|button|label|ui|text|menu|dropdown|document|quote)\b[\s\S]{0,90}\b(?:says|shows|reads|contains|labeled|labelled|called|named)\b[\s\S]{0,140}\blive_env\.(?:configure_route_watch|configure_live_source_watch_job|change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|evaluate_goal_satisfaction)\b/i.test(prompt);
 
 const findWorkstationControlPhaseSpec = (
   prompt: string,
@@ -1017,7 +1019,21 @@ const hasStandingWatchCue = (prompt: string): boolean =>
   /\b(?:announce|notify|speak|call\s*out|callout|tell\s+me)\b[\s\S]{0,60}\bif\b[\s\S]{0,140}\b(?:anything\s+important|something\s+important|something\s+changes?|it\s+changes?|source\s+changes?|visual\s+changes?|screen\s+changes?|happens?)\b/i.test(prompt) ||
   /\b(?:watch|monitor|track|keep\s+watching|keep\s+an\s+eye\s+on)\b[\s\S]{0,160}\b(?:active\s+visual\s+source|visual\s+source|live\s+source|source)\b[\s\S]{0,180}\b(?:minecraft\s+video\s+predictor|predictor\s+contract|prediction\s+watch|chronological\s+micro[-\s]?batch(?:es)?|micro[-\s]?batch(?:es)?|short\s+text\s+checkpoints?)\b/i.test(prompt);
 
+const routeWatchAliasToolForPrompt = (
+  prompt: string,
+): "live_env.configure_route_watch" | "live_env.configure_live_source_watch_job" | null => {
+  if (/\blive_env\.configure_route_watch\b/i.test(prompt)) return "live_env.configure_route_watch";
+  if (/\blive_env\.configure_live_source_watch_job\b/i.test(prompt)) {
+    return "live_env.configure_live_source_watch_job";
+  }
+  return null;
+};
+
+const hasRouteWatchAliasCue = (prompt: string): boolean =>
+  routeWatchAliasToolForPrompt(prompt) !== null;
+
 const hasWatchJobSetupCue = (prompt: string): boolean =>
+  hasRouteWatchAliasCue(prompt) ||
   (
     hasStandingWatchCue(prompt) ||
     /\b(?:watch|monitor|track|keep\s+an\s+eye\s+on)\b[\s\S]{0,180}\bonly\s+(?:announce|tell|notify|call\s*out|callout|voice)\b[\s\S]{0,120}\b(?:if|when|unless)\b/i.test(prompt) ||
@@ -1322,6 +1338,7 @@ export const resolveLiveSourceTurnPhase = (
   }
 
   if (hasWatchJobSetupCue(prompt) && packets.length === 0) {
+    const watchSetupTool = routeWatchAliasToolForPrompt(prompt) ?? "live_env.configure_live_source_watch_job";
     if (hasWatchPolicyReceipt(receipts) || input.activePolicyRef) {
       return makeResolution({
         phase: "terminal_checkpoint",
@@ -1341,7 +1358,7 @@ export const resolveLiveSourceTurnPhase = (
       phase: "configure_watch_job",
       reason: "Prompt asks for a standing watch behavior; configure the watch job policy first.",
       canonicalGoal: "configure_watch_job",
-      allowedTools: ["live_env.configure_live_source_watch_job"],
+      allowedTools: [watchSetupTool],
       forbiddenTools: [
         "live_env.read_processed_live_source_mail",
         "live_env.process_live_source_mail",
@@ -1349,7 +1366,7 @@ export const resolveLiveSourceTurnPhase = (
         "live_env.record_live_source_mail_decision",
         "live_env.request_interim_voice_callout",
       ],
-      requiredEvidence: ["live_env.configure_live_source_watch_job"],
+      requiredEvidence: [watchSetupTool],
       completionEvidence: ["stage_play_live_source_watch_job_policy"],
       nextPhase: "terminal_checkpoint",
       locked: true,

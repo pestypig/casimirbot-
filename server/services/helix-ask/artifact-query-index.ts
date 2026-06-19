@@ -1872,6 +1872,31 @@ export const buildArtifactQueryIndex = (input: {
   const lifecycleTrace = readRecord(input.payload.tool_lifecycle_trace);
   const followupDecision = readRecord(input.payload.tool_followup_decision);
   const capabilityPlan = readRecord(input.payload.capability_plan);
+  const capabilityItinerary = readRecord(input.payload.capability_itinerary);
+  const compoundCapabilityContract =
+    readRecord(input.payload.compound_capability_contract) ??
+    readRecord(capabilityItinerary?.compound_capability_contract);
+  const capabilityItineraryExecutionState =
+    readRecord(input.payload.capability_itinerary_execution_state) ??
+    readRecord(capabilityItinerary?.execution_state);
+  const compoundSubgoalLedger = readArray(capabilityItineraryExecutionState?.compound_subgoal_ledger)
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry));
+  const compoundSubgoalRailStatuses = compoundSubgoalLedger.map((entry) => ({
+    subgoal_id: readNullableString(entry.subgoal_id),
+    order: readNumber(entry.order),
+    requested_capability: readNullableString(entry.requested_capability),
+    selected_capability: readNullableString(entry.selected_capability),
+    executed_capability: readNullableString(entry.executed_capability),
+    observation_kind: readNullableString(entry.observation_kind),
+    observation_ref: readNullableString(entry.observation_ref),
+    satisfaction: readNullableString(entry.satisfaction),
+    rail_status: readNullableString(entry.rail_status),
+    rail_failure_code: readNullableString(entry.rail_failure_code),
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  }));
   const admission = readRecord(input.payload.tool_call_admission_decision);
   const artifacts = artifactsForPayload(input.payload);
   const lifecycleCapability = capabilityFromPayload(input.payload, lifecycleTrace);
@@ -1951,6 +1976,10 @@ export const buildArtifactQueryIndex = (input: {
     queryable_artifact_keys: unique(artifactRefs.flatMap((entry) => readStringArray(entry.query_keys))),
     tool_family: resolvedToolFamily,
     capability,
+    compound_capability_contract: compoundCapabilityContract,
+    capability_itinerary_execution_state: capabilityItineraryExecutionState,
+    compound_subgoal_ledger: compoundSubgoalLedger,
+    compound_subgoal_rail_statuses: compoundSubgoalRailStatuses,
     tool_family_contract: contractSummary(contract),
     requested_capability_contract: requestedCapabilityContract,
     required_observation_coverage_mode: requiredObservationCoverageMode,

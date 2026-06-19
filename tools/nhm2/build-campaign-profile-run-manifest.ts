@@ -38,10 +38,22 @@ const stringList = (value: unknown): string[] =>
 const evidenceBlockersFromArtifact = (artifact: unknown): string[] => {
   const blockers = new Set<string>();
   const record = asRecord(artifact);
+  if (
+    record?.contractVersion === "nhm2_candidate_metric_profile_spec/v1" &&
+    asRecord(record.campaignReadiness)?.canEnterFullAdmMetricTensorRoute === true
+  ) {
+    return [];
+  }
   const summary = asRecord(record?.summary);
+  const campaignReadiness = asRecord(record?.campaignReadiness);
+  const executableGeometry = asRecord(record?.executableGeometry);
   const firstBlocker = asString(summary?.firstBlocker);
   if (firstBlocker != null) blockers.add(firstBlocker);
+  const campaignFirstBlocker = asString(campaignReadiness?.firstBlocker);
+  if (campaignFirstBlocker != null) blockers.add(campaignFirstBlocker);
   for (const blocker of stringList(record?.blockers)) blockers.add(blocker);
+  for (const blocker of stringList(campaignReadiness?.blockers)) blockers.add(blocker);
+  for (const blocker of stringList(executableGeometry?.blockers)) blockers.add(blocker);
   const regions = Array.isArray(record?.regions) ? record.regions : [];
   for (const entry of regions) {
     const region = asRecord(entry);
@@ -65,6 +77,7 @@ const readEvidenceInput = (
 };
 
 const evidenceFileNames: Record<Nhm2CampaignProfileRunEvidenceId, string> = {
+  candidate_metric_profile_spec: "nhm2-candidate-metric-profile-spec.json",
   metric_required_full_regional_tensor:
     "nhm2-metric-required-full-regional-tensor.json",
   projected_momentum_demand_audit:

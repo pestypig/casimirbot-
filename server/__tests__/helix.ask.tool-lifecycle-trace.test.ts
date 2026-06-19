@@ -2827,6 +2827,123 @@ describe("Helix Ask tool lifecycle trace", () => {
     ]));
   });
 
+  it("exposes compound subgoal rail status in the artifact query index", () => {
+    const turnId = "ask:test:compound-debug-index";
+    const compoundContract = {
+      schema: "helix.compound_capability_contract.v1",
+      turn_id: turnId,
+      prompt_shape: "compound_capability",
+      requires_all_subgoals: true,
+      terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+      subgoals: [
+        {
+          subgoal_id: `${turnId}:compound_capability_subgoal:1:workspace_os_status`,
+          order: 1,
+          requested_capability: "workspace_os.status",
+          runtime_capability: "workspace_os.status",
+          required_observation_kinds: ["workspace_os_status_observation"],
+        },
+        {
+          subgoal_id: `${turnId}:compound_capability_subgoal:2:scientific-calculator_solve_expression`,
+          order: 2,
+          requested_capability: "scientific-calculator.solve_expression",
+          runtime_capability: "scientific-calculator.solve_expression",
+          required_observation_kinds: ["calculator_receipt", "workstation_tool_evaluation"],
+        },
+      ],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const executionState = {
+      schema: "helix.capability_itinerary_execution_state.v1",
+      applies: true,
+      complete: false,
+      compound_subgoal_ledger: [
+        {
+          subgoal_id: `${turnId}:compound_capability_subgoal:1:workspace_os_status`,
+          order: 1,
+          requested_capability: "workspace_os.status",
+          selected_capability: "workspace_os.status",
+          executed_capability: "workspace_os.status",
+          observation_kind: "workspace_os_status_observation",
+          observation_ref: `${turnId}:workspace_status`,
+          satisfaction: "satisfied",
+          rail_status: "complete",
+          rail_failure_code: null,
+        },
+        {
+          subgoal_id: `${turnId}:compound_capability_subgoal:2:scientific-calculator_solve_expression`,
+          order: 2,
+          requested_capability: "scientific-calculator.solve_expression",
+          selected_capability: "scientific-calculator.solve_expression",
+          executed_capability: "scientific-calculator.solve_expression",
+          observation_kind: null,
+          observation_ref: null,
+          satisfaction: "pending",
+          rail_status: "pending",
+          rail_failure_code: "subgoal_observation_missing",
+        },
+      ],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const payload: Record<string, unknown> = {
+      active_prompt:
+        "Use workspace_os.status, then call scientific-calculator.solve_expression with this exact expression: 2+2.",
+      compound_capability_contract: compoundContract,
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+        compound_capability_contract: compoundContract,
+        execution_state: executionState,
+      },
+      capability_itinerary_execution_state: executionState,
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: `${turnId}:workspace_status`,
+          kind: "workspace_os_status_observation",
+          payload: {
+            schema: "helix.workspace_os_status_observation.v1",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    const index = buildArtifactQueryIndex({ turnId, payload });
+
+    expect(index.compound_capability_contract).toBe(compoundContract);
+    expect(index.capability_itinerary_execution_state).toBe(executionState);
+    expect(index.compound_subgoal_ledger).toEqual(executionState.compound_subgoal_ledger);
+    expect(index.compound_subgoal_rail_statuses).toEqual([
+      expect.objectContaining({
+        requested_capability: "workspace_os.status",
+        executed_capability: "workspace_os.status",
+        observation_kind: "workspace_os_status_observation",
+        observation_ref: `${turnId}:workspace_status`,
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        rail_failure_code: null,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      }),
+      expect.objectContaining({
+        requested_capability: "scientific-calculator.solve_expression",
+        selected_capability: "scientific-calculator.solve_expression",
+        executed_capability: "scientific-calculator.solve_expression",
+        observation_kind: null,
+        observation_ref: null,
+        satisfaction: "pending",
+        rail_status: "pending",
+        rail_failure_code: "subgoal_observation_missing",
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      }),
+    ]);
+  });
+
   it("normalizes a completed internet_search.web_research turn through the same rail table", () => {
     const payload: Record<string, unknown> = {
       active_prompt: "Use internet_search.web_research to find current source evidence.",

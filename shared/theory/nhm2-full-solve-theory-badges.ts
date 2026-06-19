@@ -48,6 +48,8 @@ const NHM2_CAMPAIGN_PROFILE_RUN_MANIFEST =
   "artifacts/research/full-solve/profile-search/nhm2-campaign-profile-run-manifest-latest.json";
 const NHM2_0P9000_COMBINED_PROFILE_CAMPAIGN_RUN_ROOT =
   "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1";
+const NHM2_0P9000_COMBINED_CANDIDATE_METRIC_PROFILE_SPEC =
+  `${NHM2_0P9000_COMBINED_PROFILE_CAMPAIGN_RUN_ROOT}/nhm2-candidate-metric-profile-spec.json`;
 const NHM2_0P9000_COMBINED_METRIC_REQUIRED_FULL_REGIONAL_TENSOR =
   `${NHM2_0P9000_COMBINED_PROFILE_CAMPAIGN_RUN_ROOT}/nhm2-metric-required-full-regional-tensor.json`;
 const NHM2_0P9000_COMBINED_METRIC_REQUIRED_MOMENTUM_DEMAND_AUDIT =
@@ -1602,6 +1604,84 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   nhm2FullSolveBadge({
+    id: "nhm2.profile.candidate_metric_profile_spec",
+    title: "Candidate Metric Profile Spec",
+    plainMeaning:
+      "Records the screened profile definition, diagnostic trip-clocking value, and whether executable candidate geometry exists for the full ADM tensor route.",
+    whyItMatters:
+      "It keeps fast-profile exploration honest: lower alpha and projected T0i suppression cannot enter the real metric tensor route until a candidate shift-field evaluator, regional atlas, and grid are declared.",
+    subjects: ["nhm2", "candidate_profile", "metric_geometry", "trip_clocking", "adm_route"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    equationFamilies: ["campaign_profile_search", "centerline_clocking", "time_dependent_source_campaign"],
+    tags: ["candidate_profile", "runtime_artifact", "noncomputable_reference", "blocks_promotion"],
+    equations: [
+      {
+        id: "candidate_profile_clocking_spec",
+        role: "calculator_demo",
+        displayLatex:
+          "\\tau_{candidate}=\\alpha_{centerline}T_{coordinate}\\;\\land\\;ADMRouteReady=false",
+        computableExpression: "tau_candidate = alpha_centerline * T_coordinate",
+        operatorKind: "scalar_expression",
+        inputSymbols: ["alpha_centerline", "T_coordinate"],
+        outputSymbols: ["tau_candidate"],
+      },
+    ],
+    units: [{ symbol: "tau_candidate", si: "s", dimension: "time" }],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "The candidate spec is an admission precondition for a fresh ADM/Einstein metric-required tensor route.",
+      "The 0p9000 combined metric-redesign row currently lacks an executable shift-field evaluator, regional support atlas ref, and grid ref.",
+      "Trip-clocking values remain diagnostic and do not certify route ETA, speed, transport, or physical viability.",
+    ],
+    calculatorPayloads: [
+      payload({
+        id: "candidate_profile_clocking_replay",
+        expression: "tau_candidate = alpha_centerline * T_coordinate",
+        displayLatex: "\\tau_{candidate}=\\alpha_{centerline}T_{coordinate}",
+        targetVariable: "tau_candidate",
+      }),
+    ],
+    sourceRefs: [
+      artifactRef(
+        "shared/contracts/nhm2-candidate-metric-profile-spec.v1.ts",
+        "nhm2-candidate-metric-profile-spec-contract",
+        "Typed candidate profile spec contract for profile levers, clocking, executable geometry refs, and ADM-route readiness.",
+      ),
+      artifactRef(
+        "tools/nhm2/build-candidate-metric-profile-spec.ts",
+        "nhm2-candidate-metric-profile-spec-builder",
+        "Builder that publishes a screened candidate profile spec from the profile-search artifact.",
+      ),
+      artifactRef(
+        NHM2_0P9000_COMBINED_CANDIDATE_METRIC_PROFILE_SPEC,
+        "runtime-artifact",
+        "0p9000 combined metric-redesign candidate spec: tau=0.9*T_coordinate, but ADM route readiness is blocked by missing executable shift-field evaluator, regional support atlas, and grid refs.",
+      ),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "time-dependent-source-campaign-target",
+        "Whitepaper dynamic campaign target note.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "candidate_profile", "metric_geometry", "trip_clocking"],
+      symbols: ["alpha_centerline", "T_coordinate", "tau_candidate", "ADMRouteReady"],
+      unitSignatures: ["s"],
+      repoPaths: [
+        "shared/contracts/nhm2-candidate-metric-profile-spec.v1.ts",
+        "tools/nhm2/build-candidate-metric-profile-spec.ts",
+        NHM2_0P9000_COMBINED_CANDIDATE_METRIC_PROFILE_SPEC,
+        NHM2_CAMPAIGN_PROFILE_SEARCH,
+        NHM2_CAMPAIGN_PROFILE_RUN_MANIFEST,
+        NHM2_FULL_SOLVE_WHITEPAPER,
+      ],
+      equationFamilies: ["campaign_profile_search", "centerline_clocking"],
+      simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
     id: "nhm2.profile.campaign_run_manifest",
     title: "Campaign Profile Run Manifest",
     plainMeaning:
@@ -1647,8 +1727,13 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
       artifactRef(
         NHM2_CAMPAIGN_PROFILE_RUN_MANIFEST,
-        "sha256:3f957a642ee7c2323928539ac38e1c3aa83d44917ded4aface0bc8a57e44824f",
-        "Run manifest: queues the 0p9000 combined metric-redesign candidate first; projected momentum-demand audit and metric momentum remediation targets are provided, and the metric-required full-regional-tensor screen is provided_blocked because it is not a fresh ADM route.",
+        "runtime-artifact",
+        "Run manifest: queues the 0p9000 combined metric-redesign candidate first; its candidate metric profile spec is provided_blocked because executable shift-field geometry, regional atlas, and grid refs are missing before the full ADM route can run.",
+      ),
+      artifactRef(
+        NHM2_0P9000_COMBINED_CANDIDATE_METRIC_PROFILE_SPEC,
+        "runtime-artifact",
+        "0p9000 combined metric-redesign candidate spec: diagnostic tau=0.9*T_coordinate; firstBlocker=candidate_executable_shift_field_evaluator_missing.",
       ),
       artifactRef(
         NHM2_0P9000_COMBINED_METRIC_REQUIRED_FULL_REGIONAL_TENSOR,
@@ -1679,6 +1764,7 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         "shared/contracts/nhm2-campaign-profile-run-manifest.v1.ts",
         "tools/nhm2/build-campaign-profile-run-manifest.ts",
         NHM2_CAMPAIGN_PROFILE_RUN_MANIFEST,
+        NHM2_0P9000_COMBINED_CANDIDATE_METRIC_PROFILE_SPEC,
         NHM2_0P9000_COMBINED_METRIC_REQUIRED_FULL_REGIONAL_TENSOR,
         NHM2_0P9000_COMBINED_METRIC_REQUIRED_MOMENTUM_DEMAND_AUDIT,
         NHM2_0P9000_COMBINED_METRIC_MOMENTUM_REMEDIATION_TARGETS,
@@ -3380,6 +3466,30 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "documents",
     label: "The profile search identifies candidate profiles that still require a full frozen time-dependent campaign run.",
     claimBoundaryNote: "Candidate ranking is diagnostic steering only and cannot validate a profile.",
+  },
+  {
+    id: "campaign_profile_search_feeds_candidate_metric_profile_spec",
+    from: "nhm2.profile.campaign_search",
+    to: "nhm2.profile.candidate_metric_profile_spec",
+    relation: "requires",
+    label: "A screened candidate must be written as an executable profile spec before the full ADM tensor route can evaluate it.",
+    claimBoundaryNote: "A candidate profile spec is an ADM-entry precondition, not a profile validation or route claim.",
+  },
+  {
+    id: "candidate_metric_profile_spec_feeds_profile_run_manifest",
+    from: "nhm2.profile.candidate_metric_profile_spec",
+    to: "nhm2.profile.campaign_run_manifest",
+    relation: "requires",
+    label: "The run manifest consumes the candidate profile spec as the first frozen-campaign evidence row.",
+    claimBoundaryNote: "Missing executable geometry blocks campaign execution without implying a no-go theorem.",
+  },
+  {
+    id: "candidate_metric_profile_spec_feeds_metric_tensor_screen",
+    from: "nhm2.profile.candidate_metric_profile_spec",
+    to: "nhm2.tensor.same_chart_full_tensor",
+    relation: "requires",
+    label: "Candidate same-chart full tensor evidence requires executable candidate geometry from the metric profile spec.",
+    claimBoundaryNote: "Projected tensors remain blocked until a real ADM/Einstein route is run for the candidate profile.",
   },
   {
     id: "campaign_profile_search_feeds_profile_run_manifest",

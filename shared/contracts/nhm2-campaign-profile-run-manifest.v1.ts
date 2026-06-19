@@ -7,6 +7,7 @@ export const NHM2_CAMPAIGN_PROFILE_RUN_MANIFEST_CONTRACT_VERSION =
   "nhm2_campaign_profile_run_manifest/v1";
 
 export const NHM2_CAMPAIGN_PROFILE_RUN_EVIDENCE_IDS = [
+  "candidate_metric_profile_spec",
   "metric_required_full_regional_tensor",
   "projected_momentum_demand_audit",
   "metric_momentum_remediation_targets",
@@ -226,6 +227,10 @@ export const buildNhm2CampaignProfileRunManifest = (
     queuedCandidates
       .slice()
       .sort((lhs, rhs) => (lhs.priorityRank ?? Infinity) - (rhs.priorityRank ?? Infinity))[0] ?? null;
+  const nextCandidateFirstEvidenceBlocker =
+    nextCandidate?.requiredEvidence.find(
+      (entry) => entry.status === "provided_blocked" || entry.status === "required_missing",
+    )?.blockers[0] ?? null;
 
   return {
     contractVersion: NHM2_CAMPAIGN_PROFILE_RUN_MANIFEST_CONTRACT_VERSION,
@@ -256,7 +261,7 @@ export const buildNhm2CampaignProfileRunManifest = (
       firstBlocker:
         nextCandidate == null
           ? "no_screened_candidate_available_for_frozen_campaign_run"
-          : "candidate_frozen_campaign_evidence_missing",
+          : nextCandidateFirstEvidenceBlocker ?? "candidate_frozen_campaign_evidence_missing",
       manifestComplete: false,
     },
     claimBoundary: {

@@ -7570,7 +7570,7 @@ const STAGE_PLAY_MAIL_WAKE_PROMPT_PATTERNS = [
   /^\s*review the latest stage play live-source mailbox finding\.\s*use the structured mailbox route metadata attached to this turn\b/i,
   /^\s*review the latest stage play live-source mailbox finding\.[\s\S]*?\bmicro-reasoner recommendation:\s*(?:record\s+interpretation|request\s+voice\s+callout|request\s+more\s+evidence|request\s+stage\s+play\s+checkpoint|draft\s+text\s+answer)\b[\s\S]*?\bstructured mailbox route metadata attached\b/i,
   /^\s*review the latest stage play live-source mailbox finding\.[\s\S]*?\bmicro-reasoner recommendation:\s*request\s+voice\s+callout\b[\s\S]*?\bstructured mailbox route metadata attached\b/i,
-  /\bui bridge reason:\s*(?:backend wake admission deferred|micro-reasoner wake candidate|operator opened queued wake)/i,
+  /\bui bridge reason:\s*(?:backend wake admission deferred|micro-reasoner (?:wake|interrupt) candidate|operator opened queued (?:wake|interrupt))/i,
 ];
 
 const STAGE_PLAY_MAIL_WAKE_ASSISTANT_PATTERNS = [
@@ -10291,8 +10291,8 @@ function buildHelixSteeringQueueMailboxItems(
         mailIds.length > 0 ? `${mailIds.length} packet-backed input${mailIds.length === 1 ? "" : "s"}` : null,
         coerceText(wake.failureReason ?? wake.reason).trim() || null,
         coerceText(wake.askTurnId).trim() ? `ask ${coerceText(wake.askTurnId).trim()}` : null,
-      ].filter(Boolean).join(" | ") || "Backend wake queue item.",
-      meta: coerceText(wake.wakeRequestId).trim() || "wake request",
+      ].filter(Boolean).join(" | ") || "Backend interrupt queue item.",
+      meta: coerceText(wake.wakeRequestId).trim() || "interrupt request",
       status,
       tone: toneForHelixSteeringQueueStatus(status),
       evidenceRefs: readHelixSteeringQueueRefs(wake.wakeRequestId, mailIds, wake.evidenceRefs),

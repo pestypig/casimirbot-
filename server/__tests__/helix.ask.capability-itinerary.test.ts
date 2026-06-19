@@ -270,6 +270,199 @@ describe("Helix Ask capability itinerary", () => {
     ]);
   });
 
+  it("does not satisfy a compound subgoal from another subgoal's shared observation kind", () => {
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:compound-shared-observation-kind",
+      promptText:
+        "Use workspace_os.status to inspect workstation status, then call scientific-calculator.solve_expression with this exact expression: 2+2.",
+      toolCallAdmissionDecision: {
+        ...scholarlyAdmission("ask:compound-shared-observation-kind"),
+        source_target: "workspace_diagnostic",
+        admitted_tool_families: ["workspace_diagnostic", "calculator", "workstation_action"],
+      },
+      availableCapabilities: availableCapabilities([
+        "workspace_os.status",
+        "scientific-calculator.solve_expression",
+      ]),
+    });
+
+    const artifacts = [
+      {
+        artifact_id: "ask:compound-shared-observation-kind:runtime_tool_call:1",
+        kind: "runtime_tool_call",
+        payload: {
+          capability_key: "workspace_os.status",
+          args: {},
+        },
+      },
+      {
+        artifact_id: "ask:compound-shared-observation-kind:runtime_tool_call:1:runtime_tool_observation",
+        kind: "runtime_tool_observation",
+        payload: {
+          capability_key: "workspace_os.status",
+          status: "completed",
+        },
+      },
+      {
+        artifact_id: "ask:compound-shared-observation-kind:workspace_status",
+        kind: "workspace_os_status_observation",
+        payload: {
+          schema: "helix.workspace_os_status_observation.v1",
+        },
+      },
+      {
+        artifact_id: "ask:compound-shared-observation-kind:workspace_tool_evaluation",
+        kind: "workstation_tool_evaluation",
+        payload: {
+          schema: "helix.workstation_tool_evaluation.v1",
+          capability_key: "workspace_os.status",
+          summary: "Workspace status returned capability records.",
+        },
+      },
+      {
+        artifact_id: "ask:compound-shared-observation-kind:runtime_tool_call:2",
+        kind: "runtime_tool_call",
+        payload: {
+          capability_key: "scientific-calculator.solve_expression",
+          args: { latex: "2+2", expression: "2+2" },
+        },
+      },
+      {
+        artifact_id: "ask:compound-shared-observation-kind:runtime_tool_call:2:runtime_tool_observation",
+        kind: "runtime_tool_observation",
+        payload: {
+          capability_key: "scientific-calculator.solve_expression",
+          status: "completed",
+        },
+      },
+    ];
+
+    const mismatched = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts,
+    });
+    const mismatchedCalculatorEntry = mismatched.compound_subgoal_ledger.find((entry) =>
+      entry.requested_capability === "scientific-calculator.solve_expression"
+    );
+
+    expect(mismatchedCalculatorEntry).toMatchObject({
+      executed_capability: "scientific-calculator.solve_expression",
+      observation_ref: null,
+      satisfaction: "pending",
+      rail_failure_code: "subgoal_observation_missing",
+    });
+    expect(mismatched.complete).toBe(false);
+    expect(mismatched.missing_required_capabilities).toEqual([
+      "scientific-calculator.solve_expression",
+    ]);
+
+    const matched = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [
+        ...artifacts,
+        {
+          artifact_id: "ask:compound-shared-observation-kind:calculator_tool_evaluation",
+          kind: "workstation_tool_evaluation",
+          payload: {
+            schema: "helix.workstation_tool_evaluation.v1",
+            capability_key: "scientific-calculator.solve_expression",
+            summary: "Calculator result: 4.",
+          },
+        },
+      ],
+    });
+    const matchedCalculatorEntry = matched.compound_subgoal_ledger.find((entry) =>
+      entry.requested_capability === "scientific-calculator.solve_expression"
+    );
+
+    expect(matchedCalculatorEntry).toMatchObject({
+      executed_capability: "scientific-calculator.solve_expression",
+      observation_ref: "ask:compound-shared-observation-kind:calculator_tool_evaluation",
+      satisfaction: "satisfied",
+      rail_failure_code: null,
+    });
+    expect(matched.complete).toBe(true);
+  });
+
+  it("links authorized calculator receipts to compound subgoals by matching expression when legacy subgoal id is generic", () => {
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:workspace-calculator-legacy-receipt",
+      promptText:
+        "Use workspace_os.status to inspect workstation status, then call scientific-calculator.solve_expression with this exact expression: 14*23+8.",
+      toolCallAdmissionDecision: {
+        ...scholarlyAdmission("ask:workspace-calculator-legacy-receipt"),
+        source_target: "workspace_diagnostic",
+        admitted_tool_families: ["workspace_diagnostic", "calculator", "workstation_action"],
+      },
+      availableCapabilities: availableCapabilities([
+        "workspace_os.status",
+        "scientific-calculator.solve_expression",
+      ]),
+    });
+
+    const state = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [
+        {
+          artifact_id: "ask:legacy-receipt:runtime_tool_call:1",
+          kind: "runtime_tool_call",
+          payload: {
+            capability_key: "workspace_os.status",
+            args: {},
+          },
+        },
+        {
+          artifact_id: "ask:legacy-receipt:runtime_tool_call:1:runtime_tool_observation",
+          kind: "runtime_tool_observation",
+          payload: {
+            capability_key: "workspace_os.status",
+            status: "completed",
+          },
+        },
+        {
+          artifact_id: "ask:legacy-receipt:runtime_tool_call:1:workspace_os_status_observation",
+          kind: "workspace_os_status_observation",
+          payload: {
+            capability_key: "workspace_os.status",
+            status: "completed",
+          },
+        },
+        {
+          artifact_id: "ask:legacy-receipt:calculator_subgoal_receipt:calculate_expression",
+          kind: "calculator_subgoal_receipt",
+          payload: {
+            schema: "helix.calculator_subgoal_receipt.v1",
+            receipt_id: "ask:legacy-receipt:calculator_subgoal_receipt:calculate_expression",
+            subgoal_id: "calculate_expression",
+            expression: "14*23+8",
+            result_text: "330",
+            status: "completed",
+            trace_source: "scientific-calculator.solve_expression",
+            authorized_by_agent_step_decision: true,
+            action_authorization: {
+              authorizes_tool_execution: true,
+              authorized_capability: "scientific-calculator.solve_expression",
+            },
+          },
+        },
+      ],
+    });
+
+    const calculatorLedgerEntry = state.compound_subgoal_ledger.find((entry) =>
+      entry.requested_capability === "scientific-calculator.solve_expression"
+    );
+    expect(calculatorLedgerEntry).toMatchObject({
+      selected_capability: "scientific-calculator.solve_expression",
+      executed_capability: "scientific-calculator.solve_expression",
+      observation_ref: "ask:legacy-receipt:calculator_subgoal_receipt:calculate_expression",
+      satisfaction: "satisfied",
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
+    expect(state.complete).toBe(true);
+    expect(state.missing_required_capabilities).toEqual([]);
+  });
+
   it("marks a compound subgoal failed when runtime validation rejects its arguments", () => {
     const itinerary = buildHelixCapabilityItinerary({
       turnId: "ask:compound-invalid-args",

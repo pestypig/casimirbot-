@@ -70,6 +70,8 @@ const LIVE_ENVIRONMENT_OPERATOR_CAPABILITIES = new Set([
   "live_env.change_workstation_preset",
   "live_env.set_visual_preset",
   "live_env.set_audio_preset",
+  "live_env.configure_route_watch",
+  "live_env.configure_live_source_watch_job",
   "live_env.bind_workstation_source",
   "live_env.unbind_workstation_source",
   "live_env.pause_workstation_loop",

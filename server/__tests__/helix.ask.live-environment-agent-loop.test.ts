@@ -172,6 +172,8 @@ describe("Helix Ask live environment agent loop", () => {
       "live_env.set_workstation_loop_state",
       "live_env.repair_loop",
       "live_env.repair_workstation_source",
+      "live_env.configure_route_watch",
+      "live_env.configure_live_source_watch_job",
       "live_env.update_live_answer_projection",
       "live_env.focus_process_graph",
       "live_env.narrator_say",

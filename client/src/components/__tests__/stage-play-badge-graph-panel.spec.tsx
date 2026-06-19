@@ -3457,7 +3457,7 @@ describe("StagePlayBadgeGraphPanel", () => {
 
     const bridgeButton = await screen.findByTestId("stage-play-open-wake-in-ask");
     expect(bridgeButton).toBeEnabled();
-    expect(bridgeButton).toHaveTextContent("Open queued wake in Helix Ask");
+    expect(bridgeButton).toHaveTextContent("Open queued interrupt in Helix Ask");
 
     await waitFor(() => {
       expect(promptEvents.length).toBeGreaterThan(0);

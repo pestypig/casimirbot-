@@ -18,6 +18,7 @@ describe("NHM2 full-solve theory badges", () => {
     "nhm2.metric_required.momentum_remediation_targets",
     "nhm2.campaign.frontier_disposition",
     "nhm2.profile.campaign_search",
+    "nhm2.profile.candidate_metric_profile_spec",
     "nhm2.profile.campaign_run_manifest",
     "nhm2.energy_condition.observer_robust_gate",
     "nhm2.qei.worldline_dossier",
@@ -65,6 +66,7 @@ describe("NHM2 full-solve theory badges", () => {
     expect(ids).toContain("nhm2.metric_required.momentum_remediation_targets");
     expect(ids).toContain("nhm2.campaign.frontier_disposition");
     expect(ids).toContain("nhm2.profile.campaign_search");
+    expect(ids).toContain("nhm2.profile.candidate_metric_profile_spec");
     expect(ids).toContain("nhm2.profile.campaign_run_manifest");
     expect(ids).toContain("nhm2.energy_condition.wec_nec_sec_dec_family");
     expect(ids).toContain("nhm2.energy_condition.observer_robust_gate");
@@ -197,6 +199,21 @@ describe("NHM2 full-solve theory badges", () => {
           relation: "requires",
         }),
         expect.objectContaining({
+          from: "nhm2.profile.campaign_search",
+          to: "nhm2.profile.candidate_metric_profile_spec",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.profile.candidate_metric_profile_spec",
+          to: "nhm2.profile.campaign_run_manifest",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.profile.candidate_metric_profile_spec",
+          to: "nhm2.tensor.same_chart_full_tensor",
+          relation: "requires",
+        }),
+        expect.objectContaining({
           from: "nhm2.profile.campaign_run_manifest",
           to: "nhm2.dynamic.time_dependent_source_campaign",
           relation: "requires",
@@ -251,6 +268,24 @@ describe("NHM2 full-solve theory badges", () => {
         }),
       ]),
     );
+    expect(badge?.claimBoundary.promotionAllowed).toBe(false);
+  });
+
+  it("keeps candidate profile clocking calculator-loadable without admitting the profile", () => {
+    const badge = buildNhm2FullSolveTheoryBadgesV1().badges.find(
+      (candidate: TheoryBadgeV1) =>
+        candidate.id === "nhm2.profile.candidate_metric_profile_spec",
+    );
+
+    expect(badge?.status).toBe("blocked");
+    expect(badge?.calculatorPayloads).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          expression: "tau_candidate = alpha_centerline * T_coordinate",
+        }),
+      ]),
+    );
+    expect(badge?.claimBoundary.physicalMechanismClaimAllowed).toBe(false);
     expect(badge?.claimBoundary.promotionAllowed).toBe(false);
   });
 

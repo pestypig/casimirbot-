@@ -5,6 +5,7 @@ import type {
   AgentGoalSessionV1,
 } from "@shared/contracts/workstation-goal-context.v1";
 import { queryActuatorForAgentGoalContextFeedV1 } from "@shared/contracts/workstation-goal-context.v1";
+import { workstationCircuitColor } from "@/lib/workstation/reasoningCircuitColor";
 
 export type LiveAnswerReasoningCircuitRow = {
   id: string;
@@ -133,17 +134,7 @@ const postToolChipClass = (required: boolean): string =>
     : "rounded border border-rose-300/30 bg-rose-950/20 px-1.5 py-0.5 font-mono text-[10px] text-rose-100";
 
 const packetTrailColor = (value: string): { hsl: string; border: string; background: string; glow: string } => {
-  let hash = 0;
-  for (const char of value || "packet") {
-    hash = ((hash << 5) - hash + char.charCodeAt(0)) | 0;
-  }
-  const hue = Math.abs(hash) % 360;
-  return {
-    hsl: `hsl(${hue} 84% 62%)`,
-    border: `hsl(${hue} 78% 52%)`,
-    background: `hsl(${hue} 72% 24% / 0.28)`,
-    glow: `0 0 0 1px hsl(${hue} 78% 52% / 0.45), 0 0 18px hsl(${hue} 84% 62% / 0.22)`,
-  };
+  return workstationCircuitColor(value, "packet");
 };
 
 const cadenceLabel = (cadence: AgentGoalSessionV1["cadence"]): string => {

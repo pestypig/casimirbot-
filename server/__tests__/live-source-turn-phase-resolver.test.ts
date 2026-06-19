@@ -712,6 +712,29 @@ describe("resolveLiveSourceTurnPhase", () => {
     }
   });
 
+  it("routes explicit route-watch alias commands to watch-job setup evidence", () => {
+    for (const toolName of ["live_env.configure_route_watch", "live_env.configure_live_source_watch_job"] as const) {
+      const phase = resolveLiveSourceTurnPhase({
+        prompt: `Run ${toolName} goal_id=goal:frog source_id=source:visual objective='Watch route evidence.'`,
+        selectedTargetSource: "live_source_mailbox",
+      });
+
+      expect(phase.phase).toBe("configure_watch_job");
+      expect(phase.canonicalGoal).toBe("configure_watch_job");
+      expect(phase.allowedTools).toEqual([toolName]);
+      expect(phase.requiredEvidence).toEqual([toolName]);
+      expect(phase.completionEvidence).toEqual(["stage_play_live_source_watch_job_policy"]);
+      expect(phase.forbiddenTools).toEqual(expect.arrayContaining([
+        "live_env.read_processed_live_source_mail",
+        "live_env.process_live_source_mail",
+        "live_env.read_live_source_mail",
+        "live_env.record_live_source_mail_decision",
+      ]));
+      expect(phase.phaseLock.locked).toBe(true);
+      expect(mandatoryToolForPhase(phase)).toBe(toolName);
+    }
+  });
+
   it("terminalizes workstation control receipts before answer authority", () => {
     for (const entry of [
       {
@@ -790,6 +813,8 @@ describe("resolveLiveSourceTurnPhase", () => {
       "Do not run live_env.change_workstation_preset; explain what evidence would be needed.",
       "If we run live_env.set_visual_preset later, what target refs should we collect?",
       'The UI label says "live_env.focus_process_graph"; summarize it.',
+      'The dropdown shows "live_env.configure_route_watch"; summarize it.',
+      'The dropdown shows "live_env.configure_live_source_watch_job"; summarize it.',
       "Could we run live_env.repair_loop later?",
       "Could we run live_env.repair_workstation_source later?",
       "Previously you used live_env.narrator_say; what did it do?",
@@ -803,6 +828,8 @@ describe("resolveLiveSourceTurnPhase", () => {
       expect(phase.allowedTools).not.toEqual(expect.arrayContaining([
         "live_env.change_workstation_preset",
         "live_env.set_visual_preset",
+        "live_env.configure_route_watch",
+        "live_env.configure_live_source_watch_job",
         "live_env.focus_process_graph",
         "live_env.repair_loop",
         "live_env.repair_workstation_source",
@@ -1247,31 +1274,33 @@ describe("resolveLiveSourceTurnPhase", () => {
   });
 
   it("terminalizes watch-job setup after policy receipt without reading mail", () => {
-    const phase = resolveLiveSourceTurnPhase({
-      prompt: "Watch this source and describe each new mail batch.",
-      latestToolReceipts: [{
-        tool_name: "live_env.configure_live_source_watch_job",
-        observation: {
-          schema: "stage_play_live_source_watch_job_policy_config_result/v1",
-          watchJobPolicyRef: "stage_play_live_source_watch_job_policy:watch-1",
-          policy: {
-            artifactId: "stage_play_live_source_watch_job_policy",
-            policyId: "stage_play_live_source_watch_job_policy:watch-1",
+    for (const toolName of ["live_env.configure_live_source_watch_job", "live_env.configure_route_watch"] as const) {
+      const phase = resolveLiveSourceTurnPhase({
+        prompt: "Watch this source and describe each new mail batch.",
+        latestToolReceipts: [{
+          tool_name: toolName,
+          observation: {
+            schema: "stage_play_live_source_watch_job_policy_config_result/v1",
+            watchJobPolicyRef: "stage_play_live_source_watch_job_policy:watch-1",
+            policy: {
+              artifactId: "stage_play_live_source_watch_job_policy",
+              policyId: "stage_play_live_source_watch_job_policy:watch-1",
+            },
           },
-        },
-      }],
-    });
+        }],
+      });
 
-    expect(phase.phase).toBe("terminal_checkpoint");
-    expect(phase.canonicalGoal).toBe("configure_watch_job");
-    expect(phase.allowedTools).toEqual([]);
-    expect(phase.forbiddenTools).toEqual(expect.arrayContaining([
-      "live_env.read_processed_live_source_mail",
-      "live_env.process_live_source_mail",
-      "live_env.read_live_source_mail",
-    ]));
-    expect(phase.completionEvidence).toEqual(["stage_play_live_source_watch_job_policy"]);
-    expect(phase.phaseLock.locked).toBe(true);
+      expect(phase.phase).toBe("terminal_checkpoint");
+      expect(phase.canonicalGoal).toBe("configure_watch_job");
+      expect(phase.allowedTools).toEqual([]);
+      expect(phase.forbiddenTools).toEqual(expect.arrayContaining([
+        "live_env.read_processed_live_source_mail",
+        "live_env.process_live_source_mail",
+        "live_env.read_live_source_mail",
+      ]));
+      expect(phase.completionEvidence).toEqual(["stage_play_live_source_watch_job_policy"]);
+      expect(phase.phaseLock.locked).toBe(true);
+    }
   });
 
   it("locks MicroDeck inspection to the read-only preset query without processed-mail fallback", () => {

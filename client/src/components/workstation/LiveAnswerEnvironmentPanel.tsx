@@ -84,6 +84,10 @@ import {
   type LiveAnswerPacketCircuitRef,
   type LiveAnswerReasoningCircuitRow,
 } from "./LiveAnswerReasoningCircuit";
+import {
+  workstationCircuitSwatch,
+  workstationMicroDeckColorKey,
+} from "@/lib/workstation/reasoningCircuitColor";
 
 type LiveEnvironmentTab = "present_state" | "navigation_evidence" | "worker_lanes" | "line_checks" | "interpreted_log" | "clarification" | "live_cognition" | "overview" | "sources" | "line_schema" | "deltas" | "windows" | "commentary" | "reviews" | "debug";
 type VisualCaptureRoute = "live_answer" | "image_lens" | "audio_transcript";
@@ -905,23 +909,10 @@ const liveAnswerMicroDeckColorKey = (input: {
   sourceKind: StagePlayLiveSourceMailSourceKindV1;
   sourceId?: string | null;
   deckId: string;
-}): string => [
-  "microdeck",
-  input.sourceKind,
-  input.sourceId || "source-pending",
-  input.deckId,
-].join(":");
+}): string => workstationMicroDeckColorKey(input);
 
 const liveAnswerMicroDeckSwatch = (colorKey: string): { backgroundColor: string; borderColor: string } => {
-  let hash = 0;
-  for (const char of colorKey || "microdeck") {
-    hash = ((hash << 5) - hash + char.charCodeAt(0)) | 0;
-  }
-  const hue = Math.abs(hash) % 360;
-  return {
-    backgroundColor: `hsl(${hue} 84% 62%)`,
-    borderColor: `hsl(${hue} 78% 52%)`,
-  };
+  return workstationCircuitSwatch(colorKey, "microdeck");
 };
 
 const sortLiveAnswerMicroDeckCatalogItems = (

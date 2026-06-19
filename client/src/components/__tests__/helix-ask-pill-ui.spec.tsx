@@ -1300,12 +1300,13 @@ describe("HelixAskPill mic-first surface contract", () => {
 
   it("exposes UI/debug parity hooks without making clipboard copy part of prompt submission", () => {
     const source = fs.readFileSync(pillPath, "utf8");
+    const compactSource = source.replace(/\s+/g, " ");
     expect(source).toContain('const latestFinalAnswerTestId = isLatestReply ? "helix-ask-latest-final-answer"');
     expect(source).toContain("isFinalRow");
     expect(source).toContain("? latestFinalAnswerTestId");
-    expect(source).toContain("data-final-answer-text={isFinalRow ? finalAnswerRawText : undefined}");
-    expect(source).toContain("data-visible-terminal-source={isFinalRow ? transcriptTerminal.source : undefined}");
-    expect(source).toContain("data-backend-terminal-answer={isFinalRow ? transcriptTerminal.backendTerminalText ?? \"\" : undefined}");
+    expect(compactSource).toContain("data-final-answer-text={isFinalRow ? finalAnswerRawText : undefined}");
+    expect(compactSource).toContain("data-visible-terminal-source={ isFinalRow ? finalAnswerPresentation.sourceLabel || finalAnswerSourceLabel || transcriptTerminal.source : undefined }");
+    expect(compactSource).toContain("data-backend-terminal-answer={isFinalRow ? transcriptTerminal.backendTerminalText ?? \"\" : undefined}");
     expect(source).toContain("ui_debug_parity_harness");
     expect(source).toContain("__HELIX_LAST_UNIFIED_DEBUG_COPY__");
     expect(source).toContain("__HELIX_LAST_UNIFIED_DEBUG_COPY_FALLBACK__");

@@ -199,6 +199,7 @@ export type AgentGoalActuatorV1 =
   | "pause_loop"
   | "resume_loop"
   | "set_loop_state"
+  | "repair_loop"
   | "focus_process_graph"
   | "repair_source"
   | "evaluate_goal_satisfaction"
@@ -229,6 +230,7 @@ export const WORKSTATION_AGENT_GOAL_ACTUATORS: readonly AgentGoalActuatorV1[] = 
   "pause_loop",
   "resume_loop",
   "set_loop_state",
+  "repair_loop",
   "focus_process_graph",
   "repair_source",
   "evaluate_goal_satisfaction",
@@ -283,7 +285,7 @@ export const WORKSTATION_AGENT_GOAL_ACTUATOR_ALIASES: Readonly<Record<string, Ag
   live_env_pause_workstation_loop: "pause_loop",
   live_env_resume_workstation_loop: "resume_loop",
   live_env_set_workstation_loop_state: "set_loop_state",
-  live_env_repair_loop: "repair_source",
+  live_env_repair_loop: "repair_loop",
   live_env_repair_workstation_source: "repair_source",
   live_env_update_live_answer_projection: "update_live_answer",
   live_env_focus_process_graph: "focus_process_graph",
@@ -300,7 +302,8 @@ export const WORKSTATION_AGENT_GOAL_ACTUATOR_ALIASES: Readonly<Record<string, Ag
   visual_preset: "set_visual_preset",
   pause_workstation_loop: "pause_loop",
   resume_workstation_loop: "resume_loop",
-  repair_workstation_loop: "repair_source",
+  repair_workstation_loop: "repair_loop",
+  repair_loop: "repair_loop",
 };
 
 export function normalizeAgentGoalActuatorV1(value: unknown): AgentGoalActuatorV1 | null {

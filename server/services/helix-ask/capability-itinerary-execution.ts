@@ -33,6 +33,11 @@ const readString = (value: unknown): string | null =>
 
 const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
 
+const normalizeCalculatorExpression = (value: string | null): string | null => {
+  if (!value) return null;
+  return value.replace(/\s+/g, "").trim().toLowerCase() || null;
+};
+
 const artifactPayload = (artifact: HelixCapabilityItineraryArtifactLike): Record<string, unknown> | null =>
   readRecord(artifact.payload);
 
@@ -87,11 +92,30 @@ const artifactCapability = (artifact: HelixCapabilityItineraryArtifactLike): str
     readString(payload?.requested_capability) ??
     readString(payload?.tool_key) ??
     readString(payload?.tool_name) ??
+    readString(payload?.trace_source) ??
     readString(observation?.capability_key) ??
     readString(observation?.tool_key) ??
     readString(result?.capability_key) ??
     readString(result?.tool_key) ??
     readString(action?.capability_key) ??
+    null
+  );
+};
+
+const artifactCompoundSubgoalId = (artifact: HelixCapabilityItineraryArtifactLike): string | null => {
+  const payload = artifactPayload(artifact);
+  const observation = readRecord(payload?.observation);
+  const result = readRecord(payload?.result);
+  const action = readRecord(payload?.action);
+  return (
+    readString(payload?.compound_subgoal_id) ??
+    readString(payload?.subgoal_id) ??
+    readString(observation?.compound_subgoal_id) ??
+    readString(observation?.subgoal_id) ??
+    readString(result?.compound_subgoal_id) ??
+    readString(result?.subgoal_id) ??
+    readString(action?.compound_subgoal_id) ??
+    readString(action?.subgoal_id) ??
     null
   );
 };
@@ -105,6 +129,156 @@ const artifactMatchesCapability = (
   const actual = artifactCapability(artifact);
   if (!actual) return false;
   return actual === capability || actual === runtimeCapability || substitutions.includes(actual);
+};
+
+const artifactCapabilityHaystack = (artifact: HelixCapabilityItineraryArtifactLike): string => {
+  const payload = artifactPayload(artifact);
+  const observation = readRecord(payload?.observation);
+  const result = readRecord(payload?.result);
+  const action = readRecord(payload?.action);
+  return [
+    artifactId(artifact),
+    artifactKind(artifact),
+    artifactSchema(artifact),
+    readString(payload?.evaluation_id),
+    readString(payload?.receipt_id),
+    readString(payload?.result_ref),
+    readString(payload?.source_ref),
+    readString(payload?.source_kind),
+    readString(payload?.trace_source),
+    ...readArray(payload?.tool_receipt_ids).map(readString),
+    ...readArray(payload?.evidence_refs).map(readString),
+    ...readArray(payload?.support_refs).map(readString),
+    ...readArray(payload?.observation_refs).map(readString),
+    readString(observation?.evaluation_id),
+    readString(observation?.receipt_id),
+    readString(result?.evaluation_id),
+    readString(result?.receipt_id),
+    readString(action?.evaluation_id),
+  ].filter((entry: string | null): entry is string => Boolean(entry)).join(" ");
+};
+
+const observationKindBelongsToCapability = (
+  artifact: HelixCapabilityItineraryArtifactLike,
+  capability: string,
+  runtimeCapability: string,
+): boolean => {
+  const text = artifactCapabilityHaystack(artifact);
+  const kind = artifactKind(artifact);
+  if (capability === "scientific-calculator.solve_expression" || runtimeCapability === "scientific-calculator.solve_expression") {
+    return /calculator_receipt|calculator_result|scientific[-_.:]calculator[-_.:]solve[-_.:]expression/i.test(text) ||
+      /^(?:calculator_receipt|calculator_result)$/i.test(kind);
+  }
+  if (capability === "workspace_os.status" || runtimeCapability === "workspace_os.status") {
+    return /workspace_os\.status|workspace[-_]os[-_]status|workspace_status/i.test(text) ||
+      /^workspace_os_status_observation$/i.test(kind);
+  }
+  if (capability === "docs-viewer.locate_in_doc" || runtimeCapability === "docs-viewer.locate_in_doc") {
+    return /docs[-_]viewer[-_.:]locate[-_]in[-_]doc|doc_location|doc_evidence_location/i.test(text) ||
+      /^doc_(?:location|evidence)/i.test(kind);
+  }
+  if (capability === "repo-code.search_concept" || runtimeCapability === "repo-code.search_concept") {
+    return /repo[-_]code[-_.:]search[-_]concept|repo_code_evidence/i.test(text) ||
+      /^repo_code_evidence_observation$/i.test(kind);
+  }
+  if (capability === "helix_ask.inspect_capability_catalog" || runtimeCapability === "helix_ask.inspect_capability_catalog") {
+    return /capability_catalog|capability_registry|capability_help_summary/i.test(text) ||
+      /capability_(?:registry|help_summary)/i.test(kind);
+  }
+  if (capability === "image_lens.inspect" || runtimeCapability === "situation-room.describe_visual_capture") {
+    return /image_lens\.inspect|situation[-_]room[-_.:]describe[-_]visual[-_]capture|visual_frame|visual_capture|situation_context_pack/i.test(text) ||
+      /visual_frame_evidence|visual_capture_coverage|situation_context_pack/i.test(kind);
+  }
+  return true;
+};
+
+const calculatorExpressionFromRecord = (record: Record<string, unknown> | null): string | null => {
+  if (!record) return null;
+  const calculatorSetup = readRecord(record.calculator_setup);
+  return (
+    readString(record.latex) ??
+    readString(record.expression) ??
+    readString(record.display_latex) ??
+    readString(calculatorSetup?.latex) ??
+    readString(calculatorSetup?.expression) ??
+    readString(calculatorSetup?.display_latex) ??
+    readString(calculatorSetup?.equation) ??
+    null
+  );
+};
+
+const artifactCalculatorExpression = (artifact: HelixCapabilityItineraryArtifactLike): string | null => {
+  const payload = artifactPayload(artifact);
+  const observation = readRecord(payload?.observation);
+  const result = readRecord(payload?.result);
+  const action = readRecord(payload?.action);
+  return (
+    calculatorExpressionFromRecord(payload) ??
+    calculatorExpressionFromRecord(observation) ??
+    calculatorExpressionFromRecord(result) ??
+    calculatorExpressionFromRecord(action) ??
+    null
+  );
+};
+
+const subgoalCalculatorExpression = (argsHint: Record<string, unknown> | null): string | null =>
+  calculatorExpressionFromRecord(argsHint);
+
+const calculatorSubgoalIdMismatchIsExpressionMatch = (
+  artifact: HelixCapabilityItineraryArtifactLike,
+  capability: string,
+  runtimeCapability: string,
+  argsHint: Record<string, unknown> | null,
+): boolean => {
+  if (capability !== "scientific-calculator.solve_expression" && runtimeCapability !== "scientific-calculator.solve_expression") {
+    return false;
+  }
+  const artifactExpression = normalizeCalculatorExpression(artifactCalculatorExpression(artifact));
+  const expectedExpression = normalizeCalculatorExpression(subgoalCalculatorExpression(argsHint));
+  return Boolean(artifactExpression && expectedExpression && artifactExpression === expectedExpression);
+};
+
+const artifactMatchesRequiredObservationKind = (
+  artifact: HelixCapabilityItineraryArtifactLike,
+  requiredObservationKinds: string[],
+  capability: string,
+  runtimeCapability: string,
+): boolean => {
+  if (requiredObservationKinds.some((kind: string) => artifactMatchesObservationKind(artifact, escapedFamilyPattern(kind)))) {
+    return true;
+  }
+  if (
+    (capability === "scientific-calculator.solve_expression" || runtimeCapability === "scientific-calculator.solve_expression") &&
+    requiredObservationKinds.includes("calculator_receipt") &&
+    artifactMatchesObservationKind(artifact, /calculator_subgoal_receipt/i)
+  ) {
+    return true;
+  }
+  return false;
+};
+
+const artifactSupportsSubgoalObservation = (
+  artifact: HelixCapabilityItineraryArtifactLike,
+  subgoalId: string | null,
+  capability: string,
+  runtimeCapability: string,
+  substitutions: string[],
+  requiredObservationKinds: string[],
+  argsHint: Record<string, unknown> | null,
+): boolean => {
+  if (!artifactMatchesRequiredObservationKind(artifact, requiredObservationKinds, capability, runtimeCapability)) {
+    return false;
+  }
+  const artifactSubgoalId = artifactCompoundSubgoalId(artifact);
+  if (
+    artifactSubgoalId &&
+    subgoalId &&
+    artifactSubgoalId !== subgoalId &&
+    !calculatorSubgoalIdMismatchIsExpressionMatch(artifact, capability, runtimeCapability, argsHint)
+  ) return false;
+  const actualCapability = artifactCapability(artifact);
+  if (actualCapability) return artifactMatchesCapability(artifact, capability, runtimeCapability, substitutions);
+  return observationKindBelongsToCapability(artifact, capability, runtimeCapability);
 };
 
 const artifactValidationErrors = (artifact: HelixCapabilityItineraryArtifactLike): string[] => {
@@ -129,6 +303,34 @@ const artifactCompletedRuntimeObservation = (
   const payload = artifactPayload(artifact);
   return readString(payload?.status) === "completed" &&
     artifactMatchesCapability(artifact, capability, runtimeCapability, substitutions);
+};
+
+const artifactProvesCompletedCapability = (
+  artifact: HelixCapabilityItineraryArtifactLike,
+  capability: string,
+  runtimeCapability: string,
+  substitutions: string[],
+): boolean => {
+  if (artifactCompletedRuntimeObservation(artifact, capability, runtimeCapability, substitutions)) return true;
+  if (capability !== "scientific-calculator.solve_expression" && runtimeCapability !== "scientific-calculator.solve_expression") {
+    return false;
+  }
+  const payload = artifactPayload(artifact);
+  const actionAuthorization = readRecord(payload?.action_authorization);
+  const kind = artifactKind(artifact);
+  if (kind === "calculator_subgoal_receipt") {
+    return readString(payload?.status) === "completed" &&
+      artifactMatchesCapability(artifact, capability, runtimeCapability, substitutions) &&
+      (
+        payload?.authorized_by_agent_step_decision === true ||
+        actionAuthorization?.authorizes_tool_execution === true
+      );
+  }
+  if (kind === "workstation_tool_evaluation") {
+    return artifactMatchesCapability(artifact, capability, runtimeCapability, substitutions) &&
+      (payload?.supports_goal === true || readString(payload?.authority) === "agent_runtime_loop");
+  }
+  return false;
 };
 
 export const isHelixCapabilityItineraryFamilyObserved = (
@@ -169,7 +371,7 @@ export const isHelixCapabilityItineraryFamilyObserved = (
   }
   if (family === "calculator") {
     return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
-      /calculator_receipt|calculator_result|workstation_tool_evaluation/i.test([
+      /calculator_receipt|calculator_subgoal_receipt|calculator_result|workstation_tool_evaluation/i.test([
         artifactKind(artifact),
         artifactSchema(artifact),
         artifactId(artifact),
@@ -253,6 +455,7 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
     isHelixCapabilityItineraryFamilyObserved(family, artifacts),
   );
   const compoundSubgoalLedger: Array<Record<string, unknown>> = compoundSubgoals.map((subgoal: Record<string, unknown>) => {
+    const subgoalId = readString(subgoal.subgoal_id);
     const requestedCapability = readString(subgoal.requested_capability) ?? "";
     const runtimeCapability = readString(subgoal.runtime_capability) ?? requestedCapability;
     const substitutions = readArray(subgoal.allowed_substitutions)
@@ -261,6 +464,7 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
     const requiredObservationKinds = readArray(subgoal.required_observation_kinds)
       .map(readString)
       .filter((entry: string | null): entry is string => Boolean(entry));
+    const argsHint = readRecord(subgoal.args_hint);
     const runtimeCalls = artifacts.filter((artifact: HelixCapabilityItineraryArtifactLike) =>
       artifactKind(artifact) === "runtime_tool_call" &&
       artifactMatchesCapability(artifact, requestedCapability, runtimeCapability, substitutions)
@@ -270,30 +474,41 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       artifactMatchesCapability(artifact, requestedCapability, runtimeCapability, substitutions)
     );
     const validationErrors = validations.flatMap(artifactValidationErrors);
-    const executed = artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
-      artifactCompletedRuntimeObservation(artifact, requestedCapability, runtimeCapability, substitutions)
-    );
-    const observationArtifact = executed
-      ? artifacts.find((artifact: HelixCapabilityItineraryArtifactLike) =>
-          requiredObservationKinds.some((kind: string) => artifactMatchesObservationKind(artifact, escapedFamilyPattern(kind)))
-        ) ?? null
-      : null;
+    const observationArtifact = artifacts.find((artifact: HelixCapabilityItineraryArtifactLike) =>
+      artifactSupportsSubgoalObservation(
+        artifact,
+        subgoalId,
+        requestedCapability,
+        runtimeCapability,
+        substitutions,
+        requiredObservationKinds,
+        argsHint,
+      )
+    ) ?? null;
+    const executedArtifact = artifacts.find((artifact: HelixCapabilityItineraryArtifactLike) =>
+      artifactProvesCompletedCapability(artifact, requestedCapability, runtimeCapability, substitutions)
+    ) ?? (observationArtifact && artifactProvesCompletedCapability(observationArtifact, requestedCapability, runtimeCapability, substitutions)
+      ? observationArtifact
+      : null);
+    const executed = Boolean(executedArtifact);
     const selectedCapability = runtimeCalls.length > 0
       ? artifactCapability(runtimeCalls[0] as HelixCapabilityItineraryArtifactLike)
-      : null;
-    const executedCapability = executed ? runtimeCapability : null;
-    const satisfaction = observationArtifact
+      : executedArtifact
+        ? artifactCapability(executedArtifact as HelixCapabilityItineraryArtifactLike) ?? runtimeCapability
+        : null;
+    const executedCapability = executed ? artifactCapability(executedArtifact as HelixCapabilityItineraryArtifactLike) ?? runtimeCapability : null;
+    const satisfaction = executed && observationArtifact
       ? "satisfied"
       : validationErrors.length > 0
         ? "failed"
         : "pending";
     return {
-      subgoal_id: readString(subgoal.subgoal_id),
+      subgoal_id: subgoalId,
       order: Number(subgoal.order) || 0,
       requested_capability: requestedCapability,
       selected_capability: selectedCapability,
       executed_capability: executedCapability,
-      args: runtimeCalls.length > 0 ? artifactArgs(runtimeCalls[0] as HelixCapabilityItineraryArtifactLike) : readRecord(subgoal.args_hint) ?? {},
+      args: runtimeCalls.length > 0 ? artifactArgs(runtimeCalls[0] as HelixCapabilityItineraryArtifactLike) : argsHint ?? {},
       observation_kind: observationArtifact ? artifactKind(observationArtifact) : null,
       observation_ref: observationArtifact ? artifactId(observationArtifact) : null,
       satisfaction,

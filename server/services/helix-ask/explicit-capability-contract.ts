@@ -48,8 +48,9 @@ const liveEnvironmentControlContract = (input: {
   required_observation_kinds: [
     "live_environment_tool_observation",
     input.requiredObservationKind ?? "stage_play_workstation_control_receipt",
+    "helix.workstation_goal_context_update.v1",
   ],
-  required_terminal_kind: input.requiredTerminalKind ?? input.requiredObservationKind ?? "stage_play_workstation_control_receipt",
+  required_terminal_kind: input.requiredTerminalKind ?? "workstation_tool_evaluation",
   allowed_substitutions: [],
   forbidden_nearby_capabilities: input.forbiddenNearbyCapabilities ?? [
     "live_env.read_processed_live_source_mail",
@@ -237,7 +238,7 @@ const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
     source_target: "live_environment",
     admission_families: ["live_environment", "workstation_action"],
     required_observation_kinds: ["live_environment_tool_observation", "helix.narrator_say_request.v1"],
-    required_terminal_kind: "helix.narrator_say_request.v1",
+    required_terminal_kind: "workstation_tool_evaluation",
     allowed_substitutions: [],
     forbidden_nearby_capabilities: [
       "live_env.narrator_bind_stream",
@@ -255,7 +256,7 @@ const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
     source_target: "live_environment",
     admission_families: ["live_environment", "workstation_action"],
     required_observation_kinds: ["live_environment_tool_observation", "helix.narrator_bind_stream_request.v1"],
-    required_terminal_kind: "helix.narrator_bind_stream_request.v1",
+    required_terminal_kind: "workstation_tool_evaluation",
     allowed_substitutions: [],
     forbidden_nearby_capabilities: [
       "live_env.narrator_say",
@@ -297,6 +298,16 @@ const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
     aliases: ["set_workstation_loop_state", "set_loop_state"],
   }),
   liveEnvironmentControlContract({
+    capability: "live_env.configure_route_watch",
+    aliases: ["configure_route_watch", "route_watch_policy"],
+    requiredObservationKind: "stage_play_live_source_watch_job_policy_config_result",
+  }),
+  liveEnvironmentControlContract({
+    capability: "live_env.configure_live_source_watch_job",
+    aliases: ["configure_live_source_watch_job", "live_source_watch_job", "watch_job_policy"],
+    requiredObservationKind: "stage_play_live_source_watch_job_policy_config_result",
+  }),
+  liveEnvironmentControlContract({
     capability: "live_env.repair_loop",
     aliases: ["repair_loop"],
   }),
@@ -316,7 +327,6 @@ const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
     capability: "live_env.start_agent_goal_session",
     aliases: ["start_agent_goal_session"],
     requiredObservationKind: "stage_play_agent_goal_session_tool_result",
-    requiredTerminalKind: "stage_play_agent_goal_session_tool_result",
   }),
   {
     schema: "helix.explicit_capability_contract.v1",
@@ -327,7 +337,7 @@ const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
     source_target: "live_environment",
     admission_families: ["live_environment"],
     required_observation_kinds: ["live_environment_tool_observation", "helix.live_environment_goal_satisfaction.v1"],
-    required_terminal_kind: "helix.live_environment_goal_satisfaction.v1",
+    required_terminal_kind: "model_synthesized_answer",
     allowed_substitutions: [],
     forbidden_nearby_capabilities: [
       "live_env.start_agent_goal_session",

@@ -21,6 +21,10 @@ import {
   listStagePlayLiveSourceMailItems,
   resetStagePlayLiveSourceMailboxForTest,
 } from "../services/stage-play/stage-play-live-source-mailbox-store";
+import {
+  appendInterpretedEvent,
+  clearInterpretedEventLogForTest,
+} from "../services/situation-room/interpreted-event-log-store";
 import { enqueueAudioTranscriptMailFromChunk } from "../services/stage-play/stage-play-audio-transcript-mail-ingest";
 import { resetStagePlayLiveSourceMailWakeStoreForTest } from "../services/stage-play/stage-play-live-source-mail-wake-store";
 import { resetStagePlayLiveSourceNarrativeStoreForTest } from "../services/stage-play/stage-play-live-source-narrative-store";
@@ -37,6 +41,10 @@ import {
   clearWorkstationReasoningTracesForTest,
   recordWorkstationReasoningTrace,
 } from "../services/helix-ask/workstation-reasoning-trace-store";
+import {
+  resetSituationConstructStoreForTest,
+  upsertSituationConstruct,
+} from "../services/situation-room/situation-construct-store";
 
 const threadId = "thread:helix-ask-live-source-mail-tool";
 const roomId = "room:helix-ask-live-source-mail-tool";
@@ -77,6 +85,8 @@ beforeEach(() => {
   resetStagePlayVisualObserverProfileStoreForTest();
   resetStagePlayGoalContextStoreForTest();
   clearWorkstationReasoningTracesForTest();
+  clearInterpretedEventLogForTest();
+  resetSituationConstructStoreForTest();
   resetVisualSnapshotStoreForTest();
   resetLiveAnswerEnvironments();
 });
@@ -488,15 +498,15 @@ describe("live-source mail live environment tools", () => {
         tool_id: "live_env.configure_route_watch",
         family: "live_env",
         creates_assistant_answer: false,
-        requires_user_confirmation: false,
-        can_run_automatically: true,
+        requires_user_confirmation: true,
+        can_run_automatically: false,
       }),
       expect.objectContaining({
         tool_id: "live_env.configure_live_source_watch_job",
         family: "live_env",
         creates_assistant_answer: false,
-        requires_user_confirmation: false,
-        can_run_automatically: true,
+        requires_user_confirmation: true,
+        can_run_automatically: false,
       }),
       expect.objectContaining({
         tool_id: "live_env.configure_interpreter_profile",
@@ -2623,12 +2633,14 @@ describe("live-source mail live environment tools", () => {
       ]),
       sourceRefs: expect.arrayContaining([sourceId]),
       loopRefs: expect.arrayContaining([
+        "workstation_context_feed:trace_memory",
         "workstation_actuator:evaluate_goal_satisfaction",
       ]),
       evidenceRefs: expect.arrayContaining([
         "allowed_actuator:evaluate_goal_satisfaction",
         "agent_goal_allowed_actuator:evaluate_goal_satisfaction",
         sourceId,
+        "workstation_context_feed:trace_memory",
         "workstation_actuator:evaluate_goal_satisfaction",
       ]),
       post_tool_model_step_required: true,
@@ -2661,6 +2673,7 @@ describe("live-source mail live environment tools", () => {
     expect(evaluationObservation.evidence_refs).toEqual(expect.arrayContaining([
       "allowed_actuator:evaluate_goal_satisfaction",
       "agent_goal_allowed_actuator:evaluate_goal_satisfaction",
+      "workstation_context_feed:trace_memory",
       "workstation_actuator:evaluate_goal_satisfaction",
     ]));
     expect(evaluationObservation.producedRefs).toEqual(expect.arrayContaining([payload.goalContextUpdateId, payload.resultId]));
@@ -2677,10 +2690,14 @@ describe("live-source mail live environment tools", () => {
         matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:evaluate_goal_satisfaction"],
       },
       sourceRefs: expect.arrayContaining([sourceId]),
-      loopRefs: expect.arrayContaining(["workstation_actuator:evaluate_goal_satisfaction"]),
+      loopRefs: expect.arrayContaining([
+        "workstation_context_feed:trace_memory",
+        "workstation_actuator:evaluate_goal_satisfaction",
+      ]),
       evidenceRefs: expect.arrayContaining([
         "allowed_actuator:evaluate_goal_satisfaction",
         "agent_goal_allowed_actuator:evaluate_goal_satisfaction",
+        "workstation_context_feed:trace_memory",
         "workstation_actuator:evaluate_goal_satisfaction",
       ]),
       assistant_answer: false,
@@ -2695,6 +2712,33 @@ describe("live-source mail live environment tools", () => {
     expect(listStagePlayAgentGoalSessions({ threadId, goalId: "goal:satisfaction-check", limit: 1 })[0]).toMatchObject({
       status: "satisfied",
     });
+
+    const traceLaneRead = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_workstation_goal_context",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        goal_id: "goal:satisfaction-check",
+        loop_ref: "workstation_context_feed:trace_memory",
+        producer_kind: "reflection",
+      },
+    });
+    const traceLanePayload = traceLaneRead.observation as any;
+    expect(traceLaneRead.ok).toBe(true);
+    expect(traceLanePayload.goalContextUpdates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        updateId: payload.goalContextUpdateId,
+        producerKind: "reflection",
+        updateKind: "summary",
+        loopRefs: expect.arrayContaining(["workstation_context_feed:trace_memory"]),
+        authority: expect.objectContaining({
+          assistantAnswer: false,
+          terminalEligible: false,
+          rawContentIncluded: false,
+        }),
+      }),
+    ]));
   });
 
   it("queries per-packet traces through live_env.query_packet_traces as non-terminal evidence", () => {
@@ -2894,6 +2938,151 @@ describe("live-source mail live environment tools", () => {
     ]));
   });
 
+  it("keeps implicit goal-scoped packet trace queries inside the AgentGoalSession source boundary", () => {
+    const targetSourceRef = "visual_source:packet-trace-target";
+    const otherSourceRef = "visual_source:packet-trace-unrelated";
+    startVisualSnapshotSource({
+      source_id: targetSourceRef,
+      thread_id: threadId,
+      room_id: roomId,
+      source_surface: "browser_tab",
+      capture_mode: "interval",
+      status: "active",
+    });
+    const targetFrame = recordVisualFrame({
+      source_id: targetSourceRef,
+      thread_id: threadId,
+      room_id: roomId,
+      frame_id: "visual_frame:packet-trace-target",
+      ts: "2026-06-04T12:11:00.000Z",
+    });
+    analyzeVisualFrame({
+      thread_id: threadId,
+      frame_id: targetFrame.frame_id,
+      evidence_id: "visual_evidence:packet-trace-target",
+      summary: "Target source shows a frog classification frame for the active goal.",
+      supports_claims: [
+        {
+          claim: "The target packet belongs to the frog classification source.",
+          support_status: "supports",
+          confidence: 0.82,
+        },
+      ],
+    });
+    startVisualSnapshotSource({
+      source_id: otherSourceRef,
+      thread_id: threadId,
+      room_id: roomId,
+      source_surface: "browser_tab",
+      capture_mode: "interval",
+      status: "active",
+    });
+    const otherFrame = recordVisualFrame({
+      source_id: otherSourceRef,
+      thread_id: threadId,
+      room_id: roomId,
+      frame_id: "visual_frame:packet-trace-unrelated",
+      ts: "2026-06-04T12:11:01.000Z",
+    });
+    analyzeVisualFrame({
+      thread_id: threadId,
+      frame_id: otherFrame.frame_id,
+      evidence_id: "visual_evidence:packet-trace-unrelated",
+      summary: "Unrelated source shows translation subtitles and should not enter the packet trace goal.",
+      supports_claims: [
+        {
+          claim: "The unrelated packet belongs to another source.",
+          support_status: "supports",
+          confidence: 0.78,
+        },
+      ],
+    });
+
+    const targetProcessObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.process_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: targetSourceRef,
+        source_kind: "visual_frame",
+      },
+    });
+    const otherProcessObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.process_live_source_mail",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: otherSourceRef,
+        source_kind: "visual_frame",
+      },
+    });
+    const targetPacketId = (targetProcessObservation.observation as any).packets[0].packetId;
+    const otherPacketId = (otherProcessObservation.observation as any).packets[0].packetId;
+
+    const sessionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_refs: [targetSourceRef],
+        loop_refs: ["stage_play_mail_loop:packet-trace-target"],
+        goal_id: "goal:packet-trace-source-boundary",
+        objective: "Inspect packet travel only for the target frog classification source.",
+        context_feeds: ["packet_traces"],
+        allowed_actuators: ["query_packet_traces"],
+      },
+    });
+    expect(sessionObservation.ok).toBe(true);
+
+    const queryObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_packet_traces",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        goal_id: "goal:packet-trace-source-boundary",
+      },
+    });
+
+    const payload = queryObservation.observation as any;
+    expect(queryObservation.ok).toBe(true);
+    expect(payload).toMatchObject({
+      status: "read",
+      goalId: "goal:packet-trace-source-boundary",
+      traceCount: 1,
+      requiredFeed: "packet_traces",
+      requiredActuator: "query_packet_traces",
+      matchedAllowedActuators: ["query_packet_traces"],
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(payload.packetTraces).toEqual([
+      expect.objectContaining({
+        packetId: targetPacketId,
+        sourceId: targetSourceRef,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      }),
+    ]);
+    expect(payload.packetTraces.map((trace: any) => trace.packetId)).not.toContain(otherPacketId);
+    expect(payload.sourceRefs).toEqual(expect.arrayContaining([targetSourceRef]));
+    expect(payload.sourceRefs).not.toContain(otherSourceRef);
+    expect(payload.evidenceRefs).toEqual(expect.arrayContaining([targetPacketId, targetSourceRef]));
+    expect(payload.evidenceRefs).not.toContain(otherPacketId);
+    expect(payload.evidenceRefs).not.toContain(otherSourceRef);
+    expect(payload.goalContextUpdates.map((update: any) => update.contentRef)).toContain(targetPacketId);
+    expect(payload.goalContextUpdates.map((update: any) => update.contentRef)).not.toContain(otherPacketId);
+    expect(payload.syncedWindow).toMatchObject({
+      processedPacketCount: 1,
+    });
+    expect(queryObservation.artifactRefs).toEqual(expect.objectContaining({
+      processedPacketIds: [targetPacketId],
+    }));
+    expect(queryObservation.producedRefs).toEqual(expect.arrayContaining([targetPacketId, payload.resultId]));
+    expect(queryObservation.producedRefs).not.toContain(otherPacketId);
+  });
+
   it("queries route-watch evidence through live_env.query_route_evidence as non-terminal feed evidence", () => {
     const sessionObservation = executeLiveEnvironmentTool({
       tool_name: "live_env.start_agent_goal_session",
@@ -3014,6 +3203,504 @@ describe("live-source mail live environment tools", () => {
       queryPayload.resultId,
       configurePayload.goalContextUpdateId,
     ]));
+  });
+
+  it("queries interpreted event logs as goal-scoped route evidence without crossing source boundaries", () => {
+    const targetSourceRef = "visual_source:event-log-target";
+    const otherSourceRef = "visual_source:event-log-unrelated";
+    const targetEvent = appendInterpretedEvent({
+      event_id: "interpreted:event-log-target",
+      thread_id: threadId,
+      room_id: roomId,
+      source_family: "visual_source",
+      kind: "tool_trace",
+      title: "Target route trace",
+      summary: "Target source route evidence for the active goal.",
+      evidence_refs: [targetSourceRef, "visual_evidence:event-log-target"],
+      related_artifact_ids: ["stage_play_processed_mail_packet:event-log-target"],
+      related_job_ids: ["stage_play_live_source_job:event-log-target"],
+      created_at: "2026-06-17T16:00:00.000Z",
+    });
+    const otherEvent = appendInterpretedEvent({
+      event_id: "interpreted:event-log-unrelated",
+      thread_id: threadId,
+      room_id: roomId,
+      source_family: "visual_source",
+      kind: "tool_trace",
+      title: "Unrelated route trace",
+      summary: "Unrelated source route evidence should not enter this goal.",
+      evidence_refs: [otherSourceRef, "visual_evidence:event-log-unrelated"],
+      related_artifact_ids: ["stage_play_processed_mail_packet:event-log-unrelated"],
+      related_job_ids: ["stage_play_live_source_job:event-log-unrelated"],
+      created_at: "2026-06-17T16:01:00.000Z",
+    });
+
+    const sessionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_refs: [targetSourceRef],
+        loop_refs: ["stage_play_mail_loop:event-log-target"],
+        goal_id: "goal:event-log-route-evidence",
+        objective: "Inspect route evidence for only the target visual source.",
+        context_feeds: ["route_evidence"],
+        allowed_actuators: ["query_route_evidence"],
+      },
+    });
+    expect(sessionObservation.ok).toBe(true);
+    const initialCheckpointCount = ((sessionObservation.observation as any).session.checkpoints ?? []).length;
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_event_log",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        goal_id: "goal:event-log-route-evidence",
+        limit: 10,
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation).toMatchObject({
+      tool_name: "live_env.query_event_log",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schema: "helix.interpreted_log_read.v1",
+      status: "read",
+      goalId: "goal:event-log-route-evidence",
+      requiredFeed: "route_evidence",
+      requiredActuator: "query_route_evidence",
+      feedAllowed: true,
+      actuatorAllowed: true,
+      matchedAllowedActuators: ["query_route_evidence"],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(payload.events.map((event: any) => event.event_id)).toEqual([targetEvent.event_id]);
+    expect(payload.events.map((event: any) => event.event_id)).not.toContain(otherEvent.event_id);
+    expect(payload.sourceRefs).toEqual(expect.arrayContaining([targetSourceRef, targetEvent.event_id]));
+    expect(payload.sourceRefs).not.toContain(otherSourceRef);
+    expect(payload.evidenceRefs).toEqual(expect.arrayContaining([
+      payload.resultId,
+      "context_feed:route_evidence",
+      "allowed_actuator:query_route_evidence",
+      "agent_goal_allowed_actuator:query_route_evidence",
+      targetEvent.event_id,
+      targetSourceRef,
+      "visual_evidence:event-log-target",
+    ]));
+    expect(payload.evidenceRefs).not.toContain(otherEvent.event_id);
+    expect(payload.evidenceRefs).not.toContain(otherSourceRef);
+    expect(payload.agentGoalSession.checkpoints).toHaveLength(initialCheckpointCount + 1);
+    expect(payload.agentGoalSession.checkpoints.at(-1)).toMatchObject({
+      actionsTaken: expect.arrayContaining(["query_route_evidence", "live_env.query_event_log"]),
+      evidenceRefs: expect.arrayContaining([payload.goalContextUpdateId, payload.resultId, targetEvent.event_id]),
+      nextStep: "continue",
+    });
+
+    const routeUpdate = listStagePlayGoalContextUpdates({
+      threadId,
+      contentRef: payload.resultId,
+      limit: 1,
+    })[0];
+    expect(routeUpdate).toMatchObject({
+      producerKind: "route_watch",
+      updateKind: "route_evidence",
+      sourceRefs: expect.arrayContaining([targetSourceRef, targetEvent.event_id]),
+      toolIdentity: {
+        requestedToolName: "live_env.query_event_log",
+        canonicalToolName: "live_env.query_event_log",
+        matchedAllowedActuators: ["query_route_evidence"],
+        matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:query_route_evidence"],
+      },
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    expect(routeUpdate.sourceRefs).not.toContain(otherSourceRef);
+    expect(routeUpdate.evidenceRefs).not.toContain(otherEvent.event_id);
+    expect(routeUpdate.suggestedDispatch.map((action) => action.kind)).not.toContain("wake_agent");
+    expect(observation.producedRefs).toEqual(expect.arrayContaining([
+      payload.goalContextUpdateId,
+      payload.resultId,
+      targetEvent.event_id,
+    ]));
+    expect(observation.producedRefs).not.toContain(otherEvent.event_id);
+  });
+
+  it("blocks goal-scoped interpreted event-log reads outside route-evidence feed policy", () => {
+    const targetSourceRef = "visual_source:event-log-blocked";
+    const targetEvent = appendInterpretedEvent({
+      event_id: "interpreted:event-log-blocked",
+      thread_id: threadId,
+      room_id: roomId,
+      source_family: "visual_source",
+      kind: "tool_trace",
+      title: "Blocked route trace",
+      summary: "This route evidence should stay hidden from a visual-only goal.",
+      evidence_refs: [targetSourceRef, "visual_evidence:event-log-blocked"],
+      related_artifact_ids: ["stage_play_processed_mail_packet:event-log-blocked"],
+      created_at: "2026-06-17T16:05:00.000Z",
+    });
+
+    const sessionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_refs: [targetSourceRef],
+        goal_id: "goal:event-log-blocked",
+        objective: "Inspect visual summaries only, not route evidence.",
+        context_feeds: ["visual_summaries"],
+        allowed_actuators: ["query_route_evidence"],
+      },
+    });
+    expect(sessionObservation.ok).toBe(true);
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_event_log",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        goal_id: "goal:event-log-blocked",
+        limit: 10,
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation).toMatchObject({
+      tool_name: "live_env.query_event_log",
+      ok: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schema: "helix.interpreted_log_read.v1",
+      status: "blocked",
+      goalId: "goal:event-log-blocked",
+      missingRequirements: ["context_feed:route_evidence"],
+      feedAllowed: false,
+      actuatorAllowed: true,
+      events: [],
+      interpreted_events: [],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(payload.evidenceRefs).not.toContain(targetEvent.event_id);
+    expect(payload.evidenceRefs).not.toContain(targetSourceRef);
+    expect(observation.evidence_refs).not.toContain(targetEvent.event_id);
+    expect(observation.evidence_refs).not.toContain(targetSourceRef);
+
+    const routeUpdate = listStagePlayGoalContextUpdates({
+      threadId,
+      contentRef: payload.resultId,
+      producerKind: "route_watch",
+      updateKind: "error",
+      limit: 1,
+    })[0];
+    expect(routeUpdate).toMatchObject({
+      freshness: expect.objectContaining({ status: "blocked" }),
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    expect(routeUpdate.evidenceRefs).not.toContain(targetEvent.event_id);
+    expect(routeUpdate.suggestedDispatch.map((action) => action.kind)).not.toContain("append_goal_context");
+  });
+
+  it("queries Situation Room constructs as goal-scoped route evidence without crossing source boundaries", () => {
+    const targetSourceRef = "visual_source:construct-target";
+    const otherSourceRef = "visual_source:construct-unrelated";
+    const targetConstruct = upsertSituationConstruct({
+      construct_id: "situation_construct:route_evidence_view:target",
+      type: "route_evidence_view",
+      name: "Target route evidence view",
+      status: "active",
+      thread_id: threadId,
+      room_id: roomId,
+      source_ids: [targetSourceRef],
+      artifact_refs: ["route_evidence_view:construct-target"],
+      receipt_refs: ["construct_receipt:target"],
+      evidence_refs: ["visual_evidence:construct-target"],
+      policy: {
+        may_execute_tools: true,
+        allowed_tools: ["live_env.query_event_log", "live_env.query_packet_traces"],
+      },
+      output_bindings: [
+        {
+          output_kind: "route_evidence_view",
+          artifact_ref: "route_evidence_view:construct-target",
+          status: "active",
+        },
+      ],
+    });
+    const otherConstruct = upsertSituationConstruct({
+      construct_id: "situation_construct:route_evidence_view:unrelated",
+      type: "route_evidence_view",
+      name: "Unrelated route evidence view",
+      status: "active",
+      thread_id: threadId,
+      room_id: roomId,
+      source_ids: [otherSourceRef],
+      artifact_refs: ["route_evidence_view:construct-unrelated"],
+      receipt_refs: ["construct_receipt:unrelated"],
+      evidence_refs: ["visual_evidence:construct-unrelated"],
+      policy: {
+        may_execute_tools: true,
+        allowed_tools: ["live_env.query_event_log"],
+      },
+      output_bindings: [
+        {
+          output_kind: "route_evidence_view",
+          artifact_ref: "route_evidence_view:construct-unrelated",
+          status: "active",
+        },
+      ],
+    });
+
+    const sessionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_refs: [targetSourceRef],
+        construct_refs: [targetConstruct.construct_id],
+        goal_id: "goal:construct-route-evidence",
+        objective: "Inspect workstation constructs for only the target visual source.",
+        context_feeds: ["route_evidence"],
+        allowed_actuators: ["query_route_evidence"],
+      },
+    });
+    expect(sessionObservation.ok).toBe(true);
+    const initialCheckpointCount = ((sessionObservation.observation as any).session.checkpoints ?? []).length;
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_constructs",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        goal_id: "goal:construct-route-evidence",
+        type: "route_evidence_view",
+        status: "active",
+        limit: 10,
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation).toMatchObject({
+      tool_name: "live_env.query_constructs",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schema: "helix.situation_construct_query_result.v1",
+      readStatus: "read",
+      goalId: "goal:construct-route-evidence",
+      requiredFeed: "route_evidence",
+      requiredActuator: "query_route_evidence",
+      feedAllowed: true,
+      actuatorAllowed: true,
+      matchedAllowedActuators: ["query_route_evidence"],
+      count: 1,
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(payload.constructs.map((construct: any) => construct.construct_id)).toEqual([targetConstruct.construct_id]);
+    expect(payload.constructs.map((construct: any) => construct.construct_id)).not.toContain(otherConstruct.construct_id);
+    expect(payload.sourceRefs).toEqual(expect.arrayContaining([
+      targetSourceRef,
+      targetConstruct.construct_id,
+      "route_evidence_view:construct-target",
+      "visual_evidence:construct-target",
+    ]));
+    expect(payload.sourceRefs).not.toContain(otherSourceRef);
+    expect(payload.evidenceRefs).toEqual(expect.arrayContaining([
+      payload.resultId,
+      "context_feed:route_evidence",
+      "allowed_actuator:query_route_evidence",
+      "agent_goal_allowed_actuator:query_route_evidence",
+      targetConstruct.construct_id,
+      targetSourceRef,
+      "visual_evidence:construct-target",
+      "route_evidence_view:construct-target",
+    ]));
+    expect(payload.evidenceRefs).not.toContain(otherConstruct.construct_id);
+    expect(payload.evidenceRefs).not.toContain(otherSourceRef);
+    expect(payload.agentGoalSession.checkpoints).toHaveLength(initialCheckpointCount + 1);
+    expect(payload.agentGoalSession.checkpoints.at(-1)).toMatchObject({
+      actionsTaken: expect.arrayContaining(["query_route_evidence", "live_env.query_constructs"]),
+      evidenceRefs: expect.arrayContaining([payload.goalContextUpdateId, payload.resultId, targetConstruct.construct_id]),
+      nextStep: "continue",
+    });
+
+    const routeUpdate = listStagePlayGoalContextUpdates({
+      threadId,
+      contentRef: payload.resultId,
+      limit: 1,
+    })[0];
+    expect(routeUpdate).toMatchObject({
+      producerKind: "route_watch",
+      updateKind: "route_evidence",
+      sourceRefs: expect.arrayContaining([targetSourceRef, targetConstruct.construct_id]),
+      toolIdentity: {
+        requestedToolName: "live_env.query_constructs",
+        canonicalToolName: "live_env.query_constructs",
+        matchedAllowedActuators: ["query_route_evidence"],
+        matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:query_route_evidence"],
+      },
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    expect(routeUpdate.sourceRefs).not.toContain(otherSourceRef);
+    expect(routeUpdate.evidenceRefs).not.toContain(otherConstruct.construct_id);
+    expect(routeUpdate.suggestedDispatch.map((action) => action.kind)).not.toContain("wake_agent");
+    expect(observation.producedRefs).toEqual(expect.arrayContaining([
+      payload.goalContextUpdateId,
+      payload.resultId,
+      targetConstruct.construct_id,
+    ]));
+    expect(observation.producedRefs).not.toContain(otherConstruct.construct_id);
+  });
+
+  it("blocks goal-scoped Situation Room construct reads outside route-evidence feed policy", () => {
+    const targetSourceRef = "visual_source:construct-blocked";
+    const targetConstruct = upsertSituationConstruct({
+      construct_id: "situation_construct:route_evidence_view:blocked",
+      type: "route_evidence_view",
+      name: "Blocked route evidence view",
+      status: "active",
+      thread_id: threadId,
+      room_id: roomId,
+      source_ids: [targetSourceRef],
+      artifact_refs: ["route_evidence_view:construct-blocked"],
+      receipt_refs: ["construct_receipt:blocked"],
+      evidence_refs: ["visual_evidence:construct-blocked"],
+      policy: {
+        may_execute_tools: true,
+        allowed_tools: ["live_env.query_event_log"],
+      },
+    });
+
+    const sessionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_refs: [targetSourceRef],
+        construct_refs: [targetConstruct.construct_id],
+        goal_id: "goal:construct-blocked",
+        objective: "Inspect visual summaries only, not construct route evidence.",
+        context_feeds: ["visual_summaries"],
+        allowed_actuators: ["query_route_evidence"],
+      },
+    });
+    expect(sessionObservation.ok).toBe(true);
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_constructs",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        goal_id: "goal:construct-blocked",
+        type: "route_evidence_view",
+        status: "active",
+        limit: 10,
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation).toMatchObject({
+      tool_name: "live_env.query_constructs",
+      ok: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schema: "helix.situation_construct_query_result.v1",
+      readStatus: "blocked",
+      goalId: "goal:construct-blocked",
+      missingRequirements: ["context_feed:route_evidence"],
+      feedAllowed: false,
+      actuatorAllowed: true,
+      constructs: [],
+      count: 0,
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(payload.evidenceRefs).not.toContain(targetConstruct.construct_id);
+    expect(payload.evidenceRefs).not.toContain(targetSourceRef);
+    expect(observation.evidence_refs).not.toContain(targetConstruct.construct_id);
+    expect(observation.evidence_refs).not.toContain(targetSourceRef);
+
+    const routeUpdate = listStagePlayGoalContextUpdates({
+      threadId,
+      contentRef: payload.resultId,
+      producerKind: "route_watch",
+      updateKind: "error",
+      limit: 1,
+    })[0];
+    expect(routeUpdate).toMatchObject({
+      freshness: expect.objectContaining({ status: "blocked" }),
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    expect(routeUpdate.evidenceRefs).not.toContain(targetConstruct.construct_id);
+    expect(routeUpdate.suggestedDispatch.map((action) => action.kind)).not.toContain("append_goal_context");
   });
 
   it("queries automation policies through live_env.query_automation_policies as non-terminal feed evidence", () => {
@@ -3655,6 +4342,123 @@ describe("live-source mail live environment tools", () => {
       queryPayload.goalContextUpdateId,
       queryPayload.resultId,
     ]));
+  });
+
+  it("keeps goal-scoped feed queries inside the AgentGoalSession source boundary when source_ref is omitted", () => {
+    const targetSourceRef = "visual_source:goal-scoped-feed";
+    const otherSourceRef = "visual_source:unrelated-feed";
+    const threadLoopRef = `thread:${threadId}`;
+    const targetLoopRef = "stage_play_mail_loop:goal-scoped-feed";
+    const otherLoopRef = "stage_play_mail_loop:unrelated-feed";
+    const authority = {
+      assistantAnswer: false,
+      terminalEligible: false,
+      rawContentIncluded: false,
+      postToolModelStepRequired: true,
+    } as const;
+
+    recordStagePlayGoalContextUpdate({
+      schemaVersion: "helix.workstation_goal_context_update.v1",
+      updateId: "stage_play_goal_context_update:test:goal-source-visual",
+      createdAtMs: Date.parse("2026-06-17T14:00:05.000Z"),
+      sourceRefs: [targetSourceRef, "visual_frame:goal-scoped-feed"],
+      loopRefs: [threadLoopRef, targetLoopRef],
+      producerKind: "visual_capture",
+      updateKind: "visual_observation",
+      contentRef: "visual_frame:goal-scoped-feed",
+      preview: "Goal-scoped visual frame shows the frog classifier target.",
+      evidenceRefs: ["visual_evidence:goal-scoped-feed"],
+      receiptRefs: ["visual_frame:goal-scoped-feed"],
+      freshness: {
+        observedAtMs: Date.parse("2026-06-17T14:00:05.000Z"),
+        staleAfterMs: 30_000,
+        status: "fresh",
+      },
+      goalRelevance: null,
+      suggestedDispatch: [{ kind: "log_receipt", receiptRef: "visual_frame:goal-scoped-feed" }],
+      authority,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    recordStagePlayGoalContextUpdate({
+      schemaVersion: "helix.workstation_goal_context_update.v1",
+      updateId: "stage_play_goal_context_update:test:other-source-visual",
+      createdAtMs: Date.parse("2026-06-17T14:00:06.000Z"),
+      sourceRefs: [otherSourceRef, "visual_frame:unrelated-feed"],
+      loopRefs: [threadLoopRef, otherLoopRef],
+      producerKind: "visual_capture",
+      updateKind: "visual_observation",
+      contentRef: "visual_frame:unrelated-feed",
+      preview: "Unrelated visual frame should not enter the goal-scoped feed query.",
+      evidenceRefs: ["visual_evidence:unrelated-feed"],
+      receiptRefs: ["visual_frame:unrelated-feed"],
+      freshness: {
+        observedAtMs: Date.parse("2026-06-17T14:00:06.000Z"),
+        staleAfterMs: 30_000,
+        status: "fresh",
+      },
+      goalRelevance: null,
+      suggestedDispatch: [{ kind: "log_receipt", receiptRef: "visual_frame:unrelated-feed" }],
+      authority,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+
+    const sessionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_refs: [targetSourceRef],
+        loop_refs: [targetLoopRef],
+        goal_id: "goal:goal-scoped-feed",
+        objective: "Read only the visual feed attached to this frog classification goal.",
+        context_feeds: ["visual_summaries"],
+        allowed_actuators: ["query_visual_summaries"],
+      },
+    });
+    expect(sessionObservation.ok).toBe(true);
+
+    const queryObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_visual_summaries",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        goal_id: "goal:goal-scoped-feed",
+      },
+    });
+
+    const queryPayload = queryObservation.observation as any;
+    expect(queryObservation.ok).toBe(true);
+    expect(queryPayload).toMatchObject({
+      feedKind: "visual_summaries",
+      goalId: "goal:goal-scoped-feed",
+      status: "read",
+      matchedAllowedActuators: ["query_visual_summaries"],
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(queryPayload.goalContextUpdates).toEqual([
+      expect.objectContaining({
+        updateId: "stage_play_goal_context_update:test:goal-source-visual",
+        sourceRefs: expect.arrayContaining([targetSourceRef]),
+        authority,
+      }),
+    ]);
+    expect(queryPayload.goalContextUpdates.map((update: any) => update.updateId)).not.toContain(
+      "stage_play_goal_context_update:test:other-source-visual",
+    );
+    expect(queryPayload.agentGoalSession.checkpoints.at(-1)).toMatchObject({
+      actionsTaken: expect.arrayContaining(["query_visual_summaries", "live_env.query_visual_summaries"]),
+      evidenceRefs: expect.arrayContaining([
+        "stage_play_goal_context_update:test:goal-source-visual",
+        queryPayload.goalContextUpdateId,
+      ]),
+      nextStep: "continue",
+    });
   });
 
   it("blocks feed-specific queries outside an explicit goal session context-feed policy", () => {
@@ -5633,7 +6437,7 @@ describe("live-source mail live environment tools", () => {
       controlKind: "set_loop_state",
       status: "prepared",
       goalId: "goal:generic-loop-control",
-      requiredActuator: "repair_source",
+      requiredActuator: "repair_loop",
       actuatorAllowed: true,
       matchedAllowedActuators: ["set_loop_state"],
       matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:set_loop_state"],
@@ -5660,7 +6464,7 @@ describe("live-source mail live environment tools", () => {
         source_id: sourceId,
         goal_id: "goal:repair-source",
         objective: "Allow the agent to repair the visual source loop.",
-        allowed_actuators: ["repair_source", "query_source_health"],
+        allowed_actuators: ["repair_source", "query_source_health", "repair_loop"],
       },
     });
     expect(session.ok).toBe(true);
@@ -5721,13 +6525,13 @@ describe("live-source mail live environment tools", () => {
     expect(repairLoopObservation.ok).toBe(true);
     expect(repairLoopPayload).toMatchObject({
       schema: "stage_play_workstation_control_receipt/v1",
-      controlKind: "repair_source",
+      controlKind: "repair_loop",
       status: "prepared",
       goalId: "goal:repair-source",
-      requiredActuator: "repair_source",
+      requiredActuator: "repair_loop",
       actuatorAllowed: true,
-      matchedAllowedActuators: ["repair_source"],
-      matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:repair_source"],
+      matchedAllowedActuators: ["repair_loop"],
+      matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:repair_loop"],
       loopRef: "loop:visual-capture",
       loopState: "repaired",
       post_tool_model_step_required: true,
@@ -5741,9 +6545,48 @@ describe("live-source mail live environment tools", () => {
     ]));
     expect(repairLoopPayload.agentGoalSession.checkpoints.at(-1)).toMatchObject({
       summary: "Prepared repair workstation loop control dispatch for this goal session.",
-      actionsTaken: expect.arrayContaining(["repair_source", "live_env.repair_loop"]),
+      actionsTaken: expect.arrayContaining(["repair_loop", "live_env.repair_loop"]),
       nextStep: "continue",
     });
+
+    const sourceOnlySession = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        goal_id: "goal:source-only-repair",
+        objective: "Allow source repair without direct loop repair.",
+        allowed_actuators: ["repair_source"],
+      },
+    });
+    expect(sourceOnlySession.ok).toBe(true);
+
+    const sourceOnlyLoopRepair = executeLiveEnvironmentTool({
+      tool_name: "live_env.repair_loop",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        goal_id: "goal:source-only-repair",
+        loop_ref: "loop:visual-capture",
+      },
+    });
+    const sourceOnlyLoopRepairPayload = sourceOnlyLoopRepair.observation as any;
+    expect(sourceOnlyLoopRepair.ok).toBe(false);
+    expect(sourceOnlyLoopRepairPayload).toMatchObject({
+      controlKind: "repair_loop",
+      status: "blocked",
+      requiredActuator: "repair_loop",
+      actuatorAllowed: false,
+      matchedAllowedActuators: [],
+      matchedAllowedActuatorRefs: [],
+      missingRequirements: ["allowed_actuator:repair_loop"],
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(sourceOnlyLoopRepairPayload.dispatch.map((action: any) => action.kind)).not.toContain("repair_loop");
 
     const deniedSession = executeLiveEnvironmentTool({
       tool_name: "live_env.start_agent_goal_session",
@@ -6698,6 +7541,122 @@ describe("live-source mail live environment tools", () => {
     });
   });
 
+  it("keeps implicit goal-scoped source-health queries inside the AgentGoalSession source boundary", () => {
+    const unrelatedSourceId = "visual_source:source-health-unrelated";
+    startVisualSnapshotSource({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      source_surface: "browser_tab",
+      capture_mode: "interval",
+      status: "active",
+    });
+    recordVisualFrame({
+      source_id: sourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      frame_id: "visual_frame:source-health-boundary-target",
+      ts: "2026-06-17T16:00:00.000Z",
+    });
+    startVisualSnapshotSource({
+      source_id: unrelatedSourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      source_surface: "browser_tab",
+      capture_mode: "interval",
+      status: "active",
+    });
+    recordVisualFrame({
+      source_id: unrelatedSourceId,
+      thread_id: threadId,
+      room_id: roomId,
+      frame_id: "visual_frame:source-health-boundary-unrelated",
+      ts: "2026-06-17T16:00:01.000Z",
+    });
+
+    const sessionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        goal_id: "goal:source-health-boundary",
+        objective: "Inspect only the source health attached to this visual goal.",
+        context_feeds: ["source_health"],
+        allowed_actuators: ["query_source_health"],
+      },
+    });
+    expect(sessionObservation.ok).toBe(true);
+    const initialCheckpointCount = ((sessionObservation.observation as any).session.checkpoints ?? []).length;
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_source_health",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        goal_id: "goal:source-health-boundary",
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation).toMatchObject({
+      tool_name: "live_env.query_source_health",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schema: "helix.situation_source_capability_read.v1",
+      contractValid: true,
+      contractValidationIssues: [],
+      status: "read",
+      goalId: "goal:source-health-boundary",
+      feedAllowed: true,
+      actuatorAllowed: true,
+      requiredActuator: "query_source_health",
+      matchedAllowedActuators: ["query_source_health"],
+      matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:query_source_health"],
+      capabilityCount: 1,
+      sourceRefs: [sourceId],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      post_tool_model_step_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(payload.capabilities.map((capability: any) => capability.source_id)).toEqual([sourceId]);
+    expect(payload.capabilities.map((capability: any) => capability.source_id)).not.toContain(unrelatedSourceId);
+    expect(payload.evidenceRefs).toEqual(expect.arrayContaining([
+      payload.resultId,
+      "context_feed:source_health",
+      "allowed_actuator:query_source_health",
+      "agent_goal_allowed_actuator:query_source_health",
+      sourceId,
+      `source_health:${sourceId}`,
+    ]));
+    expect(payload.evidenceRefs).not.toContain(unrelatedSourceId);
+    expect(payload.evidenceRefs).not.toContain(`source_health:${unrelatedSourceId}`);
+    expect(payload.agentGoalSession.checkpoints).toHaveLength(initialCheckpointCount + 1);
+    expect(payload.agentGoalSession.checkpoints.at(-1)).toMatchObject({
+      summary: "Queried source health and read 1 capability state(s) for this goal session.",
+      actionsTaken: expect.arrayContaining(["query_source_health", "live_env.query_source_health"]),
+      evidenceRefs: expect.arrayContaining([
+        payload.goalContextUpdateId,
+        payload.resultId,
+        sourceId,
+        `source_health:${sourceId}`,
+      ]),
+      nextStep: "repair",
+    });
+  });
+
   it("blocks source health queries outside an explicit goal session context-feed policy", () => {
     const sessionObservation = executeLiveEnvironmentTool({
       tool_name: "live_env.start_agent_goal_session",
@@ -7030,6 +7989,259 @@ describe("live-source mail live environment tools", () => {
     });
   });
 
+  it("appends goal checkpoints when reading Live Answer card lines through an allowed goal session", () => {
+    const liveAnswerSourceId = "visual_source:live-answer-goal-card-read";
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: threadId,
+      created_turn_id: "turn:live-answer-goal-card-read",
+      objective: "Track the frog card as goal-scoped Live Answer context.",
+      room_id: roomId,
+      source_ids: [liveAnswerSourceId],
+      preset: "custom",
+      line_schema: [
+        {
+          key: "scene",
+          label: "Scene",
+          update_policy: "episode_based",
+          visibility: "answer_card",
+          priority: "info",
+        },
+      ],
+    });
+    updateLiveAnswerEnvironment({
+      environment_id: environment.environment_id,
+      reason: "subgoal_update",
+      line_values: {
+        scene: {
+          value: "ImageLens goal card shows a frog on a branch.",
+          confidence: 0.87,
+          evidence_refs: ["visual_frame:goal-frog-card"],
+        },
+      },
+      latest_summary: "Goal-scoped Live Answer frog card is current.",
+      evidence_refs: ["visual_frame:goal-frog-card"],
+      now: "2026-06-17T14:15:00.000Z",
+    });
+
+    const sessionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: liveAnswerSourceId,
+        goal_id: "goal:live-answer-card-read",
+        objective: "Read Live Answer card projection lines for this visual source.",
+        context_feeds: ["live_answer_lines"],
+        allowed_actuators: ["query_live_answer_state"],
+      },
+    });
+    expect(sessionObservation.ok).toBe(true);
+    const initialCheckpointCount = ((sessionObservation.observation as any).session.checkpoints ?? []).length;
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.read_card",
+      thread_id: threadId,
+      environment_id: environment.environment_id,
+      args: {
+        room_id: roomId,
+        goal_id: "goal:live-answer-card-read",
+        line_keys: ["scene"],
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation).toMatchObject({
+      tool_name: "live_env.read_card",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schema: "helix.live_environment_card_read.v1",
+      status: "read",
+      goalId: "goal:live-answer-card-read",
+      feedAllowed: true,
+      actuatorAllowed: true,
+      requiredActuator: "query_live_answer_state",
+      matchedAllowedActuators: ["query_live_answer_state"],
+      matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:query_live_answer_state"],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(payload.lines).toEqual([
+      expect.objectContaining({
+        key: "scene",
+        ui_summary_only: true,
+        assistant_answer: false,
+      }),
+    ]);
+    expect(payload.policyEvidenceRefs).toEqual(expect.arrayContaining([
+      "context_feed:live_answer_lines",
+      "allowed_actuator:query_live_answer_state",
+      expect.stringMatching(/^agent_goal_context_feed:agent_goal_feed:/),
+      "agent_goal_allowed_actuator:query_live_answer_state",
+    ]));
+    expect(payload.agentGoalSession.checkpoints).toHaveLength(initialCheckpointCount + 1);
+    expect(payload.agentGoalSession.checkpoints.at(-1)).toMatchObject({
+      summary: "Read 1 Live Answer projection line(s) for this goal session.",
+      actionsTaken: expect.arrayContaining(["query_live_answer_state", "live_env.read_card"]),
+      evidenceRefs: expect.arrayContaining([
+        payload.goalContextUpdateId,
+        "visual_frame:goal-frog-card",
+        environment.environment_id,
+      ]),
+      nextStep: "continue",
+    });
+
+    const updates = listStagePlayGoalContextUpdates({
+      threadId,
+      goalId: "goal:live-answer-card-read",
+      sourceRef: liveAnswerSourceId,
+      producerKind: "live_answer",
+      updateKind: "summary",
+    });
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({
+      updateId: payload.goalContextUpdateId,
+      toolIdentity: {
+        requestedToolName: "live_env.read_card",
+        canonicalToolName: "live_env.read_card",
+        matchedAllowedActuators: ["query_live_answer_state"],
+        matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:query_live_answer_state"],
+      },
+      goalRelevance: expect.objectContaining({
+        goalId: "goal:live-answer-card-read",
+      }),
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+  });
+
+  it("blocks goal-scoped Live Answer card reads outside the goal session feed policy", () => {
+    const liveAnswerSourceId = "visual_source:live-answer-card-read-blocked";
+    const { environment } = createLiveAnswerEnvironment({
+      thread_id: threadId,
+      created_turn_id: "turn:live-answer-card-read-blocked",
+      objective: "Keep Live Answer card outside this visual-only goal.",
+      room_id: roomId,
+      source_ids: [liveAnswerSourceId],
+      preset: "custom",
+      line_schema: [
+        {
+          key: "scene",
+          label: "Scene",
+          update_policy: "episode_based",
+          visibility: "answer_card",
+          priority: "info",
+        },
+      ],
+    });
+    updateLiveAnswerEnvironment({
+      environment_id: environment.environment_id,
+      reason: "subgoal_update",
+      line_values: {
+        scene: {
+          value: "This Live Answer card should not enter the visual-only goal.",
+          confidence: 0.77,
+          evidence_refs: ["visual_frame:block-live-answer-card"],
+        },
+      },
+      evidence_refs: ["visual_frame:block-live-answer-card"],
+      now: "2026-06-17T14:18:00.000Z",
+    });
+
+    const sessionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: liveAnswerSourceId,
+        goal_id: "goal:live-answer-card-blocked",
+        objective: "Inspect visual summaries only, not Live Answer card state.",
+        context_feeds: ["visual_summaries"],
+        allowed_actuators: ["query_live_answer_state"],
+      },
+    });
+    expect(sessionObservation.ok).toBe(true);
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.read_card",
+      thread_id: threadId,
+      environment_id: environment.environment_id,
+      args: {
+        room_id: roomId,
+        goal_id: "goal:live-answer-card-blocked",
+        line_keys: ["scene"],
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation).toMatchObject({
+      tool_name: "live_env.read_card",
+      ok: false,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schema: "helix.live_environment_card_read.v1",
+      status: "blocked",
+      goalId: "goal:live-answer-card-blocked",
+      missingRequirements: ["context_feed:live_answer_lines"],
+      feedAllowed: false,
+      actuatorAllowed: true,
+      lines: [],
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(payload.policyEvidenceRefs).toEqual(expect.arrayContaining([
+      "context_feed:live_answer_lines",
+      "allowed_actuator:query_live_answer_state",
+      "agent_goal_allowed_actuator:query_live_answer_state",
+    ]));
+    expect(observation.evidence_refs).not.toContain("visual_frame:block-live-answer-card");
+
+    const updates = listStagePlayGoalContextUpdates({
+      threadId,
+      goalId: "goal:live-answer-card-blocked",
+      producerKind: "live_answer",
+      updateKind: "error",
+    });
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({
+      updateId: payload.goalContextUpdateId,
+      freshness: expect.objectContaining({ status: "blocked" }),
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    expect(updates[0].suggestedDispatch.map((action) => action.kind)).not.toContain("append_goal_context");
+  });
+
   it("queries compact trace memory and records trace-memory goal context", () => {
     const trace = recordWorkstationReasoningTrace({
       schema: "helix.workstation_reasoning_trace.v1",
@@ -7342,6 +8554,170 @@ describe("live-source mail live environment tools", () => {
       summary: "Queried trace memory and read 1 compact trace(s) for this goal session.",
       actionsTaken: expect.arrayContaining(["query_trace_memory", "live_env.query_trace_memory"]),
       evidenceRefs: expect.arrayContaining([payload.goalContextUpdateId, payload.resultId, trace.trace_id]),
+    });
+  });
+
+  it("keeps implicit goal-scoped trace-memory queries inside the AgentGoalSession source boundary", () => {
+    const targetTrace = recordWorkstationReasoningTrace({
+      schema: "helix.workstation_reasoning_trace.v1",
+      trace_id: "workstation_trace:goal-source-boundary-target",
+      thread_id: threadId,
+      turn_id: "turn:goal-source-boundary-target",
+      source_family: "multimodal",
+      user_goal: "Classify the frog visible in the active visual source.",
+      route_reason_code: "visual_to_microdeck",
+      input_item_refs: ["visual_evidence:goal-source-boundary-target"],
+      evidence_refs: [sourceId, "visual_evidence:goal-source-boundary-target", "microdeck_output:frog-classifier"],
+      tool_receipt_ids: ["microdeck_receipt:frog-classifier"],
+      lifecycle_event_refs: ["tool_lifecycle:goal-source-boundary-target"],
+      artifacts: {
+        visual_extraction_id: "visual_extraction:goal-source-boundary-target",
+        workstation_tool_evaluation_id: "workstation-tool-eval:goal-source-boundary-target",
+      },
+      requested_extraction_scope: "scene",
+      actual_extraction_scope: "scene",
+      scope_match: "exact",
+      proof_status: "complete",
+      compact_steps: [
+        {
+          label: "Visual source trace",
+          summary: "Bound frog classification trace to the active visual source.",
+          artifact_ref: "visual_extraction:goal-source-boundary-target",
+          status: "completed",
+        },
+      ],
+      caveats: [],
+      final_answer_snapshot: "The frog trace remains compact observation-only context.",
+      assistant_answer: false,
+      raw_content_included: false,
+      context_policy: "compact_context_pack_only",
+      created_at: "2026-06-17T15:10:00.000Z",
+    });
+    const unrelatedTrace = recordWorkstationReasoningTrace({
+      schema: "helix.workstation_reasoning_trace.v1",
+      trace_id: "workstation_trace:goal-source-boundary-unrelated",
+      thread_id: threadId,
+      turn_id: "turn:goal-source-boundary-unrelated",
+      source_family: "multimodal",
+      user_goal: "Translate audio from an unrelated source.",
+      route_reason_code: "audio_to_translation",
+      input_item_refs: ["audio_evidence:unrelated-source"],
+      evidence_refs: ["audio_source:unrelated", "audio_evidence:unrelated-source", "translation_segment:unrelated"],
+      tool_receipt_ids: ["translation_receipt:unrelated"],
+      lifecycle_event_refs: ["tool_lifecycle:goal-source-boundary-unrelated"],
+      artifacts: {
+        workstation_tool_evaluation_id: "workstation-tool-eval:goal-source-boundary-unrelated",
+      },
+      requested_extraction_scope: "custom",
+      actual_extraction_scope: "custom",
+      scope_match: "exact",
+      proof_status: "complete",
+      compact_steps: [
+        {
+          label: "Audio translation trace",
+          summary: "Unrelated trace should stay outside the visual goal session.",
+          artifact_ref: "translation_segment:unrelated",
+          status: "completed",
+        },
+      ],
+      caveats: [],
+      final_answer_snapshot: "The unrelated audio trace remains observation-only.",
+      assistant_answer: false,
+      raw_content_included: false,
+      context_policy: "compact_context_pack_only",
+      created_at: "2026-06-17T15:11:00.000Z",
+    });
+
+    const sessionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        goal_id: "goal:trace-source-boundary",
+        objective: "Read only trace memory attached to this visual source.",
+        context_feeds: ["trace_memory"],
+        allowed_actuators: ["query_trace_memory"],
+      },
+    });
+    expect(sessionObservation.ok).toBe(true);
+    const initialCheckpointCount = ((sessionObservation.observation as any).session.checkpoints ?? []).length;
+
+    const observation = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_trace_memory",
+      thread_id: threadId,
+      args: {
+        goal_id: "goal:trace-source-boundary",
+      },
+    });
+
+    const payload = observation.observation as any;
+    expect(observation).toMatchObject({
+      tool_name: "live_env.query_trace_memory",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schema: "helix.workstation_reasoning_trace_query_result.v1",
+      contractValid: true,
+      contractValidationIssues: [],
+      trace_id: null,
+      trace_count: 1,
+      selectedTrace: {
+        trace_id: targetTrace.trace_id,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      goalId: "goal:trace-source-boundary",
+      status: "read",
+      feedAllowed: true,
+      actuatorAllowed: true,
+      matchedAllowedActuators: ["query_trace_memory"],
+      matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:query_trace_memory"],
+      freshnessStatus: "fresh",
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      post_tool_model_step_required: true,
+      terminal_eligible: false,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+    expect(payload.traces.map((trace: any) => trace.trace_id)).toEqual([targetTrace.trace_id]);
+    expect(payload.traces.map((trace: any) => trace.trace_id)).not.toContain(unrelatedTrace.trace_id);
+    expect(payload.sourceRefs).toEqual(expect.arrayContaining([threadId, "multimodal", targetTrace.trace_id]));
+    expect(payload.sourceRefs).not.toContain(unrelatedTrace.trace_id);
+    expect(payload.evidenceRefs).toEqual(expect.arrayContaining([
+      payload.resultId,
+      "context_feed:trace_memory",
+      "allowed_actuator:query_trace_memory",
+      "agent_goal_allowed_actuator:query_trace_memory",
+      sourceId,
+      targetTrace.trace_id,
+      "visual_evidence:goal-source-boundary-target",
+      "microdeck_output:frog-classifier",
+      "microdeck_receipt:frog-classifier",
+      "tool_lifecycle:goal-source-boundary-target",
+    ]));
+    expect(payload.evidenceRefs).not.toContain(unrelatedTrace.trace_id);
+    expect(payload.evidenceRefs).not.toContain("audio_source:unrelated");
+    expect(payload.agentGoalSession.checkpoints).toHaveLength(initialCheckpointCount + 1);
+    expect(payload.agentGoalSession.checkpoints.at(-1)).toMatchObject({
+      summary: "Queried trace memory and read 1 compact trace(s) for this goal session.",
+      actionsTaken: expect.arrayContaining(["query_trace_memory", "live_env.query_trace_memory"]),
+      evidenceRefs: expect.arrayContaining([
+        payload.goalContextUpdateId,
+        payload.resultId,
+        targetTrace.trace_id,
+        sourceId,
+      ]),
+      nextStep: "continue",
     });
   });
 

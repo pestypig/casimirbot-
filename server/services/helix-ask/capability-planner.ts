@@ -262,6 +262,7 @@ const liveSourceToolForRequestedAction = (requestedAction: string): string => {
     requestedAction === "request_interim_voice_callout" ||
     requestedAction === "configure_interpreter_profile" ||
     requestedAction === "configure_live_source_watch_job" ||
+    requestedAction === "configure_route_watch" ||
     requestedAction === "reflect_stage_play_context" ||
     requestedAction === "query_live_source_quality" ||
     requestedAction === "summarize_live_source_current_state"
@@ -301,8 +302,12 @@ const applyLiveSourcePhaseCapabilityFilter = (input: {
   const mandatoryTool = mandatoryToolForPhase(phase as LiveSourceTurnPhaseResolutionV1 | null);
   const locked = Boolean(mandatoryTool);
   const selectedForbidden = forbiddenTools.includes(selectedCapability);
+  const selectedMatchesWatchJobAlias =
+    phaseName === "configure_watch_job" &&
+    selectedCapability === "live_env.configure_route_watch" &&
+    allowedTools.includes("live_env.configure_live_source_watch_job");
   const selectedOutsideLockedAllowlist =
-    locked && allowedTools.length > 0 && !allowedTools.includes(selectedCapability);
+    locked && allowedTools.length > 0 && !allowedTools.includes(selectedCapability) && !selectedMatchesWatchJobAlias;
   const repairTarget = mandatoryTool ?? allowedTools[0] ?? "";
   if ((selectedForbidden || selectedOutsideLockedAllowlist) && repairTarget) {
     return {
@@ -361,7 +366,7 @@ const isMutatingCapability = (family: HelixCapabilityFamily, requestedAction: st
   if (family === "workstation_action" || family === "subagent_runtime_adapter") return true;
   if (
     family === "live_environment" &&
-    /^live_env\.(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|start_agent_goal_session)$/i.test(requestedAction)
+    /^live_env\.(?:configure_route_watch|configure_live_source_watch_job|change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|start_agent_goal_session)$/i.test(requestedAction)
   ) {
     return true;
   }
@@ -614,7 +619,12 @@ export const buildCapabilityPlan = (input: {
     );
   const rules = instructionRules(instructionFrame);
   const plannedRequestedAction = contractArbitration.contract_state === "hard_live_source_phase"
-    ? (mandatoryPhaseTool ?? "live_env.read_processed_live_source_mail")
+    ? (
+        mandatoryPhaseTool === "live_env.configure_live_source_watch_job" &&
+        requestedCapabilityContract?.capability === "live_env.configure_route_watch"
+          ? "live_env.configure_route_watch"
+          : mandatoryPhaseTool ?? "live_env.read_processed_live_source_mail"
+      )
     : contextualSuppressionBlocksPlan
       ? "suppressed_contextual_tool_reference"
     : requestedCapabilityContract

@@ -142,6 +142,11 @@ describe("Helix Ask terminal authority contracts", () => {
         text: "The active goal session is monitoring frog classification.",
       },
       {
+        terminalArtifactKind: "stage_play_agent_goal_session_tool_result/v1",
+        finalAnswerSource: "stage_play_agent_goal_session_tool_result",
+        text: "The goal-session tool result says the workstation is monitoring frog classification.",
+      },
+      {
         terminalArtifactKind: "helix.narrator_say_request.v1",
         finalAnswerSource: "helix.narrator_say_request.v1",
         text: "Narrator was asked to speak the translated segment.",
@@ -160,6 +165,16 @@ describe("Helix Ask terminal authority contracts", () => {
         terminalArtifactKind: "helix.workstation_goal_context_update.v1",
         finalAnswerSource: "helix.workstation_goal_context_update.v1",
         text: "Goal context says the frog deck produced a candidate classification.",
+      },
+      {
+        terminalArtifactKind: "helix.live_environment_goal_satisfaction.v1",
+        finalAnswerSource: "helix.live_environment_goal_satisfaction.v1",
+        text: "Goal satisfaction says the workstation gathered enough frog classification evidence.",
+      },
+      {
+        terminalArtifactKind: "stage_play_workstation_control_receipt/v1",
+        finalAnswerSource: "stage_play_workstation_control_receipt",
+        text: "The workstation control receipt says the visual preset was changed.",
       },
       {
         terminalArtifactKind: "stage_play_workstation_goal_context_read_result/v1",

@@ -119,8 +119,8 @@ const feedUpdateLanes: Readonly<Record<AgentGoalContextFeedKindV1, {
     updateKinds: ["source_status"],
   },
   trace_memory: {
-    producerKinds: ["trace_memory"],
-    updateKinds: ["route_evidence", "summary"],
+    producerKinds: ["trace_memory", "reflection"],
+    updateKinds: ["route_evidence", "summary", "reflection", "error"],
   },
   narrator_events: {
     producerKinds: ["narrator"],

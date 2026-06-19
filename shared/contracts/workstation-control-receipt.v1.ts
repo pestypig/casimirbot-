@@ -13,6 +13,7 @@ export type WorkstationControlReceiptKindV1 =
   | "bind_source"
   | "unbind_source"
   | "set_loop_state"
+  | "repair_loop"
   | "repair_source"
   | "update_live_answer"
   | "focus_process_graph";
@@ -74,6 +75,7 @@ export const WORKSTATION_CONTROL_RECEIPT_KINDS: readonly WorkstationControlRecei
   "bind_source",
   "unbind_source",
   "set_loop_state",
+  "repair_loop",
   "repair_source",
   "update_live_answer",
   "focus_process_graph",
@@ -188,7 +190,7 @@ const dispatchIssues = (
       if (receipt.controlKind === "set_loop_state" && (action.kind === "set_loop_state" || action.kind === "repair_loop")) {
         blockedMutationFound = true;
       }
-      if (receipt.controlKind === "repair_source" && (action.kind === "set_loop_state" || action.kind === "repair_loop")) {
+      if ((receipt.controlKind === "repair_loop" || receipt.controlKind === "repair_source") && (action.kind === "set_loop_state" || action.kind === "repair_loop")) {
         blockedMutationFound = true;
       }
     }
@@ -251,6 +253,8 @@ const preparedControlFieldIssues = (value: WorkstationControlReceiptV1): string[
           ? []
           : ["prepared set_loop_state receipts must include loopState"]),
       ];
+    case "repair_loop":
+      return isNonEmptyString(value.loopRef) ? [] : ["prepared repair_loop receipts must include loopRef"];
     case "repair_source":
       return isNonEmptyString(value.loopRef) ? [] : ["prepared repair_source receipts must include loopRef"];
     case "update_live_answer":
@@ -293,6 +297,7 @@ const preparedControlDispatchFound = (
         fieldEquals(action.loopRef, receipt.loopRef) &&
         action.state === receipt.loopState
       );
+    case "repair_loop":
     case "repair_source":
       return actions.some((action) =>
         action.kind === "set_loop_state" &&

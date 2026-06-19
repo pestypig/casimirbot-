@@ -129,6 +129,7 @@ describe("workstation goal context contract", () => {
       "evaluate_goal_satisfaction",
       "resume_loop",
       "set_loop_state",
+      "repair_loop",
       "focus_process_graph",
     ],
     cadence: { kind: "event_accumulation", minUpdates: 2 },
@@ -467,7 +468,7 @@ describe("workstation goal context contract", () => {
     expect(normalizeAgentGoalActuatorV1("live_env.pause_workstation_loop")).toBe("pause_loop");
     expect(normalizeAgentGoalActuatorV1("live_env.resume_workstation_loop")).toBe("resume_loop");
     expect(normalizeAgentGoalActuatorV1("live_env.set_workstation_loop_state")).toBe("set_loop_state");
-    expect(normalizeAgentGoalActuatorV1("live_env.repair_loop")).toBe("repair_source");
+    expect(normalizeAgentGoalActuatorV1("live_env.repair_loop")).toBe("repair_loop");
     expect(normalizeAgentGoalActuatorV1("live_env.repair_workstation_source")).toBe("repair_source");
     expect(normalizeAgentGoalActuatorV1("live_env.update_live_answer_projection")).toBe("update_live_answer");
     expect(normalizeAgentGoalActuatorV1("narrator.say")).toBe("narrator_say");

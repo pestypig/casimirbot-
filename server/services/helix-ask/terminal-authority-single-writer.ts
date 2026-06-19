@@ -532,16 +532,7 @@ export const applyTerminalProjectionKindGuard = (
 ): HelixTerminalAuthoritySingleWriterResult => {
   const authorityKind = readString(result.selected_terminal_artifact_kind);
   const presentation = readRecord(payload.terminal_presentation);
-  const typedFailure = readRecord(payload.typed_failure);
-  const existingTypedFailureCode =
-    readString(payload.terminal_error_code) ??
-    readString(typedFailure?.error_code);
-  const hasSpecificTypedFailureAuthority =
-    authorityKind === "typed_failure" &&
-    Boolean(existingTypedFailureCode && existingTypedFailureCode !== "terminal_projection_mismatch");
-  const visibleKind = hasSpecificTypedFailureAuthority
-    ? "typed_failure"
-    : readString(presentation?.terminal_artifact_kind) ?? readString(payload.terminal_artifact_kind);
+  const visibleKind = readString(presentation?.terminal_artifact_kind) ?? readString(payload.terminal_artifact_kind);
   if (!authorityKind || !visibleKind || authorityKind === visibleKind) {
     return {
       ...result,
@@ -649,10 +640,15 @@ export const applyTerminalProjectionKindGuard = (
   }
 
   const railFailure = readTerminalBlockingToolRailFailure(payload);
+  const typedFailure = readRecord(payload.typed_failure);
+  const compoundSupportCoverage = readRecord(payload.compound_subgoal_draft_support_coverage);
+  const compoundSupportFailureCode =
+    compoundSupportCoverage?.ok === false ? "compound_subgoal_support_refs_missing" : null;
   const failureCodeCandidates = [
     readString(payload.terminal_error_code) ??
       null,
     readString(typedFailure?.error_code) ?? null,
+    compoundSupportFailureCode,
     railFailure?.railFailureCode ?? null,
   ];
   const specificFailureCode =
@@ -681,10 +677,22 @@ export const applyTerminalProjectionKindGuard = (
       : resultVisibleText && !resultVisibleTextIsGenericProjectionMismatch
         ? resultVisibleText
         : null;
+  const compoundSupportFailureText =
+    failureCode === "compound_subgoal_support_refs_missing"
+      ? (() => {
+          const missingRefs = readArray(compoundSupportCoverage?.missing_observation_refs)
+            .map(readString)
+            .filter((entry): entry is string => Boolean(entry));
+          return missingRefs.length > 0
+            ? `I could not complete this compound turn because the final draft was not grounded in every satisfied subgoal observation. Missing support refs: ${missingRefs.join(", ")}.`
+            : "I could not complete this compound turn because the final draft was not grounded in every satisfied subgoal observation.";
+        })()
+      : null;
   const failureText =
     failureCode === "terminal_projection_mismatch"
       ? TERMINAL_PROJECTION_MISMATCH_TEXT
-      : nonGenericExistingFailureText ??
+      : compoundSupportFailureText ??
+        nonGenericExistingFailureText ??
         `I could not produce a terminal answer because the requested tool rail did not complete. Cause: ${failureCode}.`;
 
   payload.ok = false;
@@ -1256,6 +1264,103 @@ const attachItineraryExecutionState = (
   artifacts: ArtifactLike[],
 ): string[] => {
   return attachHelixCapabilityItineraryExecutionState(payload, artifacts);
+};
+
+type CompoundSubgoalDraftSupportCoverage = {
+  schema: "helix.compound_subgoal_draft_support_coverage.v1";
+  applies: boolean;
+  ok: boolean;
+  required_observation_refs: string[];
+  draft_support_refs: string[];
+  missing_observation_refs: string[];
+  final_answer_draft_ref: string | null;
+  assistant_answer: false;
+  raw_content_included: false;
+};
+
+const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
+  Array.from(new Set(values.filter((entry): entry is string => Boolean(entry))));
+
+const collectRefsFromRecord = (record: Record<string, unknown> | null): string[] => {
+  if (!record) return [];
+  const directRefs = [
+    readString(record.ref),
+    readString(record.artifact_ref),
+    readString(record.artifact_id),
+    readString(record.observation_ref),
+    readString(record.source_observation_ref),
+    readString(record.citation_ref),
+  ];
+  const arrayRefs = [
+    ...readArray(record.support_refs).map(readString),
+    ...readArray(record.artifact_refs).map(readString),
+    ...readArray(record.evidence_refs).map(readString),
+    ...readArray(record.observation_refs).map(readString),
+    ...readArray(record.source_observation_refs).map(readString),
+    ...readArray(record.grounded_observation_refs).map(readString),
+    ...readArray(record.grounded_in_observation_refs).map(readString),
+    ...readArray(record.selected_evidence_refs).map(readString),
+    ...readArray(record.subgoal_observation_refs).map(readString),
+  ];
+  return uniqueStrings([...directRefs, ...arrayRefs]);
+};
+
+const collectExplicitFinalAnswerDraftSupportRefs = (draft: ArtifactLike | null | undefined): string[] => {
+  const payload = draft ? artifactPayload(draft) : null;
+  if (!payload) return [];
+  const nestedRefs = [
+    ...readArray(payload.sections).map(readRecord).flatMap(collectRefsFromRecord),
+    ...readArray(payload.citations).map(readRecord).flatMap(collectRefsFromRecord),
+    ...readArray(payload.sources).map(readRecord).flatMap(collectRefsFromRecord),
+    ...readArray(payload.evidence).map(readRecord).flatMap(collectRefsFromRecord),
+  ];
+  return uniqueStrings([
+    ...collectRefsFromRecord(payload),
+    ...nestedRefs,
+  ]);
+};
+
+const supportRefCoversObservationRef = (supportRef: string, observationRef: string): boolean =>
+  supportRef === observationRef ||
+  supportRef.endsWith(`#${observationRef}`) ||
+  supportRef.endsWith(`/${observationRef}`);
+
+const resolveCompoundSubgoalDraftSupportCoverage = (input: {
+  payload: Record<string, unknown>;
+  draft: ArtifactLike | null | undefined;
+  finalAnswerDraftRef?: string | null;
+}): CompoundSubgoalDraftSupportCoverage => {
+  const executionState = readRecord(input.payload.capability_itinerary_execution_state);
+  const ledger = readArray(executionState?.compound_subgoal_ledger)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  const requiredObservationRefs = uniqueStrings(
+    ledger
+      .filter((entry) => readString(entry.satisfaction) === "satisfied")
+      .map((entry) => readString(entry.observation_ref)),
+  );
+  const applies =
+    executionState?.applies === true &&
+    executionState?.complete === true &&
+    ledger.length > 1 &&
+    requiredObservationRefs.length > 0;
+  const draftSupportRefs = collectExplicitFinalAnswerDraftSupportRefs(input.draft);
+  const missingObservationRefs = applies
+    ? requiredObservationRefs.filter((observationRef) =>
+        !draftSupportRefs.some((supportRef) => supportRefCoversObservationRef(supportRef, observationRef)),
+      )
+    : [];
+  return {
+    schema: "helix.compound_subgoal_draft_support_coverage.v1",
+    applies,
+    ok: !applies || missingObservationRefs.length === 0,
+    required_observation_refs: requiredObservationRefs,
+    draft_support_refs: draftSupportRefs,
+    missing_observation_refs: missingObservationRefs,
+    final_answer_draft_ref: input.finalAnswerDraftRef ?? null,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
 };
 
 type ScholarlyCitation = {
@@ -1962,6 +2067,22 @@ export function applyHelixTerminalAuthoritySingleWriter(
     draftMaterialization?.ok === true &&
     hasAcceptedObservation &&
     isStaleModelOnlyNoObservationText(latestDraftCandidateForStaleCheck?.text);
+  const compoundSubgoalDraftSupportCoverage = resolveCompoundSubgoalDraftSupportCoverage({
+    payload: input.payload,
+    draft: latestDraftCandidateForStaleCheck?.artifact,
+    finalAnswerDraftRef: draftMaterialization?.final_answer_draft_ref ?? latestDraftCandidateForStaleCheck?.ref ?? null,
+  });
+  const compoundSubgoalDraftSupportMissing =
+    draftMaterialization?.ok === true &&
+    compoundSubgoalDraftSupportCoverage.applies &&
+    !compoundSubgoalDraftSupportCoverage.ok;
+  if (compoundSubgoalDraftSupportCoverage.applies) {
+    input.payload.compound_subgoal_draft_support_coverage = compoundSubgoalDraftSupportCoverage;
+    const debug = readRecord(input.payload.debug);
+    if (debug) {
+      debug.compound_subgoal_draft_support_coverage = compoundSubgoalDraftSupportCoverage;
+    }
+  }
   const canonicalGoal = readRecord(input.payload.canonical_goal_frame);
   const docsDraftMaterializationMatchesRequiredGoal =
     draftMaterialization?.ok === true &&
@@ -1985,6 +2106,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const usableDraftMaterialization =
     draftMaterialization?.ok === true &&
     !materializedDraftRejectedForStaleObservation &&
+    !compoundSubgoalDraftSupportMissing &&
     (
       itineraryObservationCriteriaSatisfied ||
       docsDraftMaterializationMatchesRequiredGoal ||
@@ -2006,9 +2128,14 @@ export function applyHelixTerminalAuthoritySingleWriter(
           : null,
       blocked_reason: materializedDraftRejectedForStaleObservation
         ? "composer_claimed_no_observations_but_receipts_exist"
+        : compoundSubgoalDraftSupportMissing
+          ? "compound_subgoal_support_refs_missing"
         : !itineraryObservationCriteriaSatisfied && !repoDraftMaterializationMatchesRequiredGoal
           ? "capability_itinerary_observations_missing"
         : draftMaterialization.blocked_reason ?? null,
+      compound_subgoal_support_coverage: compoundSubgoalDraftSupportCoverage.applies
+        ? compoundSubgoalDraftSupportCoverage
+        : null,
     };
     input.payload.route_terminal_materialization = {
       route_family: draftMaterialization.final_answer_draft_quality_gate.route_family,
@@ -2017,8 +2144,12 @@ export function applyHelixTerminalAuthoritySingleWriter(
       allowed_terminal_artifact_kinds: draftMaterialization.route_allowed_terminal_artifact_kinds,
       materialization_attempted: true,
       materialization_ok: usableDraftMaterialization,
-      materialization_blocked_reason: draftMaterialization.blocked_reason ?? null,
+      materialization_blocked_reason: compoundSubgoalDraftSupportMissing
+        ? "compound_subgoal_support_refs_missing"
+        : draftMaterialization.blocked_reason ?? null,
       capability_itinerary_observation_missing_families: missingItineraryFamilies,
+      compound_subgoal_support_refs_missing: compoundSubgoalDraftSupportMissing,
+      compound_subgoal_missing_support_refs: compoundSubgoalDraftSupportCoverage.missing_observation_refs,
       stale_model_only_blocked_reason: materializedDraftRejectedForStaleObservation
         ? "composer_claimed_no_observations_but_receipts_exist"
         : null,
@@ -2043,6 +2174,10 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const repoTerminalMaterialized =
     usableDraftMaterialization &&
     draftMaterialization.materialized_terminal_artifact_kind === "repo_code_evidence_answer";
+  const repoEvidenceAnswerCandidate = readRecord(input.payload.repo_code_evidence_answer);
+  const repoAnswerText =
+    readString(repoEvidenceAnswerCandidate?.answer_text) ??
+    readString(repoEvidenceAnswerCandidate?.text);
   const scholarlyTerminalMaterialized =
     usableDraftMaterialization &&
     draftMaterialization.materialized_terminal_artifact_kind === "scholarly_research_answer";
@@ -2161,6 +2296,13 @@ export function applyHelixTerminalAuthoritySingleWriter(
       source: "final_answer_draft",
       reason: "missing_required_observation",
     });
+  } else if (selectedDraftCandidate && compoundSubgoalDraftSupportMissing) {
+    rejectedCandidates.push({
+      ref: artifactId(selectedDraftCandidate.artifact) ?? undefined,
+      kind: "model_synthesized_answer",
+      source: "final_answer_draft",
+      reason: "missing_required_observation",
+    });
   } else if (selectedDraftCandidate && selectedDraftRejectedForStaleObservation && !materializedDraftRejectedForStaleObservation) {
     rejectedCandidates.push({
       ref: artifactId(selectedDraftCandidate.artifact) ?? undefined,
@@ -2171,6 +2313,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
   }
   const selectedDraft =
     selectedDraftRejectedForStaleObservation ||
+    compoundSubgoalDraftSupportMissing ||
     (!itineraryObservationCriteriaSatisfied && !repoDraftMaterializationMatchesRequiredGoal)
       ? null
       : selectedDraftCandidate;
@@ -2227,7 +2370,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
 
   if (
     draftMaterialization?.ok === true &&
-    !itineraryObservationCriteriaSatisfied &&
+    (!itineraryObservationCriteriaSatisfied || compoundSubgoalDraftSupportMissing) &&
     !docsDraftMaterializationMatchesRequiredGoal &&
     !repoDraftMaterializationMatchesRequiredGoal
   ) {
@@ -2373,6 +2516,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     input.payload.answer = terminalErrorText;
     input.payload.text = terminalErrorText;
     input.payload.assistant_answer = terminalErrorText;
+    delete input.payload.model_synthesized_answer;
     input.payload.typed_failure = {
       ...(readRecord(input.payload.typed_failure) ?? {}),
       schema: "helix.typed_failure.v1",
@@ -2385,6 +2529,19 @@ export function applyHelixTerminalAuthoritySingleWriter(
       repair_target: terminalBlockingToolRailFailure.repairTarget,
       selected_capability: terminalBlockingToolRailFailure.selectedCapability,
       executed_capability: terminalBlockingToolRailFailure.executedCapability,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    input.payload.terminal_answer_authority = {
+      ...(readRecord(input.payload.terminal_answer_authority) ?? {}),
+      schema: "helix.turn_terminal_authority.v1",
+      turn_id: input.turnId,
+      terminal_kind: "failure",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_text_preview: terminalErrorText.slice(0, 240),
+      terminal_text_hash: hashHelixTerminalText(terminalErrorText),
+      server_authoritative: true,
       assistant_answer: false,
       raw_content_included: false,
     };
@@ -2467,6 +2624,75 @@ export function applyHelixTerminalAuthoritySingleWriter(
       concise_text: terminalErrorText,
       assistant_answer: false,
       raw_content_included: false,
+    };
+    selectedArtifactKind = "typed_failure";
+    selectedSource = "typed_failure";
+  } else if (compoundSubgoalDraftSupportMissing) {
+    const terminalErrorCode = "compound_subgoal_support_refs_missing";
+    const missingRefs = compoundSubgoalDraftSupportCoverage.missing_observation_refs;
+    const terminalErrorText = missingRefs.length > 0
+      ? `I could not complete this compound turn because the final draft was not grounded in every satisfied subgoal observation. Missing support refs: ${missingRefs.join(", ")}.`
+      : "I could not complete this compound turn because the final draft was not grounded in every satisfied subgoal observation.";
+    if (selectedDirectAnswerTerminal) {
+      rejectedCandidates.push({
+        ref: selectedDirectAnswerTerminal.ref ?? undefined,
+        kind: "direct_answer_text",
+        source: "direct_answer_text",
+        reason: "missing_required_observation",
+      });
+    }
+    const latestDraft = findLatestFinalAnswerDraftCandidate(artifacts);
+    if (latestDraft) {
+      rejectedCandidates.push({
+        ref: latestDraft.ref ?? undefined,
+        kind: "model_synthesized_answer",
+        source: "final_answer_draft",
+        reason: "missing_required_observation",
+      });
+    }
+    input.payload.ok = false;
+    input.payload.response_type = "final_failure";
+    input.payload.final_status = "final_failure";
+    input.payload.status = "final_failure";
+    input.payload.terminal_artifact_kind = "typed_failure";
+    input.payload.final_answer_source = "typed_failure";
+    input.payload.terminal_error_code = terminalErrorCode;
+    input.payload.terminal_failure_text = terminalErrorText;
+    input.payload.selected_final_answer = terminalErrorText;
+    input.payload.answer = terminalErrorText;
+    input.payload.text = terminalErrorText;
+    input.payload.assistant_answer = terminalErrorText;
+    input.payload.typed_failure = {
+      ...(readRecord(input.payload.typed_failure) ?? {}),
+      schema: "helix.typed_failure.v1",
+      error_code: terminalErrorCode,
+      message: terminalErrorText,
+      text: terminalErrorText,
+      answer_text: terminalErrorText,
+      compound_subgoal_draft_support_coverage: compoundSubgoalDraftSupportCoverage,
+      missing_observation_refs: missingRefs,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    input.payload.terminal_presentation = {
+      ...(readRecord(input.payload.terminal_presentation) ?? {}),
+      schema: "helix.terminal_presentation.v1",
+      turn_id: input.turnId,
+      terminal_artifact_kind: "typed_failure",
+      concise_text: terminalErrorText,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    input.payload.resolved_turn_summary = {
+      ...(readRecord(input.payload.resolved_turn_summary) ?? {}),
+      turn_id: input.turnId,
+      final_status: "final_failure",
+      response_type: "final_failure",
+      final_answer_source: "typed_failure",
+      terminal_kind: "failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: terminalErrorCode,
+      pending_server_request_present: false,
     };
     selectedArtifactKind = "typed_failure";
     selectedSource = "typed_failure";
@@ -2591,6 +2817,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     input.payload.terminal_artifact_kind = "typed_failure";
     input.payload.final_answer_source = "typed_failure";
     input.payload.terminal_error_code = terminalErrorCode;
+    input.payload.terminal_failure_text = terminalErrorText;
     input.payload.selected_final_answer = terminalErrorText;
     input.payload.answer = terminalErrorText;
     input.payload.text = terminalErrorText;
@@ -2603,6 +2830,15 @@ export function applyHelixTerminalAuthoritySingleWriter(
       text: terminalErrorText,
       answer_text: terminalErrorText,
       missing_itinerary_observation_families: missingItineraryFamilies,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    input.payload.terminal_presentation = {
+      ...(readRecord(input.payload.terminal_presentation) ?? {}),
+      schema: "helix.terminal_presentation.v1",
+      turn_id: input.turnId,
+      terminal_artifact_kind: "typed_failure",
+      concise_text: terminalErrorText,
       assistant_answer: false,
       raw_content_included: false,
     };
@@ -2684,7 +2920,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     input.payload.final_status = "final_answer";
     input.payload.status = "final_answer";
     input.payload.terminal_artifact_kind = "repo_code_evidence_answer";
-    input.payload.final_answer_source = "repo_code_evidence_answer";
+    input.payload.final_answer_source = "final_answer_draft";
     input.payload.selected_final_answer = repoAnswerText;
     input.payload.answer = repoAnswerText;
     input.payload.text = repoAnswerText;
