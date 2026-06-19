@@ -88,6 +88,77 @@ describe("Helix Ask workstation answer synthesizer", () => {
     expect(answer).not.toContain("Result: 4 null");
   });
 
+  it("prefers the selected arithmetic expression result over stale terminal mirror text", () => {
+    const prompt = "Open the scientific calculator, solve 2*(3+4), and explain the steps.";
+    const plan = planWorkstationToolUse(prompt).tool_plan;
+
+    expect(plan).toBeTruthy();
+    const answer = synthesizeWorkstationToolAnswer({
+      prompt,
+      plan: plan!,
+      evaluation: {
+        schema: "helix.workstation_tool_evaluation.v1",
+        evaluation_id: "eval:stale-terminal-mirror",
+        plan_id: plan!.plan_id,
+        thread_id: "thread:test",
+        turn_id: "turn:test",
+        goal: prompt,
+        subgoal: "Evaluate the supplied calculator expression.",
+        tool_receipt_ids: ["calculator:receipt:stale-terminal-mirror"],
+        supports_goal: true,
+        terminal_text: [
+          "I used the calculator result as a numeric subgoal, then continued the reasoning from that observation.",
+          "Calculator subgoal: 2*(3+4)",
+          "Result: 2",
+          "Trace source: scientific-calculator.solve_expression.",
+        ].join("\n"),
+        answer_text: "The calculator solved 2*(3+4): 3+4 = 7, and 2*7 = 14.",
+        summary: "Runtime calculator receipts and final answer cover the requested calculator requirements.",
+        evidence_refs: ["calculator:receipt:stale-terminal-mirror"],
+        deterministic: true,
+        model_invoked: false,
+        created_at: "2026-06-16T00:00:00.000Z",
+      },
+    });
+
+    expect(answer).toContain("Calculator subgoal: 2*(3+4)");
+    expect(answer).toContain("Result: 14");
+    expect(answer).not.toContain("Result: 2\n");
+  });
+
+  it("parses calculator-backed result summaries from the equation tail, not the expression prefix", () => {
+    const prompt = "Open the scientific calculator, solve 2*(3+4), and explain the steps.";
+    const plan = planWorkstationToolUse(prompt).tool_plan;
+
+    expect(plan).toBeTruthy();
+    const answer = synthesizeWorkstationToolAnswer({
+      prompt,
+      plan: plan!,
+      evaluation: {
+        schema: "helix.workstation_tool_evaluation.v1",
+        evaluation_id: "eval:runtime-calculator-summary",
+        plan_id: plan!.plan_id,
+        thread_id: "thread:test",
+        turn_id: "turn:test",
+        goal: prompt,
+        subgoal: "Evaluate the supplied calculator expression.",
+        tool_receipt_ids: ["calculator:receipt:runtime-calculator-summary"],
+        supports_goal: true,
+        result_summary: "Calculator-backed result: 2*(3+4) = 14.",
+        summary: "Calculator-backed result: 2*(3+4) = 14.",
+        text: "Calculator-backed result: 2*(3+4) = 14.",
+        evidence_refs: ["calculator:receipt:runtime-calculator-summary"],
+        deterministic: true,
+        model_invoked: false,
+        created_at: "2026-06-16T00:00:00.000Z",
+      },
+    });
+
+    expect(answer).toContain("Calculator subgoal: 2*(3+4)");
+    expect(answer).toContain("Result: 14");
+    expect(answer).not.toContain("Result: 2\n");
+  });
+
   it("continues reasoning after calculator output for compound photon-energy prompts", () => {
     const prompt = "Explain photon energy using E=hf and calculate it for f=5e14 Hz.";
     const plan = planWorkstationToolUse(prompt).tool_plan;

@@ -1548,8 +1548,10 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain('"voice_steering_queued"');
     expect(source).toContain('"voice_steering_applied"');
     expect(source).toContain('"steering_ack_receipt"');
+    expect(source).toContain('"goal_context_snapshot"');
     expect(source).toContain('"wait_for_next_summary"');
     expect(source).toContain('if (row.rowKind === "prediction_check") return row.body || "No prior prediction."');
+    expect(source).toContain('if (row.rowKind === "goal_context_snapshot") return row.body || "Goal context snapshot recorded as non-terminal evidence."');
     expect(source).toContain("live_env.read_live_source_mail");
     expect(source).toContain("Read ${count} unread live-source mail item");
     expect(source).toContain('count === "1"');
@@ -1565,6 +1567,10 @@ describe("HelixAskPill mic-first surface contract", () => {
     expect(source).toContain("Voice receipt");
     expect(source).toContain("Voice steering received");
     expect(source).toContain("Steering ack receipt");
+    expect(source).toContain("Goal context snapshot");
+    expect(source).toContain('if (row.rowKind === "goal_context_snapshot") return "observation"');
+    expect(source).toContain('row.rowKind === "goal_context_snapshot"');
+    expect(source).toContain('? "live_answer"');
     expect(source).toContain('if (row.rowKind === "loop_state") return row.title || "Loop state"');
     expect(source).toContain('row.rowKind.startsWith("voice_steering_")');
   });

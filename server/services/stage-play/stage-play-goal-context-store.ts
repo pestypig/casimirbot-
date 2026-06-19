@@ -299,8 +299,21 @@ const trimThreadSessions = (threadId: string): void => {
 export function recordStagePlayGoalContextUpdate(
   update: WorkstationGoalContextUpdateV1,
 ): WorkstationGoalContextUpdateV1 {
+  const sourceRefs = uniqueStrings(update.sourceRefs);
+  const loopRefs = uniqueStrings(update.loopRefs);
+  const receiptRefs = uniqueStrings(update.receiptRefs);
   const normalizedUpdate: WorkstationGoalContextUpdateV1 = {
     ...update,
+    sourceRefs,
+    loopRefs,
+    evidenceRefs: uniqueStrings([
+      update.contentRef,
+      ...sourceRefs,
+      ...loopRefs,
+      ...update.evidenceRefs,
+      ...receiptRefs,
+    ]).slice(0, 80),
+    receiptRefs,
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,

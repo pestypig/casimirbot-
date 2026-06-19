@@ -48,6 +48,7 @@ const normalizeArtifactKind = (kind: string): string =>
 
 const WORKSTATION_OBSERVATION_TERMINAL_KINDS = new Set([
   "helix.agent_goal_session.v1",
+  "helix.live_environment_goal_satisfaction.v1",
   "helix.narrator_bind_stream_request.v1",
   "helix.narrator_event.v1",
   "helix.narrator_say_request.v1",
@@ -59,6 +60,7 @@ const WORKSTATION_OBSERVATION_TERMINAL_KINDS = new Set([
   "audio_transcripts",
   "automation_policies",
   "automation_status",
+  "goal_satisfaction",
   "live_answer_projection",
   "live_answer_lines",
   "live_source_causal_trace.v1",

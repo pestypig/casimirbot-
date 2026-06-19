@@ -235,6 +235,57 @@ describe("resolveHelixVisibleTerminal", () => {
     expect(terminal.usedLegacyShadow).toBe(false);
   });
 
+  it("prefers debug single-writer authority over a stale model-draft shell", () => {
+    const terminal = resolveHelixVisibleTerminal({
+      selected_final_answer:
+        "Calculator verification plan completed.\nExpression: 2*(3+4)\nResult: 2\nTrace source: scientific-calculator.solve_expression.",
+      final_answer_source: "final_answer_draft",
+      terminal_artifact_kind: "model_synthesized_answer",
+      debug: {
+        terminal_authority_single_writer: {
+          schema: "helix.terminal_authority_single_writer_result.v1",
+          visible_text:
+            "Calculator verification plan completed.\nExpression: 2*(3+4)\nResult: 14\nTrace source: scientific-calculator.solve_expression.",
+          selected_terminal_artifact_kind: "workstation_tool_evaluation",
+          source: "workstation_tool_evaluation",
+          integrity: {
+            single_writer_applied: true,
+            materialized_terminal_artifact_kind: "workstation_tool_evaluation",
+          },
+        },
+      },
+    });
+
+    expect(terminal.text).toContain("Result: 14");
+    expect(terminal.text).not.toContain("Result: 2");
+    expect(terminal.source).toBe("terminal_authority_single_writer");
+    expect(terminal.terminalArtifactKind).toBe("workstation_tool_evaluation");
+    expect(terminal.finalAnswerSource).toBe("workstation_tool_evaluation");
+    expect(terminal.terminalErrorCode).toBeNull();
+  });
+
+  it("prefers specific debug observation failures over stale projection-mismatch shells", () => {
+    const terminal = resolveHelixVisibleTerminal({
+      selected_final_answer: "I could not produce a terminal answer because terminal authority and visible projection selected different artifacts.",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "terminal_projection_mismatch",
+      debug: {
+        selected_final_answer:
+          "I could not complete this turn because the requested capability did not produce the required observation.\nRequested capability: docs-viewer.locate_in_doc.\nRequired observation: doc_location_matches.",
+        final_answer_source: "typed_failure",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "observation_missing",
+      },
+    });
+
+    expect(terminal.text).toContain("docs-viewer.locate_in_doc");
+    expect(terminal.text).toContain("doc_location_matches");
+    expect(terminal.text).not.toContain("visible projection selected different artifacts");
+    expect(terminal.terminalErrorCode).toBe("observation_missing");
+    expect(terminal.source).toBe("typed_failure");
+  });
+
   it("recovers a satisfied model-direct answer artifact from stale placeholder failure text", () => {
     const terminal = resolveHelixVisibleTerminal({
       selected_final_answer: "I could not produce a terminal answer for this turn.",

@@ -100,11 +100,47 @@ const resultFixture = (
     goalId: "goal:frog",
     status: "read",
     missingRequirements: [],
-    policyEvidenceRefs: ["context_feed:trace_memory", "allowed_actuator:query_trace_memory"],
+    policyEvidenceRefs: [
+      "context_feed:trace_memory",
+      "allowed_actuator:query_trace_memory",
+      "agent_goal_context_feed:feed:trace-memory",
+      "agent_goal_allowed_actuator:query_trace_memory",
+    ],
+    sourceRefs: ["helix-ask:desktop", "multimodal", trace.trace_id],
+    loopRefs: [
+      "helix_workstation_reasoning_trace_query:frog",
+      "workstation_context_feed:trace_memory",
+      "workstation_actuator:query_trace_memory",
+      trace.turn_id,
+      "tool_lifecycle:frog-classifier",
+    ],
+    evidenceRefs: [
+      "helix_workstation_reasoning_trace_query:frog",
+      "context_feed:trace_memory",
+      "allowed_actuator:query_trace_memory",
+      "feed:trace-memory",
+      "agent_goal_context_feed:feed:trace-memory",
+      "agent_goal_allowed_actuator:query_trace_memory",
+      "helix-ask:desktop",
+      "multimodal",
+      trace.trace_id,
+      "workstation_context_feed:trace_memory",
+      "workstation_actuator:query_trace_memory",
+      trace.turn_id,
+      "visual_evidence:frog",
+      "microdeck_run:frog-classifier",
+      "tool_receipt:frog-classifier",
+      "tool_lifecycle:frog-classifier",
+    ],
+    freshnessStatus: "fresh",
     goalSessionFound: true,
     feedAllowed: true,
     requiredActuator: "query_trace_memory",
     actuatorAllowed: true,
+    matchedContextFeeds: agentGoalSession.contextFeeds,
+    matchedContextFeedRefs: ["feed:trace-memory"],
+    matchedAllowedActuators: ["query_trace_memory"],
+    matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:query_trace_memory"],
     agentGoalSession,
     goalContextUpdateId: "stage_play_goal_context_update:trace_memory:frog",
     terminalAuthority: {
@@ -133,9 +169,17 @@ describe("helix.workstation_reasoning_trace_query_result.v1", () => {
       status: "blocked",
       missingRequirements: ["allowed_actuator:query_trace_memory"],
       actuatorAllowed: false,
+      policyEvidenceRefs: [
+        "context_feed:trace_memory",
+        "allowed_actuator:query_trace_memory",
+        "agent_goal_context_feed:feed:trace-memory",
+      ],
+      matchedAllowedActuators: [],
+      matchedAllowedActuatorRefs: [],
       traces: [],
       selectedTrace: null,
       trace_count: 0,
+      freshnessStatus: "blocked",
     } as Partial<WorkstationTraceMemoryQueryResultV1>))).toEqual([]);
   });
 
@@ -154,9 +198,93 @@ describe("helix.workstation_reasoning_trace_query_result.v1", () => {
     expect(validateWorkstationTraceMemoryQueryResultV1(resultFixture({
       policyEvidenceRefs: ["allowed_actuator:query_trace_memory"],
       feedAllowed: false,
+      matchedContextFeeds: [],
+      matchedContextFeedRefs: [],
     } as Partial<WorkstationTraceMemoryQueryResultV1>))).toEqual(expect.arrayContaining([
       "policyEvidenceRefs must include context feed policy ref",
       "read trace memory query results must have feedAllowed=true",
+    ]));
+  });
+
+  it("rejects trace-memory reads without source, loop, evidence, or freshness proof refs", () => {
+    expect(validateWorkstationTraceMemoryQueryResultV1(resultFixture({
+      loopRefs: ["trace_loop:outside-policy"],
+      evidenceRefs: [
+        "helix_workstation_reasoning_trace_query:frog",
+        "context_feed:trace_memory",
+        "allowed_actuator:query_trace_memory",
+      ],
+    } as Partial<WorkstationTraceMemoryQueryResultV1>))).toEqual(expect.arrayContaining([
+      "loopRefs must include trace-memory context feed loop ref",
+      "loopRefs must include trace-memory actuator loop ref",
+      "evidenceRefs must include every sourceRefs entry",
+      "evidenceRefs must include every loopRefs entry",
+    ]));
+
+    expect(validateWorkstationTraceMemoryQueryResultV1(resultFixture({
+      evidenceRefs: [
+        "context_feed:trace_memory",
+        "allowed_actuator:query_trace_memory",
+        "helix-ask:desktop",
+        "multimodal",
+        "workstation_trace:frog-classifier",
+        "workstation_context_feed:trace_memory",
+        "workstation_actuator:query_trace_memory",
+      ],
+    } as Partial<WorkstationTraceMemoryQueryResultV1>))).toEqual(expect.arrayContaining([
+      "evidenceRefs must include resultId",
+    ]));
+
+    expect(validateWorkstationTraceMemoryQueryResultV1(resultFixture({
+      freshnessStatus: "blocked",
+    } as Partial<WorkstationTraceMemoryQueryResultV1>))).toEqual(expect.arrayContaining([
+      "read trace memory query results must not have blocked freshnessStatus",
+    ]));
+  });
+
+  it("requires blocked trace-memory reads to report blocked freshness", () => {
+    expect(validateWorkstationTraceMemoryQueryResultV1(resultFixture({
+      status: "blocked",
+      missingRequirements: ["context_feed:trace_memory"],
+      feedAllowed: false,
+      matchedContextFeeds: [],
+      matchedContextFeedRefs: [],
+      policyEvidenceRefs: ["context_feed:trace_memory", "allowed_actuator:query_trace_memory"],
+      freshnessStatus: "fresh",
+    } as Partial<WorkstationTraceMemoryQueryResultV1>))).toEqual(expect.arrayContaining([
+      "blocked trace memory query results must have blocked freshnessStatus",
+    ]));
+  });
+
+  it("requires exact matched actuator refs for goal-authorized trace-memory reads", () => {
+    expect(validateWorkstationTraceMemoryQueryResultV1(resultFixture({
+      matchedAllowedActuators: [],
+      matchedAllowedActuatorRefs: [],
+    } as Partial<WorkstationTraceMemoryQueryResultV1>))).toEqual(expect.arrayContaining([
+      "actuatorAllowed=true for a goal session requires matchedAllowedActuators",
+    ]));
+
+    expect(validateWorkstationTraceMemoryQueryResultV1(resultFixture({
+      matchedAllowedActuatorRefs: [],
+    } as Partial<WorkstationTraceMemoryQueryResultV1>))).toEqual(expect.arrayContaining([
+      "matchedAllowedActuatorRefs must include every matchedAllowedActuators policy ref",
+    ]));
+
+    expect(validateWorkstationTraceMemoryQueryResultV1(resultFixture({
+      policyEvidenceRefs: [
+        "context_feed:trace_memory",
+        "allowed_actuator:query_trace_memory",
+        "agent_goal_context_feed:feed:trace-memory",
+      ],
+    } as Partial<WorkstationTraceMemoryQueryResultV1>))).toEqual(expect.arrayContaining([
+      "policyEvidenceRefs must include every matched allowed actuator policy ref",
+    ]));
+
+    expect(validateWorkstationTraceMemoryQueryResultV1(resultFixture({
+      actuatorAllowed: false,
+      matchedAllowedActuators: ["query_trace_memory"],
+    } as Partial<WorkstationTraceMemoryQueryResultV1>))).toEqual(expect.arrayContaining([
+      "actuatorAllowed=false must not expose matchedAllowedActuators",
     ]));
   });
 

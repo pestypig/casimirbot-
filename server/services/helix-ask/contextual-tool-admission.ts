@@ -2,6 +2,7 @@ import {
   DOCS_MD_PATH_CUE_RE,
   QUOTED_DOCS_PATH_COMMAND_RE,
 } from "./docs-viewer-intent";
+import { WORKSTATION_CONTEXT_FEED_QUERY_ACTUATORS } from "./workstation-context-feed-query-tool-contracts";
 
 export type HelixContextualToolAdmissionSuppressionReason =
   | "negated_tool_instruction"
@@ -54,8 +55,12 @@ const EXTERNAL_READONLY_TOOL_RE =
   /\b(?:browse|browsing|search(?:ing)?|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|verify\s+online|do\s+research|research|retrieve|fetch|query|resolve|collect|cite|citations?|sources?|papers?|doi|arxiv|crossref|openalex|semantic\s+scholar|pubmed|unpaywall)\b/i;
 const MUTATING_WRITE_NEGATION_RE =
   /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no)\s+(?:write|create|edit|modify|save|append|update|delete|remove|commit|stage)\s+(?:any\s+)?(?:files?|notes?|docs?|documents?|repo|repository|workspace|disk)\b/gi;
-const LIVE_ENV_CONTROL_CUE_RE =
-  /\blive_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|start_agent_goal_session)\b|\bnarrator\.(?:say|bind_stream)\b/i;
+const LIVE_ENV_CONTEXT_FEED_QUERY_TOOL_PATTERN = WORKSTATION_CONTEXT_FEED_QUERY_ACTUATORS.join("|");
+const LIVE_ENV_WORKSTATION_TOOL_PATTERN = String.raw`(?:${LIVE_ENV_CONTEXT_FEED_QUERY_TOOL_PATTERN}|change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|start_agent_goal_session|evaluate_goal_satisfaction)`;
+const LIVE_ENV_CONTROL_CUE_RE = new RegExp(
+  String.raw`\blive_env\.${LIVE_ENV_WORKSTATION_TOOL_PATTERN}\b|\bnarrator\.(?:say|bind_stream)\b`,
+  "i",
+);
 
 const stripWriteOnlyNegationsForExternalToolMatching = (prompt: string): string =>
   prompt.replace(MUTATING_WRITE_NEGATION_RE, " ").replace(NEGATED_MUTATING_WRITE_CLAUSE_RE, (clause) => {
@@ -127,7 +132,10 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
   }
 
   const liveEnvControlReference = prompt.match(
-    /(?:\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to)\b[^.!?;\n]{0,160}(?:run|call|use|execute|start|set|change|bind|update|repair|focus)?[^.!?;\n]{0,120}(?:live_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|start_agent_goal_session)|narrator\.(?:say|bind_stream))\b)|(?:"[^"]*(?:live_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|start_agent_goal_session)|narrator\.(?:say|bind_stream))[^"]*")|(?:`[^`]*(?:live_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|start_agent_goal_session)|narrator\.(?:say|bind_stream))[^`]*`)|(?:\b(?:if|when|before|after|would|could|might|hypothetically|later|tomorrow|previously|earlier|last\s+turn|screen|visible|button|label|document|docs?)\b[^.!?;\n]{0,180}(?:live_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|start_agent_goal_session)|narrator\.(?:say|bind_stream))\b)/i,
+    new RegExp(
+      String.raw`(?:\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to)\b[^.!?;\n]{0,160}(?:run|call|use|execute|start|set|change|bind|update|repair|focus|evaluate|query|check|read)?[^.!?;\n]{0,120}(?:live_env\.${LIVE_ENV_WORKSTATION_TOOL_PATTERN}|narrator\.(?:say|bind_stream))\b)|(?:"[^"]*(?:live_env\.${LIVE_ENV_WORKSTATION_TOOL_PATTERN}|narrator\.(?:say|bind_stream))[^"]*")|(?:` + "`" + String.raw`[^` + "`" + String.raw`]*(?:live_env\.${LIVE_ENV_WORKSTATION_TOOL_PATTERN}|narrator\.(?:say|bind_stream))[^` + "`" + String.raw`]*` + "`" + String.raw`)|(?:\b(?:if|when|before|after|would|could|might|hypothetically|later|tomorrow|previously|earlier|last\s+turn|screen|visible|button|label|document|docs?)\b[^.!?;\n]{0,180}(?:live_env\.${LIVE_ENV_WORKSTATION_TOOL_PATTERN}|narrator\.(?:say|bind_stream))\b)`,
+      "i",
+    ),
   )?.[0];
   if (liveEnvControlReference) {
     return {

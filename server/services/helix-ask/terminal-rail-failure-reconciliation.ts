@@ -21,6 +21,12 @@ const uniqueStrings = (values: string[]): string[] => Array.from(new Set(values.
 const isBudgetExhaustionCode = (value: string | null): boolean =>
   value === "agent_loop_budget_exhausted" || value === "max_tool_calls_budget_exhausted";
 
+const isProjectionMismatchCode = (value: string | null): boolean =>
+  value === "terminal_projection_mismatch";
+
+const isReconciliableToolRailFailureCode = (value: string | null): boolean =>
+  value === "required_observation_missing" || value === "observation_missing";
+
 const runtimeMarker = (): RecordLike => ({
   schema: "helix.tool_rail_terminal_failure_reconciliation.runtime.v1",
   version: HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION,
@@ -39,19 +45,31 @@ const firstRailRecord = (payload: RecordLike): RecordLike | null => {
   const debug = readRecord(payload.debug);
   const artifactQueryIndex = readRecord(payload.artifact_query_index);
   const debugArtifactQueryIndex = readRecord(debug?.artifact_query_index);
-  return (
+  const candidates = [
     readRecord(payload.codex_parity_agent_spine_rail_table) ??
-    readRecord(payload.tool_rail_failure_triage) ??
-    readRecord(payload.tool_turn_chain_audit) ??
-    readRecord(artifactQueryIndex?.codex_parity_agent_spine_rail_table) ??
-    readRecord(artifactQueryIndex?.tool_rail_failure_triage) ??
-    readRecord(artifactQueryIndex?.tool_turn_chain_audit) ??
-    readRecord(debug?.codex_parity_agent_spine_rail_table) ??
-    readRecord(debug?.tool_rail_failure_triage) ??
-    readRecord(debug?.tool_turn_chain_audit) ??
-    readRecord(debugArtifactQueryIndex?.codex_parity_agent_spine_rail_table) ??
-    readRecord(debugArtifactQueryIndex?.tool_rail_failure_triage) ??
-    readRecord(debugArtifactQueryIndex?.tool_turn_chain_audit)
+      readRecord(payload.tool_rail_failure_triage) ??
+      readRecord(payload.tool_turn_chain_audit),
+    readRecord(payload.tool_rail_failure_triage),
+    readRecord(payload.tool_turn_chain_audit),
+    readRecord(artifactQueryIndex?.codex_parity_agent_spine_rail_table),
+    readRecord(artifactQueryIndex?.tool_rail_failure_triage),
+    readRecord(artifactQueryIndex?.tool_turn_chain_audit),
+    readRecord(debug?.codex_parity_agent_spine_rail_table),
+    readRecord(debug?.tool_rail_failure_triage),
+    readRecord(debug?.tool_turn_chain_audit),
+    readRecord(debugArtifactQueryIndex?.codex_parity_agent_spine_rail_table),
+    readRecord(debugArtifactQueryIndex?.tool_rail_failure_triage),
+    readRecord(debugArtifactQueryIndex?.tool_turn_chain_audit),
+  ].filter((entry): entry is RecordLike => Boolean(entry));
+  return (
+    candidates.find(
+      (candidate) =>
+        readString(candidate.rail_status) === "fail_closed" &&
+        isReconciliableToolRailFailureCode(readString(candidate.rail_failure_code)) &&
+        readString(candidate.first_broken_rail) === "observation_artifact",
+    ) ??
+    candidates[0] ??
+    null
   );
 };
 
@@ -191,12 +209,12 @@ export const reconcileTerminalFailureWithToolRail = (payload: RecordLike): boole
   markTerminalFailureReconciliationRuntime(payload);
 
   const currentErrorCode = readString(payload.terminal_error_code);
-  if (!isBudgetExhaustionCode(currentErrorCode)) return false;
+  if (!isBudgetExhaustionCode(currentErrorCode) && !isProjectionMismatchCode(currentErrorCode)) return false;
 
   const rail = firstRailRecord(payload);
   if (!rail) return false;
   if (readString(rail.rail_status) !== "fail_closed") return false;
-  if (readString(rail.rail_failure_code) !== "required_observation_missing") return false;
+  if (!isReconciliableToolRailFailureCode(readString(rail.rail_failure_code))) return false;
   if (readString(rail.first_broken_rail) !== "observation_artifact") return false;
 
   const terminalErrorCode = terminalErrorCodeForRail(rail);

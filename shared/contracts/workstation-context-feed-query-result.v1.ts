@@ -1,6 +1,7 @@
 import {
   WORKSTATION_AGENT_GOAL_ACTUATORS,
   WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS,
+  queryActuatorForAgentGoalContextFeedV1,
   validateAgentGoalSessionV1,
   validateWorkstationGoalContextUpdateV1,
   type AgentGoalActuatorV1,
@@ -19,6 +20,21 @@ export type WorkstationContextFeedQueryTerminalAuthorityV1 = {
   finalAnswerEligible: false;
   completedSolverPathRequired: true;
   terminalAuthoritySingleWriterRequired: true;
+};
+
+export type WorkstationContextFeedPacketCircuitRefV1 = {
+  updateId: string;
+  producerKind: GoalContextProducerKindV1;
+  updateKind: GoalContextUpdateKindV1;
+  contentRef: string;
+  sourceRefs: string[];
+  loopRefs: string[];
+  packetRefs: string[];
+  microDeckRefs: string[];
+  receiptRefs: string[];
+  freshnessStatus: WorkstationGoalContextUpdateV1["freshness"]["status"];
+  assistant_answer: false;
+  terminal_eligible: false;
 };
 
 export type WorkstationContextFeedQueryResultV1 = {
@@ -41,10 +57,15 @@ export type WorkstationContextFeedQueryResultV1 = {
   feedAllowed: boolean;
   requiredActuator: AgentGoalActuatorV1;
   actuatorAllowed: boolean;
+  matchedContextFeeds: AgentGoalSessionV1["contextFeeds"];
+  matchedContextFeedRefs: string[];
+  matchedAllowedActuators: AgentGoalActuatorV1[];
+  matchedAllowedActuatorRefs: string[];
   agentGoalSession: unknown | null;
   agentGoalSessions: unknown[];
   goalContextUpdates: WorkstationGoalContextUpdateV1[];
   authoritySummary: unknown;
+  packetCircuitRefs: WorkstationContextFeedPacketCircuitRefV1[];
   updateCount: number;
   syncedWindow: {
     mailItemCount: number;
@@ -154,6 +175,42 @@ const terminalAuthorityIssues = (value: unknown): string[] => {
   if (value.terminalAuthoritySingleWriterRequired !== true) {
     issues.push("terminalAuthority.terminalAuthoritySingleWriterRequired must be true");
   }
+  return issues;
+};
+
+const packetCircuitRefIssues = (
+  value: unknown,
+  updates: WorkstationGoalContextUpdateV1[],
+): string[] => {
+  if (!Array.isArray(value)) return ["packetCircuitRefs must be an array"];
+  const issues: string[] = [];
+  const updatesById = new Map(updates.map((update) => [update.updateId, update]));
+  if (value.length !== updates.length) {
+    issues.push("packetCircuitRefs must include one entry for every goalContextUpdates item");
+  }
+  value.forEach((entry, index) => {
+    if (!isRecord(entry)) {
+      issues.push(`packetCircuitRefs[${index}] must be an object`);
+      return;
+    }
+    const update = isNonEmptyString(entry.updateId) ? updatesById.get(entry.updateId) : null;
+    if (!isNonEmptyString(entry.updateId)) issues.push(`packetCircuitRefs[${index}].updateId is required`);
+    if (!update) {
+      issues.push(`packetCircuitRefs[${index}].updateId must match a goalContextUpdates item`);
+    } else {
+      if (entry.producerKind !== update.producerKind) issues.push(`packetCircuitRefs[${index}].producerKind must match update`);
+      if (entry.updateKind !== update.updateKind) issues.push(`packetCircuitRefs[${index}].updateKind must match update`);
+      if (entry.contentRef !== update.contentRef) issues.push(`packetCircuitRefs[${index}].contentRef must match update`);
+      if (entry.freshnessStatus !== update.freshness.status) issues.push(`packetCircuitRefs[${index}].freshnessStatus must match update`);
+    }
+    issues.push(...stringArrayIssues(entry.sourceRefs, `packetCircuitRefs[${index}].sourceRefs`));
+    issues.push(...stringArrayIssues(entry.loopRefs, `packetCircuitRefs[${index}].loopRefs`));
+    issues.push(...stringArrayIssues(entry.packetRefs, `packetCircuitRefs[${index}].packetRefs`));
+    issues.push(...stringArrayIssues(entry.microDeckRefs, `packetCircuitRefs[${index}].microDeckRefs`));
+    issues.push(...stringArrayIssues(entry.receiptRefs, `packetCircuitRefs[${index}].receiptRefs`));
+    if (entry.assistant_answer !== false) issues.push(`packetCircuitRefs[${index}].assistant_answer must be false`);
+    if (entry.terminal_eligible !== false) issues.push(`packetCircuitRefs[${index}].terminal_eligible must be false`);
+  });
   return issues;
 };
 
@@ -275,12 +332,107 @@ export function validateWorkstationContextFeedQueryResultV1(
   }
   if (typeof value.feedAllowed !== "boolean") issues.push("feedAllowed must be boolean");
   if (!actuators.has(value.requiredActuator)) issues.push("requiredActuator is invalid");
+  const expectedQueryActuator = feedKinds.has(value.feedKind)
+    ? queryActuatorForAgentGoalContextFeedV1(value.feedKind)
+    : null;
+  if (
+    expectedQueryActuator &&
+    actuators.has(value.requiredActuator) &&
+    value.requiredActuator !== expectedQueryActuator
+  ) {
+    issues.push("requiredActuator must match feedKind query actuator");
+  }
   if (
     Array.isArray(value.policyEvidenceRefs) &&
     actuators.has(value.requiredActuator) &&
     !value.policyEvidenceRefs.includes(`allowed_actuator:${value.requiredActuator}`)
   ) {
     issues.push("policyEvidenceRefs must include actuator policy ref");
+  }
+  if (
+    Array.isArray(value.policyEvidenceRefs) &&
+    expectedQueryActuator &&
+    !value.policyEvidenceRefs.includes(`allowed_actuator:${expectedQueryActuator}`)
+  ) {
+    issues.push("policyEvidenceRefs must include feed query actuator policy ref");
+  }
+  if (!Array.isArray(value.matchedContextFeeds)) {
+    issues.push("matchedContextFeeds must be an array");
+  } else {
+    value.matchedContextFeeds.forEach((feed, index) => {
+      if (!isRecord(feed)) {
+        issues.push(`matchedContextFeeds[${index}] must be an object`);
+        return;
+      }
+      if (!isNonEmptyString(feed.feedId)) issues.push(`matchedContextFeeds[${index}].feedId is required`);
+      if (feed.sourceKind !== value.feedKind) {
+        issues.push(`matchedContextFeeds[${index}].sourceKind must match feedKind`);
+      }
+      if (feed.query !== undefined && !isNonEmptyString(feed.query)) {
+        issues.push(`matchedContextFeeds[${index}].query must be a non-empty string`);
+      }
+      if (feed.freshnessMs !== undefined && (!Number.isFinite(feed.freshnessMs) || feed.freshnessMs <= 0)) {
+        issues.push(`matchedContextFeeds[${index}].freshnessMs must be a positive number`);
+      }
+      if (feed.relevancePolicy !== undefined && !isNonEmptyString(feed.relevancePolicy)) {
+        issues.push(`matchedContextFeeds[${index}].relevancePolicy must be a non-empty string`);
+      }
+    });
+  }
+  issues.push(...stringArrayIssues(value.matchedContextFeedRefs, "matchedContextFeedRefs"));
+  if (Array.isArray(value.matchedContextFeeds) && Array.isArray(value.matchedContextFeedRefs)) {
+    for (const feed of value.matchedContextFeeds) {
+      if (isRecord(feed) && isNonEmptyString(feed.feedId) && !value.matchedContextFeedRefs.includes(feed.feedId)) {
+        issues.push("matchedContextFeedRefs must include every matchedContextFeeds feedId");
+        break;
+      }
+    }
+  }
+  if (value.goalSessionFound === true && value.feedAllowed === true && Array.isArray(value.matchedContextFeeds) && value.matchedContextFeeds.length === 0) {
+    issues.push("feedAllowed=true for a goal session requires matchedContextFeeds");
+  }
+  if (value.feedAllowed === false && Array.isArray(value.matchedContextFeeds) && value.matchedContextFeeds.length > 0) {
+    issues.push("feedAllowed=false must not expose matchedContextFeeds");
+  }
+  issues.push(...stringArrayIssues(value.matchedAllowedActuators, "matchedAllowedActuators"));
+  if (Array.isArray(value.matchedAllowedActuators)) {
+    value.matchedAllowedActuators.forEach((actuator, index) => {
+      if (expectedQueryActuator && actuator !== expectedQueryActuator) {
+        issues.push(`matchedAllowedActuators[${index}] must match feedKind query actuator`);
+      }
+    });
+  }
+  issues.push(...stringArrayIssues(value.matchedAllowedActuatorRefs, "matchedAllowedActuatorRefs"));
+  if (Array.isArray(value.matchedAllowedActuators) && Array.isArray(value.matchedAllowedActuatorRefs)) {
+    const expectedRefs = value.matchedAllowedActuators.map((actuator) => `agent_goal_allowed_actuator:${actuator}`);
+    for (const ref of expectedRefs) {
+      if (!value.matchedAllowedActuatorRefs.includes(ref)) {
+        issues.push("matchedAllowedActuatorRefs must include every matchedAllowedActuators policy ref");
+        break;
+      }
+    }
+  }
+  if (value.goalSessionFound === true && value.actuatorAllowed === true && Array.isArray(value.matchedAllowedActuators) && value.matchedAllowedActuators.length === 0) {
+    issues.push("actuatorAllowed=true for a goal session requires matchedAllowedActuators");
+  }
+  if (value.actuatorAllowed === false && Array.isArray(value.matchedAllowedActuators) && value.matchedAllowedActuators.length > 0) {
+    issues.push("actuatorAllowed=false must not expose matchedAllowedActuators");
+  }
+  if (Array.isArray(value.policyEvidenceRefs) && Array.isArray(value.matchedContextFeedRefs)) {
+    for (const ref of value.matchedContextFeedRefs) {
+      if (!value.policyEvidenceRefs.includes(`agent_goal_context_feed:${ref}`)) {
+        issues.push("policyEvidenceRefs must include every matched context feed policy ref");
+        break;
+      }
+    }
+  }
+  if (Array.isArray(value.policyEvidenceRefs) && Array.isArray(value.matchedAllowedActuatorRefs)) {
+    for (const ref of value.matchedAllowedActuatorRefs) {
+      if (!value.policyEvidenceRefs.includes(ref)) {
+        issues.push("policyEvidenceRefs must include every matched allowed actuator policy ref");
+        break;
+      }
+    }
   }
   issues.push(...stringArrayIssues(value.sourceRefs, "sourceRefs", { requireNonEmpty: true }));
   issues.push(...stringArrayIssues(value.loopRefs, "loopRefs", { requireNonEmpty: true }));
@@ -302,6 +454,11 @@ export function validateWorkstationContextFeedQueryResultV1(
       issues.push("loopRefs must include required actuator loop ref");
     }
   }
+  if (Array.isArray(value.loopRefs) && expectedQueryActuator) {
+    if (!value.loopRefs.includes(`workstation_actuator:${expectedQueryActuator}`)) {
+      issues.push("loopRefs must include feed query actuator loop ref");
+    }
+  }
   if (Array.isArray(value.evidenceRefs)) {
     if (isNonEmptyString(value.resultId) && !value.evidenceRefs.includes(value.resultId)) {
       issues.push("evidenceRefs must include resultId");
@@ -310,6 +467,22 @@ export function validateWorkstationContextFeedQueryResultV1(
       for (const ref of value.policyEvidenceRefs) {
         if (!value.evidenceRefs.includes(ref)) {
           issues.push("evidenceRefs must include every policyEvidenceRefs entry");
+          break;
+        }
+      }
+    }
+    if (Array.isArray(value.matchedContextFeedRefs)) {
+      for (const ref of value.matchedContextFeedRefs) {
+        if (!value.evidenceRefs.includes(ref)) {
+          issues.push("evidenceRefs must include every matchedContextFeedRefs entry");
+          break;
+        }
+      }
+    }
+    if (Array.isArray(value.matchedAllowedActuatorRefs)) {
+      for (const ref of value.matchedAllowedActuatorRefs) {
+        if (!value.evidenceRefs.includes(ref)) {
+          issues.push("evidenceRefs must include every matchedAllowedActuatorRefs entry");
           break;
         }
       }
@@ -367,13 +540,14 @@ export function validateWorkstationContextFeedQueryResultV1(
       }
     });
   }
+  const validGoalContextUpdates = Array.isArray(value.goalContextUpdates)
+    ? value.goalContextUpdates.filter(isRecord) as WorkstationGoalContextUpdateV1[]
+    : [];
+  issues.push(...packetCircuitRefIssues(value.packetCircuitRefs, validGoalContextUpdates));
   const expectedGoalContextUpdateRefs = Array.isArray(value.goalContextUpdates)
     ? value.goalContextUpdates
       .map((update) => update?.updateId)
       .filter(isNonEmptyString)
-    : [];
-  const validGoalContextUpdates = Array.isArray(value.goalContextUpdates)
-    ? value.goalContextUpdates.filter(isRecord)
     : [];
   const observationOnlyUpdateCount = validGoalContextUpdates.filter((update) =>
     isRecord(update.authority) &&

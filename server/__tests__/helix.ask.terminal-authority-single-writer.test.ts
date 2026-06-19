@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyHelixTerminalAuthoritySingleWriter,
+  applyTerminalProjectionKindGuard,
   syncDocEvidenceSynthesisSingleWriterFromTerminalAuthority,
   syncHelixTypedFailureAuthorityPublicMirrors,
 } from "../services/helix-ask/terminal-authority-single-writer";
@@ -22,6 +23,172 @@ const makePostToolObservation = (turnId: string) => ({
 });
 
 describe("Helix terminal authority single writer", () => {
+  it("preserves specific typed-failure rail code when projection guard reconciles stale visible kind", () => {
+    const turnId = "ask:test:typed-failure-projection-guard-specific-rail";
+    const failureText =
+      "I could not produce a terminal answer because the requested tool rail did not complete. Cause: terminal_not_materialized.";
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      ok: false,
+      final_status: "final_failure",
+      terminal_artifact_kind: "doc_location_matches",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "terminal_not_materialized",
+      terminal_failure_text: failureText,
+      selected_final_answer: "Locations:\n- stale visible doc projection",
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: turnId,
+        terminal_artifact_kind: "doc_location_matches",
+        concise_text: "Locations:\n- stale visible doc projection",
+      },
+      typed_failure: {
+        schema: "helix.typed_failure.v1",
+        error_code: "terminal_not_materialized",
+        text: failureText,
+        answer_text: failureText,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+
+    const result = applyTerminalProjectionKindGuard(payload, {
+      schema: "helix.terminal_authority_single_writer_result.v1",
+      artifactId: "terminal_authority_single_writer",
+      schemaVersion: "helix.terminal_authority_single_writer.v1",
+      turn_id: turnId,
+      selectedArtifactKind: "typed_failure",
+      selectedArtifactRef: "typed_failure:specific",
+      selected_terminal_artifact_kind: "typed_failure",
+      selected_terminal_artifact_ref: "typed_failure:specific",
+      visible_text: failureText,
+      assistant_answer: false,
+      source: "typed_failure",
+      rejected_candidates: [],
+      writes: {
+        payload_text: failureText,
+        payload_answer: failureText,
+        payload_assistant_answer: failureText,
+        payload_selected_final_answer: failureText,
+        terminal_presentation_concise_text: failureText,
+        debug_selected_final_answer: failureText,
+      },
+      wroteVisibleFields: [],
+      forbiddenPreAuthorityVisibleFields: [],
+      audit: {
+        artifactId: "terminal_authority_single_writer",
+        schemaVersion: "helix.terminal_authority_single_writer.v1",
+        selectedArtifactKind: "typed_failure",
+        selectedArtifactRef: "typed_failure:specific",
+        rejectedCandidates: [],
+        wroteVisibleFields: [],
+        forbiddenPreAuthorityVisibleFields: [],
+      },
+      integrity: {
+        single_writer_applied: true,
+        visible_matches_selected_artifact: false,
+        visible_matches_draft: false,
+        stale_failure_visible: false,
+        receipt_visible_as_answer: false,
+        post_tool_model_step_satisfied: true,
+        legacy_terminal_candidate_count: 0,
+        forbidden_terminal_candidate_count: 0,
+        payload_mirror_written_after_terminal_selection: true,
+      },
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(result.visible_text).toBe(failureText);
+    expect(payload.terminal_error_code).toBe("terminal_not_materialized");
+    expect((payload.typed_failure as Record<string, unknown>).error_code).toBe("terminal_not_materialized");
+    expect(payload.selected_final_answer).toBe(failureText);
+    expect((payload.terminal_presentation as Record<string, unknown>).terminal_artifact_kind).toBe("typed_failure");
+  });
+
+  it("uses tool rail failure code when typed failure only carries projection mismatch", () => {
+    const turnId = "ask:test:typed-failure-projection-guard-rail-fallback";
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      ok: false,
+      final_status: "final_failure",
+      terminal_artifact_kind: "workspace_action_receipt",
+      final_answer_source: "typed_failure",
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: turnId,
+        terminal_artifact_kind: "workspace_action_receipt",
+        concise_text: "Opened docs viewer.",
+      },
+      typed_failure: {
+        schema: "helix.typed_failure.v1",
+        error_code: "terminal_projection_mismatch",
+        text: "I could not produce a terminal answer because terminal authority and visible projection selected different artifacts.",
+        answer_text:
+          "I could not produce a terminal answer because terminal authority and visible projection selected different artifacts.",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      tool_turn_chain_audit: {
+        schema: "helix.tool_turn_chain_audit.v1",
+        rail_status: "fail_closed",
+        rail_failure_code: "observation_missing",
+        first_broken_rail: "observation_artifact",
+        repair_target: "observation_materializer",
+      },
+    };
+
+    applyTerminalProjectionKindGuard(payload, {
+      schema: "helix.terminal_authority_single_writer_result.v1",
+      artifactId: "terminal_authority_single_writer",
+      schemaVersion: "helix.terminal_authority_single_writer.v1",
+      turn_id: turnId,
+      selectedArtifactKind: "typed_failure",
+      selectedArtifactRef: "typed_failure:rail",
+      selected_terminal_artifact_kind: "typed_failure",
+      selected_terminal_artifact_ref: "typed_failure:rail",
+      visible_text:
+        "I could not produce a terminal answer because terminal authority and visible projection selected different artifacts.",
+      assistant_answer: false,
+      source: "typed_failure",
+      rejected_candidates: [],
+      writes: {
+        payload_text: "",
+        payload_answer: "",
+        payload_assistant_answer: "",
+        payload_selected_final_answer: "",
+        terminal_presentation_concise_text: "",
+        debug_selected_final_answer: "",
+      },
+      wroteVisibleFields: [],
+      forbiddenPreAuthorityVisibleFields: [],
+      audit: {
+        artifactId: "terminal_authority_single_writer",
+        schemaVersion: "helix.terminal_authority_single_writer.v1",
+        selectedArtifactKind: "typed_failure",
+        selectedArtifactRef: "typed_failure:rail",
+        rejectedCandidates: [],
+        wroteVisibleFields: [],
+        forbiddenPreAuthorityVisibleFields: [],
+      },
+      integrity: {
+        single_writer_applied: true,
+        visible_matches_selected_artifact: false,
+        visible_matches_draft: false,
+        stale_failure_visible: false,
+        receipt_visible_as_answer: false,
+        post_tool_model_step_satisfied: true,
+        legacy_terminal_candidate_count: 0,
+        forbidden_terminal_candidate_count: 0,
+        payload_mirror_written_after_terminal_selection: true,
+      },
+    });
+
+    expect(payload.terminal_error_code).toBe("observation_missing");
+    expect((payload.typed_failure as Record<string, unknown>).error_code).toBe("observation_missing");
+    expect(payload.selected_final_answer).toMatch(/observation_missing/);
+    expect((payload.terminal_presentation as Record<string, unknown>).terminal_artifact_kind).toBe("typed_failure");
+  });
+
   it("does not mirror processed live-source mail summaries as typed-failure answers", () => {
     const turnId = "ask:test:live-source-summary-typed-failure";
     const contentSummary =

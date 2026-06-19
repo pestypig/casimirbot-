@@ -4,6 +4,7 @@ import {
 } from "../helix-situation-source-capability";
 import {
   validateAgentGoalSessionV1,
+  type AgentGoalActuatorV1,
   type AgentGoalSessionV1,
 } from "./workstation-goal-context.v1";
 
@@ -36,6 +37,10 @@ export type WorkstationSourceHealthQueryResultV1 = {
   feedAllowed: boolean;
   requiredActuator: "query_source_health";
   actuatorAllowed: boolean;
+  matchedContextFeeds: AgentGoalSessionV1["contextFeeds"];
+  matchedContextFeedRefs: string[];
+  matchedAllowedActuators: AgentGoalActuatorV1[];
+  matchedAllowedActuatorRefs: string[];
   agentGoalSession: unknown | null;
   goalContextUpdateId: string;
   terminalAuthority: WorkstationSourceHealthTerminalAuthorityV1;
@@ -219,9 +224,31 @@ export function validateWorkstationSourceHealthQueryResultV1(
         }
       }
     }
+    if (Array.isArray(value.sourceRefs)) {
+      for (const ref of value.sourceRefs) {
+        if (!value.evidenceRefs.includes(ref)) {
+          issues.push("evidenceRefs must include every sourceRefs entry");
+          break;
+        }
+      }
+    }
+    if (Array.isArray(value.loopRefs)) {
+      for (const ref of value.loopRefs) {
+        if (!value.evidenceRefs.includes(ref)) {
+          issues.push("evidenceRefs must include every loopRefs entry");
+          break;
+        }
+      }
+    }
   }
   if (!["fresh", "stale", "blocked", "unknown"].includes(String(value.freshnessStatus))) {
     issues.push("freshnessStatus is invalid");
+  }
+  if (value.status === "read" && value.freshnessStatus === "blocked") {
+    issues.push("read source health query results must not have blocked freshnessStatus");
+  }
+  if (value.status === "blocked" && value.freshnessStatus !== "blocked") {
+    issues.push("blocked source health query results must have blocked freshnessStatus");
   }
   if (value.goalSessionFound !== null && typeof value.goalSessionFound !== "boolean") {
     issues.push("goalSessionFound must be boolean or null");
@@ -237,6 +264,91 @@ export function validateWorkstationSourceHealthQueryResultV1(
   }
   if (value.status === "read" && value.actuatorAllowed !== true) {
     issues.push("read source health query results must have actuatorAllowed=true");
+  }
+  if (!Array.isArray(value.matchedContextFeeds)) {
+    issues.push("matchedContextFeeds must be an array");
+  } else {
+    value.matchedContextFeeds.forEach((feed, index) => {
+      if (!isRecord(feed)) {
+        issues.push(`matchedContextFeeds[${index}] must be an object`);
+        return;
+      }
+      if (!isNonEmptyString(feed.feedId)) issues.push(`matchedContextFeeds[${index}].feedId is required`);
+      if (feed.sourceKind !== "source_health") {
+        issues.push(`matchedContextFeeds[${index}].sourceKind must be source_health`);
+      }
+    });
+  }
+  issues.push(...stringArrayIssues(value.matchedContextFeedRefs, "matchedContextFeedRefs"));
+  if (Array.isArray(value.matchedContextFeeds) && Array.isArray(value.matchedContextFeedRefs)) {
+    for (const feed of value.matchedContextFeeds) {
+      if (isRecord(feed) && isNonEmptyString(feed.feedId) && !value.matchedContextFeedRefs.includes(feed.feedId)) {
+        issues.push("matchedContextFeedRefs must include every matchedContextFeeds feedId");
+        break;
+      }
+    }
+  }
+  if (value.goalSessionFound === true && value.feedAllowed === true && Array.isArray(value.matchedContextFeeds) && value.matchedContextFeeds.length === 0) {
+    issues.push("feedAllowed=true for a goal session requires matchedContextFeeds");
+  }
+  if (value.feedAllowed === false && Array.isArray(value.matchedContextFeeds) && value.matchedContextFeeds.length > 0) {
+    issues.push("feedAllowed=false must not expose matchedContextFeeds");
+  }
+  issues.push(...stringArrayIssues(value.matchedAllowedActuators, "matchedAllowedActuators"));
+  if (Array.isArray(value.matchedAllowedActuators)) {
+    value.matchedAllowedActuators.forEach((actuator, index) => {
+      if (actuator !== "query_source_health") {
+        issues.push(`matchedAllowedActuators[${index}] must be query_source_health`);
+      }
+    });
+  }
+  issues.push(...stringArrayIssues(value.matchedAllowedActuatorRefs, "matchedAllowedActuatorRefs"));
+  if (Array.isArray(value.matchedAllowedActuators) && Array.isArray(value.matchedAllowedActuatorRefs)) {
+    const expectedRefs = value.matchedAllowedActuators.map((actuator) => `agent_goal_allowed_actuator:${actuator}`);
+    for (const ref of expectedRefs) {
+      if (!value.matchedAllowedActuatorRefs.includes(ref)) {
+        issues.push("matchedAllowedActuatorRefs must include every matchedAllowedActuators policy ref");
+        break;
+      }
+    }
+  }
+  if (value.goalSessionFound === true && value.actuatorAllowed === true && Array.isArray(value.matchedAllowedActuators) && value.matchedAllowedActuators.length === 0) {
+    issues.push("actuatorAllowed=true for a goal session requires matchedAllowedActuators");
+  }
+  if (value.actuatorAllowed === false && Array.isArray(value.matchedAllowedActuators) && value.matchedAllowedActuators.length > 0) {
+    issues.push("actuatorAllowed=false must not expose matchedAllowedActuators");
+  }
+  if (Array.isArray(value.policyEvidenceRefs) && Array.isArray(value.matchedContextFeedRefs)) {
+    for (const ref of value.matchedContextFeedRefs) {
+      if (!value.policyEvidenceRefs.includes(`agent_goal_context_feed:${ref}`)) {
+        issues.push("policyEvidenceRefs must include every matched context feed policy ref");
+        break;
+      }
+    }
+  }
+  if (Array.isArray(value.policyEvidenceRefs) && Array.isArray(value.matchedAllowedActuatorRefs)) {
+    for (const ref of value.matchedAllowedActuatorRefs) {
+      if (!value.policyEvidenceRefs.includes(ref)) {
+        issues.push("policyEvidenceRefs must include every matched allowed actuator policy ref");
+        break;
+      }
+    }
+  }
+  if (Array.isArray(value.evidenceRefs) && Array.isArray(value.matchedContextFeedRefs)) {
+    for (const ref of value.matchedContextFeedRefs) {
+      if (!value.evidenceRefs.includes(ref)) {
+        issues.push("evidenceRefs must include every matchedContextFeedRefs entry");
+        break;
+      }
+    }
+  }
+  if (Array.isArray(value.evidenceRefs) && Array.isArray(value.matchedAllowedActuatorRefs)) {
+    for (const ref of value.matchedAllowedActuatorRefs) {
+      if (!value.evidenceRefs.includes(ref)) {
+        issues.push("evidenceRefs must include every matchedAllowedActuatorRefs entry");
+        break;
+      }
+    }
   }
   if (value.goalSessionFound === true) {
     issues.push(...goalSessionIssues(value.agentGoalSession, "agentGoalSession", value.goalId));

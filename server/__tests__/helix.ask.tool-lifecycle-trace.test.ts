@@ -7,6 +7,11 @@ import {
 } from "../services/helix-ask/tool-lifecycle-trace";
 import { buildArtifactQueryIndex } from "../services/helix-ask/artifact-query-index";
 import { resolveToolFamilyContract } from "../services/helix-ask/tool-family-contract";
+import { WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS } from "../services/helix-ask/workstation-context-feed-query-tool-contracts";
+
+const genericContextFeedQuerySpecs = WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS.filter((spec) =>
+  !["source_health", "trace_memory", "packet_traces"].includes(spec.feedKind),
+);
 
 describe("Helix Ask tool lifecycle trace", () => {
   it("recognizes docs-viewer summarize_doc observation contract", () => {
@@ -509,6 +514,139 @@ describe("Helix Ask tool lifecycle trace", () => {
       rail_status: "complete",
       rail_failure_code: null,
       repair_target: null,
+    });
+  });
+
+  it("mirrors concrete calculator capability when workstation planner action executed it", () => {
+    const payload: Record<string, unknown> = {
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "calculator_solve",
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "calculator_stream",
+        allowed_terminal_artifact_kinds: ["workstation_tool_evaluation", "typed_failure"],
+        required_terminal_kinds: ["workstation_tool_evaluation"],
+      },
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        requested_capability: "scientific-calculator.solve_expression",
+        admitted_capability: "scientific-calculator.solve_expression",
+        selected_capability: "scientific-calculator.solve_expression",
+        admitted_tool_families: ["calculator", "workstation_action"],
+        required_observation_kinds_for_requested_capability: ["calculator_receipt", "workstation_tool_evaluation"],
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:calculator-workstation-wrapper",
+        capability_family: "workstation_action",
+        requested_action: "execute_workstation_action",
+        selected_capability: "execute_workstation_action",
+        admission_status: "admitted",
+        required_terminal_kind: "workstation_tool_evaluation",
+      },
+      operational_capability_trace: {
+        schema: "helix.operational_capability_trace.v1",
+        model_proposed_capability: "scientific-calculator.solve_expression",
+        policy_admitted_capability: "scientific-calculator.solve_expression",
+        executed_capability: "scientific-calculator.solve_expression",
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            index: 1,
+            chosen_capability: "scientific-calculator.solve_expression",
+            executed_action_key: "scientific-calculator.solve_expression",
+            produced_artifacts: ["calculator_receipt", "workstation_tool_evaluation"],
+          },
+        ],
+      },
+      runtime_tool_call: {
+        tool_call_id: "tool:calculator-workstation-wrapper",
+        capability_key: "scientific-calculator.solve_expression",
+        status: "completed",
+      },
+      selected_final_answer: "Calculator verification plan completed.\nExpression: 2*(3+4)\nResult: 14",
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        concise_text: "Calculator verification plan completed.\nExpression: 2*(3+4)\nResult: 14",
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        final_answer_source: "workstation_tool_evaluation",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        terminal_kind: "answer",
+        terminal_text_preview: "Calculator verification plan completed.\nExpression: 2*(3+4)\nResult: 14",
+        server_authoritative: true,
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "calculator_receipt:wrapper",
+          kind: "calculator_receipt",
+          payload: {
+            schema: "helix.calculator_receipt.v1",
+            expression: "2*(3+4)",
+            result: 14,
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: "workstation_tool_evaluation:wrapper",
+          kind: "workstation_tool_evaluation",
+          payload: {
+            schema: "helix.workstation_tool_evaluation.v1",
+            supports_goal: true,
+            summary: "Calculator-backed result: 2*(3+4) = 14.",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: "final_answer_draft:wrapper",
+          kind: "final_answer_draft",
+          payload: {
+            schema: "helix.final_answer_draft.v1",
+            text: "Calculator verification plan completed.\nExpression: 2*(3+4)\nResult: 14",
+            support_refs: ["calculator_receipt:wrapper", "workstation_tool_evaluation:wrapper"],
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:calculator-workstation-wrapper", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:calculator-workstation-wrapper", payload });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      route_family: "calculator",
+      requested_capability: "scientific-calculator.solve_expression",
+      selected_capability: "scientific-calculator.solve_expression",
+      executed_capability: "scientific-calculator.solve_expression",
+      selected_executed_match: true,
+      observation_artifact_kind: "calculator_receipt",
+      required_terminal_kind: "workstation_tool_evaluation",
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      selected_capability: "scientific-calculator.solve_expression",
+      admitted_capability: "scientific-calculator.solve_expression",
+      executed_capability: "scientific-calculator.solve_expression",
+      observation_kind: "calculator_receipt",
+      required_terminal_kind: "workstation_tool_evaluation",
+      selected_terminal_kind: "workstation_tool_evaluation",
+      visible_terminal_kind: "workstation_tool_evaluation",
+      codex_parity_class: "complete",
+      rail_status: "complete",
     });
   });
 
@@ -2370,6 +2508,54 @@ describe("Helix Ask tool lifecycle trace", () => {
     ]));
   });
 
+  it("infers canonical generic context-feed query capabilities from feed-kind artifacts", () => {
+    for (const spec of genericContextFeedQuerySpecs) {
+      const payload: Record<string, unknown> = {
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: `stage_play_workstation_context_feed_query_result:${spec.feedKind}`,
+            kind: "stage_play_workstation_context_feed_query_result",
+            payload: {
+              schema: "stage_play_workstation_context_feed_query_result/v1",
+              feed_kind: spec.feedKind,
+              required_actuator: spec.actuator,
+              assistant_answer: false,
+              raw_content_included: false,
+              terminal_eligible: false,
+            },
+          },
+          {
+            artifact_id: `stage_play_goal_context_update:${spec.feedKind}`,
+            kind: "helix.workstation_goal_context_update.v1",
+            payload: {
+              schema: "helix.workstation_goal_context_update.v1",
+              source_kind: spec.feedKind,
+              assistant_answer: false,
+              raw_content_included: false,
+              terminal_eligible: false,
+            },
+          },
+        ],
+      };
+
+      const index = buildArtifactQueryIndex({ turnId: `ask:test:${spec.feedKind}`, payload });
+
+      expect(index).toMatchObject({
+        capability: spec.capability,
+        tool_family: "live_source_mail",
+        tool_family_contract: {
+          tool_name: spec.capability,
+          authority: "evidence_only",
+          required_observation_kinds: spec.toolFamilyRequiredObservationKinds,
+        },
+        missing_required_observation_kinds: [],
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      });
+    }
+  });
+
   it("maps workstation control receipt artifacts to the governed control tool", () => {
     const payload: Record<string, unknown> = {
       active_prompt: "Apply the frog classifier preset to the active visual source.",
@@ -2425,6 +2611,84 @@ describe("Helix Ask tool lifecycle trace", () => {
       },
       missing_required_observation_kinds: [],
     });
+  });
+
+  it("infers exact workstation control capabilities from sparse receipt actuator fields", () => {
+    const cases = [
+      {
+        requiredActuator: "set_visual_preset",
+        controlKind: "change_preset",
+        capability: "live_env.set_visual_preset",
+        prompt: "Apply the frog classifier shade to the active visual source.",
+      },
+      {
+        requiredActuator: "set_audio_preset",
+        controlKind: "change_preset",
+        capability: "live_env.set_audio_preset",
+        prompt: "Apply the translation preset to the active audio source.",
+      },
+      {
+        requiredActuator: "focus_process_graph",
+        controlKind: "focus_process_graph",
+        capability: "live_env.focus_process_graph",
+        prompt: "Focus the process graph on the visual packet trace.",
+      },
+    ] as const;
+
+    for (const testCase of cases) {
+      const payload: Record<string, unknown> = {
+        active_prompt: testCase.prompt,
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: `stage_play_workstation_control_receipt:${testCase.requiredActuator}:1`,
+            kind: "stage_play_workstation_control_receipt",
+            payload: {
+              schema: "stage_play_workstation_control_receipt/v1",
+              requiredActuator: testCase.requiredActuator,
+              controlKind: testCase.controlKind,
+              assistant_answer: false,
+              raw_content_included: false,
+              terminal_eligible: false,
+            },
+          },
+          {
+            artifact_id: `stage_play_goal_context_update:${testCase.requiredActuator}:1`,
+            kind: "helix.workstation_goal_context_update.v1",
+            payload: {
+              schema: "helix.workstation_goal_context_update.v1",
+              update_kind: "suggested_action",
+              evidenceRefs: [`stage_play_workstation_control_receipt:${testCase.requiredActuator}:1`],
+              assistant_answer: false,
+              raw_content_included: false,
+              terminal_eligible: false,
+            },
+          },
+        ],
+      };
+
+      const index = buildArtifactQueryIndex({ turnId: `ask:test:${testCase.requiredActuator}`, payload });
+
+      expect(index).toMatchObject({
+        capability: testCase.capability,
+        tool_family: "live_source_mail",
+        tool_family_contract: {
+          tool_name: testCase.capability,
+          authority: "control_receipt",
+          required_observation_kinds: [
+            "stage_play_workstation_control_receipt",
+            "helix.workstation_goal_context_update.v1",
+          ],
+        },
+        missing_required_observation_kinds: [],
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      });
+      expect(index.queryable_artifact_keys).toEqual(expect.arrayContaining([
+        testCase.requiredActuator,
+        testCase.controlKind,
+      ]));
+    }
   });
 
   it("maps narrator request artifacts to governed non-terminal voice delivery tools", () => {

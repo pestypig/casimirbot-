@@ -409,6 +409,154 @@ function buildFixture(): StagePlayBadgeGraphV1 {
         },
       }),
       badge({
+        id: "workstation_state_plane.terminal_authority",
+        title: "Terminal Authority",
+        plainMeaning: "No current terminal answer has been selected by a completed solver path.",
+        whyItMatters: "Receipts, MicroDeck outputs, narrator events, and panel projections remain observations until terminal authority selects an answer.",
+        kind: "workstation_state_plane",
+        status: "blocked",
+        subjects: [
+          "helix_ask.checkpoint.latest",
+          "answer_snapshot.latest",
+          "stage_play_goal_context_update:automation:ui",
+        ],
+        tags: [
+          "workstation_state_plane",
+          "terminal_authority",
+          "awaiting_completed_solver_path",
+          "goal_sessions_require_terminal_authority",
+          "receipts_not_answers",
+        ],
+        liveBindings: [],
+        intentModule: undefined,
+        admission: "auto",
+        confidence: 0.72,
+        evidenceRefs: [
+          "stage_play_goal_context_update:automation:ui",
+          "helix_ask.checkpoint.latest",
+          "answer_snapshot.latest",
+        ],
+        reasonCodes: [
+          "terminal_authority_state",
+          "terminal_authority_pending",
+          "receipts_and_goal_context_are_observations",
+        ],
+        dataTray: {
+          title: "Terminal authority",
+          summary: "3 non-terminal goal-context updates; 1 goal session requires terminal authority.",
+          updatedAt: "2026-06-02T00:00:04.500Z",
+          freshness: "missing",
+          confidence: 0.72,
+          evidenceRefs: [
+            "stage_play_goal_context_update:automation:ui",
+            "goal:stage-play-monitor",
+            "helix_ask.checkpoint.latest",
+          ],
+          inputRefs: [
+            "workstation_state_plane.gates",
+            "workstation_state_plane.goal_context_bus",
+            "stage_play_goal_context_update:automation:ui",
+          ],
+          inputPreview: "Goal-context updates, receipts, narrator events, and output lanes are observations.",
+          transformLabel: "completed solver path / terminal authority boundary",
+          outputRefs: [],
+          outputPreview: "terminal answer pending",
+          skipped: [
+            "goal_context_updates",
+            "workstation_control_receipts",
+            "microdeck_outputs",
+            "narrator_events",
+            "panel_projections",
+          ],
+          blockedUntil: "completed solver path selects terminal answer",
+        },
+      }),
+      badge({
+        id: "workstation_state_plane.context_feed_index",
+        title: "Context feed index",
+        plainMeaning: "Active goal sessions declare queryable context feed lanes and query actuator policy.",
+        whyItMatters: "The agent reads indexed workstation feed evidence instead of hosting the continuous source loop.",
+        kind: "workstation_state_plane",
+        status: "observed",
+        subjects: [
+          "visual_summaries",
+          "microdeck_outputs",
+          "packet_traces",
+          "source_health",
+          "translated_transcripts",
+          "trace_memory",
+          "narrator_events",
+          "allowed_actuator:query_visual_summaries",
+          "allowed_actuator:query_translation_segments",
+        ],
+        tags: [
+          "workstation_state_plane",
+          "context_feed_index",
+          "queryable_goal_context",
+          "agent_read_model",
+          "not_terminal_authority",
+        ],
+        liveBindings: [],
+        intentModule: undefined,
+        admission: "auto",
+        confidence: 0.8,
+        evidenceRefs: [
+          "context_feed:visual_summaries",
+          "context_feed:translated_transcripts",
+          "allowed_actuator:query_visual_summaries",
+          "allowed_actuator:query_translation_segments",
+          "stage_play_context_feed_query:visual_summaries:ui",
+          "stage_play_context_feed_query:translated_transcripts:ui",
+        ],
+        reasonCodes: [
+          "context_feed_index",
+          "queryable_goal_context",
+          "agent_reads_deterministic_feeds",
+          "observation_not_terminal_authority",
+        ],
+        dataTray: {
+          title: "Context feed index",
+          summary: "8 feed lanes, 5 query actuator policy refs, 2 query receipt refs.",
+          updatedAt: "2026-06-02T00:00:04.600Z",
+          freshness: "fresh",
+          confidence: 0.8,
+          evidenceRefs: [
+            "context_feed:visual_summaries",
+            "context_feed:translated_transcripts",
+            "allowed_actuator:query_visual_summaries",
+            "allowed_actuator:query_translation_segments",
+            "stage_play_context_feed_query:visual_summaries:ui",
+            "stage_play_context_feed_query:translated_transcripts:ui",
+          ],
+          inputRefs: [
+            "goal:stage-play-monitor",
+            "stage_play_goal_context_update:translation:ui",
+          ],
+          inputPreview: "visual_summaries, microdeck_outputs, packet_traces, source_health, translated_transcripts, trace_memory, narrator_events",
+          transformLabel: "AgentGoalSession feeds -> query policy index",
+          toolRefs: [
+            "requested_tool:query_translation_segments",
+            "canonical_tool:live_env.query_translation_segments",
+            "matched_actuator:query_translation_segments",
+            "agent_goal_allowed_actuator:query_translation_segments",
+          ],
+          toolPreview: "tool query_translation_segments -> live_env.query_translation_segments; matched query_translation_segments",
+          outputRefs: [
+            "context_feed:visual_summaries",
+            "context_feed:translated_transcripts",
+            "allowed_actuator:query_visual_summaries",
+            "allowed_actuator:query_translation_segments",
+          ],
+          outputPreview: "5 query actuators policy-bound",
+          skipped: [
+            "assistant_answer=false",
+            "terminal_eligible=false",
+            "raw_content_included=false",
+          ],
+          blockedUntil: "completed solver path selects terminal answer",
+        },
+      }),
+      badge({
         id: "voice_output.current",
         title: "Current Voice Output",
         plainMeaning: "Voice output can speak only from a model-reviewed answer snapshot.",
@@ -490,6 +638,24 @@ function buildFixture(): StagePlayBadgeGraphV1 {
         label: "awaits Ask checkpoint",
         evidenceRefs: ["stage_play_checkpoint_request:ui"],
         reasonCodes: ["checkpoint_request_awaits_ask"],
+      },
+      {
+        id: "edge:goal-context-bus:context-feed-index",
+        from: "workstation_state_plane.goal_context_bus",
+        to: "workstation_state_plane.context_feed_index",
+        relation: "contains",
+        label: "goal context bus contains queryable feed index",
+        evidenceRefs: ["context_feed:visual_summaries", "context_feed:translated_transcripts"],
+        reasonCodes: ["goal_context_bus_contains_context_feed_index", "queryable_goal_context"],
+      },
+      {
+        id: "edge:context-feed-index:terminal-authority",
+        from: "workstation_state_plane.context_feed_index",
+        to: "workstation_state_plane.terminal_authority",
+        relation: "needs_check",
+        label: "context feed observations require terminal authority before final answer",
+        evidenceRefs: ["stage_play_context_feed_query:visual_summaries:ui"],
+        reasonCodes: ["context_feed_index_requires_terminal_authority", "observations_not_answers"],
       },
       {
         id: "edge:move-away:defensive-retreat-barrier",
@@ -2147,7 +2313,10 @@ describe("StagePlayBadgeGraphPanel", () => {
             "stage_play_processed_mail_packet:translation-ui",
             "microdeck_output:translation-ui",
             "context_feed:translated_transcripts",
+            "agent_goal_feed:translation",
+            "agent_goal_context_feed:agent_goal_feed:translation",
             "allowed_actuator:query_translation_segments",
+            "agent_goal_allowed_actuator:query_translation_segments",
           ],
           receiptRefs: ["stage_play_context_feed_query:translated_transcripts:ui"],
           freshness: {
@@ -2167,6 +2336,12 @@ describe("StagePlayBadgeGraphPanel", () => {
             { kind: "bind_source", sourceRef: "source:visual-tab", targetRef: "live-answer:desktop" },
             { kind: "focus_process_graph", nodeRef: "stage_play_processed_mail_packet:translation-ui" },
           ],
+          toolIdentity: {
+            requestedToolName: "query_translation_segments",
+            canonicalToolName: "live_env.query_translation_segments",
+            matchedAllowedActuators: ["query_translation_segments"],
+            matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:query_translation_segments"],
+          },
           authority: {
             assistantAnswer: false,
             terminalEligible: false,
@@ -2261,7 +2436,7 @@ describe("StagePlayBadgeGraphPanel", () => {
               relevancePolicy: "same-goal-or-stream-binding",
             },
           ],
-          allowedActuators: ["query_visual_summaries", "query_packet_traces", "query_microdeck_outputs", "query_source_health", "query_translation_segments", "narrator_bind_stream", "focus_process_graph"],
+          allowedActuators: ["query_visual_summaries", "query_packet_traces", "query_microdeck_outputs", "query_source_health", "query_translation_segments", "query_trace_memory", "narrator_bind_stream", "focus_process_graph"],
           cadence: { kind: "event_accumulation", minUpdates: 2 },
           stopConditions: [
             "User stops monitoring",
@@ -2306,6 +2481,13 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-packet-inspector-deck-title")).toHaveTextContent("Minecraft Minimal Operator");
     expect(screen.getByTestId("stage-play-packet-inspector-deck-plan")).toHaveTextContent("minimal_prompted_arbiter");
     expect(screen.getByTestId("stage-play-packet-inspector-coalescing")).toHaveTextContent("superseded 2 older wakes");
+    expect(screen.getByTestId("stage-play-packet-circuit-inspector")).toHaveTextContent(/packet-scoped observation path/i);
+    expect(screen.getAllByTestId("stage-play-packet-circuit-hop").length).toBeGreaterThanOrEqual(8);
+    expect(screen.getByTestId("stage-play-packet-circuit-inspector")).toHaveTextContent(/Source Path\s*source:visual-tab/i);
+    expect(screen.getByTestId("stage-play-packet-circuit-inspector")).toHaveTextContent(/Deck\s*Minecraft Minimal Operator/i);
+    expect(screen.getByTestId("stage-play-packet-circuit-inspector")).toHaveTextContent(/Goal Context\s*1 non-terminal update/i);
+    expect(screen.getByTestId("stage-play-packet-circuit-inspector")).toHaveTextContent(/Dispatch\s*Receipt:.*Goal context:.*Panel:.*Narrator:.*Wake interrupt/s);
+    expect(screen.getByTestId("stage-play-packet-circuit-inspector")).toHaveTextContent(/Authority\s*evidence only: assistant=false terminal=false raw=false/i);
     expect(screen.getByTestId("stage-play-applied-microdeck-checklist")).toBeTruthy();
     expect(screen.getAllByTestId("stage-play-applied-microdeck-chip").length).toBeGreaterThan(1);
     expect(screen.getAllByText("Earbud Translation Deck").length).toBeGreaterThan(0);
@@ -2348,11 +2530,14 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-control-dispatch-state")).toHaveTextContent(/1 graph/i);
     expect(screen.getByTestId("stage-play-control-dispatch-state")).toHaveTextContent(/2 narrator/i);
     expect(screen.getByTestId("stage-play-control-dispatch-state")).toHaveTextContent(/Wake remains 2 interrupt dispatches/i);
-    expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/7 allowed actuators/i);
+    expect(screen.getByTestId("stage-play-wake-interrupt-scope-state")).toHaveTextContent(/Wake split: 2 urgent, 0 blocked, 0 policy-triggered/i);
+    expect(screen.getByTestId("stage-play-wake-interrupt-scope-state")).toHaveTextContent(/Other dispatches stay on workstation control lanes/i);
+    expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/8 allowed actuators/i);
     expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/1 narrator output policy item/i);
     expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/1 narrator event feed/i);
-    expect(screen.getByTestId("stage-play-feed-policy-ref-state")).toHaveTextContent(/2 context-feed policy refs/i);
-    expect(screen.getByTestId("stage-play-feed-policy-ref-state")).toHaveTextContent(/2 actuator policy refs/i);
+    expect(screen.getByTestId("stage-play-feed-policy-ref-state")).toHaveTextContent(/3 context-feed policy refs/i);
+    expect(screen.getByTestId("stage-play-feed-policy-ref-state")).toHaveTextContent(/3 actuator policy refs/i);
+    expect(screen.getByTestId("stage-play-feed-policy-ref-state")).toHaveTextContent(/1 exact goal authorization ref/i);
     expect(screen.getByText("Minecraft danger monitor")).toBeTruthy();
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/visual summaries/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/packet traces/i);
@@ -2361,6 +2546,9 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/automation policies/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/translated transcripts/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/narrator events/i);
+    expect(screen.getAllByTestId("stage-play-goal-context-update-policy-split").some((node) =>
+      /agent_goal_context_feed:agent_goal_feed:translation/i.test(node.textContent ?? "")
+    )).toBe(true);
     expect(screen.getByTestId("stage-play-agent-goal-session-actuators")).toHaveTextContent(/query visual summaries/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-actuators")).toHaveTextContent(/query packet traces/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-actuators")).toHaveTextContent(/narrator bind stream/i);
@@ -2395,13 +2583,25 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getAllByTestId("stage-play-goal-context-update-policy").some((node) =>
       /context_feed:translated_transcripts/i.test(node.textContent ?? "") &&
       /allowed_actuator:query_translation_segments/i.test(node.textContent ?? "") &&
+      /agent_goal_allowed_actuator:query_translation_segments/i.test(node.textContent ?? "") &&
       /workstation_context_feed:translated_transcripts/i.test(node.textContent ?? "") &&
       /workstation_actuator:query_translation_segments/i.test(node.textContent ?? "")
     )).toBe(true);
     expect(screen.getAllByTestId("stage-play-goal-context-update-policy-split").some((node) =>
-      /feeds=context_feed:translated_transcripts, workstation_context_feed:translated_transcripts/i.test(node.textContent ?? "") &&
-      /actuators=allowed_actuator:query_translation_segments, workstation_actuator:query_translation_segments/i.test(node.textContent ?? "")
+      /context_feed:translated_transcripts/i.test(node.textContent ?? "") &&
+      /agent_goal_context_feed:agent_goal_feed:translation/i.test(node.textContent ?? "") &&
+      /workstation_context_feed:translated_transcripts/i.test(node.textContent ?? "") &&
+      /actuators=allowed_actuator:query_translation_segments, agent_goal_allowed_actuator:query_translation_segments, workstation_actuator:query_translation_segments/i.test(node.textContent ?? "")
     )).toBe(true);
+    expect(screen.getAllByTestId("stage-play-goal-context-update-matched-actuator-refs").some((node) =>
+      /matchedActuatorRefs=agent_goal_allowed_actuator:query_translation_segments/i.test(node.textContent ?? "")
+    )).toBe(true);
+    expect(screen.getByTestId("stage-play-agent-goal-session-feed-policy-refs")).toHaveTextContent(/agent_goal_context_feed:feed:translation/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-feed-policy-refs")).toHaveTextContent(/agent_goal_allowed_actuator:query_translation_segments/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-feed-policy-refs")).toHaveTextContent(/agent_goal_allowed_actuator:query_packet_traces/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-feed-policy-refs")).toHaveTextContent(/agent_goal_allowed_actuator:query_trace_memory/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-feed-policy-refs")).not.toHaveTextContent(/agent_goal_allowed_actuator:query_automation_policies/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-feed-policy-refs")).not.toHaveTextContent(/agent_goal_allowed_actuator:query_narrator_events/i);
     expect(screen.getAllByTestId("stage-play-goal-context-update-freshness").some((node) =>
       /freshness=fresh observed=1780521602500 staleAfter=120000ms/i.test(node.textContent ?? "")
     )).toBe(true);
@@ -3394,7 +3594,10 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(await screen.findByTestId("stage-play-badge-graph-scrollport")).toBeTruthy();
     expect(screen.getByTestId("stage-play-tool-activity-strip")).toBeTruthy();
     expect(screen.getByText("Latest reflect_stage_play_context")).toBeTruthy();
-    expect(screen.getByText("14 badges")).toBeTruthy();
+    expect(screen.getByText("16 badges")).toBeTruthy();
+    expect(screen.getAllByText(/Context feed index/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/query actuators policy-bound/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/AgentGoalSession feeds -> query policy index/i).length).toBeGreaterThan(0);
     expect(screen.getByText("0 missing checks")).toBeTruthy();
     expect(screen.getByText(/checkpoint queue: Meaningful Perturbation \/ queued/i)).toBeTruthy();
     expect(screen.getByTestId("stage-play-run-checkpoint")).toBeTruthy();
@@ -3597,6 +3800,23 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.queryByTestId("stage-play-draft-parameter-editor")).toBeNull();
   });
 
+  it("shows goal-context tool identity in the selected badge data flow", async () => {
+    renderPanel();
+    await showFullGraph();
+
+    const contextFeedButtons = await screen.findAllByRole("button", { name: /Context feed index/i });
+    fireEvent.click(contextFeedButtons[0]);
+
+    expect(screen.getByText("Data Flow")).toBeTruthy();
+    const toolIdentity = screen.getByTestId("stage-play-data-flow-tool-identity");
+    expect(toolIdentity).toHaveTextContent(/query_translation_segments -> live_env\.query_translation_segments/i);
+    expect(toolIdentity).toHaveTextContent(/matched query_translation_segments/i);
+    expect(toolIdentity).toHaveTextContent(/requested_tool:query_translation_segments/i);
+    expect(toolIdentity).toHaveTextContent(/canonical_tool:live_env\.query_translation_segments/i);
+    expect(toolIdentity).toHaveTextContent(/matched_actuator:query_translation_segments/i);
+    expect(toolIdentity).toHaveTextContent(/agent_goal_allowed_actuator:query_translation_segments/i);
+  });
+
   it("switches the Stage Console to node-specific interaction surfaces", async () => {
     renderPanel();
     await showFullGraph();
@@ -3640,6 +3860,18 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-voice-boundary-locked")).toBeTruthy();
     expect(screen.queryByTestId("stage-play-speak-reviewed-answer")).toBeNull();
     expect(screen.getAllByText(/Project Stage Play possibilities into Live Answer/i).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Terminal Authority" }));
+    expect(screen.getByTestId("stage-play-terminal-authority-node-controls")).toBeTruthy();
+    expect(screen.getAllByText("Terminal Authority").length).toBeGreaterThan(0);
+    expect(screen.getByText("Terminal Boundary")).toBeTruthy();
+    expect(screen.getByTestId("stage-play-terminal-authority-boundary")).toHaveTextContent(/completed solver path selects terminal answer/i);
+    expect(screen.getByTestId("stage-play-terminal-authority-skipped-sources")).toHaveTextContent(/goal context updates/i);
+    expect(screen.getByTestId("stage-play-terminal-authority-skipped-sources")).toHaveTextContent(/workstation control receipts/i);
+    expect(screen.getByTestId("stage-play-terminal-authority-skipped-sources")).toHaveTextContent(/microdeck outputs/i);
+    expect(screen.getByTestId("stage-play-terminal-authority-skipped-sources")).toHaveTextContent(/narrator events/i);
+    expect(screen.getByTestId("stage-play-terminal-authority-skipped-sources")).toHaveTextContent(/panel projections/i);
+    expect(screen.getByText("Authority Refs")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Current Voice Output" }));
     expect(screen.getByTestId("stage-play-voice-output-node-controls")).toBeTruthy();

@@ -1411,18 +1411,45 @@ export type StagePlayLiveSourceWatchJobPolicyConfigResultV1 = {
   artifactId: "stage_play_live_source_watch_job_policy_config_result";
   schema: typeof STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA;
   schemaVersion: typeof STAGE_PLAY_LIVE_SOURCE_WATCH_JOB_POLICY_CONFIG_RESULT_SCHEMA;
-  policy: StagePlayLiveSourceWatchJobPolicyV1;
-  jobState: StagePlayLiveSourceJobStateV1;
+  policy: StagePlayLiveSourceWatchJobPolicyV1 | null;
+  jobState: StagePlayLiveSourceJobStateV1 | null;
   transcriptRows: AskTurnTranscriptRowDraftV1[];
   policyCount: number;
-  watchJobPolicyRef: string;
-  watch_job_policy_ref: string;
+  watchJobPolicyRef: string | null;
+  watch_job_policy_ref: string | null;
   askThreadId?: string | null;
   ask_thread_id?: string | null;
   mailboxThreadId?: string | null;
   mailbox_thread_id?: string | null;
   mailboxThreadResolution?: Record<string, unknown> | null;
   mailbox_thread_resolution?: Record<string, unknown> | null;
+  goalId?: string | null;
+  goal_id?: string | null;
+  status?: "configured" | "blocked";
+  missingRequirements?: string[];
+  missing_requirements?: string[];
+  policyEvidenceRefs?: string[];
+  policy_evidence_refs?: string[];
+  goalSessionFound?: boolean | null;
+  goal_session_found?: boolean | null;
+  requiredActuator?: "configure_route_watch";
+  required_actuator?: "configure_route_watch";
+  actuatorAllowed?: boolean;
+  actuator_allowed?: boolean;
+  matchedAllowedActuators?: "configure_route_watch"[];
+  matched_allowed_actuators?: "configure_route_watch"[];
+  matchedAllowedActuatorRefs?: string[];
+  matched_allowed_actuator_refs?: string[];
+  sourceRefs?: string[];
+  source_refs?: string[];
+  loopRefs?: string[];
+  loop_refs?: string[];
+  evidenceRefs?: string[];
+  evidence_refs?: string[];
+  agentGoalSession?: unknown | null;
+  agent_goal_session?: unknown | null;
+  goalContextUpdateId?: string;
+  goal_context_update_id?: string;
   post_tool_model_step_required: true;
   assistant_answer: false;
   terminal_eligible: false;
@@ -1481,6 +1508,7 @@ export type AskTurnTranscriptRowDraftV1 = {
     | "voice_steering_rejected"
     | "voice_steering_cancel_requested"
     | "steering_ack_receipt"
+    | "goal_context_snapshot"
     | "loop_state"
     | "blocked";
   title: string;

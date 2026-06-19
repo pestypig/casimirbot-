@@ -32,6 +32,16 @@ const NHM2_AXIS_ALIGNED_SOURCE_OFF_DIAGONAL_SHEAR_AUDIT =
   `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-source-off-diagonal-shear-audit.json`;
 const NHM2_AXIS_ALIGNED_SOURCE_MOMENTUM_DENSITY_AUDIT =
   `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-source-momentum-density-audit.json`;
+const NHM2_AXIS_ALIGNED_MOMENTUM_FRAME_PROJECTION_RECEIPT =
+  `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-momentum-frame-projection-receipt.json`;
+const NHM2_AXIS_ALIGNED_MOMENTUM_FRAME_PROJECTION_EVIDENCE =
+  "fixtures/nhm2/momentum-frame-projection-evidence.axis-aligned-reduced-order-v1.json";
+const NHM2_AXIS_ALIGNED_METRIC_REQUIRED_MOMENTUM_DEMAND_AUDIT =
+  `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-metric-required-momentum-demand-audit.json`;
+const NHM2_AXIS_ALIGNED_METRIC_MOMENTUM_REMEDIATION_TARGETS =
+  `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-metric-momentum-remediation-targets.json`;
+const NHM2_AXIS_ALIGNED_CAMPAIGN_FRONTIER_DISPOSITION =
+  `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-campaign-frontier-disposition.json`;
 const NHM2_AXIS_ALIGNED_TIME_DEPENDENT_SOURCE_CAMPAIGN =
   `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-time-dependent-source-campaign.json`;
 const NHM2_AXIS_ALIGNED_REGIONAL_MATERIAL_SOURCE_TENSOR_MODEL =
@@ -1252,6 +1262,263 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   nhm2FullSolveBadge({
+    id: "nhm2.source.momentum_frame_projection_receipt",
+    title: "Momentum Frame Projection Receipt",
+    plainMeaning:
+      "Checks whether same-chart T0i/T00 momentum ratios have a local orthonormal projection receipt before causal-material bound language is allowed.",
+    whyItMatters:
+      "It prevents chart-basis component ratios from being promoted into physical causal-material falsifiers without an observer-frame or tetrad receipt.",
+    subjects: ["nhm2", "source_tensor", "momentum_density", "local_frame", "dynamic_campaign"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
+    tags: ["runtime_artifact", "momentum_t0i", "local_frame", "projection_receipt", "blocks_promotion"],
+    equations: [
+      {
+        id: "momentum_frame_projection_gate",
+        role: "noncomputable_reference",
+        displayLatex:
+          "\\mathrm{causalBound}_{J_i}\\Rightarrow T_{\\hat{0}\\hat{i}}/T_{\\hat{0}\\hat{0}}\\ \\mathrm{receipt}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["T0i", "T00", "tetrad", "local_orthonormal_frame"],
+        outputSymbols: ["momentum_frame_projection_status"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "A same-chart component ratio is diagnostic until a local orthonormal or observer-frame projection receipt exists.",
+      "A blocked projection receipt sharpens the campaign blocker but does not validate or falsify all possible material sources.",
+      "No calculator payload is provided because the receipt is a runtime evidence gate, not a scalar replay row.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef(
+        "shared/contracts/nhm2-momentum-frame-projection-receipt.v1.ts",
+        "nhm2-momentum-frame-projection-receipt-contract",
+        "Typed local-frame projection receipt for momentum-density causal-bound applicability.",
+      ),
+      artifactRef(
+        "tools/nhm2/build-momentum-frame-projection-receipt.ts",
+        "nhm2-momentum-frame-projection-receipt-builder",
+        "Builder that consumes the momentum audit and regional atlas to emit projection pass/blocked/missing evidence.",
+      ),
+      artifactRef(
+        NHM2_AXIS_ALIGNED_MOMENTUM_FRAME_PROJECTION_RECEIPT,
+        "sha256:0ce246a39e55a2be0689f72e5780d0e763c77bc03c21d82496fe826b113c8138",
+        "Axis-aligned branch projection receipt: projectionAvailable=true under declared reduced-order local-frame evidence; worst projected metric-required momentum-to-energy ratio is about 2.24e15; source-side projected ratio remains about 1e-6.",
+      ),
+      artifactRef(
+        NHM2_AXIS_ALIGNED_MOMENTUM_FRAME_PROJECTION_EVIDENCE,
+        "sha256:7c5f51640bf7a0c326fa20d19f91fe830ec2a1e2836d498095eabec53b913dc4",
+        "Declared reduced-order local-frame evidence for the axis-aligned branch; diagnostic-only and not a full ADM tetrad receipt.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "source_tensor", "momentum_density", "local_frame", "dynamic_campaign"],
+      symbols: ["T0i", "T00", "tetrad", "local_orthonormal_frame", "momentum_frame_projection_status"],
+      unitSignatures: [],
+      repoPaths: [
+        "shared/contracts/nhm2-momentum-frame-projection-receipt.v1.ts",
+        "tools/nhm2/build-momentum-frame-projection-receipt.ts",
+        NHM2_AXIS_ALIGNED_MOMENTUM_FRAME_PROJECTION_RECEIPT,
+        NHM2_AXIS_ALIGNED_MOMENTUM_FRAME_PROJECTION_EVIDENCE,
+      ],
+      equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
+      simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.metric_required.momentum_demand_audit",
+    title: "Metric-Required Momentum Demand Audit",
+    plainMeaning:
+      "Reports whether the metric-required projected momentum density exceeds the causal momentum-to-energy bound for the current profile.",
+    whyItMatters:
+      "It separates a source-model failure from a current metric-profile demand that is already too large under the declared reduced-order local-frame projection.",
+    subjects: ["nhm2", "metric_required_tensor", "momentum_density", "local_frame", "dynamic_campaign"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
+    tags: ["runtime_artifact", "momentum_t0i", "current_profile_falsifier", "claim_boundary"],
+    equations: [
+      {
+        id: "metric_required_momentum_demand_gate",
+        role: "noncomputable_reference",
+        displayLatex: "\\left|T_{\\hat{0}\\hat{i}}\\right|/\\left|T_{\\hat{0}\\hat{0}}\\right| \\le 1",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["T0i", "T00", "local_orthonormal_frame"],
+        outputSymbols: ["current_metric_profile_falsified"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "The audit consumes a projection receipt; it does not infer local-frame ratios from chart components by itself.",
+      "The current-profile falsifier is scoped to the declared reduced-order projection evidence and does not prove universal metric impossibility.",
+      "No calculator payload is provided because the audit is a runtime evidence gate, not a scalar replay row.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef(
+        "shared/contracts/nhm2-metric-required-momentum-demand-audit.v1.ts",
+        "nhm2-metric-required-momentum-demand-audit-contract",
+        "Typed audit for projected metric-required momentum-density demand.",
+      ),
+      artifactRef(
+        "tools/nhm2/build-metric-required-momentum-demand-audit.ts",
+        "nhm2-metric-required-momentum-demand-audit-builder",
+        "Builder that consumes the momentum frame projection receipt and emits current-profile falsifier evidence.",
+      ),
+      artifactRef(
+        NHM2_AXIS_ALIGNED_METRIC_REQUIRED_MOMENTUM_DEMAND_AUDIT,
+        "sha256:15a0ea6b9e0b0d67d65f5743f479faf8b4c7986ff12ef7f635fc2d8634da3364",
+        "Axis-aligned branch metric-required momentum demand audit: currentMetricProfileFalsified=true; worstProjectedMetricRequiredMomentumToEnergyRatio is about 2.24e15 at hull:T02.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "metric_required_tensor", "momentum_density", "local_frame", "dynamic_campaign"],
+      symbols: ["T0i", "T00", "local_orthonormal_frame", "current_metric_profile_falsified"],
+      unitSignatures: [],
+      repoPaths: [
+        "shared/contracts/nhm2-metric-required-momentum-demand-audit.v1.ts",
+        "tools/nhm2/build-metric-required-momentum-demand-audit.ts",
+        NHM2_AXIS_ALIGNED_METRIC_REQUIRED_MOMENTUM_DEMAND_AUDIT,
+      ],
+      equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
+      simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.metric_required.momentum_remediation_targets",
+    title: "Metric Momentum Remediation Targets",
+    plainMeaning:
+      "Reports how much the current metric-required projected T0i demand would have to be suppressed before this profile could re-enter the reduced-order campaign.",
+    whyItMatters:
+      "It turns the metric-required momentum falsifier into a concrete redesign target instead of leaving the campaign blocked by an opaque T0i failure.",
+    subjects: ["nhm2", "metric_required_tensor", "momentum_density", "remediation", "dynamic_campaign"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
+    tags: ["runtime_artifact", "momentum_t0i", "profile_remediation", "current_profile_falsifier"],
+    equations: [
+      {
+        id: "metric_momentum_required_suppression_gate",
+        role: "noncomputable_reference",
+        displayLatex:
+          "S_{required}=\\max_R\\left(\\left|T_{\\hat{0}\\hat{i}}\\right|/\\left|T_{\\hat{0}\\hat{0}}\\right|\\right)/S_{allowed}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["T0i", "T00", "local_orthonormal_frame", "S_allowed"],
+        outputSymbols: ["requiredSuppressionFactor"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "The remediation target is scoped to the current profile and declared reduced-order projection evidence.",
+      "A remediation target does not validate a new metric profile or source mechanism.",
+      "Allowed levers are metric-profile redesign, a stronger full ADM tetrad projection receipt, or rejecting the current profile for this campaign.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef(
+        "shared/contracts/nhm2-metric-momentum-remediation-targets.v1.ts",
+        "nhm2-metric-momentum-remediation-targets-contract",
+        "Typed remediation target contract for metric-required projected momentum demand.",
+      ),
+      artifactRef(
+        "tools/nhm2/build-metric-momentum-remediation-targets.ts",
+        "nhm2-metric-momentum-remediation-targets-builder",
+        "Builder that consumes the metric-required momentum demand audit and emits suppression targets.",
+      ),
+      artifactRef(
+        NHM2_AXIS_ALIGNED_METRIC_MOMENTUM_REMEDIATION_TARGETS,
+        "sha256:67df41cb136244bfd83fd6f2a3e071345cd261d215382f1b62cd629cdd9f22da",
+        "Axis-aligned branch remediation target: currentMetricProfileFalsified=true; worst=hull:T02; required suppression factor is about 2.244e15 with fractional reduction about 0.9999999999999996.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "metric_required_tensor", "momentum_density", "remediation", "dynamic_campaign"],
+      symbols: ["T0i", "T00", "local_orthonormal_frame", "requiredSuppressionFactor"],
+      unitSignatures: [],
+      repoPaths: [
+        "shared/contracts/nhm2-metric-momentum-remediation-targets.v1.ts",
+        "tools/nhm2/build-metric-momentum-remediation-targets.ts",
+        NHM2_AXIS_ALIGNED_METRIC_MOMENTUM_REMEDIATION_TARGETS,
+      ],
+      equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
+      simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.campaign.frontier_disposition",
+    title: "Campaign Frontier Disposition",
+    plainMeaning:
+      "Turns the campaign's current frontier blocker into a typed disposition: the current profile is rejected under the declared reduced-order projected T0i demand evidence.",
+    whyItMatters:
+      "It keeps the solve loop focused on profile redesign, full ADM/tetrad projection evidence, or current-profile rejection instead of hiding a non-resolvable momentum-density demand behind generic campaign failure.",
+    subjects: ["nhm2", "dynamic_campaign", "frontier_disposition", "momentum_density", "profile_rejection"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
+    tags: ["runtime_artifact", "frontier_disposition", "current_profile_rejected", "blocks_promotion"],
+    equations: [
+      {
+        id: "campaign_frontier_disposition_gate",
+        role: "noncomputable_reference",
+        displayLatex:
+          "D_{frontier}=\\mathrm{dispose}(campaign,\\;S_{required},\\;profile)",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["campaignFirstBlocker", "requiredSuppressionFactor", "profileId"],
+        outputSymbols: ["frontierDisposition"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "The disposition is scoped to the current profile, current run identity, and declared reduced-order projection evidence.",
+      "Current-profile rejection does not prove a universal impossibility theorem for NHM2 or for all possible profiles.",
+      "The allowed next actions are metric-profile redesign, stronger full ADM/tetrad projection evidence, or rejecting this profile for the campaign.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef(
+        "shared/contracts/nhm2-campaign-frontier-disposition.v1.ts",
+        "nhm2-campaign-frontier-disposition-contract",
+        "Typed campaign frontier disposition contract.",
+      ),
+      artifactRef(
+        "tools/nhm2/build-campaign-frontier-disposition.ts",
+        "nhm2-campaign-frontier-disposition-builder",
+        "Builder that consumes metric momentum remediation targets and emits a fail-closed campaign frontier state.",
+      ),
+      artifactRef(
+        NHM2_AXIS_ALIGNED_CAMPAIGN_FRONTIER_DISPOSITION,
+        "sha256:81e94004f0f6619e20606ff46d1b740818d63c497f5b7df401913737e666203b",
+        "Axis-aligned branch disposition: status=current_profile_rejected; worst=hull:T02; required suppression factor is about 2.244e15; physical and transport claims remain false.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "dynamic_campaign", "frontier_disposition", "momentum_density", "profile_rejection"],
+      symbols: ["frontierDisposition", "requiredSuppressionFactor", "T0i", "current_profile_rejected"],
+      unitSignatures: [],
+      repoPaths: [
+        "shared/contracts/nhm2-campaign-frontier-disposition.v1.ts",
+        "tools/nhm2/build-campaign-frontier-disposition.ts",
+        NHM2_AXIS_ALIGNED_CAMPAIGN_FRONTIER_DISPOSITION,
+      ],
+      equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
+      simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
     id: "nhm2.dynamic.time_dependent_source_campaign",
     title: "Time-Dependent Source Campaign",
     plainMeaning:
@@ -1311,13 +1578,33 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
       artifactRef(
         NHM2_AXIS_ALIGNED_TIME_DEPENDENT_SOURCE_CAMPAIGN,
-        "sha256:e8fbc9e7bcab18cd7fd62ce673b2d4116dc533451b0f50c148b48a53ba078ea1",
-        "Axis-aligned shear-suppressed candidate campaign: campaignPass=false; firstBlocker=momentum_density_causal_bound_frame_projection_missing; it removes the current-declared-source-model shear falsifier but requires a local orthonormal/projection receipt before the raw T0i/T00 ratio can become a causal-material bound conclusion.",
+        "sha256:060313d31e72a062701f87dc3683e88857799748aab469463f28827f68c4f63b",
+        "Axis-aligned shear-suppressed candidate campaign: campaignPass=false; firstBlocker=metric_momentum_current_profile_rejected_for_campaign; full tensor gate reports campaignFrontierDisposition=current_profile_rejected and metricMomentumWorstSuppression about 2.244e15.",
+      ),
+      artifactRef(
+        NHM2_AXIS_ALIGNED_CAMPAIGN_FRONTIER_DISPOSITION,
+        "sha256:81e94004f0f6619e20606ff46d1b740818d63c497f5b7df401913737e666203b",
+        "Campaign frontier disposition for the axis-aligned branch: current_profile_rejected under declared reduced-order projected momentum-demand evidence.",
+      ),
+      artifactRef(
+        NHM2_AXIS_ALIGNED_METRIC_REQUIRED_MOMENTUM_DEMAND_AUDIT,
+        "sha256:15a0ea6b9e0b0d67d65f5743f479faf8b4c7986ff12ef7f635fc2d8634da3364",
+        "Metric-required momentum demand audit for the axis-aligned branch: currentMetricProfileFalsified=true.",
+      ),
+      artifactRef(
+        NHM2_AXIS_ALIGNED_METRIC_MOMENTUM_REMEDIATION_TARGETS,
+        "sha256:67df41cb136244bfd83fd6f2a3e071345cd261d215382f1b62cd629cdd9f22da",
+        "Metric momentum remediation targets for the axis-aligned branch: worst required suppression factor is about 2.244e15 and nonResolvableForCurrentProfile=true.",
       ),
       artifactRef(
         NHM2_AXIS_ALIGNED_SOURCE_MOMENTUM_DENSITY_AUDIT,
         "sha256:7ee6ec82afd39cea39881b531a778a926f8f68d42b70b93790a570fa19452820",
         "Momentum-density audit for the axis-aligned branch: worst required amplification is about 2.02e22; worst metric-required momentum-to-energy ratio is about 2.24e15; the reduced-order causal material momentum-bound check is blocked pending local orthonormal/projection evidence.",
+      ),
+      artifactRef(
+        NHM2_AXIS_ALIGNED_MOMENTUM_FRAME_PROJECTION_RECEIPT,
+        "sha256:0ce246a39e55a2be0689f72e5780d0e763c77bc03c21d82496fe826b113c8138",
+        "Momentum frame projection receipt for the axis-aligned branch: projectionAvailable=true; causalBoundApplicabilityStatus=applicable; projected metric-required momentum ratio exceeds the reduced-order causal material bound.",
       ),
       artifactRef(
         NHM2_AXIS_ALIGNED_REGIONAL_MATERIAL_SOURCE_TENSOR_MODEL,
@@ -1347,6 +1634,8 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_TIME_DEPENDENT_SOURCE_CAMPAIGN,
         NHM2_AXIS_ALIGNED_SOURCE_OFF_DIAGONAL_SHEAR_AUDIT,
         NHM2_AXIS_ALIGNED_SOURCE_MOMENTUM_DENSITY_AUDIT,
+        NHM2_AXIS_ALIGNED_METRIC_MOMENTUM_REMEDIATION_TARGETS,
+        NHM2_AXIS_ALIGNED_CAMPAIGN_FRONTIER_DISPOSITION,
         NHM2_AXIS_ALIGNED_TIME_DEPENDENT_SOURCE_CAMPAIGN,
         NHM2_AXIS_ALIGNED_REGIONAL_MATERIAL_SOURCE_TENSOR_MODEL,
         NHM2_FULL_SOLVE_WHITEPAPER,
@@ -2839,12 +3128,44 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     claimBoundaryNote: "Missing shear-mechanism evidence is a diagnostic falsifier candidate, not a physical-source validation result.",
   },
   {
-    id: "source_momentum_density_audit_feeds_time_dependent_campaign",
+    id: "source_momentum_density_audit_feeds_frame_projection_receipt",
     from: "nhm2.source.momentum_density_audit",
+    to: "nhm2.source.momentum_frame_projection_receipt",
+    relation: "requires",
+    label: "The momentum audit supplies same-chart T0i/T00 ratios that require a local-frame projection receipt before causal-bound interpretation.",
+    claimBoundaryNote: "A momentum audit alone cannot turn chart components into causal-material bound evidence.",
+  },
+  {
+    id: "momentum_frame_projection_receipt_feeds_metric_required_momentum_demand_audit",
+    from: "nhm2.source.momentum_frame_projection_receipt",
+    to: "nhm2.metric_required.momentum_demand_audit",
+    relation: "requires",
+    label: "The projection receipt supplies local-frame momentum ratios for the metric-required momentum demand audit.",
+    claimBoundaryNote: "Projection evidence remains diagnostic and does not validate a physical source or transport claim.",
+  },
+  {
+    id: "metric_required_momentum_demand_audit_feeds_remediation_targets",
+    from: "nhm2.metric_required.momentum_demand_audit",
+    to: "nhm2.metric_required.momentum_remediation_targets",
+    relation: "requires",
+    label: "The metric-required momentum demand audit supplies the projected T0i ratios used to compute current-profile remediation targets.",
+    claimBoundaryNote: "A remediation target is scoped to this profile and does not validate a redesigned metric.",
+  },
+  {
+    id: "metric_momentum_remediation_targets_feed_campaign_frontier_disposition",
+    from: "nhm2.metric_required.momentum_remediation_targets",
+    to: "nhm2.campaign.frontier_disposition",
+    relation: "documents",
+    label: "The metric momentum remediation targets sharpen the campaign blocker into a typed current-profile frontier disposition.",
+    claimBoundaryNote: "A current-profile falsifier is scoped to the declared projection evidence and is not a universal no-go theorem.",
+  },
+  {
+    id: "campaign_frontier_disposition_feeds_time_dependent_campaign",
+    from: "nhm2.campaign.frontier_disposition",
     to: "nhm2.dynamic.time_dependent_source_campaign",
     relation: "documents",
-    label: "The source-side momentum-density audit sharpens T0i failures inside the frozen time-dependent campaign.",
-    claimBoundaryNote: "Missing momentum-density mechanism evidence is a diagnostic falsifier candidate, not a physical-source validation result.",
+    label: "The campaign frontier disposition records whether the current profile is rejected before the campaign continues to downstream proof gates.",
+    claimBoundaryNote: "A disposition artifact does not validate a redesigned metric profile or physical transport claim.",
   },
   {
     id: "time_dependent_campaign_blocks_diagnostic_boundary",

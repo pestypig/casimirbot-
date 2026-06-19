@@ -19,7 +19,7 @@ const goalSession: AgentGoalSessionV1 = {
   loopRefs: ["loop:visual-mail", "loop:audio-translation"],
   constructRefs: ["live-answer:desktop"],
   contextFeeds: [
-    { feedId: "feed:visual", sourceKind: "visual_summaries", freshnessMs: 10_000 },
+    { feedId: "feed:visual", sourceKind: "visual_summaries", freshnessMs: 10_000, relevancePolicy: "same-source-or-goal-id", query: "frog frames" },
     { feedId: "feed:packet", sourceKind: "packet_traces", freshnessMs: 10_000 },
     { feedId: "feed:source-health", sourceKind: "source_health", freshnessMs: 60_000 },
     { feedId: "feed:translation", sourceKind: "translated_transcripts", freshnessMs: 10_000 },
@@ -62,9 +62,30 @@ describe("LiveAnswerReasoningCircuit", () => {
             contentRef: "microdeck-output:frog-classifier",
             sourceRefs: ["visual:screen-share"],
             loopRefs: ["loop:visual-mail"],
-            evidenceRefs: ["frame:frog-001", "microdeck-run:frog-classifier"],
+            evidenceRefs: ["frame:frog-001", "microdeck-run:frog-classifier", "agent_goal_feed:visual"],
             receiptRefs: ["receipt:frog-classifier"],
-            policyRefs: ["context_feed:visual_summaries", "allowed_actuator:query_visual_summaries"],
+            policyRefs: [
+              "context_feed:visual_summaries",
+              "agent_goal_context_feed:agent_goal_feed:visual",
+              "allowed_actuator:query_visual_summaries",
+              "agent_goal_allowed_actuator:query_visual_summaries",
+            ],
+            requestedToolName: "visual_preset",
+            canonicalToolName: "live_env.set_visual_preset",
+            matchedAllowedActuators: ["set_visual_preset"],
+            matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:set_visual_preset"],
+            packetCircuitRefs: [{
+              updateId: "goal-update:visual-frog",
+              contentRef: "microdeck-output:frog-classifier",
+              packetRefs: ["stage_play_processed_mail_packet:frog-001"],
+              microDeckRefs: ["microdeck-run:frog-classifier"],
+              sourceRefs: ["visual:screen-share"],
+              loopRefs: ["loop:visual-mail"],
+              receiptRefs: ["receipt:frog-classifier"],
+              freshnessStatus: "fresh",
+              assistantAnswer: false,
+              terminalEligible: false,
+            }],
             dispatch: [
               "narrator bind translated transcript",
               "wake interrupt",
@@ -97,6 +118,22 @@ describe("LiveAnswerReasoningCircuit", () => {
             evidenceRefs: ["projection:bad-terminal"],
             receiptRefs: ["receipt:bad-terminal"],
             policyRefs: [],
+            requestedToolName: null,
+            canonicalToolName: null,
+            matchedAllowedActuators: [],
+            matchedAllowedActuatorRefs: [],
+            packetCircuitRefs: [{
+              updateId: "goal-update:bad-terminal-projection",
+              contentRef: "live-answer-projection:bad-terminal",
+              packetRefs: [],
+              microDeckRefs: [],
+              sourceRefs: ["live-answer:desktop"],
+              loopRefs: ["loop:projection"],
+              receiptRefs: ["receipt:bad-terminal"],
+              freshnessStatus: "blocked",
+              assistantAnswer: true,
+              terminalEligible: true,
+            }],
             dispatch: ["update live answer"],
             packetColorKey: "live-answer-projection:bad-terminal",
             freshness: {
@@ -122,6 +159,22 @@ describe("LiveAnswerReasoningCircuit", () => {
             evidenceRefs: ["stage_play_live_source_watch_job_policy:ui"],
             receiptRefs: ["stage_play_live_source_watch_job_policy:ui"],
             policyRefs: ["workstation_context_feed:automation_policies", "workstation_actuator:set_loop_state"],
+            requestedToolName: "live_env.set_workstation_loop_state",
+            canonicalToolName: "live_env.set_workstation_loop_state",
+            matchedAllowedActuators: ["set_loop_state"],
+            matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:set_loop_state"],
+            packetCircuitRefs: [{
+              updateId: "goal-update:automation-policy",
+              contentRef: "stage_play_live_source_watch_job_policy:ui",
+              packetRefs: [],
+              microDeckRefs: [],
+              sourceRefs: ["visual:screen-share"],
+              loopRefs: ["stage_play_live_source_watch_job:ui"],
+              receiptRefs: ["stage_play_live_source_watch_job_policy:ui"],
+              freshnessStatus: "fresh",
+              assistantAnswer: false,
+              terminalEligible: false,
+            }],
             dispatch: ["set loop state running"],
             packetColorKey: "stage_play_live_source_watch_job_policy:ui",
             freshness: {
@@ -144,6 +197,9 @@ describe("LiveAnswerReasoningCircuit", () => {
           narratorSpeechCount: 0,
           narratorBindingCount: 1,
           wakeCount: 1,
+          wakeUrgentCount: 1,
+          wakeBlockedCount: 0,
+          wakePolicyTriggeredCount: 0,
           workstationControlDispatchCount: 6,
           presetDispatchCount: 1,
           sourceBindingDispatchCount: 1,
@@ -159,8 +215,8 @@ describe("LiveAnswerReasoningCircuit", () => {
           feedQueryCount: 7,
           routeWatchCount: 0,
           automationCount: 2,
-          feedPolicyRefCount: 2,
-          actuatorPolicyRefCount: 2,
+          feedPolicyRefCount: 3,
+          actuatorPolicyRefCount: 3,
           actuatorPolicyCount: 5,
           narratorEventFeedCount: 1,
           narratorActuatorPolicyCount: 1,
@@ -177,17 +233,27 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getAllByTestId("live-answer-goal-context-row")[0]).toHaveTextContent("microdeck-output:frog-classifier");
     expect(screen.getAllByTestId("live-answer-goal-context-refs")[0]).toHaveTextContent("sources=visual:screen-share");
     expect(screen.getAllByTestId("live-answer-goal-context-refs")[0]).toHaveTextContent("loops=loop:visual-mail");
-    expect(screen.getAllByTestId("live-answer-goal-context-refs")[0]).toHaveTextContent("evidence=frame:frog-001, microdeck-run:frog-classifier");
+    expect(screen.getAllByTestId("live-answer-goal-context-refs")[0]).toHaveTextContent("evidence=frame:frog-001, microdeck-run:frog-classifier, agent_goal_feed:visual");
     expect(screen.getAllByTestId("live-answer-goal-context-refs")[0]).toHaveTextContent("receipts=receipt:frog-classifier");
-    expect(screen.getAllByTestId("live-answer-goal-context-policy-refs")[0]).toHaveTextContent("policy=context_feed:visual_summaries, allowed_actuator:query_visual_summaries");
+    expect(screen.getAllByTestId("live-answer-goal-context-policy-refs")[0]).toHaveTextContent("policy=context_feed:visual_summaries, agent_goal_context_feed:agent_goal_feed:visual, allowed_actuator:query_visual_summaries, agent_goal_allowed_actuator:query_visual_summaries");
     expect(screen.getAllByTestId("live-answer-goal-context-policy-refs")[1]).toHaveTextContent("policy=none");
     expect(screen.getAllByTestId("live-answer-goal-context-policy-refs")[2]).toHaveTextContent("policy=workstation_context_feed:automation_policies, workstation_actuator:set_loop_state");
-    expect(screen.getAllByTestId("live-answer-goal-context-policy-split")[0]).toHaveTextContent("feeds=context_feed:visual_summaries; actuators=allowed_actuator:query_visual_summaries");
+    expect(screen.getAllByTestId("live-answer-goal-context-policy-split")[0]).toHaveTextContent("feeds=context_feed:visual_summaries, agent_goal_context_feed:agent_goal_feed:visual; actuators=allowed_actuator:query_visual_summaries, agent_goal_allowed_actuator:query_visual_summaries");
     expect(screen.getAllByTestId("live-answer-goal-context-policy-split")[1]).toHaveTextContent("feeds=none; actuators=none");
     expect(screen.getAllByTestId("live-answer-goal-context-policy-split")[2]).toHaveTextContent("feeds=workstation_context_feed:automation_policies; actuators=workstation_actuator:set_loop_state");
+    expect(screen.getAllByTestId("live-answer-goal-context-tool-identity")[0]).toHaveTextContent("tool=visual_preset -> live_env.set_visual_preset; matched=set_visual_preset; matchedRefs=agent_goal_allowed_actuator:set_visual_preset");
+    expect(screen.getAllByTestId("live-answer-goal-context-tool-identity")[1]).toHaveTextContent("tool=none; matched=none; matchedRefs=none");
+    expect(screen.getAllByTestId("live-answer-goal-context-tool-identity")[2]).toHaveTextContent("tool=live_env.set_workstation_loop_state; matched=set_loop_state; matchedRefs=agent_goal_allowed_actuator:set_loop_state");
     expect(screen.getAllByTestId("live-answer-goal-context-freshness")[0]).toHaveTextContent("freshness=fresh observed=1781736210000 staleAfter=30000ms");
     expect(screen.getAllByTestId("live-answer-goal-context-freshness")[1]).toHaveTextContent("freshness=blocked observed=1781736211000 staleAfter=unbounded");
     expect(screen.getAllByTestId("live-answer-goal-context-freshness")[2]).toHaveTextContent("freshness=fresh observed=1781736212000 staleAfter=120000ms");
+    expect(screen.getAllByTestId("live-answer-packet-circuit-refs")[0]).toHaveTextContent("update=goal-update:visual-frog");
+    expect(screen.getAllByTestId("live-answer-packet-circuit-refs")[0]).toHaveTextContent("content=microdeck-output:frog-classifier");
+    expect(screen.getAllByTestId("live-answer-packet-circuit-refs")[0]).toHaveTextContent("packets=stage_play_processed_mail_packet:frog-001");
+    expect(screen.getAllByTestId("live-answer-packet-circuit-refs")[0]).toHaveTextContent("microDecks=microdeck-run:frog-classifier");
+    expect(screen.getAllByTestId("live-answer-packet-circuit-refs")[0]).toHaveTextContent("terminal=false assistant=false freshness=fresh");
+    expect(screen.getAllByTestId("live-answer-packet-circuit-refs")[1]).toHaveTextContent("terminal=true assistant=true freshness=blocked");
+    expect(screen.getAllByTestId("live-answer-packet-circuit-refs")[2]).toHaveTextContent("packets=none");
     expect(screen.getAllByTestId("live-answer-packet-color-key")[0]).toHaveTextContent("packet-color=stage_play_processed_mail_packet:frog-001");
     expect(screen.getAllByTestId("live-answer-packet-color-key")[1]).toHaveTextContent("packet-color=live-answer-projection:bad-terminal");
     expect(screen.getAllByTestId("live-answer-packet-color-key")[2]).toHaveTextContent("packet-color=stage_play_live_source_watch_job_policy:ui");
@@ -233,8 +299,8 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getByTestId("live-answer-packet-trace-count")).toHaveTextContent("2 packet traces");
     expect(screen.getByTestId("live-answer-source-health-count")).toHaveTextContent("2 source health");
     expect(screen.getByTestId("live-answer-feed-query-count")).toHaveTextContent("7 feed queries");
-    expect(screen.getByTestId("live-answer-feed-policy-ref-count")).toHaveTextContent("2 feed policy refs");
-    expect(screen.getByTestId("live-answer-actuator-policy-ref-count")).toHaveTextContent("2 actuator policy refs");
+    expect(screen.getByTestId("live-answer-feed-policy-ref-count")).toHaveTextContent("3 feed policy refs");
+    expect(screen.getByTestId("live-answer-actuator-policy-ref-count")).toHaveTextContent("3 actuator policy refs");
     expect(screen.getByTestId("live-answer-route-watch-count")).toHaveTextContent("0 route watch");
     expect(screen.getByTestId("live-answer-automation-count")).toHaveTextContent("2 automations");
     expect(screen.getByTestId("live-answer-actuator-policy-count")).toHaveTextContent("5 actuator policies");
@@ -257,8 +323,8 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("packet_traces=2");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("source_health=2");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("feed_queries=7");
-    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("feed_policy_refs=2");
-    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("actuator_policy_refs=2");
+    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("feed_policy_refs=3");
+    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("actuator_policy_refs=3");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("trace_memory=2");
     expect(screen.getByTestId("live-answer-control-dispatch-breakdown")).toHaveTextContent("control_dispatches=6");
     expect(screen.getByTestId("live-answer-control-dispatch-breakdown")).toHaveTextContent("preset=1");
@@ -268,6 +334,7 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getByTestId("live-answer-control-dispatch-breakdown")).toHaveTextContent("graph=1");
     expect(screen.getByTestId("live-answer-control-dispatch-breakdown")).toHaveTextContent("narrator=1");
     expect(screen.getByTestId("live-answer-control-dispatch-breakdown")).toHaveTextContent("wake_interrupts=1");
+    expect(screen.getByTestId("live-answer-wake-interrupt-scope")).toHaveTextContent("wake_scope urgent=1 blocked=0 policy_triggered=0");
     expect(screen.getByTestId("live-answer-agent-goal-session")).toHaveTextContent("active / 6 feeds");
     expect(screen.getByTestId("live-answer-agent-goal-policy")).toHaveTextContent("Monitor visual and translated audio feeds.");
     expect(screen.getByTestId("live-answer-agent-goal-final-authority")).toHaveTextContent("finalAuthority=true");
@@ -276,6 +343,31 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getByTestId("live-answer-agent-goal-actuators")).toHaveTextContent("actuators=query visual summaries, query packet traces, query source health, query translation segments, narrator bind stream");
     expect(screen.getByTestId("live-answer-agent-goal-stop")).toHaveTextContent("stop=operator stops monitoring");
     expect(screen.getByTestId("live-answer-agent-goal-checkpoint")).toHaveTextContent("checkpoint=Narrator stream is bound to translated transcript evidence.");
+    expect(screen.getByTestId("live-answer-context-feed-index")).toHaveTextContent("Context feed index");
+    expect(screen.getByTestId("live-answer-context-feed-index")).toHaveTextContent("Session feed lanes map to query tools as non-terminal evidence inputs.");
+    expect(screen.getByTestId("live-answer-context-feed-index-count")).toHaveTextContent("6 lanes");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[0]).toHaveTextContent("visual summaries");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[0]).toHaveTextContent("feed=feed:visual");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[0]).toHaveTextContent("queryTool=query_visual_summaries");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[0]).toHaveTextContent("policy=allowed");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[0]).toHaveTextContent("feedRef=agent_goal_context_feed:feed:visual");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[0]).toHaveTextContent("actuatorRef=agent_goal_allowed_actuator:query_visual_summaries");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[0]).toHaveTextContent("freshness=10000ms");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[0]).toHaveTextContent("relevance=same-source-or-goal-id");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[0]).toHaveTextContent("query=frog frames");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[3]).toHaveTextContent("translated transcripts");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[3]).toHaveTextContent("queryTool=query_translation_segments");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[3]).toHaveTextContent("actuatorRef=agent_goal_allowed_actuator:query_translation_segments");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[4]).toHaveTextContent("narrator events");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[4]).toHaveTextContent("queryTool=query_narrator_events");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[4]).toHaveTextContent("policy=not allowed");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[4]).toHaveTextContent("feedRef=agent_goal_context_feed:feed:narrator-events");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[4]).toHaveTextContent("actuatorRef=none");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[5]).toHaveTextContent("automation policies");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[5]).toHaveTextContent("queryTool=query_automation_policies");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[5]).toHaveTextContent("policy=not allowed");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[5]).toHaveTextContent("feedRef=agent_goal_context_feed:feed:automation");
+    expect(screen.getAllByTestId("live-answer-context-feed-lane")[5]).toHaveTextContent("actuatorRef=none");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent(
       "Wake is only an interrupt dispatch. Receipts, MicroDeck outputs, narrator bindings, and panel projections stay evidence until the completed solver path selects a terminal answer.",
     );

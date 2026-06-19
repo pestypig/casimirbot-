@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { WORKSTATION_AGENT_GOAL_CONTEXT_FEED_QUERY_ACTUATORS } from "@shared/contracts/workstation-goal-context.v1";
+import { explicitCapabilityContractForCapability } from "../services/helix-ask/explicit-capability-contract";
 import {
   TOOL_FAMILY_CONTRACTS,
   TOOL_FAMILY_DEFAULT_CONTRACTS,
@@ -7,6 +9,7 @@ import {
   type ToolFamily,
 } from "../services/helix-ask/tool-family-contract";
 import { evaluateToolFamilyTerminalPolicy } from "../services/helix-ask/tool-family-terminal-policy";
+import { WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS } from "../services/helix-ask/workstation-context-feed-query-tool-contracts";
 
 const routeContract = (allowed: string[], forbidden: string[] = []) => ({
   schema: "helix.route_product_contract.v1",
@@ -58,6 +61,7 @@ describe("Helix Ask tool-family contract registry", () => {
       ["live_env.query_live_source_quality", "live_source_mail", "evidence_only"],
       ["live_env.summarize_live_source_current_state", "live_source_mail", "evidence_only"],
       ["live_env.query_trace_memory", "live_source_mail", "evidence_only"],
+      ["live_env.evaluate_goal_satisfaction", "live_source_mail", "evidence_only"],
       ["live_env.query_packet_traces", "live_source_mail", "evidence_only"],
       ["live_env.query_visual_summaries", "live_source_mail", "evidence_only"],
       ["live_env.query_audio_transcripts", "live_source_mail", "evidence_only"],
@@ -70,6 +74,8 @@ describe("Helix Ask tool-family contract registry", () => {
       ["live_env.configure_route_watch", "live_source_mail", "control_receipt"],
       ["live_env.configure_live_source_watch_job", "live_source_mail", "control_receipt"],
       ["live_env.change_workstation_preset", "live_source_mail", "control_receipt"],
+      ["live_env.set_visual_preset", "live_source_mail", "control_receipt"],
+      ["live_env.set_audio_preset", "live_source_mail", "control_receipt"],
       ["live_env.bind_workstation_source", "live_source_mail", "control_receipt"],
       ["live_env.unbind_workstation_source", "live_source_mail", "control_receipt"],
       ["live_env.pause_workstation_loop", "live_source_mail", "control_receipt"],
@@ -110,6 +116,61 @@ describe("Helix Ask tool-family contract registry", () => {
         defaultTerminalEligible: false,
         defaultRawContentIncluded: false,
       });
+    }
+  });
+
+  it("derives workstation context-feed query contracts from the canonical feed actuator map", () => {
+    const specsByFeed = new Map(WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS.map((spec) => [spec.feedKind, spec]));
+
+    expect([...specsByFeed.keys()].sort()).toEqual(Object.keys(WORKSTATION_AGENT_GOAL_CONTEXT_FEED_QUERY_ACTUATORS).sort());
+
+    for (const [feedKind, actuator] of Object.entries(WORKSTATION_AGENT_GOAL_CONTEXT_FEED_QUERY_ACTUATORS)) {
+      const spec = specsByFeed.get(feedKind as keyof typeof WORKSTATION_AGENT_GOAL_CONTEXT_FEED_QUERY_ACTUATORS);
+
+      expect(spec).toBeDefined();
+      expect(spec).toMatchObject({
+        feedKind,
+        actuator,
+        capability: `live_env.${actuator}`,
+      });
+      expect(spec?.label).toEqual(expect.any(String));
+      expect(spec?.label.length).toBeGreaterThan(0);
+      expect(spec?.plannerExpectedReceiptKind).toEqual(expect.any(String));
+      expect(spec?.plannerExpectedReceiptKind.length).toBeGreaterThan(0);
+
+      const familyContract = resolveToolFamilyContract({ toolName: spec?.capability });
+      expect(familyContract).toMatchObject({
+        toolName: spec?.capability,
+        toolFamily: "live_source_mail",
+        authority: "evidence_only",
+        mutating: false,
+        allowedTerminalKinds: ["model_synthesized_answer"],
+        requiredReentry: true,
+        requiresGoalSatisfaction: true,
+        defaultAssistantAnswer: false,
+        defaultTerminalEligible: false,
+        defaultRawContentIncluded: false,
+      });
+      expect(familyContract?.requiredObservationKinds).toEqual(spec?.toolFamilyRequiredObservationKinds);
+      expect(familyContract?.aliases).toEqual(spec?.aliases);
+
+      const explicitContract = explicitCapabilityContractForCapability(spec?.capability);
+      expect(explicitContract).toMatchObject({
+        capability: spec?.capability,
+        capability_family: "live_environment",
+        plan_family: "live_environment",
+        source_target: "live_environment",
+        admission_families: ["live_environment"],
+        required_terminal_kind: "model_synthesized_answer",
+        allowed_substitutions: [],
+      });
+      expect(explicitContract?.aliases).toEqual(spec?.aliases);
+      expect(explicitContract?.required_observation_kinds).toEqual([
+        "live_environment_tool_observation",
+        spec?.explicitRequiredObservationKind,
+        "helix.workstation_goal_context_update.v1",
+      ]);
+      expect(explicitCapabilityContractForCapability(actuator)?.capability).toBe(spec?.capability);
     }
   });
 
@@ -201,6 +262,8 @@ describe("Helix Ask tool-family contract registry", () => {
       ["live_env.query_narrator_events", "narrator_bindings"],
       ["live_env.query_packet_traces", "packet_traces"],
       ["live_env.query_workstation_goal_context", "route_evidence"],
+      ["live_env.evaluate_goal_satisfaction", "helix.live_environment_goal_satisfaction.v1"],
+      ["live_env.evaluate_goal_satisfaction", "goal_satisfaction"],
       ["live_env.query_route_evidence", "stage_play_workstation_context_feed_query_result.v1"],
       ["live_env.query_route_evidence", "route_evidence"],
       ["live_env.query_route_evidence", "automation_policies"],

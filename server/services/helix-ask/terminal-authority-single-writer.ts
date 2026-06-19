@@ -639,25 +639,65 @@ export const applyTerminalProjectionKindGuard = (
     };
   }
 
+  const typedFailure = readRecord(payload.typed_failure);
+  const railFailure = readTerminalBlockingToolRailFailure(payload);
+  const failureCodeCandidates = [
+    readString(payload.terminal_error_code) ??
+      null,
+    readString(typedFailure?.error_code) ?? null,
+    railFailure?.railFailureCode ?? null,
+  ];
+  const specificFailureCode =
+    failureCodeCandidates.find((code) => code && code !== "terminal_projection_mismatch") ??
+    failureCodeCandidates.find((code) => Boolean(code));
+  const failureCode =
+    specificFailureCode && specificFailureCode !== "terminal_projection_mismatch"
+      ? specificFailureCode
+      : "terminal_projection_mismatch";
+  const typedFailureText =
+    readString(payload.terminal_failure_text) ??
+    readString(typedFailure?.answer_text) ??
+    readString(typedFailure?.text) ??
+    readString(typedFailure?.message) ??
+    readString(result.visible_text);
+  const typedFailureTextIsGenericProjectionMismatch =
+    typedFailureText === TERMINAL_PROJECTION_MISMATCH_TEXT ||
+    /terminal authority and visible projection selected different artifacts/i.test(typedFailureText ?? "");
+  const resultVisibleText = readString(result.visible_text);
+  const resultVisibleTextIsGenericProjectionMismatch =
+    resultVisibleText === TERMINAL_PROJECTION_MISMATCH_TEXT ||
+    /terminal authority and visible projection selected different artifacts/i.test(resultVisibleText ?? "");
+  const nonGenericExistingFailureText =
+    typedFailureText && !typedFailureTextIsGenericProjectionMismatch
+      ? typedFailureText
+      : resultVisibleText && !resultVisibleTextIsGenericProjectionMismatch
+        ? resultVisibleText
+        : null;
+  const failureText =
+    failureCode === "terminal_projection_mismatch"
+      ? TERMINAL_PROJECTION_MISMATCH_TEXT
+      : nonGenericExistingFailureText ??
+        `I could not produce a terminal answer because the requested tool rail did not complete. Cause: ${failureCode}.`;
+
   payload.ok = false;
   payload.response_type = "final_failure";
   payload.final_status = "final_failure";
   payload.status = "final_failure";
   payload.final_answer_source = "typed_failure";
   payload.terminal_artifact_kind = "typed_failure";
-  payload.terminal_error_code = "terminal_projection_mismatch";
-  payload.terminal_failure_text = TERMINAL_PROJECTION_MISMATCH_TEXT;
-  payload.selected_final_answer = TERMINAL_PROJECTION_MISMATCH_TEXT;
-  payload.answer = TERMINAL_PROJECTION_MISMATCH_TEXT;
-  payload.text = TERMINAL_PROJECTION_MISMATCH_TEXT;
-  payload.assistant_answer = TERMINAL_PROJECTION_MISMATCH_TEXT;
+  payload.terminal_error_code = failureCode;
+  payload.terminal_failure_text = failureText;
+  payload.selected_final_answer = failureText;
+  payload.answer = failureText;
+  payload.text = failureText;
+  payload.assistant_answer = failureText;
   payload.typed_failure = {
-    ...(readRecord(payload.typed_failure) ?? {}),
+    ...(typedFailure ?? {}),
     schema: "helix.typed_failure.v1",
-    error_code: "terminal_projection_mismatch",
-    message: TERMINAL_PROJECTION_MISMATCH_TEXT,
-    text: TERMINAL_PROJECTION_MISMATCH_TEXT,
-    answer_text: TERMINAL_PROJECTION_MISMATCH_TEXT,
+    error_code: failureCode,
+    message: failureText,
+    text: failureText,
+    answer_text: failureText,
     assistant_answer: false,
     raw_content_included: false,
   };
@@ -666,7 +706,7 @@ export const applyTerminalProjectionKindGuard = (
     schema: "helix.terminal_presentation.v1",
     turn_id: result.turn_id,
     terminal_artifact_kind: "typed_failure",
-    concise_text: TERMINAL_PROJECTION_MISMATCH_TEXT,
+    concise_text: failureText,
     assistant_answer: false,
     raw_content_included: false,
   };
@@ -677,8 +717,8 @@ export const applyTerminalProjectionKindGuard = (
     terminal_kind: "failure",
     final_answer_source: "typed_failure",
     terminal_artifact_kind: "typed_failure",
-    terminal_text_preview: TERMINAL_PROJECTION_MISMATCH_TEXT,
-    terminal_text_hash: hashHelixTerminalText(TERMINAL_PROJECTION_MISMATCH_TEXT),
+    terminal_text_preview: failureText,
+    terminal_text_hash: hashHelixTerminalText(failureText),
     server_authoritative: true,
     assistant_answer: false,
     raw_content_included: false,
@@ -689,25 +729,25 @@ export const applyTerminalProjectionKindGuard = (
       ...summary,
       final_status: "final_failure",
       terminal_artifact_kind: "typed_failure",
-      terminal_error_code: "terminal_projection_mismatch",
+      terminal_error_code: failureCode,
       final_answer_source: "typed_failure",
     };
   }
   return {
     ...result,
     selectedArtifactKind: "typed_failure",
-    selectedArtifactRef: `typed_failure:${textHash(`${result.turn_id}:${TERMINAL_PROJECTION_MISMATCH_TEXT}`)}`,
+    selectedArtifactRef: `typed_failure:${textHash(`${result.turn_id}:${failureText}`)}`,
     selected_terminal_artifact_kind: "typed_failure",
-    selected_terminal_artifact_ref: `typed_failure:${textHash(`${result.turn_id}:${TERMINAL_PROJECTION_MISMATCH_TEXT}`)}`,
-    visible_text: TERMINAL_PROJECTION_MISMATCH_TEXT,
+    selected_terminal_artifact_ref: `typed_failure:${textHash(`${result.turn_id}:${failureText}`)}`,
+    visible_text: failureText,
     source: "typed_failure",
     writes: {
-      payload_text: TERMINAL_PROJECTION_MISMATCH_TEXT,
-      payload_answer: TERMINAL_PROJECTION_MISMATCH_TEXT,
-      payload_assistant_answer: TERMINAL_PROJECTION_MISMATCH_TEXT,
-      payload_selected_final_answer: TERMINAL_PROJECTION_MISMATCH_TEXT,
-      terminal_presentation_concise_text: TERMINAL_PROJECTION_MISMATCH_TEXT,
-      debug_selected_final_answer: TERMINAL_PROJECTION_MISMATCH_TEXT,
+      payload_text: failureText,
+      payload_answer: failureText,
+      payload_assistant_answer: failureText,
+      payload_selected_final_answer: failureText,
+      terminal_presentation_concise_text: failureText,
+      debug_selected_final_answer: failureText,
     },
     integrity: {
       ...result.integrity,

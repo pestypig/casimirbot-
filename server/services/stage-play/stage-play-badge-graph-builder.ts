@@ -51,8 +51,10 @@ import {
 } from "./stage-play-goal-context-store";
 import type {
   AgentGoalSessionV1,
+  WorkstationDispatchActionV1,
   WorkstationGoalContextUpdateV1,
 } from "@shared/contracts/workstation-goal-context.v1";
+import { queryActuatorForAgentGoalContextFeedV1 } from "@shared/contracts/workstation-goal-context.v1";
 
 export type BuildStagePlayGraphFromWorldInput = {
   threadId: string;
@@ -1325,6 +1327,9 @@ const statePlaneDeckPromptBadgeId = (promptId: string): string =>
 const goalContextUpdateBadgeId = (updateId: string): string =>
   `goal_context_update.${hashShort(updateId, 12)}`;
 
+const workstationDispatchBadgeId = (updateId: string, actionKind: string, index: number): string =>
+  `workstation_dispatch_action.${hashShort([updateId, actionKind, index], 12)}`;
+
 const agentGoalSessionBadgeId = (goalId: string): string =>
   `agent_goal_session.${hashShort(goalId, 12)}`;
 
@@ -1338,6 +1343,99 @@ const packetRoutesToOutput = (recommendedNext: string): boolean =>
   recommendedNext === "record_interpretation" ||
   recommendedNext === "draft_text_answer" ||
   recommendedNext === "request_voice_callout";
+
+const dispatchActionTarget = (
+  action: WorkstationDispatchActionV1,
+  refs: {
+    goalContextBusId: string;
+    processLoopId: string;
+    outputBusId: string;
+    controlId: string;
+  },
+): { badgeId: string; relation: StagePlayBadgeEdgeRelationV1; label: string; reasonCodes: string[] } => {
+  if (
+    action.kind === "update_live_answer" ||
+    action.kind === "speak_narrator" ||
+    action.kind === "bind_narrator_stream"
+  ) {
+    return {
+      badgeId: refs.outputBusId,
+      relation: "feeds",
+      label: "dispatch action feeds output bus",
+      reasonCodes: ["dispatch_action_feeds_output_bus", action.kind],
+    };
+  }
+  if (action.kind === "set_loop_state" || action.kind === "repair_loop") {
+    return {
+      badgeId: refs.processLoopId,
+      relation: "feeds",
+      label: "dispatch action updates process loop",
+      reasonCodes: ["dispatch_action_updates_process_loop", action.kind],
+    };
+  }
+  if (
+    action.kind === "change_preset" ||
+    action.kind === "bind_source" ||
+    action.kind === "unbind_source" ||
+    action.kind === "focus_process_graph" ||
+    action.kind === "ask_user" ||
+    action.kind === "wake_agent"
+  ) {
+    return {
+      badgeId: refs.controlId,
+      relation: action.kind === "wake_agent" ? "recommends" : "feeds",
+      label: action.kind === "wake_agent"
+        ? "classified interrupt dispatch is one control signal"
+        : "dispatch action feeds control signals",
+      reasonCodes: [
+        action.kind === "wake_agent" ? "wake_demoted_to_interrupt_dispatch" : "dispatch_action_feeds_control",
+        action.kind,
+      ],
+    };
+  }
+  return {
+    badgeId: refs.goalContextBusId,
+    relation: "feeds",
+    label: "dispatch action feeds goal-context bus",
+    reasonCodes: ["dispatch_action_feeds_goal_context_bus", action.kind],
+  };
+};
+
+const dispatchActionRefs = (action: WorkstationDispatchActionV1): string[] => {
+  switch (action.kind) {
+    case "log_receipt":
+      return ["dispatch:log_receipt", action.receiptRef ?? null].filter(isNonEmptyString);
+    case "update_live_answer":
+      return ["dispatch:update_live_answer", action.lineKey];
+    case "append_goal_context":
+      return ["dispatch:append_goal_context", action.goalId];
+    case "speak_narrator":
+      return ["dispatch:speak_narrator", `narrator_mode:${action.mode}`];
+    case "bind_narrator_stream":
+      return ["dispatch:bind_narrator_stream", action.sourceRef, `stream:${action.streamKind}`];
+    case "change_preset":
+      return ["dispatch:change_preset", action.targetRef, action.presetId];
+    case "bind_source":
+      return ["dispatch:bind_source", action.sourceRef, action.targetRef];
+    case "unbind_source":
+      return ["dispatch:unbind_source", action.sourceRef, action.targetRef ?? null].filter(isNonEmptyString);
+    case "set_loop_state":
+      return ["dispatch:set_loop_state", action.loopRef, `loop_state:${action.state}`];
+    case "update_panel":
+      return ["dispatch:update_panel", action.panelId];
+    case "focus_process_graph":
+      return ["dispatch:focus_process_graph", action.nodeRef ?? null].filter(isNonEmptyString);
+    case "repair_loop":
+      return ["dispatch:repair_loop", action.loopRef];
+    case "ask_user":
+      return ["dispatch:ask_user"];
+    case "wake_agent":
+      return ["dispatch:wake_agent", `interrupt:${action.interruptKind}`];
+    case "none":
+    default:
+      return ["dispatch:none"];
+  }
+};
 
 const addWorkstationStatePlaneBadges = (
   badges: StagePlayBadgeV1[],
@@ -1379,6 +1477,8 @@ const addWorkstationStatePlaneBadges = (
   const outputBadgeIds = badges
     .filter((entry) => entry.kind === "answer_snapshot" || entry.kind === "live_output" || entry.kind === "voice_output")
     .map((entry) => entry.id);
+  const answerSnapshotBadge = badges.find((entry) => entry.id === "answer_snapshot.latest");
+  const checkpointBadge = badges.find((entry) => entry.id === "helix_ask.checkpoint.latest");
   const controlBadgeIds = badges
     .filter((entry) => entry.kind === "checkpoint_request" || entry.kind === "perturbation")
     .map((entry) => entry.id);
@@ -1389,6 +1489,50 @@ const addWorkstationStatePlaneBadges = (
   const packetRefs = input.microReasoners.packets.map((packet) => packet.packetId);
   const goalContextRefs = input.goalContextUpdates.map((update) => update.updateId);
   const agentGoalRefs = input.agentGoalSessions.map((session) => session.goalId);
+  const terminalAuthorityRequiredCount = input.agentGoalSessions.filter((session) =>
+    session.authority.finalReportsRequireTerminalAuthority
+  ).length;
+  const nonTerminalGoalContextCount = input.goalContextUpdates.filter((update) =>
+    update.authority.assistantAnswer === false &&
+    update.authority.terminalEligible === false &&
+    update.authority.rawContentIncluded === false
+  ).length;
+  const terminalAuthorityReady = checkpointBadge?.status === "observed" && answerSnapshotBadge?.status === "observed";
+  const contextFeedKinds = unique(input.agentGoalSessions.flatMap((session) =>
+    session.contextFeeds.map((feed) => feed.sourceKind)
+  ));
+  const contextFeedExpectedQueryRefs = unique(contextFeedKinds.map((feedKind) =>
+    `workstation_actuator:${queryActuatorForAgentGoalContextFeedV1(feedKind)}`
+  ));
+  const queryActuatorRefs = unique(input.agentGoalSessions.flatMap((session) =>
+    session.allowedActuators
+      .filter((actuator) => actuator.startsWith("query_"))
+      .map((actuator) => `allowed_actuator:${actuator}`)
+  ));
+  const contextFeedPolicyRefs = unique([
+    ...contextFeedKinds.map((feedKind) => `context_feed:${feedKind}`),
+    ...queryActuatorRefs,
+    ...input.goalContextUpdates.flatMap((update) => [
+      ...update.evidenceRefs,
+      ...update.receiptRefs,
+      ...update.loopRefs,
+    ]).filter((ref) =>
+      ref.startsWith("context_feed:") ||
+      ref.startsWith("agent_goal_allowed_actuator:") ||
+      ref.startsWith("allowed_actuator:query_") ||
+      ref.startsWith("workstation_context_feed:") ||
+      ref.startsWith("workstation_actuator:query_") ||
+      ref.startsWith("stage_play_context_feed_query:")
+    ),
+  ]);
+  const contextFeedQueryReceiptRefs = unique(input.goalContextUpdates.flatMap((update) => [
+    ...update.evidenceRefs,
+    ...update.receiptRefs,
+  ]).filter((ref) =>
+    ref.startsWith("stage_play_context_feed_query:") ||
+    ref.includes("workstation_reasoning_trace_query_result") ||
+    ref.includes("situation_source_capability_read")
+  ));
   const statePlaneEvidenceRefs = unique([
     input.graphId,
     ...input.evidenceRefs,
@@ -1624,6 +1768,85 @@ const addWorkstationStatePlaneBadges = (
     admission: "auto",
   }));
 
+  const terminalAuthorityId = pushBadge(badges, badge({
+    id: "workstation_state_plane.terminal_authority",
+    title: "Terminal authority",
+    plainMeaning: terminalAuthorityReady
+      ? "A completed solver checkpoint has selected the current terminal answer snapshot."
+      : "No current terminal answer has been selected by a completed solver path.",
+    whyItMatters: "This makes the final-answer boundary visible: packets, receipts, MicroDeck outputs, narrator events, and panel projections remain observations until terminal authority selects an answer.",
+    kind: "workstation_state_plane",
+    status: terminalAuthorityReady ? "observed" : terminalAuthorityRequiredCount > 0 || nonTerminalGoalContextCount > 0 ? "blocked" : "candidate",
+    subjects: unique([
+      checkpointBadge?.id ?? null,
+      answerSnapshotBadge?.id ?? null,
+      ...agentGoalRefs.slice(0, 8),
+      ...goalContextRefs.slice(0, 8),
+    ].filter(isNonEmptyString)),
+    tags: [
+      "workstation_state_plane",
+      "terminal_authority",
+      terminalAuthorityReady ? "completed_solver_path" : "awaiting_completed_solver_path",
+      terminalAuthorityRequiredCount > 0 ? "goal_sessions_require_terminal_authority" : "goal_session_policy_pending",
+      "receipts_not_answers",
+    ],
+    sourceRefs: statePlaneSourceRefs,
+    evidenceRefs: unique([
+      ...statePlaneEvidenceRefs,
+      checkpointBadge?.id,
+      answerSnapshotBadge?.id,
+      ...goalContextRefs,
+      ...agentGoalRefs,
+    ].filter(isNonEmptyString)),
+    confidence: terminalAuthorityReady ? 0.86 : terminalAuthorityRequiredCount > 0 || nonTerminalGoalContextCount > 0 ? 0.72 : 0.48,
+    missingEvidence: terminalAuthorityReady
+      ? []
+      : [
+          "Completed solver path must select a terminal answer before output projections become answer authority.",
+          ...(terminalAuthorityRequiredCount > 0 ? [] : ["No active goal session currently requires terminal authority for final reports."]),
+        ],
+    reasonCodes: [
+      "terminal_authority_state",
+      terminalAuthorityReady ? "completed_solver_path_selects_answer" : "terminal_authority_pending",
+      "receipts_and_goal_context_are_observations",
+      "not_private_agent_runtime",
+    ],
+    dataTray: {
+      title: "Terminal authority",
+      summary: terminalAuthorityReady
+        ? "Completed solver checkpoint selected the current answer snapshot."
+        : `${nonTerminalGoalContextCount} non-terminal goal-context update(s); ${terminalAuthorityRequiredCount} goal session(s) require terminal authority.`,
+      updatedAt: input.generatedAt,
+      freshness: terminalAuthorityReady ? "fresh" : "missing",
+      confidence: terminalAuthorityReady ? 0.86 : 0.72,
+      evidenceRefs: unique([
+        ...goalContextRefs,
+        ...agentGoalRefs,
+        checkpointBadge?.id,
+        answerSnapshotBadge?.id,
+      ].filter(isNonEmptyString)),
+      inputRefs: unique([
+        gateId,
+        "workstation_state_plane.goal_context_bus",
+        checkpointBadge?.id,
+        ...goalContextRefs.slice(0, 6),
+      ].filter(isNonEmptyString)),
+      inputPreview: "Goal-context updates, receipts, narrator events, and output lanes are observations.",
+      transformLabel: "completed solver path / terminal authority boundary",
+      outputRefs: terminalAuthorityReady ? ["answer_snapshot.latest", "live_output.current"] : [],
+      outputPreview: terminalAuthorityReady ? "terminal answer selected" : "terminal answer pending",
+      skipped: [
+        "goal_context_updates",
+        "workstation_control_receipts",
+        "microdeck_outputs",
+        "narrator_events",
+        "panel_projections",
+      ],
+      blockedUntil: terminalAuthorityReady ? null : "completed solver path selects terminal answer",
+    },
+    admission: "auto",
+  }));
+
   const goalContextBusId = pushBadge(badges, badge({
     id: "workstation_state_plane.goal_context_bus",
     title: "Goal context bus",
@@ -1655,6 +1878,96 @@ const addWorkstationStatePlaneBadges = (
     },
     admission: "auto",
   }));
+
+  const contextFeedIndexId = pushBadge(badges, badge({
+    id: "workstation_state_plane.context_feed_index",
+    title: "Context feed index",
+    plainMeaning: "Active goal sessions declare queryable context feed lanes and the query actuators allowed to inspect them.",
+    whyItMatters: "This makes the agent/workstation split visible: the agent reads indexed feed evidence instead of hosting the continuous loop itself.",
+    kind: "workstation_state_plane",
+    status: contextFeedKinds.length > 0 || contextFeedPolicyRefs.length > 0 ? "observed" : "candidate",
+    subjects: unique([...contextFeedKinds, ...contextFeedExpectedQueryRefs, ...queryActuatorRefs, ...contextFeedQueryReceiptRefs]).slice(0, 18),
+    tags: [
+      "workstation_state_plane",
+      "context_feed_index",
+      "queryable_goal_context",
+      "agent_read_model",
+      "not_terminal_authority",
+    ],
+    sourceRefs: statePlaneSourceRefs,
+    evidenceRefs: unique([...contextFeedPolicyRefs, ...contextFeedQueryReceiptRefs, ...agentGoalRefs, ...goalContextRefs]),
+    confidence: contextFeedKinds.length > 0 || contextFeedPolicyRefs.length > 0 ? 0.8 : 0.46,
+    missingEvidence: contextFeedKinds.length > 0 || contextFeedPolicyRefs.length > 0
+      ? []
+      : ["No active goal session has declared queryable context feeds yet."],
+    reasonCodes: [
+      "context_feed_index",
+      "queryable_goal_context",
+      "agent_reads_deterministic_feeds",
+      "observation_not_terminal_authority",
+    ],
+    dataTray: {
+      title: "Context feed index",
+      summary: `${contextFeedKinds.length} feed lane(s), ${contextFeedExpectedQueryRefs.length} feed query actuator(s), ${queryActuatorRefs.length} allowed query actuator policy ref(s), ${contextFeedQueryReceiptRefs.length} query receipt ref(s).`,
+      updatedAt: input.generatedAt,
+      freshness: contextFeedKinds.length > 0 || contextFeedPolicyRefs.length > 0 ? "fresh" : "unknown",
+      confidence: contextFeedKinds.length > 0 || contextFeedPolicyRefs.length > 0 ? 0.8 : 0.46,
+      evidenceRefs: unique([...contextFeedPolicyRefs, ...contextFeedQueryReceiptRefs, ...agentGoalRefs, ...goalContextRefs]),
+      inputRefs: unique([...agentGoalRefs, ...goalContextRefs]).slice(0, 12),
+      inputPreview: contextFeedKinds.join(", ") || "no feed lanes declared",
+      transformLabel: "AgentGoalSession feeds -> query policy index",
+      outputRefs: unique([...contextFeedKinds.map((feedKind) => `context_feed:${feedKind}`), ...contextFeedExpectedQueryRefs, ...queryActuatorRefs]).slice(0, 16),
+      outputPreview: queryActuatorRefs.length > 0 ? `${queryActuatorRefs.length} query actuator(s) policy-bound` : "query actuator policy pending",
+      skipped: [
+        "assistant_answer=false",
+        "terminal_eligible=false",
+        "raw_content_included=false",
+      ],
+      blockedUntil: "completed solver path selects terminal answer",
+    },
+    admission: "auto",
+  }));
+
+  pushEdge(edges, {
+    from: gateId,
+    to: terminalAuthorityId,
+    relation: "constrains",
+    label: "gates constrain terminal authority",
+    evidenceRefs: statePlaneEvidenceRefs,
+    reasonCodes: ["gates_constrain_terminal_authority", terminalAuthorityReady ? "completed_solver_path" : "terminal_authority_pending"],
+  });
+  pushEdge(edges, {
+    from: goalContextBusId,
+    to: terminalAuthorityId,
+    relation: "needs_check",
+    label: "goal context requires terminal authority before final answer",
+    evidenceRefs: unique([...goalContextRefs, ...agentGoalRefs]),
+    reasonCodes: ["goal_context_requires_terminal_authority", "observations_not_answers"],
+  });
+  pushEdge(edges, {
+    from: goalContextBusId,
+    to: contextFeedIndexId,
+    relation: "contains",
+    label: "goal context bus contains queryable feed index",
+    evidenceRefs: unique([...contextFeedPolicyRefs, ...agentGoalRefs, ...goalContextRefs]),
+    reasonCodes: ["goal_context_bus_contains_context_feed_index", "queryable_goal_context"],
+  });
+  pushEdge(edges, {
+    from: contextFeedIndexId,
+    to: terminalAuthorityId,
+    relation: "needs_check",
+    label: "context feed observations require terminal authority before final answer",
+    evidenceRefs: unique([...contextFeedPolicyRefs, ...contextFeedQueryReceiptRefs]),
+    reasonCodes: ["context_feed_index_requires_terminal_authority", "observations_not_answers"],
+  });
+  pushEdge(edges, {
+    from: terminalAuthorityId,
+    to: outputBusId,
+    relation: "constrains",
+    label: "terminal authority constrains output bus",
+    evidenceRefs: statePlaneEvidenceRefs,
+    reasonCodes: ["terminal_authority_constrains_output_bus", "single_writer_final_answer"],
+  });
 
   const goalSessionBadgeIdsByGoalId = new Map<string, string>();
   for (const session of input.agentGoalSessions.slice(0, 8)) {
@@ -1720,6 +2033,14 @@ const addWorkstationStatePlaneBadges = (
       evidenceRefs: sessionEvidenceRefs,
       reasonCodes: ["goal_context_bus_contains_session"],
     });
+    pushEdge(edges, {
+      from: sessionId,
+      to: terminalAuthorityId,
+      relation: "requires",
+      label: "goal final report requires terminal authority",
+      evidenceRefs: sessionEvidenceRefs,
+      reasonCodes: ["agent_goal_session_requires_terminal_authority", "final_report_terminal_boundary"],
+    });
     if (session.allowedActuators.length > 0) {
       pushEdge(edges, {
         from: sessionId,
@@ -1728,6 +2049,22 @@ const addWorkstationStatePlaneBadges = (
         label: "agent goal actuator policy bounds control signals",
         evidenceRefs: unique([...sessionEvidenceRefs, ...session.allowedActuators]),
         reasonCodes: ["agent_goal_session_bounds_control_signals", "agent_actuator_policy"],
+      });
+    }
+    if (session.contextFeeds.length > 0 || session.allowedActuators.some((actuator) => actuator.startsWith("query_"))) {
+      pushEdge(edges, {
+        from: sessionId,
+        to: contextFeedIndexId,
+        relation: "constrains",
+        label: "agent goal declares queryable context feed policy",
+        evidenceRefs: unique([
+          ...sessionEvidenceRefs,
+          ...session.contextFeeds.map((feed) => `context_feed:${feed.sourceKind}`),
+          ...session.allowedActuators
+            .filter((actuator) => actuator.startsWith("query_"))
+            .map((actuator) => `allowed_actuator:${actuator}`),
+        ]),
+        reasonCodes: ["agent_goal_session_declares_context_feeds", "query_actuator_policy"],
       });
     }
     if (
@@ -1749,6 +2086,18 @@ const addWorkstationStatePlaneBadges = (
   for (const update of input.goalContextUpdates.slice(0, 12)) {
     const updateId = goalContextUpdateBadgeId(update.updateId);
     const dispatchKinds = update.suggestedDispatch.map((action) => action.kind);
+    const toolIdentity = update.toolIdentity;
+    const toolIdentityRefs = toolIdentity
+      ? unique([
+        `requested_tool:${toolIdentity.requestedToolName}`,
+        `canonical_tool:${toolIdentity.canonicalToolName}`,
+        ...toolIdentity.matchedAllowedActuators.map((actuator) => `matched_actuator:${actuator}`),
+        ...toolIdentity.matchedAllowedActuatorRefs,
+      ])
+      : [];
+    const toolIdentityPreview = toolIdentity
+      ? `tool ${toolIdentity.requestedToolName} -> ${toolIdentity.canonicalToolName}; matched ${toolIdentity.matchedAllowedActuators.join(", ") || "none"}`
+      : null;
     const updateEvidenceRefs = unique([
       update.updateId,
       update.contentRef,
@@ -1756,9 +2105,11 @@ const addWorkstationStatePlaneBadges = (
       ...update.receiptRefs,
       ...update.sourceRefs,
       ...update.loopRefs,
+      ...toolIdentityRefs,
     ]);
     const feedPolicyRefs = updateEvidenceRefs.filter((ref) =>
       ref.startsWith("context_feed:") ||
+      ref.startsWith("agent_goal_allowed_actuator:") ||
       ref.startsWith("allowed_actuator:") ||
       ref.startsWith("workstation_context_feed:") ||
       ref.startsWith("workstation_actuator:")
@@ -1779,6 +2130,7 @@ const addWorkstationStatePlaneBadges = (
         update.producerKind,
         update.updateKind,
         update.freshness.status,
+        ...(toolIdentity ? ["tool_identity"] : []),
         ...dispatchKinds.map((kind) => `dispatch:${kind}`),
       ],
       sourceRefs: uniqueBy(
@@ -1796,6 +2148,7 @@ const addWorkstationStatePlaneBadges = (
         update.producerKind,
         update.updateKind,
         "observation_not_terminal_authority",
+        ...(toolIdentity ? ["tool_identity_provenance"] : []),
         ...feedPolicyReasonCodes,
       ],
       dataTray: {
@@ -1808,6 +2161,12 @@ const addWorkstationStatePlaneBadges = (
         inputRefs: unique([...update.sourceRefs, ...update.loopRefs]).slice(0, 10),
         inputPreview: update.goalRelevance?.reason ?? update.contentRef,
         transformLabel: `${update.producerKind} -> ${update.updateKind}`,
+        ...(toolIdentityRefs.length > 0
+          ? {
+            toolRefs: toolIdentityRefs,
+            toolPreview: toolIdentityPreview,
+          }
+          : {}),
         outputRefs: unique([update.contentRef, ...dispatchKinds, ...feedPolicyRefs]).slice(0, 12),
         outputPreview: dispatchKinds.length > 0 ? `dispatch: ${dispatchKinds.join(", ")}` : "no dispatch suggested",
         skipped: [
@@ -1827,6 +2186,99 @@ const addWorkstationStatePlaneBadges = (
       evidenceRefs: updateEvidenceRefs,
       reasonCodes: ["goal_context_bus_contains_update"],
     });
+    update.suggestedDispatch.forEach((action, index) => {
+      if (action.kind === "none") return;
+      const actionId = workstationDispatchBadgeId(update.updateId, action.kind, index);
+      const actionRefs = unique([
+        update.updateId,
+        update.contentRef,
+        ...toolIdentityRefs,
+        ...dispatchActionRefs(action),
+      ]);
+      const actionEvidenceRefs = unique([...updateEvidenceRefs, ...actionRefs]);
+      const target = dispatchActionTarget(action, {
+        goalContextBusId,
+        processLoopId,
+        outputBusId,
+        controlId,
+      });
+      pushBadge(badges, badge({
+        id: actionId,
+        title: `Dispatch: ${action.kind.replace(/_/g, " ")}`,
+        plainMeaning: "A suggested workstation dispatch action is represented as an evidence-only circuit signal.",
+        whyItMatters: action.kind === "wake_agent"
+          ? "Wake is demoted to a classified interrupt dispatch instead of becoming the center of continuous reasoning."
+          : "Dispatch nodes make workstation side effects inspectable without granting the graph execution authority.",
+        kind: "workstation_dispatch_action",
+        status: update.freshness.status === "blocked" ? "blocked" : "observed",
+        subjects: actionRefs,
+        tags: [
+          "workstation_dispatch_action",
+          `dispatch:${action.kind}`,
+          ...(toolIdentity ? ["tool_identity"] : []),
+          ...(action.kind === "wake_agent" ? ["wake_interrupt", action.interruptKind] : []),
+        ],
+        sourceRefs: uniqueBy(
+          [
+            { kind: "workstation_goal_context_update" as const, id: update.updateId },
+            ...update.sourceRefs.slice(0, 6).map((id) => ({ kind: "synthetic_evidence" as const, id })),
+          ],
+          (ref) => `${ref.kind}:${ref.id}`,
+        ),
+        evidenceRefs: actionEvidenceRefs,
+        confidence: action.kind === "wake_agent" ? 0.64 : 0.72,
+        reasonCodes: [
+          "goal_context_dispatch_action",
+          action.kind,
+          ...(toolIdentity ? ["tool_identity_provenance"] : []),
+          ...(action.kind === "wake_agent" ? ["wake_demoted_to_interrupt_dispatch"] : ["not_terminal_authority"]),
+        ],
+        dataTray: {
+          title: action.kind.replace(/_/g, " "),
+          summary: action.kind === "wake_agent"
+            ? `Classified ${action.interruptKind} interrupt dispatch.`
+            : `Suggested ${action.kind.replace(/_/g, " ")} dispatch.`,
+          updatedAt: new Date(update.createdAtMs).toISOString(),
+          freshness: update.freshness.status,
+          confidence: action.kind === "wake_agent" ? 0.64 : 0.72,
+          evidenceRefs: actionEvidenceRefs,
+          inputRefs: unique([update.updateId, update.contentRef]).slice(0, 8),
+          inputPreview: update.updateKind,
+          transformLabel: `${update.producerKind} dispatch`,
+          ...(toolIdentityRefs.length > 0
+            ? {
+              toolRefs: toolIdentityRefs,
+              toolPreview: toolIdentityPreview,
+            }
+            : {}),
+          outputRefs: actionRefs.slice(0, 10),
+          outputPreview: action.kind === "wake_agent" ? "classified interrupt only" : `dispatch target: ${target.badgeId}`,
+          skipped: [
+            "agent_executable=false",
+            "assistant_answer=false",
+            "terminal_eligible=false",
+          ],
+          blockedUntil: "workstation actuator policy admits the action",
+        },
+        admission: action.kind === "wake_agent" ? "ask_user" : "auto",
+      }));
+      pushEdge(edges, {
+        from: updateId,
+        to: actionId,
+        relation: "produces",
+        label: "goal-context update produces dispatch signal",
+        evidenceRefs: actionEvidenceRefs,
+        reasonCodes: ["goal_context_update_produces_dispatch_action", action.kind],
+      });
+      pushEdge(edges, {
+        from: actionId,
+        to: target.badgeId,
+        relation: target.relation,
+        label: target.label,
+        evidenceRefs: actionEvidenceRefs,
+        reasonCodes: target.reasonCodes,
+      });
+    });
     if (feedPolicyRefs.length > 0) {
       pushEdge(edges, {
         from: updateId,
@@ -1835,6 +2287,14 @@ const addWorkstationStatePlaneBadges = (
         label: "feed query policy bounds agent actuator",
         evidenceRefs: feedPolicyRefs,
         reasonCodes: ["feed_query_policy_bounds_actuator", "agent_goal_feed_policy"],
+      });
+      pushEdge(edges, {
+        from: updateId,
+        to: contextFeedIndexId,
+        relation: "feeds",
+        label: "goal-context update contributes query feed policy",
+        evidenceRefs: feedPolicyRefs,
+        reasonCodes: ["goal_context_update_feeds_context_feed_index", "feed_query_policy"],
       });
     }
     const isStreamContextUpdate =
@@ -2178,7 +2638,7 @@ const addWorkstationStatePlaneBadges = (
     }
   }
 
-  for (const childId of [sourceBusId, gateId, bufferId, processLoopId, outputBusId, controlId, goalContextBusId]) {
+  for (const childId of [sourceBusId, gateId, bufferId, processLoopId, outputBusId, controlId, terminalAuthorityId, goalContextBusId, contextFeedIndexId]) {
     pushEdge(edges, {
       from: rootId,
       to: childId,

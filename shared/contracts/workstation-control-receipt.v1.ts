@@ -27,6 +27,8 @@ export type WorkstationControlReceiptTerminalAuthorityV1 = {
 export type WorkstationControlReceiptV1 = {
   schema: typeof WORKSTATION_CONTROL_RECEIPT_SCHEMA;
   receiptId: string;
+  requestedToolName: string;
+  canonicalToolName: string;
   controlKind: WorkstationControlReceiptKindV1;
   label: string;
   ok: boolean;
@@ -36,6 +38,8 @@ export type WorkstationControlReceiptV1 = {
   goalSessionFound: boolean | null;
   requiredActuator: AgentGoalActuatorV1;
   actuatorAllowed: boolean;
+  matchedAllowedActuators: AgentGoalActuatorV1[];
+  matchedAllowedActuatorRefs: string[];
   policyEvidenceRefs: string[];
   sourceRefs: string[];
   loopRefs: string[];
@@ -91,6 +95,70 @@ const stringArrayIssues = (value: unknown, field: string, options: { requireNonE
   value.forEach((entry, index) => {
     if (!isNonEmptyString(entry)) issues.push(`${field}[${index}] must be a non-empty string`);
   });
+  return issues;
+};
+
+const matchedAllowedActuatorIssues = (
+  receipt: WorkstationControlReceiptV1,
+): string[] => {
+  const issues: string[] = [];
+  if (!Array.isArray(receipt.matchedAllowedActuators)) {
+    issues.push("matchedAllowedActuators must be an array");
+  } else {
+    const sessionAllowedActuators = isRecord(receipt.agentGoalSession) && Array.isArray(receipt.agentGoalSession.allowedActuators)
+      ? receipt.agentGoalSession.allowedActuators
+      : [];
+    receipt.matchedAllowedActuators.forEach((actuator, index) => {
+      if (!agentGoalActuators.has(actuator)) {
+        issues.push(`matchedAllowedActuators[${index}] is invalid`);
+        return;
+      }
+      if (receipt.goalSessionFound === true && !sessionAllowedActuators.includes(actuator)) {
+        issues.push(`matchedAllowedActuators[${index}] must be present in agentGoalSession.allowedActuators`);
+      }
+    });
+  }
+  issues.push(...stringArrayIssues(receipt.matchedAllowedActuatorRefs, "matchedAllowedActuatorRefs"));
+  if (Array.isArray(receipt.matchedAllowedActuators) && Array.isArray(receipt.matchedAllowedActuatorRefs)) {
+    const expectedRefs = receipt.matchedAllowedActuators
+      .filter((actuator) => agentGoalActuators.has(actuator))
+      .map((actuator) => `agent_goal_allowed_actuator:${actuator}`);
+    for (const expectedRef of expectedRefs) {
+      if (!receipt.matchedAllowedActuatorRefs.includes(expectedRef)) {
+        issues.push("matchedAllowedActuatorRefs must include every matched allowed actuator ref");
+        break;
+      }
+    }
+    for (const ref of receipt.matchedAllowedActuatorRefs) {
+      if (!expectedRefs.includes(ref)) {
+        issues.push("matchedAllowedActuatorRefs must only include matched allowed actuator refs");
+        break;
+      }
+    }
+  }
+  if (
+    receipt.goalSessionFound === true &&
+    receipt.actuatorAllowed === true &&
+    Array.isArray(receipt.matchedAllowedActuators) &&
+    receipt.matchedAllowedActuators.length === 0
+  ) {
+    issues.push("actuatorAllowed=true for a goal session requires matchedAllowedActuators");
+  }
+  if (
+    receipt.actuatorAllowed === false &&
+    Array.isArray(receipt.matchedAllowedActuators) &&
+    receipt.matchedAllowedActuators.length > 0
+  ) {
+    issues.push("actuatorAllowed=false must not expose matchedAllowedActuators");
+  }
+  if (Array.isArray(receipt.policyEvidenceRefs) && Array.isArray(receipt.matchedAllowedActuatorRefs)) {
+    for (const ref of receipt.matchedAllowedActuatorRefs) {
+      if (!receipt.policyEvidenceRefs.includes(ref)) {
+        issues.push("policyEvidenceRefs must include every matchedAllowedActuatorRefs entry");
+        break;
+      }
+    }
+  }
   return issues;
 };
 
@@ -256,6 +324,11 @@ export function validateWorkstationControlReceiptV1(value: WorkstationControlRec
     issues.push(`schema must be ${WORKSTATION_CONTROL_RECEIPT_SCHEMA}`);
   }
   if (!isNonEmptyString(value.receiptId)) issues.push("receiptId must be a non-empty string");
+  if (!isNonEmptyString(value.requestedToolName)) issues.push("requestedToolName must be a non-empty string");
+  if (!isNonEmptyString(value.canonicalToolName)) issues.push("canonicalToolName must be a non-empty string");
+  if (isNonEmptyString(value.canonicalToolName) && !value.canonicalToolName.startsWith("live_env.")) {
+    issues.push("canonicalToolName must be a live_env tool id");
+  }
   if (!controlKinds.has(value.controlKind)) issues.push("controlKind is invalid");
   if (!isNonEmptyString(value.label)) issues.push("label must be a non-empty string");
   if (typeof value.ok !== "boolean") issues.push("ok must be boolean");
@@ -275,6 +348,7 @@ export function validateWorkstationControlReceiptV1(value: WorkstationControlRec
   if (value.status === "prepared" && value.actuatorAllowed !== true) {
     issues.push("prepared receipts must have actuatorAllowed=true");
   }
+  issues.push(...matchedAllowedActuatorIssues(value));
   issues.push(...stringArrayIssues(value.policyEvidenceRefs, "policyEvidenceRefs", { requireNonEmpty: true }));
   if (
     Array.isArray(value.policyEvidenceRefs) &&
@@ -305,6 +379,14 @@ export function validateWorkstationControlReceiptV1(value: WorkstationControlRec
       for (const ref of value.policyEvidenceRefs) {
         if (!value.evidenceRefs.includes(ref)) {
           issues.push("evidenceRefs must include every policyEvidenceRefs entry");
+          break;
+        }
+      }
+    }
+    if (Array.isArray(value.matchedAllowedActuatorRefs)) {
+      for (const ref of value.matchedAllowedActuatorRefs) {
+        if (!value.evidenceRefs.includes(ref)) {
+          issues.push("evidenceRefs must include every matchedAllowedActuatorRefs entry");
           break;
         }
       }

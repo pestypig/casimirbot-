@@ -4,6 +4,12 @@ import type {
   LiveSourceWakeRouteMetadataV1,
 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import { isLiveSourceMailLoopReflectionPrompt } from "./live-source-continuation-intent";
+import {
+  WORKSTATION_CONTEXT_FEED_QUERY_CAPABILITIES,
+  WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS,
+  workstationContextFeedQuerySpecForCapability,
+  type WorkstationContextFeedQueryToolContractSpec,
+} from "./workstation-context-feed-query-tool-contracts";
 
 type RecordLike = Record<string, unknown>;
 
@@ -15,6 +21,51 @@ export type LiveSourceTurnPhaseTableEntry = {
   completionEvidence: string[];
   next: LiveSourceTurnPhaseV1 | LiveSourceTurnPhaseV1[] | null;
   terminalAllowed: boolean;
+};
+
+const WORKSTATION_CONTEXT_FEED_QUERY_BASE_FORBIDDEN_TOOLS = [
+  "live_env.query_workstation_goal_context",
+  "live_env.read_processed_live_source_mail",
+  "live_env.process_live_source_mail",
+  "live_env.read_live_source_mail",
+  "live_env.record_live_source_mail_decision",
+  "live_env.request_interim_voice_callout",
+] as const;
+
+const requiredEvidenceForContextFeedQuerySpec = (
+  spec: WorkstationContextFeedQueryToolContractSpec,
+): string[] => [spec.plannerExpectedReceiptKind];
+
+const forbiddenToolsForContextFeedQuerySpec = (
+  spec: WorkstationContextFeedQueryToolContractSpec,
+  options?: { includeFinalAnswer?: boolean },
+): string[] => {
+  const includeFinalAnswer = options?.includeFinalAnswer ?? true;
+  const forbidden = [
+    ...WORKSTATION_CONTEXT_FEED_QUERY_BASE_FORBIDDEN_TOOLS,
+    ...WORKSTATION_CONTEXT_FEED_QUERY_CAPABILITIES.filter((capability) => capability !== spec.capability),
+  ];
+  if (includeFinalAnswer) forbidden.push("final_answer");
+  return Array.from(new Set(forbidden));
+};
+
+const contextFeedQueryPhaseTableEntry = (
+  capability: string,
+): LiveSourceTurnPhaseTableEntry => {
+  const spec = workstationContextFeedQuerySpecForCapability(capability);
+  if (!spec) {
+    throw new Error(`Missing workstation context-feed query contract for ${capability}`);
+  }
+  const requiredEvidence = requiredEvidenceForContextFeedQuerySpec(spec);
+  return {
+    allowedTools: [spec.capability],
+    fallbackTools: [],
+    forbiddenTools: forbiddenToolsForContextFeedQuerySpec(spec),
+    requiredEvidence,
+    completionEvidence: requiredEvidence,
+    next: "terminal_checkpoint",
+    terminalAllowed: false,
+  };
 };
 
 export const LIVE_SOURCE_TURN_PHASE_TABLE: Record<LiveSourceTurnPhaseV1, LiveSourceTurnPhaseTableEntry> = {
@@ -101,217 +152,43 @@ export const LIVE_SOURCE_TURN_PHASE_TABLE: Record<LiveSourceTurnPhaseV1, LiveSou
     terminalAllowed: false,
   },
   query_trace_memory: {
-    allowedTools: ["live_env.query_trace_memory"],
-    fallbackTools: [],
-    forbiddenTools: [
-      "live_env.query_workstation_goal_context",
-      "live_env.read_processed_live_source_mail",
-      "live_env.process_live_source_mail",
-      "live_env.read_live_source_mail",
-      "live_env.record_live_source_mail_decision",
-      "live_env.request_interim_voice_callout",
-      "final_answer",
-    ],
-    requiredEvidence: ["helix.workstation_reasoning_trace_query_result"],
-    completionEvidence: ["helix.workstation_reasoning_trace_query_result"],
-    next: "terminal_checkpoint",
-    terminalAllowed: false,
+    ...contextFeedQueryPhaseTableEntry("live_env.query_trace_memory"),
   },
   query_packet_traces: {
-    allowedTools: ["live_env.query_packet_traces"],
-    fallbackTools: [],
-    forbiddenTools: [
-      "live_env.query_workstation_goal_context",
-      "live_env.query_trace_memory",
-      "live_env.read_processed_live_source_mail",
-      "live_env.process_live_source_mail",
-      "live_env.read_live_source_mail",
-      "live_env.record_live_source_mail_decision",
-      "live_env.request_interim_voice_callout",
-      "final_answer",
-    ],
-    requiredEvidence: ["stage_play_packet_trace_query_result"],
-    completionEvidence: ["stage_play_packet_trace_query_result"],
-    next: "terminal_checkpoint",
-    terminalAllowed: false,
+    ...contextFeedQueryPhaseTableEntry("live_env.query_packet_traces"),
   },
   query_visual_summaries: {
-    allowedTools: ["live_env.query_visual_summaries"],
-    fallbackTools: [],
-    forbiddenTools: [
-      "live_env.query_workstation_goal_context",
-      "live_env.query_trace_memory",
-      "live_env.query_packet_traces",
-      "live_env.read_processed_live_source_mail",
-      "live_env.process_live_source_mail",
-      "live_env.read_live_source_mail",
-      "live_env.record_live_source_mail_decision",
-      "live_env.request_interim_voice_callout",
-      "final_answer",
-    ],
-    requiredEvidence: ["stage_play_workstation_context_feed_query_result"],
-    completionEvidence: ["stage_play_workstation_context_feed_query_result"],
-    next: "terminal_checkpoint",
-    terminalAllowed: false,
+    ...contextFeedQueryPhaseTableEntry("live_env.query_visual_summaries"),
   },
   query_audio_transcripts: {
-    allowedTools: ["live_env.query_audio_transcripts"],
-    fallbackTools: [],
-    forbiddenTools: [
-      "live_env.query_workstation_goal_context",
-      "live_env.query_trace_memory",
-      "live_env.query_packet_traces",
-      "live_env.read_processed_live_source_mail",
-      "live_env.process_live_source_mail",
-      "live_env.read_live_source_mail",
-      "live_env.record_live_source_mail_decision",
-      "live_env.request_interim_voice_callout",
-      "final_answer",
-    ],
-    requiredEvidence: ["stage_play_workstation_context_feed_query_result"],
-    completionEvidence: ["stage_play_workstation_context_feed_query_result"],
-    next: "terminal_checkpoint",
-    terminalAllowed: false,
+    ...contextFeedQueryPhaseTableEntry("live_env.query_audio_transcripts"),
   },
   query_translation_segments: {
-    allowedTools: ["live_env.query_translation_segments"],
-    fallbackTools: [],
-    forbiddenTools: [
-      "live_env.query_workstation_goal_context",
-      "live_env.query_trace_memory",
-      "live_env.query_packet_traces",
-      "live_env.read_processed_live_source_mail",
-      "live_env.process_live_source_mail",
-      "live_env.read_live_source_mail",
-      "live_env.record_live_source_mail_decision",
-      "live_env.request_interim_voice_callout",
-      "final_answer",
-    ],
-    requiredEvidence: ["stage_play_workstation_context_feed_query_result"],
-    completionEvidence: ["stage_play_workstation_context_feed_query_result"],
-    next: "terminal_checkpoint",
-    terminalAllowed: false,
+    ...contextFeedQueryPhaseTableEntry("live_env.query_translation_segments"),
   },
   query_microdeck_outputs: {
-    allowedTools: ["live_env.query_microdeck_outputs"],
-    fallbackTools: [],
-    forbiddenTools: [
-      "live_env.query_workstation_goal_context",
-      "live_env.query_trace_memory",
-      "live_env.query_packet_traces",
-      "live_env.read_processed_live_source_mail",
-      "live_env.process_live_source_mail",
-      "live_env.read_live_source_mail",
-      "live_env.record_live_source_mail_decision",
-      "live_env.request_interim_voice_callout",
-      "final_answer",
-    ],
-    requiredEvidence: ["stage_play_workstation_context_feed_query_result"],
-    completionEvidence: ["stage_play_workstation_context_feed_query_result"],
-    next: "terminal_checkpoint",
-    terminalAllowed: false,
+    ...contextFeedQueryPhaseTableEntry("live_env.query_microdeck_outputs"),
   },
   query_live_answer_state: {
-    allowedTools: ["live_env.query_live_answer_state"],
-    fallbackTools: [],
-    forbiddenTools: [
-      "live_env.query_workstation_goal_context",
-      "live_env.query_trace_memory",
-      "live_env.query_packet_traces",
-      "live_env.read_processed_live_source_mail",
-      "live_env.process_live_source_mail",
-      "live_env.read_live_source_mail",
-      "live_env.record_live_source_mail_decision",
-      "live_env.request_interim_voice_callout",
-      "final_answer",
-    ],
-    requiredEvidence: ["stage_play_workstation_context_feed_query_result"],
-    completionEvidence: ["stage_play_workstation_context_feed_query_result"],
-    next: "terminal_checkpoint",
-    terminalAllowed: false,
+    ...contextFeedQueryPhaseTableEntry("live_env.query_live_answer_state"),
   },
   query_source_health: {
-    allowedTools: ["live_env.query_source_health"],
-    fallbackTools: [],
-    forbiddenTools: [
-      "live_env.query_workstation_goal_context",
-      "live_env.query_trace_memory",
-      "live_env.query_packet_traces",
-      "live_env.read_processed_live_source_mail",
-      "live_env.process_live_source_mail",
-      "live_env.read_live_source_mail",
-      "live_env.record_live_source_mail_decision",
-      "live_env.request_interim_voice_callout",
-      "final_answer",
-    ],
-    requiredEvidence: ["stage_play_workstation_context_feed_query_result"],
-    completionEvidence: ["stage_play_workstation_context_feed_query_result"],
-    next: "terminal_checkpoint",
-    terminalAllowed: false,
-  },
-  query_route_evidence: {
-    allowedTools: ["live_env.query_route_evidence"],
-    fallbackTools: [],
-    forbiddenTools: [
-      "live_env.query_workstation_goal_context",
-      "live_env.query_trace_memory",
-      "live_env.query_packet_traces",
-      "live_env.read_processed_live_source_mail",
-      "live_env.process_live_source_mail",
-      "live_env.read_live_source_mail",
-      "live_env.record_live_source_mail_decision",
-      "live_env.request_interim_voice_callout",
-      "final_answer",
-    ],
-    requiredEvidence: ["stage_play_workstation_context_feed_query_result"],
-    completionEvidence: ["stage_play_workstation_context_feed_query_result"],
-    next: "terminal_checkpoint",
-    terminalAllowed: false,
+    ...contextFeedQueryPhaseTableEntry("live_env.query_source_health"),
   },
   query_narrator_events: {
-    allowedTools: ["live_env.query_narrator_events"],
-    fallbackTools: [],
-    forbiddenTools: [
-      "live_env.query_workstation_goal_context",
-      "live_env.query_trace_memory",
-      "live_env.query_packet_traces",
-      "live_env.query_route_evidence",
-      "live_env.query_automation_policies",
-      "live_env.read_processed_live_source_mail",
-      "live_env.process_live_source_mail",
-      "live_env.read_live_source_mail",
-      "live_env.record_live_source_mail_decision",
-      "live_env.request_interim_voice_callout",
-      "final_answer",
-    ],
-    requiredEvidence: ["stage_play_workstation_context_feed_query_result"],
-    completionEvidence: ["stage_play_workstation_context_feed_query_result"],
-    next: "terminal_checkpoint",
-    terminalAllowed: false,
+    ...contextFeedQueryPhaseTableEntry("live_env.query_narrator_events"),
+  },
+  query_route_evidence: {
+    ...contextFeedQueryPhaseTableEntry("live_env.query_route_evidence"),
   },
   query_automation_policies: {
-    allowedTools: ["live_env.query_automation_policies"],
-    fallbackTools: [],
-    forbiddenTools: [
-      "live_env.query_workstation_goal_context",
-      "live_env.query_trace_memory",
-      "live_env.query_packet_traces",
-      "live_env.query_route_evidence",
-      "live_env.read_processed_live_source_mail",
-      "live_env.process_live_source_mail",
-      "live_env.read_live_source_mail",
-      "live_env.record_live_source_mail_decision",
-      "live_env.request_interim_voice_callout",
-      "final_answer",
-    ],
-    requiredEvidence: ["stage_play_workstation_context_feed_query_result"],
-    completionEvidence: ["stage_play_workstation_context_feed_query_result"],
-    next: "terminal_checkpoint",
-    terminalAllowed: false,
+    ...contextFeedQueryPhaseTableEntry("live_env.query_automation_policies"),
   },
   dispatch_workstation_control: {
     allowedTools: [
       "live_env.change_workstation_preset",
+      "live_env.set_visual_preset",
+      "live_env.set_audio_preset",
       "live_env.bind_workstation_source",
       "live_env.unbind_workstation_source",
       "live_env.pause_workstation_loop",
@@ -728,53 +605,47 @@ type WorkstationContextFeedPhaseSpec = {
   toolName: string;
   feedKind: string;
   label: string;
+  contract: WorkstationContextFeedQueryToolContractSpec;
   promptNounPattern: RegExp;
 };
 
-const WORKSTATION_CONTEXT_FEED_PHASE_SPECS: WorkstationContextFeedPhaseSpec[] = [
-  {
-    phase: "query_visual_summaries",
-    toolName: "live_env.query_visual_summaries",
-    feedKind: "visual_summaries",
-    label: "visual-summary",
-    promptNounPattern: /\b(?:visual\s+summar(?:y|ies)|visual\s+captures?|visual\s+frames?|screen\s+summar(?:y|ies))\b/i,
-  },
-  {
-    phase: "query_audio_transcripts",
-    toolName: "live_env.query_audio_transcripts",
-    feedKind: "audio_transcripts",
-    label: "audio-transcript",
-    promptNounPattern: /\b(?:audio\s+transcripts?|audio\s+captures?|earbud\s+transcripts?|speech\s+transcripts?)\b/i,
-  },
-  {
-    phase: "query_translation_segments",
-    toolName: "live_env.query_translation_segments",
-    feedKind: "translated_transcripts",
-    label: "translation-segment",
-    promptNounPattern: /\b(?:translation\s+segments?|translated\s+transcripts?|translated\s+segments?|translation\s+feed)\b/i,
-  },
-  {
-    phase: "query_microdeck_outputs",
-    toolName: "live_env.query_microdeck_outputs",
-    feedKind: "microdeck_outputs",
-    label: "MicroDeck-output",
-    promptNounPattern: /\b(?:micro[-\s]?deck\s+outputs?|micro[-\s]?reasoner\s+outputs?|deck\s+outputs?)\b/i,
-  },
-  {
-    phase: "query_live_answer_state",
-    toolName: "live_env.query_live_answer_state",
-    feedKind: "live_answer_lines",
-    label: "Live Answer state",
-    promptNounPattern: /\b(?:live\s+answer\s+(?:state|lines?|projection)|answer\s+projection)\b/i,
-  },
-  {
-    phase: "query_source_health",
-    toolName: "live_env.query_source_health",
-    feedKind: "source_health",
-    label: "source-health",
-    promptNounPattern: /\b(?:source\s+health|source\s+status|source\s+capability\s+state|capture\s+health)\b/i,
-  },
-];
+const WORKSTATION_CONTEXT_FEED_PROMPT_NOUN_PATTERNS: Record<string, RegExp> = {
+  visual_summaries: /\b(?:visual\s+summar(?:y|ies)|visual\s+captures?|visual\s+frames?|screen\s+summar(?:y|ies))\b/i,
+  audio_transcripts: /\b(?:audio\s+transcripts?|audio\s+captures?|earbud\s+transcripts?|speech\s+transcripts?)\b/i,
+  translated_transcripts: /\b(?:translation\s+segments?|translated\s+transcripts?|translated\s+segments?|translation\s+feed)\b/i,
+  microdeck_outputs: /\b(?:micro[-\s]?deck\s+outputs?|micro[-\s]?reasoner\s+outputs?|deck\s+outputs?)\b/i,
+  live_answer_lines: /\b(?:live\s+answer\s+(?:state|lines?|projection)|answer\s+projection)\b/i,
+  source_health: /\b(?:source\s+health|source\s+status|source\s+capability\s+state|capture\s+health)\b/i,
+  trace_memory: /\b(?:trace\s+memory|reasoning\s+traces?|proof\s+recall\s+traces?|workstation\s+reasoning\s+traces?)\b/i,
+  narrator_events: /\b(?:narrator\s+events?|narrator\s+bindings?|narrator\s+streams?)\b/i,
+  packet_traces: /\b(?:per[-\s]?packet\s+traces?|packet\s+traces?|packet\s+causal\s+traces?)\b/i,
+  route_evidence: /\b(?:route\s+evidence|route[-\s]?watch\s+evidence|route[-\s]?watch\s+updates?)\b/i,
+  automation_policies: /\b(?:automation\s+polic(?:y|ies)|workstation\s+automations?)\b/i,
+};
+
+const WORKSTATION_CONTEXT_FEED_PHASE_SPECS: WorkstationContextFeedPhaseSpec[] =
+  WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS.map((contract) => ({
+    phase: contract.actuator as LiveSourceTurnPhaseV1,
+    toolName: contract.capability,
+    feedKind: contract.feedKind,
+    label: contract.label,
+    contract,
+    promptNounPattern: WORKSTATION_CONTEXT_FEED_PROMPT_NOUN_PATTERNS[contract.feedKind],
+  }));
+
+const promptRequestsWorkstationContextFeed = (
+  prompt: string,
+  spec: WorkstationContextFeedPhaseSpec,
+): boolean =>
+  new RegExp(`\\b${spec.toolName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(prompt) ||
+  (
+    /\b(?:query|view|inspect|show|list|get|check|read|retrieve|summari[sz]e)\b/i.test(prompt) &&
+    spec.promptNounPattern.test(prompt)
+  ) ||
+  (
+    spec.promptNounPattern.test(prompt) &&
+    /\b(?:query|view|inspect|show|list|get|check|read|retrieve|latest|available|known)\b/i.test(prompt)
+  );
 
 const findWorkstationContextFeedQuerySpec = (
   prompt: string,
@@ -783,14 +654,11 @@ const findWorkstationContextFeedQuerySpec = (
   if (hasContextualWorkstationGoalContextCue(prompt)) return null;
   const selectedSpec = WORKSTATION_CONTEXT_FEED_PHASE_SPECS.find((spec) => selectedCapability === spec.toolName);
   if (selectedSpec) return selectedSpec;
-  if (
-    /(?:\blive_env\.query_narrator_events\b|\bnarrator\s+events?|\bnarrator\s+bindings?|\bnarrator\s+streams?|\blive_env\.query_route_evidence\b|\broute\s+evidence|\broute[-\s]?watch\s+evidence|\blive_env\.query_automation_policies\b|\bautomation\s+polic(?:y|ies)|\bworkstation\s+automations?)\b/i.test(prompt) ||
-    selectedCapability === "live_env.query_narrator_events" ||
-    selectedCapability === "live_env.query_route_evidence" ||
-    selectedCapability === "live_env.query_automation_policies"
-  ) {
-    return null;
-  }
+  const prioritySpec = WORKSTATION_CONTEXT_FEED_PHASE_SPECS.find((spec) =>
+    ["narrator_events", "route_evidence", "automation_policies"].includes(spec.feedKind) &&
+    promptRequestsWorkstationContextFeed(prompt, spec)
+  );
+  if (prioritySpec) return prioritySpec;
   if (
     /\b(?:prompt\s+presets?|presets?|source\s+deck\s+assembly|deck\s+assembly|active\s+micro[-\s]?deck\s+prompts?|micro[-\s]?reasoner\s+deck|micro[-\s]?deck\s+prompt)\b/i.test(prompt) &&
     !/\bmicro[-\s]?deck\s+outputs?\b/i.test(prompt)
@@ -801,15 +669,7 @@ const findWorkstationContextFeedQuerySpec = (
     return WORKSTATION_CONTEXT_FEED_PHASE_SPECS.find((spec) => spec.phase === "query_source_health") ?? null;
   }
   return WORKSTATION_CONTEXT_FEED_PHASE_SPECS.find((spec) =>
-    new RegExp(`\\b${spec.toolName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(prompt) ||
-    (
-      /\b(?:query|view|inspect|show|list|get|check|read|retrieve|summari[sz]e)\b/i.test(prompt) &&
-      spec.promptNounPattern.test(prompt)
-    ) ||
-    (
-      spec.promptNounPattern.test(prompt) &&
-      /\b(?:query|view|inspect|show|list|get|check|read|retrieve|latest|available|known)\b/i.test(prompt)
-    )
+    promptRequestsWorkstationContextFeed(prompt, spec)
   ) ?? null;
 };
 
@@ -819,10 +679,19 @@ const hasWorkstationContextFeedReceipt = (
 ): boolean =>
   receipts.some((receipt) => {
     const observation = receiptObservation(receipt);
+    const schema = readString(observation?.schema ?? observation?.schemaVersion);
+    const artifactId = readString(observation?.artifactId ?? observation?.artifact_id);
+    const expectedKinds = new Set([
+      spec.contract.explicitRequiredObservationKind,
+      spec.contract.plannerExpectedReceiptKind,
+      ...spec.contract.toolFamilyRequiredObservationKinds,
+    ]);
     return (
       receiptToolName(receipt) === spec.toolName ||
+      (schema !== null && expectedKinds.has(schema)) ||
+      (artifactId !== null && expectedKinds.has(artifactId)) ||
       (
-        readString(observation?.schema) === "stage_play_workstation_context_feed_query_result/v1" &&
+        schema === "stage_play_workstation_context_feed_query_result/v1" &&
         (
           readString(observation?.feedKind) === spec.feedKind ||
           readString(observation?.feed_kind) === spec.feedKind
@@ -843,6 +712,18 @@ const WORKSTATION_CONTROL_PHASE_SPECS: WorkstationControlPhaseSpec[] = [
     toolName: "live_env.change_workstation_preset",
     actuator: "change_preset",
     label: "workstation preset change",
+    receiptKinds: ["stage_play_workstation_control_receipt/v1", "stage_play_workstation_control_receipt"],
+  },
+  {
+    toolName: "live_env.set_visual_preset",
+    actuator: "set_visual_preset",
+    label: "visual preset change",
+    receiptKinds: ["stage_play_workstation_control_receipt/v1", "stage_play_workstation_control_receipt"],
+  },
+  {
+    toolName: "live_env.set_audio_preset",
+    actuator: "set_audio_preset",
+    label: "audio preset change",
     receiptKinds: ["stage_play_workstation_control_receipt/v1", "stage_play_workstation_control_receipt"],
   },
   {
@@ -873,6 +754,12 @@ const WORKSTATION_CONTROL_PHASE_SPECS: WorkstationControlPhaseSpec[] = [
     toolName: "live_env.set_workstation_loop_state",
     actuator: "set_loop_state",
     label: "workstation loop state change",
+    receiptKinds: ["stage_play_workstation_control_receipt/v1", "stage_play_workstation_control_receipt"],
+  },
+  {
+    toolName: "live_env.repair_loop",
+    actuator: "repair_source",
+    label: "workstation loop repair",
     receiptKinds: ["stage_play_workstation_control_receipt/v1", "stage_play_workstation_control_receipt"],
   },
   {
@@ -908,11 +795,11 @@ const WORKSTATION_CONTROL_PHASE_SPECS: WorkstationControlPhaseSpec[] = [
 ];
 
 const hasContextualWorkstationControlCue = (prompt: string): boolean =>
-  /\b(?:do\s+not|don't|dont|without|not\s+asking\s+to|no\s+need\s+to|for\s+now)\b[\s\S]{0,160}\b(?:run|call|execute|use|change|bind|unbind|pause|resume|repair|focus|say|speak)?\b[\s\S]{0,160}\blive_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream)\b/i.test(prompt) ||
-  /\b(?:if|in\s+the\s+future|future|later|eventually|hypothetically|tomorrow|next\s+time|would|could|might|should)\b[\s\S]{0,160}\blive_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream)\b/i.test(prompt) ||
-  /\b(?:previously|earlier|last\s+time|before|already|historically|was|were|had)\b[\s\S]{0,180}\blive_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream)\b/i.test(prompt) ||
-  /["'`][^"'`]*live_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream)[^"'`]*["'`]/i.test(prompt) ||
-  /\b(?:screen|page|button|label|ui|text|menu|dropdown|document|quote)\b[\s\S]{0,90}\b(?:says|shows|reads|contains|labeled|labelled|called|named)\b[\s\S]{0,140}\blive_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream)\b/i.test(prompt);
+  /\b(?:do\s+not|don't|dont|without|not\s+asking\s+to|no\s+need\s+to|for\s+now)\b[\s\S]{0,160}\b(?:run|call|execute|use|change|bind|unbind|pause|resume|repair|focus|say|speak|evaluate)?\b[\s\S]{0,160}\blive_env\.(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|evaluate_goal_satisfaction)\b/i.test(prompt) ||
+  /\b(?:if|in\s+the\s+future|future|later|eventually|hypothetically|tomorrow|next\s+time|would|could|might|should)\b[\s\S]{0,160}\blive_env\.(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|evaluate_goal_satisfaction)\b/i.test(prompt) ||
+  /\b(?:previously|earlier|last\s+time|before|already|historically|was|were|had)\b[\s\S]{0,180}\blive_env\.(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|evaluate_goal_satisfaction)\b/i.test(prompt) ||
+  /["'`][^"'`]*live_env\.(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|evaluate_goal_satisfaction)[^"'`]*["'`]/i.test(prompt) ||
+  /\b(?:screen|page|button|label|ui|text|menu|dropdown|document|quote)\b[\s\S]{0,90}\b(?:says|shows|reads|contains|labeled|labelled|called|named)\b[\s\S]{0,140}\blive_env\.(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|evaluate_goal_satisfaction)\b/i.test(prompt);
 
 const findWorkstationControlPhaseSpec = (
   prompt: string,
@@ -1649,6 +1536,11 @@ export const resolveLiveSourceTurnPhase = (
   }
 
   if (workstationContextFeedQuerySpec) {
+    const requiredEvidence = requiredEvidenceForContextFeedQuerySpec(workstationContextFeedQuerySpec.contract);
+    const forbiddenTools = forbiddenToolsForContextFeedQuerySpec(workstationContextFeedQuerySpec.contract);
+    const forbiddenToolsAfterReceipt = forbiddenToolsForContextFeedQuerySpec(workstationContextFeedQuerySpec.contract, {
+      includeFinalAnswer: false,
+    });
     if (hasWorkstationContextFeedReceipt(receipts, workstationContextFeedQuerySpec)) {
       return makeResolution({
         phase: "terminal_checkpoint",
@@ -1657,19 +1549,9 @@ export const resolveLiveSourceTurnPhase = (
         allowedTools: [],
         forbiddenTools: [
           workstationContextFeedQuerySpec.toolName,
-          "live_env.query_workstation_goal_context",
-          "live_env.query_trace_memory",
-          "live_env.query_packet_traces",
-          "live_env.query_route_evidence",
-          "live_env.query_automation_policies",
-          "live_env.query_narrator_events",
-          "live_env.read_processed_live_source_mail",
-          "live_env.process_live_source_mail",
-          "live_env.read_live_source_mail",
-          "live_env.record_live_source_mail_decision",
-          "live_env.request_interim_voice_callout",
+          ...forbiddenToolsAfterReceipt,
         ],
-        requiredEvidence: ["stage_play_workstation_context_feed_query_result"],
+        requiredEvidence,
         completionEvidence: ["model_synthesized_answer"],
         nextPhase: null,
         locked: true,
@@ -1683,22 +1565,9 @@ export const resolveLiveSourceTurnPhase = (
       canonicalGoal: "workstation_goal_context",
       allowedTools: [workstationContextFeedQuerySpec.toolName],
       fallbackTools: [],
-      forbiddenTools: [
-        "live_env.query_workstation_goal_context",
-        "live_env.query_trace_memory",
-        "live_env.query_packet_traces",
-        "live_env.query_route_evidence",
-        "live_env.query_automation_policies",
-        "live_env.query_narrator_events",
-        "live_env.read_processed_live_source_mail",
-        "live_env.process_live_source_mail",
-        "live_env.read_live_source_mail",
-        "live_env.record_live_source_mail_decision",
-        "live_env.request_interim_voice_callout",
-        "final_answer",
-      ],
-      requiredEvidence: ["stage_play_workstation_context_feed_query_result"],
-      completionEvidence: ["stage_play_workstation_context_feed_query_result"],
+      forbiddenTools,
+      requiredEvidence,
+      completionEvidence: requiredEvidence,
       nextPhase: "terminal_checkpoint",
       locked: true,
       lockReason: `${workstationContextFeedQuerySpec.label} inspection is a read-only workstation evidence query, not mailbox processing or wake dispatch.`,

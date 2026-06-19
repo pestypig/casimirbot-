@@ -19,6 +19,22 @@ import {
   type Nhm2NatarioInvariantAuditV1,
 } from "../../shared/contracts/nhm2-natario-invariant-audit.v1";
 import {
+  isNhm2CampaignFrontierDisposition,
+  type Nhm2CampaignFrontierDispositionV1,
+} from "../../shared/contracts/nhm2-campaign-frontier-disposition.v1";
+import {
+  isNhm2MetricRequiredMomentumDemandAudit,
+  type Nhm2MetricRequiredMomentumDemandAuditV1,
+} from "../../shared/contracts/nhm2-metric-required-momentum-demand-audit.v1";
+import {
+  isNhm2MetricMomentumRemediationTargets,
+  type Nhm2MetricMomentumRemediationTargetsV1,
+} from "../../shared/contracts/nhm2-metric-momentum-remediation-targets.v1";
+import {
+  isNhm2MomentumFrameProjectionReceipt,
+  type Nhm2MomentumFrameProjectionReceiptV1,
+} from "../../shared/contracts/nhm2-momentum-frame-projection-receipt.v1";
+import {
   isNhm2ObserverRobustEnergyConditionArtifact,
   type Nhm2ObserverRobustEnergyConditionArtifactV1,
 } from "../../shared/contracts/nhm2-observer-robust-energy-conditions.v1";
@@ -119,6 +135,10 @@ export const runNhm2TimeDependentSourceCampaign = (args: {
   regionalFullTensorResidualPath?: string | null;
   sourceOffDiagonalShearAuditPath?: string | null;
   sourceMomentumDensityAuditPath?: string | null;
+  momentumFrameProjectionReceiptPath?: string | null;
+  metricRequiredMomentumDemandAuditPath?: string | null;
+  metricMomentumRemediationTargetsPath?: string | null;
+  campaignFrontierDispositionPath?: string | null;
   covariantConservationDiagnosticPath?: string | null;
   qeiWorldlineDossierPath?: string | null;
   observerRobustEnergyConditionsPath?: string | null;
@@ -163,6 +183,34 @@ export const runNhm2TimeDependentSourceCampaign = (args: {
       args.sourceMomentumDensityAuditPath ?? null,
       isNhm2SourceMomentumDensityAudit,
       "source momentum-density audit",
+    );
+  const momentumFrameProjectionReceipt =
+    readOptional<Nhm2MomentumFrameProjectionReceiptV1>(
+      args.repoRoot,
+      args.momentumFrameProjectionReceiptPath ?? null,
+      isNhm2MomentumFrameProjectionReceipt,
+      "momentum frame projection receipt",
+    );
+  const metricRequiredMomentumDemandAudit =
+    readOptional<Nhm2MetricRequiredMomentumDemandAuditV1>(
+      args.repoRoot,
+      args.metricRequiredMomentumDemandAuditPath ?? null,
+      isNhm2MetricRequiredMomentumDemandAudit,
+      "metric-required momentum demand audit",
+    );
+  const metricMomentumRemediationTargets =
+    readOptional<Nhm2MetricMomentumRemediationTargetsV1>(
+      args.repoRoot,
+      args.metricMomentumRemediationTargetsPath ?? null,
+      isNhm2MetricMomentumRemediationTargets,
+      "metric momentum remediation targets",
+    );
+  const campaignFrontierDisposition =
+    readOptional<Nhm2CampaignFrontierDispositionV1>(
+      args.repoRoot,
+      args.campaignFrontierDispositionPath ?? null,
+      isNhm2CampaignFrontierDisposition,
+      "campaign frontier disposition",
     );
   const covariantConservationDiagnostic =
     readOptional<Nhm2CovariantConservationDiagnosticArtifactV1>(
@@ -253,6 +301,12 @@ export const runNhm2TimeDependentSourceCampaign = (args: {
       regionalFullTensorResidual: args.regionalFullTensorResidualPath ?? null,
       sourceOffDiagonalShearAudit: args.sourceOffDiagonalShearAuditPath ?? null,
       sourceMomentumDensityAudit: args.sourceMomentumDensityAuditPath ?? null,
+      momentumFrameProjectionReceipt: args.momentumFrameProjectionReceiptPath ?? null,
+      metricRequiredMomentumDemandAudit:
+        args.metricRequiredMomentumDemandAuditPath ?? null,
+      metricMomentumRemediationTargets:
+        args.metricMomentumRemediationTargetsPath ?? null,
+      campaignFrontierDisposition: args.campaignFrontierDispositionPath ?? null,
       covariantConservationDiagnostic:
         args.covariantConservationDiagnosticPath ?? null,
       qeiWorldlineDossier: args.qeiWorldlineDossierPath ?? null,
@@ -276,6 +330,10 @@ export const runNhm2TimeDependentSourceCampaign = (args: {
     regionalFullTensorResidual,
     sourceOffDiagonalShearAudit,
     sourceMomentumDensityAudit,
+    momentumFrameProjectionReceipt,
+    metricRequiredMomentumDemandAudit,
+    metricMomentumRemediationTargets,
+    campaignFrontierDisposition,
     covariantConservationDiagnostic,
     qeiWorldlineDossier,
     observerRobustEnergyConditions,
@@ -322,6 +380,18 @@ if (normalize(process.argv[1] ?? "") === normalize(fileURLToPath(import.meta.url
     ),
     sourceMomentumDensityAuditPath: asString(
       args["source-momentum-density-audit"],
+    ),
+    momentumFrameProjectionReceiptPath: asString(
+      args["momentum-frame-projection-receipt"],
+    ),
+    metricRequiredMomentumDemandAuditPath: asString(
+      args["metric-required-momentum-demand-audit"],
+    ),
+    metricMomentumRemediationTargetsPath: asString(
+      args["metric-momentum-remediation-targets"],
+    ),
+    campaignFrontierDispositionPath: asString(
+      args["campaign-frontier-disposition"],
     ),
     covariantConservationDiagnosticPath: asString(
       args["covariant-conservation-diagnostic"],

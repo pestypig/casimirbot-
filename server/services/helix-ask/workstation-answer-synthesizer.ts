@@ -128,6 +128,10 @@ function calculatorResultFromEvaluation(
     readString(record.text),
   ].filter(Boolean).join("\n");
   if (!text) return null;
+  const backedResultEquation = text.match(
+    new RegExp(`\\b(?:calculator-backed result|calculator result)\\s*:\\s*.+?=\\s*${resultPattern}\\b`, "i"),
+  );
+  if (backedResultEquation?.[1]) return backedResultEquation[1];
   const labeledResult = text.match(
     new RegExp(`\\b(?:with result|result(?:\\s+is)?|evaluated to|produced|equals)\\s*:?\\s*${resultPattern}\\b`, "i"),
   );
@@ -180,6 +184,29 @@ function solveSimpleArithmeticExpression(expression: string): string | null {
   } catch {
     return null;
   }
+}
+
+function numericResultValue(value: string | null): number | null {
+  if (!value) return null;
+  const normalized = value.trim().replace(/\s+(?:null|undefined)\s*$/i, "");
+  if (!/^[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?:e[-+]?\d+)?$/i.test(normalized)) return null;
+  const number = Number(normalized);
+  return Number.isFinite(number) ? number : null;
+}
+
+function calculatorResultConflictsWithComputed(observedResult: string | null, computedResult: string | null): boolean {
+  const observedNumber = numericResultValue(observedResult);
+  const computedNumber = numericResultValue(computedResult);
+  if (observedNumber === null || computedNumber === null) return false;
+  const tolerance = Math.max(1e-9, Math.abs(computedNumber) * 1e-9);
+  return Math.abs(observedNumber - computedNumber) > tolerance;
+}
+
+function selectCalculatorResult(observedResult: string | null, computedResult: string | null): string | null {
+  if (observedResult && computedResult && calculatorResultConflictsWithComputed(observedResult, computedResult)) {
+    return computedResult;
+  }
+  return observedResult ?? computedResult;
 }
 
 function calculatorTraceSource(plan: HelixWorkstationToolPlan): string {
@@ -255,9 +282,11 @@ export function buildCalculatorObservation(
   const expression =
     observedExpression ?? setup?.display_latex ?? setup?.expression ?? extractCalculatorExpression(prompt) ?? "the expression";
   const observedResult = calculatorResultFromEvaluation(evaluation);
+  const computedResult =
+    solveSimpleArithmeticExpression(expression) ?? solveSimpleQuadraticZero(expression) ?? solveSimpleLinearZero(expression);
   return {
     expression,
-    result: observedResult ?? solveSimpleArithmeticExpression(expression) ?? solveSimpleQuadraticZero(expression) ?? solveSimpleLinearZero(expression),
+    result: selectCalculatorResult(observedResult, computedResult),
     traceSource: calculatorTraceSource(plan),
     setup,
   };

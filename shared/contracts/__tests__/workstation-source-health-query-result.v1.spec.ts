@@ -79,7 +79,12 @@ const resultFixture = (
     goalId: "goal:frog",
     status: "read",
     missingRequirements: [],
-    policyEvidenceRefs: ["context_feed:source_health", "allowed_actuator:query_source_health"],
+    policyEvidenceRefs: [
+      "context_feed:source_health",
+      "allowed_actuator:query_source_health",
+      "agent_goal_context_feed:feed:source-health",
+      "agent_goal_allowed_actuator:query_source_health",
+    ],
     sourceRefs: ["visual_source:image-lens"],
     loopRefs: [
       "source_health:visual_source:image-lens",
@@ -91,12 +96,22 @@ const resultFixture = (
       "visual_source:image-lens",
       "context_feed:source_health",
       "allowed_actuator:query_source_health",
+      "feed:source-health",
+      "agent_goal_context_feed:feed:source-health",
+      "agent_goal_allowed_actuator:query_source_health",
+      "source_health:visual_source:image-lens",
+      "workstation_context_feed:source_health",
+      "workstation_actuator:query_source_health",
     ],
     freshnessStatus: "fresh",
     goalSessionFound: true,
     feedAllowed: true,
     requiredActuator: "query_source_health",
     actuatorAllowed: true,
+    matchedContextFeeds: agentGoalSession.contextFeeds,
+    matchedContextFeedRefs: ["feed:source-health"],
+    matchedAllowedActuators: ["query_source_health"],
+    matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:query_source_health"],
     agentGoalSession,
     goalContextUpdateId: "stage_play_goal_context_update:source_health:frog",
     terminalAuthority: {
@@ -126,12 +141,23 @@ describe("helix.situation_source_capability_read.v1", () => {
       status: "blocked",
       missingRequirements: ["context_feed:source_health"],
       feedAllowed: false,
+      matchedContextFeeds: [],
+      matchedContextFeedRefs: [],
+      policyEvidenceRefs: [
+        "context_feed:source_health",
+        "allowed_actuator:query_source_health",
+        "agent_goal_allowed_actuator:query_source_health",
+      ],
       sourceRefs: ["helix-ask:desktop"],
       evidenceRefs: [
         "stage_play_source_health:frog",
         "helix-ask:desktop",
         "context_feed:source_health",
         "allowed_actuator:query_source_health",
+        "agent_goal_allowed_actuator:query_source_health",
+        "source_health:visual_source:image-lens",
+        "workstation_context_feed:source_health",
+        "workstation_actuator:query_source_health",
       ],
       freshnessStatus: "blocked",
       capabilities: [],
@@ -157,6 +183,8 @@ describe("helix.situation_source_capability_read.v1", () => {
     expect(validateWorkstationSourceHealthQueryResultV1(resultFixture({
       policyEvidenceRefs: ["allowed_actuator:query_source_health"],
       feedAllowed: false,
+      matchedContextFeeds: [],
+      matchedContextFeedRefs: [],
     }))).toEqual(expect.arrayContaining([
       "policyEvidenceRefs must include context feed policy ref",
       "read source health query results must have feedAllowed=true",
@@ -174,7 +202,73 @@ describe("helix.situation_source_capability_read.v1", () => {
       "loopRefs must include source-health context feed loop ref",
       "loopRefs must include source-health actuator loop ref",
       "evidenceRefs must include every policyEvidenceRefs entry",
+      "evidenceRefs must include every loopRefs entry",
       "freshnessStatus is invalid",
+    ]));
+
+    expect(validateWorkstationSourceHealthQueryResultV1(resultFixture({
+      evidenceRefs: [
+        "stage_play_source_health:frog",
+        "context_feed:source_health",
+        "allowed_actuator:query_source_health",
+        "source_health:visual_source:image-lens",
+        "workstation_context_feed:source_health",
+        "workstation_actuator:query_source_health",
+      ],
+    }))).toEqual(expect.arrayContaining([
+      "evidenceRefs must include every sourceRefs entry",
+    ]));
+
+    expect(validateWorkstationSourceHealthQueryResultV1(resultFixture({
+      freshnessStatus: "blocked",
+    }))).toEqual(expect.arrayContaining([
+      "read source health query results must not have blocked freshnessStatus",
+    ]));
+  });
+
+  it("requires blocked source-health reads to report blocked freshness", () => {
+    expect(validateWorkstationSourceHealthQueryResultV1(resultFixture({
+      status: "blocked",
+      missingRequirements: ["context_feed:source_health"],
+      feedAllowed: false,
+      matchedContextFeeds: [],
+      matchedContextFeedRefs: [],
+      policyEvidenceRefs: ["context_feed:source_health", "allowed_actuator:query_source_health"],
+      freshnessStatus: "fresh",
+    }))).toEqual(expect.arrayContaining([
+      "blocked source health query results must have blocked freshnessStatus",
+    ]));
+  });
+
+  it("requires exact matched actuator refs for goal-authorized source-health reads", () => {
+    expect(validateWorkstationSourceHealthQueryResultV1(resultFixture({
+      matchedAllowedActuators: [],
+      matchedAllowedActuatorRefs: [],
+    }))).toEqual(expect.arrayContaining([
+      "actuatorAllowed=true for a goal session requires matchedAllowedActuators",
+    ]));
+
+    expect(validateWorkstationSourceHealthQueryResultV1(resultFixture({
+      matchedAllowedActuatorRefs: [],
+    }))).toEqual(expect.arrayContaining([
+      "matchedAllowedActuatorRefs must include every matchedAllowedActuators policy ref",
+    ]));
+
+    expect(validateWorkstationSourceHealthQueryResultV1(resultFixture({
+      policyEvidenceRefs: [
+        "context_feed:source_health",
+        "allowed_actuator:query_source_health",
+        "agent_goal_context_feed:feed:source-health",
+      ],
+    }))).toEqual(expect.arrayContaining([
+      "policyEvidenceRefs must include every matched allowed actuator policy ref",
+    ]));
+
+    expect(validateWorkstationSourceHealthQueryResultV1(resultFixture({
+      actuatorAllowed: false,
+      matchedAllowedActuators: ["query_source_health"],
+    }))).toEqual(expect.arrayContaining([
+      "actuatorAllowed=false must not expose matchedAllowedActuators",
     ]));
   });
 

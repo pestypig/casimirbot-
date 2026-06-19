@@ -64,6 +64,59 @@ const toolForDecision = (decision: HelixLiveAgentStepDecision): HelixLiveEnviron
   return null;
 };
 
+const availableToolNamesForPacket = (packet: HelixLiveEnvironmentRuntimePacket): Set<string> =>
+  new Set(packet.available_tools.flatMap((tool) => [tool.tool_id, ...(tool.tool_aliases ?? [])]));
+
+const runtimeContextRefsFromPacket = (packet: HelixLiveEnvironmentRuntimePacket): string[] => {
+  const snapshot = packet.goal_context_snapshot;
+  return uniqueStrings([
+    packet.current_goal.goal_id,
+    ...(snapshot?.recent_goal_context_update_refs ?? []),
+    ...(snapshot?.active_goal_sessions ?? []).flatMap((session) => [
+      session.goal_id,
+      ...session.source_refs,
+      ...session.loop_refs,
+      ...session.context_feed_refs,
+      ...session.allowed_actuator_refs,
+      ...session.checkpoint_refs,
+      session.final_reports_require_terminal_authority
+        ? `terminal_authority_required:${session.goal_id}`
+        : null,
+    ]),
+  ]);
+};
+
+const goalContextSnapshotTranscriptRow = (input: {
+  packet: HelixLiveEnvironmentRuntimePacket;
+  evidenceRefs: string[];
+  createdAt: string;
+}): AskTurnTranscriptRowDraftV1 | null => {
+  const snapshot = input.packet.goal_context_snapshot;
+  if (!snapshot) return null;
+  if (snapshot.active_goal_session_count <= 0 && snapshot.recent_goal_context_update_count <= 0) return null;
+  return {
+    rowId: `goal_context_snapshot:${hashShort([
+      input.packet.thread_id,
+      input.packet.environment_id,
+      snapshot.active_goal_sessions.map((session) => session.goal_id),
+      snapshot.recent_goal_context_update_refs,
+    ])}`,
+    rowKind: "goal_context_snapshot",
+    title: "Goal context snapshot",
+    body: `${snapshot.active_goal_session_count} active goal session(s); ${snapshot.recent_goal_context_update_count} recent goal-context update(s).`,
+    source: {
+      toolName: "live_env.runtime_packet",
+      artifactId: "goal_context_snapshot",
+      artifactKind: "helix.live_environment_runtime_goal_context_snapshot.v1",
+    },
+    evidenceRefs: uniqueStrings(input.evidenceRefs),
+    authority: "tool_evidence",
+    assistantAnswer: false,
+    terminalEligible: false,
+    createdAt: input.createdAt,
+  };
+};
+
 const terminalDecisionFor = (decision: HelixLiveAgentStepDecision): HelixLiveEnvironmentAgentLoopResult["terminal_decision"] | null => {
   if (decision.next_step === "answer") return "answer_allowed";
   if (decision.next_step === "ask_user") return "ask_user";
@@ -325,6 +378,9 @@ export async function runLiveEnvironmentAgentLoop(input: {
   const maxIterations = Math.max(1, Math.min(8, Math.trunc(input.maxIterations ?? 4)));
   let terminalDecision: HelixLiveEnvironmentAgentLoopResult["terminal_decision"] = "needs_more_observation";
   const currentTurnId = String(input.turnId ?? input.environmentId ?? input.threadId).trim();
+  const runtimeContextRefs: string[] = [];
+  let latestGoalContextSnapshot: HelixLiveEnvironmentRuntimePacket["goal_context_snapshot"] | null = null;
+  const transcriptRowIds = new Set<string>();
 
   for (let stepIndex = 0; stepIndex < maxIterations; stepIndex += 1) {
     const drainedSteering = currentTurnId
@@ -354,6 +410,18 @@ export async function runLiveEnvironmentAgentLoop(input: {
       pending_voice_steering_refs: pendingSteering.map((event) => event.steeringEventId),
       voice_steering_summary: summarizeVoiceSteeringForModel(pendingSteering),
     };
+    const packetRuntimeContextRefs = runtimeContextRefsFromPacket(packet);
+    runtimeContextRefs.push(...packetRuntimeContextRefs);
+    latestGoalContextSnapshot = packet.goal_context_snapshot ?? null;
+    const goalContextRow = goalContextSnapshotTranscriptRow({
+      packet,
+      evidenceRefs: packetRuntimeContextRefs,
+      createdAt: now,
+    });
+    if (goalContextRow && !transcriptRowIds.has(goalContextRow.rowId)) {
+      transcriptRows.push(goalContextRow);
+      transcriptRowIds.add(goalContextRow.rowId);
+    }
     const modelDecision = await input.chooser({
       packet,
       history: iterations,
@@ -421,7 +489,7 @@ export async function runLiveEnvironmentAgentLoop(input: {
     }
 
     const toolName = toolForDecision(decision);
-    const allowedTools = new Set(packet.available_tools.map((tool) => tool.tool_id));
+    const allowedTools = availableToolNamesForPacket(packet);
     const forcedMandatoryToolUnavailable = Boolean(forcedPhaseTool && toolName === forcedPhaseTool && !allowedTools.has(toolName));
     const toolObservation = toolName && allowedTools.has(toolName)
       ? executeLiveEnvironmentTool({
@@ -523,11 +591,13 @@ export async function runLiveEnvironmentAgentLoop(input: {
     environment_id: input.environmentId ?? null,
     iterations,
     terminal_decision: terminalDecision,
+    runtime_context_refs: uniqueStrings(runtimeContextRefs),
+    goal_context_snapshot: latestGoalContextSnapshot,
     evidence_refs: uniqueStrings(iterations.flatMap((iteration) => [
       ...iteration.step_decision.evidence_refs,
       ...(iteration.tool_observation?.evidence_refs ?? []),
       ...iteration.commentary_refs,
-    ])),
+    ]).concat(runtimeContextRefs)),
     transcriptRows,
     assistant_answer: false,
     raw_content_included: false,

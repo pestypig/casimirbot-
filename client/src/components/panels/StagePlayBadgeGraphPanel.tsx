@@ -32,6 +32,7 @@ import type {
 } from "@shared/contracts/stage-play-live-source-mail-wake.v1";
 import {
   WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
+  queryActuatorForAgentGoalContextFeedV1,
   type AgentGoalSessionV1,
   type WorkstationDispatchActionV1,
   type WorkstationGoalContextUpdateV1,
@@ -1566,6 +1567,7 @@ function proceduralExpression(badge: StagePlayBadgeV1): string {
 function badgeActionLine(badge: StagePlayBadgeV1): string {
   if (badge.kind === "observer") return "Source custody and routing";
   if (badge.kind === "source") return "Routed live source";
+  if (badge.id === "workstation_state_plane.terminal_authority") return "Terminal authority boundary";
   if (badge.kind === "workstation_state_plane") return "Workstation state plane";
   if (badge.kind === "goal_context_update") return "Goal context update";
   if (badge.kind === "agent_goal_session") return "Agent goal session";
@@ -1590,6 +1592,7 @@ function selectedNodeConsoleTitle(badge: StagePlayBadgeV1 | null): string {
   if (!badge) return "Builder Palette";
   if (badge.kind === "observer") return "Observer Source Setup";
   if (badge.kind === "source") return "Source Routing";
+  if (badge.id === "workstation_state_plane.terminal_authority") return "Terminal Authority";
   if (badge.kind === "workstation_state_plane") return "Workstation State Plane";
   if (badge.kind === "goal_context_update") return "Goal Context Update";
   if (badge.kind === "agent_goal_session") return "Agent Goal Session";
@@ -1611,6 +1614,9 @@ function selectedNodeConsoleDescription(badge: StagePlayBadgeV1 | null): string 
   }
   if (badge.kind === "observer") return "Configure source custody, routing, cadence, and audit buffers.";
   if (badge.kind === "source") return "Route this source into Stage Play and inspect its evidence custody.";
+  if (badge.id === "workstation_state_plane.terminal_authority") {
+    return "Inspect the completed-solver boundary that keeps receipts, MicroDeck outputs, narrator events, and panel projections from becoming final answers.";
+  }
   if (badge.kind === "workstation_state_plane") return "Inspect deterministic workstation process state without granting answer or action authority.";
   if (badge.kind === "goal_context_update") return "Inspect a durable, non-terminal workstation context update and its dispatch suggestions.";
   if (badge.kind === "agent_goal_session") return "Inspect the active goal session feeds, actuator bounds, checkpoints, and terminal authority requirement.";
@@ -1632,6 +1638,7 @@ function selectedNodeConsoleDescription(badge: StagePlayBadgeV1 | null): string 
 function inspectorTestIdForBadge(badge: StagePlayBadgeV1): string {
   if (badge.kind === "observer") return "stage-play-observer-node-controls";
   if (badge.kind === "source") return "stage-play-source-node-controls";
+  if (badge.id === "workstation_state_plane.terminal_authority") return "stage-play-terminal-authority-node-controls";
   if (badge.kind === "compact_observation") return "stage-play-compact-observation-node-controls";
   if (badge.kind === "procedural_binding") return "stage-play-procedural-binding-node-controls";
   if (badge.kind === "ask_checkpoint" || badge.kind === "helix_ask_checkpoint") return "stage-play-ask-checkpoint-node-controls";
@@ -1700,6 +1707,7 @@ function compactTrayMetric(value: string | number | null | undefined, fallback: 
 function stagePlayDataFlowRefs(badge: StagePlayBadgeV1): string[] {
   return uniqueSorted([
     ...(badge.dataTray?.inputRefs ?? []),
+    ...(badge.dataTray?.toolRefs ?? []),
     ...(badge.dataTray?.outputRefs ?? []),
     ...(badge.dataTray?.evidenceRefs ?? []),
   ]);
@@ -1709,8 +1717,10 @@ function hasStagePlayDataFlowTray(badge: StagePlayBadgeV1): boolean {
   return Boolean(
     badge.dataTray?.transformLabel ||
       badge.dataTray?.inputRefs?.length ||
+      badge.dataTray?.toolRefs?.length ||
       badge.dataTray?.outputRefs?.length ||
       badge.dataTray?.inputPreview ||
+      badge.dataTray?.toolPreview ||
       badge.dataTray?.outputPreview ||
       badge.dataTray?.skipped?.length ||
       badge.dataTray?.blockedUntil,
@@ -2289,12 +2299,30 @@ function outputTrayView(badge: StagePlayBadgeV1): StagePlayBadgeTrayView {
   };
 }
 
+function terminalAuthorityTrayView(badge: StagePlayBadgeV1): StagePlayBadgeTrayView {
+  const completed = badge.tags.some((tag) => /completed_solver_path/i.test(tag)) ||
+    badge.reasonCodes.some((code) => /completed_solver_path_selects_answer/i.test(code));
+  return {
+    title: badge.dataTray?.title ?? "Terminal authority",
+    metric: compactTrayMetric(completed ? "terminal selected" : "terminal pending", "terminal pending"),
+    summary: compactTrayText(
+      badge.dataTray?.outputPreview ?? badge.dataTray?.summary ?? badge.plainMeaning,
+      "Terminal answer pending.",
+    ),
+    detail: compactTrayText(
+      badge.dataTray?.blockedUntil ?? badge.dataTray?.transformLabel ?? "completed solver path boundary",
+      "completed solver path boundary",
+    ),
+  };
+}
+
 function badgeTrayView(badge: StagePlayBadgeV1, observerSources: StagePlayObserverSource[]): StagePlayBadgeTrayView {
   if (badge.kind === "observer") return observerTrayView(badge, observerSources);
   if (badge.kind === "compact_observation") return compactObservationTrayView(badge);
   if (badge.kind === "ask_checkpoint" || badge.kind === "helix_ask_checkpoint") return askCheckpointTrayView(badge);
   if (badge.kind === "answer_snapshot") return answerSnapshotTrayView(badge);
   if (badge.kind === "live_output" || badge.kind === "voice_output") return outputTrayView(badge);
+  if (badge.id === "workstation_state_plane.terminal_authority") return terminalAuthorityTrayView(badge);
   return {
     title: badge.dataTray?.title ?? badge.output?.lineKey ?? labelize(badge.kind),
     metric: compactTrayMetric(
@@ -2565,6 +2593,13 @@ type StagePlayGoalContextCircuitHop = {
   value: string;
 };
 
+type StagePlayPacketCircuitInspectorHop = {
+  key: string;
+  label: string;
+  value: string;
+  refs: string[];
+};
+
 const firstStagePlayGoalContextRef = (
   refs: string[],
   match: (ref: string) => boolean,
@@ -2644,6 +2679,96 @@ const stagePlayGoalContextCircuitHops = (
     { key: "dispatch", label: "Dispatch", value: compactStagePlayText(stagePlayDispatchActionLabel(dispatch), "none", 42) },
     { key: "destination", label: "Destination", value: compactStagePlayText(destination, "destination pending", 96) },
     { key: "authority", label: "Authority", value: authority },
+  ];
+};
+
+const stagePlayPacketCircuitInspectorHops = (
+  traffic: StagePlayPacketTrafficViewV1,
+): StagePlayPacketCircuitInspectorHop[] => {
+  const stationByKey = new Map(traffic.stationStates.map((station) => [station.station, station]));
+  const stationRefs = (key: StagePlayPacketTrafficStationKey): string[] =>
+    Array.from(new Set(stationByKey.get(key)?.refs ?? []));
+  const sourceRefs = Array.from(new Set([
+    traffic.sourceId,
+    ...stationRefs("visual_source"),
+  ].filter(Boolean) as string[]));
+  const deckRefs = Array.from(new Set([
+    traffic.deck?.presetId ?? null,
+    ...traffic.microReasonerRuns.flatMap((run) => [run.runId, run.promptId ?? null, ...run.refs]),
+    ...stationRefs("micro_reasoner_deck"),
+  ].filter(Boolean) as string[]));
+  const goalContextRefs = Array.from(new Set(traffic.goalContextUpdates.flatMap((update) => [
+    update.updateId,
+    update.contentRef,
+    ...update.evidenceRefs,
+  ])));
+  const dispatchLabels = traffic.dispatchActions.map(stagePlayDispatchActionLabel);
+  const dispatchRefs = Array.from(new Set(traffic.dispatchActions.flatMap((action) => [
+    action.kind,
+    stagePlayDispatchDestinationLabel(action),
+  ].filter(Boolean) as string[])));
+  const outputRefs = Array.from(new Set([
+    traffic.voiceReceiptId ?? null,
+    ...stationRefs("output"),
+  ].filter(Boolean) as string[]));
+  const authorityOk = traffic.goalContextUpdates.length > 0 && traffic.goalContextUpdates.every((update) =>
+    update.authority.assistantAnswer === false &&
+    update.authority.terminalEligible === false &&
+    update.authority.rawContentIncluded === false
+  );
+  return [
+    {
+      key: "source",
+      label: "Source Path",
+      value: compactStagePlayText(sourceRefs.join(" | "), "source pending", 96),
+      refs: sourceRefs,
+    },
+    {
+      key: "mail",
+      label: "Mail",
+      value: compactStagePlayText(traffic.mailIds.join(" | "), "mail pending", 96),
+      refs: traffic.mailIds,
+    },
+    {
+      key: "packet",
+      label: "Packet",
+      value: compactStagePlayText(traffic.packetId ?? traffic.packetKey, "packet pending", 96),
+      refs: stationRefs("processed_packet"),
+    },
+    {
+      key: "deck",
+      label: "Deck",
+      value: compactStagePlayText(
+        `${stagePlayPacketDeckTitle(traffic.deck)} | ${traffic.microReasonerRuns.length} run${traffic.microReasonerRuns.length === 1 ? "" : "s"}`,
+        "deck pending",
+        96,
+      ),
+      refs: deckRefs,
+    },
+    {
+      key: "goal_context",
+      label: "Goal Context",
+      value: `${traffic.goalContextUpdates.length} non-terminal update${traffic.goalContextUpdates.length === 1 ? "" : "s"}`,
+      refs: goalContextRefs,
+    },
+    {
+      key: "dispatch",
+      label: "Dispatch",
+      value: compactStagePlayText(dispatchLabels.join(" | "), "no dispatch", 260),
+      refs: dispatchRefs,
+    },
+    {
+      key: "output",
+      label: "Output",
+      value: compactStagePlayText(stationByKey.get("output")?.preview, "output pending", 96),
+      refs: outputRefs,
+    },
+    {
+      key: "authority",
+      label: "Authority",
+      value: authorityOk ? "evidence only: assistant=false terminal=false raw=false" : "authority pending or blocked",
+      refs: goalContextRefs.slice(0, 6),
+    },
   ];
 };
 
@@ -3043,6 +3168,7 @@ function StagePlayPacketTrafficBoard({
 }) {
   const selected = traffic.find((row) => row.packetKey === selectedPacketKey) ?? null;
   const selectedColor = selected ? packetTrailColor(selected.colorKey) : null;
+  const selectedCircuitHops = selected ? stagePlayPacketCircuitInspectorHops(selected) : [];
   const workBudgetTone = stagePlayBudgetTone(workBudget?.pressure?.level, workBudget?.pressure?.ratio);
   const budgetLevel = workBudget?.pressure?.level ? labelize(workBudget.pressure.level) : "n/a";
   const rolesPerPacket = workBudget?.usage?.rolesPerPacket;
@@ -3265,6 +3391,36 @@ function StagePlayPacketTrafficBoard({
               </div>
             </div>
           </div>
+          <div
+            className="mt-3 rounded border border-slate-800 bg-slate-950/65 p-3"
+            data-testid="stage-play-packet-circuit-inspector"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-200">Selected packet circuit</div>
+              <div className="font-mono text-[10px] text-slate-500">packet-scoped observation path</div>
+            </div>
+            <div className="mt-2 grid gap-1.5 md:grid-cols-2 xl:grid-cols-4">
+              {selectedCircuitHops.map((hop) => (
+                <div
+                  key={hop.key}
+                  className="min-h-[76px] rounded border border-slate-800 bg-black/20 p-2"
+                  style={selectedColor ? { borderColor: selectedColor.border } : undefined}
+                  data-testid="stage-play-packet-circuit-hop"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">{hop.label}</span>
+                    {selectedColor ? (
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: selectedColor.hsl }} aria-hidden="true" />
+                    ) : null}
+                  </div>
+                  <div className="mt-1 line-clamp-2 text-[10px] leading-snug text-slate-200">{hop.value}</div>
+                  <div className="mt-1 truncate font-mono text-[9px] text-slate-500">
+                    {hop.refs.slice(0, 3).map(compactStagePlayCircuitRef).join(" | ") || "refs pending"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
           <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {selected.microReasonerRuns.map((run) => (
               <div
@@ -3354,6 +3510,24 @@ function StagePlayGoalContextBoard({
   const activeSessions = sessions.filter((session) => session.status === "active" || session.status === "blocked").slice(0, 3);
   const wakeInterruptCount = updates.reduce(
     (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "wake_agent").length,
+    0,
+  );
+  const wakeUrgentCount = updates.reduce(
+    (count, update) => count + update.suggestedDispatch.filter((action) =>
+      action.kind === "wake_agent" && action.interruptKind === "urgent"
+    ).length,
+    0,
+  );
+  const wakeBlockedCount = updates.reduce(
+    (count, update) => count + update.suggestedDispatch.filter((action) =>
+      action.kind === "wake_agent" && action.interruptKind === "blocked"
+    ).length,
+    0,
+  );
+  const wakePolicyTriggeredCount = updates.reduce(
+    (count, update) => count + update.suggestedDispatch.filter((action) =>
+      action.kind === "wake_agent" && action.interruptKind === "policy_triggered"
+    ).length,
     0,
   );
   const narratorDispatchCount = updates.reduce(
@@ -3454,6 +3628,8 @@ function StagePlayGoalContextBoard({
       ...update.loopRefs,
     ].filter((ref) =>
       ref.startsWith("context_feed:") ||
+      ref.startsWith("agent_goal_context_feed:") ||
+      ref.startsWith("agent_goal_allowed_actuator:") ||
       ref.startsWith("allowed_actuator:") ||
       ref.startsWith("workstation_context_feed:") ||
       ref.startsWith("workstation_actuator:")
@@ -3461,15 +3637,29 @@ function StagePlayGoalContextBoard({
   const contextFeedPolicyRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
     policyRefsForUpdate(update).filter((ref) =>
       ref.startsWith("context_feed:") ||
+      ref.startsWith("agent_goal_context_feed:") ||
       ref.startsWith("workstation_context_feed:")
     );
   const actuatorPolicyRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
     policyRefsForUpdate(update).filter((ref) =>
       ref.startsWith("allowed_actuator:") ||
+      ref.startsWith("agent_goal_allowed_actuator:") ||
       ref.startsWith("workstation_actuator:")
     );
+  const matchedGoalAllowedActuatorRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
+    policyRefsForUpdate(update).filter((ref) => ref.startsWith("agent_goal_allowed_actuator:"));
   const feedPolicyRefCount = updates.reduce((count, update) => count + contextFeedPolicyRefsForUpdate(update).length, 0);
   const actuatorPolicyRefCount = updates.reduce((count, update) => count + actuatorPolicyRefsForUpdate(update).length, 0);
+  const exactGoalActuatorPolicyRefCount = updates.reduce((count, update) => count + matchedGoalAllowedActuatorRefsForUpdate(update).length, 0);
+  const sessionFeedPolicyRefs = (session: AgentGoalSessionV1): string[] =>
+    session.contextFeeds.flatMap((feed) => {
+      const actuator = queryActuatorForAgentGoalContextFeedV1(feed.sourceKind);
+      const refs = [`agent_goal_context_feed:${feed.feedId}`];
+      if (session.allowedActuators.includes(actuator)) {
+        refs.push(`agent_goal_allowed_actuator:${actuator}`);
+      }
+      return refs;
+    });
   const formatSessionCadence = (cadence: AgentGoalSessionV1["cadence"]): string => {
     if (cadence.kind === "event_accumulation") return `event accumulation / ${cadence.minUpdates} updates`;
     if (cadence.kind === "interval") return `interval / ${cadence.everyMs}ms`;
@@ -3563,13 +3753,19 @@ function StagePlayGoalContextBoard({
             {formatStagePlayCount(workstationControlDispatchCount)} non-wake control dispatch{workstationControlDispatchCount === 1 ? "" : "es"}: {formatStagePlayCount(presetDispatchCount)} preset, {formatStagePlayCount(sourceBindingDispatchCount)} source binding, {formatStagePlayCount(loopDispatchCount)} loop, {formatStagePlayCount(liveAnswerDispatchCount)} Live Answer, {formatStagePlayCount(processGraphDispatchCount)} graph, {formatStagePlayCount(narratorDispatchCount)} narrator. Wake remains {formatStagePlayCount(wakeInterruptCount)} interrupt dispatch{wakeInterruptCount === 1 ? "" : "es"}.
           </div>
         </div>
+        <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-wake-interrupt-scope-state">
+          <div className="font-semibold uppercase tracking-wide text-violet-200/80">Wake interrupt scope</div>
+          <div className="mt-0.5 text-slate-400">
+            Wake split: {formatStagePlayCount(wakeUrgentCount)} urgent, {formatStagePlayCount(wakeBlockedCount)} blocked, {formatStagePlayCount(wakePolicyTriggeredCount)} policy-triggered. Other dispatches stay on workstation control lanes.
+          </div>
+        </div>
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-actuator-policy-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Actuator policy</div>
           <div className="mt-0.5 text-slate-400">{formatStagePlayCount(actuatorPolicyCount)} allowed actuator{actuatorPolicyCount === 1 ? "" : "s"} bound to goal sessions; {formatStagePlayCount(narratorActuatorPolicyCount)} narrator output policy item{narratorActuatorPolicyCount === 1 ? "" : "s"}; {formatStagePlayCount(narratorEventFeedCount)} narrator event feed{narratorEventFeedCount === 1 ? "" : "s"}.</div>
         </div>
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-feed-policy-ref-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Feed policy refs</div>
-          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(feedPolicyRefCount)} context-feed policy ref{feedPolicyRefCount === 1 ? "" : "s"} and {formatStagePlayCount(actuatorPolicyRefCount)} actuator policy ref{actuatorPolicyRefCount === 1 ? "" : "s"} link feed inputs to controlled workstation outputs.</div>
+          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(feedPolicyRefCount)} context-feed policy ref{feedPolicyRefCount === 1 ? "" : "s"} and {formatStagePlayCount(actuatorPolicyRefCount)} actuator policy ref{actuatorPolicyRefCount === 1 ? "" : "s"} link feed inputs to controlled workstation outputs; {formatStagePlayCount(exactGoalActuatorPolicyRefCount)} exact goal authorization ref{exactGoalActuatorPolicyRefCount === 1 ? "" : "s"} are visible for debugging.</div>
         </div>
       </div>
       <div className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(240px,320px)]">
@@ -3579,6 +3775,7 @@ function StagePlayGoalContextBoard({
             const policyRefs = policyRefsForUpdate(update);
             const contextFeedPolicyRefs = contextFeedPolicyRefsForUpdate(update);
             const actuatorPolicyRefs = actuatorPolicyRefsForUpdate(update);
+            const matchedGoalActuatorRefs = matchedGoalAllowedActuatorRefsForUpdate(update);
             const circuitHops = stagePlayGoalContextCircuitHops(update);
             return (
               <div
@@ -3627,11 +3824,16 @@ function StagePlayGoalContextBoard({
                   <div className="truncate">evidence={update.evidenceRefs.slice(0, 3).join(", ") || "none"}</div>
                   <div className="truncate">receipts={update.receiptRefs.slice(0, 3).join(", ") || "none"}</div>
                   {policyRefs.length > 0 ? (
-                    <div className="truncate" data-testid="stage-play-goal-context-update-policy">policy={policyRefs.slice(0, 4).join(", ")}</div>
+                    <div className="truncate" data-testid="stage-play-goal-context-update-policy">policy={policyRefs.slice(0, 6).join(", ")}</div>
                   ) : null}
                   {contextFeedPolicyRefs.length > 0 || actuatorPolicyRefs.length > 0 ? (
                     <div className="truncate" data-testid="stage-play-goal-context-update-policy-split">
                       feeds={contextFeedPolicyRefs.slice(0, 3).join(", ") || "none"}; actuators={actuatorPolicyRefs.slice(0, 3).join(", ") || "none"}
+                    </div>
+                  ) : null}
+                  {matchedGoalActuatorRefs.length > 0 ? (
+                    <div className="truncate" data-testid="stage-play-goal-context-update-matched-actuator-refs">
+                      matchedActuatorRefs={matchedGoalActuatorRefs.slice(0, 4).join(", ")}
                     </div>
                   ) : null}
                   <div className="truncate" data-testid="stage-play-goal-context-update-freshness">freshness={freshnessLabel(update)}</div>
@@ -3656,7 +3858,9 @@ function StagePlayGoalContextBoard({
             Goal sessions read these streams and actuate panels; final reports still require terminal authority.
           </div>
           <div className="mt-3 space-y-2">
-            {activeSessions.length > 0 ? activeSessions.map((session) => (
+            {activeSessions.length > 0 ? activeSessions.map((session) => {
+              const feedPolicyRefs = sessionFeedPolicyRefs(session);
+              return (
               <div key={session.goalId} className="rounded border border-violet-900/50 bg-violet-950/15 p-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="truncate text-[11px] font-semibold text-violet-50">{session.userVisibleSummary}</div>
@@ -3672,6 +3876,9 @@ function StagePlayGoalContextBoard({
                   </div>
                   <div data-testid="stage-play-agent-goal-session-actuators">
                     actuators={session.allowedActuators.slice(0, 8).map((actuator) => labelize(actuator)).join(", ") || "none"}
+                  </div>
+                  <div data-testid="stage-play-agent-goal-session-feed-policy-refs">
+                    feedPolicyRefs={feedPolicyRefs.slice(0, 18).join(", ") || "none"}
                   </div>
                   <div data-testid="stage-play-agent-goal-session-loops">
                     loops={session.loopRefs.slice(0, 4).join(", ") || "none"}
@@ -3723,7 +3930,8 @@ function StagePlayGoalContextBoard({
                   ))}
                 </div>
               </div>
-            )) : (
+              );
+            }) : (
               <div className="rounded border border-slate-800 bg-slate-950/70 p-2 text-xs text-slate-500">
                 No active goal session is attached. Updates remain available as workstation context.
               </div>
@@ -8996,6 +9204,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function StagePlayDataFlowSection({ badge }: { badge: StagePlayBadgeV1 }) {
   if (!hasStagePlayDataFlowTray(badge)) return null;
   const inputRefs = badge.dataTray?.inputRefs ?? [];
+  const toolRefs = badge.dataTray?.toolRefs ?? [];
   const outputRefs = badge.dataTray?.outputRefs ?? [];
   const skipped = badge.dataTray?.skipped ?? [];
   const copyRefs = stagePlayDataFlowRefs(badge);
@@ -9029,6 +9238,17 @@ function StagePlayDataFlowSection({ badge }: { badge: StagePlayBadgeV1 }) {
             {badge.dataTray?.transformLabel ?? "No transform label recorded."}
           </div>
         </div>
+        {badge.dataTray?.toolPreview || toolRefs.length > 0 ? (
+          <div data-testid="stage-play-data-flow-tool-identity">
+            <div className="font-semibold uppercase tracking-wide text-slate-500">Tool Identity</div>
+            {badge.dataTray?.toolPreview ? (
+              <div className="mt-1 rounded border border-violet-900/70 bg-violet-950/15 p-2 text-violet-100">
+                {badge.dataTray.toolPreview}
+              </div>
+            ) : null}
+            {renderRefs(toolRefs, "No tool identity refs recorded.")}
+          </div>
+        ) : null}
         <div>
           <div className="font-semibold uppercase tracking-wide text-slate-500">Output</div>
           {badge.dataTray?.outputPreview ? (
@@ -10308,6 +10528,44 @@ function Inspector({
         </Section>
 
         <StagePlayDataFlowSection badge={badge} />
+
+        {badge.id === "workstation_state_plane.terminal_authority" ? (
+          <>
+            <Section title="Terminal Boundary">
+              <div className="space-y-2 text-xs">
+                <div
+                  className="rounded border border-amber-900/60 bg-amber-950/20 p-2 text-amber-100"
+                  data-testid="stage-play-terminal-authority-boundary"
+                >
+                  {badge.dataTray?.blockedUntil
+                    ? `Blocked until ${badge.dataTray.blockedUntil}.`
+                    : "Completed solver path has selected the current terminal answer."}
+                </div>
+                <div className="rounded border border-slate-800 bg-black/20 p-2 text-slate-300">
+                  {badge.plainMeaning}
+                </div>
+              </div>
+            </Section>
+            <Section title="Observation Sources">
+              <div className="flex flex-wrap gap-1" data-testid="stage-play-terminal-authority-skipped-sources">
+                {(badge.dataTray?.skipped ?? []).length > 0 ? badge.dataTray?.skipped?.map((entry) => (
+                  <Badge key={entry} variant="outline" className="border-amber-800/70 bg-amber-950/20 text-amber-100">
+                    {labelize(entry)}
+                  </Badge>
+                )) : (
+                  <span className="text-xs text-slate-500">No skipped observation sources recorded.</span>
+                )}
+              </div>
+            </Section>
+            <Section title="Authority Refs">
+              <div className="space-y-1 font-mono text-xs text-slate-400">
+                {displayEvidenceRefs.length > 0
+                  ? displayEvidenceRefs.map((ref) => <div key={ref}>{ref}</div>)
+                  : <span>No terminal authority refs recorded.</span>}
+              </div>
+            </Section>
+          </>
+        ) : null}
 
         {badge.kind === "compact_observation" ? (
           <>

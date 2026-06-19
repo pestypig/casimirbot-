@@ -23,6 +23,7 @@ import {
   detectContextualToolAdmissionSuppression,
   type HelixContextualToolAdmissionSuppression,
 } from "./contextual-tool-admission";
+import { WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS } from "./workstation-context-feed-query-tool-contracts";
 
 type RecordLike = Record<string, unknown>;
 
@@ -224,6 +225,31 @@ const nonModelToolCapability = (capability: unknown): string | null => {
   return stringValue && !isModelAnswerCapability(stringValue) ? stringValue : null;
 };
 
+const GENERIC_PLANNER_CAPABILITIES = new Set([
+  "click_or_activate_control",
+  "control_live_source",
+  "execute_live_environment_action",
+  "execute_workstation_action",
+  "inspect_live_source",
+  "open_or_validate_document",
+  "retrieve_document_evidence",
+]);
+
+const isGenericPlannerCapability = (capability: unknown): boolean => {
+  const normalized = normalize(capability);
+  return normalized ? GENERIC_PLANNER_CAPABILITIES.has(normalized) : false;
+};
+
+const preferConcreteCapability = (
+  candidate: unknown,
+  concreteCapability: string | null,
+): string | null => {
+  const candidateCapability = readString(candidate);
+  if (!candidateCapability) return concreteCapability;
+  if (concreteCapability && isGenericPlannerCapability(candidateCapability)) return concreteCapability;
+  return candidateCapability;
+};
+
 const runtimeLoopExecutedCapability = (payload: RecordLike): string | null => {
   const loop = readRecord(payload.agent_runtime_loop);
   const iterations = Array.isArray(loop?.iterations)
@@ -287,6 +313,37 @@ const artifactInferredFamily = (artifacts: RecordLike[]): string | null => {
   return best?.family ?? null;
 };
 
+const COMMON_CONTEXT_FEED_QUERY_ALIASES = new Set([
+  "stage_play_workstation_context_feed_query_result",
+  "stage_play_workstation_context_feed_query_result_v1",
+]);
+
+const capabilityFromCanonicalContextFeedQueryArtifacts = (haystack: string): string | null => {
+  const normalizedHaystack = normalize(haystack);
+  for (const spec of WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS) {
+    if (
+      spec.feedKind === "source_health" ||
+      spec.feedKind === "trace_memory" ||
+      spec.feedKind === "packet_traces"
+    ) {
+      continue;
+    }
+
+    const tokens = [
+      spec.capability,
+      spec.feedKind,
+      spec.actuator,
+      ...spec.aliases,
+      spec.explicitRequiredObservationKind,
+    ]
+      .map(normalize)
+      .filter((token) => token && !COMMON_CONTEXT_FEED_QUERY_ALIASES.has(token));
+
+    if (tokens.some((token) => normalizedHaystack.includes(token))) return spec.capability;
+  }
+  return null;
+};
+
 const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   const haystack = artifacts
     .flatMap((artifact) => [
@@ -298,6 +355,15 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
       readString(artifactPayload(artifact)?.tool_name),
       readString(artifactPayload(artifact)?.capability),
       readString(artifactPayload(artifact)?.capability_key),
+      readString(artifactPayload(artifact)?.requiredActuator),
+      readString(artifactPayload(artifact)?.required_actuator),
+      readString(artifactPayload(artifact)?.actuator),
+      readString(artifactPayload(artifact)?.controlKind),
+      readString(artifactPayload(artifact)?.control_kind),
+      readString(artifactPayload(artifact)?.feed_kind),
+      readString(artifactPayload(artifact)?.feedKind),
+      readString(artifactPayload(artifact)?.source_kind),
+      readString(artifactPayload(artifact)?.sourceKind),
     ])
     .join("\n")
     .toLowerCase();
@@ -347,29 +413,19 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   if (/live_env[-_.:]query_trace_memory|workstation_reasoning_trace_query|helix\.workstation_reasoning_trace_query_result|helix\.workstation_reasoning_trace\.v1/.test(haystack)) {
     return "live_env.query_trace_memory";
   }
-  if (/live_env[-_.:]query_visual_summaries|visual_summaries|visual_capture_summaries/.test(haystack)) {
-    return "live_env.query_visual_summaries";
+  if (/live_env[-_.:]evaluate_goal_satisfaction|goal_satisfaction|helix\.live_environment_goal_satisfaction\.v1/.test(haystack)) {
+    return "live_env.evaluate_goal_satisfaction";
   }
   if (/live_env[-_.:]query_packet_traces|packet_traces|per_packet_traces|packet_causal_trace|live_source_causal_trace/.test(haystack)) {
     return "live_env.query_packet_traces";
   }
-  if (/live_env[-_.:]query_automation_policies|query_automation_policies|automation_policies|automation_policy|automation_status|stage_play_workstation_context_feed_query_result[\s\S]*automation_policies/.test(haystack)) {
-    return "live_env.query_automation_policies";
+  const contextFeedQueryCapability = capabilityFromCanonicalContextFeedQueryArtifacts(haystack);
+  if (contextFeedQueryCapability) return contextFeedQueryCapability;
+  if (/live_env[-_.:]set_visual_preset|set_visual_preset|visual_preset/.test(haystack)) {
+    return "live_env.set_visual_preset";
   }
-  if (/live_env[-_.:]query_route_evidence|query_route_evidence|route_evidence_feed|route_watch_evidence|stage_play_workstation_context_feed_query_result[\s\S]*route_evidence/.test(haystack)) {
-    return "live_env.query_route_evidence";
-  }
-  if (/live_env[-_.:]query_audio_transcripts|audio_transcripts|transcription_loop/.test(haystack)) {
-    return "live_env.query_audio_transcripts";
-  }
-  if (/live_env[-_.:]query_translation_segments|translation_segments|translated_transcripts/.test(haystack)) {
-    return "live_env.query_translation_segments";
-  }
-  if (/live_env[-_.:]query_microdeck_outputs|microdeck_outputs|micro_reasoner_outputs/.test(haystack)) {
-    return "live_env.query_microdeck_outputs";
-  }
-  if (/live_env[-_.:]query_live_answer_state|live_answer_state|live_answer_lines/.test(haystack)) {
-    return "live_env.query_live_answer_state";
+  if (/live_env[-_.:]set_audio_preset|set_audio_preset|audio_preset/.test(haystack)) {
+    return "live_env.set_audio_preset";
   }
   if (/live_env[-_.:]change_workstation_preset|change_workstation_preset|apply_workstation_preset/.test(haystack)) {
     return "live_env.change_workstation_preset";
@@ -403,9 +459,6 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   }
   if (/live_env[-_.:]narrator_bind_stream|narrator\.bind_stream|narrator_bind_stream_request|helix\.narrator_bind_stream_request\.v1/.test(haystack)) {
     return "live_env.narrator_bind_stream";
-  }
-  if (/live_env[-_.:]query_narrator_events|narrator_events|narrator_bindings|narrator_streams/.test(haystack)) {
-    return "live_env.query_narrator_events";
   }
   if (/live_env[-_.:]configure_route_watch|configure_route_watch|route_watch_policy|route[-_\s]?watch/.test(haystack)) {
     return "live_env.configure_route_watch";
@@ -887,14 +940,25 @@ const buildToolTurnChainAudit = (input: {
     capabilityPlan?.requested_capability,
   );
   const requestedCapabilityContract = explicitCapabilityContractForCapability(requestedCapability);
-  const selectedCapability =
-    firstString(
-      capabilityPlan?.selected_capability,
-      input.lifecycleTrace?.admitted_capability,
-      input.lifecycleTrace?.requested_capability,
-    ) ?? input.capability;
   const operationalTrace = readRecord(input.payload.operational_capability_trace);
   const runtimeToolCall = readRecord(input.payload.runtime_tool_call);
+  const concreteSelectedCapability = firstString(
+    nonModelToolCapability(operationalTrace?.model_proposed_capability),
+    nonModelToolCapability(input.lifecycleTrace?.admitted_capability),
+    nonModelToolCapability(input.lifecycleTrace?.requested_capability),
+    nonModelToolCapability(runtimeToolCall?.capability_key),
+    nonModelToolCapability(input.lifecycleTrace?.executed_capability),
+    nonModelToolCapability(operationalTrace?.executed_capability),
+  );
+  const selectedCapability =
+    preferConcreteCapability(
+      firstString(
+        capabilityPlan?.selected_capability,
+        input.lifecycleTrace?.admitted_capability,
+        input.lifecycleTrace?.requested_capability,
+      ),
+      concreteSelectedCapability,
+    ) ?? input.capability;
   const toolExecutionRejected = runtimeToolExecutionRejected(input.payload, input.artifacts);
   const capabilityCatalogArtifact = input.artifacts.find((artifact) => observationKindMatches(artifact, "capability_registry")) ?? null;
   const requestedObservationKinds = unique([
@@ -1596,6 +1660,44 @@ const readAdmittedCapability = (
   return readAdmittedCapabilityEvidence(payload, audit, lifecycleTrace).capability;
 };
 
+const readSelectedCapabilityForRailTable = (
+  payload: RecordLike,
+  audit: RecordLike,
+  lifecycleTrace: RecordLike | null,
+): string | null => {
+  const operationalTrace = readRecord(payload.operational_capability_trace);
+  const runtimeToolCall = readRecord(payload.runtime_tool_call);
+  const auditSelectedCapability = readString(audit.selected_capability);
+  const concreteCapability = firstString(
+    nonModelToolCapability(operationalTrace?.model_proposed_capability),
+    nonModelToolCapability(lifecycleTrace?.admitted_capability),
+    nonModelToolCapability(lifecycleTrace?.requested_capability),
+    nonModelToolCapability(runtimeToolCall?.capability_key),
+    nonModelToolCapability(lifecycleTrace?.executed_capability),
+    nonModelToolCapability(operationalTrace?.executed_capability),
+  );
+  return preferConcreteCapability(auditSelectedCapability, concreteCapability);
+};
+
+const readExecutedCapabilityForRailTable = (
+  payload: RecordLike,
+  audit: RecordLike,
+  lifecycleTrace: RecordLike | null,
+): string | null => {
+  if (readString(audit.rail_failure_code) === "tool_execution_rejected" || readString(audit.policy_rejection_ref)) {
+    return nonModelToolCapability(audit.executed_capability);
+  }
+  const operationalTrace = readRecord(payload.operational_capability_trace);
+  const runtimeToolCall = readRecord(payload.runtime_tool_call);
+  return firstString(
+    runtimeLoopExecutedCapability(payload),
+    nonModelToolCapability(lifecycleTrace?.executed_capability),
+    nonModelToolCapability(operationalTrace?.executed_capability),
+    nonModelToolCapability(runtimeToolCall?.capability_key),
+    nonModelToolCapability(audit.executed_capability),
+  );
+};
+
 const normalizeGoalSatisfaction = (payload: RecordLike): string | null => {
   const goal = readRecord(payload.goal_satisfaction_evaluation);
   return firstString(goal?.satisfaction, goal?.next_decision, payload.final_status, payload.response_type);
@@ -1664,6 +1766,8 @@ const buildCodexParityAgentSpineRailTable = (input: {
   });
   const visibleSurface = visibleSurfaceProjection.visibleSurface;
   const admissionProof = readAdmittedCapabilityEvidence(input.payload, input.audit, input.lifecycleTrace);
+  const selectedCapability = readSelectedCapabilityForRailTable(input.payload, input.audit, input.lifecycleTrace);
+  const executedCapability = readExecutedCapabilityForRailTable(input.payload, input.audit, input.lifecycleTrace);
   const codexParityClass = codexParityClassFromAudit({
     audit: input.audit,
     triage: input.triage,
@@ -1677,11 +1781,11 @@ const buildCodexParityAgentSpineRailTable = (input: {
     visible_tool_surface: visibleSurface,
     visible_tool_surface_original_count: visibleSurfaceProjection.originalCount,
     visible_tool_surface_truncated: visibleSurfaceProjection.truncated,
-    selected_capability: readNullableString(input.audit.selected_capability),
+    selected_capability: selectedCapability,
     admitted_capability: admissionProof.capability,
     admission_proof_source: admissionProof.source,
     admission_proven: admissionProof.proven,
-    executed_capability: readNullableString(input.audit.executed_capability),
+    executed_capability: executedCapability,
     observation_kind: readNullableString(input.audit.observation_artifact_kind),
     observation_ref: readNullableString(input.audit.observation_ref),
     required_observation_kinds_for_requested_capability:
@@ -1732,6 +1836,11 @@ const buildArtifactEntry = (artifact: RecordLike): RecordLike => {
     payloadSchema,
     readString(payload?.feed_kind),
     readString(payload?.feedKind),
+    readString(payload?.requiredActuator),
+    readString(payload?.required_actuator),
+    readString(payload?.actuator),
+    readString(payload?.controlKind),
+    readString(payload?.control_kind),
     readString(artifact.producer_item_id),
     readString(artifact.source_scope),
   ]);

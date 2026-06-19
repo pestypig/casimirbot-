@@ -24,8 +24,11 @@ import {
 import { buildNhm2TileEffectiveFullTensorSourceArtifact } from "../shared/contracts/nhm2-tile-effective-full-tensor-source.v1";
 import type { Nhm2RegionalFullTensorResidualArtifactV1 } from "../shared/contracts/nhm2-regional-full-tensor-residual.v1";
 import type { Nhm2SourceComponentAuthorityLedgerArtifactV1 } from "../shared/contracts/nhm2-source-component-authority-ledger.v1";
+import type { Nhm2MetricRequiredMomentumDemandAuditV1 } from "../shared/contracts/nhm2-metric-required-momentum-demand-audit.v1";
+import type { Nhm2MomentumFrameProjectionReceiptV1 } from "../shared/contracts/nhm2-momentum-frame-projection-receipt.v1";
 import type { Nhm2SourceMomentumDensityAuditArtifactV1 } from "../shared/contracts/nhm2-source-momentum-density-audit.v1";
 import type { Nhm2SourceOffDiagonalShearAuditArtifactV1 } from "../shared/contracts/nhm2-source-off-diagonal-shear-audit.v1";
+import type { Nhm2CampaignFrontierDispositionV1 } from "../shared/contracts/nhm2-campaign-frontier-disposition.v1";
 import {
   buildNhm2DynamicEffectiveGeometryEvidence,
   buildNhm2FrequencyConvergenceEvidence,
@@ -227,7 +230,7 @@ const momentumAudit = (): Nhm2SourceMomentumDensityAuditArtifactV1 =>
       firstBlocker: "hull:T01:momentum_component_residual_exceeded",
       falsifierCandidate: true,
       currentDeclaredSourceModelFalsified: true,
-      causalMaterialMomentumBoundFalsifier: true,
+      causalMaterialMomentumBoundFalsifier: false,
       falsifierScope: "current_declared_source_model",
       falsifierReason:
         "declared_uniform_fractional_momentum_density_without_mechanism_exceeds_required_amplification",
@@ -241,6 +244,128 @@ const momentumAudit = (): Nhm2SourceMomentumDensityAuditArtifactV1 =>
       currentModelFalsifierDoesNotProveUniversalSourceImpossibility: true,
     },
   }) as Nhm2SourceMomentumDensityAuditArtifactV1;
+
+const blockedMomentumFrameProjectionReceipt = (): Nhm2MomentumFrameProjectionReceiptV1 =>
+  ({
+    contractVersion: "nhm2_momentum_frame_projection_receipt/v1",
+    generatedAt: "2026-06-18T00:00:00.000Z",
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+    runId: "campaign-test",
+    sourceMomentumDensityAuditRef: "momentum-audit.json",
+    regionalSupportFunctionAtlasRef: "atlas.json",
+    atlasHash: "atlas-hash",
+    momentumFrameProjectionEvidenceRef: null,
+    frame: {
+      requestedFrame: "local_orthonormal",
+      sourceTensorBasis: "chart",
+      tetradRef: null,
+      projectionMethod: "missing_tetrad",
+      ratioPolicy: null,
+      projectionStatus: "blocked",
+      assumptions: [],
+      blockers: ["local_orthonormal_tetrad_or_projection_receipt_missing"],
+    },
+    regions: [],
+    summary: {
+      projectionAvailable: false,
+      causalBoundApplicabilityStatus: "blocked",
+      worstProjectedMetricRequiredMomentumToEnergyRatio: null,
+      worstProjectedSourceMomentumToEnergyRatio: null,
+      anyProjectedMetricRequiredCausalMomentumBoundViolation: null,
+      anyProjectedSourceCausalMomentumBoundViolation: null,
+      firstBlocker: "local_orthonormal_tetrad_or_projection_receipt_missing",
+      blockerCount: 1,
+    },
+    claimBoundary: {
+      diagnosticOnly: true,
+      frameProjectionDoesNotValidatePhysicalSource: true,
+      chartBasisRatioCannotProveCausalBound: true,
+      localFrameReceiptRequiredForCausalMaterialBound: true,
+    },
+  }) as Nhm2MomentumFrameProjectionReceiptV1;
+
+const metricMomentumDemandAudit = (): Nhm2MetricRequiredMomentumDemandAuditV1 =>
+  ({
+    contractVersion: "nhm2_metric_required_momentum_demand_audit/v1",
+    generatedAt: "2026-06-19T00:00:00.000Z",
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+    runId: "campaign-test",
+    momentumFrameProjectionReceiptRef: "projection-receipt.json",
+    projectionEvidenceRef: "projection-evidence.json",
+    projectionApplicabilityStatus: "applicable",
+    ratioPolicy: "use_audit_same_chart_ratios_as_local_frame_reduced_order",
+    components: [],
+    summary: {
+      allProjectedRatiosAvailable: true,
+      anyProjectedMetricRequiredCausalMomentumBoundViolation: true,
+      worstRegionId: "hull",
+      worstComponentId: "T02",
+      worstProjectedMetricRequiredMomentumToEnergyRatio: 2,
+      worstExceedanceFactor: 2,
+      currentMetricProfileFalsified: true,
+      falsifierScope: "current_metric_profile_under_declared_projection",
+      firstBlocker: "hull:T02:metric_required_momentum_density_causal_bound_exceeded",
+      blockerCount: 1,
+    },
+    claimBoundary: {
+      diagnosticOnly: true,
+      metricDemandAuditDoesNotValidatePhysicalSource: true,
+      reducedOrderProjectionDoesNotReplaceFullAdmTetrad: true,
+      currentProfileFalsifierDoesNotProveUniversalMetricImpossibility: true,
+      transportClaimAllowed: false,
+    },
+  }) as Nhm2MetricRequiredMomentumDemandAuditV1;
+
+const campaignFrontierDisposition = (): Nhm2CampaignFrontierDispositionV1 =>
+  ({
+    contractVersion: "nhm2_campaign_frontier_disposition/v1",
+    generatedAt: "2026-06-19T00:00:00.000Z",
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+    runId: "campaign-test",
+    chartId: "comoving_cartesian",
+    campaignRef: "campaign.json",
+    metricMomentumRemediationTargetsRef: "remediation-targets.json",
+    frontier: {
+      gateId: "full_regional_tensor_closure",
+      campaignFirstBlocker: "global:T02:metric_momentum_suppression_required",
+      blockerClass: "metric_required_momentum_density",
+      currentProfileNonResolvable: true,
+    },
+    disposition: {
+      status: "current_profile_rejected",
+      reason:
+        "current_profile_rejected_under_declared_reduced_order_projected_momentum_demand",
+      allowedNextActions: [
+        "reduce_metric_required_projected_t0i",
+        "change_metric_profile_geometry",
+        "provide_full_adm_tetrad_projection_that_changes_ratio",
+        "reject_current_profile_for_campaign",
+      ],
+      forbiddenNextActions: [
+        "copy_metric_required_tensor_into_source",
+        "hide_momentum_density_in_global_average",
+        "silently_zero_t0i",
+        "treat_reduced_order_projection_as_physical_viability",
+      ],
+    },
+    quantitativeSummary: {
+      worstRegionId: "hull",
+      worstComponentId: "T02",
+      worstRequiredSuppressionFactor: 10,
+      worstRequiredFractionalReduction: 0.9,
+      blockerCount: 1,
+    },
+    claimBoundary: {
+      diagnosticOnly: true,
+      frontierDispositionDoesNotValidateNewMetric: true,
+      currentProfileRejectionDoesNotProveUniversalNoGo: true,
+      physicalViabilityClaimAllowed: false,
+      transportClaimAllowed: false,
+    },
+  }) as Nhm2CampaignFrontierDispositionV1;
 
 const fullTensorResidual = (
   summary?: Partial<Nhm2RegionalFullTensorResidualArtifactV1["summary"]>,
@@ -1203,6 +1328,146 @@ describe("NHM2 time-dependent source campaign", () => {
     expect(gate?.primaryMetric).toContain("momentumAuditCausalBoundApplicability=blocked");
     expect(artifact.summary.firstBlocker).toBe(
       "momentum_density_causal_bound_frame_projection_missing",
+    );
+  });
+
+  it("uses a momentum frame projection receipt to distinguish blocked local-frame evidence", () => {
+    const artifact = buildNhm2TimeDependentSourceCampaign({
+      sourceComponentAuthorityLedger: completeLedger(),
+      regionalFullTensorResidual: fullTensorResidual({
+        fullTensorResidualsPass: false,
+        worstRegionId: "hull",
+        worstComponentId: "T01",
+        worstResidualFamily: "momentum_t0i",
+        worstRelResidual: 1.001,
+        firstBlocker: "hull:T01:full_tensor_residual_exceeded",
+        blockerCount: 1,
+      }),
+      sourceMomentumDensityAudit: momentumAudit(),
+      momentumFrameProjectionReceipt: blockedMomentumFrameProjectionReceipt(),
+      frequencyConvergence: frequencyEvidence(),
+      switchingConservation: switchingEvidence(),
+      dynamicEffectiveGeometry: dynamicGeometryEvidence(),
+      qeiWorldlineDossier: qeiDossier(),
+      observerRobustEnergyConditions: observerArtifact(),
+      campaignStability: stabilityEvidence(),
+    });
+    const gate = artifact.gates.find(
+      (entry) => entry.gateId === "full_regional_tensor_closure",
+    );
+
+    expect(gate?.blockers).toEqual(
+      expect.arrayContaining([
+        "momentum_density_causal_bound_frame_projection_blocked",
+        "source_momentum_density_current_declared_model_falsified",
+        "source_momentum_density_mechanism_missing",
+      ]),
+    );
+    expect(gate?.blockers).not.toContain(
+      "momentum_density_causal_bound_frame_projection_missing",
+    );
+    expect(gate?.warnings).not.toContain("momentum_frame_projection_receipt_missing");
+    expect(gate?.primaryMetric).toContain("momentumFrameProjection=blocked");
+    expect(artifact.summary.firstBlocker).toBe(
+      "momentum_density_causal_bound_frame_projection_blocked",
+    );
+  });
+
+  it("promotes applicable metric momentum demand audit failures to current-profile falsifiers", () => {
+    const artifact = buildNhm2TimeDependentSourceCampaign({
+      sourceComponentAuthorityLedger: completeLedger(),
+      regionalFullTensorResidual: fullTensorResidual({
+        fullTensorResidualsPass: false,
+        worstRegionId: "hull",
+        worstComponentId: "T01",
+        worstResidualFamily: "momentum_t0i",
+        worstRelResidual: 1.001,
+        firstBlocker: "hull:T01:full_tensor_residual_exceeded",
+        blockerCount: 1,
+      }),
+      sourceMomentumDensityAudit: momentumAudit(),
+      momentumFrameProjectionReceipt: {
+        ...blockedMomentumFrameProjectionReceipt(),
+        summary: {
+          ...blockedMomentumFrameProjectionReceipt().summary,
+          projectionAvailable: true,
+          causalBoundApplicabilityStatus: "applicable",
+          anyProjectedMetricRequiredCausalMomentumBoundViolation: true,
+        },
+      },
+      metricRequiredMomentumDemandAudit: metricMomentumDemandAudit(),
+      frequencyConvergence: frequencyEvidence(),
+      switchingConservation: switchingEvidence(),
+      dynamicEffectiveGeometry: dynamicGeometryEvidence(),
+      qeiWorldlineDossier: qeiDossier(),
+      observerRobustEnergyConditions: observerArtifact(),
+      campaignStability: stabilityEvidence(),
+    });
+    const gate = artifact.gates.find(
+      (entry) => entry.gateId === "full_regional_tensor_closure",
+    );
+
+    expect(gate?.blockers[0]).toBe(
+      "metric_required_momentum_density_current_profile_falsified",
+    );
+    expect(gate?.primaryMetric).toContain("metricMomentumDemandFalsified=true");
+    expect(artifact.summary.firstBlocker).toBe(
+      "metric_required_momentum_density_current_profile_falsified",
+    );
+  });
+
+  it("promotes campaign frontier disposition above the raw metric momentum falsifier", () => {
+    const artifact = buildNhm2TimeDependentSourceCampaign({
+      artifactRefs: {
+        campaignFrontierDisposition: "frontier-disposition.json",
+      },
+      sourceComponentAuthorityLedger: completeLedger(),
+      regionalFullTensorResidual: fullTensorResidual({
+        fullTensorResidualsPass: false,
+        worstRegionId: "hull",
+        worstComponentId: "T02",
+        worstResidualFamily: "momentum_t0i",
+        worstRelResidual: 1.001,
+        firstBlocker: "hull:T02:full_tensor_residual_exceeded",
+        blockerCount: 1,
+      }),
+      sourceMomentumDensityAudit: momentumAudit(),
+      momentumFrameProjectionReceipt: {
+        ...blockedMomentumFrameProjectionReceipt(),
+        summary: {
+          ...blockedMomentumFrameProjectionReceipt().summary,
+          projectionAvailable: true,
+          causalBoundApplicabilityStatus: "applicable",
+          anyProjectedMetricRequiredCausalMomentumBoundViolation: true,
+        },
+      },
+      metricRequiredMomentumDemandAudit: metricMomentumDemandAudit(),
+      campaignFrontierDisposition: campaignFrontierDisposition(),
+      frequencyConvergence: frequencyEvidence(),
+      switchingConservation: switchingEvidence(),
+      dynamicEffectiveGeometry: dynamicGeometryEvidence(),
+      qeiWorldlineDossier: qeiDossier(),
+      observerRobustEnergyConditions: observerArtifact(),
+      campaignStability: stabilityEvidence(),
+    });
+    const gate = artifact.gates.find(
+      (entry) => entry.gateId === "full_regional_tensor_closure",
+    );
+
+    expect(gate?.blockers[0]).toBe(
+      "metric_momentum_current_profile_rejected_for_campaign",
+    );
+    expect(gate?.blockers).toContain(
+      "metric_required_momentum_density_current_profile_falsified",
+    );
+    expect(gate?.primaryMetric).toContain(
+      "campaignFrontierDisposition=current_profile_rejected",
+    );
+    expect(artifact.artifactRefs.campaignFrontierDisposition).toBe(
+      "frontier-disposition.json",
+    );
+    expect(artifact.summary.firstBlocker).toBe(
+      "metric_momentum_current_profile_rejected_for_campaign",
     );
   });
 

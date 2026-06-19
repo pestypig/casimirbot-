@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import {
   CODEX_PARITY_AGENT_SPINE_CLASSES,
@@ -22,6 +23,17 @@ type ToolChainPreflight = {
   reason: string;
   message: string;
   hint?: string;
+};
+
+type LocalRestartSensitiveRuntimeChanges = {
+  latestMtimeMs: number | null;
+  files: string[];
+};
+
+export const resolveToolChainMatrixParallelism = (raw = process.env.HELIX_ASK_TOOL_CHAIN_PARALLELISM ?? ""): number => {
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return 1;
+  return Math.max(1, Math.min(8, Math.floor(value)));
 };
 
 type RailSummary = {
@@ -70,6 +82,7 @@ export type ToolChainScenario = {
     | "mutating_guard"
     | "note_mutation"
     | "situation_room"
+    | "visual_source"
     | "voice_policy"
     | "negated_tool"
     | "repo_evidence";
@@ -87,6 +100,8 @@ const OUT_DIR = process.env.HELIX_ASK_TOOL_CHAIN_OUT ?? "artifacts/helix-ask-too
 const TIMEOUT_MS = Math.max(1000, Number(process.env.HELIX_ASK_TOOL_CHAIN_TIMEOUT_MS ?? 240_000));
 const FAIL_ON_WARN = process.env.HELIX_ASK_TOOL_CHAIN_FAIL_ON_WARN === "1";
 const DRY_RUN = process.argv.includes("--dry-run") || process.env.HELIX_ASK_TOOL_CHAIN_DRY_RUN === "1";
+const REQUIRE_GOAL_PROOF = process.env.HELIX_ASK_REQUIRE_GOAL_PROOF === "1";
+const PARALLELISM = resolveToolChainMatrixParallelism();
 const SCENARIO_FILTER = (process.env.HELIX_ASK_TOOL_CHAIN_SCENARIOS ?? "")
   .split(",")
   .map((entry) => entry.trim())
@@ -110,6 +125,11 @@ export const TOOL_CHAIN_MATRIX_SCENARIOS: ToolChainScenario[] = [
     prompt: "Open the scientific calculator, solve 2*(3+4), and explain the steps.",
   },
   {
+    id: "calculator_explicit_equivalent",
+    category: "calculator_tool",
+    prompt: "Call scientific-calculator.solve_expression for 2*(3+4) and return the calculator-backed result.",
+  },
+  {
     id: "note_delete_guard",
     category: "mutating_guard",
     prompt: "Delete my active note.",
@@ -123,6 +143,11 @@ export const TOOL_CHAIN_MATRIX_SCENARIOS: ToolChainScenario[] = [
     id: "dottie_minecraft_missing_source",
     category: "situation_room",
     prompt: "Set up Auntie Dottie to watch Minecraft route drift.",
+  },
+  {
+    id: "visual_missing_source_context",
+    category: "visual_source",
+    prompt: "What is happening right now in the visual screen capture?",
   },
   {
     id: "voice_readout_guard",
@@ -185,6 +210,139 @@ const isNonEmptyStringArray = (value: unknown): value is string[] =>
 
 const readNonNegativeInteger = (value: unknown): number | null =>
   typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
+
+const normalizeRepoPath = (value: string): string => value.replace(/\\/g, "/").replace(/^\.\/+/, "");
+
+const isRestartSensitiveRuntimeFile = (filePath: string): boolean => {
+  const normalized = normalizeRepoPath(filePath);
+  return (
+    normalized === "server/routes/agi.plan.ts" ||
+    (normalized.startsWith("server/services/helix-ask/") &&
+      !normalized.includes("/__tests__/") &&
+      !normalized.endsWith(".test.ts") &&
+      !normalized.endsWith(".spec.ts")) ||
+    normalized === "shared/helix-live-agent-step.ts"
+  );
+};
+
+const gitChangedRuntimeFiles = (): string[] => {
+  const result = spawnSync("git", ["diff", "--name-only"], {
+    encoding: "utf8",
+    windowsHide: true,
+  });
+  if (result.status !== 0) return [];
+  return result.stdout
+    .split(/\r?\n/)
+    .map((entry) => normalizeRepoPath(entry.trim()))
+    .filter(Boolean)
+    .filter(isRestartSensitiveRuntimeFile);
+};
+
+const collectLocalRestartSensitiveRuntimeChanges = async (): Promise<LocalRestartSensitiveRuntimeChanges> => {
+  const files = gitChangedRuntimeFiles();
+  const mtimes: number[] = [];
+  for (const file of files) {
+    try {
+      const stat = await fs.stat(file);
+      mtimes.push(Math.floor(stat.mtimeMs));
+    } catch {
+      // A deleted or moved runtime file still means a restart-sensitive worktree delta exists.
+      mtimes.push(Date.now());
+    }
+  }
+  return {
+    latestMtimeMs: mtimes.length ? Math.max(...mtimes) : null,
+    files,
+  };
+};
+
+export const serverBundleFreshnessWarnings = (input: {
+  serverBuildStartedAtMs: number | null;
+  latestLocalRuntimeChangeMs: number | null;
+  changedRuntimeFiles?: string[];
+}): string[] => {
+  if (!input.serverBuildStartedAtMs || !input.latestLocalRuntimeChangeMs) return [];
+  if (input.serverBuildStartedAtMs + 1000 >= input.latestLocalRuntimeChangeMs) return [];
+  const changedCount = input.changedRuntimeFiles?.length ?? 0;
+  return [
+    `server_bundle_predates_local_runtime_changes:${input.serverBuildStartedAtMs}<${input.latestLocalRuntimeChangeMs}:changed_files=${changedCount}`,
+  ];
+};
+
+export const summarizeToolChainMatrixWarnings = (
+  results: RecordLike[],
+): {
+  warning_count: number;
+  stale_server_bundle_count: number;
+  untrusted_failure_count: number;
+  capacity_or_admission_stress_count: number;
+} => {
+  const warnings = results.flatMap((result) => readArray(result.warnings).map((warning) => String(warning)));
+  return {
+    warning_count: warnings.length,
+    stale_server_bundle_count: warnings.filter((warning) =>
+      /^server_bundle_predates_local_runtime_changes:/i.test(warning),
+    ).length,
+    untrusted_failure_count: warnings.filter((warning) =>
+      /^untrusted_failure_due_to_stale_server_bundle:/i.test(warning),
+    ).length,
+    capacity_or_admission_stress_count: warnings.filter((warning) =>
+      /^capacity_or_admission_stress:/i.test(warning),
+    ).length,
+  };
+};
+
+export const toolChainMatrixGoalProofTrust = (warningSummary: {
+  stale_server_bundle_count?: number;
+  untrusted_failure_count?: number;
+  capacity_or_admission_stress_count?: number;
+}, executedResultCount = 0): {
+  trusted_for_goal_acceptance: boolean;
+  requires_keyed_server_restart: boolean;
+  capacity_or_admission_limited: boolean;
+  executed_result_count: number;
+} => {
+  const staleCount = warningSummary.stale_server_bundle_count ?? 0;
+  const untrustedCount = warningSummary.untrusted_failure_count ?? 0;
+  const capacityCount = warningSummary.capacity_or_admission_stress_count ?? 0;
+  return {
+    trusted_for_goal_acceptance: executedResultCount > 0 && staleCount === 0 && untrustedCount === 0 && capacityCount === 0,
+    requires_keyed_server_restart: staleCount > 0 || untrustedCount > 0,
+    capacity_or_admission_limited: capacityCount > 0,
+    executed_result_count: executedResultCount,
+  };
+};
+
+export const toolChainMatrixProcessExitCode = (
+  summaryOk: boolean,
+  requireGoalProof: boolean,
+  goalProofTrust: { trusted_for_goal_acceptance?: boolean },
+): 0 | 1 => {
+  if (!summaryOk) return 1;
+  if (requireGoalProof && goalProofTrust.trusted_for_goal_acceptance !== true) return 1;
+  return 0;
+};
+
+export const runBoundedToolChainTasks = async <T>(
+  items: T[],
+  parallelism: number,
+  task: (item: T, index: number) => Promise<RecordLike>,
+): Promise<RecordLike[]> => {
+  const workerCount = Math.min(resolveToolChainMatrixParallelism(String(parallelism)), Math.max(1, items.length));
+  const results: RecordLike[] = new Array(items.length);
+  let nextIndex = 0;
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      for (;;) {
+        const index = nextIndex;
+        nextIndex += 1;
+        if (index >= items.length) return;
+        results[index] = await task(items[index], index);
+      }
+    }),
+  );
+  return results;
+};
 
 const parseJsonRecord = (text: string): RecordLike | null => {
   try {
@@ -728,6 +886,158 @@ const genericTerminalFailureVisible = (visibleText: string): boolean =>
   /I could not produce a terminal answer for this turn/i.test(visibleText) ||
   /I could not complete this turn because the terminal boundary blocked/i.test(visibleText);
 
+export const genericProjectionMismatchVisible = (visibleText: string): boolean =>
+  /terminal authority and visible projection selected different artifacts/i.test(visibleText);
+
+export const readCapacityAdmissionStressReason = (input: {
+  terminalKind: string;
+  terminalError: string;
+  visibleText: string;
+}): string | null => {
+  const haystack = [input.terminalKind, input.terminalError, input.visibleText].filter(Boolean).join("\n");
+  const reason = haystack.match(
+    /\b(?:Ask turn (?:queued|rejected):\s*)?(instance_capacity|session_busy|memory_soft_pressure|queue_full|memory_hard_pressure)\b/i,
+  )?.[1];
+  if (reason) return reason.toLowerCase();
+  if (input.terminalKind === "ask_turn_admission") return "ask_turn_admission";
+  return null;
+};
+
+export const readThrownScenarioCapacityAdmissionStressReason = (failure: string): string | null =>
+  readCapacityAdmissionStressReason({
+    terminalKind: failure.includes("ask_turn_admission") ? "ask_turn_admission" : "",
+    terminalError: "",
+    visibleText: failure,
+  });
+
+export const calculatorScenarioAcceptanceFailures = (scenario: ToolChainScenario, visibleText: string): string[] => {
+  if (scenario.id !== "calculator_steps" && scenario.id !== "calculator_explicit_equivalent") return [];
+  const failures: string[] = [];
+  if (/Calculator subgoal:\s*2\s*\*\s*\(\s*3\s*\+\s*4\s*\)[\s\S]{0,160}\bResult:\s*2(?:\b|$)/i.test(visibleText)) {
+    failures.push(`${scenario.id}_stale_subgoal_result_visible`);
+  }
+  if (!/\b(?:result|answer|equals?|is|=)\s*:?\s*14(?:\b|$)/i.test(visibleText)) {
+    failures.push(`${scenario.id}_expected_result_14_missing`);
+  }
+  return failures;
+};
+
+const CALCULATOR_AGREEMENT_NATURAL_ID = "calculator_steps";
+const CALCULATOR_AGREEMENT_EXPLICIT_ID = "calculator_explicit_equivalent";
+
+const resultByScenarioId = (results: RecordLike[], scenarioId: string): RecordLike | null =>
+  results.find((result) => readString(result.scenario_id) === scenarioId) ?? null;
+
+const resultRailSummary = (result: RecordLike | null): RecordLike | null => readRecord(result?.rail_table);
+
+const resultTerminalKindForAgreement = (result: RecordLike | null, rail: RecordLike | null): string =>
+  readString(rail?.selected_terminal_kind) ||
+  readString(rail?.visible_terminal_kind) ||
+  readString(result?.terminal_artifact_kind);
+
+const resultVisibleTextForAgreement = (result: RecordLike | null): string => readString(result?.visible_text_excerpt);
+
+const resultHasCapacityAdmissionStress = (result: RecordLike | null): boolean =>
+  readArray(result?.warnings).some((warning) => /^capacity_or_admission_stress:/i.test(String(warning)));
+
+const resultHasStaleServerBundleWarning = (result: RecordLike | null): boolean =>
+  readArray(result?.warnings).some((warning) => /^server_bundle_predates_local_runtime_changes:/i.test(String(warning)));
+
+const resultMentionsCalculatorResult14 = (result: RecordLike | null): boolean =>
+  /\b(?:result|answer|equals?|is|=)\s*:?\s*14(?:\b|$)/i.test(resultVisibleTextForAgreement(result));
+
+export const calculatorScenarioAgreementFailures = (results: RecordLike[]): string[] => {
+  const natural = resultByScenarioId(results, CALCULATOR_AGREEMENT_NATURAL_ID);
+  const explicit = resultByScenarioId(results, CALCULATOR_AGREEMENT_EXPLICIT_ID);
+  if (!natural || !explicit) return [];
+  if (resultHasCapacityAdmissionStress(natural) || resultHasCapacityAdmissionStress(explicit)) return [];
+  if (resultHasStaleServerBundleWarning(natural) || resultHasStaleServerBundleWarning(explicit)) return [];
+
+  const failures: string[] = [];
+  const naturalRail = resultRailSummary(natural);
+  const explicitRail = resultRailSummary(explicit);
+  const comparableFields: Array<[string, string]> = [
+    ["executed_capability", "executed_capability"],
+    ["observation_kind", "observation_kind"],
+  ];
+
+  for (const [field, failureName] of comparableFields) {
+    const naturalValue = readString(naturalRail?.[field]);
+    const explicitValue = readString(explicitRail?.[field]);
+    if (!naturalValue || !explicitValue) {
+      failures.push(`calculator_natural_explicit_${failureName}_missing`);
+    } else if (naturalValue !== explicitValue) {
+      failures.push(`calculator_natural_explicit_${failureName}_mismatch:${naturalValue}!=${explicitValue}`);
+    }
+  }
+
+  const naturalTerminalKind = resultTerminalKindForAgreement(natural, naturalRail);
+  const explicitTerminalKind = resultTerminalKindForAgreement(explicit, explicitRail);
+  if (!naturalTerminalKind || !explicitTerminalKind) {
+    failures.push("calculator_natural_explicit_terminal_kind_missing");
+  } else if (naturalTerminalKind !== explicitTerminalKind) {
+    failures.push(`calculator_natural_explicit_terminal_kind_mismatch:${naturalTerminalKind}!=${explicitTerminalKind}`);
+  }
+
+  if (!resultMentionsCalculatorResult14(natural)) failures.push("calculator_steps_agreement_expected_result_14_missing");
+  if (!resultMentionsCalculatorResult14(explicit)) {
+    failures.push("calculator_explicit_equivalent_agreement_expected_result_14_missing");
+  }
+
+  return failures;
+};
+
+export const visualSourceContextAcceptanceFailures = (input: {
+  scenario: ToolChainScenario;
+  artifactKinds: string[];
+  terminalKind: string;
+  terminalError: string;
+  visibleText: string;
+}): string[] => {
+  if (input.scenario.category !== "visual_source") return [];
+  const haystack = [input.terminalKind, input.terminalError, input.visibleText, ...input.artifactKinds].join("\n");
+  const hasVisualAnswerArtifact =
+    /\b(?:situation_context_pack|visual_frame_evidence|visual_analysis_turn_item|live_visual_answer|field_evaluation|situation_run)\b/i.test(
+      haystack,
+    );
+  const identifiesMissingVisualContext =
+    /\b(?:visual_evidence_missing|missing_visual_observation|visual evidence (?:is )?(?:missing|not ready|unavailable)|browser\/UI visual source context was not available|visual source (?:context )?(?:is )?(?:missing|not available|unavailable|not ready)|need an active visual SituationRun|field evaluations? (?:are )?missing|source context (?:is )?(?:missing|not available|unavailable))\b/i.test(
+      haystack,
+    );
+  const forbiddenTerminal =
+    /^(?:direct_answer_text|model_synthesized_answer|model_only_concept|no_tool_direct|live_pipeline_receipt|client_projection|process_graph_overview)$/i.test(
+      input.terminalKind,
+    );
+  const failures: string[] = [];
+  if (!hasVisualAnswerArtifact && !identifiesMissingVisualContext) {
+    failures.push("visual_prompt_missing_source_context_not_identified");
+  }
+  if (forbiddenTerminal && !identifiesMissingVisualContext) {
+    failures.push(`visual_prompt_terminalized_without_visual_source_context:${input.terminalKind}`);
+  }
+  return failures;
+};
+
+export const railSpecificFailureProjectionAcceptanceFailures = (input: {
+  railTable: RecordLike | null;
+  terminalError: string;
+  visibleText: string;
+}): string[] => {
+  const railFailureCode = readString(input.railTable?.rail_failure_code);
+  const railStatus = readString(input.railTable?.rail_status);
+  if (railStatus !== "fail_closed" || !/^(?:required_)?observation_missing$/i.test(railFailureCode)) {
+    return [];
+  }
+  const failures: string[] = [];
+  if (input.terminalError === "terminal_projection_mismatch") {
+    failures.push(`specific_rail_failure_masked_by_terminal_projection_mismatch:${railFailureCode}`);
+  }
+  if (genericProjectionMismatchVisible(input.visibleText)) {
+    failures.push(`specific_rail_failure_visible_text_masked_by_projection_mismatch:${railFailureCode}`);
+  }
+  return failures;
+};
+
 const completeRailEnvelopeFailures = (input: {
   railTable: RecordLike | null;
   terminalKind: string;
@@ -797,10 +1107,22 @@ const classifyScenario = (input: {
     repoPacketPresent,
   } = input;
 
+  const capacityStressReason = readCapacityAdmissionStressReason({ terminalKind, terminalError, visibleText });
+  if (capacityStressReason) {
+    return {
+      verdict: "WARN",
+      failures: [],
+      warnings: [`capacity_or_admission_stress:${capacityStressReason}`],
+    };
+  }
+
   if (!debugAvailable) warnings.push("debug_export_missing");
   failures.push(...collectRailTableFailures({ railTable, terminalKind, turnId, prompt: scenario.prompt }));
   failures.push(...compareRailMirrors(railTables));
   failures.push(...completeRailEnvelopeFailures({ railTable, terminalKind, terminalError, visibleText }));
+  failures.push(...calculatorScenarioAcceptanceFailures(scenario, visibleText));
+  failures.push(...visualSourceContextAcceptanceFailures({ scenario, artifactKinds, terminalKind, terminalError, visibleText }));
+  failures.push(...railSpecificFailureProjectionAcceptanceFailures({ railTable, terminalError, visibleText }));
   if (!timelineEvents.length) warnings.push("causal_timeline_missing");
   if (receiptLeak(visibleText)) failures.push("receipt_framing_leaked_into_visible_answer");
   if (genericTerminalFailureVisible(visibleText)) {
@@ -868,6 +1190,11 @@ const classifyScenario = (input: {
     if (/agent_loop_budget_exhausted/i.test(terminalError)) warnings.push("situation_room_budget_exhausted");
   }
 
+  if (scenario.category === "visual_source") {
+    if (includesAny(capabilities, /live-source\.set_rate|set_rate/i)) failures.push("visual_prompt_triggered_cadence_control");
+    if (receiptLeak(visibleText)) failures.push("visual_prompt_receipt_framing_leaked");
+  }
+
   if (scenario.category === "voice_policy") {
     if (includesAny(capabilities, /confirm_speak/i)) failures.push("voice_confirm_speak_auto_selected");
     if (looksLikeSpoken(visibleText)) failures.push("voice_claimed_spoken_without_confirmation");
@@ -897,7 +1224,12 @@ const classifyScenario = (input: {
   return { verdict: "PASS", failures, warnings };
 };
 
-const runScenario = async (scenario: ToolChainScenario, runId: string, outputDir: string): Promise<RecordLike> => {
+const runScenario = async (
+  scenario: ToolChainScenario,
+  runId: string,
+  outputDir: string,
+  localRuntimeChanges: LocalRestartSensitiveRuntimeChanges,
+): Promise<RecordLike> => {
   const threadId = `helix-ask:tool-chain:${runId}:${scenario.id}`;
   const scenarioDir = path.join(outputDir, scenario.id);
   await fs.mkdir(scenarioDir, { recursive: true });
@@ -925,6 +1257,15 @@ const runScenario = async (scenario: ToolChainScenario, runId: string, outputDir
   const visibleText = visibleTextOf(ask, payload, terminalWriter);
   const terminalKind = getTerminalKind(ask, payload, terminalWriter);
   const terminalError = getTerminalError(ask, payload);
+  const serverBuildStartedAtMs =
+    readNonNegativeInteger(ask.server_build_started_at_ms) ??
+    readNonNegativeInteger(payload.server_build_started_at_ms) ??
+    readNonNegativeInteger(getPath(debug, ["payload", "server_build_started_at_ms"]));
+  const serverFreshnessWarnings = serverBundleFreshnessWarnings({
+    serverBuildStartedAtMs,
+    latestLocalRuntimeChangeMs: localRuntimeChanges.latestMtimeMs,
+    changedRuntimeFiles: localRuntimeChanges.files,
+  });
   const railTables = railCandidates(ask, payload, debug);
   const railTable = railTables[0] ?? null;
   const repoPacketPresent =
@@ -947,15 +1288,40 @@ const runScenario = async (scenario: ToolChainScenario, runId: string, outputDir
     repoPacketPresent,
   });
 
+  const failures =
+    serverFreshnessWarnings.length && classification.failures.length
+      ? []
+      : classification.failures;
+  const warnings =
+    serverFreshnessWarnings.length && classification.failures.length
+      ? [
+          ...classification.warnings,
+          ...serverFreshnessWarnings,
+          ...classification.failures.map((failure) => `untrusted_failure_due_to_stale_server_bundle:${failure}`),
+        ]
+      : [...classification.warnings, ...serverFreshnessWarnings];
+  const verdict: Verdict =
+    serverFreshnessWarnings.length && classification.verdict === "FAIL"
+      ? "WARN"
+      : serverFreshnessWarnings.length && classification.verdict === "PASS"
+        ? "WARN"
+        : classification.verdict;
+
   const result = {
     schema: "helix.ask_tool_chain_matrix_probe_result.v1",
     scenario_id: scenario.id,
     category: scenario.category,
     prompt: scenario.prompt,
     turn_id: turnId,
-    verdict: classification.verdict,
-    failures: classification.failures,
-    warnings: classification.warnings,
+    verdict,
+    failures,
+    warnings,
+    server_bundle_freshness: {
+      server_build_started_at_ms: serverBuildStartedAtMs,
+      latest_local_runtime_change_ms: localRuntimeChanges.latestMtimeMs,
+      changed_runtime_file_count: localRuntimeChanges.files.length,
+      stale: serverFreshnessWarnings.length > 0,
+    },
     selected_capabilities: capabilities,
     artifact_kinds: artifactKinds,
     terminal_artifact_kind: terminalKind,
@@ -984,6 +1350,9 @@ const renderMarkdownSummary = (input: {
   results: RecordLike[];
   outputDir: string;
   preflight?: ToolChainPreflight;
+  crossScenarioFailures?: string[];
+  warningSummary?: ReturnType<typeof summarizeToolChainMatrixWarnings>;
+  parallelism?: number;
 }): string => {
   const lines = [
     "# Helix Ask Tool Chain Matrix Probe",
@@ -991,7 +1360,16 @@ const renderMarkdownSummary = (input: {
     `- run_id: ${input.runId}`,
     `- base_url: ${BASE_URL}`,
     `- output_dir: ${input.outputDir}`,
+    `- parallelism: ${input.parallelism ?? 1}`,
   ];
+  if (input.warningSummary) {
+    lines.push(
+      `- warnings: ${input.warningSummary.warning_count}`,
+      `- stale_server_bundle_warnings: ${input.warningSummary.stale_server_bundle_count}`,
+      `- untrusted_stale_failure_warnings: ${input.warningSummary.untrusted_failure_count}`,
+      `- capacity_or_admission_stress_warnings: ${input.warningSummary.capacity_or_admission_stress_count}`,
+    );
+  }
   if (input.preflight) {
     lines.push(`- preflight: ${input.preflight.ok ? "ok" : "blocked"} (${input.preflight.reason})`);
     if (input.preflight.hint) lines.push(`- preflight_hint: ${input.preflight.hint}`);
@@ -1014,17 +1392,23 @@ const renderMarkdownSummary = (input: {
       } | ${findings || "none"} |`,
     );
   }
+  if (input.crossScenarioFailures?.length) {
+    lines.push("", "## Cross-scenario failures", "");
+    for (const failure of input.crossScenarioFailures) lines.push(`- ${failure}`);
+  }
   return `${lines.join("\n")}\n`;
 };
 
-const main = async (): Promise<void> => {
+const main = async (): Promise<0 | 1> => {
   const selection = selectToolChainMatrixScenarios();
   const scenarios = selection.scenarios;
   const runId = `tool-chain-${Date.now()}`;
   const outputDir = path.resolve(OUT_DIR, runId);
   await fs.mkdir(outputDir, { recursive: true });
+  const localRuntimeChanges = await collectLocalRestartSensitiveRuntimeChanges();
 
   if (selection.unknownIds.length || scenarios.length === 0) {
+    const warningSummary = summarizeToolChainMatrixWarnings([]);
     const summary = {
       schema: "helix.ask_tool_chain_matrix_probe_summary.v1",
       ok: false,
@@ -1033,45 +1417,62 @@ const main = async (): Promise<void> => {
       run_id: runId,
       base_url: BASE_URL,
       output_dir: outputDir,
+      parallelism: PARALLELISM,
       requested_scenarios: selection.requestedIds,
       selected_scenarios: scenarios.map((scenario) => scenario.id),
       unknown_scenarios: selection.unknownIds,
       available_scenarios: selection.availableIds,
+      local_restart_sensitive_runtime_changes: localRuntimeChanges,
       counts: {
         pass: 0,
         warn: 1,
         fail: 0,
       },
+      warning_summary: warningSummary,
+      goal_proof_trust: toolChainMatrixGoalProofTrust(warningSummary, 0),
+      goal_proof_required: REQUIRE_GOAL_PROOF,
       results: [],
     };
     await fs.writeFile(path.join(outputDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
-    await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, results: [], outputDir }));
+    await fs.writeFile(
+      path.join(outputDir, "summary.md"),
+      renderMarkdownSummary({ runId, results: [], outputDir, warningSummary: summary.warning_summary, parallelism: PARALLELISM }),
+    );
     console.log(JSON.stringify(summary, null, 2));
-    process.exitCode = 1;
-    return;
+    return 1;
   }
 
   if (DRY_RUN) {
+    const warningSummary = summarizeToolChainMatrixWarnings([]);
     const summary = {
       ok: true,
       dry_run: true,
       run_id: runId,
       base_url: BASE_URL,
       output_dir: outputDir,
+      parallelism: PARALLELISM,
       requested_scenarios: selection.requestedIds,
       selected_scenarios: scenarios.map((scenario) => scenario.id),
       available_scenarios: selection.availableIds,
+      local_restart_sensitive_runtime_changes: localRuntimeChanges,
       scenarios,
+      warning_summary: warningSummary,
+      goal_proof_trust: toolChainMatrixGoalProofTrust(warningSummary, 0),
+      goal_proof_required: REQUIRE_GOAL_PROOF,
       results: [],
     };
     await fs.writeFile(path.join(outputDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
-    await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, results: [], outputDir }));
+    await fs.writeFile(
+      path.join(outputDir, "summary.md"),
+      renderMarkdownSummary({ runId, results: [], outputDir, warningSummary: summary.warning_summary, parallelism: PARALLELISM }),
+    );
     console.log(JSON.stringify(summary, null, 2));
-    return;
+    return toolChainMatrixProcessExitCode(summary.ok, REQUIRE_GOAL_PROOF, summary.goal_proof_trust);
   }
 
   const preflight = await probeAskTurnApi();
   if (!preflight.ok) {
+    const warningSummary = summarizeToolChainMatrixWarnings([]);
     const summary = {
       schema: "helix.ask_tool_chain_matrix_probe_summary.v1",
       ok: false,
@@ -1080,29 +1481,50 @@ const main = async (): Promise<void> => {
       run_id: runId,
       base_url: BASE_URL,
       output_dir: outputDir,
+      parallelism: PARALLELISM,
       counts: {
         pass: 0,
         warn: 1,
         fail: 0,
       },
       preflight,
+      local_restart_sensitive_runtime_changes: localRuntimeChanges,
+      warning_summary: warningSummary,
+      goal_proof_trust: toolChainMatrixGoalProofTrust(warningSummary, 0),
+      goal_proof_required: REQUIRE_GOAL_PROOF,
       results: [],
     };
     await fs.writeFile(path.join(outputDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
-    await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, results: [], outputDir, preflight }));
+    await fs.writeFile(
+      path.join(outputDir, "summary.md"),
+      renderMarkdownSummary({ runId, results: [], outputDir, preflight, warningSummary: summary.warning_summary, parallelism: PARALLELISM }),
+    );
     console.log(JSON.stringify(summary, null, 2));
-    process.exitCode = 1;
-    return;
+    return 1;
   }
 
-  const results: RecordLike[] = [];
-  for (const scenario of scenarios) {
+  const results = await runBoundedToolChainTasks(scenarios, PARALLELISM, async (scenario) => {
     try {
       console.error(`[helix-tool-chain] ${scenario.id}: ${scenario.prompt}`);
-      results.push(await runScenario(scenario, runId, outputDir));
+      return await runScenario(scenario, runId, outputDir, localRuntimeChanges);
     } catch (error) {
       const failure = error instanceof Error ? error.message : String(error);
-      results.push({
+      const capacityStressReason = readThrownScenarioCapacityAdmissionStressReason(failure);
+      if (capacityStressReason) {
+        return {
+          schema: "helix.ask_tool_chain_matrix_probe_result.v1",
+          scenario_id: scenario.id,
+          category: scenario.category,
+          prompt: scenario.prompt,
+          verdict: "WARN",
+          failures: [],
+          warnings: [`capacity_or_admission_stress:${capacityStressReason}`],
+          terminal_artifact_kind: failure.includes("ask_turn_admission") ? "ask_turn_admission" : null,
+          terminal_error_code: capacityStressReason,
+          visible_text_excerpt: `Ask turn rejected: ${capacityStressReason}.`,
+        };
+      }
+      return {
         schema: "helix.ask_tool_chain_matrix_probe_result.v1",
         scenario_id: scenario.id,
         category: scenario.category,
@@ -1110,35 +1532,52 @@ const main = async (): Promise<void> => {
         verdict: "FAIL",
         failures: [failure],
         warnings: [],
-      });
+      };
     }
-  }
+  });
 
   const failCount = results.filter((result) => result.verdict === "FAIL").length;
   const warnCount = results.filter((result) => result.verdict === "WARN").length;
+  const crossScenarioFailures = calculatorScenarioAgreementFailures(results);
+  const warningSummary = summarizeToolChainMatrixWarnings(results);
+  const goalProofTrust = toolChainMatrixGoalProofTrust(warningSummary, results.length);
   const summary = {
     schema: "helix.ask_tool_chain_matrix_probe_summary.v1",
-    ok: failCount === 0 && (!FAIL_ON_WARN || warnCount === 0),
+    ok: failCount === 0 && crossScenarioFailures.length === 0 && (!FAIL_ON_WARN || warnCount === 0),
     run_id: runId,
     base_url: BASE_URL,
     output_dir: outputDir,
+    parallelism: PARALLELISM,
     counts: {
       pass: results.filter((result) => result.verdict === "PASS").length,
       warn: warnCount,
       fail: failCount,
+      cross_scenario_fail: crossScenarioFailures.length,
     },
     preflight,
+    local_restart_sensitive_runtime_changes: localRuntimeChanges,
+    warning_summary: warningSummary,
+    goal_proof_trust: goalProofTrust,
+    goal_proof_required: REQUIRE_GOAL_PROOF,
+    cross_scenario_failures: crossScenarioFailures,
     results,
   };
   await fs.writeFile(path.join(outputDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
-  await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, results, outputDir, preflight }));
+  await fs.writeFile(
+    path.join(outputDir, "summary.md"),
+    renderMarkdownSummary({ runId, results, outputDir, preflight, crossScenarioFailures, warningSummary, parallelism: PARALLELISM }),
+  );
   console.log(JSON.stringify(summary, null, 2));
-  if (!summary.ok) process.exitCode = 1;
+  return toolChainMatrixProcessExitCode(summary.ok, REQUIRE_GOAL_PROOF, goalProofTrust);
 };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main().catch((error) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  });
+  main()
+    .then((exitCode) => {
+      process.exit(exitCode);
+    })
+    .catch((error) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    });
 }

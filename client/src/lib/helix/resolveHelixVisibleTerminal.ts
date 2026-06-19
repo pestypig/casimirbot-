@@ -72,6 +72,11 @@ function firstText(...values: unknown[]): string {
   return "";
 }
 
+function firstTerminalErrorCode(...values: unknown[]): string {
+  const codes = values.map((value) => firstText(value)).filter(Boolean);
+  return codes.find((code) => code !== "terminal_projection_mismatch") ?? codes[0] ?? "";
+}
+
 export function normalizeFinalAnswerSourceForTerminalKind(
   source: string | null,
   terminalArtifactKind: string | null,
@@ -269,13 +274,21 @@ export function resolveHelixVisibleTerminal(
     firstText(
       envelope?.terminal_artifact_kind,
       authority?.terminal_artifact_kind,
+      singleWriter?.selected_terminal_artifact_kind,
+      singleWriter?.selectedArtifactKind,
       presentation?.terminal_artifact_kind,
       record?.terminal_artifact_kind,
       debug?.terminal_artifact_kind,
       summary?.terminal_artifact_kind,
     ) || null;
   const rawFinalAnswerSource =
-    firstText(envelope?.final_answer_source, authority?.final_answer_source, record?.final_answer_source, debug?.final_answer_source) ||
+    firstText(
+      envelope?.final_answer_source,
+      authority?.final_answer_source,
+      singleWriter?.source,
+      record?.final_answer_source,
+      debug?.final_answer_source,
+    ) ||
     null;
   const finalAnswerSource = normalizeFinalAnswerSourceForTerminalKind(rawFinalAnswerSource, terminalArtifactKind);
   const envelopeText = firstText(envelope?.terminal_text);
@@ -284,15 +297,21 @@ export function resolveHelixVisibleTerminal(
     readString(authority?.terminal_kind) !== "failure" &&
     readString(authority?.final_answer_source) !== "typed_failure" &&
     readString(authority?.terminal_artifact_kind) !== "typed_failure";
+  const singleWriterIntegrity = readRecord(singleWriter?.integrity);
+  const singleWriterIndicatesSuccess =
+    Boolean(singleWriterIntegrity?.single_writer_applied === true) &&
+    readString(singleWriter?.source) !== "typed_failure" &&
+    readString(singleWriter?.selected_terminal_artifact_kind) !== "typed_failure" &&
+    readString(singleWriter?.selectedArtifactKind) !== "typed_failure";
   const envelopeIndicatesSuccess =
     Boolean(envelopeText) &&
     readString(envelope?.terminal_kind) !== "failure" &&
     readString(envelope?.final_answer_source) !== "typed_failure" &&
     readString(envelope?.terminal_artifact_kind) !== "typed_failure";
   const terminalErrorCode =
-    envelopeIndicatesSuccess || terminalAuthorityIndicatesSuccess
+    envelopeIndicatesSuccess || terminalAuthorityIndicatesSuccess || singleWriterIndicatesSuccess
       ? null
-      : firstText(record?.terminal_error_code, debug?.terminal_error_code, summary?.terminal_error_code) || null;
+      : firstTerminalErrorCode(record?.terminal_error_code, debug?.terminal_error_code, summary?.terminal_error_code) || null;
   const effectiveFinalAnswerSource = finalAnswerSource || (terminalErrorCode ? "typed_failure" : null);
   const selectedFinalAnswer = firstText(record?.selected_final_answer, debug?.selected_final_answer);
   const selectedFinalAnswerIsAuthoritativeModelDraft =
@@ -331,7 +350,6 @@ export function resolveHelixVisibleTerminal(
   }
 
   const singleWriterText = firstText(singleWriter?.visible_text);
-  const singleWriterIntegrity = readRecord(singleWriter?.integrity);
   if (singleWriterText && singleWriterIntegrity?.single_writer_applied === true) {
     return {
       text: singleWriterText,
@@ -392,7 +410,18 @@ export function resolveHelixVisibleTerminal(
 
   const typedFailureText =
     effectiveFinalAnswerSource === "typed_failure" || terminalKind === "failure" || terminalArtifactKind === "typed_failure" || terminalErrorCode
-      ? firstText(record?.typed_failure && readRecord(record.typed_failure)?.answer_text, record?.selected_final_answer, debug?.selected_final_answer) ||
+      ? firstText(
+          record?.terminal_error_code === "terminal_projection_mismatch" && debug?.terminal_error_code === terminalErrorCode
+            ? debug?.typed_failure && readRecord(debug.typed_failure)?.answer_text
+            : null,
+          record?.terminal_error_code === "terminal_projection_mismatch" && debug?.terminal_error_code === terminalErrorCode
+            ? debug?.selected_final_answer
+            : null,
+          record?.typed_failure && readRecord(record.typed_failure)?.answer_text,
+          record?.selected_final_answer,
+          debug?.typed_failure && readRecord(debug.typed_failure)?.answer_text,
+          debug?.selected_final_answer,
+        ) ||
         renderTypedFailureFallback(terminalErrorCode)
       : "";
   if (typedFailureText) {

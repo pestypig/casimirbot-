@@ -684,6 +684,66 @@ describe("Helix Ask negated/contextual tool admission", () => {
     expect(__testHelixCalculatorCompoundPlanning.shouldSuppressHelixCalculatorCompoundPlanning(promptText)).toBe(true);
   });
 
+  it("normalizes stale calculator receipt results from the expression before terminal materialization", () => {
+    expect(
+      __testHelixCalculatorCompoundPlanning.readHelixCalculatorReceiptResultText({
+        expression: "2*(3+4)",
+        result_text: "2",
+        result_unit: null,
+      }),
+    ).toBe("14");
+  });
+
+  it("detects stale calculator draft result text before terminal materialization", () => {
+    expect(
+      __testHelixCalculatorCompoundPlanning.helixCalculatorAnswerConflictsWithExpressionResult(
+        [
+          "I used the calculator result as a numeric subgoal, then continued the reasoning from that observation.",
+          "Calculator subgoal: 2*(3+4)",
+          "Result: 2",
+          "Trace source: scientific-calculator.solve_expression.",
+        ].join("\n"),
+      ),
+    ).toBe(true);
+  });
+
+  it("sanitizes stale calculator return text from receipt results at the final handoff", () => {
+    const text = [
+      "I used the calculator result as a numeric subgoal, then continued the reasoning from that observation.",
+      "Calculator subgoal: 2*(3+4)",
+      "Result: 2",
+      "Trace source: scientific-calculator.solve_expression.",
+    ].join("\n");
+
+    const sanitized = __testHelixCalculatorCompoundPlanning.sanitizeHelixCalculatorAnswerAgainstReceiptResults({
+      text,
+      prompt: "Open the scientific calculator, solve 2*(3+4), and explain the steps.",
+      receipts: [
+        {
+          receipt_id: "calculator:receipt:2-times-sum",
+          subgoal_id: "calculator_subgoal_1",
+          expression: "2*(3+4)",
+          result_text: "2",
+          result_unit: null,
+        },
+      ],
+      coverage: {
+        schema: "helix.calculator_plan_coverage.v1",
+        coverage_id: "coverage:2-times-sum",
+        turn_id: turnId,
+        coverage: "complete",
+        requirements: [],
+        missing_requirement_ids: [],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    });
+
+    expect(sanitized).toContain("Calculator expression: 2*(3+4)");
+    expect(sanitized).toContain("Result: 14");
+    expect(sanitized).not.toContain("Result: 2\n");
+  });
+
   it("does not request doc_reference when explicit docs locate already has a path ref", () => {
     const failure = __testHelixEvidenceRetrievalFailure.buildAskTurnEvidenceRetrievalFailure({
       transcript:

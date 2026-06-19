@@ -4,6 +4,7 @@ import {
   WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS,
   WORKSTATION_AGENT_GOAL_DEFAULT_CONTEXT_FEEDS,
   WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
+  WORKSTATION_AGENT_GOAL_CONTEXT_FEED_QUERY_ACTUATORS,
   WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
   WORKSTATION_NARRATOR_BIND_STREAM_REQUEST_SCHEMA,
   WORKSTATION_NARRATOR_SAY_REQUEST_SCHEMA,
@@ -11,6 +12,7 @@ import {
   WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
   WORKSTATION_GOAL_CONTEXT_UPDATE_KINDS,
   normalizeAgentGoalActuatorV1,
+  queryActuatorForAgentGoalContextFeedV1,
   type AgentGoalSessionV1,
   type GoalContextProducerKindV1,
   type GoalContextUpdateKindV1,
@@ -49,7 +51,14 @@ describe("workstation goal context contract", () => {
     updateKind: "visual_observation",
     contentRef: "stage_play_processed_mail_packet:1",
     preview: "Visual source packet classified a fresh danger cue.",
-    evidenceRefs: ["stage_play_processed_mail_packet:1", "visual_frame:1", "stage_play_micro_reasoner_run:1"],
+    evidenceRefs: [
+      "stage_play_processed_mail_packet:1",
+      "visual_frame:1",
+      "stage_play_micro_reasoner_run:1",
+      "source:visual-tab",
+      "stage_play_mail_loop:desktop",
+      "agent_goal_allowed_actuator:query_visual_summaries",
+    ],
     receiptRefs: ["stage_play_live_source_mail:1"],
     freshness: {
       observedAtMs: 1_700_000_000_000,
@@ -117,6 +126,7 @@ describe("workstation goal context contract", () => {
       "query_packet_traces",
       "query_route_evidence",
       "query_automation_policies",
+      "evaluate_goal_satisfaction",
       "resume_loop",
       "set_loop_state",
       "focus_process_graph",
@@ -148,10 +158,12 @@ describe("workstation goal context contract", () => {
     sourceId: "live-answer:translation",
     sourceRefs: ["live-answer:translation", "live_answer"],
     loopRefs: ["narrator:say", "thread:helix-ask:desktop", "workstation_actuator:narrator_say"],
+    policyEvidenceRefs: ["allowed_actuator:narrator_say", "agent_goal_allowed_actuator:narrator_say"],
     evidenceRefs: [
       "helix:narrator:say:1",
       "translation_segment:latest",
       "allowed_actuator:narrator_say",
+      "agent_goal_allowed_actuator:narrator_say",
       "live-answer:translation",
       "live_answer",
       "narrator:say",
@@ -159,6 +171,13 @@ describe("workstation goal context contract", () => {
       "workstation_actuator:narrator_say",
     ],
     producedRefs: ["helix:narrator:say:1", "stage_play_goal_context_update:narrator:say"],
+    goalId: "goal:live-monitor",
+    goalSessionFound: true,
+    requiredActuator: "narrator_say",
+    actuatorAllowed: true,
+    matchedAllowedActuators: ["narrator_say"],
+    matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:narrator_say"],
+    agentGoalSession: goal,
     goalContextUpdateId: "stage_play_goal_context_update:narrator:say",
     deliveryMode: "confirm_to_speak",
     priority: "normal",
@@ -181,16 +200,25 @@ describe("workstation goal context contract", () => {
     sourceRef: "source:browser-audio",
     sourceRefs: ["source:browser-audio", "translated_transcript"],
     loopRefs: ["narrator:bind_stream", "thread:helix-ask:desktop", "workstation_actuator:narrator_bind_stream"],
+    policyEvidenceRefs: ["allowed_actuator:narrator_bind_stream", "agent_goal_allowed_actuator:narrator_bind_stream"],
     evidenceRefs: [
       "helix:narrator:bind:1",
       "source:browser-audio",
       "translated_transcript",
       "allowed_actuator:narrator_bind_stream",
+      "agent_goal_allowed_actuator:narrator_bind_stream",
       "narrator:bind_stream",
       "thread:helix-ask:desktop",
       "workstation_actuator:narrator_bind_stream",
     ],
     producedRefs: ["helix:narrator:bind:1", "stage_play_goal_context_update:narrator:bind"],
+    goalId: "goal:live-monitor",
+    goalSessionFound: true,
+    requiredActuator: "narrator_bind_stream",
+    actuatorAllowed: true,
+    matchedAllowedActuators: ["narrator_bind_stream"],
+    matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:narrator_bind_stream"],
+    agentGoalSession: goal,
     goalContextUpdateId: "stage_play_goal_context_update:narrator:bind",
     streamKind: "translated_transcript",
     presetId: "preset:translation-visible",
@@ -227,7 +255,12 @@ describe("workstation goal context contract", () => {
         contentRef: `${producerKind}:content:1`,
         sourceRefs: [`${producerKind}:source:1`],
         loopRefs: [`${producerKind}:loop:1`],
-        evidenceRefs: [`${producerKind}:content:1`, `${producerKind}:evidence:1`],
+        evidenceRefs: [
+          `${producerKind}:content:1`,
+          `${producerKind}:source:1`,
+          `${producerKind}:loop:1`,
+          `${producerKind}:evidence:1`,
+        ],
         receiptRefs: [`${producerKind}:receipt:1`],
         preview: `${producerKind} produced an observation for the active goal.`,
       })).toEqual([]);
@@ -241,10 +274,77 @@ describe("workstation goal context contract", () => {
         updateId: `goal_context_update:${updateKind}:1`,
         updateKind,
         contentRef: `${updateKind}:content:1`,
-        evidenceRefs: [`${updateKind}:content:1`, `${updateKind}:evidence:1`],
+        evidenceRefs: [
+          `${updateKind}:content:1`,
+          "source:visual-tab",
+          "stage_play_mail_loop:desktop",
+          `${updateKind}:evidence:1`,
+        ],
         preview: `${updateKind} observation for the workstation reasoning circuit.`,
       })).toEqual([]);
     }
+  });
+
+  it("maps every goal context feed lane to a valid query actuator", () => {
+    expect(Object.keys(WORKSTATION_AGENT_GOAL_CONTEXT_FEED_QUERY_ACTUATORS).sort()).toEqual(
+      [...WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS].sort(),
+    );
+    for (const sourceKind of WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS) {
+      const actuator = queryActuatorForAgentGoalContextFeedV1(sourceKind);
+      expect(WORKSTATION_AGENT_GOAL_ACTUATORS).toContain(actuator);
+      expect(actuator.startsWith("query_")).toBe(true);
+    }
+    expect(queryActuatorForAgentGoalContextFeedV1("visual_summaries")).toBe("query_visual_summaries");
+    expect(queryActuatorForAgentGoalContextFeedV1("translated_transcripts")).toBe("query_translation_segments");
+    expect(queryActuatorForAgentGoalContextFeedV1("live_answer_lines")).toBe("query_live_answer_state");
+    expect(queryActuatorForAgentGoalContextFeedV1("narrator_events")).toBe("query_narrator_events");
+    expect(queryActuatorForAgentGoalContextFeedV1("automation_policies")).toBe("query_automation_policies");
+  });
+
+  it("requires goal-context update evidence to bind source and loop refs", () => {
+    expect(validateWorkstationGoalContextUpdateV1({
+      ...update,
+      evidenceRefs: [
+        update.contentRef,
+        "visual_frame:1",
+        "stage_play_micro_reasoner_run:1",
+      ],
+    })).toEqual(expect.arrayContaining([
+      "evidenceRefs must include every sourceRefs entry",
+      "evidenceRefs must include every loopRefs entry",
+    ]));
+  });
+
+  it("validates tool identity as non-terminal actuator provenance on goal-context updates", () => {
+    expect(validateWorkstationGoalContextUpdateV1({
+      ...update,
+      toolIdentity: {
+        requestedToolName: "visual_preset",
+        canonicalToolName: "live_env.set_visual_preset",
+        matchedAllowedActuators: ["set_visual_preset"],
+        matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:set_visual_preset"],
+      },
+      evidenceRefs: [
+        ...update.evidenceRefs,
+        "agent_goal_allowed_actuator:set_visual_preset",
+      ],
+    })).toEqual([]);
+
+    expect(validateWorkstationGoalContextUpdateV1({
+      ...update,
+      toolIdentity: {
+        requestedToolName: "",
+        canonicalToolName: "set_visual_preset" as `live_env.${string}`,
+        matchedAllowedActuators: ["wake_agent" as never],
+        matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:other"],
+      },
+    })).toEqual(expect.arrayContaining([
+      "toolIdentity.requestedToolName is required",
+      "toolIdentity.canonicalToolName must be a live_env tool name",
+      "toolIdentity.matchedAllowedActuators[0] is invalid",
+      "toolIdentity.matchedAllowedActuatorRefs must include every matched actuator policy ref",
+      "evidenceRefs must include every toolIdentity matched actuator ref",
+    ]));
   });
 
   it("rejects goal-context updates that try to become terminal answers", () => {
@@ -367,8 +467,11 @@ describe("workstation goal context contract", () => {
     expect(normalizeAgentGoalActuatorV1("live_env.pause_workstation_loop")).toBe("pause_loop");
     expect(normalizeAgentGoalActuatorV1("live_env.resume_workstation_loop")).toBe("resume_loop");
     expect(normalizeAgentGoalActuatorV1("live_env.set_workstation_loop_state")).toBe("set_loop_state");
+    expect(normalizeAgentGoalActuatorV1("live_env.repair_loop")).toBe("repair_source");
     expect(normalizeAgentGoalActuatorV1("live_env.repair_workstation_source")).toBe("repair_source");
     expect(normalizeAgentGoalActuatorV1("live_env.update_live_answer_projection")).toBe("update_live_answer");
+    expect(normalizeAgentGoalActuatorV1("narrator.say")).toBe("narrator_say");
+    expect(normalizeAgentGoalActuatorV1("narrator.bind_stream")).toBe("narrator_bind_stream");
     expect(normalizeAgentGoalActuatorV1("live_env.narrator_bind_stream")).toBe("narrator_bind_stream");
     expect(normalizeAgentGoalActuatorV1("live_env.set_visual_preset")).toBe("set_visual_preset");
     expect(normalizeAgentGoalActuatorV1("live_env.set_audio_preset")).toBe("set_audio_preset");
@@ -376,6 +479,7 @@ describe("workstation goal context contract", () => {
     expect(normalizeAgentGoalActuatorV1("audio preset")).toBe("set_audio_preset");
     expect(normalizeAgentGoalActuatorV1("live_env.query_automation_policies")).toBe("query_automation_policies");
     expect(normalizeAgentGoalActuatorV1("live_env.query_narrator_events")).toBe("query_narrator_events");
+    expect(normalizeAgentGoalActuatorV1("live_env.evaluate_goal_satisfaction")).toBe("evaluate_goal_satisfaction");
     expect(normalizeAgentGoalActuatorV1("pause workstation loop")).toBe("pause_loop");
     expect(normalizeAgentGoalActuatorV1("wake_agent")).toBeNull();
   });
@@ -523,6 +627,33 @@ describe("workstation goal context contract", () => {
   it("accepts narrator control request artifacts as non-terminal workstation observations", () => {
     expect(validateNarratorSayRequestV1(narratorSayRequest)).toEqual([]);
     expect(validateNarratorBindStreamRequestV1(narratorBindStreamRequest)).toEqual([]);
+  });
+
+  it("requires narrator goal-session artifacts to expose exact matched actuator policy provenance", () => {
+    expect(validateNarratorSayRequestV1({
+      ...narratorSayRequest,
+      matchedAllowedActuators: [],
+      matchedAllowedActuatorRefs: [],
+    })).toEqual(expect.arrayContaining([
+      "actuatorAllowed=true for a goal session requires matchedAllowedActuators",
+    ]));
+
+    expect(validateNarratorBindStreamRequestV1({
+      ...narratorBindStreamRequest,
+      policyEvidenceRefs: ["allowed_actuator:narrator_bind_stream"],
+      evidenceRefs: [
+        "helix:narrator:bind:1",
+        "source:browser-audio",
+        "translated_transcript",
+        "allowed_actuator:narrator_bind_stream",
+        "narrator:bind_stream",
+        "thread:helix-ask:desktop",
+        "workstation_actuator:narrator_bind_stream",
+      ],
+    })).toEqual(expect.arrayContaining([
+      "policyEvidenceRefs must include every matchedAllowedActuatorRefs entry",
+      "evidenceRefs must include every matchedAllowedActuatorRefs entry",
+    ]));
   });
 
   it("rejects narrator requests whose evidence omits policy, source, or loop proof refs", () => {

@@ -86,13 +86,36 @@ const queryResultFixture = (overrides: Record<string, unknown> = {}) => {
     packetId: "stage_play_processed_mail_packet:frog",
     status: "read",
     missingRequirements: [],
-    policyEvidenceRefs: ["context_feed:packet_traces", "allowed_actuator:query_packet_traces"],
+    policyEvidenceRefs: [
+      "context_feed:packet_traces",
+      "allowed_actuator:query_packet_traces",
+      "agent_goal_context_feed:feed:packet-traces",
+      "agent_goal_allowed_actuator:query_packet_traces",
+    ],
     goalSessionFound: true,
     feedAllowed: true,
     requiredFeed: "packet_traces",
     requiredActuator: "query_packet_traces",
     actuatorAllowed: true,
+    matchedContextFeeds: agentGoalSession.contextFeeds,
+    matchedContextFeedRefs: ["feed:packet-traces"],
+    matchedAllowedActuators: ["query_packet_traces"],
+    matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:query_packet_traces"],
     agentGoalSession,
+    sourceRefs: ["visual_source:image-lens"],
+    loopRefs: ["workstation_context_feed:packet_traces", "workstation_actuator:query_packet_traces"],
+    evidenceRefs: [
+      "stage_play_packet_trace_query:frog",
+      "context_feed:packet_traces",
+      "allowed_actuator:query_packet_traces",
+      "agent_goal_context_feed:feed:packet-traces",
+      "feed:packet-traces",
+      "agent_goal_allowed_actuator:query_packet_traces",
+      "visual_source:image-lens",
+      "workstation_context_feed:packet_traces",
+      "workstation_actuator:query_packet_traces",
+      "stage_play_processed_mail_packet:frog",
+    ],
     packetTraces: [packetTraceFixture()],
     goalContextUpdates: [],
     authoritySummary: {
@@ -176,6 +199,8 @@ describe("stage play packet trace contracts", () => {
     expect(validateStagePlayPacketTraceQueryResultV1(queryResultFixture({
       policyEvidenceRefs: ["context_feed:packet_traces"],
       actuatorAllowed: false,
+      matchedAllowedActuators: [],
+      matchedAllowedActuatorRefs: [],
       agentGoalSession: { goalId: "goal:wrong", threadId: "helix-ask:desktop" },
     }))).toEqual(expect.arrayContaining([
       "policyEvidenceRefs must include packet trace actuator policy ref",
@@ -190,6 +215,39 @@ describe("stage play packet trace contracts", () => {
     }))).toEqual(expect.arrayContaining([
       "policyEvidenceRefs must include packet trace context feed policy ref",
       "read packet trace query results must have feedAllowed=true",
+    ]));
+  });
+
+  it("requires packet trace reads to expose exact matched goal feed and actuator provenance", () => {
+    expect(validateStagePlayPacketTraceQueryResultV1(queryResultFixture({
+      matchedContextFeeds: [],
+      matchedContextFeedRefs: [],
+    }))).toEqual(expect.arrayContaining([
+      "feedAllowed=true for a goal session requires matchedContextFeeds",
+    ]));
+
+    expect(validateStagePlayPacketTraceQueryResultV1(queryResultFixture({
+      matchedAllowedActuators: [],
+      matchedAllowedActuatorRefs: [],
+    }))).toEqual(expect.arrayContaining([
+      "actuatorAllowed=true for a goal session requires matchedAllowedActuators",
+    ]));
+
+    expect(validateStagePlayPacketTraceQueryResultV1(queryResultFixture({
+      policyEvidenceRefs: ["context_feed:packet_traces", "allowed_actuator:query_packet_traces"],
+      evidenceRefs: [
+        "stage_play_packet_trace_query:frog",
+        "context_feed:packet_traces",
+        "allowed_actuator:query_packet_traces",
+        "visual_source:image-lens",
+        "workstation_context_feed:packet_traces",
+        "workstation_actuator:query_packet_traces",
+      ],
+    }))).toEqual(expect.arrayContaining([
+      "policyEvidenceRefs must include every matched context feed policy ref",
+      "policyEvidenceRefs must include every matched allowed actuator policy ref",
+      "evidenceRefs must include every matchedContextFeedRefs entry",
+      "evidenceRefs must include every matchedAllowedActuatorRefs entry",
     ]));
   });
 });

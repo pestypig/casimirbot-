@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { HELIX_LIVE_AGENT_STEP_DECISION_SCHEMA } from "@shared/helix-live-agent-step";
+import {
+  HELIX_LIVE_AGENT_STEP_DECISION_SCHEMA,
+  type HelixLiveEnvironmentToolName,
+} from "@shared/helix-live-agent-step";
 import type { LiveSourceTurnPhaseResolutionV1 } from "@shared/contracts/stage-play-live-source-mail.v1";
 import { runLiveEnvironmentAgentLoop } from "../services/helix-ask/live-environment-agent-loop";
 import { executeLiveEnvironmentTool } from "../services/helix-ask/live-environment-tool-adapter";
@@ -16,6 +19,10 @@ import { runtimeMemoryGovernor } from "../services/runtime/runtime-memory-govern
 import { buildCapabilityPlan } from "../services/helix-ask/capability-planner";
 import { evaluateTerminalBoundaryEligibility } from "../services/helix-ask/runtime-authority-contract";
 import { buildToolCallAdmissionDecision } from "../services/helix-ask/tool-call-admission";
+import {
+  WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS,
+  executableAliasesForWorkstationContextFeedQuerySpec,
+} from "../services/helix-ask/workstation-context-feed-query-tool-contracts";
 import { buildLiveEnvironmentRuntimePacket } from "../services/situation-room/live-environment-runtime-packet-builder";
 import {
   createLiveAnswerEnvironment,
@@ -37,6 +44,7 @@ import {
   resetSituationConstructStoreForTest,
   upsertSituationConstruct,
 } from "../services/situation-room/situation-construct-store";
+import { resetStagePlayGoalContextStoreForTest } from "../services/stage-play/stage-play-goal-context-store";
 
 const resetAll = () => {
   resetLiveAnswerEnvironments();
@@ -46,6 +54,7 @@ const resetAll = () => {
   resetLiveSituationRunsForTest();
   resetLiveFieldWorkersForTest();
   resetSituationConstructStoreForTest();
+  resetStagePlayGoalContextStoreForTest();
   resetInterimVoiceCalloutsForTest();
   resetVoiceSteeringEventsForTest();
   runtimeMemoryGovernor.resetRuntimeMemoryGovernorForTests();
@@ -150,14 +159,18 @@ describe("Helix Ask live environment agent loop", () => {
       "live_env.query_narrator_events",
       "live_env.query_route_evidence",
       "live_env.query_automation_policies",
+      "live_env.evaluate_goal_satisfaction",
     ];
     const controlTools = [
       "live_env.change_workstation_preset",
+      "live_env.set_visual_preset",
+      "live_env.set_audio_preset",
       "live_env.bind_workstation_source",
       "live_env.unbind_workstation_source",
       "live_env.pause_workstation_loop",
       "live_env.resume_workstation_loop",
       "live_env.set_workstation_loop_state",
+      "live_env.repair_loop",
       "live_env.repair_workstation_source",
       "live_env.update_live_answer_projection",
       "live_env.focus_process_graph",
@@ -182,6 +195,229 @@ describe("Helix Ask live environment agent loop", () => {
         can_run_automatically: false,
       });
     }
+    expect(toolById.get("live_env.narrator_say")).toMatchObject({
+      tool_aliases: ["narrator.say", "narrator_say"],
+    });
+    expect(toolById.get("live_env.narrator_bind_stream")).toMatchObject({
+      tool_aliases: ["narrator.bind_stream", "narrator_bind_stream"],
+    });
+    for (const spec of WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS) {
+      expect(toolById.get(spec.capability)).toMatchObject({
+        tool_aliases: executableAliasesForWorkstationContextFeedQuerySpec(spec),
+      });
+    }
+  });
+
+  it("projects active AgentGoalSession feed and actuator policy into the model-visible runtime packet", () => {
+    const environment = seedEnvironment();
+    const sessionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: environment.thread_id,
+      environment_id: environment.environment_id,
+      args: {
+        room_id: environment.room_id,
+        source_id: "visual-source:runtime-packet",
+        goal_id: "goal:runtime-packet-context",
+        objective: "Monitor the visual source through packet traces and narrator events.",
+        context_feeds: ["visual_summaries", "packet_traces", "narrator_events"],
+        allowed_actuators: ["query_visual_summaries", "query_packet_traces", "query_narrator_events", "narrator_bind_stream"],
+      },
+    });
+    expect(sessionObservation.ok).toBe(true);
+
+    const packet = buildLiveEnvironmentRuntimePacket({
+      threadId: environment.thread_id,
+      environmentId: environment.environment_id,
+      now: "2026-05-26T12:00:04.000Z",
+    });
+
+    expect(packet.goal_context_snapshot).toMatchObject({
+      active_goal_session_count: 1,
+      recent_goal_context_update_count: 0,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(packet.goal_context_snapshot?.active_goal_sessions[0]).toMatchObject({
+      goal_id: "goal:runtime-packet-context",
+      status: "active",
+      source_refs: expect.arrayContaining(["visual-source:runtime-packet"]),
+      context_feed_kinds: expect.arrayContaining(["visual_summaries", "packet_traces", "narrator_events"]),
+      context_feed_refs: expect.arrayContaining([
+        expect.stringMatching(/^agent_goal_context_feed:/),
+      ]),
+      allowed_actuators: expect.arrayContaining([
+        "query_visual_summaries",
+        "query_packet_traces",
+        "query_narrator_events",
+        "narrator_bind_stream",
+      ]),
+      allowed_actuator_refs: expect.arrayContaining([
+        "agent_goal_allowed_actuator:query_visual_summaries",
+        "agent_goal_allowed_actuator:query_packet_traces",
+        "agent_goal_allowed_actuator:query_narrator_events",
+        "agent_goal_allowed_actuator:narrator_bind_stream",
+      ]),
+      checkpoint_refs: expect.arrayContaining([expect.stringMatching(/^stage_play_goal_checkpoint:/)]),
+      final_reports_require_terminal_authority: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+  });
+
+  it("carries runtime goal-context snapshot refs into loop evidence before terminal review", async () => {
+    const environment = seedEnvironment();
+    const sessionObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.start_agent_goal_session",
+      thread_id: environment.thread_id,
+      environment_id: environment.environment_id,
+      args: {
+        room_id: environment.room_id,
+        source_id: "visual-source:loop-context",
+        goal_id: "goal:loop-context",
+        objective: "Keep visual packet context available for terminal review.",
+        context_feeds: ["visual_summaries", "packet_traces"],
+        allowed_actuators: ["query_visual_summaries", "query_packet_traces"],
+      },
+    });
+    expect(sessionObservation.ok).toBe(true);
+
+    const loop = await runLiveEnvironmentAgentLoop({
+      threadId: environment.thread_id,
+      environmentId: environment.environment_id,
+      maxIterations: 1,
+      now: "2026-05-26T12:00:04.000Z",
+      chooser: ({ packet, stepIndex }) => {
+        const visibleSession = packet.goal_context_snapshot?.active_goal_sessions.find((session) =>
+          session.goal_id === "goal:loop-context"
+        );
+        expect(packet.goal_context_snapshot?.active_goal_session_count).toBeGreaterThanOrEqual(1);
+        expect(visibleSession?.allowed_actuator_refs).toEqual(expect.arrayContaining([
+          "agent_goal_allowed_actuator:query_visual_summaries",
+          "agent_goal_allowed_actuator:query_packet_traces",
+        ]));
+        return {
+          schema: HELIX_LIVE_AGENT_STEP_DECISION_SCHEMA,
+          decision_id: "live_step:runtime_context_terminal_review",
+          thread_id: environment.thread_id,
+          environment_id: environment.environment_id,
+          step_index: stepIndex,
+          decision_authority: "model",
+          decision_timing: "terminal_review",
+          next_step: "answer",
+          selected_tool: null,
+          tool_args: null,
+          rationale_summary: "The model can see goal-context feed policy before terminal review.",
+          expected_evidence_kind: null,
+          evidence_refs: [],
+          assistant_answer: false,
+          raw_content_included: false,
+        };
+      },
+    });
+
+    expect(loop.goal_context_snapshot).toMatchObject({
+      active_goal_session_count: 1,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(loop.runtime_context_refs).toEqual(expect.arrayContaining([
+      "goal:loop-context",
+      "visual-source:loop-context",
+      "agent_goal_allowed_actuator:query_visual_summaries",
+      "agent_goal_allowed_actuator:query_packet_traces",
+      "terminal_authority_required:goal:loop-context",
+      expect.stringMatching(/^agent_goal_context_feed:/),
+      expect.stringMatching(/^stage_play_goal_checkpoint:/),
+    ]));
+    expect(loop.evidence_refs).toEqual(expect.arrayContaining(loop.runtime_context_refs ?? []));
+    expect(loop.transcriptRows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        rowKind: "goal_context_snapshot",
+        title: "Goal context snapshot",
+        source: expect.objectContaining({
+          toolName: "live_env.runtime_packet",
+          artifactKind: "helix.live_environment_runtime_goal_context_snapshot.v1",
+        }),
+        evidenceRefs: expect.arrayContaining(loop.runtime_context_refs ?? []),
+        authority: "tool_evidence",
+        assistantAnswer: false,
+        terminalEligible: false,
+      }),
+    ]));
+    expect(loop.assistant_answer).toBe(false);
+    expect(loop.raw_content_included).toBe(false);
+  });
+
+  it("executes advertised workstation tool aliases through the agent loop as canonical non-terminal observations", async () => {
+    const environment = seedEnvironment();
+
+    const loop = await runLiveEnvironmentAgentLoop({
+      threadId: environment.thread_id,
+      environmentId: environment.environment_id,
+      maxIterations: 2,
+      now: "2026-05-26T12:00:04.000Z",
+      chooser: ({ stepIndex }) => stepIndex === 0
+        ? {
+            schema: HELIX_LIVE_AGENT_STEP_DECISION_SCHEMA,
+            decision_id: "live_step:alias_query:0",
+            thread_id: environment.thread_id,
+            environment_id: environment.environment_id,
+            step_index: stepIndex,
+            decision_authority: "model",
+            decision_timing: "pre_observation",
+            next_step: "call_tool",
+            selected_tool: "visual_summaries" as HelixLiveEnvironmentToolName,
+            tool_args: {
+              room_id: environment.room_id,
+              source_id: "visual-source:alias-query",
+            },
+            rationale_summary: "Use the runtime-advertised alias for the visual summaries feed.",
+            expected_evidence_kind: "stage_play_workstation_context_feed_query_result",
+            evidence_refs: [],
+            assistant_answer: false,
+            raw_content_included: false,
+          }
+        : {
+            schema: HELIX_LIVE_AGENT_STEP_DECISION_SCHEMA,
+            decision_id: "live_step:alias_query:1",
+            thread_id: environment.thread_id,
+            environment_id: environment.environment_id,
+            step_index: stepIndex,
+            decision_authority: "model",
+            decision_timing: "post_observation",
+            next_step: "answer",
+            selected_tool: null,
+            tool_args: null,
+            rationale_summary: "The alias-produced observation has re-entered the loop.",
+            expected_evidence_kind: null,
+            evidence_refs: ["stage_play_workstation_context_feed_query_result:visual_summaries"],
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+    });
+
+    expect(loop.iterations[0]?.tool_observation).toMatchObject({
+      tool_name: "live_env.query_visual_summaries",
+      ok: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(loop.iterations[0]?.tool_observation?.observation).toMatchObject({
+      requestedToolName: "visual_summaries",
+      canonicalToolName: "live_env.query_visual_summaries",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(loop.terminal_decision).toBe("answer_allowed");
   });
 
   it("records interim voice callout requests as provisional tool evidence", () => {

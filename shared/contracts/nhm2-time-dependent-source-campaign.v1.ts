@@ -1,7 +1,11 @@
 import type { CasimirMaterialReceiptV1 } from "./casimir-material-receipt.v1";
+import type { Nhm2CampaignFrontierDispositionV1 } from "./nhm2-campaign-frontier-disposition.v1";
 import type { Nhm2CoupledClosurePassCandidateArtifactV1 } from "./nhm2-coupled-closure-pass-candidate.v1";
 import type { Nhm2CovariantConservationDiagnosticArtifactV1 } from "./nhm2-covariant-conservation-diagnostic.v1";
+import type { Nhm2MetricMomentumRemediationTargetsV1 } from "./nhm2-metric-momentum-remediation-targets.v1";
+import type { Nhm2MetricRequiredMomentumDemandAuditV1 } from "./nhm2-metric-required-momentum-demand-audit.v1";
 import type { Nhm2NatarioInvariantAuditV1 } from "./nhm2-natario-invariant-audit.v1";
+import type { Nhm2MomentumFrameProjectionReceiptV1 } from "./nhm2-momentum-frame-projection-receipt.v1";
 import type { Nhm2ObserverRobustEnergyConditionArtifactV1 } from "./nhm2-observer-robust-energy-conditions.v1";
 import type { Nhm2QeiWorldlineDossierV1 } from "./nhm2-qei-worldline-dossier.v1";
 import type { Nhm2RegionalFullTensorResidualArtifactV1 } from "./nhm2-regional-full-tensor-residual.v1";
@@ -135,6 +139,10 @@ export type Nhm2TimeDependentSourceCampaignArtifactRefsV1 = {
   regionalFullTensorResidual: string | null;
   sourceOffDiagonalShearAudit: string | null;
   sourceMomentumDensityAudit: string | null;
+  momentumFrameProjectionReceipt: string | null;
+  metricRequiredMomentumDemandAudit: string | null;
+  metricMomentumRemediationTargets: string | null;
+  campaignFrontierDisposition: string | null;
   covariantConservationDiagnostic: string | null;
   qeiWorldlineDossier: string | null;
   observerRobustEnergyConditions: string | null;
@@ -249,6 +257,10 @@ export type BuildNhm2TimeDependentSourceCampaignInput = {
   regionalFullTensorResidual?: Nhm2RegionalFullTensorResidualArtifactV1 | null;
   sourceOffDiagonalShearAudit?: Nhm2SourceOffDiagonalShearAuditArtifactV1 | null;
   sourceMomentumDensityAudit?: Nhm2SourceMomentumDensityAuditArtifactV1 | null;
+  momentumFrameProjectionReceipt?: Nhm2MomentumFrameProjectionReceiptV1 | null;
+  metricRequiredMomentumDemandAudit?: Nhm2MetricRequiredMomentumDemandAuditV1 | null;
+  metricMomentumRemediationTargets?: Nhm2MetricMomentumRemediationTargetsV1 | null;
+  campaignFrontierDisposition?: Nhm2CampaignFrontierDispositionV1 | null;
   covariantConservationDiagnostic?: Nhm2CovariantConservationDiagnosticArtifactV1 | null;
   qeiWorldlineDossier?: Nhm2QeiWorldlineDossierV1 | null;
   observerRobustEnergyConditions?: Nhm2ObserverRobustEnergyConditionArtifactV1 | null;
@@ -518,6 +530,10 @@ const refs = (
   regionalFullTensorResidual: input?.regionalFullTensorResidual ?? null,
   sourceOffDiagonalShearAudit: input?.sourceOffDiagonalShearAudit ?? null,
   sourceMomentumDensityAudit: input?.sourceMomentumDensityAudit ?? null,
+  momentumFrameProjectionReceipt: input?.momentumFrameProjectionReceipt ?? null,
+  metricRequiredMomentumDemandAudit: input?.metricRequiredMomentumDemandAudit ?? null,
+  metricMomentumRemediationTargets: input?.metricMomentumRemediationTargets ?? null,
+  campaignFrontierDisposition: input?.campaignFrontierDisposition ?? null,
   covariantConservationDiagnostic: input?.covariantConservationDiagnostic ?? null,
   qeiWorldlineDossier: input?.qeiWorldlineDossier ?? null,
   observerRobustEnergyConditions: input?.observerRobustEnergyConditions ?? null,
@@ -699,6 +715,10 @@ const fullTensorGate = (
   residual: Nhm2RegionalFullTensorResidualArtifactV1 | null | undefined,
   shearAudit: Nhm2SourceOffDiagonalShearAuditArtifactV1 | null | undefined,
   momentumAudit: Nhm2SourceMomentumDensityAuditArtifactV1 | null | undefined,
+  momentumFrameProjection: Nhm2MomentumFrameProjectionReceiptV1 | null | undefined,
+  metricMomentumDemandAudit: Nhm2MetricRequiredMomentumDemandAuditV1 | null | undefined,
+  metricMomentumRemediationTargets: Nhm2MetricMomentumRemediationTargetsV1 | null | undefined,
+  campaignFrontierDisposition: Nhm2CampaignFrontierDispositionV1 | null | undefined,
 ): Nhm2TimeDependentSourceCampaignGateV1 => {
   if (residual == null) {
     return gate({
@@ -728,9 +748,31 @@ const fullTensorGate = (
       : null,
   ]);
   const momentumAuditBlockers = uniqueText([
+    campaignFrontierDisposition?.disposition.status === "current_profile_rejected"
+      ? "metric_momentum_current_profile_rejected_for_campaign"
+      : null,
+    metricMomentumDemandAudit?.summary.currentMetricProfileFalsified
+      ? "metric_required_momentum_density_current_profile_falsified"
+      : null,
     momentumAudit?.summary.anyMetricRequiredCausalMomentumBoundViolation &&
-    momentumAudit.summary.causalMomentumBoundApplicabilityStatus !== "applicable"
+    momentumAudit.summary.causalMomentumBoundApplicabilityStatus !== "applicable" &&
+    momentumFrameProjection == null
       ? "momentum_density_causal_bound_frame_projection_missing"
+      : null,
+    momentumFrameProjection?.summary.causalBoundApplicabilityStatus === "missing"
+      ? "momentum_density_causal_bound_frame_projection_missing"
+      : null,
+    momentumFrameProjection?.summary.causalBoundApplicabilityStatus === "blocked"
+      ? "momentum_density_causal_bound_frame_projection_blocked"
+      : null,
+    metricMomentumDemandAudit == null &&
+    momentumFrameProjection?.summary.anyProjectedMetricRequiredCausalMomentumBoundViolation
+      ? "metric_required_momentum_density_causal_bound_exceeded"
+      : null,
+    metricMomentumDemandAudit != null &&
+    !metricMomentumDemandAudit.summary.currentMetricProfileFalsified &&
+    metricMomentumDemandAudit.summary.anyProjectedMetricRequiredCausalMomentumBoundViolation
+      ? "metric_required_momentum_density_causal_bound_exceeded"
       : null,
     momentumAudit?.summary.causalMaterialMomentumBoundFalsifier
       ? "metric_required_momentum_density_causal_bound_exceeded"
@@ -760,6 +802,9 @@ const fullTensorGate = (
   const warnings = uniqueText([
     shearAudit == null ? "source_off_diagonal_shear_audit_missing" : null,
     momentumAudit == null ? "source_momentum_density_audit_missing" : null,
+    momentumAudit != null && momentumFrameProjection == null
+      ? "momentum_frame_projection_receipt_missing"
+      : null,
     shearAudit?.summary.uniformFractionalShearAnsatzDetected
       ? "source_off_diagonal_uniform_fractional_shear_ansatz"
       : null,
@@ -796,6 +841,12 @@ const fullTensorGate = (
       `momentumAuditWorstFractionalAmplification=${momentumAudit?.summary.worstFractionalAmplificationToRequirement ?? "missing"}`,
       `momentumAuditWorstMetricRequiredRatio=${momentumAudit?.summary.worstMetricRequiredMomentumToEnergyRatio ?? "missing"}`,
       `momentumAuditCausalBoundApplicability=${momentumAudit?.summary.causalMomentumBoundApplicabilityStatus ?? "missing"}`,
+      `momentumFrameProjection=${momentumFrameProjection?.summary.causalBoundApplicabilityStatus ?? "missing"}`,
+      `metricMomentumDemandWorstRatio=${metricMomentumDemandAudit?.summary.worstProjectedMetricRequiredMomentumToEnergyRatio ?? "missing"}`,
+      `metricMomentumDemandFalsified=${metricMomentumDemandAudit?.summary.currentMetricProfileFalsified ?? "missing"}`,
+      `metricMomentumWorstSuppression=${metricMomentumRemediationTargets?.summary.worstRequiredSuppressionFactor ?? "missing"}`,
+      `metricMomentumNonResolvableForCurrentProfile=${metricMomentumRemediationTargets?.summary.nonResolvableForCurrentProfile ?? "missing"}`,
+      `campaignFrontierDisposition=${campaignFrontierDisposition?.disposition.status ?? "missing"}`,
     ].join(";"),
     warnings,
   });
@@ -919,6 +970,10 @@ export const buildNhm2TimeDependentSourceCampaign = (
       input.regionalFullTensorResidual,
       input.sourceOffDiagonalShearAudit,
       input.sourceMomentumDensityAudit,
+      input.momentumFrameProjectionReceipt,
+      input.metricRequiredMomentumDemandAudit,
+      input.metricMomentumRemediationTargets,
+      input.campaignFrontierDisposition,
     ),
     observerGate(input.observerRobustEnergyConditions),
     qeiGate(input.qeiWorldlineDossier),
@@ -1099,6 +1154,10 @@ const isArtifactRefs = (
     isNullableText(record.regionalFullTensorResidual) &&
     isNullableText(record.sourceOffDiagonalShearAudit) &&
     isNullableText(record.sourceMomentumDensityAudit) &&
+    isNullableText(record.momentumFrameProjectionReceipt) &&
+    isNullableText(record.metricRequiredMomentumDemandAudit) &&
+    isNullableText(record.metricMomentumRemediationTargets) &&
+    isNullableText(record.campaignFrontierDisposition) &&
     isNullableText(record.covariantConservationDiagnostic) &&
     isNullableText(record.qeiWorldlineDossier) &&
     isNullableText(record.observerRobustEnergyConditions) &&

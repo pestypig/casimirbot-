@@ -734,6 +734,11 @@ describe("Helix Ask workstation tool planner", () => {
       expected_receipt_kind: "narrator_say_receipt",
       required: true,
     });
+    expect(plan.scores[0]).toMatchObject({
+      affordance_id: "narrator.say",
+      panel_id: "narrator",
+      action_id: "narrator.say",
+    });
   });
 
   it("routes narrator stream binding requests for translated transcripts", () => {
@@ -886,6 +891,53 @@ describe("Helix Ask workstation tool planner", () => {
         proof_key: "goalContextUpdates",
       },
       required: true,
+    });
+  });
+
+  it("routes canonical narrator dot tools through governed live-env receipts", () => {
+    const sayPlan = planWorkstationToolUse(
+      'Run narrator.say goal_id=goal:translate text="Translation is available." source_id=helix_ask:translation.',
+      { threadId: "thread:narrator-dot-say", turnId: "turn:narrator-dot-say" },
+    );
+    const bindPlan = planWorkstationToolUse(
+      "Run narrator.bind_stream goal_id=goal:translate source_ref=source:browser-audio stream_kind=translated_transcript.",
+      { threadId: "thread:narrator-dot-bind", turnId: "turn:narrator-dot-bind" },
+    );
+
+    expect(sayPlan.intent).toBe("narrator_control");
+    expect(sayPlan.action).toBeNull();
+    expect(sayPlan.tool_plan?.steps[0]).toMatchObject({
+      kind: "run_ask_tool",
+      tool_id: "live_env.narrator_say",
+      args: expect.objectContaining({
+        goal_id: "goal:translate",
+        text: "Translation is available",
+        source_id: "helix_ask:translation",
+      }),
+      expected_receipt_kind: "helix.narrator_say_request.v1",
+    });
+    expect(sayPlan.scores[0]).toMatchObject({
+      affordance_id: "live_env.narrator_say",
+      panel_id: "helix_ask",
+      action_id: "live_env.narrator_say",
+    });
+
+    expect(bindPlan.intent).toBe("narrator_control");
+    expect(bindPlan.action).toBeNull();
+    expect(bindPlan.tool_plan?.steps[0]).toMatchObject({
+      kind: "run_ask_tool",
+      tool_id: "live_env.narrator_bind_stream",
+      args: expect.objectContaining({
+        goal_id: "goal:translate",
+        source_ref: "source:browser-audio",
+        stream_kind: "translated_transcript",
+      }),
+      expected_receipt_kind: "helix.narrator_bind_stream_request.v1",
+    });
+    expect(bindPlan.scores[0]).toMatchObject({
+      affordance_id: "live_env.narrator_bind_stream",
+      panel_id: "helix_ask",
+      action_id: "live_env.narrator_bind_stream",
     });
   });
 
@@ -1329,6 +1381,28 @@ describe("Helix Ask workstation tool planner", () => {
         },
       },
       {
+        prompt: "Run live_env.set_visual_preset goal_id=goal:frog target_ref=source:visual:active preset_id=preset:frog-classifier",
+        turnId: "turn:set-visual-preset",
+        stepId: "set_visual_preset",
+        toolId: "live_env.set_visual_preset",
+        args: {
+          goal_id: "goal:frog",
+          target_ref: "source:visual:active",
+          preset_id: "preset:frog-classifier",
+        },
+      },
+      {
+        prompt: "Set the audio preset goal_id=goal:translate target_ref=source:audio:active preset_id=preset:earbud-translation",
+        turnId: "turn:set-audio-preset",
+        stepId: "set_audio_preset",
+        toolId: "live_env.set_audio_preset",
+        args: {
+          goal_id: "goal:translate",
+          target_ref: "source:audio:active",
+          preset_id: "preset:earbud-translation",
+        },
+      },
+      {
         prompt: "Run live_env.bind_workstation_source goal_id=goal:frog source_ref=source:visual:active target_ref=live-answer:visual",
         turnId: "turn:bind-source",
         stepId: "bind_workstation_source",
@@ -1380,6 +1454,17 @@ describe("Helix Ask workstation tool planner", () => {
           goal_id: "goal:frog",
           loop_ref: "loop:visual-mail",
           state: "paused",
+        },
+      },
+      {
+        prompt: "Run live_env.repair_loop goal_id=goal:frog loop_ref=loop:visual-mail",
+        turnId: "turn:repair-loop",
+        stepId: "repair_loop",
+        toolId: "live_env.repair_loop",
+        args: {
+          goal_id: "goal:frog",
+          loop_ref: "loop:visual-mail",
+          state: "repaired",
         },
       },
       {
@@ -1476,7 +1561,9 @@ describe("Helix Ask workstation tool planner", () => {
       'The UI label says "live_env.pause_workstation_loop"; summarize it.',
       "If we later run live_env.resume_workstation_loop, what loop refs should we gather?",
       "Do not repair workstation source; explain the repair policy.",
+      "Do not run live_env.repair_loop; explain the repair policy.",
       'The UI label says "live_env.repair_workstation_source"; summarize it.',
+      'The UI label says "live_env.repair_loop"; summarize it.',
       "The screen shows a button labeled Apply preset; describe the screen text.",
     ]) {
       const plan = planWorkstationToolUse(prompt, { threadId: "thread:workstation-control-negative" });

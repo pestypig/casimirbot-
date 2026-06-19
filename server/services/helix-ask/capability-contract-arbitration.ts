@@ -9,6 +9,7 @@ import {
   extractExplicitCapabilityContract,
   type ExplicitCapabilityContract,
 } from "./explicit-capability-contract";
+import { WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS } from "./workstation-context-feed-query-tool-contracts";
 
 type RecordLike = Record<string, unknown>;
 
@@ -61,6 +62,30 @@ const isLiveSourceMailboxGoalKind = (value: string | null | undefined): boolean 
     String(value ?? "").trim(),
   );
 
+const LIVE_ENVIRONMENT_OPERATOR_CAPABILITIES = new Set([
+  ...WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS.map((spec) => spec.capability),
+  "live_env.reflect_stage_play_context",
+  "live_env.narrator_say",
+  "live_env.narrator_bind_stream",
+  "live_env.change_workstation_preset",
+  "live_env.set_visual_preset",
+  "live_env.set_audio_preset",
+  "live_env.bind_workstation_source",
+  "live_env.unbind_workstation_source",
+  "live_env.pause_workstation_loop",
+  "live_env.resume_workstation_loop",
+  "live_env.set_workstation_loop_state",
+  "live_env.repair_loop",
+  "live_env.repair_workstation_source",
+  "live_env.update_live_answer_projection",
+  "live_env.focus_process_graph",
+  "live_env.start_agent_goal_session",
+  "live_env.evaluate_goal_satisfaction",
+]);
+
+const isLiveEnvironmentOperatorCapability = (capability: string | null | undefined): boolean =>
+  LIVE_ENVIRONMENT_OPERATOR_CAPABILITIES.has(String(capability ?? "").trim());
+
 const liveSourceMailboxGoalKindFromRouteMetadata = (
   routeMetadata: RecordLike | null,
   fallbackGoalKind: string,
@@ -72,6 +97,8 @@ const liveSourceMailboxGoalKindFromRouteMetadata = (
 };
 
 export const canonicalGoalKindForExplicitCapability = (capability: string | null | undefined): string | null => {
+  if (isLiveEnvironmentOperatorCapability(capability)) return "live_environment_review";
+
   switch (capability) {
     case "scientific-calculator.solve_expression":
       return "calculator_solve";
@@ -90,20 +117,6 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
     case "live_env.process_live_source_mail":
     case "live_env.reflect_live_source_mail_loop":
       return "live_source_mailbox_review";
-    case "live_env.reflect_stage_play_context":
-    case "live_env.narrator_say":
-    case "live_env.narrator_bind_stream":
-    case "live_env.change_workstation_preset":
-    case "live_env.bind_workstation_source":
-    case "live_env.unbind_workstation_source":
-    case "live_env.pause_workstation_loop":
-    case "live_env.resume_workstation_loop":
-    case "live_env.set_workstation_loop_state":
-    case "live_env.repair_workstation_source":
-    case "live_env.update_live_answer_projection":
-    case "live_env.focus_process_graph":
-    case "live_env.start_agent_goal_session":
-      return "live_environment_review";
     case "image_lens.inspect":
     case "situation-room.describe_visual_capture":
       return "visual_capture_describe";
@@ -113,6 +126,8 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
 };
 
 export const answerScopeForExplicitCapability = (capability: string | null | undefined): string => {
+  if (isLiveEnvironmentOperatorCapability(capability)) return "live_environment_state";
+
   switch (capability) {
     case "scientific-calculator.solve_expression":
       return "current_turn_action";
@@ -128,20 +143,6 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
     case "live_env.process_live_source_mail":
     case "live_env.reflect_live_source_mail_loop":
       return "live_source_mail";
-    case "live_env.reflect_stage_play_context":
-    case "live_env.narrator_say":
-    case "live_env.narrator_bind_stream":
-    case "live_env.change_workstation_preset":
-    case "live_env.bind_workstation_source":
-    case "live_env.unbind_workstation_source":
-    case "live_env.pause_workstation_loop":
-    case "live_env.resume_workstation_loop":
-    case "live_env.set_workstation_loop_state":
-    case "live_env.repair_workstation_source":
-    case "live_env.update_live_answer_projection":
-    case "live_env.focus_process_graph":
-    case "live_env.start_agent_goal_session":
-      return "live_environment_state";
     case "image_lens.inspect":
     case "situation-room.describe_visual_capture":
       return "visual_capture";

@@ -205,8 +205,8 @@ describe("Helix capability plan contract", () => {
 
       expect(plan).toMatchObject({
         capability_family: "debug_export",
-        requested_action: "model.direct_answer",
-        selected_capability: "model.direct_answer",
+        requested_action: "suppressed_contextual_tool_reference",
+        selected_capability: "suppressed_contextual_tool_reference",
         source_target: "model_only",
         mutating: false,
         operator_command_required: false,
@@ -849,6 +849,140 @@ describe("Helix capability plan contract", () => {
     });
   });
 
+  it("routes explicit goal-satisfaction evaluation through a governed evidence-only contract", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:goal-satisfaction-explicit",
+      promptText:
+        "Run live_env.evaluate_goal_satisfaction goal_id=goal:frog evidence_refs=goal_context_update:frog,terminal_authority_single_writer.",
+      sourceTargetIntent: baseSourceTarget("model_only", "general_background"),
+      toolCallAdmissionDecision: toolAdmission("live_environment", ["live_environment"]),
+      canonicalGoalFrame: canonicalGoal("model_only_concept", "direct_answer_text"),
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "live_environment",
+      source_target: "live_environment",
+      requested_capability: "live_env.evaluate_goal_satisfaction",
+      requested_action: "live_env.evaluate_goal_satisfaction",
+      selected_capability: "live_env.evaluate_goal_satisfaction",
+      goal_kind: "live_environment_review",
+      required_terminal_kind: "helix.live_environment_goal_satisfaction.v1",
+      mutating: false,
+      admission_status: "needs_evidence",
+    });
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "explicit_capability_command",
+      requested_capability: "live_env.evaluate_goal_satisfaction",
+      selected_source_target: "live_environment",
+      selected_plan_family: "live_environment",
+      required_observation_kinds: expect.arrayContaining([
+        "live_environment_tool_observation",
+        "helix.live_environment_goal_satisfaction.v1",
+      ]),
+    });
+  });
+
+  it.each([
+    {
+      label: "source health",
+      capability: "live_env.query_source_health",
+      observationKind: "helix.situation_source_capability_read.v1",
+      prompt: "Run live_env.query_source_health goal_id=goal:frog source_ref=source:visual:active.",
+    },
+    {
+      label: "trace memory",
+      capability: "live_env.query_trace_memory",
+      observationKind: "helix.workstation_reasoning_trace_query_result.v1",
+      prompt: "Run live_env.query_trace_memory goal_id=goal:frog trace_id=trace:frog.",
+    },
+    {
+      label: "packet traces",
+      capability: "live_env.query_packet_traces",
+      observationKind: "stage_play_packet_trace_query_result/v1",
+      prompt: "Run live_env.query_packet_traces goal_id=goal:frog source_ref=source:visual:active.",
+    },
+    {
+      label: "visual summaries",
+      capability: "live_env.query_visual_summaries",
+      observationKind: "stage_play_workstation_context_feed_query_result/v1",
+      prompt: "Run live_env.query_visual_summaries goal_id=goal:frog source_ref=source:visual:active.",
+    },
+    {
+      label: "audio transcripts",
+      capability: "live_env.query_audio_transcripts",
+      observationKind: "stage_play_workstation_context_feed_query_result/v1",
+      prompt: "Run live_env.query_audio_transcripts goal_id=goal:translate source_ref=source:audio:active.",
+    },
+    {
+      label: "translation segments",
+      capability: "live_env.query_translation_segments",
+      observationKind: "stage_play_workstation_context_feed_query_result/v1",
+      prompt: "Run live_env.query_translation_segments goal_id=goal:translate source_ref=source:audio:active.",
+    },
+    {
+      label: "MicroDeck outputs",
+      capability: "live_env.query_microdeck_outputs",
+      observationKind: "stage_play_workstation_context_feed_query_result/v1",
+      prompt: "Run live_env.query_microdeck_outputs goal_id=goal:frog source_ref=source:visual:active.",
+    },
+    {
+      label: "Live Answer state",
+      capability: "live_env.query_live_answer_state",
+      observationKind: "stage_play_workstation_context_feed_query_result/v1",
+      prompt: "Run live_env.query_live_answer_state goal_id=goal:frog source_ref=live-answer:visual.",
+    },
+    {
+      label: "narrator events",
+      capability: "live_env.query_narrator_events",
+      observationKind: "stage_play_workstation_context_feed_query_result/v1",
+      prompt: "Run live_env.query_narrator_events goal_id=goal:translate source_ref=narrator:translation.",
+    },
+    {
+      label: "route evidence",
+      capability: "live_env.query_route_evidence",
+      observationKind: "stage_play_workstation_context_feed_query_result/v1",
+      prompt: "Run live_env.query_route_evidence goal_id=goal:frog source_ref=route-watch:frog.",
+    },
+    {
+      label: "automation policies",
+      capability: "live_env.query_automation_policies",
+      observationKind: "stage_play_workstation_context_feed_query_result/v1",
+      prompt: "Run live_env.query_automation_policies goal_id=goal:frog source_ref=automation:frog-watch.",
+    },
+  ])("routes explicit workstation query contract: $label", ({ prompt, capability, observationKind }) => {
+    const plan = buildCapabilityPlan({
+      turnId: `ask:${capability.replace(/[^a-z0-9]+/gi, "-")}`,
+      promptText: prompt,
+      sourceTargetIntent: baseSourceTarget("model_only", "general_background"),
+      toolCallAdmissionDecision: toolAdmission("live_environment", ["live_environment"]),
+      canonicalGoalFrame: canonicalGoal("model_only_concept", "direct_answer_text"),
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "live_environment",
+      source_target: "live_environment",
+      requested_capability: capability,
+      requested_action: capability,
+      selected_capability: capability,
+      goal_kind: "live_environment_review",
+      required_terminal_kind: "model_synthesized_answer",
+      mutating: false,
+      admission_status: "needs_evidence",
+    });
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "explicit_capability_command",
+      requested_capability: capability,
+      selected_source_target: "live_environment",
+      selected_plan_family: "live_environment",
+      required_observation_kinds: expect.arrayContaining([
+        "live_environment_tool_observation",
+        observationKind,
+        "helix.workstation_goal_context_update.v1",
+      ]),
+      required_terminal_kind: "model_synthesized_answer",
+    });
+  });
+
   it("suppresses contextual narrator capability mentions instead of admitting voice control", () => {
     const plan = buildCapabilityPlan({
       turnId: "ask:narrator-contextual-reference",
@@ -866,8 +1000,8 @@ describe("Helix capability plan contract", () => {
     expect(plan).toMatchObject({
       capability_family: "debug_export",
       source_target: "model_only",
-      requested_action: "model.direct_answer",
-      selected_capability: "model.direct_answer",
+      requested_action: "suppressed_contextual_tool_reference",
+      selected_capability: "suppressed_contextual_tool_reference",
       tool_admission_suppressed: true,
     });
     expect(plan.capability_contract_arbitration).toMatchObject({
@@ -883,6 +1017,20 @@ describe("Helix capability plan contract", () => {
       prompt:
         "Run live_env.change_workstation_preset goal_id=goal:frog target_ref=source:visual:active preset_id=preset:frog-classifier.",
       capability: "live_env.change_workstation_preset",
+      terminalKind: "stage_play_workstation_control_receipt",
+    },
+    {
+      label: "visual preset change",
+      prompt:
+        "Run live_env.set_visual_preset goal_id=goal:frog target_ref=source:visual:active preset_id=preset:frog-classifier.",
+      capability: "live_env.set_visual_preset",
+      terminalKind: "stage_play_workstation_control_receipt",
+    },
+    {
+      label: "audio preset change",
+      prompt:
+        "Run live_env.set_audio_preset goal_id=goal:translate target_ref=source:audio:active preset_id=preset:earbud-translation.",
+      capability: "live_env.set_audio_preset",
       terminalKind: "stage_play_workstation_control_receipt",
     },
     {
@@ -918,6 +1066,13 @@ describe("Helix capability plan contract", () => {
       prompt:
         "Run live_env.set_workstation_loop_state goal_id=goal:frog loop_ref=loop:visual-mail state=paused.",
       capability: "live_env.set_workstation_loop_state",
+      terminalKind: "stage_play_workstation_control_receipt",
+    },
+    {
+      label: "loop repair",
+      prompt:
+        "Run live_env.repair_loop goal_id=goal:frog loop_ref=loop:visual-mail.",
+      capability: "live_env.repair_loop",
       terminalKind: "stage_play_workstation_control_receipt",
     },
     {
@@ -986,13 +1141,38 @@ describe("Helix capability plan contract", () => {
   it.each([
     {
       prompt:
+        "Do not run live_env.query_visual_summaries; explain what evidence would be needed first.",
+      mandatory: "live_env.query_visual_summaries",
+    },
+    {
+      prompt:
+        'The UI label says "live_env.query_narrator_events"; summarize that label without querying anything.',
+      mandatory: "live_env.query_narrator_events",
+    },
+    {
+      prompt:
+        "If we run live_env.query_trace_memory later, what trace refs should we gather?",
+      mandatory: "live_env.query_trace_memory",
+    },
+    {
+      prompt:
         "Do not run live_env.change_workstation_preset; explain what evidence would be needed first.",
       mandatory: "live_env.change_workstation_preset",
     },
     {
       prompt:
+        "If we run live_env.set_visual_preset later, what target_ref and preset_id should we gather?",
+      mandatory: "live_env.set_visual_preset",
+    },
+    {
+      prompt:
         'The UI label says "live_env.focus_process_graph"; summarize that label without focusing anything.',
       mandatory: "live_env.focus_process_graph",
+    },
+    {
+      prompt:
+        "If we run live_env.repair_loop later, what loop refs should we gather?",
+      mandatory: "live_env.repair_loop",
     },
     {
       prompt:
@@ -1016,8 +1196,8 @@ describe("Helix capability plan contract", () => {
     expect(plan).toMatchObject({
       capability_family: "debug_export",
       source_target: "model_only",
-      requested_action: "model.direct_answer",
-      selected_capability: "model.direct_answer",
+      requested_action: "suppressed_contextual_tool_reference",
+      selected_capability: "suppressed_contextual_tool_reference",
       tool_admission_suppressed: true,
     });
     expect(plan.capability_contract_arbitration).toMatchObject({
@@ -1132,8 +1312,8 @@ describe("Helix capability plan contract", () => {
     expect(plan).toMatchObject({
       capability_family: "debug_export",
       source_target: "model_only",
-      requested_action: "model.direct_answer",
-      selected_capability: "model.direct_answer",
+      requested_action: "suppressed_contextual_tool_reference",
+      selected_capability: "suppressed_contextual_tool_reference",
       goal_kind: "model_only_concept",
       required_terminal_kind: "direct_answer_text",
       tool_admission_suppressed: true,

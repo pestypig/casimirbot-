@@ -27,6 +27,13 @@ export type WorkstationDispatchActionV1 =
   | { kind: "ask_user" }
   | { kind: "wake_agent"; interruptKind: "urgent" | "blocked" | "policy_triggered"; reason: string };
 
+export type WorkstationGoalContextToolIdentityV1 = {
+  requestedToolName: string;
+  canonicalToolName: `live_env.${string}`;
+  matchedAllowedActuators: AgentGoalActuatorV1[];
+  matchedAllowedActuatorRefs: string[];
+};
+
 export type GoalContextProducerKindV1 =
   | "visual_capture"
   | "audio_capture"
@@ -107,6 +114,7 @@ export type WorkstationGoalContextUpdateV1 = {
     relevance: number;
     reason: string;
   } | null;
+  toolIdentity?: WorkstationGoalContextToolIdentityV1 | null;
   suggestedDispatch: WorkstationDispatchActionV1[];
   assistant_answer?: false;
   terminal_eligible?: false;
@@ -193,6 +201,7 @@ export type AgentGoalActuatorV1 =
   | "set_loop_state"
   | "focus_process_graph"
   | "repair_source"
+  | "evaluate_goal_satisfaction"
   | "ask_user";
 
 export const WORKSTATION_AGENT_GOAL_ACTUATORS: readonly AgentGoalActuatorV1[] = [
@@ -222,8 +231,29 @@ export const WORKSTATION_AGENT_GOAL_ACTUATORS: readonly AgentGoalActuatorV1[] = 
   "set_loop_state",
   "focus_process_graph",
   "repair_source",
+  "evaluate_goal_satisfaction",
   "ask_user",
 ];
+
+export const WORKSTATION_AGENT_GOAL_CONTEXT_FEED_QUERY_ACTUATORS: Readonly<Record<AgentGoalContextFeedKindV1, AgentGoalActuatorV1>> = {
+  visual_summaries: "query_visual_summaries",
+  audio_transcripts: "query_audio_transcripts",
+  translated_transcripts: "query_translation_segments",
+  microdeck_outputs: "query_microdeck_outputs",
+  live_answer_lines: "query_live_answer_state",
+  source_health: "query_source_health",
+  trace_memory: "query_trace_memory",
+  narrator_events: "query_narrator_events",
+  packet_traces: "query_packet_traces",
+  route_evidence: "query_route_evidence",
+  automation_policies: "query_automation_policies",
+};
+
+export function queryActuatorForAgentGoalContextFeedV1(
+  sourceKind: AgentGoalContextFeedKindV1,
+): AgentGoalActuatorV1 {
+  return WORKSTATION_AGENT_GOAL_CONTEXT_FEED_QUERY_ACTUATORS[sourceKind];
+}
 
 const normalizeWorkstationGoalToken = (value: unknown): string | null => {
   const normalized = typeof value === "string"
@@ -253,12 +283,15 @@ export const WORKSTATION_AGENT_GOAL_ACTUATOR_ALIASES: Readonly<Record<string, Ag
   live_env_pause_workstation_loop: "pause_loop",
   live_env_resume_workstation_loop: "resume_loop",
   live_env_set_workstation_loop_state: "set_loop_state",
+  live_env_repair_loop: "repair_source",
   live_env_repair_workstation_source: "repair_source",
   live_env_update_live_answer_projection: "update_live_answer",
   live_env_focus_process_graph: "focus_process_graph",
   live_env_narrator_say: "narrator_say",
   live_env_narrator_bind_stream: "narrator_bind_stream",
   live_env_query_trace_memory: "query_trace_memory",
+  live_env_evaluate_goal_satisfaction: "evaluate_goal_satisfaction",
+  evaluate_goal_satisfaction: "evaluate_goal_satisfaction",
   narrator_say_request: "narrator_say",
   narrator_bind_stream_request: "narrator_bind_stream",
   set_audio_preset: "set_audio_preset",
@@ -361,6 +394,14 @@ export type NarratorSayRequestV1 = {
   loopRefs: string[];
   evidenceRefs: string[];
   producedRefs: string[];
+  policyEvidenceRefs: string[];
+  goalId?: string | null;
+  goalSessionFound: boolean | null;
+  requiredActuator: "narrator_say";
+  actuatorAllowed: boolean;
+  matchedAllowedActuators: AgentGoalActuatorV1[];
+  matchedAllowedActuatorRefs: string[];
+  agentGoalSession: unknown | null;
   goalContextUpdateId: string;
   deliveryMode: Exclude<NarratorDeliveryMode, "hidden">;
   priority: "low" | "normal" | "high";
@@ -385,6 +426,14 @@ export type NarratorBindStreamRequestV1 = {
   loopRefs: string[];
   evidenceRefs: string[];
   producedRefs: string[];
+  policyEvidenceRefs: string[];
+  goalId?: string | null;
+  goalSessionFound: boolean | null;
+  requiredActuator: "narrator_bind_stream";
+  actuatorAllowed: boolean;
+  matchedAllowedActuators: AgentGoalActuatorV1[];
+  matchedAllowedActuatorRefs: string[];
+  agentGoalSession: unknown | null;
   goalContextUpdateId: string;
   streamKind:
     | "transcript_stream"
@@ -487,6 +536,152 @@ const stringArrayIssue = (value: unknown, field: string, options: { requireNonEm
   value.forEach((entry, index) => {
     if (typeof entry !== "string" || !entry.trim()) issues.push(`${field}[${index}] must be a non-empty string`);
   });
+  return issues;
+};
+
+const goalContextToolIdentityIssues = (
+  value: WorkstationGoalContextUpdateV1["toolIdentity"],
+): string[] => {
+  if (value === undefined || value === null) return [];
+  const issues: string[] = [];
+  if (typeof value !== "object" || Array.isArray(value)) return ["toolIdentity must be an object or null"];
+  if (typeof value.requestedToolName !== "string" || !value.requestedToolName.trim()) {
+    issues.push("toolIdentity.requestedToolName is required");
+  }
+  if (typeof value.canonicalToolName !== "string" || !value.canonicalToolName.startsWith("live_env.")) {
+    issues.push("toolIdentity.canonicalToolName must be a live_env tool name");
+  }
+  if (!Array.isArray(value.matchedAllowedActuators)) {
+    issues.push("toolIdentity.matchedAllowedActuators must be an array");
+  } else {
+    value.matchedAllowedActuators.forEach((actuator, index) => {
+      if (!agentGoalActuators.has(actuator)) {
+        issues.push(`toolIdentity.matchedAllowedActuators[${index}] is invalid`);
+      }
+    });
+  }
+  issues.push(...stringArrayIssue(value.matchedAllowedActuatorRefs, "toolIdentity.matchedAllowedActuatorRefs"));
+  if (Array.isArray(value.matchedAllowedActuators) && Array.isArray(value.matchedAllowedActuatorRefs)) {
+    for (const actuator of value.matchedAllowedActuators) {
+      const ref = `agent_goal_allowed_actuator:${actuator}`;
+      if (!value.matchedAllowedActuatorRefs.includes(ref)) {
+        issues.push("toolIdentity.matchedAllowedActuatorRefs must include every matched actuator policy ref");
+        break;
+      }
+    }
+  }
+  return issues;
+};
+
+const matchedNarratorActuatorIssues = (value: {
+  policyEvidenceRefs: string[];
+  goalId?: string | null;
+  goalSessionFound: boolean | null;
+  requiredActuator: "narrator_say" | "narrator_bind_stream";
+  actuatorAllowed: boolean;
+  matchedAllowedActuators: AgentGoalActuatorV1[];
+  matchedAllowedActuatorRefs: string[];
+  agentGoalSession: unknown | null;
+  evidenceRefs: string[];
+}): string[] => {
+  const issues: string[] = [];
+  if (value.goalId != null && (typeof value.goalId !== "string" || !value.goalId.trim())) {
+    issues.push("goalId must be a non-empty string or null");
+  }
+  if (value.goalSessionFound !== null && typeof value.goalSessionFound !== "boolean") {
+    issues.push("goalSessionFound must be boolean or null");
+  }
+  if (value.requiredActuator !== "narrator_say" && value.requiredActuator !== "narrator_bind_stream") {
+    issues.push("requiredActuator must be narrator_say or narrator_bind_stream");
+  }
+  if (typeof value.actuatorAllowed !== "boolean") issues.push("actuatorAllowed must be boolean");
+  issues.push(...stringArrayIssue(value.policyEvidenceRefs, "policyEvidenceRefs", { requireNonEmpty: true }));
+  if (
+    Array.isArray(value.policyEvidenceRefs) &&
+    (value.requiredActuator === "narrator_say" || value.requiredActuator === "narrator_bind_stream") &&
+    !value.policyEvidenceRefs.includes(`allowed_actuator:${value.requiredActuator}`)
+  ) {
+    issues.push("policyEvidenceRefs must include narrator actuator policy ref");
+  }
+  if (!Array.isArray(value.matchedAllowedActuators)) {
+    issues.push("matchedAllowedActuators must be an array");
+  } else {
+    const sessionAllowedActuators =
+      typeof value.agentGoalSession === "object" &&
+      value.agentGoalSession !== null &&
+      !Array.isArray(value.agentGoalSession) &&
+      Array.isArray((value.agentGoalSession as AgentGoalSessionV1).allowedActuators)
+        ? (value.agentGoalSession as AgentGoalSessionV1).allowedActuators
+        : [];
+    value.matchedAllowedActuators.forEach((actuator, index) => {
+      if (!agentGoalActuators.has(actuator)) {
+        issues.push(`matchedAllowedActuators[${index}] is invalid`);
+        return;
+      }
+      if (value.goalSessionFound === true && !sessionAllowedActuators.includes(actuator)) {
+        issues.push(`matchedAllowedActuators[${index}] must be present in agentGoalSession.allowedActuators`);
+      }
+    });
+  }
+  issues.push(...stringArrayIssue(value.matchedAllowedActuatorRefs, "matchedAllowedActuatorRefs"));
+  if (Array.isArray(value.matchedAllowedActuators) && Array.isArray(value.matchedAllowedActuatorRefs)) {
+    const expectedRefs = value.matchedAllowedActuators
+      .filter((actuator) => agentGoalActuators.has(actuator))
+      .map((actuator) => `agent_goal_allowed_actuator:${actuator}`);
+    for (const expectedRef of expectedRefs) {
+      if (!value.matchedAllowedActuatorRefs.includes(expectedRef)) {
+        issues.push("matchedAllowedActuatorRefs must include every matched allowed actuator ref");
+        break;
+      }
+    }
+    for (const ref of value.matchedAllowedActuatorRefs) {
+      if (!expectedRefs.includes(ref)) {
+        issues.push("matchedAllowedActuatorRefs must only include matched allowed actuator refs");
+        break;
+      }
+    }
+  }
+  if (
+    value.goalSessionFound === true &&
+    value.actuatorAllowed === true &&
+    Array.isArray(value.matchedAllowedActuators) &&
+    value.matchedAllowedActuators.length === 0
+  ) {
+    issues.push("actuatorAllowed=true for a goal session requires matchedAllowedActuators");
+  }
+  if (
+    value.actuatorAllowed === false &&
+    Array.isArray(value.matchedAllowedActuators) &&
+    value.matchedAllowedActuators.length > 0
+  ) {
+    issues.push("actuatorAllowed=false must not expose matchedAllowedActuators");
+  }
+  if (Array.isArray(value.policyEvidenceRefs) && Array.isArray(value.matchedAllowedActuatorRefs)) {
+    for (const ref of value.matchedAllowedActuatorRefs) {
+      if (!value.policyEvidenceRefs.includes(ref)) {
+        issues.push("policyEvidenceRefs must include every matchedAllowedActuatorRefs entry");
+        break;
+      }
+    }
+  }
+  if (Array.isArray(value.evidenceRefs)) {
+    if (Array.isArray(value.policyEvidenceRefs)) {
+      for (const ref of value.policyEvidenceRefs) {
+        if (!value.evidenceRefs.includes(ref)) {
+          issues.push("evidenceRefs must include every policyEvidenceRefs entry");
+          break;
+        }
+      }
+    }
+    if (Array.isArray(value.matchedAllowedActuatorRefs)) {
+      for (const ref of value.matchedAllowedActuatorRefs) {
+        if (!value.evidenceRefs.includes(ref)) {
+          issues.push("evidenceRefs must include every matchedAllowedActuatorRefs entry");
+          break;
+        }
+      }
+    }
+  }
   return issues;
 };
 
@@ -633,6 +828,22 @@ export function validateWorkstationGoalContextUpdateV1(value: WorkstationGoalCon
   if (Array.isArray(value.evidenceRefs) && value.contentRef && !value.evidenceRefs.includes(value.contentRef)) {
     issues.push("evidenceRefs must include contentRef");
   }
+  if (Array.isArray(value.evidenceRefs) && Array.isArray(value.sourceRefs)) {
+    for (const ref of value.sourceRefs) {
+      if (!value.evidenceRefs.includes(ref)) {
+        issues.push("evidenceRefs must include every sourceRefs entry");
+        break;
+      }
+    }
+  }
+  if (Array.isArray(value.evidenceRefs) && Array.isArray(value.loopRefs)) {
+    for (const ref of value.loopRefs) {
+      if (!value.evidenceRefs.includes(ref)) {
+        issues.push("evidenceRefs must include every loopRefs entry");
+        break;
+      }
+    }
+  }
   issues.push(...stringArrayIssue(value.receiptRefs, "receiptRefs"));
   if (!value.freshness || !Number.isFinite(value.freshness.observedAtMs) || value.freshness.observedAtMs <= 0) {
     issues.push("freshness.observedAtMs must be a positive timestamp");
@@ -641,6 +852,15 @@ export function validateWorkstationGoalContextUpdateV1(value: WorkstationGoalCon
     issues.push("freshness.staleAfterMs must be a positive number");
   }
   if (!freshnessStatuses.has(value.freshness?.status)) issues.push("freshness.status is invalid");
+  issues.push(...goalContextToolIdentityIssues(value.toolIdentity));
+  if (value.toolIdentity?.matchedAllowedActuatorRefs?.length) {
+    for (const ref of value.toolIdentity.matchedAllowedActuatorRefs) {
+      if (!value.evidenceRefs.includes(ref)) {
+        issues.push("evidenceRefs must include every toolIdentity matched actuator ref");
+        break;
+      }
+    }
+  }
   issues.push(...dispatchActionIssues(value.suggestedDispatch));
   if (value.assistant_answer !== false) issues.push("goal context updates must expose assistant_answer=false");
   if (value.terminal_eligible !== false) issues.push("goal context updates must expose terminal_eligible=false");
@@ -720,6 +940,7 @@ export function validateNarratorSayRequestV1(value: NarratorSayRequestV1): strin
   issues.push(...stringArrayIssue(value.loopRefs, "loopRefs", { requireNonEmpty: true }));
   issues.push(...stringArrayIssue(value.evidenceRefs, "evidenceRefs", { requireNonEmpty: true }));
   issues.push(...stringArrayIssue(value.producedRefs, "producedRefs", { requireNonEmpty: true }));
+  issues.push(...matchedNarratorActuatorIssues(value));
   if (Array.isArray(value.evidenceRefs) && value.requestId && !value.evidenceRefs.includes(value.requestId)) {
     issues.push("evidenceRefs must include requestId");
   }
@@ -777,6 +998,7 @@ export function validateNarratorBindStreamRequestV1(value: NarratorBindStreamReq
   issues.push(...stringArrayIssue(value.loopRefs, "loopRefs", { requireNonEmpty: true }));
   issues.push(...stringArrayIssue(value.evidenceRefs, "evidenceRefs", { requireNonEmpty: true }));
   issues.push(...stringArrayIssue(value.producedRefs, "producedRefs", { requireNonEmpty: true }));
+  issues.push(...matchedNarratorActuatorIssues(value));
   if (Array.isArray(value.evidenceRefs) && value.requestId && !value.evidenceRefs.includes(value.requestId)) {
     issues.push("evidenceRefs must include requestId");
   }

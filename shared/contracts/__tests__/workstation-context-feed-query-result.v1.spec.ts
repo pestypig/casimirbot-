@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
   WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
+  queryActuatorForAgentGoalContextFeedV1,
   type AgentGoalSessionV1,
   type WorkstationGoalContextUpdateV1,
 } from "../workstation-goal-context.v1";
@@ -23,7 +24,12 @@ const updateFixture = (
   updateKind: "visual_observation",
   contentRef: "stage_play_live_source_mail:frog",
   preview: "ImageLens shows a frog image.",
-  evidenceRefs: ["stage_play_live_source_mail:frog"],
+  evidenceRefs: [
+    "stage_play_live_source_mail:frog",
+    "visual_source:image-lens",
+    "thread:helix-ask:desktop",
+    "stage_play_mail_loop:helix-ask:desktop",
+  ],
   receiptRefs: ["stage_play_live_source_mail:frog"],
   freshness: {
     observedAtMs: 1_780_000_000_000,
@@ -56,6 +62,28 @@ const resultFixture = (
   overrides: Partial<WorkstationContextFeedQueryResultV1> = {},
 ): WorkstationContextFeedQueryResultV1 => {
   const update = updateFixture();
+  const resultId = overrides.resultId ?? "stage_play_context_feed_query:visual_summaries:frog";
+  const feedKind = overrides.feedKind ?? "visual_summaries";
+  const requiredActuator = overrides.requiredActuator ?? queryActuatorForAgentGoalContextFeedV1(feedKind);
+  const matchedContextFeeds = overrides.matchedContextFeeds ?? [{
+    feedId: `feed:${feedKind}`,
+    sourceKind: feedKind,
+    freshnessMs: 30_000,
+    relevancePolicy: "same-source-or-goal-id",
+  }];
+  const matchedContextFeedRefs = overrides.matchedContextFeedRefs ?? matchedContextFeeds.map((feed) => feed.feedId);
+  const matchedAllowedActuators = overrides.matchedAllowedActuators ??
+    (overrides.actuatorAllowed === false ? [] : [requiredActuator]);
+  const matchedAllowedActuatorRefs = overrides.matchedAllowedActuatorRefs ??
+    matchedAllowedActuators.map((actuator) => `agent_goal_allowed_actuator:${actuator}`);
+  const sessionContextFeeds: AgentGoalSessionV1["contextFeeds"] = matchedContextFeeds.length > 0
+    ? matchedContextFeeds
+    : [{
+        feedId: "feed:non-matching",
+        sourceKind: feedKind === "visual_summaries" ? "trace_memory" : "visual_summaries",
+        freshnessMs: 30_000,
+        relevancePolicy: "same-source-or-goal-id",
+      }];
   const agentGoalSession: AgentGoalSessionV1 = {
     schemaVersion: WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
     goalId: "goal:frog",
@@ -67,13 +95,8 @@ const resultFixture = (
     sourceRefs: ["visual_source:image-lens"],
     loopRefs: ["thread:helix-ask:desktop", "stage_play_mail_loop:helix-ask:desktop"],
     constructRefs: ["image-lens", "live-answer-environment"],
-    contextFeeds: [{
-      feedId: "feed:visual-summaries",
-      sourceKind: "visual_summaries",
-      freshnessMs: 30_000,
-      relevancePolicy: "same-source-or-goal-id",
-    }],
-    allowedActuators: ["query_visual_summaries"],
+    contextFeeds: sessionContextFeeds,
+    allowedActuators: [requiredActuator],
     cadence: { kind: "user_turn_only" },
     stopConditions: ["user stops the goal", "visual source disconnects"],
     checkpoints: [{
@@ -81,7 +104,7 @@ const resultFixture = (
       createdAtMs: 1_780_000_000_000,
       summary: "Visual summaries queried for frog evidence.",
       evidenceRefs: ["stage_play_goal_context_update:visual:1"],
-      actionsTaken: ["query_visual_summaries"],
+      actionsTaken: [requiredActuator],
       nextStep: "continue",
     }],
     authority: {
@@ -91,6 +114,37 @@ const resultFixture = (
     },
   };
   const goalContextUpdates = overrides.goalContextUpdates ?? [update];
+  const packetCircuitRefs = overrides.packetCircuitRefs ?? goalContextUpdates.map((entry) => {
+    const allRefs = Array.from(new Set([
+      entry.updateId,
+      entry.contentRef,
+      ...entry.sourceRefs,
+      ...entry.loopRefs,
+      ...entry.evidenceRefs,
+      ...entry.receiptRefs,
+    ]));
+    return {
+      updateId: entry.updateId,
+      producerKind: entry.producerKind,
+      updateKind: entry.updateKind,
+      contentRef: entry.contentRef,
+      sourceRefs: entry.sourceRefs,
+      loopRefs: entry.loopRefs,
+      packetRefs: allRefs.filter((ref) =>
+        ref.startsWith("stage_play_processed_mail_packet:") ||
+        ref.startsWith("stage_play_live_source_mail:") ||
+        ref.startsWith("stage_play_packet_trace:")
+      ),
+      microDeckRefs: allRefs.filter((ref) =>
+        ref.startsWith("stage_play_micro_reasoner_run:") ||
+        ref.startsWith("microdeck:")
+      ),
+      receiptRefs: entry.receiptRefs,
+      freshnessStatus: entry.freshness.status,
+      assistant_answer: false,
+      terminal_eligible: false,
+    };
+  });
   const agentGoalSessions = overrides.agentGoalSessions ?? [agentGoalSession];
   const validGoalSessions = agentGoalSessions
     .filter((entry): entry is AgentGoalSessionV1 =>
@@ -123,12 +177,11 @@ const resultFixture = (
     raw_content_included: false,
     post_tool_model_step_required: true,
   };
-  const resultId = overrides.resultId ?? "stage_play_context_feed_query:visual_summaries:frog";
-  const feedKind = overrides.feedKind ?? "visual_summaries";
-  const requiredActuator = overrides.requiredActuator ?? "query_visual_summaries";
   const policyEvidenceRefs = overrides.policyEvidenceRefs ?? [
     `context_feed:${feedKind}`,
     `allowed_actuator:${requiredActuator}`,
+    ...matchedContextFeedRefs.map((feedRef) => `agent_goal_context_feed:${feedRef}`),
+    ...matchedAllowedActuatorRefs,
   ];
   const sourceRefs = overrides.sourceRefs ?? ["visual_source:image-lens"];
   const loopRefs = overrides.loopRefs ?? [
@@ -140,6 +193,8 @@ const resultFixture = (
   const evidenceRefs = overrides.evidenceRefs ?? [
     resultId,
     ...policyEvidenceRefs,
+    ...matchedContextFeedRefs,
+    ...matchedAllowedActuatorRefs,
     ...sourceRefs,
     ...loopRefs,
     ...goalContextUpdates.flatMap((entry) => [
@@ -169,10 +224,15 @@ const resultFixture = (
     feedAllowed: true,
     requiredActuator,
     actuatorAllowed: true,
+    matchedContextFeeds,
+    matchedContextFeedRefs,
+    matchedAllowedActuators,
+    matchedAllowedActuatorRefs,
     agentGoalSession,
     agentGoalSessions,
     goalContextUpdates,
     authoritySummary,
+    packetCircuitRefs,
     updateCount: overrides.updateCount ?? goalContextUpdates.length,
     syncedWindow: {
       mailItemCount: 1,
@@ -212,6 +272,31 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
       policyEvidenceRefs: ["allowed_actuator:query_visual_summaries"],
     }))).toEqual(expect.arrayContaining([
       "policyEvidenceRefs must include context feed policy ref",
+    ]));
+
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      requiredActuator: "query_trace_memory",
+      policyEvidenceRefs: ["context_feed:visual_summaries", "allowed_actuator:query_trace_memory"],
+      loopRefs: [
+        "thread:helix-ask:desktop",
+        "stage_play_mail_loop:helix-ask:desktop",
+        "workstation_context_feed:visual_summaries",
+        "workstation_actuator:query_trace_memory",
+      ],
+      evidenceRefs: [
+        "stage_play_context_feed_query:visual_summaries:frog",
+        "context_feed:visual_summaries",
+        "allowed_actuator:query_trace_memory",
+        "visual_source:image-lens",
+        "thread:helix-ask:desktop",
+        "stage_play_mail_loop:helix-ask:desktop",
+        "workstation_context_feed:visual_summaries",
+        "workstation_actuator:query_trace_memory",
+      ],
+    }))).toEqual(expect.arrayContaining([
+      "requiredActuator must match feedKind query actuator",
+      "policyEvidenceRefs must include feed query actuator policy ref",
+      "loopRefs must include feed query actuator loop ref",
     ]));
   });
 
@@ -267,6 +352,55 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
       freshnessStatus: "blocked",
     }))).toEqual(expect.arrayContaining([
       "blocked feed query results must not include goalContextUpdates",
+    ]));
+  });
+
+  it("requires exact matched actuator refs for goal-authorized feed queries", () => {
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      matchedAllowedActuators: [],
+      matchedAllowedActuatorRefs: [],
+    }))).toEqual(expect.arrayContaining([
+      "actuatorAllowed=true for a goal session requires matchedAllowedActuators",
+    ]));
+
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      matchedAllowedActuatorRefs: [],
+    }))).toEqual(expect.arrayContaining([
+      "matchedAllowedActuatorRefs must include every matchedAllowedActuators policy ref",
+    ]));
+
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      policyEvidenceRefs: [
+        "context_feed:visual_summaries",
+        "allowed_actuator:query_visual_summaries",
+        "agent_goal_context_feed:feed:visual_summaries",
+      ],
+    }))).toEqual(expect.arrayContaining([
+      "policyEvidenceRefs must include every matched allowed actuator policy ref",
+    ]));
+
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      evidenceRefs: [
+        "stage_play_context_feed_query:visual_summaries:frog",
+        "context_feed:visual_summaries",
+        "allowed_actuator:query_visual_summaries",
+        "agent_goal_context_feed:feed:visual_summaries",
+        "feed:visual_summaries",
+        "visual_source:image-lens",
+        "thread:helix-ask:desktop",
+        "stage_play_mail_loop:helix-ask:desktop",
+        "workstation_context_feed:visual_summaries",
+        "workstation_actuator:query_visual_summaries",
+      ],
+    }))).toEqual(expect.arrayContaining([
+      "evidenceRefs must include every matchedAllowedActuatorRefs entry",
+    ]));
+
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      actuatorAllowed: false,
+      matchedAllowedActuators: ["query_visual_summaries"],
+    }))).toEqual(expect.arrayContaining([
+      "actuatorAllowed=false must not expose matchedAllowedActuators",
     ]));
   });
 
@@ -347,6 +481,35 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
     ]));
   });
 
+  it("requires packet circuit refs to mirror every embedded goal-context update without terminal authority", () => {
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      packetCircuitRefs: [],
+    }))).toEqual(expect.arrayContaining([
+      "packetCircuitRefs must include one entry for every goalContextUpdates item",
+    ]));
+
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      packetCircuitRefs: [{
+        updateId: "stage_play_goal_context_update:wrong",
+        producerKind: "microdeck",
+        updateKind: "classification",
+        contentRef: "stage_play_processed_mail_packet:wrong",
+        sourceRefs: [],
+        loopRefs: [],
+        packetRefs: [],
+        microDeckRefs: [],
+        receiptRefs: [],
+        freshnessStatus: "stale",
+        assistant_answer: true as false,
+        terminal_eligible: true as false,
+      }],
+    } as Partial<WorkstationContextFeedQueryResultV1>))).toEqual(expect.arrayContaining([
+      "packetCircuitRefs[0].updateId must match a goalContextUpdates item",
+      "packetCircuitRefs[0].assistant_answer must be false",
+      "packetCircuitRefs[0].terminal_eligible must be false",
+    ]));
+  });
+
   it("accepts MicroDeck updates only on the MicroDeck feed lane", () => {
     const microdeckUpdate = updateFixture({
       updateId: "stage_play_goal_context_update:microdeck:1",
@@ -354,7 +517,12 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
       updateKind: "classification",
       contentRef: "stage_play_processed_mail_packet:frog",
       preview: "MicroDeck classified the packet as amphibian visual evidence.",
-      evidenceRefs: ["stage_play_processed_mail_packet:frog"],
+      evidenceRefs: [
+        "stage_play_processed_mail_packet:frog",
+        "visual_source:image-lens",
+        "thread:helix-ask:desktop",
+        "stage_play_mail_loop:helix-ask:desktop",
+      ],
       receiptRefs: ["stage_play_processed_mail_packet:frog"],
     });
 
@@ -362,7 +530,12 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
       resultId: "stage_play_context_feed_query:microdeck_outputs:frog",
       feedKind: "microdeck_outputs",
       label: "MicroDeck outputs",
-      policyEvidenceRefs: ["context_feed:microdeck_outputs", "allowed_actuator:query_microdeck_outputs"],
+      policyEvidenceRefs: [
+        "context_feed:microdeck_outputs",
+        "allowed_actuator:query_microdeck_outputs",
+        "agent_goal_context_feed:feed:microdeck_outputs",
+        "agent_goal_allowed_actuator:query_microdeck_outputs",
+      ],
       requiredActuator: "query_microdeck_outputs",
       goalContextUpdates: [microdeckUpdate],
       updateCount: 1,
@@ -419,7 +592,12 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
       updateKind: "automation_status",
       contentRef: "stage_play_live_source_watch_job_policy:route-watch",
       preview: "Route-watch automation policy is armed for source packets.",
-      evidenceRefs: ["stage_play_live_source_watch_job_policy:route-watch"],
+      evidenceRefs: [
+        "stage_play_live_source_watch_job_policy:route-watch",
+        "visual_source:image-lens",
+        "thread:helix-ask:desktop",
+        "stage_play_mail_loop:helix-ask:desktop",
+      ],
       receiptRefs: ["stage_play_live_source_watch_job_policy:route-watch"],
     });
 
@@ -427,7 +605,12 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
       resultId: "stage_play_context_feed_query:route_evidence:frog",
       feedKind: "route_evidence",
       label: "route evidence",
-      policyEvidenceRefs: ["context_feed:route_evidence", "allowed_actuator:query_route_evidence"],
+      policyEvidenceRefs: [
+        "context_feed:route_evidence",
+        "allowed_actuator:query_route_evidence",
+        "agent_goal_context_feed:feed:route_evidence",
+        "agent_goal_allowed_actuator:query_route_evidence",
+      ],
       requiredActuator: "query_route_evidence",
       goalContextUpdates: [automationUpdate],
       updateCount: 1,
@@ -463,6 +646,13 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
       status: "blocked",
       missingRequirements: ["context_feed:visual_summaries"],
       feedAllowed: false,
+      matchedContextFeeds: [],
+      matchedContextFeedRefs: [],
+      policyEvidenceRefs: [
+        "context_feed:visual_summaries",
+        "allowed_actuator:query_visual_summaries",
+        "agent_goal_allowed_actuator:query_visual_summaries",
+      ],
       goalContextUpdates: [],
       updateCount: 0,
       freshnessStatus: "blocked",

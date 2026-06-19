@@ -25,6 +25,11 @@ import {
   WORKSTATION_AGENT_GOAL_ACTUATORS,
   WORKSTATION_AGENT_GOAL_DEFAULT_CONTEXT_FEEDS,
 } from "../../../shared/contracts/workstation-goal-context.v1";
+import {
+  WORKSTATION_CONTEXT_FEED_QUERY_CAPABILITIES,
+  type WorkstationContextFeedQueryCapability,
+  workstationContextFeedQuerySpecForCapability,
+} from "./workstation-context-feed-query-tool-contracts";
 
 export type WorkstationToolIntent =
   | "calculator_verify"
@@ -989,7 +994,7 @@ function buildNarratorControlPlan(
         },
       ];
   scores.push({
-    affordance_id: useLiveEnvTool ? liveEnvToolId : `narrator.${actionId}`,
+    affordance_id: useLiveEnvTool ? liveEnvToolId : actionId,
     panel_id: useLiveEnvTool ? "helix_ask" : "narrator",
     action_id: useLiveEnvTool ? liveEnvToolId : actionId,
     score: 0.94,
@@ -1242,28 +1247,28 @@ function makeOpenStep(panelId: string, depends_on: string[] = []): HelixWorkstat
 
 const GOAL_CONTEXT_OBJECT_PATTERN =
   "(?:workstation\\s+goal\\s+context|goal\\s+context\\s+updates?|active\\s+goal\\s+sessions?|agent\\s+goal\\s+sessions?|goal\\s+sessions?|per[-\\s]?packet\\s+traces?|packet\\s+traces?|trace\\s+memory|reasoning\\s+circuit|process\\s+graph\\s+traces?|visual\\s+summaries|audio\\s+transcripts?|translation\\s+segments?|translated\\s+transcripts?|micro[-\\s]?deck\\s+outputs?|live\\s+answer\\s+state|live\\s+answer\\s+lines?|source\\s+health|source\\s+status|source\\s+capability\\s+state|narrator\\s+events?|narrator\\s+bindings?|narrator\\s+streams?|route\\s+evidence|route[-\\s]?watch\\s+evidence|route[-\\s]?watch\\s+updates?|automation\\s+polic(?:y|ies)|workstation\\s+automations?)";
+const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const GOAL_CONTEXT_FEED_QUERY_TOOL_PATTERN = WORKSTATION_CONTEXT_FEED_QUERY_CAPABILITIES.map(escapeRegex).join("|");
+const WORKSTATION_CONTEXT_FEED_NON_TRACE_QUERY_CAPABILITIES = WORKSTATION_CONTEXT_FEED_QUERY_CAPABILITIES.filter(
+  (capability): capability is WorkstationContextFeedTool => capability !== "live_env.query_trace_memory",
+);
+const GOAL_CONTEXT_NON_TRACE_FEED_QUERY_TOOL_PATTERN =
+  WORKSTATION_CONTEXT_FEED_NON_TRACE_QUERY_CAPABILITIES.map(escapeRegex).join("|");
 const GOAL_CONTEXT_TOOL_PATTERN =
-  "live_env\\.(?:query_workstation_goal_context|start_agent_goal_session|query_trace_memory|query_packet_traces|query_visual_summaries|query_audio_transcripts|query_translation_segments|query_microdeck_outputs|query_live_answer_state|query_source_health|query_narrator_events|query_route_evidence|query_automation_policies)";
+  `(?:live_env\\.query_workstation_goal_context|live_env\\.start_agent_goal_session|${GOAL_CONTEXT_FEED_QUERY_TOOL_PATTERN})`;
 
-type WorkstationContextFeedTool =
-  | "live_env.query_packet_traces"
-  | "live_env.query_visual_summaries"
-  | "live_env.query_audio_transcripts"
-  | "live_env.query_translation_segments"
-  | "live_env.query_microdeck_outputs"
-  | "live_env.query_live_answer_state"
-  | "live_env.query_source_health"
-  | "live_env.query_narrator_events"
-  | "live_env.query_route_evidence"
-  | "live_env.query_automation_policies";
+type WorkstationContextFeedTool = Exclude<WorkstationContextFeedQueryCapability, "live_env.query_trace_memory">;
 
 type WorkstationControlTool =
   | "live_env.change_workstation_preset"
+  | "live_env.set_visual_preset"
+  | "live_env.set_audio_preset"
   | "live_env.bind_workstation_source"
   | "live_env.unbind_workstation_source"
   | "live_env.pause_workstation_loop"
   | "live_env.resume_workstation_loop"
   | "live_env.set_workstation_loop_state"
+  | "live_env.repair_loop"
   | "live_env.repair_workstation_source"
   | "live_env.update_live_answer_projection"
   | "live_env.focus_process_graph";
@@ -1282,7 +1287,7 @@ function hasContextualWorkstationGoalContextCue(prompt: string): boolean {
 const WORKSTATION_CONTROL_OBJECT_PATTERN =
   "(?:workstation\\s+presets?|presets?|sources?|source\\s+bindings?|source\\s+routes?|loops?|loop\\s+state|process\\s+loops?|live\\s+answer\\s+projection|live\\s+answer\\s+line|process\\s+graph(?:\\s+focus)?|stage\\s+play\\s+graph)";
 const WORKSTATION_CONTROL_TOOL_PATTERN =
-  "live_env\\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph)";
+  "live_env\\.(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph)";
 
 function hasContextualWorkstationControlCue(prompt: string): boolean {
   const object = WORKSTATION_CONTROL_OBJECT_PATTERN;
@@ -1297,9 +1302,15 @@ function hasContextualWorkstationControlCue(prompt: string): boolean {
 
 function selectWorkstationControlTool(prompt: string): WorkstationControlTool | null {
   if (hasContextualWorkstationControlCue(prompt)) return null;
-  const explicit = prompt.match(/\blive_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph)\b/i)?.[0]?.toLowerCase();
+  const explicit = prompt.match(/\blive_env\.(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph)\b/i)?.[0]?.toLowerCase();
   if (explicit) return explicit as WorkstationControlTool;
   if (/\b(?:change|set|apply|switch)\b[\s\S]{0,120}\b(?:workstation\s+)?preset\b/i.test(prompt)) {
+    if (/\b(?:audio|earbud|transcript|translation|speech|mic|microphone)\b/i.test(prompt)) {
+      return "live_env.set_audio_preset";
+    }
+    if (/\b(?:visual|screen|image|lens|camera|frame|capture)\b/i.test(prompt)) {
+      return "live_env.set_visual_preset";
+    }
     return "live_env.change_workstation_preset";
   }
   if (/\b(?:bind|attach|route|connect)\b[\s\S]{0,120}\bsource\b/i.test(prompt)) {
@@ -1338,7 +1349,11 @@ function inferLoopState(prompt: string): "paused" | "running" | "repaired" | nul
 
 function workstationControlMissingRequirements(toolId: WorkstationControlTool, args: Record<string, unknown>): string[] {
   const has = (key: string) => typeof args[key] === "string" && String(args[key]).trim().length > 0;
-  if (toolId === "live_env.change_workstation_preset") {
+  if (
+    toolId === "live_env.change_workstation_preset" ||
+    toolId === "live_env.set_visual_preset" ||
+    toolId === "live_env.set_audio_preset"
+  ) {
     return [
       ...(has("target_ref") ? [] : ["target_ref"]),
       ...(has("preset_id") ? [] : ["preset_id"]),
@@ -1354,7 +1369,8 @@ function workstationControlMissingRequirements(toolId: WorkstationControlTool, a
   if (
     toolId === "live_env.pause_workstation_loop" ||
     toolId === "live_env.resume_workstation_loop" ||
-    toolId === "live_env.set_workstation_loop_state"
+    toolId === "live_env.set_workstation_loop_state" ||
+    toolId === "live_env.repair_loop"
   ) return has("loop_ref") ? [] : ["loop_ref"];
   if (toolId === "live_env.repair_workstation_source") return has("loop_ref") ? [] : ["loop_ref"];
   if (toolId === "live_env.update_live_answer_projection") return has("line_key") ? [] : ["line_key"];
@@ -1382,7 +1398,7 @@ function buildWorkstationControlArgs(prompt: string, toolId: WorkstationControlT
     ...(nodeRef ? { node_ref: nodeRef } : {}),
     ...(toolId === "live_env.pause_workstation_loop" ? { state: "paused" } : {}),
     ...(toolId === "live_env.resume_workstation_loop" ? { state: "running" } : {}),
-    ...(toolId === "live_env.repair_workstation_source" ? { state: "repaired" } : {}),
+    ...(toolId === "live_env.repair_loop" || toolId === "live_env.repair_workstation_source" ? { state: "repaired" } : {}),
     ...(toolId === "live_env.set_workstation_loop_state" && inferLoopState(prompt) ? { state: inferLoopState(prompt) } : {}),
     reason: "Agent-requested governed workstation control dispatch.",
   };
@@ -1567,8 +1583,7 @@ function wantsQueryWorkstationGoalContext(prompt: string): boolean {
   if (hasContextualWorkstationGoalContextCue(prompt)) return false;
   return (
     /\blive_env\.query_workstation_goal_context\b/i.test(prompt) ||
-    /\blive_env\.query_trace_memory\b/i.test(prompt) ||
-    /\blive_env\.(?:query_packet_traces|query_visual_summaries|query_audio_transcripts|query_translation_segments|query_microdeck_outputs|query_live_answer_state|query_source_health|query_narrator_events|query_route_evidence|query_automation_policies)\b/i.test(prompt) ||
+    new RegExp(`\\b(?:${GOAL_CONTEXT_FEED_QUERY_TOOL_PATTERN})\\b`, "i").test(prompt) ||
     new RegExp(`\\b(?:query|view|inspect|show|list|get|check|read|retrieve|summari[sz]e)\\b[\\s\\S]{0,140}\\b${GOAL_CONTEXT_OBJECT_PATTERN}\\b`, "i").test(prompt) ||
     new RegExp(`\\b${GOAL_CONTEXT_OBJECT_PATTERN}\\b[\\s\\S]{0,140}\\b(?:query|view|inspect|show|list|get|check|read|retrieve|latest|active|available|known)\\b`, "i").test(prompt)
   );
@@ -1585,6 +1600,8 @@ function wantsTraceMemoryQuery(prompt: string): boolean {
 
 function selectWorkstationContextFeedTool(prompt: string): WorkstationContextFeedTool | null {
   if (hasContextualWorkstationGoalContextCue(prompt)) return null;
+  const explicit = prompt.match(new RegExp(`\\b(?:${GOAL_CONTEXT_NON_TRACE_FEED_QUERY_TOOL_PATTERN})\\b`, "i"))?.[0]?.toLowerCase();
+  if (explicit) return explicit as WorkstationContextFeedTool;
   if (/\blive_env\.query_packet_traces\b/i.test(prompt) || /\b(?:per[-\s]?packet\s+traces?|packet\s+traces?|packet\s+causal\s+traces?)\b/i.test(prompt)) {
     return "live_env.query_packet_traces";
   }
@@ -1619,6 +1636,11 @@ function selectWorkstationContextFeedTool(prompt: string): WorkstationContextFee
     return "live_env.query_automation_policies";
   }
   return null;
+}
+
+function expectedReceiptKindForWorkstationContextFeedTool(toolId: WorkstationContextFeedTool): string {
+  return workstationContextFeedQuerySpecForCapability(toolId)?.plannerExpectedReceiptKind ??
+    "stage_play_workstation_context_feed_query_result";
 }
 
 function extractGoalContextObjective(prompt: string): string {
@@ -1778,12 +1800,8 @@ function buildWorkstationGoalContextPlan(
       depends_on: startSession ? ["start_agent_goal_session", ...postSessionControlStepIds] : [],
       expected_receipt_kind: traceMemory
         ? "helix.workstation_reasoning_trace_query_result"
-        : feedTool === "live_env.query_packet_traces"
-          ? "stage_play_packet_trace_query_result"
-        : feedTool === "live_env.query_source_health"
-          ? "helix.situation_source_capability_read.v1"
         : feedTool
-          ? "stage_play_workstation_context_feed_query_result"
+          ? expectedReceiptKindForWorkstationContextFeedTool(feedTool)
           : "stage_play_workstation_goal_context_read_result",
       expected_state_change: { store: "stage-play-goal-context", proof_key: "goalContextUpdates" },
       required: true,

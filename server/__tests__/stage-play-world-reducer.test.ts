@@ -113,7 +113,7 @@ describe("Stage Play world-state badge reducer", () => {
           freshnessMs: 45000,
         },
       ],
-      allowedActuators: ["query_visual_summaries", "query_translation_segments", "configure_route_watch", "focus_process_graph", "narrator_bind_stream"],
+      allowedActuators: ["query_visual_summaries", "query_translation_segments", "configure_route_watch", "set_loop_state", "focus_process_graph", "narrator_bind_stream"],
       cadence: { kind: "event_accumulation", minUpdates: 2 },
       checkpoint: {
         summary: "Route-watch automation attached to goal-context circuit.",
@@ -135,6 +135,7 @@ describe("Stage Play world-state badge reducer", () => {
       evidenceRefs: [
         "stage_play_live_source_watch_job_policy:goal-circuit",
         loopRef,
+        "agent_goal_allowed_actuator:set_loop_state",
       ],
       receiptRefs: ["stage_play_live_source_watch_job_policy:goal-circuit"],
       freshness: {
@@ -151,7 +152,14 @@ describe("Stage Play world-state badge reducer", () => {
         { kind: "log_receipt", receiptRef: "stage_play_live_source_watch_job_policy:goal-circuit" },
         { kind: "update_panel", panelId: "stage-play-badge-graph" },
         { kind: "set_loop_state", loopRef, state: "running" },
+        { kind: "wake_agent", interruptKind: "policy_triggered", reason: "operator policy requests review of loop state" },
       ],
+      toolIdentity: {
+        requestedToolName: "live_env.set_workstation_loop_state",
+        canonicalToolName: "live_env.set_workstation_loop_state",
+        matchedAllowedActuators: ["set_loop_state"],
+        matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:set_loop_state"],
+      },
       authority: {
         assistantAnswer: false,
         terminalEligible: false,
@@ -232,6 +240,66 @@ describe("Stage Play world-state badge reducer", () => {
         }),
       }),
       expect.objectContaining({
+        id: "workstation_state_plane.context_feed_index",
+        kind: "workstation_state_plane",
+        status: "observed",
+        tags: expect.arrayContaining([
+          "context_feed_index",
+          "queryable_goal_context",
+          "agent_read_model",
+          "not_terminal_authority",
+        ]),
+        reasonCodes: expect.arrayContaining([
+          "context_feed_index",
+          "queryable_goal_context",
+          "agent_reads_deterministic_feeds",
+          "observation_not_terminal_authority",
+        ]),
+        dataTray: expect.objectContaining({
+          transformLabel: "AgentGoalSession feeds -> query policy index",
+          inputPreview: expect.stringContaining("translated_transcripts"),
+          outputRefs: expect.arrayContaining([
+            "context_feed:translated_transcripts",
+            "workstation_actuator:query_translation_segments",
+            "allowed_actuator:query_translation_segments",
+          ]),
+          skipped: expect.arrayContaining([
+            "assistant_answer=false",
+            "terminal_eligible=false",
+            "raw_content_included=false",
+          ]),
+          blockedUntil: "completed solver path selects terminal answer",
+        }),
+      }),
+      expect.objectContaining({
+        id: "workstation_state_plane.terminal_authority",
+        kind: "workstation_state_plane",
+        status: "blocked",
+        tags: expect.arrayContaining([
+          "terminal_authority",
+          "awaiting_completed_solver_path",
+          "goal_sessions_require_terminal_authority",
+          "receipts_not_answers",
+        ]),
+        reasonCodes: expect.arrayContaining([
+          "terminal_authority_state",
+          "terminal_authority_pending",
+          "receipts_and_goal_context_are_observations",
+        ]),
+        dataTray: expect.objectContaining({
+          transformLabel: "completed solver path / terminal authority boundary",
+          outputPreview: "terminal answer pending",
+          blockedUntil: "completed solver path selects terminal answer",
+          skipped: expect.arrayContaining([
+            "goal_context_updates",
+            "workstation_control_receipts",
+            "microdeck_outputs",
+            "narrator_events",
+            "panel_projections",
+          ]),
+        }),
+      }),
+      expect.objectContaining({
         kind: "agent_goal_session",
         status: "observed",
         sourceRefs: expect.arrayContaining([
@@ -256,9 +324,17 @@ describe("Stage Play world-state badge reducer", () => {
           "goal_context_update",
           "automation",
           "observation_not_terminal_authority",
+          "tool_identity_provenance",
         ]),
         dataTray: expect.objectContaining({
           transformLabel: "automation -> automation_status",
+          toolRefs: expect.arrayContaining([
+            "requested_tool:live_env.set_workstation_loop_state",
+            "canonical_tool:live_env.set_workstation_loop_state",
+            "matched_actuator:set_loop_state",
+            "agent_goal_allowed_actuator:set_loop_state",
+          ]),
+          toolPreview: "tool live_env.set_workstation_loop_state -> live_env.set_workstation_loop_state; matched set_loop_state",
           outputPreview: expect.stringContaining("set_loop_state"),
           skipped: expect.arrayContaining([
             "assistant_answer=false",
@@ -286,6 +362,45 @@ describe("Stage Play world-state badge reducer", () => {
       "allowed_actuator:query_translation_segments",
     ]));
     expect(sessionBadge?.admission).toBe("auto");
+    const dispatchBadges = graph.badges.filter((badge) => badge.kind === "workstation_dispatch_action");
+    const wakeDispatchBadge = dispatchBadges.find((badge) => badge.tags.includes("dispatch:wake_agent"));
+    expect(dispatchBadges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "workstation_dispatch_action",
+        tags: expect.arrayContaining(["dispatch:set_loop_state"]),
+        reasonCodes: expect.arrayContaining(["goal_context_dispatch_action", "not_terminal_authority", "tool_identity_provenance"]),
+        dataTray: expect.objectContaining({
+          toolRefs: expect.arrayContaining([
+            "requested_tool:live_env.set_workstation_loop_state",
+            "canonical_tool:live_env.set_workstation_loop_state",
+            "matched_actuator:set_loop_state",
+            "agent_goal_allowed_actuator:set_loop_state",
+          ]),
+        }),
+      }),
+      expect.objectContaining({
+        kind: "workstation_dispatch_action",
+        tags: expect.arrayContaining(["dispatch:update_live_answer"]),
+      }),
+      expect.objectContaining({
+        kind: "workstation_dispatch_action",
+        tags: expect.arrayContaining(["dispatch:bind_narrator_stream"]),
+      }),
+      expect.objectContaining({
+        kind: "workstation_dispatch_action",
+        admission: "ask_user",
+        tags: expect.arrayContaining(["dispatch:wake_agent", "wake_interrupt", "policy_triggered"]),
+        reasonCodes: expect.arrayContaining(["wake_demoted_to_interrupt_dispatch"]),
+        dataTray: expect.objectContaining({
+          outputPreview: "classified interrupt only",
+          skipped: expect.arrayContaining([
+            "agent_executable=false",
+            "assistant_answer=false",
+            "terminal_eligible=false",
+          ]),
+        }),
+      }),
+    ]));
     expect(graph.edges).toEqual(expect.arrayContaining([
       expect.objectContaining({
         from: "workstation_state_plane.current",
@@ -293,10 +408,57 @@ describe("Stage Play world-state badge reducer", () => {
         relation: "contains",
       }),
       expect.objectContaining({
+        from: "workstation_state_plane.current",
+        to: "workstation_state_plane.terminal_authority",
+        relation: "contains",
+      }),
+      expect.objectContaining({
+        from: "workstation_state_plane.gates",
+        to: "workstation_state_plane.terminal_authority",
+        relation: "constrains",
+        reasonCodes: expect.arrayContaining(["gates_constrain_terminal_authority"]),
+      }),
+      expect.objectContaining({
+        from: "workstation_state_plane.goal_context_bus",
+        to: "workstation_state_plane.context_feed_index",
+        relation: "contains",
+        reasonCodes: expect.arrayContaining(["goal_context_bus_contains_context_feed_index", "queryable_goal_context"]),
+      }),
+      expect.objectContaining({
+        from: "workstation_state_plane.context_feed_index",
+        to: "workstation_state_plane.terminal_authority",
+        relation: "needs_check",
+        reasonCodes: expect.arrayContaining(["context_feed_index_requires_terminal_authority", "observations_not_answers"]),
+      }),
+      expect.objectContaining({
+        from: "workstation_state_plane.goal_context_bus",
+        to: "workstation_state_plane.terminal_authority",
+        relation: "needs_check",
+        reasonCodes: expect.arrayContaining(["goal_context_requires_terminal_authority", "observations_not_answers"]),
+      }),
+      expect.objectContaining({
+        from: "workstation_state_plane.terminal_authority",
+        to: "workstation_state_plane.output_bus",
+        relation: "constrains",
+        reasonCodes: expect.arrayContaining(["terminal_authority_constrains_output_bus", "single_writer_final_answer"]),
+      }),
+      expect.objectContaining({
         from: sessionBadge?.id,
         to: "workstation_state_plane.control_signals",
         relation: "constrains",
         reasonCodes: expect.arrayContaining(["agent_goal_session_bounds_control_signals"]),
+      }),
+      expect.objectContaining({
+        from: sessionBadge?.id,
+        to: "workstation_state_plane.terminal_authority",
+        relation: "requires",
+        reasonCodes: expect.arrayContaining(["agent_goal_session_requires_terminal_authority"]),
+      }),
+      expect.objectContaining({
+        from: sessionBadge?.id,
+        to: "workstation_state_plane.context_feed_index",
+        relation: "constrains",
+        reasonCodes: expect.arrayContaining(["agent_goal_session_declares_context_feeds", "query_actuator_policy"]),
       }),
       expect.objectContaining({
         from: sessionBadge?.id,
@@ -345,6 +507,12 @@ describe("Stage Play world-state badge reducer", () => {
       }),
       expect.objectContaining({
         from: translationUpdateBadge?.id,
+        to: "workstation_state_plane.context_feed_index",
+        relation: "feeds",
+        reasonCodes: expect.arrayContaining(["goal_context_update_feeds_context_feed_index", "feed_query_policy"]),
+      }),
+      expect.objectContaining({
+        from: translationUpdateBadge?.id,
         to: "workstation_state_plane.control_signals",
         relation: "constrains",
         reasonCodes: expect.arrayContaining(["feed_query_policy_bounds_actuator"]),
@@ -352,6 +520,18 @@ describe("Stage Play world-state badge reducer", () => {
           "context_feed:translated_transcripts",
           "allowed_actuator:query_translation_segments",
         ]),
+      }),
+      expect.objectContaining({
+        from: updateBadge?.id,
+        to: expect.stringMatching(/^workstation_dispatch_action\./),
+        relation: "produces",
+        reasonCodes: expect.arrayContaining(["goal_context_update_produces_dispatch_action"]),
+      }),
+      expect.objectContaining({
+        from: wakeDispatchBadge?.id,
+        to: "workstation_state_plane.control_signals",
+        relation: "recommends",
+        reasonCodes: expect.arrayContaining(["wake_demoted_to_interrupt_dispatch", "wake_agent"]),
       }),
     ]));
     expect(graph.authority).toMatchObject({

@@ -9608,6 +9608,7 @@ export type HelixMailLoopTranscriptRowKind =
   | "voice_steering_rejected"
   | "voice_steering_cancel_requested"
   | "steering_ack_receipt"
+  | "goal_context_snapshot"
   | "wait_for_next_summary"
   | "requested_tool"
   | "loop_state"
@@ -9659,6 +9660,7 @@ const HELIX_MAIL_LOOP_TRANSCRIPT_ROW_KINDS = new Set<HelixMailLoopTranscriptRowK
   "voice_steering_rejected",
   "voice_steering_cancel_requested",
   "steering_ack_receipt",
+  "goal_context_snapshot",
   "wait_for_next_summary",
   "requested_tool",
   "loop_state",
@@ -9907,6 +9909,7 @@ function formatHelixMailLoopTranscriptBody(row: HelixMailLoopTranscriptRow): str
   if (row.rowKind === "voice_steering_rejected") return row.body || "Voice steering rejected.";
   if (row.rowKind === "voice_steering_cancel_requested") return row.body || "Voice steering cancel requested.";
   if (row.rowKind === "steering_ack_receipt") return row.body || "Steering acknowledgement receipt recorded.";
+  if (row.rowKind === "goal_context_snapshot") return row.body || "Goal context snapshot recorded as non-terminal evidence.";
   return row.body;
 }
 
@@ -9954,6 +9957,7 @@ function labelForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): st
   if (row.rowKind === "voice_steering_rejected") return "Voice steering rejected";
   if (row.rowKind === "voice_steering_cancel_requested") return "Voice steering cancel";
   if (row.rowKind === "steering_ack_receipt") return "Steering ack receipt";
+  if (row.rowKind === "goal_context_snapshot") return row.title || "Goal context snapshot";
   if (row.rowKind === "mail_wake_requested") return "Wake requested";
   if (row.rowKind === "mail_wake_deferred") return "Wake deferred";
   if (row.rowKind === "requested_tool") return "Requested tool";
@@ -9982,6 +9986,7 @@ function toneForHelixMailLoopTranscriptRow(row: HelixMailLoopTranscriptRow): Hel
   if (row.rowKind === "voice_tool_call") return "working";
   if (row.rowKind === "voice_receipt") return "observation";
   if (row.rowKind === "voice_steering_received" || row.rowKind === "steering_ack_receipt") return "observation";
+  if (row.rowKind === "goal_context_snapshot") return "observation";
   if (row.rowKind === "voice_steering_rejected" || row.rowKind === "voice_steering_cancel_requested") return "warning";
   if (row.rowKind === "voice_steering_queued" || row.rowKind === "voice_steering_applied" || row.rowKind === "voice_steering_deferred") return "checkpoint";
   return "working";
@@ -9998,6 +10003,8 @@ export function buildHelixMailLoopTurnStreamRows(replyId: string, mailRows: Heli
       row.rowKind.startsWith("voice_steering_") ||
       row.rowKind === "steering_ack_receipt"
       ? "voice"
+      : row.rowKind === "goal_context_snapshot"
+        ? "live_answer"
       : "live_source_mail",
     label: labelForHelixMailLoopTranscriptRow(row),
     text: formatHelixMailLoopTranscriptBody(row),
@@ -15739,9 +15746,7 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
   };
   const visibleFinalAnswerForParity = clientProgressPlaceholderExport
     ? ""
-    : terminalArtifactKind === "model_synthesized_answer" && finalAnswerSource === "final_answer_draft"
-      ? selectedFinalAnswer || coerceText(reply.content).trim()
-      : coerceText(reply.content).trim() || selectedFinalAnswer || "";
+    : visibleAnswerText || selectedFinalAnswer || "";
   const selectedFinalAnswerForParity = coerceText(envelopeWithoutHash.selected_final_answer).trim();
   const currentCompoundRunIdForParity = coerceText(calculatorPanelStateForDebug?.current_compound_run_id).trim();
   const visibleCompoundRunIdsForParity = Array.isArray(calculatorPanelStateForDebug?.visible_compound_run_ids)

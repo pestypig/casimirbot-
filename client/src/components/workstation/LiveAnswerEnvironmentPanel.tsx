@@ -81,6 +81,7 @@ import {
 import { postAudioTranscriptLiveSourceDescriptor } from "@/lib/helix/liveSourceDescriptorClient";
 import {
   LiveAnswerReasoningCircuit,
+  type LiveAnswerPacketCircuitRef,
   type LiveAnswerReasoningCircuitRow,
 } from "./LiveAnswerReasoningCircuit";
 
@@ -648,6 +649,8 @@ const liveAnswerFeedQueryUpdate = (update: WorkstationGoalContextUpdateV1): bool
 const liveAnswerPolicyRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
   Array.from(new Set([...update.evidenceRefs, ...update.loopRefs].filter((ref) =>
     ref.startsWith("context_feed:") ||
+    ref.startsWith("agent_goal_context_feed:") ||
+    ref.startsWith("agent_goal_allowed_actuator:") ||
     ref.startsWith("allowed_actuator:") ||
     ref.startsWith("workstation_context_feed:") ||
     ref.startsWith("workstation_actuator:")
@@ -656,14 +659,50 @@ const liveAnswerPolicyRefsForUpdate = (update: WorkstationGoalContextUpdateV1): 
 const liveAnswerContextFeedPolicyRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
   liveAnswerPolicyRefsForUpdate(update).filter((ref) =>
     ref.startsWith("context_feed:") ||
+    ref.startsWith("agent_goal_context_feed:") ||
     ref.startsWith("workstation_context_feed:")
   );
 
 const liveAnswerActuatorPolicyRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
   liveAnswerPolicyRefsForUpdate(update).filter((ref) =>
     ref.startsWith("allowed_actuator:") ||
+    ref.startsWith("agent_goal_allowed_actuator:") ||
     ref.startsWith("workstation_actuator:")
   );
+
+const liveAnswerPacketCircuitRefsForUpdate = (update: WorkstationGoalContextUpdateV1): LiveAnswerPacketCircuitRef[] => {
+  const refs = Array.from(new Set([
+    update.updateId,
+    update.contentRef,
+    ...update.sourceRefs,
+    ...update.loopRefs,
+    ...update.evidenceRefs,
+    ...update.receiptRefs,
+  ].filter(Boolean)));
+  return [{
+    updateId: update.updateId,
+    contentRef: update.contentRef,
+    packetRefs: refs.filter((ref) =>
+      ref.startsWith("stage_play_processed_mail_packet:") ||
+      ref.startsWith("stage_play_live_source_mail:") ||
+      ref.startsWith("stage_play_packet_trace:") ||
+      ref.includes("packet:")
+    ),
+    microDeckRefs: refs.filter((ref) =>
+      ref.startsWith("stage_play_micro_reasoner_run:") ||
+      ref.startsWith("microdeck:") ||
+      ref.startsWith("microdeck-output:") ||
+      ref.startsWith("microdeck-run:") ||
+      ref.includes("micro_reasoner")
+    ),
+    sourceRefs: update.sourceRefs,
+    loopRefs: update.loopRefs,
+    receiptRefs: update.receiptRefs,
+    freshnessStatus: update.freshness.status,
+    assistantAnswer: update.authority.assistantAnswer,
+    terminalEligible: update.authority.terminalEligible,
+  }];
+};
 
 const liveAnswerAutomationUpdate = (update: WorkstationGoalContextUpdateV1): boolean =>
   update.producerKind === "automation" || update.updateKind === "automation_status";
@@ -1824,6 +1863,11 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         evidenceRefs: update.evidenceRefs,
         receiptRefs: update.receiptRefs,
         policyRefs: liveAnswerPolicyRefsForUpdate(update),
+        requestedToolName: update.toolIdentity?.requestedToolName ?? null,
+        canonicalToolName: update.toolIdentity?.canonicalToolName ?? null,
+        matchedAllowedActuators: update.toolIdentity?.matchedAllowedActuators ?? [],
+        matchedAllowedActuatorRefs: update.toolIdentity?.matchedAllowedActuatorRefs ?? [],
+        packetCircuitRefs: liveAnswerPacketCircuitRefsForUpdate(update),
         dispatch: update.suggestedDispatch.slice(0, 4).map(liveAnswerDispatchLabel),
         packetColorKey: liveAnswerPacketColorKey(update),
         freshness: {
@@ -1853,6 +1897,15 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       narratorSpeechCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "speak_narrator").length,
       narratorBindingCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "bind_narrator_stream").length,
       wakeCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "wake_agent").length,
+      wakeUrgentCount: dispatches.filter((action: WorkstationDispatchActionV1) =>
+        action.kind === "wake_agent" && action.interruptKind === "urgent"
+      ).length,
+      wakeBlockedCount: dispatches.filter((action: WorkstationDispatchActionV1) =>
+        action.kind === "wake_agent" && action.interruptKind === "blocked"
+      ).length,
+      wakePolicyTriggeredCount: dispatches.filter((action: WorkstationDispatchActionV1) =>
+        action.kind === "wake_agent" && action.interruptKind === "policy_triggered"
+      ).length,
       workstationControlDispatchCount: dispatches.filter(isLiveAnswerWorkstationControlDispatch).length,
       presetDispatchCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "change_preset").length,
       sourceBindingDispatchCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "bind_source" || action.kind === "unbind_source").length,

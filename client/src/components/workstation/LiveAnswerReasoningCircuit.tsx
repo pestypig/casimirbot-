@@ -1,5 +1,10 @@
 import React from "react";
-import type { AgentGoalSessionV1 } from "@shared/contracts/workstation-goal-context.v1";
+import type {
+  AgentGoalActuatorV1,
+  AgentGoalContextFeedKindV1,
+  AgentGoalSessionV1,
+} from "@shared/contracts/workstation-goal-context.v1";
+import { queryActuatorForAgentGoalContextFeedV1 } from "@shared/contracts/workstation-goal-context.v1";
 
 export type LiveAnswerReasoningCircuitRow = {
   id: string;
@@ -13,6 +18,11 @@ export type LiveAnswerReasoningCircuitRow = {
   evidenceRefs: string[];
   receiptRefs: string[];
   policyRefs: string[];
+  requestedToolName?: string | null;
+  canonicalToolName?: string | null;
+  matchedAllowedActuators?: string[];
+  matchedAllowedActuatorRefs?: string[];
+  packetCircuitRefs: LiveAnswerPacketCircuitRef[];
   dispatch: string[];
   packetColorKey: string;
   freshness: {
@@ -28,6 +38,19 @@ export type LiveAnswerReasoningCircuitRow = {
   };
 };
 
+export type LiveAnswerPacketCircuitRef = {
+  updateId: string;
+  contentRef: string;
+  packetRefs: string[];
+  microDeckRefs: string[];
+  sourceRefs: string[];
+  loopRefs: string[];
+  receiptRefs: string[];
+  freshnessStatus: string;
+  assistantAnswer: boolean;
+  terminalEligible: boolean;
+};
+
 export type LiveAnswerReasoningCircuitSummary = {
   updateCount: number;
   observationOnlyCount: number;
@@ -35,6 +58,9 @@ export type LiveAnswerReasoningCircuitSummary = {
   narratorSpeechCount: number;
   narratorBindingCount: number;
   wakeCount: number;
+  wakeUrgentCount: number;
+  wakeBlockedCount: number;
+  wakePolicyTriggeredCount: number;
   workstationControlDispatchCount: number;
   presetDispatchCount: number;
   sourceBindingDispatchCount: number;
@@ -64,6 +90,20 @@ type LiveAnswerCircuitHop = {
   key: string;
   label: string;
   value: string;
+};
+
+type LiveAnswerContextFeedLane = {
+  key: string;
+  goalId: string;
+  feedId: string;
+  contextFeedRef: string;
+  sourceKind: AgentGoalContextFeedKindV1;
+  freshnessMs?: number;
+  relevancePolicy?: string;
+  query?: string;
+  queryActuator: AgentGoalActuatorV1 | null;
+  actuatorAllowed: boolean;
+  allowedActuatorRef: string | null;
 };
 
 const compactLabel = (value: string): string =>
@@ -186,13 +226,51 @@ const liveAnswerCircuitHops = (row: LiveAnswerReasoningCircuitRow): LiveAnswerCi
 const contextFeedPolicyRefs = (refs: string[]): string[] =>
   refs.filter((ref) =>
     ref.startsWith("context_feed:") ||
+    ref.startsWith("agent_goal_context_feed:") ||
     ref.startsWith("workstation_context_feed:")
   );
 
 const actuatorPolicyRefs = (refs: string[]): string[] =>
   refs.filter((ref) =>
+    ref.startsWith("agent_goal_allowed_actuator:") ||
     ref.startsWith("allowed_actuator:") ||
     ref.startsWith("workstation_actuator:")
+  );
+
+const toolIdentityLabel = (row: LiveAnswerReasoningCircuitRow): string => {
+  if (!row.requestedToolName && !row.canonicalToolName) return "tool=none";
+  const requested = row.requestedToolName ?? "unknown";
+  const canonical = row.canonicalToolName ?? requested;
+  return requested === canonical ? `tool=${canonical}` : `tool=${requested} -> ${canonical}`;
+};
+
+const matchedActuatorLabel = (row: LiveAnswerReasoningCircuitRow): string =>
+  `matched=${row.matchedAllowedActuators?.length ? row.matchedAllowedActuators.join(", ") : "none"}`;
+
+const matchedActuatorRefLabel = (row: LiveAnswerReasoningCircuitRow): string =>
+  `matchedRefs=${row.matchedAllowedActuatorRefs?.length ? row.matchedAllowedActuatorRefs.join(", ") : "none"}`;
+
+const buildContextFeedLanes = (sessions: AgentGoalSessionV1[]): LiveAnswerContextFeedLane[] =>
+  sessions.flatMap((session: AgentGoalSessionV1) =>
+    session.contextFeeds.map((feed): LiveAnswerContextFeedLane => {
+      const queryActuator = queryActuatorForAgentGoalContextFeedV1(feed.sourceKind);
+      const actuatorAllowed = queryActuator === null ? false : session.allowedActuators.includes(queryActuator);
+      return {
+        key: `${session.goalId}:${feed.feedId}`,
+        goalId: session.goalId,
+        feedId: feed.feedId,
+        contextFeedRef: `agent_goal_context_feed:${feed.feedId}`,
+        sourceKind: feed.sourceKind,
+        freshnessMs: feed.freshnessMs,
+        relevancePolicy: feed.relevancePolicy,
+        query: feed.query,
+        queryActuator,
+        actuatorAllowed,
+        allowedActuatorRef: actuatorAllowed && queryActuator !== null
+          ? `agent_goal_allowed_actuator:${queryActuator}`
+          : null,
+      };
+    }),
   );
 
 export function LiveAnswerReasoningCircuit({
@@ -204,6 +282,7 @@ export function LiveAnswerReasoningCircuit({
   summary: LiveAnswerReasoningCircuitSummary;
   sessions: AgentGoalSessionV1[];
 }) {
+  const contextFeedLanes = buildContextFeedLanes(sessions);
   return (
     <div className="order-13 mt-3 rounded border border-violet-300/20 bg-violet-950/10 px-2 py-2" data-testid="live-answer-reasoning-circuit">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -321,8 +400,24 @@ export function LiveAnswerReasoningCircuit({
                   <span className="truncate" data-testid="live-answer-goal-context-policy-split">
                     feeds={feedPolicyRefs.length ? feedPolicyRefs.join(", ") : "none"}; actuators={outputPolicyRefs.length ? outputPolicyRefs.join(", ") : "none"}
                   </span>
+                  <span className="truncate" data-testid="live-answer-goal-context-tool-identity">
+                    {toolIdentityLabel(row)}; {matchedActuatorLabel(row)}; {matchedActuatorRefLabel(row)}
+                  </span>
                   <span className="truncate">receipts={row.receiptRefs.length ? row.receiptRefs.join(", ") : "none"}</span>
                   <span className="truncate" data-testid="live-answer-goal-context-freshness">freshness={freshnessLabel(row.freshness)}</span>
+                </div>
+                <div className="mt-1.5 grid gap-1 rounded border border-sky-300/15 bg-sky-950/10 p-1 font-mono text-[10px] text-slate-400" data-testid="live-answer-packet-circuit-refs">
+                  {row.packetCircuitRefs.length > 0 ? row.packetCircuitRefs.slice(0, 3).map((ref: LiveAnswerPacketCircuitRef) => (
+                    <div key={`${row.id}:${ref.updateId}`} className="min-w-0">
+                      <div className="truncate text-sky-100">update={ref.updateId}</div>
+                      <div className="truncate">content={ref.contentRef}</div>
+                      <div className="truncate">packets={ref.packetRefs.length ? ref.packetRefs.join(", ") : "none"}</div>
+                      <div className="truncate">microDecks={ref.microDeckRefs.length ? ref.microDeckRefs.join(", ") : "none"}</div>
+                      <div className="truncate">terminal={String(ref.terminalEligible)} assistant={String(ref.assistantAnswer)} freshness={ref.freshnessStatus}</div>
+                    </div>
+                  )) : (
+                    <span className="truncate text-slate-500">packet circuit refs unavailable</span>
+                  )}
                 </div>
                 <div className="mt-1.5 grid grid-cols-2 gap-1 rounded border border-white/10 bg-black/20 p-1 font-mono text-[10px] text-slate-400" data-testid="live-answer-goal-context-circuit-route">
                   {circuitHops.map((hop: LiveAnswerCircuitHop) => (
@@ -365,6 +460,9 @@ export function LiveAnswerReasoningCircuit({
           <p className="mt-1 font-mono text-[10px] text-slate-400" data-testid="live-answer-control-dispatch-breakdown">
             control_dispatches={summary.workstationControlDispatchCount} preset={summary.presetDispatchCount} source_binding={summary.sourceBindingDispatchCount} loop={summary.loopDispatchCount} live_answer={summary.liveAnswerDispatchCount} graph={summary.processGraphDispatchCount} narrator={summary.narratorSpeechCount + summary.narratorBindingCount} wake_interrupts={summary.wakeCount}
           </p>
+          <p className="mt-1 font-mono text-[10px] text-slate-400" data-testid="live-answer-wake-interrupt-scope">
+            wake_scope urgent={summary.wakeUrgentCount} blocked={summary.wakeBlockedCount} policy_triggered={summary.wakePolicyTriggeredCount}
+          </p>
           <p className="mt-1 text-[11px] leading-5 text-slate-500">
             Wake is only an interrupt dispatch. Receipts, MicroDeck outputs, narrator bindings, and panel projections stay evidence until the completed solver path selects a terminal answer.
           </p>
@@ -381,6 +479,50 @@ export function LiveAnswerReasoningCircuit({
             ) : null}
           </div>
           <div className="mt-2 grid gap-2">
+            <div className="rounded border border-indigo-300/15 bg-indigo-950/10 p-2" data-testid="live-answer-context-feed-index">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase text-indigo-100">Context feed index</p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    Session feed lanes map to query tools as non-terminal evidence inputs.
+                  </p>
+                </div>
+                <span className="shrink-0 rounded border border-indigo-300/20 px-1.5 py-0.5 font-mono text-[10px] text-indigo-100" data-testid="live-answer-context-feed-index-count">
+                  {contextFeedLanes.length} lanes
+                </span>
+              </div>
+              <div className="mt-1.5 grid gap-1">
+                {contextFeedLanes.slice(0, 8).map((lane: LiveAnswerContextFeedLane) => (
+                  <div
+                    key={lane.key}
+                    className="rounded border border-white/10 bg-black/20 px-1.5 py-1 font-mono text-[10px] text-slate-400"
+                    data-testid="live-answer-context-feed-lane"
+                  >
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <span className="text-indigo-100">{compactLabel(lane.sourceKind)}</span>
+                      <span>feed={lane.feedId}</span>
+                      <span>queryTool={lane.queryActuator ?? "none"}</span>
+                      <span className={lane.actuatorAllowed ? "text-emerald-100" : "text-amber-100"}>
+                        policy={lane.actuatorAllowed ? "allowed" : "not allowed"}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-slate-500">
+                      <span>goal={lane.goalId}</span>
+                      <span>feedRef={lane.contextFeedRef}</span>
+                      <span>actuatorRef={lane.allowedActuatorRef ?? "none"}</span>
+                      <span>freshness={lane.freshnessMs === undefined ? "unbounded" : `${lane.freshnessMs}ms`}</span>
+                      <span>relevance={lane.relevancePolicy ?? "unspecified"}</span>
+                      <span>query={lane.query ?? "default"}</span>
+                    </div>
+                  </div>
+                ))}
+                {contextFeedLanes.length === 0 ? (
+                  <span className="rounded border border-white/10 bg-black/20 px-1.5 py-1 font-mono text-[10px] text-slate-500">
+                    no context feed lanes
+                  </span>
+                ) : null}
+              </div>
+            </div>
             {sessions.slice(0, 2).map((session: AgentGoalSessionV1) => {
               const latestCheckpoint = session.checkpoints.at(-1);
               const finalReportRequirementCount = session.authority.finalReportRequirements?.requiredEvidenceKinds?.length ?? 0;

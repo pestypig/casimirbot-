@@ -42,6 +42,7 @@ export const STAGE_PLAY_BADGE_KINDS = [
   "voice_output",
   "workstation_state_plane",
   "goal_context_update",
+  "workstation_dispatch_action",
   "agent_goal_session",
   "perturbation",
   "checkpoint_request",
@@ -254,6 +255,8 @@ export type StagePlayBadgeDataTrayV1 = {
   inputRefs?: string[];
   inputPreview?: string | null;
   transformLabel?: string;
+  toolRefs?: string[];
+  toolPreview?: string | null;
   outputRefs?: string[];
   outputPreview?: string | null;
   skipped?: string[];
@@ -620,6 +623,12 @@ function validateDataTray(prefix: string, value: unknown, issues: string[]): voi
   }
   if (value.transformLabel != null && !isNonEmptyString(value.transformLabel)) {
     issues.push(`${prefix}.transformLabel must be a non-empty string`);
+  }
+  if (value.toolRefs != null && !isStringArray(value.toolRefs)) {
+    issues.push(`${prefix}.toolRefs must be strings`);
+  }
+  if (value.toolPreview != null && typeof value.toolPreview !== "string") {
+    issues.push(`${prefix}.toolPreview must be a string or null`);
   }
   if (value.outputRefs != null && !isStringArray(value.outputRefs)) {
     issues.push(`${prefix}.outputRefs must be strings`);

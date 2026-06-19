@@ -39,16 +39,23 @@ export type HelixLiveEnvironmentToolName =
   | "live_env.query_route_evidence"
   | "live_env.query_automation_policies"
   | "live_env.change_workstation_preset"
+  | "live_env.set_visual_preset"
+  | "live_env.set_audio_preset"
   | "live_env.bind_workstation_source"
   | "live_env.unbind_workstation_source"
   | "live_env.pause_workstation_loop"
   | "live_env.resume_workstation_loop"
   | "live_env.set_workstation_loop_state"
+  | "live_env.repair_loop"
   | "live_env.repair_workstation_source"
   | "live_env.update_live_answer_projection"
   | "live_env.focus_process_graph"
   | "live_env.narrator_say"
   | "live_env.narrator_bind_stream"
+  | "narrator.say"
+  | "narrator.bind_stream"
+  | "narrator_say"
+  | "narrator_bind_stream"
   | "live_env.query_micro_reasoner_prompts"
   | "live_env.query_micro_reasoner_presets"
   | "live_env.draft_micro_reasoner_preset"
@@ -128,6 +135,31 @@ export type HelixLiveEnvironmentRuntimePacket = {
   source_health_refs: string[];
   navigation_state_ref?: string | null;
   missing_evidence: string[];
+  goal_context_snapshot?: {
+    active_goal_session_count: number;
+    recent_goal_context_update_count: number;
+    active_goal_sessions: Array<{
+      goal_id: string;
+      status: string;
+      source_refs: string[];
+      loop_refs: string[];
+      context_feed_kinds: string[];
+      context_feed_refs: string[];
+      allowed_actuators: string[];
+      allowed_actuator_refs: string[];
+      checkpoint_refs: string[];
+      final_reports_require_terminal_authority: boolean;
+      assistant_answer: false;
+      terminal_eligible: false;
+      raw_content_included: false;
+    }>;
+    recent_goal_context_update_refs: string[];
+    context_role: "tool_evidence";
+    ask_context_policy: "evidence_only";
+    assistant_answer: false;
+    terminal_eligible: false;
+    raw_content_included: false;
+  };
   pending_voice_steering_refs?: string[];
   voice_steering_summary?: {
     count: number;
@@ -151,6 +183,7 @@ export type HelixLiveEnvironmentRuntimePacket = {
     creates_assistant_answer: false;
     requires_user_confirmation: boolean;
     can_run_automatically: boolean;
+    tool_aliases?: string[];
   }>;
   policy: {
     may_surface_user_text: boolean;
@@ -228,6 +261,8 @@ export type HelixLiveEnvironmentAgentLoopResult = {
     | "ask_user"
     | "fail_closed"
     | "budget_exhausted";
+  runtime_context_refs?: string[];
+  goal_context_snapshot?: HelixLiveEnvironmentRuntimePacket["goal_context_snapshot"] | null;
   evidence_refs: string[];
   transcriptRows?: AskTurnTranscriptRowDraftV1[];
   assistant_answer: false;

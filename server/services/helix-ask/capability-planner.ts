@@ -361,7 +361,7 @@ const isMutatingCapability = (family: HelixCapabilityFamily, requestedAction: st
   if (family === "workstation_action" || family === "subagent_runtime_adapter") return true;
   if (
     family === "live_environment" &&
-    /^live_env\.(?:change_workstation_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|start_agent_goal_session)$/i.test(requestedAction)
+    /^live_env\.(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph|narrator_say|narrator_bind_stream|start_agent_goal_session)$/i.test(requestedAction)
   ) {
     return true;
   }
@@ -616,9 +616,7 @@ export const buildCapabilityPlan = (input: {
   const plannedRequestedAction = contractArbitration.contract_state === "hard_live_source_phase"
     ? (mandatoryPhaseTool ?? "live_env.read_processed_live_source_mail")
     : contextualSuppressionBlocksPlan
-      ? contractArbitration.contract_state === "suppressed_contextual_reference" || sourceTarget === "model_only"
-        ? "model.direct_answer"
-        : "suppressed_contextual_tool_reference"
+      ? "suppressed_contextual_tool_reference"
     : requestedCapabilityContract
       ? requestedCapabilityContract.runtime_capability ?? requestedCapabilityContract.capability
     : family === "live_source" &&

@@ -5,6 +5,7 @@ import {
   contextualToolSuppressionBlocksFamily,
   detectContextualToolAdmissionSuppression,
 } from "./contextual-tool-admission";
+import { WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS } from "./workstation-context-feed-query-tool-contracts";
 
 export type ExplicitCapabilityContract = {
   schema: "helix.explicit_capability_contract.v1";
@@ -44,6 +45,33 @@ const liveEnvironmentControlContract = (input: {
   forbidden_nearby_capabilities: input.forbiddenNearbyCapabilities ?? [
     "live_env.read_processed_live_source_mail",
     "live_env.read_live_source_mail",
+    "model.direct_answer",
+  ],
+});
+
+const liveEnvironmentQueryContract = (input: {
+  capability: string;
+  aliases?: string[];
+  requiredObservationKind: string;
+}): ExplicitCapabilityContract => ({
+  schema: "helix.explicit_capability_contract.v1",
+  capability: input.capability,
+  ...(input.aliases ? { aliases: input.aliases } : {}),
+  capability_family: "live_environment",
+  plan_family: "live_environment",
+  source_target: "live_environment",
+  admission_families: ["live_environment"],
+  required_observation_kinds: [
+    "live_environment_tool_observation",
+    input.requiredObservationKind,
+    "helix.workstation_goal_context_update.v1",
+  ],
+  required_terminal_kind: "model_synthesized_answer",
+  allowed_substitutions: [],
+  forbidden_nearby_capabilities: [
+    "live_env.read_processed_live_source_mail",
+    "live_env.read_live_source_mail",
+    "live_env.process_live_source_mail",
     "model.direct_answer",
   ],
 });
@@ -232,6 +260,14 @@ const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
     aliases: ["change_workstation_preset", "change_preset"],
   }),
   liveEnvironmentControlContract({
+    capability: "live_env.set_visual_preset",
+    aliases: ["set_visual_preset", "visual_preset"],
+  }),
+  liveEnvironmentControlContract({
+    capability: "live_env.set_audio_preset",
+    aliases: ["set_audio_preset", "audio_preset"],
+  }),
+  liveEnvironmentControlContract({
     capability: "live_env.bind_workstation_source",
     aliases: ["bind_workstation_source", "bind_source"],
   }),
@@ -249,7 +285,11 @@ const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
   }),
   liveEnvironmentControlContract({
     capability: "live_env.set_workstation_loop_state",
-    aliases: ["set_workstation_loop_state"],
+    aliases: ["set_workstation_loop_state", "set_loop_state"],
+  }),
+  liveEnvironmentControlContract({
+    capability: "live_env.repair_loop",
+    aliases: ["repair_loop"],
   }),
   liveEnvironmentControlContract({
     capability: "live_env.repair_workstation_source",
@@ -269,6 +309,29 @@ const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
     requiredObservationKind: "stage_play_agent_goal_session_tool_result",
     requiredTerminalKind: "stage_play_agent_goal_session_tool_result",
   }),
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: "live_env.evaluate_goal_satisfaction",
+    aliases: ["evaluate_goal_satisfaction", "goal_satisfaction"],
+    capability_family: "live_environment",
+    plan_family: "live_environment",
+    source_target: "live_environment",
+    admission_families: ["live_environment"],
+    required_observation_kinds: ["live_environment_tool_observation", "helix.live_environment_goal_satisfaction.v1"],
+    required_terminal_kind: "helix.live_environment_goal_satisfaction.v1",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: [
+      "live_env.start_agent_goal_session",
+      "live_env.read_processed_live_source_mail",
+      "live_env.read_live_source_mail",
+      "model.direct_answer",
+    ],
+  },
+  ...WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS.map((spec) => liveEnvironmentQueryContract({
+    capability: spec.capability,
+    aliases: [...spec.aliases],
+    requiredObservationKind: spec.explicitRequiredObservationKind,
+  })),
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "image_lens.inspect",

@@ -1,0 +1,32 @@
+{
+  "contractVersion": "nhm2_momentum_frame_projection_evidence/v1",
+  "generatedAt": "2026-06-19T00:00:00.000Z",
+  "laneId": "nhm2_shift_lapse",
+  "selectedProfileId": "stage1_centerline_alpha_0p995_v1",
+  "runId": "nhm2-reference-ledger-2026-05-05-v1",
+  "regionalSupportFunctionAtlasRef": "artifacts\\research\\full-solve\\validation-chain\\axis-aligned-shear-suppressed-smoke-v1\\nhm2-regional-support-function-atlas.json",
+  "atlasHash": "ef432b7d0ef45db590d238fce63375a095d6d8e310d6ce652ee0bea731d5c396",
+  "frame": {
+    "frameId": "axis_aligned_reduced_order_local_orthonormal_frame_v1",
+    "requestedFrame": "local_orthonormal",
+    "sourceTensorBasis": "local_orthonormal_to_chart",
+    "tetradRef": "declared://nhm2/axis-aligned/reduced-order-local-orthonormal-frame-v1",
+    "projectionMethod": "declared_reduced_order_local_orthonormal",
+    "ratioPolicy": "use_audit_same_chart_ratios_as_local_frame_reduced_order",
+    "projectionStatus": "pass",
+    "assumptions": [
+      "diagnostic smoke-chain projection evidence for the axis-aligned shear-suppressed branch",
+      "uses audit same-chart momentum-to-energy fractions as reduced-order local-frame ratios",
+      "does not include full ADM lapse/shift time-leg tetrad reconstruction",
+      "does not validate a physical material source or propulsion mechanism"
+    ],
+    "blockers": []
+  },
+  "components": [],
+  "claimBoundary": {
+    "diagnosticOnly": true,
+    "projectionEvidenceDoesNotValidatePhysicalSource": true,
+    "reducedOrderFrameDoesNotReplaceFullAdmTetrad": true,
+    "causalBoundConclusionRequiresProjectionStatusPass": true
+  }
+}

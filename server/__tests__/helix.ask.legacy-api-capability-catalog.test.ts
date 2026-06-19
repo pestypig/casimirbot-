@@ -51,5 +51,45 @@ describe("Helix Ask legacy API capability catalog", () => {
       required_terminal_kind: "capability_help_summary",
       selected_terminal_artifact_kind: "capability_help_summary",
     });
+
+    const availableCapabilities =
+      body?.initial_available_capabilities ??
+      body?.available_capabilities ??
+      body?.debug?.initial_available_capabilities ??
+      body?.debug?.available_capabilities;
+    const capabilityRows = Array.isArray(availableCapabilities?.capabilities)
+      ? availableCapabilities.capabilities
+      : [];
+    const capabilityByKey = (key: string) =>
+      capabilityRows.find((entry: Record<string, unknown>) => entry?.capability_key === key);
+
+    expect(capabilityByKey("live_env.query_source_health")).toMatchObject({
+      expected_artifacts: expect.arrayContaining([
+        "live_environment_tool_observation",
+        "helix.situation_source_capability_read.v1",
+        "helix.workstation_goal_context_update.v1",
+      ]),
+    });
+    expect(capabilityByKey("live_env.query_trace_memory")).toMatchObject({
+      expected_artifacts: expect.arrayContaining([
+        "live_environment_tool_observation",
+        "helix.workstation_reasoning_trace_query_result.v1",
+        "helix.workstation_goal_context_update.v1",
+      ]),
+    });
+    expect(capabilityByKey("live_env.query_narrator_events")).toMatchObject({
+      expected_artifacts: expect.arrayContaining([
+        "live_environment_tool_observation",
+        "stage_play_workstation_context_feed_query_result/v1",
+        "helix.workstation_goal_context_update.v1",
+      ]),
+    });
+    expect(capabilityByKey("live_env.evaluate_goal_satisfaction")).toMatchObject({
+      expected_artifacts: expect.arrayContaining([
+        "live_environment_tool_observation",
+        "helix.live_environment_goal_satisfaction.v1",
+        "helix.workstation_goal_context_update.v1",
+      ]),
+    });
   }, 60_000);
 });

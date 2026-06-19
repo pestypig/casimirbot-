@@ -513,4 +513,83 @@ describe("Helix Ask response-boundary terminal mirrors", () => {
       available: true,
     });
   });
+
+  it("exports rail-specific observation failures instead of generic projection mismatch", () => {
+    const staleProjectionFailure =
+      "I could not produce a terminal answer because terminal authority and visible projection selected different artifacts.";
+    const payload = {
+      turn_id: "ask:test-rail-specific-observation-failure",
+      ok: false,
+      response_type: "final_failure",
+      final_status: "final_failure",
+      status: "final_failure",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "terminal_projection_mismatch",
+      terminal_failure_text: staleProjectionFailure,
+      selected_final_answer: staleProjectionFailure,
+      answer: staleProjectionFailure,
+      text: staleProjectionFailure,
+      current_turn_artifact_ledger: [],
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        terminal_kind: "failure",
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+        terminal_error_code: "terminal_projection_mismatch",
+        terminal_text_preview: staleProjectionFailure,
+        server_authoritative: true,
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "terminal_projection_mismatch",
+        concise_text: staleProjectionFailure,
+      },
+      codex_parity_agent_spine_rail_table: {
+        schema: "helix.codex_parity_agent_spine_rail_table.v1",
+        turn_id: "ask:test-rail-specific-observation-failure",
+        route_family: "docs_viewer",
+        requested_capability: "docs-viewer.open",
+        selected_capability: "docs-viewer.open",
+        executed_capability: "execute_workstation_action",
+        observation_artifact_kind: "workspace_action_receipt",
+        required_observation_kinds_for_requested_capability: ["doc_open_receipt"],
+        rail_status: "fail_closed",
+        first_broken_rail: "observation_artifact",
+        rail_failure_code: "observation_missing",
+        repair_target: "observation_materializer",
+      },
+      debug: {},
+    };
+
+    const envelope = __testHelixAskOutputContract.buildHelixDebugExportEnvelope({
+      payload,
+      prompt: "Open the docs viewer.",
+      sessionId: "test-session",
+    }) as Record<string, any>;
+
+    expect(envelope.terminal_error_code).toBe("observation_missing");
+    expect(envelope.selected_final_answer).toContain("requested capability did not produce the required observation");
+    expect(envelope.selected_final_answer).toContain("docs-viewer.open");
+    expect(envelope.selected_final_answer).toContain("doc_open_receipt");
+    expect(envelope.selected_final_answer).not.toContain("visible projection selected different artifacts");
+    expect(envelope.tool_rail_terminal_failure_reconciliation).toMatchObject({
+      applied: true,
+      replaced_terminal_error_code: "terminal_projection_mismatch",
+      terminal_error_code: "observation_missing",
+      rail_failure_code: "observation_missing",
+      first_broken_rail: "observation_artifact",
+    });
+    expect(envelope.debug.tool_rail_terminal_failure_reconciliation).toMatchObject({
+      applied: true,
+      terminal_error_code: "observation_missing",
+    });
+    expect(envelope.resolved_turn_summary).toMatchObject({
+      final_status: "final_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "observation_missing",
+      final_answer_source: "typed_failure",
+    });
+  });
 });

@@ -68,6 +68,7 @@ import {
   type NarratorBindStreamRequestV1,
   type NarratorSayRequestV1,
   type WorkstationDispatchActionV1,
+  type WorkstationGoalContextToolIdentityV1,
   type WorkstationGoalContextUpdateV1,
 } from "@shared/contracts/workstation-goal-context.v1";
 import {
@@ -96,6 +97,11 @@ import {
   getActiveLiveAnswerEnvironmentForThread,
   getLiveAnswerEnvironment,
 } from "../situation-room/live-answer-environment-store";
+import {
+  WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS,
+  workstationContextFeedQueryCapabilityForAlias,
+  type WorkstationContextFeedQueryToolContractSpec,
+} from "./workstation-context-feed-query-tool-contracts";
 import { queryEventWindow } from "../situation-room/event-window-query";
 import { appendInterpretedEvent, listInterpretedEvents } from "../situation-room/interpreted-event-log-store";
 import {
@@ -214,6 +220,7 @@ import {
   listStagePlayGoalContextUpdates,
   recordStagePlayGoalContextUpdate,
   syncStagePlayGoalContextFromMailbox,
+  upsertStagePlayAgentGoalSession,
 } from "../stage-play/stage-play-goal-context-store";
 import {
   recordInterimVoiceCalloutRequest,
@@ -246,6 +253,28 @@ type ExecuteLiveEnvironmentToolInput = {
   args?: Record<string, unknown> | null;
   thread_id: string;
   environment_id?: string | null;
+};
+
+const canonicalLiveEnvironmentToolName = (
+  toolName: HelixLiveEnvironmentToolName | string,
+): HelixLiveEnvironmentToolName => {
+  const normalized = String(toolName).trim();
+  if (normalized === "narrator.say" || normalized === "narrator_say") return "live_env.narrator_say";
+  if (normalized === "narrator.bind_stream" || normalized === "narrator_bind_stream") return "live_env.narrator_bind_stream";
+  if (normalized === "change_workstation_preset") return "live_env.change_workstation_preset";
+  if (normalized === "set_visual_preset" || normalized === "visual_preset") return "live_env.set_visual_preset";
+  if (normalized === "set_audio_preset" || normalized === "audio_preset") return "live_env.set_audio_preset";
+  if (normalized === "bind_workstation_source" || normalized === "bind_source") return "live_env.bind_workstation_source";
+  if (normalized === "unbind_workstation_source" || normalized === "unbind_source") return "live_env.unbind_workstation_source";
+  if (normalized === "pause_workstation_loop" || normalized === "pause_loop") return "live_env.pause_workstation_loop";
+  if (normalized === "resume_workstation_loop" || normalized === "resume_loop") return "live_env.resume_workstation_loop";
+  if (normalized === "set_workstation_loop_state" || normalized === "set_loop_state") return "live_env.set_workstation_loop_state";
+  if (normalized === "repair_loop") return "live_env.repair_loop";
+  if (normalized === "repair_workstation_source" || normalized === "repair_source") return "live_env.repair_workstation_source";
+  if (normalized === "update_live_answer_projection") return "live_env.update_live_answer_projection";
+  if (normalized === "focus_process_graph") return "live_env.focus_process_graph";
+  return (workstationContextFeedQueryCapabilityForAlias(normalized) as HelixLiveEnvironmentToolName | null) ??
+    (normalized as HelixLiveEnvironmentToolName);
 };
 
 type StagePlayLiveAnswerProjectionReason =
@@ -2238,12 +2267,25 @@ const recordLiveEnvironmentGoalContextUpdate = (input: {
   freshnessStatus?: "fresh" | "stale" | "blocked" | "unknown";
   goalId?: string | null;
   goalRelevanceReason?: string | null;
+  toolIdentity?: WorkstationGoalContextToolIdentityV1 | null;
   suggestedDispatch?: WorkstationDispatchActionV1[];
 }): string => {
   const nowMs = Date.now();
   const mailboxThreadId = input.mailboxThreadId ?? input.threadId;
   const receiptRefs = uniqueStrings(input.receiptRefs ?? [input.contentRef]);
-  const evidenceRefs = uniqueStrings([input.contentRef, ...(input.evidenceRefs ?? []), ...receiptRefs]);
+  const sourceRefs = uniqueStrings(input.sourceRefs ?? []);
+  const loopRefs = uniqueStrings([
+    `thread:${mailboxThreadId}`,
+    `stage_play_mail_loop:${mailboxThreadId}`,
+    ...(input.loopRefs ?? []),
+  ]);
+  const evidenceRefs = uniqueStrings([
+    input.contentRef,
+    ...sourceRefs,
+    ...loopRefs,
+    ...(input.evidenceRefs ?? []),
+    ...receiptRefs,
+  ]);
   const dispatch: WorkstationDispatchActionV1[] = input.suggestedDispatch ?? [
     { kind: "log_receipt", receiptRef: receiptRefs[0] ?? input.contentRef },
     { kind: "update_panel", panelId: "stage-play-badge-graph" },
@@ -2256,12 +2298,8 @@ const recordLiveEnvironmentGoalContextUpdate = (input: {
       nowMs,
     ], 18)}`,
     createdAtMs: nowMs,
-    sourceRefs: uniqueStrings(input.sourceRefs ?? []),
-    loopRefs: uniqueStrings([
-      `thread:${mailboxThreadId}`,
-      `stage_play_mail_loop:${mailboxThreadId}`,
-      ...(input.loopRefs ?? []),
-    ]),
+    sourceRefs,
+    loopRefs,
     producerKind: input.producerKind,
     updateKind: input.updateKind,
     contentRef: input.contentRef,
@@ -2280,6 +2318,7 @@ const recordLiveEnvironmentGoalContextUpdate = (input: {
           reason: input.goalRelevanceReason ?? "Live environment query contributes to the active workstation goal.",
         }
       : null,
+    toolIdentity: input.toolIdentity ?? null,
     suggestedDispatch: dispatch,
     authority: {
       assistantAnswer: false,
@@ -2297,62 +2336,74 @@ type WorkstationContextFeedQuerySpec = {
   label: string;
 };
 
-const WORKSTATION_CONTEXT_FEED_QUERY_SPECS: Partial<Record<HelixLiveEnvironmentToolName, WorkstationContextFeedQuerySpec>> = {
-  "live_env.query_visual_summaries": {
-    feedKind: "visual_summaries",
-    actuator: "query_visual_summaries",
-    label: "visual summaries",
-  },
-  "live_env.query_audio_transcripts": {
-    feedKind: "audio_transcripts",
-    actuator: "query_audio_transcripts",
-    label: "audio transcripts",
-  },
-  "live_env.query_translation_segments": {
-    feedKind: "translated_transcripts",
-    actuator: "query_translation_segments",
-    label: "translation segments",
-  },
-  "live_env.query_microdeck_outputs": {
-    feedKind: "microdeck_outputs",
-    actuator: "query_microdeck_outputs",
-    label: "MicroDeck outputs",
-  },
-  "live_env.query_live_answer_state": {
-    feedKind: "live_answer_lines",
-    actuator: "query_live_answer_state",
-    label: "Live Answer state",
-  },
-  "live_env.query_narrator_events": {
-    feedKind: "narrator_events",
-    actuator: "query_narrator_events",
-    label: "narrator events",
-  },
-  "live_env.query_route_evidence": {
-    feedKind: "route_evidence",
-    actuator: "query_route_evidence",
-    label: "route evidence",
-  },
-  "live_env.query_automation_policies": {
-    feedKind: "automation_policies",
-    actuator: "query_automation_policies",
-    label: "automation policies",
-  },
-};
+const ADAPTER_GENERIC_CONTEXT_FEED_QUERY_FEEDS = new Set<AgentGoalContextFeedKindV1>([
+  "visual_summaries",
+  "audio_transcripts",
+  "translated_transcripts",
+  "microdeck_outputs",
+  "live_answer_lines",
+  "narrator_events",
+  "route_evidence",
+  "automation_policies",
+]);
+
+const WORKSTATION_CONTEXT_FEED_QUERY_SPECS: Partial<Record<HelixLiveEnvironmentToolName, WorkstationContextFeedQueryToolContractSpec>> =
+  Object.fromEntries(
+    WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS
+      .filter((spec) => ADAPTER_GENERIC_CONTEXT_FEED_QUERY_FEEDS.has(spec.feedKind))
+      .map((spec) => [spec.capability, spec]),
+  ) as Partial<Record<HelixLiveEnvironmentToolName, WorkstationContextFeedQueryToolContractSpec>>;
 
 const readWorkstationContextFeedQuerySpec = (
   toolName: HelixLiveEnvironmentToolName,
-): WorkstationContextFeedQuerySpec | null => WORKSTATION_CONTEXT_FEED_QUERY_SPECS[toolName] ?? null;
+): WorkstationContextFeedQuerySpec | null => {
+  const spec = WORKSTATION_CONTEXT_FEED_QUERY_SPECS[toolName];
+  return spec
+    ? {
+        feedKind: spec.feedKind,
+        actuator: spec.actuator,
+        label: spec.label,
+      }
+    : null;
+};
 
-const goalSessionFeedAllowed = (
+const matchedGoalSessionContextFeeds = (
   session: AgentGoalSessionV1 | null,
   feedKind: WorkstationContextFeedQuerySpec["feedKind"],
-): boolean => Boolean(session?.contextFeeds.some((feed) => feed.sourceKind === feedKind));
+): AgentGoalSessionV1["contextFeeds"] =>
+  session?.contextFeeds.filter((feed) => feed.sourceKind === feedKind) ?? [];
 
 const goalSessionActuatorAllowed = (
   session: AgentGoalSessionV1 | null,
   actuator: AgentGoalActuatorV1,
 ): boolean => Boolean(session?.allowedActuators.includes(actuator));
+
+const goalEvidenceKindSatisfied = (input: {
+  kind: string;
+  updates: WorkstationGoalContextUpdateV1[];
+  evidenceRefs: string[];
+}): boolean => {
+  const kind = input.kind.trim().toLowerCase();
+  if (!kind) return true;
+  const haystack = [
+    ...input.evidenceRefs,
+    ...input.updates.flatMap((update) => [
+      update.updateId,
+      update.contentRef,
+      update.producerKind,
+      update.updateKind,
+      ...update.sourceRefs,
+      ...update.loopRefs,
+      ...update.evidenceRefs,
+      ...update.receiptRefs,
+    ]),
+  ].join("\n").toLowerCase();
+  if (kind === "goal_context_update") return input.updates.length > 0 || /goal_context_update/.test(haystack);
+  if (kind === "agent_step_observation_packet") return /(?:live_environment_tool_observation|agent_step_observation_packet|tool_observation|observation_packet)/.test(haystack);
+  if (kind === "route_product_contract") return /route_product_contract/.test(haystack);
+  if (kind === "terminal_authority_single_writer") return /terminal_authority_single_writer/.test(haystack);
+  return haystack.includes(kind);
+};
 
 type WorkstationControlSpec = {
   controlKind:
@@ -2366,6 +2417,7 @@ type WorkstationControlSpec = {
   label: string;
   defaultPanelId: string;
   defaultLoopState?: "paused" | "running" | "repaired";
+  primaryActuator?: AgentGoalActuatorV1;
 };
 
 const WORKSTATION_CONTROL_SPECS: Partial<Record<HelixLiveEnvironmentToolName, WorkstationControlSpec>> = {
@@ -2373,6 +2425,18 @@ const WORKSTATION_CONTROL_SPECS: Partial<Record<HelixLiveEnvironmentToolName, Wo
     controlKind: "change_preset",
     label: "change workstation preset",
     defaultPanelId: "stage-play-badge-graph",
+  },
+  "live_env.set_visual_preset": {
+    controlKind: "change_preset",
+    label: "set visual preset",
+    defaultPanelId: "stage-play-badge-graph",
+    primaryActuator: "set_visual_preset",
+  },
+  "live_env.set_audio_preset": {
+    controlKind: "change_preset",
+    label: "set audio preset",
+    defaultPanelId: "stage-play-badge-graph",
+    primaryActuator: "set_audio_preset",
   },
   "live_env.bind_workstation_source": {
     controlKind: "bind_source",
@@ -2401,6 +2465,11 @@ const WORKSTATION_CONTROL_SPECS: Partial<Record<HelixLiveEnvironmentToolName, Wo
     label: "set workstation loop state",
     defaultPanelId: "stage-play-badge-graph",
   },
+  "live_env.repair_loop": {
+    controlKind: "repair_source",
+    label: "repair workstation loop",
+    defaultPanelId: "stage-play-badge-graph",
+  },
   "live_env.repair_workstation_source": {
     controlKind: "repair_source",
     label: "repair workstation source",
@@ -2426,6 +2495,7 @@ const workstationControlActuator = (
   spec: WorkstationControlSpec,
   loopState: "paused" | "running" | "repaired" | null,
 ): AgentGoalActuatorV1 => {
+  if (spec.primaryActuator) return spec.primaryActuator;
   if (spec.controlKind !== "set_loop_state") return spec.controlKind;
   if (loopState === "paused") return "pause_loop";
   if (loopState === "running") return "resume_loop";
@@ -2437,7 +2507,11 @@ const workstationControlFallbackActuator = (
   spec: WorkstationControlSpec,
   actuator: AgentGoalActuatorV1,
 ): AgentGoalActuatorV1 | null =>
-  spec.controlKind === "set_loop_state" && actuator !== "set_loop_state" ? "set_loop_state" : null;
+  spec.controlKind === "set_loop_state" && actuator !== "set_loop_state"
+    ? "set_loop_state"
+    : spec.controlKind === "change_preset" && actuator !== "change_preset"
+      ? "change_preset"
+      : null;
 
 const workstationPresetModalityActuators = (input: {
   spec: WorkstationControlSpec;
@@ -3108,6 +3182,7 @@ export function executeLiveEnvironmentTool(
   input: ExecuteLiveEnvironmentToolInput,
 ): HelixLiveEnvironmentToolObservation {
   const args = input.args ?? {};
+  const canonicalToolName = canonicalLiveEnvironmentToolName(input.tool_name);
   const explicitSourceId = readString(args.source_id) ?? readString(args.sourceId);
   let environment =
     (input.environment_id ? getLiveAnswerEnvironment(input.environment_id) : null) ??
@@ -3117,9 +3192,9 @@ export function executeLiveEnvironmentTool(
   const effectiveThreadId = environment?.thread_id ?? input.thread_id;
   const roomId = readString(args.room_id) ?? environment?.room_id ?? null;
 
-  if (input.tool_name === "live_env.narrator_say" || input.tool_name === "live_env.narrator_bind_stream") {
+  if (canonicalToolName === "live_env.narrator_say" || canonicalToolName === "live_env.narrator_bind_stream") {
     const environmentId = environment?.environment_id ?? input.environment_id ?? null;
-    const narratorKind: NarratorControlKind = input.tool_name === "live_env.narrator_bind_stream" ? "bind_stream" : "say";
+    const narratorKind: NarratorControlKind = canonicalToolName === "live_env.narrator_bind_stream" ? "bind_stream" : "say";
     const text = readString(args.text) ?? readString(args.message) ?? readString(args.utterance);
     const sourceRef =
       readString(args.source_ref) ??
@@ -3153,7 +3228,11 @@ export function executeLiveEnvironmentTool(
           limit: 1,
         })[0] ?? null
       : null;
-    const actuatorAllowed = !goalId || Boolean(goalSession?.allowedActuators.includes(actuator));
+    const matchedAllowedActuators = goalSession?.allowedActuators.includes(actuator) ? [actuator] : [];
+    const matchedAllowedActuatorRefs = matchedAllowedActuators.map((candidate) =>
+      `agent_goal_allowed_actuator:${candidate}`
+    );
+    const actuatorAllowed = !goalId || matchedAllowedActuators.length > 0;
     const authorizationMissing = goalId
       ? goalSession
         ? actuatorAllowed
@@ -3165,10 +3244,12 @@ export function executeLiveEnvironmentTool(
     const ok = effectiveMissingRequirements.length === 0;
     const policyEvidenceRefs = uniqueStrings([
       `allowed_actuator:${actuator}`,
+      ...matchedAllowedActuatorRefs,
       ...authorizationMissing,
     ]);
     const requestId = `helix_narrator_${narratorKind}_request:${hashShort([
       input.thread_id,
+      canonicalToolName,
       input.tool_name,
       text,
       sourceRef,
@@ -3219,6 +3300,12 @@ export function executeLiveEnvironmentTool(
       goalRelevanceReason: narratorKind === "say"
         ? "Narrator speech request was prepared for the active workstation goal."
         : "Narrator stream binding was prepared for the active workstation goal.",
+      toolIdentity: {
+        requestedToolName: input.tool_name,
+        canonicalToolName,
+        matchedAllowedActuators,
+        matchedAllowedActuatorRefs,
+      },
       suggestedDispatch: dispatch,
     });
     const producedRefs = [requestId, goalContextUpdateId];
@@ -3230,7 +3317,7 @@ export function executeLiveEnvironmentTool(
           sourceRefs,
           loopRefs,
           evidenceRefs: uniqueStrings([goalContextUpdateId, ...narratorEvidenceRefs]).slice(0, 80),
-          actionsTaken: uniqueStrings([actuator, input.tool_name]),
+          actionsTaken: uniqueStrings([actuator, canonicalToolName, input.tool_name]),
           summary: narratorKind === "say"
             ? "Prepared narrator say request for this goal session."
             : `Prepared narrator ${streamKind ?? "stream"} binding for this goal session.`,
@@ -3240,6 +3327,10 @@ export function executeLiveEnvironmentTool(
     const common = {
       requestId,
       request_id: requestId,
+      requestedToolName: input.tool_name,
+      requested_tool_name: input.tool_name,
+      canonicalToolName,
+      canonical_tool_name: canonicalToolName,
       status: ok ? "prepared" : "blocked",
       missingRequirements: effectiveMissingRequirements,
       missing_requirements: effectiveMissingRequirements,
@@ -3251,6 +3342,10 @@ export function executeLiveEnvironmentTool(
       required_actuator: actuator,
       actuatorAllowed,
       actuator_allowed: actuatorAllowed,
+      matchedAllowedActuators,
+      matched_allowed_actuators: matchedAllowedActuators,
+      matchedAllowedActuatorRefs,
+      matched_allowed_actuator_refs: matchedAllowedActuatorRefs,
       policyEvidenceRefs,
       policy_evidence_refs: policyEvidenceRefs,
       sourceRefs,
@@ -3334,7 +3429,7 @@ export function executeLiveEnvironmentTool(
     return makeObservation({
       threadId: input.thread_id,
       environmentId,
-      toolName: input.tool_name,
+      toolName: canonicalToolName,
       ok: resultOk,
       summary: resultOk
         ? narratorKind === "say"
@@ -3350,7 +3445,7 @@ export function executeLiveEnvironmentTool(
     });
   }
 
-  const workstationControlSpec = readWorkstationControlSpec(input.tool_name);
+  const workstationControlSpec = readWorkstationControlSpec(canonicalToolName);
   if (workstationControlSpec) {
     const scope = resolveLiveSourceToolScope({
       args,
@@ -3399,6 +3494,10 @@ export function executeLiveEnvironmentTool(
     const matchedPolicyActuator = goalSession
       ? policyActuators.find((candidate) => goalSession.allowedActuators.includes(candidate)) ?? null
       : null;
+    const matchedAllowedActuators = matchedPolicyActuator ? [matchedPolicyActuator] : [];
+    const matchedAllowedActuatorRefs = matchedAllowedActuators.map((candidate) =>
+      `agent_goal_allowed_actuator:${candidate}`
+    );
     const actuatorAllowed = !goalId || Boolean(matchedPolicyActuator);
     const authorizationMissing = goalId
       ? goalSession
@@ -3412,6 +3511,7 @@ export function executeLiveEnvironmentTool(
     const reason = readString(args.reason) ?? readString(args.summary) ?? null;
     const receiptId = `stage_play_workstation_control_receipt:${workstationControlSpec.controlKind}:${hashShort([
       input.thread_id,
+      canonicalToolName,
       input.tool_name,
       controlDispatch.targetRef,
       controlDispatch.sourceRef,
@@ -3441,6 +3541,7 @@ export function executeLiveEnvironmentTool(
       matchedPolicyActuator && matchedPolicyActuator !== actuator && matchedPolicyActuator !== fallbackActuator
         ? `allowed_actuator:${matchedPolicyActuator}`
         : null,
+      ...matchedAllowedActuatorRefs,
       ...authorizationMissing,
     ]);
     const loopRefs = uniqueStrings([
@@ -3476,6 +3577,12 @@ export function executeLiveEnvironmentTool(
       evidenceRefs,
       receiptRefs: [receiptId],
       freshnessStatus: ok ? "fresh" : "blocked",
+      toolIdentity: {
+        requestedToolName: input.tool_name,
+        canonicalToolName,
+        matchedAllowedActuators,
+        matchedAllowedActuatorRefs,
+      },
       suggestedDispatch: dispatch,
     });
     const checkpointedGoalSession = ok && goalSession
@@ -3486,7 +3593,7 @@ export function executeLiveEnvironmentTool(
           sourceRefs,
           loopRefs,
           evidenceRefs: uniqueStrings([goalContextUpdateId, ...evidenceRefs]).slice(0, 80),
-          actionsTaken: uniqueStrings([actuator, fallbackActuator, matchedPolicyActuator, input.tool_name]),
+          actionsTaken: uniqueStrings([actuator, fallbackActuator, matchedPolicyActuator, canonicalToolName, input.tool_name]),
           summary: `Prepared ${workstationControlSpec.label} control dispatch for this goal session.`,
           nextStep: "continue",
         })
@@ -3495,6 +3602,10 @@ export function executeLiveEnvironmentTool(
       schema: WORKSTATION_CONTROL_RECEIPT_SCHEMA,
       receiptId,
       receipt_id: receiptId,
+      requestedToolName: input.tool_name,
+      requested_tool_name: input.tool_name,
+      canonicalToolName,
+      canonical_tool_name: canonicalToolName,
       controlKind: workstationControlSpec.controlKind,
       control_kind: workstationControlSpec.controlKind,
       label: workstationControlSpec.label,
@@ -3510,6 +3621,10 @@ export function executeLiveEnvironmentTool(
       required_actuator: actuator,
       actuatorAllowed,
       actuator_allowed: actuatorAllowed,
+      matchedAllowedActuators,
+      matched_allowed_actuators: matchedAllowedActuators,
+      matchedAllowedActuatorRefs,
+      matched_allowed_actuator_refs: matchedAllowedActuatorRefs,
       policyEvidenceRefs,
       policy_evidence_refs: policyEvidenceRefs,
       sourceRefs,
@@ -3573,7 +3688,7 @@ export function executeLiveEnvironmentTool(
     return makeObservation({
       threadId: input.thread_id,
       environmentId,
-      toolName: input.tool_name,
+      toolName: canonicalToolName,
       ok: resultOk,
       summary: resultOk
         ? `Prepared ${workstationControlSpec.label} dispatch as non-terminal workstation control evidence.`
@@ -5607,8 +5722,16 @@ export function executeLiveEnvironmentTool(
           limit: 1,
         })[0] ?? null
       : null;
-    const feedAllowed = !goalId || goalSessionFeedAllowed(goalSession, "packet_traces");
-    const actuatorAllowed = !goalId || goalSessionActuatorAllowed(goalSession, "query_packet_traces");
+    const matchedContextFeeds = matchedGoalSessionContextFeeds(goalSession, "packet_traces");
+    const matchedContextFeedRefs = matchedContextFeeds.map((feed) => feed.feedId);
+    const matchedAllowedActuators = goalSessionActuatorAllowed(goalSession, "query_packet_traces")
+      ? ["query_packet_traces" as const]
+      : [];
+    const matchedAllowedActuatorRefs = matchedAllowedActuators.map((actuator) =>
+      `agent_goal_allowed_actuator:${actuator}`
+    );
+    const feedAllowed = !goalId || matchedContextFeeds.length > 0;
+    const actuatorAllowed = !goalId || matchedAllowedActuators.length > 0;
     const missingRequirements = goalId
       ? goalSession
         ? [
@@ -5620,6 +5743,8 @@ export function executeLiveEnvironmentTool(
     const policyEvidenceRefs = uniqueStrings([
       "context_feed:packet_traces",
       "allowed_actuator:query_packet_traces",
+      ...matchedContextFeedRefs.map((feedRef) => `agent_goal_context_feed:${feedRef}`),
+      ...matchedAllowedActuatorRefs,
       ...missingRequirements,
     ]);
     const ok = missingRequirements.length === 0;
@@ -5776,10 +5901,32 @@ export function executeLiveEnvironmentTool(
       goalId,
       packetId,
       processedMailPackets.map((packet) => packet.packetId),
+      matchedContextFeedRefs,
+      matchedAllowedActuatorRefs,
     ])}`;
+    const resultSourceRefs = uniqueStrings([
+      sourceRef,
+      scope.sourceId,
+      ...processedMailPackets.map((packet) => packet.sourceId),
+    ]);
+    const resultLoopRefs = uniqueStrings([
+      "workstation_context_feed:packet_traces",
+      "workstation_actuator:query_packet_traces",
+      `packet_trace_query:${scope.mailboxThreadResolution.mailboxThreadId}`,
+      ...processedMailPackets.flatMap((packet) => [
+        packet.packetId,
+        packet.jobId,
+        packet.causalTrace?.traceId,
+        packet.causalTrace?.cycleId,
+      ]),
+    ]);
     const evidenceRefs = uniqueStrings([
       resultId,
       ...policyEvidenceRefs,
+      ...matchedContextFeedRefs,
+      ...matchedAllowedActuatorRefs,
+      ...resultSourceRefs,
+      ...resultLoopRefs,
       scope.mailboxThreadResolution.mailboxThreadId,
       ...packetTraces.flatMap((trace) => trace.evidenceRefs),
       ...goalContextUpdates.flatMap((update) => [update.updateId, update.contentRef, ...update.evidenceRefs, ...update.receiptRefs]),
@@ -5796,22 +5943,8 @@ export function executeLiveEnvironmentTool(
           ? `Queried ${packetTraces.length} packet trace(s) for workstation packet debugging.`
           : "No packet traces are currently available for this workstation scope."
         : `Blocked packet trace query; missing ${missingRequirements.join(", ")}.`,
-      sourceRefs: uniqueStrings([
-        sourceRef,
-        scope.sourceId,
-        ...processedMailPackets.map((packet) => packet.sourceId),
-      ]),
-      loopRefs: uniqueStrings([
-        "workstation_context_feed:packet_traces",
-        "workstation_actuator:query_packet_traces",
-        `packet_trace_query:${scope.mailboxThreadResolution.mailboxThreadId}`,
-        ...processedMailPackets.flatMap((packet) => [
-          packet.packetId,
-          packet.jobId,
-          packet.causalTrace?.traceId,
-          packet.causalTrace?.cycleId,
-        ]),
-      ]),
+      sourceRefs: resultSourceRefs,
+      loopRefs: resultLoopRefs,
       evidenceRefs,
       receiptRefs: [resultId],
       freshnessStatus: ok ? (packetTraces.length > 0 ? "fresh" : "unknown") : "blocked",
@@ -5829,13 +5962,8 @@ export function executeLiveEnvironmentTool(
           session: goalSession,
           threadId: scope.mailboxThreadResolution.mailboxThreadId,
           roomId,
-          sourceRefs: uniqueStrings([sourceRef, scope.sourceId, ...processedMailPackets.map((packet) => packet.sourceId)]),
-          loopRefs: uniqueStrings([
-            "workstation_context_feed:packet_traces",
-            "workstation_actuator:query_packet_traces",
-            `packet_trace_query:${scope.mailboxThreadResolution.mailboxThreadId}`,
-            ...processedMailPackets.flatMap((packet) => [packet.packetId, packet.jobId, packet.causalTrace?.traceId]),
-          ]),
+          sourceRefs: resultSourceRefs,
+          loopRefs: resultLoopRefs,
           evidenceRefs: uniqueStrings([goalContextUpdateId, ...evidenceRefs]).slice(0, 80),
           actionsTaken: ["query_packet_traces", input.tool_name],
           summary: `Queried packet traces and read ${packetTraces.length} packet trace(s) for this goal session.`,
@@ -5875,8 +6003,22 @@ export function executeLiveEnvironmentTool(
       required_actuator: "query_packet_traces",
       actuatorAllowed,
       actuator_allowed: actuatorAllowed,
+      matchedContextFeeds,
+      matched_context_feeds: matchedContextFeeds,
+      matchedContextFeedRefs,
+      matched_context_feed_refs: matchedContextFeedRefs,
+      matchedAllowedActuators,
+      matched_allowed_actuators: matchedAllowedActuators,
+      matchedAllowedActuatorRefs,
+      matched_allowed_actuator_refs: matchedAllowedActuatorRefs,
       agentGoalSession: checkpointedGoalSession,
       agent_goal_session: checkpointedGoalSession,
+      sourceRefs: resultSourceRefs,
+      source_refs: resultSourceRefs,
+      loopRefs: resultLoopRefs,
+      loop_refs: resultLoopRefs,
+      evidenceRefs,
+      evidence_refs: evidenceRefs,
       packetTraces,
       packet_traces: packetTraces,
       goalContextUpdates,
@@ -5933,7 +6075,7 @@ export function executeLiveEnvironmentTool(
     });
   }
 
-  const feedQuerySpec = readWorkstationContextFeedQuerySpec(input.tool_name);
+  const feedQuerySpec = readWorkstationContextFeedQuerySpec(canonicalToolName);
   if (feedQuerySpec) {
     const scope = resolveLiveSourceToolScope({
       args,
@@ -5962,8 +6104,16 @@ export function executeLiveEnvironmentTool(
           limit: 1,
         })[0] ?? null
       : null;
-    const feedAllowed = !goalId || goalSessionFeedAllowed(goalSession, feedQuerySpec.feedKind);
-    const actuatorAllowed = !goalId || goalSessionActuatorAllowed(goalSession, feedQuerySpec.actuator);
+    const matchedContextFeeds = matchedGoalSessionContextFeeds(goalSession, feedQuerySpec.feedKind);
+    const matchedContextFeedRefs = matchedContextFeeds.map((feed) => feed.feedId);
+    const matchedAllowedActuators = goalSessionActuatorAllowed(goalSession, feedQuerySpec.actuator)
+      ? [feedQuerySpec.actuator]
+      : [];
+    const matchedAllowedActuatorRefs = matchedAllowedActuators.map((actuator) =>
+      `agent_goal_allowed_actuator:${actuator}`
+    );
+    const feedAllowed = !goalId || matchedContextFeeds.length > 0;
+    const actuatorAllowed = !goalId || matchedAllowedActuators.length > 0;
     const feedMissingRequirements = goalId
       ? goalSession
         ? [
@@ -6035,10 +6185,14 @@ export function executeLiveEnvironmentTool(
       sourceRef,
       goalId,
       goalContextUpdates.map((update) => update.updateId),
+      matchedContextFeedRefs,
+      matchedAllowedActuatorRefs,
     ])}`;
     const policyEvidenceRefs = uniqueStrings([
       `context_feed:${feedQuerySpec.feedKind}`,
       `allowed_actuator:${feedQuerySpec.actuator}`,
+      ...matchedContextFeedRefs.map((feedRef) => `agent_goal_context_feed:${feedRef}`),
+      ...matchedAllowedActuatorRefs,
       ...feedMissingRequirements,
     ]);
     const resultSourceRefs = uniqueStrings([
@@ -6055,6 +6209,8 @@ export function executeLiveEnvironmentTool(
     const evidenceRefs = uniqueStrings([
       resultId,
       ...policyEvidenceRefs,
+      ...matchedContextFeedRefs,
+      ...matchedAllowedActuatorRefs,
       ...resultSourceRefs,
       ...resultLoopRefs,
       ...goalContextUpdates.flatMap((update) => [
@@ -6099,7 +6255,7 @@ export function executeLiveEnvironmentTool(
           sourceRefs: resultSourceRefs,
           loopRefs: resultLoopRefs,
           evidenceRefs: uniqueStrings([goalContextUpdateId, ...evidenceRefs]).slice(0, 80),
-          actionsTaken: [feedQuerySpec.actuator, input.tool_name],
+          actionsTaken: uniqueStrings([feedQuerySpec.actuator, canonicalToolName, input.tool_name]),
           summary: `Queried ${feedQuerySpec.label} feed and read ${goalContextUpdates.length} update(s) for this goal session.`,
           nextStep: goalContextUpdates.length > 0 ? "continue" : "ask_user",
         })
@@ -6107,6 +6263,38 @@ export function executeLiveEnvironmentTool(
     const authoritySummary = summarizeGoalContextAuthority({
       updates: goalContextUpdates,
       sessions: checkpointedGoalSession ? [checkpointedGoalSession] : [],
+    });
+    const packetCircuitRefs = goalContextUpdates.map((update) => {
+      const allRefs = uniqueStrings([
+        update.contentRef,
+        update.updateId,
+        ...update.sourceRefs,
+        ...update.loopRefs,
+        ...update.evidenceRefs,
+        ...update.receiptRefs,
+      ]);
+      return {
+        updateId: update.updateId,
+        producerKind: update.producerKind,
+        updateKind: update.updateKind,
+        contentRef: update.contentRef,
+        sourceRefs: update.sourceRefs,
+        loopRefs: update.loopRefs,
+        packetRefs: allRefs.filter((ref) =>
+          ref.startsWith("stage_play_processed_mail_packet:") ||
+          ref.startsWith("stage_play_live_source_mail:") ||
+          ref.startsWith("stage_play_packet_trace:")
+        ),
+        microDeckRefs: allRefs.filter((ref) =>
+          ref.startsWith("stage_play_micro_reasoner_run:") ||
+          ref.startsWith("microdeck:") ||
+          ref.startsWith("microdeck_output:")
+        ),
+        receiptRefs: update.receiptRefs,
+        freshnessStatus: update.freshness.status,
+        assistant_answer: false as const,
+        terminal_eligible: false as const,
+      };
     });
     const feedQueryResult: WorkstationContextFeedQueryResultV1 = {
       schema: WORKSTATION_CONTEXT_FEED_QUERY_RESULT_SCHEMA,
@@ -6128,10 +6316,15 @@ export function executeLiveEnvironmentTool(
       feedAllowed,
       requiredActuator: feedQuerySpec.actuator,
       actuatorAllowed,
+      matchedContextFeeds,
+      matchedContextFeedRefs,
+      matchedAllowedActuators,
+      matchedAllowedActuatorRefs,
       agentGoalSession: checkpointedGoalSession,
       agentGoalSessions: checkpointedGoalSession ? [checkpointedGoalSession] : [],
       goalContextUpdates,
       authoritySummary,
+      packetCircuitRefs,
       updateCount: goalContextUpdates.length,
       syncedWindow: {
         mailItemCount: mailItems.length,
@@ -6158,7 +6351,7 @@ export function executeLiveEnvironmentTool(
     return makeObservation({
       threadId: input.thread_id,
       environmentId,
-      toolName: input.tool_name,
+      toolName: canonicalToolName,
       ok: resultOk,
       summary: resultOk
         ? `Read ${goalContextUpdates.length} ${feedQuerySpec.label} goal-context update(s).`
@@ -6168,6 +6361,10 @@ export function executeLiveEnvironmentTool(
       observation: {
         ...feedQueryResult,
         result_id: resultId,
+        requestedToolName: input.tool_name,
+        requested_tool_name: input.tool_name,
+        canonicalToolName,
+        canonical_tool_name: canonicalToolName,
         feed_kind: feedQuerySpec.feedKind,
         mailbox_thread_id: scope.mailboxThreadResolution.mailboxThreadId,
         mailbox_thread_resolution: scope.mailboxThreadResolution,
@@ -6183,10 +6380,20 @@ export function executeLiveEnvironmentTool(
         feed_allowed: feedAllowed,
         required_actuator: feedQuerySpec.actuator,
         actuator_allowed: actuatorAllowed,
+        matchedContextFeeds,
+        matched_context_feeds: matchedContextFeeds,
+        matchedContextFeedRefs,
+        matched_context_feed_refs: matchedContextFeedRefs,
+        matchedAllowedActuators,
+        matched_allowed_actuators: matchedAllowedActuators,
+        matchedAllowedActuatorRefs,
+        matched_allowed_actuator_refs: matchedAllowedActuatorRefs,
         agent_goal_session: checkpointedGoalSession,
         agent_goal_sessions: checkpointedGoalSession ? [checkpointedGoalSession] : [],
         goal_context_updates: goalContextUpdates,
         authority_summary: authoritySummary,
+        packetCircuitRefs,
+        packet_circuit_refs: packetCircuitRefs,
         update_count: goalContextUpdates.length,
         synced_window: {
           mail_item_count: mailItems.length,
@@ -6221,8 +6428,16 @@ export function executeLiveEnvironmentTool(
           limit: 1,
         })[0] ?? null
       : null;
-    const feedAllowed = !goalId || goalSessionFeedAllowed(goalSession, "trace_memory");
-    const actuatorAllowed = !goalId || goalSessionActuatorAllowed(goalSession, "query_trace_memory");
+    const matchedContextFeeds = matchedGoalSessionContextFeeds(goalSession, "trace_memory");
+    const matchedContextFeedRefs = matchedContextFeeds.map((feed) => feed.feedId);
+    const matchedAllowedActuators = goalSessionActuatorAllowed(goalSession, "query_trace_memory")
+      ? ["query_trace_memory" as const]
+      : [];
+    const matchedAllowedActuatorRefs = matchedAllowedActuators.map((actuator) =>
+      `agent_goal_allowed_actuator:${actuator}`
+    );
+    const feedAllowed = !goalId || matchedContextFeeds.length > 0;
+    const actuatorAllowed = !goalId || matchedAllowedActuators.length > 0;
     const feedMissingRequirements = goalId
       ? goalSession
         ? [
@@ -6235,6 +6450,8 @@ export function executeLiveEnvironmentTool(
     const policyEvidenceRefs = uniqueStrings([
       "context_feed:trace_memory",
       "allowed_actuator:query_trace_memory",
+      ...matchedContextFeedRefs.map((feedRef) => `agent_goal_context_feed:${feedRef}`),
+      ...matchedAllowedActuatorRefs,
       ...feedMissingRequirements,
     ]);
     const traceId =
@@ -6251,7 +6468,7 @@ export function executeLiveEnvironmentTool(
           .slice(-limit)) : [];
     const selectedTrace = traces.at(-1) ?? null;
     const traceRefs = traces.map((trace) => trace.trace_id);
-    const evidenceRefs = uniqueStrings([
+    const traceEvidenceRefs = uniqueStrings([
       ...traceRefs,
       ...(selectedTrace?.evidence_refs ?? []),
       ...(selectedTrace?.tool_receipt_ids ?? []),
@@ -6262,7 +6479,30 @@ export function executeLiveEnvironmentTool(
       traceId ?? null,
       turnId ?? null,
       traceRefs,
+      matchedContextFeedRefs,
     ])}`;
+    const resultSourceRefs = uniqueStrings([
+      input.thread_id,
+      selectedTrace?.source_family,
+      ...traceRefs,
+    ]);
+    const resultLoopRefs = uniqueStrings([
+      resultId,
+      "workstation_context_feed:trace_memory",
+      "workstation_actuator:query_trace_memory",
+      ...traces.map((trace) => trace.turn_id),
+      ...traces.flatMap((trace) => trace.lifecycle_event_refs),
+    ]);
+    const freshnessStatus = ok ? (traces.length > 0 ? "fresh" : "unknown") : "blocked";
+    const resultEvidenceRefs = uniqueStrings([
+      resultId,
+      ...policyEvidenceRefs,
+      ...matchedContextFeedRefs,
+      ...matchedAllowedActuatorRefs,
+      ...resultSourceRefs,
+      ...resultLoopRefs,
+      ...traceEvidenceRefs,
+    ]);
     const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
       threadId: input.thread_id,
       mailboxThreadId: input.thread_id,
@@ -6275,21 +6515,11 @@ export function executeLiveEnvironmentTool(
           ? `Trace memory selected ${selectedTrace.trace_id}; proof ${selectedTrace.proof_status}, scope ${selectedTrace.scope_match}.`
           : "Trace memory query found no workstation reasoning traces for this scope."
         : `Blocked trace memory query; missing ${feedMissingRequirements.join(", ")}.`,
-      sourceRefs: uniqueStrings([
-        input.thread_id,
-        selectedTrace?.source_family,
-        ...traceRefs,
-      ]),
-      loopRefs: uniqueStrings([
-        resultId,
-        "workstation_context_feed:trace_memory",
-        "workstation_actuator:query_trace_memory",
-        ...traces.map((trace) => trace.turn_id),
-        ...traces.flatMap((trace) => trace.lifecycle_event_refs),
-      ]),
-      evidenceRefs: uniqueStrings([...policyEvidenceRefs, ...evidenceRefs]),
+      sourceRefs: resultSourceRefs,
+      loopRefs: resultLoopRefs,
+      evidenceRefs: resultEvidenceRefs,
       receiptRefs: [resultId, ...traceRefs],
-      freshnessStatus: ok ? (traces.length > 0 ? "fresh" : "unknown") : "blocked",
+      freshnessStatus,
       suggestedDispatch: [
         { kind: "log_receipt", receiptRef: resultId },
         ...(ok ? [{ kind: "append_goal_context" as const, goalId: goalId ?? `trace_memory:${input.thread_id}` }] : []),
@@ -6301,19 +6531,9 @@ export function executeLiveEnvironmentTool(
           session: goalSession,
           threadId: input.thread_id,
           roomId,
-          sourceRefs: uniqueStrings([
-            input.thread_id,
-            selectedTrace?.source_family,
-            ...traceRefs,
-          ]),
-          loopRefs: uniqueStrings([
-            resultId,
-            "workstation_context_feed:trace_memory",
-            "workstation_actuator:query_trace_memory",
-            ...traces.map((trace) => trace.turn_id),
-            ...traces.flatMap((trace) => trace.lifecycle_event_refs),
-          ]),
-          evidenceRefs: uniqueStrings([goalContextUpdateId, resultId, ...policyEvidenceRefs, ...evidenceRefs]).slice(0, 80),
+          sourceRefs: resultSourceRefs,
+          loopRefs: resultLoopRefs,
+          evidenceRefs: uniqueStrings([goalContextUpdateId, ...resultEvidenceRefs]).slice(0, 80),
           actionsTaken: ["query_trace_memory", input.tool_name],
           summary: `Queried trace memory and read ${traces.length} compact trace(s) for this goal session.`,
           nextStep: traces.length > 0 ? "continue" : "ask_user",
@@ -6332,10 +6552,18 @@ export function executeLiveEnvironmentTool(
       status: ok ? "read" : "blocked",
       missingRequirements: feedMissingRequirements,
       policyEvidenceRefs,
+      sourceRefs: resultSourceRefs,
+      loopRefs: resultLoopRefs,
+      evidenceRefs: resultEvidenceRefs,
+      freshnessStatus,
       goalSessionFound: goalId ? Boolean(goalSession) : null,
       feedAllowed,
       requiredActuator: "query_trace_memory",
       actuatorAllowed,
+      matchedContextFeeds,
+      matchedContextFeedRefs,
+      matchedAllowedActuators,
+      matchedAllowedActuatorRefs,
       agentGoalSession: checkpointedGoalSession,
       goalContextUpdateId,
       terminalAuthority: {
@@ -6373,10 +6601,22 @@ export function executeLiveEnvironmentTool(
         goal_id: goalId,
         missing_requirements: feedMissingRequirements,
         policy_evidence_refs: policyEvidenceRefs,
+        source_refs: resultSourceRefs,
+        loop_refs: resultLoopRefs,
+        evidence_refs: resultEvidenceRefs,
+        freshness_status: freshnessStatus,
         goal_session_found: goalId ? Boolean(goalSession) : null,
         feed_allowed: feedAllowed,
         required_actuator: "query_trace_memory",
         actuator_allowed: actuatorAllowed,
+        matchedContextFeeds,
+        matched_context_feeds: matchedContextFeeds,
+        matchedContextFeedRefs,
+        matched_context_feed_refs: matchedContextFeedRefs,
+        matchedAllowedActuators,
+        matched_allowed_actuators: matchedAllowedActuators,
+        matchedAllowedActuatorRefs,
+        matched_allowed_actuator_refs: matchedAllowedActuatorRefs,
         agent_goal_session: checkpointedGoalSession,
         goal_context_update_id: goalContextUpdateId,
         terminal_authority: {
@@ -6390,7 +6630,7 @@ export function executeLiveEnvironmentTool(
         contractValidationIssues,
         contract_validation_issues: contractValidationIssues,
       },
-      evidenceRefs: uniqueStrings([goalContextUpdateId, resultId, ...policyEvidenceRefs, ...evidenceRefs]),
+      evidenceRefs: uniqueStrings([goalContextUpdateId, ...resultEvidenceRefs]),
       producedRefs: [resultId, goalContextUpdateId, ...traceRefs],
       forceNormalizedRefs: true,
     });
@@ -7472,7 +7712,13 @@ export function executeLiveEnvironmentTool(
           limit: 1,
         })[0] ?? null
       : null;
-    const actuatorAllowed = !goalId || goalSessionActuatorAllowed(goalSession, "configure_route_watch");
+    const matchedAllowedActuators = goalSessionActuatorAllowed(goalSession, "configure_route_watch")
+      ? ["configure_route_watch" as const]
+      : [];
+    const matchedAllowedActuatorRefs = matchedAllowedActuators.map((actuator) =>
+      `agent_goal_allowed_actuator:${actuator}`
+    );
+    const actuatorAllowed = !goalId || matchedAllowedActuators.length > 0;
     const missingRequirements = goalId
       ? goalSession
         ? actuatorAllowed
@@ -7482,6 +7728,7 @@ export function executeLiveEnvironmentTool(
       : [];
     const policyEvidenceRefs = uniqueStrings([
       "allowed_actuator:configure_route_watch",
+      ...matchedAllowedActuatorRefs,
       ...missingRequirements,
     ]);
     if (missingRequirements.length > 0) {
@@ -7493,6 +7740,25 @@ export function executeLiveEnvironmentTool(
         policyDefaults.objectiveText,
         missingRequirements,
       ])}`;
+      const blockedSourceRefs = uniqueStrings([
+        ...sourceIds,
+        mailboxThreadResolution.mailboxThreadId,
+      ]);
+      const blockedLoopRefs = uniqueStrings([
+        `watch_job_config:${mailboxThreadResolution.mailboxThreadId}`,
+        `route_watch:${goalId ?? input.thread_id}`,
+        "workstation_context_feed:automation_policies",
+        "workstation_context_feed:route_evidence",
+        "workstation_actuator:configure_route_watch",
+      ]);
+      const blockedEvidenceRefs = uniqueStrings([
+        blockedReceiptId,
+        ...policyEvidenceRefs,
+        ...matchedAllowedActuatorRefs,
+        mailboxThreadResolution.mailboxThreadId,
+        ...blockedSourceRefs,
+        ...blockedLoopRefs,
+      ]);
       const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
         threadId: input.thread_id,
         mailboxThreadId: mailboxThreadResolution.mailboxThreadId,
@@ -7501,23 +7767,9 @@ export function executeLiveEnvironmentTool(
         updateKind: "automation_status",
         contentRef: blockedReceiptId,
         preview: `Blocked live-source watch job configuration; missing ${missingRequirements.join(", ")}.`,
-        sourceRefs: uniqueStrings([
-          ...sourceIds,
-          mailboxThreadResolution.mailboxThreadId,
-        ]),
-        loopRefs: uniqueStrings([
-          `watch_job_config:${mailboxThreadResolution.mailboxThreadId}`,
-          `route_watch:${goalId ?? input.thread_id}`,
-          "workstation_context_feed:automation_policies",
-          "workstation_context_feed:route_evidence",
-          "workstation_actuator:configure_route_watch",
-        ]),
-        evidenceRefs: uniqueStrings([
-          blockedReceiptId,
-          ...policyEvidenceRefs,
-          mailboxThreadResolution.mailboxThreadId,
-          ...sourceIds,
-        ]),
+        sourceRefs: blockedSourceRefs,
+        loopRefs: blockedLoopRefs,
+        evidenceRefs: blockedEvidenceRefs,
         receiptRefs: [blockedReceiptId],
         freshnessStatus: "blocked",
         staleAfterMs: 120_000,
@@ -7559,6 +7811,16 @@ export function executeLiveEnvironmentTool(
         required_actuator: "configure_route_watch",
         actuatorAllowed,
         actuator_allowed: actuatorAllowed,
+        matchedAllowedActuators,
+        matched_allowed_actuators: matchedAllowedActuators,
+        matchedAllowedActuatorRefs,
+        matched_allowed_actuator_refs: matchedAllowedActuatorRefs,
+        sourceRefs: blockedSourceRefs,
+        source_refs: blockedSourceRefs,
+        loopRefs: blockedLoopRefs,
+        loop_refs: blockedLoopRefs,
+        evidenceRefs: blockedEvidenceRefs,
+        evidence_refs: blockedEvidenceRefs,
         goalContextUpdateId,
         goal_context_update_id: goalContextUpdateId,
         post_tool_model_step_required: true,
@@ -7575,7 +7837,7 @@ export function executeLiveEnvironmentTool(
         ok: false,
         summary: `Cannot configure live-source watch job; missing ${missingRequirements.join(", ")}.`,
         observation: result,
-        evidenceRefs: [blockedReceiptId, goalContextUpdateId, ...policyEvidenceRefs, mailboxThreadResolution.mailboxThreadId, ...sourceIds],
+        evidenceRefs: uniqueStrings([goalContextUpdateId, ...blockedEvidenceRefs]),
         producedRefs: [blockedReceiptId, goalContextUpdateId],
         forceNormalizedRefs: true,
       });
@@ -7624,6 +7886,31 @@ export function executeLiveEnvironmentTool(
     const transcriptRows = buildWatchJobConfiguredTranscriptRows({
       policy: configured.policy,
     });
+    const resultSourceRefs = uniqueStrings([
+      ...configured.policy.sourceIds,
+      ...sourceIds,
+      configured.policy.environmentId,
+      mailboxThreadResolution.mailboxThreadId,
+    ]);
+    const resultLoopRefs = uniqueStrings([
+      configured.jobState.jobId,
+      configured.policy.policyId,
+      `watch_job:${configured.jobState.jobId}`,
+      `watch_policy:${configured.policy.policyId}`,
+      "workstation_context_feed:automation_policies",
+      "workstation_context_feed:route_evidence",
+      "workstation_actuator:configure_route_watch",
+    ]);
+    const resultEvidenceRefs = uniqueStrings([
+      configured.policy.policyId,
+      configured.jobState.jobId,
+      ...policyEvidenceRefs,
+      ...matchedAllowedActuatorRefs,
+      mailboxThreadResolution.mailboxThreadId,
+      ...resultSourceRefs,
+      ...resultLoopRefs,
+      ...configured.policy.evidenceRefs,
+    ]);
     const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
       threadId: input.thread_id,
       mailboxThreadId: mailboxThreadResolution.mailboxThreadId,
@@ -7632,28 +7919,9 @@ export function executeLiveEnvironmentTool(
       updateKind: "automation_status",
       contentRef: configured.policy.policyId,
       preview: `Configured live-source watch job for ${policyDefaults.objectiveText}; loop is armed for the next source summary.`,
-      sourceRefs: uniqueStrings([
-        ...configured.policy.sourceIds,
-        ...sourceIds,
-        configured.policy.environmentId,
-        mailboxThreadResolution.mailboxThreadId,
-      ]),
-      loopRefs: uniqueStrings([
-        configured.jobState.jobId,
-        configured.policy.policyId,
-        `watch_job:${configured.jobState.jobId}`,
-        `watch_policy:${configured.policy.policyId}`,
-        "workstation_context_feed:automation_policies",
-        "workstation_context_feed:route_evidence",
-        "workstation_actuator:configure_route_watch",
-      ]),
-      evidenceRefs: uniqueStrings([
-        configured.policy.policyId,
-        configured.jobState.jobId,
-        ...policyEvidenceRefs,
-        mailboxThreadResolution.mailboxThreadId,
-        ...configured.policy.evidenceRefs,
-      ]),
+      sourceRefs: resultSourceRefs,
+      loopRefs: resultLoopRefs,
+      evidenceRefs: resultEvidenceRefs,
       receiptRefs: [configured.policy.policyId],
       freshnessStatus: "fresh",
       staleAfterMs: 120_000,
@@ -7672,28 +7940,11 @@ export function executeLiveEnvironmentTool(
           session: goalSession,
           threadId: mailboxThreadResolution.mailboxThreadId,
           roomId,
-          sourceRefs: uniqueStrings([
-            ...configured.policy.sourceIds,
-            ...sourceIds,
-            configured.policy.environmentId,
-            mailboxThreadResolution.mailboxThreadId,
-          ]),
-          loopRefs: uniqueStrings([
-            configured.jobState.jobId,
-            configured.policy.policyId,
-            `watch_job:${configured.jobState.jobId}`,
-            `watch_policy:${configured.policy.policyId}`,
-            "workstation_context_feed:automation_policies",
-            "workstation_context_feed:route_evidence",
-            "workstation_actuator:configure_route_watch",
-          ]),
+          sourceRefs: resultSourceRefs,
+          loopRefs: resultLoopRefs,
           evidenceRefs: uniqueStrings([
             goalContextUpdateId,
-            configured.policy.policyId,
-            configured.jobState.jobId,
-            ...policyEvidenceRefs,
-            mailboxThreadResolution.mailboxThreadId,
-            ...configured.policy.evidenceRefs,
+            ...resultEvidenceRefs,
           ]).slice(0, 80),
           actionsTaken: ["configure_route_watch", input.tool_name],
           summary: "Configured route-watch automation for this goal session.",
@@ -7729,8 +7980,18 @@ export function executeLiveEnvironmentTool(
       required_actuator: "configure_route_watch",
       actuatorAllowed,
       actuator_allowed: actuatorAllowed,
+      matchedAllowedActuators,
+      matched_allowed_actuators: matchedAllowedActuators,
+      matchedAllowedActuatorRefs,
+      matched_allowed_actuator_refs: matchedAllowedActuatorRefs,
       agentGoalSession: checkpointedGoalSession,
       agent_goal_session: checkpointedGoalSession,
+      sourceRefs: resultSourceRefs,
+      source_refs: resultSourceRefs,
+      loopRefs: resultLoopRefs,
+      loop_refs: resultLoopRefs,
+      evidenceRefs: resultEvidenceRefs,
+      evidence_refs: resultEvidenceRefs,
       goalContextUpdateId,
       goal_context_update_id: goalContextUpdateId,
       post_tool_model_step_required: true,
@@ -7747,13 +8008,7 @@ export function executeLiveEnvironmentTool(
       ok: true,
       summary: `Configured live-source watch job policy ${configured.policy.policyId}; no mail was read.`,
       observation: result,
-      evidenceRefs: [
-        configured.policy.policyId,
-        configured.jobState.jobId,
-        ...policyEvidenceRefs,
-        mailboxThreadResolution.mailboxThreadId,
-        ...configured.policy.evidenceRefs,
-      ],
+      evidenceRefs: resultEvidenceRefs,
       producedRefs: [
         configured.policy.policyId,
         configured.jobState.jobId,
@@ -8897,8 +9152,16 @@ export function executeLiveEnvironmentTool(
           limit: 1,
         })[0] ?? null
       : null;
-    const feedAllowed = !goalId || goalSessionFeedAllowed(goalSession, "source_health");
-    const actuatorAllowed = !goalId || goalSessionActuatorAllowed(goalSession, "query_source_health");
+    const matchedContextFeeds = matchedGoalSessionContextFeeds(goalSession, "source_health");
+    const matchedContextFeedRefs = matchedContextFeeds.map((feed) => feed.feedId);
+    const matchedAllowedActuators = goalSessionActuatorAllowed(goalSession, "query_source_health")
+      ? ["query_source_health" as const]
+      : [];
+    const matchedAllowedActuatorRefs = matchedAllowedActuators.map((actuator) =>
+      `agent_goal_allowed_actuator:${actuator}`
+    );
+    const feedAllowed = !goalId || matchedContextFeeds.length > 0;
+    const actuatorAllowed = !goalId || matchedAllowedActuators.length > 0;
     const feedMissingRequirements = goalId
       ? goalSession
         ? [
@@ -8911,6 +9174,8 @@ export function executeLiveEnvironmentTool(
     const policyEvidenceRefs = uniqueStrings([
       "context_feed:source_health",
       "allowed_actuator:query_source_health",
+      ...matchedContextFeedRefs.map((feedRef) => `agent_goal_context_feed:${feedRef}`),
+      ...matchedAllowedActuatorRefs,
       ...feedMissingRequirements,
     ]);
     const result = readSituationSourceCapabilities({
@@ -8925,6 +9190,7 @@ export function executeLiveEnvironmentTool(
       roomId ?? null,
       sourceRefs,
       result.capabilities.map((capability) => capability.status),
+      matchedContextFeedRefs,
     ])}`;
     const resultSourceRefs = ok
       ? uniqueStrings(sourceRefs.length > 0 ? sourceRefs : [input.thread_id])
@@ -8939,9 +9205,12 @@ export function executeLiveEnvironmentTool(
     const resultEvidenceRefs = uniqueStrings([
       contentRef,
       ...policyEvidenceRefs,
+      ...matchedContextFeedRefs,
+      ...matchedAllowedActuatorRefs,
       ...(ok ? sourceRefs : [input.thread_id]),
+      ...resultLoopRefs,
     ]);
-    const freshnessStatus = ok ? (blockedCapabilities.length > 0 ? "blocked" : "fresh") : "blocked";
+    const freshnessStatus = ok ? (result.capabilities.length > 0 ? "fresh" : "unknown") : "blocked";
     const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
       threadId: input.thread_id,
       mailboxThreadId: input.thread_id,
@@ -9003,6 +9272,10 @@ export function executeLiveEnvironmentTool(
       feedAllowed,
       requiredActuator: "query_source_health",
       actuatorAllowed,
+      matchedContextFeeds,
+      matchedContextFeedRefs,
+      matchedAllowedActuators,
+      matchedAllowedActuatorRefs,
       agentGoalSession: checkpointedGoalSession,
       goalContextUpdateId,
       terminalAuthority: {
@@ -9046,6 +9319,14 @@ export function executeLiveEnvironmentTool(
         feed_allowed: feedAllowed,
         required_actuator: "query_source_health",
         actuator_allowed: actuatorAllowed,
+        matchedContextFeeds,
+        matched_context_feeds: matchedContextFeeds,
+        matchedContextFeedRefs,
+        matched_context_feed_refs: matchedContextFeedRefs,
+        matchedAllowedActuators,
+        matched_allowed_actuators: matchedAllowedActuators,
+        matchedAllowedActuatorRefs,
+        matched_allowed_actuator_refs: matchedAllowedActuatorRefs,
         agent_goal_session: checkpointedGoalSession,
         goal_context_update_id: goalContextUpdateId,
         capability_count: visibleResult.capabilities.length,
@@ -9343,6 +9624,241 @@ export function executeLiveEnvironmentTool(
       summary: `${input.tool_name} recorded ${event.event_id}.`,
       observation: event,
       evidenceRefs: [event.event_id, ...event.evidence_refs],
+    });
+  }
+
+  if (input.tool_name === "live_env.evaluate_goal_satisfaction") {
+    const goalId = readString(args.goal_id) ?? readString(args.goalId);
+    const suppliedEvidenceRefs = readStringArray(args.evidence_refs ?? args.evidenceRefs);
+    const suppliedMissingEvidence = readStringArray(args.missing_evidence ?? args.missingEvidence);
+    const goalSession = goalId
+      ? listStagePlayAgentGoalSessions({
+          threadId: input.thread_id,
+          goalId,
+          limit: 1,
+        })[0] ?? null
+      : null;
+    const sourceRef = readString(args.source_ref) ?? readString(args.sourceRef) ?? readString(args.source_id) ?? readString(args.sourceId);
+    const updates = listStagePlayGoalContextUpdates({
+      threadId: input.thread_id,
+      goalId,
+      sourceRef,
+      limit: readNumber(args.limit, 40),
+    });
+    const requiredEvidenceKinds = uniqueStrings([
+      ...(goalSession?.authority.finalReportRequirements.requiredEvidenceKinds ?? []),
+      ...readStringArray(args.required_evidence ?? args.requiredEvidence ?? args.required_evidence_kinds ?? args.requiredEvidenceKinds),
+    ]);
+    const candidateEvidenceRefs = uniqueStrings([
+      ...suppliedEvidenceRefs,
+      ...updates.map((update) => update.updateId),
+      ...updates.flatMap((update) => update.evidenceRefs),
+    ]);
+    const missingEvidenceKinds = uniqueStrings([
+      ...requiredEvidenceKinds.filter((kind) =>
+        !goalEvidenceKindSatisfied({
+          kind,
+          updates,
+          evidenceRefs: candidateEvidenceRefs,
+        })
+      ),
+      ...suppliedMissingEvidence,
+    ]);
+    const matchedAllowedActuators = goalSessionActuatorAllowed(goalSession, "evaluate_goal_satisfaction")
+      ? ["evaluate_goal_satisfaction" as const]
+      : [];
+    const matchedAllowedActuatorRefs = matchedAllowedActuators.map((actuator) =>
+      `agent_goal_allowed_actuator:${actuator}`
+    );
+    const actuatorAllowed = !goalId || matchedAllowedActuators.length > 0;
+    const missingRequirements = uniqueStrings([
+      ...(goalId && !goalSession ? ["goal_session"] : []),
+      ...(goalId && goalSession && !actuatorAllowed ? ["allowed_actuator:evaluate_goal_satisfaction"] : []),
+      ...missingEvidenceKinds.map((kind) => `evidence:${kind}`),
+    ]);
+    const policyEvidenceRefs = uniqueStrings([
+      "allowed_actuator:evaluate_goal_satisfaction",
+      ...matchedAllowedActuatorRefs,
+      ...missingRequirements.filter((requirement) => requirement.startsWith("allowed_actuator:")),
+    ]);
+    const resultSourceRefs = uniqueStrings([
+      sourceRef,
+      ...(goalSession?.sourceRefs ?? []),
+    ]);
+    const resultLoopRefs = uniqueStrings([
+      ...(goalSession?.loopRefs ?? []),
+      "workstation_actuator:evaluate_goal_satisfaction",
+    ]);
+    const satisfied = missingRequirements.length === 0 && (candidateEvidenceRefs.length > 0 || updates.length > 0);
+    const status = missingRequirements.includes("goal_session") || missingRequirements.includes("allowed_actuator:evaluate_goal_satisfaction")
+      ? "blocked"
+      : satisfied
+        ? "satisfied"
+        : "needs_more_evidence";
+    const resultId = `helix_goal_satisfaction:${hashShort([
+      input.thread_id,
+      goalId ?? "unscoped",
+      candidateEvidenceRefs,
+      missingRequirements,
+    ])}`;
+    const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+      threadId: input.thread_id,
+      mailboxThreadId: input.thread_id,
+      roomId,
+      producerKind: "reflection",
+      updateKind: satisfied ? "summary" : missingRequirements.length > 0 ? "error" : "reflection",
+      contentRef: resultId,
+      preview: satisfied
+        ? `Goal satisfaction evidence is sufficient for ${goalId ?? "the unscoped live-environment objective"}; terminal authority is still required for any final report.`
+        : `Goal satisfaction needs more evidence for ${goalId ?? "the unscoped live-environment objective"}: ${missingRequirements.join(", ") || "evidence refs"}.`,
+      sourceRefs: resultSourceRefs,
+      loopRefs: resultLoopRefs,
+      evidenceRefs: uniqueStrings([
+        resultId,
+        ...policyEvidenceRefs,
+        ...matchedAllowedActuatorRefs,
+        ...resultSourceRefs,
+        ...resultLoopRefs,
+        ...candidateEvidenceRefs,
+        ...(goalSession ? [goalSession.goalId] : []),
+        "terminal_authority_required",
+      ]),
+      receiptRefs: [resultId],
+      freshnessStatus: status === "blocked" ? "blocked" : satisfied ? "fresh" : "unknown",
+      goalId: goalId ?? null,
+      goalRelevanceReason: "Goal satisfaction evaluation summarizes current workstation evidence without terminalizing it.",
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: resultId },
+        ...(goalId ? [{ kind: "append_goal_context", goalId } as WorkstationDispatchActionV1] : []),
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+      ],
+    });
+    const checkpointedGoalSession = goalSession && actuatorAllowed
+      ? upsertStagePlayAgentGoalSession({
+          ...goalSession,
+          status: satisfied ? "satisfied" : goalSession.status,
+          loopRefs: resultLoopRefs,
+          checkpoints: [
+            ...goalSession.checkpoints,
+            {
+              checkpointId: `stage_play_goal_checkpoint:${hashShort([goalSession.goalId, resultId], 12)}`,
+              createdAtMs: Date.now(),
+              summary: satisfied
+                ? "Goal evidence is sufficient for final-report preparation; terminal authority remains required."
+                : `Goal evidence is incomplete: ${missingRequirements.join(", ") || "missing evidence"}.`,
+              evidenceRefs: uniqueStrings([
+                goalContextUpdateId,
+                resultId,
+                ...policyEvidenceRefs,
+                ...matchedAllowedActuatorRefs,
+                ...candidateEvidenceRefs,
+              ]).slice(0, 40),
+              actionsTaken: ["evaluate_goal_satisfaction", input.tool_name],
+              nextStep: satisfied ? "report" : "repair",
+            },
+          ].slice(-20),
+        })
+      : goalSession;
+    return makeObservation({
+      threadId: input.thread_id,
+      environmentId: input.environment_id,
+      toolName: input.tool_name,
+      ok: status !== "blocked",
+      summary: satisfied
+        ? "Goal satisfaction has enough evidence for final-report preparation; terminal authority is still required."
+        : status === "blocked"
+          ? `Goal satisfaction evaluation blocked: ${missingRequirements.join(", ")}.`
+          : "Goal satisfaction needs more evidence before final-report preparation.",
+      observation: {
+        schema: "helix.live_environment_goal_satisfaction.v1",
+        resultId,
+        result_id: resultId,
+        goalId: goalId ?? null,
+        goal_id: goalId ?? null,
+        status,
+        satisfied,
+        requiredEvidenceKinds,
+        required_evidence_kinds: requiredEvidenceKinds,
+        satisfiedEvidenceKinds: requiredEvidenceKinds.filter((kind) =>
+          goalEvidenceKindSatisfied({ kind, updates, evidenceRefs: candidateEvidenceRefs })
+        ),
+        satisfied_evidence_kinds: requiredEvidenceKinds.filter((kind) =>
+          goalEvidenceKindSatisfied({ kind, updates, evidenceRefs: candidateEvidenceRefs })
+        ),
+        missingEvidenceKinds,
+        missing_evidence_kinds: missingEvidenceKinds,
+        missingRequirements,
+        missing_requirements: missingRequirements,
+        policyEvidenceRefs,
+        policy_evidence_refs: policyEvidenceRefs,
+        candidateEvidenceRefs,
+        candidate_evidence_refs: candidateEvidenceRefs,
+        sourceRefs: resultSourceRefs,
+        source_refs: resultSourceRefs,
+        loopRefs: resultLoopRefs,
+        loop_refs: resultLoopRefs,
+        evidenceRefs: uniqueStrings([
+          resultId,
+          ...policyEvidenceRefs,
+          ...matchedAllowedActuatorRefs,
+          ...resultSourceRefs,
+          ...resultLoopRefs,
+          ...candidateEvidenceRefs,
+        ]),
+        evidence_refs: uniqueStrings([
+          resultId,
+          ...policyEvidenceRefs,
+          ...matchedAllowedActuatorRefs,
+          ...resultSourceRefs,
+          ...resultLoopRefs,
+          ...candidateEvidenceRefs,
+        ]),
+        goalContextUpdateId,
+        goal_context_update_id: goalContextUpdateId,
+        goalContextUpdateRefs: updates.map((update) => update.updateId),
+        goal_context_update_refs: updates.map((update) => update.updateId),
+        goalSessionFound: goalId ? Boolean(goalSession) : null,
+        goal_session_found: goalId ? Boolean(goalSession) : null,
+        requiredActuator: "evaluate_goal_satisfaction",
+        required_actuator: "evaluate_goal_satisfaction",
+        actuatorAllowed,
+        actuator_allowed: actuatorAllowed,
+        matchedAllowedActuators,
+        matched_allowed_actuators: matchedAllowedActuators,
+        matchedAllowedActuatorRefs,
+        matched_allowed_actuator_refs: matchedAllowedActuatorRefs,
+        agentGoalSession: checkpointedGoalSession,
+        agent_goal_session: checkpointedGoalSession,
+        terminalAuthority: {
+          status: "not_terminal",
+          finalAnswerEligible: false,
+          completedSolverPathRequired: true,
+          terminalAuthoritySingleWriterRequired: true,
+        },
+        terminal_authority: {
+          status: "not_terminal",
+          final_answer_eligible: false,
+          completed_solver_path_required: true,
+          terminal_authority_single_writer_required: true,
+        },
+        post_tool_model_step_required: true,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        context_role: "tool_evidence",
+        ask_context_policy: "evidence_only",
+      },
+      evidenceRefs: uniqueStrings([
+        goalContextUpdateId,
+        resultId,
+        ...policyEvidenceRefs,
+        ...matchedAllowedActuatorRefs,
+        ...resultSourceRefs,
+        ...resultLoopRefs,
+        ...candidateEvidenceRefs,
+      ]),
+      producedRefs: [goalContextUpdateId, resultId],
+      forceNormalizedRefs: true,
     });
   }
 

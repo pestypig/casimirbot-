@@ -13,6 +13,9 @@ import {
 const receiptFixture = (
   overrides: Partial<WorkstationControlReceiptV1> = {},
 ): WorkstationControlReceiptV1 => {
+  const fixtureRequiredActuator = overrides.requiredActuator ?? "change_preset";
+  const fixtureControlKind = overrides.controlKind ?? "change_preset";
+  const fixtureMatchedAllowedActuators = overrides.actuatorAllowed === false ? [] : [fixtureRequiredActuator];
   const agentGoalSession: AgentGoalSessionV1 = {
     schemaVersion: WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
     goalId: "goal:frog",
@@ -22,7 +25,7 @@ const receiptFixture = (
     userVisibleSummary: "Classifying frog imagery.",
     status: "active",
     sourceRefs: ["visual_source:image-lens", "source:visual:active"],
-    loopRefs: ["helix-ask:desktop", "workstation_control:change_preset", "workstation_actuator:change_preset"],
+    loopRefs: ["helix-ask:desktop", `workstation_control:${fixtureControlKind}`, `workstation_actuator:${fixtureRequiredActuator}`],
     constructRefs: ["stage-play-badge-graph", "live-answer-environment"],
     contextFeeds: [{
       feedId: "feed:visual-summaries",
@@ -30,7 +33,7 @@ const receiptFixture = (
       freshnessMs: 30_000,
       relevancePolicy: "same-source-or-goal-id",
     }],
-    allowedActuators: ["change_preset"],
+    allowedActuators: fixtureMatchedAllowedActuators.length > 0 ? fixtureMatchedAllowedActuators : [fixtureRequiredActuator],
     cadence: { kind: "user_turn_only" },
     stopConditions: ["user stops the goal", "visual source disconnects"],
     checkpoints: [{
@@ -50,6 +53,8 @@ const receiptFixture = (
   return {
   schema: WORKSTATION_CONTROL_RECEIPT_SCHEMA,
   receiptId: "stage_play_workstation_control_receipt:change_preset:frog",
+  requestedToolName: "visual_preset",
+  canonicalToolName: "live_env.set_visual_preset",
   controlKind: "change_preset",
   label: "change workstation preset",
   ok: true,
@@ -59,12 +64,15 @@ const receiptFixture = (
   goalSessionFound: true,
   requiredActuator: "change_preset",
   actuatorAllowed: true,
-  policyEvidenceRefs: ["allowed_actuator:change_preset"],
+  matchedAllowedActuators: ["change_preset"],
+  matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:change_preset"],
+  policyEvidenceRefs: ["allowed_actuator:change_preset", "agent_goal_allowed_actuator:change_preset"],
   sourceRefs: ["visual_source:image-lens", "source:visual:active"],
   loopRefs: ["helix-ask:desktop", "workstation_control:change_preset", "workstation_actuator:change_preset"],
   evidenceRefs: [
     "stage_play_workstation_control_receipt:change_preset:frog",
     "allowed_actuator:change_preset",
+    "agent_goal_allowed_actuator:change_preset",
     "visual_source:image-lens",
     "source:visual:active",
     "helix-ask:desktop",
@@ -139,12 +147,46 @@ describe("stage_play_workstation_control_receipt/v1", () => {
     ]));
   });
 
+  it("requires goal-session control receipts to expose exact matched actuator policy provenance", () => {
+    expect(validateWorkstationControlReceiptV1(receiptFixture({
+      matchedAllowedActuators: [],
+      matchedAllowedActuatorRefs: [],
+    }))).toEqual(expect.arrayContaining([
+      "actuatorAllowed=true for a goal session requires matchedAllowedActuators",
+    ]));
+
+    expect(validateWorkstationControlReceiptV1(receiptFixture({
+      matchedAllowedActuators: ["change_preset"],
+      matchedAllowedActuatorRefs: [],
+    }))).toEqual(expect.arrayContaining([
+      "matchedAllowedActuatorRefs must include every matched allowed actuator ref",
+    ]));
+
+    expect(validateWorkstationControlReceiptV1(receiptFixture({
+      policyEvidenceRefs: ["allowed_actuator:change_preset"],
+      evidenceRefs: [
+        "stage_play_workstation_control_receipt:change_preset:frog",
+        "allowed_actuator:change_preset",
+        "visual_source:image-lens",
+        "source:visual:active",
+        "helix-ask:desktop",
+        "workstation_control:change_preset",
+        "workstation_actuator:change_preset",
+      ],
+    }))).toEqual(expect.arrayContaining([
+      "policyEvidenceRefs must include every matchedAllowedActuatorRefs entry",
+      "evidenceRefs must include every matchedAllowedActuatorRefs entry",
+    ]));
+  });
+
   it("accepts blocked receipts only when mutating dispatches are suppressed", () => {
     const receipt = receiptFixture({
       ok: false,
       status: "blocked",
       missingRequirements: ["allowed_actuator:change_preset"],
       actuatorAllowed: false,
+      matchedAllowedActuators: [],
+      matchedAllowedActuatorRefs: [],
       dispatch: [
         { kind: "log_receipt", receiptRef: "stage_play_workstation_control_receipt:change_preset:frog" },
         { kind: "update_panel", panelId: "stage-play-badge-graph" },
@@ -162,6 +204,8 @@ describe("stage_play_workstation_control_receipt/v1", () => {
     expect(validateWorkstationControlReceiptV1(receiptFixture({
       actuatorAllowed: false,
       policyEvidenceRefs: ["goal:policy-context"],
+      matchedAllowedActuators: [],
+      matchedAllowedActuatorRefs: [],
       agentGoalSession: {
         goalId: "goal:wrong",
         threadId: "helix-ask:desktop",
@@ -209,12 +253,15 @@ describe("stage_play_workstation_control_receipt/v1", () => {
       controlKind: "focus_process_graph",
       label: "focus process graph",
       requiredActuator: "focus_process_graph",
-      policyEvidenceRefs: ["allowed_actuator:focus_process_graph"],
+      matchedAllowedActuators: ["focus_process_graph"],
+      matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:focus_process_graph"],
+      policyEvidenceRefs: ["allowed_actuator:focus_process_graph", "agent_goal_allowed_actuator:focus_process_graph"],
       sourceRefs: ["visual_source:image-lens", "packet:frog"],
       loopRefs: ["helix-ask:desktop", "workstation_control:focus_process_graph", "workstation_actuator:focus_process_graph"],
       evidenceRefs: [
         "stage_play_workstation_control_receipt:focus_process_graph:frog",
         "allowed_actuator:focus_process_graph",
+        "agent_goal_allowed_actuator:focus_process_graph",
         "visual_source:image-lens",
         "packet:frog",
         "helix-ask:desktop",
@@ -244,7 +291,9 @@ describe("stage_play_workstation_control_receipt/v1", () => {
       controlKind: "focus_process_graph",
       label: "focus process graph",
       requiredActuator: "focus_process_graph",
-      policyEvidenceRefs: ["allowed_actuator:focus_process_graph"],
+      matchedAllowedActuators: ["focus_process_graph"],
+      matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:focus_process_graph"],
+      policyEvidenceRefs: ["allowed_actuator:focus_process_graph", "agent_goal_allowed_actuator:focus_process_graph"],
       nodeRef: null,
     }))).toEqual(expect.arrayContaining([
       "prepared focus_process_graph receipts must include nodeRef",
@@ -257,7 +306,9 @@ describe("stage_play_workstation_control_receipt/v1", () => {
       controlKind: "bind_source",
       label: "bind workstation source",
       requiredActuator: "bind_source",
-      policyEvidenceRefs: ["allowed_actuator:bind_source"],
+      matchedAllowedActuators: ["bind_source"],
+      matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:bind_source"],
+      policyEvidenceRefs: ["allowed_actuator:bind_source", "agent_goal_allowed_actuator:bind_source"],
       sourceRefs: ["source:visual:active", "live-answer:visual"],
       sourceRef: "source:visual:active",
       targetRef: "live-answer:visual",
@@ -266,6 +317,7 @@ describe("stage_play_workstation_control_receipt/v1", () => {
       evidenceRefs: [
         "stage_play_workstation_control_receipt:bind_source:frog",
         "allowed_actuator:bind_source",
+        "agent_goal_allowed_actuator:bind_source",
         "source:visual:active",
         "live-answer:visual",
         "helix-ask:desktop",
@@ -292,7 +344,9 @@ describe("stage_play_workstation_control_receipt/v1", () => {
       controlKind: "bind_source",
       label: "bind workstation source",
       requiredActuator: "bind_source",
-      policyEvidenceRefs: ["allowed_actuator:bind_source"],
+      matchedAllowedActuators: ["bind_source"],
+      matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:bind_source"],
+      policyEvidenceRefs: ["allowed_actuator:bind_source", "agent_goal_allowed_actuator:bind_source"],
       sourceRef: "source:visual:active",
       targetRef: null,
       presetId: null,
@@ -304,7 +358,9 @@ describe("stage_play_workstation_control_receipt/v1", () => {
       controlKind: "set_loop_state",
       label: "set workstation loop state",
       requiredActuator: "pause_loop",
-      policyEvidenceRefs: ["allowed_actuator:pause_loop"],
+      matchedAllowedActuators: ["pause_loop"],
+      matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:pause_loop"],
+      policyEvidenceRefs: ["allowed_actuator:pause_loop", "agent_goal_allowed_actuator:pause_loop"],
       targetRef: null,
       presetId: null,
       loopRef: null,

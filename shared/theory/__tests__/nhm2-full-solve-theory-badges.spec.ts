@@ -15,6 +15,8 @@ describe("NHM2 full-solve theory badges", () => {
     "nhm2.dynamic.frequency_convergence",
     "nhm2.dynamic.effective_geometry_agreement",
     "nhm2.dynamic.time_dependent_source_campaign",
+    "nhm2.metric_required.momentum_remediation_targets",
+    "nhm2.campaign.frontier_disposition",
     "nhm2.energy_condition.observer_robust_gate",
     "nhm2.qei.worldline_dossier",
     "casimir.material.lifshitz_receipt",
@@ -58,6 +60,8 @@ describe("NHM2 full-solve theory badges", () => {
     expect(ids).toContain("nhm2.dynamic.frequency_convergence");
     expect(ids).toContain("nhm2.dynamic.effective_geometry_agreement");
     expect(ids).toContain("nhm2.dynamic.time_dependent_source_campaign");
+    expect(ids).toContain("nhm2.metric_required.momentum_remediation_targets");
+    expect(ids).toContain("nhm2.campaign.frontier_disposition");
     expect(ids).toContain("nhm2.energy_condition.wec_nec_sec_dec_family");
     expect(ids).toContain("nhm2.energy_condition.observer_robust_gate");
     expect(ids).toContain("nhm2.qei.worldline_sampling_requirement");
@@ -159,6 +163,21 @@ describe("NHM2 full-solve theory badges", () => {
           relation: "requires",
         }),
         expect.objectContaining({
+          from: "nhm2.metric_required.momentum_demand_audit",
+          to: "nhm2.metric_required.momentum_remediation_targets",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.metric_required.momentum_remediation_targets",
+          to: "nhm2.campaign.frontier_disposition",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "nhm2.campaign.frontier_disposition",
+          to: "nhm2.dynamic.time_dependent_source_campaign",
+          relation: "documents",
+        }),
+        expect.objectContaining({
           from: "nhm2.dynamic.time_dependent_source_campaign",
           to: "nhm2.claim_boundary.diagnostic_only",
           relation: "blocks",
@@ -179,6 +198,8 @@ describe("NHM2 full-solve theory badges", () => {
       "nhm2.dynamic.frequency_convergence",
       "nhm2.dynamic.effective_geometry_agreement",
       "nhm2.dynamic.time_dependent_source_campaign",
+      "nhm2.metric_required.momentum_remediation_targets",
+      "nhm2.campaign.frontier_disposition",
       "nhm2.energy_condition.observer_robust_gate",
       "nhm2.qei.worldline_dossier",
       "nhm2.natario.invariant_audit",
@@ -264,6 +285,8 @@ describe("NHM2 full-solve theory badges", () => {
         "nhm2.dynamic.frequency_convergence",
         "nhm2.dynamic.effective_geometry_agreement",
         "nhm2.dynamic.time_dependent_source_campaign",
+        "nhm2.metric_required.momentum_remediation_targets",
+        "nhm2.campaign.frontier_disposition",
         "nhm2.qei.worldline_dossier",
         "nhm2.natario.curvature_invariants",
         "nhm2.natario.invariant_audit",
@@ -303,6 +326,8 @@ describe("NHM2 full-solve theory badges", () => {
       "nhm2.source.same_basis_tensor_authority",
       "nhm2.closure.coupled_pass_candidate",
       "nhm2.closure.regional_tensor_pass_path_harness",
+      "nhm2.metric_required.momentum_remediation_targets",
+      "nhm2.campaign.frontier_disposition",
       "nhm2.energy_condition.observer_robust_gate",
       "nhm2.qei.worldline_dossier",
       "nhm2.natario.invariant_audit",
@@ -393,6 +418,16 @@ describe("NHM2 full-solve theory badges", () => {
         expect.objectContaining({
           from: "nhm2.closure.regional_tensor_pass_path_harness",
           to: "nhm2.claim_boundary.diagnostic_only",
+        }),
+        expect.objectContaining({
+          from: "nhm2.metric_required.momentum_remediation_targets",
+          to: "nhm2.campaign.frontier_disposition",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "nhm2.campaign.frontier_disposition",
+          to: "nhm2.dynamic.time_dependent_source_campaign",
+          relation: "documents",
         }),
         expect.objectContaining({
           from: "casimir.material.lifshitz_receipt",

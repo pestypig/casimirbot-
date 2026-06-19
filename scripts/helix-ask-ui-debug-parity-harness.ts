@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { chromium, type Page } from "@playwright/test";
 import {
@@ -13,7 +14,7 @@ import {
   CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS,
 } from "../server/services/helix-ask/codex-parity-agent-spine-contract";
 
-type HarnessPrompt = {
+export type HarnessPrompt = {
   prompt: string;
   expectCoverage?: boolean;
   expectCalculatorPanel?: boolean;
@@ -23,25 +24,112 @@ type HarnessResult = {
   prompt: string;
   visible_final_answer: string;
   debug_export: Record<string, unknown> | null;
+  api_response?: Record<string, unknown> | null;
+  api_debug_export?: Record<string, unknown> | null;
+  ui_api_terminal_parity_violations?: string[];
   terminal_authority: unknown;
   codex_parity_agent_spine_rail_table: unknown;
   goal_satisfaction: unknown;
   agent_runtime_loop: unknown;
   coverage_artifacts: unknown[];
   calculator_panel_state: Record<string, unknown> | null;
+  server_bundle_freshness?: Record<string, unknown>;
+  warnings: string[];
   violations: string[];
 };
 
+type LocalRestartSensitiveRuntimeChanges = {
+  latestMtimeMs: number | null;
+  files: string[];
+};
+
 const BASE_URL = process.env.HELIX_ASK_UI_URL ?? process.env.PLAYWRIGHT_TEST_BASE_URL ?? "http://localhost:5050/desktop";
+const API_BASE_URL = (
+  process.env.HELIX_ASK_BASE_URL ??
+  (() => {
+    try {
+      return new URL(BASE_URL).origin;
+    } catch {
+      return "http://localhost:5050";
+    }
+  })()
+).replace(/\/+$/, "");
 const OUT_PATH =
   process.env.HELIX_ASK_UI_DEBUG_PARITY_OUT ??
   path.resolve(process.cwd(), "artifacts/helix-ask/ui-debug-parity-latest.json");
+const COMPARE_API = process.env.HELIX_ASK_UI_DEBUG_PARITY_COMPARE_API === "1";
+const API_SESSION_ID = process.env.HELIX_ASK_UI_DEBUG_PARITY_API_SESSION_ID?.trim() || "";
+const API_TIMEOUT_MS = Math.max(1000, Number(process.env.HELIX_ASK_UI_DEBUG_PARITY_API_TIMEOUT_MS ?? 180_000));
+const PROMPT_PRESET = process.env.HELIX_ASK_UI_DEBUG_PARITY_PRESET?.trim() || "default";
+const REQUIRE_GOAL_PROOF = process.env.HELIX_ASK_REQUIRE_GOAL_PROOF === "1";
 
-const DEFAULT_PROMPTS: HarnessPrompt[] = [
+export const HELIX_ASK_NATURAL_CALCULATOR_PROMPT =
+  "Open the scientific calculator, solve 2*(3+4), and explain the steps.";
+export const HELIX_ASK_EXPLICIT_CALCULATOR_PROMPT =
+  "Call scientific-calculator.solve_expression for 2*(3+4) and return the calculator-backed result.";
+export const HELIX_ASK_TOOL_CATALOG_PROMPT = "What tools are available for Helix Ask to use right now?";
+export const HELIX_ASK_DOCS_LOCATE_PROMPT =
+  "Use docs-viewer.locate_in_doc to find where the Helix Ask Codex loop discipline says receipts are observations.";
+export const HELIX_ASK_VISUAL_CONTEXT_PROMPT = "What is happening right now in the visual screen capture?";
+
+export const DEFAULT_PROMPTS: HarnessPrompt[] = [
   { prompt: "Open docs panel." },
   { prompt: "What doc are we looking at right now?" },
-  { prompt: "Use calculator solve x^2-9=0.", expectCoverage: true, expectCalculatorPanel: true },
+  { prompt: HELIX_ASK_NATURAL_CALCULATOR_PROMPT, expectCoverage: true, expectCalculatorPanel: true },
 ];
+
+export const BROAD_PARITY_PROMPTS: HarnessPrompt[] = [
+  { prompt: HELIX_ASK_TOOL_CATALOG_PROMPT },
+  { prompt: "Open docs panel." },
+  { prompt: HELIX_ASK_DOCS_LOCATE_PROMPT },
+  { prompt: HELIX_ASK_NATURAL_CALCULATOR_PROMPT, expectCoverage: true, expectCalculatorPanel: true },
+  { prompt: HELIX_ASK_EXPLICIT_CALCULATOR_PROMPT, expectCoverage: true, expectCalculatorPanel: true },
+  { prompt: "Use workspace_os.status to inspect workstation status." },
+  { prompt: HELIX_ASK_VISUAL_CONTEXT_PROMPT },
+  { prompt: "Do not open the docs viewer; just explain what the docs viewer is for." },
+];
+
+export const resolveUiDebugParityPromptPreset = (preset = PROMPT_PRESET): HarnessPrompt[] => {
+  const normalized = preset.trim().toLowerCase();
+  if (normalized === "broad" || normalized === "full" || normalized === "goal") return BROAD_PARITY_PROMPTS;
+  return DEFAULT_PROMPTS;
+};
+
+const normalizeHarnessPrompt = (value: unknown): HarnessPrompt | null => {
+  if (typeof value === "string") {
+    const prompt = value.trim();
+    return prompt ? { prompt } : null;
+  }
+  const record = asRecord(value);
+  const prompt = readString(record?.prompt);
+  if (!prompt) return null;
+  return {
+    prompt,
+    expectCoverage: record?.expectCoverage === true,
+    expectCalculatorPanel: record?.expectCalculatorPanel === true,
+  };
+};
+
+export const resolveUiDebugParityPrompts = (
+  raw = process.env.HELIX_ASK_UI_DEBUG_PARITY_PROMPTS ?? "",
+  preset = PROMPT_PRESET,
+): HarnessPrompt[] => {
+  const trimmed = raw.trim();
+  if (!trimmed) return resolveUiDebugParityPromptPreset(preset);
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    const values = Array.isArray(parsed) ? parsed : [parsed];
+    const prompts = values.map(normalizeHarnessPrompt).filter((entry): entry is HarnessPrompt => Boolean(entry));
+    if (prompts.length > 0) return prompts;
+  } catch {
+    // Fall through to the lightweight delimiter format below.
+  }
+  const prompts = trimmed
+    .split(/\n|\|{3,}/)
+    .map((entry) => normalizeHarnessPrompt(entry))
+    .filter((entry): entry is HarnessPrompt => Boolean(entry));
+  return prompts.length > 0 ? prompts : resolveUiDebugParityPromptPreset(preset);
+};
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
@@ -58,11 +146,380 @@ const isNonEmptyStringArray = (value: unknown): value is string[] =>
 const readNonNegativeInteger = (value: unknown): number | null =>
   typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
 
+const normalizeRepoPath = (value: string): string => value.replace(/\\/g, "/").replace(/^\.\/+/, "");
+
+const isRestartSensitiveRuntimeFile = (filePath: string): boolean => {
+  const normalized = normalizeRepoPath(filePath);
+  return (
+    normalized === "server/routes/agi.plan.ts" ||
+    (normalized.startsWith("server/services/helix-ask/") &&
+      !normalized.includes("/__tests__/") &&
+      !normalized.endsWith(".test.ts") &&
+      !normalized.endsWith(".spec.ts")) ||
+    normalized === "shared/helix-live-agent-step.ts"
+  );
+};
+
+const gitChangedRuntimeFiles = (): string[] => {
+  const result = spawnSync("git", ["diff", "--name-only"], {
+    encoding: "utf8",
+    windowsHide: true,
+  });
+  if (result.status !== 0) return [];
+  return result.stdout
+    .split(/\r?\n/)
+    .map((entry) => normalizeRepoPath(entry.trim()))
+    .filter(Boolean)
+    .filter(isRestartSensitiveRuntimeFile);
+};
+
+const collectLocalRestartSensitiveRuntimeChanges = (): LocalRestartSensitiveRuntimeChanges => {
+  const files = gitChangedRuntimeFiles();
+  const mtimes: number[] = [];
+  for (const file of files) {
+    try {
+      mtimes.push(Math.floor(fs.statSync(file).mtimeMs));
+    } catch {
+      mtimes.push(Date.now());
+    }
+  }
+  return {
+    latestMtimeMs: mtimes.length ? Math.max(...mtimes) : null,
+    files,
+  };
+};
+
+export const uiServerBundleFreshnessWarnings = (input: {
+  serverBuildStartedAtMs: number | null;
+  latestLocalRuntimeChangeMs: number | null;
+  changedRuntimeFiles?: string[];
+}): string[] => {
+  if (!input.serverBuildStartedAtMs || !input.latestLocalRuntimeChangeMs) return [];
+  if (input.serverBuildStartedAtMs + 1000 >= input.latestLocalRuntimeChangeMs) return [];
+  const changedCount = input.changedRuntimeFiles?.length ?? 0;
+  return [
+    `server_bundle_predates_local_runtime_changes:${input.serverBuildStartedAtMs}<${input.latestLocalRuntimeChangeMs}:changed_files=${changedCount}`,
+  ];
+};
+
+export const summarizeUiDebugParityWarnings = (
+  results: Array<Record<string, unknown>>,
+): {
+  warning_count: number;
+  stale_server_bundle_count: number;
+  untrusted_violation_count: number;
+  capacity_or_admission_stress_count: number;
+} => {
+  const warnings = results.flatMap((result) =>
+    Array.isArray(result.warnings) ? result.warnings.map((warning) => String(warning)) : [],
+  );
+  return {
+    warning_count: warnings.length,
+    stale_server_bundle_count: warnings.filter((warning) =>
+      /^server_bundle_predates_local_runtime_changes:/i.test(warning),
+    ).length,
+    untrusted_violation_count: warnings.filter((warning) =>
+      /^untrusted_violation_due_to_stale_server_bundle:/i.test(warning),
+    ).length,
+    capacity_or_admission_stress_count: warnings.filter((warning) =>
+      /^capacity_or_admission_stress:/i.test(warning),
+    ).length,
+  };
+};
+
+export const uiDebugParityGoalProofTrust = (warningSummary: {
+  stale_server_bundle_count?: number;
+  untrusted_violation_count?: number;
+  capacity_or_admission_stress_count?: number;
+}, executedResultCount = 0): {
+  trusted_for_goal_acceptance: boolean;
+  requires_keyed_server_restart: boolean;
+  capacity_or_admission_limited: boolean;
+  executed_result_count: number;
+} => {
+  const staleCount = warningSummary.stale_server_bundle_count ?? 0;
+  const untrustedCount = warningSummary.untrusted_violation_count ?? 0;
+  const capacityCount = warningSummary.capacity_or_admission_stress_count ?? 0;
+  return {
+    trusted_for_goal_acceptance: executedResultCount > 0 && staleCount === 0 && untrustedCount === 0 && capacityCount === 0,
+    requires_keyed_server_restart: staleCount > 0 || untrustedCount > 0,
+    capacity_or_admission_limited: capacityCount > 0,
+    executed_result_count: executedResultCount,
+  };
+};
+
+export const uiDebugParityProcessExitCode = (
+  summaryOk: boolean,
+  requireGoalProof: boolean,
+  goalProofTrust: { trusted_for_goal_acceptance?: boolean },
+): 0 | 1 => {
+  if (!summaryOk) return 1;
+  if (requireGoalProof && goalProofTrust.trusted_for_goal_acceptance !== true) return 1;
+  return 0;
+};
+
+const resultHasWarning = (result: Record<string, unknown> | null, pattern: RegExp): boolean =>
+  Array.isArray(result?.warnings) && result.warnings.some((warning) => pattern.test(String(warning)));
+
+const resultHasStaleServerBundleWarning = (result: Record<string, unknown> | null): boolean =>
+  resultHasWarning(result, /^server_bundle_predates_local_runtime_changes:/i);
+
+const resultHasCapacityAdmissionWarning = (result: Record<string, unknown> | null): boolean =>
+  resultHasWarning(result, /^capacity_or_admission_stress:/i);
+
+const uiHarnessResultByPrompt = (results: Array<Record<string, unknown>>, prompt: string): Record<string, unknown> | null =>
+  results.find((result) => readString(result.prompt) === prompt) ?? null;
+
+const uiHarnessRailTable = (result: Record<string, unknown> | null): Record<string, unknown> | null =>
+  asRecord(result?.codex_parity_agent_spine_rail_table);
+
+const uiHarnessTerminalKind = (result: Record<string, unknown> | null, rail: Record<string, unknown> | null): string =>
+  firstNonEmptyString(
+    rail?.selected_terminal_kind,
+    rail?.visible_terminal_kind,
+    getPath(result, ["debug_export", "terminal_artifact_kind"]),
+  );
+
+const uiHarnessTerminalError = (result: Record<string, unknown> | null): string =>
+  firstNonEmptyString(
+    getPath(result, ["debug_export", "terminal_error_code"]),
+    getPath(result, ["debug_export", "payload", "terminal_error_code"]),
+  );
+
+const uiHarnessVisibleAnswer = (result: Record<string, unknown> | null): string =>
+  readString(result?.visible_final_answer);
+
+const uiHarnessMentionsCalculatorResult14 = (result: Record<string, unknown> | null): boolean =>
+  /\b(?:result|answer|equals?|is|=)\s*:?\s*14(?:\b|$)/i.test(uiHarnessVisibleAnswer(result));
+
+export const summarizeUiDebugParityGoalAcceptance = (
+  results: Array<Record<string, unknown>>,
+): {
+  ok: boolean;
+  calculator_pair_selected: boolean;
+  calculator_pair_skipped_reason: string | null;
+  calculator_pair_failures: string[];
+  docs_locate_selected: boolean;
+  docs_locate_skipped_reason: string | null;
+  docs_locate_failures: string[];
+  visual_context_selected: boolean;
+  visual_context_skipped_reason: string | null;
+  visual_context_failures: string[];
+} => {
+  const natural = uiHarnessResultByPrompt(results, HELIX_ASK_NATURAL_CALCULATOR_PROMPT);
+  const explicit = uiHarnessResultByPrompt(results, HELIX_ASK_EXPLICIT_CALCULATOR_PROMPT);
+  const calculatorPair = (() => {
+    if (!natural && !explicit) {
+      return {
+        selected: false,
+        skippedReason: "calculator_pair_not_selected",
+        failures: [] as string[],
+      };
+    }
+    if (!natural || !explicit) {
+      return {
+        selected: false,
+        skippedReason: natural ? "explicit_calculator_prompt_not_selected" : "natural_calculator_prompt_not_selected",
+        failures: [] as string[],
+      };
+    }
+    if (resultHasStaleServerBundleWarning(natural) || resultHasStaleServerBundleWarning(explicit)) {
+      return {
+        selected: true,
+        skippedReason: "stale_server_bundle",
+        failures: [] as string[],
+      };
+    }
+    if (resultHasCapacityAdmissionWarning(natural) || resultHasCapacityAdmissionWarning(explicit)) {
+      return {
+        selected: true,
+        skippedReason: "capacity_or_admission_stress",
+        failures: [] as string[],
+      };
+    }
+
+    const failures: string[] = [];
+    const naturalRail = uiHarnessRailTable(natural);
+    const explicitRail = uiHarnessRailTable(explicit);
+    for (const field of ["executed_capability", "observation_kind"] as const) {
+      const naturalValue = readString(naturalRail?.[field]);
+      const explicitValue = readString(explicitRail?.[field]);
+      if (!naturalValue || !explicitValue) {
+        failures.push(`ui_calculator_natural_explicit_${field}_missing`);
+      } else if (naturalValue !== explicitValue) {
+        failures.push(`ui_calculator_natural_explicit_${field}_mismatch:${naturalValue}!=${explicitValue}`);
+      }
+    }
+
+    const naturalTerminalKind = uiHarnessTerminalKind(natural, naturalRail);
+    const explicitTerminalKind = uiHarnessTerminalKind(explicit, explicitRail);
+    if (!naturalTerminalKind || !explicitTerminalKind) {
+      failures.push("ui_calculator_natural_explicit_terminal_kind_missing");
+    } else if (naturalTerminalKind !== explicitTerminalKind) {
+      failures.push(`ui_calculator_natural_explicit_terminal_kind_mismatch:${naturalTerminalKind}!=${explicitTerminalKind}`);
+    }
+
+    if (!uiHarnessMentionsCalculatorResult14(natural)) {
+      failures.push("ui_calculator_natural_expected_result_14_missing");
+    }
+    if (!uiHarnessMentionsCalculatorResult14(explicit)) {
+      failures.push("ui_calculator_explicit_expected_result_14_missing");
+    }
+
+    return { selected: true, skippedReason: null, failures };
+  })();
+
+  const docsLocate = (() => {
+    const result = uiHarnessResultByPrompt(results, HELIX_ASK_DOCS_LOCATE_PROMPT);
+    if (!result) return { selected: false, skippedReason: "docs_locate_prompt_not_selected", failures: [] as string[] };
+    if (resultHasStaleServerBundleWarning(result)) return { selected: true, skippedReason: "stale_server_bundle", failures: [] as string[] };
+    if (resultHasCapacityAdmissionWarning(result)) {
+      return { selected: true, skippedReason: "capacity_or_admission_stress", failures: [] as string[] };
+    }
+
+    const failures: string[] = [];
+    const rail = uiHarnessRailTable(result);
+    const terminalKind = uiHarnessTerminalKind(result, rail);
+    const terminalError = uiHarnessTerminalError(result);
+    const visibleAnswer = uiHarnessVisibleAnswer(result);
+    const railStatus = readString(rail?.rail_status);
+    const codexParityClass = readString(rail?.codex_parity_class);
+    const railFailureCode = readString(rail?.rail_failure_code);
+    const firstBrokenRail = readString(rail?.first_broken_rail);
+    const observationKind = readString(rail?.observation_kind);
+    if (terminalError === "terminal_projection_mismatch" || /terminal authority and visible projection selected different artifacts/i.test(visibleAnswer)) {
+      failures.push("ui_docs_locate_terminal_projection_mismatch");
+    }
+    if (railStatus === "fail_closed" || codexParityClass === "broken") {
+      if (!firstBrokenRail) failures.push("ui_docs_locate_fail_closed_first_broken_rail_missing");
+      if (!railFailureCode) failures.push("ui_docs_locate_fail_closed_failure_code_missing");
+      if (railFailureCode === "terminal_projection_mismatch") {
+        failures.push("ui_docs_locate_fail_closed_as_terminal_projection_mismatch");
+      }
+      return { selected: true, skippedReason: null, failures };
+    }
+
+    if (railStatus === "complete" || codexParityClass === "complete") {
+      if (terminalKind === "typed_failure") failures.push("ui_docs_locate_complete_typed_failure_terminal");
+      if (rail?.observed_artifact_supports_requested_capability !== true) {
+        failures.push("ui_docs_locate_complete_without_requested_observation_support");
+      }
+      if (!/doc_(?:location|evidence)/i.test([terminalKind, observationKind].join("\n"))) {
+        failures.push(`ui_docs_locate_unexpected_terminal_or_observation:${terminalKind || "missing"}/${observationKind || "missing"}`);
+      }
+      return { selected: true, skippedReason: null, failures };
+    }
+
+    failures.push(`ui_docs_locate_no_complete_or_fail_closed_rail:${railStatus || codexParityClass || "missing"}`);
+    return { selected: true, skippedReason: null, failures };
+  })();
+
+  const visualContext = (() => {
+    const result = uiHarnessResultByPrompt(results, HELIX_ASK_VISUAL_CONTEXT_PROMPT);
+    if (!result) return { selected: false, skippedReason: "visual_context_prompt_not_selected", failures: [] as string[] };
+    if (resultHasStaleServerBundleWarning(result)) return { selected: true, skippedReason: "stale_server_bundle", failures: [] as string[] };
+    if (resultHasCapacityAdmissionWarning(result)) {
+      return { selected: true, skippedReason: "capacity_or_admission_stress", failures: [] as string[] };
+    }
+
+    const failures: string[] = [];
+    const rail = uiHarnessRailTable(result);
+    const terminalKind = uiHarnessTerminalKind(result, rail);
+    const terminalError = uiHarnessTerminalError(result);
+    const haystack = [
+      terminalKind,
+      terminalError,
+      uiHarnessVisibleAnswer(result),
+      readString(rail?.observation_kind),
+      readString(rail?.rail_failure_code),
+    ].join("\n");
+    const hasVisualAnswerArtifact =
+      /\b(?:situation_context_pack|visual_frame_evidence|visual_analysis_turn_item|live_visual_answer|field_evaluation|situation_run)\b/i.test(
+        haystack,
+      );
+    const identifiesMissingVisualContext =
+      /\b(?:visual_evidence_missing|missing_visual_observation|visual evidence (?:is )?(?:missing|not ready|unavailable)|browser\/UI visual source context was not available|visual source (?:context )?(?:is )?(?:missing|not available|unavailable|not ready)|need an active visual SituationRun|field evaluations? (?:are )?missing|source context (?:is )?(?:missing|not available|unavailable))\b/i.test(
+        haystack,
+      );
+    const forbiddenTerminal =
+      /^(?:direct_answer_text|model_synthesized_answer|model_only_concept|no_tool_direct|live_pipeline_receipt|client_projection|process_graph_overview)$/i.test(
+        terminalKind,
+      );
+    if (!hasVisualAnswerArtifact && !identifiesMissingVisualContext) {
+      failures.push("ui_visual_prompt_missing_source_context_not_identified");
+    }
+    if (forbiddenTerminal && !identifiesMissingVisualContext) {
+      failures.push(`ui_visual_prompt_terminalized_without_visual_source_context:${terminalKind}`);
+    }
+    return { selected: true, skippedReason: null, failures };
+  })();
+
+  const allFailures = [...calculatorPair.failures, ...docsLocate.failures, ...visualContext.failures];
+
+  return {
+    ok: allFailures.length === 0,
+    calculator_pair_selected: calculatorPair.selected,
+    calculator_pair_skipped_reason: calculatorPair.skippedReason,
+    calculator_pair_failures: calculatorPair.failures,
+    docs_locate_selected: docsLocate.selected,
+    docs_locate_skipped_reason: docsLocate.skippedReason,
+    docs_locate_failures: docsLocate.failures,
+    visual_context_selected: visualContext.selected,
+    visual_context_skipped_reason: visualContext.skippedReason,
+    visual_context_failures: visualContext.failures,
+  };
+};
+
 const getPath = (value: unknown, pathParts: string[]): unknown =>
   pathParts.reduce<unknown>((current, key) => {
     if (!current || typeof current !== "object") return undefined;
     return (current as Record<string, unknown>)[key];
   }, value);
+
+const normalizeParityText = (value: string): string =>
+  value.replace(/\r\n?/g, "\n").replace(/[ \t]+/g, " ").trim();
+
+const firstNonEmptyString = (...values: unknown[]): string => {
+  for (const value of values) {
+    const text = readString(value);
+    if (text) return text;
+  }
+  return "";
+};
+
+export const buildUiApiParitySessionId = (input: {
+  configuredSessionId?: string | null;
+  prompt: string;
+  turnId?: string | null;
+  index?: number;
+}): string => {
+  const configured = input.configuredSessionId?.trim();
+  if (configured) return configured;
+  const stablePrompt = input.prompt.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 64);
+  const turn = input.turnId?.trim().replace(/[^a-zA-Z0-9:_-]+/g, "-").slice(0, 80);
+  const suffix = turn || stablePrompt || `prompt-${input.index ?? 0}`;
+  return `helix-ask:ui-api-parity:${suffix}`;
+};
+
+const fetchJson = async <T>(url: string, init?: RequestInit): Promise<T> => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+    });
+    const text = await response.text();
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}: ${text.slice(0, 800)}`);
+    return JSON.parse(text) as T;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
 
 const collectCoverageArtifacts = (debugExport: Record<string, unknown> | null): unknown[] => {
   if (!debugExport) return [];
@@ -92,6 +549,145 @@ export const collectUiDebugRailCandidates = (
 
 const findRailTable = (debugExport: Record<string, unknown> | null): Record<string, unknown> | null =>
   collectUiDebugRailCandidates(debugExport)[0] ?? null;
+
+const readTerminalArtifactKind = (
+  response: Record<string, unknown> | null,
+  debugExport: Record<string, unknown> | null,
+): string =>
+  firstNonEmptyString(
+    response?.terminal_artifact_kind,
+    getPath(response, ["terminal_answer_authority", "terminal_artifact_kind"]),
+    debugExport?.terminal_artifact_kind,
+    getPath(debugExport, ["terminal_answer_authority", "terminal_artifact_kind"]),
+    getPath(debugExport, ["payload", "terminal_artifact_kind"]),
+    getPath(debugExport, ["payload", "terminal_answer_authority", "terminal_artifact_kind"]),
+    getPath(debugExport, ["resolved_turn_summary", "terminal_artifact_kind"]),
+  );
+
+const readTerminalErrorCode = (
+  response: Record<string, unknown> | null,
+  debugExport: Record<string, unknown> | null,
+): string =>
+  firstNonEmptyString(
+    response?.terminal_error_code,
+    debugExport?.terminal_error_code,
+    getPath(debugExport, ["payload", "terminal_error_code"]),
+    getPath(debugExport, ["resolved_turn_summary", "terminal_error_code"]),
+  );
+
+const readVisibleFinalText = (
+  response: Record<string, unknown> | null,
+  debugExport: Record<string, unknown> | null,
+): string =>
+  firstNonEmptyString(
+    getPath(debugExport, ["ui_debug_parity_harness", "visible_final_answer"]),
+    response?.selected_final_answer,
+    debugExport?.selected_final_answer,
+    getPath(response, ["terminal_answer_authority", "terminal_text_preview"]),
+    getPath(debugExport, ["terminal_answer_authority", "terminal_text_preview"]),
+    response?.answer,
+    response?.text,
+    response?.content,
+  );
+
+const readTurnId = (response: Record<string, unknown> | null, debugExport: Record<string, unknown> | null): string =>
+  firstNonEmptyString(
+    response?.turn_id,
+    response?.active_turn_id,
+    debugExport?.turn_id,
+    debugExport?.active_turn_id,
+    getPath(debugExport, ["payload", "turn_id"]),
+    getPath(debugExport, ["payload", "active_turn_id"]),
+  );
+
+const readServerBuildStartedAtMs = (
+  response: Record<string, unknown> | null,
+  debugExport: Record<string, unknown> | null,
+): number | null =>
+  readNonNegativeInteger(response?.server_build_started_at_ms) ??
+  readNonNegativeInteger(debugExport?.server_build_started_at_ms) ??
+  readNonNegativeInteger(getPath(debugExport, ["payload", "server_build_started_at_ms"])) ??
+  readNonNegativeInteger(getPath(debugExport, ["debug", "server_build_started_at_ms"])) ??
+  readNonNegativeInteger(getPath(debugExport, ["payload", "debug", "server_build_started_at_ms"]));
+
+const readPrompt = (response: Record<string, unknown> | null, debugExport: Record<string, unknown> | null): string =>
+  firstNonEmptyString(
+    response?.question,
+    response?.prompt,
+    response?.active_prompt,
+    debugExport?.active_prompt,
+    getPath(debugExport, ["payload", "active_prompt"]),
+    getPath(debugExport, ["payload", "selectedDebugQuestion"]),
+  );
+
+export const collectUiApiTerminalParityViolations = (input: {
+  uiDebugExport: Record<string, unknown> | null;
+  apiResponse: Record<string, unknown> | null;
+  apiDebugExport?: Record<string, unknown> | null;
+  uiVisibleFinalAnswer?: string;
+  requireSameTurnText?: boolean;
+}): string[] => {
+  const violations: string[] = [];
+  const uiDebugExport = input.uiDebugExport;
+  const apiResponse = input.apiResponse;
+  const apiDebugExport = input.apiDebugExport ?? null;
+  if (!uiDebugExport) violations.push("ui_debug_export_missing");
+  if (!apiResponse) violations.push("api_response_missing");
+  if (!uiDebugExport || !apiResponse) return violations;
+
+  const uiPrompt = readPrompt(null, uiDebugExport);
+  const apiPrompt = readPrompt(apiResponse, apiDebugExport);
+  if (uiPrompt && apiPrompt && normalizeParityText(uiPrompt) !== normalizeParityText(apiPrompt)) {
+    violations.push("ui_api_prompt_mismatch");
+  }
+
+  const uiKind = readTerminalArtifactKind(null, uiDebugExport);
+  const apiKind = readTerminalArtifactKind(apiResponse, apiDebugExport);
+  if (uiKind && apiKind && uiKind !== apiKind) {
+    violations.push(`ui_api_terminal_kind_mismatch:${uiKind}!=${apiKind}`);
+  }
+
+  const uiError = readTerminalErrorCode(null, uiDebugExport);
+  const apiError = readTerminalErrorCode(apiResponse, apiDebugExport);
+  if (uiError !== apiError) {
+    violations.push(`ui_api_terminal_error_mismatch:${uiError || "null"}!=${apiError || "null"}`);
+  }
+
+  const uiRail = findRailTable(uiDebugExport);
+  const apiRail = findRailTable(apiDebugExport) ?? asRecord(apiResponse.codex_parity_agent_spine_rail_table);
+  const railFields = [
+    "requested_capability",
+    "selected_capability",
+    "executed_capability",
+    "observation_kind",
+    "selected_terminal_kind",
+    "visible_terminal_kind",
+    "rail_status",
+    "rail_failure_code",
+  ] as const;
+  if (uiRail && apiRail) {
+    for (const field of railFields) {
+      const uiValue = comparableRailValue(uiRail[field]);
+      const apiValue = comparableRailValue(apiRail[field]);
+      if (JSON.stringify(uiValue) !== JSON.stringify(apiValue)) {
+        violations.push(`ui_api_rail_${field}_mismatch:${String(uiValue ?? "null")}!=${String(apiValue ?? "null")}`);
+      }
+    }
+  }
+
+  const uiTurnId = readTurnId(null, uiDebugExport);
+  const apiTurnId = readTurnId(apiResponse, apiDebugExport);
+  const shouldCompareText = input.requireSameTurnText === true || Boolean(uiTurnId && apiTurnId && uiTurnId === apiTurnId);
+  if (shouldCompareText) {
+    const uiText = normalizeParityText(input.uiVisibleFinalAnswer ?? readVisibleFinalText(null, uiDebugExport));
+    const apiText = normalizeParityText(readVisibleFinalText(apiResponse, apiDebugExport));
+    if (uiText && apiText && uiText !== apiText) {
+      violations.push("ui_api_visible_answer_mismatch");
+    }
+  }
+
+  return violations;
+};
 
 const RAIL_MIRROR_COMPARISON_FIELDS = [
   "schema",
@@ -348,7 +944,7 @@ export const collectRailTableViolations = (
   return violations;
 };
 
-const completeRailEnvelopeViolations = (input: {
+export const collectCompleteRailEnvelopeViolations = (input: {
   railTable: Record<string, unknown> | null;
   debugExport: Record<string, unknown> | null;
   visibleFinalAnswer: string;
@@ -448,7 +1044,32 @@ async function collectCalculatorPanelState(page: Page): Promise<Record<string, u
   });
 }
 
-async function runPrompt(page: Page, item: HarnessPrompt): Promise<HarnessResult> {
+const runApiCompanionTurn = async (input: {
+  prompt: string;
+  sessionId: string;
+}): Promise<{ response: Record<string, unknown> | null; debugExport: Record<string, unknown> | null }> => {
+  const response = await fetchJson<Record<string, unknown>>(`${API_BASE_URL}/api/agi/ask/turn`, {
+    method: "POST",
+    body: JSON.stringify({
+      sessionId: input.sessionId,
+      question: input.prompt,
+      mode: "read",
+      debug: true,
+    }),
+  });
+  const turnId = readString(response.turn_id);
+  const debugExport = turnId
+    ? await fetchJson<Record<string, unknown>>(`${API_BASE_URL}/api/agi/ask/turn/${encodeURIComponent(turnId)}/debug-export`)
+    : null;
+  return { response, debugExport };
+};
+
+async function runPrompt(
+  page: Page,
+  item: HarnessPrompt,
+  index: number,
+  localRuntimeChanges: LocalRestartSensitiveRuntimeChanges,
+): Promise<HarnessResult> {
   await submitPrompt(page, item.prompt);
   const visibleFinalAnswer = await page
     .locator('[data-testid="helix-ask-latest-final-answer"]')
@@ -472,11 +1093,12 @@ async function runPrompt(page: Page, item: HarnessPrompt): Promise<HarnessResult
   const calculatorPanelState = await collectCalculatorPanelState(page);
   const parity = asRecord(debugExport?.ui_debug_parity_harness);
   const violations: string[] = [];
+  const warnings: string[] = [];
 
   if (!debugExport) violations.push("debug_export_missing");
   violations.push(...collectRailTableViolations(railTable, terminalAuthority, turnId || null, debugTerminalKind || null));
   violations.push(...collectUiDebugRailMirrorViolations(railCandidates));
-  violations.push(...completeRailEnvelopeViolations({ railTable, debugExport, visibleFinalAnswer }));
+  violations.push(...collectCompleteRailEnvelopeViolations({ railTable, debugExport, visibleFinalAnswer }));
   if (!visibleFinalAnswer) violations.push("visible_final_answer_missing");
   if (terminalAuthorityText && visibleFinalAnswer !== terminalAuthorityText) {
     violations.push("ui_terminal_authority_text_mismatch");
@@ -497,51 +1119,130 @@ async function runPrompt(page: Page, item: HarnessPrompt): Promise<HarnessResult
   if (parity?.clipboard_debug_copy_required_for_prompt_submission !== false) {
     violations.push("clipboard_debug_copy_can_block_prompt_submission");
   }
+  const apiSessionId = buildUiApiParitySessionId({
+    configuredSessionId: API_SESSION_ID,
+    prompt: item.prompt,
+    turnId,
+    index,
+  });
+  let apiResponse: Record<string, unknown> | null | undefined;
+  let apiDebugExport: Record<string, unknown> | null | undefined;
+  let uiApiTerminalParityViolations: string[] | undefined;
+  if (COMPARE_API) {
+    try {
+      const api = await runApiCompanionTurn({ prompt: item.prompt, sessionId: apiSessionId });
+      apiResponse = api.response;
+      apiDebugExport = api.debugExport;
+      uiApiTerminalParityViolations = collectUiApiTerminalParityViolations({
+        uiDebugExport: debugExport,
+        apiResponse,
+        apiDebugExport,
+        uiVisibleFinalAnswer: visibleFinalAnswer,
+      });
+      violations.push(...uiApiTerminalParityViolations);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      uiApiTerminalParityViolations = [`ui_api_companion_turn_failed:${message.slice(0, 240)}`];
+      violations.push(...uiApiTerminalParityViolations);
+    }
+  }
+  const serverBuildStartedAtMs = Math.min(
+    ...[
+      readServerBuildStartedAtMs(null, debugExport),
+      readServerBuildStartedAtMs(apiResponse ?? null, apiDebugExport ?? null),
+    ].filter((entry): entry is number => typeof entry === "number"),
+  );
+  const normalizedServerBuildStartedAtMs = Number.isFinite(serverBuildStartedAtMs) ? serverBuildStartedAtMs : null;
+  const staleBundleWarnings = uiServerBundleFreshnessWarnings({
+    serverBuildStartedAtMs: normalizedServerBuildStartedAtMs,
+    latestLocalRuntimeChangeMs: localRuntimeChanges.latestMtimeMs,
+    changedRuntimeFiles: localRuntimeChanges.files,
+  });
+  if (staleBundleWarnings.length && violations.length) {
+    warnings.push(
+      ...staleBundleWarnings,
+      ...violations.map((violation) => `untrusted_violation_due_to_stale_server_bundle:${violation}`),
+    );
+    violations.length = 0;
+  } else {
+    warnings.push(...staleBundleWarnings);
+  }
 
   return {
     prompt: item.prompt,
     visible_final_answer: visibleFinalAnswer,
     debug_export: debugExport,
+    api_response: apiResponse,
+    api_debug_export: apiDebugExport,
+    ui_api_terminal_parity_violations: uiApiTerminalParityViolations,
     terminal_authority: terminalAuthority,
     codex_parity_agent_spine_rail_table: railTable,
     goal_satisfaction: debugExport?.goal_satisfaction_evaluation ?? null,
     agent_runtime_loop: debugExport?.agent_runtime_loop ?? debugExport?.agent_step_loop ?? null,
     coverage_artifacts: coverageArtifacts,
     calculator_panel_state: calculatorPanelState,
+    server_bundle_freshness: {
+      server_build_started_at_ms: normalizedServerBuildStartedAtMs,
+      latest_local_runtime_change_ms: localRuntimeChanges.latestMtimeMs,
+      changed_runtime_file_count: localRuntimeChanges.files.length,
+      stale: staleBundleWarnings.length > 0,
+    },
+    warnings,
     violations,
   };
 }
 
-async function main(): Promise<void> {
+async function main(): Promise<0 | 1> {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
   await installClipboardFailureShim(page);
   await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
 
   const results: HarnessResult[] = [];
+  const prompts = resolveUiDebugParityPrompts();
+  const localRuntimeChanges = collectLocalRestartSensitiveRuntimeChanges();
   try {
-    for (const item of DEFAULT_PROMPTS) {
-      results.push(await runPrompt(page, item));
+    for (const [index, item] of prompts.entries()) {
+      results.push(await runPrompt(page, item, index, localRuntimeChanges));
     }
   } finally {
     await browser.close();
   }
 
+  const warningSummary = summarizeUiDebugParityWarnings(results as Array<Record<string, unknown>>);
+  const goalAcceptance = summarizeUiDebugParityGoalAcceptance(results as Array<Record<string, unknown>>);
+  const goalProofTrust = uiDebugParityGoalProofTrust(warningSummary, results.length);
   const output = {
     schema: "helix.ask.ui_debug_parity_harness_report.v1",
     url: BASE_URL,
+    api_url: API_BASE_URL,
+    api_comparison_enabled: COMPARE_API,
+    prompt_preset: PROMPT_PRESET,
+    local_restart_sensitive_runtime_changes: localRuntimeChanges,
     created_at: new Date().toISOString(),
+    prompts,
+    counts: {
+      pass: results.filter((result) => result.violations.length === 0 && result.warnings.length === 0).length,
+      warn: results.filter((result) => result.violations.length === 0 && result.warnings.length > 0).length,
+      fail: results.filter((result) => result.violations.length > 0).length,
+    },
+    warning_summary: warningSummary,
+    goal_acceptance: goalAcceptance,
+    goal_proof_trust: goalProofTrust,
+    goal_proof_required: REQUIRE_GOAL_PROOF,
     results,
-    ok: results.every((result) => result.violations.length === 0),
+    ok: results.every((result) => result.violations.length === 0) && goalAcceptance.ok,
   };
   fs.mkdirSync(path.dirname(OUT_PATH), { recursive: true });
   fs.writeFileSync(OUT_PATH, JSON.stringify(output, null, 2));
   if (!output.ok) {
     console.error(JSON.stringify(output, null, 2));
-    process.exitCode = 1;
+  } else if (!goalProofTrust.trusted_for_goal_acceptance) {
+    console.warn(`Helix Ask UI/debug parity classified, but is not trusted goal proof: ${OUT_PATH}`);
   } else {
     console.log(`Helix Ask UI/debug parity passed: ${OUT_PATH}`);
   }
+  return uiDebugParityProcessExitCode(output.ok, REQUIRE_GOAL_PROOF, goalProofTrust);
 }
 
 const invokedAsCli = process.argv[1]
@@ -549,8 +1250,12 @@ const invokedAsCli = process.argv[1]
   : false;
 
 if (invokedAsCli) {
-  void main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
+  void main()
+    .then((exitCode) => {
+      process.exit(exitCode);
+    })
+    .catch((error) => {
+      console.error(error);
+      process.exit(1);
+    });
 }
