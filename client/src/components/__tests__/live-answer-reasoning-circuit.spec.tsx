@@ -217,6 +217,8 @@ describe("LiveAnswerReasoningCircuit", () => {
           automationCount: 2,
           feedPolicyRefCount: 3,
           actuatorPolicyRefCount: 3,
+          toolAttributedUpdateCount: 2,
+          matchedToolActuatorUpdateCount: 2,
           actuatorPolicyCount: 5,
           narratorEventFeedCount: 1,
           narratorActuatorPolicyCount: 1,
@@ -280,7 +282,7 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getAllByTestId("live-answer-goal-context-authority-chips")[2]).toHaveTextContent("assistant=false");
     expect(screen.getAllByTestId("live-answer-goal-context-authority-chips")[2]).toHaveTextContent("terminal=false");
     expect(screen.getAllByTestId("live-answer-goal-context-authority-chips")[2]).toHaveTextContent("raw=false");
-    expect(screen.getAllByTestId("live-answer-goal-context-dispatch").map((node) => node.textContent)).toEqual([
+    expect(screen.getAllByTestId("live-answer-goal-context-dispatch").map((node: HTMLElement) => node.textContent)).toEqual([
       "narrator bind translated transcript",
       "wake interrupt",
       "preset frog classifier",
@@ -301,6 +303,8 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getByTestId("live-answer-feed-query-count")).toHaveTextContent("7 feed queries");
     expect(screen.getByTestId("live-answer-feed-policy-ref-count")).toHaveTextContent("3 feed policy refs");
     expect(screen.getByTestId("live-answer-actuator-policy-ref-count")).toHaveTextContent("3 actuator policy refs");
+    expect(screen.getByTestId("live-answer-tool-attribution-count")).toHaveTextContent("2 tool-attributed updates");
+    expect(screen.getByTestId("live-answer-matched-tool-actuator-count")).toHaveTextContent("2 matched tool actuator updates");
     expect(screen.getByTestId("live-answer-route-watch-count")).toHaveTextContent("0 route watch");
     expect(screen.getByTestId("live-answer-automation-count")).toHaveTextContent("2 automations");
     expect(screen.getByTestId("live-answer-actuator-policy-count")).toHaveTextContent("5 actuator policies");
@@ -325,6 +329,8 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("feed_queries=7");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("feed_policy_refs=3");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("actuator_policy_refs=3");
+    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("tool_attributed_updates=2");
+    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("matched_tool_actuator_updates=2");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("trace_memory=2");
     expect(screen.getByTestId("live-answer-control-dispatch-breakdown")).toHaveTextContent("control_dispatches=6");
     expect(screen.getByTestId("live-answer-control-dispatch-breakdown")).toHaveTextContent("preset=1");

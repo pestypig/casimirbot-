@@ -1231,6 +1231,47 @@ describe("Helix Ask workstation tool planner", () => {
     });
   });
 
+  it("routes goal-satisfaction checks to non-terminal goal-context evaluation evidence", () => {
+    const plan = planWorkstationToolUse(
+      "Evaluate goal satisfaction goal_id=goal:frog-monitor source_id=visual_source:tab-1 evidence_refs=goal_context_update:frog,terminal_authority_single_writer.",
+      { threadId: "thread:goal-satisfaction", turnId: "turn:goal-satisfaction" },
+    );
+
+    expect(plan.intent).toBe("workstation_goal_context");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.action).toBeNull();
+    expect(plan.tool_plan?.steps.map((step) => step.tool_id ?? `${step.panel_id}.${step.action_id}`)).toEqual([
+      "live_env.evaluate_goal_satisfaction",
+      "undefined.undefined",
+    ]);
+    expect(plan.tool_plan?.steps[0]).toMatchObject({
+      step_id: "evaluate_goal_satisfaction",
+      kind: "run_ask_tool",
+      tool_id: "live_env.evaluate_goal_satisfaction",
+      args: expect.objectContaining({
+        thread_id: "thread:goal-satisfaction",
+        goal_id: "goal:frog-monitor",
+        source_id: "visual_source:tab-1",
+        source_ref: "visual_source:tab-1",
+        evidence_refs: ["goal_context_update:frog", "terminal_authority_single_writer"],
+      }),
+      expected_receipt_kind: "helix.live_environment_goal_satisfaction.v1",
+      expected_state_change: {
+        store: "stage-play-goal-context",
+        proof_key: "goalContextUpdates",
+      },
+      required: true,
+    });
+    expect(plan.tool_plan?.steps[1]).toMatchObject({
+      step_id: "evaluate_goal_satisfaction_receipt",
+      kind: "evaluate_result",
+      depends_on: ["evaluate_goal_satisfaction"],
+      expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+      required: true,
+    });
+    expect(plan.reason).toMatch(/without creating answer authority/i);
+  });
+
   it("routes feed-specific workstation context prompts to the matching live-env query", () => {
     const packetPlan = planWorkstationToolUse(
       "Inspect the per-packet traces for source_id=visual_source:tab-1.",
@@ -1581,7 +1622,9 @@ describe("Helix Ask workstation tool planner", () => {
       "Could we inspect goal context updates later after the source is running?",
       "Previously you queried per-packet traces; what did that mean?",
       "Do not query trace memory; explain the phrase.",
+      "Do not evaluate goal satisfaction; explain what evidence would be needed first.",
       'The UI label says "live_env.query_trace_memory"; summarize it.',
+      'The UI label says "live_env.evaluate_goal_satisfaction"; summarize it.',
       'The UI label says "live_env.query_packet_traces"; summarize it.',
       'The UI label says "live_env.query_route_evidence"; summarize it.',
       'The UI label says "live_env.query_automation_policies"; summarize it.',
@@ -1589,6 +1632,7 @@ describe("Helix Ask workstation tool planner", () => {
       'The UI label says "live_env.query_source_health"; summarize it.',
       "Could we query route-watch evidence later?",
       "Could we query automation policies later?",
+      "Could we evaluate goal satisfaction later after terminal authority is ready?",
       "Could we check source health later after the live source is running?",
     ]) {
       const plan = planWorkstationToolUse(prompt, { threadId: "thread:goal-context-negative" });

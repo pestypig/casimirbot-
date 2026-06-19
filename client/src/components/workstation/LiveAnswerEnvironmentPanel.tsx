@@ -1964,6 +1964,13 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         (count: number, update: WorkstationGoalContextUpdateV1) => count + liveAnswerActuatorPolicyRefsForUpdate(update).length,
         0,
       ),
+      toolAttributedUpdateCount: goalContextUpdates.filter((update: WorkstationGoalContextUpdateV1) =>
+        Boolean(update.toolIdentity?.requestedToolName || update.toolIdentity?.canonicalToolName)
+      ).length,
+      matchedToolActuatorUpdateCount: goalContextUpdates.filter((update: WorkstationGoalContextUpdateV1) =>
+        (update.toolIdentity?.matchedAllowedActuators.length ?? 0) > 0 ||
+        (update.toolIdentity?.matchedAllowedActuatorRefs.length ?? 0) > 0
+      ).length,
       actuatorPolicyCount: agentGoalSessions.reduce((count: number, session: AgentGoalSessionV1) => count + session.allowedActuators.length, 0),
       narratorEventFeedCount: goalContextUpdates.filter((update: WorkstationGoalContextUpdateV1) => update.producerKind === "narrator").length +
         agentGoalSessions.filter((session: AgentGoalSessionV1) =>

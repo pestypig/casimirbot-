@@ -285,6 +285,73 @@ describe("stage-play goal context store", () => {
     expect(listStagePlayGoalContextUpdates({ goalId: "goal:frog-classification" })).toHaveLength(2);
   });
 
+  it("filters goal-context feeds by freshness status without making observations terminal", () => {
+    const staleMail = mailFixture({
+      mailId: "stage_play_live_source_mail:visual-stale",
+      sourceRefs: {
+        sourceId: "visual_source:screen",
+        frameRef: "visual_frame:screen-stale",
+        evidenceRef: "visual_frame:screen-stale",
+      },
+      evidenceRefs: ["visual_frame:screen-stale"],
+      hints: {
+        deterministicChangeHint: "summary_changed",
+        sourceFreshness: "stale",
+      },
+      createdAt: "2026-06-17T13:58:00.000Z",
+      updatedAt: "2026-06-17T13:58:00.000Z",
+    });
+    const freshPacket = packetFixture();
+    const stalePacket = packetFixture({
+      packetId: "stage_play_processed_mail_packet:frog-stale",
+      mailIds: ["stage_play_live_source_mail:visual-stale"],
+      visualEvidenceRefs: ["visual_frame:screen-stale"],
+      evidenceRefs: ["stage_play_processed_mail_packet:frog-stale", "visual_frame:screen-stale"],
+      createdAt: "2026-06-17T13:58:02.000Z",
+    });
+
+    syncStagePlayGoalContextFromMailbox({
+      threadId,
+      roomId: "room:stage-play",
+      mailItems: [mailFixture(), staleMail],
+      processedMailPackets: [freshPacket, stalePacket],
+      microReasonerRuns: [],
+      nowMs: Date.parse("2026-06-17T14:00:03.000Z"),
+    });
+
+    const freshUpdates = listStagePlayGoalContextUpdates({ freshnessStatus: "fresh" });
+    const staleUpdates = listStagePlayGoalContextUpdates({ freshnessStatus: "stale" });
+
+    expect(freshUpdates).toHaveLength(2);
+    expect(staleUpdates).toHaveLength(2);
+    expect(freshUpdates.every((update) => update.freshness.status === "fresh")).toBe(true);
+    expect(staleUpdates.every((update) => update.freshness.status === "stale")).toBe(true);
+    expect(staleUpdates).toEqual([
+      expect.objectContaining({
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        authority: {
+          assistantAnswer: false,
+          terminalEligible: false,
+          rawContentIncluded: false,
+          postToolModelStepRequired: true,
+        },
+      }),
+      expect.objectContaining({
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+        authority: {
+          assistantAnswer: false,
+          terminalEligible: false,
+          rawContentIncluded: false,
+          postToolModelStepRequired: true,
+        },
+      }),
+    ]);
+  });
+
   it("records audio capture arrivals separately from transcript packet processing", () => {
     const audioMail = mailFixture({
       mailId: "stage_play_live_source_mail:audio-1",

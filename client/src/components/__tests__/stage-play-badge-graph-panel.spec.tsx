@@ -2538,6 +2538,9 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-feed-policy-ref-state")).toHaveTextContent(/3 context-feed policy refs/i);
     expect(screen.getByTestId("stage-play-feed-policy-ref-state")).toHaveTextContent(/3 actuator policy refs/i);
     expect(screen.getByTestId("stage-play-feed-policy-ref-state")).toHaveTextContent(/1 exact goal authorization ref/i);
+    expect(screen.getByTestId("stage-play-tool-attribution-state")).toHaveTextContent(/1 tool-attributed update/i);
+    expect(screen.getByTestId("stage-play-tool-attribution-state")).toHaveTextContent(/1 matched allowed actuator update/i);
+    expect(screen.getByTestId("stage-play-tool-attribution-state")).toHaveTextContent(/requested tool, canonical tool, and exact goal authorization refs/i);
     expect(screen.getByText("Minecraft danger monitor")).toBeTruthy();
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/visual summaries/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/packet traces/i);

@@ -335,12 +335,14 @@ export function listStagePlayGoalContextUpdates(input: {
   goalId?: string | null;
   producerKind?: GoalContextProducerKindV1 | string | null;
   updateKind?: GoalContextUpdateKindV1 | string | null;
+  freshnessStatus?: WorkstationGoalContextUpdateV1["freshness"]["status"] | string | null;
   limit?: number;
 } = {}): WorkstationGoalContextUpdateV1[] {
   const sourceRef = normalize(input.sourceRef);
   const loopRef = normalize(input.loopRef);
   const contentRef = normalize(input.contentRef);
   const goalId = normalize(input.goalId);
+  const freshnessStatus = normalize(input.freshnessStatus);
   const threadLoopRef = normalize(input.threadId) ? `thread:${normalize(input.threadId)}` : null;
   return Array.from(updatesById.values())
     .filter((update) => !threadLoopRef || update.loopRefs.includes(threadLoopRef))
@@ -348,6 +350,7 @@ export function listStagePlayGoalContextUpdates(input: {
     .filter((update) => !loopRef || update.loopRefs.includes(loopRef))
     .filter((update) => !contentRef || update.contentRef === contentRef)
     .filter((update) => !goalId || update.goalRelevance?.goalId === goalId)
+    .filter((update) => !freshnessStatus || update.freshness.status === freshnessStatus)
     .filter((update) => !input.producerKind || update.producerKind === input.producerKind)
     .filter((update) => !input.updateKind || update.updateKind === input.updateKind)
     .sort((left, right) => right.createdAtMs - left.createdAtMs || left.updateId.localeCompare(right.updateId))

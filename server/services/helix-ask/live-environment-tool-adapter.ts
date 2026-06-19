@@ -2250,6 +2250,16 @@ const goalContextFreshnessStatus = (
   return "unknown";
 };
 
+const readGoalContextFreshnessFilter = (
+  value: unknown,
+): WorkstationGoalContextUpdateV1["freshness"]["status"] | null => {
+  const raw = readString(value)?.toLowerCase();
+  if (!raw) return null;
+  if (raw === "unknown") return "unknown";
+  const normalized = goalContextFreshnessStatus(raw);
+  return normalized === "unknown" ? null : normalized;
+};
+
 const recordLiveEnvironmentGoalContextUpdate = (input: {
   threadId: string;
   mailboxThreadId?: string | null;
@@ -3752,6 +3762,12 @@ export function executeLiveEnvironmentTool(
           observedAtMs: Number.isFinite(observedAtMs) ? observedAtMs : Date.now(),
           staleAfterMs: 45_000,
           freshnessStatus: selectedLines.length > 0 ? "fresh" : "unknown",
+          toolIdentity: {
+            requestedToolName: input.tool_name,
+            canonicalToolName,
+            matchedAllowedActuators: [],
+            matchedAllowedActuatorRefs: [],
+          },
           suggestedDispatch: [
             { kind: "log_receipt", receiptRef: resultId },
             ...selectedLineKeys.map((lineKey): WorkstationDispatchActionV1 => ({ kind: "update_live_answer", lineKey })),
@@ -5950,6 +5966,12 @@ export function executeLiveEnvironmentTool(
       freshnessStatus: ok ? (packetTraces.length > 0 ? "fresh" : "unknown") : "blocked",
       goalId,
       goalRelevanceReason: "The agent queried per-packet traffic as goal-context evidence.",
+      toolIdentity: {
+        requestedToolName: input.tool_name,
+        canonicalToolName: "live_env.query_packet_traces",
+        matchedAllowedActuators,
+        matchedAllowedActuatorRefs,
+      },
       suggestedDispatch: [
         { kind: "log_receipt", receiptRef: resultId },
         ...(goalId && ok ? [{ kind: "append_goal_context" as const, goalId }] : []),
@@ -6095,6 +6117,8 @@ export function executeLiveEnvironmentTool(
       scope.sourceId ??
       null;
     const goalId = readString(args.goal_id) ?? readString(args.goalId);
+    const requestedFreshnessStatus =
+      readGoalContextFreshnessFilter(args.freshness_status ?? args.freshnessStatus ?? args.freshness);
     const limit = Math.max(1, Math.min(readNumber(args.limit, 24), 80));
     const mailLimit = Math.max(1, Math.min(readNumber(args.mail_limit ?? args.mailLimit, 32), 100));
     const goalSession = goalId
@@ -6176,6 +6200,7 @@ export function executeLiveEnvironmentTool(
       threadId: scope.mailboxThreadResolution.mailboxThreadId,
       sourceRef,
       goalId: goalSession ? null : goalId,
+      freshnessStatus: requestedFreshnessStatus,
       limit: 200,
     })
       .filter((update) => workstationContextFeedUpdateMatchesV1(feedQuerySpec.feedKind, update))
@@ -6184,6 +6209,7 @@ export function executeLiveEnvironmentTool(
       input.thread_id,
       sourceRef,
       goalId,
+      requestedFreshnessStatus,
       goalContextUpdates.map((update) => update.updateId),
       matchedContextFeedRefs,
       matchedAllowedActuatorRefs,
@@ -6191,6 +6217,7 @@ export function executeLiveEnvironmentTool(
     const policyEvidenceRefs = uniqueStrings([
       `context_feed:${feedQuerySpec.feedKind}`,
       `allowed_actuator:${feedQuerySpec.actuator}`,
+      ...(requestedFreshnessStatus ? [`freshness_filter:${requestedFreshnessStatus}`] : []),
       ...matchedContextFeedRefs.map((feedRef) => `agent_goal_context_feed:${feedRef}`),
       ...matchedAllowedActuatorRefs,
       ...feedMissingRequirements,
@@ -6245,6 +6272,12 @@ export function executeLiveEnvironmentTool(
       freshnessStatus,
       goalId,
       goalRelevanceReason: `The agent queried ${feedQuerySpec.label} as a feed-specific goal-context input.`,
+      toolIdentity: {
+        requestedToolName: input.tool_name,
+        canonicalToolName,
+        matchedAllowedActuators,
+        matchedAllowedActuatorRefs,
+      },
       suggestedDispatch: dispatch,
     });
     const checkpointedGoalSession = ok && goalSession
@@ -6376,6 +6409,8 @@ export function executeLiveEnvironmentTool(
         loop_refs: resultLoopRefs,
         evidence_refs: evidenceRefs,
         freshness_status: freshnessStatus,
+        requestedFreshnessStatus,
+        requested_freshness_status: requestedFreshnessStatus,
         goal_session_found: goalId ? Boolean(goalSession) : null,
         feed_allowed: feedAllowed,
         required_actuator: feedQuerySpec.actuator,
@@ -6520,6 +6555,14 @@ export function executeLiveEnvironmentTool(
       evidenceRefs: resultEvidenceRefs,
       receiptRefs: [resultId, ...traceRefs],
       freshnessStatus,
+      goalId,
+      goalRelevanceReason: "The agent queried compact trace memory as a goal-context input.",
+      toolIdentity: {
+        requestedToolName: input.tool_name,
+        canonicalToolName: "live_env.query_trace_memory",
+        matchedAllowedActuators,
+        matchedAllowedActuatorRefs,
+      },
       suggestedDispatch: [
         { kind: "log_receipt", receiptRef: resultId },
         ...(ok ? [{ kind: "append_goal_context" as const, goalId: goalId ?? `trace_memory:${input.thread_id}` }] : []),
@@ -7777,6 +7820,12 @@ export function executeLiveEnvironmentTool(
         goalRelevanceReason: goalId
           ? "Watch-job automation policy requires explicit goal actuator authorization."
           : null,
+        toolIdentity: {
+          requestedToolName: input.tool_name,
+          canonicalToolName,
+          matchedAllowedActuators,
+          matchedAllowedActuatorRefs,
+        },
         suggestedDispatch: [
           { kind: "log_receipt", receiptRef: blockedReceiptId },
           { kind: "update_panel", panelId: "stage-play-badge-graph" },
@@ -7929,6 +7978,12 @@ export function executeLiveEnvironmentTool(
       goalRelevanceReason: goalId
         ? "Watch-job automation policy contributes deterministic route-watch context for this agent goal."
         : null,
+      toolIdentity: {
+        requestedToolName: input.tool_name,
+        canonicalToolName,
+        matchedAllowedActuators,
+        matchedAllowedActuatorRefs,
+      },
       suggestedDispatch: [
         { kind: "log_receipt", receiptRef: configured.policy.policyId },
         { kind: "update_panel", panelId: "stage-play-badge-graph" },
@@ -9231,6 +9286,14 @@ export function executeLiveEnvironmentTool(
       evidenceRefs: resultEvidenceRefs,
       receiptRefs: [contentRef],
       freshnessStatus,
+      goalId,
+      goalRelevanceReason: "The agent queried source health as a goal-context input.",
+      toolIdentity: {
+        requestedToolName: input.tool_name,
+        canonicalToolName: "live_env.query_source_health",
+        matchedAllowedActuators,
+        matchedAllowedActuatorRefs,
+      },
       suggestedDispatch: [
         { kind: "log_receipt", receiptRef: contentRef },
         { kind: "update_panel", panelId: "stage-play-badge-graph" },
@@ -9390,6 +9453,12 @@ export function executeLiveEnvironmentTool(
       receiptRefs: [quality.qualityId],
       observedAtMs: Date.parse(quality.createdAt),
       freshnessStatus: goalContextFreshnessStatus(quality.freshness),
+      toolIdentity: {
+        requestedToolName: input.tool_name,
+        canonicalToolName,
+        matchedAllowedActuators: [],
+        matchedAllowedActuatorRefs: [],
+      },
       suggestedDispatch: [
         { kind: "log_receipt", receiptRef: quality.qualityId },
         { kind: "update_panel", panelId: "stage-play-badge-graph" },
@@ -9474,6 +9543,12 @@ export function executeLiveEnvironmentTool(
       receiptRefs: [currentState.currentStateId, currentState.quality.qualityId],
       observedAtMs: Date.parse(currentState.createdAt),
       freshnessStatus: goalContextFreshnessStatus(currentState.quality.freshness),
+      toolIdentity: {
+        requestedToolName: input.tool_name,
+        canonicalToolName,
+        matchedAllowedActuators: [],
+        matchedAllowedActuatorRefs: [],
+      },
       suggestedDispatch: [
         { kind: "log_receipt", receiptRef: currentState.currentStateId },
         { kind: "update_live_answer", lineKey: "live_source_current_state" },
@@ -9727,6 +9802,12 @@ export function executeLiveEnvironmentTool(
       freshnessStatus: status === "blocked" ? "blocked" : satisfied ? "fresh" : "unknown",
       goalId: goalId ?? null,
       goalRelevanceReason: "Goal satisfaction evaluation summarizes current workstation evidence without terminalizing it.",
+      toolIdentity: {
+        requestedToolName: input.tool_name,
+        canonicalToolName,
+        matchedAllowedActuators,
+        matchedAllowedActuatorRefs,
+      },
       suggestedDispatch: [
         { kind: "log_receipt", receiptRef: resultId },
         ...(goalId ? [{ kind: "append_goal_context", goalId } as WorkstationDispatchActionV1] : []),

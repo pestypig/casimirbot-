@@ -1246,7 +1246,7 @@ function makeOpenStep(panelId: string, depends_on: string[] = []): HelixWorkstat
 }
 
 const GOAL_CONTEXT_OBJECT_PATTERN =
-  "(?:workstation\\s+goal\\s+context|goal\\s+context\\s+updates?|active\\s+goal\\s+sessions?|agent\\s+goal\\s+sessions?|goal\\s+sessions?|per[-\\s]?packet\\s+traces?|packet\\s+traces?|trace\\s+memory|reasoning\\s+circuit|process\\s+graph\\s+traces?|visual\\s+summaries|audio\\s+transcripts?|translation\\s+segments?|translated\\s+transcripts?|micro[-\\s]?deck\\s+outputs?|live\\s+answer\\s+state|live\\s+answer\\s+lines?|source\\s+health|source\\s+status|source\\s+capability\\s+state|narrator\\s+events?|narrator\\s+bindings?|narrator\\s+streams?|route\\s+evidence|route[-\\s]?watch\\s+evidence|route[-\\s]?watch\\s+updates?|automation\\s+polic(?:y|ies)|workstation\\s+automations?)";
+  "(?:workstation\\s+goal\\s+context|goal\\s+context\\s+updates?|active\\s+goal\\s+sessions?|agent\\s+goal\\s+sessions?|goal\\s+sessions?|goal\\s+satisfaction|satisfaction\\s+evaluation|final\\s+report\\s+readiness|per[-\\s]?packet\\s+traces?|packet\\s+traces?|trace\\s+memory|reasoning\\s+circuit|process\\s+graph\\s+traces?|visual\\s+summaries|audio\\s+transcripts?|translation\\s+segments?|translated\\s+transcripts?|micro[-\\s]?deck\\s+outputs?|live\\s+answer\\s+state|live\\s+answer\\s+lines?|source\\s+health|source\\s+status|source\\s+capability\\s+state|narrator\\s+events?|narrator\\s+bindings?|narrator\\s+streams?|route\\s+evidence|route[-\\s]?watch\\s+evidence|route[-\\s]?watch\\s+updates?|automation\\s+polic(?:y|ies)|workstation\\s+automations?)";
 const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const GOAL_CONTEXT_FEED_QUERY_TOOL_PATTERN = WORKSTATION_CONTEXT_FEED_QUERY_CAPABILITIES.map(escapeRegex).join("|");
 const WORKSTATION_CONTEXT_FEED_NON_TRACE_QUERY_CAPABILITIES = WORKSTATION_CONTEXT_FEED_QUERY_CAPABILITIES.filter(
@@ -1255,7 +1255,7 @@ const WORKSTATION_CONTEXT_FEED_NON_TRACE_QUERY_CAPABILITIES = WORKSTATION_CONTEX
 const GOAL_CONTEXT_NON_TRACE_FEED_QUERY_TOOL_PATTERN =
   WORKSTATION_CONTEXT_FEED_NON_TRACE_QUERY_CAPABILITIES.map(escapeRegex).join("|");
 const GOAL_CONTEXT_TOOL_PATTERN =
-  `(?:live_env\\.query_workstation_goal_context|live_env\\.start_agent_goal_session|${GOAL_CONTEXT_FEED_QUERY_TOOL_PATTERN})`;
+  `(?:live_env\\.query_workstation_goal_context|live_env\\.start_agent_goal_session|live_env\\.evaluate_goal_satisfaction|${GOAL_CONTEXT_FEED_QUERY_TOOL_PATTERN})`;
 
 type WorkstationContextFeedTool = Exclude<WorkstationContextFeedQueryCapability, "live_env.query_trace_memory">;
 
@@ -1598,6 +1598,16 @@ function wantsTraceMemoryQuery(prompt: string): boolean {
   );
 }
 
+function wantsGoalSatisfactionEvaluation(prompt: string): boolean {
+  if (hasContextualWorkstationGoalContextCue(prompt)) return false;
+  return (
+    /\blive_env\.evaluate_goal_satisfaction\b/i.test(prompt) ||
+    /\b(?:evaluate|check|inspect|assess|verify|determine)\b[\s\S]{0,120}\b(?:goal\s+satisfaction|whether\s+(?:the\s+)?goal\s+is\s+satisfied|final\s+report\s+readiness|terminal\s+authority\s+readiness)\b/i.test(prompt) ||
+    /\b(?:is|are|was)\b[\s\S]{0,80}\b(?:goal|objective)\b[\s\S]{0,80}\b(?:satisfied|complete|ready\s+for\s+(?:a\s+)?final\s+report)\b/i.test(prompt) ||
+    /\b(?:enough|sufficient)\b[\s\S]{0,80}\b(?:goal\s+context|evidence|receipts?|updates?)\b[\s\S]{0,100}\b(?:final\s+report|terminal\s+authority|complete\s+the\s+goal)\b/i.test(prompt)
+  );
+}
+
 function selectWorkstationContextFeedTool(prompt: string): WorkstationContextFeedTool | null {
   if (hasContextualWorkstationGoalContextCue(prompt)) return null;
   const explicit = prompt.match(new RegExp(`\\b(?:${GOAL_CONTEXT_NON_TRACE_FEED_QUERY_TOOL_PATTERN})\\b`, "i"))?.[0]?.toLowerCase();
@@ -1636,6 +1646,31 @@ function selectWorkstationContextFeedTool(prompt: string): WorkstationContextFee
     return "live_env.query_automation_policies";
   }
   return null;
+}
+
+function splitPlannerListArg(value: string | null): string[] {
+  if (!value) return [];
+  return value
+    .split(/[,\s]+/g)
+    .map((entry) => stripOuterPunctuation(entry))
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
+function extractNamedListArg(prompt: string, names: string[]): string[] {
+  for (const name of names) {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const quoted = prompt.match(new RegExp(`\\b${escaped}\\b\\s*(?::|=)?\\s*(?:"([^"]+)"|'([^']+)')`, "i"));
+    const quotedValue = quoted?.[1] ?? quoted?.[2];
+    if (quotedValue) return splitPlannerListArg(quotedValue);
+    const bare = prompt.match(new RegExp(
+      `\\b${escaped}\\b\\s*(?::|=)\\s*([^.;]+?)(?=\\s+[a-z_ ]+\\s*(?::|=)|[.;]|$)`,
+      "i",
+    ))?.[1];
+    const parsed = splitPlannerListArg(bare ?? null);
+    if (parsed.length > 0) return parsed;
+  }
+  return [];
 }
 
 function expectedReceiptKindForWorkstationContextFeedTool(toolId: WorkstationContextFeedTool): string {
@@ -1861,6 +1896,66 @@ function buildWorkstationGoalContextPlan(
         : feedTool
           ? "Prompt asks for a specific workstation context feed; query that feed before any answer."
       : "Prompt asks for workstation goal-context or packet trace evidence; query the goal-context feed before any answer.",
+    missing_required_args: [],
+  };
+}
+
+function buildGoalSatisfactionEvaluationPlan(
+  normalized: string,
+  options: PlanWorkstationToolUseOptions,
+  scores: AffordanceScore[],
+): WorkstationToolPlannerResult {
+  const threadId = options.threadId ?? "helix-ask:desktop";
+  const goalId =
+    extractNamedArg(normalized, ["goal_id", "goal id"]) ??
+    `goal:workstation-context:${(options.turnId ?? Date.now()).toString().replace(/[^a-z0-9_-]+/gi, "_")}`;
+  const sourceId = extractNamedArg(normalized, ["source_id", "source id", "source_ref", "source ref"]);
+  const evidenceRefs = extractNamedListArg(normalized, ["evidence_refs", "evidence refs", "evidence"]);
+  const steps: HelixWorkstationToolPlanStep[] = [
+    {
+      step_id: "evaluate_goal_satisfaction",
+      kind: "run_ask_tool",
+      tool_id: "live_env.evaluate_goal_satisfaction",
+      args: {
+        thread_id: threadId,
+        goal_id: goalId,
+        ...(sourceId ? { source_id: sourceId, source_ref: sourceId } : {}),
+        ...(evidenceRefs.length > 0 ? { evidence_refs: evidenceRefs } : {}),
+        reason: "Evaluate current workstation goal context as non-terminal evidence before any final report.",
+      },
+      expected_receipt_kind: "helix.live_environment_goal_satisfaction.v1",
+      expected_state_change: { store: "stage-play-goal-context", proof_key: "goalContextUpdates" },
+      required: true,
+    },
+    {
+      step_id: "evaluate_goal_satisfaction_receipt",
+      kind: "evaluate_result",
+      depends_on: ["evaluate_goal_satisfaction"],
+      expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+      required: true,
+    },
+  ];
+  scores.push({
+    affordance_id: "live_env.evaluate_goal_satisfaction",
+    panel_id: "helix_ask",
+    action_id: "live_env.evaluate_goal_satisfaction",
+    score: 0.9,
+    reason: "affirmative goal-satisfaction prompt should evaluate non-terminal workstation evidence before any final report",
+    required_args_missing: [],
+  });
+  return {
+    intent: "workstation_goal_context",
+    action: null,
+    tool_plan: buildToolPlan({
+      prompt: normalized,
+      intent: "workstation_goal_context",
+      missing: [],
+      options,
+      steps,
+    }),
+    scores,
+    should_use_tool: true,
+    reason: "Prompt asks whether the active goal is satisfied; evaluate goal-context evidence without creating answer authority.",
     missing_required_args: [],
   };
 }
@@ -2221,6 +2316,10 @@ export function planWorkstationToolUse(
 
   if (isWatchJobAutomationPrompt(normalized)) {
     return buildWatchJobAutomationPlan(normalized, options, scores);
+  }
+
+  if (wantsGoalSatisfactionEvaluation(normalized)) {
+    return buildGoalSatisfactionEvaluationPlan(normalized, options, scores);
   }
 
   if (wantsQueryWorkstationGoalContext(normalized)) {

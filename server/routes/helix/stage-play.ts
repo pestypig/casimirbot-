@@ -1381,6 +1381,10 @@ helixStagePlayRouter.get("/goal-context", (req: Request, res: Response) => {
     const loopRef = readQueryString(req.query.loopRef) ?? readQueryString(req.query.loop_ref);
     const contentRef = readQueryString(req.query.contentRef) ?? readQueryString(req.query.content_ref);
     const goalId = readQueryString(req.query.goalId) ?? readQueryString(req.query.goal_id);
+    const freshnessStatus =
+      readQueryString(req.query.freshnessStatus) ??
+      readQueryString(req.query.freshness_status) ??
+      readQueryString(req.query.freshness);
     const limit = Math.min(Math.max(readOptionalNumber(req.query.limit) ?? 50, 1), 120);
     return res.json({
       ok: true,
@@ -1392,6 +1396,7 @@ helixStagePlayRouter.get("/goal-context", (req: Request, res: Response) => {
         loopRef,
         contentRef,
         goalId,
+        freshnessStatus,
         producerKind: readQueryString(req.query.producerKind) ?? readQueryString(req.query.producer_kind),
         updateKind: readQueryString(req.query.updateKind) ?? readQueryString(req.query.update_kind),
         limit,

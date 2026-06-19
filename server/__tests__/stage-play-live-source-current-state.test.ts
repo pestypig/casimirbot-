@@ -36,6 +36,10 @@ import {
   listLiveSourceBudgetStates,
   resetLiveSourceBudgetStoreForTest,
 } from "../services/stage-play/stage-play-live-source-budget-store";
+import {
+  listStagePlayGoalContextUpdates,
+  resetStagePlayGoalContextStoreForTest,
+} from "../services/stage-play/stage-play-goal-context-store";
 
 const threadId = "thread:live-source-current-state";
 const roomId = "room:live-source-current-state";
@@ -47,6 +51,7 @@ beforeEach(() => {
   resetStagePlayLiveSourceNarrativeStoreForTest();
   resetStagePlayLiveSourceMailTranscriptStoreForTest();
   resetLiveSourceBudgetStoreForTest();
+  resetStagePlayGoalContextStoreForTest();
   resetVisualSnapshotStoreForTest();
   resetSituationSourceCapabilitiesForTest();
 });
@@ -346,11 +351,34 @@ describe("live-source current state and source quality", () => {
     expect(payload).toMatchObject({
       artifactId: "stage_play_live_source_quality",
       schemaVersion: "stage_play_live_source_quality/v1",
+      goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:source_health:/),
       post_tool_model_step_required: true,
       terminal_eligible: false,
       assistant_answer: false,
     });
     expect(payload.latestRefs.mailId).toMatch(/^stage_play_live_source_mail:/);
+    const qualityUpdate = listStagePlayGoalContextUpdates({
+      threadId,
+      producerKind: "source_health",
+      updateKind: "source_status",
+      limit: 1,
+    })[0];
+    expect(qualityUpdate).toMatchObject({
+      updateId: payload.goalContextUpdateId,
+      contentRef: payload.qualityId,
+      toolIdentity: {
+        requestedToolName: "live_env.query_live_source_quality",
+        canonicalToolName: "live_env.query_live_source_quality",
+        matchedAllowedActuators: [],
+        matchedAllowedActuatorRefs: [],
+      },
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
   });
 
   it("records a processed budget receipt for a completed wake", async () => {

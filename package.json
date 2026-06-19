@@ -216,6 +216,7 @@
     "nhm2:build-metric-required-momentum-demand-audit": "tsx tools/nhm2/build-metric-required-momentum-demand-audit.ts",
     "nhm2:build-metric-momentum-remediation-targets": "tsx tools/nhm2/build-metric-momentum-remediation-targets.ts",
     "nhm2:build-campaign-frontier-disposition": "tsx tools/nhm2/build-campaign-frontier-disposition.ts",
+    "nhm2:build-campaign-profile-search": "tsx tools/nhm2/build-campaign-profile-search.ts",
     "nhm2:build-qei-bound-receipt": "tsx tools/nhm2/build-qei-bound-receipt.ts",
     "nhm2:build-qei-worldline-sample-plan": "tsx tools/nhm2/build-qei-worldline-sample-plan.ts",
     "nhm2:build-qei-pointwise-transition-source-samples": "tsx tools/nhm2/build-qei-pointwise-transition-source-samples.ts",

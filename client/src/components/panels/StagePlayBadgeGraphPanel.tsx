@@ -3609,6 +3609,13 @@ function StagePlayGoalContextBoard({
     (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "log_receipt").length,
     0,
   );
+  const toolAttributedUpdateCount = updates.filter((update) =>
+    Boolean(update.toolIdentity?.requestedToolName || update.toolIdentity?.canonicalToolName)
+  ).length;
+  const matchedToolActuatorUpdateCount = updates.filter((update) =>
+    (update.toolIdentity?.matchedAllowedActuators.length ?? 0) > 0 ||
+    (update.toolIdentity?.matchedAllowedActuatorRefs.length ?? 0) > 0
+  ).length;
   const actuatorPolicyCount = activeSessions.reduce((count, session) => count + session.allowedActuators.length, 0);
   const narratorActuatorPolicyCount = activeSessions.reduce(
     (count, session) => count + session.allowedActuators.filter((actuator) =>
@@ -3694,6 +3701,8 @@ function StagePlayGoalContextBoard({
           <StagePlayMetricPill label="translations" value={formatStagePlayCount(translatedTranscriptContextCount)} tone={translatedTranscriptContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="feed queries" value={formatStagePlayCount(feedQueryContextCount)} tone={feedQueryContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="feed policy refs" value={formatStagePlayCount(feedPolicyRefCount)} tone={feedPolicyRefCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="tool-attributed" value={formatStagePlayCount(toolAttributedUpdateCount)} tone={toolAttributedUpdateCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="matched actuators" value={formatStagePlayCount(matchedToolActuatorUpdateCount)} tone={matchedToolActuatorUpdateCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="automations" value={formatStagePlayCount(automationContextCount)} tone={automationContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="actuator policies" value={formatStagePlayCount(actuatorPolicyCount)} tone={actuatorPolicyCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="active goals" value={formatStagePlayCount(activeSessions.length)} tone={activeSessions.length > 0 ? "good" : "default"} />
@@ -3766,6 +3775,10 @@ function StagePlayGoalContextBoard({
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-feed-policy-ref-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Feed policy refs</div>
           <div className="mt-0.5 text-slate-400">{formatStagePlayCount(feedPolicyRefCount)} context-feed policy ref{feedPolicyRefCount === 1 ? "" : "s"} and {formatStagePlayCount(actuatorPolicyRefCount)} actuator policy ref{actuatorPolicyRefCount === 1 ? "" : "s"} link feed inputs to controlled workstation outputs; {formatStagePlayCount(exactGoalActuatorPolicyRefCount)} exact goal authorization ref{exactGoalActuatorPolicyRefCount === 1 ? "" : "s"} are visible for debugging.</div>
+        </div>
+        <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-tool-attribution-state">
+          <div className="font-semibold uppercase tracking-wide text-violet-200/80">Tool attribution</div>
+          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(toolAttributedUpdateCount)} tool-attributed update{toolAttributedUpdateCount === 1 ? "" : "s"}; {formatStagePlayCount(matchedToolActuatorUpdateCount)} matched allowed actuator update{matchedToolActuatorUpdateCount === 1 ? "" : "s"} expose requested tool, canonical tool, and exact goal authorization refs.</div>
         </div>
       </div>
       <div className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(240px,320px)]">

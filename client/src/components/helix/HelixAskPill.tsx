@@ -15746,7 +15746,10 @@ export function buildHelixDebugExportEnvelopeFromMasterPayload(reply: HelixAskRe
   };
   const visibleFinalAnswerForParity = clientProgressPlaceholderExport
     ? ""
-    : visibleAnswerText || selectedFinalAnswer || "";
+    : coerceText(payload.visible_final_answer).trim() ||
+      coerceText(payload.visibleFinalAnswer).trim() ||
+      selectedFinalAnswer ||
+      "";
   const selectedFinalAnswerForParity = coerceText(envelopeWithoutHash.selected_final_answer).trim();
   const currentCompoundRunIdForParity = coerceText(calculatorPanelStateForDebug?.current_compound_run_id).trim();
   const visibleCompoundRunIdsForParity = Array.isArray(calculatorPanelStateForDebug?.visible_compound_run_ids)
