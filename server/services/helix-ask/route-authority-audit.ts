@@ -126,6 +126,10 @@ const classifyViolations = (input: {
   const livePipelineProcedureReceipt =
     terminal === "live_pipeline_receipt" &&
     isLivePipelineProcedurePrompt(input.promptText, route);
+  const capabilityHelpAuthorityApplies =
+    terminal === "capability_help_summary" ||
+    route === "capability_help" ||
+    route === "capability_help / capability_help_summary";
 
   if ((sourceTarget === "visual_capture" || visualContentPrompt || /visual|screen|capture/i.test(route)) && terminal === "process_graph_overview") {
     codes.push("process_graph_used_as_visual_evidence");
@@ -139,7 +143,7 @@ const classifyViolations = (input: {
   if (procedureMemoryAuthorityApplies && terminal !== "procedure_epoch_replay" && terminal !== "visual_scene_comparison_result" && terminal !== "typed_failure") {
     codes.push("procedure_memory_bypassed");
   }
-  if ((sourceTarget === "repo_code" || sourceTarget === "runtime_evidence") && terminal !== "repo_code_evidence_answer" && terminal !== "repo_entity_definition" && terminal !== "typed_failure") {
+  if ((sourceTarget === "repo_code" || (sourceTarget === "runtime_evidence" && !capabilityHelpAuthorityApplies)) && terminal !== "repo_code_evidence_answer" && terminal !== "repo_entity_definition" && terminal !== "typed_failure") {
     codes.push("repo_evidence_bypassed");
   }
   if (!livePipelineProcedureReceipt && (sourceTarget === "visual_capture" || visualContentPrompt) && terminal === "live_pipeline_receipt") codes.push("visual_evidence_bypassed");

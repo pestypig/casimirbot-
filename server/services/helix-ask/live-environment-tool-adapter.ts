@@ -3183,7 +3183,13 @@ export function executeLiveEnvironmentTool(
       `thread:${input.thread_id}`,
       `workstation_actuator:${actuator}`,
     ]);
-    const narratorEvidenceRefs = uniqueStrings([requestId, ...policyEvidenceRefs, ...evidenceRefs]);
+    const narratorEvidenceRefs = uniqueStrings([
+      requestId,
+      ...policyEvidenceRefs,
+      ...sourceRefs,
+      ...loopRefs,
+      ...evidenceRefs,
+    ]);
     const rawDispatch = buildNarratorDispatch({
       kind: narratorKind,
       receiptRef: requestId,
@@ -6035,9 +6041,22 @@ export function executeLiveEnvironmentTool(
       `allowed_actuator:${feedQuerySpec.actuator}`,
       ...feedMissingRequirements,
     ]);
+    const resultSourceRefs = uniqueStrings([
+      sourceRef,
+      scope.sourceId,
+      ...goalContextUpdates.flatMap((update) => update.sourceRefs),
+    ]);
+    const resultLoopRefs = uniqueStrings([
+      ...goalContextUpdates.flatMap((update) => update.loopRefs),
+      `workstation_context_feed:${feedQuerySpec.feedKind}`,
+      `workstation_actuator:${feedQuerySpec.actuator}`,
+    ]);
+    const freshnessStatus = ok ? (goalContextUpdates.length > 0 ? "fresh" : "unknown") : "blocked";
     const evidenceRefs = uniqueStrings([
       resultId,
       ...policyEvidenceRefs,
+      ...resultSourceRefs,
+      ...resultLoopRefs,
       ...goalContextUpdates.flatMap((update) => [
         update.updateId,
         update.contentRef,
@@ -6063,19 +6082,11 @@ export function executeLiveEnvironmentTool(
           ? `Queried ${goalContextUpdates.length} ${feedQuerySpec.label} update(s) from workstation goal context.`
           : `No ${feedQuerySpec.label} updates are currently available for this workstation scope.`
         : `Blocked ${feedQuerySpec.label} feed query; missing ${feedMissingRequirements.join(", ")}.`,
-      sourceRefs: uniqueStrings([
-        sourceRef,
-        scope.sourceId,
-        ...goalContextUpdates.flatMap((update) => update.sourceRefs),
-      ]),
-      loopRefs: uniqueStrings([
-        ...goalContextUpdates.flatMap((update) => update.loopRefs),
-        `workstation_context_feed:${feedQuerySpec.feedKind}`,
-        `workstation_actuator:${feedQuerySpec.actuator}`,
-      ]),
+      sourceRefs: resultSourceRefs,
+      loopRefs: resultLoopRefs,
       evidenceRefs,
       receiptRefs: [resultId],
-      freshnessStatus: ok ? (goalContextUpdates.length > 0 ? "fresh" : "unknown") : "blocked",
+      freshnessStatus,
       goalId,
       goalRelevanceReason: `The agent queried ${feedQuerySpec.label} as a feed-specific goal-context input.`,
       suggestedDispatch: dispatch,
@@ -6085,16 +6096,8 @@ export function executeLiveEnvironmentTool(
           session: goalSession,
           threadId: scope.mailboxThreadResolution.mailboxThreadId,
           roomId,
-          sourceRefs: uniqueStrings([
-            sourceRef,
-            scope.sourceId,
-            ...goalContextUpdates.flatMap((update) => update.sourceRefs),
-          ]),
-          loopRefs: uniqueStrings([
-            ...goalContextUpdates.flatMap((update) => update.loopRefs),
-            `workstation_context_feed:${feedQuerySpec.feedKind}`,
-            `workstation_actuator:${feedQuerySpec.actuator}`,
-          ]),
+          sourceRefs: resultSourceRefs,
+          loopRefs: resultLoopRefs,
           evidenceRefs: uniqueStrings([goalContextUpdateId, ...evidenceRefs]).slice(0, 80),
           actionsTaken: [feedQuerySpec.actuator, input.tool_name],
           summary: `Queried ${feedQuerySpec.label} feed and read ${goalContextUpdates.length} update(s) for this goal session.`,
@@ -6117,6 +6120,10 @@ export function executeLiveEnvironmentTool(
       status: ok ? "read" : "blocked",
       missingRequirements: feedMissingRequirements,
       policyEvidenceRefs,
+      sourceRefs: resultSourceRefs,
+      loopRefs: resultLoopRefs,
+      evidenceRefs,
+      freshnessStatus,
       goalSessionFound: goalId ? Boolean(goalSession) : null,
       feedAllowed,
       requiredActuator: feedQuerySpec.actuator,
@@ -6132,6 +6139,12 @@ export function executeLiveEnvironmentTool(
         microReasonerRunCount: microReasonerRuns.length,
       },
       goalContextUpdateId,
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       post_tool_model_step_required: true,
       assistant_answer: false,
       terminal_eligible: false,
@@ -6162,6 +6175,10 @@ export function executeLiveEnvironmentTool(
         goal_id: goalId,
         missing_requirements: feedMissingRequirements,
         policy_evidence_refs: policyEvidenceRefs,
+        source_refs: resultSourceRefs,
+        loop_refs: resultLoopRefs,
+        evidence_refs: evidenceRefs,
+        freshness_status: freshnessStatus,
         goal_session_found: goalId ? Boolean(goalSession) : null,
         feed_allowed: feedAllowed,
         required_actuator: feedQuerySpec.actuator,
@@ -6177,6 +6194,12 @@ export function executeLiveEnvironmentTool(
           micro_reasoner_run_count: microReasonerRuns.length,
         },
         goal_context_update_id: goalContextUpdateId,
+        terminal_authority: {
+          status: "not_terminal",
+          final_answer_eligible: false,
+          completed_solver_path_required: true,
+          terminal_authority_single_writer_required: true,
+        },
         contractValid,
         contract_valid: contractValid,
         contractValidationIssues,
@@ -8903,6 +8926,22 @@ export function executeLiveEnvironmentTool(
       sourceRefs,
       result.capabilities.map((capability) => capability.status),
     ])}`;
+    const resultSourceRefs = ok
+      ? uniqueStrings(sourceRefs.length > 0 ? sourceRefs : [input.thread_id])
+      : [input.thread_id];
+    const resultLoopRefs = ok
+      ? uniqueStrings([
+          ...sourceRefs.map((sourceRef) => `source_health:${sourceRef}`),
+          "workstation_context_feed:source_health",
+          "workstation_actuator:query_source_health",
+        ])
+      : [`source_health:${input.thread_id}`, "workstation_context_feed:source_health", "workstation_actuator:query_source_health"];
+    const resultEvidenceRefs = uniqueStrings([
+      contentRef,
+      ...policyEvidenceRefs,
+      ...(ok ? sourceRefs : [input.thread_id]),
+    ]);
+    const freshnessStatus = ok ? (blockedCapabilities.length > 0 ? "blocked" : "fresh") : "blocked";
     const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
       threadId: input.thread_id,
       mailboxThreadId: input.thread_id,
@@ -8918,17 +8957,11 @@ export function executeLiveEnvironmentTool(
               .join("; ")}.`
           : "Source health read found no registered source capability state."
         : `Blocked source health query; missing ${feedMissingRequirements.join(", ")}.`,
-      sourceRefs: ok ? sourceRefs : [input.thread_id],
-      loopRefs: ok
-        ? uniqueStrings([
-            ...sourceRefs.map((sourceRef) => `source_health:${sourceRef}`),
-            "workstation_context_feed:source_health",
-            "workstation_actuator:query_source_health",
-          ])
-        : [`source_health:${input.thread_id}`, "workstation_context_feed:source_health", "workstation_actuator:query_source_health"],
-      evidenceRefs: ok ? uniqueStrings([...policyEvidenceRefs, ...sourceRefs]) : uniqueStrings([...policyEvidenceRefs, contentRef, input.thread_id]),
+      sourceRefs: resultSourceRefs,
+      loopRefs: resultLoopRefs,
+      evidenceRefs: resultEvidenceRefs,
       receiptRefs: [contentRef],
-      freshnessStatus: ok ? (blockedCapabilities.length > 0 ? "blocked" : "fresh") : "blocked",
+      freshnessStatus,
       suggestedDispatch: [
         { kind: "log_receipt", receiptRef: contentRef },
         { kind: "update_panel", panelId: "stage-play-badge-graph" },
@@ -8943,17 +8976,9 @@ export function executeLiveEnvironmentTool(
           session: goalSession,
           threadId: input.thread_id,
           roomId,
-          sourceRefs: uniqueStrings(sourceRefs.length > 0 ? sourceRefs : [input.thread_id]),
-          loopRefs: uniqueStrings(
-            sourceRefs.length > 0
-              ? [
-                  ...sourceRefs.map((sourceRef) => `source_health:${sourceRef}`),
-                  "workstation_context_feed:source_health",
-                  "workstation_actuator:query_source_health",
-                ]
-              : [`source_health:${input.thread_id}`, "workstation_context_feed:source_health", "workstation_actuator:query_source_health"],
-          ),
-          evidenceRefs: uniqueStrings([goalContextUpdateId, contentRef, ...policyEvidenceRefs, ...sourceRefs]).slice(0, 80),
+          sourceRefs: resultSourceRefs,
+          loopRefs: resultLoopRefs,
+          evidenceRefs: uniqueStrings([goalContextUpdateId, ...resultEvidenceRefs]).slice(0, 80),
           actionsTaken: ["query_source_health", input.tool_name],
           summary: `Queried source health and read ${visibleResult.capabilities.length} capability state(s) for this goal session.`,
           nextStep: blockedCapabilities.length > 0 ? "repair" : "continue",
@@ -8970,6 +8995,10 @@ export function executeLiveEnvironmentTool(
       status: ok ? "read" : "blocked",
       missingRequirements: feedMissingRequirements,
       policyEvidenceRefs,
+      sourceRefs: resultSourceRefs,
+      loopRefs: resultLoopRefs,
+      evidenceRefs: resultEvidenceRefs,
+      freshnessStatus,
       goalSessionFound: goalId ? Boolean(goalSession) : null,
       feedAllowed,
       requiredActuator: "query_source_health",
@@ -9009,6 +9038,10 @@ export function executeLiveEnvironmentTool(
         goal_id: goalId,
         missing_requirements: feedMissingRequirements,
         policy_evidence_refs: policyEvidenceRefs,
+        source_refs: resultSourceRefs,
+        loop_refs: resultLoopRefs,
+        evidence_refs: resultEvidenceRefs,
+        freshness_status: freshnessStatus,
         goal_session_found: goalId ? Boolean(goalSession) : null,
         feed_allowed: feedAllowed,
         required_actuator: "query_source_health",
@@ -9027,8 +9060,8 @@ export function executeLiveEnvironmentTool(
         contractValidationIssues,
         contract_validation_issues: contractValidationIssues,
       },
-      evidenceRefs: uniqueStrings([goalContextUpdateId, contentRef, ...policyEvidenceRefs, ...sourceRefs]),
-      producedRefs: [goalContextUpdateId, contentRef, ...sourceRefs],
+      evidenceRefs: uniqueStrings([goalContextUpdateId, ...resultEvidenceRefs]),
+      producedRefs: [goalContextUpdateId, contentRef, ...resultSourceRefs],
       forceNormalizedRefs: true,
     });
   }

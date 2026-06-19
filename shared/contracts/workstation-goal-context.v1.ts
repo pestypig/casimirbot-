@@ -723,6 +723,31 @@ export function validateNarratorSayRequestV1(value: NarratorSayRequestV1): strin
   if (Array.isArray(value.evidenceRefs) && value.requestId && !value.evidenceRefs.includes(value.requestId)) {
     issues.push("evidenceRefs must include requestId");
   }
+  if (Array.isArray(value.loopRefs) && !value.loopRefs.includes("narrator:say")) {
+    issues.push("loopRefs must include narrator:say");
+  }
+  if (Array.isArray(value.loopRefs) && !value.loopRefs.includes("workstation_actuator:narrator_say")) {
+    issues.push("loopRefs must include workstation_actuator:narrator_say");
+  }
+  if (Array.isArray(value.evidenceRefs) && Array.isArray(value.sourceRefs)) {
+    for (const ref of value.sourceRefs) {
+      if (!value.evidenceRefs.includes(ref)) {
+        issues.push("evidenceRefs must include every sourceRefs entry");
+        break;
+      }
+    }
+  }
+  if (Array.isArray(value.evidenceRefs) && Array.isArray(value.loopRefs)) {
+    for (const ref of value.loopRefs) {
+      if (!value.evidenceRefs.includes(ref)) {
+        issues.push("evidenceRefs must include every loopRefs entry");
+        break;
+      }
+    }
+  }
+  if (Array.isArray(value.evidenceRefs) && !value.evidenceRefs.includes("allowed_actuator:narrator_say")) {
+    issues.push("evidenceRefs must include narrator_say actuator policy ref");
+  }
   if (Array.isArray(value.producedRefs) && value.requestId && !value.producedRefs.includes(value.requestId)) {
     issues.push("producedRefs must include requestId");
   }
@@ -754,6 +779,31 @@ export function validateNarratorBindStreamRequestV1(value: NarratorBindStreamReq
   issues.push(...stringArrayIssue(value.producedRefs, "producedRefs", { requireNonEmpty: true }));
   if (Array.isArray(value.evidenceRefs) && value.requestId && !value.evidenceRefs.includes(value.requestId)) {
     issues.push("evidenceRefs must include requestId");
+  }
+  if (Array.isArray(value.loopRefs) && !value.loopRefs.includes("narrator:bind_stream")) {
+    issues.push("loopRefs must include narrator:bind_stream");
+  }
+  if (Array.isArray(value.loopRefs) && !value.loopRefs.includes("workstation_actuator:narrator_bind_stream")) {
+    issues.push("loopRefs must include workstation_actuator:narrator_bind_stream");
+  }
+  if (Array.isArray(value.evidenceRefs) && Array.isArray(value.sourceRefs)) {
+    for (const ref of value.sourceRefs) {
+      if (!value.evidenceRefs.includes(ref)) {
+        issues.push("evidenceRefs must include every sourceRefs entry");
+        break;
+      }
+    }
+  }
+  if (Array.isArray(value.evidenceRefs) && Array.isArray(value.loopRefs)) {
+    for (const ref of value.loopRefs) {
+      if (!value.evidenceRefs.includes(ref)) {
+        issues.push("evidenceRefs must include every loopRefs entry");
+        break;
+      }
+    }
+  }
+  if (Array.isArray(value.evidenceRefs) && !value.evidenceRefs.includes("allowed_actuator:narrator_bind_stream")) {
+    issues.push("evidenceRefs must include narrator_bind_stream actuator policy ref");
   }
   if (Array.isArray(value.producedRefs) && value.requestId && !value.producedRefs.includes(value.requestId)) {
     issues.push("producedRefs must include requestId");

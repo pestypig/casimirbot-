@@ -290,6 +290,42 @@ export function validateWorkstationControlReceiptV1(value: WorkstationControlRec
   issues.push(...stringArrayIssues(value.loopRefs, "loopRefs", { requireNonEmpty: true }));
   issues.push(...stringArrayIssues(value.evidenceRefs, "evidenceRefs", { requireNonEmpty: true }));
   issues.push(...stringArrayIssues(value.producedRefs, "producedRefs", { requireNonEmpty: true }));
+  if (Array.isArray(value.loopRefs) && !value.loopRefs.includes(`workstation_control:${value.controlKind}`)) {
+    issues.push("loopRefs must include workstation control loop ref");
+  }
+  if (
+    Array.isArray(value.loopRefs) &&
+    agentGoalActuators.has(value.requiredActuator) &&
+    !value.loopRefs.includes(`workstation_actuator:${value.requiredActuator}`)
+  ) {
+    issues.push("loopRefs must include required actuator loop ref");
+  }
+  if (Array.isArray(value.evidenceRefs)) {
+    if (Array.isArray(value.policyEvidenceRefs)) {
+      for (const ref of value.policyEvidenceRefs) {
+        if (!value.evidenceRefs.includes(ref)) {
+          issues.push("evidenceRefs must include every policyEvidenceRefs entry");
+          break;
+        }
+      }
+    }
+    if (Array.isArray(value.sourceRefs)) {
+      for (const ref of value.sourceRefs) {
+        if (!value.evidenceRefs.includes(ref)) {
+          issues.push("evidenceRefs must include every sourceRefs entry");
+          break;
+        }
+      }
+    }
+    if (Array.isArray(value.loopRefs)) {
+      for (const ref of value.loopRefs) {
+        if (!value.evidenceRefs.includes(ref)) {
+          issues.push("evidenceRefs must include every loopRefs entry");
+          break;
+        }
+      }
+    }
+  }
   if (!isNonEmptyString(value.panelId)) issues.push("panelId must be a non-empty string");
   if (value.loopState != null && value.loopState !== "paused" && value.loopState !== "running" && value.loopState !== "repaired") {
     issues.push("loopState is invalid");

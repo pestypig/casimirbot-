@@ -139,12 +139,39 @@ describe("stage-play goal context store", () => {
   });
 
   it("derives queryable non-terminal goal context and an agent goal session from mailbox packets", () => {
+    const claimRun = runFixture({
+      evidenceRefs: [
+        "stage_play_micro_reasoner_run:frog-claims",
+        "stage_play_live_source_mail:visual-1",
+        "microdeck_output:frog-claims",
+        "microdeck_evidence:frog-claims",
+      ],
+      goalContextUpdateRefs: ["stage_play_goal_context_update:microdeck:upstream-claims"],
+    });
+    const riskRun = runFixture({
+      runId: "stage_play_micro_reasoner_run:frog-risk",
+      role: "risk_screener",
+      outputRefs: ["microdeck_output:frog-risk"],
+      evidenceRefs: [
+        "stage_play_micro_reasoner_run:frog-risk",
+        "stage_play_live_source_mail:visual-1",
+        "microdeck_output:frog-risk",
+        "microdeck_evidence:frog-risk",
+      ],
+      goalContextUpdateRefs: ["stage_play_goal_context_update:microdeck:upstream-risk"],
+    });
+    const packet = packetFixture({
+      microReasonerRunRefs: [
+        "stage_play_micro_reasoner_run:frog-claims",
+        "stage_play_micro_reasoner_run:frog-risk",
+      ],
+    });
     const updates = syncStagePlayGoalContextFromMailbox({
       threadId,
       roomId: "room:stage-play",
       mailItems: [mailFixture()],
-      processedMailPackets: [packetFixture()],
-      microReasonerRuns: [runFixture()],
+      processedMailPackets: [packet],
+      microReasonerRuns: [claimRun, riskRun],
       nowMs: Date.parse("2026-06-17T14:00:03.000Z"),
     });
 
@@ -166,6 +193,24 @@ describe("stage-play goal context store", () => {
     });
     expect(updates[0].sourceRefs).toContain("visual_source:screen");
     expect(updates[0].loopRefs).toContain(`stage_play_mail_loop:${threadId}`);
+    expect(updates[0].loopRefs).toEqual(expect.arrayContaining([
+      "stage_play_micro_reasoner_run:frog-claims",
+      "stage_play_micro_reasoner_run:frog-risk",
+    ]));
+    expect(updates[0].evidenceRefs).toEqual(expect.arrayContaining([
+      "stage_play_micro_reasoner_run:frog-claims",
+      "stage_play_micro_reasoner_run:frog-risk",
+      "microdeck_evidence:frog-claims",
+      "microdeck_evidence:frog-risk",
+      "microdeck_output:frog-claims",
+      "microdeck_output:frog-risk",
+      "stage_play_goal_context_update:microdeck:upstream-claims",
+      "stage_play_goal_context_update:microdeck:upstream-risk",
+    ]));
+    expect(updates[0].receiptRefs).toEqual(expect.arrayContaining([
+      "stage_play_micro_reasoner_run:frog-claims",
+      "stage_play_micro_reasoner_run:frog-risk",
+    ]));
     expect(updates[0].suggestedDispatch.map((action) => action.kind)).toEqual([
       "log_receipt",
       "append_goal_context",

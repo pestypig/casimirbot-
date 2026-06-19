@@ -187,6 +187,7 @@ const artifactKindMatchesCapability = (
   if (capability === "scholarly-research.lookup_papers") return /scholarly_research_observation|helix\.scholarly_research_observation\.v1|scholarly_research/i.test(joined);
   if (capability === "scholarly-research.fetch_full_text") return /scholarly_full_text_observation|helix\.scholarly_full_text_observation\.v1|scholarly_research/i.test(joined);
   if (capability === "internet-search.search_web") return /internet_search_observation|helix\.internet_search_observation\.v1|internet_search/i.test(joined);
+  if (capability === "helix_ask.inspect_capability_catalog") return /capability_registry|capability_help_summary|helix\.capability_catalog_observation\.v1|inspect_capability_catalog/i.test(joined);
   if (capability === "workspace-directory.resolve") return /workspace_directory_resolution|helix\.workspace_directory_resolution\.v1/i.test(joined);
   if (capability === "helix_ask.reflect_theory_context") {
     return /helix_theory_context_reflection_tool_receipt|theory_context_reflection|reflect_theory_context/i.test(joined);
@@ -630,6 +631,16 @@ export function hasSelectedCapabilityObservation(payload: Record<string, unknown
     const record = readRecord(artifact);
     const artifactId = readString(record?.artifact_id);
     if (record && artifactId) artifactById.set(artifactId, record);
+  }
+  if (
+    selectedCapabilityMatches(payload, "helix_ask.inspect_capability_catalog") &&
+    artifacts
+      .map(readRecord)
+      .some((artifact) =>
+        artifactKindMatchesCapability("helix_ask.inspect_capability_catalog", artifact),
+      )
+  ) {
+    return true;
   }
 
   const runtimeLoopHasObservation = iterations.some((iteration) => {

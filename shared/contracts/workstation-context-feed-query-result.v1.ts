@@ -14,6 +14,13 @@ import {
 export const WORKSTATION_CONTEXT_FEED_QUERY_RESULT_SCHEMA =
   "stage_play_workstation_context_feed_query_result/v1" as const;
 
+export type WorkstationContextFeedQueryTerminalAuthorityV1 = {
+  status: "not_terminal";
+  finalAnswerEligible: false;
+  completedSolverPathRequired: true;
+  terminalAuthoritySingleWriterRequired: true;
+};
+
 export type WorkstationContextFeedQueryResultV1 = {
   schema: typeof WORKSTATION_CONTEXT_FEED_QUERY_RESULT_SCHEMA;
   resultId: string;
@@ -26,6 +33,10 @@ export type WorkstationContextFeedQueryResultV1 = {
   status: "read" | "blocked";
   missingRequirements: string[];
   policyEvidenceRefs: string[];
+  sourceRefs: string[];
+  loopRefs: string[];
+  evidenceRefs: string[];
+  freshnessStatus: "fresh" | "stale" | "blocked" | "unknown";
   goalSessionFound: boolean | null;
   feedAllowed: boolean;
   requiredActuator: AgentGoalActuatorV1;
@@ -41,6 +52,7 @@ export type WorkstationContextFeedQueryResultV1 = {
     microReasonerRunCount: number;
   };
   goalContextUpdateId: string;
+  terminalAuthority: WorkstationContextFeedQueryTerminalAuthorityV1;
   post_tool_model_step_required: true;
   assistant_answer: false;
   terminal_eligible: false;
@@ -51,6 +63,12 @@ export type WorkstationContextFeedQueryResultV1 = {
 
 const feedKinds = new Set<string>(WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS);
 const actuators = new Set<string>(WORKSTATION_AGENT_GOAL_ACTUATORS);
+const freshnessStatuses = new Set<WorkstationContextFeedQueryResultV1["freshnessStatus"]>([
+  "fresh",
+  "stale",
+  "blocked",
+  "unknown",
+]);
 const feedUpdateLanes: Readonly<Record<AgentGoalContextFeedKindV1, {
   producerKinds: readonly GoalContextProducerKindV1[];
   updateKinds: readonly GoalContextUpdateKindV1[];
@@ -122,6 +140,20 @@ const stringArrayIssues = (value: unknown, field: string, options: { requireNonE
   value.forEach((entry, index) => {
     if (!isNonEmptyString(entry)) issues.push(`${field}[${index}] must be a non-empty string`);
   });
+  return issues;
+};
+
+const terminalAuthorityIssues = (value: unknown): string[] => {
+  const issues: string[] = [];
+  if (!isRecord(value)) return ["terminalAuthority must be an object"];
+  if (value.status !== "not_terminal") issues.push("terminalAuthority.status must be not_terminal");
+  if (value.finalAnswerEligible !== false) issues.push("terminalAuthority.finalAnswerEligible must be false");
+  if (value.completedSolverPathRequired !== true) {
+    issues.push("terminalAuthority.completedSolverPathRequired must be true");
+  }
+  if (value.terminalAuthoritySingleWriterRequired !== true) {
+    issues.push("terminalAuthority.terminalAuthoritySingleWriterRequired must be true");
+  }
   return issues;
 };
 
@@ -250,6 +282,55 @@ export function validateWorkstationContextFeedQueryResultV1(
   ) {
     issues.push("policyEvidenceRefs must include actuator policy ref");
   }
+  issues.push(...stringArrayIssues(value.sourceRefs, "sourceRefs", { requireNonEmpty: true }));
+  issues.push(...stringArrayIssues(value.loopRefs, "loopRefs", { requireNonEmpty: true }));
+  issues.push(...stringArrayIssues(value.evidenceRefs, "evidenceRefs", { requireNonEmpty: true }));
+  if (!freshnessStatuses.has(value.freshnessStatus)) issues.push("freshnessStatus is invalid");
+  if (value.status === "read" && value.freshnessStatus === "blocked") {
+    issues.push("read feed query results must not have blocked freshnessStatus");
+  }
+  if (value.status === "blocked" && value.freshnessStatus !== "blocked") {
+    issues.push("blocked feed query results must have blocked freshnessStatus");
+  }
+  if (Array.isArray(value.loopRefs) && feedKinds.has(value.feedKind)) {
+    if (!value.loopRefs.includes(`workstation_context_feed:${value.feedKind}`)) {
+      issues.push("loopRefs must include workstation context feed loop ref");
+    }
+  }
+  if (Array.isArray(value.loopRefs) && actuators.has(value.requiredActuator)) {
+    if (!value.loopRefs.includes(`workstation_actuator:${value.requiredActuator}`)) {
+      issues.push("loopRefs must include required actuator loop ref");
+    }
+  }
+  if (Array.isArray(value.evidenceRefs)) {
+    if (isNonEmptyString(value.resultId) && !value.evidenceRefs.includes(value.resultId)) {
+      issues.push("evidenceRefs must include resultId");
+    }
+    if (Array.isArray(value.policyEvidenceRefs)) {
+      for (const ref of value.policyEvidenceRefs) {
+        if (!value.evidenceRefs.includes(ref)) {
+          issues.push("evidenceRefs must include every policyEvidenceRefs entry");
+          break;
+        }
+      }
+    }
+    if (Array.isArray(value.sourceRefs)) {
+      for (const ref of value.sourceRefs) {
+        if (!value.evidenceRefs.includes(ref)) {
+          issues.push("evidenceRefs must include every sourceRefs entry");
+          break;
+        }
+      }
+    }
+    if (Array.isArray(value.loopRefs)) {
+      for (const ref of value.loopRefs) {
+        if (!value.evidenceRefs.includes(ref)) {
+          issues.push("evidenceRefs must include every loopRefs entry");
+          break;
+        }
+      }
+    }
+  }
   if (typeof value.actuatorAllowed !== "boolean") issues.push("actuatorAllowed must be boolean");
   if (value.status === "read" && value.feedAllowed !== true) issues.push("read feed query results must have feedAllowed=true");
   if (value.status === "read" && value.actuatorAllowed !== true) {
@@ -351,6 +432,7 @@ export function validateWorkstationContextFeedQueryResultV1(
     }
   }
   if (!isNonEmptyString(value.goalContextUpdateId)) issues.push("goalContextUpdateId must be a non-empty string");
+  issues.push(...terminalAuthorityIssues(value.terminalAuthority));
   if (value.post_tool_model_step_required !== true) issues.push("post_tool_model_step_required must be true");
   if (value.assistant_answer !== false) issues.push("assistant_answer must be false");
   if (value.terminal_eligible !== false) issues.push("terminal_eligible must be false");

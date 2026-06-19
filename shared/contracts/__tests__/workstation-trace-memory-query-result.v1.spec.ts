@@ -5,6 +5,11 @@ import {
   validateWorkstationTraceMemoryQueryResultV1,
   type WorkstationTraceMemoryQueryResultV1,
 } from "../workstation-trace-memory-query-result.v1";
+import {
+  WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
+  WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
+  type AgentGoalSessionV1,
+} from "../workstation-goal-context.v1";
 
 const traceFixture = (
   overrides: Partial<HelixWorkstationReasoningTrace> = {},
@@ -49,6 +54,40 @@ const resultFixture = (
   overrides: Partial<WorkstationTraceMemoryQueryResultV1> = {},
 ): WorkstationTraceMemoryQueryResultV1 => {
   const trace = traceFixture();
+  const agentGoalSession: AgentGoalSessionV1 = {
+    schemaVersion: WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
+    goalId: "goal:frog",
+    threadId: "helix-ask:desktop",
+    roomId: "room:desktop",
+    objective: "Use trace memory while classifying frog imagery from ImageLens.",
+    userVisibleSummary: "Reading trace memory.",
+    status: "active",
+    sourceRefs: ["visual_evidence:frog", "microdeck_run:frog-classifier"],
+    loopRefs: ["workstation_context_feed:trace_memory", "workstation_actuator:query_trace_memory"],
+    constructRefs: ["image-lens", "stage-play-badge-graph"],
+    contextFeeds: [{
+      feedId: "feed:trace-memory",
+      sourceKind: "trace_memory",
+      freshnessMs: 120_000,
+      relevancePolicy: "same-thread-or-turn",
+    }],
+    allowedActuators: ["query_trace_memory"],
+    cadence: { kind: "user_turn_only" },
+    stopConditions: ["user stops the goal", "trace memory becomes unavailable"],
+    checkpoints: [{
+      checkpointId: "goal_checkpoint:trace-memory:1",
+      createdAtMs: 1_780_000_000_000,
+      summary: "Trace memory queried.",
+      evidenceRefs: ["workstation_trace:frog-classifier"],
+      actionsTaken: ["query_trace_memory"],
+      nextStep: "continue",
+    }],
+    authority: {
+      assistantAnswer: false,
+      finalReportsRequireTerminalAuthority: true,
+      finalReportRequirements: WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
+    },
+  };
   return {
     schema: WORKSTATION_TRACE_MEMORY_QUERY_RESULT_SCHEMA,
     resultId: "helix_workstation_reasoning_trace_query:frog",
@@ -66,7 +105,7 @@ const resultFixture = (
     feedAllowed: true,
     requiredActuator: "query_trace_memory",
     actuatorAllowed: true,
-    agentGoalSession: null,
+    agentGoalSession,
     goalContextUpdateId: "stage_play_goal_context_update:trace_memory:frog",
     terminalAuthority: {
       status: "not_terminal",
@@ -98,6 +137,27 @@ describe("helix.workstation_reasoning_trace_query_result.v1", () => {
       selectedTrace: null,
       trace_count: 0,
     } as Partial<WorkstationTraceMemoryQueryResultV1>))).toEqual([]);
+  });
+
+  it("rejects trace-memory reads without policy refs or valid goal-session evidence", () => {
+    expect(validateWorkstationTraceMemoryQueryResultV1(resultFixture({
+      policyEvidenceRefs: ["context_feed:trace_memory"],
+      actuatorAllowed: false,
+      agentGoalSession: { goalId: "goal:wrong", threadId: "helix-ask:desktop" },
+    } as Partial<WorkstationTraceMemoryQueryResultV1>))).toEqual(expect.arrayContaining([
+      "policyEvidenceRefs must include actuator policy ref",
+      "read trace memory query results must have actuatorAllowed=true",
+      "agentGoalSession.schemaVersion must match agent goal session schema",
+      "agentGoalSession.goalId must match goalId",
+    ]));
+
+    expect(validateWorkstationTraceMemoryQueryResultV1(resultFixture({
+      policyEvidenceRefs: ["allowed_actuator:query_trace_memory"],
+      feedAllowed: false,
+    } as Partial<WorkstationTraceMemoryQueryResultV1>))).toEqual(expect.arrayContaining([
+      "policyEvidenceRefs must include context feed policy ref",
+      "read trace memory query results must have feedAllowed=true",
+    ]));
   });
 
   it("rejects terminalizing query results and traces", () => {

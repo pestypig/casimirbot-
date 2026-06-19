@@ -33,6 +33,22 @@ describe("narrator event contract", () => {
     expect(validateNarratorEventV1(event)).toEqual([]);
   });
 
+  it("accepts narrator observations linked to durable goal-context updates", () => {
+    expect(validateNarratorEventV1({
+      ...event,
+      goalId: "goal:translation-monitor",
+      goalContextUpdateId: "stage_play_goal_context_update:narrator:translation",
+      evidenceRefs: [
+        "image_lens_focus_run:1",
+        "stage_play_goal_context_update:narrator:translation",
+      ],
+      producedRefs: [
+        "narrator:event:1",
+        "stage_play_goal_context_update:narrator:translation",
+      ],
+    })).toEqual([]);
+  });
+
   it("accepts terminal final-answer events only with final authority", () => {
     const finalAnswerProjection = {
       ...event,
@@ -51,17 +67,19 @@ describe("narrator event contract", () => {
   it("rejects non-final events that try to become answers", () => {
     expect(validateNarratorEventV1({
       ...event,
+      authority: "terminal_answer",
       assistant_answer: true,
       terminal_eligible: true,
       rawContentIncluded: true,
     })).toEqual(expect.arrayContaining([
+      "non-final narrator events must not use terminal_answer authority",
       "non-final narrator events must not be assistant answers",
       "non-final narrator events must not be terminal eligible",
       "non-final narrator events must not include raw content",
     ]));
   });
 
-  it("requires narrator observations to carry evidence refs", () => {
+  it("requires narrator observations to carry evidence refs and durable goal-context proof when present", () => {
     expect(validateNarratorEventV1({
       ...event,
       evidenceRefs: [],
@@ -73,6 +91,23 @@ describe("narrator event contract", () => {
       evidenceRefs: ["valid-ref", ""],
     })).toEqual(expect.arrayContaining([
       "evidenceRefs[1] must be a non-empty string",
+    ]));
+    expect(validateNarratorEventV1({
+      ...event,
+      goalId: " ",
+      goalContextUpdateId: "stage_play_goal_context_update:narrator:translation",
+      producedRefs: ["narrator:event:1"],
+    })).toEqual(expect.arrayContaining([
+      "goalId must be a non-empty string or null",
+      "evidenceRefs must include goalContextUpdateId",
+      "producedRefs must include goalContextUpdateId",
+    ]));
+    expect(validateNarratorEventV1({
+      ...event,
+      goalContextUpdateId: "stage_play_goal_context_update:narrator:translation",
+    })).toEqual(expect.arrayContaining([
+      "evidenceRefs must include goalContextUpdateId",
+      "producedRefs must be provided when goalContextUpdateId is present",
     ]));
   });
 

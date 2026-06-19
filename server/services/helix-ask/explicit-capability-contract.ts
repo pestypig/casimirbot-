@@ -51,6 +51,19 @@ const liveEnvironmentControlContract = (input: {
 const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
   {
     schema: "helix.explicit_capability_contract.v1",
+    capability: "helix_ask.inspect_capability_catalog",
+    aliases: ["helix.ask.inspect_capability_catalog", "inspect_capability_catalog"],
+    capability_family: "capability_catalog",
+    plan_family: "capability_catalog",
+    source_target: "runtime_evidence",
+    admission_families: ["capability_catalog", "runtime_evidence"],
+    required_observation_kinds: ["capability_registry", "capability_help_summary"],
+    required_terminal_kind: "capability_help_summary",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
     capability: "scientific-calculator.solve_expression",
     capability_family: "calculator",
     plan_family: "workstation_action",

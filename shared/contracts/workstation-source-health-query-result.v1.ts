@@ -2,6 +2,10 @@ import {
   HELIX_SITUATION_SOURCE_CAPABILITY_SCHEMA,
   type HelixSituationSourceCapability,
 } from "../helix-situation-source-capability";
+import {
+  validateAgentGoalSessionV1,
+  type AgentGoalSessionV1,
+} from "./workstation-goal-context.v1";
 
 export const WORKSTATION_SOURCE_HEALTH_QUERY_RESULT_SCHEMA =
   "helix.situation_source_capability_read.v1" as const;
@@ -24,6 +28,10 @@ export type WorkstationSourceHealthQueryResultV1 = {
   status: "read" | "blocked";
   missingRequirements: string[];
   policyEvidenceRefs: string[];
+  sourceRefs: string[];
+  loopRefs: string[];
+  evidenceRefs: string[];
+  freshnessStatus: "fresh" | "stale" | "blocked" | "unknown";
   goalSessionFound: boolean | null;
   feedAllowed: boolean;
   requiredActuator: "query_source_health";
@@ -147,6 +155,20 @@ const terminalAuthorityIssues = (value: unknown): string[] => {
   return issues;
 };
 
+const goalSessionIssues = (
+  value: unknown,
+  field: string,
+  expectedGoalId: string | null | undefined,
+): string[] => {
+  if (!isRecord(value)) return [`${field} must be an object`];
+  const issues = validateAgentGoalSessionV1(value as AgentGoalSessionV1)
+    .map((issue) => `${field}.${issue}`);
+  if (isNonEmptyString(expectedGoalId) && value.goalId !== expectedGoalId) {
+    issues.push(`${field}.goalId must match goalId`);
+  }
+  return issues;
+};
+
 export function validateWorkstationSourceHealthQueryResultV1(
   value: WorkstationSourceHealthQueryResultV1,
 ): string[] {
@@ -175,12 +197,50 @@ export function validateWorkstationSourceHealthQueryResultV1(
     issues.push("blocked source health query results must include missingRequirements");
   }
   issues.push(...stringArrayIssues(value.policyEvidenceRefs, "policyEvidenceRefs", { requireNonEmpty: true }));
+  if (Array.isArray(value.policyEvidenceRefs) && !value.policyEvidenceRefs.includes("context_feed:source_health")) {
+    issues.push("policyEvidenceRefs must include context feed policy ref");
+  }
+  issues.push(...stringArrayIssues(value.sourceRefs, "sourceRefs", { requireNonEmpty: true }));
+  issues.push(...stringArrayIssues(value.loopRefs, "loopRefs", { requireNonEmpty: true }));
+  issues.push(...stringArrayIssues(value.evidenceRefs, "evidenceRefs", { requireNonEmpty: true }));
+  if (Array.isArray(value.loopRefs) && !value.loopRefs.includes("workstation_context_feed:source_health")) {
+    issues.push("loopRefs must include source-health context feed loop ref");
+  }
+  if (Array.isArray(value.loopRefs) && !value.loopRefs.includes("workstation_actuator:query_source_health")) {
+    issues.push("loopRefs must include source-health actuator loop ref");
+  }
+  if (Array.isArray(value.evidenceRefs)) {
+    if (!value.evidenceRefs.includes(value.resultId)) issues.push("evidenceRefs must include resultId");
+    if (Array.isArray(value.policyEvidenceRefs)) {
+      for (const ref of value.policyEvidenceRefs) {
+        if (!value.evidenceRefs.includes(ref)) {
+          issues.push("evidenceRefs must include every policyEvidenceRefs entry");
+          break;
+        }
+      }
+    }
+  }
+  if (!["fresh", "stale", "blocked", "unknown"].includes(String(value.freshnessStatus))) {
+    issues.push("freshnessStatus is invalid");
+  }
   if (value.goalSessionFound !== null && typeof value.goalSessionFound !== "boolean") {
     issues.push("goalSessionFound must be boolean or null");
   }
   if (typeof value.feedAllowed !== "boolean") issues.push("feedAllowed must be boolean");
   if (value.requiredActuator !== "query_source_health") issues.push("requiredActuator must be query_source_health");
   if (typeof value.actuatorAllowed !== "boolean") issues.push("actuatorAllowed must be boolean");
+  if (Array.isArray(value.policyEvidenceRefs) && !value.policyEvidenceRefs.includes("allowed_actuator:query_source_health")) {
+    issues.push("policyEvidenceRefs must include actuator policy ref");
+  }
+  if (value.status === "read" && value.feedAllowed !== true) {
+    issues.push("read source health query results must have feedAllowed=true");
+  }
+  if (value.status === "read" && value.actuatorAllowed !== true) {
+    issues.push("read source health query results must have actuatorAllowed=true");
+  }
+  if (value.goalSessionFound === true) {
+    issues.push(...goalSessionIssues(value.agentGoalSession, "agentGoalSession", value.goalId));
+  }
   if (!isNonEmptyString(value.goalContextUpdateId)) issues.push("goalContextUpdateId must be a non-empty string");
   issues.push(...terminalAuthorityIssues(value.terminalAuthority));
   if (value.post_tool_model_step_required !== true) issues.push("post_tool_model_step_required must be true");

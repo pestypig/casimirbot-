@@ -22,6 +22,12 @@ const runFixture = (
   mailIds: ["stage_play_live_source_mail:visual-1"],
   inputRefs: ["stage_play_live_source_mail:visual-1"],
   outputRefs: ["microdeck_output:frog-claims"],
+  evidenceRefs: [
+    "stage_play_micro_reasoner_run:frog-claims",
+    "stage_play_live_source_mail:visual-1",
+    "microdeck_output:frog-claims",
+  ],
+  goalContextUpdateRefs: ["stage_play_goal_context_update:microdeck:frog-claims"],
   inputPreview: "Frog image visible in ImageLens.",
   outputPreview: "Likely frog classification cues are visible.",
   status: "completed",
@@ -59,6 +65,28 @@ describe("stage_play_micro_reasoner_run/v1", () => {
       "terminal_eligible must be false",
       "raw_content_included must be false",
       "context_role must be tool_evidence or micro_reasoner_evidence",
+    ]));
+  });
+
+  it("rejects MicroReasoner evidence refs that omit the run, input, or output refs", () => {
+    expect(validateStagePlayMicroReasonerRunV1(runFixture({
+      evidenceRefs: ["stage_play_live_source_mail:visual-1", "microdeck_output:frog-claims"],
+    }))).toEqual(expect.arrayContaining([
+      "evidenceRefs must include runId",
+    ]));
+
+    expect(validateStagePlayMicroReasonerRunV1(runFixture({
+      evidenceRefs: ["stage_play_micro_reasoner_run:frog-claims", "microdeck_output:frog-claims"],
+    }))).toEqual(expect.arrayContaining([
+      "evidenceRefs must include inputRefs",
+    ]));
+
+    expect(validateStagePlayMicroReasonerRunV1(runFixture({
+      evidenceRefs: ["stage_play_micro_reasoner_run:frog-claims", "stage_play_live_source_mail:visual-1"],
+      goalContextUpdateRefs: ["stage_play_goal_context_update:microdeck:frog-claims", ""],
+    }))).toEqual(expect.arrayContaining([
+      "evidenceRefs must include outputRefs",
+      "goalContextUpdateRefs must include only non-empty strings",
     ]));
   });
 });

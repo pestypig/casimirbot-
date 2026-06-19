@@ -27,7 +27,7 @@ export const capabilityPlanId = (plan: HelixCapabilityPlan): string =>
 const isReceiptKind = (kind: string): boolean => /receipt|tool_evaluation|workstation_tool_evaluation/i.test(kind);
 
 const isEvidenceKind = (kind: string): boolean =>
-  /^(?:workspace_directory_resolution|doc_search_results|doc_candidate_validation|doc_location_matches|doc_evidence_location|doc_location_result|doc_equation_context|situation_context_pack|procedure_epoch_replay|visual_scene_comparison_result|repo_code_evidence_answer|scholarly_research_observation|scholarly_full_text_observation|scholarly_research_answer|internet_search_observation|internet_search_answer|process_graph_overview|source_binding_status|source_binding_repair_candidate|reasoning_context|validation)$/.test(kind);
+  /^(?:workspace_directory_resolution|doc_search_results|doc_candidate_validation|doc_location_matches|doc_evidence_location|doc_location_result|doc_equation_context|situation_context_pack|procedure_epoch_replay|visual_scene_comparison_result|repo_code_evidence_answer|scholarly_research_observation|scholarly_full_text_observation|scholarly_research_answer|internet_search_observation|internet_search_answer|process_graph_overview|source_binding_status|source_binding_repair_candidate|capability_registry|capability_help_summary|reasoning_context|validation)$/.test(kind);
 
 const collectRefs = (artifacts: RecordLike[]): { receiptRefs: string[]; evidenceRefs: string[] } => {
   const receiptRefs: string[] = [];

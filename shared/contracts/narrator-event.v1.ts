@@ -40,6 +40,9 @@ export type NarratorEventV1 = {
   terminal_eligible: boolean;
   certainty?: NarratorCertainty | null;
   evidenceRefs: string[];
+  goalId?: string | null;
+  goalContextUpdateId?: string | null;
+  producedRefs?: string[];
   traceId?: string;
   turnKey?: string;
   rawContentIncluded: boolean;
@@ -104,6 +107,34 @@ export function validateNarratorEventV1(value: NarratorEventV1): string[] {
   if (!value.text.trim()) issues.push("text is required");
   if (!authorities.has(value.authority)) issues.push("authority is invalid");
   issues.push(...stringArrayIssues(value.evidenceRefs, "evidenceRefs", { requireNonEmpty: true }));
+  if (value.goalId !== undefined && value.goalId !== null && !value.goalId.trim()) {
+    issues.push("goalId must be a non-empty string or null");
+  }
+  if (value.goalContextUpdateId !== undefined && value.goalContextUpdateId !== null && !value.goalContextUpdateId.trim()) {
+    issues.push("goalContextUpdateId must be a non-empty string or null");
+  }
+  if (value.producedRefs !== undefined) {
+    issues.push(...stringArrayIssues(value.producedRefs, "producedRefs", { requireNonEmpty: true }));
+  }
+  if (
+    value.goalContextUpdateId &&
+    Array.isArray(value.evidenceRefs) &&
+    !value.evidenceRefs.includes(value.goalContextUpdateId)
+  ) {
+    issues.push("evidenceRefs must include goalContextUpdateId");
+  }
+  if (value.goalContextUpdateId) {
+    if (!Array.isArray(value.producedRefs)) {
+      issues.push("producedRefs must be provided when goalContextUpdateId is present");
+    } else {
+      if (value.eventId && !value.producedRefs.includes(value.eventId)) {
+        issues.push("producedRefs must include eventId");
+      }
+      if (!value.producedRefs.includes(value.goalContextUpdateId)) {
+        issues.push("producedRefs must include goalContextUpdateId");
+      }
+    }
+  }
   if (!deliveryModes.has(value.requestedDeliveryMode)) issues.push("requestedDeliveryMode is invalid");
   if (!deliveryModes.has(value.defaultDeliveryMode)) issues.push("defaultDeliveryMode is invalid");
   if (!value.dedupeKey) issues.push("dedupeKey is required");
@@ -117,6 +148,7 @@ export function validateNarratorEventV1(value: NarratorEventV1): string[] {
     if (value.assistant_answer !== true) issues.push("final_answer requires assistant_answer true");
     if (value.terminal_eligible !== true) issues.push("final_answer requires terminal_eligible true");
   } else {
+    if (value.authority === "terminal_answer") issues.push("non-final narrator events must not use terminal_answer authority");
     if (value.assistant_answer !== false) issues.push("non-final narrator events must not be assistant answers");
     if (value.terminal_eligible !== false) issues.push("non-final narrator events must not be terminal eligible");
     if (value.rawContentIncluded !== false) issues.push("non-final narrator events must not include raw content");

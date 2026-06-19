@@ -3404,7 +3404,7 @@ export const DOC_FILE_METADATA: Record<string, DocFileMetadata> = {
   "docs/research/nhm2-code-and-evidence-congruence-audit-2026-04-02.md": {"mtimeMs":1775326476469,"mtimeIso":"2026-04-04T18:14:36.469Z","sizeBytes":33411},
   "docs/research/nhm2-current-status-memo-2026-04-03.md": {"mtimeMs":1775189304950,"mtimeIso":"2026-04-03T04:08:24.950Z","sizeBytes":33826},
   "docs/research/nhm2-current-status-whitepaper-2026-04-03.md": {"mtimeMs":1777741176553,"mtimeIso":"2026-05-02T16:59:36.553Z","sizeBytes":52822},
-  "docs/research/nhm2-current-status-whitepaper-2026-05-02.md": {"mtimeMs":1781814090495,"mtimeIso":"2026-06-18T20:21:30.495Z","sizeBytes":119290},
+  "docs/research/nhm2-current-status-whitepaper-2026-05-02.md": {"mtimeMs":1781815928850,"mtimeIso":"2026-06-18T20:52:08.850Z","sizeBytes":121418},
   "docs/research/nhm2-deeper-reformulation-decision-memo-2026-03-31.md": {"mtimeMs":1775006287429,"mtimeIso":"2026-04-01T01:18:07.429Z","sizeBytes":2839},
   "docs/research/nhm2-deeper-reformulation-decision-memo-2026-04-01.md": {"mtimeMs":1775073519632,"mtimeIso":"2026-04-01T19:58:39.632Z","sizeBytes":2839},
   "docs/research/nhm2-deeper-reformulation-decision-memo-2026-04-02.md": {"mtimeMs":1775109167308,"mtimeIso":"2026-04-02T05:52:47.308Z","sizeBytes":2840},

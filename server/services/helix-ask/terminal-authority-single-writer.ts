@@ -2643,7 +2643,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     };
     delete input.payload.terminal_error_code;
     delete input.payload.terminal_failure_text;
-  } else if (!solverContinuationPending && selectedGoalArtifact?.kind === "capability_help_summary") {
+  } else if (selectedGoalArtifact?.kind === "capability_help_summary") {
     selectedArtifactRef = selectedGoalArtifact.ref;
     selectedArtifactKind = selectedGoalArtifact.kind;
     selectedSource = selectedGoalArtifact.kind;

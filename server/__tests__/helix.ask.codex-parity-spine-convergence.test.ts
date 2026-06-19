@@ -1,8 +1,8 @@
 import express from "express";
 import request from "supertest";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { planRouter } from "../routes/agi.plan";
+import { planRouter, resetHelixAskDebugPayloadCacheForTests } from "../routes/agi.plan";
 import {
   CODEX_PARITY_AGENT_SPINE_CLASSES,
   CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS,
@@ -130,6 +130,12 @@ const resetEndpointAdmissionForTests = (): void => {
   resetHelixAskTurnAdmissionForTests();
 };
 
+const resetConvergenceHarnessState = (): void => {
+  resetEndpointAdmissionForTests();
+  resetStagePlayLiveSourceMailWakeStoreForTest();
+  resetHelixAskDebugPayloadCacheForTests();
+};
+
 const expectRailTableShape = (railTable: RecordLike, turnId: string): void => {
   expect(railTable).toMatchObject({
     schema: CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
@@ -253,7 +259,7 @@ const fetchRailTable = async (input: {
   }
   (turn as unknown as { body?: unknown }).body = undefined;
   (debug as unknown as { body?: unknown }).body = undefined;
-  resetEndpointAdmissionForTests();
+  resetConvergenceHarnessState();
   return { turnId: turnId as string, turnRail: turnRail as RecordLike, debugRail: debugRail as RecordLike, terminal };
 };
 
@@ -275,8 +281,11 @@ const seedVisualCapture = async (input: {
 };
 
 beforeEach(() => {
-  resetEndpointAdmissionForTests();
-  resetStagePlayLiveSourceMailWakeStoreForTest();
+  resetConvergenceHarnessState();
+});
+
+afterEach(() => {
+  resetConvergenceHarnessState();
 });
 
 const EXPLICIT_CAPABILITY_SCENARIOS: ExplicitCapabilityScenario[] = [

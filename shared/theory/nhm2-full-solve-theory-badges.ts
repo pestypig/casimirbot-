@@ -30,6 +30,8 @@ const NHM2_SOURCE_OFF_DIAGONAL_SHEAR_AUDIT =
   `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-source-off-diagonal-shear-audit.json`;
 const NHM2_AXIS_ALIGNED_SOURCE_OFF_DIAGONAL_SHEAR_AUDIT =
   `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-source-off-diagonal-shear-audit.json`;
+const NHM2_AXIS_ALIGNED_SOURCE_MOMENTUM_DENSITY_AUDIT =
+  `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-source-momentum-density-audit.json`;
 const NHM2_AXIS_ALIGNED_TIME_DEPENDENT_SOURCE_CAMPAIGN =
   `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-time-dependent-source-campaign.json`;
 const NHM2_AXIS_ALIGNED_REGIONAL_MATERIAL_SOURCE_TENSOR_MODEL =
@@ -1185,6 +1187,71 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   nhm2FullSolveBadge({
+    id: "nhm2.source.momentum_density_audit",
+    title: "Momentum-Density Audit",
+    plainMeaning:
+      "Checks whether source-side T0i momentum-density components have documented flux, current, or constitutive momentum evidence.",
+    whyItMatters:
+      "It separates a present T0i tensor row from a source model that can actually explain momentum density on the same chart.",
+    subjects: ["nhm2", "source_tensor", "momentum_density", "t0i", "dynamic_campaign"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
+    tags: ["runtime_artifact", "momentum_t0i", "source_mechanism", "falsifier_candidate"],
+    equations: [
+      {
+        id: "momentum_density_audit_gate",
+        role: "noncomputable_reference",
+        displayLatex:
+          "\\mathrm{momentumAudit}=\\{T_{01},T_{02},T_{03}\\}_{source}\\land mechanism_{J_i}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["T01", "T02", "T03", "mechanism_J_i"],
+        outputSymbols: ["source_momentum_density_status"],
+      },
+    ],
+    units: [
+      { symbol: "T0i", unit: "J/m^3", quantity: "momentum_density_channel", dimensionSignature: "M L^-1 T^-2" },
+    ],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "A declared full tensor row does not by itself document a momentum-density mechanism.",
+      "Momentum-density pass windows are residual diagnostics and cannot be used as source-model inputs.",
+      "A current-model falsifier is scoped to the declared source model and is not a universal impossibility proof.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef(
+        "shared/contracts/nhm2-source-momentum-density-audit.v1.ts",
+        "nhm2-source-momentum-density-audit-contract",
+        "Typed audit for source-side T0i momentum-density mechanism evidence.",
+      ),
+      artifactRef(
+        "tools/nhm2/build-source-momentum-density-audit.ts",
+        "nhm2-source-momentum-density-audit-builder",
+        "Builder that compares source component authority against regional full-tensor momentum-density residuals.",
+      ),
+      artifactRef(
+        NHM2_AXIS_ALIGNED_SOURCE_MOMENTUM_DENSITY_AUDIT,
+        "sha256:7ee6ec82afd39cea39881b531a778a926f8f68d42b70b93790a570fa19452820",
+        "Axis-aligned candidate momentum audit: currentDeclaredSourceModelFalsified=true; causalMaterialMomentumBoundFalsifier=false because the atlas tensor basis is chart, not local_orthonormal_to_chart; uniform T0i fractions detected; worst required amplification is about 2.02e22 and worst metric-required momentum-to-energy ratio is about 2.24e15 on T02.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "source_tensor", "momentum_density", "t0i", "dynamic_campaign"],
+      symbols: ["T01", "T02", "T03", "mechanism_J_i", "source_momentum_density_status"],
+      unitSignatures: ["M L^-1 T^-2"],
+      repoPaths: [
+        "shared/contracts/nhm2-source-momentum-density-audit.v1.ts",
+        "tools/nhm2/build-source-momentum-density-audit.ts",
+        NHM2_AXIS_ALIGNED_SOURCE_MOMENTUM_DENSITY_AUDIT,
+      ],
+      equationFamilies: ["full_tensor_residual", "time_dependent_source_campaign"],
+      simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
     id: "nhm2.dynamic.time_dependent_source_campaign",
     title: "Time-Dependent Source Campaign",
     plainMeaning:
@@ -1244,8 +1311,13 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
       ),
       artifactRef(
         NHM2_AXIS_ALIGNED_TIME_DEPENDENT_SOURCE_CAMPAIGN,
-        "sha256:a42d6e122b77d117093c9dc68a7997f7739b66c91c5acbca8d2506e3f7479928",
-        "Axis-aligned shear-suppressed candidate campaign: campaignPass=false; firstBlocker=hull:T01:full_tensor_residual_exceeded; it removes the current-declared-source-model shear falsifier but exposes momentum-density closure as the next source-side failure.",
+        "sha256:e8fbc9e7bcab18cd7fd62ce673b2d4116dc533451b0f50c148b48a53ba078ea1",
+        "Axis-aligned shear-suppressed candidate campaign: campaignPass=false; firstBlocker=momentum_density_causal_bound_frame_projection_missing; it removes the current-declared-source-model shear falsifier but requires a local orthonormal/projection receipt before the raw T0i/T00 ratio can become a causal-material bound conclusion.",
+      ),
+      artifactRef(
+        NHM2_AXIS_ALIGNED_SOURCE_MOMENTUM_DENSITY_AUDIT,
+        "sha256:7ee6ec82afd39cea39881b531a778a926f8f68d42b70b93790a570fa19452820",
+        "Momentum-density audit for the axis-aligned branch: worst required amplification is about 2.02e22; worst metric-required momentum-to-energy ratio is about 2.24e15; the reduced-order causal material momentum-bound check is blocked pending local orthonormal/projection evidence.",
       ),
       artifactRef(
         NHM2_AXIS_ALIGNED_REGIONAL_MATERIAL_SOURCE_TENSOR_MODEL,
@@ -1274,6 +1346,7 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_SOURCE_OFF_DIAGONAL_SHEAR_AUDIT,
         NHM2_TIME_DEPENDENT_SOURCE_CAMPAIGN,
         NHM2_AXIS_ALIGNED_SOURCE_OFF_DIAGONAL_SHEAR_AUDIT,
+        NHM2_AXIS_ALIGNED_SOURCE_MOMENTUM_DENSITY_AUDIT,
         NHM2_AXIS_ALIGNED_TIME_DEPENDENT_SOURCE_CAMPAIGN,
         NHM2_AXIS_ALIGNED_REGIONAL_MATERIAL_SOURCE_TENSOR_MODEL,
         NHM2_FULL_SOLVE_WHITEPAPER,
@@ -2764,6 +2837,14 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "documents",
     label: "The source-side shear audit sharpens off-diagonal Tij failures inside the frozen time-dependent campaign.",
     claimBoundaryNote: "Missing shear-mechanism evidence is a diagnostic falsifier candidate, not a physical-source validation result.",
+  },
+  {
+    id: "source_momentum_density_audit_feeds_time_dependent_campaign",
+    from: "nhm2.source.momentum_density_audit",
+    to: "nhm2.dynamic.time_dependent_source_campaign",
+    relation: "documents",
+    label: "The source-side momentum-density audit sharpens T0i failures inside the frozen time-dependent campaign.",
+    claimBoundaryNote: "Missing momentum-density mechanism evidence is a diagnostic falsifier candidate, not a physical-source validation result.",
   },
   {
     id: "time_dependent_campaign_blocks_diagnostic_boundary",

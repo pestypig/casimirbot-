@@ -152,6 +152,11 @@ describe("workstation goal context contract", () => {
       "helix:narrator:say:1",
       "translation_segment:latest",
       "allowed_actuator:narrator_say",
+      "live-answer:translation",
+      "live_answer",
+      "narrator:say",
+      "thread:helix-ask:desktop",
+      "workstation_actuator:narrator_say",
     ],
     producedRefs: ["helix:narrator:say:1", "stage_play_goal_context_update:narrator:say"],
     goalContextUpdateId: "stage_play_goal_context_update:narrator:say",
@@ -179,7 +184,11 @@ describe("workstation goal context contract", () => {
     evidenceRefs: [
       "helix:narrator:bind:1",
       "source:browser-audio",
+      "translated_transcript",
       "allowed_actuator:narrator_bind_stream",
+      "narrator:bind_stream",
+      "thread:helix-ask:desktop",
+      "workstation_actuator:narrator_bind_stream",
     ],
     producedRefs: ["helix:narrator:bind:1", "stage_play_goal_context_update:narrator:bind"],
     goalContextUpdateId: "stage_play_goal_context_update:narrator:bind",
@@ -514,6 +523,32 @@ describe("workstation goal context contract", () => {
   it("accepts narrator control request artifacts as non-terminal workstation observations", () => {
     expect(validateNarratorSayRequestV1(narratorSayRequest)).toEqual([]);
     expect(validateNarratorBindStreamRequestV1(narratorBindStreamRequest)).toEqual([]);
+  });
+
+  it("rejects narrator requests whose evidence omits policy, source, or loop proof refs", () => {
+    expect(validateNarratorSayRequestV1({
+      ...narratorSayRequest,
+      loopRefs: ["thread:helix-ask:desktop"],
+      evidenceRefs: ["helix:narrator:say:1", "translation_segment:latest"],
+    })).toEqual(expect.arrayContaining([
+      "loopRefs must include narrator:say",
+      "loopRefs must include workstation_actuator:narrator_say",
+      "evidenceRefs must include every sourceRefs entry",
+      "evidenceRefs must include every loopRefs entry",
+      "evidenceRefs must include narrator_say actuator policy ref",
+    ]));
+
+    expect(validateNarratorBindStreamRequestV1({
+      ...narratorBindStreamRequest,
+      loopRefs: ["thread:helix-ask:desktop"],
+      evidenceRefs: ["helix:narrator:bind:1", "source:browser-audio"],
+    })).toEqual(expect.arrayContaining([
+      "loopRefs must include narrator:bind_stream",
+      "loopRefs must include workstation_actuator:narrator_bind_stream",
+      "evidenceRefs must include every sourceRefs entry",
+      "evidenceRefs must include every loopRefs entry",
+      "evidenceRefs must include narrator_bind_stream actuator policy ref",
+    ]));
   });
 
   it("rejects narrator say requests that try to become answer authority or raw terminal text", () => {

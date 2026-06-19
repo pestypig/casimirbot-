@@ -74,11 +74,84 @@ const collectCoverageArtifacts = (debugExport: Record<string, unknown> | null): 
   });
 };
 
+export const collectUiDebugRailCandidates = (
+  debugExport: Record<string, unknown> | null,
+): Record<string, unknown>[] => {
+  const payload = asRecord(debugExport?.payload);
+  return [
+    asRecord(debugExport?.codex_parity_agent_spine_rail_table),
+    asRecord(getPath(debugExport, ["debug", "codex_parity_agent_spine_rail_table"])),
+    asRecord(getPath(debugExport, ["artifact_query_index", "codex_parity_agent_spine_rail_table"])),
+    asRecord(getPath(debugExport, ["debug", "artifact_query_index", "codex_parity_agent_spine_rail_table"])),
+    asRecord(payload?.codex_parity_agent_spine_rail_table),
+    asRecord(getPath(payload, ["debug", "codex_parity_agent_spine_rail_table"])),
+    asRecord(getPath(payload, ["artifact_query_index", "codex_parity_agent_spine_rail_table"])),
+    asRecord(getPath(payload, ["debug", "artifact_query_index", "codex_parity_agent_spine_rail_table"])),
+  ].filter((entry): entry is Record<string, unknown> => Boolean(entry));
+};
+
 const findRailTable = (debugExport: Record<string, unknown> | null): Record<string, unknown> | null =>
-  asRecord(debugExport?.codex_parity_agent_spine_rail_table) ??
-  asRecord(getPath(debugExport, ["debug", "codex_parity_agent_spine_rail_table"])) ??
-  asRecord(getPath(debugExport, ["artifact_query_index", "codex_parity_agent_spine_rail_table"])) ??
-  asRecord(getPath(debugExport, ["debug", "artifact_query_index", "codex_parity_agent_spine_rail_table"]));
+  collectUiDebugRailCandidates(debugExport)[0] ?? null;
+
+const RAIL_MIRROR_COMPARISON_FIELDS = [
+  "schema",
+  "turn_id",
+  "prompt",
+  "requested_capability",
+  "visible_tool_surface",
+  "visible_tool_surface_original_count",
+  "visible_tool_surface_truncated",
+  "selected_capability",
+  "admitted_capability",
+  "admission_proof_source",
+  "admission_proven",
+  "executed_capability",
+  "observation_kind",
+  "observation_ref",
+  "required_observation_kinds_for_requested_capability",
+  "observed_artifact_supports_requested_capability",
+  "reentry_status",
+  "reentry_proof_source",
+  "reentry_proven",
+  "goal_satisfaction",
+  "required_terminal_kind",
+  "selected_terminal_kind",
+  "terminal_authority_proof_source",
+  "terminal_authority_proven",
+  "visible_terminal_kind",
+  "visible_projection_source",
+  "visible_projection_proven",
+  "codex_parity_class",
+  "first_broken_rail",
+  "repair_target",
+  "rail_status",
+  "rail_failure_code",
+  "normalized_codex_parity_classes",
+  "assistant_answer",
+  "terminal_eligible",
+  "raw_content_included",
+] as const;
+
+const comparableRailValue = (value: unknown): unknown => value === undefined ? null : value;
+
+export const collectUiDebugRailMirrorViolations = (
+  railTables: Record<string, unknown>[],
+): string[] => {
+  if (railTables.length < 2) return [];
+  const violations: string[] = [];
+  const base = railTables[0];
+  for (const [index, railTable] of railTables.entries()) {
+    if (index === 0) continue;
+    for (const key of RAIL_MIRROR_COMPARISON_FIELDS) {
+      const baseValue = comparableRailValue(base[key]);
+      const mirrorValue = comparableRailValue(railTable[key]);
+      if (JSON.stringify(baseValue) !== JSON.stringify(mirrorValue)) {
+        violations.push(`rail_mirror_${index}_${key}_mismatch:${String(mirrorValue ?? "null")}!=${String(baseValue ?? "null")}`);
+      }
+    }
+  }
+  return violations;
+};
 
 export const collectRailTableViolations = (
   railTable: Record<string, unknown> | null,
@@ -383,7 +456,8 @@ async function runPrompt(page: Page, item: HarnessPrompt): Promise<HarnessResult
     .then((value) => value ?? "");
   const debugExport = await collectDebugExport(page);
   const terminalAuthority = asRecord(debugExport?.terminal_answer_authority);
-  const railTable = findRailTable(debugExport);
+  const railCandidates = collectUiDebugRailCandidates(debugExport);
+  const railTable = railCandidates[0] ?? null;
   const turnId =
     readString(debugExport?.turn_id) ||
     readString(debugExport?.active_turn_id) ||
@@ -401,6 +475,7 @@ async function runPrompt(page: Page, item: HarnessPrompt): Promise<HarnessResult
 
   if (!debugExport) violations.push("debug_export_missing");
   violations.push(...collectRailTableViolations(railTable, terminalAuthority, turnId || null, debugTerminalKind || null));
+  violations.push(...collectUiDebugRailMirrorViolations(railCandidates));
   violations.push(...completeRailEnvelopeViolations({ railTable, debugExport, visibleFinalAnswer }));
   if (!visibleFinalAnswer) violations.push("visible_final_answer_missing");
   if (terminalAuthorityText && visibleFinalAnswer !== terminalAuthorityText) {

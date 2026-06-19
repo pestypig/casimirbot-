@@ -24,6 +24,7 @@ import {
 import { buildNhm2TileEffectiveFullTensorSourceArtifact } from "../shared/contracts/nhm2-tile-effective-full-tensor-source.v1";
 import type { Nhm2RegionalFullTensorResidualArtifactV1 } from "../shared/contracts/nhm2-regional-full-tensor-residual.v1";
 import type { Nhm2SourceComponentAuthorityLedgerArtifactV1 } from "../shared/contracts/nhm2-source-component-authority-ledger.v1";
+import type { Nhm2SourceMomentumDensityAuditArtifactV1 } from "../shared/contracts/nhm2-source-momentum-density-audit.v1";
 import type { Nhm2SourceOffDiagonalShearAuditArtifactV1 } from "../shared/contracts/nhm2-source-off-diagonal-shear-audit.v1";
 import {
   buildNhm2DynamicEffectiveGeometryEvidence,
@@ -187,6 +188,59 @@ const completeLedger = (
       missingComponentsCannotBeZeroFilled: true,
     },
   }) as Nhm2SourceComponentAuthorityLedgerArtifactV1;
+
+const momentumAudit = (): Nhm2SourceMomentumDensityAuditArtifactV1 =>
+  ({
+    contractVersion: "nhm2_source_momentum_density_audit/v1",
+    generatedAt: "2026-06-18T00:00:00.000Z",
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+    runId: "campaign-test",
+    sourceComponentAuthorityLedgerRef: "ledger.json",
+    regionalFullTensorResidualRef: "residual.json",
+    regionalSupportFunctionAtlasRef: "atlas.json",
+    regions: [],
+    summary: {
+      allMomentumComponentsPresent: true,
+      allMomentumWithinTolerance: false,
+      anyMomentumMechanismMissing: true,
+      worstRegionId: "hull",
+      worstComponentId: "T02",
+      worstRequiredAmplificationToPass: 2.2e21,
+      worstMetricRequiredMomentumToEnergyRatio: 2e15,
+      worstSourceMomentumToEnergyRatio: 0.000001,
+      causalMomentumBoundApplicabilityStatus: "blocked",
+      causalMomentumBoundFrameRef: "grid:chart",
+      causalMomentumBoundRequiresLocalOrthonormalFrame: true,
+      causalMomentumBoundApplicabilityBlockers: [
+        "causal_momentum_bound_requires_local_orthonormal_frame:atlas_tensor_basis=chart",
+      ],
+      anyMetricRequiredCausalMomentumBoundViolation: true,
+      anySourceCausalMomentumBoundViolation: false,
+      uniformFractionalMomentumAnsatzDetected: true,
+      sourceFractionByComponent: {
+        T01: 0.000001,
+        T02: 0.0000005,
+        T03: 0.0000002,
+      },
+      worstFractionalAmplificationToRequirement: 2e21,
+      firstBlocker: "hull:T01:momentum_component_residual_exceeded",
+      falsifierCandidate: true,
+      currentDeclaredSourceModelFalsified: true,
+      causalMaterialMomentumBoundFalsifier: true,
+      falsifierScope: "current_declared_source_model",
+      falsifierReason:
+        "declared_uniform_fractional_momentum_density_without_mechanism_exceeds_required_amplification",
+      blockerCount: 12,
+    },
+    claimBoundary: {
+      diagnosticOnly: true,
+      momentumAuditDoesNotValidatePhysicalSource: true,
+      passWindowCannotBeUsedAsSourceModelInput: true,
+      missingMomentumMechanismBlocksClosure: true,
+      currentModelFalsifierDoesNotProveUniversalSourceImpossibility: true,
+    },
+  }) as Nhm2SourceMomentumDensityAuditArtifactV1;
 
 const fullTensorResidual = (
   summary?: Partial<Nhm2RegionalFullTensorResidualArtifactV1["summary"]>,
@@ -1105,6 +1159,50 @@ describe("NHM2 time-dependent source campaign", () => {
     expect(gate?.primaryMetric).toContain("shearAuditWorstSuppression=5830000000000000");
     expect(artifact.summary.firstBlocker).toBe(
       "source_off_diagonal_current_declared_model_falsified",
+    );
+  });
+
+  it("surfaces momentum-density ansatz evidence in the full tensor campaign gate", () => {
+    const artifact = buildNhm2TimeDependentSourceCampaign({
+      sourceComponentAuthorityLedger: completeLedger(),
+      regionalFullTensorResidual: fullTensorResidual({
+        fullTensorResidualsPass: false,
+        worstRegionId: "hull",
+        worstComponentId: "T01",
+        worstResidualFamily: "momentum_t0i",
+        worstRelResidual: 1.001,
+        firstBlocker: "hull:T01:full_tensor_residual_exceeded",
+        blockerCount: 1,
+      }),
+      sourceMomentumDensityAudit: momentumAudit(),
+      frequencyConvergence: frequencyEvidence(),
+      switchingConservation: switchingEvidence(),
+      dynamicEffectiveGeometry: dynamicGeometryEvidence(),
+      qeiWorldlineDossier: qeiDossier(),
+      observerRobustEnergyConditions: observerArtifact(),
+      campaignStability: stabilityEvidence(),
+    });
+    const gate = artifact.gates.find(
+      (entry) => entry.gateId === "full_regional_tensor_closure",
+    );
+
+    expect(gate?.status).toBe("fail");
+    expect(gate?.blockers).toEqual(
+      expect.arrayContaining([
+        "momentum_density_causal_bound_frame_projection_missing",
+        "source_momentum_density_current_declared_model_falsified",
+        "source_momentum_density_mechanism_missing",
+        "hull:T01:full_tensor_residual_exceeded",
+      ]),
+    );
+    expect(gate?.warnings).toEqual(
+      expect.arrayContaining(["source_momentum_density_uniform_fractional_ansatz"]),
+    );
+    expect(gate?.primaryMetric).toContain("momentumAuditWorstAmplification=2.2e+21");
+    expect(gate?.primaryMetric).toContain("momentumAuditWorstMetricRequiredRatio=2000000000000000");
+    expect(gate?.primaryMetric).toContain("momentumAuditCausalBoundApplicability=blocked");
+    expect(artifact.summary.firstBlocker).toBe(
+      "momentum_density_causal_bound_frame_projection_missing",
     );
   });
 

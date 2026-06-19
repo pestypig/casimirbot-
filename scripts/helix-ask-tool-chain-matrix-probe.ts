@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   CODEX_PARITY_AGENT_SPINE_CLASSES,
   CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS,
@@ -59,7 +60,7 @@ type RailSummary = {
   rail_failure_code: string | null;
 };
 
-type ToolChainScenario = {
+export type ToolChainScenario = {
   id: string;
   prompt: string;
   category:
@@ -74,7 +75,14 @@ type ToolChainScenario = {
     | "repo_evidence";
 };
 
-const BASE_URL = (process.env.HELIX_ASK_BASE_URL ?? "http://127.0.0.1:5050").replace(/\/+$/, "");
+export type ToolChainScenarioSelection = {
+  scenarios: ToolChainScenario[];
+  requestedIds: string[];
+  unknownIds: string[];
+  availableIds: string[];
+};
+
+const BASE_URL = (process.env.HELIX_ASK_BASE_URL ?? "http://127.0.0.1:1498").replace(/\/+$/, "");
 const OUT_DIR = process.env.HELIX_ASK_TOOL_CHAIN_OUT ?? "artifacts/helix-ask-tool-chain-matrix";
 const TIMEOUT_MS = Math.max(1000, Number(process.env.HELIX_ASK_TOOL_CHAIN_TIMEOUT_MS ?? 240_000));
 const FAIL_ON_WARN = process.env.HELIX_ASK_TOOL_CHAIN_FAIL_ON_WARN === "1";
@@ -84,7 +92,7 @@ const SCENARIO_FILTER = (process.env.HELIX_ASK_TOOL_CHAIN_SCENARIOS ?? "")
   .map((entry) => entry.trim())
   .filter(Boolean);
 
-const SCENARIOS: ToolChainScenario[] = [
+export const TOOL_CHAIN_MATRIX_SCENARIOS: ToolChainScenario[] = [
   {
     id: "docs_open",
     category: "workstation_tool",
@@ -132,6 +140,30 @@ const SCENARIOS: ToolChainScenario[] = [
     prompt: "What is Auntie Dottie in this app?",
   },
 ];
+
+const SCENARIOS = TOOL_CHAIN_MATRIX_SCENARIOS;
+
+export const selectToolChainMatrixScenarios = (
+  requestedIds: string[] = SCENARIO_FILTER,
+): ToolChainScenarioSelection => {
+  const normalizedRequestedIds = Array.from(new Set(requestedIds.map((entry) => entry.trim()).filter(Boolean)));
+  const availableIds = SCENARIOS.map((scenario) => scenario.id);
+  if (normalizedRequestedIds.length === 0) {
+    return {
+      scenarios: SCENARIOS,
+      requestedIds: [],
+      unknownIds: [],
+      availableIds,
+    };
+  }
+  const knownIds = new Set(availableIds);
+  return {
+    scenarios: SCENARIOS.filter((scenario) => normalizedRequestedIds.includes(scenario.id)),
+    requestedIds: normalizedRequestedIds,
+    unknownIds: normalizedRequestedIds.filter((id) => !knownIds.has(id)),
+    availableIds,
+  };
+};
 
 const readRecord = (value: unknown): RecordLike | null =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as RecordLike) : null;
@@ -255,14 +287,19 @@ const getPayload = (ask: RecordLike, debug: RecordLike | null): RecordLike => {
   return ask;
 };
 
-const findRailTable = (ask: RecordLike, payload: RecordLike, debug: RecordLike | null): RecordLike | null =>
-  readRecord(ask.codex_parity_agent_spine_rail_table) ??
-  readRecord(payload.codex_parity_agent_spine_rail_table) ??
-  readRecord(getPath(payload, ["debug", "codex_parity_agent_spine_rail_table"])) ??
-  readRecord(getPath(payload, ["artifact_query_index", "codex_parity_agent_spine_rail_table"])) ??
-  readRecord(getPath(payload, ["debug", "artifact_query_index", "codex_parity_agent_spine_rail_table"])) ??
-  readRecord(debug?.codex_parity_agent_spine_rail_table) ??
-  readRecord(getPath(debug, ["payload", "codex_parity_agent_spine_rail_table"]));
+const railCandidates = (ask: RecordLike, payload: RecordLike, debug: RecordLike | null): RecordLike[] =>
+  [
+    readRecord(ask.codex_parity_agent_spine_rail_table),
+    readRecord(payload.codex_parity_agent_spine_rail_table),
+    readRecord(getPath(payload, ["debug", "codex_parity_agent_spine_rail_table"])),
+    readRecord(getPath(payload, ["artifact_query_index", "codex_parity_agent_spine_rail_table"])),
+    readRecord(getPath(payload, ["debug", "artifact_query_index", "codex_parity_agent_spine_rail_table"])),
+    readRecord(debug?.codex_parity_agent_spine_rail_table),
+    readRecord(getPath(debug, ["payload", "codex_parity_agent_spine_rail_table"])),
+    readRecord(getPath(debug, ["payload", "debug", "codex_parity_agent_spine_rail_table"])),
+    readRecord(getPath(debug, ["payload", "artifact_query_index", "codex_parity_agent_spine_rail_table"])),
+    readRecord(getPath(debug, ["debug", "codex_parity_agent_spine_rail_table"])),
+  ].filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry));
 
 const railSummaryFor = (railTable: RecordLike | null): RailSummary => ({
   present: Boolean(railTable),
@@ -499,6 +536,64 @@ const collectRailTableFailures = (input: {
   return failures;
 };
 
+const RAIL_MIRROR_COMPARISON_FIELDS = [
+  "schema",
+  "turn_id",
+  "prompt",
+  "requested_capability",
+  "visible_tool_surface",
+  "visible_tool_surface_original_count",
+  "visible_tool_surface_truncated",
+  "selected_capability",
+  "admitted_capability",
+  "admission_proof_source",
+  "admission_proven",
+  "executed_capability",
+  "observation_kind",
+  "observation_ref",
+  "required_observation_kinds_for_requested_capability",
+  "observed_artifact_supports_requested_capability",
+  "reentry_status",
+  "reentry_proof_source",
+  "reentry_proven",
+  "goal_satisfaction",
+  "required_terminal_kind",
+  "selected_terminal_kind",
+  "terminal_authority_proof_source",
+  "terminal_authority_proven",
+  "visible_terminal_kind",
+  "visible_projection_source",
+  "visible_projection_proven",
+  "codex_parity_class",
+  "first_broken_rail",
+  "repair_target",
+  "rail_status",
+  "rail_failure_code",
+  "normalized_codex_parity_classes",
+  "assistant_answer",
+  "terminal_eligible",
+  "raw_content_included",
+] as const;
+
+const railMirrorComparableValue = (value: unknown): unknown => value === undefined ? null : value;
+
+const compareRailMirrors = (rails: RecordLike[]): string[] => {
+  if (rails.length < 2) return [];
+  const failures: string[] = [];
+  const base = rails[0];
+  for (const [index, rail] of rails.entries()) {
+    if (index === 0) continue;
+    for (const key of RAIL_MIRROR_COMPARISON_FIELDS) {
+      const baseValue = railMirrorComparableValue(base[key]);
+      const railValue = railMirrorComparableValue(rail[key]);
+      if (JSON.stringify(baseValue) !== JSON.stringify(railValue)) {
+        failures.push(`rail_mirror_${index}_${key}_mismatch:${String(railValue ?? "null")}!=${String(baseValue ?? "null")}`);
+      }
+    }
+  }
+  return failures;
+};
+
 const collectTimelineEvents = (payload: RecordLike, debug: RecordLike | null): RecordLike[] => {
   const candidates = [
     readRecord(payload.causal_turn_timeline),
@@ -679,6 +774,7 @@ const classifyScenario = (input: {
   visibleText: string;
   terminalWriter: RecordLike | null;
   railTable: RecordLike | null;
+  railTables: RecordLike[];
   turnId: string;
   debugAvailable: boolean;
   repoPacketPresent: boolean;
@@ -695,6 +791,7 @@ const classifyScenario = (input: {
     visibleText,
     terminalWriter,
     railTable,
+    railTables,
     turnId,
     debugAvailable,
     repoPacketPresent,
@@ -702,6 +799,7 @@ const classifyScenario = (input: {
 
   if (!debugAvailable) warnings.push("debug_export_missing");
   failures.push(...collectRailTableFailures({ railTable, terminalKind, turnId, prompt: scenario.prompt }));
+  failures.push(...compareRailMirrors(railTables));
   failures.push(...completeRailEnvelopeFailures({ railTable, terminalKind, terminalError, visibleText }));
   if (!timelineEvents.length) warnings.push("causal_timeline_missing");
   if (receiptLeak(visibleText)) failures.push("receipt_framing_leaked_into_visible_answer");
@@ -827,7 +925,8 @@ const runScenario = async (scenario: ToolChainScenario, runId: string, outputDir
   const visibleText = visibleTextOf(ask, payload, terminalWriter);
   const terminalKind = getTerminalKind(ask, payload, terminalWriter);
   const terminalError = getTerminalError(ask, payload);
-  const railTable = findRailTable(ask, payload, debug);
+  const railTables = railCandidates(ask, payload, debug);
+  const railTable = railTables[0] ?? null;
   const repoPacketPresent =
     Boolean(readRecord(payload.repo_docs_synthesis_packet_summary)) ||
     artifactKinds.some((kind) => kind.includes("repo_docs_synthesis_packet")) ||
@@ -842,6 +941,7 @@ const runScenario = async (scenario: ToolChainScenario, runId: string, outputDir
     visibleText,
     terminalWriter,
     railTable,
+    railTables,
     turnId,
     debugAvailable: Boolean(debug),
     repoPacketPresent,
@@ -918,17 +1018,57 @@ const renderMarkdownSummary = (input: {
 };
 
 const main = async (): Promise<void> => {
-  const selected = new Set(SCENARIO_FILTER);
-  const scenarios = SCENARIO_FILTER.length ? SCENARIOS.filter((scenario) => selected.has(scenario.id)) : SCENARIOS;
-
-  if (DRY_RUN) {
-    console.log(JSON.stringify({ ok: true, dry_run: true, base_url: BASE_URL, scenarios }, null, 2));
-    return;
-  }
-
+  const selection = selectToolChainMatrixScenarios();
+  const scenarios = selection.scenarios;
   const runId = `tool-chain-${Date.now()}`;
   const outputDir = path.resolve(OUT_DIR, runId);
   await fs.mkdir(outputDir, { recursive: true });
+
+  if (selection.unknownIds.length || scenarios.length === 0) {
+    const summary = {
+      schema: "helix.ask_tool_chain_matrix_probe_summary.v1",
+      ok: false,
+      blocked: true,
+      blocked_reason: selection.unknownIds.length ? "unknown_scenario_filter" : "no_scenarios_selected",
+      run_id: runId,
+      base_url: BASE_URL,
+      output_dir: outputDir,
+      requested_scenarios: selection.requestedIds,
+      selected_scenarios: scenarios.map((scenario) => scenario.id),
+      unknown_scenarios: selection.unknownIds,
+      available_scenarios: selection.availableIds,
+      counts: {
+        pass: 0,
+        warn: 1,
+        fail: 0,
+      },
+      results: [],
+    };
+    await fs.writeFile(path.join(outputDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
+    await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, results: [], outputDir }));
+    console.log(JSON.stringify(summary, null, 2));
+    process.exitCode = 1;
+    return;
+  }
+
+  if (DRY_RUN) {
+    const summary = {
+      ok: true,
+      dry_run: true,
+      run_id: runId,
+      base_url: BASE_URL,
+      output_dir: outputDir,
+      requested_scenarios: selection.requestedIds,
+      selected_scenarios: scenarios.map((scenario) => scenario.id),
+      available_scenarios: selection.availableIds,
+      scenarios,
+      results: [],
+    };
+    await fs.writeFile(path.join(outputDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
+    await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, results: [], outputDir }));
+    console.log(JSON.stringify(summary, null, 2));
+    return;
+  }
 
   const preflight = await probeAskTurnApi();
   if (!preflight.ok) {
@@ -996,7 +1136,9 @@ const main = async (): Promise<void> => {
   if (!summary.ok) process.exitCode = 1;
 };
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  });
+}

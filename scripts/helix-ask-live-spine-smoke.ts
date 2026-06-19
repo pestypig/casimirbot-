@@ -227,7 +227,7 @@ export const LIVE_SPINE_SMOKE_SCENARIOS: LiveSpineScenario[] = [
     coverage: ["capability_catalog"],
     prompt: "What tools are available for the helix ask to use?",
     expected: {
-      requestedCapability: null,
+      requestedCapability: "helix_ask.inspect_capability_catalog",
       selectedCapability: "helix_ask.inspect_capability_catalog",
       admittedCapability: "helix_ask.inspect_capability_catalog",
       executedCapability: "helix_ask.inspect_capability_catalog",
@@ -444,6 +444,7 @@ const extractPayload = (debugExport: unknown): RecordLike | null => {
 };
 
 const railCandidates = (ask: RecordLike, debugExport: unknown): RecordLike[] => {
+  const rawDebug = readRecord(debugExport);
   const payload = extractPayload(debugExport);
   return [
     readRecord(ask.codex_parity_agent_spine_rail_table),
@@ -451,6 +452,11 @@ const railCandidates = (ask: RecordLike, debugExport: unknown): RecordLike[] => 
     readRecord(getPath(payload, ["debug", "codex_parity_agent_spine_rail_table"])),
     readRecord(getPath(payload, ["artifact_query_index", "codex_parity_agent_spine_rail_table"])),
     readRecord(getPath(payload, ["debug", "artifact_query_index", "codex_parity_agent_spine_rail_table"])),
+    readRecord(rawDebug?.codex_parity_agent_spine_rail_table),
+    readRecord(getPath(rawDebug, ["payload", "codex_parity_agent_spine_rail_table"])),
+    readRecord(getPath(rawDebug, ["payload", "debug", "codex_parity_agent_spine_rail_table"])),
+    readRecord(getPath(rawDebug, ["payload", "artifact_query_index", "codex_parity_agent_spine_rail_table"])),
+    readRecord(getPath(rawDebug, ["debug", "codex_parity_agent_spine_rail_table"])),
   ].filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry));
 };
 
@@ -742,36 +748,58 @@ const shapeFailures = (rail: RecordLike, turnId: string, prompt: string): string
   return failures;
 };
 
+const RAIL_MIRROR_COMPARISON_FIELDS = [
+  "schema",
+  "turn_id",
+  "prompt",
+  "requested_capability",
+  "visible_tool_surface",
+  "visible_tool_surface_original_count",
+  "visible_tool_surface_truncated",
+  "selected_capability",
+  "admitted_capability",
+  "admission_proof_source",
+  "admission_proven",
+  "executed_capability",
+  "observation_kind",
+  "observation_ref",
+  "required_observation_kinds_for_requested_capability",
+  "observed_artifact_supports_requested_capability",
+  "reentry_status",
+  "reentry_proof_source",
+  "reentry_proven",
+  "goal_satisfaction",
+  "required_terminal_kind",
+  "selected_terminal_kind",
+  "terminal_authority_proof_source",
+  "terminal_authority_proven",
+  "visible_terminal_kind",
+  "visible_projection_source",
+  "visible_projection_proven",
+  "codex_parity_class",
+  "first_broken_rail",
+  "repair_target",
+  "rail_status",
+  "rail_failure_code",
+  "normalized_codex_parity_classes",
+  "assistant_answer",
+  "terminal_eligible",
+  "raw_content_included",
+] as const;
+
+const railMirrorComparableValue = (value: unknown): unknown => value === undefined ? null : value;
+
 const compareRailMirrors = (rails: RecordLike[]): string[] => {
   if (rails.length < 2) return [];
   const failures: string[] = [];
   const base = rails[0];
   for (const [index, rail] of rails.entries()) {
-    for (const key of [
-      "requested_capability",
-      "selected_capability",
-      "admitted_capability",
-      "admission_proof_source",
-      "admission_proven",
-      "executed_capability",
-      "required_observation_kinds_for_requested_capability",
-      "observed_artifact_supports_requested_capability",
-      "reentry_status",
-      "reentry_proof_source",
-      "reentry_proven",
-      "terminal_authority_proof_source",
-      "terminal_authority_proven",
-      "visible_projection_source",
-      "visible_projection_proven",
-      "codex_parity_class",
-      "first_broken_rail",
-      "repair_target",
-      "selected_terminal_kind",
-      "visible_terminal_kind",
-      "rail_failure_code",
-    ]) {
-      if (JSON.stringify(base[key]) !== JSON.stringify(rail[key])) {
-        failures.push(`rail_mirror_${index}_${key}_mismatch:${String(rail[key] ?? "null")}!=${String(base[key] ?? "null")}`);
+    if (index === 0) continue;
+    for (const key of RAIL_MIRROR_COMPARISON_FIELDS) {
+      const baseValue = railMirrorComparableValue(base[key]);
+      const railValue = railMirrorComparableValue(rail[key]);
+      if (JSON.stringify(baseValue) !== JSON.stringify(railValue)) {
+        failures.push(`rail_mirror_${index}_${key}_mismatch:${String(railValue ?? "null")}!=${String(baseValue ?? "null")}`);
       }
     }
   }

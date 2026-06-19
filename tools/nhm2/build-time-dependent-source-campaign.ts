@@ -47,6 +47,10 @@ import {
   type Nhm2SourceOffDiagonalShearAuditArtifactV1,
 } from "../../shared/contracts/nhm2-source-off-diagonal-shear-audit.v1";
 import {
+  isNhm2SourceMomentumDensityAudit,
+  type Nhm2SourceMomentumDensityAuditArtifactV1,
+} from "../../shared/contracts/nhm2-source-momentum-density-audit.v1";
+import {
   buildNhm2TimeDependentSourceCampaign,
   isNhm2CampaignStabilityEvidence,
   isNhm2DynamicEffectiveGeometryEvidence,
@@ -114,6 +118,7 @@ export const runNhm2TimeDependentSourceCampaign = (args: {
   sourceComponentAuthorityLedgerPath?: string | null;
   regionalFullTensorResidualPath?: string | null;
   sourceOffDiagonalShearAuditPath?: string | null;
+  sourceMomentumDensityAuditPath?: string | null;
   covariantConservationDiagnosticPath?: string | null;
   qeiWorldlineDossierPath?: string | null;
   observerRobustEnergyConditionsPath?: string | null;
@@ -151,6 +156,13 @@ export const runNhm2TimeDependentSourceCampaign = (args: {
       args.sourceOffDiagonalShearAuditPath ?? null,
       isNhm2SourceOffDiagonalShearAudit,
       "source off-diagonal shear audit",
+    );
+  const sourceMomentumDensityAudit =
+    readOptional<Nhm2SourceMomentumDensityAuditArtifactV1>(
+      args.repoRoot,
+      args.sourceMomentumDensityAuditPath ?? null,
+      isNhm2SourceMomentumDensityAudit,
+      "source momentum-density audit",
     );
   const covariantConservationDiagnostic =
     readOptional<Nhm2CovariantConservationDiagnosticArtifactV1>(
@@ -240,6 +252,7 @@ export const runNhm2TimeDependentSourceCampaign = (args: {
       sourceComponentAuthorityLedger: args.sourceComponentAuthorityLedgerPath ?? null,
       regionalFullTensorResidual: args.regionalFullTensorResidualPath ?? null,
       sourceOffDiagonalShearAudit: args.sourceOffDiagonalShearAuditPath ?? null,
+      sourceMomentumDensityAudit: args.sourceMomentumDensityAuditPath ?? null,
       covariantConservationDiagnostic:
         args.covariantConservationDiagnosticPath ?? null,
       qeiWorldlineDossier: args.qeiWorldlineDossierPath ?? null,
@@ -262,6 +275,7 @@ export const runNhm2TimeDependentSourceCampaign = (args: {
     sourceComponentAuthorityLedger,
     regionalFullTensorResidual,
     sourceOffDiagonalShearAudit,
+    sourceMomentumDensityAudit,
     covariantConservationDiagnostic,
     qeiWorldlineDossier,
     observerRobustEnergyConditions,
@@ -305,6 +319,9 @@ if (normalize(process.argv[1] ?? "") === normalize(fileURLToPath(import.meta.url
     regionalFullTensorResidualPath: asString(args["regional-full-tensor-residual"]),
     sourceOffDiagonalShearAuditPath: asString(
       args["source-off-diagonal-shear-audit"],
+    ),
+    sourceMomentumDensityAuditPath: asString(
+      args["source-momentum-density-audit"],
     ),
     covariantConservationDiagnosticPath: asString(
       args["covariant-conservation-diagnostic"],

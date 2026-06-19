@@ -2047,12 +2047,24 @@ export function listStagePlayMicroReasonerPrompts(input: {
 export function recordStagePlayMicroReasonerRun(
   run: StagePlayMicroReasonerRunV1,
 ): StagePlayMicroReasonerRunV1 {
-  const validationIssues = validateStagePlayMicroReasonerRunV1(run);
+  const normalizedRun: StagePlayMicroReasonerRunV1 = {
+    ...run,
+    inputRefs: uniqueStrings(run.inputRefs),
+    outputRefs: uniqueStrings(run.outputRefs),
+    evidenceRefs: uniqueStrings([
+      run.runId,
+      ...run.inputRefs,
+      ...run.outputRefs,
+      ...(run.evidenceRefs ?? []),
+    ]),
+    goalContextUpdateRefs: uniqueStrings(run.goalContextUpdateRefs ?? []),
+  };
+  const validationIssues = validateStagePlayMicroReasonerRunV1(normalizedRun);
   if (validationIssues.length > 0) {
     throw new Error(`Invalid stage play micro reasoner run: ${validationIssues.join("; ")}`);
   }
-  runsById.set(run.runId, run);
-  return run;
+  runsById.set(normalizedRun.runId, normalizedRun);
+  return normalizedRun;
 }
 
 export function getStagePlayMicroReasonerRun(

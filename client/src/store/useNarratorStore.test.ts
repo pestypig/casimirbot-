@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { validateNarratorEventV1 } from "@shared/contracts/narrator-event.v1";
 import { useNarratorStore } from "./useNarratorStore";
 
 const initialState = useNarratorStore.getState();
@@ -38,6 +39,36 @@ describe("useNarratorStore", () => {
     expect(event).not.toBeNull();
     expect(useNarratorStore.getState().events).toHaveLength(1);
     expect(useNarratorStore.getState().events[0].assistant_answer).toBe(false);
+  });
+
+  it("normalizes durable goal-context refs for narrator events", () => {
+    const event = useNarratorStore.getState().publishEvent({
+      eventId: "narrator:event:goal-context",
+      sourceKind: "live_answer",
+      sourceId: "live-answer:translation-line:1",
+      text: "Translation stream is ready for narrator review.",
+      authority: "live_observation",
+      assistant_answer: false,
+      terminal_eligible: false,
+      goalId: "goal:translation-monitor",
+      goalContextUpdateId: "stage_play_goal_context_update:narrator:translation",
+      evidenceRefs: ["translation_segment:latest"],
+      rawContentIncluded: false,
+      speakable: true,
+      requestedDeliveryMode: "confirm_to_speak",
+      defaultDeliveryMode: "visible_only",
+    }, { nowMs: 20 });
+
+    expect(event).not.toBeNull();
+    expect(event?.evidenceRefs).toEqual(expect.arrayContaining([
+      "translation_segment:latest",
+      "stage_play_goal_context_update:narrator:translation",
+    ]));
+    expect(event?.producedRefs).toEqual([
+      "narrator:event:goal-context",
+      "stage_play_goal_context_update:narrator:translation",
+    ]);
+    expect(validateNarratorEventV1(event!)).toEqual([]);
   });
 
   it("drops duplicate narrator events inside the dedupe window", () => {

@@ -64,6 +64,82 @@ describe("Helix Ask live spine smoke dry-run contract", () => {
     });
   });
 
+  it("fails fixture classification when a debug rail mirror is stale", () => {
+    const scenario = LIVE_SPINE_SMOKE_SCENARIOS.find((entry) => entry.id === "capability_catalog_runtime");
+    expect(scenario).toBeTruthy();
+    const ask = buildCapabilityCatalogAskFixture({ includeRuntimeMarker: true });
+    const rail = ask.codex_parity_agent_spine_rail_table as Record<string, unknown>;
+    const staleDebugRail = {
+      ...rail,
+      turn_id: "ask:live-spine-smoke-fixture:previous-turn",
+      prompt: "Stale previous prompt",
+      visible_tool_surface: ["model.direct_answer"],
+      visible_tool_surface_original_count: 1,
+      observation_kind: "reasoning_context",
+      observation_ref: null,
+      required_terminal_kind: "model_synthesized_answer",
+      rail_status: "fail_closed",
+      raw_content_included: true,
+    };
+
+    const result = classifyLiveSpineSmokeResult(
+      scenario!,
+      ask,
+      {
+        payload: {
+          debug: {
+            codex_parity_agent_spine_rail_table: staleDebugRail,
+          },
+        },
+      },
+    );
+
+    expect(result.verdict).toBe("FAIL");
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        "rail_mirror_1_turn_id_mismatch:ask:live-spine-smoke-fixture:previous-turn!=ask:live-spine-smoke-fixture",
+        "rail_mirror_1_prompt_mismatch:Stale previous prompt!=What tools are available for the helix ask to use?",
+        "rail_mirror_1_visible_tool_surface_mismatch:model.direct_answer!=helix_ask.inspect_capability_catalog",
+        "rail_mirror_1_observation_kind_mismatch:reasoning_context!=capability_registry",
+        "rail_mirror_1_observation_ref_mismatch:null!=ask:live-spine-smoke-fixture:capability_registry_inspect:capability_registry:1",
+        "rail_mirror_1_required_terminal_kind_mismatch:model_synthesized_answer!=capability_help_summary",
+        "rail_mirror_1_rail_status_mismatch:fail_closed!=complete",
+        "rail_mirror_1_raw_content_included_mismatch:true!=false",
+      ]),
+    );
+  });
+
+  it("fails fixture classification when a raw debug wrapper rail mirror is stale", () => {
+    const scenario = LIVE_SPINE_SMOKE_SCENARIOS.find((entry) => entry.id === "capability_catalog_runtime");
+    expect(scenario).toBeTruthy();
+    const ask = buildCapabilityCatalogAskFixture({ includeRuntimeMarker: true });
+    const rail = ask.codex_parity_agent_spine_rail_table as Record<string, unknown>;
+    const staleWrapperRail = {
+      ...rail,
+      turn_id: "ask:live-spine-smoke-fixture:previous-wrapper-turn",
+      prompt: "Stale wrapper prompt",
+      visible_tool_surface: ["model.direct_answer"],
+    };
+
+    const result = classifyLiveSpineSmokeResult(
+      scenario!,
+      ask,
+      {
+        codex_parity_agent_spine_rail_table: staleWrapperRail,
+        payload: ask,
+      },
+    );
+
+    expect(result.verdict).toBe("FAIL");
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        "rail_mirror_2_turn_id_mismatch:ask:live-spine-smoke-fixture:previous-wrapper-turn!=ask:live-spine-smoke-fixture",
+        "rail_mirror_2_prompt_mismatch:Stale wrapper prompt!=What tools are available for the helix ask to use?",
+        "rail_mirror_2_visible_tool_surface_mismatch:model.direct_answer!=helix_ask.inspect_capability_catalog",
+      ]),
+    );
+  });
+
   it("fails fixture classification when a fail-closed rail projects as a normal final answer", () => {
     const scenario = LIVE_SPINE_SMOKE_SCENARIOS.find(
       (entry) => entry.id === "live_source_mail_observation_or_fail_closed",
@@ -143,7 +219,7 @@ const buildCapabilityCatalogAskFixture = (input: { includeRuntimeMarker: boolean
     schema: "helix.codex_parity_agent_spine_rail_table.v1",
     turn_id: turnId,
     prompt,
-    requested_capability: null,
+    requested_capability: "helix_ask.inspect_capability_catalog",
     visible_tool_surface: ["helix_ask.inspect_capability_catalog"],
     visible_tool_surface_original_count: 1,
     visible_tool_surface_truncated: false,
@@ -154,8 +230,8 @@ const buildCapabilityCatalogAskFixture = (input: { includeRuntimeMarker: boolean
     executed_capability: "helix_ask.inspect_capability_catalog",
     observation_kind: "capability_registry",
     observation_ref: `${turnId}:capability_registry_inspect:capability_registry:1`,
-    required_observation_kinds_for_requested_capability: [],
-    observed_artifact_supports_requested_capability: null,
+    required_observation_kinds_for_requested_capability: ["capability_registry", "capability_help_summary"],
+    observed_artifact_supports_requested_capability: true,
     reentry_status: "reentered",
     reentry_proof_source: "capability_help_summary_materialized_from_catalog_observation",
     reentry_proven: true,

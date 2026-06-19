@@ -55,6 +55,12 @@ describe("stage play MicroReasoner run store", () => {
     expect(run.assistant_answer).toBe(false);
     expect(run.terminal_eligible).toBe(false);
     expect(run.raw_content_included).toBe(false);
+    expect(run.evidenceRefs).toEqual(expect.arrayContaining([
+      run.runId,
+      "stage_play_live_source_mail:visual-1",
+      "microdeck_output:frog-claims",
+    ]));
+    expect(run.goalContextUpdateRefs).toEqual([]);
     expect(getStagePlayMicroReasonerRun(run.runId)).toEqual(run);
   });
 

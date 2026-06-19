@@ -174,6 +174,35 @@ describe("stage_play_workstation_control_receipt/v1", () => {
     ]));
   });
 
+  it("rejects control receipts whose evidence does not carry policy, source, and loop proof refs", () => {
+    expect(validateWorkstationControlReceiptV1(receiptFixture({
+      loopRefs: ["helix-ask:desktop"],
+      evidenceRefs: [
+        "stage_play_workstation_control_receipt:change_preset:frog",
+        "allowed_actuator:change_preset",
+        "visual_source:image-lens",
+      ],
+    }))).toEqual(expect.arrayContaining([
+      "loopRefs must include workstation control loop ref",
+      "loopRefs must include required actuator loop ref",
+      "evidenceRefs must include every sourceRefs entry",
+      "evidenceRefs must include every loopRefs entry",
+    ]));
+
+    expect(validateWorkstationControlReceiptV1(receiptFixture({
+      evidenceRefs: [
+        "stage_play_workstation_control_receipt:change_preset:frog",
+        "visual_source:image-lens",
+        "source:visual:active",
+        "helix-ask:desktop",
+        "workstation_control:change_preset",
+        "workstation_actuator:change_preset",
+      ],
+    }))).toEqual(expect.arrayContaining([
+      "evidenceRefs must include every policyEvidenceRefs entry",
+    ]));
+  });
+
   it("requires prepared process-graph focus receipts to name a node", () => {
     expect(validateWorkstationControlReceiptV1(receiptFixture({
       receiptId: "stage_play_workstation_control_receipt:focus_process_graph:frog",
@@ -181,6 +210,7 @@ describe("stage_play_workstation_control_receipt/v1", () => {
       label: "focus process graph",
       requiredActuator: "focus_process_graph",
       policyEvidenceRefs: ["allowed_actuator:focus_process_graph"],
+      sourceRefs: ["visual_source:image-lens", "packet:frog"],
       loopRefs: ["helix-ask:desktop", "workstation_control:focus_process_graph", "workstation_actuator:focus_process_graph"],
       evidenceRefs: [
         "stage_play_workstation_control_receipt:focus_process_graph:frog",
@@ -228,6 +258,7 @@ describe("stage_play_workstation_control_receipt/v1", () => {
       label: "bind workstation source",
       requiredActuator: "bind_source",
       policyEvidenceRefs: ["allowed_actuator:bind_source"],
+      sourceRefs: ["source:visual:active", "live-answer:visual"],
       sourceRef: "source:visual:active",
       targetRef: "live-answer:visual",
       presetId: null,

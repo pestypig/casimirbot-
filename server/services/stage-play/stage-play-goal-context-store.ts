@@ -528,7 +528,10 @@ export function syncStagePlayGoalContextFromMailbox(input: {
 
   for (const packet of input.processedMailPackets) {
     const primaryMail = lookupMail(packet, mailById);
-    const primaryRun = packet.microReasonerRunRefs.map((runRef) => runsById.get(runRef)).find(Boolean) ?? null;
+    const packetRuns = packet.microReasonerRunRefs
+      .map((runRef) => runsById.get(runRef))
+      .filter((run): run is StagePlayMicroReasonerRunV1 => Boolean(run));
+    const primaryRun = packetRuns[0] ?? null;
     const sourceKind = primaryMail?.sourceKind ?? null;
     const observedAtMs = readTimeMs(packet.createdAt, nowMs);
     const goalId =
@@ -539,7 +542,7 @@ export function syncStagePlayGoalContextFromMailbox(input: {
       primaryMail?.sourceId,
       ...packet.mailIds,
       ...packet.visualEvidenceRefs,
-      ...(primaryRun?.outputRefs ?? []),
+      ...packetRuns.flatMap((run) => run.outputRefs),
     ]);
     const loopRefs = uniqueStrings([
       `thread:${input.threadId}`,
@@ -555,7 +558,11 @@ export function syncStagePlayGoalContextFromMailbox(input: {
       packet.packetId,
       ...packet.evidenceRefs,
       ...packet.visualEvidenceRefs,
-      ...(primaryRun?.outputRefs ?? []),
+      ...packet.microReasonerRunRefs,
+      ...packetRuns.flatMap((run) => run.inputRefs),
+      ...packetRuns.flatMap((run) => run.outputRefs),
+      ...packetRuns.flatMap((run) => run.evidenceRefs ?? []),
+      ...packetRuns.flatMap((run) => run.goalContextUpdateRefs ?? []),
     ]).slice(0, 80);
     const packetReceiptRefs = uniqueStrings([
       ...packet.mailIds,

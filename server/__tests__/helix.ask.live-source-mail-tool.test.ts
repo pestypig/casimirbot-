@@ -2592,6 +2592,23 @@ describe("live-source mail live environment tools", () => {
         "context_feed:visual_summaries",
         "allowed_actuator:query_visual_summaries",
       ]),
+      sourceRefs: expect.arrayContaining([sourceId]),
+      loopRefs: expect.arrayContaining([
+        "workstation_context_feed:visual_summaries",
+        "workstation_actuator:query_visual_summaries",
+      ]),
+      evidenceRefs: expect.arrayContaining([
+        "context_feed:visual_summaries",
+        "allowed_actuator:query_visual_summaries",
+        sourceId,
+      ]),
+      freshnessStatus: "fresh",
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       post_tool_model_step_required: true,
       assistant_answer: false,
       terminal_eligible: false,
@@ -2698,6 +2715,17 @@ describe("live-source mail live environment tools", () => {
         "context_feed:microdeck_outputs",
         "allowed_actuator:query_microdeck_outputs",
       ]),
+      loopRefs: expect.arrayContaining([
+        "workstation_context_feed:microdeck_outputs",
+        "workstation_actuator:query_microdeck_outputs",
+      ]),
+      freshnessStatus: "fresh",
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
       post_tool_model_step_required: true,
       assistant_answer: false,
       terminal_eligible: false,
@@ -4882,6 +4910,13 @@ describe("live-source mail live environment tools", () => {
       contractValidationIssues: [],
       goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:source_health:/),
       policyEvidenceRefs: ["context_feed:source_health", "allowed_actuator:query_source_health"],
+      sourceRefs: expect.any(Array),
+      loopRefs: expect.arrayContaining(["workstation_context_feed:source_health", "workstation_actuator:query_source_health"]),
+      evidenceRefs: expect.arrayContaining([
+        "context_feed:source_health",
+        "allowed_actuator:query_source_health",
+      ]),
+      freshnessStatus: expect.stringMatching(/^(fresh|stale|blocked|unknown)$/),
       capabilityCount: expect.any(Number),
       terminalAuthority: {
         status: "not_terminal",
@@ -4905,7 +4940,7 @@ describe("live-source mail live environment tools", () => {
       updateId: payload.goalContextUpdateId,
       producerKind: "source_health",
       updateKind: "source_status",
-      evidenceRefs: expect.arrayContaining(["context_feed:source_health", "allowed_actuator:query_source_health"]),
+      evidenceRefs: expect.arrayContaining(payload.evidenceRefs),
       loopRefs: expect.arrayContaining(["workstation_context_feed:source_health", "workstation_actuator:query_source_health"]),
       authority: {
         assistantAnswer: false,
@@ -4924,6 +4959,7 @@ describe("live-source mail live environment tools", () => {
       "context_feed:source_health",
       "allowed_actuator:query_source_health",
     ]));
+    expect(observation.evidence_refs).toEqual(expect.arrayContaining(payload.evidenceRefs));
     expect(observation.producedRefs).toEqual(expect.arrayContaining([
       payload.goalContextUpdateId,
       payload.resultId,
@@ -4975,6 +5011,14 @@ describe("live-source mail live environment tools", () => {
       actuatorAllowed: true,
       requiredActuator: "query_source_health",
       policyEvidenceRefs: ["context_feed:source_health", "allowed_actuator:query_source_health"],
+      sourceRefs: expect.any(Array),
+      loopRefs: expect.arrayContaining(["workstation_context_feed:source_health", "workstation_actuator:query_source_health"]),
+      evidenceRefs: expect.arrayContaining([
+        payload.resultId,
+        "context_feed:source_health",
+        "allowed_actuator:query_source_health",
+      ]),
+      freshnessStatus: expect.stringMatching(/^(fresh|stale|blocked|unknown)$/),
       goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:source_health:/),
       capabilityCount: expect.any(Number),
       terminalAuthority: {
@@ -5063,6 +5107,15 @@ describe("live-source mail live environment tools", () => {
       feedAllowed: false,
       missingRequirements: ["context_feed:source_health"],
       policyEvidenceRefs: ["context_feed:source_health", "allowed_actuator:query_source_health"],
+      sourceRefs: [threadId],
+      loopRefs: expect.arrayContaining(["workstation_context_feed:source_health", "workstation_actuator:query_source_health"]),
+      evidenceRefs: expect.arrayContaining([
+        payload.resultId,
+        threadId,
+        "context_feed:source_health",
+        "allowed_actuator:query_source_health",
+      ]),
+      freshnessStatus: "blocked",
       capabilities: [],
       capabilityCount: 0,
       terminalAuthority: {
@@ -5087,7 +5140,7 @@ describe("live-source mail live environment tools", () => {
     expect(sourceHealthUpdate).toMatchObject({
       contentRef: expect.stringMatching(/^stage_play_source_health:/),
       freshness: expect.objectContaining({ status: "blocked" }),
-      evidenceRefs: expect.arrayContaining(["context_feed:source_health", "allowed_actuator:query_source_health"]),
+      evidenceRefs: expect.arrayContaining(payload.evidenceRefs),
       loopRefs: expect.arrayContaining(["workstation_context_feed:source_health", "workstation_actuator:query_source_health"]),
       authority: {
         assistantAnswer: false,
@@ -5103,6 +5156,7 @@ describe("live-source mail live environment tools", () => {
       "context_feed:source_health",
       "allowed_actuator:query_source_health",
     ]));
+    expect(observation.evidence_refs).toEqual(expect.arrayContaining(payload.evidenceRefs));
     expect(observation.producedRefs).toEqual(expect.arrayContaining([
       payload.goalContextUpdateId,
       payload.resultId,

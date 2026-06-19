@@ -43,6 +43,84 @@ describe("Helix Ask API parity rail envelope invariants", () => {
     expect(probe.procedural_ok).toBe(true);
     expect(probe.failures).toEqual([]);
   });
+
+  it("rejects stale debug rail mirrors that disagree with the API rail", () => {
+    const scenario = liveSourceFailClosedScenario();
+    const askTurn = buildLiveSourceFailClosedTurn({ projectAsTypedFailure: true });
+    const railTable = askTurn.codex_parity_agent_spine_rail_table as Record<string, unknown>;
+    const staleDebugRail = {
+      ...railTable,
+      turn_id: "ask:test:previous-turn",
+      prompt: "Stale previous prompt",
+      visible_tool_surface: ["model.direct_answer"],
+      visible_tool_surface_original_count: 1,
+      assistant_answer: true,
+      executed_capability: null,
+      observation_ref: null,
+    };
+    const debugPayload = Object.fromEntries(
+      Object.entries(askTurn).filter(([key]) => key !== "codex_parity_agent_spine_rail_table"),
+    );
+
+    const probe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: {
+        payload: {
+          ...debugPayload,
+          debug: {
+            codex_parity_agent_spine_rail_table: staleDebugRail,
+          },
+        },
+      },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(probe.procedural_ok).toBe(false);
+    expect(probe.failures).toEqual(
+      expect.arrayContaining([
+        "rail_mirror_1_turn_id_mismatch:ask:test:previous-turn!=ask:test:fail-closed-rail-projection-contract",
+        "rail_mirror_1_prompt_mismatch:Stale previous prompt!=Use live_env.read_processed_live_source_mail to inspect the latest processed live-source mail.",
+        "rail_mirror_1_visible_tool_surface_mismatch:model.direct_answer!=live_env.read_processed_live_source_mail",
+        "rail_mirror_1_assistant_answer_mismatch:true!=false",
+        "rail_mirror_1_executed_capability_mismatch:null!=live_env.read_processed_live_source_mail",
+        "rail_mirror_1_observation_ref_mismatch:null!=ask:test:reasoning_context:1",
+      ]),
+    );
+  });
+
+  it("rejects stale raw debug wrapper rail mirrors even when debug payload is current", () => {
+    const scenario = liveSourceFailClosedScenario();
+    const askTurn = buildLiveSourceFailClosedTurn({ projectAsTypedFailure: true });
+    const railTable = askTurn.codex_parity_agent_spine_rail_table as Record<string, unknown>;
+    const staleWrapperRail = {
+      ...railTable,
+      turn_id: "ask:test:previous-wrapper-turn",
+      prompt: "Stale wrapper prompt",
+      visible_tool_surface: ["model.direct_answer"],
+    };
+
+    const probe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: {
+        codex_parity_agent_spine_rail_table: staleWrapperRail,
+        payload: askTurn,
+      },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(probe.procedural_ok).toBe(false);
+    expect(probe.failures).toEqual(
+      expect.arrayContaining([
+        "rail_mirror_2_turn_id_mismatch:ask:test:previous-wrapper-turn!=ask:test:fail-closed-rail-projection-contract",
+        "rail_mirror_2_prompt_mismatch:Stale wrapper prompt!=Use live_env.read_processed_live_source_mail to inspect the latest processed live-source mail.",
+        "rail_mirror_2_visible_tool_surface_mismatch:model.direct_answer!=live_env.read_processed_live_source_mail",
+      ]),
+    );
+  });
 });
 
 const liveSourceFailClosedScenario = (): HelixApiParityScenario => ({

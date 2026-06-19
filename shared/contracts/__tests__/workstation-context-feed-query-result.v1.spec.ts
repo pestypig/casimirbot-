@@ -123,10 +123,36 @@ const resultFixture = (
     raw_content_included: false,
     post_tool_model_step_required: true,
   };
+  const resultId = overrides.resultId ?? "stage_play_context_feed_query:visual_summaries:frog";
+  const feedKind = overrides.feedKind ?? "visual_summaries";
+  const requiredActuator = overrides.requiredActuator ?? "query_visual_summaries";
+  const policyEvidenceRefs = overrides.policyEvidenceRefs ?? [
+    `context_feed:${feedKind}`,
+    `allowed_actuator:${requiredActuator}`,
+  ];
+  const sourceRefs = overrides.sourceRefs ?? ["visual_source:image-lens"];
+  const loopRefs = overrides.loopRefs ?? [
+    "thread:helix-ask:desktop",
+    "stage_play_mail_loop:helix-ask:desktop",
+    `workstation_context_feed:${feedKind}`,
+    `workstation_actuator:${requiredActuator}`,
+  ];
+  const evidenceRefs = overrides.evidenceRefs ?? [
+    resultId,
+    ...policyEvidenceRefs,
+    ...sourceRefs,
+    ...loopRefs,
+    ...goalContextUpdates.flatMap((entry) => [
+      entry.updateId,
+      entry.contentRef,
+      ...entry.evidenceRefs,
+      ...entry.receiptRefs,
+    ]),
+  ];
   return {
     schema: WORKSTATION_CONTEXT_FEED_QUERY_RESULT_SCHEMA,
-    resultId: "stage_play_context_feed_query:visual_summaries:frog",
-    feedKind: "visual_summaries",
+    resultId,
+    feedKind,
     label: "visual summaries",
     mailboxThreadId: "helix-ask:desktop",
     mailboxThreadResolution: { mailboxThreadId: "helix-ask:desktop" },
@@ -134,10 +160,14 @@ const resultFixture = (
     goalId: "goal:frog",
     status: "read",
     missingRequirements: [],
-    policyEvidenceRefs: ["context_feed:visual_summaries", "allowed_actuator:query_visual_summaries"],
+    policyEvidenceRefs,
+    sourceRefs,
+    loopRefs,
+    evidenceRefs,
+    freshnessStatus: "fresh",
     goalSessionFound: true,
     feedAllowed: true,
-    requiredActuator: "query_visual_summaries",
+    requiredActuator,
     actuatorAllowed: true,
     agentGoalSession,
     agentGoalSessions,
@@ -150,6 +180,12 @@ const resultFixture = (
       microReasonerRunCount: 0,
     },
     goalContextUpdateId: "stage_play_goal_context_update:route_watch:feed-query",
+    terminalAuthority: {
+      status: "not_terminal",
+      finalAnswerEligible: false,
+      completedSolverPathRequired: true,
+      terminalAuthoritySingleWriterRequired: true,
+    },
     post_tool_model_step_required: true,
     assistant_answer: false,
     terminal_eligible: false,
@@ -179,6 +215,42 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
     ]));
   });
 
+  it("requires feed query results to carry source, loop, evidence, and freshness proof refs", () => {
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      loopRefs: ["thread:helix-ask:desktop"],
+      evidenceRefs: [
+        "stage_play_context_feed_query:visual_summaries:frog",
+        "context_feed:visual_summaries",
+        "allowed_actuator:query_visual_summaries",
+      ],
+    }))).toEqual(expect.arrayContaining([
+      "loopRefs must include workstation context feed loop ref",
+      "loopRefs must include required actuator loop ref",
+      "evidenceRefs must include every sourceRefs entry",
+      "evidenceRefs must include every loopRefs entry",
+    ]));
+
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      evidenceRefs: [
+        "context_feed:visual_summaries",
+        "allowed_actuator:query_visual_summaries",
+        "visual_source:image-lens",
+        "thread:helix-ask:desktop",
+        "stage_play_mail_loop:helix-ask:desktop",
+        "workstation_context_feed:visual_summaries",
+        "workstation_actuator:query_visual_summaries",
+      ],
+    }))).toEqual(expect.arrayContaining([
+      "evidenceRefs must include resultId",
+    ]));
+
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      freshnessStatus: "blocked",
+    }))).toEqual(expect.arrayContaining([
+      "read feed query results must not have blocked freshnessStatus",
+    ]));
+  });
+
   it("requires read results to be admitted and blocked results to suppress updates", () => {
     expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
       feedAllowed: false,
@@ -192,6 +264,7 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
       status: "blocked",
       missingRequirements: ["context_feed:visual_summaries"],
       feedAllowed: false,
+      freshnessStatus: "blocked",
     }))).toEqual(expect.arrayContaining([
       "blocked feed query results must not include goalContextUpdates",
     ]));
@@ -392,6 +465,7 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
       feedAllowed: false,
       goalContextUpdates: [],
       updateCount: 0,
+      freshnessStatus: "blocked",
       syncedWindow: {
         mailItemCount: 0,
         processedPacketCount: 0,
@@ -418,6 +492,12 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
       assistant_answer: true,
       terminal_eligible: true,
       raw_content_included: true,
+      terminalAuthority: {
+        status: "terminal",
+        finalAnswerEligible: true,
+        completedSolverPathRequired: false,
+        terminalAuthoritySingleWriterRequired: false,
+      },
       authoritySummary: {
         answerAuthority: "panel_projection",
         assistant_answer: true,
@@ -438,6 +518,10 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
       "authoritySummary.raw_content_included must be false",
       "authoritySummary.post_tool_model_step_required must be true",
       "authoritySummary.answerAuthority must require completed solver path",
+      "terminalAuthority.status must be not_terminal",
+      "terminalAuthority.finalAnswerEligible must be false",
+      "terminalAuthority.completedSolverPathRequired must be true",
+      "terminalAuthority.terminalAuthoritySingleWriterRequired must be true",
       "assistant_answer must be false",
       "terminal_eligible must be false",
       "raw_content_included must be false",

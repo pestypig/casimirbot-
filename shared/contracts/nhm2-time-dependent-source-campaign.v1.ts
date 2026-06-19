@@ -9,6 +9,7 @@ import type { Nhm2RegionalSupportFunctionAtlasV1 } from "./nhm2-regional-support
 import { getNhm2RegionalSupportFunctionAtlasHash } from "./nhm2-regional-support-function-atlas.v1";
 import type { Nhm2RegionalTensorPassPathHarnessArtifactV1 } from "./nhm2-regional-tensor-pass-path-harness.v1";
 import type { Nhm2SourceComponentAuthorityLedgerArtifactV1 } from "./nhm2-source-component-authority-ledger.v1";
+import type { Nhm2SourceMomentumDensityAuditArtifactV1 } from "./nhm2-source-momentum-density-audit.v1";
 import type { Nhm2SourceOffDiagonalShearAuditArtifactV1 } from "./nhm2-source-off-diagonal-shear-audit.v1";
 
 export const NHM2_TIME_DEPENDENT_SOURCE_CAMPAIGN_CONTRACT_VERSION =
@@ -133,6 +134,7 @@ export type Nhm2TimeDependentSourceCampaignArtifactRefsV1 = {
   sourceComponentAuthorityLedger: string | null;
   regionalFullTensorResidual: string | null;
   sourceOffDiagonalShearAudit: string | null;
+  sourceMomentumDensityAudit: string | null;
   covariantConservationDiagnostic: string | null;
   qeiWorldlineDossier: string | null;
   observerRobustEnergyConditions: string | null;
@@ -246,6 +248,7 @@ export type BuildNhm2TimeDependentSourceCampaignInput = {
   sourceComponentAuthorityLedger?: Nhm2SourceComponentAuthorityLedgerArtifactV1 | null;
   regionalFullTensorResidual?: Nhm2RegionalFullTensorResidualArtifactV1 | null;
   sourceOffDiagonalShearAudit?: Nhm2SourceOffDiagonalShearAuditArtifactV1 | null;
+  sourceMomentumDensityAudit?: Nhm2SourceMomentumDensityAuditArtifactV1 | null;
   covariantConservationDiagnostic?: Nhm2CovariantConservationDiagnosticArtifactV1 | null;
   qeiWorldlineDossier?: Nhm2QeiWorldlineDossierV1 | null;
   observerRobustEnergyConditions?: Nhm2ObserverRobustEnergyConditionArtifactV1 | null;
@@ -514,6 +517,7 @@ const refs = (
   sourceComponentAuthorityLedger: input?.sourceComponentAuthorityLedger ?? null,
   regionalFullTensorResidual: input?.regionalFullTensorResidual ?? null,
   sourceOffDiagonalShearAudit: input?.sourceOffDiagonalShearAudit ?? null,
+  sourceMomentumDensityAudit: input?.sourceMomentumDensityAudit ?? null,
   covariantConservationDiagnostic: input?.covariantConservationDiagnostic ?? null,
   qeiWorldlineDossier: input?.qeiWorldlineDossier ?? null,
   observerRobustEnergyConditions: input?.observerRobustEnergyConditions ?? null,
@@ -694,6 +698,7 @@ const dynamicGeometryGate = (
 const fullTensorGate = (
   residual: Nhm2RegionalFullTensorResidualArtifactV1 | null | undefined,
   shearAudit: Nhm2SourceOffDiagonalShearAuditArtifactV1 | null | undefined,
+  momentumAudit: Nhm2SourceMomentumDensityAuditArtifactV1 | null | undefined,
 ): Nhm2TimeDependentSourceCampaignGateV1 => {
   if (residual == null) {
     return gate({
@@ -722,8 +727,28 @@ const fullTensorGate = (
       ? "source_off_diagonal_shear_mechanism_missing"
       : null,
   ]);
+  const momentumAuditBlockers = uniqueText([
+    momentumAudit?.summary.anyMetricRequiredCausalMomentumBoundViolation &&
+    momentumAudit.summary.causalMomentumBoundApplicabilityStatus !== "applicable"
+      ? "momentum_density_causal_bound_frame_projection_missing"
+      : null,
+    momentumAudit?.summary.causalMaterialMomentumBoundFalsifier
+      ? "metric_required_momentum_density_causal_bound_exceeded"
+      : null,
+    momentumAudit?.summary.currentDeclaredSourceModelFalsified
+      ? "source_momentum_density_current_declared_model_falsified"
+      : null,
+    momentumAudit?.summary.falsifierCandidate &&
+    !momentumAudit.summary.currentDeclaredSourceModelFalsified
+      ? "source_momentum_density_falsifier_candidate"
+      : null,
+    momentumAudit?.summary.anyMomentumMechanismMissing
+      ? "source_momentum_density_mechanism_missing"
+      : null,
+  ]);
   const blockers = uniqueText([
     ...shearAuditBlockers,
+    ...momentumAuditBlockers,
     residual.summary.allRequiredComponentsPresent
       ? null
       : "regional_full_tensor_components_missing",
@@ -734,8 +759,12 @@ const fullTensorGate = (
   ]);
   const warnings = uniqueText([
     shearAudit == null ? "source_off_diagonal_shear_audit_missing" : null,
+    momentumAudit == null ? "source_momentum_density_audit_missing" : null,
     shearAudit?.summary.uniformFractionalShearAnsatzDetected
       ? "source_off_diagonal_uniform_fractional_shear_ansatz"
+      : null,
+    momentumAudit?.summary.uniformFractionalMomentumAnsatzDetected
+      ? "source_momentum_density_uniform_fractional_ansatz"
       : null,
   ]);
   const worstRegion = residual.regions.find(
@@ -763,6 +792,10 @@ const fullTensorGate = (
       `currentToAllowedMagnitudeRatio=${worstFamily?.maxCurrentToAllowedMagnitudeRatio ?? "missing"}`,
       `shearAuditWorstRatio=${shearAudit?.summary.worstCurrentToAllowedMagnitudeRatio ?? "missing"}`,
       `shearAuditWorstSuppression=${shearAudit?.summary.worstFractionalSuppressionToRequirement ?? "missing"}`,
+      `momentumAuditWorstAmplification=${momentumAudit?.summary.worstRequiredAmplificationToPass ?? "missing"}`,
+      `momentumAuditWorstFractionalAmplification=${momentumAudit?.summary.worstFractionalAmplificationToRequirement ?? "missing"}`,
+      `momentumAuditWorstMetricRequiredRatio=${momentumAudit?.summary.worstMetricRequiredMomentumToEnergyRatio ?? "missing"}`,
+      `momentumAuditCausalBoundApplicability=${momentumAudit?.summary.causalMomentumBoundApplicabilityStatus ?? "missing"}`,
     ].join(";"),
     warnings,
   });
@@ -882,7 +915,11 @@ export const buildNhm2TimeDependentSourceCampaign = (
     switchingGate(input.switchingConservation, input.covariantConservationDiagnostic),
     frequencyGate(input.frequencyConvergence),
     dynamicGeometryGate(input.dynamicEffectiveGeometry),
-    fullTensorGate(input.regionalFullTensorResidual, input.sourceOffDiagonalShearAudit),
+    fullTensorGate(
+      input.regionalFullTensorResidual,
+      input.sourceOffDiagonalShearAudit,
+      input.sourceMomentumDensityAudit,
+    ),
     observerGate(input.observerRobustEnergyConditions),
     qeiGate(input.qeiWorldlineDossier),
     stabilityGate(input.campaignStability, input.natarioInvariantAudit),
@@ -1061,6 +1098,7 @@ const isArtifactRefs = (
     isNullableText(record.sourceComponentAuthorityLedger) &&
     isNullableText(record.regionalFullTensorResidual) &&
     isNullableText(record.sourceOffDiagonalShearAudit) &&
+    isNullableText(record.sourceMomentumDensityAudit) &&
     isNullableText(record.covariantConservationDiagnostic) &&
     isNullableText(record.qeiWorldlineDossier) &&
     isNullableText(record.observerRobustEnergyConditions) &&

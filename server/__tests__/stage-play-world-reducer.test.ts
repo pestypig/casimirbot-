@@ -670,6 +670,8 @@ describe("Stage Play world-state badge reducer", () => {
       mailIds: ["stage_play_live_source_mail:visual-shade"],
       inputRefs: ["stage_play_live_source_mail:visual-shade", "visual_frame:shade"],
       outputRefs: ["microdeck_output:visual-shade:claims"],
+      evidenceRefs: ["microdeck_evidence:visual-shade-extra"],
+      goalContextUpdateRefs: ["stage_play_goal_context_update:microdeck:visual-shade"],
       inputPreview: "Live Answer screen packet with shade preset output.",
       outputPreview: "Shade preset appears active and routes back to visual capture.",
       status: "completed",
@@ -841,6 +843,30 @@ describe("Stage Play world-state badge reducer", () => {
       blockedUntil: "route authority / checkpoint gate",
       inputRefs: expect.arrayContaining(["audio_transcript:packet-circuit", "stage_play_live_source_mail:audio-translation"]),
       outputPreview: expect.stringContaining("recommended: draft_text_answer"),
+    }));
+    expect(visualRun).toEqual(expect.objectContaining({
+      evidenceRefs: expect.arrayContaining([
+        "stage_play_micro_reasoner_run:visual-shade",
+        "stage_play_live_source_mail:visual-shade",
+        "visual_frame:shade",
+        "microdeck_output:visual-shade:claims",
+        "microdeck_evidence:visual-shade-extra",
+        "stage_play_goal_context_update:microdeck:visual-shade",
+      ]),
+      dataTray: expect.objectContaining({
+        evidenceRefs: expect.arrayContaining([
+          "microdeck_evidence:visual-shade-extra",
+          "stage_play_goal_context_update:microdeck:visual-shade",
+        ]),
+      }),
+    }));
+    expect(audioRun?.dataTray).toEqual(expect.objectContaining({
+      evidenceRefs: expect.arrayContaining([
+        "stage_play_micro_reasoner_run:audio-translation",
+        "stage_play_live_source_mail:audio-translation",
+        "audio_chunk:translation",
+        "microdeck_output:audio-translation:text",
+      ]),
     }));
     expect(graph.edges).toEqual(expect.arrayContaining([
       expect.objectContaining({

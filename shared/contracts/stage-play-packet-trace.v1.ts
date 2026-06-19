@@ -1,3 +1,8 @@
+import {
+  validateAgentGoalSessionV1,
+  type AgentGoalSessionV1,
+} from "./workstation-goal-context.v1";
+
 export const STAGE_PLAY_PACKET_TRACE_SCHEMA = "helix.stage_play.packet_trace.v1" as const;
 export const STAGE_PLAY_PACKET_TRACE_QUERY_RESULT_SCHEMA = "stage_play_packet_trace_query_result/v1" as const;
 
@@ -95,6 +100,19 @@ const validateTerminalAuthority = (
   return issues;
 };
 
+const goalSessionIssues = (
+  value: unknown,
+  field: string,
+  expectedGoalId: string | null | undefined,
+): string[] => {
+  if (!isRecord(value)) return [`${field} must be an object`];
+  const issues = validateAgentGoalSessionV1(value as AgentGoalSessionV1).map((issue) => `${field}.${issue}`);
+  if (isNonEmptyString(expectedGoalId) && value.goalId !== expectedGoalId) {
+    issues.push(`${field}.goalId must match goalId`);
+  }
+  return issues;
+};
+
 export function validateStagePlayPacketTraceV1(value: unknown): string[] {
   const issues: string[] = [];
   if (!isRecord(value)) return ["packet trace must be an object"];
@@ -134,10 +152,28 @@ export function validateStagePlayPacketTraceQueryResultV1(value: unknown): strin
   if (value.status !== "read" && value.status !== "blocked") issues.push("status must be read or blocked");
   issues.push(...stringArrayIssues(value.missingRequirements, "missingRequirements"));
   issues.push(...stringArrayIssues(value.policyEvidenceRefs, "policyEvidenceRefs", true));
+  if (Array.isArray(value.policyEvidenceRefs) && !value.policyEvidenceRefs.includes("context_feed:packet_traces")) {
+    issues.push("policyEvidenceRefs must include packet trace context feed policy ref");
+  }
+  if (Array.isArray(value.policyEvidenceRefs) && !value.policyEvidenceRefs.includes("allowed_actuator:query_packet_traces")) {
+    issues.push("policyEvidenceRefs must include packet trace actuator policy ref");
+  }
+  if (value.goalSessionFound !== null && typeof value.goalSessionFound !== "boolean") {
+    issues.push("goalSessionFound must be boolean or null");
+  }
   if (typeof value.feedAllowed !== "boolean") issues.push("feedAllowed must be boolean");
+  if (value.status === "read" && value.feedAllowed !== true) {
+    issues.push("read packet trace query results must have feedAllowed=true");
+  }
   if (value.requiredFeed !== "packet_traces") issues.push("requiredFeed must be packet_traces");
   if (value.requiredActuator !== "query_packet_traces") issues.push("requiredActuator must be query_packet_traces");
   if (typeof value.actuatorAllowed !== "boolean") issues.push("actuatorAllowed must be boolean");
+  if (value.status === "read" && value.actuatorAllowed !== true) {
+    issues.push("read packet trace query results must have actuatorAllowed=true");
+  }
+  if (value.goalSessionFound === true) {
+    issues.push(...goalSessionIssues(value.agentGoalSession, "agentGoalSession", value.goalId as string | null | undefined));
+  }
   if (!Array.isArray(value.packetTraces)) {
     issues.push("packetTraces must be an array");
   } else {

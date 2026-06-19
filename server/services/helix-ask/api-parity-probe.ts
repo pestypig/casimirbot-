@@ -258,12 +258,83 @@ const readContextualToolMentionCues = (solverTrace: RecordLike | null): string[]
     .map((entry: RecordLike) => `${readString(entry.verb_or_cue) ?? ""} ${readString(entry.text) ?? ""}`.trim())
     .filter(Boolean);
 
-const readRailTable = (ask: RecordLike, debug: RecordLike | null): RecordLike | null =>
-  readRecord(ask.codex_parity_agent_spine_rail_table) ??
-  readRecord(debug?.codex_parity_agent_spine_rail_table) ??
-  readRecord(getPath(debug, ["debug", "codex_parity_agent_spine_rail_table"])) ??
-  readRecord(getPath(debug, ["artifact_query_index", "codex_parity_agent_spine_rail_table"])) ??
-  readRecord(getPath(debug, ["debug", "artifact_query_index", "codex_parity_agent_spine_rail_table"]));
+const readRailTables = (ask: RecordLike, debug: RecordLike | null, rawDebugExport?: unknown): RecordLike[] => {
+  const rawDebug = readRecord(rawDebugExport);
+  return (
+  [
+    readRecord(ask.codex_parity_agent_spine_rail_table),
+    readRecord(debug?.codex_parity_agent_spine_rail_table),
+    readRecord(getPath(debug, ["debug", "codex_parity_agent_spine_rail_table"])),
+    readRecord(getPath(debug, ["artifact_query_index", "codex_parity_agent_spine_rail_table"])),
+    readRecord(getPath(debug, ["debug", "artifact_query_index", "codex_parity_agent_spine_rail_table"])),
+    readRecord(rawDebug?.codex_parity_agent_spine_rail_table),
+    readRecord(getPath(rawDebug, ["payload", "codex_parity_agent_spine_rail_table"])),
+    readRecord(getPath(rawDebug, ["payload", "debug", "codex_parity_agent_spine_rail_table"])),
+    readRecord(getPath(rawDebug, ["payload", "artifact_query_index", "codex_parity_agent_spine_rail_table"])),
+    readRecord(getPath(rawDebug, ["debug", "codex_parity_agent_spine_rail_table"])),
+  ].filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry))
+  );
+};
+
+const RAIL_MIRROR_COMPARISON_FIELDS = [
+  "schema",
+  "turn_id",
+  "prompt",
+  "requested_capability",
+  "visible_tool_surface",
+  "visible_tool_surface_original_count",
+  "visible_tool_surface_truncated",
+  "selected_capability",
+  "admitted_capability",
+  "admission_proof_source",
+  "admission_proven",
+  "executed_capability",
+  "observation_kind",
+  "observation_ref",
+  "required_observation_kinds_for_requested_capability",
+  "observed_artifact_supports_requested_capability",
+  "reentry_status",
+  "reentry_proof_source",
+  "reentry_proven",
+  "goal_satisfaction",
+  "required_terminal_kind",
+  "selected_terminal_kind",
+  "terminal_authority_proof_source",
+  "terminal_authority_proven",
+  "visible_terminal_kind",
+  "visible_projection_source",
+  "visible_projection_proven",
+  "codex_parity_class",
+  "first_broken_rail",
+  "repair_target",
+  "rail_status",
+  "rail_failure_code",
+  "normalized_codex_parity_classes",
+  "assistant_answer",
+  "terminal_eligible",
+  "raw_content_included",
+] as const;
+
+const railMirrorComparableValue = (value: unknown): unknown => value === undefined ? null : value;
+
+const addRailMirrorFailures = (input: {
+  failures: string[];
+  railTables: RecordLike[];
+}): void => {
+  const { failures, railTables } = input;
+  if (railTables.length < 2) return;
+  const base = railTables[0];
+  for (const [index, railTable] of railTables.entries()) {
+    if (index === 0) continue;
+    for (const key of RAIL_MIRROR_COMPARISON_FIELDS) {
+      const baseValue = railMirrorComparableValue(base[key]);
+      const railValue = railMirrorComparableValue(railTable[key]);
+      if (JSON.stringify(baseValue) !== JSON.stringify(railValue)) {
+        failures.push(`rail_mirror_${index}_${key}_mismatch:${String(railValue ?? "null")}!=${String(baseValue ?? "null")}`);
+      }
+    }
+  }
+};
 
 const buildRailTableSummary = (railTable: RecordLike | null): HelixApiParityRailTableSummary => ({
   present: Boolean(railTable),
@@ -717,7 +788,8 @@ export function buildApiParityProbeResult(input: {
   const terminalFailureReconciliationRuntimeCurrent =
     terminalFailureReconciliationRuntime?.available === true &&
     terminalFailureReconciliationRuntimeVersion === HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION;
-  const railTable = readRailTable(ask, debug);
+  const railTables = readRailTables(ask, debug, input.debugExport);
+  const railTable = railTables[0] ?? null;
   const capabilitySelectionResult = readCapabilitySelectionResult(ask, debug);
   const selectedCapabilities = [
     readString(capabilitySelectionResult?.capability_id),
@@ -774,6 +846,7 @@ export function buildApiParityProbeResult(input: {
     turnId: nonStreamTurnId,
     prompt: input.scenario.prompt,
   });
+  addRailMirrorFailures({ failures, railTables });
   addCompleteRailEnvelopeFailures({ failures, railTable, ask, debug });
   addFailClosedRailEnvelopeFailures({ failures, railTable, ask, debug });
   addRailEnvelopeProjectionFailures({ failures, railTable, terminalArtifactKind });

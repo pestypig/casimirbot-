@@ -211,6 +211,7 @@
     "nhm2:publish-regional-source-closure-evidence": "tsx tools/nhm2/publish-regional-source-closure-evidence.ts",
     "nhm2:build-regional-full-tensor-residual": "tsx tools/nhm2/build-regional-full-tensor-residual.ts",
     "nhm2:build-source-off-diagonal-shear-audit": "tsx tools/nhm2/build-source-off-diagonal-shear-audit.ts",
+    "nhm2:build-source-momentum-density-audit": "tsx tools/nhm2/build-source-momentum-density-audit.ts",
     "nhm2:build-qei-bound-receipt": "tsx tools/nhm2/build-qei-bound-receipt.ts",
     "nhm2:build-qei-worldline-sample-plan": "tsx tools/nhm2/build-qei-worldline-sample-plan.ts",
     "nhm2:build-qei-pointwise-transition-source-samples": "tsx tools/nhm2/build-qei-pointwise-transition-source-samples.ts",

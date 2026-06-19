@@ -679,6 +679,8 @@ export type StagePlayMicroReasonerRunV1 = {
   mailIds: string[];
   inputRefs: string[];
   outputRefs: string[];
+  evidenceRefs?: string[];
+  goalContextUpdateRefs?: string[];
   inputPreview: string;
   outputPreview: string;
   status: "queued" | "running" | "completed" | "failed" | "skipped";
@@ -797,6 +799,34 @@ export function validateStagePlayMicroReasonerRunV1(value: unknown): string[] {
   if (!isStagePlayStringArray(value.mailIds)) issues.push("mailIds must be strings");
   if (!isStagePlayStringArray(value.inputRefs)) issues.push("inputRefs must be strings");
   if (!isStagePlayStringArray(value.outputRefs)) issues.push("outputRefs must be strings");
+  if (value.evidenceRefs != null) {
+    if (!isStagePlayStringArray(value.evidenceRefs)) {
+      issues.push("evidenceRefs must be strings");
+    } else {
+      if (isStagePlayNonEmptyString(value.runId) && !value.evidenceRefs.includes(value.runId)) {
+        issues.push("evidenceRefs must include runId");
+      }
+      for (const inputRef of isStagePlayStringArray(value.inputRefs) ? value.inputRefs : []) {
+        if (isStagePlayNonEmptyString(inputRef) && !value.evidenceRefs.includes(inputRef)) {
+          issues.push("evidenceRefs must include inputRefs");
+          break;
+        }
+      }
+      for (const outputRef of isStagePlayStringArray(value.outputRefs) ? value.outputRefs : []) {
+        if (isStagePlayNonEmptyString(outputRef) && !value.evidenceRefs.includes(outputRef)) {
+          issues.push("evidenceRefs must include outputRefs");
+          break;
+        }
+      }
+    }
+  }
+  if (value.goalContextUpdateRefs != null) {
+    if (!isStagePlayStringArray(value.goalContextUpdateRefs)) {
+      issues.push("goalContextUpdateRefs must be strings");
+    } else if (!value.goalContextUpdateRefs.every(isStagePlayNonEmptyString)) {
+      issues.push("goalContextUpdateRefs must include only non-empty strings");
+    }
+  }
   if (!isStagePlayNonEmptyString(value.inputPreview)) issues.push("inputPreview must be a non-empty string");
   if (!isStagePlayNonEmptyString(value.outputPreview)) issues.push("outputPreview must be a non-empty string");
   if (!stagePlayIncludes(STAGE_PLAY_MICRO_REASONER_RUN_STATUSES, value.status)) {

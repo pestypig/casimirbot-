@@ -100,6 +100,9 @@ const narratorStorage = createJSONStorage(() =>
   typeof localStorage === "undefined" ? memoryStorage() : localStorage,
 );
 
+const uniqueNarratorRefs = (refs: Array<string | null | undefined>): string[] =>
+  Array.from(new Set(refs.filter((ref): ref is string => typeof ref === "string" && ref.trim().length > 0)));
+
 const emptyQueueState = (): NarratorQueueState => ({
   speaking: false,
   queuedEventIds: [],
@@ -125,8 +128,16 @@ const emptyReadRegion = (): NarratorReadRegionState => ({
 function createNarratorEvent(input: PublishNarratorEventInput): NarratorEventV1 {
   const nowMs = input.createdAtMs ?? Date.now();
   const eventId = input.eventId ?? `narrator:event:${nowMs}:${Math.random().toString(36).slice(2, 8)}`;
+  const evidenceRefs = input.goalContextUpdateId
+    ? uniqueNarratorRefs([...input.evidenceRefs, input.goalContextUpdateId])
+    : input.evidenceRefs;
+  const producedRefs = input.goalContextUpdateId
+    ? uniqueNarratorRefs([...(input.producedRefs ?? []), eventId, input.goalContextUpdateId])
+    : input.producedRefs;
   return {
     ...input,
+    evidenceRefs,
+    producedRefs,
     schemaVersion: NARRATOR_EVENT_SCHEMA,
     eventId,
     dedupeKey: input.dedupeKey ?? buildNarratorDedupeKey(input),

@@ -1978,7 +1978,13 @@ const addWorkstationStatePlaneBadges = (
   for (const run of input.microReasoners.runs.slice(-12)) {
     const runId = statePlaneDeckRunBadgeId(run.runId);
     runBadgeIdsByRunId.set(run.runId, runId);
-    const runEvidenceRefs = unique([run.runId, ...run.inputRefs, ...run.outputRefs]);
+    const runEvidenceRefs = unique([
+      run.runId,
+      ...run.inputRefs,
+      ...run.outputRefs,
+      ...(run.evidenceRefs ?? []),
+      ...(run.goalContextUpdateRefs ?? []),
+    ]);
     pushBadge(badges, badge({
       id: runId,
       title: `Deck run: ${run.role}`,
