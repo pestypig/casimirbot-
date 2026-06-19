@@ -31,6 +31,9 @@ export type WorkstationContextFeedPacketCircuitRefV1 = {
   loopRefs: string[];
   packetRefs: string[];
   microDeckRefs: string[];
+  transcriptRefs: string[];
+  projectionRefs: string[];
+  sourceHealthRefs: string[];
   traceMemoryRefs: string[];
   narratorRefs: string[];
   routeWatchRefs: string[];
@@ -211,6 +214,9 @@ const packetCircuitRefIssues = (
     issues.push(...stringArrayIssues(entry.loopRefs, `packetCircuitRefs[${index}].loopRefs`));
     issues.push(...stringArrayIssues(entry.packetRefs, `packetCircuitRefs[${index}].packetRefs`));
     issues.push(...stringArrayIssues(entry.microDeckRefs, `packetCircuitRefs[${index}].microDeckRefs`));
+    issues.push(...stringArrayIssues(entry.transcriptRefs, `packetCircuitRefs[${index}].transcriptRefs`));
+    issues.push(...stringArrayIssues(entry.projectionRefs, `packetCircuitRefs[${index}].projectionRefs`));
+    issues.push(...stringArrayIssues(entry.sourceHealthRefs, `packetCircuitRefs[${index}].sourceHealthRefs`));
     issues.push(...stringArrayIssues(entry.traceMemoryRefs, `packetCircuitRefs[${index}].traceMemoryRefs`));
     issues.push(...stringArrayIssues(entry.narratorRefs, `packetCircuitRefs[${index}].narratorRefs`));
     issues.push(...stringArrayIssues(entry.routeWatchRefs, `packetCircuitRefs[${index}].routeWatchRefs`));

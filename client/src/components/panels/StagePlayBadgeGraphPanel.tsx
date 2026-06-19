@@ -2657,13 +2657,31 @@ const stagePlayGoalContextCircuitHops = (
   ) ?? allRefs.find((ref) =>
     /translated_transcript|translation/i.test(ref)
   ) ?? update.updateKind;
+  const transcript = Array.from(new Set(allRefs.filter((ref) =>
+    /^audio_transcript:|^transcript_window:|^translated_transcript|^translation_segment:|^workstation_context_feed:audio_transcripts|^workstation_context_feed:translated_transcripts|^workstation_actuator:query_audio_transcripts|^workstation_actuator:query_translation_segments/i.test(ref)
+  )))
+    .slice(0, 4)
+    .map(compactStagePlayCircuitRef)
+    .join(" | ") || "transcript pending";
+  const projection = Array.from(new Set(allRefs.filter((ref) =>
+    /^live_answer|^live-answer|^workstation_context_feed:live_answer_lines|^workstation_actuator:query_live_answer_state|^workstation_actuator:update_live_answer/i.test(ref)
+  )))
+    .slice(0, 4)
+    .map(compactStagePlayCircuitRef)
+    .join(" | ") || "projection pending";
+  const sourceHealth = Array.from(new Set(allRefs.filter((ref) =>
+    /^source_health:|^source_health_status:|^source_health_watch:|^source-health:|^stage_play_source_health:|^source_status:|^workstation_context_feed:source_health|^workstation_actuator:query_source_health|^workstation_actuator:repair_source/i.test(ref)
+  )))
+    .slice(0, 4)
+    .map(compactStagePlayCircuitRef)
+    .join(" | ") || "source health pending";
   const narrator = Array.from(new Set([
     ...allRefs.filter((ref) =>
-      /^helix_narrator_|^narrator:|^workstation_actuator:narrator_/i.test(ref)
+      /^helix_narrator_|^narrator:|^workstation_context_feed:narrator_events|^workstation_actuator:narrator_/i.test(ref)
     ),
     ...update.suggestedDispatch.flatMap((action) => {
-      if (action.kind === "bind_narrator_stream") return [action.sourceRef, `narrator:${action.streamKind}`];
-      if (action.kind === "speak_narrator") return [`narrator:${action.mode}`];
+      if (action.kind === "bind_narrator_stream") return [action.sourceRef, `narrator:${action.streamKind}`, "workstation_context_feed:narrator_events"];
+      if (action.kind === "speak_narrator") return [`narrator:${action.mode}`, "workstation_context_feed:narrator_events"];
       return [];
     }),
   ]))
@@ -2671,7 +2689,7 @@ const stagePlayGoalContextCircuitHops = (
     .map(compactStagePlayCircuitRef)
     .join(" | ") || "narrator pending";
   const routeWatch = Array.from(new Set(allRefs.filter((ref) =>
-    /^route_watch:|^watch_job:|^watch_policy:|^stage_play_live_source_watch_job:|^live_job_evidence:|^situation_construct_query:|^workstation_actuator:query_route_evidence/i.test(ref)
+    /^route_watch:|^watch_job:|^watch_policy:|^stage_play_live_source_watch_job:|^live_job_evidence:|^situation_construct_query:|^workstation_context_feed:route_evidence|^workstation_actuator:query_route_evidence/i.test(ref)
   )))
     .slice(0, 4)
     .map(compactStagePlayCircuitRef)
@@ -2709,6 +2727,9 @@ const stagePlayGoalContextCircuitHops = (
     { key: "source", label: "Source", value: compactStagePlayCircuitRef(source) },
     { key: "loop", label: "Loop", value: compactStagePlayCircuitRef(loop) },
     { key: "deck", label: "Deck", value: compactStagePlayCircuitRef(deck) },
+    { key: "transcript", label: "Transcript", value: transcript },
+    { key: "projection", label: "Projection", value: projection },
+    { key: "source-health", label: "Source Health", value: sourceHealth },
     { key: "narrator", label: "Narrator", value: narrator },
     { key: "trace-memory", label: "Trace Memory", value: traceMemory },
     { key: "route-watch", label: "Route Watch", value: routeWatch },
@@ -3582,6 +3603,29 @@ function StagePlayGoalContextBoard({
   );
   const narratorEventFeedCount = updates.filter((update) => update.producerKind === "narrator").length +
     activeSessions.filter((session) => session.contextFeeds.some((feed) => feed.sourceKind === "narrator_events")).length;
+  const refsForGoalContextUpdate = (update: WorkstationGoalContextUpdateV1): string[] => [
+    update.contentRef,
+    ...update.sourceRefs,
+    ...update.loopRefs,
+    ...update.evidenceRefs,
+    ...update.receiptRefs,
+  ].filter(Boolean);
+  const isRouteEvidenceContextUpdate = (update: WorkstationGoalContextUpdateV1): boolean =>
+    update.producerKind === "route_watch" ||
+    update.updateKind === "route_evidence" ||
+    refsForGoalContextUpdate(update).some((ref) =>
+      /^route_watch:|^watch_job:|^watch_policy:|^stage_play_live_source_watch_job:|^live_job_evidence:|^situation_construct_query:|^workstation_context_feed:route_evidence|^workstation_actuator:query_route_evidence/i.test(ref)
+    );
+  const isAutomationPolicyContextUpdate = (update: WorkstationGoalContextUpdateV1): boolean =>
+    update.producerKind === "automation" ||
+    update.updateKind === "automation_status" ||
+    refsForGoalContextUpdate(update).some((ref) =>
+      /^automation:|^automation_policy:|^workstation_context_feed:automation_policies|^stage_play_live_source_watch_job_policy:|^workstation_actuator:configure_route_watch/i.test(ref)
+    );
+  const routeEvidenceContextCount = updates.filter(isRouteEvidenceContextUpdate).length +
+    activeSessions.filter((session) => session.contextFeeds.some((feed) => feed.sourceKind === "route_evidence")).length;
+  const automationPolicyContextCount = updates.filter(isAutomationPolicyContextUpdate).length +
+    activeSessions.filter((session) => session.contextFeeds.some((feed) => feed.sourceKind === "automation_policies")).length;
   const automationContextCount = updates.filter((update) =>
     update.producerKind === "automation" ||
     update.updateKind === "automation_status" ||
@@ -3719,15 +3763,50 @@ function StagePlayGoalContextBoard({
     );
     const dispatchRefs = update.suggestedDispatch.flatMap((action) => {
       if (action.kind === "bind_narrator_stream") {
-        return [action.sourceRef, `narrator:${action.streamKind}`, "workstation_actuator:narrator_bind_stream"];
+        return [action.sourceRef, `narrator:${action.streamKind}`, "workstation_context_feed:narrator_events", "workstation_actuator:narrator_bind_stream"];
       }
       if (action.kind === "speak_narrator") {
-        return [`narrator:${action.mode}`, "workstation_actuator:narrator_say"];
+        return [`narrator:${action.mode}`, "workstation_context_feed:narrator_events", "workstation_actuator:narrator_say"];
       }
       return [];
     });
     return Array.from(new Set([...evidenceRefs, ...dispatchRefs]));
   };
+  const transcriptRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
+    Array.from(new Set([
+      update.contentRef,
+      ...update.sourceRefs,
+      ...update.loopRefs,
+      ...update.evidenceRefs,
+      ...update.receiptRefs,
+    ].filter((ref) =>
+      /^audio_transcript:|^transcript_window:|^translated_transcript|^translation_segment:|^workstation_context_feed:audio_transcripts|^workstation_context_feed:translated_transcripts|^workstation_actuator:query_audio_transcripts|^workstation_actuator:query_translation_segments/i.test(ref)
+    )));
+  const projectionRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
+    Array.from(new Set([
+      update.contentRef,
+      ...update.sourceRefs,
+      ...update.loopRefs,
+      ...update.evidenceRefs,
+      ...update.receiptRefs,
+    ].filter((ref) =>
+      /^live_answer|^live-answer|^workstation_context_feed:live_answer_lines|^workstation_actuator:query_live_answer_state|^workstation_actuator:update_live_answer/i.test(ref)
+    )));
+  const sourceHealthRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
+    Array.from(new Set([
+      update.contentRef,
+      ...update.sourceRefs,
+      ...update.loopRefs,
+      ...update.suggestedDispatch.flatMap((action) =>
+        action.kind === "repair_source"
+          ? [action.sourceRef, action.loopRef, "workstation_actuator:repair_source"].filter((ref): ref is string => Boolean(ref))
+          : []
+      ),
+      ...update.evidenceRefs,
+      ...update.receiptRefs,
+    ].filter((ref) =>
+      /^source_health:|^source_health_status:|^source_health_watch:|^source-health:|^stage_play_source_health:|^source_status:|^workstation_context_feed:source_health|^workstation_actuator:query_source_health|^workstation_actuator:repair_source/i.test(ref)
+    )));
   const routeWatchRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
     Array.from(new Set([
       update.contentRef,
@@ -3736,7 +3815,7 @@ function StagePlayGoalContextBoard({
       ...update.evidenceRefs,
       ...update.receiptRefs,
     ].filter((ref) =>
-      /^route_watch:|^watch_job:|^watch_policy:|^stage_play_live_source_watch_job:|^live_job_evidence:|^situation_construct_query:|^workstation_actuator:query_route_evidence/i.test(ref)
+      /^route_watch:|^watch_job:|^watch_policy:|^stage_play_live_source_watch_job:|^live_job_evidence:|^situation_construct_query:|^workstation_context_feed:route_evidence|^workstation_actuator:query_route_evidence/i.test(ref)
     )));
   const automationRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
     Array.from(new Set([
@@ -3824,7 +3903,9 @@ function StagePlayGoalContextBoard({
           <StagePlayMetricPill label="session filters" value={formatStagePlayCount(sessionFilterRefCount)} tone={sessionFilterRefCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="tool-attributed" value={formatStagePlayCount(toolAttributedUpdateCount)} tone={toolAttributedUpdateCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="matched actuators" value={formatStagePlayCount(matchedToolActuatorUpdateCount)} tone={matchedToolActuatorUpdateCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="route evidence" value={formatStagePlayCount(routeEvidenceContextCount)} tone={routeEvidenceContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="automations" value={formatStagePlayCount(automationContextCount)} tone={automationContextCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="automation policies" value={formatStagePlayCount(automationPolicyContextCount)} tone={automationPolicyContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="actuator policies" value={formatStagePlayCount(actuatorPolicyCount)} tone={actuatorPolicyCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="active goals" value={formatStagePlayCount(activeSessions.length)} tone={activeSessions.length > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="terminal authority" value={`${terminalAuthorityRequiredCount}/${activeSessions.length}`} tone={terminalAuthorityRequiredCount > 0 ? "warn" : "default"} />
@@ -3869,7 +3950,7 @@ function StagePlayGoalContextBoard({
         </div>
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-route-watch-automation-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Route-watch automations</div>
-          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(automationContextCount)} automation status update{automationContextCount === 1 ? "" : "s"} with {formatStagePlayCount(runningAutomationCount)} running loop dispatch{runningAutomationCount === 1 ? "" : "es"}.</div>
+          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(routeEvidenceContextCount)} route evidence item{routeEvidenceContextCount === 1 ? "" : "s"} and {formatStagePlayCount(automationPolicyContextCount)} automation polic{automationPolicyContextCount === 1 ? "y" : "ies"} with {formatStagePlayCount(runningAutomationCount)} running loop dispatch{runningAutomationCount === 1 ? "" : "es"}.</div>
         </div>
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-dispatch-mix-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Dispatch mix</div>
@@ -3921,6 +4002,9 @@ function StagePlayGoalContextBoard({
             const freshnessFilterRefs = freshnessFilterRefsForUpdate(update);
             const sessionFilterRefs = sessionFilterRefsForUpdate(update);
             const narratorRefs = narratorRefsForUpdate(update);
+            const transcriptRefs = transcriptRefsForUpdate(update);
+            const projectionRefs = projectionRefsForUpdate(update);
+            const sourceHealthRefs = sourceHealthRefsForUpdate(update);
             const traceMemoryRefs = traceMemoryRefsForUpdate(update);
             const routeWatchRefs = routeWatchRefsForUpdate(update);
             const automationRefs = automationRefsForUpdate(update);
@@ -3974,6 +4058,21 @@ function StagePlayGoalContextBoard({
                   {narratorRefs.length > 0 ? (
                     <div className="truncate" data-testid="stage-play-goal-context-narrator-refs">
                       narrator={narratorRefs.slice(0, 5).join(", ")}
+                    </div>
+                  ) : null}
+                  {transcriptRefs.length > 0 ? (
+                    <div className="truncate" data-testid="stage-play-goal-context-transcript-refs">
+                      transcripts={transcriptRefs.slice(0, 5).join(", ")}
+                    </div>
+                  ) : null}
+                  {projectionRefs.length > 0 ? (
+                    <div className="truncate" data-testid="stage-play-goal-context-projection-refs">
+                      projections={projectionRefs.slice(0, 5).join(", ")}
+                    </div>
+                  ) : null}
+                  {sourceHealthRefs.length > 0 ? (
+                    <div className="truncate" data-testid="stage-play-goal-context-source-health-refs">
+                      sourceHealth={sourceHealthRefs.slice(0, 6).join(", ")}
                     </div>
                   ) : null}
                   {traceMemoryRefs.length > 0 ? (
@@ -4051,10 +4150,10 @@ function StagePlayGoalContextBoard({
                 </div>
                 <div className="mt-2 grid gap-1 font-mono text-[9px] text-slate-400" data-testid="stage-play-agent-goal-session-contract">
                   <div data-testid="stage-play-agent-goal-session-feeds">
-                    feeds={session.contextFeeds.slice(0, 8).map((feed) => labelize(feed.sourceKind)).join(", ") || "none"}
+                    feeds={session.contextFeeds.map((feed) => labelize(feed.sourceKind)).join(", ") || "none"}
                   </div>
                   <div data-testid="stage-play-agent-goal-session-actuators">
-                    actuators={session.allowedActuators.slice(0, 8).map((actuator) => labelize(actuator)).join(", ") || "none"}
+                    actuators={session.allowedActuators.map((actuator) => labelize(actuator)).join(", ") || "none"}
                   </div>
                   <div data-testid="stage-play-agent-goal-session-narrator-controls">
                     narratorControls={narratorControls.map((actuator) => labelize(actuator)).join(", ") || "none"}

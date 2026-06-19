@@ -118,7 +118,9 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
   artifacts?: ArtifactLike[] | null;
 }): HelixCompoundCapabilitySynthesisReadiness {
   const artifacts = input.artifacts ?? readArray(input.payload.current_turn_artifact_ledger).map(readRecord).filter(Boolean) as ArtifactLike[];
-  const itinerary = readRecord(input.payload.capability_itinerary);
+  const itinerary =
+    readRecord(input.capabilityItinerary) ??
+    readRecord(input.payload.capability_itinerary);
   const existingState =
     readRecord(input.payload.capability_itinerary_execution_state) ??
     readRecord(itinerary?.execution_state);

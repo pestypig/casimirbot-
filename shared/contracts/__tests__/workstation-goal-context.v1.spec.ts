@@ -158,7 +158,7 @@ describe("workstation goal context contract", () => {
     sourceKind: "live_answer",
     sourceId: "live-answer:translation",
     sourceRefs: ["live-answer:translation", "live_answer"],
-    loopRefs: ["narrator:say", "thread:helix-ask:desktop", "workstation_actuator:narrator_say"],
+    loopRefs: ["narrator:say", "thread:helix-ask:desktop", "workstation_context_feed:narrator_events", "workstation_actuator:narrator_say"],
     policyEvidenceRefs: ["allowed_actuator:narrator_say", "agent_goal_allowed_actuator:narrator_say"],
     evidenceRefs: [
       "helix:narrator:say:1",
@@ -169,6 +169,7 @@ describe("workstation goal context contract", () => {
       "live_answer",
       "narrator:say",
       "thread:helix-ask:desktop",
+      "workstation_context_feed:narrator_events",
       "workstation_actuator:narrator_say",
     ],
     producedRefs: ["helix:narrator:say:1", "stage_play_goal_context_update:narrator:say"],
@@ -200,7 +201,7 @@ describe("workstation goal context contract", () => {
     requestId: "helix:narrator:bind:1",
     sourceRef: "source:browser-audio",
     sourceRefs: ["source:browser-audio", "translated_transcript"],
-    loopRefs: ["narrator:bind_stream", "thread:helix-ask:desktop", "workstation_actuator:narrator_bind_stream"],
+    loopRefs: ["narrator:bind_stream", "thread:helix-ask:desktop", "workstation_context_feed:narrator_events", "workstation_actuator:narrator_bind_stream"],
     policyEvidenceRefs: ["allowed_actuator:narrator_bind_stream", "agent_goal_allowed_actuator:narrator_bind_stream"],
     evidenceRefs: [
       "helix:narrator:bind:1",
@@ -210,6 +211,7 @@ describe("workstation goal context contract", () => {
       "agent_goal_allowed_actuator:narrator_bind_stream",
       "narrator:bind_stream",
       "thread:helix-ask:desktop",
+      "workstation_context_feed:narrator_events",
       "workstation_actuator:narrator_bind_stream",
     ],
     producedRefs: ["helix:narrator:bind:1", "stage_play_goal_context_update:narrator:bind"],
@@ -697,6 +699,7 @@ describe("workstation goal context contract", () => {
         "allowed_actuator:narrator_bind_stream",
         "narrator:bind_stream",
         "thread:helix-ask:desktop",
+        "workstation_context_feed:narrator_events",
         "workstation_actuator:narrator_bind_stream",
       ],
     })).toEqual(expect.arrayContaining([
@@ -713,9 +716,11 @@ describe("workstation goal context contract", () => {
     })).toEqual(expect.arrayContaining([
       "loopRefs must include narrator:say",
       "loopRefs must include workstation_actuator:narrator_say",
+      "loopRefs must include workstation_context_feed:narrator_events",
       "evidenceRefs must include every sourceRefs entry",
       "evidenceRefs must include every loopRefs entry",
       "evidenceRefs must include narrator_say actuator policy ref",
+      "evidenceRefs must include narrator event feed ref",
     ]));
 
     expect(validateNarratorBindStreamRequestV1({
@@ -725,9 +730,11 @@ describe("workstation goal context contract", () => {
     })).toEqual(expect.arrayContaining([
       "loopRefs must include narrator:bind_stream",
       "loopRefs must include workstation_actuator:narrator_bind_stream",
+      "loopRefs must include workstation_context_feed:narrator_events",
       "evidenceRefs must include every sourceRefs entry",
       "evidenceRefs must include every loopRefs entry",
       "evidenceRefs must include narrator_bind_stream actuator policy ref",
+      "evidenceRefs must include narrator event feed ref",
     ]));
   });
 

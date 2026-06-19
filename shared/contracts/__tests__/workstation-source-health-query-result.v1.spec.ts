@@ -91,6 +91,12 @@ const resultFixture = (
       "workstation_context_feed:source_health",
       "workstation_actuator:query_source_health",
     ],
+    sourceHealthRefs: [
+      "stage_play_source_health:frog",
+      "source_health:visual_source:image-lens",
+      "workstation_context_feed:source_health",
+      "workstation_actuator:query_source_health",
+    ],
     evidenceRefs: [
       "stage_play_source_health:frog",
       "visual_source:image-lens",
@@ -149,6 +155,12 @@ describe("helix.situation_source_capability_read.v1", () => {
         "agent_goal_allowed_actuator:query_source_health",
       ],
       sourceRefs: ["helix-ask:desktop"],
+      sourceHealthRefs: [
+        "stage_play_source_health:frog",
+        "source_health:visual_source:image-lens",
+        "workstation_context_feed:source_health",
+        "workstation_actuator:query_source_health",
+      ],
       evidenceRefs: [
         "stage_play_source_health:frog",
         "helix-ask:desktop",
@@ -195,12 +207,16 @@ describe("helix.situation_source_capability_read.v1", () => {
     expect(validateWorkstationSourceHealthQueryResultV1(resultFixture({
       sourceRefs: [],
       loopRefs: ["source_health:visual_source:image-lens"],
+      sourceHealthRefs: [],
       evidenceRefs: ["stage_play_source_health:frog"],
       freshnessStatus: "invalid" as "fresh",
     }))).toEqual(expect.arrayContaining([
       "sourceRefs must include at least one reference",
       "loopRefs must include source-health context feed loop ref",
       "loopRefs must include source-health actuator loop ref",
+      "sourceHealthRefs must include at least one reference",
+      "sourceHealthRefs must include source-health context feed ref",
+      "sourceHealthRefs must include source-health actuator ref",
       "evidenceRefs must include every policyEvidenceRefs entry",
       "evidenceRefs must include every loopRefs entry",
       "freshnessStatus is invalid",

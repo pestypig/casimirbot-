@@ -44,6 +44,9 @@ export type LiveAnswerPacketCircuitRef = {
   contentRef: string;
   packetRefs: string[];
   microDeckRefs: string[];
+  transcriptRefs: string[];
+  projectionRefs: string[];
+  sourceHealthRefs: string[];
   traceMemoryRefs: string[];
   narratorRefs: string[];
   routeWatchRefs: string[];
@@ -81,7 +84,9 @@ export type LiveAnswerReasoningCircuitSummary = {
   sourceHealthCount: number;
   feedQueryCount: number;
   routeWatchCount: number;
+  routeEvidenceCount: number;
   automationCount: number;
+  automationPolicyCount: number;
   feedPolicyRefCount: number;
   actuatorPolicyRefCount: number;
   freshnessFilterRefCount: number;
@@ -380,8 +385,14 @@ export function LiveAnswerReasoningCircuit({
           <span className="rounded border border-sky-300/20 px-2 py-1 font-mono text-[10px] text-sky-100" data-testid="live-answer-route-watch-count">
             {summary.routeWatchCount} route watch
           </span>
+          <span className="rounded border border-sky-300/20 px-2 py-1 font-mono text-[10px] text-sky-100" data-testid="live-answer-route-evidence-count">
+            {summary.routeEvidenceCount} route evidence
+          </span>
           <span className="rounded border border-orange-300/20 px-2 py-1 font-mono text-[10px] text-orange-100" data-testid="live-answer-automation-count">
             {summary.automationCount} automations
+          </span>
+          <span className="rounded border border-orange-300/20 px-2 py-1 font-mono text-[10px] text-orange-100" data-testid="live-answer-automation-policy-count">
+            {summary.automationPolicyCount} automation policies
           </span>
           <span className="rounded border border-emerald-300/20 px-2 py-1 font-mono text-[10px] text-emerald-100" data-testid="live-answer-actuator-policy-count">
             {summary.actuatorPolicyCount} actuator polic{summary.actuatorPolicyCount === 1 ? "y" : "ies"}
@@ -460,6 +471,15 @@ export function LiveAnswerReasoningCircuit({
                       <div className="truncate">content={ref.contentRef}</div>
                       <div className="truncate">packets={ref.packetRefs.length ? ref.packetRefs.join(", ") : "none"}</div>
                       <div className="truncate">microDecks={ref.microDeckRefs.length ? ref.microDeckRefs.join(", ") : "none"}</div>
+                      <div className="truncate" data-testid="live-answer-packet-transcript-refs">
+                        transcripts={(ref.transcriptRefs ?? []).length ? (ref.transcriptRefs ?? []).join(", ") : "none"}
+                      </div>
+                      <div className="truncate" data-testid="live-answer-packet-projection-refs">
+                        projections={(ref.projectionRefs ?? []).length ? (ref.projectionRefs ?? []).join(", ") : "none"}
+                      </div>
+                      <div className="truncate" data-testid="live-answer-packet-source-health-refs">
+                        sourceHealth={(ref.sourceHealthRefs ?? []).length ? (ref.sourceHealthRefs ?? []).join(", ") : "none"}
+                      </div>
                       <div className="truncate" data-testid="live-answer-packet-trace-memory-refs">
                         traceMemory={(ref.traceMemoryRefs ?? []).length ? (ref.traceMemoryRefs ?? []).join(", ") : "none"}
                       </div>
@@ -537,7 +557,7 @@ export function LiveAnswerReasoningCircuit({
           <p className="text-[10px] font-semibold uppercase text-slate-300">Authority posture</p>
           <p className="mt-1 text-xs text-violet-100" data-testid="live-answer-terminal-authority-posture">{summary.terminalPosture}</p>
           <p className="mt-1 font-mono text-[10px] text-slate-400">
-            observation_only={summary.observationOnlyCount} interrupt_dispatches={summary.wakeCount} microdeck_outputs={summary.microdeckOutputCount} visual_summaries={summary.visualSummaryCount} narrator_bindings={summary.narratorBindingCount} audio_transcripts={summary.audioTranscriptCount} translations={summary.translatedTranscriptCount} packet_traces={summary.packetTraceCount} source_health={summary.sourceHealthCount} feed_queries={summary.feedQueryCount} feed_policy_refs={summary.feedPolicyRefCount} actuator_policy_refs={summary.actuatorPolicyRefCount} freshness_filters={summary.freshnessFilterRefCount} session_filters={summary.sessionFilterRefCount} tool_attributed_updates={summary.toolAttributedUpdateCount} matched_tool_actuator_updates={summary.matchedToolActuatorUpdateCount} route_watch={summary.routeWatchCount} automations={summary.automationCount} actuator_policies={summary.actuatorPolicyCount} narrator_output_policies={summary.narratorActuatorPolicyCount} narrator_event_feeds={summary.narratorEventFeedCount} trace_memory={summary.traceMemoryCount} terminal_authority_sessions={summary.terminalAuthorityRequiredCount}
+            observation_only={summary.observationOnlyCount} interrupt_dispatches={summary.wakeCount} microdeck_outputs={summary.microdeckOutputCount} visual_summaries={summary.visualSummaryCount} narrator_bindings={summary.narratorBindingCount} audio_transcripts={summary.audioTranscriptCount} translations={summary.translatedTranscriptCount} packet_traces={summary.packetTraceCount} source_health={summary.sourceHealthCount} feed_queries={summary.feedQueryCount} feed_policy_refs={summary.feedPolicyRefCount} actuator_policy_refs={summary.actuatorPolicyRefCount} freshness_filters={summary.freshnessFilterRefCount} session_filters={summary.sessionFilterRefCount} tool_attributed_updates={summary.toolAttributedUpdateCount} matched_tool_actuator_updates={summary.matchedToolActuatorUpdateCount} route_watch={summary.routeWatchCount} route_evidence={summary.routeEvidenceCount} automations={summary.automationCount} automation_policies={summary.automationPolicyCount} actuator_policies={summary.actuatorPolicyCount} narrator_output_policies={summary.narratorActuatorPolicyCount} narrator_event_feeds={summary.narratorEventFeedCount} trace_memory={summary.traceMemoryCount} terminal_authority_sessions={summary.terminalAuthorityRequiredCount}
           </p>
           <p className="mt-1 font-mono text-[10px] text-slate-400" data-testid="live-answer-control-dispatch-breakdown">
             control_dispatches={summary.workstationControlDispatchCount} preset={summary.presetDispatchCount} source_binding={summary.sourceBindingDispatchCount} source_repair={summary.sourceRepairDispatchCount} loop={summary.loopDispatchCount} live_answer={summary.liveAnswerDispatchCount} graph={summary.processGraphDispatchCount} narrator_speech={summary.narratorSpeechCount} narrator_binding={summary.narratorBindingCount} interrupt_dispatches={summary.wakeCount}

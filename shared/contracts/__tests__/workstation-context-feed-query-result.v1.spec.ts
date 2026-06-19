@@ -118,6 +118,8 @@ const resultFixture = (
     const allRefs = Array.from(new Set([
       entry.updateId,
       entry.contentRef,
+      `workstation_context_feed:${feedKind}`,
+      `workstation_actuator:${requiredActuator}`,
       ...entry.sourceRefs,
       ...entry.loopRefs,
       ...entry.evidenceRefs,
@@ -139,6 +141,34 @@ const resultFixture = (
         ref.startsWith("stage_play_micro_reasoner_run:") ||
         ref.startsWith("microdeck:")
       ),
+      transcriptRefs: allRefs.filter((ref) =>
+        ref.startsWith("audio_transcript:") ||
+        ref.startsWith("transcript_window:") ||
+        ref.startsWith("translated_transcript") ||
+        ref.startsWith("translation_segment:") ||
+        ref.startsWith("workstation_context_feed:audio_transcripts") ||
+        ref.startsWith("workstation_context_feed:translated_transcripts") ||
+        ref.startsWith("workstation_actuator:query_audio_transcripts") ||
+        ref.startsWith("workstation_actuator:query_translation_segments")
+      ),
+      projectionRefs: allRefs.filter((ref) =>
+        ref.startsWith("live_answer") ||
+        ref.startsWith("live-answer") ||
+        ref.startsWith("workstation_context_feed:live_answer_lines") ||
+        ref.startsWith("workstation_actuator:query_live_answer_state") ||
+        ref.startsWith("workstation_actuator:update_live_answer")
+      ),
+      sourceHealthRefs: allRefs.filter((ref) =>
+        ref.startsWith("source_health:") ||
+        ref.startsWith("source_health_status:") ||
+        ref.startsWith("source_health_watch:") ||
+        ref.startsWith("source-health:") ||
+        ref.startsWith("stage_play_source_health:") ||
+        ref.startsWith("source_status:") ||
+        ref.startsWith("workstation_context_feed:source_health") ||
+        ref.startsWith("workstation_actuator:query_source_health") ||
+        ref.startsWith("workstation_actuator:repair_source")
+      ),
       traceMemoryRefs: allRefs.filter((ref) =>
         ref.startsWith("trace_memory:") ||
         ref.startsWith("trace-memory:") ||
@@ -150,6 +180,7 @@ const resultFixture = (
       narratorRefs: allRefs.filter((ref) =>
         ref.startsWith("helix_narrator_") ||
         ref.startsWith("narrator:") ||
+        ref.startsWith("workstation_context_feed:narrator_events") ||
         ref.startsWith("workstation_actuator:narrator_")
       ),
       routeWatchRefs: allRefs.filter((ref) =>
@@ -159,6 +190,7 @@ const resultFixture = (
         ref.startsWith("stage_play_live_source_watch_job:") ||
         ref.startsWith("live_job_evidence:") ||
         ref.startsWith("situation_construct_query:") ||
+        ref.startsWith("workstation_context_feed:route_evidence") ||
         ref.startsWith("workstation_actuator:query_route_evidence")
       ),
       automationRefs: allRefs.filter((ref) =>
@@ -527,6 +559,9 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
         loopRefs: [],
         packetRefs: [],
         microDeckRefs: [],
+        transcriptRefs: [],
+        projectionRefs: [],
+        sourceHealthRefs: [],
         traceMemoryRefs: [],
         narratorRefs: "not-array" as unknown as string[],
         routeWatchRefs: [],
@@ -700,6 +735,7 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
       preview: "Route-watch automation policy is armed for source packets.",
       evidenceRefs: [
         "stage_play_live_source_watch_job_policy:route-watch",
+        "workstation_context_feed:route_evidence",
         "visual_source:image-lens",
         "thread:helix-ask:desktop",
         "stage_play_mail_loop:helix-ask:desktop",
@@ -727,7 +763,10 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
       "stage_play_live_source_watch_job_policy:route-watch",
     ]);
     expect(result.packetCircuitRefs[0].traceMemoryRefs).toEqual([]);
-    expect(result.packetCircuitRefs[0].routeWatchRefs).toEqual([]);
+    expect(result.packetCircuitRefs[0].routeWatchRefs).toEqual(expect.arrayContaining([
+      "workstation_context_feed:route_evidence",
+      "workstation_actuator:query_route_evidence",
+    ]));
     expect(result.packetCircuitRefs[0]).toMatchObject({
       assistant_answer: false,
       terminal_eligible: false,
@@ -768,12 +807,188 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
     });
 
     expect(validateWorkstationContextFeedQueryResultV1(result)).toEqual([]);
-    expect(result.packetCircuitRefs[0].traceMemoryRefs).toEqual([
+    expect(result.packetCircuitRefs[0].traceMemoryRefs).toEqual(expect.arrayContaining([
       "trace_memory:frog-routing",
       "workstation_context_feed:trace_memory",
+      "workstation_actuator:query_trace_memory",
       "workstation_trace_memory:frog-routing",
-    ]);
+    ]));
     expect(result.packetCircuitRefs[0]).toMatchObject({
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+  });
+
+  it("keeps narrator event feed refs in packet circuit records as observation-only routing state", () => {
+    const narratorUpdate = updateFixture({
+      updateId: "stage_play_goal_context_update:narrator:1",
+      producerKind: "narrator",
+      updateKind: "suggested_action",
+      contentRef: "helix_narrator_bind_stream_request:frog",
+      preview: "Narrator stream binding is prepared as evidence.",
+      sourceRefs: ["source:browser-audio", "translated_transcript"],
+      loopRefs: [
+        "narrator:bind_stream",
+        "workstation_context_feed:narrator_events",
+        "workstation_actuator:narrator_bind_stream",
+      ],
+      evidenceRefs: [
+        "helix_narrator_bind_stream_request:frog",
+        "narrator:bind_stream",
+        "workstation_context_feed:narrator_events",
+        "workstation_actuator:narrator_bind_stream",
+        "source:browser-audio",
+        "translated_transcript",
+      ],
+      receiptRefs: ["helix_narrator_bind_stream_request:frog"],
+    });
+
+    const result = resultFixture({
+      resultId: "stage_play_context_feed_query:narrator_events:frog",
+      feedKind: "narrator_events",
+      label: "narrator events",
+      requiredActuator: "query_narrator_events",
+      policyEvidenceRefs: [
+        "context_feed:narrator_events",
+        "allowed_actuator:query_narrator_events",
+        "agent_goal_context_feed:feed:narrator_events",
+        "agent_goal_allowed_actuator:query_narrator_events",
+      ],
+      goalContextUpdates: [narratorUpdate],
+      updateCount: 1,
+    });
+
+    expect(validateWorkstationContextFeedQueryResultV1(result)).toEqual([]);
+    expect(result.packetCircuitRefs[0].narratorRefs).toEqual(expect.arrayContaining([
+      "helix_narrator_bind_stream_request:frog",
+      "narrator:bind_stream",
+      "workstation_context_feed:narrator_events",
+      "workstation_actuator:narrator_bind_stream",
+    ]));
+    expect(result.packetCircuitRefs[0]).toMatchObject({
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+  });
+
+  it("keeps audio and translated transcript feed refs in packet circuit records", () => {
+    const audioUpdate = updateFixture({
+      updateId: "stage_play_goal_context_update:audio:1",
+      producerKind: "audio_capture",
+      updateKind: "transcript_window",
+      contentRef: "stage_play_live_source_mail:audio-1",
+      preview: "Audio transcript window is available as evidence.",
+      sourceRefs: ["audio_source:earbuds", "audio_chunk:frog"],
+      loopRefs: ["stage_play_mail_loop:helix-ask:desktop"],
+      evidenceRefs: ["stage_play_live_source_mail:audio-1", "audio_source:earbuds", "audio_chunk:frog", "stage_play_mail_loop:helix-ask:desktop"],
+      receiptRefs: ["stage_play_live_source_mail:audio-1"],
+    });
+    const audioResult = resultFixture({
+      feedKind: "audio_transcripts",
+      label: "audio transcripts",
+      requiredActuator: "query_audio_transcripts",
+      goalContextUpdates: [audioUpdate],
+      updateCount: 1,
+    });
+
+    expect(validateWorkstationContextFeedQueryResultV1(audioResult)).toEqual([]);
+    expect(audioResult.packetCircuitRefs[0].transcriptRefs).toEqual([
+      "workstation_context_feed:audio_transcripts",
+      "workstation_actuator:query_audio_transcripts",
+    ]);
+    expect(audioResult.packetCircuitRefs[0]).toMatchObject({
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+
+    const translationUpdate = updateFixture({
+      updateId: "stage_play_goal_context_update:translation:1",
+      producerKind: "translation_loop",
+      updateKind: "translated_transcript",
+      contentRef: "stage_play_processed_mail_packet:translation-1",
+      preview: "Translated transcript is available as evidence.",
+      sourceRefs: ["audio_source:earbuds"],
+      loopRefs: ["stage_play_translation_loop:earbuds"],
+      evidenceRefs: ["stage_play_processed_mail_packet:translation-1", "audio_source:earbuds", "stage_play_translation_loop:earbuds"],
+      receiptRefs: ["stage_play_processed_mail_packet:translation-1"],
+    });
+    const translationResult = resultFixture({
+      feedKind: "translated_transcripts",
+      label: "translated transcripts",
+      requiredActuator: "query_translation_segments",
+      goalContextUpdates: [translationUpdate],
+      updateCount: 1,
+    });
+
+    expect(validateWorkstationContextFeedQueryResultV1(translationResult)).toEqual([]);
+    expect(translationResult.packetCircuitRefs[0].transcriptRefs).toEqual([
+      "workstation_context_feed:translated_transcripts",
+      "workstation_actuator:query_translation_segments",
+    ]);
+    expect(translationResult.packetCircuitRefs[0]).toMatchObject({
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+  });
+
+  it("keeps Live Answer projection and source-health feed refs in packet circuit records", () => {
+    const liveAnswerUpdate = updateFixture({
+      updateId: "stage_play_goal_context_update:live_answer:1",
+      producerKind: "live_answer",
+      updateKind: "summary",
+      contentRef: "live_answer_projection:frog",
+      preview: "Live Answer projection line is available as evidence.",
+      sourceRefs: ["live-answer:desktop"],
+      loopRefs: ["live_answer_projection_loop:frog"],
+      evidenceRefs: ["live_answer_projection:frog", "live-answer:desktop", "live_answer_projection_loop:frog"],
+      receiptRefs: ["live_answer_projection:frog"],
+    });
+    const liveAnswerResult = resultFixture({
+      feedKind: "live_answer_lines",
+      label: "Live Answer lines",
+      requiredActuator: "query_live_answer_state",
+      goalContextUpdates: [liveAnswerUpdate],
+      updateCount: 1,
+    });
+
+    expect(validateWorkstationContextFeedQueryResultV1(liveAnswerResult)).toEqual([]);
+    expect(liveAnswerResult.packetCircuitRefs[0].projectionRefs).toEqual(expect.arrayContaining([
+      "live_answer_projection:frog",
+      "live-answer:desktop",
+      "workstation_context_feed:live_answer_lines",
+      "workstation_actuator:query_live_answer_state",
+    ]));
+    expect(liveAnswerResult.packetCircuitRefs[0]).toMatchObject({
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+
+    const sourceHealthUpdate = updateFixture({
+      updateId: "stage_play_goal_context_update:source_health:1",
+      producerKind: "source_health",
+      updateKind: "source_status",
+      contentRef: "stage_play_source_health:visual-tab",
+      preview: "Visual source is connected and fresh.",
+      sourceRefs: ["source:visual-tab"],
+      loopRefs: ["source_health_watch:visual-tab"],
+      evidenceRefs: ["stage_play_source_health:visual-tab", "source:visual-tab", "source_health_watch:visual-tab"],
+      receiptRefs: ["stage_play_source_health:visual-tab"],
+    });
+    const sourceHealthResult = resultFixture({
+      feedKind: "source_health",
+      label: "source health",
+      requiredActuator: "query_source_health",
+      goalContextUpdates: [sourceHealthUpdate],
+      updateCount: 1,
+    });
+
+    expect(validateWorkstationContextFeedQueryResultV1(sourceHealthResult)).toEqual([]);
+    expect(sourceHealthResult.packetCircuitRefs[0].sourceHealthRefs).toEqual(expect.arrayContaining([
+      "stage_play_source_health:visual-tab",
+      "workstation_context_feed:source_health",
+      "workstation_actuator:query_source_health",
+    ]));
+    expect(sourceHealthResult.packetCircuitRefs[0]).toMatchObject({
       assistant_answer: false,
       terminal_eligible: false,
     });

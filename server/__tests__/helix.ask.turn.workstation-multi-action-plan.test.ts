@@ -308,7 +308,7 @@ describe("Helix Ask workstation multi-action tool plans", () => {
     expect(goalContextUpdates).toHaveLength(1);
     expect(goalContextUpdates[0]).toMatchObject({
       producerKind: "automation",
-      updateKind: "suggested_action",
+      updateKind: "automation_status",
       contentRef: "receipt:loop-paused",
       sourceRefs: expect.arrayContaining([
         "goal:frog",
@@ -392,11 +392,12 @@ describe("Helix Ask workstation multi-action tool plans", () => {
 
     const goalContextUpdates = listStagePlayGoalContextUpdates({
       threadId: "helix-ask:repair-source",
-      producerKind: "automation",
+      producerKind: "source_health",
     });
     expect(goalContextUpdates).toHaveLength(1);
     expect(goalContextUpdates[0]).toMatchObject({
-      updateKind: "suggested_action",
+      producerKind: "source_health",
+      updateKind: "source_status",
       contentRef: "receipt:source-repaired",
       sourceRefs: expect.arrayContaining([
         "goal:frog",
@@ -459,11 +460,12 @@ describe("Helix Ask workstation multi-action tool plans", () => {
 
     const goalContextUpdates = listStagePlayGoalContextUpdates({
       threadId: "helix-ask:goal-setup-controls",
-      producerKind: "automation",
+      producerKind: "live_answer",
     });
     expect(goalContextUpdates).toHaveLength(1);
     expect(goalContextUpdates[0]).toMatchObject({
-      updateKind: "preset_state",
+      producerKind: "live_answer",
+      updateKind: "summary",
       contentRef: "receipt:goal-setup-controls",
       sourceRefs: expect.arrayContaining([
         "goal:visual-ops",

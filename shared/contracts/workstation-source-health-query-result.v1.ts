@@ -31,6 +31,7 @@ export type WorkstationSourceHealthQueryResultV1 = {
   policyEvidenceRefs: string[];
   sourceRefs: string[];
   loopRefs: string[];
+  sourceHealthRefs: string[];
   evidenceRefs: string[];
   freshnessStatus: "fresh" | "stale" | "blocked" | "unknown";
   goalSessionFound: boolean | null;
@@ -207,7 +208,14 @@ export function validateWorkstationSourceHealthQueryResultV1(
   }
   issues.push(...stringArrayIssues(value.sourceRefs, "sourceRefs", { requireNonEmpty: true }));
   issues.push(...stringArrayIssues(value.loopRefs, "loopRefs", { requireNonEmpty: true }));
+  issues.push(...stringArrayIssues(value.sourceHealthRefs, "sourceHealthRefs", { requireNonEmpty: true }));
   issues.push(...stringArrayIssues(value.evidenceRefs, "evidenceRefs", { requireNonEmpty: true }));
+  if (Array.isArray(value.sourceHealthRefs) && !value.sourceHealthRefs.includes("workstation_context_feed:source_health")) {
+    issues.push("sourceHealthRefs must include source-health context feed ref");
+  }
+  if (Array.isArray(value.sourceHealthRefs) && !value.sourceHealthRefs.includes("workstation_actuator:query_source_health")) {
+    issues.push("sourceHealthRefs must include source-health actuator ref");
+  }
   if (Array.isArray(value.loopRefs) && !value.loopRefs.includes("workstation_context_feed:source_health")) {
     issues.push("loopRefs must include source-health context feed loop ref");
   }

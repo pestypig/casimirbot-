@@ -116,6 +116,51 @@ describe("compound capability synthesis readiness", () => {
     expect(readiness.support_refs).toEqual(["obs:scholarly", "obs:theory"]);
   });
 
+  it("uses the runtime itinerary argument when the payload mirror is absent", () => {
+    const turnId = "ask:test:runtime-itinerary-argument";
+    const readiness = resolveCompoundCapabilitySynthesisReadiness({
+      payload: {},
+      capabilityItinerary: {
+        schema: "helix.capability_itinerary.v1",
+        terminal_success_criteria: {
+          requires_post_observation_synthesis: true,
+          required_observation_families: ["docs_viewer", "calculator"],
+        },
+        planned_steps: [
+          { requested_capability: "docs-viewer.locate_in_doc" },
+          { requested_capability: "scientific-calculator.solve_expression" },
+        ],
+        execution_state: {
+          complete: true,
+          required_observation_families: ["docs_viewer", "calculator"],
+          compound_subgoal_ledger: [
+            {
+              requested_capability: "docs-viewer.locate_in_doc",
+              observation_ref: `${turnId}:doc_location`,
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+            {
+              requested_capability: "scientific-calculator.solve_expression",
+              observation_ref: `${turnId}:calculator_receipt`,
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+          ],
+        },
+      },
+      artifacts: [],
+    });
+
+    expect(readiness).toMatchObject({
+      applies: true,
+      complete: true,
+      synthesis_required: true,
+      goal_kind: "doc_evidence_synthesis",
+      required_terminal_kind: "doc_evidence_synthesis_answer",
+    });
+  });
+
   it("requires docs compound synthesis even when an earlier subgoal draft exists", () => {
     const turnId = "ask:test:docs-compound-stale-draft";
     const readiness = resolveCompoundCapabilitySynthesisReadiness({

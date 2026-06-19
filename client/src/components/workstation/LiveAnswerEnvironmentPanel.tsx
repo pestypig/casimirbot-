@@ -704,6 +704,34 @@ const liveAnswerPacketCircuitRefsForUpdate = (update: WorkstationGoalContextUpda
       ref.startsWith("microdeck-run:") ||
       ref.includes("micro_reasoner")
     ),
+    transcriptRefs: refs.filter((ref) =>
+      ref.startsWith("audio_transcript:") ||
+      ref.startsWith("transcript_window:") ||
+      ref.startsWith("translated_transcript") ||
+      ref.startsWith("translation_segment:") ||
+      ref.startsWith("workstation_context_feed:audio_transcripts") ||
+      ref.startsWith("workstation_context_feed:translated_transcripts") ||
+      ref.startsWith("workstation_actuator:query_audio_transcripts") ||
+      ref.startsWith("workstation_actuator:query_translation_segments")
+    ),
+    projectionRefs: refs.filter((ref) =>
+      ref.startsWith("live_answer") ||
+      ref.startsWith("live-answer") ||
+      ref.startsWith("workstation_context_feed:live_answer_lines") ||
+      ref.startsWith("workstation_actuator:query_live_answer_state") ||
+      ref.startsWith("workstation_actuator:update_live_answer")
+    ),
+    sourceHealthRefs: refs.filter((ref) =>
+      ref.startsWith("source_health:") ||
+      ref.startsWith("source_health_status:") ||
+      ref.startsWith("source_health_watch:") ||
+      ref.startsWith("source-health:") ||
+      ref.startsWith("stage_play_source_health:") ||
+      ref.startsWith("source_status:") ||
+      ref.startsWith("workstation_context_feed:source_health") ||
+      ref.startsWith("workstation_actuator:query_source_health") ||
+      ref.startsWith("workstation_actuator:repair_source")
+    ),
     traceMemoryRefs: refs.filter((ref) =>
       ref.startsWith("trace_memory:") ||
       ref.startsWith("trace-memory:") ||
@@ -715,6 +743,7 @@ const liveAnswerPacketCircuitRefsForUpdate = (update: WorkstationGoalContextUpda
     narratorRefs: refs.filter((ref) =>
       ref.startsWith("helix_narrator_") ||
       ref.startsWith("narrator:") ||
+      ref.startsWith("workstation_context_feed:narrator_events") ||
       ref.startsWith("workstation_actuator:narrator_")
     ),
     routeWatchRefs: refs.filter((ref) =>
@@ -724,6 +753,7 @@ const liveAnswerPacketCircuitRefsForUpdate = (update: WorkstationGoalContextUpda
       ref.startsWith("stage_play_live_source_watch_job:") ||
       ref.startsWith("live_job_evidence:") ||
       ref.startsWith("situation_construct_query:") ||
+      ref.startsWith("workstation_context_feed:route_evidence") ||
       ref.startsWith("workstation_actuator:query_route_evidence")
     ),
     automationRefs: refs.filter((ref) =>
@@ -744,6 +774,15 @@ const liveAnswerPacketCircuitRefsForUpdate = (update: WorkstationGoalContextUpda
 
 const liveAnswerAutomationUpdate = (update: WorkstationGoalContextUpdateV1): boolean =>
   update.producerKind === "automation" || update.updateKind === "automation_status";
+
+const liveAnswerRouteEvidenceUpdate = (update: WorkstationGoalContextUpdateV1): boolean =>
+  update.producerKind === "route_watch" ||
+  update.updateKind === "route_evidence" ||
+  liveAnswerPacketCircuitRefsForUpdate(update).some((ref) => ref.routeWatchRefs.length > 0);
+
+const liveAnswerAutomationPolicyUpdate = (update: WorkstationGoalContextUpdateV1): boolean =>
+  liveAnswerAutomationUpdate(update) ||
+  liveAnswerPacketCircuitRefsForUpdate(update).some((ref) => ref.automationRefs.length > 0);
 
 const documentMarkdownSourceIdFromLocation = (threadId: string): string => {
   if (typeof window === "undefined") return `document_markdown:${threadId}`;
@@ -1980,7 +2019,15 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       feedQueryCount: goalContextUpdates.filter(liveAnswerFeedQueryUpdate).length +
         agentGoalSessions.reduce((count: number, session: AgentGoalSessionV1) => count + session.contextFeeds.length, 0),
       routeWatchCount: goalContextUpdates.filter((update: WorkstationGoalContextUpdateV1) => update.producerKind === "route_watch").length,
+      routeEvidenceCount: goalContextUpdates.filter(liveAnswerRouteEvidenceUpdate).length +
+        agentGoalSessions.filter((session: AgentGoalSessionV1) =>
+          session.contextFeeds.some((feed) => feed.sourceKind === "route_evidence")
+        ).length,
       automationCount: goalContextUpdates.filter(liveAnswerAutomationUpdate).length +
+        agentGoalSessions.filter((session: AgentGoalSessionV1) =>
+          session.contextFeeds.some((feed) => feed.sourceKind === "automation_policies")
+        ).length,
+      automationPolicyCount: goalContextUpdates.filter(liveAnswerAutomationPolicyUpdate).length +
         agentGoalSessions.filter((session: AgentGoalSessionV1) =>
           session.contextFeeds.some((feed) => feed.sourceKind === "automation_policies")
         ).length,

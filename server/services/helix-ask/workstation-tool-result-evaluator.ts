@@ -16,6 +16,8 @@ import {
   WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
   normalizeAgentGoalActuatorV1,
   type AgentGoalActuatorV1,
+  type GoalContextProducerKindV1,
+  type GoalContextUpdateKindV1,
   type NarratorBindStreamRequestV1,
   type WorkstationDispatchActionV1,
 } from "../../../shared/contracts/workstation-goal-context.v1";
@@ -318,6 +320,34 @@ function buildWorkstationControlDispatch(input: {
   return dispatch;
 }
 
+function classifyWorkstationControlGoalContextSurface(actuators: AgentGoalActuatorV1[]): {
+  producerKind: GoalContextProducerKindV1;
+  updateKind: GoalContextUpdateKindV1;
+} {
+  if (actuators.some((actuator) => actuator === "update_live_answer")) {
+    return { producerKind: "live_answer", updateKind: "summary" };
+  }
+  if (actuators.some((actuator) =>
+    actuator === "bind_source" || actuator === "unbind_source" || actuator === "repair_source"
+  )) {
+    return { producerKind: "source_health", updateKind: "source_status" };
+  }
+  if (actuators.some((actuator) => actuator === "focus_process_graph")) {
+    return { producerKind: "reflection", updateKind: "suggested_action" };
+  }
+  if (actuators.some((actuator) =>
+    actuator === "change_preset" || actuator === "set_audio_preset" || actuator === "set_visual_preset"
+  )) {
+    return { producerKind: "automation", updateKind: "preset_state" };
+  }
+  if (actuators.some((actuator) =>
+    actuator === "pause_loop" || actuator === "resume_loop" || actuator === "set_loop_state" || actuator === "repair_loop"
+  )) {
+    return { producerKind: "automation", updateKind: "automation_status" };
+  }
+  return { producerKind: "automation", updateKind: "suggested_action" };
+}
+
 function maybeRecordWorkstationControlGoalContextUpdate(input: {
   plan: HelixWorkstationToolPlan;
   summary: string;
@@ -368,6 +398,7 @@ function maybeRecordWorkstationControlGoalContextUpdate(input: {
   });
   const primaryToolName = canonicalLiveEnvToolName(controlSteps[0]?.tool_id) ?? "live_env.workstation_control";
   const primaryActuator = normalizeAgentGoalActuatorV1(primaryToolName);
+  const surfaceClassification = classifyWorkstationControlGoalContextSurface(actuators);
 
   recordStagePlayGoalContextUpdate({
     schemaVersion: WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
@@ -386,12 +417,8 @@ function maybeRecordWorkstationControlGoalContextUpdate(input: {
       ...actuators.map((actuator) => `workstation_actuator:${actuator}`),
       ...argsRefs.filter((ref) => ref?.startsWith("loop:")),
     ]),
-    producerKind: "automation",
-    updateKind: actuators.some((actuator) =>
-      actuator === "change_preset" || actuator === "set_audio_preset" || actuator === "set_visual_preset"
-    )
-      ? "preset_state"
-      : "suggested_action",
+    producerKind: surfaceClassification.producerKind,
+    updateKind: surfaceClassification.updateKind,
     contentRef: receiptRef,
     preview: input.summary,
     evidenceRefs: uniqueStrings([

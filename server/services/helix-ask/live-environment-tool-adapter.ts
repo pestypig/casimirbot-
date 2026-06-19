@@ -3596,6 +3596,7 @@ export function executeLiveEnvironmentTool(
     const loopRefs = uniqueStrings([
       `narrator:${narratorKind}`,
       `thread:${input.thread_id}`,
+      "workstation_context_feed:narrator_events",
       `workstation_actuator:${actuator}`,
     ]);
     const narratorEvidenceRefs = uniqueStrings([
@@ -6987,6 +6988,8 @@ export function executeLiveEnvironmentTool(
       const allRefs = uniqueStrings([
         update.contentRef,
         update.updateId,
+        `workstation_context_feed:${feedQuerySpec.feedKind}`,
+        `workstation_actuator:${feedQuerySpec.actuator}`,
         ...update.sourceRefs,
         ...update.loopRefs,
         ...update.evidenceRefs,
@@ -7009,6 +7012,34 @@ export function executeLiveEnvironmentTool(
           ref.startsWith("microdeck:") ||
           ref.startsWith("microdeck_output:")
         ),
+        transcriptRefs: allRefs.filter((ref) =>
+          ref.startsWith("audio_transcript:") ||
+          ref.startsWith("transcript_window:") ||
+          ref.startsWith("translated_transcript") ||
+          ref.startsWith("translation_segment:") ||
+          ref.startsWith("workstation_context_feed:audio_transcripts") ||
+          ref.startsWith("workstation_context_feed:translated_transcripts") ||
+          ref.startsWith("workstation_actuator:query_audio_transcripts") ||
+          ref.startsWith("workstation_actuator:query_translation_segments")
+        ),
+        projectionRefs: allRefs.filter((ref) =>
+          ref.startsWith("live_answer") ||
+          ref.startsWith("live-answer") ||
+          ref.startsWith("workstation_context_feed:live_answer_lines") ||
+          ref.startsWith("workstation_actuator:query_live_answer_state") ||
+          ref.startsWith("workstation_actuator:update_live_answer")
+        ),
+        sourceHealthRefs: allRefs.filter((ref) =>
+          ref.startsWith("source_health:") ||
+          ref.startsWith("source_health_status:") ||
+          ref.startsWith("source_health_watch:") ||
+          ref.startsWith("source-health:") ||
+          ref.startsWith("stage_play_source_health:") ||
+          ref.startsWith("source_status:") ||
+          ref.startsWith("workstation_context_feed:source_health") ||
+          ref.startsWith("workstation_actuator:query_source_health") ||
+          ref.startsWith("workstation_actuator:repair_source")
+        ),
         traceMemoryRefs: allRefs.filter((ref) =>
           ref.startsWith("trace_memory:") ||
           ref.startsWith("trace-memory:") ||
@@ -7020,6 +7051,7 @@ export function executeLiveEnvironmentTool(
         narratorRefs: allRefs.filter((ref) =>
           ref.startsWith("helix_narrator_") ||
           ref.startsWith("narrator:") ||
+          ref.startsWith("workstation_context_feed:narrator_events") ||
           ref.startsWith("workstation_actuator:narrator_")
         ),
         routeWatchRefs: allRefs.filter((ref) =>
@@ -7029,6 +7061,7 @@ export function executeLiveEnvironmentTool(
           ref.startsWith("stage_play_live_source_watch_job:") ||
           ref.startsWith("live_job_evidence:") ||
           ref.startsWith("situation_construct_query:") ||
+          ref.startsWith("workstation_context_feed:route_evidence") ||
           ref.startsWith("workstation_actuator:query_route_evidence")
         ),
         automationRefs: allRefs.filter((ref) =>
@@ -9984,6 +10017,18 @@ export function executeLiveEnvironmentTool(
       ...resultSourceRefs,
       ...resultLoopRefs,
     ]);
+    const sourceHealthRefs = uniqueStrings([
+      contentRef,
+      ...resultLoopRefs.filter((ref) =>
+        ref.startsWith("source_health:") ||
+        ref.startsWith("source_health_status:") ||
+        ref.startsWith("source_health_watch:") ||
+        ref.startsWith("source-health:") ||
+        ref.startsWith("stage_play_source_health:") ||
+        ref.startsWith("workstation_context_feed:source_health") ||
+        ref.startsWith("workstation_actuator:query_source_health")
+      ),
+    ]);
     const freshnessStatus = ok ? (visibleResult.capabilities.length > 0 ? "fresh" : "unknown") : "blocked";
     const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
       threadId: input.thread_id,
@@ -10048,6 +10093,7 @@ export function executeLiveEnvironmentTool(
       policyEvidenceRefs,
       sourceRefs: resultSourceRefs,
       loopRefs: resultLoopRefs,
+      sourceHealthRefs,
       evidenceRefs: resultEvidenceRefs,
       freshnessStatus,
       goalSessionFound: goalId ? Boolean(goalSession) : null,

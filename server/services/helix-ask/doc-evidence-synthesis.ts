@@ -138,6 +138,84 @@ const readSameTurnCommittedRoute = (payload: RecordLike, turnId: string): HelixC
   return committed;
 };
 
+const recordCapabilityText = (value: unknown): string =>
+  readArray(value)
+    .map(readRecord)
+    .map((entry) => [
+      readString(entry?.requested_capability),
+      readString(entry?.runtime_capability),
+      readString(entry?.executed_capability),
+      readString(entry?.selected_capability),
+      readString(entry?.capability_hint),
+    ].filter(Boolean).join(" "))
+    .join(" ");
+
+const resolveCompoundDocsSynthesisTerminalContract = (
+  payload: RecordLike,
+): DocsSynthesisTerminalContractResolution | null => {
+  const readiness = readRecord(payload.compound_capability_synthesis_readiness);
+  const readinessGoalKind = readString(readiness?.goal_kind);
+  const readinessTerminalKind = readString(readiness?.required_terminal_kind);
+  if (
+    (readiness?.synthesis_required === true || readiness?.complete === true) &&
+    readinessGoalKind === "doc_evidence_synthesis" &&
+    readinessTerminalKind === "doc_evidence_synthesis_answer"
+  ) {
+    return {
+      allowed: true,
+      goalKind: "doc_evidence_synthesis",
+      goalKindSource: "compound_capability_synthesis_readiness.goal_kind",
+      requiredTerminalKind: "doc_evidence_synthesis_answer",
+      requiredTerminalKindSource: "compound_capability_synthesis_readiness.required_terminal_kind",
+      disallowReason: null,
+    };
+  }
+
+  const itinerary = readRecord(payload.capability_itinerary);
+  const terminalCriteria = readRecord(itinerary?.terminal_success_criteria);
+  const executionState =
+    readRecord(payload.capability_itinerary_execution_state) ??
+    readRecord(itinerary?.execution_state);
+  const contract = readRecord(itinerary?.compound_capability_contract);
+  const requiredFamilies = readArray(terminalCriteria?.required_observation_families)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  const requiredCapabilities = readArray(terminalCriteria?.required_capabilities)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  const subgoals = readArray(contract?.subgoals);
+  const capabilityText = [
+    requiredCapabilities.join(" "),
+    recordCapabilityText(itinerary?.planned_steps),
+    recordCapabilityText(subgoals),
+    recordCapabilityText(executionState?.compound_subgoal_ledger),
+  ].join(" ");
+  const hasDocsSubgoal =
+    requiredFamilies.includes("docs_viewer") ||
+    /docs-viewer\.(?:locate_in_doc|summarize_doc|search_docs)/i.test(capabilityText);
+  const isCompound =
+    requiredFamilies.length > 1 ||
+    requiredCapabilities.length > 1 ||
+    subgoals.length > 1;
+  if (
+    terminalCriteria?.requires_post_observation_synthesis === true &&
+    executionState?.complete === true &&
+    isCompound &&
+    hasDocsSubgoal
+  ) {
+    return {
+      allowed: true,
+      goalKind: "doc_evidence_synthesis",
+      goalKindSource: "capability_itinerary.terminal_success_criteria",
+      requiredTerminalKind: "doc_evidence_synthesis_answer",
+      requiredTerminalKindSource: "capability_itinerary.terminal_success_criteria",
+      disallowReason: null,
+    };
+  }
+
+  return null;
+};
+
 const resolveDocsSynthesisTerminalContract = (input: {
   turnId: string;
   payload: RecordLike;
@@ -146,6 +224,8 @@ const resolveDocsSynthesisTerminalContract = (input: {
   const committedRoute = readSameTurnCommittedRoute(input.payload, input.turnId);
   const canonicalGoal = readRecord(input.payload.canonical_goal_frame);
   const committedGoal = committedRoute?.canonical_goal;
+  const compoundTerminalContract = resolveCompoundDocsSynthesisTerminalContract(input.payload);
+  if (compoundTerminalContract) return compoundTerminalContract;
   const committedForbidden = committedGoal?.forbidden_terminal_artifact_kinds ?? [];
   if (committedForbidden.includes("doc_evidence_synthesis_answer")) {
     return {

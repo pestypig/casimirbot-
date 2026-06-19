@@ -942,6 +942,124 @@ describe("Helix Ask docs evidence synthesis answer", () => {
     });
   });
 
+  it("lets completed compound docs itinerary dominate stale locate-in-doc terminal metadata", () => {
+    const prompt =
+      "Use docs-viewer.locate_in_doc to find where docs/helix-ask-codex-loop-discipline.md says routes choose procedures, then run scientific-calculator.solve_expression with 19+23.";
+    const payload: Record<string, unknown> = synthesisPayload(prompt);
+    payload.route_product_contract = {
+      ...(payload.route_product_contract as Record<string, unknown>),
+      allowed_terminal_artifact_kinds: ["doc_location_matches", "typed_failure", "workstation_tool_evaluation"],
+      forbidden_terminal_artifact_kinds: ["doc_evidence_synthesis_answer", "direct_answer_text"],
+    };
+    payload.canonical_goal_frame = {
+      turn_id: turnId,
+      goal_kind: "locate_in_doc",
+      required_terminal_kind: "doc_location_matches",
+    };
+    payload.committed_ask_route = {
+      schema: "helix.committed_ask_route.v1",
+      turn_id: turnId,
+      route: { source_target: "docs_viewer" },
+      canonical_goal: {
+        goal_kind: "locate_in_doc",
+        required_terminal_kind: "doc_location_matches",
+        allowed_terminal_artifact_kinds: ["doc_location_matches", "typed_failure"],
+        forbidden_terminal_artifact_kinds: ["doc_evidence_synthesis_answer"],
+      },
+    };
+    payload.capability_itinerary = {
+      schema: "helix.capability_itinerary.v1",
+      terminal_success_criteria: {
+        required_observation_families: ["docs_viewer", "calculator"],
+        required_capabilities: ["docs-viewer.locate_in_doc", "scientific-calculator.solve_expression"],
+        allowed_terminal_artifact_kinds: ["final_answer_draft"],
+        requires_post_observation_synthesis: true,
+      },
+      planned_steps: [
+        { requested_capability: "docs-viewer.locate_in_doc" },
+        { requested_capability: "scientific-calculator.solve_expression" },
+      ],
+      execution_state: {
+        complete: true,
+        compound_subgoal_ledger: [
+          {
+            requested_capability: "docs-viewer.locate_in_doc",
+            executed_capability: "docs-viewer.locate_in_doc",
+            observation_ref: "doc-location:routes-compound",
+            satisfaction: "satisfied",
+            rail_status: "complete",
+          },
+          {
+            requested_capability: "scientific-calculator.solve_expression",
+            executed_capability: "scientific-calculator.solve_expression",
+            observation_ref: "calculator:19-plus-23",
+            satisfaction: "satisfied",
+            rail_status: "complete",
+          },
+        ],
+      },
+    };
+    const location = {
+      artifact_id: "doc-location:routes-compound",
+      turn_id: turnId,
+      kind: "doc_location_matches",
+      payload: {
+        schema: "helix.doc_location_matches.v1",
+        kind: "doc_location_matches",
+        query: "routes choose procedures",
+        source_path: "/docs/helix-ask-codex-loop-discipline.md",
+        matches: [
+          {
+            path: "/docs/helix-ask-codex-loop-discipline.md",
+            heading: "Turn-Chain Fundamentals",
+            line_start: 196,
+            line_end: 202,
+            snippet: "Routes choose procedures. Tools produce observations.",
+          },
+        ],
+        match_count: 1,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+    const finalDraft = {
+      artifact_id: "draft:routes-compound",
+      turn_id: turnId,
+      kind: "final_answer_draft",
+      payload: {
+        schema: "helix.final_answer_draft.v1",
+        artifact_id: "draft:routes-compound",
+        text: "The document states that routes choose procedures, and the calculator result is 42.",
+        required_terminal_kind: "doc_location_matches",
+        support_refs: ["doc-location:routes-compound", "calculator:19-plus-23"],
+        artifact_refs: ["doc-location:routes-compound", "calculator:19-plus-23"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+
+    const result = materializeDocEvidenceSynthesisAnswer({
+      turnId,
+      promptText: prompt,
+      payload,
+      artifactLedger: [location, finalDraft],
+      answerText: "The document states that routes choose procedures, and the calculator result is 42.",
+      finalAnswerDraftRef: "draft:routes-compound",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.blocked_reason).not.toBe("route_contract_disallowed");
+    expect(payload.docs_synthesis_debug).toMatchObject({
+      materializer_contract_allowed: true,
+      materializer_goal_kind_source: "capability_itinerary.terminal_success_criteria",
+      materializer_required_terminal_kind: "doc_evidence_synthesis_answer",
+    });
+    expect(payload.doc_evidence_synthesis_answer).toMatchObject({
+      terminal_artifact_kind: "doc_evidence_synthesis_answer",
+      goal_kind: "doc_evidence_synthesis",
+    });
+  });
+
   it("does not materialize a model draft without doc support refs", () => {
     const prompt =
       "Compare docs/helix-ask-flow.md and docs/helix-ask-codex-loop-discipline.md.";

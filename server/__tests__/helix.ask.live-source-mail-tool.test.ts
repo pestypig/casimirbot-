@@ -3171,6 +3171,14 @@ describe("live-source mail live environment tools", () => {
         },
       }),
     ]));
+    expect(queryPayload.packetCircuitRefs).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        updateId: configurePayload.goalContextUpdateId,
+        routeWatchRefs: expect.arrayContaining(["workstation_context_feed:route_evidence"]),
+        assistant_answer: false,
+        terminal_eligible: false,
+      }),
+    ]));
     expect(queryPayload.authoritySummary).toMatchObject({
       answerAuthority: "completed_solver_path_required",
       assistant_answer: false,
@@ -4895,6 +4903,28 @@ describe("live-source mail live environment tools", () => {
         contentRef: processPayload.packets[0].packetId,
       }),
     ]));
+    expect(audioQueryAfterProcessPayload.packetCircuitRefs).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        producerKind: "audio_capture",
+        contentRef: audioMail.mailId,
+        transcriptRefs: expect.arrayContaining([
+          "workstation_context_feed:audio_transcripts",
+          "workstation_actuator:query_audio_transcripts",
+        ]),
+        assistant_answer: false,
+        terminal_eligible: false,
+      }),
+      expect.objectContaining({
+        producerKind: "transcription_loop",
+        contentRef: processPayload.packets[0].packetId,
+        transcriptRefs: expect.arrayContaining([
+          "workstation_context_feed:audio_transcripts",
+          "workstation_actuator:query_audio_transcripts",
+        ]),
+        assistant_answer: false,
+        terminal_eligible: false,
+      }),
+    ]));
     expect(audioQueryAfterProcessPayload.authoritySummary).toMatchObject({
       updateCount: 2,
       observationOnlyUpdateCount: 2,
@@ -4952,6 +4982,18 @@ describe("live-source mail live environment tools", () => {
         postToolModelStepRequired: true,
       },
     });
+    expect(queryPayload.packetCircuitRefs).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        producerKind: "translation_loop",
+        contentRef: processPayload.packets[0].packetId,
+        transcriptRefs: expect.arrayContaining([
+          "workstation_context_feed:translated_transcripts",
+          "workstation_actuator:query_translation_segments",
+        ]),
+        assistant_answer: false,
+        terminal_eligible: false,
+      }),
+    ]));
     expect(queryObservation.producedRefs).toEqual(expect.arrayContaining([
       queryPayload.goalContextUpdateId,
       queryPayload.resultId,
@@ -7305,7 +7347,10 @@ describe("live-source mail live environment tools", () => {
           "allowed_actuator:narrator_bind_stream",
           "source:browser-audio",
         ]),
-        loopRefs: expect.arrayContaining(["workstation_actuator:narrator_bind_stream"]),
+        loopRefs: expect.arrayContaining([
+          "workstation_context_feed:narrator_events",
+          "workstation_actuator:narrator_bind_stream",
+        ]),
         receiptRefs: [preparedPayload.requestId],
         authority: {
           assistantAnswer: false,
@@ -7322,6 +7367,7 @@ describe("live-source mail live environment tools", () => {
         narratorRefs: expect.arrayContaining([
           preparedPayload.requestId,
           "narrator:bind_stream",
+          "workstation_context_feed:narrator_events",
           "workstation_actuator:narrator_bind_stream",
         ]),
         assistant_answer: false,
@@ -7399,6 +7445,7 @@ describe("live-source mail live environment tools", () => {
       policyEvidenceRefs: ["context_feed:source_health", "allowed_actuator:query_source_health"],
       sourceRefs: expect.any(Array),
       loopRefs: expect.arrayContaining(["workstation_context_feed:source_health", "workstation_actuator:query_source_health"]),
+      sourceHealthRefs: expect.arrayContaining(["workstation_context_feed:source_health", "workstation_actuator:query_source_health"]),
       evidenceRefs: expect.arrayContaining([
         "context_feed:source_health",
         "allowed_actuator:query_source_health",
@@ -8028,6 +8075,17 @@ describe("live-source mail live environment tools", () => {
         postToolModelStepRequired: true,
       },
     });
+    expect(queryPayload.packetCircuitRefs).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        updateId: readPayload.goalContextUpdateId,
+        projectionRefs: expect.arrayContaining([
+          "workstation_context_feed:live_answer_lines",
+          "workstation_actuator:query_live_answer_state",
+        ]),
+        assistant_answer: false,
+        terminal_eligible: false,
+      }),
+    ]));
   });
 
   it("appends goal checkpoints when reading Live Answer card lines through an allowed goal session", () => {

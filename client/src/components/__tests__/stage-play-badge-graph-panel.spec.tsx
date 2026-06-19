@@ -2461,6 +2461,12 @@ describe("StagePlayBadgeGraphPanel", () => {
               relevancePolicy: "same-source",
             },
             {
+              feedId: "feed:route-evidence",
+              sourceKind: "route_evidence",
+              freshnessMs: 60000,
+              relevancePolicy: "same-goal-or-route",
+            },
+            {
               feedId: "feed:automation",
               sourceKind: "automation_policies",
               freshnessMs: 120000,
@@ -2485,7 +2491,7 @@ describe("StagePlayBadgeGraphPanel", () => {
               relevancePolicy: "same-goal-or-stream-binding",
             },
           ],
-          allowedActuators: ["query_visual_summaries", "query_packet_traces", "query_microdeck_outputs", "query_source_health", "query_translation_segments", "query_trace_memory", "query_automation_policies", "narrator_bind_stream", "narrator_say", "focus_process_graph"],
+          allowedActuators: ["query_visual_summaries", "query_packet_traces", "query_microdeck_outputs", "query_source_health", "query_translation_segments", "query_trace_memory", "query_automation_policies", "query_route_evidence", "narrator_bind_stream", "narrator_say", "focus_process_graph"],
           cadence: { kind: "event_accumulation", minUpdates: 2 },
           stopConditions: [
             "User stops monitoring",
@@ -2574,7 +2580,8 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-audio-transcript-state")).toHaveTextContent(/capture speech queryable before agent reasoning/i);
     expect(screen.getByTestId("stage-play-translation-state")).toHaveTextContent(/2 translated transcript context items/i);
     expect(screen.getByTestId("stage-play-translation-state")).toHaveTextContent(/translation output visible as evidence/i);
-    expect(screen.getByTestId("stage-play-route-watch-automation-state")).toHaveTextContent(/1 automation status update/i);
+    expect(screen.getByTestId("stage-play-route-watch-automation-state")).toHaveTextContent(/2 route evidence items/i);
+    expect(screen.getByTestId("stage-play-route-watch-automation-state")).toHaveTextContent(/2 automation policies/i);
     expect(screen.getByTestId("stage-play-route-watch-automation-state")).toHaveTextContent(/1 running loop dispatch/i);
     expect(screen.getByTestId("stage-play-dispatch-mix-state")).toHaveTextContent(/21 dispatch suggestions/i);
     expect(screen.getByTestId("stage-play-dispatch-mix-state")).toHaveTextContent(/2 interrupt dispatches/i);
@@ -2597,7 +2604,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-control-dispatch-state")).toHaveTextContent(/Wake remains 2 interrupt dispatches/i);
     expect(screen.getByTestId("stage-play-wake-interrupt-scope-state")).toHaveTextContent(/Interrupt split: 2 urgent, 0 blocked, 0 policy-triggered/i);
     expect(screen.getByTestId("stage-play-wake-interrupt-scope-state")).toHaveTextContent(/Other dispatches stay on workstation control lanes/i);
-    expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/10 allowed actuators/i);
+    expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/11 allowed actuators/i);
     expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/2 narrator output policy items/i);
     expect(screen.getByTestId("stage-play-actuator-policy-state")).toHaveTextContent(/1 narrator event feed/i);
     expect(screen.getByTestId("stage-play-feed-policy-ref-state")).toHaveTextContent(/4 context-feed policy refs/i);
@@ -2616,6 +2623,7 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/source health/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/microdeck outputs/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/automation policies/i);
+    expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/route evidence/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/translated transcripts/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-feeds")).toHaveTextContent(/narrator events/i);
     expect(screen.getAllByTestId("stage-play-goal-context-update-policy-split").some((node) =>
@@ -2705,13 +2713,26 @@ describe("StagePlayBadgeGraphPanel", () => {
       /Source\s*source:visual-tab/i.test(node.textContent ?? "") &&
       /Loop\s*translation_loop:ui/i.test(node.textContent ?? "") &&
       /Deck\s*microdeck_output:translation-ui/i.test(node.textContent ?? "") &&
+      /Transcript\s*(?:workstation_)?context_feed:translated_transcripts/i.test(node.textContent ?? "") &&
       /Narrator\s*narrator:translated_transcript.*actuator:narrator_bind_stream/s.test(node.textContent ?? "") &&
       /Dispatch\s*Live Answer:/i.test(node.textContent ?? "") &&
       /Destination\s*live_answer:projection:translation-ui.*narrator:translated_transcript/s.test(node.textContent ?? "") &&
       /Authority\s*evidence only/i.test(node.textContent ?? "")
     )).toBe(true);
+    expect(screen.getAllByTestId("stage-play-goal-context-transcript-refs").some((node) =>
+      /transcripts=workstation_context_feed:translated_transcripts/i.test(node.textContent ?? "") &&
+      /workstation_actuator:query_translation_segments/i.test(node.textContent ?? "")
+    )).toBe(true);
+    expect(screen.getAllByTestId("stage-play-goal-context-projection-refs").some((node) =>
+      /projections=live_answer_projection:bad_terminal/i.test(node.textContent ?? "")
+    )).toBe(true);
+    expect(screen.getAllByTestId("stage-play-goal-context-source-health-refs").some((node) =>
+      /sourceHealth=source_health_status:visual-tab/i.test(node.textContent ?? "") &&
+      /source_health_watch:visual-tab/i.test(node.textContent ?? "")
+    )).toBe(true);
     expect(screen.getAllByTestId("stage-play-goal-context-narrator-refs").some((node) =>
       /narrator=narrator:translated_transcript/i.test(node.textContent ?? "") &&
+      /workstation_context_feed:narrator_events/i.test(node.textContent ?? "") &&
       /workstation_actuator:narrator_bind_stream/i.test(node.textContent ?? "")
     )).toBe(true);
     expect(screen.getAllByTestId("stage-play-goal-context-circuit-route").some((node) =>
@@ -2722,6 +2743,14 @@ describe("StagePlayBadgeGraphPanel", () => {
     )).toBe(true);
     expect(screen.getAllByTestId("stage-play-goal-context-circuit-route").some((node) =>
       /Trace Memory\s*trace_memory:stage-play-routing-ui/i.test(node.textContent ?? "") &&
+      /Authority\s*evidence only/i.test(node.textContent ?? "")
+    )).toBe(true);
+    expect(screen.getAllByTestId("stage-play-goal-context-circuit-route").some((node) =>
+      /Projection\s*live_answer:projection:bad_terminal/i.test(node.textContent ?? "") &&
+      /Authority\s*blocked terminal claim/i.test(node.textContent ?? "")
+    )).toBe(true);
+    expect(screen.getAllByTestId("stage-play-goal-context-circuit-route").some((node) =>
+      /Source Health\s*(?:source_health_status:visual-tab|context_feed:source_health)/i.test(node.textContent ?? "") &&
       /Authority\s*evidence only/i.test(node.textContent ?? "")
     )).toBe(true);
     expect(screen.getAllByTestId("stage-play-goal-context-circuit-route").some((node) =>

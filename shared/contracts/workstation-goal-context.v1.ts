@@ -1006,6 +1006,9 @@ export function validateNarratorSayRequestV1(value: NarratorSayRequestV1): strin
   if (Array.isArray(value.loopRefs) && !value.loopRefs.includes("workstation_actuator:narrator_say")) {
     issues.push("loopRefs must include workstation_actuator:narrator_say");
   }
+  if (Array.isArray(value.loopRefs) && !value.loopRefs.includes("workstation_context_feed:narrator_events")) {
+    issues.push("loopRefs must include workstation_context_feed:narrator_events");
+  }
   if (Array.isArray(value.evidenceRefs) && Array.isArray(value.sourceRefs)) {
     for (const ref of value.sourceRefs) {
       if (!value.evidenceRefs.includes(ref)) {
@@ -1024,6 +1027,9 @@ export function validateNarratorSayRequestV1(value: NarratorSayRequestV1): strin
   }
   if (Array.isArray(value.evidenceRefs) && !value.evidenceRefs.includes("allowed_actuator:narrator_say")) {
     issues.push("evidenceRefs must include narrator_say actuator policy ref");
+  }
+  if (Array.isArray(value.evidenceRefs) && !value.evidenceRefs.includes("workstation_context_feed:narrator_events")) {
+    issues.push("evidenceRefs must include narrator event feed ref");
   }
   if (Array.isArray(value.producedRefs) && value.requestId && !value.producedRefs.includes(value.requestId)) {
     issues.push("producedRefs must include requestId");
@@ -1064,6 +1070,9 @@ export function validateNarratorBindStreamRequestV1(value: NarratorBindStreamReq
   if (Array.isArray(value.loopRefs) && !value.loopRefs.includes("workstation_actuator:narrator_bind_stream")) {
     issues.push("loopRefs must include workstation_actuator:narrator_bind_stream");
   }
+  if (Array.isArray(value.loopRefs) && !value.loopRefs.includes("workstation_context_feed:narrator_events")) {
+    issues.push("loopRefs must include workstation_context_feed:narrator_events");
+  }
   if (Array.isArray(value.evidenceRefs) && Array.isArray(value.sourceRefs)) {
     for (const ref of value.sourceRefs) {
       if (!value.evidenceRefs.includes(ref)) {
@@ -1082,6 +1091,9 @@ export function validateNarratorBindStreamRequestV1(value: NarratorBindStreamReq
   }
   if (Array.isArray(value.evidenceRefs) && !value.evidenceRefs.includes("allowed_actuator:narrator_bind_stream")) {
     issues.push("evidenceRefs must include narrator_bind_stream actuator policy ref");
+  }
+  if (Array.isArray(value.evidenceRefs) && !value.evidenceRefs.includes("workstation_context_feed:narrator_events")) {
+    issues.push("evidenceRefs must include narrator event feed ref");
   }
   if (Array.isArray(value.producedRefs) && value.requestId && !value.producedRefs.includes(value.requestId)) {
     issues.push("producedRefs must include requestId");
