@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -9,6 +9,7 @@ import {
 } from "../shared/contracts/nhm2-dynamic-geometry-samples.v1";
 import type { Nhm2ObserverRobustEnergyConditionArtifactV1 } from "../shared/contracts/nhm2-observer-robust-energy-conditions.v1";
 import type { Nhm2QeiWorldlineDossierV1 } from "../shared/contracts/nhm2-qei-worldline-dossier.v1";
+import { buildNhm2RegionalSupportFunctionAtlas } from "../shared/contracts/nhm2-regional-support-function-atlas.v1";
 import {
   buildNhm2EffectiveGeometryReference,
   isNhm2EffectiveGeometryReference,
@@ -46,6 +47,7 @@ import {
 import { runNhm2DynamicGeometrySamples } from "../tools/nhm2/build-dynamic-geometry-samples";
 import { runNhm2DynamicEffectiveGeometryEvidence } from "../tools/nhm2/build-dynamic-effective-geometry-evidence";
 import { runNhm2BackreactionResidualReceipt } from "../tools/nhm2/build-backreaction-residual-receipt";
+import { runNhm2CandidateDynamicEffectiveGeometryAgreement } from "../tools/nhm2/build-candidate-dynamic-effective-geometry-agreement";
 
 const encodedR32 = (values: number[]): string => {
   const bytes = Buffer.alloc(values.length * 4);
@@ -75,6 +77,109 @@ const writeBrick = (
     })}\n`,
     "utf8",
   );
+};
+
+const atlasFixture = () => {
+  const region = (
+    regionId:
+      | "global"
+      | "hull"
+      | "wall"
+      | "exterior_shell"
+      | "hull_wall_transition"
+      | "wall_exterior_transition",
+    semanticRole: "closure_region" | "transition_region" | "global_region",
+  ) => ({
+    regionId,
+    semanticRole,
+    maskRef: `mask:${regionId}`,
+    supportFunctionRef: `support:${regionId}`,
+    sampleCount: 1,
+    supportStats: {
+      minWeight: 0,
+      maxWeight: 1,
+      meanWeight: regionId === "global" ? 1 : 0.5,
+      nonzeroFraction: 1,
+    },
+    aggregationPolicy: {
+      weighting: regionId === "global" ? "global_weighted" as const : "support_weighted" as const,
+      normalization: "sum_weights" as const,
+      includeTransitionSamples: semanticRole === "transition_region",
+    },
+  });
+  return buildNhm2RegionalSupportFunctionAtlas({
+    runIdentity: {
+      runId: "campaign-test",
+      profileId: "stage1_centerline_alpha_0p995_v1",
+      chartId: "comoving_cartesian",
+      metricRef: "metric.json",
+      gridRef: "grid.json",
+      samplePlanRef: "grid.json",
+      createdAt: "2026-06-18T00:00:00.000Z",
+    },
+    basisAndUnits: {
+      tensorBasis: "chart",
+      coordinateSystem: "comoving_cartesian",
+      lengthUnit: "m",
+      energyDensityUnit: "J/m^3",
+      stressEnergyConvention: "Tmunu",
+      signatureConvention: "-+++",
+    },
+    regions: {
+      global: region("global", "global_region"),
+      hull: region("hull", "closure_region"),
+      wall: region("wall", "closure_region"),
+      exterior_shell: region("exterior_shell", "closure_region"),
+      hull_wall_transition: region("hull_wall_transition", "transition_region"),
+      wall_exterior_transition: region("wall_exterior_transition", "transition_region"),
+    },
+    transitionKernels: [
+      {
+        kernelId: "kernel:hull_wall",
+        fromRegion: "hull",
+        toRegion: "wall",
+        supportRegion: "hull_wall_transition",
+        kernelKind: "smootherstep_c2",
+        smoothnessClass: "C2",
+        widthMeters: 1,
+        derivativeTermsAvailable: true,
+        derivativeRef: "derivatives:hull_wall",
+      },
+      {
+        kernelId: "kernel:wall_exterior",
+        fromRegion: "wall",
+        toRegion: "exterior_shell",
+        supportRegion: "wall_exterior_transition",
+        kernelKind: "smootherstep_c2",
+        smoothnessClass: "C2",
+        widthMeters: 1,
+        derivativeTermsAvailable: true,
+        derivativeRef: "derivatives:wall_exterior",
+      },
+    ],
+    partitionOfUnity: {
+      appliesTo: ["global", "hull", "wall", "exterior_shell"],
+      sumWeightsMean: 1,
+      sumWeightsMaxAbsError: 0,
+      negativeWeightMin: 0,
+      overlapPolicy: "partition_of_unity",
+      status: "pass",
+    },
+    derivativeSupport: {
+      partialMuWAvailable: true,
+      covariantDerivativeSupportAvailable: true,
+      derivativeBasis: "chart",
+      derivativeRef: "derivatives:atlas",
+      transitionDerivativeTermsRequired: true,
+    },
+    provenance: {
+      generatedFrom: ["test-fixture"],
+      inputHashes: { grid: "grid-hash" },
+      atlasHash: "atlas-hash",
+      targetEchoForbidden: true,
+      targetDerivedFieldsUsed: false,
+    },
+  });
 };
 
 const fullSourceTensor = {
@@ -1085,6 +1190,59 @@ describe("NHM2 time-dependent source campaign", () => {
     expect(evidence.blockers).toEqual([]);
     expect(evidence.agreementStatus).toBe("pass");
     expect(evidence.backreactionResidualRef).toBe("backreaction.json");
+  });
+
+  it("publishes candidate dynamic/effective geometry agreement from source campaign inputs", () => {
+    const repoRoot = mkdtempSync(join(tmpdir(), "nhm2-candidate-dynamic-"));
+    const runRoot = "candidate-run";
+    mkdirSync(join(repoRoot, runRoot), { recursive: true });
+    writeFileSync(
+      join(repoRoot, runRoot, "nhm2-candidate-tile-effective-full-tensor-source.json"),
+      `${JSON.stringify(averagedSourceTensor(), null, 2)}\n`,
+      "utf8",
+    );
+    writeFileSync(
+      join(repoRoot, runRoot, "nhm2-frequency-convergence-evidence.json"),
+      `${JSON.stringify(frequencyEvidence(), null, 2)}\n`,
+      "utf8",
+    );
+    writeFileSync(
+      join(repoRoot, runRoot, "nhm2-switching-covariant-conservation-evidence.json"),
+      `${JSON.stringify(switchingEvidence(), null, 2)}\n`,
+      "utf8",
+    );
+    writeFileSync(
+      join(repoRoot, runRoot, "nhm2-regional-support-function-atlas.json"),
+      `${JSON.stringify(atlasFixture(), null, 2)}\n`,
+      "utf8",
+    );
+
+    const evidence = runNhm2CandidateDynamicEffectiveGeometryAgreement({
+      repoRoot,
+      runRoot,
+      dims: [2, 2, 2],
+      steps: 0,
+      dtSeconds: 0,
+      averagingWindowSeconds: 1,
+      toleranceLInf: 0.1,
+      auditOnly: true,
+    });
+
+    expect(evidence.agreementStatus).toBe("pass");
+    expect(evidence.blockers).toEqual([]);
+    expect(evidence.dynamicGeometryRef).toBe(
+      "candidate-run/nhm2-dynamic-geometry-samples.json",
+    );
+    expect(evidence.effectiveGeometryRef).toBe(
+      "candidate-run/nhm2-effective-geometry-reference.json",
+    );
+    expect(evidence.averagedSourceTensorRef).toBe(
+      "candidate-run/nhm2-averaged-source-tensor-receipt.json",
+    );
+    expect(evidence.backreactionResidualRef).toBe(
+      "candidate-run/nhm2-backreaction-residual-receipt.json",
+    );
+    expect(evidence.bounded).toBe(true);
   });
 
   it("emits a valid fail-closed artifact when evidence is missing", () => {

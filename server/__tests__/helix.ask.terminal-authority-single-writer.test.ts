@@ -539,6 +539,132 @@ describe("Helix terminal authority single writer", () => {
     expect(payload.selected_final_answer).toBe(directText);
   });
 
+  it("quarantines workstation circuit observations until solver authority selects a terminal answer", () => {
+    const turnId = "ask:test:workstation-circuit-observations-nonterminal";
+    const observationText =
+      "The frog-classification microdeck produced a likely tree frog packet and queued narration.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:goal_context_update`,
+        kind: "workstation_goal_context_update",
+        payload: {
+          schema: "helix.workstation_goal_context_update.v1",
+          updateId: `${turnId}:goal_context_update`,
+          producerKind: "microdeck",
+          sourceRef: "image_lens:frog_upload",
+          summary: observationText,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: `${turnId}:micro_reasoner_run`,
+        kind: "stage_play_micro_reasoner_run",
+        payload: {
+          schemaVersion: "stage_play_micro_reasoner_run/v1",
+          artifactId: "stage_play_micro_reasoner_run",
+          runId: `${turnId}:micro_reasoner_run`,
+          text: "MicroReasoner frog deck output is available for synthesis.",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: `${turnId}:narrator_event`,
+        kind: "narrator_event",
+        payload: {
+          schema: "helix.narrator_event/v1",
+          eventId: `${turnId}:narrator_event`,
+          text: "Narrator event recorded for the frog-classification output.",
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: `${turnId}:context_feed_query`,
+        kind: "stage_play_workstation_context_feed_query_result",
+        payload: {
+          schemaVersion: "stage_play_workstation_context_feed_query_result/v1",
+          artifactId: "stage_play_workstation_context_feed_query_result",
+          feedKind: "microdeck_outputs",
+          text: observationText,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      current_turn_artifact_ledger: artifacts,
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "workstation_panel",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+        forbidden_terminal_artifact_kinds: [
+          "helix.workstation_goal_context_update.v1",
+          "stage_play_micro_reasoner_run",
+          "narrator_event",
+          "stage_play_workstation_context_feed_query_result",
+        ],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        goal_kind: "workstation_goal_context_query",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      selected_final_answer: observationText,
+      answer: observationText,
+      text: observationText,
+      terminal_artifact_kind: "stage_play_workstation_context_feed_query_result",
+      final_answer_source: "stage_play_workstation_context_feed_query_result",
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        concise_text: observationText,
+        terminal_artifact_kind: "stage_play_workstation_context_feed_query_result",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(result.source).toBe("typed_failure");
+    expect(result.visible_text).not.toBe(observationText);
+    expect(payload.terminal_error_code).toBe("observation_artifact_cannot_terminalize");
+    expect(payload.workstation_observation_terminal_rejection).toMatchObject({
+      schema: "helix.workstation_observation_terminal_rejection.v1",
+      rejected_terminal_artifact_kind: "stage_play_workstation_context_feed_query_result",
+      reason: "observation_artifact_cannot_terminalize",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(result.rejected_candidates).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "workstation_goal_context_update", reason: "receipt_or_projection" }),
+      expect.objectContaining({ kind: "stage_play_micro_reasoner_run", reason: "receipt_or_projection" }),
+      expect.objectContaining({ kind: "narrator_event", reason: "receipt_or_projection" }),
+      expect.objectContaining({ kind: "stage_play_workstation_context_feed_query_result", reason: "receipt_or_projection" }),
+    ]));
+    expect(result.integrity.receipt_visible_as_answer).toBe(false);
+    expect(result.integrity.forbidden_terminal_candidate_count).toBeGreaterThanOrEqual(4);
+  });
+
   it("fails closed when terminal authority sees a broken tool rail", () => {
     const turnId = "ask:test:broken-tool-rail-terminal-guard";
     const draftText = "A polished answer that should not pass because the requested rail is broken.";
@@ -1949,5 +2075,187 @@ describe("Helix terminal authority single writer", () => {
       missing_observation_refs: [],
     });
     expect(payload.final_answer_source).toBe("final_answer_draft");
+  });
+
+  it("allows compound calculator drafts grounded through workstation evaluation evidence refs", () => {
+    const turnId = "ask:test:compound-calculator-support-aliases";
+    const workspaceSubgoalId = `${turnId}:compound_capability_subgoal:1:workspace_os_status`;
+    const calculatorSubgoalId = `${turnId}:compound_capability_subgoal:2:scientific-calculator_solve_expression`;
+    const workspaceObservationRef = `${turnId}:workspace_os_status_observation`;
+    const calculatorReceiptRef = `${turnId}:calculator_subgoal_receipt:calculate_expression`;
+    const calculatorCoverageRef = `${turnId}:calculator_plan_coverage`;
+    const workstationEvaluationRef = `${turnId}:runtime_calculator_workstation_tool_evaluation`;
+    const draftText = "Workspace status was inspected, and the calculator-backed result is 330.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:runtime_tool_call:1`,
+        kind: "runtime_tool_call",
+        payload: {
+          call_id: `${turnId}:runtime_tool_call:1`,
+          capability_key: "workspace_os.status",
+          compound_subgoal_id: workspaceSubgoalId,
+          args: {},
+        },
+      },
+      {
+        artifact_id: `${turnId}:runtime_tool_call:1:runtime_tool_observation`,
+        kind: "runtime_tool_observation",
+        payload: {
+          call_id: `${turnId}:runtime_tool_call:1`,
+          capability_key: "workspace_os.status",
+          compound_subgoal_id: workspaceSubgoalId,
+          status: "completed",
+        },
+      },
+      {
+        artifact_id: workspaceObservationRef,
+        kind: "workspace_os_status_observation",
+        payload: {
+          schema: "helix.workspace_os_status_observation.v1",
+          capability_key: "workspace_os.status",
+          compound_subgoal_id: workspaceSubgoalId,
+        },
+      },
+      {
+        artifact_id: `${turnId}:runtime_tool_call:2`,
+        kind: "runtime_tool_call",
+        payload: {
+          call_id: `${turnId}:runtime_tool_call:2`,
+          capability_key: "scientific-calculator.solve_expression",
+          compound_subgoal_id: calculatorSubgoalId,
+          args: { latex: "14*23+8" },
+        },
+      },
+      {
+        artifact_id: `${turnId}:runtime_tool_call:2:runtime_tool_observation`,
+        kind: "runtime_tool_observation",
+        payload: {
+          call_id: `${turnId}:runtime_tool_call:2`,
+          capability_key: "scientific-calculator.solve_expression",
+          compound_subgoal_id: calculatorSubgoalId,
+          status: "completed",
+        },
+      },
+      {
+        artifact_id: calculatorCoverageRef,
+        kind: "calculator_plan_coverage",
+        payload: {
+          schema: "helix.calculator_plan_coverage.v1",
+          coverage: "complete",
+          receipt_refs: [calculatorReceiptRef],
+        },
+      },
+      {
+        artifact_id: workstationEvaluationRef,
+        kind: "workstation_tool_evaluation",
+        payload: {
+          schema: "helix.workstation_tool_evaluation.v1",
+          evaluation_id: workstationEvaluationRef,
+          tool_key: "scientific-calculator.solve_expression",
+          supports_goal: true,
+          evidence_refs: [calculatorReceiptRef],
+          receipt_ids: [calculatorReceiptRef],
+          coverage_ref: calculatorCoverageRef,
+          authority: "agent_runtime_loop",
+        },
+      },
+      {
+        artifact_id: `${turnId}:final_answer_draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: draftText,
+          support_refs: [workspaceObservationRef, calculatorReceiptRef],
+          artifact_refs: [workspaceObservationRef, calculatorReceiptRef, calculatorCoverageRef],
+          receipt_refs: [calculatorReceiptRef],
+          coverage_refs: [calculatorCoverageRef],
+          authority: "llm_post_observation_composer",
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt: "Use workspace_os.status, then calculate 14*23+8.",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "model_only",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+        forbidden_terminal_artifact_kinds: ["workspace_action_receipt", "agent_step_observation_packet"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        goal_kind: "compound_tool",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+        prompt_shape: "compound_tool",
+        relevant_tool_families: ["workspace_diagnostic", "calculator"],
+        terminal_success_criteria: {
+          required_observation_families: ["workspace_diagnostic", "calculator"],
+          required_capabilities: ["workspace_os.status", "scientific-calculator.solve_expression"],
+          requires_post_observation_synthesis: true,
+        },
+        compound_capability_contract: {
+          schema: "helix.compound_capability_contract.v1",
+          turn_id: turnId,
+          prompt_shape: "compound_capability",
+          requires_all_subgoals: true,
+          terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          subgoals: [
+            {
+              subgoal_id: workspaceSubgoalId,
+              order: 1,
+              requested_capability: "workspace_os.status",
+              runtime_capability: "workspace_os.status",
+              required_observation_kinds: ["workspace_os_status_observation"],
+              allowed_substitutions: [],
+              args_hint: {},
+            },
+            {
+              subgoal_id: calculatorSubgoalId,
+              order: 2,
+              requested_capability: "scientific-calculator.solve_expression",
+              runtime_capability: "scientific-calculator.solve_expression",
+              required_observation_kinds: ["calculator_receipt", "workstation_tool_evaluation"],
+              allowed_substitutions: [],
+              args_hint: { latex: "14*23+8", expression: "14*23+8" },
+            },
+          ],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: draftText,
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(result.source).toBe("final_answer_draft");
+    expect(payload.compound_subgoal_draft_support_coverage).toMatchObject({
+      applies: true,
+      ok: true,
+      required_observation_refs: [workspaceObservationRef, workstationEvaluationRef],
+      missing_observation_refs: [],
+    });
+    expect(payload.final_answer_source).toBe("final_answer_draft");
+    expect(payload.terminal_error_code).toBeUndefined();
   });
 });

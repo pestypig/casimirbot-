@@ -349,7 +349,7 @@ describe("Helix scholarly research tool admission", () => {
     ).toBe(false);
   });
 
-  it("allows terminal when the compound itinerary observations are complete", () => {
+  it("requires post-observation synthesis when the compound itinerary observations are complete but no draft exists", () => {
     const turnId = "ask:scholarly-locator-complete";
     const promptText =
       "Use scholarly research to find papers about photosynthesis quantum coherence, then use the Theory Badge Graph locator and synthesize uncertainty.";
@@ -400,6 +400,93 @@ describe("Helix scholarly research tool admission", () => {
           payload: {
             schema: "helix.theory_context_reflection_tool_receipt.v1",
             artifact_id: `${turnId}:theory:helix_theory_context_reflection_tool_receipt`,
+          },
+        },
+      ] as any,
+      goalSatisfactionEvaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        turn_id: turnId,
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+        observed_results: [],
+      } as any,
+      capabilityItineraryRef: `${turnId}:capability_itinerary`,
+      decisionTiming: "post_observation",
+    });
+
+    expect(decision.decision).toBe("answer_directly");
+    expect(decision.next_step).toBe("answer");
+    expect(decision.chosen_capability).toBe("model.direct_answer");
+    expect(decision.expected_artifacts).toEqual(
+      expect.arrayContaining(["final_answer_draft", "model_synthesized_answer"]),
+    );
+    expect(decision.continuation_policy).not.toBe("terminal_only");
+  });
+
+  it("allows terminal when the compound itinerary observations are complete and a final draft exists", () => {
+    const turnId = "ask:scholarly-locator-complete-with-draft";
+    const promptText =
+      "Use scholarly research to find papers about photosynthesis quantum coherence, then use the Theory Badge Graph locator and synthesize uncertainty.";
+
+    const decision = __testHelixAgentStepDecisionHints.buildHelixAgentStepDecisionArtifact({
+      turnId,
+      transcript: promptText,
+      canonicalGoalFrame: canonicalGoal("scholarly_research_lookup", "scholarly_research_answer") as any,
+      capabilityItinerary: compoundScholarlyLocatorItinerary(turnId),
+      availableCapabilities: {
+        schema: "helix.available_capabilities.v1",
+        turn_id: turnId,
+        recommended_capability_key: "model.direct_answer",
+        tool_admission_suppressed: false,
+        capabilities: [
+          {
+            capability_key: "helix_ask.reflect_theory_context",
+            requires_action: true,
+            availability: "available",
+            goal_fit: "possible",
+            expected_artifacts: ["helix_theory_context_reflection_tool_receipt"],
+            reason: "Theory locator already produced graph evidence.",
+          },
+          {
+            capability_key: "model.direct_answer",
+            requires_action: false,
+            availability: "available",
+            goal_fit: "fallback",
+            expected_artifacts: ["direct_answer_text"],
+            reason: "Terminal synthesis is available after itinerary completion.",
+          },
+        ],
+      } as any,
+      artifacts: [
+        {
+          artifact_id: `${turnId}:lookup:scholarly_research_observation`,
+          turn_id: turnId,
+          kind: "scholarly_research_observation",
+          payload: {
+            schema: "helix.scholarly_research_observation.v1",
+            artifact_id: `${turnId}:lookup:scholarly_research_observation`,
+          },
+        },
+        {
+          artifact_id: `${turnId}:theory:helix_theory_context_reflection_tool_receipt`,
+          turn_id: turnId,
+          kind: "helix_theory_context_reflection_tool_receipt",
+          payload: {
+            schema: "helix.theory_context_reflection_tool_receipt.v1",
+            artifact_id: `${turnId}:theory:helix_theory_context_reflection_tool_receipt`,
+          },
+        },
+        {
+          artifact_id: `${turnId}:final_answer_draft`,
+          turn_id: turnId,
+          kind: "final_answer_draft",
+          payload: {
+            schema: "helix.final_answer_draft.v1",
+            text: "Synthesized uncertainty from both observed subgoals.",
+            support_refs: [
+              `${turnId}:lookup:scholarly_research_observation`,
+              `${turnId}:theory:helix_theory_context_reflection_tool_receipt`,
+            ],
           },
         },
       ] as any,

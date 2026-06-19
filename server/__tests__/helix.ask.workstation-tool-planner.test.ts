@@ -1183,6 +1183,104 @@ describe("Helix Ask workstation tool planner", () => {
     });
   });
 
+  it("assembles goal-session workstation setup controls before querying goal context", () => {
+    const plan = planWorkstationToolUse(
+      "Start an agent goal session goal_id=goal:visual-ops source_id=source:visual-tab objective=\"Monitor visual source.\" Apply visual preset target_ref=source:visual-tab preset_id=preset:frog-classifier, bind source source_ref=source:visual-tab bind_target_ref=live-answer:desktop, pause loop loop_ref=loop:visual-mail, update Live Answer projection line_key=visual_summary, and focus the process graph node_ref=packet:visual-frog.",
+      { threadId: "thread:goal-workstation-setup", turnId: "turn:goal-workstation-setup" },
+    );
+
+    expect(plan.intent).toBe("workstation_goal_context");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.missing_required_args).toEqual([]);
+    expect(plan.tool_plan?.steps.map((step) => step.tool_id ?? `${step.panel_id}.${step.action_id}`)).toEqual([
+      "live_env.start_agent_goal_session",
+      "live_env.set_visual_preset",
+      "live_env.bind_workstation_source",
+      "live_env.update_live_answer_projection",
+      "live_env.set_workstation_loop_state",
+      "live_env.focus_process_graph",
+      "live_env.query_workstation_goal_context",
+      "undefined.undefined",
+    ]);
+    expect(plan.tool_plan?.steps[1]).toMatchObject({
+      step_id: "set_visual_preset",
+      kind: "run_ask_tool",
+      tool_id: "live_env.set_visual_preset",
+      args: expect.objectContaining({
+        goal_id: "goal:visual-ops",
+        target_ref: "source:visual-tab",
+        preset_id: "preset:frog-classifier",
+      }),
+      depends_on: ["start_agent_goal_session"],
+      expected_receipt_kind: "stage_play_workstation_control_receipt",
+      required: true,
+    });
+    expect(plan.tool_plan?.steps[2]).toMatchObject({
+      step_id: "bind_workstation_source",
+      kind: "run_ask_tool",
+      tool_id: "live_env.bind_workstation_source",
+      args: expect.objectContaining({
+        goal_id: "goal:visual-ops",
+        source_ref: "source:visual-tab",
+        target_ref: "live-answer:desktop",
+      }),
+      depends_on: ["start_agent_goal_session"],
+      expected_receipt_kind: "stage_play_workstation_control_receipt",
+      required: true,
+    });
+    expect(plan.tool_plan?.steps[3]).toMatchObject({
+      step_id: "update_live_answer_projection",
+      kind: "run_ask_tool",
+      tool_id: "live_env.update_live_answer_projection",
+      args: expect.objectContaining({
+        goal_id: "goal:visual-ops",
+        line_key: "visual_summary",
+      }),
+      depends_on: ["start_agent_goal_session"],
+      expected_receipt_kind: "stage_play_workstation_control_receipt",
+      required: true,
+    });
+    expect(plan.tool_plan?.steps[4]).toMatchObject({
+      step_id: "set_workstation_loop_state",
+      kind: "run_ask_tool",
+      tool_id: "live_env.set_workstation_loop_state",
+      args: expect.objectContaining({
+        goal_id: "goal:visual-ops",
+        loop_ref: "loop:visual-mail",
+        state: "paused",
+      }),
+      depends_on: ["start_agent_goal_session"],
+      expected_receipt_kind: "stage_play_workstation_control_receipt",
+      required: true,
+    });
+    expect(plan.tool_plan?.steps[5]).toMatchObject({
+      step_id: "focus_process_graph",
+      kind: "run_ask_tool",
+      tool_id: "live_env.focus_process_graph",
+      args: expect.objectContaining({
+        goal_id: "goal:visual-ops",
+        node_ref: "packet:visual-frog",
+      }),
+      depends_on: ["start_agent_goal_session"],
+      expected_receipt_kind: "stage_play_workstation_control_receipt",
+      required: true,
+    });
+    expect(plan.tool_plan?.steps[6]).toMatchObject({
+      step_id: "query_workstation_goal_context",
+      tool_id: "live_env.query_workstation_goal_context",
+      depends_on: [
+        "start_agent_goal_session",
+        "set_visual_preset",
+        "bind_workstation_source",
+        "update_live_answer_projection",
+        "set_workstation_loop_state",
+        "focus_process_graph",
+      ],
+      expected_receipt_kind: "stage_play_workstation_goal_context_read_result",
+      required: true,
+    });
+  });
+
   it("routes affirmative live-source watch-job automation setup through route-watch goal context", () => {
     const plan = planWorkstationToolUse(
       'Run live_env.configure_live_source_watch_job goal_id=goal:frog-monitor source_id=source:visual-tab objective="Watch visual frames for frog classification evidence." decision_policy_prompt="Describe each batch and keep route-watch receipts evidence-only."',
@@ -1560,8 +1658,29 @@ describe("Helix Ask workstation tool planner", () => {
         },
       },
       {
+        prompt: "Run bind_source goal_id=goal:frog source_ref=source:visual:active target_ref=live-answer:visual",
+        turnId: "turn:bind-source-short-alias",
+        stepId: "bind_workstation_source",
+        toolId: "live_env.bind_workstation_source",
+        args: {
+          goal_id: "goal:frog",
+          source_ref: "source:visual:active",
+          target_ref: "live-answer:visual",
+        },
+      },
+      {
         prompt: "Run live_env.unbind_workstation_source goal_id=goal:frog source_ref=source:visual:active",
         turnId: "turn:unbind-source",
+        stepId: "unbind_workstation_source",
+        toolId: "live_env.unbind_workstation_source",
+        args: {
+          goal_id: "goal:frog",
+          source_ref: "source:visual:active",
+        },
+      },
+      {
+        prompt: "Run live_env.unbind_source goal_id=goal:frog source_ref=source:visual:active",
+        turnId: "turn:unbind-source-short-alias",
         stepId: "unbind_workstation_source",
         toolId: "live_env.unbind_workstation_source",
         args: {
@@ -1703,8 +1822,10 @@ describe("Helix Ask workstation tool planner", () => {
       "Do not change workstation preset; explain how presets work.",
       'The UI label says "live_env.focus_process_graph"; summarize it.',
       "Could we bind the source to Live Answer later?",
+      "Could we run bind_source later?",
       "Previously you paused the loop; what did that mean?",
       'The UI label says "live_env.pause_workstation_loop"; summarize it.',
+      'The UI label says "unbind_source"; summarize it.',
       "If we later run live_env.resume_workstation_loop, what loop refs should we gather?",
       "Do not repair workstation source; explain the repair policy.",
       "Do not run live_env.repair_loop; explain the repair policy.",

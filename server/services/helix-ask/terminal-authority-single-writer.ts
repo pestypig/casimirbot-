@@ -28,6 +28,7 @@ import { liveSourceModelSynthesisMissingFailure } from "./live-source-terminal-f
 import { hashHelixTerminalText } from "./turn-terminal-authority";
 import { evaluateCalculatorToolAnswerSupport, routeMetadataIndicatesCalculator } from "./calculator-tool-answer-support";
 import { synthesizeWorkstationToolAnswer } from "./workstation-answer-synthesizer";
+import { isWorkstationObservationTerminalKind } from "./tool-family-terminal-policy";
 
 type ArtifactLike = {
   artifact_id?: unknown;
@@ -1290,11 +1291,19 @@ const collectRefsFromRecord = (record: Record<string, unknown> | null): string[]
     readString(record.observation_ref),
     readString(record.source_observation_ref),
     readString(record.citation_ref),
+    readString(record.evaluation_id),
+    readString(record.receipt_id),
+    readString(record.coverage_ref),
+    readString(record.result_ref),
+    readString(record.source_ref),
   ];
   const arrayRefs = [
     ...readArray(record.support_refs).map(readString),
     ...readArray(record.artifact_refs).map(readString),
     ...readArray(record.evidence_refs).map(readString),
+    ...readArray(record.receipt_ids).map(readString),
+    ...readArray(record.receipt_refs).map(readString),
+    ...readArray(record.coverage_refs).map(readString),
     ...readArray(record.observation_refs).map(readString),
     ...readArray(record.source_observation_refs).map(readString),
     ...readArray(record.grounded_observation_refs).map(readString),
@@ -1325,9 +1334,32 @@ const supportRefCoversObservationRef = (supportRef: string, observationRef: stri
   supportRef.endsWith(`#${observationRef}`) ||
   supportRef.endsWith(`/${observationRef}`);
 
+const artifactRefMatches = (artifact: ArtifactLike, ref: string): boolean => {
+  const payload = artifactPayload(artifact);
+  return uniqueStrings([
+    readString(artifact.artifact_id),
+    readString(payload?.artifact_id),
+    readString(payload?.evaluation_id),
+    readString(payload?.receipt_id),
+  ]).some((candidate) => candidate === ref);
+};
+
+const collectObservationEquivalentSupportRefs = (
+  artifacts: ArtifactLike[],
+  observationRef: string,
+): string[] => {
+  const artifact = artifacts.find((entry) => artifactRefMatches(entry, observationRef));
+  const payload = artifact ? artifactPayload(artifact) : null;
+  return uniqueStrings([
+    observationRef,
+    ...collectRefsFromRecord(payload),
+  ]);
+};
+
 const resolveCompoundSubgoalDraftSupportCoverage = (input: {
   payload: Record<string, unknown>;
   draft: ArtifactLike | null | undefined;
+  artifactLedger?: ArtifactLike[] | null;
   finalAnswerDraftRef?: string | null;
 }): CompoundSubgoalDraftSupportCoverage => {
   const executionState = readRecord(input.payload.capability_itinerary_execution_state);
@@ -1345,10 +1377,19 @@ const resolveCompoundSubgoalDraftSupportCoverage = (input: {
     ledger.length > 1 &&
     requiredObservationRefs.length > 0;
   const draftSupportRefs = collectExplicitFinalAnswerDraftSupportRefs(input.draft);
+  const artifactLedger = input.artifactLedger ?? readArray(input.payload.current_turn_artifact_ledger)
+    .map(readRecord)
+    .filter((entry): entry is ArtifactLike => Boolean(entry));
   const missingObservationRefs = applies
-    ? requiredObservationRefs.filter((observationRef) =>
-        !draftSupportRefs.some((supportRef) => supportRefCoversObservationRef(supportRef, observationRef)),
-      )
+    ? requiredObservationRefs.filter((observationRef) => {
+        const equivalentRefs = collectObservationEquivalentSupportRefs(artifactLedger, observationRef);
+        return !equivalentRefs.some((equivalentRef) =>
+          draftSupportRefs.some((supportRef) =>
+            supportRefCoversObservationRef(supportRef, equivalentRef) ||
+            supportRefCoversObservationRef(equivalentRef, supportRef),
+          ),
+        );
+      })
     : [];
   return {
     schema: "helix.compound_subgoal_draft_support_coverage.v1",
@@ -1521,7 +1562,23 @@ const appendScholarlyCitationFooter = (
 
 const isForbiddenReceiptOrProjection = (artifact: ArtifactLike): boolean => {
   const kind = artifactKind(artifact);
+  const observationKindValues = [
+    kind,
+    artifactSchema(artifact),
+    artifactId(artifact),
+    ...nestedObservationPayloads(artifact).flatMap((payload) => [
+      readString(payload.schema),
+      readString(payload.schemaVersion),
+      readString(payload.artifactId),
+      readString(payload.artifact_id),
+      readString(payload.kind),
+      readString(payload.feedKind),
+      readString(payload.updateKind),
+      readString(payload.producerKind),
+    ]),
+  ].filter((entry): entry is string => Boolean(entry));
   return (
+    observationKindValues.some(isWorkstationObservationTerminalKind) ||
     kind === "workspace_action_receipt" ||
     kind === "note_update_receipt" ||
     kind === "note_action_receipt" ||
@@ -2070,6 +2127,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const compoundSubgoalDraftSupportCoverage = resolveCompoundSubgoalDraftSupportCoverage({
     payload: input.payload,
     draft: latestDraftCandidateForStaleCheck?.artifact,
+    artifactLedger: artifacts,
     finalAnswerDraftRef: draftMaterialization?.final_answer_draft_ref ?? latestDraftCandidateForStaleCheck?.ref ?? null,
   });
   const compoundSubgoalDraftSupportMissing =
@@ -2459,6 +2517,22 @@ export function applyHelixTerminalAuthoritySingleWriter(
     Boolean(noteUpdateReceiptSatisfied && latestDraftForContinuation);
   const repoDraftSupersedesToolRailFailure =
     repoDraftMaterializationMatchesRequiredGoal && goalAllowsTerminal;
+  const compoundDraftSupersedesToolRailFailure =
+    Boolean(
+      usableDraftMaterialization &&
+      compoundSubgoalDraftSupportCoverage.applies &&
+      compoundSubgoalDraftSupportCoverage.ok &&
+      goalAllowsTerminal &&
+      rawTerminalBlockingToolRailFailure &&
+      (
+        rawTerminalBlockingToolRailFailure.firstBrokenRail === "terminal_materialization" ||
+        rawTerminalBlockingToolRailFailure.firstBrokenRail === "terminal_authority" ||
+        rawTerminalBlockingToolRailFailure.firstBrokenRail === "visible_projection" ||
+        rawTerminalBlockingToolRailFailure.repairTarget === "terminal_materializer" ||
+        rawTerminalBlockingToolRailFailure.repairTarget === "terminal_authority" ||
+        rawTerminalBlockingToolRailFailure.repairTarget === "presenter_boundary"
+      ),
+    );
   const workstationTerminalSupersedesToolRailFailure = workstationTerminalCanRepairToolRailFailure({
     payload: input.payload,
     failure: rawTerminalBlockingToolRailFailure,
@@ -2466,7 +2540,10 @@ export function applyHelixTerminalAuthoritySingleWriter(
     workstationTerminalMaterialized,
   });
   const terminalBlockingToolRailFailure =
-    noteMutationDraftSupersedesToolRailFailure || repoDraftSupersedesToolRailFailure || workstationTerminalSupersedesToolRailFailure
+    noteMutationDraftSupersedesToolRailFailure ||
+    repoDraftSupersedesToolRailFailure ||
+    compoundDraftSupersedesToolRailFailure ||
+    workstationTerminalSupersedesToolRailFailure
       ? null
       : rawTerminalBlockingToolRailFailure?.railFailureCode === "terminal_projection_mismatch" &&
     (

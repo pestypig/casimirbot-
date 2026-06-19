@@ -56,6 +56,59 @@ const demandAudit = (): Nhm2MetricRequiredMomentumDemandAuditV1 =>
   }) as Nhm2MetricRequiredMomentumDemandAuditV1;
 
 describe("nhm2_campaign_profile_search/v1", () => {
+  it("generates a remediation-scaled candidate ladder from the measured momentum blocker", () => {
+    const targets = buildNhm2MetricMomentumRemediationTargets({
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      metricRequiredMomentumDemandAudit: demandAudit(),
+      metricRequiredMomentumDemandAuditRef: "demand-audit.json",
+    });
+    const search = buildNhm2CampaignProfileSearch({
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      metricMomentumRemediationTargets: targets,
+      metricMomentumRemediationTargetsRef: "targets.json",
+    });
+    const byKind = new Map(
+      search.candidates.map((candidate) => [
+        `${candidate.alphaCenterline}:${candidate.proposalKind}`,
+        candidate,
+      ]),
+    );
+    const shiftNearMiss = byKind.get("0.9:shift_suppressed");
+    const smoothingNearMiss = byKind.get("0.95:smoothing_suppressed");
+    const fastestCombined = byKind.get("0.9:combined_metric_redesign");
+    const fastestObserverCompatible = byKind.get("0.7:observer_compatible_source");
+
+    expect(search.summary.candidateCount).toBe(14);
+    expect(search.summary.screenPassCount).toBe(5);
+    expect(search.summary.rejectedCount).toBe(9);
+    expect(search.ranking.fastestScreenedCandidateProfileId).toBe(
+      "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+    );
+
+    expect(shiftNearMiss?.campaignScreen.status).toBe("rejected_metric_momentum");
+    expect(shiftNearMiss?.campaignScreen.estimatedWorstMetricMomentumRatio).toBe(2);
+    expect(smoothingNearMiss?.campaignScreen.status).toBe(
+      "rejected_metric_momentum",
+    );
+    expect(smoothingNearMiss?.campaignScreen.estimatedWorstMetricMomentumRatio)
+      .toBeCloseTo(1.3333333333333333);
+
+    expect(fastestCombined?.campaignScreen.status).toBe(
+      "screen_pass_needs_campaign_run",
+    );
+    expect(fastestCombined?.levers.projectedT0iSuppressionFactor).toBe(200);
+    expect(fastestCombined?.campaignScreen.estimatedWorstMetricMomentumRatio).toBe(0.05);
+    expect(fastestObserverCompatible?.campaignScreen.status).toBe(
+      "screen_pass_needs_campaign_run",
+    );
+    expect(fastestObserverCompatible?.campaignScreen.blockers).toEqual([
+      "full_frozen_campaign_run_required",
+    ]);
+    expect(search.claimBoundary.profileSearchDoesNotValidateProfile).toBe(true);
+    expect(search.claimBoundary.routeEtaClaimAllowed).toBe(false);
+    expect(isNhm2CampaignProfileSearch(search)).toBe(true);
+  });
+
   it("rejects alpha-only speed seeking and ranks fastest screened metric-redesign candidates", () => {
     const targets = buildNhm2MetricMomentumRemediationTargets({
       generatedAt: "2026-06-19T00:00:00.000Z",

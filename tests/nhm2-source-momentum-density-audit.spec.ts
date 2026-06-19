@@ -342,4 +342,39 @@ describe("nhm2_source_momentum_density_audit/v1", () => {
     expect(artifact.summary.allMomentumWithinTolerance).toBe(false);
     expect(artifact.regions[0].components[0].mechanismStatus).toBe("documented");
   });
+
+  it("treats zero required T0i over zero required T00 as an explicit zero momentum ratio", () => {
+    const zeroMetricResidual = structuredClone(residual());
+    for (const region of zeroMetricResidual.regions) {
+      for (const component of region.componentResiduals) {
+        if (
+          component.componentId === "T00" ||
+          component.componentId === "T01" ||
+          component.componentId === "T02" ||
+          component.componentId === "T03"
+        ) {
+          component.metricRequired = 0;
+          component.status = "pass";
+          component.blockers = [];
+          component.correctionHint.status = "already_within_tolerance";
+        }
+      }
+      region.status = "pass";
+      region.blockers = [];
+    }
+
+    const artifact = buildNhm2SourceMomentumDensityAudit({
+      sourceComponentAuthorityLedger: ledger("poynting_flux_constitutive_momentum_model"),
+      regionalFullTensorResidual: zeroMetricResidual,
+      regionalSupportFunctionAtlas: atlas("chart"),
+    });
+
+    const t01 = artifact.regions[0].components.find(
+      (component) => component.componentId === "T01",
+    );
+    expect(t01?.metricRequiredFractionOfAbsT00).toBe(0);
+    expect(t01?.metricRequiredCausalMomentumBoundStatus).toBe("pass");
+    expect(artifact.summary.worstMetricRequiredMomentumToEnergyRatio).toBe(0);
+    expect(isNhm2SourceMomentumDensityAudit(artifact)).toBe(true);
+  });
 });

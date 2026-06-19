@@ -35,6 +35,9 @@ const stringList = (value: unknown): string[] =>
         .filter((entry): entry is string => entry != null)
     : [];
 
+const isIgnorableBlocker = (blocker: string): boolean =>
+  blocker.trim().toLowerCase() === "none";
+
 const evidenceBlockersFromArtifact = (artifact: unknown): string[] => {
   const blockers = new Set<string>();
   const record = asRecord(artifact);
@@ -47,6 +50,56 @@ const evidenceBlockersFromArtifact = (artifact: unknown): string[] => {
   const summary = asRecord(record?.summary);
   const campaignReadiness = asRecord(record?.campaignReadiness);
   const executableGeometry = asRecord(record?.executableGeometry);
+  if (record?.contractVersion === "nhm2_observer_robust_energy_conditions/v1") {
+    const observerCompleteWithoutViolation =
+      summary?.robustCheckComplete === true && summary?.anyViolation !== true;
+    if (summary?.robustCheckComplete !== true) {
+      blockers.add("observer_robust_check_incomplete");
+    }
+    if (summary?.anyViolation === true) {
+      blockers.add("observer_family_energy_condition_violation");
+    }
+    const families = Array.isArray(record.observerFamilies)
+      ? record.observerFamilies
+      : [];
+    for (const entry of families) {
+      const family = asRecord(entry);
+      const familyId = asString(family?.familyId) ?? "observer_family";
+      if (family?.status === "fail") {
+        const worst = asRecord(family.worstCase);
+        const condition = asString(worst?.condition) ?? "energy_condition";
+        blockers.add(`${familyId}:${condition}:observer_energy_condition_violation`);
+      }
+      for (const blocker of stringList(family?.blockers)) {
+        if (
+          observerCompleteWithoutViolation &&
+          familyId === "continuous_optimizer" &&
+          blocker === "continuous_optimizer_not_implemented"
+        ) {
+          continue;
+        }
+        blockers.add(`${familyId}:${blocker}`);
+      }
+    }
+  }
+  if (record?.contractVersion === "nhm2_qei_worldline_dossier/v1") {
+    if (summary?.dossierComplete !== true) {
+      blockers.add("qei_worldline_dossier_incomplete");
+    }
+    if (summary?.allMarginsPass === false) {
+      blockers.add("qei_margin_not_pass");
+    }
+    const worldlines = Array.isArray(record.worldlines)
+      ? record.worldlines
+      : [];
+    for (const entry of worldlines) {
+      const worldline = asRecord(entry);
+      const worldlineId = asString(worldline?.worldlineId) ?? "worldline";
+      for (const blocker of stringList(worldline?.blockers)) {
+        blockers.add(`${worldlineId}:${blocker}`);
+      }
+    }
+  }
   const firstBlocker = asString(summary?.firstBlocker);
   if (firstBlocker != null) blockers.add(firstBlocker);
   const campaignFirstBlocker = asString(campaignReadiness?.firstBlocker);
@@ -62,7 +115,7 @@ const evidenceBlockersFromArtifact = (artifact: unknown): string[] => {
       blockers.add(`${regionId}:${blocker}`);
     }
   }
-  return Array.from(blockers);
+  return Array.from(blockers).filter((blocker) => !isIgnorableBlocker(blocker));
 };
 
 const readEvidenceInput = (

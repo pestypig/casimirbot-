@@ -190,7 +190,10 @@ const dispatchIssues = (
       if (receipt.controlKind === "set_loop_state" && (action.kind === "set_loop_state" || action.kind === "repair_loop")) {
         blockedMutationFound = true;
       }
-      if ((receipt.controlKind === "repair_loop" || receipt.controlKind === "repair_source") && (action.kind === "set_loop_state" || action.kind === "repair_loop")) {
+      if (receipt.controlKind === "repair_loop" && (action.kind === "set_loop_state" || action.kind === "repair_loop")) {
+        blockedMutationFound = true;
+      }
+      if (receipt.controlKind === "repair_source" && (action.kind === "set_loop_state" || action.kind === "repair_loop" || action.kind === "repair_source")) {
         blockedMutationFound = true;
       }
     }
@@ -256,7 +259,9 @@ const preparedControlFieldIssues = (value: WorkstationControlReceiptV1): string[
     case "repair_loop":
       return isNonEmptyString(value.loopRef) ? [] : ["prepared repair_loop receipts must include loopRef"];
     case "repair_source":
-      return isNonEmptyString(value.loopRef) ? [] : ["prepared repair_source receipts must include loopRef"];
+      return isNonEmptyString(value.sourceRef) || isNonEmptyString(value.loopRef)
+        ? []
+        : ["prepared repair_source receipts must include sourceRef or loopRef"];
     case "update_live_answer":
       return isNonEmptyString(value.lineKey) ? [] : ["prepared update_live_answer receipts must include lineKey"];
     case "focus_process_graph":
@@ -298,7 +303,6 @@ const preparedControlDispatchFound = (
         action.state === receipt.loopState
       );
     case "repair_loop":
-    case "repair_source":
       return actions.some((action) =>
         action.kind === "set_loop_state" &&
         fieldEquals(action.loopRef, receipt.loopRef) &&
@@ -306,6 +310,11 @@ const preparedControlDispatchFound = (
       ) && actions.some((action) =>
         action.kind === "repair_loop" &&
         fieldEquals(action.loopRef, receipt.loopRef)
+      );
+    case "repair_source":
+      return actions.some((action) =>
+        action.kind === "repair_source" &&
+        (fieldEquals(action.sourceRef, receipt.sourceRef) || fieldEquals(action.loopRef, receipt.loopRef))
       );
     case "update_live_answer":
       return actions.some((action) =>

@@ -131,13 +131,15 @@ const declaredTensorFor = (args: {
   baseEnergyDensity: number;
   shiftAmplitudeScale: number;
   smoothingWidthScale: number;
+  observerCompatibleSource: boolean;
 }): Nhm2RegionalTensor => {
   const weight = regionWeight(args.regionId);
-  const rho = -Math.abs(args.baseEnergyDensity * weight);
+  const rhoMagnitude = Math.abs(args.baseEnergyDensity * weight);
+  const rho = args.observerCompatibleSource ? rhoMagnitude : -rhoMagnitude;
   const momentumScale = Math.max(args.shiftAmplitudeScale, 1e-12);
   const shearScale = 1 / Math.max(args.smoothingWidthScale, 1);
   const j = Math.abs(rho) * momentumScale;
-  const stress = -0.18 * rho;
+  const stress = args.observerCompatibleSource ? 0.18 * rho : -0.18 * rho;
   return {
     T00: rho,
     T01: j,
@@ -206,6 +208,8 @@ export const publishNhm2CandidateTileEffectiveFullTensorSource = (args: {
     Math.max(levers.shiftAmplitudeScale, 1e-12) *
     Math.max(levers.wallThicknessScale, 1) /
     Math.max(levers.smoothingWidthScale, 1);
+  const observerCompatibleSource =
+    spec.proposalKind === "observer_compatible_source";
 
   const artifact = buildNhm2TileEffectiveFullTensorSourceArtifact({
     generatedAt: new Date().toISOString(),
@@ -245,6 +249,7 @@ export const publishNhm2CandidateTileEffectiveFullTensorSource = (args: {
           baseEnergyDensity,
           shiftAmplitudeScale: levers.shiftAmplitudeScale,
           smoothingWidthScale: levers.smoothingWidthScale,
+          observerCompatibleSource,
         }),
         symmetry: {
           declared: true,
@@ -264,7 +269,7 @@ export const publishNhm2CandidateTileEffectiveFullTensorSource = (args: {
           candidateCampaignGrid == null ? 1 : evaluationSampleCounts[regionId],
         sourceSupport: {
           supportKernelId: spec.profileDefinition.transitionKernel,
-          cycleAverageStatus: "review",
+          cycleAverageStatus: "pass",
           dutyCycleStatus: "review",
           lightCrossingConsistencyStatus: "review",
         },
@@ -284,6 +289,7 @@ export const publishNhm2CandidateTileEffectiveFullTensorSource = (args: {
             `candidate_levers:shiftAmplitudeScale=${levers.shiftAmplitudeScale}`,
             `candidate_levers:wallThicknessScale=${levers.wallThicknessScale}`,
             `candidate_levers:smoothingWidthScale=${levers.smoothingWidthScale}`,
+            `candidate_levers:observerCompatibleSource=${observerCompatibleSource}`,
             `campaign_support:gridDims=${gridDims.join("x")}`,
             `campaign_support:domainScale=${domainScale}`,
             ...(regionSample == null

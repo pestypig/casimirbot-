@@ -115,33 +115,15 @@ describe("nhm2_profile_campaign_frontier/v1", () => {
   it("does not rank a fast-looking candidate while required evidence is blocked", () => {
     const candidateProfileId =
       "stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1";
+    const evidence = allEvidenceProvided(candidateProfileId);
+    evidence[candidateProfileId].source_tile_counterpart_compatibility = {
+      artifactRef: `${candidateProfileId}/source-compat.json`,
+      blockers: ["candidate_tile_effective_counterpart_source_missing"],
+    };
     const manifest = buildNhm2CampaignProfileRunManifest({
       generatedAt: "2026-06-19T00:00:00.000Z",
       profileSearch: profileSearch(),
-      candidateEvidenceRefs: {
-        [candidateProfileId]: {
-          candidate_metric_profile_spec: {
-            artifactRef: `${candidateProfileId}/spec.json`,
-            blockers: [],
-          },
-          metric_required_full_regional_tensor: {
-            artifactRef: `${candidateProfileId}/metric-required.json`,
-            blockers: [],
-          },
-          projected_momentum_demand_audit: {
-            artifactRef: `${candidateProfileId}/momentum-demand.json`,
-            blockers: [],
-          },
-          metric_momentum_remediation_targets: {
-            artifactRef: `${candidateProfileId}/remediation-targets.json`,
-            blockers: [],
-          },
-          source_tile_counterpart_compatibility: {
-            artifactRef: `${candidateProfileId}/source-compat.json`,
-            blockers: ["candidate_tile_effective_counterpart_source_missing"],
-          },
-        },
-      },
+      candidateEvidenceRefs: evidence,
     });
     const frontier = buildNhm2ProfileCampaignFrontier({
       generatedAt: "2026-06-19T00:00:00.000Z",
@@ -154,7 +136,16 @@ describe("nhm2_profile_campaign_frontier/v1", () => {
     expect(frontier.frontier.firstBlocker).toBe(
       "candidate_tile_effective_counterpart_source_missing",
     );
+    expect(frontier.frontier.firstBlockerClass).toBe(
+      "source_counterpart_or_material_evidence",
+    );
+    expect(frontier.frontier.recommendedNextAction).toContain(
+      "source-side tensor/material counterpart",
+    );
     expect(frontier.summary.profileCampaignFrontierComplete).toBe(false);
+    expect(frontier.summary.highestLeverageBlockerClass).toBe(
+      "source_counterpart_or_material_evidence",
+    );
     expect(frontier.claimBoundary.routeEtaClaimAllowed).toBe(false);
     expect(isNhm2ProfileCampaignFrontier(frontier)).toBe(true);
   });
@@ -183,10 +174,93 @@ describe("nhm2_profile_campaign_frontier/v1", () => {
     expect(frontier.frontier.fastestCampaignAdmissibleProfileId).toBe(
       fastestCandidateId,
     );
+    expect(frontier.frontier.firstBlockerClass).toBe("none");
+    expect(
+      frontier.candidates.find(
+        (candidate) => candidate.candidateProfileId === fastestCandidateId,
+      )?.blockerClass,
+    ).toBe("none");
     expect(frontier.summary.fastestAdmissibleAlpha).toBe(0.9);
+    expect(frontier.summary.highestLeverageBlockerClass).toBe("none");
     expect(rejectedAlphaOnly?.status).toBe("rejected_profile_screen");
     expect(rejectedAlphaOnly?.fastestRankEligible).toBe(false);
     expect(frontier.claimBoundary.physicalViabilityClaimAllowed).toBe(false);
+    expect(isNhm2ProfileCampaignFrontier(frontier)).toBe(true);
+  });
+
+  it("classifies observer failures after tensor closure as the next profile-design lead", () => {
+    const candidateProfileId =
+      "stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1";
+    const evidence = allEvidenceProvided(candidateProfileId);
+    evidence[candidateProfileId].observer_family_energy_conditions = {
+      artifactRef: `${candidateProfileId}/observer.json`,
+      blockers: [
+        "wall:WEC:negative_energy_density_for_boosted_timelike_grid",
+        "wall:DEC:negative_null_direction_grid_flux",
+      ],
+    };
+    evidence[candidateProfileId].time_dependent_source_campaign = {
+      artifactRef: `${candidateProfileId}/campaign.json`,
+      blockers: ["observer_family_pass_false"],
+    };
+    const manifest = buildNhm2CampaignProfileRunManifest({
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      profileSearch: profileSearch(),
+      candidateEvidenceRefs: evidence,
+    });
+    const frontier = buildNhm2ProfileCampaignFrontier({
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      campaignProfileRunManifest: manifest,
+    });
+
+    expect(frontier.frontier.fastestCampaignAdmissibleProfileId).toBeNull();
+    expect(frontier.frontier.fastestBlockedProfileId).toBe(candidateProfileId);
+    expect(frontier.frontier.firstBlockerClass).toBe(
+      "observer_energy_condition_after_tensor_closure",
+    );
+    expect(frontier.frontier.recommendedNextAction).toContain(
+      "observer-compatible metric/source family",
+    );
+    expect(frontier.summary.highestLeverageBlockerClass).toBe(
+      "observer_energy_condition_after_tensor_closure",
+    );
+    expect(isNhm2ProfileCampaignFrontier(frontier)).toBe(true);
+  });
+
+  it("classifies regional tensor and momentum closure failures before observer work", () => {
+    const candidateProfileId =
+      "stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1";
+    const evidence = allEvidenceProvided(candidateProfileId);
+    evidence[candidateProfileId].projected_momentum_demand_audit = {
+      artifactRef: `${candidateProfileId}/momentum-demand.json`,
+      blockers: ["global:T01:projected_metric_momentum_ratio_missing"],
+    };
+    evidence[candidateProfileId].regional_full_tensor_residuals = {
+      artifactRef: `${candidateProfileId}/regional-residuals.json`,
+      blockers: ["global:T01:full_tensor_residual_missing_source_counterpart"],
+    };
+    evidence[candidateProfileId].observer_family_energy_conditions = {
+      artifactRef: `${candidateProfileId}/observer.json`,
+      blockers: ["observer_robust_check_incomplete"],
+    };
+    const manifest = buildNhm2CampaignProfileRunManifest({
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      profileSearch: profileSearch(),
+      candidateEvidenceRefs: evidence,
+    });
+    const frontier = buildNhm2ProfileCampaignFrontier({
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      campaignProfileRunManifest: manifest,
+    });
+
+    expect(frontier.frontier.fastestCampaignAdmissibleProfileId).toBeNull();
+    expect(frontier.frontier.fastestBlockedProfileId).toBe(candidateProfileId);
+    expect(frontier.frontier.firstBlockerClass).toBe(
+      "regional_full_tensor_or_momentum_closure",
+    );
+    expect(frontier.frontier.recommendedNextAction).toContain(
+      "regional full tensor and momentum projection closure",
+    );
     expect(isNhm2ProfileCampaignFrontier(frontier)).toBe(true);
   });
 });

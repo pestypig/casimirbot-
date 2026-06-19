@@ -24,6 +24,7 @@ export type WorkstationDispatchActionV1 =
   | { kind: "update_panel"; panelId: string }
   | { kind: "focus_process_graph"; nodeRef?: string | null }
   | { kind: "repair_loop"; loopRef: string }
+  | { kind: "repair_source"; sourceRef?: string | null; loopRef?: string | null }
   | { kind: "ask_user" }
   | { kind: "wake_agent"; interruptKind: "urgent" | "blocked" | "policy_triggered"; reason: string };
 
@@ -519,6 +520,25 @@ const narratorVoicePolicies = new Set<string>(WORKSTATION_NARRATOR_VOICE_POLICIE
 
 const narratorPriorities = new Set<string>(WORKSTATION_NARRATOR_PRIORITIES);
 
+const dispatchActionKinds = new Set<string>([
+  "none",
+  "log_receipt",
+  "update_live_answer",
+  "append_goal_context",
+  "speak_narrator",
+  "bind_narrator_stream",
+  "change_preset",
+  "bind_source",
+  "unbind_source",
+  "set_loop_state",
+  "update_panel",
+  "focus_process_graph",
+  "repair_loop",
+  "repair_source",
+  "ask_user",
+  "wake_agent",
+]);
+
 const terminalAuthorityIssue = (value: unknown, field: string): string[] => {
   const issues: string[] = [];
   if (typeof value !== "object" || value === null || Array.isArray(value)) return [`${field} must be an object`];
@@ -701,6 +721,10 @@ const dispatchActionIssues = (value: unknown): string[] => {
       issues.push(`suggestedDispatch[${index}].kind must be a non-empty string`);
       return;
     }
+    if (!dispatchActionKinds.has(record.kind)) {
+      issues.push(`suggestedDispatch[${index}].kind is invalid`);
+      return;
+    }
     if (record.kind === "log_receipt" && (typeof record.receiptRef !== "string" || !record.receiptRef.trim())) {
       issues.push(`suggestedDispatch[${index}].log_receipt must include receiptRef`);
     }
@@ -712,6 +736,25 @@ const dispatchActionIssues = (value: unknown): string[] => {
     }
     if (record.kind === "update_live_answer" && (typeof record.lineKey !== "string" || !record.lineKey.trim())) {
       issues.push(`suggestedDispatch[${index}].update_live_answer must include lineKey`);
+    }
+    if (record.kind === "change_preset") {
+      if (typeof record.targetRef !== "string" || !record.targetRef.trim()) {
+        issues.push(`suggestedDispatch[${index}].change_preset must include targetRef`);
+      }
+      if (typeof record.presetId !== "string" || !record.presetId.trim()) {
+        issues.push(`suggestedDispatch[${index}].change_preset must include presetId`);
+      }
+    }
+    if (record.kind === "bind_source") {
+      if (typeof record.sourceRef !== "string" || !record.sourceRef.trim()) {
+        issues.push(`suggestedDispatch[${index}].bind_source must include sourceRef`);
+      }
+      if (typeof record.targetRef !== "string" || !record.targetRef.trim()) {
+        issues.push(`suggestedDispatch[${index}].bind_source must include targetRef`);
+      }
+    }
+    if (record.kind === "unbind_source" && (typeof record.sourceRef !== "string" || !record.sourceRef.trim())) {
+      issues.push(`suggestedDispatch[${index}].unbind_source must include sourceRef`);
     }
     if (record.kind === "speak_narrator") {
       if (record.mode !== "confirm" && record.mode !== "auto" && record.mode !== "visible_only") {
@@ -743,6 +786,16 @@ const dispatchActionIssues = (value: unknown): string[] => {
     }
     if (record.kind === "repair_loop" && (typeof record.loopRef !== "string" || !record.loopRef.trim())) {
       issues.push(`suggestedDispatch[${index}].repair_loop must include loopRef`);
+    }
+    if (record.kind === "repair_source") {
+      const hasSourceRef = typeof record.sourceRef === "string" && record.sourceRef.trim();
+      const hasLoopRef = typeof record.loopRef === "string" && record.loopRef.trim();
+      if (!hasSourceRef && !hasLoopRef) {
+        issues.push(`suggestedDispatch[${index}].repair_source must include sourceRef or loopRef`);
+      }
+    }
+    if (record.kind === "focus_process_graph" && (typeof record.nodeRef !== "string" || !record.nodeRef.trim())) {
+      issues.push(`suggestedDispatch[${index}].focus_process_graph must include nodeRef`);
     }
     if (record.kind === "wake_agent") {
       if (

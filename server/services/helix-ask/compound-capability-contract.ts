@@ -146,6 +146,16 @@ const runtimeCapabilityForContract = (contract: ExplicitCapabilityContract): str
     ? contract.runtime_capability
     : contract.capability;
 
+const requiredObservationKindsForCompoundSubgoal = (
+  contract: ExplicitCapabilityContract,
+  subgoalCount: number,
+): string[] => {
+  if (subgoalCount > 1 && contract.capability === "helix_ask.inspect_capability_catalog") {
+    return ["capability_registry"];
+  }
+  return [...contract.required_observation_kinds];
+};
+
 export const buildHelixCompoundCapabilityContract = (input: {
   turnId: string;
   promptText: string;
@@ -169,7 +179,7 @@ export const buildHelixCompoundCapabilityContract = (input: {
         match,
         ordered,
       }),
-      required_observation_kinds: [...contract.required_observation_kinds],
+      required_observation_kinds: requiredObservationKindsForCompoundSubgoal(contract, ordered.length),
       required_terminal_kind: contract.required_terminal_kind,
       allowed_substitutions: [...contract.allowed_substitutions],
       status: "pending",

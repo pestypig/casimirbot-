@@ -31,6 +31,10 @@ export type WorkstationContextFeedPacketCircuitRefV1 = {
   loopRefs: string[];
   packetRefs: string[];
   microDeckRefs: string[];
+  traceMemoryRefs: string[];
+  narratorRefs: string[];
+  routeWatchRefs: string[];
+  automationRefs: string[];
   receiptRefs: string[];
   freshnessStatus: WorkstationGoalContextUpdateV1["freshness"]["status"];
   assistant_answer: false;
@@ -207,6 +211,10 @@ const packetCircuitRefIssues = (
     issues.push(...stringArrayIssues(entry.loopRefs, `packetCircuitRefs[${index}].loopRefs`));
     issues.push(...stringArrayIssues(entry.packetRefs, `packetCircuitRefs[${index}].packetRefs`));
     issues.push(...stringArrayIssues(entry.microDeckRefs, `packetCircuitRefs[${index}].microDeckRefs`));
+    issues.push(...stringArrayIssues(entry.traceMemoryRefs, `packetCircuitRefs[${index}].traceMemoryRefs`));
+    issues.push(...stringArrayIssues(entry.narratorRefs, `packetCircuitRefs[${index}].narratorRefs`));
+    issues.push(...stringArrayIssues(entry.routeWatchRefs, `packetCircuitRefs[${index}].routeWatchRefs`));
+    issues.push(...stringArrayIssues(entry.automationRefs, `packetCircuitRefs[${index}].automationRefs`));
     issues.push(...stringArrayIssues(entry.receiptRefs, `packetCircuitRefs[${index}].receiptRefs`));
     if (entry.assistant_answer !== false) issues.push(`packetCircuitRefs[${index}].assistant_answer must be false`);
     if (entry.terminal_eligible !== false) issues.push(`packetCircuitRefs[${index}].terminal_eligible must be false`);

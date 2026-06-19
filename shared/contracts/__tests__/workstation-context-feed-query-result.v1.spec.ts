@@ -139,6 +139,35 @@ const resultFixture = (
         ref.startsWith("stage_play_micro_reasoner_run:") ||
         ref.startsWith("microdeck:")
       ),
+      traceMemoryRefs: allRefs.filter((ref) =>
+        ref.startsWith("trace_memory:") ||
+        ref.startsWith("trace-memory:") ||
+        ref.startsWith("workstation_trace_memory:") ||
+        ref.startsWith("workstation_context_feed:trace_memory") ||
+        ref.includes("trace_memory") ||
+        ref.includes("trace-memory")
+      ),
+      narratorRefs: allRefs.filter((ref) =>
+        ref.startsWith("helix_narrator_") ||
+        ref.startsWith("narrator:") ||
+        ref.startsWith("workstation_actuator:narrator_")
+      ),
+      routeWatchRefs: allRefs.filter((ref) =>
+        ref.startsWith("route_watch:") ||
+        ref.startsWith("watch_job:") ||
+        ref.startsWith("watch_policy:") ||
+        ref.startsWith("stage_play_live_source_watch_job:") ||
+        ref.startsWith("live_job_evidence:") ||
+        ref.startsWith("situation_construct_query:") ||
+        ref.startsWith("workstation_actuator:query_route_evidence")
+      ),
+      automationRefs: allRefs.filter((ref) =>
+        ref.startsWith("automation:") ||
+        ref.startsWith("automation_policy:") ||
+        ref.startsWith("workstation_context_feed:automation_policies") ||
+        ref.startsWith("stage_play_live_source_watch_job_policy:") ||
+        ref.startsWith("workstation_actuator:configure_route_watch")
+      ),
       receiptRefs: entry.receiptRefs,
       freshnessStatus: entry.freshness.status,
       assistant_answer: false,
@@ -498,6 +527,10 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
         loopRefs: [],
         packetRefs: [],
         microDeckRefs: [],
+        traceMemoryRefs: [],
+        narratorRefs: "not-array" as unknown as string[],
+        routeWatchRefs: [],
+        automationRefs: [],
         receiptRefs: [],
         freshnessStatus: "stale",
         assistant_answer: true as false,
@@ -505,6 +538,7 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
       }],
     } as Partial<WorkstationContextFeedQueryResultV1>))).toEqual(expect.arrayContaining([
       "packetCircuitRefs[0].updateId must match a goalContextUpdates item",
+      "packetCircuitRefs[0].narratorRefs must be an array",
       "packetCircuitRefs[0].assistant_answer must be false",
       "packetCircuitRefs[0].terminal_eligible must be false",
     ]));
@@ -673,7 +707,7 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
       receiptRefs: ["stage_play_live_source_watch_job_policy:route-watch"],
     });
 
-    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+    const result = resultFixture({
       resultId: "stage_play_context_feed_query:route_evidence:frog",
       feedKind: "route_evidence",
       label: "route evidence",
@@ -686,7 +720,63 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
       requiredActuator: "query_route_evidence",
       goalContextUpdates: [automationUpdate],
       updateCount: 1,
-    }))).toEqual([]);
+    });
+
+    expect(validateWorkstationContextFeedQueryResultV1(result)).toEqual([]);
+    expect(result.packetCircuitRefs[0].automationRefs).toEqual([
+      "stage_play_live_source_watch_job_policy:route-watch",
+    ]);
+    expect(result.packetCircuitRefs[0].traceMemoryRefs).toEqual([]);
+    expect(result.packetCircuitRefs[0].routeWatchRefs).toEqual([]);
+    expect(result.packetCircuitRefs[0]).toMatchObject({
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
+  });
+
+  it("keeps trace-memory refs in packet circuit records as observation-only routing state", () => {
+    const traceMemoryUpdate = updateFixture({
+      updateId: "stage_play_goal_context_update:trace:1",
+      producerKind: "trace_memory",
+      updateKind: "reflection",
+      contentRef: "trace_memory:frog-routing",
+      preview: "Trace memory records the frog classification route.",
+      evidenceRefs: [
+        "trace_memory:frog-routing",
+        "workstation_context_feed:trace_memory",
+        "stage_play_processed_mail_packet:frog",
+        "visual_source:image-lens",
+        "thread:helix-ask:desktop",
+        "stage_play_mail_loop:helix-ask:desktop",
+      ],
+      receiptRefs: ["workstation_trace_memory:frog-routing"],
+    });
+
+    const result = resultFixture({
+      resultId: "stage_play_context_feed_query:trace_memory:frog",
+      feedKind: "trace_memory",
+      label: "trace memory",
+      requiredActuator: "query_trace_memory",
+      policyEvidenceRefs: [
+        "context_feed:trace_memory",
+        "allowed_actuator:query_trace_memory",
+        "agent_goal_context_feed:feed:trace_memory",
+        "agent_goal_allowed_actuator:query_trace_memory",
+      ],
+      goalContextUpdates: [traceMemoryUpdate],
+      updateCount: 1,
+    });
+
+    expect(validateWorkstationContextFeedQueryResultV1(result)).toEqual([]);
+    expect(result.packetCircuitRefs[0].traceMemoryRefs).toEqual([
+      "trace_memory:frog-routing",
+      "workstation_context_feed:trace_memory",
+      "workstation_trace_memory:frog-routing",
+    ]);
+    expect(result.packetCircuitRefs[0]).toMatchObject({
+      assistant_answer: false,
+      terminal_eligible: false,
+    });
   });
 
   it("rejects automation policy feed results carrying route-watch evidence records", () => {

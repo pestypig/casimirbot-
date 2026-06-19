@@ -19,7 +19,8 @@ export type Nhm2CampaignProfileSearchCandidateV1 = {
     | "alpha_only"
     | "shift_suppressed"
     | "smoothing_suppressed"
-    | "combined_metric_redesign";
+    | "combined_metric_redesign"
+    | "observer_compatible_source";
   levers: {
     lapseDepthScale: number;
     shiftAmplitudeScale: number;
@@ -126,57 +127,107 @@ const isNullableNumber = (value: unknown): value is number | null =>
 const tagForAlpha = (alpha: number): string =>
   `0p${Math.round(alpha * 10000).toString().padStart(4, "0")}`;
 
-const defaultCandidateSpecs: NonNullable<
-  BuildNhm2CampaignProfileSearchInput["candidateSpecs"]
-> = [
-  {
-    alphaCenterline: 0.99,
-    proposalKind: "alpha_only",
-    projectedT0iSuppressionFactor: 1,
-  },
-  {
-    alphaCenterline: 0.95,
-    proposalKind: "alpha_only",
-    projectedT0iSuppressionFactor: 1,
-  },
-  {
-    alphaCenterline: 0.9,
-    proposalKind: "alpha_only",
-    projectedT0iSuppressionFactor: 1,
-  },
-  {
-    alphaCenterline: 0.7,
-    proposalKind: "alpha_only",
-    projectedT0iSuppressionFactor: 1,
-  },
-  {
-    alphaCenterline: 0.99,
-    proposalKind: "combined_metric_redesign",
-    shiftAmplitudeScale: 1e-8,
-    wallThicknessScale: 10,
-    smoothingWidthScale: 10,
-    projectedT0iSuppressionFactor: 3e15,
-    transitionKernel: "smootherstep_c2",
-  },
-  {
-    alphaCenterline: 0.95,
-    proposalKind: "combined_metric_redesign",
-    shiftAmplitudeScale: 1e-9,
-    wallThicknessScale: 10,
-    smoothingWidthScale: 10,
-    projectedT0iSuppressionFactor: 1e16,
-    transitionKernel: "smootherstep_c2",
-  },
-  {
-    alphaCenterline: 0.9,
-    proposalKind: "combined_metric_redesign",
-    shiftAmplitudeScale: 1e-10,
-    wallThicknessScale: 10,
-    smoothingWidthScale: 20,
-    projectedT0iSuppressionFactor: 5e16,
-    transitionKernel: "compact_bump",
-  },
-];
+const alphaLadder = [0.99, 0.95, 0.9, 0.7] as const;
+
+const finitePositive = (value: number | null | undefined, fallback: number): number =>
+  value != null && Number.isFinite(value) && value > 0 ? value : fallback;
+
+const defaultCandidateSpecsFor = (
+  worstRequiredSuppressionFactor: number | null,
+): NonNullable<BuildNhm2CampaignProfileSearchInput["candidateSpecs"]> => {
+  const required = finitePositive(worstRequiredSuppressionFactor, 1);
+  const screenPass = (margin: number): number => required * margin;
+  const nearMiss = (fraction: number): number => Math.max(1, required * fraction);
+  return [
+    ...alphaLadder.map((alphaCenterline) => ({
+      alphaCenterline,
+      proposalKind: "alpha_only" as const,
+      projectedT0iSuppressionFactor: 1,
+    })),
+    {
+      alphaCenterline: 0.99,
+      proposalKind: "shift_suppressed",
+      shiftAmplitudeScale: 1e-6,
+      projectedT0iSuppressionFactor: nearMiss(0.01),
+      transitionKernel: "reuse_current",
+    },
+    {
+      alphaCenterline: 0.95,
+      proposalKind: "shift_suppressed",
+      shiftAmplitudeScale: 1e-7,
+      projectedT0iSuppressionFactor: nearMiss(0.1),
+      transitionKernel: "reuse_current",
+    },
+    {
+      alphaCenterline: 0.9,
+      proposalKind: "shift_suppressed",
+      shiftAmplitudeScale: 1e-8,
+      projectedT0iSuppressionFactor: nearMiss(0.5),
+      transitionKernel: "reuse_current",
+    },
+    {
+      alphaCenterline: 0.99,
+      proposalKind: "smoothing_suppressed",
+      wallThicknessScale: 5,
+      smoothingWidthScale: 10,
+      projectedT0iSuppressionFactor: nearMiss(0.2),
+      transitionKernel: "smootherstep_c2",
+    },
+    {
+      alphaCenterline: 0.95,
+      proposalKind: "smoothing_suppressed",
+      wallThicknessScale: 10,
+      smoothingWidthScale: 20,
+      projectedT0iSuppressionFactor: nearMiss(0.75),
+      transitionKernel: "smootherstep_c2",
+    },
+    {
+      alphaCenterline: 0.99,
+      proposalKind: "combined_metric_redesign",
+      shiftAmplitudeScale: 1e-8,
+      wallThicknessScale: 10,
+      smoothingWidthScale: 10,
+      projectedT0iSuppressionFactor: screenPass(1.25),
+      transitionKernel: "smootherstep_c2",
+    },
+    {
+      alphaCenterline: 0.95,
+      proposalKind: "combined_metric_redesign",
+      shiftAmplitudeScale: 1e-9,
+      wallThicknessScale: 10,
+      smoothingWidthScale: 10,
+      projectedT0iSuppressionFactor: screenPass(4),
+      transitionKernel: "smootherstep_c2",
+    },
+    {
+      alphaCenterline: 0.9,
+      proposalKind: "combined_metric_redesign",
+      shiftAmplitudeScale: 1e-10,
+      wallThicknessScale: 10,
+      smoothingWidthScale: 20,
+      projectedT0iSuppressionFactor: screenPass(20),
+      transitionKernel: "compact_bump",
+    },
+    {
+      alphaCenterline: 0.9,
+      proposalKind: "observer_compatible_source",
+      shiftAmplitudeScale: 1e-10,
+      wallThicknessScale: 10,
+      smoothingWidthScale: 20,
+      projectedT0iSuppressionFactor: screenPass(20),
+      transitionKernel: "compact_bump",
+    },
+    {
+      alphaCenterline: 0.7,
+      proposalKind: "observer_compatible_source",
+      shiftAmplitudeScale: 1e-10,
+      wallThicknessScale: 10,
+      smoothingWidthScale: 20,
+      projectedT0iSuppressionFactor: screenPass(20),
+      transitionKernel: "compact_bump",
+    },
+  ];
+};
 
 const candidateIdFor = (
   alpha: number,
@@ -248,10 +299,10 @@ export const buildNhm2CampaignProfileSearch = (
   const targets = input.metricMomentumRemediationTargets;
   const worstRequiredSuppressionFactor =
     targets.summary.worstRequiredSuppressionFactor;
-  const candidates = (input.candidateSpecs?.length
+  const candidateSpecs = input.candidateSpecs?.length
     ? input.candidateSpecs
-    : defaultCandidateSpecs
-  ).map((spec) =>
+    : defaultCandidateSpecsFor(worstRequiredSuppressionFactor);
+  const candidates = candidateSpecs.map((spec) =>
     buildCandidate(spec, targets.selectedProfileId, worstRequiredSuppressionFactor),
   );
   const screenPasses = candidates
@@ -338,9 +389,13 @@ const isCandidate = (
     typeof record.parentProfileId === "string" &&
     isFiniteNumber(record.alphaCenterline) &&
     isFiniteNumber(record.subjectiveEfficiencyProxy) &&
-    ["alpha_only", "shift_suppressed", "smoothing_suppressed", "combined_metric_redesign"].includes(
-      String(record.proposalKind),
-    ) &&
+    [
+      "alpha_only",
+      "shift_suppressed",
+      "smoothing_suppressed",
+      "combined_metric_redesign",
+      "observer_compatible_source",
+    ].includes(String(record.proposalKind)) &&
     levers != null &&
     isFiniteNumber(levers.lapseDepthScale) &&
     isFiniteNumber(levers.shiftAmplitudeScale) &&

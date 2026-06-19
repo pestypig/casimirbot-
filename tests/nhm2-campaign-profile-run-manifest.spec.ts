@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import {
   buildNhm2CampaignFrontierDisposition,
@@ -14,6 +17,9 @@ import {
   buildNhm2MetricMomentumRemediationTargets,
 } from "../shared/contracts/nhm2-metric-momentum-remediation-targets.v1";
 import type { Nhm2MetricRequiredMomentumDemandAuditV1 } from "../shared/contracts/nhm2-metric-required-momentum-demand-audit.v1";
+import type { Nhm2ObserverRobustEnergyConditionArtifactV1 } from "../shared/contracts/nhm2-observer-robust-energy-conditions.v1";
+import type { Nhm2QeiWorldlineDossierV1 } from "../shared/contracts/nhm2-qei-worldline-dossier.v1";
+import { publishNhm2CampaignProfileRunManifest } from "../tools/nhm2/build-campaign-profile-run-manifest";
 
 const demandAudit = (): Nhm2MetricRequiredMomentumDemandAuditV1 =>
   ({
@@ -148,6 +154,45 @@ describe("nhm2_campaign_profile_run_manifest/v1", () => {
     expect(isNhm2CampaignProfileRunManifest(manifest)).toBe(true);
   });
 
+  it("does not treat literal none as a blocking evidence reason", () => {
+    const targets = buildNhm2MetricMomentumRemediationTargets({
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      metricRequiredMomentumDemandAudit: demandAudit(),
+      metricRequiredMomentumDemandAuditRef: "demand-audit.json",
+    });
+    const search = buildNhm2CampaignProfileSearch({
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      metricMomentumRemediationTargets: targets,
+      candidateSpecs: [
+        {
+          alphaCenterline: 0.9,
+          proposalKind: "combined_metric_redesign",
+          projectedT0iSuppressionFactor: 20,
+        },
+      ],
+    });
+    const candidateProfileId =
+      "stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1";
+    const manifest = buildNhm2CampaignProfileRunManifest({
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      profileSearch: search,
+      candidateEvidenceRefs: {
+        [candidateProfileId]: {
+          time_dependent_source_campaign: {
+            artifactRef: "candidate/nhm2-time-dependent-source-campaign.json",
+            blockers: ["none"],
+          },
+        },
+      },
+    });
+    const campaignEvidence = manifest.candidates[0]?.requiredEvidence.find(
+      (entry) => entry.evidenceId === "time_dependent_source_campaign",
+    );
+
+    expect(campaignEvidence?.status).toBe("provided");
+    expect(campaignEvidence?.blockers).toEqual([]);
+  });
+
   it("marks provided candidate evidence refs without treating the manifest as complete", () => {
     const targets = buildNhm2MetricMomentumRemediationTargets({
       generatedAt: "2026-06-19T00:00:00.000Z",
@@ -245,5 +290,304 @@ describe("nhm2_campaign_profile_run_manifest/v1", () => {
     });
     expect(manifest.claimBoundary.transportClaimAllowed).toBe(false);
     expect(isNhm2CampaignProfileRunManifest(manifest)).toBe(true);
+  });
+
+  it("marks observer evidence as blocked when observer-family violations are present", () => {
+    const targets = buildNhm2MetricMomentumRemediationTargets({
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      metricRequiredMomentumDemandAudit: demandAudit(),
+      metricRequiredMomentumDemandAuditRef: "demand-audit.json",
+    });
+    const search = buildNhm2CampaignProfileSearch({
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      metricMomentumRemediationTargets: targets,
+      candidateSpecs: [
+        {
+          alphaCenterline: 0.9,
+          proposalKind: "combined_metric_redesign",
+          projectedT0iSuppressionFactor: 20,
+        },
+      ],
+    });
+    const observerArtifact: Nhm2ObserverRobustEnergyConditionArtifactV1 = {
+      contractVersion: "nhm2_observer_robust_energy_conditions/v1",
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      laneId: "nhm2_shift_lapse",
+      selectedProfileId:
+        "stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1",
+      tensorRef: "source.json",
+      observerFamilies: [
+        {
+          familyId: "boosted_timelike_grid",
+          status: "fail",
+          worstCase: {
+            condition: "WEC",
+            value: -1,
+          },
+          blockers: [],
+        },
+        {
+          familyId: "continuous_optimizer",
+          status: "not_run",
+          optimizerUsed: false,
+          blockers: ["continuous_optimizer_not_implemented"],
+        },
+      ],
+      summary: {
+        eulerianOnly: false,
+        robustCheckComplete: false,
+        anyViolation: true,
+        missedViolationRisk: "high",
+      },
+      literatureRefs: [
+        "le_2026_observer_robust_warp_energy_conditions",
+        "santiago_schuster_visser_2021_generic_warp_nec",
+      ],
+      claimBoundary: {
+        diagnosticOnly: true,
+        friendlyObserverCannotProveWec: true,
+      },
+    };
+    const dir = mkdtempSync(join(tmpdir(), "nhm2-run-manifest-"));
+    const candidateId =
+      "stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1";
+    const runRoot = join(dir, "runs", candidateId);
+    mkdirSync(runRoot, { recursive: true });
+    writeFileSync(
+      join(dir, "profile-search.json"),
+      `${JSON.stringify(search, null, 2)}\n`,
+      "utf8",
+    );
+    writeFileSync(
+      join(runRoot, "nhm2-observer-robust-energy-conditions.json"),
+      `${JSON.stringify(observerArtifact, null, 2)}\n`,
+      "utf8",
+    );
+
+    const manifest = publishNhm2CampaignProfileRunManifest({
+      repoRoot: dir,
+      profileSearchPath: "profile-search.json",
+      outPath: "manifest.json",
+      runRootBase: "runs",
+      auditOnly: true,
+    });
+    const observer = manifest.candidates[0]?.requiredEvidence.find(
+      (entry) => entry.evidenceId === "observer_family_energy_conditions",
+    );
+
+    expect(observer?.status).toBe("provided_blocked");
+    expect(observer?.blockers).toEqual(
+      expect.arrayContaining([
+        "observer_robust_check_incomplete",
+        "observer_family_energy_condition_violation",
+        "boosted_timelike_grid:WEC:observer_energy_condition_violation",
+        "continuous_optimizer:continuous_optimizer_not_implemented",
+      ]),
+    );
+    expect(manifest.summary.firstBlocker).toBe("candidate_metric_profile_spec_missing_for_frozen_campaign_run");
+    expect(observerArtifact.summary.anyViolation).toBe(true);
+  });
+
+  it("keeps observer evidence provided when only the continuous optimizer is unimplemented", () => {
+    const targets = buildNhm2MetricMomentumRemediationTargets({
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      metricRequiredMomentumDemandAudit: demandAudit(),
+      metricRequiredMomentumDemandAuditRef: "demand-audit.json",
+    });
+    const search = buildNhm2CampaignProfileSearch({
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      metricMomentumRemediationTargets: targets,
+      candidateSpecs: [
+        {
+          alphaCenterline: 0.9,
+          proposalKind: "combined_metric_redesign",
+          projectedT0iSuppressionFactor: 20,
+        },
+      ],
+    });
+    const observerArtifact: Nhm2ObserverRobustEnergyConditionArtifactV1 = {
+      contractVersion: "nhm2_observer_robust_energy_conditions/v1",
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      laneId: "nhm2_shift_lapse",
+      selectedProfileId:
+        "stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1",
+      tensorRef: "source.json",
+      observerFamilies: [
+        {
+          familyId: "boosted_timelike_grid",
+          status: "pass",
+          sampleCount: 16,
+          worstCase: {
+            condition: "WEC",
+            value: 1,
+          },
+          blockers: [],
+        },
+        {
+          familyId: "algebraic_type_i",
+          status: "pass",
+          sampleCount: 4,
+          worstCase: {
+            condition: "DEC",
+            value: 1,
+          },
+          blockers: [],
+        },
+        {
+          familyId: "continuous_optimizer",
+          status: "not_run",
+          optimizerUsed: false,
+          blockers: ["continuous_optimizer_not_implemented"],
+        },
+      ],
+      summary: {
+        eulerianOnly: false,
+        robustCheckComplete: true,
+        anyViolation: false,
+        missedViolationRisk: "medium",
+      },
+      literatureRefs: [
+        "le_2026_observer_robust_warp_energy_conditions",
+        "santiago_schuster_visser_2021_generic_warp_nec",
+      ],
+      claimBoundary: {
+        diagnosticOnly: true,
+        friendlyObserverCannotProveWec: true,
+      },
+    };
+    const dir = mkdtempSync(join(tmpdir(), "nhm2-run-manifest-"));
+    const candidateId =
+      "stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1";
+    const runRoot = join(dir, "runs", candidateId);
+    mkdirSync(runRoot, { recursive: true });
+    writeFileSync(
+      join(dir, "profile-search.json"),
+      `${JSON.stringify(search, null, 2)}\n`,
+      "utf8",
+    );
+    writeFileSync(
+      join(runRoot, "nhm2-observer-robust-energy-conditions.json"),
+      `${JSON.stringify(observerArtifact, null, 2)}\n`,
+      "utf8",
+    );
+
+    const manifest = publishNhm2CampaignProfileRunManifest({
+      repoRoot: dir,
+      profileSearchPath: "profile-search.json",
+      outPath: "manifest.json",
+      runRootBase: "runs",
+      auditOnly: true,
+    });
+    const observer = manifest.candidates[0]?.requiredEvidence.find(
+      (entry) => entry.evidenceId === "observer_family_energy_conditions",
+    );
+
+    expect(observer?.status).toBe("provided");
+    expect(observer?.blockers).toEqual([]);
+  });
+
+  it("marks QEI worldline evidence as blocked when nested worldline margins fail", () => {
+    const targets = buildNhm2MetricMomentumRemediationTargets({
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      metricRequiredMomentumDemandAudit: demandAudit(),
+      metricRequiredMomentumDemandAuditRef: "demand-audit.json",
+    });
+    const search = buildNhm2CampaignProfileSearch({
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      metricMomentumRemediationTargets: targets,
+      candidateSpecs: [
+        {
+          alphaCenterline: 0.9,
+          proposalKind: "combined_metric_redesign",
+          projectedT0iSuppressionFactor: 20,
+        },
+      ],
+    });
+    const qeiArtifact: Nhm2QeiWorldlineDossierV1 = {
+      contractVersion: "nhm2_qei_worldline_dossier/v1",
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      laneId: "nhm2_shift_lapse",
+      selectedProfileId:
+        "stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1",
+      worldlines: [
+        {
+          worldlineId: "qei:wall:atlas",
+          regionId: "wall",
+          chartId: "comoving_cartesian",
+          samplingFunction: {
+            kind: "lorentzian",
+            tauSeconds: 1e-10,
+            normalized: true,
+          },
+          sampledRho: {
+            valueSI: 0.05,
+            status: "computed",
+          },
+          bound: {
+            valueSI: 0,
+            status: "literature_bound",
+          },
+          margin: {
+            valueSI: -0.05,
+            pass: false,
+          },
+          consistency: {
+            tauVsDuty: "pass",
+            tauVsLightCrossing: "pass",
+            tauVsModulation: "pass",
+          },
+          blockers: ["qei_margin_failed"],
+        },
+      ],
+      summary: {
+        hasWallWorldline: true,
+        allMarginsPass: false,
+        anyProxy: false,
+        dossierComplete: false,
+      },
+      literatureRefs: ["ford_roman_1996_quantum_inequality"],
+      claimBoundary: {
+        diagnosticOnly: true,
+        scalarMarginCannotSubstituteForDossier: true,
+      },
+    };
+    const dir = mkdtempSync(join(tmpdir(), "nhm2-run-manifest-"));
+    const candidateId =
+      "stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1";
+    const runRoot = join(dir, "runs", candidateId);
+    mkdirSync(runRoot, { recursive: true });
+    writeFileSync(
+      join(dir, "profile-search.json"),
+      `${JSON.stringify(search, null, 2)}\n`,
+      "utf8",
+    );
+    writeFileSync(
+      join(runRoot, "nhm2-qei-worldline-dossier.json"),
+      `${JSON.stringify(qeiArtifact, null, 2)}\n`,
+      "utf8",
+    );
+
+    const manifest = publishNhm2CampaignProfileRunManifest({
+      repoRoot: dir,
+      profileSearchPath: "profile-search.json",
+      outPath: "manifest.json",
+      runRootBase: "runs",
+      auditOnly: true,
+    });
+    const qei = manifest.candidates[0]?.requiredEvidence.find(
+      (entry) => entry.evidenceId === "qei_worldline_dossier",
+    );
+
+    expect(qei?.status).toBe("provided_blocked");
+    expect(qei?.blockers).toEqual(
+      expect.arrayContaining([
+        "qei_worldline_dossier_incomplete",
+        "qei_margin_not_pass",
+        "qei:wall:atlas:qei_margin_failed",
+      ]),
+    );
+    expect(manifest.summary.firstBlocker).toBe(
+      "candidate_metric_profile_spec_missing_for_frozen_campaign_run",
+    );
   });
 });

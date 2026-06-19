@@ -13,6 +13,19 @@ export type Nhm2ProfileCampaignFrontierCandidateStatusV1 =
   | "blocked_campaign_candidate"
   | "rejected_profile_screen";
 
+export type Nhm2ProfileCampaignFrontierBlockerClassV1 =
+  | "none"
+  | "profile_screen_rejected"
+  | "missing_campaign_evidence"
+  | "source_counterpart_or_material_evidence"
+  | "regional_full_tensor_or_momentum_closure"
+  | "conservation_or_dynamic_backreaction"
+  | "qei_worldline_dossier"
+  | "observer_energy_condition_after_tensor_closure"
+  | "stability"
+  | "claim_policy"
+  | "unknown_campaign_blocker";
+
 export type Nhm2ProfileCampaignFrontierCandidateV1 = {
   candidateProfileId: string;
   alphaCenterline: number;
@@ -25,6 +38,8 @@ export type Nhm2ProfileCampaignFrontierCandidateV1 = {
   blockedEvidenceIds: Nhm2CampaignProfileRunEvidenceId[];
   firstBlocker: string | null;
   blockers: string[];
+  blockerClass: Nhm2ProfileCampaignFrontierBlockerClassV1;
+  recommendedNextAction: string;
 };
 
 export type Nhm2ProfileCampaignFrontierArtifactV1 = {
@@ -48,6 +63,8 @@ export type Nhm2ProfileCampaignFrontierArtifactV1 = {
     fastestRejectedProfileId: string | null;
     recommendedNextProfileId: string | null;
     firstBlocker: string | null;
+    firstBlockerClass: Nhm2ProfileCampaignFrontierBlockerClassV1;
+    recommendedNextAction: string | null;
     recommendationReason:
       | "run_or_repair_fastest_blocked_candidate_evidence"
       | "campaign_admissible_diagnostic_profile_available"
@@ -60,6 +77,7 @@ export type Nhm2ProfileCampaignFrontierArtifactV1 = {
     rejectedCandidateCount: number;
     fastestAdmissibleAlpha: number | null;
     fastestBlockedAlpha: number | null;
+    highestLeverageBlockerClass: Nhm2ProfileCampaignFrontierBlockerClassV1;
     profileCampaignFrontierComplete: boolean;
   };
   claimBoundary: {
@@ -123,6 +141,9 @@ const buildFrontierCandidate = (
       blockers: candidate.blockers.length
         ? candidate.blockers
         : ["candidate_rejected_by_profile_screen"],
+      blockerClass: "profile_screen_rejected",
+      recommendedNextAction:
+        "do_not_rank_alpha_only_or_screen_rejected_profiles_until profile levers reduce metric-required T0i under the campaign screen",
     };
   }
 
@@ -144,6 +165,10 @@ const buildFrontierCandidate = (
     requiredEvidenceComplete
       ? "campaign_admissible_diagnostic_candidate"
       : "blocked_campaign_candidate";
+  const blockerClass =
+    status === "campaign_admissible_diagnostic_candidate"
+      ? "none"
+      : classifyBlocker(missingEvidenceIds, blockedEvidenceIds, blockers);
 
   return {
     candidateProfileId: candidate.candidateProfileId,
@@ -165,7 +190,99 @@ const buildFrontierCandidate = (
         : blockers.length
           ? blockers
           : ["candidate_campaign_evidence_incomplete"],
+    blockerClass,
+    recommendedNextAction:
+      status === "campaign_admissible_diagnostic_candidate"
+        ? "candidate is diagnostic-admissible under campaign evidence; preserve claim locks and review before any stronger policy admission"
+        : recommendedActionFor(blockerClass),
   };
+};
+
+const hasAny = (values: string[], patterns: RegExp[]): boolean =>
+  values.some((value) => patterns.some((pattern) => pattern.test(value)));
+
+const classifyBlocker = (
+  missingEvidenceIds: Nhm2CampaignProfileRunEvidenceId[],
+  blockedEvidenceIds: Nhm2CampaignProfileRunEvidenceId[],
+  blockers: string[],
+): Nhm2ProfileCampaignFrontierBlockerClassV1 => {
+  if (missingEvidenceIds.length > 0) return "missing_campaign_evidence";
+  if (blockedEvidenceIds.includes("source_tile_counterpart_compatibility")) {
+    return "source_counterpart_or_material_evidence";
+  }
+  if (
+    blockedEvidenceIds.includes("regional_full_tensor_residuals") ||
+    blockedEvidenceIds.includes("projected_momentum_demand_audit") ||
+    hasAny(blockers, [
+      /full_tensor_residual/i,
+      /momentum_density/i,
+      /projected_metric_momentum/i,
+      /metric_momentum/i,
+    ])
+  ) {
+    return "regional_full_tensor_or_momentum_closure";
+  }
+  if (hasAny(blockers, [/source.*missing/i, /material/i, /counterpart/i])) {
+    return "source_counterpart_or_material_evidence";
+  }
+  if (
+    blockedEvidenceIds.includes("switching_covariant_conservation") ||
+    blockedEvidenceIds.includes("dynamic_effective_geometry_agreement") ||
+    hasAny(blockers, [/conservation/i, /backreaction/i, /dynamic_geometry/i])
+  ) {
+    return "conservation_or_dynamic_backreaction";
+  }
+  if (
+    blockedEvidenceIds.includes("qei_worldline_dossier") ||
+    hasAny(blockers, [/qei/i, /worldline/i])
+  ) {
+    return "qei_worldline_dossier";
+  }
+  if (
+    blockedEvidenceIds.includes("observer_family_energy_conditions") ||
+    hasAny(blockers, [/observer/i, /WEC/i, /NEC/i, /DEC/i, /SEC/i])
+  ) {
+    return "observer_energy_condition_after_tensor_closure";
+  }
+  if (
+    blockedEvidenceIds.includes("horizon_blueshift_particle_stability") ||
+    hasAny(blockers, [/horizon/i, /blueshift/i, /particle/i, /stability/i])
+  ) {
+    return "stability";
+  }
+  if (hasAny(blockers, [/claim/i, /transport/i, /routeEta/i, /propulsion/i])) {
+    return "claim_policy";
+  }
+  return "unknown_campaign_blocker";
+};
+
+const recommendedActionFor = (
+  blockerClass: Nhm2ProfileCampaignFrontierBlockerClassV1,
+): string => {
+  switch (blockerClass) {
+    case "none":
+      return "candidate is diagnostic-admissible under campaign evidence; preserve claim locks and review before any stronger policy admission";
+    case "profile_screen_rejected":
+      return "redesign metric/profile levers before running a frozen campaign; alpha-only changes do not reduce projected T0i";
+    case "missing_campaign_evidence":
+      return "materialize the missing frozen candidate evidence with stable artifact refs before ranking the profile";
+    case "source_counterpart_or_material_evidence":
+      return "supply source-side tensor/material counterpart evidence without metric echo before residual or observer claims";
+    case "regional_full_tensor_or_momentum_closure":
+      return "tune same-atlas regional full tensor and momentum projection closure before observer or trip-clock ranking";
+    case "conservation_or_dynamic_backreaction":
+      return "repair switching conservation, support derivatives, or dynamic backreaction before profile admission";
+    case "qei_worldline_dossier":
+      return "complete wall and transition QEI worldline receipts with bound and tau provenance";
+    case "observer_energy_condition_after_tensor_closure":
+      return "explore an observer-compatible metric/source family: current tensor closure can coexist with negative wall T00 that fails WEC/DEC observer checks";
+    case "stability":
+      return "repair horizon, blueshift, particle accumulation, or perturbative stability evidence";
+    case "claim_policy":
+      return "keep claim locks closed until policy admits a stronger diagnostic tier";
+    case "unknown_campaign_blocker":
+      return "inspect the typed blockers and add a narrower frontier classifier before treating this profile as comparable";
+  }
 };
 
 export const buildNhm2ProfileCampaignFrontier = (
@@ -189,6 +306,7 @@ export const buildNhm2ProfileCampaignFrontier = (
   const fastestAdmissible = admissible[0] ?? null;
   const fastestBlocked = blocked[0] ?? null;
   const recommended = fastestAdmissible ?? fastestBlocked;
+  const firstBlockerClass = recommended?.blockerClass ?? "unknown_campaign_blocker";
 
   return {
     contractVersion: NHM2_PROFILE_CAMPAIGN_FRONTIER_CONTRACT_VERSION,
@@ -212,6 +330,8 @@ export const buildNhm2ProfileCampaignFrontier = (
       fastestRejectedProfileId: rejected[0]?.candidateProfileId ?? null,
       recommendedNextProfileId: recommended?.candidateProfileId ?? null,
       firstBlocker: recommended?.firstBlocker ?? null,
+      firstBlockerClass,
+      recommendedNextAction: recommended?.recommendedNextAction ?? null,
       recommendationReason:
         fastestAdmissible != null
           ? "campaign_admissible_diagnostic_profile_available"
@@ -226,6 +346,7 @@ export const buildNhm2ProfileCampaignFrontier = (
       rejectedCandidateCount: rejected.length,
       fastestAdmissibleAlpha: fastestAdmissible?.alphaCenterline ?? null,
       fastestBlockedAlpha: fastestBlocked?.alphaCenterline ?? null,
+      highestLeverageBlockerClass: firstBlockerClass,
       profileCampaignFrontierComplete: fastestAdmissible != null,
     },
     claimBoundary: {
@@ -265,9 +386,26 @@ const isCandidate = (
       NHM2_CAMPAIGN_PROFILE_RUN_EVIDENCE_IDS.includes(entry),
     ) &&
     isNullableText(record.firstBlocker) &&
-    Array.isArray(record.blockers)
+    Array.isArray(record.blockers) &&
+    isBlockerClass(record.blockerClass) &&
+    typeof record.recommendedNextAction === "string"
   );
 };
+
+const isBlockerClass = (
+  value: unknown,
+): value is Nhm2ProfileCampaignFrontierBlockerClassV1 =>
+  value === "none" ||
+  value === "profile_screen_rejected" ||
+  value === "missing_campaign_evidence" ||
+  value === "source_counterpart_or_material_evidence" ||
+  value === "regional_full_tensor_or_momentum_closure" ||
+  value === "conservation_or_dynamic_backreaction" ||
+  value === "qei_worldline_dossier" ||
+  value === "observer_energy_condition_after_tensor_closure" ||
+  value === "stability" ||
+  value === "claim_policy" ||
+  value === "unknown_campaign_blocker";
 
 export const isNhm2ProfileCampaignFrontier = (
   value: unknown,
@@ -303,6 +441,8 @@ export const isNhm2ProfileCampaignFrontier = (
     isNullableText(frontier.fastestRejectedProfileId) &&
     isNullableText(frontier.recommendedNextProfileId) &&
     isNullableText(frontier.firstBlocker) &&
+    isBlockerClass(frontier.firstBlockerClass) &&
+    isNullableText(frontier.recommendedNextAction) &&
     (frontier.recommendationReason ===
       "run_or_repair_fastest_blocked_candidate_evidence" ||
       frontier.recommendationReason ===
@@ -315,6 +455,7 @@ export const isNhm2ProfileCampaignFrontier = (
     typeof summary.rejectedCandidateCount === "number" &&
     isNullableNumber(summary.fastestAdmissibleAlpha) &&
     isNullableNumber(summary.fastestBlockedAlpha) &&
+    isBlockerClass(summary.highestLeverageBlockerClass) &&
     typeof summary.profileCampaignFrontierComplete === "boolean" &&
     claimBoundary?.diagnosticOnly === true &&
     claimBoundary.profileFrontierDoesNotValidateProfile === true &&

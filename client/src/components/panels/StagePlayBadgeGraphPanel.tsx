@@ -33,6 +33,7 @@ import type {
 import {
   WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
   queryActuatorForAgentGoalContextFeedV1,
+  type AgentGoalActuatorV1,
   type AgentGoalSessionV1,
   type WorkstationDispatchActionV1,
   type WorkstationGoalContextUpdateV1,
@@ -2545,6 +2546,13 @@ const packetTrailColor = (value: string): { hsl: string; border: string; backgro
 const stagePlayAppliedDeckKey = (presetId: string, sourceId: string | null, reason: string): string =>
   `${presetId}:${sourceId ?? "source_unknown"}:${reason}`;
 
+const stagePlayNarratorControlActuators = (actuators: readonly AgentGoalActuatorV1[]): AgentGoalActuatorV1[] =>
+  actuators.filter((actuator) =>
+    actuator === "bind_narrator" ||
+    actuator === "narrator_bind_stream" ||
+    actuator === "narrator_say"
+  );
+
 const stagePlayIsoMs = (value?: string | null): number => {
   const ms = value ? new Date(value).getTime() : NaN;
   return Number.isFinite(ms) && ms > 0 ? ms : 1;
@@ -2562,6 +2570,7 @@ const stagePlayDispatchActionLabel = (action: WorkstationDispatchActionV1): stri
   if (action.kind === "focus_process_graph") return `Focus: ${action.nodeRef ?? "graph"}`;
   if (action.kind === "update_panel") return `Panel: ${action.panelId}`;
   if (action.kind === "repair_loop") return `Repair: ${action.loopRef}`;
+  if (action.kind === "repair_source") return `Repair source: ${action.sourceRef ?? action.loopRef ?? "source"}`;
   if (action.kind === "wake_agent") {
     const interruptKind = "interruptKind" in action && action.interruptKind ? ` (${action.interruptKind})` : "";
     return `Wake interrupt${interruptKind}${action.reason ? `: ${compactStagePlayText(action.reason, "wake", 42)}` : ""}`;
@@ -2573,7 +2582,7 @@ const stagePlayDispatchActionLabel = (action: WorkstationDispatchActionV1): stri
 
 const stagePlayDispatchTone = (action: WorkstationDispatchActionV1): "default" | "good" | "warn" | "blocked" => {
   if (action.kind === "wake_agent" || action.kind === "ask_user") return "warn";
-  if (action.kind === "repair_loop") return "blocked";
+  if (action.kind === "repair_loop" || action.kind === "repair_source") return "blocked";
   if (action.kind === "append_goal_context" || action.kind === "update_live_answer" || action.kind === "bind_narrator_stream" || action.kind === "speak_narrator" || action.kind === "set_loop_state") return "good";
   return "default";
 };
@@ -2616,6 +2625,7 @@ const stagePlayDispatchDestinationLabel = (action: WorkstationDispatchActionV1):
   if (action.kind === "bind_source") return action.targetRef;
   if (action.kind === "unbind_source") return action.targetRef ?? action.sourceRef;
   if (action.kind === "set_loop_state" || action.kind === "repair_loop") return action.loopRef;
+  if (action.kind === "repair_source") return action.sourceRef ?? action.loopRef ?? "workstation source";
   if (action.kind === "focus_process_graph") return action.nodeRef ?? "stage-play-badge-graph";
   if (action.kind === "wake_agent") return "wake interrupt";
   if (action.kind === "ask_user") return "operator";
@@ -2647,6 +2657,38 @@ const stagePlayGoalContextCircuitHops = (
   ) ?? allRefs.find((ref) =>
     /translated_transcript|translation/i.test(ref)
   ) ?? update.updateKind;
+  const narrator = Array.from(new Set([
+    ...allRefs.filter((ref) =>
+      /^helix_narrator_|^narrator:|^workstation_actuator:narrator_/i.test(ref)
+    ),
+    ...update.suggestedDispatch.flatMap((action) => {
+      if (action.kind === "bind_narrator_stream") return [action.sourceRef, `narrator:${action.streamKind}`];
+      if (action.kind === "speak_narrator") return [`narrator:${action.mode}`];
+      return [];
+    }),
+  ]))
+    .slice(0, 4)
+    .map(compactStagePlayCircuitRef)
+    .join(" | ") || "narrator pending";
+  const routeWatch = Array.from(new Set(allRefs.filter((ref) =>
+    /^route_watch:|^watch_job:|^watch_policy:|^stage_play_live_source_watch_job:|^live_job_evidence:|^situation_construct_query:|^workstation_actuator:query_route_evidence/i.test(ref)
+  )))
+    .slice(0, 4)
+    .map(compactStagePlayCircuitRef)
+    .join(" | ") || "route watch pending";
+  const automation = Array.from(new Set(allRefs.filter((ref) =>
+    /^automation:|^automation_policy:|^workstation_context_feed:automation_policies|^stage_play_live_source_watch_job_policy:|^workstation_actuator:configure_route_watch/i.test(ref)
+  )))
+    .slice(0, 4)
+    .map(compactStagePlayCircuitRef)
+    .join(" | ") || "automation pending";
+  const traceMemory = Array.from(new Set(allRefs.filter((ref) =>
+    /^trace_memory:|^trace-memory:|^workstation_trace_memory:|^workstation_context_feed:trace_memory/i.test(ref) ||
+    /trace_memory|trace-memory/i.test(ref)
+  )))
+    .slice(0, 4)
+    .map(compactStagePlayCircuitRef)
+    .join(" | ") || "trace memory pending";
   const dispatch = update.suggestedDispatch.find((action) =>
     action.kind !== "log_receipt" &&
     action.kind !== "append_goal_context" &&
@@ -2667,6 +2709,10 @@ const stagePlayGoalContextCircuitHops = (
     { key: "source", label: "Source", value: compactStagePlayCircuitRef(source) },
     { key: "loop", label: "Loop", value: compactStagePlayCircuitRef(loop) },
     { key: "deck", label: "Deck", value: compactStagePlayCircuitRef(deck) },
+    { key: "narrator", label: "Narrator", value: narrator },
+    { key: "trace-memory", label: "Trace Memory", value: traceMemory },
+    { key: "route-watch", label: "Route Watch", value: routeWatch },
+    { key: "automation", label: "Automation", value: automation },
     { key: "dispatch", label: "Dispatch", value: compactStagePlayText(stagePlayDispatchActionLabel(dispatch), "none", 42) },
     { key: "destination", label: "Destination", value: compactStagePlayText(destination, "destination pending", 96) },
     { key: "authority", label: "Authority", value: authority },
@@ -2769,6 +2815,7 @@ const isStagePlayWorkstationControlDispatch = (action: WorkstationDispatchAction
   action.kind === "unbind_source" ||
   action.kind === "set_loop_state" ||
   action.kind === "repair_loop" ||
+  action.kind === "repair_source" ||
   action.kind === "update_live_answer" ||
   action.kind === "focus_process_graph" ||
   action.kind === "speak_narrator" ||
@@ -2858,7 +2905,7 @@ function StagePlayMailPayloadLedger({
       </div>
       <div className="mt-3 rounded border border-slate-800 bg-black/25 p-3 text-xs leading-relaxed text-slate-400">
         {payloadCount > 0
-          ? "Each chip is a mail, packet, wake, Ask handoff, or result artifact. Follow the same color/id across stations."
+          ? "Each chip is a mail, packet, dispatch interrupt, Ask handoff, or result artifact. Follow the same color/id across stations."
           : "Waiting for the first visual-source mail artifact."}
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] sm:grid-cols-4">
@@ -3076,7 +3123,7 @@ function StagePlayTrafficHeader({
         <StagePlayMetricPill label="mail age" value={formatStagePlayMs(mailAgeMs)} tone={mailAgeMs != null && mailAgeMs <= cadenceMs * 1.5 ? "good" : "warn"} />
         <StagePlayMetricPill label="packet age" value={formatStagePlayMs(packetAgeMs)} tone={packetAgeMs != null && packetAgeMs <= cadenceMs * 1.5 ? "good" : "warn"} />
         <StagePlayMetricPill label="deck time" value={formatStagePlayMs(deckLatencyMs)} tone={deckLatencyMs <= 1000 ? "good" : deckLatencyMs <= cadenceMs ? "warn" : "blocked"} />
-        <StagePlayMetricPill label="wake / ask" value={wakeLabel} tone={wakeTone} />
+        <StagePlayMetricPill label="interrupts" value={wakeLabel} tone={wakeTone} />
         <StagePlayMetricPill label="workload" value={workBudgetLabel} tone={workBudgetTone} />
         <StagePlayMetricPill label="deck budget" value={deckBudgetLabel} tone={workBudgetTone} />
         <StagePlayMetricPill label="pressure" value={runtimePressureLabel} tone={pressureTone} />
@@ -3525,6 +3572,10 @@ function StagePlayGoalContextBoard({
     (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "speak_narrator" || action.kind === "bind_narrator_stream").length,
     0,
   );
+  const narratorSpeechCount = updates.reduce(
+    (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "speak_narrator").length,
+    0,
+  );
   const narratorBindingCount = updates.reduce(
     (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "bind_narrator_stream").length,
     0,
@@ -3576,6 +3627,10 @@ function StagePlayGoalContextBoard({
     (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "bind_source" || action.kind === "unbind_source").length,
     0,
   );
+  const sourceRepairDispatchCount = updates.reduce(
+    (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "repair_source").length,
+    0,
+  );
   const liveAnswerDispatchCount = updates.reduce(
     (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "update_live_answer").length,
     0,
@@ -3593,7 +3648,9 @@ function StagePlayGoalContextBoard({
     0,
   );
   const loopDispatchCount = updates.reduce(
-    (count, update) => count + update.suggestedDispatch.filter((action) => action.kind === "set_loop_state" || action.kind === "repair_loop").length,
+    (count, update) => count + update.suggestedDispatch.filter((action) =>
+      action.kind === "set_loop_state" || action.kind === "repair_loop"
+    ).length,
     0,
   );
   const receiptDispatchCount = updates.reduce(
@@ -3650,6 +3707,58 @@ function StagePlayGoalContextBoard({
     Array.from(new Set(update.evidenceRefs.filter((ref) => ref.startsWith("freshness_filter:"))));
   const sessionFilterRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
     Array.from(new Set(update.evidenceRefs.filter((ref) => ref.startsWith("agent_goal_session_filter:"))));
+  const narratorRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] => {
+    const evidenceRefs = [
+      update.contentRef,
+      ...update.sourceRefs,
+      ...update.loopRefs,
+      ...update.evidenceRefs,
+      ...update.receiptRefs,
+    ].filter((ref) =>
+      /^helix_narrator_|^narrator:|^workstation_actuator:narrator_|narrator/i.test(ref)
+    );
+    const dispatchRefs = update.suggestedDispatch.flatMap((action) => {
+      if (action.kind === "bind_narrator_stream") {
+        return [action.sourceRef, `narrator:${action.streamKind}`, "workstation_actuator:narrator_bind_stream"];
+      }
+      if (action.kind === "speak_narrator") {
+        return [`narrator:${action.mode}`, "workstation_actuator:narrator_say"];
+      }
+      return [];
+    });
+    return Array.from(new Set([...evidenceRefs, ...dispatchRefs]));
+  };
+  const routeWatchRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
+    Array.from(new Set([
+      update.contentRef,
+      ...update.sourceRefs,
+      ...update.loopRefs,
+      ...update.evidenceRefs,
+      ...update.receiptRefs,
+    ].filter((ref) =>
+      /^route_watch:|^watch_job:|^watch_policy:|^stage_play_live_source_watch_job:|^live_job_evidence:|^situation_construct_query:|^workstation_actuator:query_route_evidence/i.test(ref)
+    )));
+  const automationRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
+    Array.from(new Set([
+      update.contentRef,
+      ...update.sourceRefs,
+      ...update.loopRefs,
+      ...update.evidenceRefs,
+      ...update.receiptRefs,
+    ].filter((ref) =>
+      /^automation:|^automation_policy:|^workstation_context_feed:automation_policies|^stage_play_live_source_watch_job_policy:|^workstation_actuator:configure_route_watch/i.test(ref)
+    )));
+  const traceMemoryRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
+    Array.from(new Set([
+      update.contentRef,
+      ...update.sourceRefs,
+      ...update.loopRefs,
+      ...update.evidenceRefs,
+      ...update.receiptRefs,
+    ].filter((ref) =>
+      /^trace_memory:|^trace-memory:|^workstation_trace_memory:|^workstation_context_feed:trace_memory/i.test(ref) ||
+      /trace_memory|trace-memory/i.test(ref)
+    )));
   const feedPolicyRefCount = updates.reduce((count, update) => count + contextFeedPolicyRefsForUpdate(update).length, 0);
   const actuatorPolicyRefCount = updates.reduce((count, update) => count + actuatorPolicyRefsForUpdate(update).length, 0);
   const exactGoalActuatorPolicyRefCount = updates.reduce((count, update) => count + matchedGoalAllowedActuatorRefsForUpdate(update).length, 0);
@@ -3669,6 +3778,18 @@ function StagePlayGoalContextBoard({
     if (cadence.kind === "interval") return `interval / ${cadence.everyMs}ms`;
     return labelize(cadence.kind);
   };
+  const formatFinalReportContract = (session: AgentGoalSessionV1): string => {
+    const requirements = session.authority.finalReportRequirements;
+    return [
+      `completed_solver_path=${String(requirements?.completedSolverPathRequired ?? false)}`,
+      `evidence_reentry=${String(requirements?.evidenceReentryRequired ?? false)}`,
+      `route_authority=${String(requirements?.routeAuthorityRequired ?? false)}`,
+      `single_writer=${String(requirements?.terminalAuthoritySingleWriterRequired ?? false)}`,
+      `allowed_terminal=${requirements?.allowedTerminalArtifactKinds?.map(labelize).join(", ") || "none"}`,
+      `required_evidence=${requirements?.requiredEvidenceKinds?.map(labelize).join(", ") || "none"}`,
+      `prohibited_sources=${requirements?.prohibitedReportSources?.map(labelize).join(", ") || "none"}`,
+    ].join("; ");
+  };
   const authorityChipClass = (flag: boolean): string =>
     flag
       ? "rounded border border-rose-400/40 bg-rose-950/25 px-1.5 py-0.5 font-mono text-[9px] text-rose-100"
@@ -3681,13 +3802,14 @@ function StagePlayGoalContextBoard({
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-wide text-violet-200">Goal Context Substrate</div>
           <div className="mt-0.5 text-xs text-violet-100/70">
-            Micro-reasoner outputs feed queryable goal context first. Wake is shown only as an interrupt dispatch.
+            Micro-reasoner outputs feed queryable goal context first. Interrupt dispatch is the only visible wake role.
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <StagePlayMetricPill label="updates" value={formatStagePlayCount(updates.length)} />
-          <StagePlayMetricPill label="wake interrupts" value={formatStagePlayCount(wakeInterruptCount)} tone={wakeInterruptCount > 0 ? "warn" : "default"} />
+          <StagePlayMetricPill label="interrupt dispatches" value={formatStagePlayCount(wakeInterruptCount)} tone={wakeInterruptCount > 0 ? "warn" : "default"} />
           <StagePlayMetricPill label="narrator dispatch" value={formatStagePlayCount(narratorDispatchCount)} tone={narratorDispatchCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="narrator speech" value={formatStagePlayCount(narratorSpeechCount)} tone={narratorSpeechCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="narrator bindings" value={formatStagePlayCount(narratorBindingCount)} tone={narratorBindingCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="narrator events" value={formatStagePlayCount(narratorEventFeedCount)} tone={narratorEventFeedCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="visual summaries" value={formatStagePlayCount(visualSummaryContextCount)} tone={visualSummaryContextCount > 0 ? "good" : "default"} />
@@ -3752,19 +3874,19 @@ function StagePlayGoalContextBoard({
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-dispatch-mix-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Dispatch mix</div>
           <div className="mt-0.5 text-slate-400">
-            {formatStagePlayCount(totalDispatchCount)} dispatch suggestion{totalDispatchCount === 1 ? "" : "s"}: {formatStagePlayCount(wakeInterruptCount)} wake interrupt{wakeInterruptCount === 1 ? "" : "s"}, {formatStagePlayCount(panelDispatchCount)} panel update{panelDispatchCount === 1 ? "" : "s"}, {formatStagePlayCount(narratorDispatchCount)} narrator output{narratorDispatchCount === 1 ? "" : "s"}, {formatStagePlayCount(loopDispatchCount)} loop action{loopDispatchCount === 1 ? "" : "s"}, {formatStagePlayCount(goalContextDispatchCount)} goal-context append{goalContextDispatchCount === 1 ? "" : "s"}, {formatStagePlayCount(receiptDispatchCount)} receipt log{receiptDispatchCount === 1 ? "" : "s"}.
+            {formatStagePlayCount(totalDispatchCount)} dispatch suggestion{totalDispatchCount === 1 ? "" : "s"}: {formatStagePlayCount(wakeInterruptCount)} interrupt dispatch{wakeInterruptCount === 1 ? "" : "es"}, {formatStagePlayCount(panelDispatchCount)} panel update{panelDispatchCount === 1 ? "" : "s"}, {formatStagePlayCount(narratorSpeechCount)} narrator speech, {formatStagePlayCount(narratorBindingCount)} narrator binding{narratorBindingCount === 1 ? "" : "s"}, {formatStagePlayCount(sourceRepairDispatchCount)} source repair{sourceRepairDispatchCount === 1 ? "" : "s"}, {formatStagePlayCount(loopDispatchCount)} loop action{loopDispatchCount === 1 ? "" : "s"}, {formatStagePlayCount(goalContextDispatchCount)} goal-context append{goalContextDispatchCount === 1 ? "" : "s"}, {formatStagePlayCount(receiptDispatchCount)} receipt log{receiptDispatchCount === 1 ? "" : "s"}.
           </div>
         </div>
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-control-dispatch-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Workstation controls</div>
           <div className="mt-0.5 text-slate-400">
-            {formatStagePlayCount(workstationControlDispatchCount)} non-wake control dispatch{workstationControlDispatchCount === 1 ? "" : "es"}: {formatStagePlayCount(presetDispatchCount)} preset, {formatStagePlayCount(sourceBindingDispatchCount)} source binding, {formatStagePlayCount(loopDispatchCount)} loop, {formatStagePlayCount(liveAnswerDispatchCount)} Live Answer, {formatStagePlayCount(processGraphDispatchCount)} graph, {formatStagePlayCount(narratorDispatchCount)} narrator. Wake remains {formatStagePlayCount(wakeInterruptCount)} interrupt dispatch{wakeInterruptCount === 1 ? "" : "es"}.
+            {formatStagePlayCount(workstationControlDispatchCount)} workstation control dispatch{workstationControlDispatchCount === 1 ? "" : "es"}: {formatStagePlayCount(presetDispatchCount)} preset, {formatStagePlayCount(sourceBindingDispatchCount)} source binding, {formatStagePlayCount(sourceRepairDispatchCount)} source repair, {formatStagePlayCount(loopDispatchCount)} loop, {formatStagePlayCount(liveAnswerDispatchCount)} Live Answer, {formatStagePlayCount(processGraphDispatchCount)} graph, {formatStagePlayCount(narratorSpeechCount)} narrator speech, {formatStagePlayCount(narratorBindingCount)} narrator binding{narratorBindingCount === 1 ? "" : "s"}. Wake remains {formatStagePlayCount(wakeInterruptCount)} interrupt dispatch{wakeInterruptCount === 1 ? "" : "es"}.
           </div>
         </div>
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-wake-interrupt-scope-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Wake interrupt scope</div>
           <div className="mt-0.5 text-slate-400">
-            Wake split: {formatStagePlayCount(wakeUrgentCount)} urgent, {formatStagePlayCount(wakeBlockedCount)} blocked, {formatStagePlayCount(wakePolicyTriggeredCount)} policy-triggered. Other dispatches stay on workstation control lanes.
+            Interrupt split: {formatStagePlayCount(wakeUrgentCount)} urgent, {formatStagePlayCount(wakeBlockedCount)} blocked, {formatStagePlayCount(wakePolicyTriggeredCount)} policy-triggered. Other dispatches stay on workstation control lanes.
           </div>
         </div>
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-actuator-policy-state">
@@ -3798,6 +3920,10 @@ function StagePlayGoalContextBoard({
             const matchedGoalActuatorRefs = matchedGoalAllowedActuatorRefsForUpdate(update);
             const freshnessFilterRefs = freshnessFilterRefsForUpdate(update);
             const sessionFilterRefs = sessionFilterRefsForUpdate(update);
+            const narratorRefs = narratorRefsForUpdate(update);
+            const traceMemoryRefs = traceMemoryRefsForUpdate(update);
+            const routeWatchRefs = routeWatchRefsForUpdate(update);
+            const automationRefs = automationRefsForUpdate(update);
             const circuitHops = stagePlayGoalContextCircuitHops(update);
             return (
               <div
@@ -3845,12 +3971,32 @@ function StagePlayGoalContextBoard({
                   <div className="truncate">sources={update.sourceRefs.slice(0, 3).join(", ") || "none"}</div>
                   <div className="truncate">evidence={update.evidenceRefs.slice(0, 3).join(", ") || "none"}</div>
                   <div className="truncate">receipts={update.receiptRefs.slice(0, 3).join(", ") || "none"}</div>
+                  {narratorRefs.length > 0 ? (
+                    <div className="truncate" data-testid="stage-play-goal-context-narrator-refs">
+                      narrator={narratorRefs.slice(0, 5).join(", ")}
+                    </div>
+                  ) : null}
+                  {traceMemoryRefs.length > 0 ? (
+                    <div className="truncate" data-testid="stage-play-goal-context-trace-memory-refs">
+                      traceMemory={traceMemoryRefs.slice(0, 5).join(", ")}
+                    </div>
+                  ) : null}
+                  {routeWatchRefs.length > 0 ? (
+                    <div className="truncate" data-testid="stage-play-goal-context-route-watch-refs">
+                      routeWatch={routeWatchRefs.slice(0, 5).join(", ")}
+                    </div>
+                  ) : null}
+                  {automationRefs.length > 0 ? (
+                    <div className="truncate" data-testid="stage-play-goal-context-automation-refs">
+                      automation={automationRefs.slice(0, 5).join(", ")}
+                    </div>
+                  ) : null}
                   {policyRefs.length > 0 ? (
                     <div className="truncate" data-testid="stage-play-goal-context-update-policy">policy={policyRefs.slice(0, 6).join(", ")}</div>
                   ) : null}
                   {contextFeedPolicyRefs.length > 0 || actuatorPolicyRefs.length > 0 ? (
                     <div className="truncate" data-testid="stage-play-goal-context-update-policy-split">
-                      feeds={contextFeedPolicyRefs.slice(0, 3).join(", ") || "none"}; actuators={actuatorPolicyRefs.slice(0, 3).join(", ") || "none"}
+                      feeds={contextFeedPolicyRefs.slice(0, 3).join(", ") || "none"}; actuators={actuatorPolicyRefs.slice(0, 4).join(", ") || "none"}
                     </div>
                   ) : null}
                   {matchedGoalActuatorRefs.length > 0 ? (
@@ -3892,6 +4038,7 @@ function StagePlayGoalContextBoard({
           <div className="mt-3 space-y-2">
             {activeSessions.length > 0 ? activeSessions.map((session) => {
               const feedPolicyRefs = sessionFeedPolicyRefs(session);
+              const narratorControls = stagePlayNarratorControlActuators(session.allowedActuators);
               return (
               <div key={session.goalId} className="rounded border border-violet-900/50 bg-violet-950/15 p-2">
                 <div className="flex items-center justify-between gap-2">
@@ -3908,6 +4055,12 @@ function StagePlayGoalContextBoard({
                   </div>
                   <div data-testid="stage-play-agent-goal-session-actuators">
                     actuators={session.allowedActuators.slice(0, 8).map((actuator) => labelize(actuator)).join(", ") || "none"}
+                  </div>
+                  <div data-testid="stage-play-agent-goal-session-narrator-controls">
+                    narratorControls={narratorControls.map((actuator) => labelize(actuator)).join(", ") || "none"}
+                  </div>
+                  <div data-testid="stage-play-agent-goal-session-final-report-contract">
+                    finalReportContract={formatFinalReportContract(session)}
                   </div>
                   <div data-testid="stage-play-agent-goal-session-feed-policy-refs">
                     feedPolicyRefs={feedPolicyRefs.slice(0, 18).join(", ") || "none"}
@@ -7547,12 +7700,19 @@ function StagePlayMailLoopLiveOverview({
                     className="inline-flex max-w-full items-center gap-1.5 rounded border bg-slate-950/70 px-2 py-1 text-[10px] text-slate-100"
                     style={{ borderColor: color.border, boxShadow: color.glow }}
                     title={`${entry.title} | ${entry.sourceId ?? "source pending"} | ${entry.reason}`}
+                    data-circuit-color-hsl={color.hsl}
+                    data-circuit-color-key={entry.colorKey}
+                    data-deck-preset-id={entry.presetId}
+                    data-source-ref={entry.sourceId ?? "source pending"}
                     data-testid="stage-play-applied-microdeck-chip"
                   >
                     <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-300" aria-hidden="true" />
                     <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color.hsl }} aria-hidden="true" />
                     <span className="max-w-[16rem] truncate font-semibold">{entry.title}</span>
                     <span className="font-mono text-[9px] text-slate-400">{entry.reason}</span>
+                    <span className="max-w-[12rem] truncate font-mono text-[9px] text-emerald-100/70">
+                      color={compactStagePlayCircuitRef(entry.colorKey)}
+                    </span>
                   </div>
                 );
               })}

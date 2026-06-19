@@ -44,6 +44,10 @@ export type LiveAnswerPacketCircuitRef = {
   contentRef: string;
   packetRefs: string[];
   microDeckRefs: string[];
+  traceMemoryRefs: string[];
+  narratorRefs: string[];
+  routeWatchRefs: string[];
+  automationRefs: string[];
   sourceRefs: string[];
   loopRefs: string[];
   receiptRefs: string[];
@@ -65,6 +69,7 @@ export type LiveAnswerReasoningCircuitSummary = {
   workstationControlDispatchCount: number;
   presetDispatchCount: number;
   sourceBindingDispatchCount: number;
+  sourceRepairDispatchCount: number;
   loopDispatchCount: number;
   liveAnswerDispatchCount: number;
   processGraphDispatchCount: number;
@@ -166,6 +171,7 @@ const circuitDestinationLabel = (dispatch: string): string => {
   if (/focus graph/i.test(normalized)) return "process graph focus";
   if (/update live answer/i.test(normalized)) return "live answer projection";
   if (/set loop state/i.test(normalized)) return "loop control";
+  if (/repair source/i.test(normalized)) return "source repair";
   if (/repair loop/i.test(normalized)) return "loop repair";
   if (/ask user/i.test(normalized)) return "operator";
   return normalized || "destination pending";
@@ -238,6 +244,13 @@ const freshnessFilterRefs = (refs: string[]): string[] =>
 const sessionFilterRefs = (refs: string[]): string[] =>
   refs.filter((ref) => ref.startsWith("agent_goal_session_filter:"));
 
+const narratorControlActuators = (actuators: readonly AgentGoalActuatorV1[]): AgentGoalActuatorV1[] =>
+  actuators.filter((actuator) =>
+    actuator === "bind_narrator" ||
+    actuator === "narrator_bind_stream" ||
+    actuator === "narrator_say"
+  );
+
 const toolIdentityLabel = (row: LiveAnswerReasoningCircuitRow): string => {
   if (!row.requestedToolName && !row.canonicalToolName) return "tool=none";
   const requested = row.requestedToolName ?? "unknown";
@@ -250,6 +263,19 @@ const matchedActuatorLabel = (row: LiveAnswerReasoningCircuitRow): string =>
 
 const matchedActuatorRefLabel = (row: LiveAnswerReasoningCircuitRow): string =>
   `matchedRefs=${row.matchedAllowedActuatorRefs?.length ? row.matchedAllowedActuatorRefs.join(", ") : "none"}`;
+
+const finalReportContractLabel = (session: AgentGoalSessionV1): string => {
+  const requirements = session.authority.finalReportRequirements;
+  return [
+    `completed_solver_path=${String(requirements?.completedSolverPathRequired ?? false)}`,
+    `evidence_reentry=${String(requirements?.evidenceReentryRequired ?? false)}`,
+    `route_authority=${String(requirements?.routeAuthorityRequired ?? false)}`,
+    `single_writer=${String(requirements?.terminalAuthoritySingleWriterRequired ?? false)}`,
+    `allowed_terminal=${requirements?.allowedTerminalArtifactKinds?.map(compactLabel).join(", ") || "none"}`,
+    `required_evidence=${requirements?.requiredEvidenceKinds?.map(compactLabel).join(", ") || "none"}`,
+    `prohibited_sources=${requirements?.prohibitedReportSources?.map(compactLabel).join(", ") || "none"}`,
+  ].join("; ");
+};
 
 const buildContextFeedLanes = (sessions: AgentGoalSessionV1[]): LiveAnswerContextFeedLane[] =>
   sessions.flatMap((session: AgentGoalSessionV1) =>
@@ -300,17 +326,17 @@ export function LiveAnswerReasoningCircuit({
           <span className="rounded border border-emerald-300/20 px-2 py-1 font-mono text-[10px] text-emerald-100">
             {summary.activeGoalCount} goals
           </span>
-          <span className="rounded border border-cyan-300/20 px-2 py-1 font-mono text-[10px] text-cyan-100">
+          <span className="rounded border border-cyan-300/20 px-2 py-1 font-mono text-[10px] text-cyan-100" data-testid="live-answer-narrator-speech-count">
             {summary.narratorSpeechCount} narrator speech
           </span>
           <span className="rounded border border-cyan-300/20 px-2 py-1 font-mono text-[10px] text-cyan-100" data-testid="live-answer-narrator-binding-count">
             {summary.narratorBindingCount} narrator bindings
           </span>
           <span className="rounded border border-amber-300/20 px-2 py-1 font-mono text-[10px] text-amber-100" data-testid="live-answer-wake-dispatch-count">
-            {summary.wakeCount} wake dispatch{summary.wakeCount === 1 ? "" : "es"}
+            {summary.wakeCount} interrupt dispatch{summary.wakeCount === 1 ? "" : "es"}
           </span>
           <span className="rounded border border-emerald-300/20 px-2 py-1 font-mono text-[10px] text-emerald-100" data-testid="live-answer-control-dispatch-count">
-            {summary.workstationControlDispatchCount} non-wake control dispatch{summary.workstationControlDispatchCount === 1 ? "" : "es"}
+            {summary.workstationControlDispatchCount} workstation control dispatch{summary.workstationControlDispatchCount === 1 ? "" : "es"}
           </span>
           <span className="rounded border border-fuchsia-300/20 px-2 py-1 font-mono text-[10px] text-fuchsia-100" data-testid="live-answer-microdeck-output-count">
             {summary.microdeckOutputCount} MicroDeck output{summary.microdeckOutputCount === 1 ? "" : "s"}
@@ -434,6 +460,41 @@ export function LiveAnswerReasoningCircuit({
                       <div className="truncate">content={ref.contentRef}</div>
                       <div className="truncate">packets={ref.packetRefs.length ? ref.packetRefs.join(", ") : "none"}</div>
                       <div className="truncate">microDecks={ref.microDeckRefs.length ? ref.microDeckRefs.join(", ") : "none"}</div>
+                      <div className="truncate" data-testid="live-answer-packet-trace-memory-refs">
+                        traceMemory={(ref.traceMemoryRefs ?? []).length ? (ref.traceMemoryRefs ?? []).join(", ") : "none"}
+                      </div>
+                      <div className="truncate" data-testid="live-answer-packet-narrator-refs">
+                        narrator={(ref.narratorRefs ?? []).length ? (ref.narratorRefs ?? []).join(", ") : "none"}
+                      </div>
+                      <div className="truncate" data-testid="live-answer-packet-route-watch-refs">
+                        routeWatch={(ref.routeWatchRefs ?? []).length ? (ref.routeWatchRefs ?? []).join(", ") : "none"}
+                      </div>
+                      <div className="truncate" data-testid="live-answer-packet-automation-refs">
+                        automation={(ref.automationRefs ?? []).length ? (ref.automationRefs ?? []).join(", ") : "none"}
+                      </div>
+                      {ref.microDeckRefs.length > 0 ? (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {ref.microDeckRefs.slice(0, 4).map((microDeckRef: string) => (
+                            <span
+                              key={`${row.id}:${ref.updateId}:microdeck-color:${microDeckRef}`}
+                              className="inline-flex min-w-0 items-center gap-1 rounded border px-1 py-0.5 text-[10px] text-sky-100"
+                              data-microdeck-ref={microDeckRef}
+                              data-packet-color-hsl={color.hsl}
+                              data-packet-color-key={row.packetColorKey}
+                              data-testid="live-answer-packet-microdeck-color-link"
+                              style={{ borderColor: color.border, backgroundColor: color.background }}
+                              title={`packet=${row.packetColorKey} microdeck=${microDeckRef}`}
+                            >
+                              <span
+                                className="h-2 w-2 shrink-0 rounded-full border"
+                                aria-hidden="true"
+                                style={{ backgroundColor: color.hsl, borderColor: color.border }}
+                              />
+                              <span className="truncate">packet={row.packetColorKey} -&gt; microdeck={microDeckRef}</span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
                       <div className="truncate">terminal={String(ref.terminalEligible)} assistant={String(ref.assistantAnswer)} freshness={ref.freshnessStatus}</div>
                     </div>
                   )) : (
@@ -476,16 +537,16 @@ export function LiveAnswerReasoningCircuit({
           <p className="text-[10px] font-semibold uppercase text-slate-300">Authority posture</p>
           <p className="mt-1 text-xs text-violet-100" data-testid="live-answer-terminal-authority-posture">{summary.terminalPosture}</p>
           <p className="mt-1 font-mono text-[10px] text-slate-400">
-            observation_only={summary.observationOnlyCount} wake_dispatches={summary.wakeCount} microdeck_outputs={summary.microdeckOutputCount} visual_summaries={summary.visualSummaryCount} narrator_bindings={summary.narratorBindingCount} audio_transcripts={summary.audioTranscriptCount} translations={summary.translatedTranscriptCount} packet_traces={summary.packetTraceCount} source_health={summary.sourceHealthCount} feed_queries={summary.feedQueryCount} feed_policy_refs={summary.feedPolicyRefCount} actuator_policy_refs={summary.actuatorPolicyRefCount} freshness_filters={summary.freshnessFilterRefCount} session_filters={summary.sessionFilterRefCount} tool_attributed_updates={summary.toolAttributedUpdateCount} matched_tool_actuator_updates={summary.matchedToolActuatorUpdateCount} route_watch={summary.routeWatchCount} automations={summary.automationCount} actuator_policies={summary.actuatorPolicyCount} narrator_output_policies={summary.narratorActuatorPolicyCount} narrator_event_feeds={summary.narratorEventFeedCount} trace_memory={summary.traceMemoryCount} terminal_authority_sessions={summary.terminalAuthorityRequiredCount}
+            observation_only={summary.observationOnlyCount} interrupt_dispatches={summary.wakeCount} microdeck_outputs={summary.microdeckOutputCount} visual_summaries={summary.visualSummaryCount} narrator_bindings={summary.narratorBindingCount} audio_transcripts={summary.audioTranscriptCount} translations={summary.translatedTranscriptCount} packet_traces={summary.packetTraceCount} source_health={summary.sourceHealthCount} feed_queries={summary.feedQueryCount} feed_policy_refs={summary.feedPolicyRefCount} actuator_policy_refs={summary.actuatorPolicyRefCount} freshness_filters={summary.freshnessFilterRefCount} session_filters={summary.sessionFilterRefCount} tool_attributed_updates={summary.toolAttributedUpdateCount} matched_tool_actuator_updates={summary.matchedToolActuatorUpdateCount} route_watch={summary.routeWatchCount} automations={summary.automationCount} actuator_policies={summary.actuatorPolicyCount} narrator_output_policies={summary.narratorActuatorPolicyCount} narrator_event_feeds={summary.narratorEventFeedCount} trace_memory={summary.traceMemoryCount} terminal_authority_sessions={summary.terminalAuthorityRequiredCount}
           </p>
           <p className="mt-1 font-mono text-[10px] text-slate-400" data-testid="live-answer-control-dispatch-breakdown">
-            control_dispatches={summary.workstationControlDispatchCount} preset={summary.presetDispatchCount} source_binding={summary.sourceBindingDispatchCount} loop={summary.loopDispatchCount} live_answer={summary.liveAnswerDispatchCount} graph={summary.processGraphDispatchCount} narrator={summary.narratorSpeechCount + summary.narratorBindingCount} wake_interrupts={summary.wakeCount}
+            control_dispatches={summary.workstationControlDispatchCount} preset={summary.presetDispatchCount} source_binding={summary.sourceBindingDispatchCount} source_repair={summary.sourceRepairDispatchCount} loop={summary.loopDispatchCount} live_answer={summary.liveAnswerDispatchCount} graph={summary.processGraphDispatchCount} narrator_speech={summary.narratorSpeechCount} narrator_binding={summary.narratorBindingCount} interrupt_dispatches={summary.wakeCount}
           </p>
           <p className="mt-1 font-mono text-[10px] text-slate-400" data-testid="live-answer-wake-interrupt-scope">
-            wake_scope urgent={summary.wakeUrgentCount} blocked={summary.wakeBlockedCount} policy_triggered={summary.wakePolicyTriggeredCount}
+            interrupt_scope urgent={summary.wakeUrgentCount} blocked={summary.wakeBlockedCount} policy_triggered={summary.wakePolicyTriggeredCount}
           </p>
           <p className="mt-1 text-[11px] leading-5 text-slate-500">
-            Wake is only an interrupt dispatch. Receipts, MicroDeck outputs, narrator bindings, and panel projections stay evidence until the completed solver path selects a terminal answer.
+            Interrupt dispatch is the only visible wake role. Receipts, MicroDeck outputs, narrator bindings, and panel projections stay evidence until the completed solver path selects a terminal answer.
           </p>
           <div className="mt-2 flex flex-wrap gap-1">
             {sessions.slice(0, 3).map((session: AgentGoalSessionV1) => (
@@ -547,6 +608,7 @@ export function LiveAnswerReasoningCircuit({
             {sessions.slice(0, 2).map((session: AgentGoalSessionV1) => {
               const latestCheckpoint = session.checkpoints.at(-1);
               const finalReportRequirementCount = session.authority.finalReportRequirements?.requiredEvidenceKinds?.length ?? 0;
+              const narratorControls = narratorControlActuators(session.allowedActuators);
               return (
                 <div key={`${session.goalId}:policy`} className="rounded border border-violet-300/15 bg-violet-950/10 p-2" data-testid="live-answer-agent-goal-policy">
                   <div className="flex items-start justify-between gap-2">
@@ -565,6 +627,12 @@ export function LiveAnswerReasoningCircuit({
                     </span>
                     <span className="truncate" data-testid="live-answer-agent-goal-actuators">
                       actuators={session.allowedActuators.slice(0, 6).map(compactLabel).join(", ") || "none"}
+                    </span>
+                    <span className="truncate" data-testid="live-answer-agent-goal-narrator-controls">
+                      narratorControls={narratorControls.map(compactLabel).join(", ") || "none"}
+                    </span>
+                    <span className="truncate" data-testid="live-answer-agent-goal-final-report-contract">
+                      finalReportContract={finalReportContractLabel(session)}
                     </span>
                     <span className="truncate" data-testid="live-answer-agent-goal-stop">
                       stop={session.stopConditions[0] ?? "none"}

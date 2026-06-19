@@ -1922,10 +1922,26 @@ export const buildArtifactQueryIndex = (input: {
     capabilityPlan?.requested_capability,
   );
   const requestedCapabilityContract = explicitCapabilityContractForCapability(requestedCapability);
-  const requiredObservationKinds = requestedCapabilityContract?.required_observation_kinds.length
+  const requestedCapabilityCompoundSubgoal = compoundSubgoalLedger.find((entry) =>
+    normalizedEqual(readNullableString(entry.requested_capability), requestedCapability) ||
+    normalizedEqual(readNullableString(entry.runtime_capability), requestedCapability)
+  ) ?? readArray(readRecord(compoundCapabilityContract)?.subgoals)
+    .map((entry) => readRecord(entry))
+    .find((entry) =>
+      normalizedEqual(readNullableString(entry?.requested_capability), requestedCapability) ||
+      normalizedEqual(readNullableString(entry?.runtime_capability), requestedCapability)
+    ) ?? null;
+  const compoundSubgoalRequiredObservationKinds = readStringArray(
+    readRecord(requestedCapabilityCompoundSubgoal)?.required_observation_kinds,
+  );
+  const requiredObservationKinds = compoundSubgoalRequiredObservationKinds.length
+    ? compoundSubgoalRequiredObservationKinds
+    : requestedCapabilityContract?.required_observation_kinds.length
     ? requestedCapabilityContract.required_observation_kinds
     : contract?.requiredObservationKinds ?? [];
-  const requiredObservationCoverageMode = requestedCapabilityContract
+  const requiredObservationCoverageMode = compoundSubgoalRequiredObservationKinds.length
+    ? "any"
+    : requestedCapabilityContract
     ? explicitObservationCoverageMode(requestedCapabilityContract.capability)
     : "all";
   const requiredObservationCoverage = requiredObservationKinds.map((kind) => {

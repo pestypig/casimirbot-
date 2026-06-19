@@ -26,15 +26,17 @@ import type { Nhm2CandidateMetricProfileSpecV1 } from "../shared/contracts/nhm2-
 const candidateProfileId =
   "stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1";
 
-const spec = (): Nhm2CandidateMetricProfileSpecV1 => ({
+const spec = (
+  overrides: Partial<Nhm2CandidateMetricProfileSpecV1> = {},
+): Nhm2CandidateMetricProfileSpecV1 => ({
   contractVersion: "nhm2_candidate_metric_profile_spec/v1",
   generatedAt: "2026-06-19T00:00:00.000Z",
   laneId: "nhm2_shift_lapse",
-  candidateProfileId,
+  candidateProfileId: overrides.candidateProfileId ?? candidateProfileId,
   parentProfileId: "stage1_centerline_alpha_0p995_v1",
-  alphaCenterline: 0.9,
-  subjectiveEfficiencyProxy: 1 / 0.9,
-  proposalKind: "combined_metric_redesign",
+  alphaCenterline: overrides.alphaCenterline ?? 0.9,
+  subjectiveEfficiencyProxy: overrides.subjectiveEfficiencyProxy ?? 1 / 0.9,
+  proposalKind: overrides.proposalKind ?? "combined_metric_redesign",
   sourceProfileSearchRef: "profile-search.json",
   profileDefinition: {
     lapseDepthScale: 1,
@@ -179,6 +181,39 @@ describe("candidate tile-effective full tensor source", () => {
     expect(isNhm2TileEffectiveFullTensorSourceArtifact(persisted)).toBe(true);
   });
 
+  it("emits observer-compatible source-family tensors as source-side trials, not metric echoes", () => {
+    const repoRoot = mkdtempSync(join(tmpdir(), "nhm2-candidate-source-"));
+    const observerSpec = spec({
+      candidateProfileId:
+        "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1",
+      alphaCenterline: 0.7,
+      subjectiveEfficiencyProxy: 1 / 0.7,
+      proposalKind: "observer_compatible_source",
+    });
+    writeFileSync(
+      join(repoRoot, "candidate-spec.json"),
+      JSON.stringify(observerSpec),
+      "utf8",
+    );
+
+    const artifact = publishNhm2CandidateTileEffectiveFullTensorSource({
+      repoRoot,
+      candidateProfileSpecPath: "candidate-spec.json",
+      outPath: "candidate-source.json",
+      runId: "observer-compatible-source-test",
+    });
+    const wall = artifact.regions.find((region) => region.regionId === "wall");
+
+    expect(artifact.sourceModel.metricRequiredInputRefs).toEqual([]);
+    expect(artifact.sourceModel.notDerivedFromMetricRequiredTensor).toBe(true);
+    expect(wall?.tensor.T00).toBeGreaterThan(0);
+    expect(wall?.tensor.T11).toBeGreaterThan(0);
+    expect(wall?.provenance.preAggregationValueRefs).toContain(
+      "candidate_levers:observerCompatibleSource=true",
+    );
+    expect(artifact.physicalMechanismClaimAllowed).toBe(false);
+  });
+
   it("can align source-side sampling metadata to the campaign grid without metric target inputs", () => {
     const repoRoot = mkdtempSync(join(tmpdir(), "nhm2-candidate-source-"));
     const candidateSpec = spec();
@@ -211,6 +246,11 @@ describe("candidate tile-effective full tensor source", () => {
     expect(byRegion.get("exterior_shell")?.sampleCount).toBe(344);
     expect(byRegion.get("wall")?.regionMaskRef).toBe(campaignGrid.regionSamples.wall.maskRef);
     expect(byRegion.get("wall")?.provenance.notDerivedFromMetricRequiredTensor).toBe(true);
+    expect(
+      artifact.regions.every(
+        (region) => region.sourceSupport.cycleAverageStatus === "pass",
+      ),
+    ).toBe(true);
   });
 
   it("derives fixed-cycle-average frequency convergence from source-side tensor provenance", () => {

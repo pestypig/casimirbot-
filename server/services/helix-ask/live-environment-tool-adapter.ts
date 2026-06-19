@@ -2874,7 +2874,8 @@ const filterDeniedControlDispatch = (
   dispatch.filter((action) => {
     if (action.kind === spec.controlKind) return false;
     if (spec.controlKind === "set_loop_state" && action.kind === "repair_loop") return false;
-    if ((spec.controlKind === "repair_loop" || spec.controlKind === "repair_source") && (action.kind === "set_loop_state" || action.kind === "repair_loop")) return false;
+    if (spec.controlKind === "repair_loop" && (action.kind === "set_loop_state" || action.kind === "repair_loop")) return false;
+    if (spec.controlKind === "repair_source" && (action.kind === "set_loop_state" || action.kind === "repair_loop" || action.kind === "repair_source")) return false;
     return true;
   });
 
@@ -2954,9 +2955,13 @@ const buildWorkstationControlDispatch = (input: {
     dispatch.push({ kind: "set_loop_state", loopRef, state: loopState });
     if (loopState === "repaired") dispatch.push({ kind: "repair_loop", loopRef });
   }
-  if ((input.spec.controlKind === "repair_loop" || input.spec.controlKind === "repair_source") && loopRef) {
+  if (input.spec.controlKind === "repair_loop" && loopRef) {
     dispatch.push({ kind: "set_loop_state", loopRef, state: "repaired" });
     dispatch.push({ kind: "repair_loop", loopRef });
+  }
+  if (input.spec.controlKind === "repair_source" && (sourceRef || loopRef)) {
+    dispatch.push({ kind: "repair_source", sourceRef, loopRef });
+    if (loopRef) dispatch.push({ kind: "set_loop_state", loopRef, state: "repaired" });
   }
   if (input.spec.controlKind === "update_live_answer" && lineKey) {
     dispatch.push({ kind: "update_live_answer", lineKey });
@@ -7003,6 +7008,35 @@ export function executeLiveEnvironmentTool(
           ref.startsWith("stage_play_micro_reasoner_run:") ||
           ref.startsWith("microdeck:") ||
           ref.startsWith("microdeck_output:")
+        ),
+        traceMemoryRefs: allRefs.filter((ref) =>
+          ref.startsWith("trace_memory:") ||
+          ref.startsWith("trace-memory:") ||
+          ref.startsWith("workstation_trace_memory:") ||
+          ref.startsWith("workstation_context_feed:trace_memory") ||
+          ref.includes("trace_memory") ||
+          ref.includes("trace-memory")
+        ),
+        narratorRefs: allRefs.filter((ref) =>
+          ref.startsWith("helix_narrator_") ||
+          ref.startsWith("narrator:") ||
+          ref.startsWith("workstation_actuator:narrator_")
+        ),
+        routeWatchRefs: allRefs.filter((ref) =>
+          ref.startsWith("route_watch:") ||
+          ref.startsWith("watch_job:") ||
+          ref.startsWith("watch_policy:") ||
+          ref.startsWith("stage_play_live_source_watch_job:") ||
+          ref.startsWith("live_job_evidence:") ||
+          ref.startsWith("situation_construct_query:") ||
+          ref.startsWith("workstation_actuator:query_route_evidence")
+        ),
+        automationRefs: allRefs.filter((ref) =>
+          ref.startsWith("automation:") ||
+          ref.startsWith("automation_policy:") ||
+          ref.startsWith("workstation_context_feed:automation_policies") ||
+          ref.startsWith("stage_play_live_source_watch_job_policy:") ||
+          ref.startsWith("workstation_actuator:configure_route_watch")
         ),
         receiptRefs: update.receiptRefs,
         freshnessStatus: update.freshness.status,

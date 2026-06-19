@@ -16,6 +16,7 @@ import {
   WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS,
   WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
   WORKSTATION_GOAL_CONTEXT_UPDATE_SCHEMA,
+  queryActuatorForAgentGoalContextFeedV1,
   validateAgentGoalSessionV1,
   validateWorkstationGoalContextUpdateV1,
   type AgentGoalActuatorV1,
@@ -111,6 +112,13 @@ const mergeAllowedActuators = (
   return Array.from(new Set(merged));
 };
 
+const queryActuatorsForContextFeeds = (
+  feeds: AgentGoalSessionV1["contextFeeds"],
+): AgentGoalActuatorV1[] =>
+  feeds
+    .map((feed) => queryActuatorForAgentGoalContextFeedV1(feed.sourceKind))
+    .filter((actuator): actuator is AgentGoalActuatorV1 => agentGoalActuators.has(actuator));
+
 const readTimeMs = (value: string | null | undefined, fallbackMs: number): number => {
   const parsed = value ? Date.parse(value) : Number.NaN;
   return Number.isFinite(parsed) ? parsed : fallbackMs;
@@ -189,19 +197,31 @@ const dispatchActionsForMail = (mail: StagePlayLiveSourceMailItemV1): Workstatio
   { kind: "update_panel", panelId: "stage-play-badge-graph" },
 ];
 
-const wakeInterruptReason = (input: {
+const wakeInterruptDecision = (input: {
   packet: StagePlayProcessedMailPacketV1;
   wakeRequests: StagePlayLiveSourceMailWakeRequestV1[];
   wakeResults: StagePlayLiveSourceMailWakeResultV1[];
-}): string | null => {
+}): Extract<WorkstationDispatchActionV1, { kind: "wake_agent" }> | null => {
   if (input.packet.salience.level === "urgent") {
-    return input.packet.arbiter?.reason ?? "urgent packet salience qualifies as an operator interrupt";
+    return {
+      kind: "wake_agent",
+      interruptKind: "urgent",
+      reason: input.packet.arbiter?.reason ?? "urgent packet salience qualifies as an operator interrupt",
+    };
   }
   if (input.packet.arbiter?.wakeAsk && input.packet.resolutionState === "ask_decision_needed") {
-    return input.packet.arbiter.reason ?? "arbiter policy marked this packet as Ask-interrupt eligible";
+    return {
+      kind: "wake_agent",
+      interruptKind: "policy_triggered",
+      reason: input.packet.arbiter.reason ?? "arbiter policy marked this packet as Ask-interrupt eligible",
+    };
   }
   if (input.packet.uncertainties.length > 0 && input.packet.observedFacts.length === 0) {
-    return "packet processing is blocked and needs operator or agent repair";
+    return {
+      kind: "wake_agent",
+      interruptKind: "blocked",
+      reason: "packet processing is blocked and needs operator or agent repair",
+    };
   }
   const matchingRequests = input.wakeRequests.filter((wake) => wake.packetIds?.includes(input.packet.packetId));
   const matchingResults = input.wakeResults.filter((result) => result.packetIds?.includes(input.packet.packetId));
@@ -214,7 +234,11 @@ const wakeInterruptReason = (input: {
       wake.lifecycleStage === "voice_blocked"
     )
   ) {
-    return "wake receipt is blocked, pressure-deferred, or waiting for UI handoff";
+    return {
+      kind: "wake_agent",
+      interruptKind: "blocked",
+      reason: "wake receipt is blocked, pressure-deferred, or waiting for UI handoff",
+    };
   }
   if (
     matchingResults.some((result) =>
@@ -223,7 +247,11 @@ const wakeInterruptReason = (input: {
       result.lifecycleStage === "voice_blocked"
     )
   ) {
-    return "wake result reports blocked or pressure-deferred follow-up";
+    return {
+      kind: "wake_agent",
+      interruptKind: "blocked",
+      reason: "wake result reports blocked or pressure-deferred follow-up",
+    };
   }
   return null;
 };
@@ -249,18 +277,12 @@ const buildDispatchActions = (input: {
     input.packet.voiceCalloutMatches.length > 0 ||
     input.decisions.some((decision) => decision.voiceCalloutDraft?.voiceEligible);
   if (shouldSpeak) dispatch.push({ kind: "speak_narrator", mode: "confirm" });
-  const interruptReason = wakeInterruptReason({
+  const interruptDecision = wakeInterruptDecision({
     packet: input.packet,
     wakeRequests: input.wakeRequests,
     wakeResults: input.wakeResults,
   });
-  if (interruptReason) {
-    dispatch.push({
-      kind: "wake_agent",
-      interruptKind: interruptReason.includes("blocked") || interruptReason.includes("deferred") ? "blocked" : "urgent",
-      reason: interruptReason,
-    });
-  }
+  if (interruptDecision) dispatch.push(interruptDecision);
   return dispatch;
 };
 
@@ -435,6 +457,11 @@ export function ensureStagePlayAgentGoalSession(input: {
     ...(input.checkpoint?.actionsTaken ?? []),
     existing ? "refresh_goal_context_feeds" : "start_agent_goal_session",
   ]).slice(0, 12);
+  const contextFeeds = mergeContextFeeds(goalId, existing?.contextFeeds, input.contextFeeds);
+  const allowedActuators = Array.from(new Set([
+    ...mergeAllowedActuators(existing?.allowedActuators, input.allowedActuators),
+    ...queryActuatorsForContextFeeds(contextFeeds),
+  ]));
   return upsertStagePlayAgentGoalSession({
     schemaVersion: WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
     goalId,
@@ -446,8 +473,8 @@ export function ensureStagePlayAgentGoalSession(input: {
     sourceRefs,
     loopRefs,
     constructRefs,
-    contextFeeds: mergeContextFeeds(goalId, existing?.contextFeeds, input.contextFeeds),
-    allowedActuators: mergeAllowedActuators(existing?.allowedActuators, input.allowedActuators),
+    contextFeeds,
+    allowedActuators,
     cadence: input.cadence ?? existing?.cadence ?? { kind: "user_turn_only" },
     stopConditions: uniqueStrings([
       ...(existing?.stopConditions ?? [

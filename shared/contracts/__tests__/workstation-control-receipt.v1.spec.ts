@@ -411,6 +411,67 @@ describe("stage_play_workstation_control_receipt/v1", () => {
         { kind: "repair_loop", loopRef: "loop:visual-capture" },
       ],
     }))).toEqual([]);
+
+    expect(validateWorkstationControlReceiptV1(receiptFixture({
+      receiptId: "stage_play_workstation_control_receipt:repair_source:frog",
+      requestedToolName: "live_env.repair_workstation_source",
+      canonicalToolName: "live_env.repair_workstation_source",
+      controlKind: "repair_source",
+      label: "repair workstation source",
+      requiredActuator: "repair_source",
+      matchedAllowedActuators: ["repair_source"],
+      matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:repair_source"],
+      policyEvidenceRefs: ["allowed_actuator:repair_source", "agent_goal_allowed_actuator:repair_source"],
+      targetRef: null,
+      presetId: null,
+      sourceRef: "source:visual:active",
+      loopRef: "loop:visual-capture",
+      loopState: "repaired",
+      loopRefs: ["helix-ask:desktop", "workstation_control:repair_source", "workstation_actuator:repair_source"],
+      evidenceRefs: [
+        "stage_play_workstation_control_receipt:repair_source:frog",
+        "allowed_actuator:repair_source",
+        "agent_goal_allowed_actuator:repair_source",
+        "visual_source:image-lens",
+        "source:visual:active",
+        "helix-ask:desktop",
+        "workstation_control:repair_source",
+        "workstation_actuator:repair_source",
+      ],
+      producedRefs: [
+        "stage_play_workstation_control_receipt:repair_source:frog",
+        "stage_play_goal_context_update:control:frog",
+      ],
+      dispatch: [
+        { kind: "log_receipt", receiptRef: "stage_play_workstation_control_receipt:repair_source:frog" },
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+        { kind: "repair_source", sourceRef: "source:visual:active", loopRef: "loop:visual-capture" },
+        { kind: "set_loop_state", loopRef: "loop:visual-capture", state: "repaired" },
+      ],
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: "stage_play_workstation_control_receipt:repair_source:frog" },
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+        { kind: "repair_source", sourceRef: "source:visual:active", loopRef: "loop:visual-capture" },
+        { kind: "set_loop_state", loopRef: "loop:visual-capture", state: "repaired" },
+      ],
+    }))).toEqual([]);
+
+    expect(validateWorkstationControlReceiptV1(receiptFixture({
+      controlKind: "repair_source",
+      label: "repair workstation source",
+      requiredActuator: "repair_source",
+      matchedAllowedActuators: ["repair_source"],
+      matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:repair_source"],
+      policyEvidenceRefs: ["allowed_actuator:repair_source", "agent_goal_allowed_actuator:repair_source"],
+      sourceRef: null,
+      loopRef: null,
+      targetRef: null,
+      presetId: null,
+    }))).toEqual(expect.arrayContaining([
+      "prepared repair_source receipts must include sourceRef or loopRef",
+      "dispatch must include prepared repair_source dispatch",
+      "suggestedDispatch must include prepared repair_source dispatch",
+    ]));
   });
 
   it("rejects blocked or terminalizing workstation control receipts", () => {

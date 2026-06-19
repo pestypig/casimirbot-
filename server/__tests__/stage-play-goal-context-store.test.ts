@@ -138,6 +138,33 @@ describe("stage-play goal context store", () => {
     resetStagePlayGoalContextStoreForTest();
   });
 
+  it("keeps every declared context feed queryable by adding its query actuator", () => {
+    const session = ensureStagePlayAgentGoalSession({
+      threadId,
+      roomId: "room:stage-play",
+      objectiveId: "goal:automation-watch",
+      objectiveText: "Monitor route-watch automation policies for the active visual loop.",
+      sourceRefs: ["visual_source:screen"],
+      loopRefs: ["stage_play_live_source_watch_job:screen"],
+      contextFeeds: [{
+        feedId: "feed:automation",
+        sourceKind: "automation_policies",
+        freshnessMs: 120_000,
+        relevancePolicy: "same-goal-or-loop-policy",
+      }],
+      allowedActuators: ["configure_route_watch"],
+      nowMs: Date.parse("2026-06-17T14:00:02.000Z"),
+    });
+
+    expect(session?.contextFeeds).toEqual(expect.arrayContaining([
+      expect.objectContaining({ sourceKind: "automation_policies" }),
+    ]));
+    expect(session?.allowedActuators).toEqual(expect.arrayContaining([
+      "configure_route_watch",
+      "query_automation_policies",
+    ]));
+  });
+
   it("derives queryable non-terminal goal context and an agent goal session from mailbox packets", () => {
     const claimRun = runFixture({
       evidenceRefs: [
@@ -274,6 +301,9 @@ describe("stage-play goal context store", () => {
         "repair_loop",
         "focus_process_graph",
         "repair_source",
+        "query_route_evidence",
+        "query_automation_policies",
+        "query_narrator_events",
         "ask_user",
       ]),
       authority: {
@@ -688,7 +718,7 @@ describe("stage-play goal context store", () => {
     });
   });
 
-  it("keeps wake as a dispatch action instead of answer authority", () => {
+  it("keeps policy-triggered wake as a dispatch action instead of answer authority", () => {
     const wakeRequest: StagePlayLiveSourceMailWakeRequestV1 = {
       artifactId: "stage_play_live_source_mail_wake_request",
       schemaVersion: "stage_play_live_source_mail_wake_request/v1",
@@ -747,7 +777,7 @@ describe("stage-play goal context store", () => {
     expect(update.suggestedDispatch).toEqual(expect.arrayContaining([
       expect.objectContaining({
         kind: "wake_agent",
-        interruptKind: "urgent",
+        interruptKind: "policy_triggered",
         reason: "User asked the agent to monitor this image classification goal.",
       }),
     ]));
@@ -755,6 +785,37 @@ describe("stage-play goal context store", () => {
     expect(update.authority.assistantAnswer).toBe(false);
     expect(update.authority.terminalEligible).toBe(false);
     expect(update.authority.postToolModelStepRequired).toBe(true);
+  });
+
+  it("keeps urgent salience as the urgent interrupt dispatch lane", () => {
+    const [update] = syncStagePlayGoalContextFromMailbox({
+      threadId,
+      roomId: "room:stage-play",
+      mailItems: [mailFixture()],
+      processedMailPackets: [
+        packetFixture({
+          arbiter: undefined,
+          salience: {
+            level: "urgent",
+            reasons: ["operator safety threshold exceeded"],
+            voiceCandidate: false,
+          },
+          resolutionState: "processed_packet_ready",
+        }),
+      ],
+      microReasonerRuns: [runFixture()],
+      nowMs: Date.parse("2026-06-17T14:00:03.000Z"),
+    });
+
+    expect(update.suggestedDispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "wake_agent",
+        interruptKind: "urgent",
+        reason: "urgent packet salience qualifies as an operator interrupt",
+      }),
+    ]));
+    expect(update.authority.assistantAnswer).toBe(false);
+    expect(update.authority.terminalEligible).toBe(false);
   });
 
   it("merges explicit agent goal session feeds, actuators, cadence, and checkpoints", () => {

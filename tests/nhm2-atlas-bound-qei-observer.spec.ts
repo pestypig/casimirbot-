@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -15,6 +15,7 @@ import {
 import { buildNhm2TileEffectiveFullTensorSourceArtifact } from "../shared/contracts/nhm2-tile-effective-full-tensor-source.v1";
 import { buildAtlasBoundObserverRobustEnergyConditions } from "../tools/nhm2/build-atlas-bound-observer-robust-energy-conditions";
 import { buildAtlasBoundQeiWorldlineDossier } from "../tools/nhm2/build-atlas-bound-qei-worldline-dossier";
+import { runNhm2CandidateQeiWorldlineDossier } from "../tools/nhm2/build-candidate-qei-worldline-dossier";
 import { buildQeiPointwiseTransitionSourceSamples } from "../tools/nhm2/build-qei-pointwise-transition-source-samples";
 import { buildQeiWorldlineSamplePlan } from "../tools/nhm2/build-qei-worldline-sample-plan";
 import { buildQeiWorldlineSamplingReceipt } from "../tools/nhm2/build-qei-worldline-sampling-receipt";
@@ -296,7 +297,7 @@ describe("atlas-bound QEI and observer builders", () => {
           normalized: true,
         },
         bound: {
-          valueSI: 20,
+          valueSI: -20,
           unit: "J/m^3",
           provenanceRef: "ford_roman_1996_quantum_inequality",
           status: "literature_bound",
@@ -344,7 +345,7 @@ describe("atlas-bound QEI and observer builders", () => {
       normalized: true,
     });
     expect(wall?.bound).toMatchObject({
-      valueSI: 20,
+      valueSI: -20,
       status: "literature_bound",
       provenanceRef: "ford_roman_1996_quantum_inequality",
     });
@@ -569,7 +570,7 @@ describe("atlas-bound QEI and observer builders", () => {
           normalized: true,
         },
         bound: {
-          valueSI: 20,
+          valueSI: -20,
           unit: "J/m^3",
           provenanceRef: "ford_roman_1996_quantum_inequality",
           status: "literature_bound",
@@ -683,6 +684,182 @@ describe("atlas-bound QEI and observer builders", () => {
     ).toContain("hull_wall_transition:sample:T00");
   });
 
+  it("uses lower-bound QEI margin semantics for positive atlas-bound densities", () => {
+    const dir = mkdtempSync(join(tmpdir(), "nhm2-qei-"));
+    const atlasArtifact = atlas();
+    const sourceArtifact = source();
+    const atlasPath = writeJson(dir, "atlas.json", atlasArtifact);
+    const sourcePath = writeJson(dir, "source.json", sourceArtifact);
+    const receiptPath = writeJson(
+      dir,
+      "receipt.json",
+      buildNhm2QeiBoundReceipt({
+        generatedAt: "2026-06-13T00:00:00.000Z",
+        laneId: "nhm2_shift_lapse",
+        selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+        atlasRef: atlasPath,
+        atlasHash: atlasArtifact.provenance.atlasHash,
+        tensorRef: sourceArtifact.artifactId,
+        boundModelKind: "ford_roman_lorentzian",
+        samplingFunction: {
+          kind: "lorentzian",
+          tauSeconds: 1e-10,
+          normalized: true,
+        },
+        bound: {
+          valueSI: 0,
+          unit: "J/m^3",
+          provenanceRef: "ford_roman_1996_quantum_inequality",
+          status: "literature_bound",
+        },
+        tauPolicy: {
+          tauVsDuty: "pass",
+          tauVsLightCrossing: "pass",
+          tauVsModulation: "pass",
+          dutyCycle: 0.5,
+          lightCrossingSeconds: 1e-6,
+          modulationSeconds: 1e-6,
+        },
+        provenance: {
+          boundProvenanceRef: "ford_roman_1996_quantum_inequality",
+          qftStateRef: "qft-state.json",
+          renormalizationConventionRef: "renormalization.json",
+          tauSourceRef: "sampling-policy.json#tau",
+          dutyCycleSourceRef: "tile-duty.json#dutyCycle",
+          modulationSourceRef: "drive-modulation.json#period",
+          lightCrossingSourceRef: "atlas.json#lightCrossing",
+        },
+        applicability: {
+          appliesToRegions: ["wall", "hull_wall_transition", "wall_exterior_transition"],
+          stationaryWorldlineAssumption: true,
+          reducedOrderOnly: false,
+          qftStateSpecified: true,
+          renormalizationConventionSpecified: true,
+        },
+      }),
+    );
+    const samplingPath = writeJson(
+      dir,
+      "sampling.json",
+      buildNhm2QeiWorldlineSamplingReceipt({
+        generatedAt: "2026-06-13T00:00:00.000Z",
+        laneId: "nhm2_shift_lapse",
+        selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+        atlasRef: atlasPath,
+        atlasHash: atlasArtifact.provenance.atlasHash,
+        tensorRef: sourceArtifact.artifactId,
+        worldlineSamples: [
+          {
+            worldlineId: "qei:wall:atlas",
+            regionId: "wall",
+            chartId: "comoving_cartesian",
+            supportFunctionRef: "support.wall",
+            sampleLocationsRef: "sample-plan.json:wall:worldline_samples",
+            sampleMethod: "atlas_region_source_tensor",
+            sampledRho: {
+              valueSI: 10,
+              provenanceRef: `${sourceArtifact.artifactId}:wall:T00`,
+              status: "computed",
+            },
+            sourceTensorRef: `${sourceArtifact.artifactId}:wall`,
+            blockers: [],
+            warnings: [],
+          },
+          {
+            worldlineId: "qei:hull_wall_transition:atlas",
+            regionId: "hull_wall_transition",
+            chartId: "comoving_cartesian",
+            supportFunctionRef: "support.hull_wall_transition",
+            sampleLocationsRef: "sample-plan.json:hull_wall_transition:worldline_samples",
+            sampleMethod: "explicit_transition_source_tensor",
+            sampledRho: {
+              valueSI: 10,
+              provenanceRef: `${sourceArtifact.artifactId}:hull_wall_transition:sample:T00`,
+              status: "computed",
+            },
+            sourceTensorRef: sourceArtifact.artifactId,
+            blockers: [],
+            warnings: [],
+          },
+          {
+            worldlineId: "qei:wall_exterior_transition:atlas",
+            regionId: "wall_exterior_transition",
+            chartId: "comoving_cartesian",
+            supportFunctionRef: "support.wall_exterior_transition",
+            sampleLocationsRef: "sample-plan.json:wall_exterior_transition:worldline_samples",
+            sampleMethod: "explicit_transition_source_tensor",
+            sampledRho: {
+              valueSI: 10,
+              provenanceRef: `${sourceArtifact.artifactId}:wall_exterior_transition:sample:T00`,
+              status: "computed",
+            },
+            sourceTensorRef: sourceArtifact.artifactId,
+            blockers: [],
+            warnings: [],
+          },
+        ],
+      }),
+    );
+
+    const artifact = buildAtlasBoundQeiWorldlineDossier({
+      repoRoot: dir,
+      regionalSupportAtlasPath: atlasPath,
+      sourceFullTensorPath: sourcePath,
+      qeiBoundReceiptPath: receiptPath,
+      qeiWorldlineSamplingReceiptPath: samplingPath,
+      outPath: "qei.json",
+      auditOnly: true,
+    });
+
+    expect(artifact.summary.dossierComplete).toBe(true);
+    expect(artifact.worldlines.every((worldline) => worldline.margin.pass === true)).toBe(true);
+    expect(artifact.worldlines.map((worldline) => worldline.margin.valueSI)).toEqual([
+      10,
+      10,
+      10,
+    ]);
+    expect(artifact.worldlines.flatMap((worldline) => worldline.blockers)).not.toContain(
+      "qei_margin_failed",
+    );
+  });
+
+  it("publishes a candidate QEI dossier chain for frozen campaign run roots", () => {
+    const dir = mkdtempSync(join(tmpdir(), "nhm2-candidate-qei-"));
+    const runRoot = "candidate-run";
+    mkdirSync(join(dir, runRoot), { recursive: true });
+    const atlasPath = writeJson(dir, `${runRoot}/nhm2-regional-support-function-atlas.json`, atlas());
+    const sourcePath = writeJson(
+      dir,
+      `${runRoot}/nhm2-candidate-tile-effective-full-tensor-source.json`,
+      source(),
+    );
+
+    const artifact = runNhm2CandidateQeiWorldlineDossier({
+      repoRoot: dir,
+      runRoot,
+      regionalSupportAtlasPath: atlasPath,
+      sourceFullTensorPath: sourcePath,
+      boundSI: -20,
+      auditOnly: true,
+    });
+
+    expect(artifact.summary.dossierComplete).toBe(true);
+    expect(artifact.summary.hasWallWorldline).toBe(true);
+    expect(artifact.summary.anyProxy).toBe(false);
+    expect(artifact.worldlines.map((worldline) => worldline.regionId)).toEqual([
+      "wall",
+      "hull_wall_transition",
+      "wall_exterior_transition",
+    ]);
+    expect(
+      artifact.worldlines.find((worldline) => worldline.regionId === "hull_wall_transition")
+        ?.sampledRho.provenanceRef,
+    ).toContain("transition_kernel_source_tensor:T00");
+    expect(
+      artifact.worldlines.flatMap((worldline) => worldline.blockers),
+    ).not.toContain("transition_worldline_source_sample_missing");
+  });
+
   it("marks stale QEI bound receipts as atlas-mismatched worldline blockers", () => {
     const dir = mkdtempSync(join(tmpdir(), "nhm2-qei-"));
     const sourceArtifact = source();
@@ -705,7 +882,7 @@ describe("atlas-bound QEI and observer builders", () => {
           normalized: true,
         },
         bound: {
-          valueSI: 20,
+          valueSI: -20,
           unit: "J/m^3",
           provenanceRef: "ford_roman_1996_quantum_inequality",
           status: "literature_bound",
@@ -761,7 +938,7 @@ describe("atlas-bound QEI and observer builders", () => {
       repoRoot: dir,
       regionalSupportAtlasPath: atlasPath,
       sourceFullTensorPath: sourcePath,
-      qeiBoundSI: 20,
+      qeiBoundSI: -20,
       tauSeconds: 1e-10,
       dutyCycle: 0.5,
       modulationSeconds: 1e-6,

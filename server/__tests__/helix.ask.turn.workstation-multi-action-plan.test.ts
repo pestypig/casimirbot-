@@ -122,7 +122,8 @@ describe("Helix Ask workstation multi-action tool plans", () => {
 
   it("evaluates narrator control receipts as non-terminal deterministic evidence", () => {
     resetStagePlayGoalContextStoreForTest();
-    const prompt = "Turn on narrator for the translated transcript stream source_ref=source:browser-audio.";
+    const prompt =
+      "Run panel action panel_id=narrator action_id=narrator.bind_stream source_ref=source:browser-audio stream_kind=translated_transcript.";
     const result = planWorkstationToolUse(prompt, {
       threadId: "helix-ask:narrator-control",
       turnId: "turn:narrator-control",
@@ -184,6 +185,341 @@ describe("Helix Ask workstation multi-action tool plans", () => {
     ]));
   });
 
+  it("evaluates narrator.say panel receipts as non-terminal voice dispatch context", () => {
+    resetStagePlayGoalContextStoreForTest();
+    const prompt =
+      'Run panel action panel_id=narrator action_id=narrator.say with text="Translation is now routed through Narrator." source_id=helix_ask:translation delivery_mode=visible_only.';
+    const result = planWorkstationToolUse(prompt, {
+      threadId: "helix-ask:narrator-say-panel",
+      turnId: "turn:narrator-say-panel",
+      now: new Date("2026-05-13T00:00:00.000Z"),
+    });
+
+    expect(result.tool_plan?.intent).toBe("narrator_control");
+    expect(actionKeys(prompt)).toEqual(
+      expect.arrayContaining(["narrator.open", "narrator.narrator.say"]),
+    );
+
+    const evaluation = evaluateWorkstationToolPlan({
+      plan: result.tool_plan!,
+      receipt_ids: ["receipt:narrator-say"],
+      evidence_refs: ["helix_narrator_event:translation"],
+      summary: "Narrator say queued as governed workstation speech.",
+    });
+    expect(evaluation.schema).toBe("helix.workstation_tool_evaluation.v1");
+    expect(evaluation.deterministic).toBe(true);
+    expect(evaluation.model_invoked).toBe(false);
+    expect(evaluation.supports_goal).toBe(true);
+    const evidence = listSyntheticEvidence("helix-ask:narrator-say-panel").find(
+      (entry) => entry.evidence_id === evaluation.synthetic_evidence_ids?.[0],
+    );
+    expect(evidence?.assistant_answer).toBe(false);
+    expect(evidence?.raw_content_included).toBe(false);
+
+    const goalContextUpdates = listStagePlayGoalContextUpdates({
+      threadId: "helix-ask:narrator-say-panel",
+      producerKind: "narrator",
+    });
+    expect(goalContextUpdates).toHaveLength(1);
+    expect(goalContextUpdates[0]).toMatchObject({
+      producerKind: "narrator",
+      updateKind: "suggested_action",
+      contentRef: "receipt:narrator-say",
+      sourceRefs: expect.arrayContaining([
+        "helix_ask:translation",
+        "workstation_actuator:narrator_say",
+      ]),
+      loopRefs: expect.arrayContaining([
+        "narrator:say",
+        "workstation_actuator:narrator_say",
+      ]),
+      evidenceRefs: expect.arrayContaining([
+        "receipt:narrator-say",
+        "helix_narrator_event:translation",
+        "allowed_actuator:narrator_say",
+      ]),
+      receiptRefs: ["receipt:narrator-say"],
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    expect(goalContextUpdates[0].suggestedDispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "log_receipt", receiptRef: "receipt:narrator-say" }),
+      expect.objectContaining({ kind: "update_panel", panelId: "narrator" }),
+      expect.objectContaining({ kind: "update_panel", panelId: "stage-play-badge-graph" }),
+      expect.objectContaining({ kind: "speak_narrator", mode: "visible_only" }),
+    ]));
+    expect(goalContextUpdates[0].suggestedDispatch.map((action) => action.kind)).not.toContain("bind_narrator_stream");
+  });
+
+  it("evaluates workstation control receipts as non-terminal graph dispatch context", () => {
+    resetStagePlayGoalContextStoreForTest();
+    const prompt = "Run live_env.set_workstation_loop_state goal_id=goal:frog loop_ref=loop:visual-mail state=paused";
+    const result = planWorkstationToolUse(prompt, {
+      threadId: "helix-ask:workstation-control",
+      turnId: "turn:workstation-control",
+      now: new Date("2026-05-13T00:00:00.000Z"),
+    });
+
+    expect(result.tool_plan?.intent).toBe("workstation_control");
+    expect(result.tool_plan?.steps[0]).toMatchObject({
+      step_id: "set_workstation_loop_state",
+      kind: "run_ask_tool",
+      tool_id: "live_env.set_workstation_loop_state",
+      args: expect.objectContaining({
+        goal_id: "goal:frog",
+        loop_ref: "loop:visual-mail",
+        state: "paused",
+      }),
+      expected_receipt_kind: "stage_play_workstation_control_receipt",
+      expected_state_change: {
+        store: "stage-play-goal-context",
+        proof_key: "goalContextUpdates",
+      },
+    });
+
+    const evaluation = evaluateWorkstationToolPlan({
+      plan: result.tool_plan!,
+      receipt_ids: ["receipt:loop-paused"],
+      evidence_refs: ["receipt:loop-paused"],
+      summary: "Workstation loop state change receipt recorded for graph dispatch.",
+    });
+    expect(evaluation.schema).toBe("helix.workstation_tool_evaluation.v1");
+    expect(evaluation.deterministic).toBe(true);
+    expect(evaluation.model_invoked).toBe(false);
+    expect(evaluation.supports_goal).toBe(true);
+
+    const evidence = listSyntheticEvidence("helix-ask:workstation-control").find(
+      (entry) => entry.evidence_id === evaluation.synthetic_evidence_ids?.[0],
+    );
+    expect(evidence?.assistant_answer).toBe(false);
+    expect(evidence?.raw_content_included).toBe(false);
+
+    const goalContextUpdates = listStagePlayGoalContextUpdates({
+      threadId: "helix-ask:workstation-control",
+      producerKind: "automation",
+    });
+    expect(goalContextUpdates).toHaveLength(1);
+    expect(goalContextUpdates[0]).toMatchObject({
+      producerKind: "automation",
+      updateKind: "suggested_action",
+      contentRef: "receipt:loop-paused",
+      sourceRefs: expect.arrayContaining([
+        "goal:frog",
+        "loop:visual-mail",
+        "workstation_actuator:set_loop_state",
+      ]),
+      loopRefs: expect.arrayContaining([
+        "thread:helix-ask:workstation-control",
+        "set_workstation_loop_state",
+        "workstation_control:set_loop_state",
+        "workstation_actuator:set_loop_state",
+        "loop:visual-mail",
+      ]),
+      evidenceRefs: expect.arrayContaining([
+        "receipt:loop-paused",
+        "goal:frog",
+        "loop:visual-mail",
+        "allowed_actuator:set_loop_state",
+        "agent_goal_allowed_actuator:set_loop_state",
+      ]),
+      receiptRefs: ["receipt:loop-paused"],
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+      goalRelevance: {
+        goalId: "goal:frog",
+        relevance: 0.75,
+        reason: "Workstation control receipt belongs to this active operator goal.",
+      },
+      toolIdentity: {
+        requestedToolName: "live_env.set_workstation_loop_state",
+        canonicalToolName: "live_env.set_workstation_loop_state",
+        matchedAllowedActuators: ["set_loop_state"],
+        matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:set_loop_state"],
+      },
+    });
+    expect(goalContextUpdates[0].suggestedDispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "log_receipt", receiptRef: "receipt:loop-paused" }),
+      expect.objectContaining({ kind: "update_panel", panelId: "stage-play-badge-graph" }),
+      expect.objectContaining({ kind: "append_goal_context", goalId: "goal:frog" }),
+      expect.objectContaining({ kind: "set_loop_state", loopRef: "loop:visual-mail", state: "paused" }),
+    ]));
+    expect(goalContextUpdates[0].suggestedDispatch.map((action) => action.kind)).not.toContain("wake_agent");
+  });
+
+  it("preserves source repair as a distinct non-terminal workstation dispatch", () => {
+    resetStagePlayGoalContextStoreForTest();
+    const prompt =
+      "Run live_env.repair_workstation_source goal_id=goal:frog source_ref=source:visual-tab loop_ref=loop:visual-mail";
+    const result = planWorkstationToolUse(prompt, {
+      threadId: "helix-ask:repair-source",
+      turnId: "turn:repair-source",
+      now: new Date("2026-05-13T00:00:00.000Z"),
+    });
+
+    expect(result.tool_plan?.intent).toBe("workstation_control");
+    expect(result.tool_plan?.steps[0]).toMatchObject({
+      step_id: "repair_workstation_source",
+      kind: "run_ask_tool",
+      tool_id: "live_env.repair_workstation_source",
+      args: expect.objectContaining({
+        goal_id: "goal:frog",
+        source_ref: "source:visual-tab",
+        loop_ref: "loop:visual-mail",
+        state: "repaired",
+      }),
+    });
+
+    evaluateWorkstationToolPlan({
+      plan: result.tool_plan!,
+      receipt_ids: ["receipt:source-repaired"],
+      evidence_refs: ["receipt:source-repaired"],
+      summary: "Workstation source repair receipt recorded for graph dispatch.",
+    });
+
+    const goalContextUpdates = listStagePlayGoalContextUpdates({
+      threadId: "helix-ask:repair-source",
+      producerKind: "automation",
+    });
+    expect(goalContextUpdates).toHaveLength(1);
+    expect(goalContextUpdates[0]).toMatchObject({
+      updateKind: "suggested_action",
+      contentRef: "receipt:source-repaired",
+      sourceRefs: expect.arrayContaining([
+        "goal:frog",
+        "source:visual-tab",
+        "loop:visual-mail",
+        "workstation_actuator:repair_source",
+      ]),
+      loopRefs: expect.arrayContaining([
+        "thread:helix-ask:repair-source",
+        "repair_workstation_source",
+        "workstation_control:repair_source",
+        "workstation_actuator:repair_source",
+        "loop:visual-mail",
+      ]),
+      evidenceRefs: expect.arrayContaining([
+        "receipt:source-repaired",
+        "allowed_actuator:repair_source",
+        "agent_goal_allowed_actuator:repair_source",
+      ]),
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    expect(goalContextUpdates[0].suggestedDispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "repair_source", sourceRef: "source:visual-tab", loopRef: "loop:visual-mail" }),
+      expect.objectContaining({ kind: "set_loop_state", loopRef: "loop:visual-mail", state: "repaired" }),
+    ]));
+    expect(goalContextUpdates[0].suggestedDispatch.map((action) => action.kind)).not.toContain("wake_agent");
+  });
+
+  it("evaluates goal-session setup controls as one non-terminal workstation dispatch context", () => {
+    resetStagePlayGoalContextStoreForTest();
+    const prompt =
+      'Start an agent goal session goal_id=goal:visual-ops source_id=source:visual-tab objective="Monitor visual source." Apply visual preset target_ref=source:visual-tab preset_id=preset:frog-classifier, bind source source_ref=source:visual-tab bind_target_ref=live-answer:desktop, pause loop loop_ref=loop:visual-mail, update Live Answer projection line_key=visual_summary, and focus the process graph node_ref=packet:visual-frog.';
+    const result = planWorkstationToolUse(prompt, {
+      threadId: "helix-ask:goal-setup-controls",
+      turnId: "turn:goal-setup-controls",
+      now: new Date("2026-05-13T00:00:00.000Z"),
+    });
+
+    expect(result.tool_plan?.intent).toBe("workstation_goal_context");
+    expect(result.tool_plan?.steps.map((step) => step.tool_id ?? step.action_id)).toEqual(expect.arrayContaining([
+      "live_env.start_agent_goal_session",
+      "live_env.set_visual_preset",
+      "live_env.bind_workstation_source",
+      "live_env.update_live_answer_projection",
+      "live_env.set_workstation_loop_state",
+      "live_env.focus_process_graph",
+    ]));
+
+    evaluateWorkstationToolPlan({
+      plan: result.tool_plan!,
+      receipt_ids: ["receipt:goal-setup-controls"],
+      evidence_refs: ["receipt:goal-setup-controls"],
+      summary: "Goal-session setup prepared the workstation control circuit.",
+    });
+
+    const goalContextUpdates = listStagePlayGoalContextUpdates({
+      threadId: "helix-ask:goal-setup-controls",
+      producerKind: "automation",
+    });
+    expect(goalContextUpdates).toHaveLength(1);
+    expect(goalContextUpdates[0]).toMatchObject({
+      updateKind: "preset_state",
+      contentRef: "receipt:goal-setup-controls",
+      sourceRefs: expect.arrayContaining([
+        "goal:visual-ops",
+        "source:visual-tab",
+        "live-answer:desktop",
+        "preset:frog-classifier",
+        "loop:visual-mail",
+        "packet:visual-frog",
+        "workstation_actuator:set_visual_preset",
+        "workstation_actuator:bind_source",
+        "workstation_actuator:update_live_answer",
+        "workstation_actuator:set_loop_state",
+        "workstation_actuator:focus_process_graph",
+      ]),
+      loopRefs: expect.arrayContaining([
+        "thread:helix-ask:goal-setup-controls",
+        "set_visual_preset",
+        "bind_workstation_source",
+        "update_live_answer_projection",
+        "set_workstation_loop_state",
+        "focus_process_graph",
+        "workstation_control:set_visual_preset",
+        "workstation_control:bind_source",
+        "workstation_control:update_live_answer",
+        "workstation_control:set_loop_state",
+        "workstation_control:focus_process_graph",
+      ]),
+      evidenceRefs: expect.arrayContaining([
+        "receipt:goal-setup-controls",
+        "allowed_actuator:set_visual_preset",
+        "allowed_actuator:bind_source",
+        "allowed_actuator:update_live_answer",
+        "allowed_actuator:set_loop_state",
+        "allowed_actuator:focus_process_graph",
+      ]),
+      authority: {
+        assistantAnswer: false,
+        terminalEligible: false,
+        rawContentIncluded: false,
+        postToolModelStepRequired: true,
+      },
+    });
+    expect(goalContextUpdates[0].suggestedDispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "log_receipt", receiptRef: "receipt:goal-setup-controls" }),
+      expect.objectContaining({ kind: "update_panel", panelId: "stage-play-badge-graph" }),
+      expect.objectContaining({ kind: "update_panel", panelId: "live-answer-environment" }),
+      expect.objectContaining({ kind: "append_goal_context", goalId: "goal:visual-ops" }),
+      expect.objectContaining({ kind: "change_preset", targetRef: "source:visual-tab", presetId: "preset:frog-classifier" }),
+      expect.objectContaining({ kind: "bind_source", sourceRef: "source:visual-tab", targetRef: "live-answer:desktop" }),
+      expect.objectContaining({ kind: "update_live_answer", lineKey: "visual_summary" }),
+      expect.objectContaining({ kind: "set_loop_state", loopRef: "loop:visual-mail", state: "paused" }),
+      expect.objectContaining({ kind: "focus_process_graph", nodeRef: "packet:visual-frog" }),
+    ]));
+    expect(goalContextUpdates[0].suggestedDispatch.map((action) => action.kind)).not.toContain("wake_agent");
+  });
+
   it("returns matching receipt artifacts from the ask/turn note path", async () => {
     const app = express();
     app.use(express.json());
@@ -221,5 +557,5 @@ describe("Helix Ask workstation multi-action tool plans", () => {
       .query({ thread_id: sessionId })
       .expect(200);
     expect(subgoalResponse.body?.evaluations?.at(-1)?.status).toBe("completed");
-  });
+  }, 20_000);
 });

@@ -1291,7 +1291,7 @@ function hasContextualWorkstationGoalContextCue(prompt: string): boolean {
 const WORKSTATION_CONTROL_OBJECT_PATTERN =
   "(?:workstation\\s+presets?|presets?|sources?|source\\s+bindings?|source\\s+routes?|loops?|loop\\s+state|process\\s+loops?|live\\s+answer\\s+projection|live\\s+answer\\s+line|process\\s+graph(?:\\s+focus)?|stage\\s+play\\s+graph)";
 const WORKSTATION_CONTROL_TOOL_PATTERN =
-  "live_env\\.(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph)";
+  "(?:live_env\\.)?(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|bind_source|unbind_workstation_source|unbind_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph)";
 
 function hasContextualWorkstationControlCue(prompt: string): boolean {
   const object = WORKSTATION_CONTROL_OBJECT_PATTERN;
@@ -1306,8 +1306,10 @@ function hasContextualWorkstationControlCue(prompt: string): boolean {
 
 function selectWorkstationControlTool(prompt: string): WorkstationControlTool | null {
   if (hasContextualWorkstationControlCue(prompt)) return null;
-  const explicit = prompt.match(/\blive_env\.(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|unbind_workstation_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph)\b/i)?.[0]?.toLowerCase();
-  if (explicit) return explicit as WorkstationControlTool;
+  const explicit = prompt.match(/\b(?:live_env\.)?(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|bind_source|unbind_workstation_source|unbind_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph)\b/i)?.[0]?.toLowerCase().replace(/^live_env\./, "");
+  if (explicit === "bind_source") return "live_env.bind_workstation_source";
+  if (explicit === "unbind_source") return "live_env.unbind_workstation_source";
+  if (explicit) return `live_env.${explicit}` as WorkstationControlTool;
   if (/\b(?:change|set|apply|switch)\b[\s\S]{0,120}\b(?:workstation\s+)?preset\b/i.test(prompt)) {
     if (/\b(?:audio|earbud|transcript|translation|speech|mic|microphone)\b/i.test(prompt)) {
       return "live_env.set_audio_preset";
@@ -1801,6 +1803,36 @@ function wantsGoalSessionGraphFocus(prompt: string): boolean {
   return /\b(?:focus|show|select|highlight|open)\b[\s\S]{0,140}\b(?:process\s+graph|stage\s+play\s+graph|reasoning\s+circuit|packet\s+trace)\b/i.test(prompt);
 }
 
+function pushGoalSessionSetupControlStep(input: {
+  steps: HelixWorkstationToolPlanStep[];
+  stepIds: string[];
+  scores: AffordanceScore[];
+  stepId: string;
+  toolId: WorkstationControlTool;
+  args: Record<string, unknown>;
+  reason: string;
+}): void {
+  input.stepIds.push(input.stepId);
+  input.steps.push({
+    step_id: input.stepId,
+    kind: "run_ask_tool",
+    tool_id: input.toolId,
+    args: input.args,
+    depends_on: ["start_agent_goal_session"],
+    expected_receipt_kind: "stage_play_workstation_control_receipt",
+    expected_state_change: { store: "stage-play-goal-context", proof_key: "goalContextUpdates" },
+    required: true,
+  });
+  input.scores.push({
+    affordance_id: input.toolId,
+    panel_id: "helix_ask",
+    action_id: input.toolId,
+    score: 0.86,
+    reason: input.reason,
+    required_args_missing: [],
+  });
+}
+
 function buildWorkstationGoalContextPlan(
   normalized: string,
   options: PlanWorkstationToolUseOptions,
@@ -1841,6 +1873,84 @@ function buildWorkstationGoalContextPlan(
   };
   const postSessionControlSteps: HelixWorkstationToolPlanStep[] = [];
   const postSessionControlStepIds: string[] = [];
+  if (startSession) {
+    const targetRef = extractNamedArg(normalized, ["target_ref", "target ref", "target_id", "target id"]);
+    const presetId = extractNamedArg(normalized, ["preset_id", "preset id", "preset"]);
+    const bindSourceRef = extractNamedArg(normalized, ["bind_source_ref", "bind source ref", "source_ref", "source ref", "source_id", "source id"]);
+    const bindTargetRef = extractNamedArg(normalized, ["bind_target_ref", "bind target ref", "target_ref", "target ref", "target_id", "target id"]);
+    const lineKey = extractNamedArg(normalized, ["line_key", "line key", "live_answer_line_key", "live answer line key"]);
+    const loopRef = extractNamedArg(normalized, ["loop_ref", "loop ref", "loop_id", "loop id"]);
+    const requestedLoopState = inferLoopState(normalized);
+    if (targetRef && presetId && /\b(?:preset|shade|classifier|deck)\b/i.test(normalized)) {
+      const toolId = /\b(?:audio|earbud|transcript|translation|speech|mic|microphone)\b/i.test(normalized)
+        ? "live_env.set_audio_preset" as const
+        : /\b(?:visual|screen|image|lens|camera|frame|capture)\b/i.test(normalized)
+          ? "live_env.set_visual_preset" as const
+          : "live_env.change_workstation_preset" as const;
+      pushGoalSessionSetupControlStep({
+        steps: postSessionControlSteps,
+        stepIds: postSessionControlStepIds,
+        scores,
+        stepId: toolId.replace(/^live_env\./, ""),
+        toolId,
+        args: {
+          goal_id: goalId,
+          target_ref: targetRef,
+          preset_id: presetId,
+          reason: "Apply requested workstation preset as part of goal-session setup.",
+        },
+        reason: "goal-session setup prompt also asks to apply a workstation preset",
+      });
+    }
+    if (bindSourceRef && bindTargetRef && /\b(?:bind|attach|route|connect)\b[\s\S]{0,120}\bsource\b/i.test(normalized)) {
+      pushGoalSessionSetupControlStep({
+        steps: postSessionControlSteps,
+        stepIds: postSessionControlStepIds,
+        scores,
+        stepId: "bind_workstation_source",
+        toolId: "live_env.bind_workstation_source",
+        args: {
+          goal_id: goalId,
+          source_ref: bindSourceRef,
+          target_ref: bindTargetRef,
+          reason: "Bind requested source to workstation target as part of goal-session setup.",
+        },
+        reason: "goal-session setup prompt also asks to bind a source to a workstation target",
+      });
+    }
+    if (lineKey && /\blive\s+answer\b[\s\S]{0,120}\b(?:projection|line|output|state)\b/i.test(normalized)) {
+      pushGoalSessionSetupControlStep({
+        steps: postSessionControlSteps,
+        stepIds: postSessionControlStepIds,
+        scores,
+        stepId: "update_live_answer_projection",
+        toolId: "live_env.update_live_answer_projection",
+        args: {
+          goal_id: goalId,
+          line_key: lineKey,
+          reason: "Update requested Live Answer projection as part of goal-session setup.",
+        },
+        reason: "goal-session setup prompt also asks to update a Live Answer projection",
+      });
+    }
+    if (loopRef && requestedLoopState && /\b(?:loop|process\s+loop|mail\s+loop)\b/i.test(normalized)) {
+      const toolId = requestedLoopState === "repaired" ? "live_env.repair_loop" as const : "live_env.set_workstation_loop_state" as const;
+      pushGoalSessionSetupControlStep({
+        steps: postSessionControlSteps,
+        stepIds: postSessionControlStepIds,
+        scores,
+        stepId: requestedLoopState === "repaired" ? "repair_loop" : "set_workstation_loop_state",
+        toolId,
+        args: {
+          goal_id: goalId,
+          loop_ref: loopRef,
+          state: requestedLoopState,
+          reason: "Set requested process-loop state as part of goal-session setup.",
+        },
+        reason: "goal-session setup prompt also asks to control a workstation process loop",
+      });
+    }
+  }
   if (startSession && wantsGoalSessionNarratorBinding(normalized)) {
     const streamKind = inferNarratorStreamKind(normalized);
     const sourceRef = sourceId ?? extractNamedArg(normalized, ["source_ref", "source ref"]) ?? defaultNarratorSourceRef(streamKind);

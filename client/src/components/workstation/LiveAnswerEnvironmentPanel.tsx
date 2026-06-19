@@ -562,6 +562,7 @@ const liveAnswerDispatchLabel = (action: WorkstationDispatchActionV1): string =>
   if (action.kind === "log_receipt") return "log receipt";
   if (action.kind === "update_panel") return `panel ${action.panelId}`;
   if (action.kind === "repair_loop") return "repair loop";
+  if (action.kind === "repair_source") return "repair source";
   if (action.kind === "ask_user") return "ask user";
   return compactLabel(action.kind);
 };
@@ -572,6 +573,7 @@ const isLiveAnswerWorkstationControlDispatch = (action: WorkstationDispatchActio
   action.kind === "unbind_source" ||
   action.kind === "set_loop_state" ||
   action.kind === "repair_loop" ||
+  action.kind === "repair_source" ||
   action.kind === "update_live_answer" ||
   action.kind === "focus_process_graph" ||
   action.kind === "speak_narrator" ||
@@ -701,6 +703,35 @@ const liveAnswerPacketCircuitRefsForUpdate = (update: WorkstationGoalContextUpda
       ref.startsWith("microdeck-output:") ||
       ref.startsWith("microdeck-run:") ||
       ref.includes("micro_reasoner")
+    ),
+    traceMemoryRefs: refs.filter((ref) =>
+      ref.startsWith("trace_memory:") ||
+      ref.startsWith("trace-memory:") ||
+      ref.startsWith("workstation_trace_memory:") ||
+      ref.startsWith("workstation_context_feed:trace_memory") ||
+      ref.includes("trace_memory") ||
+      ref.includes("trace-memory")
+    ),
+    narratorRefs: refs.filter((ref) =>
+      ref.startsWith("helix_narrator_") ||
+      ref.startsWith("narrator:") ||
+      ref.startsWith("workstation_actuator:narrator_")
+    ),
+    routeWatchRefs: refs.filter((ref) =>
+      ref.startsWith("route_watch:") ||
+      ref.startsWith("watch_job:") ||
+      ref.startsWith("watch_policy:") ||
+      ref.startsWith("stage_play_live_source_watch_job:") ||
+      ref.startsWith("live_job_evidence:") ||
+      ref.startsWith("situation_construct_query:") ||
+      ref.startsWith("workstation_actuator:query_route_evidence")
+    ),
+    automationRefs: refs.filter((ref) =>
+      ref.startsWith("automation:") ||
+      ref.startsWith("automation_policy:") ||
+      ref.startsWith("workstation_context_feed:automation_policies") ||
+      ref.startsWith("stage_play_live_source_watch_job_policy:") ||
+      ref.startsWith("workstation_actuator:configure_route_watch")
     ),
     sourceRefs: update.sourceRefs,
     loopRefs: update.loopRefs,
@@ -1903,7 +1934,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       workstationControlDispatchCount: dispatches.filter(isLiveAnswerWorkstationControlDispatch).length,
       presetDispatchCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "change_preset").length,
       sourceBindingDispatchCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "bind_source" || action.kind === "unbind_source").length,
-      loopDispatchCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "set_loop_state" || action.kind === "repair_loop").length,
+      sourceRepairDispatchCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "repair_source").length,
+      loopDispatchCount: dispatches.filter((action: WorkstationDispatchActionV1) =>
+        action.kind === "set_loop_state" || action.kind === "repair_loop"
+      ).length,
       liveAnswerDispatchCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "update_live_answer").length,
       processGraphDispatchCount: dispatches.filter((action: WorkstationDispatchActionV1) => action.kind === "focus_process_graph").length,
       microdeckOutputCount: goalContextUpdates.filter((update: WorkstationGoalContextUpdateV1) =>

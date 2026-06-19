@@ -107,6 +107,9 @@ const sourceRegionMap = (
 const t00FromTensor = (tensor: Nhm2RegionalTensor): number | null =>
   typeof tensor.T00 === "number" && Number.isFinite(tensor.T00) ? tensor.T00 : null;
 
+const qeiLowerBoundMargin = (sampledRho: number | null, bound: number | null): number | null =>
+  sampledRho == null || bound == null ? null : sampledRho - bound;
+
 const regionHasAuthority = (
   region: Nhm2TileEffectiveFullTensorSourceArtifact["regions"][number] | null | undefined,
 ): boolean =>
@@ -421,10 +424,7 @@ export const buildAtlasBoundQeiWorldlineDossier = (args: {
     const samplingKind = bound.samplingKind ?? args.samplingKind ?? "unknown";
     const samplingNormalized =
       bound.samplingNormalized ?? (args.samplingNormalized === true);
-    const margin =
-      density.valueSI == null || bound.valueSI == null
-        ? null
-        : bound.valueSI - density.valueSI;
+    const margin = qeiLowerBoundMargin(density.valueSI, bound.valueSI);
     const blockers = [
       ...density.blockers,
       ...bound.blockers,

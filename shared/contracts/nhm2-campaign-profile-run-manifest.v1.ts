@@ -133,7 +133,11 @@ const evidenceRequirementFor = (
   const artifactRef =
     typeof evidence === "string" ? evidence : evidence?.artifactRef ?? null;
   const evidenceBlockers =
-    typeof evidence === "string" ? [] : evidence?.blockers?.filter((entry) => entry.trim().length > 0) ?? [];
+    typeof evidence === "string"
+      ? []
+      : evidence?.blockers?.filter(
+          (entry) => entry.trim().length > 0 && entry.trim().toLowerCase() !== "none",
+        ) ?? [];
   return {
     evidenceId,
     required: queued,
@@ -172,6 +176,14 @@ const buildCandidate = (
   const queued =
     candidate.campaignScreen.status === "screen_pass_needs_campaign_run";
   const runRoot = queued ? `${runRootBase}/${candidate.candidateProfileId}` : null;
+  const requiredEvidence = NHM2_CAMPAIGN_PROFILE_RUN_EVIDENCE_IDS.map((evidenceId) =>
+    evidenceRequirementFor(evidenceId, queued, evidenceRefs?.[evidenceId] ?? null),
+  );
+  const queuedBlockers = requiredEvidence.flatMap((entry) =>
+    entry.status === "provided_blocked" || entry.status === "required_missing"
+      ? entry.blockers
+      : [],
+  );
   return {
     candidateProfileId: candidate.candidateProfileId,
     parentProfileId: candidate.parentProfileId,
@@ -184,12 +196,12 @@ const buildCandidate = (
     manifestStatus: queued
       ? "queued_full_campaign_required"
       : "not_queued_rejected_by_profile_screen",
-    requiredEvidence: NHM2_CAMPAIGN_PROFILE_RUN_EVIDENCE_IDS.map((evidenceId) =>
-      evidenceRequirementFor(evidenceId, queued, evidenceRefs?.[evidenceId] ?? null),
-    ),
+    requiredEvidence,
     nextCommand: queued && runRoot != null ? buildNextCommand(candidate.candidateProfileId, runRoot) : null,
     blockers: queued
-      ? ["all_required_campaign_evidence_missing_for_candidate"]
+      ? queuedBlockers.length > 0
+        ? queuedBlockers
+        : []
       : candidate.campaignScreen.blockers,
   };
 };

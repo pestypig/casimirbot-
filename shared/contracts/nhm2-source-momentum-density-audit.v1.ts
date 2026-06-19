@@ -130,7 +130,11 @@ const CURRENT_MODEL_FALSIFIER_AMPLIFICATION_THRESHOLD = 1e6;
 const CAUSAL_MOMENTUM_TO_ENERGY_RATIO_LIMIT = 1;
 
 const safeAbsRatio = (numerator: number | null, denominator: number | null): number | null => {
-  if (numerator == null || denominator == null || denominator === 0) return null;
+  if (numerator == null || denominator == null) return null;
+  if (denominator === 0) {
+    if (numerator === 0) return 0;
+    return Number.MAX_VALUE;
+  }
   return Math.abs(numerator) / Math.abs(denominator);
 };
 

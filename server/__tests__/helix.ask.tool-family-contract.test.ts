@@ -8,7 +8,10 @@ import {
   resolveToolFamilyContract,
   type ToolFamily,
 } from "../services/helix-ask/tool-family-contract";
-import { evaluateToolFamilyTerminalPolicy } from "../services/helix-ask/tool-family-terminal-policy";
+import {
+  evaluateToolFamilyTerminalPolicy,
+  isWorkstationObservationTerminalKind,
+} from "../services/helix-ask/tool-family-terminal-policy";
 import { WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS } from "../services/helix-ask/workstation-context-feed-query-tool-contracts";
 
 const routeContract = (allowed: string[], forbidden: string[] = []) => ({
@@ -211,6 +214,13 @@ describe("Helix Ask tool-family contract registry", () => {
       expect(decision.terminal_eligible).toBe(false);
       expect(decision.raw_content_included).toBe(false);
     }
+  });
+
+  it("classifies workstation circuit observations as nonterminal artifact kinds", () => {
+    expect(isWorkstationObservationTerminalKind("helix.workstation_goal_context_update.v1")).toBe(true);
+    expect(isWorkstationObservationTerminalKind("stage_play_workstation_context_feed_query_result/v1")).toBe(true);
+    expect(isWorkstationObservationTerminalKind("stage_play_micro_reasoner_run/v1")).toBe(true);
+    expect(isWorkstationObservationTerminalKind("helix.narrator_event/v1")).toBe(true);
   });
 
   it("prevents read-only evidence tools from writing terminal answer fields", () => {
