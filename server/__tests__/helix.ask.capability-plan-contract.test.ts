@@ -365,6 +365,60 @@ describe("Helix capability plan contract", () => {
     }
   });
 
+  it("admits every explicit capability family in ordered compound prompts", () => {
+    const cases = [
+      {
+        promptText:
+          "Use workspace_os.status to inspect workstation status, then call scientific-calculator.solve_expression with this exact expression: 14*23+8.",
+        sourceTarget: "repo_code",
+        expectedFamilies: ["workspace_diagnostic", "calculator", "workstation_action"],
+        expectedCapabilities: ["workspace_os.status", "scientific-calculator.solve_expression"],
+      },
+      {
+        promptText:
+          "Use docs-viewer.locate_in_doc to cite the route-authority rule in the active document, then run scientific-calculator.solve_expression with this exact expression: 19+23.",
+        sourceTarget: "docs_viewer",
+        expectedFamilies: ["docs_viewer", "calculator", "workstation_action"],
+        expectedCapabilities: ["docs-viewer.locate_in_doc", "scientific-calculator.solve_expression"],
+      },
+      {
+        promptText:
+          "Call helix_ask.inspect_capability_catalog, then use workspace_os.status to inspect workstation status.",
+        sourceTarget: "runtime_evidence",
+        expectedFamilies: ["capability_catalog", "runtime_evidence", "workspace_diagnostic"],
+        expectedCapabilities: ["helix_ask.inspect_capability_catalog", "workspace_os.status"],
+      },
+      {
+        promptText:
+          "Use repo-code.search_concept to find where terminal authority is enforced, plus docs-viewer.locate_in_doc to locate the same rule in the active document.",
+        sourceTarget: "repo_code",
+        expectedFamilies: ["repo_code", "docs_viewer"],
+        expectedCapabilities: ["repo-code.search_concept", "docs-viewer.locate_in_doc"],
+      },
+      {
+        promptText:
+          "Use situation-room.describe_visual_capture, then run scientific-calculator.solve_expression with this exact expression: 5*9.",
+        sourceTarget: "visual_capture",
+        expectedFamilies: ["situation_run", "calculator", "workstation_action"],
+        expectedCapabilities: ["image_lens.inspect", "scientific-calculator.solve_expression"],
+      },
+    ];
+
+    for (const testCase of cases) {
+      const admission = buildToolCallAdmissionDecision({
+        turnId: "ask:compound-admission",
+        promptText: testCase.promptText,
+        sourceTargetIntent: baseSourceTarget(testCase.sourceTarget),
+        canonicalGoalFrame: canonicalGoal("debug_diagnosis", "repo_code_evidence_answer"),
+      });
+
+      expect(admission.admitted_tool_families).toEqual(expect.arrayContaining(testCase.expectedFamilies));
+      expect(admission.admitted_tool_families).not.toContain("model_only");
+      expect(admission.reason).toContain("compound_explicit_capability_contracts_required");
+      expect(admission.compound_requested_capabilities).toEqual(testCase.expectedCapabilities);
+    }
+  });
+
   it("repairs forbidden live-source mailbox reads to the phase-allowed decision tool", () => {
     const plan = buildCapabilityPlan({
       turnId: "ask:mailbox-phase-record-decision",

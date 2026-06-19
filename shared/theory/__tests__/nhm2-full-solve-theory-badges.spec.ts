@@ -17,6 +17,8 @@ describe("NHM2 full-solve theory badges", () => {
     "nhm2.dynamic.time_dependent_source_campaign",
     "nhm2.metric_required.momentum_remediation_targets",
     "nhm2.campaign.frontier_disposition",
+    "nhm2.profile.campaign_search",
+    "nhm2.profile.campaign_run_manifest",
     "nhm2.energy_condition.observer_robust_gate",
     "nhm2.qei.worldline_dossier",
     "casimir.material.lifshitz_receipt",
@@ -62,6 +64,8 @@ describe("NHM2 full-solve theory badges", () => {
     expect(ids).toContain("nhm2.dynamic.time_dependent_source_campaign");
     expect(ids).toContain("nhm2.metric_required.momentum_remediation_targets");
     expect(ids).toContain("nhm2.campaign.frontier_disposition");
+    expect(ids).toContain("nhm2.profile.campaign_search");
+    expect(ids).toContain("nhm2.profile.campaign_run_manifest");
     expect(ids).toContain("nhm2.energy_condition.wec_nec_sec_dec_family");
     expect(ids).toContain("nhm2.energy_condition.observer_robust_gate");
     expect(ids).toContain("nhm2.qei.worldline_sampling_requirement");
@@ -178,6 +182,26 @@ describe("NHM2 full-solve theory badges", () => {
           relation: "documents",
         }),
         expect.objectContaining({
+          from: "nhm2.campaign.frontier_disposition",
+          to: "nhm2.profile.campaign_search",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "nhm2.profile.campaign_search",
+          to: "nhm2.dynamic.time_dependent_source_campaign",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "nhm2.profile.campaign_search",
+          to: "nhm2.profile.campaign_run_manifest",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.profile.campaign_run_manifest",
+          to: "nhm2.dynamic.time_dependent_source_campaign",
+          relation: "requires",
+        }),
+        expect.objectContaining({
           from: "nhm2.dynamic.time_dependent_source_campaign",
           to: "nhm2.claim_boundary.diagnostic_only",
           relation: "blocks",
@@ -200,6 +224,8 @@ describe("NHM2 full-solve theory badges", () => {
       "nhm2.dynamic.time_dependent_source_campaign",
       "nhm2.metric_required.momentum_remediation_targets",
       "nhm2.campaign.frontier_disposition",
+      "nhm2.profile.campaign_search",
+      "nhm2.profile.campaign_run_manifest",
       "nhm2.energy_condition.observer_robust_gate",
       "nhm2.qei.worldline_dossier",
       "nhm2.natario.invariant_audit",
@@ -287,6 +313,8 @@ describe("NHM2 full-solve theory badges", () => {
         "nhm2.dynamic.time_dependent_source_campaign",
         "nhm2.metric_required.momentum_remediation_targets",
         "nhm2.campaign.frontier_disposition",
+        "nhm2.profile.campaign_search",
+        "nhm2.profile.campaign_run_manifest",
         "nhm2.qei.worldline_dossier",
         "nhm2.natario.curvature_invariants",
         "nhm2.natario.invariant_audit",
@@ -328,6 +356,8 @@ describe("NHM2 full-solve theory badges", () => {
       "nhm2.closure.regional_tensor_pass_path_harness",
       "nhm2.metric_required.momentum_remediation_targets",
       "nhm2.campaign.frontier_disposition",
+      "nhm2.profile.campaign_search",
+      "nhm2.profile.campaign_run_manifest",
       "nhm2.energy_condition.observer_robust_gate",
       "nhm2.qei.worldline_dossier",
       "nhm2.natario.invariant_audit",
@@ -428,6 +458,26 @@ describe("NHM2 full-solve theory badges", () => {
           from: "nhm2.campaign.frontier_disposition",
           to: "nhm2.dynamic.time_dependent_source_campaign",
           relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "nhm2.campaign.frontier_disposition",
+          to: "nhm2.profile.campaign_search",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "nhm2.profile.campaign_search",
+          to: "nhm2.dynamic.time_dependent_source_campaign",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "nhm2.profile.campaign_search",
+          to: "nhm2.profile.campaign_run_manifest",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.profile.campaign_run_manifest",
+          to: "nhm2.dynamic.time_dependent_source_campaign",
+          relation: "requires",
         }),
         expect.objectContaining({
           from: "casimir.material.lifshitz_receipt",

@@ -542,6 +542,41 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
     }))).toEqual([]);
   });
 
+  it("accepts MicroDeck preset-state updates on the MicroDeck feed lane", () => {
+    const microdeckPresetUpdate = updateFixture({
+      updateId: "stage_play_goal_context_update:microdeck:preset-state",
+      producerKind: "microdeck",
+      updateKind: "preset_state",
+      contentRef: "stage_play_micro_reasoner_prompt_tool_activity:science-visual",
+      preview: "MicroDeck preset science-visual was applied to the visual source.",
+      evidenceRefs: [
+        "stage_play_micro_reasoner_prompt_tool_activity:science-visual",
+        "stage_play_micro_reasoner_prompt_preset:science-visual:v1",
+        "visual_source:image-lens",
+        "thread:helix-ask:desktop",
+        "stage_play_mail_loop:helix-ask:desktop",
+        "workstation_context_feed:microdeck_outputs",
+        "workstation_actuator:query_microdeck_outputs",
+      ],
+      receiptRefs: ["stage_play_micro_reasoner_prompt_tool_activity:science-visual"],
+    });
+
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      resultId: "stage_play_context_feed_query:microdeck_outputs:preset-state",
+      feedKind: "microdeck_outputs",
+      label: "MicroDeck outputs",
+      policyEvidenceRefs: [
+        "context_feed:microdeck_outputs",
+        "allowed_actuator:query_microdeck_outputs",
+        "agent_goal_context_feed:feed:microdeck_outputs",
+        "agent_goal_allowed_actuator:query_microdeck_outputs",
+      ],
+      requiredActuator: "query_microdeck_outputs",
+      goalContextUpdates: [microdeckPresetUpdate],
+      updateCount: 1,
+    }))).toEqual([]);
+  });
+
   it("rejects visual feed query results carrying MicroDeck updates", () => {
     const microdeckUpdate = updateFixture({
       updateId: "stage_play_goal_context_update:microdeck:wrong-lane",

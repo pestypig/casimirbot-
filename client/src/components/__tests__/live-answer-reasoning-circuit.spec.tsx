@@ -62,7 +62,14 @@ describe("LiveAnswerReasoningCircuit", () => {
             contentRef: "microdeck-output:frog-classifier",
             sourceRefs: ["visual:screen-share"],
             loopRefs: ["loop:visual-mail"],
-            evidenceRefs: ["frame:frog-001", "microdeck-run:frog-classifier", "agent_goal_feed:visual"],
+            evidenceRefs: [
+              "frame:frog-001",
+              "microdeck-run:frog-classifier",
+              "agent_goal_feed:visual",
+              "freshness_filter:fresh",
+              "agent_goal_session_filter:context_feed:trace_memory",
+              "agent_goal_session_filter:allowed_actuator:narrator_bind_stream",
+            ],
             receiptRefs: ["receipt:frog-classifier"],
             policyRefs: [
               "context_feed:visual_summaries",
@@ -217,6 +224,8 @@ describe("LiveAnswerReasoningCircuit", () => {
           automationCount: 2,
           feedPolicyRefCount: 3,
           actuatorPolicyRefCount: 3,
+          freshnessFilterRefCount: 1,
+          sessionFilterRefCount: 2,
           toolAttributedUpdateCount: 2,
           matchedToolActuatorUpdateCount: 2,
           actuatorPolicyCount: 5,
@@ -243,6 +252,12 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getAllByTestId("live-answer-goal-context-policy-split")[0]).toHaveTextContent("feeds=context_feed:visual_summaries, agent_goal_context_feed:agent_goal_feed:visual; actuators=allowed_actuator:query_visual_summaries, agent_goal_allowed_actuator:query_visual_summaries");
     expect(screen.getAllByTestId("live-answer-goal-context-policy-split")[1]).toHaveTextContent("feeds=none; actuators=none");
     expect(screen.getAllByTestId("live-answer-goal-context-policy-split")[2]).toHaveTextContent("feeds=workstation_context_feed:automation_policies; actuators=workstation_actuator:set_loop_state");
+    expect(screen.getAllByTestId("live-answer-goal-context-freshness-filter")[0]).toHaveTextContent("requestedFreshness=freshness_filter:fresh");
+    expect(screen.getAllByTestId("live-answer-goal-context-freshness-filter")[1]).toHaveTextContent("requestedFreshness=none");
+    expect(screen.getAllByTestId("live-answer-goal-context-freshness-filter")[2]).toHaveTextContent("requestedFreshness=none");
+    expect(screen.getAllByTestId("live-answer-goal-context-session-filter")[0]).toHaveTextContent("requestedSession=agent_goal_session_filter:context_feed:trace_memory, agent_goal_session_filter:allowed_actuator:narrator_bind_stream");
+    expect(screen.getAllByTestId("live-answer-goal-context-session-filter")[1]).toHaveTextContent("requestedSession=none");
+    expect(screen.getAllByTestId("live-answer-goal-context-session-filter")[2]).toHaveTextContent("requestedSession=none");
     expect(screen.getAllByTestId("live-answer-goal-context-tool-identity")[0]).toHaveTextContent("tool=visual_preset -> live_env.set_visual_preset; matched=set_visual_preset; matchedRefs=agent_goal_allowed_actuator:set_visual_preset");
     expect(screen.getAllByTestId("live-answer-goal-context-tool-identity")[1]).toHaveTextContent("tool=none; matched=none; matchedRefs=none");
     expect(screen.getAllByTestId("live-answer-goal-context-tool-identity")[2]).toHaveTextContent("tool=live_env.set_workstation_loop_state; matched=set_loop_state; matchedRefs=agent_goal_allowed_actuator:set_loop_state");
@@ -303,6 +318,8 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getByTestId("live-answer-feed-query-count")).toHaveTextContent("7 feed queries");
     expect(screen.getByTestId("live-answer-feed-policy-ref-count")).toHaveTextContent("3 feed policy refs");
     expect(screen.getByTestId("live-answer-actuator-policy-ref-count")).toHaveTextContent("3 actuator policy refs");
+    expect(screen.getByTestId("live-answer-freshness-filter-ref-count")).toHaveTextContent("1 freshness filters");
+    expect(screen.getByTestId("live-answer-session-filter-ref-count")).toHaveTextContent("2 session filters");
     expect(screen.getByTestId("live-answer-tool-attribution-count")).toHaveTextContent("2 tool-attributed updates");
     expect(screen.getByTestId("live-answer-matched-tool-actuator-count")).toHaveTextContent("2 matched tool actuator updates");
     expect(screen.getByTestId("live-answer-route-watch-count")).toHaveTextContent("0 route watch");
@@ -329,6 +346,8 @@ describe("LiveAnswerReasoningCircuit", () => {
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("feed_queries=7");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("feed_policy_refs=3");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("actuator_policy_refs=3");
+    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("freshness_filters=1");
+    expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("session_filters=2");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("tool_attributed_updates=2");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("matched_tool_actuator_updates=2");
     expect(screen.getByTestId("live-answer-reasoning-circuit")).toHaveTextContent("trace_memory=2");

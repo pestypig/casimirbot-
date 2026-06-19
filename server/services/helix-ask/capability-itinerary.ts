@@ -16,6 +16,7 @@ import {
   detectContextualToolAdmissionSuppression,
 } from "./contextual-tool-admission";
 import { buildToolUseRestatement, detectInternetSearchIntent } from "./internet-search-intent";
+import { buildHelixCompoundCapabilityContract } from "./compound-capability-contract";
 import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
 
@@ -133,6 +134,55 @@ const allowedTerminalKindsFor = (families: HelixCapabilityItineraryFamily[]): st
   return unique(kinds);
 };
 
+const itineraryFamilyForContractSubgoal = (subgoal: RecordLike): HelixCapabilityItineraryFamily => {
+  const capabilityFamily = readString(subgoal.capability_family);
+  const admissionFamilies = Array.isArray(subgoal.admission_families)
+    ? subgoal.admission_families.map(readString).filter(Boolean)
+    : [];
+  const preferred =
+    admissionFamilies.find((family) => family !== "workstation_action" && family !== "runtime_evidence") ??
+    admissionFamilies[0] ??
+    capabilityFamily;
+  return (preferred || capabilityFamily || "runtime_evidence") as HelixCapabilityItineraryFamily;
+};
+
+const stepForCompoundSubgoal = (input: {
+  subgoal: RecordLike;
+  promptText: string;
+  status: HelixCapabilityItineraryStepStatus;
+}): HelixCapabilityItineraryStep => {
+  const requestedCapability = readString(input.subgoal.requested_capability);
+  const runtimeCapability = readString(input.subgoal.runtime_capability) || requestedCapability;
+  const family = itineraryFamilyForContractSubgoal(input.subgoal);
+  const requiredObservationKinds = Array.isArray(input.subgoal.required_observation_kinds)
+    ? input.subgoal.required_observation_kinds.map(readString).filter(Boolean)
+    : observationKindsFor(family, input.promptText);
+  return {
+    step_id:
+      readString(input.subgoal.subgoal_id) ||
+      `compound_${readString(input.subgoal.order) || "subgoal"}_${requestedCapability.replace(/[^A-Za-z0-9_-]+/g, "_")}`,
+    tool_family: family,
+    capability_hint: runtimeCapability || capabilityHintFor(family, input.promptText),
+    requested_capability: requestedCapability || null,
+    runtime_capability: runtimeCapability || null,
+    compound_subgoal_id: readString(input.subgoal.subgoal_id) || null,
+    args_hint:
+      input.subgoal.args_hint && typeof input.subgoal.args_hint === "object" && !Array.isArray(input.subgoal.args_hint)
+        ? (input.subgoal.args_hint as Record<string, unknown>)
+        : {},
+    purpose: requestedCapability
+      ? `Execute explicit compound capability subgoal ${requestedCapability}.`
+      : "Execute the explicit compound capability subgoal.",
+    execution_group: "evidence",
+    required_observation_kinds: requiredObservationKinds,
+    status: input.status,
+    reason:
+      input.status === "missing"
+        ? "The explicit compound subgoal is not admitted or visible as an executable capability."
+        : "The explicit compound subgoal must produce its own observation before terminal synthesis.",
+  };
+};
+
 const statusForFamily = (input: {
   family: HelixCapabilityItineraryFamily;
   admittedFamilies: HelixCapabilityItineraryFamily[];
@@ -212,6 +262,10 @@ export function buildHelixCapabilityItinerary(input: {
   availableCapabilities?: unknown;
 }): HelixCapabilityItinerary {
   const admission = readRecord(input.toolCallAdmissionDecision);
+  const compoundCapabilityContract = buildHelixCompoundCapabilityContract({
+    turnId: input.turnId,
+    promptText: input.promptText,
+  });
   const admittedFamilies = (Array.isArray(admission?.admitted_tool_families)
     ? admission.admitted_tool_families
     : []) as HelixCapabilityItineraryFamily[];
@@ -224,16 +278,45 @@ export function buildHelixCapabilityItinerary(input: {
   const locatorFamilies: HelixCapabilityItineraryFamily[] = theoryLocatorRequested(input.promptText)
     ? ["theory_locator"]
     : [];
-  const relevantFamilies = unique([...researchFamilies, ...repoFamilies, ...docsFamilies, ...locatorFamilies]);
-  const plannedSteps = relevantFamilies.map((family) => {
+  const compoundSubgoals = Array.isArray(compoundCapabilityContract?.subgoals)
+    ? compoundCapabilityContract.subgoals as unknown as RecordLike[]
+    : [];
+  const compoundFamilies = compoundSubgoals.map(itineraryFamilyForContractSubgoal);
+  const relevantFamilies = unique([...compoundFamilies, ...researchFamilies, ...repoFamilies, ...docsFamilies, ...locatorFamilies]);
+  const compoundSteps = compoundSubgoals.map((subgoal) => {
+    const family = itineraryFamilyForContractSubgoal(subgoal);
+    const runtimeCapability = readString(subgoal.runtime_capability) || readString(subgoal.requested_capability);
     const status = statusForFamily({
       family,
       admittedFamilies,
       forbiddenFamilies,
       availableCapabilities: input.availableCapabilities,
     });
-    return stepForFamily({ family, promptText: input.promptText, status });
+    const availableStatus =
+      runtimeCapability && hasCapability(input.availableCapabilities, runtimeCapability)
+        ? "planned"
+        : status;
+    return stepForCompoundSubgoal({
+      subgoal,
+      promptText: input.promptText,
+      status: availableStatus as HelixCapabilityItineraryStepStatus,
+    });
   });
+  const nonCompoundFamilies = relevantFamilies.filter((family) =>
+    !compoundFamilies.includes(family)
+  );
+  const plannedSteps = [
+    ...compoundSteps,
+    ...nonCompoundFamilies.map((family) => {
+      const status = statusForFamily({
+        family,
+        admittedFamilies,
+        forbiddenFamilies,
+        availableCapabilities: input.availableCapabilities,
+      });
+      return stepForFamily({ family, promptText: input.promptText, status });
+    }),
+  ];
   const admittedItineraryFamilies = plannedSteps
     .filter((step) => step.status === "admitted" || step.status === "planned")
     .map((step) => step.tool_family);
@@ -244,7 +327,7 @@ export function buildHelixCapabilityItinerary(input: {
     .filter((step) => step.status === "missing")
     .map((step) => step.tool_family);
   const promptShape =
-    relevantFamilies.length > 1
+    compoundSubgoals.length > 1 || relevantFamilies.length > 1
       ? "compound_tool"
       : relevantFamilies.length === 1
         ? "single_tool"
@@ -255,7 +338,11 @@ export function buildHelixCapabilityItinerary(input: {
     ...(locatorFamilies.length > 0 ? ["locator_observation_missing"] : []),
     ...(promptShape === "compound_tool" ? ["compound_evidence_not_reentered"] : []),
     ...(missingItineraryFamilies.length > 0 ? ["capability_family_not_admitted_or_visible"] : []),
+    ...(compoundSubgoals.length > 1 ? ["compound_subgoal_observation_missing"] : []),
   ];
+  const compoundRequiredCapabilities = compoundSubgoals
+    .map((subgoal) => readString(subgoal.requested_capability))
+    .filter(Boolean);
   return {
     schema: HELIX_CAPABILITY_ITINERARY_SCHEMA,
     turn_id: input.turnId,
@@ -305,10 +392,12 @@ export function buildHelixCapabilityItinerary(input: {
     ],
     terminal_success_criteria: {
       required_observation_families: relevantFamilies,
+      required_capabilities: compoundRequiredCapabilities,
       allowed_terminal_artifact_kinds: allowedTerminalKindsFor(relevantFamilies),
       requires_post_observation_synthesis: relevantFamilies.length > 0,
       typed_failure_codes: unique(typedFailures),
     },
+    ...(compoundCapabilityContract ? { compound_capability_contract: compoundCapabilityContract as unknown as Record<string, unknown> } : {}),
     authority: "planning_only",
     not_terminal: true,
     assistant_answer: false,

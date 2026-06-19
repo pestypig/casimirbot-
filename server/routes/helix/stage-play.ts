@@ -1406,6 +1406,15 @@ helixStagePlayRouter.get("/goal-context", (req: Request, res: Response) => {
         goalId,
         sourceRef,
         status: readQueryString(req.query.status),
+        contextFeedKind:
+          readQueryString(req.query.contextFeedKind) ??
+          readQueryString(req.query.context_feed_kind) ??
+          readQueryString(req.query.sourceKind) ??
+          readQueryString(req.query.source_kind),
+        allowedActuator:
+          readQueryString(req.query.allowedActuator) ??
+          readQueryString(req.query.allowed_actuator) ??
+          readQueryString(req.query.actuator),
         limit: Math.min(limit, 50),
       }),
       assistant_answer: false,

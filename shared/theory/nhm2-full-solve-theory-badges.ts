@@ -42,6 +42,18 @@ const NHM2_AXIS_ALIGNED_METRIC_MOMENTUM_REMEDIATION_TARGETS =
   `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-metric-momentum-remediation-targets.json`;
 const NHM2_AXIS_ALIGNED_CAMPAIGN_FRONTIER_DISPOSITION =
   `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-campaign-frontier-disposition.json`;
+const NHM2_CAMPAIGN_PROFILE_SEARCH =
+  "artifacts/research/full-solve/profile-search/nhm2-campaign-profile-search-latest.json";
+const NHM2_CAMPAIGN_PROFILE_RUN_MANIFEST =
+  "artifacts/research/full-solve/profile-search/nhm2-campaign-profile-run-manifest-latest.json";
+const NHM2_0P9000_COMBINED_PROFILE_CAMPAIGN_RUN_ROOT =
+  "artifacts/research/full-solve/profile-campaign-runs/stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1";
+const NHM2_0P9000_COMBINED_METRIC_REQUIRED_FULL_REGIONAL_TENSOR =
+  `${NHM2_0P9000_COMBINED_PROFILE_CAMPAIGN_RUN_ROOT}/nhm2-metric-required-full-regional-tensor.json`;
+const NHM2_0P9000_COMBINED_METRIC_REQUIRED_MOMENTUM_DEMAND_AUDIT =
+  `${NHM2_0P9000_COMBINED_PROFILE_CAMPAIGN_RUN_ROOT}/nhm2-metric-required-momentum-demand-audit.json`;
+const NHM2_0P9000_COMBINED_METRIC_MOMENTUM_REMEDIATION_TARGETS =
+  `${NHM2_0P9000_COMBINED_PROFILE_CAMPAIGN_RUN_ROOT}/nhm2-metric-momentum-remediation-targets.json`;
 const NHM2_AXIS_ALIGNED_TIME_DEPENDENT_SOURCE_CAMPAIGN =
   `${NHM2_AXIS_ALIGNED_SHEAR_SUPPRESSED_SMOKE_ROOT}/nhm2-time-dependent-source-campaign.json`;
 const NHM2_AXIS_ALIGNED_REGIONAL_MATERIAL_SOURCE_TENSOR_MODEL =
@@ -1519,6 +1531,165 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   nhm2FullSolveBadge({
+    id: "nhm2.profile.campaign_search",
+    title: "Campaign Profile Search",
+    plainMeaning:
+      "Screens candidate NHM2 profiles against the current metric-required momentum frontier before spending a full frozen campaign run.",
+    whyItMatters:
+      "It separates faster clocking ambitions from profiles that actually reduce the projected T0i blocker exposed by the current campaign.",
+    subjects: ["nhm2", "profile_search", "dynamic_campaign", "momentum_density", "metric_redesign"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    equationFamilies: ["campaign_profile_search", "time_dependent_source_campaign"],
+    tags: ["profile_search", "runtime_artifact", "noncomputable_reference", "blocks_promotion"],
+    equations: [
+      {
+        id: "campaign_profile_search_gate",
+        role: "noncomputable_reference",
+        displayLatex:
+          "candidate=\\min_\\alpha\\{profile:\\;T0i_{screen}\\leq bound\\}\\;\\land\\;campaignRunRequired",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["alpha", "T0i_screen", "requiredSuppressionFactor"],
+        outputSymbols: ["recommendedNextProfileId"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Fastest means lowest alpha only after the current projected T0i campaign screen is cleared.",
+      "Alpha-only candidates are rejected because changing clocking depth alone does not retire metric-required momentum density.",
+      "A profile-search screen pass requires a full frozen campaign run and does not pass the campaign by itself.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef(
+        "shared/contracts/nhm2-campaign-profile-search.v1.ts",
+        "nhm2-campaign-profile-search-contract",
+        "Typed campaign profile-search contract.",
+      ),
+      artifactRef(
+        "tools/nhm2/build-campaign-profile-search.ts",
+        "nhm2-campaign-profile-search-builder",
+        "Builder that consumes metric momentum remediation targets and campaign frontier disposition to rank candidate profiles.",
+      ),
+      artifactRef(
+        NHM2_CAMPAIGN_PROFILE_SEARCH,
+        "sha256:2e2eeb03ce2c8f927d1a213c6a9a7894f2a29200c80a8569e247388e20dfc862",
+        "Initial profile-search artifact: alpha-only 0p7000 is rejected; fastest screened candidate is stage1_centerline_alpha_0p9000_combined_metric_redesign_campaign_screen_v1; full frozen campaign run remains required.",
+      ),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "time-dependent-source-campaign-target",
+        "Whitepaper dynamic campaign target note.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "profile_search", "dynamic_campaign", "momentum_density"],
+      symbols: ["alpha", "T0i", "requiredSuppressionFactor", "recommendedNextProfileId"],
+      unitSignatures: [],
+      repoPaths: [
+        "shared/contracts/nhm2-campaign-profile-search.v1.ts",
+        "tools/nhm2/build-campaign-profile-search.ts",
+        NHM2_CAMPAIGN_PROFILE_SEARCH,
+        NHM2_AXIS_ALIGNED_CAMPAIGN_FRONTIER_DISPOSITION,
+        NHM2_AXIS_ALIGNED_METRIC_MOMENTUM_REMEDIATION_TARGETS,
+        NHM2_FULL_SOLVE_WHITEPAPER,
+      ],
+      equationFamilies: ["campaign_profile_search", "time_dependent_source_campaign"],
+      simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.profile.campaign_run_manifest",
+    title: "Campaign Profile Run Manifest",
+    plainMeaning:
+      "Lists the frozen campaign evidence that each screened profile must produce before the profile can be ranked as campaign-admissible.",
+    whyItMatters:
+      "It turns a promising profile screen into an explicit missing-evidence checklist for full tensor, conservation, QEI, observer, dynamic, and stability gates.",
+    subjects: ["nhm2", "profile_run_manifest", "dynamic_campaign", "artifact_governance"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    equationFamilies: ["campaign_profile_run_manifest", "time_dependent_source_campaign"],
+    tags: ["profile_run_manifest", "runtime_artifact", "noncomputable_reference", "blocks_promotion"],
+    equations: [
+      {
+        id: "campaign_profile_run_manifest_gate",
+        role: "noncomputable_reference",
+        displayLatex:
+          "runReady=\\bigwedge evidence_i(profile)\\;\\land\\;campaignRun(profile)",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["profile", "evidence_i", "campaignRun"],
+        outputSymbols: ["nextCandidateProfileId", "manifestComplete"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Only candidates that pass the profile screen are queued for frozen campaign evidence generation.",
+      "Queued candidates remain blocked until every required campaign evidence row is produced for that profile.",
+      "The run manifest is scheduling and evidence governance, not a campaign evaluation result.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef(
+        "shared/contracts/nhm2-campaign-profile-run-manifest.v1.ts",
+        "nhm2-campaign-profile-run-manifest-contract",
+        "Typed campaign profile run-manifest contract.",
+      ),
+      artifactRef(
+        "tools/nhm2/build-campaign-profile-run-manifest.ts",
+        "nhm2-campaign-profile-run-manifest-builder",
+        "Builder that consumes profile search results and emits required frozen-campaign evidence rows per candidate.",
+      ),
+      artifactRef(
+        NHM2_CAMPAIGN_PROFILE_RUN_MANIFEST,
+        "sha256:3f957a642ee7c2323928539ac38e1c3aa83d44917ded4aface0bc8a57e44824f",
+        "Run manifest: queues the 0p9000 combined metric-redesign candidate first; projected momentum-demand audit and metric momentum remediation targets are provided, and the metric-required full-regional-tensor screen is provided_blocked because it is not a fresh ADM route.",
+      ),
+      artifactRef(
+        NHM2_0P9000_COMBINED_METRIC_REQUIRED_FULL_REGIONAL_TENSOR,
+        "sha256:76cc316fd921e842aae90ceb9f393660faf709152475d5c705356df155722abf",
+        "0p9000 combined metric-redesign candidate metric-required full-regional-tensor screen: T0i is projected from the reduced-order momentum screen, while T00 and Tij are inherited parent-profile placeholders; firstBlocker=candidate_metric_required_full_tensor_screen_not_full_adm_route.",
+      ),
+      artifactRef(
+        NHM2_0P9000_COMBINED_METRIC_REQUIRED_MOMENTUM_DEMAND_AUDIT,
+        "sha256:472dd4bd93d59911ad2326c68dff88bdcb363360071b2058efcba894a1d7daa1",
+        "0p9000 combined metric-redesign candidate reduced-order projected momentum-demand screen: all T0i rows are within the causal ratio bound; worst row is hull:T02 with projected ratio about 0.044888; this is not a full ADM tetrad or campaign pass.",
+      ),
+      artifactRef(
+        NHM2_0P9000_COMBINED_METRIC_MOMENTUM_REMEDIATION_TARGETS,
+        "sha256:7acdad10a07dcc495707d16b3f4f861cf74ab2c7d1a4c084ab581f1b2c72595a",
+        "0p9000 combined metric-redesign candidate remediation target screen: remediationRequired=false under the reduced-order scaled projected-momentum audit.",
+      ),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "time-dependent-source-campaign-target",
+        "Whitepaper dynamic campaign target note.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "profile_run_manifest", "dynamic_campaign", "artifact_governance"],
+      symbols: ["nextCandidateProfileId", "manifestComplete", "evidence_i", "campaignRun"],
+      unitSignatures: [],
+      repoPaths: [
+        "shared/contracts/nhm2-campaign-profile-run-manifest.v1.ts",
+        "tools/nhm2/build-campaign-profile-run-manifest.ts",
+        NHM2_CAMPAIGN_PROFILE_RUN_MANIFEST,
+        NHM2_0P9000_COMBINED_METRIC_REQUIRED_FULL_REGIONAL_TENSOR,
+        NHM2_0P9000_COMBINED_METRIC_REQUIRED_MOMENTUM_DEMAND_AUDIT,
+        NHM2_0P9000_COMBINED_METRIC_MOMENTUM_REMEDIATION_TARGETS,
+        NHM2_CAMPAIGN_PROFILE_SEARCH,
+        NHM2_FULL_SOLVE_WHITEPAPER,
+      ],
+      equationFamilies: ["campaign_profile_run_manifest", "time_dependent_source_campaign"],
+      simulationOwners: ["NHM2", "general_relativity", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
     id: "nhm2.dynamic.time_dependent_source_campaign",
     title: "Time-Dependent Source Campaign",
     plainMeaning:
@@ -1587,6 +1758,31 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         "Campaign frontier disposition for the axis-aligned branch: current_profile_rejected under declared reduced-order projected momentum-demand evidence.",
       ),
       artifactRef(
+        NHM2_CAMPAIGN_PROFILE_SEARCH,
+        "sha256:2e2eeb03ce2c8f927d1a213c6a9a7894f2a29200c80a8569e247388e20dfc862",
+        "Profile-search screen: fastest screened candidate is 0p9000 combined metric redesign, but screenPassDoesNotPassCampaign=true.",
+      ),
+      artifactRef(
+        NHM2_CAMPAIGN_PROFILE_RUN_MANIFEST,
+        "sha256:3f957a642ee7c2323928539ac38e1c3aa83d44917ded4aface0bc8a57e44824f",
+        "Profile run manifest: 0p9000 combined metric-redesign is queued first; projected momentum-demand audit and remediation target rows are provided, metric-required full-regional-tensor screen is provided_blocked, and source/tile compatibility, residual, conservation, frequency, dynamic/effective geometry, QEI, observer, stability, and campaign rows remain required/missing.",
+      ),
+      artifactRef(
+        NHM2_0P9000_COMBINED_METRIC_REQUIRED_FULL_REGIONAL_TENSOR,
+        "sha256:76cc316fd921e842aae90ceb9f393660faf709152475d5c705356df155722abf",
+        "0p9000 combined metric-redesign metric-required full-regional-tensor screen: all regions remain blocked because the screen projects T0i and inherits T00/Tij from the parent profile instead of emitting a fresh candidate ADM/Einstein tensor.",
+      ),
+      artifactRef(
+        NHM2_0P9000_COMBINED_METRIC_REQUIRED_MOMENTUM_DEMAND_AUDIT,
+        "sha256:472dd4bd93d59911ad2326c68dff88bdcb363360071b2058efcba894a1d7daa1",
+        "0p9000 combined metric-redesign candidate reduced-order projected momentum-demand screen: worst projected metric-required momentum-to-energy ratio is hull:T02 at about 0.044888, below the causal ratio bound.",
+      ),
+      artifactRef(
+        NHM2_0P9000_COMBINED_METRIC_MOMENTUM_REMEDIATION_TARGETS,
+        "sha256:7acdad10a07dcc495707d16b3f4f861cf74ab2c7d1a4c084ab581f1b2c72595a",
+        "0p9000 combined metric-redesign candidate remediation target screen: remediationRequired=false under the reduced-order projected-momentum screen.",
+      ),
+      artifactRef(
         NHM2_AXIS_ALIGNED_METRIC_REQUIRED_MOMENTUM_DEMAND_AUDIT,
         "sha256:15a0ea6b9e0b0d67d65f5743f479faf8b4c7986ff12ef7f635fc2d8634da3364",
         "Metric-required momentum demand audit for the axis-aligned branch: currentMetricProfileFalsified=true.",
@@ -1636,6 +1832,8 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
         NHM2_AXIS_ALIGNED_SOURCE_MOMENTUM_DENSITY_AUDIT,
         NHM2_AXIS_ALIGNED_METRIC_MOMENTUM_REMEDIATION_TARGETS,
         NHM2_AXIS_ALIGNED_CAMPAIGN_FRONTIER_DISPOSITION,
+        NHM2_CAMPAIGN_PROFILE_SEARCH,
+        NHM2_CAMPAIGN_PROFILE_RUN_MANIFEST,
         NHM2_AXIS_ALIGNED_TIME_DEPENDENT_SOURCE_CAMPAIGN,
         NHM2_AXIS_ALIGNED_REGIONAL_MATERIAL_SOURCE_TENSOR_MODEL,
         NHM2_FULL_SOLVE_WHITEPAPER,
@@ -3166,6 +3364,38 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "documents",
     label: "The campaign frontier disposition records whether the current profile is rejected before the campaign continues to downstream proof gates.",
     claimBoundaryNote: "A disposition artifact does not validate a redesigned metric profile or physical transport claim.",
+  },
+  {
+    id: "campaign_frontier_disposition_feeds_profile_search",
+    from: "nhm2.campaign.frontier_disposition",
+    to: "nhm2.profile.campaign_search",
+    relation: "documents",
+    label: "The campaign frontier disposition supplies the current-profile rejection and suppression target used to screen redesigned profiles.",
+    claimBoundaryNote: "A profile-search screen pass is not a campaign pass or physical transport claim.",
+  },
+  {
+    id: "campaign_profile_search_feeds_time_dependent_campaign",
+    from: "nhm2.profile.campaign_search",
+    to: "nhm2.dynamic.time_dependent_source_campaign",
+    relation: "documents",
+    label: "The profile search identifies candidate profiles that still require a full frozen time-dependent campaign run.",
+    claimBoundaryNote: "Candidate ranking is diagnostic steering only and cannot validate a profile.",
+  },
+  {
+    id: "campaign_profile_search_feeds_profile_run_manifest",
+    from: "nhm2.profile.campaign_search",
+    to: "nhm2.profile.campaign_run_manifest",
+    relation: "requires",
+    label: "The profile-search output supplies the screened candidates that the run manifest turns into frozen campaign evidence requirements.",
+    claimBoundaryNote: "Queued profile runs are not campaign passes.",
+  },
+  {
+    id: "campaign_profile_run_manifest_feeds_time_dependent_campaign",
+    from: "nhm2.profile.campaign_run_manifest",
+    to: "nhm2.dynamic.time_dependent_source_campaign",
+    relation: "requires",
+    label: "The time-dependent campaign can only rank a candidate after the manifest evidence rows are produced for that profile.",
+    claimBoundaryNote: "A completed manifest would still be diagnostic evidence governance, not physical viability.",
   },
   {
     id: "time_dependent_campaign_blocks_diagnostic_boundary",

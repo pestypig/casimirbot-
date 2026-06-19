@@ -3655,9 +3655,15 @@ function StagePlayGoalContextBoard({
     );
   const matchedGoalAllowedActuatorRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
     policyRefsForUpdate(update).filter((ref) => ref.startsWith("agent_goal_allowed_actuator:"));
+  const freshnessFilterRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
+    Array.from(new Set(update.evidenceRefs.filter((ref) => ref.startsWith("freshness_filter:"))));
+  const sessionFilterRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
+    Array.from(new Set(update.evidenceRefs.filter((ref) => ref.startsWith("agent_goal_session_filter:"))));
   const feedPolicyRefCount = updates.reduce((count, update) => count + contextFeedPolicyRefsForUpdate(update).length, 0);
   const actuatorPolicyRefCount = updates.reduce((count, update) => count + actuatorPolicyRefsForUpdate(update).length, 0);
   const exactGoalActuatorPolicyRefCount = updates.reduce((count, update) => count + matchedGoalAllowedActuatorRefsForUpdate(update).length, 0);
+  const freshnessFilterRefCount = updates.reduce((count, update) => count + freshnessFilterRefsForUpdate(update).length, 0);
+  const sessionFilterRefCount = updates.reduce((count, update) => count + sessionFilterRefsForUpdate(update).length, 0);
   const sessionFeedPolicyRefs = (session: AgentGoalSessionV1): string[] =>
     session.contextFeeds.flatMap((feed) => {
       const actuator = queryActuatorForAgentGoalContextFeedV1(feed.sourceKind);
@@ -3701,6 +3707,8 @@ function StagePlayGoalContextBoard({
           <StagePlayMetricPill label="translations" value={formatStagePlayCount(translatedTranscriptContextCount)} tone={translatedTranscriptContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="feed queries" value={formatStagePlayCount(feedQueryContextCount)} tone={feedQueryContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="feed policy refs" value={formatStagePlayCount(feedPolicyRefCount)} tone={feedPolicyRefCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="freshness filters" value={formatStagePlayCount(freshnessFilterRefCount)} tone={freshnessFilterRefCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="session filters" value={formatStagePlayCount(sessionFilterRefCount)} tone={sessionFilterRefCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="tool-attributed" value={formatStagePlayCount(toolAttributedUpdateCount)} tone={toolAttributedUpdateCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="matched actuators" value={formatStagePlayCount(matchedToolActuatorUpdateCount)} tone={matchedToolActuatorUpdateCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="automations" value={formatStagePlayCount(automationContextCount)} tone={automationContextCount > 0 ? "good" : "default"} />
@@ -3776,6 +3784,14 @@ function StagePlayGoalContextBoard({
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Feed policy refs</div>
           <div className="mt-0.5 text-slate-400">{formatStagePlayCount(feedPolicyRefCount)} context-feed policy ref{feedPolicyRefCount === 1 ? "" : "s"} and {formatStagePlayCount(actuatorPolicyRefCount)} actuator policy ref{actuatorPolicyRefCount === 1 ? "" : "s"} link feed inputs to controlled workstation outputs; {formatStagePlayCount(exactGoalActuatorPolicyRefCount)} exact goal authorization ref{exactGoalActuatorPolicyRefCount === 1 ? "" : "s"} are visible for debugging.</div>
         </div>
+        <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-freshness-filter-state">
+          <div className="font-semibold uppercase tracking-wide text-violet-200/80">Freshness filters</div>
+          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(freshnessFilterRefCount)} requested freshness filter ref{freshnessFilterRefCount === 1 ? "" : "s"} show whether the agent queried fresh, stale, blocked, or unknown context.</div>
+        </div>
+        <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-session-filter-state">
+          <div className="font-semibold uppercase tracking-wide text-violet-200/80">Session filters</div>
+          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(sessionFilterRefCount)} goal-session filter ref{sessionFilterRefCount === 1 ? "" : "s"} show which feed and actuator constraints shaped the agent context query.</div>
+        </div>
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-tool-attribution-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Tool attribution</div>
           <div className="mt-0.5 text-slate-400">{formatStagePlayCount(toolAttributedUpdateCount)} tool-attributed update{toolAttributedUpdateCount === 1 ? "" : "s"}; {formatStagePlayCount(matchedToolActuatorUpdateCount)} matched allowed actuator update{matchedToolActuatorUpdateCount === 1 ? "" : "s"} expose requested tool, canonical tool, and exact goal authorization refs.</div>
@@ -3789,6 +3805,8 @@ function StagePlayGoalContextBoard({
             const contextFeedPolicyRefs = contextFeedPolicyRefsForUpdate(update);
             const actuatorPolicyRefs = actuatorPolicyRefsForUpdate(update);
             const matchedGoalActuatorRefs = matchedGoalAllowedActuatorRefsForUpdate(update);
+            const freshnessFilterRefs = freshnessFilterRefsForUpdate(update);
+            const sessionFilterRefs = sessionFilterRefsForUpdate(update);
             const circuitHops = stagePlayGoalContextCircuitHops(update);
             return (
               <div
@@ -3847,6 +3865,16 @@ function StagePlayGoalContextBoard({
                   {matchedGoalActuatorRefs.length > 0 ? (
                     <div className="truncate" data-testid="stage-play-goal-context-update-matched-actuator-refs">
                       matchedActuatorRefs={matchedGoalActuatorRefs.slice(0, 4).join(", ")}
+                    </div>
+                  ) : null}
+                  {freshnessFilterRefs.length > 0 ? (
+                    <div className="truncate" data-testid="stage-play-goal-context-update-freshness-filter">
+                      requestedFreshness={freshnessFilterRefs.slice(0, 4).join(", ")}
+                    </div>
+                  ) : null}
+                  {sessionFilterRefs.length > 0 ? (
+                    <div className="truncate" data-testid="stage-play-goal-context-update-session-filter">
+                      requestedSession={sessionFilterRefs.slice(0, 4).join(", ")}
                     </div>
                   ) : null}
                   <div className="truncate" data-testid="stage-play-goal-context-update-freshness">freshness={freshnessLabel(update)}</div>

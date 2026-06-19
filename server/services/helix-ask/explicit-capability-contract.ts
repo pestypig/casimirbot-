@@ -22,6 +22,15 @@ export type ExplicitCapabilityContract = {
   forbidden_nearby_capabilities: string[];
 };
 
+export type ExtractedExplicitCapabilityContract = {
+  contract: ExplicitCapabilityContract;
+  capability: string;
+  matched_name: string;
+  match_index: number;
+  match_end_index: number;
+  source: "command_mention" | "compound_command_chain";
+};
+
 const liveEnvironmentControlContract = (input: {
   capability: string;
   aliases?: string[];
@@ -359,6 +368,22 @@ const commandMentionsCapability = (prompt: string, capability: string): boolean 
   return new RegExp(String.raw`\b${commandVerb}\b[\s\S]{0,80}\b${escaped}\b`, "i").test(prompt);
 };
 
+const capabilityMentionRegex = (capability: string): RegExp =>
+  new RegExp(String.raw`\b${escapeRegex(capability)}\b`, "gi");
+
+const commandMentionsCapabilityAt = (prompt: string, capability: string, matchIndex: number): boolean => {
+  const windowStart = Math.max(0, matchIndex - 100);
+  const before = prompt.slice(windowStart, matchIndex);
+  return new RegExp(String.raw`\b${commandVerb}\b[\s\S]{0,100}$`, "i").test(before) ||
+    commandMentionsCapability(prompt.slice(Math.max(0, matchIndex - 20), matchIndex + capability.length + 90), capability);
+};
+
+const compoundCommandChainMentionsCapabilityAt = (prompt: string, matchIndex: number): boolean => {
+  const before = prompt.slice(Math.max(0, matchIndex - 120), matchIndex);
+  if (!new RegExp(String.raw`\b${commandVerb}\b`, "i").test(prompt)) return false;
+  return /\b(?:then|and|plus|after|before|followed\s+by|next)\b[\s\S]{0,80}$/i.test(before);
+};
+
 const commandMentionsContract = (prompt: string, contract: ExplicitCapabilityContract): boolean => {
   const names = uniqueStrings([
     contract.capability,
@@ -392,12 +417,51 @@ export const explicitCapabilityContractForCapability = (
 export const extractExplicitCapabilityContract = (
   promptText: string | null | undefined,
 ): ExplicitCapabilityContract | null => {
+  return extractExplicitCapabilityContracts(promptText)[0]?.contract ?? null;
+};
+
+export const extractExplicitCapabilityContracts = (
+  promptText: string | null | undefined,
+): ExtractedExplicitCapabilityContract[] => {
   const prompt = String(promptText ?? "").trim();
-  if (!prompt) return null;
-  const contracts = explicitCapabilityContracts.filter((entry: ExplicitCapabilityContract) =>
-    commandMentionsContract(prompt, entry)
-  );
-  return contracts.find((contract: ExplicitCapabilityContract) => !familySuppressed(prompt, contract)) ?? null;
+  if (!prompt) return [];
+  const matches: ExtractedExplicitCapabilityContract[] = [];
+  for (const contract of explicitCapabilityContracts) {
+    if (familySuppressed(prompt, contract)) continue;
+    const names = uniqueStrings([
+      contract.capability,
+      contract.runtime_capability ?? "",
+      ...(contract.aliases ?? []),
+    ]);
+    let best: ExtractedExplicitCapabilityContract | null = null;
+    for (const name of names) {
+      const matcher = capabilityMentionRegex(name);
+      for (const match of prompt.matchAll(matcher)) {
+        const matchIndex = typeof match.index === "number" ? match.index : -1;
+        if (matchIndex < 0) continue;
+        const commandMention = commandMentionsCapabilityAt(prompt, name, matchIndex);
+        const compoundMention = compoundCommandChainMentionsCapabilityAt(prompt, matchIndex);
+        if (!commandMention && !compoundMention) continue;
+        const candidate: ExtractedExplicitCapabilityContract = {
+          contract,
+          capability: contract.capability,
+          matched_name: name,
+          match_index: matchIndex,
+          match_end_index: matchIndex + name.length,
+          source: commandMention ? "command_mention" : "compound_command_chain",
+        };
+        if (!best || candidate.match_index < best.match_index) {
+          best = candidate;
+        }
+      }
+    }
+    if (best) matches.push(best);
+  }
+  return matches
+    .sort((left, right) => left.match_index - right.match_index)
+    .filter((match, index, ordered) =>
+      ordered.findIndex((entry) => entry.contract.capability === match.contract.capability) === index
+    );
 };
 
 export const explicitCapabilityMatches = (

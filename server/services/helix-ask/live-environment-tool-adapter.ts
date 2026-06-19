@@ -4467,6 +4467,7 @@ export function executeLiveEnvironmentTool(
     const sourceKind = readString(args.source_kind) ?? readString(args.sourceKind);
     const presetId = readString(args.preset_id) ?? readString(args.presetId);
     const basePresetId = readString(args.base_preset_id) ?? readString(args.basePresetId);
+    const goalId = readString(args.goal_id) ?? readString(args.goalId);
     const activityAction =
       input.tool_name === "live_env.apply_micro_reasoner_preset"
         ? "apply"
@@ -4593,6 +4594,47 @@ export function executeLiveEnvironmentTool(
         updatedAt: new Date().toISOString(),
         evidenceRefs: uniqueStrings([presetId, ...sourceIds, ...prompts.map((prompt) => prompt.promptId)]),
       });
+      const applyEvidenceRefs = uniqueStrings([
+        activityId,
+        presetId,
+        preset?.presetId,
+        ...sourceIds,
+        ...prompts.map((prompt) => prompt.promptId),
+      ]);
+      const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+        threadId: input.thread_id,
+        roomId,
+        producerKind: "microdeck",
+        updateKind: "preset_state",
+        contentRef: activityId,
+        preview: preset
+          ? `MicroDeck preset ${preset.title} was applied to ${sourceIds.length} source(s).`
+          : `MicroDeck preset could not be applied because ${presetId ?? "the requested preset"} was not found.`,
+        sourceRefs: uniqueStrings([sourceId, ...sourceIds]),
+        loopRefs: uniqueStrings([
+          "workstation_context_feed:microdeck_outputs",
+          "workstation_actuator:query_microdeck_outputs",
+          "microdeck:preset_state",
+          ...prompts.map((prompt) => `microdeck_prompt:${prompt.role}`),
+        ]),
+        evidenceRefs: applyEvidenceRefs,
+        receiptRefs: [activityId],
+        freshnessStatus: preset ? "fresh" : "blocked",
+        goalId,
+        goalRelevanceReason: "MicroDeck preset application changed the deterministic workstation deck configuration.",
+        toolIdentity: {
+          requestedToolName: input.tool_name,
+          canonicalToolName: "live_env.apply_micro_reasoner_preset",
+          matchedAllowedActuators: [],
+          matchedAllowedActuatorRefs: [],
+        },
+        suggestedDispatch: [
+          { kind: "log_receipt", receiptRef: activityId },
+          ...(goalId && preset ? [{ kind: "append_goal_context" as const, goalId }] : []),
+          { kind: "update_panel", panelId: "stage-play-badge-graph" },
+          { kind: "update_panel", panelId: "live-answer-environment" },
+        ],
+      });
       return makeObservation({
         threadId: input.thread_id,
         environmentId: environment?.environment_id ?? input.environment_id,
@@ -4609,14 +4651,16 @@ export function executeLiveEnvironmentTool(
           sourceIds,
           source_ids: sourceIds,
           toolActivities: listStagePlayMicroReasonerPromptToolActivities({ sourceId, limit: 10 }),
+          goalContextUpdateId,
+          goal_context_update_id: goalContextUpdateId,
           assistant_answer: false,
           terminal_eligible: false,
           raw_content_included: false,
           context_role: "tool_evidence",
           ask_context_policy: "evidence_only",
         },
-        evidenceRefs: uniqueStrings([presetId, ...sourceIds, ...prompts.map((prompt) => prompt.promptId), activityId]),
-        producedRefs: preset ? uniqueStrings([preset.presetId]) : [],
+        evidenceRefs: uniqueStrings([goalContextUpdateId, ...applyEvidenceRefs]),
+        producedRefs: preset ? uniqueStrings([preset.presetId, goalContextUpdateId]) : [goalContextUpdateId],
       });
     }
 
@@ -5631,6 +5675,17 @@ export function executeLiveEnvironmentTool(
       wakeResults,
     });
     const goalId = readString(args.goal_id) ?? readString(args.goalId);
+    const requestedFreshnessStatus =
+      readGoalContextFreshnessFilter(args.freshness_status ?? args.freshnessStatus ?? args.freshness);
+    const requestedContextFeedKind =
+      readString(args.context_feed_kind) ??
+      readString(args.contextFeedKind) ??
+      readString(args.feed_kind) ??
+      readString(args.feedKind);
+    const requestedAllowedActuator =
+      readString(args.allowed_actuator) ??
+      readString(args.allowedActuator) ??
+      readString(args.actuator);
     const goalContextUpdates = listStagePlayGoalContextUpdates({
       threadId: scope.mailboxThreadResolution.mailboxThreadId,
       sourceRef,
@@ -5639,6 +5694,7 @@ export function executeLiveEnvironmentTool(
       goalId,
       producerKind: readString(args.producer_kind) ?? readString(args.producerKind),
       updateKind: readString(args.update_kind) ?? readString(args.updateKind),
+      freshnessStatus: requestedFreshnessStatus,
       limit: updateLimit,
     });
     const agentGoalSessions = listStagePlayAgentGoalSessions({
@@ -5646,6 +5702,8 @@ export function executeLiveEnvironmentTool(
       goalId,
       sourceRef,
       status: readString(args.status),
+      contextFeedKind: requestedContextFeedKind,
+      allowedActuator: requestedAllowedActuator,
       limit: Math.min(updateLimit, 50),
     });
     const authoritySummary = summarizeGoalContextAuthority({
@@ -5654,6 +5712,9 @@ export function executeLiveEnvironmentTool(
     });
     const evidenceRefs = uniqueStrings([
       scope.mailboxThreadResolution.mailboxThreadId,
+      ...(requestedFreshnessStatus ? [`freshness_filter:${requestedFreshnessStatus}`] : []),
+      ...(requestedContextFeedKind ? [`agent_goal_session_filter:context_feed:${requestedContextFeedKind}`] : []),
+      ...(requestedAllowedActuator ? [`agent_goal_session_filter:allowed_actuator:${requestedAllowedActuator}`] : []),
       ...mailItems.map((item) => item.mailId),
       ...processedMailPackets.map((packet) => packet.packetId),
       ...microReasonerRuns.map((run) => run.runId),
@@ -5663,7 +5724,14 @@ export function executeLiveEnvironmentTool(
         ...update.evidenceRefs,
         ...update.receiptRefs,
       ]),
-      ...agentGoalSessions.map((session) => session.goalId),
+      ...agentGoalSessions.flatMap((session) => [
+        session.goalId,
+        ...session.sourceRefs,
+        ...session.loopRefs,
+        ...session.constructRefs,
+        ...session.contextFeeds.map((feed) => `agent_goal_context_feed:${feed.sourceKind}`),
+        ...session.allowedActuators.map((actuator) => `agent_goal_allowed_actuator:${actuator}`),
+      ]),
     ]);
     return makeObservation({
       threadId: input.thread_id,
@@ -5679,6 +5747,12 @@ export function executeLiveEnvironmentTool(
         mailbox_thread_resolution: scope.mailboxThreadResolution,
         goalContextUpdates,
         goal_context_updates: goalContextUpdates,
+        requestedFreshnessStatus,
+        requested_freshness_status: requestedFreshnessStatus,
+        requestedContextFeedKind,
+        requested_context_feed_kind: requestedContextFeedKind,
+        requestedAllowedActuator,
+        requested_allowed_actuator: requestedAllowedActuator,
         agentGoalSessions,
         agent_goal_sessions: agentGoalSessions,
         authoritySummary,

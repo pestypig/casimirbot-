@@ -78,6 +78,8 @@ export type LiveAnswerReasoningCircuitSummary = {
   automationCount: number;
   feedPolicyRefCount: number;
   actuatorPolicyRefCount: number;
+  freshnessFilterRefCount: number;
+  sessionFilterRefCount: number;
   toolAttributedUpdateCount: number;
   matchedToolActuatorUpdateCount: number;
   actuatorPolicyCount: number;
@@ -239,6 +241,12 @@ const actuatorPolicyRefs = (refs: string[]): string[] =>
     ref.startsWith("workstation_actuator:")
   );
 
+const freshnessFilterRefs = (refs: string[]): string[] =>
+  refs.filter((ref) => ref.startsWith("freshness_filter:"));
+
+const sessionFilterRefs = (refs: string[]): string[] =>
+  refs.filter((ref) => ref.startsWith("agent_goal_session_filter:"));
+
 const toolIdentityLabel = (row: LiveAnswerReasoningCircuitRow): string => {
   if (!row.requestedToolName && !row.canonicalToolName) return "tool=none";
   const requested = row.requestedToolName ?? "unknown";
@@ -340,6 +348,12 @@ export function LiveAnswerReasoningCircuit({
           <span className="rounded border border-indigo-300/20 px-2 py-1 font-mono text-[10px] text-indigo-100" data-testid="live-answer-actuator-policy-ref-count">
             {summary.actuatorPolicyRefCount} actuator policy refs
           </span>
+          <span className="rounded border border-indigo-300/20 px-2 py-1 font-mono text-[10px] text-indigo-100" data-testid="live-answer-freshness-filter-ref-count">
+            {summary.freshnessFilterRefCount} freshness filters
+          </span>
+          <span className="rounded border border-indigo-300/20 px-2 py-1 font-mono text-[10px] text-indigo-100" data-testid="live-answer-session-filter-ref-count">
+            {summary.sessionFilterRefCount} session filters
+          </span>
           <span className="rounded border border-violet-300/20 px-2 py-1 font-mono text-[10px] text-violet-100" data-testid="live-answer-tool-attribution-count">
             {summary.toolAttributedUpdateCount} tool-attributed updates
           </span>
@@ -378,6 +392,8 @@ export function LiveAnswerReasoningCircuit({
             const color = packetTrailColor(row.packetColorKey);
             const feedPolicyRefs = contextFeedPolicyRefs(row.policyRefs);
             const outputPolicyRefs = actuatorPolicyRefs(row.policyRefs);
+            const requestedFreshnessRefs = freshnessFilterRefs(row.evidenceRefs);
+            const requestedSessionRefs = sessionFilterRefs(row.evidenceRefs);
             const circuitHops = liveAnswerCircuitHops(row);
             return (
               <div
@@ -407,6 +423,12 @@ export function LiveAnswerReasoningCircuit({
                   <span className="truncate" data-testid="live-answer-goal-context-policy-refs">policy={row.policyRefs.length ? row.policyRefs.join(", ") : "none"}</span>
                   <span className="truncate" data-testid="live-answer-goal-context-policy-split">
                     feeds={feedPolicyRefs.length ? feedPolicyRefs.join(", ") : "none"}; actuators={outputPolicyRefs.length ? outputPolicyRefs.join(", ") : "none"}
+                  </span>
+                  <span className="truncate" data-testid="live-answer-goal-context-freshness-filter">
+                    requestedFreshness={requestedFreshnessRefs.length ? requestedFreshnessRefs.join(", ") : "none"}
+                  </span>
+                  <span className="truncate" data-testid="live-answer-goal-context-session-filter">
+                    requestedSession={requestedSessionRefs.length ? requestedSessionRefs.join(", ") : "none"}
                   </span>
                   <span className="truncate" data-testid="live-answer-goal-context-tool-identity">
                     {toolIdentityLabel(row)}; {matchedActuatorLabel(row)}; {matchedActuatorRefLabel(row)}
@@ -463,7 +485,7 @@ export function LiveAnswerReasoningCircuit({
           <p className="text-[10px] font-semibold uppercase text-slate-300">Authority posture</p>
           <p className="mt-1 text-xs text-violet-100" data-testid="live-answer-terminal-authority-posture">{summary.terminalPosture}</p>
           <p className="mt-1 font-mono text-[10px] text-slate-400">
-            observation_only={summary.observationOnlyCount} wake_dispatches={summary.wakeCount} microdeck_outputs={summary.microdeckOutputCount} visual_summaries={summary.visualSummaryCount} narrator_bindings={summary.narratorBindingCount} audio_transcripts={summary.audioTranscriptCount} translations={summary.translatedTranscriptCount} packet_traces={summary.packetTraceCount} source_health={summary.sourceHealthCount} feed_queries={summary.feedQueryCount} feed_policy_refs={summary.feedPolicyRefCount} actuator_policy_refs={summary.actuatorPolicyRefCount} tool_attributed_updates={summary.toolAttributedUpdateCount} matched_tool_actuator_updates={summary.matchedToolActuatorUpdateCount} route_watch={summary.routeWatchCount} automations={summary.automationCount} actuator_policies={summary.actuatorPolicyCount} narrator_output_policies={summary.narratorActuatorPolicyCount} narrator_event_feeds={summary.narratorEventFeedCount} trace_memory={summary.traceMemoryCount} terminal_authority_sessions={summary.terminalAuthorityRequiredCount}
+            observation_only={summary.observationOnlyCount} wake_dispatches={summary.wakeCount} microdeck_outputs={summary.microdeckOutputCount} visual_summaries={summary.visualSummaryCount} narrator_bindings={summary.narratorBindingCount} audio_transcripts={summary.audioTranscriptCount} translations={summary.translatedTranscriptCount} packet_traces={summary.packetTraceCount} source_health={summary.sourceHealthCount} feed_queries={summary.feedQueryCount} feed_policy_refs={summary.feedPolicyRefCount} actuator_policy_refs={summary.actuatorPolicyRefCount} freshness_filters={summary.freshnessFilterRefCount} session_filters={summary.sessionFilterRefCount} tool_attributed_updates={summary.toolAttributedUpdateCount} matched_tool_actuator_updates={summary.matchedToolActuatorUpdateCount} route_watch={summary.routeWatchCount} automations={summary.automationCount} actuator_policies={summary.actuatorPolicyCount} narrator_output_policies={summary.narratorActuatorPolicyCount} narrator_event_feeds={summary.narratorEventFeedCount} trace_memory={summary.traceMemoryCount} terminal_authority_sessions={summary.terminalAuthorityRequiredCount}
           </p>
           <p className="mt-1 font-mono text-[10px] text-slate-400" data-testid="live-answer-control-dispatch-breakdown">
             control_dispatches={summary.workstationControlDispatchCount} preset={summary.presetDispatchCount} source_binding={summary.sourceBindingDispatchCount} loop={summary.loopDispatchCount} live_answer={summary.liveAnswerDispatchCount} graph={summary.processGraphDispatchCount} narrator={summary.narratorSpeechCount + summary.narratorBindingCount} wake_interrupts={summary.wakeCount}

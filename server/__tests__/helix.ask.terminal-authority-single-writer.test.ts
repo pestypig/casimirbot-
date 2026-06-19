@@ -1487,4 +1487,128 @@ describe("Helix terminal authority single writer", () => {
       raw_content_included: false,
     });
   });
+
+  it("fails closed when a compound itinerary still has an unsatisfied subgoal", () => {
+    const turnId = "ask:test:compound-subgoal-terminal-gate";
+    const draftText = "Workspace status was inspected, so this draft tries to answer before calculator execution.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:runtime_tool_call:1`,
+        kind: "runtime_tool_call",
+        payload: {
+          call_id: `${turnId}:runtime_tool_call:1`,
+          capability_key: "workspace_os.status",
+          args: {},
+        },
+      },
+      {
+        artifact_id: `${turnId}:runtime_tool_call:1:runtime_tool_observation`,
+        kind: "runtime_tool_observation",
+        payload: {
+          call_id: `${turnId}:runtime_tool_call:1`,
+          capability_key: "workspace_os.status",
+          status: "completed",
+        },
+      },
+      {
+        artifact_id: `${turnId}:workspace_os_status_observation`,
+        kind: "workspace_os_status_observation",
+        payload: {
+          schema: "helix.workspace_os_status_observation.v1",
+          summary: { available: 1 },
+        },
+      },
+      {
+        artifact_id: `${turnId}:final_answer_draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: draftText,
+          authority: "llm_post_observation_composer",
+        },
+      },
+    ];
+    const missingCalculatorSubgoalId =
+      `${turnId}:compound_capability_subgoal:2:scientific-calculator_solve_expression`;
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+        forbidden_terminal_artifact_kinds: ["workspace_action_receipt", "agent_step_observation_packet"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        goal_kind: "compound_tool",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+        prompt_shape: "compound_tool",
+        relevant_tool_families: ["workspace_diagnostic", "calculator"],
+        terminal_success_criteria: {
+          required_observation_families: ["workspace_diagnostic", "calculator"],
+          required_capabilities: ["workspace_os.status", "scientific-calculator.solve_expression"],
+          requires_post_observation_synthesis: true,
+        },
+        compound_capability_contract: {
+          schema: "helix.compound_capability_contract.v1",
+          turn_id: turnId,
+          prompt_shape: "compound_capability",
+          requires_all_subgoals: true,
+          terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          subgoals: [
+            {
+              subgoal_id: `${turnId}:compound_capability_subgoal:1:workspace_os_status`,
+              order: 1,
+              requested_capability: "workspace_os.status",
+              runtime_capability: "workspace_os.status",
+              required_observation_kinds: ["workspace_os_status_observation"],
+              allowed_substitutions: [],
+              args_hint: {},
+            },
+            {
+              subgoal_id: missingCalculatorSubgoalId,
+              order: 2,
+              requested_capability: "scientific-calculator.solve_expression",
+              runtime_capability: "scientific-calculator.solve_expression",
+              required_observation_kinds: ["calculator_receipt", "workstation_tool_evaluation"],
+              allowed_substitutions: [],
+              args_hint: { latex: "2+2", expression: "2+2" },
+            },
+          ],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: draftText,
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(result.visible_text).toContain("scientific-calculator.solve_expression");
+    expect(payload.capability_itinerary_execution_state).toMatchObject({
+      complete: false,
+      missing_required_capabilities: ["scientific-calculator.solve_expression"],
+      next_missing_subgoal_id: missingCalculatorSubgoalId,
+    });
+    expect(payload.selected_final_answer).not.toBe(draftText);
+  });
 });

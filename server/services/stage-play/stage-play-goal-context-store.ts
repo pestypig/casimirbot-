@@ -372,14 +372,20 @@ export function listStagePlayAgentGoalSessions(input: {
   goalId?: string | null;
   status?: AgentGoalSessionV1["status"] | string | null;
   sourceRef?: string | null;
+  contextFeedKind?: AgentGoalContextFeedKindV1 | string | null;
+  allowedActuator?: AgentGoalActuatorV1 | string | null;
   limit?: number;
 } = {}): AgentGoalSessionV1[] {
   const sourceRef = normalize(input.sourceRef);
+  const contextFeedKind = normalize(input.contextFeedKind);
+  const allowedActuator = normalize(input.allowedActuator);
   return Array.from(sessionsById.values())
     .filter((session) => !input.threadId || session.threadId === input.threadId)
     .filter((session) => !input.goalId || session.goalId === input.goalId)
     .filter((session) => !input.status || session.status === input.status)
     .filter((session) => !sourceRef || session.sourceRefs.includes(sourceRef))
+    .filter((session) => !contextFeedKind || session.contextFeeds.some((feed) => feed.sourceKind === contextFeedKind))
+    .filter((session) => !allowedActuator || session.allowedActuators.includes(allowedActuator as AgentGoalActuatorV1))
     .sort((left, right) => {
       const leftTime = left.checkpoints.at(-1)?.createdAtMs ?? 0;
       const rightTime = right.checkpoints.at(-1)?.createdAtMs ?? 0;

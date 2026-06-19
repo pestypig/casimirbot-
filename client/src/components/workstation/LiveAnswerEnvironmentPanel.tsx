@@ -670,6 +670,9 @@ const liveAnswerActuatorPolicyRefsForUpdate = (update: WorkstationGoalContextUpd
     ref.startsWith("workstation_actuator:")
   );
 
+const liveAnswerFreshnessFilterRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
+  Array.from(new Set(update.evidenceRefs.filter((ref) => ref.startsWith("freshness_filter:"))));
+
 const liveAnswerPacketCircuitRefsForUpdate = (update: WorkstationGoalContextUpdateV1): LiveAnswerPacketCircuitRef[] => {
   const refs = Array.from(new Set([
     update.updateId,
@@ -1962,6 +1965,15 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
       ),
       actuatorPolicyRefCount: goalContextUpdates.reduce(
         (count: number, update: WorkstationGoalContextUpdateV1) => count + liveAnswerActuatorPolicyRefsForUpdate(update).length,
+        0,
+      ),
+      freshnessFilterRefCount: goalContextUpdates.reduce(
+        (count: number, update: WorkstationGoalContextUpdateV1) => count + liveAnswerFreshnessFilterRefsForUpdate(update).length,
+        0,
+      ),
+      sessionFilterRefCount: goalContextUpdates.reduce(
+        (count: number, update: WorkstationGoalContextUpdateV1) =>
+          count + update.evidenceRefs.filter((ref) => ref.startsWith("agent_goal_session_filter:")).length,
         0,
       ),
       toolAttributedUpdateCount: goalContextUpdates.filter((update: WorkstationGoalContextUpdateV1) =>

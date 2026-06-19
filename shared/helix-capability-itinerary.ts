@@ -24,6 +24,10 @@ export type HelixCapabilityItineraryStep = {
   step_id: string;
   tool_family: HelixCapabilityItineraryFamily;
   capability_hint: string | null;
+  requested_capability?: string | null;
+  runtime_capability?: string | null;
+  compound_subgoal_id?: string | null;
+  args_hint?: Record<string, unknown>;
   purpose: string;
   execution_group: HelixCapabilityItineraryExecutionGroup;
   required_observation_kinds: string[];
@@ -50,15 +54,22 @@ export type HelixCapabilityItinerary = {
   reasoning_criteria: HelixCapabilityItineraryReasoningCriterion[];
   terminal_success_criteria: {
     required_observation_families: HelixCapabilityItineraryFamily[];
+    required_capabilities?: string[];
     allowed_terminal_artifact_kinds: string[];
     requires_post_observation_synthesis: boolean;
     typed_failure_codes: string[];
   };
+  compound_capability_contract?: Record<string, unknown>;
   execution_state?: {
     required_observation_families: HelixCapabilityItineraryFamily[];
+    required_capabilities?: string[];
     admitted_tool_families: HelixCapabilityItineraryFamily[];
     observed_families: HelixCapabilityItineraryFamily[];
     missing_observation_families: HelixCapabilityItineraryFamily[];
+    missing_compound_subgoal_ids?: string[];
+    missing_required_capabilities?: string[];
+    compound_subgoal_ledger?: Array<Record<string, unknown>>;
+    next_missing_subgoal_id?: string | null;
     complete: boolean;
   };
   authority: "planning_only";

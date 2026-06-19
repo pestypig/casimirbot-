@@ -2317,6 +2317,9 @@ describe("StagePlayBadgeGraphPanel", () => {
             "agent_goal_context_feed:agent_goal_feed:translation",
             "allowed_actuator:query_translation_segments",
             "agent_goal_allowed_actuator:query_translation_segments",
+            "freshness_filter:fresh",
+            "agent_goal_session_filter:context_feed:translated_transcripts",
+            "agent_goal_session_filter:allowed_actuator:narrator_bind_stream",
           ],
           receiptRefs: ["stage_play_context_feed_query:translated_transcripts:ui"],
           freshness: {
@@ -2538,6 +2541,10 @@ describe("StagePlayBadgeGraphPanel", () => {
     expect(screen.getByTestId("stage-play-feed-policy-ref-state")).toHaveTextContent(/3 context-feed policy refs/i);
     expect(screen.getByTestId("stage-play-feed-policy-ref-state")).toHaveTextContent(/3 actuator policy refs/i);
     expect(screen.getByTestId("stage-play-feed-policy-ref-state")).toHaveTextContent(/1 exact goal authorization ref/i);
+    expect(screen.getByTestId("stage-play-freshness-filter-state")).toHaveTextContent(/1 requested freshness filter ref/i);
+    expect(screen.getByTestId("stage-play-freshness-filter-state")).toHaveTextContent(/fresh, stale, blocked, or unknown context/i);
+    expect(screen.getByTestId("stage-play-session-filter-state")).toHaveTextContent(/2 goal-session filter refs/i);
+    expect(screen.getByTestId("stage-play-session-filter-state")).toHaveTextContent(/feed and actuator constraints/i);
     expect(screen.getByTestId("stage-play-tool-attribution-state")).toHaveTextContent(/1 tool-attributed update/i);
     expect(screen.getByTestId("stage-play-tool-attribution-state")).toHaveTextContent(/1 matched allowed actuator update/i);
     expect(screen.getByTestId("stage-play-tool-attribution-state")).toHaveTextContent(/requested tool, canonical tool, and exact goal authorization refs/i);
@@ -2598,6 +2605,12 @@ describe("StagePlayBadgeGraphPanel", () => {
     )).toBe(true);
     expect(screen.getAllByTestId("stage-play-goal-context-update-matched-actuator-refs").some((node) =>
       /matchedActuatorRefs=agent_goal_allowed_actuator:query_translation_segments/i.test(node.textContent ?? "")
+    )).toBe(true);
+    expect(screen.getAllByTestId("stage-play-goal-context-update-freshness-filter").some((node) =>
+      /requestedFreshness=freshness_filter:fresh/i.test(node.textContent ?? "")
+    )).toBe(true);
+    expect(screen.getAllByTestId("stage-play-goal-context-update-session-filter").some((node) =>
+      /requestedSession=agent_goal_session_filter:context_feed:translated_transcripts, agent_goal_session_filter:allowed_actuator:narrator_bind_stream/i.test(node.textContent ?? "")
     )).toBe(true);
     expect(screen.getByTestId("stage-play-agent-goal-session-feed-policy-refs")).toHaveTextContent(/agent_goal_context_feed:feed:translation/i);
     expect(screen.getByTestId("stage-play-agent-goal-session-feed-policy-refs")).toHaveTextContent(/agent_goal_allowed_actuator:query_translation_segments/i);

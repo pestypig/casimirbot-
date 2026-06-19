@@ -1052,6 +1052,65 @@ describe("Helix Ask workstation tool planner", () => {
     });
   });
 
+  it("passes goal-session feed and actuator filters to generic workstation context queries", () => {
+    const plan = planWorkstationToolUse(
+      "Show workstation goal sessions context_feed_kind=trace_memory allowed_actuator=narrator_bind_stream for source_id=source:browser-audio.",
+      { threadId: "thread:goal-session-filters", turnId: "turn:goal-session-filters" },
+    );
+
+    expect(plan.intent).toBe("workstation_goal_context");
+    expect(plan.should_use_tool).toBe(true);
+    expect(plan.action).toBeNull();
+    expect(plan.tool_plan?.steps.map((step) => step.tool_id ?? `${step.panel_id}.${step.action_id}`)).toEqual([
+      "live_env.query_workstation_goal_context",
+      "undefined.undefined",
+    ]);
+    expect(plan.tool_plan?.steps[0]).toMatchObject({
+      step_id: "query_workstation_goal_context",
+      kind: "run_ask_tool",
+      tool_id: "live_env.query_workstation_goal_context",
+      args: expect.objectContaining({
+        thread_id: "thread:goal-session-filters",
+        source_id: "source:browser-audio",
+        source_ref: "source:browser-audio",
+        context_feed_kind: "trace_memory",
+        allowed_actuator: "narrator_bind_stream",
+        limit: 40,
+      }),
+      expected_receipt_kind: "stage_play_workstation_goal_context_read_result",
+      expected_state_change: {
+        store: "stage-play-goal-context",
+        proof_key: "goalContextUpdates",
+      },
+      required: true,
+    });
+    expect(plan.tool_plan?.steps[1]).toMatchObject({
+      step_id: "evaluate_workstation_goal_context",
+      kind: "evaluate_result",
+      depends_on: ["query_workstation_goal_context"],
+      expected_receipt_kind: "helix.workstation_tool_evaluation.v1",
+      required: true,
+    });
+
+    const naturalPlan = planWorkstationToolUse(
+      "Which active workstation goal sessions can use narrator_bind_stream with the trace memory context feed?",
+      { threadId: "thread:natural-goal-session-filters", turnId: "turn:natural-goal-session-filters" },
+    );
+    expect(naturalPlan.intent).toBe("workstation_goal_context");
+    expect(naturalPlan.tool_plan?.steps[0]).toMatchObject({
+      step_id: "query_workstation_goal_context",
+      kind: "run_ask_tool",
+      tool_id: "live_env.query_workstation_goal_context",
+      args: expect.objectContaining({
+        thread_id: "thread:natural-goal-session-filters",
+        context_feed_kind: "trace_memory",
+        allowed_actuator: "narrator_bind_stream",
+      }),
+      expected_receipt_kind: "stage_play_workstation_goal_context_read_result",
+      required: true,
+    });
+  });
+
   it("assembles goal-session narrator and graph controls before querying the updated circuit", () => {
     const plan = planWorkstationToolUse(
       "Start an agent goal session goal_id=goal:translate source_id=source:browser-audio objective=\"Monitor translated transcript output.\" Turn on narrator for the translated transcript stream and focus the process graph node_ref=stage_play_processed_mail_packet:latest.",
@@ -1295,6 +1354,9 @@ describe("Helix Ask workstation tool planner", () => {
       step_id: "query_visual_summaries",
       kind: "run_ask_tool",
       tool_id: "live_env.query_visual_summaries",
+      args: expect.objectContaining({
+        freshness_status: "fresh",
+      }),
       expected_receipt_kind: "stage_play_workstation_context_feed_query_result",
       required: true,
     });
@@ -1404,6 +1466,48 @@ describe("Helix Ask workstation tool planner", () => {
       kind: "run_ask_tool",
       tool_id: "live_env.query_automation_policies",
       expected_receipt_kind: "stage_play_workstation_context_feed_query_result",
+      required: true,
+    });
+  });
+
+  it("adds freshness scope to workstation context feed query plans", () => {
+    const staleVisualPlan = planWorkstationToolUse(
+      "Read stale visual summaries for source_id=visual_source:tab-1.",
+      { threadId: "thread:stale-visual-feed", turnId: "turn:stale-visual-feed" },
+    );
+    expect(staleVisualPlan.intent).toBe("workstation_goal_context");
+    expect(staleVisualPlan.tool_plan?.steps[0]).toMatchObject({
+      step_id: "query_visual_summaries",
+      kind: "run_ask_tool",
+      tool_id: "live_env.query_visual_summaries",
+      args: expect.objectContaining({
+        source_id: "visual_source:tab-1",
+        source_ref: "visual_source:tab-1",
+        freshness_status: "stale",
+      }),
+      expected_receipt_kind: "stage_play_workstation_context_feed_query_result",
+      expected_state_change: {
+        store: "stage-play-goal-context",
+        proof_key: "goalContextUpdates",
+      },
+      required: true,
+    });
+
+    const blockedHealthPlan = planWorkstationToolUse(
+      "Check blocked source health updates for source_id=audio_source:share.",
+      { threadId: "thread:blocked-health-feed", turnId: "turn:blocked-health-feed" },
+    );
+    expect(blockedHealthPlan.intent).toBe("workstation_goal_context");
+    expect(blockedHealthPlan.tool_plan?.steps[0]).toMatchObject({
+      step_id: "query_source_health",
+      kind: "run_ask_tool",
+      tool_id: "live_env.query_source_health",
+      args: expect.objectContaining({
+        source_id: "audio_source:share",
+        source_ref: "audio_source:share",
+        freshness_status: "blocked",
+      }),
+      expected_receipt_kind: "helix.situation_source_capability_read.v1",
       required: true,
     });
   });
@@ -1622,6 +1726,7 @@ describe("Helix Ask workstation tool planner", () => {
       "Could we inspect goal context updates later after the source is running?",
       "Previously you queried per-packet traces; what did that mean?",
       "Do not query trace memory; explain the phrase.",
+      "Do not read stale visual summaries; explain what a stale feed means.",
       "Do not evaluate goal satisfaction; explain what evidence would be needed first.",
       'The UI label says "live_env.query_trace_memory"; summarize it.',
       'The UI label says "live_env.evaluate_goal_satisfaction"; summarize it.',

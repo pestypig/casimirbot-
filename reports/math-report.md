@@ -1,6 +1,6 @@
 # Math Report
 
-Generated: 2026-06-19T11:12:21.820Z
+Generated: 2026-06-19T15:15:40.642Z
 Registry entries: 129
 
 ## Coverage by Stage
@@ -60,8 +60,8 @@ none
 - tests considered: 0
 
 ## Auto-discovered Dependencies
-- nodes: 2087
-- edges: 4723
+- nodes: 2094
+- edges: 4726
 
 ## Stage Violations (Edges)
 none

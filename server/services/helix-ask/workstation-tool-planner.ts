@@ -22,11 +22,15 @@ import {
   upsertVoiceInterpretationContext,
 } from "../voice/voice-interpretation-context-store";
 import {
+  type AgentGoalActuatorV1,
+  type AgentGoalContextFeedKindV1,
   WORKSTATION_AGENT_GOAL_ACTUATORS,
   WORKSTATION_AGENT_GOAL_DEFAULT_CONTEXT_FEEDS,
+  normalizeAgentGoalActuatorV1,
 } from "../../../shared/contracts/workstation-goal-context.v1";
 import {
   WORKSTATION_CONTEXT_FEED_QUERY_CAPABILITIES,
+  WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS,
   type WorkstationContextFeedQueryCapability,
   workstationContextFeedQuerySpecForCapability,
 } from "./workstation-context-feed-query-tool-contracts";
@@ -1584,7 +1588,7 @@ function wantsQueryWorkstationGoalContext(prompt: string): boolean {
   return (
     /\blive_env\.query_workstation_goal_context\b/i.test(prompt) ||
     new RegExp(`\\b(?:${GOAL_CONTEXT_FEED_QUERY_TOOL_PATTERN})\\b`, "i").test(prompt) ||
-    new RegExp(`\\b(?:query|view|inspect|show|list|get|check|read|retrieve|summari[sz]e)\\b[\\s\\S]{0,140}\\b${GOAL_CONTEXT_OBJECT_PATTERN}\\b`, "i").test(prompt) ||
+    new RegExp(`\\b(?:query|view|inspect|show|list|get|check|read|retrieve|summari[sz]e|which|what|where)\\b[\\s\\S]{0,140}\\b${GOAL_CONTEXT_OBJECT_PATTERN}\\b`, "i").test(prompt) ||
     new RegExp(`\\b${GOAL_CONTEXT_OBJECT_PATTERN}\\b[\\s\\S]{0,140}\\b(?:query|view|inspect|show|list|get|check|read|retrieve|latest|active|available|known)\\b`, "i").test(prompt)
   );
 }
@@ -1678,6 +1682,107 @@ function expectedReceiptKindForWorkstationContextFeedTool(toolId: WorkstationCon
     "stage_play_workstation_context_feed_query_result";
 }
 
+function extractGoalContextFreshnessStatus(prompt: string): "fresh" | "stale" | "blocked" | "unknown" | null {
+  if (/\b(?:stale|expired|outdated|old)\b[\s\S]{0,140}\b(?:goal\s+context|visual\s+summaries|audio\s+transcripts?|translation\s+segments?|micro[-\s]?deck\s+outputs?|live\s+answer\s+state|source\s+health|trace\s+memory|route\s+evidence|automation\s+polic(?:y|ies))\b/i.test(prompt)) {
+    return "stale";
+  }
+  if (/\b(?:goal\s+context|visual\s+summaries|audio\s+transcripts?|translation\s+segments?|micro[-\s]?deck\s+outputs?|live\s+answer\s+state|source\s+health|trace\s+memory|route\s+evidence|automation\s+polic(?:y|ies))\b[\s\S]{0,140}\b(?:stale|expired|outdated|old)\b/i.test(prompt)) {
+    return "stale";
+  }
+  if (/\b(?:blocked|failed|unavailable|insufficient)\b[\s\S]{0,140}\b(?:goal\s+context|visual\s+summaries|audio\s+transcripts?|translation\s+segments?|micro[-\s]?deck\s+outputs?|live\s+answer\s+state|source\s+health|trace\s+memory|route\s+evidence|automation\s+polic(?:y|ies))\b/i.test(prompt)) {
+    return "blocked";
+  }
+  if (/\b(?:goal\s+context|visual\s+summaries|audio\s+transcripts?|translation\s+segments?|micro[-\s]?deck\s+outputs?|live\s+answer\s+state|source\s+health|trace\s+memory|route\s+evidence|automation\s+polic(?:y|ies))\b[\s\S]{0,140}\b(?:blocked|failed|unavailable|insufficient)\b/i.test(prompt)) {
+    return "blocked";
+  }
+  if (/\b(?:unknown|uncertain|unclassified)\b[\s\S]{0,140}\b(?:freshness|goal\s+context|visual\s+summaries|audio\s+transcripts?|translation\s+segments?|micro[-\s]?deck\s+outputs?|live\s+answer\s+state|source\s+health|trace\s+memory|route\s+evidence|automation\s+polic(?:y|ies))\b/i.test(prompt)) {
+    return "unknown";
+  }
+  if (/\b(?:fresh|current|latest|active|recent)\b[\s\S]{0,140}\b(?:goal\s+context|visual\s+summaries|audio\s+transcripts?|translation\s+segments?|micro[-\s]?deck\s+outputs?|live\s+answer\s+state|source\s+health|trace\s+memory|route\s+evidence|automation\s+polic(?:y|ies))\b/i.test(prompt)) {
+    return "fresh";
+  }
+  if (/\b(?:goal\s+context|visual\s+summaries|audio\s+transcripts?|translation\s+segments?|micro[-\s]?deck\s+outputs?|live\s+answer\s+state|source\s+health|trace\s+memory|route\s+evidence|automation\s+polic(?:y|ies))\b[\s\S]{0,140}\b(?:fresh|current|latest|active|recent)\b/i.test(prompt)) {
+    return "fresh";
+  }
+  return null;
+}
+
+function normalizeGoalContextFeedKindForPlanner(value: unknown): AgentGoalContextFeedKindV1 | null {
+  const normalized = typeof value === "string"
+    ? value.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "")
+    : "";
+  if (!normalized) return null;
+  for (const spec of WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS) {
+    if (
+      spec.feedKind === normalized ||
+      spec.capability.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") === normalized ||
+      spec.aliases.some((alias) =>
+        alias.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") === normalized
+      )
+    ) {
+      return spec.feedKind;
+    }
+  }
+  return null;
+}
+
+function workstationGoalAliasPattern(value: string): string {
+  return value
+    .trim()
+    .split(/[_\s-]+/g)
+    .map(escapeRegex)
+    .filter(Boolean)
+    .join("[_\\s-]*");
+}
+
+function extractGoalContextFeedKindFilter(prompt: string): AgentGoalContextFeedKindV1 | null {
+  const explicit = extractNamedArg(prompt, [
+    "context_feed_kind",
+    "context feed kind",
+    "feed_kind",
+    "feed kind",
+    "context_feed",
+    "context feed",
+  ]);
+  const explicitFeed = normalizeGoalContextFeedKindForPlanner(explicit);
+  if (explicitFeed) return explicitFeed;
+  for (const spec of WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS) {
+    const aliases = [spec.feedKind, spec.label, ...spec.aliases]
+      .map(workstationGoalAliasPattern)
+      .filter(Boolean);
+    const aliasPattern = aliases.join("|");
+    if (
+      new RegExp(`\\b(?:context\\s+feed|feed|goal\\s+session|agent\\s+goal\\s+session)s?\\b[\\s\\S]{0,120}\\b(?:${aliasPattern})\\b`, "i").test(prompt) ||
+      new RegExp(`\\b(?:${aliasPattern})\\b[\\s\\S]{0,120}\\b(?:context\\s+feed|feed|goal\\s+session|agent\\s+goal\\s+session)s?\\b`, "i").test(prompt)
+    ) {
+      return spec.feedKind;
+    }
+  }
+  return null;
+}
+
+function extractGoalContextAllowedActuatorFilter(prompt: string): AgentGoalActuatorV1 | null {
+  const explicit = extractNamedArg(prompt, [
+    "allowed_actuator",
+    "allowed actuator",
+    "actuator",
+    "control_actuator",
+    "control actuator",
+  ]);
+  const explicitActuator = normalizeAgentGoalActuatorV1(explicit);
+  if (explicitActuator) return explicitActuator;
+  for (const actuator of WORKSTATION_AGENT_GOAL_ACTUATORS) {
+    const alias = workstationGoalAliasPattern(actuator);
+    if (
+      new RegExp(`\\b(?:allowed\\s+actuator|actuator|can\\s+(?:use|run|call)|allowed\\s+to\\s+(?:use|run|call))\\b[\\s\\S]{0,120}\\b${alias}\\b`, "i").test(prompt) ||
+      new RegExp(`\\b${alias}\\b[\\s\\S]{0,120}\\b(?:allowed\\s+actuator|actuator|goal\\s+session|agent\\s+goal\\s+session)\\b`, "i").test(prompt)
+    ) {
+      return actuator;
+    }
+  }
+  return null;
+}
+
 function extractGoalContextObjective(prompt: string): string {
   const explicit =
     extractNamedArg(prompt, ["objective", "goal", "goal objective"]) ??
@@ -1702,17 +1807,24 @@ function buildWorkstationGoalContextPlan(
   scores: AffordanceScore[],
 ): WorkstationToolPlannerResult {
   const startSession = wantsStartAgentGoalSession(normalized);
-  const traceMemory = !startSession && wantsTraceMemoryQuery(normalized);
-  const feedTool = !startSession && !traceMemory ? selectWorkstationContextFeedTool(normalized) : null;
+  const contextFeedKindFilter = extractGoalContextFeedKindFilter(normalized);
+  const allowedActuatorFilter = extractGoalContextAllowedActuatorFilter(normalized);
+  const hasSessionFilters = Boolean(contextFeedKindFilter || allowedActuatorFilter);
+  const traceMemory = !startSession && !hasSessionFilters && wantsTraceMemoryQuery(normalized);
+  const feedTool = !startSession && !traceMemory && !hasSessionFilters ? selectWorkstationContextFeedTool(normalized) : null;
   const threadId = options.threadId ?? "helix-ask:desktop";
   const objective = extractGoalContextObjective(normalized);
   const sourceId = extractNamedArg(normalized, ["source_id", "source id", "source_ref", "source ref"]);
+  const freshnessStatus = extractGoalContextFreshnessStatus(normalized);
   const goalId =
     extractNamedArg(normalized, ["goal_id", "goal id"]) ??
     `goal:workstation-context:${(options.turnId ?? Date.now()).toString().replace(/[^a-z0-9_-]+/gi, "_")}`;
   const queryArgs = {
     thread_id: threadId,
     ...(sourceId ? { source_id: sourceId, source_ref: sourceId } : {}),
+    ...(freshnessStatus ? { freshness_status: freshnessStatus } : {}),
+    ...(contextFeedKindFilter ? { context_feed_kind: contextFeedKindFilter } : {}),
+    ...(allowedActuatorFilter ? { allowed_actuator: allowedActuatorFilter } : {}),
     limit: 40,
   };
   const traceQueryArgs = {

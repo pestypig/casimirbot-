@@ -108,7 +108,7 @@ const feedUpdateLanes: Readonly<Record<AgentGoalContextFeedKindV1, {
   },
   microdeck_outputs: {
     producerKinds: ["microdeck"],
-    updateKinds: ["summary", "visual_observation", "classification", "translated_transcript", "route_evidence", "reflection"],
+    updateKinds: ["summary", "visual_observation", "classification", "translated_transcript", "route_evidence", "reflection", "preset_state"],
   },
   live_answer_lines: {
     producerKinds: ["live_answer"],

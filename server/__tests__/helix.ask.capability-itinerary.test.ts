@@ -3,6 +3,7 @@ import { HELIX_INTERNET_SEARCH_CAPABILITY } from "@shared/helix-internet-search-
 import { HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY } from "@shared/helix-scholarly-research-observation";
 import type { HelixToolCallAdmissionDecision } from "@shared/helix-tool-call-admission";
 import { buildHelixCapabilityItinerary } from "../services/helix-ask/capability-itinerary";
+import { buildHelixCapabilityItineraryExecutionState } from "../services/helix-ask/capability-itinerary-execution";
 
 const scholarlyAdmission = (turnId: string): HelixToolCallAdmissionDecision => ({
   schema: "helix.tool_call_admission_decision.v1",
@@ -44,6 +45,289 @@ const availableCapabilities = (keys: string[]) => ({
 });
 
 describe("Helix Ask capability itinerary", () => {
+  it("creates ordered compound subgoals for workspace status then calculator", () => {
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:workspace-then-calculator",
+      promptText:
+        "Use workspace_os.status to inspect workstation status, then call scientific-calculator.solve_expression with this exact expression: 14*23+8.",
+      toolCallAdmissionDecision: {
+        ...scholarlyAdmission("ask:workspace-then-calculator"),
+        source_target: "workspace_diagnostic",
+        admitted_tool_families: ["workspace_diagnostic", "calculator", "workstation_action"],
+      },
+      availableCapabilities: availableCapabilities([
+        "workspace_os.status",
+        "scientific-calculator.solve_expression",
+      ]),
+    });
+
+    expect(itinerary.prompt_shape).toBe("compound_tool");
+    expect(itinerary.compound_capability_contract).toBeTruthy();
+    const subgoals = (itinerary.compound_capability_contract?.subgoals ?? []) as Array<Record<string, unknown>>;
+    expect(subgoals.map((subgoal) => subgoal.requested_capability)).toEqual([
+      "workspace_os.status",
+      "scientific-calculator.solve_expression",
+    ]);
+    expect(subgoals[1]?.args_hint).toEqual({
+      latex: "14*23+8",
+      expression: "14*23+8",
+    });
+    expect(itinerary.terminal_success_criteria.required_capabilities).toEqual([
+      "workspace_os.status",
+      "scientific-calculator.solve_expression",
+    ]);
+  });
+
+  it("extracts only the calculator expression from a docs-locate compound prompt", () => {
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:docs-then-calculator",
+      promptText:
+        "Use docs-viewer.locate_in_doc to cite the claim in the active document, then run scientific-calculator.solve_expression with this exact expression: 19+23.",
+      toolCallAdmissionDecision: {
+        ...scholarlyAdmission("ask:docs-then-calculator"),
+        source_target: "docs_viewer",
+        admitted_tool_families: ["docs_viewer", "calculator", "workstation_action"],
+      },
+      availableCapabilities: availableCapabilities([
+        "docs-viewer.locate_in_doc",
+        "scientific-calculator.solve_expression",
+      ]),
+    });
+
+    const subgoals = (itinerary.compound_capability_contract?.subgoals ?? []) as Array<Record<string, unknown>>;
+    expect(subgoals.map((subgoal) => subgoal.requested_capability)).toEqual([
+      "docs-viewer.locate_in_doc",
+      "scientific-calculator.solve_expression",
+    ]);
+    expect(subgoals[1]?.args_hint).toEqual({
+      latex: "19+23",
+      expression: "19+23",
+    });
+  });
+
+  it("creates ordered compound subgoals for catalog/workspace, repo/docs, and visual/calculator prompts", () => {
+    const cases = [
+      {
+        turnId: "ask:catalog-then-workspace",
+        promptText:
+          "Call helix_ask.inspect_capability_catalog, then use workspace_os.status to inspect workstation status.",
+        admittedFamilies: ["capability_catalog", "runtime_evidence", "workspace_diagnostic"],
+        available: ["helix_ask.inspect_capability_catalog", "workspace_os.status"],
+        expectedRequested: ["helix_ask.inspect_capability_catalog", "workspace_os.status"],
+        expectedRuntime: ["helix_ask.inspect_capability_catalog", "workspace_os.status"],
+      },
+      {
+        turnId: "ask:repo-plus-docs",
+        promptText:
+          "Use repo-code.search_concept to find where terminal authority is enforced, plus docs-viewer.locate_in_doc to locate the same rule in the active document.",
+        admittedFamilies: ["repo_code", "docs_viewer"],
+        available: ["repo-code.search_concept", "docs-viewer.locate_in_doc"],
+        expectedRequested: ["repo-code.search_concept", "docs-viewer.locate_in_doc"],
+        expectedRuntime: ["repo-code.search_concept", "docs-viewer.locate_in_doc"],
+      },
+      {
+        turnId: "ask:visual-then-calculator",
+        promptText:
+          "Use situation-room.describe_visual_capture, then run scientific-calculator.solve_expression with this exact expression: 5*9.",
+        admittedFamilies: ["situation_run", "calculator", "workstation_action"],
+        available: ["situation-room.describe_visual_capture", "scientific-calculator.solve_expression"],
+        expectedRequested: ["image_lens.inspect", "scientific-calculator.solve_expression"],
+        expectedRuntime: ["situation-room.describe_visual_capture", "scientific-calculator.solve_expression"],
+      },
+    ];
+
+    for (const testCase of cases) {
+      const itinerary = buildHelixCapabilityItinerary({
+        turnId: testCase.turnId,
+        promptText: testCase.promptText,
+        toolCallAdmissionDecision: {
+          ...scholarlyAdmission(testCase.turnId),
+          source_target: "runtime_evidence",
+          admitted_tool_families: testCase.admittedFamilies,
+        },
+        availableCapabilities: availableCapabilities(testCase.available),
+      });
+      const subgoals = (itinerary.compound_capability_contract?.subgoals ?? []) as Array<Record<string, unknown>>;
+
+      expect(itinerary.prompt_shape).toBe("compound_tool");
+      expect(subgoals.map((subgoal) => subgoal.requested_capability)).toEqual(testCase.expectedRequested);
+      expect(subgoals.map((subgoal) => subgoal.runtime_capability)).toEqual(testCase.expectedRuntime);
+      expect(itinerary.terminal_success_criteria.required_capabilities).toEqual(testCase.expectedRequested);
+    }
+  });
+
+  it("keeps terminal incomplete until every compound subgoal has runtime-backed observation", () => {
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:compound-ledger",
+      promptText:
+        "Use workspace_os.status to inspect workstation status, then call scientific-calculator.solve_expression with this exact expression: 2+2.",
+      toolCallAdmissionDecision: {
+        ...scholarlyAdmission("ask:compound-ledger"),
+        source_target: "workspace_diagnostic",
+        admitted_tool_families: ["workspace_diagnostic", "calculator", "workstation_action"],
+      },
+      availableCapabilities: availableCapabilities([
+        "workspace_os.status",
+        "scientific-calculator.solve_expression",
+      ]),
+    });
+
+    const partial = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [
+        {
+          artifact_id: "ask:compound-ledger:runtime_tool_call:1",
+          kind: "runtime_tool_call",
+          payload: {
+            capability_key: "workspace_os.status",
+            args: {},
+          },
+        },
+        {
+          artifact_id: "ask:compound-ledger:runtime_tool_call:1:runtime_tool_observation",
+          kind: "runtime_tool_observation",
+          payload: {
+            capability_key: "workspace_os.status",
+            status: "completed",
+          },
+        },
+        {
+          artifact_id: "ask:compound-ledger:workspace_status",
+          kind: "workspace_os_status_observation",
+          payload: {
+            schema: "helix.workspace_os_status_observation.v1",
+          },
+        },
+      ],
+    });
+
+    expect(partial.complete).toBe(false);
+    expect(partial.compound_subgoal_ledger.map((entry) => entry.satisfaction)).toEqual([
+      "satisfied",
+      "pending",
+    ]);
+    expect(partial.next_missing_subgoal_id).toContain("scientific-calculator");
+    expect(partial.missing_required_capabilities).toEqual([
+      "scientific-calculator.solve_expression",
+    ]);
+
+    const complete = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [
+        {
+          artifact_id: "ask:compound-ledger:runtime_tool_call:1",
+          kind: "runtime_tool_call",
+          payload: {
+            capability_key: "workspace_os.status",
+            args: {},
+          },
+        },
+        {
+          artifact_id: "ask:compound-ledger:runtime_tool_call:1:runtime_tool_observation",
+          kind: "runtime_tool_observation",
+          payload: {
+            capability_key: "workspace_os.status",
+            status: "completed",
+          },
+        },
+        {
+          artifact_id: "ask:compound-ledger:workspace_status",
+          kind: "workspace_os_status_observation",
+          payload: {
+            schema: "helix.workspace_os_status_observation.v1",
+          },
+        },
+        {
+          artifact_id: "ask:compound-ledger:runtime_tool_call:2",
+          kind: "runtime_tool_call",
+          payload: {
+            capability_key: "scientific-calculator.solve_expression",
+            args: { latex: "2+2", expression: "2+2" },
+          },
+        },
+        {
+          artifact_id: "ask:compound-ledger:runtime_tool_call:2:runtime_tool_observation",
+          kind: "runtime_tool_observation",
+          payload: {
+            capability_key: "scientific-calculator.solve_expression",
+            status: "completed",
+          },
+        },
+        {
+          artifact_id: "ask:compound-ledger:calculator_receipt",
+          kind: "calculator_receipt",
+          payload: {
+            schema: "helix.calculator_receipt.v1",
+          },
+        },
+      ],
+    });
+
+    expect(complete.complete).toBe(true);
+    expect(complete.compound_subgoal_ledger.map((entry) => entry.satisfaction)).toEqual([
+      "satisfied",
+      "satisfied",
+    ]);
+  });
+
+  it("marks a compound subgoal failed when runtime validation rejects its arguments", () => {
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:compound-invalid-args",
+      promptText:
+        "Use docs-viewer.locate_in_doc to cite the claim, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
+      toolCallAdmissionDecision: {
+        ...scholarlyAdmission("ask:compound-invalid-args"),
+        source_target: "docs_viewer",
+        admitted_tool_families: ["docs_viewer", "calculator", "workstation_action"],
+      },
+      availableCapabilities: availableCapabilities([
+        "docs-viewer.locate_in_doc",
+        "scientific-calculator.solve_expression",
+      ]),
+    });
+    const calculatorSubgoal = ((itinerary.compound_capability_contract?.subgoals ?? []) as Array<Record<string, unknown>>)
+      .find((subgoal) => subgoal.requested_capability === "scientific-calculator.solve_expression");
+
+    const state = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [
+        {
+          artifact_id: "ask:compound-invalid-args:runtime_tool_call:2",
+          kind: "runtime_tool_call",
+          payload: {
+            call_id: "ask:compound-invalid-args:runtime_tool_call:2",
+            capability_key: "scientific-calculator.solve_expression",
+            args: {
+              latex: "Use docs-viewer.locate_in_doc to cite the claim, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
+              compound_subgoal_id: calculatorSubgoal?.subgoal_id,
+            },
+          },
+        },
+        {
+          artifact_id: "ask:compound-invalid-args:runtime_tool_call:2:runtime_tool_call_validation",
+          kind: "runtime_tool_call_validation",
+          payload: {
+            call_id: "ask:compound-invalid-args:runtime_tool_call:2",
+            capability_key: "scientific-calculator.solve_expression",
+            valid: false,
+            errors: ["invalid_arg:latex_is_prose"],
+          },
+        },
+      ],
+    });
+
+    const calculatorLedgerEntry = state.compound_subgoal_ledger.find((entry) =>
+      entry.requested_capability === "scientific-calculator.solve_expression"
+    );
+    expect(calculatorLedgerEntry).toMatchObject({
+      satisfaction: "failed",
+      rail_status: "fail_closed",
+      rail_failure_code: "invalid_arg:latex_is_prose",
+    });
+    expect(state.complete).toBe(false);
+    expect(state.missing_required_capabilities).toContain("scientific-calculator.solve_expression");
+  });
+
   it("records compound scholarly research plus theory locator criteria before execution", () => {
     const itinerary = buildHelixCapabilityItinerary({
       turnId: "ask:compound-itinerary",

@@ -871,5 +871,21 @@ describe("stage-play goal context store", () => {
       actionsTaken: ["start_agent_goal_session"],
       nextStep: "continue",
     });
+    expect(listStagePlayAgentGoalSessions({
+      threadId,
+      contextFeedKind: "trace_memory",
+    }).map((entry) => entry.goalId)).toEqual(["goal:frog-classification"]);
+    expect(listStagePlayAgentGoalSessions({
+      threadId,
+      contextFeedKind: "source_health",
+    })).toEqual([]);
+    expect(listStagePlayAgentGoalSessions({
+      threadId,
+      allowedActuator: "narrator_bind_stream",
+    }).map((entry) => entry.goalId)).toEqual(["goal:frog-classification"]);
+    expect(listStagePlayAgentGoalSessions({
+      threadId,
+      allowedActuator: "query_source_health",
+    })).toEqual([]);
   });
 });

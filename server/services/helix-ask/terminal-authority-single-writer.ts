@@ -532,7 +532,16 @@ export const applyTerminalProjectionKindGuard = (
 ): HelixTerminalAuthoritySingleWriterResult => {
   const authorityKind = readString(result.selected_terminal_artifact_kind);
   const presentation = readRecord(payload.terminal_presentation);
-  const visibleKind = readString(presentation?.terminal_artifact_kind) ?? readString(payload.terminal_artifact_kind);
+  const typedFailure = readRecord(payload.typed_failure);
+  const existingTypedFailureCode =
+    readString(payload.terminal_error_code) ??
+    readString(typedFailure?.error_code);
+  const hasSpecificTypedFailureAuthority =
+    authorityKind === "typed_failure" &&
+    Boolean(existingTypedFailureCode && existingTypedFailureCode !== "terminal_projection_mismatch");
+  const visibleKind = hasSpecificTypedFailureAuthority
+    ? "typed_failure"
+    : readString(presentation?.terminal_artifact_kind) ?? readString(payload.terminal_artifact_kind);
   if (!authorityKind || !visibleKind || authorityKind === visibleKind) {
     return {
       ...result,
@@ -639,7 +648,6 @@ export const applyTerminalProjectionKindGuard = (
     };
   }
 
-  const typedFailure = readRecord(payload.typed_failure);
   const railFailure = readTerminalBlockingToolRailFailure(payload);
   const failureCodeCandidates = [
     readString(payload.terminal_error_code) ??
@@ -2492,6 +2500,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     input.payload.terminal_artifact_kind = "typed_failure";
     input.payload.final_answer_source = "typed_failure";
     input.payload.terminal_error_code = terminalErrorCode;
+    input.payload.terminal_failure_text = terminalErrorText;
     input.payload.selected_final_answer = terminalErrorText;
     input.payload.answer = terminalErrorText;
     input.payload.text = terminalErrorText;
@@ -2505,6 +2514,15 @@ export function applyHelixTerminalAuthoritySingleWriter(
       answer_text: terminalErrorText,
       unresolved_requirement_ids: unresolved,
       failed_closed_requirement_ids: failedClosed,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    input.payload.terminal_presentation = {
+      ...(readRecord(input.payload.terminal_presentation) ?? {}),
+      schema: "helix.terminal_presentation.v1",
+      turn_id: input.turnId,
+      terminal_artifact_kind: "typed_failure",
+      concise_text: terminalErrorText,
       assistant_answer: false,
       raw_content_included: false,
     };

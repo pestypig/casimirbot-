@@ -43,6 +43,8 @@ export type HelixToolCallAdmissionRouteArbitration = {
   repo_code_preserved_as_secondary_context: boolean;
   requested_capability?: string | null;
   requested_capability_family?: HelixToolCallAdmissionFamily | string | null;
+  compound_requested_capabilities?: string[];
+  compound_required_observation_kinds?: string[];
   requested_capability_source?: string | null;
   requested_capability_confidence?: number | null;
   required_observation_kinds_for_requested_capability?: string[];
@@ -92,6 +94,8 @@ export type HelixToolCallAdmissionDecision = {
   capability_contract_guard_version?: "E82";
   requested_capability?: string | null;
   requested_capability_family?: HelixToolCallAdmissionFamily | string | null;
+  compound_requested_capabilities?: string[];
+  compound_required_observation_kinds?: string[];
   requested_capability_source?: string | null;
   requested_capability_confidence?: number | null;
   required_observation_kinds_for_requested_capability?: string[];

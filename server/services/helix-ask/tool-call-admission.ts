@@ -16,6 +16,8 @@ import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
 import {
   extractExplicitCapabilityContract,
+  extractExplicitCapabilityContracts,
+  type ExplicitCapabilityContract,
   explicitCapabilityContractForCapability,
 } from "./explicit-capability-contract";
 import {
@@ -27,6 +29,19 @@ import { isWorkspaceOsStatusPrompt } from "./workspace-os-status-intent";
 import { isAskCapabilityCatalogPrompt } from "./capability-catalog-intent";
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
+
+const uniqueExplicitCapabilityContracts = (
+  contracts: Array<ExplicitCapabilityContract | null | undefined>,
+): ExplicitCapabilityContract[] => {
+  const seen = new Set<string>();
+  const result: ExplicitCapabilityContract[] = [];
+  for (const contract of contracts) {
+    if (!contract || seen.has(contract.capability)) continue;
+    seen.add(contract.capability);
+    result.push(contract);
+  }
+  return result;
+};
 
 const readRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -315,10 +330,18 @@ export function buildToolCallAdmissionDecision(input: {
   const toolUseRestatement = buildToolUseRestatement(promptText);
   const calculatorSolveIntent = calculatorSolveRequested(promptText, input.sourceTargetIntent);
   const mandatoryToolName = readMandatoryToolName(mandatoryNextToolRecord);
+  const promptExplicitCapabilityMatches = extractExplicitCapabilityContracts(promptText);
+  const promptExplicitCapabilityContracts = uniqueExplicitCapabilityContracts(
+    promptExplicitCapabilityMatches.map((match) => match.contract),
+  );
   const promptExplicitCapabilityContract = extractExplicitCapabilityContract(promptText);
   const explicitCapabilityContract =
     promptExplicitCapabilityContract ??
     explicitCapabilityContractForCapability(mandatoryToolName);
+  const explicitCapabilityContractsForAdmission = uniqueExplicitCapabilityContracts([
+    ...promptExplicitCapabilityContracts,
+    explicitCapabilityContract,
+  ]);
   const requestedCapabilitySource = promptExplicitCapabilityContract
     ? "explicit_user_command"
     : explicitCapabilityContract
@@ -710,15 +733,21 @@ export function buildToolCallAdmissionDecision(input: {
     reason = `${reason}+compound_theory_locator_required`;
   }
 
-  if (explicitCapabilityContract) {
-    const requestedFamilies = explicitCapabilityContract.admission_families.filter(familyAllowed);
+  if (explicitCapabilityContractsForAdmission.length > 0) {
+    const requestedFamilies = explicitCapabilityContractsForAdmission
+      .flatMap((contract) => contract.admission_families)
+      .filter(familyAllowed);
     const nextFamilies = unique([
       ...admittedToolFamilies.filter((family: HelixToolCallAdmissionFamily) => family !== "model_only"),
       ...requestedFamilies,
     ]);
     admittedToolFamilies = nextFamilies;
     required = true;
-    reason = `${reason}+explicit_capability_contract_required`;
+    reason = `${reason}+${
+      explicitCapabilityContractsForAdmission.length > 1
+        ? "compound_explicit_capability_contracts_required"
+        : "explicit_capability_contract_required"
+    }`;
     if (explicitCapabilityDominatesSourceTarget) {
       reason = `${reason}+explicit_capability_contract_dominance`;
     }
@@ -733,7 +762,9 @@ export function buildToolCallAdmissionDecision(input: {
     finalAdmittedToolFamilies.includes("calculator") &&
     finalAdmittedToolFamilies.includes("workstation_action");
   const explicitCapabilityAdmitted = explicitCapabilityContract
-    ? explicitCapabilityContract.admission_families.every((family) => finalAdmittedToolFamilies.includes(family))
+    ? explicitCapabilityContractsForAdmission.every((contract) =>
+        contract.admission_families.every((family) => finalAdmittedToolFamilies.includes(family))
+      )
     : false;
   const routeArbitrationGuardVersion = explicitCapabilityContract ? "E82" as const : "E80" as const;
   const routeArbitrationSelectedCapability =
@@ -767,6 +798,8 @@ export function buildToolCallAdmissionDecision(input: {
           repo_code_preserved_as_secondary_context: calculatorAdmissionDominatesSourceTarget && sourceTarget === "repo_code",
           requested_capability: explicitCapabilityContract?.capability ?? null,
           requested_capability_family: explicitCapabilityContract?.capability_family ?? null,
+          compound_requested_capabilities: promptExplicitCapabilityContracts.map((contract) => contract.capability),
+          compound_required_observation_kinds: unique(promptExplicitCapabilityContracts.flatMap((contract) => contract.required_observation_kinds)),
           requested_capability_source: requestedCapabilitySource,
           requested_capability_confidence: requestedCapabilityConfidence,
           required_observation_kinds_for_requested_capability:
@@ -840,6 +873,8 @@ export function buildToolCallAdmissionDecision(input: {
                 capability_contract_guard_version: "E82" as const,
                 requested_capability: explicitCapabilityContract.capability,
                 requested_capability_family: explicitCapabilityContract.capability_family,
+                compound_requested_capabilities: promptExplicitCapabilityContracts.map((contract) => contract.capability),
+                compound_required_observation_kinds: unique(promptExplicitCapabilityContracts.flatMap((contract) => contract.required_observation_kinds)),
                 requested_capability_source: requestedCapabilitySource,
                 requested_capability_confidence: requestedCapabilityConfidence,
                 required_observation_kinds_for_requested_capability:
