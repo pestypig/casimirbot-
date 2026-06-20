@@ -5,6 +5,7 @@ import {
   hashTheoryFrontierGraph,
 } from "../theory-frontier-search";
 import { verifyTheoryFrontierCandidateExactContract } from "../theory-frontier-exact-verifier";
+import { buildTheoryBadgeGraphV1 } from "../../contracts/theory-badge-graph.v1";
 
 describe("theory frontier search", () => {
   it("preserves deterministic candidate replay for the same graph, query, and seed", () => {
@@ -92,6 +93,60 @@ describe("theory frontier search", () => {
     ).toBe(true);
     expect(search.scholarlyLookupRequests.every((request) => request.noAutoPromoteLiterature === true)).toBe(true);
     expect(search.scholarlyLookupRequests.every((request) => request.mutating === false)).toBe(true);
+  });
+
+  it("uses explicit badge scale envelopes as bounded-system frontier coordinates", () => {
+    const sourceGraph = buildHelixTheoryBadgeGraphV1();
+    const [leftBadge, rightBadge] = sourceGraph.badges;
+    expect(leftBadge).toBeDefined();
+    expect(rightBadge).toBeDefined();
+    if (!leftBadge || !rightBadge) throw new Error("frontier search graph has fewer than two badges");
+
+    const graph = buildTheoryBadgeGraphV1({
+      graphId: "test.explicit-scale-frontier",
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      title: "Explicit scale envelope frontier fixture",
+      description: "Two-badge fixture for bounded-system frontier coordinate tests.",
+      badges: [
+        {
+          ...leftBadge,
+          scaleEnvelope: {
+            characteristicLog10M: -11.5,
+            minLog10M: -12,
+            maxLog10M: -11,
+            basis: "derived" as const,
+            sourceRefs: [{ kind: "doc" as const, path: "docs/theory-frontier-scale.md" }],
+          },
+        },
+        {
+          ...rightBadge,
+          scaleEnvelope: {
+            characteristicLog10M: -5.5,
+            minLog10M: -6,
+            maxLog10M: -5,
+            basis: "model_assumption" as const,
+            sourceRefs: [{ kind: "doc" as const, path: "docs/theory-frontier-scale.md" }],
+          },
+        },
+      ],
+      edges: [],
+    });
+
+    const search = buildTheoryFrontierSearch({
+      graph,
+      query: `${leftBadge.id} ${rightBadge.id}`,
+      searchSeed: "explicit-scale-envelope-seed",
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      originBadgeIds: [leftBadge.id, rightBadge.id],
+      limit: 25,
+    });
+    const candidate = search.candidates.find(
+      (item) => item.badgeIds.includes(leftBadge.id) && item.badgeIds.includes(rightBadge.id),
+    );
+
+    expect(candidate).toBeDefined();
+    expect(candidate?.biomeRegion.scaleEnvelopeLog10M).toEqual({ min: -12, max: -5 });
+    expect(candidate?.congruence.uncertaintyBudget).toContain("scale envelope log10(m) -12..-5");
   });
 
   it("marks explicit claim-boundary regions as blocked candidates", () => {

@@ -281,7 +281,7 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       text: hypothetical,
     };
   }
-  const hypotheticalCalculator = prompt.match(/\b(?:if|when|before|after|would|could|might|hypothetically|may\s+ask|next\s+time|later)\b[\s\S]{0,140}(?:open|opened|show|view|use|run|call|calculate|compute|solve|evaluate)\b[\s\S]{0,120}(?:scientific\s+calculator|calculator|equation|expression)\b[\s\S]{0,160}\b(?:not\s+now|not\s+yet|but\s+not\s+now|without\s+doing\s+it\s+now)?/i)?.[0];
+  const hypotheticalCalculator = prompt.match(/\b(?:if|when|before|after|would|could|might|hypothetically|may\s+ask|next\s+time|later)\b[^.!?;\n]{0,140}(?:open|opened|show|view|use|run|call|calculate|compute|solve|evaluate)\b[^.!?;\n]{0,120}(?:scientific\s+calculator|calculator|equation|expression)\b[^.!?;\n]{0,160}\b(?:not\s+now|not\s+yet|but\s+not\s+now|without\s+doing\s+it\s+now)?/i)?.[0];
   if (hypotheticalCalculator) {
     return {
       tool_admission_suppressed: true,

@@ -11,6 +11,7 @@ import type {
   TheoryBadgeEdgeV1,
   TheoryBadgeGraphV1,
   TheoryBadgeLevel,
+  TheoryBadgeScaleEnvelopeV1,
   TheoryBadgeV1,
 } from "../contracts/theory-badge-graph.v1";
 import {
@@ -263,6 +264,53 @@ function temperatureFor(scaleBand: TheoryBiomeBand, scaleLog10M: number | null):
   return clamp01(theoryBiomeBandIndex(scaleBand) / Math.max(1, THEORY_BIOME_BAND_ORDER.length - 1));
 }
 
+function finiteOrNull(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function buildScaleEnvelope(args: {
+  badge: TheoryBadgeV1;
+  scaleBand: TheoryBiomeBand;
+  scaleLog10M: number | null;
+}): TheoryBadgeScaleEnvelopeV1 {
+  if (args.badge.scaleEnvelope) {
+    return {
+      characteristicLog10M: finiteOrNull(args.badge.scaleEnvelope.characteristicLog10M),
+      minLog10M: finiteOrNull(args.badge.scaleEnvelope.minLog10M),
+      maxLog10M: finiteOrNull(args.badge.scaleEnvelope.maxLog10M),
+      basis: args.badge.scaleEnvelope.basis,
+      sourceRefs: [...args.badge.scaleEnvelope.sourceRefs],
+    };
+  }
+
+  const characteristicLog10M = finiteOrNull(args.scaleLog10M);
+  if (characteristicLog10M == null) {
+    return {
+      characteristicLog10M: null,
+      minLog10M: null,
+      maxLog10M: null,
+      basis: "heuristic",
+      sourceRefs: [],
+    };
+  }
+
+  const scaleBand = THEORY_SCALE_BANDS.find((candidate) => candidate.band === args.scaleBand);
+  const halfWidth = scaleBand
+    ? Math.min(0.5, (scaleBand.maxLog10M - scaleBand.minLog10M) / 4)
+    : 0.5;
+  return {
+    characteristicLog10M,
+    minLog10M: scaleBand
+      ? Math.max(scaleBand.minLog10M, characteristicLog10M - halfWidth)
+      : characteristicLog10M - halfWidth,
+    maxLog10M: scaleBand
+      ? Math.min(scaleBand.maxLog10M, characteristicLog10M + halfWidth)
+      : characteristicLog10M + halfWidth,
+    basis: "heuristic",
+    sourceRefs: [],
+  };
+}
+
 function claimPressureFor(badge: TheoryBadgeV1, scaleBand: TheoryBiomeBand): number {
   if (scaleBand === "claim_boundary" || badge.level === "claim_boundary") return 1;
   const boundary = badge.claimBoundary;
@@ -342,6 +390,11 @@ export function buildTheoryBiomeLayoutV1(graph: TheoryBadgeGraphV1): TheoryBiome
     placed.push({ x: resolved.x, y: resolved.y });
 
     const claimPressure = claimPressureFor(badge, inferred.scaleBand);
+    const scaleEnvelope = buildScaleEnvelope({
+      badge,
+      scaleBand: inferred.scaleBand,
+      scaleLog10M: inferred.scaleLog10M,
+    });
     const { chunkX, chunkY } = chunkFor(resolved.x, resolved.y);
     const renderChunkId = `${chunkX}:${chunkY}`;
     const coordinateSemanticChunkId = semanticChunkId({
@@ -353,6 +406,7 @@ export function buildTheoryBiomeLayoutV1(graph: TheoryBadgeGraphV1): TheoryBiome
     return {
       badgeId: badge.id,
       scaleLog10M: inferred.scaleLog10M,
+      scaleEnvelope,
       scaleBand: inferred.scaleBand,
       fidelity: inferred.fidelity,
       domainKey: inferred.domainKey,

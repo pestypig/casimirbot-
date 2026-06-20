@@ -67,6 +67,13 @@ const THEORY_BADGE_SOURCE_KINDS = [
   "literature_ref",
 ] as const;
 
+export const THEORY_BADGE_SCALE_ENVELOPE_BASES = [
+  "measured",
+  "derived",
+  "model_assumption",
+  "heuristic",
+] as const;
+
 const THEORY_BADGE_CALCULATOR_ACTIONS = [
   "ingest_latex",
   "solve_expression",
@@ -135,6 +142,16 @@ export type TheoryBadgeSourceRefV1 = {
   note?: string | null;
 };
 
+export type TheoryBadgeScaleEnvelopeBasisV1 = (typeof THEORY_BADGE_SCALE_ENVELOPE_BASES)[number];
+
+export type TheoryBadgeScaleEnvelopeV1 = {
+  characteristicLog10M: number | null;
+  minLog10M: number | null;
+  maxLog10M: number | null;
+  basis: TheoryBadgeScaleEnvelopeBasisV1;
+  sourceRefs: TheoryBadgeSourceRefV1[];
+};
+
 export type TheoryBadgeCalculatorPayloadV1 = {
   id: string;
   expression: string;
@@ -172,6 +189,7 @@ export type TheoryBadgeV1 = {
 
   calculatorPayloads: TheoryBadgeCalculatorPayloadV1[];
   sourceRefs: TheoryBadgeSourceRefV1[];
+  scaleEnvelope?: TheoryBadgeScaleEnvelopeV1 | null;
 
   hintKeys: {
     subjects: string[];
@@ -232,6 +250,9 @@ const isStringArray = (value: unknown): value is string[] =>
 
 const includes = <T extends readonly string[]>(items: T, value: unknown): value is T[number] =>
   typeof value === "string" && items.includes(value);
+
+const isFiniteNumberOrNull = (value: unknown): value is number | null =>
+  value === null || (typeof value === "number" && Number.isFinite(value));
 
 function countBy(values: string[]): Record<string, number> {
   return values.reduce<Record<string, number>>((acc: Record<string, number>, value: string) => {
@@ -364,14 +385,64 @@ export function validateTheoryBadgeGraphV1(value: unknown): string[] {
       }
     }
 
-    if (!Array.isArray(rawBadge.sourceRefs)) issues.push(`${prefix}.sourceRefs must be an array`);
-    for (const [sourceIndex, rawSource] of (Array.isArray(rawBadge.sourceRefs) ? rawBadge.sourceRefs : []).entries()) {
-      const sourcePrefix = `${prefix}.sourceRefs[${sourceIndex}]`;
-      if (!isRecord(rawSource)) {
-        issues.push(`${sourcePrefix} must be an object`);
-        continue;
+    const validateSourceRefs = (sourceRefs: unknown, sourcePrefixBase: string): void => {
+      if (!Array.isArray(sourceRefs)) {
+        issues.push(`${sourcePrefixBase} must be an array`);
+        return;
       }
-      if (!includes(THEORY_BADGE_SOURCE_KINDS, rawSource.kind)) issues.push(`${sourcePrefix}.kind is invalid`);
+      for (const [sourceIndex, rawSource] of sourceRefs.entries()) {
+        const sourcePrefix = `${sourcePrefixBase}[${sourceIndex}]`;
+        if (!isRecord(rawSource)) {
+          issues.push(`${sourcePrefix} must be an object`);
+          continue;
+        }
+        if (!includes(THEORY_BADGE_SOURCE_KINDS, rawSource.kind)) issues.push(`${sourcePrefix}.kind is invalid`);
+      }
+    };
+
+    validateSourceRefs(rawBadge.sourceRefs, `${prefix}.sourceRefs`);
+
+    if (rawBadge.scaleEnvelope != null) {
+      const envelopePrefix = `${prefix}.scaleEnvelope`;
+      if (!isRecord(rawBadge.scaleEnvelope)) {
+        issues.push(`${envelopePrefix} must be an object`);
+      } else {
+        const envelope = rawBadge.scaleEnvelope;
+        if (!isFiniteNumberOrNull(envelope.characteristicLog10M)) {
+          issues.push(`${envelopePrefix}.characteristicLog10M must be a finite number or null`);
+        }
+        if (!isFiniteNumberOrNull(envelope.minLog10M)) {
+          issues.push(`${envelopePrefix}.minLog10M must be a finite number or null`);
+        }
+        if (!isFiniteNumberOrNull(envelope.maxLog10M)) {
+          issues.push(`${envelopePrefix}.maxLog10M must be a finite number or null`);
+        }
+        if (!includes(THEORY_BADGE_SCALE_ENVELOPE_BASES, envelope.basis)) {
+          issues.push(`${envelopePrefix}.basis is invalid`);
+        }
+        validateSourceRefs(envelope.sourceRefs, `${envelopePrefix}.sourceRefs`);
+        if (
+          typeof envelope.minLog10M === "number" &&
+          typeof envelope.maxLog10M === "number" &&
+          envelope.minLog10M > envelope.maxLog10M
+        ) {
+          issues.push(`${envelopePrefix}.minLog10M must be <= maxLog10M`);
+        }
+        if (
+          typeof envelope.characteristicLog10M === "number" &&
+          typeof envelope.minLog10M === "number" &&
+          envelope.characteristicLog10M < envelope.minLog10M
+        ) {
+          issues.push(`${envelopePrefix}.characteristicLog10M must be >= minLog10M`);
+        }
+        if (
+          typeof envelope.characteristicLog10M === "number" &&
+          typeof envelope.maxLog10M === "number" &&
+          envelope.characteristicLog10M > envelope.maxLog10M
+        ) {
+          issues.push(`${envelopePrefix}.characteristicLog10M must be <= maxLog10M`);
+        }
+      }
     }
 
     if (!isRecord(rawBadge.hintKeys)) {

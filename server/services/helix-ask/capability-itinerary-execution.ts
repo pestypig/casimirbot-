@@ -36,6 +36,25 @@ const readString = (value: unknown): string | null =>
 
 const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
 
+const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
+  Array.from(new Set(values.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)));
+
+const subgoalFirstBrokenRailFor = (failureCode: string | null, satisfaction: string): string | null => {
+  if (satisfaction === "satisfied" || !failureCode) return null;
+  if (failureCode.startsWith("invalid_arg:")) return "capability_execution";
+  if (failureCode === "input_binding_missing") return "evidence_reentry";
+  if (failureCode === "subgoal_observation_missing") return "observation_artifact";
+  return "capability_execution";
+};
+
+const subgoalRepairTargetFor = (failureCode: string | null, satisfaction: string): string | null => {
+  if (satisfaction === "satisfied" || !failureCode) return null;
+  if (failureCode.startsWith("invalid_arg:")) return "tool_execution";
+  if (failureCode === "input_binding_missing") return "reentry_gate";
+  if (failureCode === "subgoal_observation_missing") return "observation_materializer";
+  return "tool_execution";
+};
+
 const normalizeCalculatorExpression = (value: string | null): string | null => {
   if (!value) return null;
   return value.replace(/\s+/g, "").trim().toLowerCase() || null;
@@ -296,6 +315,31 @@ const artifactArgs = (artifact: HelixCapabilityItineraryArtifactLike): Record<st
   return readRecord(payload?.args);
 };
 
+const artifactSupportRefs = (artifact: HelixCapabilityItineraryArtifactLike | null): string[] => {
+  if (!artifact) return [];
+  const payload = artifactPayload(artifact);
+  const observation = readRecord(payload?.observation);
+  const result = readRecord(payload?.result);
+  const refs = [
+    artifactId(artifact),
+    readString(payload?.source_ref),
+    readString(payload?.target_ref),
+    readString(payload?.result_ref),
+    readString(payload?.receipt_id),
+    readString(payload?.evaluation_id),
+    readString(observation?.source_ref),
+    readString(observation?.receipt_id),
+    readString(result?.source_ref),
+    readString(result?.receipt_id),
+    ...readArray(payload?.support_refs).map(readString),
+    ...readArray(payload?.evidence_refs).map(readString),
+    ...readArray(payload?.observation_refs).map(readString),
+    ...readArray(payload?.receipt_refs).map(readString),
+    ...readArray(payload?.tool_receipt_ids).map(readString),
+  ];
+  return uniqueStrings(refs);
+};
+
 const artifactCompletedRuntimeObservation = (
   artifact: HelixCapabilityItineraryArtifactLike,
   capability: string,
@@ -482,7 +526,7 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       artifactMatchesObservationKind(artifact, escapedFamilyPattern(kind))
     )
   );
-  const compoundSubgoalLedger: Array<Record<string, unknown>> = compoundSubgoals.map((subgoal: Record<string, unknown>) => {
+  const rawCompoundSubgoalLedger: Array<Record<string, unknown>> = compoundSubgoals.map((subgoal: Record<string, unknown>) => {
     const subgoalId = readString(subgoal.subgoal_id);
     const requestedCapability = readString(subgoal.requested_capability) ?? "";
     const runtimeCapability = readString(subgoal.runtime_capability) ?? requestedCapability;
@@ -490,6 +534,12 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       .map(readString)
       .filter((entry: string | null): entry is string => Boolean(entry));
     const requiredObservationKinds = readArray(subgoal.required_observation_kinds)
+      .map(readString)
+      .filter((entry: string | null): entry is string => Boolean(entry));
+    const requiredArgs = readArray(subgoal.required_args)
+      .map(readString)
+      .filter((entry: string | null): entry is string => Boolean(entry));
+    const optionalArgs = readArray(subgoal.optional_args)
       .map(readString)
       .filter((entry: string | null): entry is string => Boolean(entry));
     const argsHint = readRecord(subgoal.args_hint);
@@ -530,6 +580,8 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       : validationErrors.length > 0
         ? "failed"
         : "pending";
+    const railFailureCode = validationErrors[0] ?? (satisfaction === "pending" ? "subgoal_observation_missing" : null);
+    const supportRefs = artifactSupportRefs(observationArtifact);
     return {
       subgoal_id: subgoalId,
       order: Number(subgoal.order) || 0,
@@ -537,16 +589,71 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       selected_capability: selectedCapability,
       executed_capability: executedCapability,
       args: runtimeCalls.length > 0 ? artifactArgs(runtimeCalls[0] as HelixCapabilityItineraryArtifactLike) : argsHint ?? {},
+      required_args: requiredArgs,
+      optional_args: optionalArgs,
+      input_bindings: readArray(subgoal.input_bindings),
       observation_kind: observationArtifact ? artifactKind(observationArtifact) : null,
       observation_ref: observationArtifact ? artifactId(observationArtifact) : null,
+      support_refs: supportRefs,
       satisfaction,
       rail_status: satisfaction === "satisfied" ? "complete" : satisfaction === "failed" ? "fail_closed" : "pending",
-      rail_failure_code: validationErrors[0] ?? (satisfaction === "pending" ? "subgoal_observation_missing" : null),
+      first_broken_rail: subgoalFirstBrokenRailFor(railFailureCode, satisfaction),
+      rail_failure_code: railFailureCode,
+      repair_target: subgoalRepairTargetFor(railFailureCode, satisfaction),
       required_observation_kinds: requiredObservationKinds,
       contribution_role: readString(subgoal.contribution_role),
       terminal_contribution_kind: readString(subgoal.terminal_contribution_kind) ?? readString(subgoal.required_terminal_kind),
       assistant_answer: false,
       raw_content_included: false,
+    };
+  });
+  const compoundSubgoalLedger: Array<Record<string, unknown>> = rawCompoundSubgoalLedger.map((entry: Record<string, unknown>) => {
+    const bindings = readArray(entry.input_bindings)
+      .map(readRecord)
+      .filter((binding: Record<string, unknown> | null): binding is Record<string, unknown> => Boolean(binding));
+    if (bindings.length === 0) return entry;
+    const boundInputRefs = bindings.flatMap((binding: Record<string, unknown>) => {
+      const sourceEntry = rawCompoundSubgoalLedger.find((candidate: Record<string, unknown>) =>
+        readString(candidate.subgoal_id) === readString(binding.from_subgoal_id)
+      );
+      if (readString(sourceEntry?.satisfaction) !== "satisfied") return [];
+      const refs = uniqueStrings([
+        readString(sourceEntry?.observation_ref),
+        ...readArray(sourceEntry?.support_refs).map(readString),
+      ]);
+      return refs.map((ref: string) => ({
+        binding_id: readString(binding.binding_id),
+        arg_name: readString(binding.arg_name),
+        binding_kind: readString(binding.binding_kind),
+        from_subgoal_id: readString(binding.from_subgoal_id),
+        from_capability: readString(binding.from_capability),
+        ref,
+      }));
+    });
+    const unresolvedInputBindings = bindings.filter((binding: Record<string, unknown>) =>
+      binding.required === true &&
+      !boundInputRefs.some((bound: Record<string, unknown>) =>
+        readString(bound.binding_id) === readString(binding.binding_id)
+      )
+    );
+    if (readString(entry.satisfaction) === "satisfied" && unresolvedInputBindings.length > 0) {
+      const railFailureCode = "input_binding_missing";
+      const satisfaction = "failed";
+      return {
+        ...entry,
+        bound_input_refs: boundInputRefs,
+        unresolved_input_bindings: unresolvedInputBindings,
+        satisfaction,
+        rail_status: "fail_closed",
+        first_broken_rail: subgoalFirstBrokenRailFor(railFailureCode, satisfaction),
+        rail_failure_code: railFailureCode,
+        repair_target: subgoalRepairTargetFor(railFailureCode, satisfaction),
+      };
+    }
+    return {
+      ...entry,
+      bound_input_refs: boundInputRefs,
+      unresolved_input_bindings: unresolvedInputBindings,
     };
   });
   const missingSubgoals = compoundSubgoalLedger.filter((entry: Record<string, unknown>) => readString(entry.satisfaction) !== "satisfied");

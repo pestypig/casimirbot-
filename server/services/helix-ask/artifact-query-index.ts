@@ -1935,13 +1935,28 @@ export const buildArtifactQueryIndex = (input: {
     requested_capability: readNullableString(entry.requested_capability),
     selected_capability: readNullableString(entry.selected_capability),
     executed_capability: readNullableString(entry.executed_capability),
+    args: readRecord(entry.args),
+    required_args: readStringArray(entry.required_args),
+    optional_args: readStringArray(entry.optional_args),
+    input_bindings: readArray(entry.input_bindings)
+      .map((binding) => readRecord(binding))
+      .filter((binding): binding is RecordLike => Boolean(binding)),
     observation_kind: readNullableString(entry.observation_kind),
     observation_ref: readNullableString(entry.observation_ref),
+    support_refs: readStringArray(entry.support_refs),
+    bound_input_refs: readArray(entry.bound_input_refs)
+      .map((binding) => readRecord(binding))
+      .filter((binding): binding is RecordLike => Boolean(binding)),
+    unresolved_input_bindings: readArray(entry.unresolved_input_bindings)
+      .map((binding) => readRecord(binding))
+      .filter((binding): binding is RecordLike => Boolean(binding)),
     satisfaction: readNullableString(entry.satisfaction),
     contribution_role: readNullableString(entry.contribution_role),
     terminal_contribution_kind: readNullableString(entry.terminal_contribution_kind),
     rail_status: readNullableString(entry.rail_status),
+    first_broken_rail: readNullableString(entry.first_broken_rail),
     rail_failure_code: readNullableString(entry.rail_failure_code),
+    repair_target: readNullableString(entry.repair_target),
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,

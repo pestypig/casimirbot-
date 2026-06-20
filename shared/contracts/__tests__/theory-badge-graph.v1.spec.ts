@@ -41,4 +41,22 @@ describe("theory_badge_graph/v1", () => {
       "edges[0].to references missing badge: missing.badge",
     );
   });
+
+  it("rejects incoherent badge scale envelopes", () => {
+    const graph = buildNhm2TheoryBadgeGraphV1();
+    graph.badges[0] = {
+      ...graph.badges[0],
+      scaleEnvelope: {
+        characteristicLog10M: -3,
+        minLog10M: -2,
+        maxLog10M: -4,
+        basis: "measured",
+        sourceRefs: [],
+      },
+    };
+
+    expect(validateTheoryBadgeGraphV1(graph)).toEqual(
+      expect.arrayContaining(["badges[0].scaleEnvelope.minLog10M must be <= maxLog10M"]),
+    );
+  });
 });

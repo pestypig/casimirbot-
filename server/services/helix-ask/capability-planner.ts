@@ -34,6 +34,7 @@ import {
   extractExplicitCapabilityContract,
 } from "./explicit-capability-contract";
 import { resolveAskCapabilityContractArbitration } from "./capability-contract-arbitration";
+import { buildHelixCompoundCapabilityContract } from "./compound-capability-contract";
 import { isAskCapabilityCatalogPrompt } from "./capability-catalog-intent";
 import { hasExplicitRepoEvidenceRequest } from "./repo-code-intent-detector";
 
@@ -617,6 +618,15 @@ export const buildCapabilityPlan = (input: {
       sourceTarget === "model_only" ||
       contextualSuppressionBlocksCapabilityFamily(contextualSuppression, family)
     );
+  const compoundCapabilityContract = contextualSuppressionBlocksPlan
+    ? null
+    : buildHelixCompoundCapabilityContract({
+        turnId: input.turnId,
+        promptText: input.promptText,
+      });
+  const compoundSubgoals = compoundCapabilityContract?.requires_all_subgoals === true
+    ? compoundCapabilityContract.subgoals
+    : [];
   const rules = instructionRules(instructionFrame);
   const plannedRequestedAction = contractArbitration.contract_state === "hard_live_source_phase"
     ? (
@@ -699,6 +709,15 @@ export const buildCapabilityPlan = (input: {
     goal_kind: canonicalGoalKind || "unknown",
     required_terminal_kind: contractArbitration.required_terminal_kind,
     capability_contract_arbitration: contractArbitration as unknown as Record<string, unknown>,
+    ...(compoundSubgoals.length > 1
+      ? {
+          compound_capability_contract: compoundCapabilityContract as unknown as Record<string, unknown>,
+          compound_requested_capabilities: compoundSubgoals.map((subgoal) => subgoal.requested_capability),
+          compound_required_observation_kinds: uniqueStrings(
+            compoundSubgoals.flatMap((subgoal) => subgoal.required_observation_kinds),
+          ),
+        }
+      : {}),
     admission_status: admission.status,
     selected_capability: phaseFilteredPlan.selectedCapability,
     ...(phaseFilteredPlan.repaired ? { phase_repaired: true } : {}),

@@ -1,3 +1,5 @@
+import type { TheoryBadgeScaleEnvelopeV1 } from "./theory-badge-graph.v1";
+
 export const THEORY_BIOME_LAYOUT_SCHEMA_VERSION = "theory_biome_layout/v1" as const;
 
 export const THEORY_BIOME_LAYOUT_SPACING_CONTRACT_V1 = {
@@ -37,6 +39,7 @@ export type TheoryBiomeFidelity =
 export type TheoryBiomeCoordinateV1 = {
   badgeId: string;
   scaleLog10M: number | null;
+  scaleEnvelope: TheoryBadgeScaleEnvelopeV1;
   scaleBand: TheoryBiomeBand;
   fidelity: TheoryBiomeFidelity;
   domainKey: string;

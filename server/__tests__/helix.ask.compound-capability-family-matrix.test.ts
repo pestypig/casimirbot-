@@ -30,6 +30,12 @@ const promptFor = (contract: ExplicitContract): string => {
   if (contract.capability === "internet_search.web_research") {
     return "Call internet_search.web_research for OpenAI Codex documentation.";
   }
+  if (contract.capability === "scholarly-research.lookup_papers") {
+    return "Call scholarly-research.lookup_papers for Alcubierre metric energy estimates.";
+  }
+  if (contract.capability === "scholarly-research.fetch_full_text") {
+    return "Call scholarly-research.fetch_full_text paper_result_id=arxiv:warp-1994.";
+  }
   if (contract.capability === "image_lens.inspect") {
     return "Call image_lens.inspect to inspect the current visual frame.";
   }
@@ -68,6 +74,7 @@ const expectedTerminalKindsByFamily: Record<string, string[]> = {
   repo_code: ["repo_code_evidence_answer"],
   workspace_directory: ["workspace_directory_resolution"],
   internet_search: ["internet_search_answer"],
+  scholarly_research: ["scholarly_research_answer"],
   live_source_mail: ["model_synthesized_answer"],
   live_source_decision: ["model_synthesized_answer"],
   voice_delivery: ["model_synthesized_answer"],
@@ -264,6 +271,7 @@ describe("Helix Ask compound capability family matrix", () => {
       "repo_code",
       "workspace_directory",
       "internet_search",
+      "scholarly_research",
       "live_source_mail",
       "live_source_decision",
       "voice_delivery",
@@ -300,10 +308,29 @@ describe("Helix Ask compound capability family matrix", () => {
       expect(subgoals[0]?.requested_capability, contract.capability).toBe(contract.capability);
       expect(subgoals[0]?.runtime_capability, contract.capability).toBe(runtimeCapabilityFor(contract));
       expect(subgoals[0]?.capability_family, contract.capability).toBe(contract.capability_family);
+      expect(subgoals[0]?.required_args, contract.capability).toEqual(contract.required_args);
+      expect(subgoals[0]?.optional_args, contract.capability).toEqual(contract.optional_args);
       expect(subgoals[0]?.required_terminal_kind, contract.capability).toBe(contract.required_terminal_kind);
       expect(subgoals[0]?.required_observation_kinds, contract.capability).toEqual(contract.required_observation_kinds);
       expect(compound?.requires_all_subgoals, contract.capability).toBe(false);
     }
+  });
+
+  it("exposes required and optional argument rails for every explicit capability contract", () => {
+    for (const contract of explicitCapabilityContractsForTests) {
+      expect(Array.isArray(contract.required_args), contract.capability).toBe(true);
+      expect(Array.isArray(contract.optional_args), contract.capability).toBe(true);
+    }
+
+    expect(explicitCapabilityContractsForTests.find((contract) =>
+      contract.capability === "scientific-calculator.solve_expression"
+    )?.required_args).toEqual(["latex"]);
+    expect(explicitCapabilityContractsForTests.find((contract) =>
+      contract.capability === "scholarly-research.lookup_papers"
+    )?.required_args).toEqual(["query"]);
+    expect(explicitCapabilityContractsForTests.find((contract) =>
+      contract.capability === "scholarly-research.fetch_full_text"
+    )?.required_args).toEqual(["paper_result_or_source"]);
   });
 
   it("keeps every explicit capability on its family-specific terminal product contract", () => {

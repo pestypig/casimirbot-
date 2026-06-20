@@ -108,6 +108,388 @@ describe("Helix Ask capability itinerary", () => {
     });
   });
 
+  it("keeps research, theory reflection, and calculator subgoals in order", () => {
+    const promptText =
+      "Use internet_search.web_research to find a cited research-paper source for the Alcubierre metric or warp-drive energy estimates. " +
+      "Then use helix_ask.reflect_theory_context to connect the cited source to the Helix Ask rule that receipts are observations before terminal authority. " +
+      "Finally run scientific-calculator.solve_expression with this exact expression: (9+3)*7-25. " +
+      "Answer by explaining the citation-to-calculation connection and give the numeric result.";
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:research-reflection-calculator",
+      promptText,
+      toolCallAdmissionDecision: {
+        ...scholarlyAdmission("ask:research-reflection-calculator"),
+        source_target: "internet_search",
+        admitted_tool_families: ["internet_search", "theory_locator", "calculator", "workstation_action"],
+      },
+      availableCapabilities: availableCapabilities([
+        HELIX_INTERNET_SEARCH_CAPABILITY,
+        "helix_ask.reflect_theory_context",
+        "scientific-calculator.solve_expression",
+      ]),
+    });
+
+    expect(itinerary.prompt_shape).toBe("compound_tool");
+    const subgoals = (itinerary.compound_capability_contract?.subgoals ?? []) as Array<Record<string, unknown>>;
+    expect(subgoals.map((subgoal) => subgoal.requested_capability)).toEqual([
+      "internet_search.web_research",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ]);
+    expect(subgoals[1]?.args_hint).toEqual(expect.objectContaining({
+      prompt: promptText,
+      build_explanation_plan: true,
+      sync_panel: true,
+      panel_overlay_mode: "live_answer_context",
+      open_panel: false,
+    }));
+    expect(subgoals[1]?.depends_on_subgoal_ids).toEqual([subgoals[0]?.subgoal_id]);
+    expect(subgoals[1]?.input_bindings).toEqual([
+      expect.objectContaining({
+        arg_name: "source_ref",
+        binding_kind: "source_ref",
+        from_subgoal_id: subgoals[0]?.subgoal_id,
+        from_capability: "internet_search.web_research",
+        required_observation_kinds: ["internet_search_observation"],
+        required: true,
+      }),
+    ]);
+    expect(subgoals[2]?.args_hint).toEqual({
+      latex: "(9+3)*7-25",
+      expression: "(9+3)*7-25",
+    });
+    expect(itinerary.terminal_success_criteria.required_capabilities).toEqual([
+      "internet_search.web_research",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ]);
+    expect(itinerary.terminal_success_criteria.forbidden_terminal_artifact_kinds).toContain("tool_receipt");
+  });
+
+  it("binds prior research observations into the theory reflection subgoal rail", () => {
+    const turnId = "ask:research-reflection-binding";
+    const promptText =
+      "Use internet_search.web_research to find a cited research-paper source for the Alcubierre metric. " +
+      "Then use helix_ask.reflect_theory_context to connect the cited source to receipts as observations.";
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId,
+      promptText,
+      toolCallAdmissionDecision: {
+        ...scholarlyAdmission(turnId),
+        source_target: "internet_search",
+        admitted_tool_families: ["internet_search", "theory_locator"],
+      },
+      availableCapabilities: availableCapabilities([
+        HELIX_INTERNET_SEARCH_CAPABILITY,
+        "helix_ask.reflect_theory_context",
+      ]),
+    });
+    const subgoals = (itinerary.compound_capability_contract?.subgoals ?? []) as Array<Record<string, unknown>>;
+    const researchSubgoalId = String(subgoals[0]?.subgoal_id);
+    const reflectionSubgoalId = String(subgoals[1]?.subgoal_id);
+    const complete = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [
+        {
+          artifact_id: "obs:web-search-call",
+          kind: "runtime_tool_call",
+          payload: {
+            capability_key: HELIX_INTERNET_SEARCH_CAPABILITY,
+            compound_subgoal_id: researchSubgoalId,
+            args: { query: "Alcubierre metric energy estimate" },
+          },
+        },
+        {
+          artifact_id: "obs:web-search-runtime",
+          kind: "runtime_tool_observation",
+          payload: {
+            capability_key: HELIX_INTERNET_SEARCH_CAPABILITY,
+            compound_subgoal_id: researchSubgoalId,
+            status: "completed",
+          },
+        },
+        {
+          artifact_id: "obs:web-search",
+          kind: "internet_search_observation",
+          payload: {
+            schema: "helix.internet_search_observation.v1",
+            capability_key: HELIX_INTERNET_SEARCH_CAPABILITY,
+            compound_subgoal_id: researchSubgoalId,
+            source_ref: "paper:alcubierre-1994",
+            evidence_refs: ["paper:alcubierre-1994"],
+          },
+        },
+        {
+          artifact_id: "obs:reflection-call",
+          kind: "runtime_tool_call",
+          payload: {
+            capability_key: "helix_ask.reflect_theory_context",
+            compound_subgoal_id: reflectionSubgoalId,
+            args: {
+              prompt: promptText,
+              build_explanation_plan: true,
+            },
+          },
+        },
+        {
+          artifact_id: "obs:reflection-runtime",
+          kind: "runtime_tool_observation",
+          payload: {
+            capability_key: "helix_ask.reflect_theory_context",
+            compound_subgoal_id: reflectionSubgoalId,
+            status: "completed",
+          },
+        },
+        {
+          artifact_id: "obs:reflection",
+          kind: "theory_context_reflection",
+          payload: {
+            schema: "helix.theory_context_reflection.v1",
+            capability_key: "helix_ask.reflect_theory_context",
+            compound_subgoal_id: reflectionSubgoalId,
+            evidence_refs: ["obs:web-search"],
+          },
+        },
+      ],
+    });
+
+    const reflectionEntry = complete.compound_subgoal_ledger.find((entry) =>
+      entry.requested_capability === "helix_ask.reflect_theory_context"
+    );
+    expect(reflectionEntry).toMatchObject({
+      satisfaction: "satisfied",
+      rail_status: "complete",
+      unresolved_input_bindings: [],
+    });
+    expect(reflectionEntry?.bound_input_refs).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        from_subgoal_id: researchSubgoalId,
+        from_capability: "internet_search.web_research",
+        ref: "obs:web-search",
+      }),
+    ]));
+  });
+
+  it("binds prior repo and docs observations into a later reflection subgoal rail", () => {
+    const turnId = "ask:repo-docs-reflection-binding";
+    const promptText =
+      "Use repo-code.search_concept to find terminal authority enforcement, " +
+      "then use docs-viewer.locate_in_doc to locate the same rule in the active document, " +
+      "then use helix_ask.reflect_theory_context to compare the repo and doc evidence.";
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId,
+      promptText,
+      toolCallAdmissionDecision: {
+        ...scholarlyAdmission(turnId),
+        source_target: "runtime_evidence",
+        admitted_tool_families: ["repo_code", "docs_viewer", "theory_locator"],
+      },
+      availableCapabilities: availableCapabilities([
+        "repo-code.search_concept",
+        "docs-viewer.locate_in_doc",
+        "helix_ask.reflect_theory_context",
+      ]),
+    });
+    const subgoals = (itinerary.compound_capability_contract?.subgoals ?? []) as Array<Record<string, unknown>>;
+    const repoSubgoalId = String(subgoals[0]?.subgoal_id);
+    const docsSubgoalId = String(subgoals[1]?.subgoal_id);
+    const reflectionSubgoalId = String(subgoals[2]?.subgoal_id);
+
+    expect(subgoals.map((subgoal) => subgoal.requested_capability)).toEqual([
+      "repo-code.search_concept",
+      "docs-viewer.locate_in_doc",
+      "helix_ask.reflect_theory_context",
+    ]);
+    expect(subgoals[2]?.depends_on_subgoal_ids).toEqual([repoSubgoalId, docsSubgoalId]);
+    expect(subgoals[2]?.input_bindings).toEqual([
+      expect.objectContaining({
+        arg_name: "source_refs",
+        binding_kind: "source_ref",
+        from_subgoal_id: repoSubgoalId,
+        from_capability: "repo-code.search_concept",
+        required_observation_kinds: ["repo_code_evidence_observation", "repo_evidence_relevance_gate"],
+      }),
+      expect.objectContaining({
+        arg_name: "source_refs",
+        binding_kind: "source_ref",
+        from_subgoal_id: docsSubgoalId,
+        from_capability: "docs-viewer.locate_in_doc",
+        required_observation_kinds: ["doc_location_result", "doc_location_matches", "doc_evidence_location"],
+      }),
+    ]);
+
+    const complete = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [
+        {
+          artifact_id: "obs:repo-call",
+          kind: "runtime_tool_call",
+          payload: {
+            capability_key: "repo-code.search_concept",
+            compound_subgoal_id: repoSubgoalId,
+            args: { query: "terminal authority enforcement" },
+          },
+        },
+        {
+          artifact_id: "obs:repo-runtime",
+          kind: "runtime_tool_observation",
+          payload: {
+            capability_key: "repo-code.search_concept",
+            compound_subgoal_id: repoSubgoalId,
+            status: "completed",
+          },
+        },
+        {
+          artifact_id: "obs:repo-evidence",
+          kind: "repo_code_evidence_observation",
+          payload: {
+            schema: "helix.repo_code_evidence_observation.v1",
+            capability_key: "repo-code.search_concept",
+            compound_subgoal_id: repoSubgoalId,
+            evidence_refs: ["repo:file:terminal-authority-single-writer.ts"],
+          },
+        },
+        {
+          artifact_id: "obs:docs-call",
+          kind: "runtime_tool_call",
+          payload: {
+            capability_key: "docs-viewer.locate_in_doc",
+            compound_subgoal_id: docsSubgoalId,
+            args: { query: "terminal authority" },
+          },
+        },
+        {
+          artifact_id: "obs:docs-runtime",
+          kind: "runtime_tool_observation",
+          payload: {
+            capability_key: "docs-viewer.locate_in_doc",
+            compound_subgoal_id: docsSubgoalId,
+            status: "completed",
+          },
+        },
+        {
+          artifact_id: "obs:doc-location",
+          kind: "doc_location_matches",
+          payload: {
+            schema: "helix.doc_location_matches.v1",
+            capability_key: "docs-viewer.locate_in_doc",
+            compound_subgoal_id: docsSubgoalId,
+            evidence_refs: ["docs/helix-ask-codex-loop-discipline.md#terminal-authority"],
+          },
+        },
+        {
+          artifact_id: "obs:reflection-call",
+          kind: "runtime_tool_call",
+          payload: {
+            capability_key: "helix_ask.reflect_theory_context",
+            compound_subgoal_id: reflectionSubgoalId,
+            args: {
+              prompt: promptText,
+              source_refs: ["obs:repo-evidence", "obs:doc-location"],
+            },
+          },
+        },
+        {
+          artifact_id: "obs:reflection-runtime",
+          kind: "runtime_tool_observation",
+          payload: {
+            capability_key: "helix_ask.reflect_theory_context",
+            compound_subgoal_id: reflectionSubgoalId,
+            status: "completed",
+          },
+        },
+        {
+          artifact_id: "obs:reflection",
+          kind: "theory_context_reflection",
+          payload: {
+            schema: "helix.theory_context_reflection.v1",
+            capability_key: "helix_ask.reflect_theory_context",
+            compound_subgoal_id: reflectionSubgoalId,
+            evidence_refs: ["obs:repo-evidence", "obs:doc-location"],
+          },
+        },
+      ],
+    });
+
+    const reflectionEntry = complete.compound_subgoal_ledger.find((entry) =>
+      entry.requested_capability === "helix_ask.reflect_theory_context"
+    );
+    expect(reflectionEntry).toMatchObject({
+      satisfaction: "satisfied",
+      rail_status: "complete",
+      unresolved_input_bindings: [],
+    });
+    expect(reflectionEntry?.bound_input_refs).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        from_subgoal_id: repoSubgoalId,
+        from_capability: "repo-code.search_concept",
+        ref: "obs:repo-evidence",
+      }),
+      expect.objectContaining({
+        from_subgoal_id: docsSubgoalId,
+        from_capability: "docs-viewer.locate_in_doc",
+        ref: "obs:doc-location",
+      }),
+    ]));
+  });
+
+  it("keeps civilization scenario and bounds reflection subgoals bound in order", () => {
+    const promptText =
+      "Call helix_ask.build_civilization_scenario_frame for a long-range settlement scenario, " +
+      "then call helix_ask.reflect_civilization_bounds to reflect collaboration and falsification bounds.";
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:civilization-frame-then-bounds",
+      promptText,
+      toolCallAdmissionDecision: {
+        ...scholarlyAdmission("ask:civilization-frame-then-bounds"),
+        source_target: "workspace_action",
+        admitted_tool_families: ["workstation_action"],
+      },
+      availableCapabilities: availableCapabilities([
+        "helix_ask.build_civilization_scenario_frame",
+        "helix_ask.reflect_civilization_bounds",
+      ]),
+    });
+    const subgoals = (itinerary.compound_capability_contract?.subgoals ?? []) as Array<Record<string, unknown>>;
+
+    expect(subgoals.map((subgoal) => subgoal.requested_capability)).toEqual([
+      "helix_ask.build_civilization_scenario_frame",
+      "helix_ask.reflect_civilization_bounds",
+    ]);
+    expect(subgoals[0]?.args_hint).toEqual(expect.objectContaining({
+      prompt: promptText,
+      refs: ["helix-ask:current-turn"],
+      options: expect.objectContaining({
+        allowFictional: true,
+        allowHistorical: true,
+        includeNeedleScenarioFallback: true,
+      }),
+    }));
+    expect(subgoals[1]?.args_hint).toEqual(expect.objectContaining({
+      prompt: promptText,
+      scenarioFrameRef: "step:build_civilization_scenario_frame",
+      refs: ["helix-ask:current-turn"],
+      options: expect.objectContaining({
+        includeBridgeContext: true,
+        includeCollaborationBounds: true,
+        includeFalsificationHooks: true,
+      }),
+    }));
+    expect(subgoals[1]?.depends_on_subgoal_ids).toEqual([subgoals[0]?.subgoal_id]);
+    expect(subgoals[1]?.input_bindings).toEqual([
+      expect.objectContaining({
+        arg_name: "source_ref",
+        binding_kind: "source_ref",
+        from_subgoal_id: subgoals[0]?.subgoal_id,
+        from_capability: "helix_ask.build_civilization_scenario_frame",
+        required_observation_kinds: [
+          "civilization_scenario_frame/v1",
+          "helix_civilization_scenario_frame_tool_result",
+        ],
+      }),
+    ]);
+  });
+
   it("creates ordered compound subgoals for catalog/workspace, repo/docs, and visual/calculator prompts", () => {
     const cases = [
       {
@@ -576,6 +958,77 @@ describe("Helix Ask capability itinerary", () => {
     expect(itinerary.not_terminal).toBe(true);
     expect(itinerary.assistant_answer).toBe(false);
     expect(itinerary.raw_content_included).toBe(false);
+  });
+
+  it("keeps explicit scholarly lookup and full-text fetch subgoals with narrow args", () => {
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:scholarly-lookup-then-fetch",
+      promptText:
+        "Call scholarly-research.lookup_papers for Alcubierre metric energy estimates, then call scholarly-research.fetch_full_text paper_result_id=arxiv:warp-1994.",
+      toolCallAdmissionDecision: scholarlyAdmission("ask:scholarly-lookup-then-fetch"),
+      availableCapabilities: availableCapabilities([
+        HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+        HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      ]),
+    });
+
+    expect(itinerary.prompt_shape).toBe("compound_tool");
+    const subgoals = (itinerary.compound_capability_contract?.subgoals ?? []) as Array<Record<string, unknown>>;
+    expect(subgoals.map((subgoal) => subgoal.requested_capability)).toEqual([
+      HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+    ]);
+    expect(subgoals[0]?.args_hint).toEqual({
+      query: "Alcubierre metric energy estimates",
+      limit: 5,
+    });
+    expect(subgoals[0]?.required_args).toEqual(["query"]);
+    expect(subgoals[1]?.args_hint).toEqual({
+      paper_result_id: "arxiv:warp-1994",
+    });
+    expect(subgoals[1]?.required_args).toEqual(["paper_result_or_source"]);
+    expect(subgoals[0]?.required_observation_kinds).toEqual(["scholarly_research_observation"]);
+    expect(subgoals[1]?.required_observation_kinds).toEqual(["scholarly_full_text_observation"]);
+    expect(itinerary.terminal_success_criteria.required_capabilities).toEqual([
+      HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+    ]);
+    expect(itinerary.terminal_success_criteria.forbidden_terminal_artifact_kinds).toContain("tool_receipt");
+  });
+
+  it("preserves required argument rails in the compound subgoal ledger", () => {
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:compound-required-args-ledger",
+      promptText:
+        "Use docs-viewer.locate_in_doc to cite the claim, then call scientific-calculator.solve_expression with this exact expression: 12/3.",
+      toolCallAdmissionDecision: {
+        ...scholarlyAdmission("ask:compound-required-args-ledger"),
+        source_target: "docs_viewer",
+        admitted_tool_families: ["docs_viewer", "calculator", "workstation_action"],
+      },
+      availableCapabilities: availableCapabilities([
+        "docs-viewer.locate_in_doc",
+        "scientific-calculator.solve_expression",
+      ]),
+    });
+    const state = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [],
+    });
+
+    expect(state.compound_subgoal_ledger.map((entry) => ({
+      requested_capability: entry.requested_capability,
+      required_args: entry.required_args,
+    }))).toEqual([
+      {
+        requested_capability: "docs-viewer.locate_in_doc",
+        required_args: ["query"],
+      },
+      {
+        requested_capability: "scientific-calculator.solve_expression",
+        required_args: ["latex"],
+      },
+    ]);
   });
 
   it("requires frontier candidate and literature-map observations for scholarly theory frontier prompts", () => {

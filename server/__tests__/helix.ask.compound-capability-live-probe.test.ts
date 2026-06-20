@@ -25,11 +25,19 @@ const workspaceThenCalculatorDebug = (overrides: Record<string, unknown> = {}) =
       selected_capability: "workspace_os.status",
       executed_capability: "workspace_os.status",
       args: {},
+      required_args: [],
+      optional_args: [],
+      input_bindings: [],
       observation_kind: "workspace_os_status_observation",
       observation_ref: "obs:workspace-status",
+      support_refs: ["obs:workspace-status"],
+      bound_input_refs: [],
+      unresolved_input_bindings: [],
       satisfaction: "satisfied",
       rail_status: "complete",
+      first_broken_rail: null,
       rail_failure_code: null,
+      repair_target: null,
     },
     {
       subgoal_id: calculatorSubgoalId,
@@ -41,11 +49,19 @@ const workspaceThenCalculatorDebug = (overrides: Record<string, unknown> = {}) =
         latex: "14*23+8",
         expression: "14*23+8",
       },
+      required_args: ["latex"],
+      optional_args: ["expression", "equation"],
+      input_bindings: [],
       observation_kind: "calculator_receipt",
       observation_ref: "obs:calculator",
+      support_refs: ["obs:calculator"],
+      bound_input_refs: [],
+      unresolved_input_bindings: [],
       satisfaction: "satisfied",
       rail_status: "complete",
+      first_broken_rail: null,
       rail_failure_code: null,
+      repair_target: null,
     },
   ];
   const compoundSubgoalRailStatuses = compoundSubgoalLedger.map((entry) => ({
@@ -54,11 +70,20 @@ const workspaceThenCalculatorDebug = (overrides: Record<string, unknown> = {}) =
     requested_capability: entry.requested_capability,
     selected_capability: entry.selected_capability,
     executed_capability: entry.executed_capability,
+    args: entry.args,
+    required_args: entry.required_args,
+    optional_args: entry.optional_args,
+    input_bindings: entry.input_bindings,
     observation_kind: entry.observation_kind,
     observation_ref: entry.observation_ref,
+    support_refs: entry.support_refs,
+    bound_input_refs: entry.bound_input_refs,
+    unresolved_input_bindings: entry.unresolved_input_bindings,
     satisfaction: entry.satisfaction,
     rail_status: entry.rail_status,
+    first_broken_rail: entry.first_broken_rail,
     rail_failure_code: entry.rail_failure_code,
+    repair_target: entry.repair_target,
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,
@@ -79,6 +104,8 @@ const workspaceThenCalculatorDebug = (overrides: Record<string, unknown> = {}) =
           requested_capability: "workspace_os.status",
           runtime_capability: "workspace_os.status",
           args_hint: {},
+          required_args: [],
+          optional_args: [],
         },
         {
           subgoal_id: calculatorSubgoalId,
@@ -89,6 +116,8 @@ const workspaceThenCalculatorDebug = (overrides: Record<string, unknown> = {}) =
             latex: "14*23+8",
             expression: "14*23+8",
           },
+          required_args: ["latex"],
+          optional_args: ["expression", "equation"],
         },
       ],
     },
@@ -127,11 +156,19 @@ const invalidCalculatorArgsFailClosedDebug = (overrides: Record<string, unknown>
       args: {
         query: "rule of thumb",
       },
+      required_args: ["query"],
+      optional_args: ["document_path", "doc"],
+      input_bindings: [],
       observation_kind: "doc_location_matches",
       observation_ref: "obs:doc-location",
+      support_refs: ["obs:doc-location"],
+      bound_input_refs: [],
+      unresolved_input_bindings: [],
       satisfaction: "satisfied",
       rail_status: "complete",
+      first_broken_rail: null,
       rail_failure_code: null,
+      repair_target: null,
     },
     {
       subgoal_id: calculatorSubgoalId,
@@ -143,11 +180,19 @@ const invalidCalculatorArgsFailClosedDebug = (overrides: Record<string, unknown>
         latex: "explain why receipts matter",
         expression: "explain why receipts matter",
       },
+      required_args: ["latex"],
+      optional_args: ["expression", "equation"],
+      input_bindings: [],
       observation_kind: null,
       observation_ref: null,
+      support_refs: [],
+      bound_input_refs: [],
+      unresolved_input_bindings: [],
       satisfaction: "failed",
       rail_status: "fail_closed",
+      first_broken_rail: "capability_execution",
       rail_failure_code: "invalid_arg:latex_is_prose",
+      repair_target: "tool_execution",
     },
   ];
   const compoundSubgoalRailStatuses = compoundSubgoalLedger.map((entry) => ({
@@ -156,11 +201,20 @@ const invalidCalculatorArgsFailClosedDebug = (overrides: Record<string, unknown>
     requested_capability: entry.requested_capability,
     selected_capability: entry.selected_capability,
     executed_capability: entry.executed_capability,
+    args: entry.args,
+    required_args: entry.required_args,
+    optional_args: entry.optional_args,
+    input_bindings: entry.input_bindings,
     observation_kind: entry.observation_kind,
     observation_ref: entry.observation_ref,
+    support_refs: entry.support_refs,
+    bound_input_refs: entry.bound_input_refs,
+    unresolved_input_bindings: entry.unresolved_input_bindings,
     satisfaction: entry.satisfaction,
     rail_status: entry.rail_status,
+    first_broken_rail: entry.first_broken_rail,
     rail_failure_code: entry.rail_failure_code,
+    repair_target: entry.repair_target,
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,
@@ -184,6 +238,8 @@ const invalidCalculatorArgsFailClosedDebug = (overrides: Record<string, unknown>
           args_hint: {
             query: "rule of thumb",
           },
+          required_args: ["query"],
+          optional_args: ["document_path", "doc"],
         },
         {
           subgoal_id: calculatorSubgoalId,
@@ -194,6 +250,8 @@ const invalidCalculatorArgsFailClosedDebug = (overrides: Record<string, unknown>
             latex: "explain why receipts matter",
             expression: "explain why receipts matter",
           },
+          required_args: ["latex"],
+          optional_args: ["expression", "equation"],
         },
       ],
     },
@@ -218,6 +276,415 @@ const invalidCalculatorArgsFailClosedDebug = (overrides: Record<string, unknown>
   };
 };
 
+const compoundDebug = (input: {
+  turnId: string;
+  terminalArtifactKind?: string;
+  finalAnswerSource?: string;
+  subgoals: Array<{
+    requested_capability: string;
+    runtime_capability?: string;
+    executed_capability: string | null;
+    args?: Record<string, unknown>;
+    required_args?: string[];
+    optional_args?: string[];
+    input_bindings?: Array<Record<string, unknown>>;
+    observation_kind: string | null;
+    observation_ref: string | null;
+    support_refs?: string[];
+    bound_input_refs?: Array<Record<string, unknown>>;
+    unresolved_input_bindings?: Array<Record<string, unknown>>;
+    satisfaction?: string;
+    rail_status?: string;
+    first_broken_rail?: string | null;
+    rail_failure_code?: string | null;
+    repair_target?: string | null;
+  }>;
+  overrides?: Record<string, unknown>;
+}) => {
+  const terminalArtifactKind = input.terminalArtifactKind ?? "model_synthesized_answer";
+  const finalAnswerSource = input.finalAnswerSource ?? "final_answer_draft";
+  const ledger = input.subgoals.map((entry, index) => {
+    const subgoalId = `${input.turnId}:compound_capability_subgoal:${index + 1}:${entry.requested_capability.replace(/[^A-Za-z0-9_-]+/g, "_")}`;
+    return {
+      subgoal_id: subgoalId,
+      order: index + 1,
+      requested_capability: entry.requested_capability,
+      selected_capability: entry.runtime_capability ?? entry.requested_capability,
+      executed_capability: entry.executed_capability,
+      args: entry.args ?? {},
+      required_args: entry.required_args ?? [],
+      optional_args: entry.optional_args ?? [],
+      input_bindings: entry.input_bindings ?? [],
+      observation_kind: entry.observation_kind,
+      observation_ref: entry.observation_ref,
+      support_refs: entry.support_refs ?? (entry.observation_ref ? [entry.observation_ref] : []),
+      bound_input_refs: entry.bound_input_refs ?? [],
+      unresolved_input_bindings: entry.unresolved_input_bindings ?? [],
+      satisfaction: entry.satisfaction ?? "satisfied",
+      rail_status: entry.rail_status ?? "complete",
+      first_broken_rail: entry.first_broken_rail ?? null,
+      rail_failure_code: entry.rail_failure_code ?? null,
+      repair_target: entry.repair_target ?? null,
+    };
+  });
+  const railStatuses = ledger.map((entry) => ({
+    ...entry,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  }));
+  const contractSubgoals = ledger.map((entry) => ({
+    subgoal_id: entry.subgoal_id,
+    order: entry.order,
+    requested_capability: entry.requested_capability,
+    runtime_capability: input.subgoals[entry.order - 1]?.runtime_capability ?? entry.requested_capability,
+    args_hint: entry.args,
+    required_args: entry.required_args,
+    optional_args: entry.optional_args,
+    input_bindings: entry.input_bindings,
+  }));
+  const payload = {
+    terminal_artifact_kind: terminalArtifactKind,
+    terminal_presentation: {
+      terminal_artifact_kind: terminalArtifactKind,
+    },
+    final_answer_source: finalAnswerSource,
+    compound_capability_contract: {
+      schema: "helix.compound_capability_contract.v1",
+      turn_id: input.turnId,
+      subgoals: contractSubgoals,
+    },
+    capability_itinerary_execution_state: {
+      compound_subgoal_ledger: ledger,
+    },
+    artifact_query_index: {
+      compound_subgoal_rail_statuses: railStatuses,
+    },
+    ...(input.overrides ?? {}),
+  };
+  return {
+    ask: {
+      turn_id: input.turnId,
+      terminal_artifact_kind: terminalArtifactKind,
+      final_answer_source: finalAnswerSource,
+    },
+    debugExport: {
+      schema: "helix.ask.debug_export.v1",
+      payload,
+    },
+  };
+};
+
+const internetReflectionCalculatorDebug = (overrides: Record<string, unknown> = {}) => {
+  const turnId = "ask:test:internet-reflection-calculator";
+  const researchSubgoalId = `${turnId}:compound_capability_subgoal:1:internet_search_web_research`;
+  const reflectionSubgoalId = `${turnId}:compound_capability_subgoal:2:helix_ask_reflect_theory_context`;
+  const bindingId = `${reflectionSubgoalId}:input_binding:1`;
+  return compoundDebug({
+    turnId,
+    subgoals: [
+      {
+        requested_capability: "internet_search.web_research",
+        runtime_capability: "internet-search.search_web",
+        executed_capability: "internet-search.search_web",
+        args: {
+          query: "Alcubierre metric energy estimates",
+        },
+        required_args: ["query"],
+        observation_kind: "internet_search_observation",
+        observation_ref: "obs:web-search",
+      },
+      {
+        requested_capability: "helix_ask.reflect_theory_context",
+        executed_capability: "helix_ask.reflect_theory_context",
+        args: {
+          prompt: "connect source to receipts-as-observations",
+          source_ref: "obs:web-search",
+        },
+        input_bindings: [
+          {
+            binding_id: bindingId,
+            arg_name: "source_ref",
+            binding_kind: "source_ref",
+            from_subgoal_id: researchSubgoalId,
+            from_capability: "internet_search.web_research",
+            required_observation_kinds: ["internet_search_observation"],
+            required: true,
+            status: "pending",
+          },
+        ],
+        observation_kind: "theory_context_reflection",
+        observation_ref: "obs:reflection",
+        bound_input_refs: [
+          {
+            binding_id: bindingId,
+            arg_name: "source_ref",
+            binding_kind: "source_ref",
+            from_subgoal_id: researchSubgoalId,
+            from_capability: "internet_search.web_research",
+            ref: "obs:web-search",
+          },
+        ],
+      },
+      {
+        requested_capability: "scientific-calculator.solve_expression",
+        executed_capability: "scientific-calculator.solve_expression",
+        args: {
+          latex: "(9+3)*7-25",
+          expression: "(9+3)*7-25",
+        },
+        required_args: ["latex"],
+        optional_args: ["expression", "equation"],
+        observation_kind: "calculator_receipt",
+        observation_ref: "obs:calculator",
+      },
+    ],
+    overrides,
+  });
+};
+
+const scholarlyReflectionCalculatorDebug = (overrides: Record<string, unknown> = {}) => {
+  const turnId = "ask:test:scholarly-reflection-calculator";
+  const researchSubgoalId = `${turnId}:compound_capability_subgoal:1:scholarly-research_lookup_papers`;
+  const reflectionSubgoalId = `${turnId}:compound_capability_subgoal:2:helix_ask_reflect_theory_context`;
+  const bindingId = `${reflectionSubgoalId}:input_binding:1`;
+  return compoundDebug({
+    turnId,
+    subgoals: [
+      {
+        requested_capability: "scholarly-research.lookup_papers",
+        executed_capability: "scholarly-research.lookup_papers",
+        args: {
+          query: "Alcubierre metric energy estimates",
+        },
+        required_args: ["query"],
+        observation_kind: "scholarly_research_observation",
+        observation_ref: "obs:scholarly-lookup",
+      },
+      {
+        requested_capability: "helix_ask.reflect_theory_context",
+        executed_capability: "helix_ask.reflect_theory_context",
+        args: {
+          prompt: "connect scholarly source to receipts-as-observations",
+          source_ref: "obs:scholarly-lookup",
+        },
+        input_bindings: [
+          {
+            binding_id: bindingId,
+            arg_name: "source_ref",
+            binding_kind: "source_ref",
+            from_subgoal_id: researchSubgoalId,
+            from_capability: "scholarly-research.lookup_papers",
+            required_observation_kinds: ["scholarly_research_observation"],
+            required: true,
+            status: "pending",
+          },
+        ],
+        observation_kind: "theory_context_reflection",
+        observation_ref: "obs:reflection",
+        bound_input_refs: [
+          {
+            binding_id: bindingId,
+            arg_name: "source_ref",
+            binding_kind: "source_ref",
+            from_subgoal_id: researchSubgoalId,
+            from_capability: "scholarly-research.lookup_papers",
+            ref: "obs:scholarly-lookup",
+          },
+        ],
+      },
+      {
+        requested_capability: "scientific-calculator.solve_expression",
+        executed_capability: "scientific-calculator.solve_expression",
+        args: {
+          latex: "(12+5)*3",
+          expression: "(12+5)*3",
+        },
+        required_args: ["latex"],
+        optional_args: ["expression", "equation"],
+        observation_kind: "calculator_receipt",
+        observation_ref: "obs:calculator",
+      },
+    ],
+    overrides,
+  });
+};
+
+const workspaceDirectoryThenDocsDebug = (overrides: Record<string, unknown> = {}) => {
+  const turnId = "ask:test:workspace-directory-then-docs";
+  return compoundDebug({
+    turnId,
+    subgoals: [
+      {
+        requested_capability: "workspace-directory.resolve",
+        executed_capability: "workspace-directory.resolve",
+        args: {
+          query: "docs/helix-ask-codex-loop-discipline.md",
+        },
+        required_args: ["query"],
+        optional_args: ["uri", "path", "target", "target_kinds", "limit"],
+        observation_kind: "workspace_directory_resolution",
+        observation_ref: "obs:workspace-directory",
+      },
+      {
+        requested_capability: "docs-viewer.locate_in_doc",
+        executed_capability: "docs-viewer.locate_in_doc",
+        args: {
+          query: "rule of thumb",
+          path: "docs/helix-ask-codex-loop-discipline.md",
+        },
+        required_args: ["query"],
+        optional_args: ["path", "anchor", "term", "text"],
+        observation_kind: "doc_location_matches",
+        observation_ref: "obs:doc-location",
+      },
+    ],
+    overrides,
+  });
+};
+
+const microReasonerPresetsThenDraftDebug = (overrides: Record<string, unknown> = {}) => {
+  const turnId = "ask:test:micro-reasoner-presets-then-draft";
+  return compoundDebug({
+    turnId,
+    subgoals: [
+      {
+        requested_capability: "live_env.query_micro_reasoner_presets",
+        executed_capability: "live_env.query_micro_reasoner_presets",
+        args: {},
+        observation_kind: "stage_play_micro_reasoner_prompt_preset_query_result",
+        observation_ref: "obs:micro-reasoner-presets",
+      },
+      {
+        requested_capability: "live_env.draft_micro_reasoner_preset",
+        executed_capability: "live_env.draft_micro_reasoner_preset",
+        args: {
+          prompt: "draft a live-source micro reasoner preset",
+        },
+        observation_kind: "stage_play_micro_reasoner_prompt_preset_draft",
+        observation_ref: "obs:micro-reasoner-draft",
+      },
+    ],
+    overrides,
+  });
+};
+
+const civilizationBoundsReflectionDebug = (overrides: Record<string, unknown> = {}) => {
+  const turnId = "ask:test:civilization-bounds-reflection";
+  const frameSubgoalId = `${turnId}:compound_capability_subgoal:1:helix_ask_build_civilization_scenario_frame`;
+  const reflectionSubgoalId = `${turnId}:compound_capability_subgoal:2:helix_ask_reflect_civilization_bounds`;
+  const bindingId = `${reflectionSubgoalId}:input_binding:1`;
+  return compoundDebug({
+    turnId,
+    subgoals: [
+      {
+        requested_capability: "helix_ask.build_civilization_scenario_frame",
+        executed_capability: "helix_ask.build_civilization_scenario_frame",
+        args: {
+          prompt: "long-range settlement scenario",
+        },
+        observation_kind: "civilization_scenario_frame/v1",
+        observation_ref: "obs:civilization-frame",
+      },
+      {
+        requested_capability: "helix_ask.reflect_civilization_bounds",
+        executed_capability: "helix_ask.reflect_civilization_bounds",
+        args: {
+          prompt: "reflect collaboration and falsification bounds",
+          scenarioFrameRef: "obs:civilization-frame",
+        },
+        input_bindings: [
+          {
+            binding_id: bindingId,
+            arg_name: "source_ref",
+            binding_kind: "source_ref",
+            from_subgoal_id: frameSubgoalId,
+            from_capability: "helix_ask.build_civilization_scenario_frame",
+            required_observation_kinds: [
+              "civilization_scenario_frame/v1",
+              "helix_civilization_scenario_frame_tool_result",
+            ],
+            required: true,
+            status: "pending",
+          },
+        ],
+        observation_kind: "civilization_bounds_reflection",
+        observation_ref: "obs:civilization-bounds",
+        bound_input_refs: [
+          {
+            binding_id: bindingId,
+            arg_name: "source_ref",
+            binding_kind: "source_ref",
+            from_subgoal_id: frameSubgoalId,
+            from_capability: "helix_ask.build_civilization_scenario_frame",
+            ref: "obs:civilization-frame",
+          },
+        ],
+      },
+    ],
+    overrides,
+  });
+};
+
+const zenGraphReflectionBridgeDebug = (overrides: Record<string, unknown> = {}) => {
+  const turnId = "ask:test:zen-graph-reflection-bridge";
+  const reflectionSubgoalId = `${turnId}:compound_capability_subgoal:1:helix_ask_reflect_ideology_context`;
+  const bridgeSubgoalId = `${turnId}:compound_capability_subgoal:2:helix_ask_bridge_theory_ideology_context`;
+  const bindingId = `${bridgeSubgoalId}:input_binding:1`;
+  return compoundDebug({
+    turnId,
+    subgoals: [
+      {
+        requested_capability: "helix_ask.reflect_ideology_context",
+        executed_capability: "helix_ask.reflect_ideology_context",
+        args: {
+          prompt: "wisdom under uncertainty",
+        },
+        observation_kind: "ideology_context_reflection/v1",
+        observation_ref: "obs:zen-reflection",
+      },
+      {
+        requested_capability: "helix_ask.bridge_theory_ideology_context",
+        executed_capability: "helix_ask.bridge_theory_ideology_context",
+        args: {
+          prompt: "bridge theory and ideology context",
+          ideology_reflection_ref: "obs:zen-reflection",
+        },
+        input_bindings: [
+          {
+            binding_id: bindingId,
+            arg_name: "source_ref",
+            binding_kind: "source_ref",
+            from_subgoal_id: reflectionSubgoalId,
+            from_capability: "helix_ask.reflect_ideology_context",
+            required_observation_kinds: [
+              "ideology_context_reflection/v1",
+              "procedural_zen_classification/v1",
+              "helix_zen_graph_reflection_tool_result",
+              "workstation_tool_evaluation",
+            ],
+            required: true,
+            status: "pending",
+          },
+        ],
+        observation_kind: "helix_theory_ideology_bridge_tool_result",
+        observation_ref: "obs:theory-zen-bridge",
+        bound_input_refs: [
+          {
+            binding_id: bindingId,
+            arg_name: "source_ref",
+            binding_kind: "source_ref",
+            from_subgoal_id: reflectionSubgoalId,
+            from_capability: "helix_ask.reflect_ideology_context",
+            ref: "obs:zen-reflection",
+          },
+        ],
+      },
+    ],
+    overrides,
+  });
+};
+
 describe("Helix Ask compound capability live probe", () => {
   it("selects all compound live scenarios by default and reports unknown filters", () => {
     const all = selectCompoundCapabilityLiveScenarios([]);
@@ -236,6 +703,12 @@ describe("Helix Ask compound capability live probe", () => {
     expect(filtered.unknownIds).toEqual(["missing_scenario"]);
     expect(filtered.scenarios.map((scenario) => scenario.id)).toEqual(["workspace_then_calculator"]);
     expect(filtered.availableIds).toContain("docs_then_calculator");
+    expect(filtered.availableIds).toContain("workspace_directory_then_docs");
+    expect(filtered.availableIds).toContain("micro_reasoner_presets_then_draft");
+    expect(filtered.availableIds).toContain("internet_reflection_calculator");
+    expect(filtered.availableIds).toContain("scholarly_reflection_calculator");
+    expect(filtered.availableIds).toContain("civilization_bounds_reflection");
+    expect(filtered.availableIds).toContain("zen_graph_reflection_bridge");
   });
 
   it("accepts a complete ordered compound ledger with bounded calculator args", () => {
@@ -259,6 +732,212 @@ describe("Helix Ask compound capability live probe", () => {
     ]);
     expect(result.subgoal_satisfactions).toEqual(["satisfied", "satisfied"]);
     expect(result.subgoal_rail_statuses).toEqual(["complete", "complete"]);
+  });
+
+  it("accepts internet search plus theory reflection plus calculator with source binding", () => {
+    const { ask, debugExport } = internetReflectionCalculatorDebug();
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("internet_reflection_calculator"),
+      ask,
+      debugExport,
+    });
+
+    expect(result.failures).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.requested_capabilities).toEqual([
+      "internet_search.web_research",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ]);
+    expect(result.executed_capabilities).toEqual([
+      "internet-search.search_web",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ]);
+  });
+
+  it("accepts scholarly research plus theory reflection plus calculator with source binding", () => {
+    const { ask, debugExport } = scholarlyReflectionCalculatorDebug();
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("scholarly_reflection_calculator"),
+      ask,
+      debugExport,
+    });
+
+    expect(result.failures).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.requested_capabilities).toEqual([
+      "scholarly-research.lookup_papers",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ]);
+    expect(result.executed_capabilities).toEqual([
+      "scholarly-research.lookup_papers",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ]);
+  });
+
+  it("accepts workspace-directory resolution plus docs location without dropping either rail", () => {
+    const { ask, debugExport } = workspaceDirectoryThenDocsDebug();
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("workspace_directory_then_docs"),
+      ask,
+      debugExport,
+    });
+
+    expect(result.failures).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.requested_capabilities).toEqual([
+      "workspace-directory.resolve",
+      "docs-viewer.locate_in_doc",
+    ]);
+    expect(result.executed_capabilities).toEqual([
+      "workspace-directory.resolve",
+      "docs-viewer.locate_in_doc",
+    ]);
+  });
+
+  it("accepts live-env micro-reasoner preset query plus draft without mailbox packet state", () => {
+    const { ask, debugExport } = microReasonerPresetsThenDraftDebug();
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("micro_reasoner_presets_then_draft"),
+      ask,
+      debugExport,
+    });
+
+    expect(result.failures).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.requested_capabilities).toEqual([
+      "live_env.query_micro_reasoner_presets",
+      "live_env.draft_micro_reasoner_preset",
+    ]);
+    expect(result.executed_capabilities).toEqual([
+      "live_env.query_micro_reasoner_presets",
+      "live_env.draft_micro_reasoner_preset",
+    ]);
+  });
+
+  it("accepts civilization scenario frame plus civilization bounds reflection with source binding", () => {
+    const { ask, debugExport } = civilizationBoundsReflectionDebug();
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("civilization_bounds_reflection"),
+      ask,
+      debugExport,
+    });
+
+    expect(result.failures).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.requested_capabilities).toEqual([
+      "helix_ask.build_civilization_scenario_frame",
+      "helix_ask.reflect_civilization_bounds",
+    ]);
+    expect(result.executed_capabilities).toEqual([
+      "helix_ask.build_civilization_scenario_frame",
+      "helix_ask.reflect_civilization_bounds",
+    ]);
+  });
+
+  it("accepts zen graph reflection plus theory-ideology bridge with source binding", () => {
+    const { ask, debugExport } = zenGraphReflectionBridgeDebug();
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("zen_graph_reflection_bridge"),
+      ask,
+      debugExport,
+    });
+
+    expect(result.failures).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.requested_capabilities).toEqual([
+      "helix_ask.reflect_ideology_context",
+      "helix_ask.bridge_theory_ideology_context",
+    ]);
+    expect(result.executed_capabilities).toEqual([
+      "helix_ask.reflect_ideology_context",
+      "helix_ask.bridge_theory_ideology_context",
+    ]);
+  });
+
+  it("catches satisfied reflection subgoals that lose required bound input refs", () => {
+    const base = internetReflectionCalculatorDebug();
+    const payload = (base.debugExport as any).payload;
+    payload.capability_itinerary_execution_state.compound_subgoal_ledger[1].bound_input_refs = [];
+    payload.artifact_query_index.compound_subgoal_rail_statuses[1].bound_input_refs = [];
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("internet_reflection_calculator"),
+      ask: base.ask,
+      debugExport: base.debugExport,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.failures).toContain("subgoal_2_bound_input_refs_missing");
+  });
+
+  it("catches reflection subgoals bound to the wrong upstream capability", () => {
+    const base = civilizationBoundsReflectionDebug();
+    const payload = (base.debugExport as any).payload;
+    payload.capability_itinerary_execution_state.compound_subgoal_ledger[1].input_bindings[0].from_capability =
+      "model.direct_answer";
+    payload.artifact_query_index.compound_subgoal_rail_statuses[1].input_bindings[0].from_capability =
+      "model.direct_answer";
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("civilization_bounds_reflection"),
+      ask: base.ask,
+      debugExport: base.debugExport,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.failures).toContain(
+      "subgoal_2_input_binding_from_capability_missing:helix_ask.build_civilization_scenario_frame",
+    );
+  });
+
+  it("catches scholarly reflection subgoals bound to non-scholarly upstream evidence", () => {
+    const base = scholarlyReflectionCalculatorDebug();
+    const payload = (base.debugExport as any).payload;
+    payload.capability_itinerary_execution_state.compound_subgoal_ledger[1].input_bindings[0].from_capability =
+      "internet_search.web_research";
+    payload.artifact_query_index.compound_subgoal_rail_statuses[1].input_bindings[0].from_capability =
+      "internet_search.web_research";
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("scholarly_reflection_calculator"),
+      ask: base.ask,
+      debugExport: base.debugExport,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.failures).toContain(
+      "subgoal_2_input_binding_from_capability_missing:scholarly-research.lookup_papers",
+    );
+  });
+
+  it("catches zen bridge subgoals bound to non-zen upstream evidence", () => {
+    const base = zenGraphReflectionBridgeDebug();
+    const payload = (base.debugExport as any).payload;
+    payload.capability_itinerary_execution_state.compound_subgoal_ledger[1].input_bindings[0].from_capability =
+      "helix_ask.reflect_theory_context";
+    payload.artifact_query_index.compound_subgoal_rail_statuses[1].input_bindings[0].from_capability =
+      "helix_ask.reflect_theory_context";
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("zen_graph_reflection_bridge"),
+      ask: base.ask,
+      debugExport: base.debugExport,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.failures).toContain(
+      "subgoal_2_input_binding_from_capability_missing:helix_ask.reflect_ideology_context",
+    );
   });
 
   it("catches dropped later subgoals instead of allowing first-tool success", () => {
@@ -322,6 +1001,76 @@ describe("Helix Ask compound capability live probe", () => {
     expect(result.failures).toContain("calculator_expression_contains_non_math_prompt_text");
   });
 
+  it("catches missing rail args even when ledger args are present", () => {
+    const base = workspaceThenCalculatorDebug();
+    const payload = (base.debugExport as any).payload;
+    delete payload.artifact_query_index.compound_subgoal_rail_statuses[1].args;
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("workspace_then_calculator"),
+      ask: base.ask,
+      debugExport: base.debugExport,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.failures).toContain("subgoal_2_rail_args_missing");
+    expect(result.failures).toContain("calculator_rail_expression_mismatch:null");
+  });
+
+  it("catches missing required-arg rail mirrors", () => {
+    const base = workspaceThenCalculatorDebug();
+    const payload = (base.debugExport as any).payload;
+    delete payload.artifact_query_index.compound_subgoal_rail_statuses[1].required_args;
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("workspace_then_calculator"),
+      ask: base.ask,
+      debugExport: base.debugExport,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.failures).toContain("subgoal_2_rail_required_args_missing");
+  });
+
+  it("catches missing support-ref rail mirrors for satisfied subgoals", () => {
+    const base = workspaceThenCalculatorDebug();
+    const payload = (base.debugExport as any).payload;
+    delete payload.artifact_query_index.compound_subgoal_rail_statuses[0].support_refs;
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("workspace_then_calculator"),
+      ask: base.ask,
+      debugExport: base.debugExport,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.failures).toContain("subgoal_1_rail_support_refs_missing");
+  });
+
+  it("catches calculator rail args that include non-math prompt text", () => {
+    const base = workspaceThenCalculatorDebug();
+    const payload = (base.debugExport as any).payload;
+    payload.artifact_query_index.compound_subgoal_rail_statuses[1].args = {
+      latex:
+        "Use workspace_os.status to inspect workstation status, then call scientific-calculator.solve_expression with this exact expression: 14*23+8.",
+      expression:
+        "Use workspace_os.status to inspect workstation status, then call scientific-calculator.solve_expression with this exact expression: 14*23+8.",
+    };
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("workspace_then_calculator"),
+      ask: base.ask,
+      debugExport: base.debugExport,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.failures).toContain("subgoal_2_rail_args_mismatch");
+    expect(result.failures).toContain(
+      "calculator_rail_expression_mismatch:Use workspace_os.status to inspect workstation status, then call scientific-calculator.solve_expression with this exact expression: 14*23+8.",
+    );
+    expect(result.failures).toContain("calculator_rail_expression_contains_non_math_prompt_text");
+  });
+
   it("catches budget exhaustion and terminal projection divergence", () => {
     const base = workspaceThenCalculatorDebug({
       terminal_error_code: "agent_loop_budget_exhausted",
@@ -343,6 +1092,50 @@ describe("Helix Ask compound capability live probe", () => {
     expect(result.ok).toBe(false);
     expect(result.failures).toContain("budget_exhaustion:agent_loop_budget_exhausted");
     expect(result.failures).toContain("terminal_projection_mismatch:typed_failure!=model_synthesized_answer");
+  });
+
+  it("catches receipt terminal fallback for successful compound turns", () => {
+    const base = workspaceThenCalculatorDebug({
+      terminal_artifact_kind: "tool_receipt",
+      terminal_presentation: {
+        terminal_artifact_kind: "tool_receipt",
+      },
+      final_answer_source: "tool_receipt",
+    });
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("workspace_then_calculator"),
+      ask: {
+        ...base.ask,
+        terminal_artifact_kind: "tool_receipt",
+        final_answer_source: "tool_receipt",
+      },
+      debugExport: base.debugExport,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.failures).toContain("receipt_terminal_forbidden:tool_receipt");
+    expect(result.failures).toContain("receipt_final_answer_source_forbidden:tool_receipt");
+  });
+
+  it("catches missing terminal authority on successful compound turns", () => {
+    const base = workspaceThenCalculatorDebug();
+    const payload = (base.debugExport as any).payload;
+    delete payload.terminal_artifact_kind;
+    delete payload.terminal_presentation;
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("workspace_then_calculator"),
+      ask: {
+        turn_id: base.ask.turn_id,
+        final_answer_source: base.ask.final_answer_source,
+      },
+      debugExport: base.debugExport,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.failures).toContain("terminal_authority_kind_missing");
+    expect(result.failures).toContain("visible_terminal_kind_missing");
   });
 
   it("catches compound final drafts missing satisfied subgoal support refs", () => {
@@ -382,6 +1175,23 @@ describe("Helix Ask compound capability live probe", () => {
     expect(result.executed_capabilities).toEqual(["docs-viewer.locate_in_doc", null]);
     expect(result.subgoal_satisfactions).toEqual(["satisfied", "failed"]);
     expect(result.subgoal_rail_statuses).toEqual(["complete", "fail_closed"]);
+  });
+
+  it("catches failed subgoals missing first-broken-rail metadata", () => {
+    const base = invalidCalculatorArgsFailClosedDebug();
+    const payload = (base.debugExport as any).payload;
+    delete payload.capability_itinerary_execution_state.compound_subgoal_ledger[1].first_broken_rail;
+    delete payload.artifact_query_index.compound_subgoal_rail_statuses[1].first_broken_rail;
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("invalid_calculator_args_fail_closed"),
+      ask: base.ask,
+      debugExport: base.debugExport,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.failures).toContain("subgoal_2_first_broken_rail_missing");
+    expect(result.failures).toContain("subgoal_2_rail_first_broken_rail_missing");
   });
 
   it("rejects invalid-args fail-closed scenarios when the terminal error is not the expected typed failure", () => {

@@ -11,6 +11,7 @@ export type CompoundCapabilityScenario = {
   seed?: "visual_capture";
   expectedRequested: ExpectedValue[];
   expectedRuntime: ExpectedValue[];
+  expectedInputBindingFromCapabilities?: Array<string | string[] | null>;
   expectedCalculatorExpression?: string;
   expectedSubgoalSatisfaction?: ExpectedValue[];
   expectedRailStatus?: ExpectedValue[];
@@ -69,10 +70,24 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
     expectedCalculatorExpression: "19+23",
   },
   {
+    id: "workspace_directory_then_docs",
+    prompt:
+      "Call workspace-directory.resolve for docs/helix-ask-codex-loop-discipline.md, then use docs-viewer.locate_in_doc to locate the rule of thumb in docs/helix-ask-codex-loop-discipline.md.",
+    expectedRequested: ["workspace-directory.resolve", "docs-viewer.locate_in_doc"],
+    expectedRuntime: ["workspace-directory.resolve", "docs-viewer.locate_in_doc"],
+  },
+  {
     id: "catalog_then_workspace",
     prompt: "Call helix_ask.inspect_capability_catalog, then use workspace_os.status to inspect workstation status.",
     expectedRequested: ["helix_ask.inspect_capability_catalog", "workspace_os.status"],
     expectedRuntime: ["helix_ask.inspect_capability_catalog", "workspace_os.status"],
+  },
+  {
+    id: "micro_reasoner_presets_then_draft",
+    prompt:
+      "Call live_env.query_micro_reasoner_presets to inspect the micro reasoner preset catalog, then call live_env.draft_micro_reasoner_preset to draft a live-source micro reasoner preset.",
+    expectedRequested: ["live_env.query_micro_reasoner_presets", "live_env.draft_micro_reasoner_preset"],
+    expectedRuntime: ["live_env.query_micro_reasoner_presets", "live_env.draft_micro_reasoner_preset"],
   },
   {
     id: "repo_plus_docs",
@@ -82,6 +97,40 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
     expectedRuntime: ["repo-code.search_concept", "docs-viewer.locate_in_doc"],
   },
   {
+    id: "internet_reflection_calculator",
+    prompt:
+      "Use internet_search.web_research to find a cited research-paper source for Alcubierre metric energy estimates, then use helix_ask.reflect_theory_context to connect that source to the Helix Ask receipts-as-observations rule, then run scientific-calculator.solve_expression with this exact expression: (9+3)*7-25.",
+    expectedRequested: [
+      "internet_search.web_research",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ],
+    expectedRuntime: [
+      ["internet-search.search_web", "internet_search.web_research"],
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ],
+    expectedInputBindingFromCapabilities: [null, "internet_search.web_research", null],
+    expectedCalculatorExpression: "(9+3)*7-25",
+  },
+  {
+    id: "scholarly_reflection_calculator",
+    prompt:
+      "Use scholarly-research.lookup_papers for Alcubierre metric energy estimates, then use helix_ask.reflect_theory_context to connect that scholarly source to the Helix Ask receipts-as-observations rule, then run scientific-calculator.solve_expression with this exact expression: (12+5)*3.",
+    expectedRequested: [
+      "scholarly-research.lookup_papers",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ],
+    expectedRuntime: [
+      "scholarly-research.lookup_papers",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ],
+    expectedInputBindingFromCapabilities: [null, "scholarly-research.lookup_papers", null],
+    expectedCalculatorExpression: "(12+5)*3",
+  },
+  {
     id: "visual_then_calculator",
     seed: "visual_capture",
     prompt:
@@ -89,6 +138,34 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
     expectedRequested: [["situation-room.describe_visual_capture", "image_lens.inspect"], "scientific-calculator.solve_expression"],
     expectedRuntime: ["situation-room.describe_visual_capture", "scientific-calculator.solve_expression"],
     expectedCalculatorExpression: "5*9",
+  },
+  {
+    id: "civilization_bounds_reflection",
+    prompt:
+      "Call helix_ask.build_civilization_scenario_frame for a long-range settlement scenario, then call helix_ask.reflect_civilization_bounds to reflect collaboration and falsification bounds.",
+    expectedRequested: [
+      "helix_ask.build_civilization_scenario_frame",
+      "helix_ask.reflect_civilization_bounds",
+    ],
+    expectedRuntime: [
+      "helix_ask.build_civilization_scenario_frame",
+      "helix_ask.reflect_civilization_bounds",
+    ],
+    expectedInputBindingFromCapabilities: [null, "helix_ask.build_civilization_scenario_frame"],
+  },
+  {
+    id: "zen_graph_reflection_bridge",
+    prompt:
+      "Call helix_ask.reflect_ideology_context for wisdom under uncertainty, then call helix_ask.bridge_theory_ideology_context to bridge the theory and ideology context.",
+    expectedRequested: [
+      "helix_ask.reflect_ideology_context",
+      "helix_ask.bridge_theory_ideology_context",
+    ],
+    expectedRuntime: [
+      "helix_ask.reflect_ideology_context",
+      "helix_ask.bridge_theory_ideology_context",
+    ],
+    expectedInputBindingFromCapabilities: [null, "helix_ask.reflect_ideology_context"],
   },
   {
     id: "invalid_calculator_args_fail_closed",
@@ -298,6 +375,49 @@ const subgoalArgsFor = (contractSubgoal: RecordLike | null, ledgerEntry: RecordL
 const expressionFor = (args: RecordLike | null): string | null =>
   readString(args?.latex) ?? readString(args?.expression) ?? readString(args?.input);
 
+const RECEIPT_TERMINAL_KINDS = new Set([
+  "tool_receipt",
+  "calculator_receipt",
+  "workspace_action_receipt",
+  "docs_viewer_receipt",
+  "live_pipeline_receipt",
+  "voice_receipt",
+]);
+
+const hasOwn = (record: RecordLike | null, key: string): boolean =>
+  Boolean(record && Object.prototype.hasOwnProperty.call(record, key));
+
+const jsonEqual = (left: unknown, right: unknown): boolean => JSON.stringify(left) === JSON.stringify(right);
+
+const stringArraysEqual = (left: unknown, right: unknown): boolean =>
+  jsonEqual(readStringArray(left), readStringArray(right));
+
+const mirrorArray = (input: {
+  failures: string[];
+  index: number;
+  ledgerEntry: RecordLike | null;
+  railEntry: RecordLike | null;
+  key: string;
+  requiredWhenLedgerHasKey?: boolean;
+}): void => {
+  const { failures, index, ledgerEntry, railEntry, key, requiredWhenLedgerHasKey = true } = input;
+  if (!ledgerEntry || !railEntry) return;
+  if (!hasOwn(ledgerEntry, key) && !requiredWhenLedgerHasKey) return;
+  if (!Array.isArray(railEntry[key])) {
+    failures.push(`subgoal_${index + 1}_rail_${key}_missing`);
+    return;
+  }
+  if (Array.isArray(ledgerEntry[key]) && !jsonEqual(railEntry[key], ledgerEntry[key])) {
+    failures.push(`subgoal_${index + 1}_rail_${key}_mismatch`);
+  }
+};
+
+const requiredInputBindingsFor = (entry: RecordLike | null): RecordLike[] =>
+  readArray(entry?.input_bindings)
+    .map(readRecord)
+    .filter((binding: RecordLike | null): binding is RecordLike => Boolean(binding))
+    .filter((binding) => binding.required === true);
+
 export const evaluateCompoundCapabilityScenario = (input: {
   scenario: CompoundCapabilityScenario;
   ask: RecordLike;
@@ -351,7 +471,17 @@ export const evaluateCompoundCapabilityScenario = (input: {
     const railObservationRef = maybeCapability(railEntry ?? {}, "observation_ref");
     const railSatisfaction = maybeCapability(railEntry ?? {}, "satisfaction");
     const railStatus = maybeCapability(railEntry ?? {}, "rail_status");
+    const firstBrokenRail = maybeCapability(ledgerEntry ?? {}, "first_broken_rail");
+    const repairTarget = maybeCapability(ledgerEntry ?? {}, "repair_target");
+    const railFirstBrokenRail = maybeCapability(railEntry ?? {}, "first_broken_rail");
     const railFailureCode = maybeCapability(railEntry ?? {}, "rail_failure_code");
+    const railRepairTarget = maybeCapability(railEntry ?? {}, "repair_target");
+    const ledgerArgs = subgoalArgsFor(contractSubgoal, ledgerEntry);
+    const railArgs = readRecord(railEntry?.args);
+    const requiredInputBindings = requiredInputBindingsFor(ledgerEntry);
+    const boundInputRefs = readArray(ledgerEntry?.bound_input_refs).map(readRecord).filter(Boolean);
+    const unresolvedInputBindings = readArray(ledgerEntry?.unresolved_input_bindings).map(readRecord).filter(Boolean);
+    const expectedInputBindingFromCapability = input.scenario.expectedInputBindingFromCapabilities?.[index];
     const expectedRuntime = index < input.scenario.expectedRuntime.length ? input.scenario.expectedRuntime[index] : expected;
     const expectedSatisfaction =
       input.scenario.expectedSubgoalSatisfaction && index < input.scenario.expectedSubgoalSatisfaction.length
@@ -372,12 +502,37 @@ export const evaluateCompoundCapabilityScenario = (input: {
     if (!matchesExpected(executed, expectedRuntime)) {
       failures.push(`subgoal_${index + 1}_executed_mismatch:${executed ?? "null"}`);
     }
+    if (!ledgerArgs) failures.push(`subgoal_${index + 1}_args_missing`);
     if (expectedSatisfaction === "satisfied") {
       if (!observationKind) failures.push(`subgoal_${index + 1}_observation_kind_missing`);
       if (!observationRef) failures.push(`subgoal_${index + 1}_observation_ref_missing`);
     }
     if (!matchesExpected(satisfaction, expectedSatisfaction)) {
       failures.push(`subgoal_${index + 1}_satisfaction_mismatch:${satisfaction ?? "null"}`);
+    }
+    if (satisfaction && satisfaction !== "satisfied") {
+      if (!firstBrokenRail) failures.push(`subgoal_${index + 1}_first_broken_rail_missing`);
+      if (!repairTarget) failures.push(`subgoal_${index + 1}_repair_target_missing`);
+    }
+    if (expectedInputBindingFromCapability !== undefined) {
+      if (expectedInputBindingFromCapability === null) {
+        if (requiredInputBindings.length > 0) failures.push(`subgoal_${index + 1}_unexpected_required_input_binding`);
+      } else {
+        const expectedFromCapabilities = Array.isArray(expectedInputBindingFromCapability)
+          ? expectedInputBindingFromCapability
+          : [expectedInputBindingFromCapability];
+        const actualFromCapabilities = requiredInputBindings
+          .map((binding) => readString(binding.from_capability))
+          .filter((entry: string | null): entry is string => Boolean(entry));
+        const missing = expectedFromCapabilities.filter((entry) => !actualFromCapabilities.includes(entry));
+        if (missing.length > 0) {
+          failures.push(`subgoal_${index + 1}_input_binding_from_capability_missing:${missing.join(",")}`);
+        }
+      }
+    }
+    if (expectedSatisfaction === "satisfied" && requiredInputBindings.length > 0) {
+      if (boundInputRefs.length === 0) failures.push(`subgoal_${index + 1}_bound_input_refs_missing`);
+      if (unresolvedInputBindings.length > 0) failures.push(`subgoal_${index + 1}_unresolved_input_bindings_present`);
     }
     if (!railEntry) {
       failures.push(`subgoal_${index + 1}_rail_status_entry_missing`);
@@ -401,6 +556,33 @@ export const evaluateCompoundCapabilityScenario = (input: {
       if (expectedRailFailureCode !== undefined && !matchesExpected(railFailureCode, expectedRailFailureCode)) {
         failures.push(`subgoal_${index + 1}_rail_failure_code_mismatch:${railFailureCode ?? "null"}`);
       }
+      if (railFirstBrokenRail !== firstBrokenRail) {
+        failures.push(`subgoal_${index + 1}_rail_first_broken_rail_mismatch:${railFirstBrokenRail ?? "null"}!=${firstBrokenRail ?? "null"}`);
+      }
+      if (railRepairTarget !== repairTarget) {
+        failures.push(`subgoal_${index + 1}_rail_repair_target_mismatch:${railRepairTarget ?? "null"}!=${repairTarget ?? "null"}`);
+      }
+      if (railSatisfaction && railSatisfaction !== "satisfied") {
+        if (!railFirstBrokenRail) failures.push(`subgoal_${index + 1}_rail_first_broken_rail_missing`);
+        if (!railRepairTarget) failures.push(`subgoal_${index + 1}_rail_repair_target_missing`);
+      }
+      if (!railArgs) {
+        failures.push(`subgoal_${index + 1}_rail_args_missing`);
+      } else if (ledgerArgs && !jsonEqual(railArgs, ledgerArgs)) {
+        failures.push(`subgoal_${index + 1}_rail_args_mismatch`);
+      }
+      mirrorArray({ failures, index, ledgerEntry, railEntry, key: "required_args" });
+      mirrorArray({ failures, index, ledgerEntry, railEntry, key: "optional_args" });
+      mirrorArray({ failures, index, ledgerEntry, railEntry, key: "input_bindings" });
+      mirrorArray({ failures, index, ledgerEntry, railEntry, key: "bound_input_refs" });
+      mirrorArray({ failures, index, ledgerEntry, railEntry, key: "unresolved_input_bindings" });
+      if (ledgerEntry && railEntry && hasOwn(ledgerEntry, "support_refs")) {
+        if (!Array.isArray(railEntry.support_refs)) {
+          failures.push(`subgoal_${index + 1}_rail_support_refs_missing`);
+        } else if (!stringArraysEqual(railEntry.support_refs, ledgerEntry.support_refs)) {
+          failures.push(`subgoal_${index + 1}_rail_support_refs_mismatch`);
+        }
+      }
     }
   });
 
@@ -417,6 +599,13 @@ export const evaluateCompoundCapabilityScenario = (input: {
     }
     if (expression && /workspace_os\.status|docs-viewer|repo-code|situation-room|then|plus/i.test(expression)) {
       failures.push("calculator_expression_contains_non_math_prompt_text");
+    }
+    const railExpression = expressionFor(readRecord(railStatuses[calculatorIndex]?.args));
+    if (railExpression !== input.scenario.expectedCalculatorExpression) {
+      failures.push(`calculator_rail_expression_mismatch:${railExpression ?? "null"}`);
+    }
+    if (railExpression && /workspace_os\.status|docs-viewer|repo-code|situation-room|then|plus/i.test(railExpression)) {
+      failures.push("calculator_rail_expression_contains_non_math_prompt_text");
     }
   }
 
@@ -436,8 +625,20 @@ export const evaluateCompoundCapabilityScenario = (input: {
   ) {
     failures.push(`final_answer_source_mismatch:${finalAnswerSource ?? "null"}`);
   }
+  if (input.scenario.expectedTerminalErrorCode === undefined) {
+    if (!terminalAuthorityKind) failures.push("terminal_authority_kind_missing");
+    if (!visibleTerminalKind) failures.push("visible_terminal_kind_missing");
+  }
   if (terminalAuthorityKind && visibleTerminalKind && terminalAuthorityKind !== visibleTerminalKind) {
     failures.push(`terminal_projection_mismatch:${terminalAuthorityKind}!=${visibleTerminalKind}`);
+  }
+  if (input.scenario.expectedTerminalErrorCode === undefined) {
+    if (terminalAuthorityKind && RECEIPT_TERMINAL_KINDS.has(terminalAuthorityKind)) {
+      failures.push(`receipt_terminal_forbidden:${terminalAuthorityKind}`);
+    }
+    if (finalAnswerSource && RECEIPT_TERMINAL_KINDS.has(finalAnswerSource)) {
+      failures.push(`receipt_final_answer_source_forbidden:${finalAnswerSource}`);
+    }
   }
   if (terminalErrorCode === "compound_subgoal_support_refs_missing") {
     const coverage = readRecord(payload?.compound_subgoal_draft_support_coverage);
@@ -507,6 +708,7 @@ const runScenario = async (scenario: CompoundCapabilityScenario, runId: string, 
 const renderMarkdownSummary = (input: {
   runId: string;
   outputDir: string;
+  selectedScenarioIds?: string[];
   results: CompoundCapabilityScenarioSummary[];
 }): string => {
   const lines = [
@@ -515,6 +717,7 @@ const renderMarkdownSummary = (input: {
     `- run_id: ${input.runId}`,
     `- base_url: ${BASE_URL}`,
     `- output_dir: ${input.outputDir}`,
+    `- selected_scenarios: ${JSON.stringify(input.selectedScenarioIds ?? input.results.map((result) => result.id))}`,
     "",
     "## Scenarios",
   ];
@@ -565,6 +768,7 @@ const main = async (): Promise<void> => {
   const outputDir = path.resolve(OUT_DIR, runId);
   await fs.mkdir(outputDir, { recursive: true });
   const selection = selectCompoundCapabilityLiveScenarios();
+  const selectedScenarioIds = selection.scenarios.map((scenario) => scenario.id);
 
   if (selection.unknownIds.length || selection.scenarios.length === 0) {
     const summary = {
@@ -574,12 +778,14 @@ const main = async (): Promise<void> => {
       run_id: runId,
       base_url: BASE_URL,
       output_dir: outputDir,
+      selected_scenarios: selectedScenarioIds,
+      scenario_count: selection.scenarios.length,
       unknown_scenarios: selection.unknownIds,
       available_scenarios: selection.availableIds,
       results: [],
     };
     await fs.writeFile(path.join(outputDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
-    await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, outputDir, results: [] }));
+    await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, outputDir, selectedScenarioIds, results: [] }));
     console.log(JSON.stringify(summary, null, 2));
     process.exitCode = 1;
     return;
@@ -592,12 +798,13 @@ const main = async (): Promise<void> => {
       run_id: runId,
       base_url: BASE_URL,
       output_dir: outputDir,
-      selected_scenarios: selection.scenarios.map((scenario) => scenario.id),
+      selected_scenarios: selectedScenarioIds,
+      scenario_count: selection.scenarios.length,
       scenarios: selection.scenarios,
       results: [],
     };
     await fs.writeFile(path.join(outputDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
-    await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, outputDir, results: [] }));
+    await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, outputDir, selectedScenarioIds, results: [] }));
     console.log(JSON.stringify(summary, null, 2));
     return;
   }
@@ -612,10 +819,12 @@ const main = async (): Promise<void> => {
       run_id: runId,
       base_url: BASE_URL,
       output_dir: outputDir,
+      selected_scenarios: selectedScenarioIds,
+      scenario_count: selection.scenarios.length,
       results: [],
     };
     await fs.writeFile(path.join(outputDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
-    await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, outputDir, results: [] }));
+    await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, outputDir, selectedScenarioIds, results: [] }));
     console.log(JSON.stringify(summary, null, 2));
     process.exitCode = 1;
     return;
@@ -649,10 +858,14 @@ const main = async (): Promise<void> => {
     run_id: runId,
     base_url: BASE_URL,
     output_dir: outputDir,
+    selected_scenarios: selectedScenarioIds,
+    scenario_count: selection.scenarios.length,
+    passed_count: results.filter((result) => result.ok).length,
+    failed_count: results.filter((result) => !result.ok).length,
     results,
   };
   await fs.writeFile(path.join(outputDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
-  await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, outputDir, results }));
+  await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, outputDir, selectedScenarioIds, results }));
   console.log(JSON.stringify(summary, null, 2));
   if (!summary.ok) process.exitCode = 1;
 };

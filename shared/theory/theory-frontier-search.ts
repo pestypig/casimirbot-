@@ -115,6 +115,15 @@ function stableGraphProjection(graph: TheoryBadgeGraphV1): string {
             dimensionSignature: unit.dimensionSignature ?? null,
           }))
           .sort((left, right) => left.symbol.localeCompare(right.symbol)),
+        scaleEnvelope: badge.scaleEnvelope
+          ? {
+              characteristicLog10M: badge.scaleEnvelope.characteristicLog10M,
+              minLog10M: badge.scaleEnvelope.minLog10M,
+              maxLog10M: badge.scaleEnvelope.maxLog10M,
+              basis: badge.scaleEnvelope.basis,
+              sourceRefs: badge.scaleEnvelope.sourceRefs.map((sourceRef) => sourceReferenceId(sourceRef)).sort(),
+            }
+          : null,
         sourceRefs: badge.sourceRefs
           .map((sourceRef) => sourceReferenceId(sourceRef))
           .sort(),
@@ -284,9 +293,17 @@ function coordinateEnvelope(coordinates: TheoryBiomeCoordinateV1[]): {
   min: number | null;
   max: number | null;
 } {
-  const scales = coordinates
-    .map((coordinate) => coordinate.scaleLog10M)
-    .filter((scale): scale is number => typeof scale === "number" && Number.isFinite(scale));
+  const scales = coordinates.flatMap((coordinate) => {
+    const envelopeValues = [
+      coordinate.scaleEnvelope.minLog10M,
+      coordinate.scaleEnvelope.maxLog10M,
+      coordinate.scaleEnvelope.characteristicLog10M,
+    ].filter((scale): scale is number => typeof scale === "number" && Number.isFinite(scale));
+    if (envelopeValues.length > 0) return envelopeValues;
+    return typeof coordinate.scaleLog10M === "number" && Number.isFinite(coordinate.scaleLog10M)
+      ? [coordinate.scaleLog10M]
+      : [];
+  });
   if (scales.length === 0) return { min: null, max: null };
   return {
     min: Math.min(...scales),
@@ -446,6 +463,7 @@ function buildCandidate(args: {
   const directRelations = edgeRelationsFor(args.graph, args.badgeIds);
   const pathRelations = edgeRelationsFor(args.graph, firstPrinciplesPathBadgeIds);
   const cheapBiomeScore = scoreCheapBiome(coordinates);
+  const scaleEnvelope = coordinateEnvelope(coordinates);
   const congruenceScore = round6(
     clamp01(
       (unitCompatibility === "compatible" ? 0.3 : unitCompatibility === "partial" ? 0.16 : 0.08) +
@@ -515,7 +533,7 @@ function buildCandidate(args: {
       evidenceReferenceIds: sourceReferences.map(sourceReferenceId),
     },
     biomeRegion: {
-      scaleEnvelopeLog10M: coordinateEnvelope(coordinates),
+      scaleEnvelopeLog10M: scaleEnvelope,
       scaleBands: unique(coordinates.map((coordinate) => coordinate.scaleBand)).sort(),
       domainKeys: unique(coordinates.map((coordinate) => coordinate.domainKey)).sort(),
       fidelityKeys: unique(coordinates.map((coordinate) => coordinate.fidelity)).sort(),
@@ -540,6 +558,7 @@ function buildCandidate(args: {
       falsificationChecks: falsifiers,
       uncertaintyBudget: [
         `placement entropy is scoped to query "${args.query}"`,
+        `scale envelope log10(m) ${scaleEnvelope.min ?? "unbounded"}..${scaleEnvelope.max ?? "unbounded"}`,
         `average claim pressure ${averageClaimPressure}`,
         "probability terrain is placement uncertainty, not truth probability",
       ],

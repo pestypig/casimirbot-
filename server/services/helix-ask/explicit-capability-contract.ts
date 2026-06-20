@@ -1,5 +1,9 @@
 import type { HelixCapabilityFamily } from "@shared/helix-capability-plan";
 import { HELIX_INTERNET_SEARCH_CAPABILITY } from "@shared/helix-internet-search-observation";
+import {
+  HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+  HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+} from "@shared/helix-scholarly-research-observation";
 import type { HelixToolCallAdmissionFamily } from "@shared/helix-tool-call-admission";
 import {
   contextualToolSuppressionBlocksFamily,
@@ -20,7 +24,13 @@ export type ExplicitCapabilityContract = {
   required_terminal_kind: string;
   allowed_substitutions: string[];
   forbidden_nearby_capabilities: string[];
+  required_args: string[];
+  optional_args: string[];
 };
+
+type ExplicitCapabilityContractDefinition =
+  Omit<ExplicitCapabilityContract, "required_args" | "optional_args"> &
+  Partial<Pick<ExplicitCapabilityContract, "required_args" | "optional_args">>;
 
 export type ExtractedExplicitCapabilityContract = {
   contract: ExplicitCapabilityContract;
@@ -37,7 +47,7 @@ const liveEnvironmentControlContract = (input: {
   requiredObservationKind?: string;
   requiredTerminalKind?: string;
   forbiddenNearbyCapabilities?: string[];
-}): ExplicitCapabilityContract => ({
+}): ExplicitCapabilityContractDefinition => ({
   schema: "helix.explicit_capability_contract.v1",
   capability: input.capability,
   ...(input.aliases ? { aliases: input.aliases } : {}),
@@ -64,7 +74,7 @@ const liveEnvironmentQueryContract = (input: {
   aliases?: string[];
   requiredObservationKind?: string;
   requiredObservationKinds?: string[];
-}): ExplicitCapabilityContract => ({
+}): ExplicitCapabilityContractDefinition => ({
   schema: "helix.explicit_capability_contract.v1",
   capability: input.capability,
   ...(input.aliases ? { aliases: input.aliases } : {}),
@@ -91,7 +101,7 @@ const liveSourceMailEvidenceContract = (input: {
   capability: string;
   aliases?: string[];
   requiredObservationKinds: string[];
-}): ExplicitCapabilityContract => ({
+}): ExplicitCapabilityContractDefinition => ({
   schema: "helix.explicit_capability_contract.v1",
   capability: input.capability,
   ...(input.aliases ? { aliases: input.aliases } : {}),
@@ -109,7 +119,7 @@ const contextReflectionEvidenceContract = (input: {
   capability: string;
   aliases?: string[];
   requiredObservationKinds: string[];
-}): ExplicitCapabilityContract => ({
+}): ExplicitCapabilityContractDefinition => ({
   schema: "helix.explicit_capability_contract.v1",
   capability: input.capability,
   ...(input.aliases ? { aliases: input.aliases } : {}),
@@ -123,7 +133,69 @@ const contextReflectionEvidenceContract = (input: {
   forbidden_nearby_capabilities: ["model.direct_answer"],
 });
 
-const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
+const requiredArgsForCapability = (capability: string): string[] => {
+  switch (capability) {
+    case "scientific-calculator.solve_expression":
+      return ["latex"];
+    case "docs-viewer.locate_in_doc":
+      return ["query"];
+    case "repo-code.search_concept":
+      return ["query"];
+    case "workspace-directory.resolve":
+      return ["query"];
+    case "internet_search.web_research":
+      return ["query"];
+    case HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY:
+      return ["query"];
+    case HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY:
+      return ["paper_result_or_source"];
+    case "workstation-notes.append_to_note":
+      return ["text"];
+    default:
+      return [];
+  }
+};
+
+const optionalArgsForCapability = (capability: string): string[] => {
+  switch (capability) {
+    case "scientific-calculator.solve_expression":
+      return ["expression", "equation"];
+    case "docs-viewer.open":
+      return ["path", "anchor", "selected_text"];
+    case "docs-viewer.locate_in_doc":
+      return ["path", "anchor", "term", "text"];
+    case "docs-viewer.summarize_doc":
+      return ["path", "anchor", "selected_text"];
+    case "docs-viewer.doc_equation_context":
+      return ["path", "anchor", "query", "selected_text"];
+    case "repo-code.search_concept":
+      return ["concept", "limit"];
+    case "workspace-directory.resolve":
+      return ["uri", "path", "target", "target_kinds", "limit"];
+    case "internet_search.web_research":
+      return ["question", "prompt", "topic", "search_query"];
+    case HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY:
+      return ["doi", "arxiv_id", "arxivId", "title", "journal", "reference", "citation", "limit"];
+    case HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY:
+      return ["paper_result_id", "paper_id", "result_id", "doi", "arxiv_id", "arxivId", "source_url", "pdf_url", "full_text_url", "url"];
+    case "image_lens.inspect":
+      return ["view_state", "source_id", "regions"];
+    case "workstation-notes.append_to_note":
+      return ["body", "content", "note_id", "title"];
+    default:
+      return [];
+  }
+};
+
+const normalizeExplicitCapabilityContract = (
+  contract: ExplicitCapabilityContractDefinition,
+): ExplicitCapabilityContract => ({
+  ...contract,
+  required_args: contract.required_args ?? requiredArgsForCapability(contract.capability),
+  optional_args: contract.optional_args ?? optionalArgsForCapability(contract.capability),
+});
+
+const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinition[] = [
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "helix_ask.inspect_capability_catalog",
@@ -265,6 +337,32 @@ const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
     required_terminal_kind: "internet_search_answer",
     allowed_substitutions: [],
     forbidden_nearby_capabilities: ["model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+    aliases: ["scholarly_research.lookup_papers", "scholarly_research", "lookup_papers"],
+    capability_family: "scholarly_research",
+    plan_family: "scholarly_research",
+    source_target: "scholarly_research",
+    admission_families: ["scholarly_research"],
+    required_observation_kinds: ["scholarly_research_observation"],
+    required_terminal_kind: "scholarly_research_answer",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+    aliases: ["scholarly_research.fetch_full_text", "fetch_full_text", "scholarly_full_text"],
+    capability_family: "scholarly_research",
+    plan_family: "scholarly_research",
+    source_target: "scholarly_research",
+    admission_families: ["scholarly_research"],
+    required_observation_kinds: ["scholarly_full_text_observation"],
+    required_terminal_kind: "scholarly_research_answer",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
   },
   liveSourceMailEvidenceContract({
     capability: "live_env.query_micro_reasoner_presets",
@@ -676,6 +774,9 @@ const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
     forbidden_nearby_capabilities: ["model.direct_answer"],
   },
 ];
+
+const explicitCapabilityContracts: ExplicitCapabilityContract[] =
+  explicitCapabilityContractDefinitions.map(normalizeExplicitCapabilityContract);
 
 const commandVerb = String.raw`(?:call|use|run|invoke|execute|inspect\s+using|locate\s+(?:in\s+doc\s+)?using|find\s+using)`;
 

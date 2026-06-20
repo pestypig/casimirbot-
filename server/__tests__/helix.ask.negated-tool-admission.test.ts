@@ -656,6 +656,39 @@ describe("Helix Ask negated/contextual tool admission", () => {
     }
   });
 
+  it("does not suppress affirmative calculator commands after contextual words in a previous sentence", () => {
+    const promptText =
+      "Use internet_search.web_research to find a cited research-paper source for the Alcubierre metric. " +
+      "Then use helix_ask.reflect_theory_context to connect the cited source to the rule that receipts are observations before terminal authority. " +
+      "Finally run scientific-calculator.solve_expression with this exact expression: (9+3)*7-25.";
+    const sourceTargetIntent = arbitrateAskSourceTarget({ turnId, threadId, promptText });
+    const admission = buildToolCallAdmissionDecision({ turnId, sourceTargetIntent, promptText });
+    const plan = buildCapabilityPlan({
+      turnId,
+      promptText,
+      sourceTargetIntent,
+      toolCallAdmissionDecision: admission,
+      canonicalGoalFrame: canonicalGoal,
+      availableCapabilities: availableCapabilities([
+        "internet-search.search_web",
+        "helix_ask.reflect_theory_context",
+        "scientific-calculator.solve_expression",
+      ]) as any,
+    });
+
+    expect(admission.tool_admission_suppressed).not.toBe(true);
+    expect(plan.tool_admission_suppressed).not.toBe(true);
+    expect(plan.compound_capability_contract?.subgoals.map((subgoal) => subgoal.requested_capability)).toEqual([
+      "internet_search.web_research",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ]);
+    expect(plan.compound_capability_contract?.subgoals.at(-1)?.args_hint).toEqual({
+      expression: "(9+3)*7-25",
+      latex: "(9+3)*7-25",
+    });
+  });
+
   it("does not let suppressed calculator references enter calculator compound planning", () => {
     const promptText =
       "Do not call any tools. Explain why calculator receipts are observations, not terminal answers.";

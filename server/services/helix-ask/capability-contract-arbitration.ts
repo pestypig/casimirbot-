@@ -118,6 +118,10 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
     case "internet_search.web_research":
     case "internet-search.search_web":
       return "internet_search_lookup";
+    case "scholarly-research.lookup_papers":
+      return "scholarly_research_lookup";
+    case "scholarly-research.fetch_full_text":
+      return "scholarly_full_text_lookup";
     case "live_env.read_processed_live_source_mail":
     case "live_env.process_live_source_mail":
     case "live_env.reflect_live_source_mail_loop":
@@ -146,6 +150,9 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
     case "internet_search.web_research":
     case "internet-search.search_web":
       return "external_internet_search";
+    case "scholarly-research.lookup_papers":
+    case "scholarly-research.fetch_full_text":
+      return "external_scholarly_research";
     case "live_env.read_processed_live_source_mail":
     case "live_env.process_live_source_mail":
     case "live_env.reflect_live_source_mail_loop":

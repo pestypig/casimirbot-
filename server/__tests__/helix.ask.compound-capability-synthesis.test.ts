@@ -176,6 +176,56 @@ describe("compound capability synthesis readiness", () => {
     ]);
   });
 
+  it("requires synthesis from visual capture and calculator observations together", () => {
+    const readiness = resolveCompoundCapabilitySynthesisReadiness({
+      payload: {
+        capability_itinerary_execution_state: {
+          schema: "helix.capability_itinerary_execution_state.v1",
+          applies: true,
+          complete: true,
+          compound_subgoal_ledger: [
+            {
+              requested_capability: "image_lens.inspect",
+              selected_capability: "situation-room.describe_visual_capture",
+              executed_capability: "situation-room.describe_visual_capture",
+              observation_kind: "situation_context_pack",
+              observation_ref: "obs:visual-context",
+              satisfaction: "satisfied",
+              rail_status: "complete",
+              terminal_contribution_kind: "situation_context_pack",
+            },
+            {
+              requested_capability: "scientific-calculator.solve_expression",
+              selected_capability: "scientific-calculator.solve_expression",
+              executed_capability: "scientific-calculator.solve_expression",
+              observation_kind: "calculator_receipt",
+              observation_ref: "obs:calculator",
+              satisfaction: "satisfied",
+              rail_status: "complete",
+              terminal_contribution_kind: "workstation_tool_evaluation",
+            },
+          ],
+        },
+      },
+      artifacts: [],
+    });
+
+    expect(readiness).toMatchObject({
+      applies: true,
+      complete: true,
+      synthesis_required: true,
+      has_docs_subgoal: false,
+      goal_kind: "compound_evidence_synthesis",
+      required_terminal_kind: "model_synthesized_answer",
+      synthesis_terminal_kind: "model_synthesized_answer",
+    });
+    expect(readiness.support_refs).toEqual(["obs:visual-context", "obs:calculator"]);
+    expect(readiness.terminal_contribution_kinds).toEqual([
+      "situation_context_pack",
+      "workstation_tool_evaluation",
+    ]);
+  });
+
   it("requires synthesis after catalog and workspace subgoals are both observed", () => {
     const readiness = resolveCompoundCapabilitySynthesisReadiness({
       payload: {

@@ -18,12 +18,25 @@ export type HelixCompoundCapabilitySubgoal = {
   plan_family: string;
   source_target: string;
   admission_families: string[];
+  required_args: string[];
+  optional_args: string[];
   args_hint: RecordLike;
   required_observation_kinds: string[];
   required_terminal_kind: string;
   contribution_role: string;
   terminal_contribution_kind: string;
   allowed_substitutions: string[];
+  depends_on_subgoal_ids: string[];
+  input_bindings: Array<{
+    binding_id: string;
+    arg_name: "source_ref" | "source_refs" | "target_ref" | "support_refs";
+    binding_kind: "source_ref" | "target_ref" | "support_ref";
+    from_subgoal_id: string;
+    from_capability: string;
+    required_observation_kinds: string[];
+    required: boolean;
+    status: "pending";
+  }>;
   status: "pending";
   mandatory: true;
 };
@@ -106,6 +119,50 @@ const docsLocateArgs = (promptText: string): RecordLike => {
   };
 };
 
+const segmentForMatch = (
+  promptText: string,
+  match: Pick<ExtractedExplicitCapabilityContract, "match_end_index" | "match_index">,
+  ordered: ExtractedExplicitCapabilityContract[],
+): string => {
+  const nextCapabilityIndex = findNextCapabilityIndex(promptText, match, ordered);
+  const segmentEnd = nextCapabilityIndex > match.match_index ? nextCapabilityIndex : promptText.length;
+  return promptText.slice(match.match_end_index, segmentEnd);
+};
+
+const scholarlyLookupArgs = (
+  promptText: string,
+  match: ExtractedExplicitCapabilityContract,
+  ordered: ExtractedExplicitCapabilityContract[],
+): RecordLike => {
+  const segment = segmentForMatch(promptText, match, ordered);
+  const query =
+    segment.match(/\b(?:for|about|on|query|search(?:\s+for)?)\b\s*[:=]?\s*["']?([^"'\n.;]+)["']?/i)?.[1] ??
+    (segment || promptText);
+  const boundedQuery = query.split(/\s*,?\s*\b(?:then|next|followed\s+by)\b\s+(?:call|use|run)\b/i)[0] ?? query;
+  return {
+    query: normalizeSpace(stripBoundaryPunctuation(boundedQuery)),
+    limit: 5,
+  };
+};
+
+const scholarlyFullTextArgs = (
+  promptText: string,
+  match: ExtractedExplicitCapabilityContract,
+  ordered: ExtractedExplicitCapabilityContract[],
+): RecordLike => {
+  const segment = segmentForMatch(promptText, match, ordered);
+  const source = `${segment} ${promptText}`;
+  const paperResultId =
+    source.match(/\b(?:paper_result_id|paper_id|result_id)\s*[:=]\s*["']?([^"'\s,.;]+)["']?/i)?.[1] ??
+    source.match(/\b(?:arxiv|openalex|semantic_scholar|crossref|doi):[^\s,.;]+/i)?.[0];
+  const sourceUrl = source.match(/\b(?:source_url|pdf_url|full_text_url|url)\s*[:=]\s*["']?(https?:\/\/[^"'\s,.;]+)["']?/i)?.[1] ??
+    source.match(/https?:\/\/[^\s"']+/i)?.[0];
+  return {
+    ...(paperResultId ? { paper_result_id: stripBoundaryPunctuation(paperResultId) } : {}),
+    ...(sourceUrl ? { source_url: stripBoundaryPunctuation(sourceUrl) } : {}),
+  };
+};
+
 const argsHintForSubgoal = (input: {
   promptText: string;
   match: ExtractedExplicitCapabilityContract;
@@ -124,6 +181,73 @@ const argsHintForSubgoal = (input: {
   }
   if (capability === "workspace_os.status") return {};
   if (capability === "helix_ask.inspect_capability_catalog") return {};
+  if (capability === "scholarly-research.lookup_papers") {
+    return scholarlyLookupArgs(input.promptText, input.match, input.ordered);
+  }
+  if (capability === "scholarly-research.fetch_full_text") {
+    return scholarlyFullTextArgs(input.promptText, input.match, input.ordered);
+  }
+  if (capability === "helix_ask.reflect_theory_context") {
+    return {
+      prompt: normalizeSpace(input.promptText),
+      build_explanation_plan: true,
+      sync_panel: true,
+      panel_overlay_mode: "live_answer_context",
+      open_panel: false,
+    };
+  }
+  if (capability === "helix_ask.reflect_ideology_context") {
+    return {
+      inputKind: "user_prompt",
+      text: normalizeSpace(input.promptText),
+      refs: ["helix-ask:current-turn"],
+      options: {
+        includeOverlay: true,
+        includeRecommendedActions: true,
+        includeAdmissionArtifacts: true,
+        includeLocator: true,
+        includeFruition: true,
+        includeProceduralClassification: true,
+      },
+    };
+  }
+  if (capability === "helix_ask.bridge_theory_ideology_context") {
+    return {
+      prompt: normalizeSpace(input.promptText),
+      refs: ["helix-ask:current-turn"],
+      theory_reflection_ref: "step:reflect_theory_context",
+      ideology_reflection_ref: "step:reflect_zen_graph_context",
+    };
+  }
+  if (capability === "helix_ask.build_civilization_scenario_frame") {
+    return {
+      prompt: normalizeSpace(input.promptText),
+      refs: ["helix-ask:current-turn"],
+      options: {
+        allowFictional: true,
+        allowHistorical: true,
+        includeNeedleScenarioFallback: true,
+      },
+    };
+  }
+  if (capability === "helix_ask.reflect_civilization_bounds") {
+    return {
+      prompt: normalizeSpace(input.promptText),
+      scenarioFrameRef: "step:build_civilization_scenario_frame",
+      refs: ["helix-ask:current-turn"],
+      options: {
+        includeBridgeContext: true,
+        includeCollaborationBounds: true,
+        includeFalsificationHooks: true,
+      },
+    };
+  }
+  if (input.match.contract.capability_family === "context_reflection") {
+    return {
+      prompt: normalizeSpace(input.promptText),
+      refs: ["helix-ask:current-turn"],
+    };
+  }
   if (capability === "docs-viewer.locate_in_doc") return docsLocateArgs(input.promptText);
   if (capability === "repo-code.search_concept") {
     return {
@@ -174,6 +298,53 @@ const requiredObservationKindsForCompoundSubgoal = (
   return [...contract.required_observation_kinds];
 };
 
+const subgoalIdFor = (turnId: string, order: number, capability: string): string =>
+  `${turnId}:compound_capability_subgoal:${order}:${capability.replace(/[^A-Za-z0-9_-]+/g, "_")}`;
+
+const SUBGOAL_BINDING_SOURCE_FAMILIES = new Set([
+  "internet_search",
+  "scholarly_research",
+  "docs_viewer",
+  "repo_code",
+  "visual_capture",
+  "workspace_directory",
+  "capability_catalog",
+  "context_reflection",
+  "theory_locator",
+  "zen_graph_reflection",
+  "civilization_bounds",
+]);
+
+const SUBGOAL_BINDING_CONSUMER_FAMILIES = new Set([
+  "context_reflection",
+  "theory_locator",
+  "zen_graph_reflection",
+  "civilization_bounds",
+]);
+
+const inputBindingsForSubgoal = (input: {
+  turnId: string;
+  match: ExtractedExplicitCapabilityContract;
+  ordered: ExtractedExplicitCapabilityContract[];
+  index: number;
+}) => {
+  const contract = input.match.contract;
+  if (!SUBGOAL_BINDING_CONSUMER_FAMILIES.has(contract.capability_family)) return [];
+  const priorEvidenceSubgoals = input.ordered.slice(0, input.index)
+    .map((entry: ExtractedExplicitCapabilityContract, priorIndex: number) => ({ entry, priorIndex }))
+    .filter(({ entry }) => SUBGOAL_BINDING_SOURCE_FAMILIES.has(entry.contract.capability_family));
+  return priorEvidenceSubgoals.map(({ entry, priorIndex }, bindingIndex: number) => ({
+    binding_id: `${subgoalIdFor(input.turnId, input.index + 1, contract.capability)}:input_binding:${bindingIndex + 1}`,
+    arg_name: priorEvidenceSubgoals.length === 1 ? "source_ref" as const : "source_refs" as const,
+    binding_kind: "source_ref" as const,
+    from_subgoal_id: subgoalIdFor(input.turnId, priorIndex + 1, entry.contract.capability),
+    from_capability: entry.contract.capability,
+    required_observation_kinds: requiredObservationKindsForCompoundSubgoal(entry.contract, input.ordered.length),
+    required: true,
+    status: "pending" as const,
+  }));
+};
+
 export const buildHelixCompoundCapabilityContract = (input: {
   turnId: string;
   promptText: string;
@@ -183,8 +354,15 @@ export const buildHelixCompoundCapabilityContract = (input: {
   const subgoals = ordered.map((match: ExtractedExplicitCapabilityContract, index: number): HelixCompoundCapabilitySubgoal => {
     const contract = match.contract;
     const requestedCapability = contract.capability;
+    const subgoalId = subgoalIdFor(input.turnId, index + 1, requestedCapability);
+    const inputBindings = inputBindingsForSubgoal({
+      turnId: input.turnId,
+      match,
+      ordered,
+      index,
+    });
     return {
-      subgoal_id: `${input.turnId}:compound_capability_subgoal:${index + 1}:${requestedCapability.replace(/[^A-Za-z0-9_-]+/g, "_")}`,
+      subgoal_id: subgoalId,
       order: index + 1,
       requested_capability: requestedCapability,
       runtime_capability: runtimeCapabilityForContract(contract),
@@ -192,6 +370,8 @@ export const buildHelixCompoundCapabilityContract = (input: {
       plan_family: contract.plan_family,
       source_target: contract.source_target,
       admission_families: [...contract.admission_families],
+      required_args: [...contract.required_args],
+      optional_args: [...contract.optional_args],
       args_hint: argsHintForSubgoal({
         promptText: input.promptText,
         match,
@@ -202,6 +382,8 @@ export const buildHelixCompoundCapabilityContract = (input: {
       contribution_role: contributionRoleForContract(contract),
       terminal_contribution_kind: contract.required_terminal_kind,
       allowed_substitutions: [...contract.allowed_substitutions],
+      depends_on_subgoal_ids: inputBindings.map((binding) => binding.from_subgoal_id),
+      input_bindings: inputBindings,
       status: "pending",
       mandatory: true,
     };
