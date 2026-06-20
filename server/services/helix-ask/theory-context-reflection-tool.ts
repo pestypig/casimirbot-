@@ -5,6 +5,10 @@ import type {
 import type {
   TheoryContextReflectionConfidenceMode,
 } from "../../../shared/contracts/theory-context-reflection.v1";
+import type {
+  HelixScholarlyFullTextObservation,
+  HelixScholarlyResearchObservation,
+} from "../../../shared/helix-scholarly-research-observation";
 import { buildNhm2TheoryBadgeGraphV1 } from "../../../shared/theory/nhm2-theory-badges";
 import { runHelixTheoryContextReflectionTool } from "../../../shared/theory/theory-context-reflection-tool";
 import {
@@ -26,6 +30,8 @@ export type RunAskLevelTheoryContextReflectionToolInput = {
   syncPanel?: boolean;
   openPanel?: boolean;
   panelOverlayMode?: HelixTheoryContextReflectionPanelSyncOverlayMode;
+  scholarlyResearchObservation?: HelixScholarlyResearchObservation | null;
+  scholarlyFullTextObservation?: HelixScholarlyFullTextObservation | null;
 };
 
 function theoryCongruenceTraceMode(): TheoryCongruenceTraceFeatureFlagMode {
@@ -50,6 +56,8 @@ export function runAskLevelTheoryContextReflectionTool(
     turnId: input.turnId,
     source: "helix_ask",
     buildExplanationPlan: input.buildExplanationPlan ?? true,
+    scholarlyResearchObservation: input.scholarlyResearchObservation ?? null,
+    scholarlyFullTextObservation: input.scholarlyFullTextObservation ?? null,
     panelSync: {
       requested: input.syncPanel ?? true,
       applied: false,

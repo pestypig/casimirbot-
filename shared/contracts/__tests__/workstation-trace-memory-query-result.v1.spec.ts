@@ -54,6 +54,7 @@ const resultFixture = (
   overrides: Partial<WorkstationTraceMemoryQueryResultV1> = {},
 ): WorkstationTraceMemoryQueryResultV1 => {
   const trace = traceFixture();
+  const goalContextUpdateId = overrides.goalContextUpdateId ?? "stage_play_goal_context_update:trace_memory:frog";
   const agentGoalSession: AgentGoalSessionV1 = {
     schemaVersion: WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
     goalId: "goal:frog",
@@ -115,6 +116,7 @@ const resultFixture = (
       "tool_lifecycle:frog-classifier",
     ],
     evidenceRefs: [
+      goalContextUpdateId,
       "helix_workstation_reasoning_trace_query:frog",
       "context_feed:trace_memory",
       "allowed_actuator:query_trace_memory",
@@ -142,7 +144,7 @@ const resultFixture = (
     matchedAllowedActuators: ["query_trace_memory"],
     matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:query_trace_memory"],
     agentGoalSession,
-    goalContextUpdateId: "stage_play_goal_context_update:trace_memory:frog",
+    goalContextUpdateId,
     terminalAuthority: {
       status: "not_terminal",
       finalAnswerEligible: false,
@@ -207,6 +209,29 @@ describe("helix.workstation_reasoning_trace_query_result.v1", () => {
   });
 
   it("rejects trace-memory reads without source, loop, evidence, or freshness proof refs", () => {
+    expect(validateWorkstationTraceMemoryQueryResultV1(resultFixture({
+      evidenceRefs: [
+        "helix_workstation_reasoning_trace_query:frog",
+        "context_feed:trace_memory",
+        "allowed_actuator:query_trace_memory",
+        "feed:trace-memory",
+        "agent_goal_context_feed:feed:trace-memory",
+        "agent_goal_allowed_actuator:query_trace_memory",
+        "helix-ask:desktop",
+        "multimodal",
+        "workstation_trace:frog-classifier",
+        "workstation_context_feed:trace_memory",
+        "workstation_actuator:query_trace_memory",
+        "turn:frog-classifier",
+        "visual_evidence:frog",
+        "microdeck_run:frog-classifier",
+        "tool_receipt:frog-classifier",
+        "tool_lifecycle:frog-classifier",
+      ],
+    } as Partial<WorkstationTraceMemoryQueryResultV1>))).toEqual(expect.arrayContaining([
+      "evidenceRefs must include goalContextUpdateId",
+    ]));
+
     expect(validateWorkstationTraceMemoryQueryResultV1(resultFixture({
       loopRefs: ["trace_loop:outside-policy"],
       evidenceRefs: [

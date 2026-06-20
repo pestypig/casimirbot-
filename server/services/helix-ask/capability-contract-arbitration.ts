@@ -64,6 +64,7 @@ const isLiveSourceMailboxGoalKind = (value: string | null | undefined): boolean 
 
 const LIVE_ENVIRONMENT_OPERATOR_CAPABILITIES = new Set([
   ...WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS.map((spec) => spec.capability),
+  "live_env.query_workstation_goal_context",
   "live_env.reflect_stage_play_context",
   "live_env.narrator_say",
   "live_env.narrator_bind_stream",
@@ -102,6 +103,8 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
   if (isLiveEnvironmentOperatorCapability(capability)) return "live_environment_review";
 
   switch (capability) {
+    case "helix_ask.inspect_capability_catalog":
+      return "capability_help";
     case "scientific-calculator.solve_expression":
       return "calculator_solve";
     case "workspace_os.status":
@@ -131,6 +134,8 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
   if (isLiveEnvironmentOperatorCapability(capability)) return "live_environment_state";
 
   switch (capability) {
+    case "helix_ask.inspect_capability_catalog":
+      return "runtime_evidence";
     case "scientific-calculator.solve_expression":
       return "current_turn_action";
     case "workspace_os.status":

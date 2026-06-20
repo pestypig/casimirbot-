@@ -341,10 +341,16 @@ export const WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS: AgentGoal
   prohibitedReportSources: [
     "goal_context_update",
     "tool_receipt",
+    "workstation_control_receipt",
     "panel_projection",
+    "live_answer_projection",
     "microdeck_output",
     "narrator_event",
+    "narrator_binding",
+    "interrupt_dispatch",
     "wake_request",
+    "wake_result",
+    "actuator_ref",
   ],
 };
 
@@ -399,6 +405,8 @@ export type NarratorSayRequestV1 = {
   evidenceRefs: string[];
   producedRefs: string[];
   policyEvidenceRefs: string[];
+  dispatch: WorkstationDispatchActionV1[];
+  suggestedDispatch: WorkstationDispatchActionV1[];
   goalId?: string | null;
   goalSessionFound: boolean | null;
   requiredActuator: "narrator_say";
@@ -431,6 +439,8 @@ export type NarratorBindStreamRequestV1 = {
   evidenceRefs: string[];
   producedRefs: string[];
   policyEvidenceRefs: string[];
+  dispatch: WorkstationDispatchActionV1[];
+  suggestedDispatch: WorkstationDispatchActionV1[];
   goalId?: string | null;
   goalSessionFound: boolean | null;
   requiredActuator: "narrator_bind_stream";
@@ -560,6 +570,36 @@ const stringArrayIssue = (value: unknown, field: string, options: { requireNonEm
     if (typeof entry !== "string" || !entry.trim()) issues.push(`${field}[${index}] must be a non-empty string`);
   });
   return issues;
+};
+
+const missingDefaultFinalReportProhibitedSources = (
+  sources: unknown,
+): string[] => {
+  if (!Array.isArray(sources)) return [];
+  const sourceSet = new Set(sources.filter((source): source is string => typeof source === "string"));
+  return WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS.prohibitedReportSources.filter(
+    (source) => !sourceSet.has(source),
+  );
+};
+
+const missingDefaultFinalReportRequiredEvidenceKinds = (
+  evidenceKinds: unknown,
+): string[] => {
+  if (!Array.isArray(evidenceKinds)) return [];
+  const evidenceKindSet = new Set(evidenceKinds.filter((kind): kind is string => typeof kind === "string"));
+  return WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS.requiredEvidenceKinds.filter(
+    (kind) => !evidenceKindSet.has(kind),
+  );
+};
+
+const unsupportedFinalReportTerminalArtifactKinds = (
+  artifactKinds: unknown,
+): string[] => {
+  if (!Array.isArray(artifactKinds)) return [];
+  const defaultAllowedKinds = new Set(WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS.allowedTerminalArtifactKinds);
+  return artifactKinds.filter(
+    (kind): kind is string => typeof kind === "string" && !defaultAllowedKinds.has(kind),
+  );
 };
 
 const goalContextToolIdentityIssues = (
@@ -813,6 +853,34 @@ const dispatchActionIssues = (value: unknown): string[] => {
   return issues;
 };
 
+const narratorRequestDispatchIssues = (
+  value: unknown,
+  field: string,
+  requestId: string | null | undefined,
+): string[] => {
+  const issues = dispatchActionIssues(value).map((issue) =>
+    issue.replace("suggestedDispatch", field)
+  );
+  if (!Array.isArray(value)) return issues;
+  let matchingLogReceiptFound = false;
+  value.forEach((action) => {
+    if (
+      typeof action === "object" &&
+      action !== null &&
+      !Array.isArray(action) &&
+      (action as Record<string, unknown>).kind === "log_receipt" &&
+      typeof (action as Record<string, unknown>).receiptRef === "string" &&
+      (action as Record<string, unknown>).receiptRef === requestId
+    ) {
+      matchingLogReceiptFound = true;
+    }
+  });
+  if (!matchingLogReceiptFound) {
+    issues.push(`${field} must include a log_receipt action with receiptRef matching requestId`);
+  }
+  return issues;
+};
+
 const goalSessionCadenceIssues = (value: unknown): string[] => {
   const issues: string[] = [];
   if (typeof value !== "object" || value === null || Array.isArray(value)) return ["cadence must be an object"];
@@ -875,7 +943,7 @@ export function validateWorkstationGoalContextUpdateV1(value: WorkstationGoalCon
   if (!value.updateId) issues.push("updateId is required");
   if (!Number.isFinite(value.createdAtMs) || value.createdAtMs <= 0) issues.push("createdAtMs must be a positive timestamp");
   issues.push(...stringArrayIssue(value.sourceRefs, "sourceRefs", { requireNonEmpty: true }));
-  issues.push(...stringArrayIssue(value.loopRefs, "loopRefs"));
+  issues.push(...stringArrayIssue(value.loopRefs, "loopRefs", { requireNonEmpty: true }));
   if (!producerKinds.has(value.producerKind)) issues.push("producerKind is invalid");
   if (!updateKinds.has(value.updateKind)) issues.push("updateKind is invalid");
   if (!value.contentRef) issues.push("contentRef is required");
@@ -979,8 +1047,17 @@ export function validateAgentGoalSessionV1(value: AgentGoalSessionV1): string[] 
     if (requirements.routeAuthorityRequired !== true) issues.push("final report requirements must require route authority");
     if (requirements.terminalAuthoritySingleWriterRequired !== true) issues.push("final report requirements must require terminal authority single writer");
     issues.push(...stringArrayIssue(requirements.allowedTerminalArtifactKinds, "authority.finalReportRequirements.allowedTerminalArtifactKinds", { requireNonEmpty: true }));
+    if (unsupportedFinalReportTerminalArtifactKinds(requirements.allowedTerminalArtifactKinds).length > 0) {
+      issues.push("authority.finalReportRequirements.allowedTerminalArtifactKinds may only include default terminal artifact kinds");
+    }
     issues.push(...stringArrayIssue(requirements.requiredEvidenceKinds, "authority.finalReportRequirements.requiredEvidenceKinds", { requireNonEmpty: true }));
+    if (missingDefaultFinalReportRequiredEvidenceKinds(requirements.requiredEvidenceKinds).length > 0) {
+      issues.push("authority.finalReportRequirements.requiredEvidenceKinds must include default workstation final-report evidence requirements");
+    }
     issues.push(...stringArrayIssue(requirements.prohibitedReportSources, "authority.finalReportRequirements.prohibitedReportSources", { requireNonEmpty: true }));
+    if (missingDefaultFinalReportProhibitedSources(requirements.prohibitedReportSources).length > 0) {
+      issues.push("authority.finalReportRequirements.prohibitedReportSources must include default workstation observation source bans");
+    }
   }
   return issues;
 }
@@ -997,8 +1074,17 @@ export function validateNarratorSayRequestV1(value: NarratorSayRequestV1): strin
   issues.push(...stringArrayIssue(value.evidenceRefs, "evidenceRefs", { requireNonEmpty: true }));
   issues.push(...stringArrayIssue(value.producedRefs, "producedRefs", { requireNonEmpty: true }));
   issues.push(...matchedNarratorActuatorIssues(value));
+  issues.push(...narratorRequestDispatchIssues(value.dispatch, "dispatch", value.requestId));
+  issues.push(...narratorRequestDispatchIssues(value.suggestedDispatch, "suggestedDispatch", value.requestId));
   if (Array.isArray(value.evidenceRefs) && value.requestId && !value.evidenceRefs.includes(value.requestId)) {
     issues.push("evidenceRefs must include requestId");
+  }
+  if (
+    Array.isArray(value.evidenceRefs) &&
+    value.goalContextUpdateId &&
+    !value.evidenceRefs.includes(value.goalContextUpdateId)
+  ) {
+    issues.push("evidenceRefs must include goalContextUpdateId");
   }
   if (Array.isArray(value.loopRefs) && !value.loopRefs.includes("narrator:say")) {
     issues.push("loopRefs must include narrator:say");
@@ -1061,8 +1147,17 @@ export function validateNarratorBindStreamRequestV1(value: NarratorBindStreamReq
   issues.push(...stringArrayIssue(value.evidenceRefs, "evidenceRefs", { requireNonEmpty: true }));
   issues.push(...stringArrayIssue(value.producedRefs, "producedRefs", { requireNonEmpty: true }));
   issues.push(...matchedNarratorActuatorIssues(value));
+  issues.push(...narratorRequestDispatchIssues(value.dispatch, "dispatch", value.requestId));
+  issues.push(...narratorRequestDispatchIssues(value.suggestedDispatch, "suggestedDispatch", value.requestId));
   if (Array.isArray(value.evidenceRefs) && value.requestId && !value.evidenceRefs.includes(value.requestId)) {
     issues.push("evidenceRefs must include requestId");
+  }
+  if (
+    Array.isArray(value.evidenceRefs) &&
+    value.goalContextUpdateId &&
+    !value.evidenceRefs.includes(value.goalContextUpdateId)
+  ) {
+    issues.push("evidenceRefs must include goalContextUpdateId");
   }
   if (Array.isArray(value.loopRefs) && !value.loopRefs.includes("narrator:bind_stream")) {
     issues.push("loopRefs must include narrator:bind_stream");

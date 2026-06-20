@@ -328,6 +328,8 @@ export function buildToolCallAdmissionDecision(input: {
   };
   const contextualSuppression = detectContextualToolAdmissionSuppression(promptText);
   const toolUseRestatement = buildToolUseRestatement(promptText);
+  const unknownSourceArtifactDiscoveryIntent =
+    sourceTarget === "unknown" && hasUnknownSourceArtifactDiscoveryIntent(promptText);
   const calculatorSolveIntent = calculatorSolveRequested(promptText, input.sourceTargetIntent);
   const mandatoryToolName = readMandatoryToolName(mandatoryNextToolRecord);
   const promptExplicitCapabilityMatches = extractExplicitCapabilityContracts(promptText);
@@ -398,7 +400,7 @@ export function buildToolCallAdmissionDecision(input: {
       ? explicitCapabilityContract.source_target
       : calculatorAdmissionDominatesSourceTarget
       ? "calculator_stream"
-      : sourceTarget === "unknown" && toolUseRestatement.requiredToolFamilies.includes("docs_viewer")
+      : sourceTarget === "unknown" && !unknownSourceArtifactDiscoveryIntent && toolUseRestatement.requiredToolFamilies.includes("docs_viewer")
       ? "docs_viewer"
       : sourceTarget === "unknown" && toolUseRestatement.requiredToolFamilies.includes("internet_search")
       ? "internet_search"
@@ -513,7 +515,7 @@ export function buildToolCallAdmissionDecision(input: {
       "no_tool_direct",
     ];
     reason = "internet_search_requires_external_web_evidence_path";
-  } else if (sourceTarget === "unknown" && hasUnknownSourceArtifactDiscoveryIntent(promptText)) {
+  } else if (unknownSourceArtifactDiscoveryIntent) {
     required = true;
     admittedToolFamilies = ["workspace_directory", "docs_viewer", "repo_code", "runtime_evidence"];
     extraForbiddenTerminalKinds = [

@@ -2573,7 +2573,7 @@ const stagePlayDispatchActionLabel = (action: WorkstationDispatchActionV1): stri
   if (action.kind === "repair_source") return `Repair source: ${action.sourceRef ?? action.loopRef ?? "source"}`;
   if (action.kind === "wake_agent") {
     const interruptKind = "interruptKind" in action && action.interruptKind ? ` (${action.interruptKind})` : "";
-    return `Wake interrupt${interruptKind}${action.reason ? `: ${compactStagePlayText(action.reason, "wake", 42)}` : ""}`;
+    return `Interrupt dispatch${interruptKind}${action.reason ? `: ${compactStagePlayText(action.reason, "interrupt", 42)}` : ""}`;
   }
   if (action.kind === "log_receipt") return `Receipt: ${action.receiptRef ?? "latest"}`;
   if (action.kind === "ask_user") return "Ask user";
@@ -2627,7 +2627,7 @@ const stagePlayDispatchDestinationLabel = (action: WorkstationDispatchActionV1):
   if (action.kind === "set_loop_state" || action.kind === "repair_loop") return action.loopRef;
   if (action.kind === "repair_source") return action.sourceRef ?? action.loopRef ?? "workstation source";
   if (action.kind === "focus_process_graph") return action.nodeRef ?? "stage-play-badge-graph";
-  if (action.kind === "wake_agent") return "wake interrupt";
+  if (action.kind === "wake_agent") return "interrupt dispatch";
   if (action.kind === "ask_user") return "operator";
   return null;
 };
@@ -2652,9 +2652,12 @@ const stagePlayGoalContextCircuitHops = (
     (ref) => /loop|mail|translation|transcription|health|automation|route|watch/i.test(ref),
     update.producerKind,
   );
-  const deck = allRefs.find((ref) =>
+  const deckRefs = allRefs.filter((ref) =>
     /microdeck|micro_reasoner|prompt_preset|deck/i.test(ref)
-  ) ?? allRefs.find((ref) =>
+  );
+  const deck = deckRefs.find((ref) =>
+    /^microdeck_output:|^stage_play_micro_reasoner_|prompt_preset/i.test(ref)
+  ) ?? deckRefs[0] ?? allRefs.find((ref) =>
     /translated_transcript|translation/i.test(ref)
   ) ?? update.updateKind;
   const transcript = Array.from(new Set(allRefs.filter((ref) =>
@@ -3514,21 +3517,7 @@ function StagePlayGoalContextBoard({
   sessions: AgentGoalSessionV1[];
 }) {
   const isPacketTraceUpdate = (update: WorkstationGoalContextUpdateV1): boolean => {
-    const refs = [
-      update.contentRef,
-      ...update.evidenceRefs,
-      ...update.receiptRefs,
-      ...update.loopRefs,
-      ...update.sourceRefs,
-    ];
-    return refs.some((ref) =>
-      ref.includes("stage_play_packet_trace_query") ||
-      ref.includes("packet_trace_query") ||
-      ref.includes("packet_traces") ||
-      ref.includes("live_source_trace:") ||
-      ref.includes("stage_play_processed_mail_packet:") ||
-      ref.includes("processed_mail_packet")
-    );
+    return Boolean(update.updateId && update.contentRef);
   };
   const isFeedQueryUpdate = (update: WorkstationGoalContextUpdateV1): boolean => {
     const refs = [update.contentRef, ...update.evidenceRefs, ...update.receiptRefs, ...update.loopRefs];
@@ -3745,6 +3734,33 @@ function StagePlayGoalContextBoard({
       ref.startsWith("agent_goal_allowed_actuator:") ||
       ref.startsWith("workstation_actuator:")
     );
+  const dispatchActuatorRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
+    update.suggestedDispatch.flatMap((action) => {
+      if (action.kind === "change_preset") return ["workstation_actuator:change_preset"];
+      if (action.kind === "bind_source") return ["workstation_actuator:bind_source"];
+      if (action.kind === "unbind_source") return ["workstation_actuator:unbind_source"];
+      if (action.kind === "set_loop_state") {
+        return action.state === "paused"
+          ? ["workstation_actuator:set_loop_state", "workstation_actuator:pause_loop"]
+          : ["workstation_actuator:set_loop_state", "workstation_actuator:resume_loop"];
+      }
+      if (action.kind === "repair_loop") return ["workstation_actuator:repair_loop"];
+      if (action.kind === "repair_source") return ["workstation_actuator:repair_source"];
+      if (action.kind === "update_live_answer") return ["workstation_actuator:update_live_answer"];
+      if (action.kind === "focus_process_graph") return ["workstation_actuator:focus_process_graph"];
+      if (action.kind === "speak_narrator") return ["workstation_actuator:narrator_say"];
+      if (action.kind === "bind_narrator_stream") return ["workstation_actuator:narrator_bind_stream", "workstation_actuator:bind_narrator"];
+      if (action.kind === "ask_user") return ["workstation_actuator:ask_user"];
+      return [];
+    });
+  const actuatorRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
+    Array.from(new Set([
+      ...update.loopRefs,
+      ...update.evidenceRefs,
+      ...update.receiptRefs,
+      ...policyRefsForUpdate(update),
+      ...dispatchActuatorRefsForUpdate(update),
+    ].filter((ref) => ref.startsWith("workstation_actuator:"))));
   const matchedGoalAllowedActuatorRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
     policyRefsForUpdate(update).filter((ref) => ref.startsWith("agent_goal_allowed_actuator:"));
   const freshnessFilterRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
@@ -3838,8 +3854,33 @@ function StagePlayGoalContextBoard({
       /^trace_memory:|^trace-memory:|^workstation_trace_memory:|^workstation_context_feed:trace_memory/i.test(ref) ||
       /trace_memory|trace-memory/i.test(ref)
     )));
+  const microDeckRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
+    Array.from(new Set([
+      update.contentRef,
+      ...update.sourceRefs,
+      ...update.loopRefs,
+      ...update.evidenceRefs,
+      ...update.receiptRefs,
+    ].filter((ref) =>
+      /^microdeck:|^microdeck_|^micro_reasoner:|^microdeck_output:|^stage_play_micro_reasoner_|^workstation_context_feed:microdeck_outputs|^workstation_actuator:query_microdeck_outputs|prompt_preset/i.test(ref)
+    )));
+  const microDeckLifecycleRefs = Array.from(new Set(updates.flatMap(microDeckRefsForUpdate)));
+  const microDeckFeedSessionCount = activeSessions.filter((session) =>
+    session.contextFeeds.some((feed) => feed.sourceKind === "microdeck_outputs")
+  ).length;
+  const microDeckLifecycleContextCount = microDeckLifecycleRefs.length + microDeckFeedSessionCount;
+  const countMicroDeckLifecycleRefs = (patterns: RegExp[]): number =>
+    microDeckLifecycleRefs.filter((ref) => patterns.some((pattern) => pattern.test(ref))).length;
+  const microDeckPresetCreateCount = countMicroDeckLifecycleRefs([/^microdeck:preset_create/i]);
+  const microDeckPresetStateCount = countMicroDeckLifecycleRefs([/^microdeck:preset_state/i, /^microdeck_output:/i]);
+  const microDeckPresetQueryCount = countMicroDeckLifecycleRefs([/^microdeck:preset_query/i, /^workstation_context_feed:microdeck_outputs/i, /^workstation_actuator:query_microdeck_outputs/i]);
+  const microDeckPresetDraftCount = countMicroDeckLifecycleRefs([/^microdeck:preset_draft/i]);
+  const microDeckPromptRouteCount = countMicroDeckLifecycleRefs([/^microdeck:prompt_route/i]);
+  const microDeckPromptUpdateCount = countMicroDeckLifecycleRefs([/^microdeck:prompt_update/i]);
+  const microDeckPromptTestCount = countMicroDeckLifecycleRefs([/^microdeck:prompt_test/i]);
   const feedPolicyRefCount = updates.reduce((count, update) => count + contextFeedPolicyRefsForUpdate(update).length, 0);
   const actuatorPolicyRefCount = updates.reduce((count, update) => count + actuatorPolicyRefsForUpdate(update).length, 0);
+  const actuatorRefCount = updates.reduce((count, update) => count + actuatorRefsForUpdate(update).length, 0);
   const exactGoalActuatorPolicyRefCount = updates.reduce((count, update) => count + matchedGoalAllowedActuatorRefsForUpdate(update).length, 0);
   const freshnessFilterRefCount = updates.reduce((count, update) => count + freshnessFilterRefsForUpdate(update).length, 0);
   const sessionFilterRefCount = updates.reduce((count, update) => count + sessionFilterRefsForUpdate(update).length, 0);
@@ -3881,7 +3922,7 @@ function StagePlayGoalContextBoard({
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-wide text-violet-200">Goal Context Substrate</div>
           <div className="mt-0.5 text-xs text-violet-100/70">
-            Micro-reasoner outputs feed queryable goal context first. Interrupt dispatch is the only visible wake role.
+            Micro-reasoner outputs feed queryable goal context first. Wake-agent appears only as classified interrupt dispatch.
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -3897,8 +3938,10 @@ function StagePlayGoalContextBoard({
           <StagePlayMetricPill label="trace memory" value={formatStagePlayCount(traceMemoryContextCount)} tone={traceMemoryContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="audio transcripts" value={formatStagePlayCount(audioTranscriptContextCount)} tone={audioTranscriptContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="translations" value={formatStagePlayCount(translatedTranscriptContextCount)} tone={translatedTranscriptContextCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="MicroDeck lifecycle" value={formatStagePlayCount(microDeckLifecycleContextCount)} tone={microDeckLifecycleContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="feed queries" value={formatStagePlayCount(feedQueryContextCount)} tone={feedQueryContextCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="feed policy refs" value={formatStagePlayCount(feedPolicyRefCount)} tone={feedPolicyRefCount > 0 ? "good" : "default"} />
+          <StagePlayMetricPill label="actuator refs" value={formatStagePlayCount(actuatorRefCount)} tone={actuatorRefCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="freshness filters" value={formatStagePlayCount(freshnessFilterRefCount)} tone={freshnessFilterRefCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="session filters" value={formatStagePlayCount(sessionFilterRefCount)} tone={sessionFilterRefCount > 0 ? "good" : "default"} />
           <StagePlayMetricPill label="tool-attributed" value={formatStagePlayCount(toolAttributedUpdateCount)} tone={toolAttributedUpdateCount > 0 ? "good" : "default"} />
@@ -3948,6 +3991,12 @@ function StagePlayGoalContextBoard({
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Translations</div>
           <div className="mt-0.5 text-slate-400">{formatStagePlayCount(translatedTranscriptContextCount)} translated transcript context item{translatedTranscriptContextCount === 1 ? "" : "s"} keep translation output visible as evidence for Live Answer and Narrator.</div>
         </div>
+        <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-microdeck-lifecycle-state">
+          <div className="font-semibold uppercase tracking-wide text-violet-200/80">MicroDeck lifecycle</div>
+          <div className="mt-0.5 text-slate-400">
+            {formatStagePlayCount(microDeckLifecycleContextCount)} lifecycle ref{microDeckLifecycleContextCount === 1 ? "" : "s"} track deck output and management: create={formatStagePlayCount(microDeckPresetCreateCount)}, state={formatStagePlayCount(microDeckPresetStateCount)}, query={formatStagePlayCount(microDeckPresetQueryCount)}, draft={formatStagePlayCount(microDeckPresetDraftCount)}, route={formatStagePlayCount(microDeckPromptRouteCount)}, update={formatStagePlayCount(microDeckPromptUpdateCount)}, test={formatStagePlayCount(microDeckPromptTestCount)}.
+          </div>
+        </div>
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-route-watch-automation-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Route-watch automations</div>
           <div className="mt-0.5 text-slate-400">{formatStagePlayCount(routeEvidenceContextCount)} route evidence item{routeEvidenceContextCount === 1 ? "" : "s"} and {formatStagePlayCount(automationPolicyContextCount)} automation polic{automationPolicyContextCount === 1 ? "y" : "ies"} with {formatStagePlayCount(runningAutomationCount)} running loop dispatch{runningAutomationCount === 1 ? "" : "es"}.</div>
@@ -3961,11 +4010,11 @@ function StagePlayGoalContextBoard({
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-control-dispatch-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Workstation controls</div>
           <div className="mt-0.5 text-slate-400">
-            {formatStagePlayCount(workstationControlDispatchCount)} workstation control dispatch{workstationControlDispatchCount === 1 ? "" : "es"}: {formatStagePlayCount(presetDispatchCount)} preset, {formatStagePlayCount(sourceBindingDispatchCount)} source binding, {formatStagePlayCount(sourceRepairDispatchCount)} source repair, {formatStagePlayCount(loopDispatchCount)} loop, {formatStagePlayCount(liveAnswerDispatchCount)} Live Answer, {formatStagePlayCount(processGraphDispatchCount)} graph, {formatStagePlayCount(narratorSpeechCount)} narrator speech, {formatStagePlayCount(narratorBindingCount)} narrator binding{narratorBindingCount === 1 ? "" : "s"}. Wake remains {formatStagePlayCount(wakeInterruptCount)} interrupt dispatch{wakeInterruptCount === 1 ? "" : "es"}.
+            {formatStagePlayCount(workstationControlDispatchCount)} workstation control dispatch{workstationControlDispatchCount === 1 ? "" : "es"}: {formatStagePlayCount(presetDispatchCount)} preset, {formatStagePlayCount(sourceBindingDispatchCount)} source binding, {formatStagePlayCount(sourceRepairDispatchCount)} source repair, {formatStagePlayCount(loopDispatchCount)} loop, {formatStagePlayCount(liveAnswerDispatchCount)} Live Answer, {formatStagePlayCount(processGraphDispatchCount)} graph, {formatStagePlayCount(narratorSpeechCount)} narrator speech, {formatStagePlayCount(narratorBindingCount)} narrator binding{narratorBindingCount === 1 ? "" : "s"}. Wake-agent is limited to {formatStagePlayCount(wakeInterruptCount)} interrupt dispatch{wakeInterruptCount === 1 ? "" : "es"}.
           </div>
         </div>
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-wake-interrupt-scope-state">
-          <div className="font-semibold uppercase tracking-wide text-violet-200/80">Wake interrupt scope</div>
+          <div className="font-semibold uppercase tracking-wide text-violet-200/80">Interrupt dispatch scope</div>
           <div className="mt-0.5 text-slate-400">
             Interrupt split: {formatStagePlayCount(wakeUrgentCount)} urgent, {formatStagePlayCount(wakeBlockedCount)} blocked, {formatStagePlayCount(wakePolicyTriggeredCount)} policy-triggered. Other dispatches stay on workstation control lanes.
           </div>
@@ -3973,6 +4022,10 @@ function StagePlayGoalContextBoard({
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-actuator-policy-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Actuator policy</div>
           <div className="mt-0.5 text-slate-400">{formatStagePlayCount(actuatorPolicyCount)} allowed actuator{actuatorPolicyCount === 1 ? "" : "s"} bound to goal sessions; {formatStagePlayCount(narratorActuatorPolicyCount)} narrator output policy item{narratorActuatorPolicyCount === 1 ? "" : "s"}; {formatStagePlayCount(narratorEventFeedCount)} narrator event feed{narratorEventFeedCount === 1 ? "" : "s"}.</div>
+        </div>
+        <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-actuator-ref-state">
+          <div className="font-semibold uppercase tracking-wide text-violet-200/80">Actuator refs</div>
+          <div className="mt-0.5 text-slate-400">{formatStagePlayCount(actuatorRefCount)} workstation actuator ref{actuatorRefCount === 1 ? "" : "s"} expose query and control traffic as packet-circuit custody, not answer authority.</div>
         </div>
         <div className="rounded border border-violet-900/50 bg-slate-950/60 px-2 py-1.5" data-testid="stage-play-feed-policy-ref-state">
           <div className="font-semibold uppercase tracking-wide text-violet-200/80">Feed policy refs</div>
@@ -4005,9 +4058,11 @@ function StagePlayGoalContextBoard({
             const transcriptRefs = transcriptRefsForUpdate(update);
             const projectionRefs = projectionRefsForUpdate(update);
             const sourceHealthRefs = sourceHealthRefsForUpdate(update);
+            const actuatorRefs = actuatorRefsForUpdate(update);
             const traceMemoryRefs = traceMemoryRefsForUpdate(update);
             const routeWatchRefs = routeWatchRefsForUpdate(update);
             const automationRefs = automationRefsForUpdate(update);
+            const microDeckRefs = microDeckRefsForUpdate(update);
             const circuitHops = stagePlayGoalContextCircuitHops(update);
             return (
               <div
@@ -4075,9 +4130,19 @@ function StagePlayGoalContextBoard({
                       sourceHealth={sourceHealthRefs.slice(0, 6).join(", ")}
                     </div>
                   ) : null}
+                  {actuatorRefs.length > 0 ? (
+                    <div className="truncate" data-testid="stage-play-goal-context-actuator-refs">
+                      actuators={actuatorRefs.slice(0, 6).join(", ")}
+                    </div>
+                  ) : null}
                   {traceMemoryRefs.length > 0 ? (
                     <div className="truncate" data-testid="stage-play-goal-context-trace-memory-refs">
                       traceMemory={traceMemoryRefs.slice(0, 5).join(", ")}
+                    </div>
+                  ) : null}
+                  {microDeckRefs.length > 0 ? (
+                    <div className="truncate" data-testid="stage-play-goal-context-microdeck-refs">
+                      microdeck={microDeckRefs.slice(0, 8).join(", ")}
                     </div>
                   ) : null}
                   {routeWatchRefs.length > 0 ? (
@@ -4091,11 +4156,11 @@ function StagePlayGoalContextBoard({
                     </div>
                   ) : null}
                   {policyRefs.length > 0 ? (
-                    <div className="truncate" data-testid="stage-play-goal-context-update-policy">policy={policyRefs.slice(0, 6).join(", ")}</div>
+                    <div className="truncate" data-testid="stage-play-goal-context-update-policy">policy={policyRefs.slice(0, 10).join(", ")}</div>
                   ) : null}
                   {contextFeedPolicyRefs.length > 0 || actuatorPolicyRefs.length > 0 ? (
                     <div className="truncate" data-testid="stage-play-goal-context-update-policy-split">
-                      feeds={contextFeedPolicyRefs.slice(0, 3).join(", ") || "none"}; actuators={actuatorPolicyRefs.slice(0, 4).join(", ") || "none"}
+                      feeds={contextFeedPolicyRefs.slice(0, 5).join(", ") || "none"}; actuators={actuatorPolicyRefs.slice(0, 6).join(", ") || "none"}
                     </div>
                   ) : null}
                   {matchedGoalActuatorRefs.length > 0 ? (
@@ -4994,7 +5059,7 @@ function buildObserverMailLoopNodes(input: {
     ? `Memory: heap ${runtimeAdmission.memory.heapUsedMiB ?? "?"}/${runtimeAdmission.limits.maxHeapUsedMiB ?? "?"} MiB; rss ${runtimeAdmission.memory.rssMiB ?? "?"}/${runtimeAdmission.limits.maxRssMiB ?? "?"} MiB`
     : null;
   const localBypassText = runtimeAdmission?.localBypass?.applied
-    ? `Local wake bypass: ${runtimeAdmission.localBypass.reason}`
+    ? `Local interrupt bypass: ${runtimeAdmission.localBypass.reason}`
     : null;
   const continuation = mailbox?.wakeAdmissionCycle?.continuation ?? null;
   const continuationRunnableWakeIds = continuation?.runnableWakeIds ?? [];
@@ -5006,10 +5071,10 @@ function buildObserverMailLoopNodes(input: {
   const continuationStateText = continuation
     ? continuation.scheduled
       ? `scheduled (${labelize(continuationReason ?? "runnable_wake_remaining")})`
-      : continuationReason === "manual_cycle_no_auto_continuation"
-        ? "manual cycle no auto continuation"
+        : continuationReason === "manual_cycle_no_auto_continuation"
+          ? "manual cycle no auto continuation"
         : continuationReason === "wake_runner_disabled"
-          ? "deferred; wake runner disabled"
+          ? "deferred; interrupt runner disabled"
           : continuationReason === "no_runnable_wake_remaining"
             ? "armed for next summary"
             : labelize(continuationReason ?? "deferred")
@@ -5024,9 +5089,9 @@ function buildObserverMailLoopNodes(input: {
   const wakePressureActive = latestWakeStatus === "deferred_for_pressure" || pressureWakeCount > 0 || deferredWakeIds.length > 0;
   const wakePressureBand = wakePressureActive
     ? {
-        title: "Wake admission",
+        title: "Interrupt admission",
         lines: [
-          "Deferred before Ask wake",
+          "Deferred before Ask interrupt",
           `${visualBacklogCount} raw visual backlog retained`,
           pressureNextRetryAt ? `Next retry: ${formatStagePlayClock(pressureNextRetryAt)}` : null,
           runtimePressureLevel ? `Pressure: ${labelize(runtimePressureLevel)}` : null,
@@ -5059,7 +5124,7 @@ function buildObserverMailLoopNodes(input: {
             : unreadCount > 0
               ? `Unread retained: ${unreadCount}`
               : null,
-          continuationRunnableWakeIds.length > 0 ? `Runnable wakes: ${continuationRunnableWakeIds.length}` : null,
+          continuationRunnableWakeIds.length > 0 ? `Runnable interrupts: ${continuationRunnableWakeIds.length}` : null,
         ].filter((line): line is string => Boolean(line)),
         tone: continuation?.scheduled ? "good" as const : "pending" as const,
       }
@@ -5208,7 +5273,7 @@ function buildObserverMailLoopNodes(input: {
       statusChips: [
         visualBacklogCount > 0 ? `${visualBacklogCount} observer backlog` : "observer backlog clear",
         processingWakeRequests.length > 0 ? `${processingWakeRequests.length} processing trigger(s)` : null,
-        askWakeRequestCount > 0 ? `${askWakeRequestCount} packet Ask handoff(s)` : "no packet Ask handoff",
+        askWakeRequestCount > 0 ? `${askWakeRequestCount} packet interrupt handoff(s)` : "no packet interrupt handoff",
       ].filter((entry): entry is string => Boolean(entry)),
       payloadRows: [
         {
@@ -5222,7 +5287,7 @@ function buildObserverMailLoopNodes(input: {
           tone: visualBacklogCount > 0 ? "warn" : "default",
         },
         {
-          label: "Packet Ask handoff",
+          label: "Packet interrupt handoff",
           value: `${queuedWakeMailCount} queued packet mail | ${runningWakeMailCount} running | ${retryWakeMailCount} retry | ${pressureWakeMailCount} pressure-deferred`,
           tone: askWakeRequestCount > 0 ? "warn" : "default",
         },
@@ -5587,7 +5652,7 @@ function buildObserverMailLoopNodes(input: {
     {
       id: "observer_mail_loop:ask_wake",
       title: "Ask Handoff",
-      subtitle: "packet-backed wake admission",
+      subtitle: "packet-backed interrupt admission",
       status: latestWakeLifecycleStage ?? latestWakeStatus ?? (latestProcessedPacket?.arbiter?.wakeAsk ? "handoff pending" : "not Ask-ready"),
       preview: manualCheckpointWithoutPolicy && unreadCount > 0
         ? `manual checkpoint completed; ${unreadCount} unread retained until a watch policy is configured`
@@ -6323,18 +6388,18 @@ function StagePlayMailLoopLiveOverview({
     packet: latestPacket,
   });
   const wakeBridgeReason = wakeStatus === "deferred_for_pressure"
-    ? "backend wake admission deferred for pressure, opening visible Helix Ask wake as a manual override"
+    ? "backend interrupt admission deferred for pressure, opening visible Helix Ask interrupt as a manual override"
     : wakeStatus === "failed_retryable"
-      ? "backend wake attempt failed retryably, opening visible Helix Ask wake"
+      ? "backend interrupt attempt failed retryably, opening visible Helix Ask interrupt"
       : "micro-reasoner interrupt candidate ready for Helix Ask";
   const wakeBridgeButtonLabel = wakeStatus === "deferred_for_pressure"
-    ? "Open pressure-deferred wake in Helix Ask"
+    ? "Open pressure-deferred interrupt"
     : wakeStatus === "failed_retryable"
-      ? "Retry wake in Helix Ask"
+      ? "Retry interrupt in Helix Ask"
       : "Open queued interrupt in Helix Ask";
   const wakeBridgeButtonTitle = wakeBridgeEligible
     ? wakeStatus === "deferred_for_pressure"
-      ? "Open and auto-submit this pressure-deferred mailbox wake in Helix Ask as a visible manual override."
+      ? "Open and auto-submit this pressure-deferred mailbox interrupt in Helix Ask as a visible manual override."
       : "Open and auto-submit this constrained mailbox interrupt in Helix Ask."
     : "No eligible unresolved interrupt candidate is ready.";
   const packetChars = latestPacket ? jsonCharCount(latestPacket) : 0;
@@ -6719,9 +6784,9 @@ function StagePlayMailLoopLiveOverview({
     },
     {
       key: "packet-wake",
-      label: "wake admission queue",
+      label: "interrupt admission queue",
       from: "packet",
-      to: "wake",
+      to: "interrupt",
       count: wakeRequests.length,
       bytes: compactPacketChars,
       ageMs: latestWake ? Date.now() - new Date(latestWake.updatedAt).getTime() : null,
@@ -7001,8 +7066,8 @@ function StagePlayMailLoopLiveOverview({
         preview: wake
           ? `${labelize(wake.lifecycleStage ?? wake.status)} interrupt | ${wake.askTurnId ?? "no Ask turn"}`
           : packet.arbiter?.wakeAsk
-            ? "Wake interrupt requested; admission pending."
-            : "No wake interrupt; packet remains goal context.",
+            ? "Interrupt requested; admission pending."
+            : "No interrupt dispatch; packet remains goal context.",
         refs: wake ? [wake.wakeRequestId, ...wake.evidenceRefs] : [],
         completedAt: wake?.updatedAt ?? wakeResult?.createdAt ?? null,
       },
@@ -7025,7 +7090,7 @@ function StagePlayMailLoopLiveOverview({
           : packetVoiceRequested
             ? "Voice requested, receipt pending."
             : wakeResult?.status === "completed"
-              ? "Wake result completed."
+              ? "Interrupt result completed."
               : "No output required yet.",
         refs: voiceRefs,
         completedAt: wakeResult?.createdAt ?? null,
@@ -7064,7 +7129,7 @@ function StagePlayMailLoopLiveOverview({
       coalescing: {
         supersededWakeIds,
         label: supersededWakeIds.length > 0
-          ? `superseded ${supersededWakeIds.length} older wake${supersededWakeIds.length === 1 ? "" : "s"}; latest same-source packet wins`
+          ? `superseded ${supersededWakeIds.length} older interrupt${supersededWakeIds.length === 1 ? "" : "s"}; latest same-source packet wins`
           : null,
       },
       status: trafficStatus,
@@ -7259,7 +7324,7 @@ function StagePlayMailLoopLiveOverview({
       meta: `${formatStagePlayClock(packet.createdAt)} | ${formatStagePlayCount(jsonCharCount(packet))} chars`,
       rows: [
         { label: "effort", value: labelize(packet.effortEstimate?.currentEffort ?? "unknown") },
-        { label: "wake ask", value: packet.arbiter?.wakeAsk ? "true" : "false", tone: packet.arbiter?.wakeAsk ? "warn" : "good" },
+        { label: "interrupt ask", value: packet.arbiter?.wakeAsk ? "true" : "false", tone: packet.arbiter?.wakeAsk ? "warn" : "good" },
         { label: "arbiter", value: labelize(packet.arbiter?.recommendedNext ?? packet.recommendedNext) },
         { label: "confidence", value: String(packet.arbiter?.confidence ?? "n/a") },
         { label: "mail ids", value: String(packet.mailIds.length) },
@@ -7572,7 +7637,7 @@ function StagePlayMailLoopLiveOverview({
             {latestPacket?.effortEstimate?.currentEffort ? labelize(latestPacket.effortEstimate.currentEffort) : "Waiting for current effort"}
           </div>
           <div className="mt-1 text-xs text-slate-400">
-            {latestPacket?.arbiter?.reason ?? "Waiting for the first mail packet to decide whether Ask should wake."}
+            {latestPacket?.arbiter?.reason ?? "Waiting for the first mail packet to decide whether an Ask interrupt is needed."}
           </div>
           {latestWake ? (
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -7615,7 +7680,7 @@ function StagePlayMailLoopLiveOverview({
               disabled={!selectedPacketTrace.processedPacket && selectedPacketTrace.rawVisualMail.length === 0}
               className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-45"
               data-testid="stage-play-copy-mail-loop-packet-trace"
-              title="Copy the selected packet trace from raw mail through deck, wake, Ask, decision, voice, and continuation state."
+              title="Copy the selected packet trace from raw mail through deck, interrupt dispatch, Ask, decision, voice, and continuation state."
             >
               <Copy className="h-3 w-3" aria-hidden="true" />
               Copy packet trace
@@ -7626,10 +7691,10 @@ function StagePlayMailLoopLiveOverview({
               disabled={!selectedWakeTrace.wakeRequestId}
               className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-45"
               data-testid="stage-play-copy-mail-loop-wake-trace"
-              title="Copy the selected wake trace, including superseded wake ids and wake results."
+              title="Copy the selected interrupt trace, including wake request ids and interrupt results."
             >
               <Copy className="h-3 w-3" aria-hidden="true" />
-              Copy wake trace
+              Copy interrupt trace
             </button>
             <button
               type="button"
@@ -7637,7 +7702,7 @@ function StagePlayMailLoopLiveOverview({
               disabled={!selectedAskDebugTrace.wakeRequestId}
               className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-[10px] font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-45"
               data-testid="stage-play-copy-mail-loop-ask-debug"
-              title="Copy the mailbox projection of Ask debug for this wake."
+              title="Copy the mailbox projection of Ask debug for this interrupt."
             >
               <Copy className="h-3 w-3" aria-hidden="true" />
               Copy Ask debug
@@ -7668,7 +7733,7 @@ function StagePlayMailLoopLiveOverview({
                 : debugCopyState === "packet"
                   ? "packet trace copied"
                 : debugCopyState === "wake"
-                  ? "wake trace copied"
+                  ? "interrupt trace copied"
                 : debugCopyState === "ask"
                   ? "Ask debug copied"
                 : debugCopyState === "full"
@@ -8095,7 +8160,7 @@ function StagePlayMailLoopLiveOverview({
                   : currentAskTurnId
                     ? "Ask route entered"
                     : liveOverviewPendingWake
-                      ? "Wake waiting"
+                      ? "Interrupt waiting"
                       : "Queue clear"}
               </div>
               <div className="mt-1 text-xs leading-relaxed text-slate-400">{currentWakeSummary}</div>
@@ -8147,7 +8212,7 @@ function StagePlayMailLoopLiveOverview({
                 Voice checkpoint: {voiceStatusLabel}. {voiceCheckpointRefs.length > 0
                   ? `${voiceCheckpointRefs.length} voice/hold/block receipt reference(s) recorded.`
                   : voiceRequested
-                    ? "The packet requested voice, but no voice/hold/block receipt is visible for this wake."
+                    ? "The packet requested voice, but no voice/hold/block receipt is visible for this interrupt."
                     : "No voice callout is requested for this route."}
               </div>
             </div>
@@ -8300,7 +8365,7 @@ function StagePlayMailLoopLiveOverview({
               {voiceCheckpointRefs.length > 0
                 ? `${voiceCheckpointRefs.length} voice/hold/block receipt reference(s) recorded.`
                 : voiceRequested
-                  ? "The packet requested voice, but no voice/hold/block receipt is visible for this wake."
+                  ? "The packet requested voice, but no voice/hold/block receipt is visible for this interrupt."
                   : "The latest packet did not request a voice callout."}
             </div>
           </div>
@@ -8407,7 +8472,7 @@ function StagePlayMailLoopLiveOverview({
                 </div>
                 <div className="mt-2 line-clamp-2 text-[11px] text-slate-300">
                   {packet.effortEstimate?.currentEffort ? labelize(packet.effortEstimate.currentEffort) : "effort pending"}
-                  {packet.arbiter?.wakeAsk ? " | wake Ask" : " | local wait"}
+                  {packet.arbiter?.wakeAsk ? " | interrupt Ask" : " | local wait"}
                 </div>
                 <div className="mt-2 h-1.5 rounded bg-slate-800">
                   <div

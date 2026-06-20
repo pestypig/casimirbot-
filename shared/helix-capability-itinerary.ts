@@ -31,6 +31,8 @@ export type HelixCapabilityItineraryStep = {
   purpose: string;
   execution_group: HelixCapabilityItineraryExecutionGroup;
   required_observation_kinds: string[];
+  contribution_role?: string | null;
+  terminal_contribution_kind?: string | null;
   status: HelixCapabilityItineraryStepStatus;
   reason: string;
 };
@@ -56,6 +58,8 @@ export type HelixCapabilityItinerary = {
     required_observation_families: HelixCapabilityItineraryFamily[];
     required_capabilities?: string[];
     allowed_terminal_artifact_kinds: string[];
+    forbidden_terminal_artifact_kinds?: string[];
+    compound_terminal_policy?: string;
     requires_post_observation_synthesis: boolean;
     typed_failure_codes: string[];
   };

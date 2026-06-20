@@ -1123,6 +1123,11 @@ function readAgentGoalFinalReportRequirements(args: Record<string, unknown>): Ag
   const allowedTerminalArtifactKinds = readStringArray(record.allowedTerminalArtifactKinds ?? record.allowed_terminal_artifact_kinds);
   const requiredEvidenceKinds = readStringArray(record.requiredEvidenceKinds ?? record.required_evidence_kinds);
   const prohibitedReportSources = readStringArray(record.prohibitedReportSources ?? record.prohibited_report_sources);
+  const defaultAllowedTerminalArtifactKinds = WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS.allowedTerminalArtifactKinds;
+  const allowedTerminalArtifactKindSet = new Set(defaultAllowedTerminalArtifactKinds);
+  const normalizedAllowedTerminalArtifactKinds = uniqueStrings(allowedTerminalArtifactKinds).filter((kind) =>
+    allowedTerminalArtifactKindSet.has(kind)
+  );
   return allowedTerminalArtifactKinds.length > 0 || requiredEvidenceKinds.length > 0 || prohibitedReportSources.length > 0
     ? {
         completedSolverPathRequired: true,
@@ -1130,13 +1135,21 @@ function readAgentGoalFinalReportRequirements(args: Record<string, unknown>): Ag
         routeAuthorityRequired: true,
         terminalAuthoritySingleWriterRequired: true,
         allowedTerminalArtifactKinds: allowedTerminalArtifactKinds.length > 0
-          ? allowedTerminalArtifactKinds
-          : WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS.allowedTerminalArtifactKinds,
+          ? (normalizedAllowedTerminalArtifactKinds.length > 0
+              ? normalizedAllowedTerminalArtifactKinds
+              : defaultAllowedTerminalArtifactKinds)
+          : defaultAllowedTerminalArtifactKinds,
         requiredEvidenceKinds: requiredEvidenceKinds.length > 0
-          ? requiredEvidenceKinds
+          ? uniqueStrings([
+              ...WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS.requiredEvidenceKinds,
+              ...requiredEvidenceKinds,
+            ])
           : WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS.requiredEvidenceKinds,
         prohibitedReportSources: prohibitedReportSources.length > 0
-          ? prohibitedReportSources
+          ? uniqueStrings([
+              ...WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS.prohibitedReportSources,
+              ...prohibitedReportSources,
+            ])
           : WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS.prohibitedReportSources,
       }
     : undefined;
@@ -3009,7 +3022,7 @@ const missingWorkstationControlRequirements = (input: {
     case "repair_loop":
       return input.loopRef ? [] : ["loop_ref"];
     case "repair_source":
-      return input.loopRef ? [] : ["loop_ref"];
+      return input.sourceRef || input.loopRef ? [] : ["source_ref|loop_ref"];
     case "update_live_answer":
       return input.lineKey ? [] : ["line_key"];
     case "focus_process_graph":
@@ -3687,8 +3700,8 @@ export function executeLiveEnvironmentTool(
       source_refs: sourceRefs,
       loopRefs,
       loop_refs: loopRefs,
-      evidenceRefs: narratorEvidenceRefs,
-      evidence_refs: narratorEvidenceRefs,
+      evidenceRefs: uniqueStrings([goalContextUpdateId, ...narratorEvidenceRefs]),
+      evidence_refs: uniqueStrings([goalContextUpdateId, ...narratorEvidenceRefs]),
       producedRefs,
       produced_refs: producedRefs,
       agentGoalSession: checkpointedGoalSession,
@@ -3966,8 +3979,8 @@ export function executeLiveEnvironmentTool(
       source_refs: sourceRefs,
       loopRefs,
       loop_refs: loopRefs,
-      evidenceRefs,
-      evidence_refs: evidenceRefs,
+      evidenceRefs: uniqueStrings([goalContextUpdateId, ...evidenceRefs]),
+      evidence_refs: uniqueStrings([goalContextUpdateId, ...evidenceRefs]),
       producedRefs: [receiptId, goalContextUpdateId],
       produced_refs: [receiptId, goalContextUpdateId],
       agentGoalSession: checkpointedGoalSession,
@@ -4171,6 +4184,8 @@ export function executeLiveEnvironmentTool(
       observation: environment
         ? {
             schema: "helix.live_environment_card_read.v1",
+            resultId,
+            result_id: resultId,
             environment_id: environment.environment_id,
             thread_id: environment.thread_id,
             room_id: environment.room_id ?? null,
@@ -4181,6 +4196,26 @@ export function executeLiveEnvironmentTool(
             missing_requirements: missingRequirements,
             policyEvidenceRefs,
             policy_evidence_refs: policyEvidenceRefs,
+            sourceRefs,
+            source_refs: sourceRefs,
+            loopRefs,
+            loop_refs: loopRefs,
+            evidenceRefs: uniqueStrings([
+              ...(goalContextUpdateId ? [goalContextUpdateId] : []),
+              ...evidenceRefs,
+            ]),
+            evidence_refs: uniqueStrings([
+              ...(goalContextUpdateId ? [goalContextUpdateId] : []),
+              ...evidenceRefs,
+            ]),
+            producedRefs: uniqueStrings([
+              ...(goalContextUpdateId ? [goalContextUpdateId] : []),
+              resultId,
+            ]),
+            produced_refs: uniqueStrings([
+              ...(goalContextUpdateId ? [goalContextUpdateId] : []),
+              resultId,
+            ]),
             feedAllowed,
             feed_allowed: feedAllowed,
             actuatorAllowed,
@@ -4969,6 +5004,7 @@ export function executeLiveEnvironmentTool(
     ]);
     const sourceId = sourceIds[0] ?? explicitSourceId ?? null;
     const presetId = readString(args.preset_id) ?? readString(args.presetId);
+    const goalId = readString(args.goal_id) ?? readString(args.goalId);
     const activePreset = getActiveStagePlayMicroReasonerPromptPresetForSource({ sourceId, presetId });
     const router = activePreset?.delegationRouter ?? null;
     const candidateCount = rawDelegationCandidateCount(args);
@@ -5030,8 +5066,9 @@ export function executeLiveEnvironmentTool(
         ...sourceIds,
       ]),
     });
+    const routeActivityId = `stage_play_micro_reasoner_prompt_tool_activity:${hashShort([result.delegationId, input.thread_id])}`;
     recordStagePlayMicroReasonerPromptToolActivity({
-      activityId: `stage_play_micro_reasoner_prompt_tool_activity:${hashShort([result.delegationId, input.thread_id])}`,
+      activityId: routeActivityId,
       toolName: input.tool_name,
       action: "route",
       status: "completed",
@@ -5043,6 +5080,59 @@ export function executeLiveEnvironmentTool(
       updatedAt: result.createdAt,
       evidenceRefs: uniqueStrings([result.delegationId, ...result.evidenceRefs]),
     });
+    const routeSourceRefs = uniqueStrings([sourceId, ...sourceIds]);
+    const routeLoopRefs = uniqueStrings([
+      "workstation_context_feed:microdeck_outputs",
+      "workstation_actuator:query_microdeck_outputs",
+      "microdeck:prompt_route",
+      ...(activePreset ? [`microdeck_preset:${activePreset.presetId}`] : []),
+      ...(activePreset?.rolePromptIds.prompt_router ? [`microdeck_prompt:${activePreset.rolePromptIds.prompt_router}`] : []),
+    ]);
+    const routeEvidenceRefs = uniqueStrings([
+      routeActivityId,
+      result.delegationId,
+      result.presetId,
+      result.selectedCandidateId,
+      ...result.evidenceRefs,
+      ...sourceIds,
+    ]);
+    const suggestedDispatch: WorkstationDispatchActionV1[] = [
+      { kind: "log_receipt", receiptRef: routeActivityId },
+      ...(goalId ? [{ kind: "append_goal_context", goalId } as WorkstationDispatchActionV1] : []),
+      { kind: "update_panel", panelId: "stage-play-badge-graph" },
+      { kind: "update_panel", panelId: "live-answer-environment" },
+      ...(result.shouldHandoffToHelixAsk
+        ? [{
+            kind: "wake_agent",
+            interruptKind: "policy_triggered",
+            reason: "MicroDeck prompt route produced a Helix Ask handoff recommendation.",
+          } as WorkstationDispatchActionV1]
+        : []),
+    ];
+    const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+      threadId: input.thread_id,
+      roomId,
+      producerKind: "microdeck",
+      updateKind: "route_evidence",
+      contentRef: result.delegationId,
+      preview: result.selectedCandidateId
+        ? `MicroDeck routed live-source summary to ${result.selectedCandidateId}.`
+        : "MicroDeck did not find a candidate prompt above threshold.",
+      sourceRefs: routeSourceRefs,
+      loopRefs: routeLoopRefs,
+      evidenceRefs: routeEvidenceRefs,
+      receiptRefs: [routeActivityId, result.delegationId],
+      freshnessStatus: result.selectedCandidateId ? "fresh" : "blocked",
+      goalId,
+      goalRelevanceReason: "MicroDeck prompt routing produced deterministic deck output for workstation goal context.",
+      toolIdentity: {
+        requestedToolName: input.tool_name,
+        canonicalToolName: "live_env.route_micro_reasoner_prompt",
+        matchedAllowedActuators: [],
+        matchedAllowedActuatorRefs: [],
+      },
+      suggestedDispatch,
+    });
     return makeObservation({
       threadId: input.thread_id,
       environmentId: environment?.environment_id ?? input.environment_id,
@@ -5051,9 +5141,38 @@ export function executeLiveEnvironmentTool(
       summary: result.selectedCandidateId
         ? `MicroDeck routed live-source summary to ${result.selectedCandidateId}.`
         : "MicroDeck did not find a candidate prompt above threshold.",
-      observation: result,
-      evidenceRefs: uniqueStrings([result.delegationId, ...result.evidenceRefs]),
-      producedRefs: [result.delegationId],
+      observation: {
+        ...result,
+        sourceIds,
+        source_ids: sourceIds,
+        sourceRefs: routeSourceRefs,
+        source_refs: routeSourceRefs,
+        loopRefs: routeLoopRefs,
+        loop_refs: routeLoopRefs,
+        evidenceRefs: uniqueStrings([goalContextUpdateId, ...routeEvidenceRefs]),
+        evidence_refs: uniqueStrings([goalContextUpdateId, ...routeEvidenceRefs]),
+        producedRefs: [result.delegationId, goalContextUpdateId],
+        produced_refs: [result.delegationId, goalContextUpdateId],
+        suggestedDispatch,
+        suggested_dispatch: suggestedDispatch,
+        goalContextUpdateId,
+        goal_context_update_id: goalContextUpdateId,
+        terminalAuthority: {
+          status: "not_terminal",
+          finalAnswerEligible: false,
+          completedSolverPathRequired: true,
+          terminalAuthoritySingleWriterRequired: true,
+        },
+        terminal_authority: {
+          status: "not_terminal",
+          final_answer_eligible: false,
+          completed_solver_path_required: true,
+          terminal_authority_single_writer_required: true,
+        },
+        post_tool_model_step_required: true,
+      },
+      evidenceRefs: uniqueStrings([goalContextUpdateId, ...routeEvidenceRefs]),
+      producedRefs: [result.delegationId, goalContextUpdateId],
     });
   }
 
@@ -5126,15 +5245,80 @@ export function executeLiveEnvironmentTool(
         updatedAt: new Date().toISOString(),
         evidenceRefs: uniqueStrings([draft.draftId, draft.recommendedBasePresetId, ...sourceIds]),
       });
+      const draftSourceRefs = uniqueStrings([sourceId, ...sourceIds]);
+      const draftLoopRefs = uniqueStrings([
+        "workstation_context_feed:microdeck_outputs",
+        "workstation_actuator:query_microdeck_outputs",
+        "microdeck:preset_draft",
+      ]);
+      const draftEvidenceRefs = uniqueStrings([
+        activityId,
+        draft.draftId,
+        draft.recommendedBasePresetId,
+        ...draft.evidenceRefs,
+        ...sourceIds,
+      ]);
+      const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+        threadId: input.thread_id,
+        roomId,
+        producerKind: "microdeck",
+        updateKind: "suggested_action",
+        contentRef: draft.draftId,
+        preview: `Drafted MicroDeck preset proposal from ${draft.recommendedBasePresetTitle}.`,
+        sourceRefs: draftSourceRefs,
+        loopRefs: draftLoopRefs,
+        evidenceRefs: draftEvidenceRefs,
+        receiptRefs: [activityId, draft.draftId],
+        freshnessStatus: "fresh",
+        goalId,
+        goalRelevanceReason: "MicroDeck draft proposes a workstation deck configuration without creating or applying it.",
+        toolIdentity: {
+          requestedToolName: input.tool_name,
+          canonicalToolName: "live_env.draft_micro_reasoner_preset",
+          matchedAllowedActuators: [],
+          matchedAllowedActuatorRefs: [],
+        },
+        suggestedDispatch: [
+          { kind: "log_receipt", receiptRef: activityId },
+          ...(goalId ? [{ kind: "append_goal_context" as const, goalId }] : []),
+          { kind: "update_panel", panelId: "stage-play-badge-graph" },
+          { kind: "update_panel", panelId: "live-answer-environment" },
+        ],
+      });
       return makeObservation({
         threadId: input.thread_id,
         environmentId: environment?.environment_id ?? input.environment_id,
         toolName: input.tool_name,
         ok: true,
         summary,
-        observation: draft,
-        evidenceRefs: uniqueStrings([draft.draftId, draft.recommendedBasePresetId, ...draft.evidenceRefs, activityId]),
-        producedRefs: [draft.draftId],
+        observation: {
+          ...draft,
+          sourceRefs: draftSourceRefs,
+          source_refs: draftSourceRefs,
+          loopRefs: draftLoopRefs,
+          loop_refs: draftLoopRefs,
+          evidenceRefs: uniqueStrings([goalContextUpdateId, ...draftEvidenceRefs]),
+          evidence_refs: uniqueStrings([goalContextUpdateId, ...draftEvidenceRefs]),
+          producedRefs: [draft.draftId, goalContextUpdateId],
+          produced_refs: [draft.draftId, goalContextUpdateId],
+          goalContextUpdateId,
+          goal_context_update_id: goalContextUpdateId,
+          terminalAuthority: {
+            status: "not_terminal",
+            finalAnswerEligible: false,
+            completedSolverPathRequired: true,
+            terminalAuthoritySingleWriterRequired: true,
+          },
+          terminal_authority: {
+            status: "not_terminal",
+            final_answer_eligible: false,
+            completed_solver_path_required: true,
+            terminal_authority_single_writer_required: true,
+          },
+          post_tool_model_step_required: true,
+        },
+        evidenceRefs: uniqueStrings([goalContextUpdateId, ...draftEvidenceRefs]),
+        producedRefs: [draft.draftId, goalContextUpdateId],
       });
     }
 
@@ -5255,9 +5439,40 @@ export function executeLiveEnvironmentTool(
           microReasonerPrompts: prompts,
           sourceIds,
           source_ids: sourceIds,
+          sourceRefs: uniqueStrings([sourceId, ...sourceIds]),
+          source_refs: uniqueStrings([sourceId, ...sourceIds]),
+          loopRefs: uniqueStrings([
+            "workstation_context_feed:microdeck_outputs",
+            "workstation_actuator:query_microdeck_outputs",
+            "microdeck:preset_state",
+            ...prompts.map((prompt) => `microdeck_prompt:${prompt.role}`),
+          ]),
+          loop_refs: uniqueStrings([
+            "workstation_context_feed:microdeck_outputs",
+            "workstation_actuator:query_microdeck_outputs",
+            "microdeck:preset_state",
+            ...prompts.map((prompt) => `microdeck_prompt:${prompt.role}`),
+          ]),
+          evidenceRefs: uniqueStrings([goalContextUpdateId, ...applyEvidenceRefs]),
+          evidence_refs: uniqueStrings([goalContextUpdateId, ...applyEvidenceRefs]),
+          producedRefs: preset ? uniqueStrings([preset.presetId, goalContextUpdateId]) : [goalContextUpdateId],
+          produced_refs: preset ? uniqueStrings([preset.presetId, goalContextUpdateId]) : [goalContextUpdateId],
           toolActivities: listStagePlayMicroReasonerPromptToolActivities({ sourceId, limit: 10 }),
           goalContextUpdateId,
           goal_context_update_id: goalContextUpdateId,
+          terminalAuthority: {
+            status: "not_terminal",
+            finalAnswerEligible: false,
+            completedSolverPathRequired: true,
+            terminalAuthoritySingleWriterRequired: true,
+          },
+          terminal_authority: {
+            status: "not_terminal",
+            final_answer_eligible: false,
+            completed_solver_path_required: true,
+            terminal_authority_single_writer_required: true,
+          },
+          post_tool_model_step_required: true,
           assistant_answer: false,
           terminal_eligible: false,
           raw_content_included: false,
@@ -5358,6 +5573,50 @@ export function executeLiveEnvironmentTool(
             ...prompts.map((prompt) => prompt.promptId),
           ]),
         });
+        const createSourceRefs = uniqueStrings([sourceId, ...sourceIds]);
+        const createLoopRefs = uniqueStrings([
+          "workstation_context_feed:microdeck_outputs",
+          "workstation_actuator:query_microdeck_outputs",
+          "microdeck:preset_state",
+          "microdeck:preset_create",
+          ...prompts.map((prompt) => `microdeck_prompt:${prompt.role}`),
+        ]);
+        const createEvidenceRefs = uniqueStrings([
+          activityId,
+          routerPreset?.presetId,
+          routerPreset?.rolePromptIds.prompt_router,
+          ...sourceIds,
+          ...prompts.map((prompt) => prompt.promptId),
+        ]);
+        const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+          threadId: input.thread_id,
+          roomId,
+          producerKind: "microdeck",
+          updateKind: "preset_state",
+          contentRef: routerPreset?.presetId ?? activityId,
+          preview: routerPreset
+            ? `Created custom MicroDeck prompt-router preset ${routerPreset.title}.`
+            : "Custom MicroDeck prompt-router preset could not be created from the supplied candidates.",
+          sourceRefs: createSourceRefs,
+          loopRefs: createLoopRefs,
+          evidenceRefs: createEvidenceRefs,
+          receiptRefs: uniqueStrings([activityId, routerPreset?.presetId]),
+          freshnessStatus: routerPreset ? "fresh" : "blocked",
+          goalId,
+          goalRelevanceReason: "MicroDeck preset creation changed the deterministic workstation deck configuration.",
+          toolIdentity: {
+            requestedToolName: input.tool_name,
+            canonicalToolName: "live_env.create_micro_reasoner_preset",
+            matchedAllowedActuators: [],
+            matchedAllowedActuatorRefs: [],
+          },
+          suggestedDispatch: [
+            { kind: "log_receipt", receiptRef: activityId },
+            ...(goalId && routerPreset ? [{ kind: "append_goal_context" as const, goalId }] : []),
+            { kind: "update_panel", panelId: "stage-play-badge-graph" },
+            { kind: "update_panel", panelId: "live-answer-environment" },
+          ],
+        });
         return makeObservation({
           threadId: input.thread_id,
           environmentId: environment?.environment_id ?? input.environment_id,
@@ -5373,21 +5632,38 @@ export function executeLiveEnvironmentTool(
             microReasonerPrompts: prompts,
             sourceIds,
             source_ids: sourceIds,
+            sourceRefs: createSourceRefs,
+            source_refs: createSourceRefs,
+            loopRefs: createLoopRefs,
+            loop_refs: createLoopRefs,
+            evidenceRefs: uniqueStrings([goalContextUpdateId, ...createEvidenceRefs]),
+            evidence_refs: uniqueStrings([goalContextUpdateId, ...createEvidenceRefs]),
+            producedRefs: routerPreset ? uniqueStrings([routerPreset.presetId, goalContextUpdateId]) : [goalContextUpdateId],
+            produced_refs: routerPreset ? uniqueStrings([routerPreset.presetId, goalContextUpdateId]) : [goalContextUpdateId],
             toolActivities: listStagePlayMicroReasonerPromptToolActivities({ sourceId, limit: 10 }),
+            goalContextUpdateId,
+            goal_context_update_id: goalContextUpdateId,
+            terminalAuthority: {
+              status: "not_terminal",
+              finalAnswerEligible: false,
+              completedSolverPathRequired: true,
+              terminalAuthoritySingleWriterRequired: true,
+            },
+            terminal_authority: {
+              status: "not_terminal",
+              final_answer_eligible: false,
+              completed_solver_path_required: true,
+              terminal_authority_single_writer_required: true,
+            },
+            post_tool_model_step_required: true,
             assistant_answer: false,
             terminal_eligible: false,
             raw_content_included: false,
             context_role: "tool_evidence",
             ask_context_policy: "evidence_only",
           },
-          evidenceRefs: uniqueStrings([
-            routerPreset?.presetId,
-            routerPreset?.rolePromptIds.prompt_router,
-            ...sourceIds,
-            ...prompts.map((prompt) => prompt.promptId),
-            activityId,
-          ]),
-          producedRefs: routerPreset ? uniqueStrings([routerPreset.presetId]) : [],
+          evidenceRefs: uniqueStrings([goalContextUpdateId, ...createEvidenceRefs]),
+          producedRefs: routerPreset ? uniqueStrings([routerPreset.presetId, goalContextUpdateId]) : [goalContextUpdateId],
         });
       }
       const role = readMicroReasonerRole(args.role);
@@ -5463,6 +5739,51 @@ export function executeLiveEnvironmentTool(
           ...prompts.map((prompt) => prompt.promptId),
         ]),
       });
+      const createSourceRefs = uniqueStrings([sourceId, ...sourceIds]);
+      const createLoopRefs = uniqueStrings([
+        "workstation_context_feed:microdeck_outputs",
+        "workstation_actuator:query_microdeck_outputs",
+        "microdeck:preset_state",
+        "microdeck:preset_create",
+        ...(result?.prompt ? [`microdeck_prompt:${result.prompt.role}`] : []),
+        ...prompts.map((prompt) => `microdeck_prompt:${prompt.role}`),
+      ]);
+      const createEvidenceRefs = uniqueStrings([
+        activityId,
+        result?.preset.presetId,
+        result?.prompt.promptId,
+        ...sourceIds,
+        ...prompts.map((prompt) => prompt.promptId),
+      ]);
+      const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+        threadId: input.thread_id,
+        roomId,
+        producerKind: "microdeck",
+        updateKind: "preset_state",
+        contentRef: result?.preset.presetId ?? activityId,
+        preview: result
+          ? `Created custom MicroDeck preset ${result.preset.title}.`
+          : "Custom MicroDeck preset could not be created from the supplied prompt.",
+        sourceRefs: createSourceRefs,
+        loopRefs: createLoopRefs,
+        evidenceRefs: createEvidenceRefs,
+        receiptRefs: uniqueStrings([activityId, result?.preset.presetId, result?.prompt.promptId]),
+        freshnessStatus: result ? "fresh" : "blocked",
+        goalId,
+        goalRelevanceReason: "MicroDeck preset creation changed the deterministic workstation deck configuration.",
+        toolIdentity: {
+          requestedToolName: input.tool_name,
+          canonicalToolName: "live_env.create_micro_reasoner_preset",
+          matchedAllowedActuators: [],
+          matchedAllowedActuatorRefs: [],
+        },
+        suggestedDispatch: [
+          { kind: "log_receipt", receiptRef: activityId },
+          ...(goalId && result ? [{ kind: "append_goal_context" as const, goalId }] : []),
+          { kind: "update_panel", panelId: "stage-play-badge-graph" },
+          { kind: "update_panel", panelId: "live-answer-environment" },
+        ],
+      });
       return makeObservation({
         threadId: input.thread_id,
         environmentId: environment?.environment_id ?? input.environment_id,
@@ -5479,21 +5800,44 @@ export function executeLiveEnvironmentTool(
           microReasonerPrompts: prompts,
           sourceIds,
           source_ids: sourceIds,
+          sourceRefs: createSourceRefs,
+          source_refs: createSourceRefs,
+          loopRefs: createLoopRefs,
+          loop_refs: createLoopRefs,
+          evidenceRefs: uniqueStrings([goalContextUpdateId, ...createEvidenceRefs]),
+          evidence_refs: uniqueStrings([goalContextUpdateId, ...createEvidenceRefs]),
+          producedRefs: result
+            ? uniqueStrings([result.preset.presetId, result.prompt.promptId, goalContextUpdateId])
+            : [goalContextUpdateId],
+          produced_refs: result
+            ? uniqueStrings([result.preset.presetId, result.prompt.promptId, goalContextUpdateId])
+            : [goalContextUpdateId],
           toolActivities: listStagePlayMicroReasonerPromptToolActivities({ sourceId, limit: 10 }),
+          goalContextUpdateId,
+          goal_context_update_id: goalContextUpdateId,
+          terminalAuthority: {
+            status: "not_terminal",
+            finalAnswerEligible: false,
+            completedSolverPathRequired: true,
+            terminalAuthoritySingleWriterRequired: true,
+          },
+          terminal_authority: {
+            status: "not_terminal",
+            final_answer_eligible: false,
+            completed_solver_path_required: true,
+            terminal_authority_single_writer_required: true,
+          },
+          post_tool_model_step_required: true,
           assistant_answer: false,
           terminal_eligible: false,
           raw_content_included: false,
           context_role: "tool_evidence",
           ask_context_policy: "evidence_only",
         },
-        evidenceRefs: uniqueStrings([
-          result?.preset.presetId,
-          result?.prompt.promptId,
-          ...sourceIds,
-          ...prompts.map((prompt) => prompt.promptId),
-          activityId,
-        ]),
-        producedRefs: result ? uniqueStrings([result.preset.presetId, result.prompt.promptId]) : [],
+        evidenceRefs: uniqueStrings([goalContextUpdateId, ...createEvidenceRefs]),
+        producedRefs: result
+          ? uniqueStrings([result.preset.presetId, result.prompt.promptId, goalContextUpdateId])
+          : [goalContextUpdateId],
       });
     }
 
@@ -5515,6 +5859,13 @@ export function executeLiveEnvironmentTool(
       presetId: activePreset?.presetId ?? presetId,
     });
     const summary = `Found ${presets.length} MicroDeck preset(s) and ${prompts.length} prompt(s).`;
+    const queryEvidenceRefs = uniqueStrings([
+      activityId,
+      activePreset?.presetId,
+      ...presets.map((preset) => preset.presetId),
+      ...prompts.map((prompt) => prompt.promptId),
+      ...sourceIds,
+    ]);
     recordStagePlayMicroReasonerPromptToolActivity({
       activityId,
       toolName: input.tool_name,
@@ -5526,12 +5877,42 @@ export function executeLiveEnvironmentTool(
       promptId: null,
       createdAt: now,
       updatedAt: new Date().toISOString(),
-      evidenceRefs: uniqueStrings([
-        activePreset?.presetId,
-        ...presets.map((preset) => preset.presetId),
-        ...prompts.map((prompt) => prompt.promptId),
-        ...sourceIds,
-      ]),
+      evidenceRefs: queryEvidenceRefs,
+    });
+    const queryLoopRefs = uniqueStrings([
+      "workstation_context_feed:microdeck_outputs",
+      "workstation_actuator:query_microdeck_outputs",
+      "microdeck:preset_state",
+      "microdeck:preset_query",
+      ...prompts.map((prompt) => `microdeck_prompt:${prompt.role}`),
+    ]);
+    const querySourceRefs = uniqueStrings([sourceId, ...sourceIds]);
+    const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+      threadId: input.thread_id,
+      roomId,
+      producerKind: "microdeck",
+      updateKind: "preset_state",
+      contentRef: activityId,
+      preview: `MicroDeck preset query found ${presets.length} active preset(s) and ${prompts.length} prompt(s).`,
+      sourceRefs: querySourceRefs,
+      loopRefs: queryLoopRefs,
+      evidenceRefs: queryEvidenceRefs,
+      receiptRefs: [activityId],
+      freshnessStatus: "fresh",
+      goalId,
+      goalRelevanceReason: "MicroDeck preset query exposed deterministic deck state for workstation goal context.",
+      toolIdentity: {
+        requestedToolName: input.tool_name,
+        canonicalToolName: "live_env.query_micro_reasoner_presets",
+        matchedAllowedActuators: [],
+        matchedAllowedActuatorRefs: [],
+      },
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: activityId },
+        ...(goalId ? [{ kind: "append_goal_context" as const, goalId }] : []),
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+        { kind: "update_panel", panelId: "live-answer-environment" },
+      ],
     });
     return makeObservation({
       threadId: input.thread_id,
@@ -5552,20 +5933,38 @@ export function executeLiveEnvironmentTool(
         source_kind: sourceKind,
         sourceIds,
         source_ids: sourceIds,
+        sourceRefs: querySourceRefs,
+        source_refs: querySourceRefs,
+        loopRefs: queryLoopRefs,
+        loop_refs: queryLoopRefs,
+        evidenceRefs: uniqueStrings([goalContextUpdateId, ...queryEvidenceRefs]),
+        evidence_refs: uniqueStrings([goalContextUpdateId, ...queryEvidenceRefs]),
+        producedRefs: uniqueStrings([goalContextUpdateId, activePreset?.presetId, ...prompts.map((prompt) => prompt.promptId)]),
+        produced_refs: uniqueStrings([goalContextUpdateId, activePreset?.presetId, ...prompts.map((prompt) => prompt.promptId)]),
         toolActivities: listStagePlayMicroReasonerPromptToolActivities({ sourceId, limit: 10 }),
+        goalContextUpdateId,
+        goal_context_update_id: goalContextUpdateId,
+        terminalAuthority: {
+          status: "not_terminal",
+          finalAnswerEligible: false,
+          completedSolverPathRequired: true,
+          terminalAuthoritySingleWriterRequired: true,
+        },
+        terminal_authority: {
+          status: "not_terminal",
+          final_answer_eligible: false,
+          completed_solver_path_required: true,
+          terminal_authority_single_writer_required: true,
+        },
+        post_tool_model_step_required: true,
         assistant_answer: false,
         terminal_eligible: false,
         raw_content_included: false,
         context_role: "tool_evidence",
         ask_context_policy: "evidence_only",
       },
-      evidenceRefs: uniqueStrings([
-        activePreset?.presetId,
-        ...presets.map((preset) => preset.presetId),
-        ...prompts.map((prompt) => prompt.promptId),
-        ...sourceIds,
-        activityId,
-      ]),
+      evidenceRefs: uniqueStrings([goalContextUpdateId, ...queryEvidenceRefs]),
+      producedRefs: uniqueStrings([goalContextUpdateId, activePreset?.presetId, ...prompts.map((prompt) => prompt.promptId)]),
     });
   }
 
@@ -5574,6 +5973,13 @@ export function executeLiveEnvironmentTool(
     input.tool_name === "live_env.update_micro_reasoner_prompt" ||
     input.tool_name === "live_env.test_micro_reasoner_prompt"
   ) {
+    const sourceIds = uniqueStrings([
+      ...readStringArray(args.source_ids ?? args.sourceIds),
+      readString(args.source_id) ?? readString(args.sourceId) ?? explicitSourceId,
+    ]);
+    const sourceId = sourceIds[0] ?? explicitSourceId ?? null;
+    const sourceRefs = uniqueStrings([sourceId, ...sourceIds]);
+    const goalId = readString(args.goal_id) ?? readString(args.goalId);
     const role = readString(args.role) as any;
     const prompts = listStagePlayMicroReasonerPrompts({
       active: input.tool_name === "live_env.query_micro_reasoner_prompts" ? true : undefined,
@@ -5621,6 +6027,48 @@ export function executeLiveEnvironmentTool(
             updatedAt: now,
             createdAt: now,
           });
+      const updateLoopRefs = uniqueStrings([
+        "workstation_context_feed:microdeck_outputs",
+        "workstation_actuator:query_microdeck_outputs",
+        "microdeck:preset_state",
+        "microdeck:prompt_update",
+        `microdeck_prompt:${existingPrompt.role}`,
+        ...(forked ? [`microdeck_prompt:${forked.role}`] : []),
+      ]);
+      const updateEvidenceRefs = uniqueStrings([
+        forked?.promptId,
+        existingPrompt.promptId,
+        ...sourceIds,
+      ]);
+      const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+        threadId: input.thread_id,
+        roomId,
+        producerKind: "microdeck",
+        updateKind: "preset_state",
+        contentRef: forked?.promptId ?? existingPrompt.promptId,
+        preview: forked
+          ? `Activated MicroDeck prompt ${forked.title} v${forked.version}.`
+          : "MicroDeck prompt update was prepared but not activated.",
+        sourceRefs,
+        loopRefs: updateLoopRefs,
+        evidenceRefs: updateEvidenceRefs,
+        receiptRefs: uniqueStrings([forked?.promptId, existingPrompt.promptId]),
+        freshnessStatus: forked ? "fresh" : "blocked",
+        goalId,
+        goalRelevanceReason: "MicroDeck prompt update changed the deterministic workstation deck configuration.",
+        toolIdentity: {
+          requestedToolName: input.tool_name,
+          canonicalToolName: "live_env.update_micro_reasoner_prompt",
+          matchedAllowedActuators: [],
+          matchedAllowedActuatorRefs: [],
+        },
+        suggestedDispatch: [
+          { kind: "log_receipt", receiptRef: forked?.promptId ?? existingPrompt.promptId },
+          ...(goalId && forked ? [{ kind: "append_goal_context" as const, goalId }] : []),
+          { kind: "update_panel", panelId: "stage-play-badge-graph" },
+          { kind: "update_panel", panelId: "live-answer-environment" },
+        ],
+      });
       return makeObservation({
         threadId: input.thread_id,
         environmentId: environment?.environment_id ?? input.environment_id,
@@ -5635,13 +6083,37 @@ export function executeLiveEnvironmentTool(
           prompt: forked,
           previousPrompt: existingPrompt,
           previous_prompt: existingPrompt,
+          sourceRefs,
+          source_refs: sourceRefs,
+          loopRefs: updateLoopRefs,
+          loop_refs: updateLoopRefs,
+          evidenceRefs: uniqueStrings([goalContextUpdateId, ...updateEvidenceRefs]),
+          evidence_refs: uniqueStrings([goalContextUpdateId, ...updateEvidenceRefs]),
+          producedRefs: forked ? [forked.promptId, goalContextUpdateId] : [goalContextUpdateId],
+          produced_refs: forked ? [forked.promptId, goalContextUpdateId] : [goalContextUpdateId],
+          goalContextUpdateId,
+          goal_context_update_id: goalContextUpdateId,
+          terminalAuthority: {
+            status: "not_terminal",
+            finalAnswerEligible: false,
+            completedSolverPathRequired: true,
+            terminalAuthoritySingleWriterRequired: true,
+          },
+          terminal_authority: {
+            status: "not_terminal",
+            final_answer_eligible: false,
+            completed_solver_path_required: true,
+            terminal_authority_single_writer_required: true,
+          },
+          post_tool_model_step_required: true,
           assistant_answer: false,
           terminal_eligible: false,
           raw_content_included: false,
           context_role: "tool_evidence",
           ask_context_policy: "evidence_only",
         },
-        evidenceRefs: uniqueStrings([forked?.promptId, existingPrompt.promptId]),
+        evidenceRefs: uniqueStrings([goalContextUpdateId, ...updateEvidenceRefs]),
+        producedRefs: forked ? [forked.promptId, goalContextUpdateId] : [goalContextUpdateId],
       });
     }
     if (input.tool_name === "live_env.test_micro_reasoner_prompt") {
@@ -5663,6 +6135,54 @@ export function executeLiveEnvironmentTool(
         sourceKind: scope.sourceKind,
         defaultLimit: readNumber(args.limit, 5),
       });
+      const prompt = role ? getActiveStagePlayMicroReasonerPromptForRole(role) : prompts.at(-1) ?? null;
+      const promptTestId = `stage_play_micro_reasoner_prompt_test:${hashShort([
+        input.thread_id,
+        prompt?.promptId,
+        mailItems.map((item) => item.mailId),
+        Date.now(),
+      ])}`;
+      const testSourceRefs = uniqueStrings([sourceId, scope.sourceId, ...sourceIds]);
+      const testLoopRefs = uniqueStrings([
+        "workstation_context_feed:microdeck_outputs",
+        "workstation_actuator:query_microdeck_outputs",
+        "microdeck:prompt_test",
+        ...(prompt ? [`microdeck_prompt:${prompt.role}`] : []),
+      ]);
+      const testEvidenceRefs = uniqueStrings([
+        promptTestId,
+        prompt?.promptId,
+        ...mailItems.map((item) => item.mailId),
+        ...mailItems.flatMap((item) => item.evidenceRefs),
+        ...sourceIds,
+      ]);
+      const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+        threadId: input.thread_id,
+        roomId,
+        producerKind: "microdeck",
+        updateKind: "reflection",
+        contentRef: promptTestId,
+        preview: `Prepared MicroDeck prompt test context for ${mailItems.length} recent mail item(s).`,
+        sourceRefs: testSourceRefs,
+        loopRefs: testLoopRefs,
+        evidenceRefs: testEvidenceRefs,
+        receiptRefs: [promptTestId],
+        freshnessStatus: "fresh",
+        goalId,
+        goalRelevanceReason: "MicroDeck prompt test produced dry-run deck evidence without activating a prompt.",
+        toolIdentity: {
+          requestedToolName: input.tool_name,
+          canonicalToolName: "live_env.test_micro_reasoner_prompt",
+          matchedAllowedActuators: [],
+          matchedAllowedActuatorRefs: [],
+        },
+        suggestedDispatch: [
+          { kind: "log_receipt", receiptRef: promptTestId },
+          ...(goalId ? [{ kind: "append_goal_context" as const, goalId }] : []),
+          { kind: "update_panel", panelId: "stage-play-badge-graph" },
+          { kind: "update_panel", panelId: "live-answer-environment" },
+        ],
+      });
       return makeObservation({
         threadId: input.thread_id,
         environmentId: environment?.environment_id ?? input.environment_id,
@@ -5671,23 +6191,83 @@ export function executeLiveEnvironmentTool(
         summary: `Prepared prompt test context for ${mailItems.length} recent mail item(s); no prompt was activated.`,
         observation: {
           schema: "stage_play_micro_reasoner_prompt_test_result/v1",
-          prompt: role ? getActiveStagePlayMicroReasonerPromptForRole(role) : prompts.at(-1) ?? null,
+          promptTestId,
+          prompt_test_id: promptTestId,
+          prompt,
           mailItems,
           mail_items: mailItems,
           activated: false,
+          sourceRefs: testSourceRefs,
+          source_refs: testSourceRefs,
+          loopRefs: testLoopRefs,
+          loop_refs: testLoopRefs,
+          evidenceRefs: uniqueStrings([goalContextUpdateId, ...testEvidenceRefs]),
+          evidence_refs: uniqueStrings([goalContextUpdateId, ...testEvidenceRefs]),
+          producedRefs: [promptTestId, goalContextUpdateId],
+          produced_refs: [promptTestId, goalContextUpdateId],
+          goalContextUpdateId,
+          goal_context_update_id: goalContextUpdateId,
+          terminalAuthority: {
+            status: "not_terminal",
+            finalAnswerEligible: false,
+            completedSolverPathRequired: true,
+            terminalAuthoritySingleWriterRequired: true,
+          },
+          terminal_authority: {
+            status: "not_terminal",
+            final_answer_eligible: false,
+            completed_solver_path_required: true,
+            terminal_authority_single_writer_required: true,
+          },
+          post_tool_model_step_required: true,
           assistant_answer: false,
           terminal_eligible: false,
           raw_content_included: false,
           context_role: "tool_evidence",
           ask_context_policy: "evidence_only",
         },
-        evidenceRefs: uniqueStrings([
-          ...(role ? [getActiveStagePlayMicroReasonerPromptForRole(role)?.promptId] : prompts.map((prompt) => prompt.promptId)),
-          ...mailItems.map((item) => item.mailId),
-          ...mailItems.flatMap((item) => item.evidenceRefs),
-        ]),
+        evidenceRefs: uniqueStrings([goalContextUpdateId, ...testEvidenceRefs]),
+        producedRefs: [promptTestId, goalContextUpdateId],
       });
     }
+    const queryLoopRefs = uniqueStrings([
+      "workstation_context_feed:microdeck_outputs",
+      "workstation_actuator:query_microdeck_outputs",
+      "microdeck:preset_state",
+      "microdeck:prompt_query",
+      ...prompts.map((prompt) => `microdeck_prompt:${prompt.role}`),
+    ]);
+    const queryEvidenceRefs = uniqueStrings([
+      ...prompts.map((prompt) => prompt.promptId),
+      ...sourceIds,
+    ]);
+    const goalContextUpdateId = recordLiveEnvironmentGoalContextUpdate({
+      threadId: input.thread_id,
+      roomId,
+      producerKind: "microdeck",
+      updateKind: "preset_state",
+      contentRef: `stage_play_micro_reasoner_prompt_query:${hashShort([input.thread_id, role ?? "all", prompts.map((prompt) => prompt.promptId), Date.now()])}`,
+      preview: `Found ${prompts.length} active MicroDeck prompt(s).`,
+      sourceRefs,
+      loopRefs: queryLoopRefs,
+      evidenceRefs: queryEvidenceRefs,
+      receiptRefs: prompts.map((prompt) => prompt.promptId).slice(0, 20),
+      freshnessStatus: "fresh",
+      goalId,
+      goalRelevanceReason: "MicroDeck prompt query exposed deterministic deck prompt state for workstation goal context.",
+      toolIdentity: {
+        requestedToolName: input.tool_name,
+        canonicalToolName: "live_env.query_micro_reasoner_prompts",
+        matchedAllowedActuators: [],
+        matchedAllowedActuatorRefs: [],
+      },
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: prompts[0]?.promptId ?? "microdeck_prompt_query" },
+        ...(goalId ? [{ kind: "append_goal_context" as const, goalId }] : []),
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+        { kind: "update_panel", panelId: "live-answer-environment" },
+      ],
+    });
     return makeObservation({
       threadId: input.thread_id,
       environmentId: environment?.environment_id ?? input.environment_id,
@@ -5697,13 +6277,37 @@ export function executeLiveEnvironmentTool(
       observation: {
         schema: "stage_play_micro_reasoner_prompt_query_result/v1",
         prompts,
+        sourceRefs,
+        source_refs: sourceRefs,
+        loopRefs: queryLoopRefs,
+        loop_refs: queryLoopRefs,
+        evidenceRefs: uniqueStrings([goalContextUpdateId, ...queryEvidenceRefs]),
+        evidence_refs: uniqueStrings([goalContextUpdateId, ...queryEvidenceRefs]),
+        producedRefs: uniqueStrings([goalContextUpdateId, ...prompts.map((prompt) => prompt.promptId)]),
+        produced_refs: uniqueStrings([goalContextUpdateId, ...prompts.map((prompt) => prompt.promptId)]),
+        goalContextUpdateId,
+        goal_context_update_id: goalContextUpdateId,
+        terminalAuthority: {
+          status: "not_terminal",
+          finalAnswerEligible: false,
+          completedSolverPathRequired: true,
+          terminalAuthoritySingleWriterRequired: true,
+        },
+        terminal_authority: {
+          status: "not_terminal",
+          final_answer_eligible: false,
+          completed_solver_path_required: true,
+          terminal_authority_single_writer_required: true,
+        },
+        post_tool_model_step_required: true,
         assistant_answer: false,
         terminal_eligible: false,
         raw_content_included: false,
         context_role: "tool_evidence",
         ask_context_policy: "evidence_only",
       },
-      evidenceRefs: prompts.map((prompt) => prompt.promptId),
+      evidenceRefs: uniqueStrings([goalContextUpdateId, ...queryEvidenceRefs]),
+      producedRefs: uniqueStrings([goalContextUpdateId, ...prompts.map((prompt) => prompt.promptId)]),
     });
   }
 
@@ -7040,6 +7644,9 @@ export function executeLiveEnvironmentTool(
           ref.startsWith("workstation_actuator:query_source_health") ||
           ref.startsWith("workstation_actuator:repair_source")
         ),
+        actuatorRefs: allRefs.filter((ref) =>
+          ref.startsWith("workstation_actuator:")
+        ),
         traceMemoryRefs: allRefs.filter((ref) =>
           ref.startsWith("trace_memory:") ||
           ref.startsWith("trace-memory:") ||
@@ -7075,6 +7682,7 @@ export function executeLiveEnvironmentTool(
         freshnessStatus: update.freshness.status,
         assistant_answer: false as const,
         terminal_eligible: false as const,
+        raw_content_included: false as const,
       };
     });
     const feedQueryResult: WorkstationContextFeedQueryResultV1 = {
@@ -7091,7 +7699,7 @@ export function executeLiveEnvironmentTool(
       policyEvidenceRefs,
       sourceRefs: resultSourceRefs,
       loopRefs: resultLoopRefs,
-      evidenceRefs,
+      evidenceRefs: uniqueStrings([goalContextUpdateId, ...evidenceRefs]),
       freshnessStatus,
       goalSessionFound: goalId ? Boolean(goalSession) : null,
       feedAllowed,
@@ -7346,7 +7954,7 @@ export function executeLiveEnvironmentTool(
       policyEvidenceRefs,
       sourceRefs: resultSourceRefs,
       loopRefs: resultLoopRefs,
-      evidenceRefs: resultEvidenceRefs,
+      evidenceRefs: uniqueStrings([goalContextUpdateId, ...resultEvidenceRefs]),
       freshnessStatus,
       goalSessionFound: goalId ? Boolean(goalSession) : null,
       feedAllowed,
@@ -7395,7 +8003,7 @@ export function executeLiveEnvironmentTool(
         policy_evidence_refs: policyEvidenceRefs,
         source_refs: resultSourceRefs,
         loop_refs: resultLoopRefs,
-        evidence_refs: resultEvidenceRefs,
+        evidence_refs: uniqueStrings([goalContextUpdateId, ...resultEvidenceRefs]),
         freshness_status: freshnessStatus,
         goal_session_found: goalId ? Boolean(goalSession) : null,
         feed_allowed: feedAllowed,
@@ -10094,7 +10702,7 @@ export function executeLiveEnvironmentTool(
       sourceRefs: resultSourceRefs,
       loopRefs: resultLoopRefs,
       sourceHealthRefs,
-      evidenceRefs: resultEvidenceRefs,
+      evidenceRefs: uniqueStrings([goalContextUpdateId, ...resultEvidenceRefs]),
       freshnessStatus,
       goalSessionFound: goalId ? Boolean(goalSession) : null,
       feedAllowed,
@@ -10141,7 +10749,7 @@ export function executeLiveEnvironmentTool(
         policy_evidence_refs: policyEvidenceRefs,
         source_refs: resultSourceRefs,
         loop_refs: resultLoopRefs,
-        evidence_refs: resultEvidenceRefs,
+        evidence_refs: uniqueStrings([goalContextUpdateId, ...resultEvidenceRefs]),
         freshness_status: freshnessStatus,
         goal_session_found: goalId ? Boolean(goalSession) : null,
         feed_allowed: feedAllowed,

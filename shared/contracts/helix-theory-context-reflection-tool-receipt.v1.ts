@@ -8,6 +8,18 @@ import {
   type TheoryContextReflectionV1,
 } from "./theory-context-reflection.v1";
 import {
+  isTheoryFrontierSearchV1,
+  type TheoryFrontierSearchV1,
+} from "./theory-frontier-search.v1";
+import {
+  isTheoryFrontierLiteratureMapV1,
+  type TheoryFrontierLiteratureMapV1,
+} from "./theory-frontier-literature-map.v1";
+import {
+  isTheoryFrontierExactContractVerificationV1,
+  type TheoryFrontierExactContractVerificationV1,
+} from "./theory-frontier-exact-contract-verification.v1";
+import {
   isTheoryCongruenceTraceV1,
   type TheoryCongruenceTraceV1,
 } from "../helix-theory-congruence-trace";
@@ -52,6 +64,9 @@ export type HelixTheoryContextReflectionToolReceiptV1 = {
   reflectionV1: TheoryContextReflectionV1;
   explanationPlanV1: TheoryContextExplanationPlanV1 | null;
   theoryCongruenceTraceV1: TheoryCongruenceTraceV1 | null;
+  frontierSearchV1: TheoryFrontierSearchV1 | null;
+  frontierLiteratureMapV1: TheoryFrontierLiteratureMapV1 | null;
+  frontierExactVerificationResultsV1: TheoryFrontierExactContractVerificationV1[];
 
   panelSync: {
     requested: boolean;
@@ -83,6 +98,9 @@ type BuildHelixTheoryContextReflectionToolReceiptInput = Omit<
   | "receiptId"
   | "authority"
   | "theoryCongruenceTraceV1"
+  | "frontierSearchV1"
+  | "frontierLiteratureMapV1"
+  | "frontierExactVerificationResultsV1"
   | "assistant_answer"
   | "raw_content_included"
   | "terminal_eligible"
@@ -94,6 +112,9 @@ type BuildHelixTheoryContextReflectionToolReceiptInput = Omit<
   generatedAt?: string;
   receiptId?: string;
   theoryCongruenceTraceV1?: TheoryCongruenceTraceV1 | null;
+  frontierSearchV1?: TheoryFrontierSearchV1 | null;
+  frontierLiteratureMapV1?: TheoryFrontierLiteratureMapV1 | null;
+  frontierExactVerificationResultsV1?: TheoryFrontierExactContractVerificationV1[];
 };
 
 const AUTHORITY: HelixTheoryContextReflectionToolReceiptAuthorityV1 = {
@@ -183,6 +204,9 @@ export function buildHelixTheoryContextReflectionToolReceiptV1(
     reflectionV1: input.reflectionV1,
     explanationPlanV1: input.explanationPlanV1,
     theoryCongruenceTraceV1: input.theoryCongruenceTraceV1 ?? null,
+    frontierSearchV1: input.frontierSearchV1 ?? null,
+    frontierLiteratureMapV1: input.frontierLiteratureMapV1 ?? null,
+    frontierExactVerificationResultsV1: input.frontierExactVerificationResultsV1 ?? [],
     panelSync: input.panelSync,
     authority: { ...AUTHORITY },
     recommendedNextActions: input.recommendedNextActions,
@@ -220,6 +244,30 @@ export function validateHelixTheoryContextReflectionToolReceiptV1(value: unknown
     !isTheoryCongruenceTraceV1(value.theoryCongruenceTraceV1)
   ) {
     issues.push("theoryCongruenceTraceV1 must be null or a valid helix.theory_congruence_trace.v1 artifact");
+  }
+  if (
+    value.frontierSearchV1 !== undefined &&
+    value.frontierSearchV1 !== null &&
+    !isTheoryFrontierSearchV1(value.frontierSearchV1)
+  ) {
+    issues.push("frontierSearchV1 must be null or a valid theory_frontier_search/v1 artifact");
+  }
+  if (
+    value.frontierLiteratureMapV1 !== undefined &&
+    value.frontierLiteratureMapV1 !== null &&
+    !isTheoryFrontierLiteratureMapV1(value.frontierLiteratureMapV1)
+  ) {
+    issues.push("frontierLiteratureMapV1 must be null or a valid theory_frontier_literature_map/v1 artifact");
+  }
+  if (!Array.isArray(value.frontierExactVerificationResultsV1)) {
+    issues.push("frontierExactVerificationResultsV1 must be an array");
+  } else {
+    value.frontierExactVerificationResultsV1.forEach((result: unknown, index: number) => {
+      const prefix = `frontierExactVerificationResultsV1[${index}]`;
+      if (!isTheoryFrontierExactContractVerificationV1(result)) {
+        issues.push(`${prefix} must be a valid theory_frontier_exact_contract_verification/v1 artifact`);
+      }
+    });
   }
 
   if (!isRecord(value.panelSync)) {

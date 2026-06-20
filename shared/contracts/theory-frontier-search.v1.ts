@@ -2,6 +2,7 @@ import {
   type ProbabilityTerrainV1,
   validateProbabilityTerrainV1,
 } from "./probability-terrain.v1";
+import type { HelixAskSourceTargetRequestedOutput } from "../helix-ask-source-target-intent";
 import {
   type TheoryFrontierCandidateV1,
   validateTheoryFrontierCandidateV1,
@@ -45,6 +46,20 @@ export const THEORY_FRONTIER_METHOD_ANCHORS_V1 = [
 
 export type TheoryFrontierMethodAnchorV1 = (typeof THEORY_FRONTIER_METHOD_ANCHORS_V1)[number];
 
+export type TheoryFrontierScholarlyLookupRequestV1 = {
+  requestId: string;
+  candidateId: string;
+  targetSource: "scholarly_research";
+  requestedOutputs: HelixAskSourceTargetRequestedOutput[];
+  query: string;
+  badgeIds: string[];
+  renderChunkIds: string[];
+  semanticChunkIds: string[];
+  reason: string;
+  mutating: false;
+  noAutoPromoteLiterature: true;
+};
+
 export type TheoryFrontierSearchV1 = {
   artifactId: typeof THEORY_FRONTIER_SEARCH_ARTIFACT_ID;
   schemaVersion: typeof THEORY_FRONTIER_SEARCH_SCHEMA_VERSION;
@@ -58,6 +73,7 @@ export type TheoryFrontierSearchV1 = {
   scoringVersion: string;
   verifierVersion: string;
   candidates: TheoryFrontierCandidateV1[];
+  scholarlyLookupRequests: TheoryFrontierScholarlyLookupRequestV1[];
   probabilityTerrain: ProbabilityTerrainV1;
   summary: {
     candidateCount: number;
@@ -78,9 +94,10 @@ export type TheoryFrontierSearchV1 = {
 
 export type BuildTheoryFrontierSearchV1Input = Omit<
   TheoryFrontierSearchV1,
-  "artifactId" | "schemaVersion" | "generatedAt" | "summary" | "methodAnchors" | "interpretation"
+  "artifactId" | "schemaVersion" | "generatedAt" | "scholarlyLookupRequests" | "summary" | "methodAnchors" | "interpretation"
 > & {
   generatedAt?: string;
+  scholarlyLookupRequests?: TheoryFrontierScholarlyLookupRequestV1[];
   summary?: Partial<TheoryFrontierSearchV1["summary"]>;
   methodAnchors?: readonly TheoryFrontierMethodAnchorV1[];
 };
@@ -99,6 +116,35 @@ function countStatuses(candidates: TheoryFrontierCandidateV1[]): Record<string, 
     counts[candidate.status] = (counts[candidate.status] ?? 0) + 1;
     return counts;
   }, {});
+}
+
+function validateScholarlyLookupRequests(value: unknown, issues: string[]): void {
+  if (!Array.isArray(value)) {
+    issues.push("scholarlyLookupRequests must be an array");
+    return;
+  }
+  for (const [index, request] of value.entries()) {
+    const prefix = `scholarlyLookupRequests[${index}]`;
+    if (!isRecord(request)) {
+      issues.push(`${prefix} must be an object`);
+      continue;
+    }
+    for (const field of ["requestId", "candidateId", "query", "reason"] as const) {
+      if (!isNonEmptyString(request[field])) issues.push(`${prefix}.${field} must be a non-empty string`);
+    }
+    if (request.targetSource !== "scholarly_research") {
+      issues.push(`${prefix}.targetSource must be scholarly_research`);
+    }
+    for (const field of ["requestedOutputs", "badgeIds", "renderChunkIds", "semanticChunkIds"] as const) {
+      if (!Array.isArray(request[field]) || !request[field].every((item: unknown) => typeof item === "string")) {
+        issues.push(`${prefix}.${field} must be an array of strings`);
+      }
+    }
+    if (request.mutating !== false) issues.push(`${prefix}.mutating must be false`);
+    if (request.noAutoPromoteLiterature !== true) {
+      issues.push(`${prefix}.noAutoPromoteLiterature must be true`);
+    }
+  }
 }
 
 export function buildTheoryFrontierSearchV1(input: BuildTheoryFrontierSearchV1Input): TheoryFrontierSearchV1 {
@@ -130,6 +176,7 @@ export function buildTheoryFrontierSearchV1(input: BuildTheoryFrontierSearchV1In
     scoringVersion: input.scoringVersion,
     verifierVersion: input.verifierVersion,
     candidates: input.candidates,
+    scholarlyLookupRequests: input.scholarlyLookupRequests ?? [],
     probabilityTerrain: input.probabilityTerrain,
     summary,
     methodAnchors: input.methodAnchors ?? THEORY_FRONTIER_METHOD_ANCHORS_V1,
@@ -177,6 +224,8 @@ export function validateTheoryFrontierSearchV1(value: unknown): string[] {
       }
     }
   }
+
+  validateScholarlyLookupRequests(value.scholarlyLookupRequests, issues);
 
   for (const issue of validateProbabilityTerrainV1(value.probabilityTerrain)) {
     issues.push(`probabilityTerrain.${issue}`);

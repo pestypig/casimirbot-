@@ -182,7 +182,11 @@ const dispatchIssues = (
       issues.push(`${field}[${index}].kind must be a non-empty string`);
       return;
     }
-    if (action.kind === "log_receipt" && isNonEmptyString(action.receiptRef)) {
+    if (
+      action.kind === "log_receipt" &&
+      isNonEmptyString(action.receiptRef) &&
+      action.receiptRef === receipt.receiptId
+    ) {
       logReceiptFound = true;
     }
     if (receipt.status === "blocked") {
@@ -198,7 +202,7 @@ const dispatchIssues = (
       }
     }
   });
-  if (!logReceiptFound) issues.push(`${field} must include a log_receipt action with receiptRef`);
+  if (!logReceiptFound) issues.push(`${field} must include a log_receipt action with receiptRef matching receiptId`);
   if (blockedMutationFound) issues.push(`${field} must not include mutating control dispatch while blocked`);
   if (receipt.status === "prepared" && !preparedControlDispatchFound(receipt, value)) {
     issues.push(`${field} must include prepared ${receipt.controlKind} dispatch`);
@@ -434,6 +438,13 @@ export function validateWorkstationControlReceiptV1(value: WorkstationControlRec
   if (!isNonEmptyString(value.goalContextUpdateId)) issues.push("goalContextUpdateId must be a non-empty string");
   if (Array.isArray(value.evidenceRefs) && isNonEmptyString(value.receiptId) && !value.evidenceRefs.includes(value.receiptId)) {
     issues.push("evidenceRefs must include receiptId");
+  }
+  if (
+    Array.isArray(value.evidenceRefs) &&
+    isNonEmptyString(value.goalContextUpdateId) &&
+    !value.evidenceRefs.includes(value.goalContextUpdateId)
+  ) {
+    issues.push("evidenceRefs must include goalContextUpdateId");
   }
   if (Array.isArray(value.producedRefs) && isNonEmptyString(value.receiptId) && !value.producedRefs.includes(value.receiptId)) {
     issues.push("producedRefs must include receiptId");

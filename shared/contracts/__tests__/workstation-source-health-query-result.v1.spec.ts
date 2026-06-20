@@ -35,6 +35,7 @@ const resultFixture = (
   overrides: Partial<WorkstationSourceHealthQueryResultV1> = {},
 ): WorkstationSourceHealthQueryResultV1 => {
   const capability = capabilityFixture();
+  const goalContextUpdateId = overrides.goalContextUpdateId ?? "stage_play_goal_context_update:source_health:frog";
   const agentGoalSession: AgentGoalSessionV1 = {
     schemaVersion: WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
     goalId: "goal:frog",
@@ -98,6 +99,7 @@ const resultFixture = (
       "workstation_actuator:query_source_health",
     ],
     evidenceRefs: [
+      goalContextUpdateId,
       "stage_play_source_health:frog",
       "visual_source:image-lens",
       "context_feed:source_health",
@@ -119,7 +121,7 @@ const resultFixture = (
     matchedAllowedActuators: ["query_source_health"],
     matchedAllowedActuatorRefs: ["agent_goal_allowed_actuator:query_source_health"],
     agentGoalSession,
-    goalContextUpdateId: "stage_play_goal_context_update:source_health:frog",
+    goalContextUpdateId,
     terminalAuthority: {
       status: "not_terminal",
       finalAnswerEligible: false,
@@ -162,6 +164,7 @@ describe("helix.situation_source_capability_read.v1", () => {
         "workstation_actuator:query_source_health",
       ],
       evidenceRefs: [
+        "stage_play_goal_context_update:source_health:frog",
         "stage_play_source_health:frog",
         "helix-ask:desktop",
         "context_feed:source_health",
@@ -204,6 +207,23 @@ describe("helix.situation_source_capability_read.v1", () => {
   });
 
   it("rejects source-health reads without compact source, loop, evidence, or freshness proof", () => {
+    expect(validateWorkstationSourceHealthQueryResultV1(resultFixture({
+      evidenceRefs: [
+        "stage_play_source_health:frog",
+        "visual_source:image-lens",
+        "context_feed:source_health",
+        "allowed_actuator:query_source_health",
+        "feed:source-health",
+        "agent_goal_context_feed:feed:source-health",
+        "agent_goal_allowed_actuator:query_source_health",
+        "source_health:visual_source:image-lens",
+        "workstation_context_feed:source_health",
+        "workstation_actuator:query_source_health",
+      ],
+    }))).toEqual(expect.arrayContaining([
+      "evidenceRefs must include goalContextUpdateId",
+    ]));
+
     expect(validateWorkstationSourceHealthQueryResultV1(resultFixture({
       sourceRefs: [],
       loopRefs: ["source_health:visual_source:image-lens"],

@@ -2067,6 +2067,16 @@ describe("Helix terminal authority single writer", () => {
 
     expect(result.selected_terminal_artifact_kind).toBe("model_synthesized_answer");
     expect(result.visible_text).toBe(draftText);
+    expect(payload.model_synthesized_answer).toMatchObject({
+      schema: "helix.model_synthesized_answer.v1",
+      support_refs: [workspaceObservationRef, docsObservationRef],
+      support_refs_count: 2,
+      subgoal_observation_refs: [workspaceObservationRef, docsObservationRef],
+      subgoal_observation_refs_count: 2,
+      source_families: ["workspace_diagnostic", "docs_viewer"],
+      model_step_capability: "model.synthesize_from_compound_subgoal_observations",
+      final_answer_draft_ref: `${turnId}:final_answer_draft`,
+    });
     expect(payload.compound_subgoal_draft_support_coverage).toMatchObject({
       applies: true,
       ok: true,
@@ -2249,6 +2259,14 @@ describe("Helix terminal authority single writer", () => {
 
     expect(result.selected_terminal_artifact_kind).toBe("model_synthesized_answer");
     expect(result.source).toBe("final_answer_draft");
+    expect(payload.model_synthesized_answer).toMatchObject({
+      schema: "helix.model_synthesized_answer.v1",
+      support_refs: expect.arrayContaining([workspaceObservationRef, calculatorReceiptRef]),
+      subgoal_observation_refs: [workspaceObservationRef, workstationEvaluationRef],
+      subgoal_observation_refs_count: 2,
+      source_families: ["workspace_diagnostic", "calculator"],
+      model_step_capability: "model.synthesize_from_compound_subgoal_observations",
+    });
     expect(payload.compound_subgoal_draft_support_coverage).toMatchObject({
       applies: true,
       ok: true,

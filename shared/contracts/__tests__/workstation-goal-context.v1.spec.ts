@@ -160,8 +160,19 @@ describe("workstation goal context contract", () => {
     sourceRefs: ["live-answer:translation", "live_answer"],
     loopRefs: ["narrator:say", "thread:helix-ask:desktop", "workstation_context_feed:narrator_events", "workstation_actuator:narrator_say"],
     policyEvidenceRefs: ["allowed_actuator:narrator_say", "agent_goal_allowed_actuator:narrator_say"],
+    dispatch: [
+      { kind: "log_receipt", receiptRef: "helix:narrator:say:1" },
+      { kind: "update_panel", panelId: "narrator" },
+      { kind: "speak_narrator", mode: "confirm" },
+    ],
+    suggestedDispatch: [
+      { kind: "log_receipt", receiptRef: "helix:narrator:say:1" },
+      { kind: "update_panel", panelId: "narrator" },
+      { kind: "speak_narrator", mode: "confirm" },
+    ],
     evidenceRefs: [
       "helix:narrator:say:1",
+      "stage_play_goal_context_update:narrator:say",
       "translation_segment:latest",
       "allowed_actuator:narrator_say",
       "agent_goal_allowed_actuator:narrator_say",
@@ -203,8 +214,29 @@ describe("workstation goal context contract", () => {
     sourceRefs: ["source:browser-audio", "translated_transcript"],
     loopRefs: ["narrator:bind_stream", "thread:helix-ask:desktop", "workstation_context_feed:narrator_events", "workstation_actuator:narrator_bind_stream"],
     policyEvidenceRefs: ["allowed_actuator:narrator_bind_stream", "agent_goal_allowed_actuator:narrator_bind_stream"],
+    dispatch: [
+      { kind: "log_receipt", receiptRef: "helix:narrator:bind:1" },
+      { kind: "update_panel", panelId: "narrator" },
+      {
+        kind: "bind_narrator_stream",
+        sourceRef: "source:browser-audio",
+        streamKind: "translated_transcript",
+        deliveryMode: "visible_only",
+      },
+    ],
+    suggestedDispatch: [
+      { kind: "log_receipt", receiptRef: "helix:narrator:bind:1" },
+      { kind: "update_panel", panelId: "narrator" },
+      {
+        kind: "bind_narrator_stream",
+        sourceRef: "source:browser-audio",
+        streamKind: "translated_transcript",
+        deliveryMode: "visible_only",
+      },
+    ],
     evidenceRefs: [
       "helix:narrator:bind:1",
+      "stage_play_goal_context_update:narrator:bind",
       "source:browser-audio",
       "translated_transcript",
       "allowed_actuator:narrator_bind_stream",
@@ -378,6 +410,7 @@ describe("workstation goal context contract", () => {
     expect(validateWorkstationGoalContextUpdateV1({
       ...update,
       sourceRefs: [],
+      loopRefs: [],
       evidenceRefs: [],
       freshness: {
         observedAtMs: 0,
@@ -386,6 +419,7 @@ describe("workstation goal context contract", () => {
       },
     })).toEqual(expect.arrayContaining([
       "sourceRefs must include at least one reference",
+      "loopRefs must include at least one reference",
       "evidenceRefs must include at least one reference",
       "evidenceRefs must include contentRef",
       "freshness.observedAtMs must be a positive timestamp",
@@ -499,6 +533,20 @@ describe("workstation goal context contract", () => {
 
   it("accepts durable goal sessions with explicit context feeds and actuators", () => {
     expect(validateAgentGoalSessionV1(goal)).toEqual([]);
+    expect(goal.authority.finalReportRequirements.prohibitedReportSources).toEqual(expect.arrayContaining([
+      "goal_context_update",
+      "tool_receipt",
+      "workstation_control_receipt",
+      "panel_projection",
+      "live_answer_projection",
+      "microdeck_output",
+      "narrator_event",
+      "narrator_binding",
+      "interrupt_dispatch",
+      "wake_request",
+      "wake_result",
+      "actuator_ref",
+    ]));
   });
 
   it("accepts the complete query and actuator vocabulary for durable goal sessions", () => {
@@ -675,9 +723,103 @@ describe("workstation goal context contract", () => {
     ]));
   });
 
+  it("rejects goal sessions that omit default workstation observation source bans", () => {
+    expect(validateAgentGoalSessionV1({
+      ...goal,
+      authority: {
+        assistantAnswer: false,
+        finalReportsRequireTerminalAuthority: true,
+        finalReportRequirements: {
+          ...WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
+          prohibitedReportSources: ["tool_receipt"],
+        },
+      },
+    })).toEqual(expect.arrayContaining([
+      "authority.finalReportRequirements.prohibitedReportSources must include default workstation observation source bans",
+    ]));
+  });
+
+  it("rejects goal sessions that allow observation artifacts as terminal report artifacts", () => {
+    expect(validateAgentGoalSessionV1({
+      ...goal,
+      authority: {
+        assistantAnswer: false,
+        finalReportsRequireTerminalAuthority: true,
+        finalReportRequirements: {
+          ...WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
+          allowedTerminalArtifactKinds: ["final_answer", "microdeck_output"],
+        },
+      },
+    })).toEqual(expect.arrayContaining([
+      "authority.finalReportRequirements.allowedTerminalArtifactKinds may only include default terminal artifact kinds",
+    ]));
+  });
+
+  it("rejects goal sessions that omit default final-report evidence requirements", () => {
+    expect(validateAgentGoalSessionV1({
+      ...goal,
+      authority: {
+        assistantAnswer: false,
+        finalReportsRequireTerminalAuthority: true,
+        finalReportRequirements: {
+          ...WORKSTATION_AGENT_GOAL_DEFAULT_FINAL_REPORT_REQUIREMENTS,
+          requiredEvidenceKinds: ["goal_context_update"],
+        },
+      },
+    })).toEqual(expect.arrayContaining([
+      "authority.finalReportRequirements.requiredEvidenceKinds must include default workstation final-report evidence requirements",
+    ]));
+  });
+
   it("accepts narrator control request artifacts as non-terminal workstation observations", () => {
     expect(validateNarratorSayRequestV1(narratorSayRequest)).toEqual([]);
     expect(validateNarratorBindStreamRequestV1(narratorBindStreamRequest)).toEqual([]);
+  });
+
+  it("requires narrator request dispatch logs to point at the validated request", () => {
+    expect(validateNarratorSayRequestV1({
+      ...narratorSayRequest,
+      dispatch: [
+        { kind: "log_receipt", receiptRef: "helix:narrator:say:other" },
+        { kind: "update_panel", panelId: "narrator" },
+        { kind: "speak_narrator", mode: "confirm" },
+      ],
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: "helix:narrator:say:other" },
+        { kind: "update_panel", panelId: "narrator" },
+        { kind: "speak_narrator", mode: "confirm" },
+      ],
+    })).toEqual(expect.arrayContaining([
+      "dispatch must include a log_receipt action with receiptRef matching requestId",
+      "suggestedDispatch must include a log_receipt action with receiptRef matching requestId",
+    ]));
+
+    expect(validateNarratorBindStreamRequestV1({
+      ...narratorBindStreamRequest,
+      dispatch: [
+        { kind: "log_receipt", receiptRef: "helix:narrator:bind:other" },
+        { kind: "update_panel", panelId: "narrator" },
+        {
+          kind: "bind_narrator_stream",
+          sourceRef: "source:browser-audio",
+          streamKind: "translated_transcript",
+          deliveryMode: "visible_only",
+        },
+      ],
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: "helix:narrator:bind:other" },
+        { kind: "update_panel", panelId: "narrator" },
+        {
+          kind: "bind_narrator_stream",
+          sourceRef: "source:browser-audio",
+          streamKind: "translated_transcript",
+          deliveryMode: "visible_only",
+        },
+      ],
+    })).toEqual(expect.arrayContaining([
+      "dispatch must include a log_receipt action with receiptRef matching requestId",
+      "suggestedDispatch must include a log_receipt action with receiptRef matching requestId",
+    ]));
   });
 
   it("requires narrator goal-session artifacts to expose exact matched actuator policy provenance", () => {
@@ -709,6 +851,20 @@ describe("workstation goal context contract", () => {
   });
 
   it("rejects narrator requests whose evidence omits policy, source, or loop proof refs", () => {
+    expect(validateNarratorSayRequestV1({
+      ...narratorSayRequest,
+      evidenceRefs: narratorSayRequest.evidenceRefs.filter((ref) => ref !== narratorSayRequest.goalContextUpdateId),
+    })).toEqual(expect.arrayContaining([
+      "evidenceRefs must include goalContextUpdateId",
+    ]));
+
+    expect(validateNarratorBindStreamRequestV1({
+      ...narratorBindStreamRequest,
+      evidenceRefs: narratorBindStreamRequest.evidenceRefs.filter((ref) => ref !== narratorBindStreamRequest.goalContextUpdateId),
+    })).toEqual(expect.arrayContaining([
+      "evidenceRefs must include goalContextUpdateId",
+    ]));
+
     expect(validateNarratorSayRequestV1({
       ...narratorSayRequest,
       loopRefs: ["thread:helix-ask:desktop"],
@@ -760,6 +916,7 @@ describe("workstation goal context contract", () => {
       "loopRefs must include at least one reference",
       "producedRefs must include at least one reference",
       "evidenceRefs must include requestId",
+      "evidenceRefs must include goalContextUpdateId",
       "producedRefs must include goalContextUpdateId",
       "deliveryMode must be visible_only, confirm_to_speak, or auto_speak",
       "terminalAuthority.status must be not_terminal",

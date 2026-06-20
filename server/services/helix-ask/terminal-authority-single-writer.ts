@@ -54,6 +54,27 @@ const readString = (value: unknown): string | null =>
 
 const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
 
+const compoundTerminalSynthesisPolicyActive = (payload: Record<string, unknown>): boolean => {
+  const itinerary = readRecord(payload.capability_itinerary);
+  const contract =
+    readRecord(payload.compound_capability_contract) ??
+    readRecord(itinerary?.compound_capability_contract);
+  const synthesisReadiness = readRecord(payload.compound_capability_synthesis_readiness);
+  const executionState =
+    readRecord(payload.capability_itinerary_execution_state) ??
+    readRecord(itinerary?.execution_state);
+  const terminalCriteria = readRecord(itinerary?.terminal_success_criteria);
+  const subgoalCount = readArray(contract?.subgoals).length;
+  const ledgerCount = readArray(executionState?.compound_subgoal_ledger).length;
+  return (
+    subgoalCount > 1 ||
+    ledgerCount > 1 ||
+    readString(contract?.terminal_policy) === "synthesize_from_satisfied_subgoal_observations" ||
+    terminalCriteria?.compound_terminal_policy === "synthesize_from_satisfied_subgoal_observations" ||
+    synthesisReadiness?.applies === true
+  );
+};
+
 const isContextualToolReferenceSuppressed = (payload: Record<string, unknown>): boolean => {
   const capabilityPlan = readRecord(payload.capability_plan);
   const arbitration = readRecord(capabilityPlan?.capability_contract_arbitration);
@@ -2119,6 +2140,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const itineraryObservationCriteriaSatisfied = missingItineraryFamilies.length === 0;
   const acceptedObservationArtifacts = artifacts.filter(isAcceptedObservationPacket);
   const hasAcceptedObservation = acceptedObservationArtifacts.length > 0;
+  const compoundTerminalSynthesisActive = compoundTerminalSynthesisPolicyActive(input.payload);
   const latestDraftCandidateForStaleCheck = findLatestFinalAnswerDraftCandidate(artifacts);
   const materializedDraftRejectedForStaleObservation =
     draftMaterialization?.ok === true &&
@@ -2398,6 +2420,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const routeAllowsModelSynthesizedAnswer = routeContractAllowsTerminalKind(input.payload, "model_synthesized_answer");
   const deterministicReceiptFallbackCanSurface =
     Boolean(deterministicReceiptFallbackDraft) &&
+    !compoundTerminalSynthesisActive &&
     (
       routeContractAllowedTerminalKinds(input.payload).includes("tool_receipt") ||
       isStagePlayPostObservationSynthesisText(artifactText(deterministicReceiptFallbackDraft!.artifact))
@@ -2539,11 +2562,28 @@ export function applyHelixTerminalAuthoritySingleWriter(
     terminal: selectedWorkstationToolEvaluation,
     workstationTerminalMaterialized,
   });
+  const visualGoalArtifactSupersedesToolRailFailure =
+    Boolean(
+      selectedGoalArtifact &&
+      isVisualSituationTerminalKind(selectedGoalArtifact.kind) &&
+      goalAllowsTerminal &&
+      rawTerminalBlockingToolRailFailure &&
+      (
+        rawTerminalBlockingToolRailFailure.railFailureCode === "terminal_not_materialized" ||
+        rawTerminalBlockingToolRailFailure.firstBrokenRail === "terminal_materialization" ||
+        rawTerminalBlockingToolRailFailure.firstBrokenRail === "terminal_authority" ||
+        rawTerminalBlockingToolRailFailure.firstBrokenRail === "visible_projection" ||
+        rawTerminalBlockingToolRailFailure.repairTarget === "terminal_materializer" ||
+        rawTerminalBlockingToolRailFailure.repairTarget === "terminal_authority" ||
+        rawTerminalBlockingToolRailFailure.repairTarget === "presenter_boundary"
+      ),
+    );
   const terminalBlockingToolRailFailure =
     noteMutationDraftSupersedesToolRailFailure ||
     repoDraftSupersedesToolRailFailure ||
     compoundDraftSupersedesToolRailFailure ||
-    workstationTerminalSupersedesToolRailFailure
+    workstationTerminalSupersedesToolRailFailure ||
+    visualGoalArtifactSupersedesToolRailFailure
       ? null
       : rawTerminalBlockingToolRailFailure?.railFailureCode === "terminal_projection_mismatch" &&
     (

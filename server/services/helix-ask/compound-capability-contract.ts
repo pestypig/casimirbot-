@@ -21,6 +21,8 @@ export type HelixCompoundCapabilitySubgoal = {
   args_hint: RecordLike;
   required_observation_kinds: string[];
   required_terminal_kind: string;
+  contribution_role: string;
+  terminal_contribution_kind: string;
   allowed_substitutions: string[];
   status: "pending";
   mandatory: true;
@@ -146,6 +148,22 @@ const runtimeCapabilityForContract = (contract: ExplicitCapabilityContract): str
     ? contract.runtime_capability
     : contract.capability;
 
+const contributionRoleForContract = (contract: ExplicitCapabilityContract): string => {
+  if (contract.capability_family === "docs_viewer") return "document_evidence";
+  if (contract.capability_family === "calculator") return "numeric_result";
+  if (contract.capability_family === "internet_search" || contract.capability_family === "scholarly_research") {
+    return "retrieved_evidence";
+  }
+  if (contract.capability_family === "context_reflection" || contract.capability_family === "theory_locator") {
+    return "reflection";
+  }
+  if (contract.capability_family === "workspace_diagnostic") return "workspace_status";
+  if (contract.capability_family === "capability_catalog") return "capability_catalog";
+  if (contract.capability_family === "repo_code") return "repo_evidence";
+  if (contract.capability_family === "visual_capture") return "visual_evidence";
+  return contract.capability_family || "tool_observation";
+};
+
 const requiredObservationKindsForCompoundSubgoal = (
   contract: ExplicitCapabilityContract,
   subgoalCount: number,
@@ -181,6 +199,8 @@ export const buildHelixCompoundCapabilityContract = (input: {
       }),
       required_observation_kinds: requiredObservationKindsForCompoundSubgoal(contract, ordered.length),
       required_terminal_kind: contract.required_terminal_kind,
+      contribution_role: contributionRoleForContract(contract),
+      terminal_contribution_kind: contract.required_terminal_kind,
       allowed_substitutions: [...contract.allowed_substitutions],
       status: "pending",
       mandatory: true,

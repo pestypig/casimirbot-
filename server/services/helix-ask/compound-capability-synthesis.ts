@@ -17,8 +17,11 @@ export type HelixCompoundCapabilitySynthesisReadiness = {
   has_docs_subgoal: boolean;
   has_failed_subgoal: boolean;
   support_refs: string[];
-  goal_kind: "doc_evidence_synthesis" | undefined;
-  required_terminal_kind: "doc_evidence_synthesis_answer" | undefined;
+  subgoal_terminal_kinds: string[];
+  terminal_contribution_kinds: string[];
+  synthesis_terminal_kind: "doc_evidence_synthesis_answer" | "model_synthesized_answer" | undefined;
+  goal_kind: "doc_evidence_synthesis" | "compound_evidence_synthesis" | undefined;
+  required_terminal_kind: "doc_evidence_synthesis_answer" | "model_synthesized_answer" | undefined;
   assistant_answer: false;
   raw_content_included: false;
 };
@@ -60,6 +63,9 @@ const hasTerminalFinalAnswerDraft = (
       const text = readString(draft.text) ?? readString(draft.answer_text);
       if (!text) return false;
       const draftTerminalKind = readString(draft.required_terminal_kind) ?? readString(draft.terminal_artifact_kind);
+      if (requiredTerminalKind === "model_synthesized_answer") {
+        return !draftTerminalKind || draftTerminalKind === requiredTerminalKind;
+      }
       if (requiredTerminalKind) return draftTerminalKind === requiredTerminalKind;
       return !draftTerminalKind || draftTerminalKind === "model_synthesized_answer";
     });
@@ -112,6 +118,17 @@ const supportRefsFromArtifacts = (artifacts: ArtifactLike[]): string[] =>
     return id ? [id] : [];
   }));
 
+const terminalKindsFromSubgoals = (subgoals: unknown[]): string[] =>
+  unique(subgoals
+    .map(readRecord)
+    .map((subgoal) => readString(subgoal?.required_terminal_kind))
+    .filter((kind): kind is string => Boolean(kind)));
+
+const terminalContributionKindsFromLedger = (ledger: RecordLike[]): string[] =>
+  unique(ledger
+    .map((entry) => readString(entry.terminal_contribution_kind))
+    .filter((kind): kind is string => Boolean(kind)));
+
 export function resolveCompoundCapabilitySynthesisReadiness(input: {
   payload: RecordLike;
   capabilityItinerary?: unknown;
@@ -142,12 +159,23 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
   const applies = (state.applies === true || itineraryRequiresSynthesis) && (ledger.length > 1 || requiredFamilies.length > 1);
   const complete = applies && state.complete === true;
   const hasFailedSubgoal = ledger.some((entry) => readString(entry.satisfaction) === "failed" || readString(entry.rail_status) === "fail_closed");
+  const subgoalTerminalKinds = terminalKindsFromSubgoals(subgoals);
+  const terminalContributionKinds = terminalContributionKindsFromLedger(ledger);
   const hasDocsSubgoal = /docs-viewer\.locate_in_doc|docs-viewer\.summarize_doc|docs-viewer\.search_docs/i.test([
     capabilityText(ledger),
     capabilityText(subgoals),
     itineraryCapabilityText(itinerary),
   ].join(" "));
-  const requiredTerminalKind = hasDocsSubgoal ? "doc_evidence_synthesis_answer" : undefined;
+  const requiredTerminalKind = applies
+    ? hasDocsSubgoal
+      ? "doc_evidence_synthesis_answer"
+      : "model_synthesized_answer"
+    : undefined;
+  const synthesisTerminalKind = complete
+    ? hasDocsSubgoal
+      ? "doc_evidence_synthesis_answer"
+      : "model_synthesized_answer"
+    : undefined;
   const hasDraft = hasFinalAnswerDraft(input.payload, artifacts);
   const hasTerminalDraft = hasTerminalFinalAnswerDraft(input.payload, artifacts, requiredTerminalKind);
   const supportRefs = ledger.length > 0
@@ -162,7 +190,14 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
     has_docs_subgoal: hasDocsSubgoal,
     has_failed_subgoal: hasFailedSubgoal,
     support_refs: supportRefs,
-    goal_kind: hasDocsSubgoal ? "doc_evidence_synthesis" : undefined,
+    subgoal_terminal_kinds: subgoalTerminalKinds,
+    terminal_contribution_kinds: terminalContributionKinds.length > 0 ? terminalContributionKinds : subgoalTerminalKinds,
+    synthesis_terminal_kind: synthesisTerminalKind,
+    goal_kind: applies
+      ? hasDocsSubgoal
+        ? "doc_evidence_synthesis"
+        : "compound_evidence_synthesis"
+      : undefined,
     required_terminal_kind: requiredTerminalKind,
     assistant_answer: false,
     raw_content_included: false,

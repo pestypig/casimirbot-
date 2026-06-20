@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { resolveCompoundCapabilitySynthesisReadiness } from "../services/helix-ask/compound-capability-synthesis";
 import { buildHelixCompoundCapabilityContract } from "../services/helix-ask/compound-capability-contract";
+import { resolveAskCapabilityContractArbitration } from "../services/helix-ask/capability-contract-arbitration";
 
 describe("compound capability synthesis readiness", () => {
   it("requires synthesis when all compound subgoals are satisfied but no final draft exists", () => {
@@ -116,6 +117,63 @@ describe("compound capability synthesis readiness", () => {
     expect(readiness.support_refs).toEqual(["obs:scholarly", "obs:theory"]);
   });
 
+  it("requires model synthesis for non-doc heterogeneous compound observations", () => {
+    const readiness = resolveCompoundCapabilitySynthesisReadiness({
+      payload: {
+        capability_itinerary_execution_state: {
+          schema: "helix.capability_itinerary_execution_state.v1",
+          applies: true,
+          complete: true,
+          compound_subgoal_ledger: [
+            {
+              requested_capability: "internet_search.web_research",
+              executed_capability: "internet_search.web_research",
+              observation_kind: "internet_search_observation",
+              observation_ref: "obs:web",
+              satisfaction: "satisfied",
+              rail_status: "complete",
+              terminal_contribution_kind: "model_synthesized_answer",
+            },
+            {
+              requested_capability: "helix_ask.reflect_theory_context",
+              executed_capability: "helix_ask.reflect_theory_context",
+              observation_kind: "helix_theory_context_reflection_tool_receipt",
+              observation_ref: "obs:reflection",
+              satisfaction: "satisfied",
+              rail_status: "complete",
+              terminal_contribution_kind: "model_synthesized_answer",
+            },
+            {
+              requested_capability: "scientific-calculator.solve_expression",
+              executed_capability: "scientific-calculator.solve_expression",
+              observation_kind: "calculator_receipt",
+              observation_ref: "obs:calculator",
+              satisfaction: "satisfied",
+              rail_status: "complete",
+              terminal_contribution_kind: "workstation_tool_evaluation",
+            },
+          ],
+        },
+      },
+      artifacts: [],
+    });
+
+    expect(readiness).toMatchObject({
+      applies: true,
+      complete: true,
+      synthesis_required: true,
+      has_docs_subgoal: false,
+      goal_kind: "compound_evidence_synthesis",
+      required_terminal_kind: "model_synthesized_answer",
+      synthesis_terminal_kind: "model_synthesized_answer",
+    });
+    expect(readiness.support_refs).toEqual(["obs:web", "obs:reflection", "obs:calculator"]);
+    expect(readiness.terminal_contribution_kinds).toEqual([
+      "model_synthesized_answer",
+      "workstation_tool_evaluation",
+    ]);
+  });
+
   it("uses the runtime itinerary argument when the payload mirror is absent", () => {
     const turnId = "ask:test:runtime-itinerary-argument";
     const readiness = resolveCompoundCapabilitySynthesisReadiness({
@@ -225,5 +283,28 @@ describe("compound capability synthesis readiness", () => {
     ]);
     expect(contract?.subgoals[0]?.required_observation_kinds).toEqual(["capability_registry"]);
     expect(contract?.subgoals[0]?.required_terminal_kind).toBe("capability_help_summary");
+    expect(contract?.subgoals[0]?.contribution_role).toBe("capability_catalog");
+    expect(contract?.subgoals[0]?.terminal_contribution_kind).toBe("capability_help_summary");
+  });
+
+  it("makes explicit catalog prompts dominate repo fallback contracts", () => {
+    const arbitration = resolveAskCapabilityContractArbitration({
+      turnId: "ask:test:catalog-dominance",
+      promptText: "Call helix_ask.inspect_capability_catalog to list the tools available to Helix Ask.",
+      fallbackSourceTarget: "repo_code",
+      fallbackPlanFamily: "repo_code",
+      fallbackGoalKind: "repo_code_evidence_question",
+      fallbackRequiredTerminalKind: "repo_code_evidence_answer",
+    });
+
+    expect(arbitration).toMatchObject({
+      contract_state: "explicit_capability_command",
+      requested_capability: "helix_ask.inspect_capability_catalog",
+      selected_source_target: "runtime_evidence",
+      selected_plan_family: "capability_catalog",
+      canonical_goal_kind: "capability_help",
+      required_terminal_kind: "capability_help_summary",
+      route_metadata_demoted: false,
+    });
   });
 });

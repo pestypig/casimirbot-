@@ -224,6 +224,9 @@ export function validateWorkstationSourceHealthQueryResultV1(
   }
   if (Array.isArray(value.evidenceRefs)) {
     if (!value.evidenceRefs.includes(value.resultId)) issues.push("evidenceRefs must include resultId");
+    if (isNonEmptyString(value.goalContextUpdateId) && !value.evidenceRefs.includes(value.goalContextUpdateId)) {
+      issues.push("evidenceRefs must include goalContextUpdateId");
+    }
     if (Array.isArray(value.policyEvidenceRefs)) {
       for (const ref of value.policyEvidenceRefs) {
         if (!value.evidenceRefs.includes(ref)) {

@@ -8,8 +8,16 @@ import type {
   TheoryContextReflectionSource,
 } from "../contracts/theory-context-reflection.v1";
 import type { TheoryBadgeGraphV1 } from "../contracts/theory-badge-graph.v1";
+import type { TheoryFrontierCandidateV1 } from "../contracts/theory-frontier-candidate.v1";
+import type {
+  HelixScholarlyFullTextObservation,
+  HelixScholarlyResearchObservation,
+} from "../helix-scholarly-research-observation";
 import { buildTheoryContextExplanationPlan } from "./theory-context-explanation-plan";
 import { buildTheoryContextReflection } from "./theory-context-reflector";
+import { verifyTheoryFrontierCandidateExactContract } from "./theory-frontier-exact-verifier";
+import { buildTheoryFrontierLiteratureMapFromScholarlyObservations } from "./theory-frontier-literature-map";
+import { buildTheoryFrontierSearch } from "./theory-frontier-search";
 
 export type RunHelixTheoryContextReflectionToolInput = {
   graph: TheoryBadgeGraphV1;
@@ -24,6 +32,11 @@ export type RunHelixTheoryContextReflectionToolInput = {
   threadId?: string | null;
   turnId: string;
   buildExplanationPlan?: boolean;
+  buildFrontierSearch?: boolean;
+  frontierSearchSeed?: string;
+  buildFrontierLiteratureMap?: boolean;
+  scholarlyResearchObservation?: HelixScholarlyResearchObservation | null;
+  scholarlyFullTextObservation?: HelixScholarlyFullTextObservation | null;
   panelSync?: {
     requested: boolean;
     applied?: boolean;
@@ -32,6 +45,9 @@ export type RunHelixTheoryContextReflectionToolInput = {
     selectedLiveContextBlock?: boolean;
   };
 };
+
+const theoryFrontierRequested = (prompt: string): boolean =>
+  /\b(?:theory\s+frontier|frontier\s+seed|seed\s+finder|frontier\s+candidate|missing\s+intermediate\s+badges?|unresolved\s+semantic\s+regions?|in\s+between\s+(?:the\s+)?badges?|candidate\s+terrain|biome\s+fields?|probability\s+terrain|verified_frontier_yield_per_budget|frontier\s+projection)\b/i.test(prompt);
 
 export function runHelixTheoryContextReflectionTool(
   input: RunHelixTheoryContextReflectionToolInput,
@@ -54,6 +70,34 @@ export function runHelixTheoryContextReflectionTool(
         reflection: reflectionV1,
       })
     : null;
+  const shouldBuildFrontierSearch = input.buildFrontierSearch ?? theoryFrontierRequested(input.prompt);
+  const frontierSearchV1 = shouldBuildFrontierSearch
+      ? buildTheoryFrontierSearch({
+          graph: input.graph,
+          query: input.prompt,
+          searchSeed: input.frontierSearchSeed ?? `ask:${input.turnId}:theory-frontier`,
+          limit: input.limit,
+        })
+      : null;
+  const frontierExactVerificationResultsV1 =
+    frontierSearchV1?.candidates.map((candidate: TheoryFrontierCandidateV1) =>
+      verifyTheoryFrontierCandidateExactContract(candidate),
+    ) ?? [];
+  const shouldBuildFrontierLiteratureMap =
+    Boolean(frontierSearchV1) &&
+    (input.buildFrontierLiteratureMap ??
+      Boolean(input.scholarlyResearchObservation || input.scholarlyFullTextObservation));
+  const frontierLiteratureMapV1 =
+    frontierSearchV1 && shouldBuildFrontierLiteratureMap
+      ? buildTheoryFrontierLiteratureMapFromScholarlyObservations({
+          graph: input.graph,
+          query: input.prompt,
+          searchSeed: input.frontierSearchSeed ?? `ask:${input.turnId}:theory-frontier`,
+          candidates: frontierSearchV1.candidates,
+          researchObservation: input.scholarlyResearchObservation,
+          fullTextObservation: input.scholarlyFullTextObservation,
+        })
+      : null;
 
   return buildHelixTheoryContextReflectionToolReceiptV1({
     turnId: input.turnId,
@@ -62,6 +106,9 @@ export function runHelixTheoryContextReflectionTool(
     conversationContext: input.conversationContext ?? null,
     reflectionV1,
     explanationPlanV1,
+    frontierSearchV1,
+    frontierLiteratureMapV1,
+    frontierExactVerificationResultsV1,
     panelSync: {
       requested: input.panelSync?.requested ?? false,
       applied: input.panelSync?.applied ?? false,

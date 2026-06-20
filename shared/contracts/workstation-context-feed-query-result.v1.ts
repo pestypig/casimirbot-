@@ -1,6 +1,8 @@
 import {
   WORKSTATION_AGENT_GOAL_ACTUATORS,
   WORKSTATION_AGENT_GOAL_CONTEXT_FEED_KINDS,
+  WORKSTATION_GOAL_CONTEXT_PRODUCER_KINDS,
+  WORKSTATION_GOAL_CONTEXT_UPDATE_KINDS,
   queryActuatorForAgentGoalContextFeedV1,
   validateAgentGoalSessionV1,
   validateWorkstationGoalContextUpdateV1,
@@ -34,6 +36,7 @@ export type WorkstationContextFeedPacketCircuitRefV1 = {
   transcriptRefs: string[];
   projectionRefs: string[];
   sourceHealthRefs: string[];
+  actuatorRefs: string[];
   traceMemoryRefs: string[];
   narratorRefs: string[];
   routeWatchRefs: string[];
@@ -42,6 +45,7 @@ export type WorkstationContextFeedPacketCircuitRefV1 = {
   freshnessStatus: WorkstationGoalContextUpdateV1["freshness"]["status"];
   assistant_answer: false;
   terminal_eligible: false;
+  raw_content_included: false;
 };
 
 export type WorkstationContextFeedQueryResultV1 = {
@@ -134,8 +138,8 @@ const feedUpdateLanes: Readonly<Record<AgentGoalContextFeedKindV1, {
     updateKinds: ["suggested_action", "automation_status", "route_evidence"],
   },
   packet_traces: {
-    producerKinds: ["visual_capture", "audio_capture", "transcription_loop", "translation_loop", "microdeck", "route_watch"],
-    updateKinds: ["visual_observation", "transcript_window", "translated_transcript", "classification", "route_evidence", "suggested_action", "error"],
+    producerKinds: WORKSTATION_GOAL_CONTEXT_PRODUCER_KINDS,
+    updateKinds: WORKSTATION_GOAL_CONTEXT_UPDATE_KINDS,
   },
   route_evidence: {
     producerKinds: ["route_watch", "automation"],
@@ -217,6 +221,7 @@ const packetCircuitRefIssues = (
     issues.push(...stringArrayIssues(entry.transcriptRefs, `packetCircuitRefs[${index}].transcriptRefs`));
     issues.push(...stringArrayIssues(entry.projectionRefs, `packetCircuitRefs[${index}].projectionRefs`));
     issues.push(...stringArrayIssues(entry.sourceHealthRefs, `packetCircuitRefs[${index}].sourceHealthRefs`));
+    issues.push(...stringArrayIssues(entry.actuatorRefs, `packetCircuitRefs[${index}].actuatorRefs`));
     issues.push(...stringArrayIssues(entry.traceMemoryRefs, `packetCircuitRefs[${index}].traceMemoryRefs`));
     issues.push(...stringArrayIssues(entry.narratorRefs, `packetCircuitRefs[${index}].narratorRefs`));
     issues.push(...stringArrayIssues(entry.routeWatchRefs, `packetCircuitRefs[${index}].routeWatchRefs`));
@@ -224,6 +229,7 @@ const packetCircuitRefIssues = (
     issues.push(...stringArrayIssues(entry.receiptRefs, `packetCircuitRefs[${index}].receiptRefs`));
     if (entry.assistant_answer !== false) issues.push(`packetCircuitRefs[${index}].assistant_answer must be false`);
     if (entry.terminal_eligible !== false) issues.push(`packetCircuitRefs[${index}].terminal_eligible must be false`);
+    if (entry.raw_content_included !== false) issues.push(`packetCircuitRefs[${index}].raw_content_included must be false`);
   });
   return issues;
 };
@@ -620,6 +626,13 @@ export function validateWorkstationContextFeedQueryResultV1(
     }
   }
   if (!isNonEmptyString(value.goalContextUpdateId)) issues.push("goalContextUpdateId must be a non-empty string");
+  if (
+    isNonEmptyString(value.goalContextUpdateId) &&
+    Array.isArray(value.evidenceRefs) &&
+    !value.evidenceRefs.includes(value.goalContextUpdateId)
+  ) {
+    issues.push("evidenceRefs must include goalContextUpdateId");
+  }
   issues.push(...terminalAuthorityIssues(value.terminalAuthority));
   if (value.post_tool_model_step_required !== true) issues.push("post_tool_model_step_required must be true");
   if (value.assistant_answer !== false) issues.push("assistant_answer must be false");

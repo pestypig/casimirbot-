@@ -78,6 +78,7 @@
     "precompute:lattice": "tsx scripts/precompute-lattice.ts",
     "math:validate": "tsx scripts/validate-math-stage.ts",
     "math:report": "tsx scripts/math-report.ts",
+    "formal:lean:check": "cd formal/lean && lake build",
     "math:trace": "tsx scripts/math-trace.ts",
     "math:congruence:check": "tsx scripts/math-congruence-citation-check.ts",
     "math:congruence:check:strict": "tsx scripts/math-congruence-citation-check.ts --strict",

@@ -16,6 +16,7 @@ const receiptFixture = (
   const fixtureRequiredActuator = overrides.requiredActuator ?? "change_preset";
   const fixtureControlKind = overrides.controlKind ?? "change_preset";
   const fixtureMatchedAllowedActuators = overrides.actuatorAllowed === false ? [] : [fixtureRequiredActuator];
+  const fixtureGoalContextUpdateId = overrides.goalContextUpdateId ?? "stage_play_goal_context_update:control:frog";
   const agentGoalSession: AgentGoalSessionV1 = {
     schemaVersion: WORKSTATION_AGENT_GOAL_SESSION_SCHEMA,
     goalId: "goal:frog",
@@ -70,6 +71,7 @@ const receiptFixture = (
   sourceRefs: ["visual_source:image-lens", "source:visual:active"],
   loopRefs: ["helix-ask:desktop", "workstation_control:change_preset", "workstation_actuator:change_preset"],
   evidenceRefs: [
+    fixtureGoalContextUpdateId,
     "stage_play_workstation_control_receipt:change_preset:frog",
     "allowed_actuator:change_preset",
     "agent_goal_allowed_actuator:change_preset",
@@ -81,7 +83,7 @@ const receiptFixture = (
   ],
   producedRefs: [
     "stage_play_workstation_control_receipt:change_preset:frog",
-    "stage_play_goal_context_update:control:frog",
+    fixtureGoalContextUpdateId,
   ],
   agentGoalSession,
   targetRef: "source:visual:active",
@@ -107,7 +109,7 @@ const receiptFixture = (
     { kind: "update_panel", panelId: "stage-play-badge-graph" },
     { kind: "change_preset", targetRef: "source:visual:active", presetId: "preset:frog-classifier" },
   ],
-  goalContextUpdateId: "stage_play_goal_context_update:control:frog",
+  goalContextUpdateId: fixtureGoalContextUpdateId,
   terminalAuthority: {
     status: "not_terminal",
     finalAnswerEligible: false,
@@ -144,6 +146,26 @@ describe("stage_play_workstation_control_receipt/v1", () => {
     expect(validateWorkstationControlReceiptV1(receipt)).toEqual(expect.arrayContaining([
       "dispatch must include prepared change_preset dispatch",
       "suggestedDispatch must include prepared change_preset dispatch",
+    ]));
+  });
+
+  it("requires dispatch receipt logs to point at the validated receipt", () => {
+    const receipt = receiptFixture({
+      dispatch: [
+        { kind: "log_receipt", receiptRef: "stage_play_workstation_control_receipt:other:frog" },
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+        { kind: "change_preset", targetRef: "source:visual:active", presetId: "preset:frog-classifier" },
+      ],
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: "stage_play_workstation_control_receipt:other:frog" },
+        { kind: "update_panel", panelId: "stage-play-badge-graph" },
+        { kind: "change_preset", targetRef: "source:visual:active", presetId: "preset:frog-classifier" },
+      ],
+    });
+
+    expect(validateWorkstationControlReceiptV1(receipt)).toEqual(expect.arrayContaining([
+      "dispatch must include a log_receipt action with receiptRef matching receiptId",
+      "suggestedDispatch must include a log_receipt action with receiptRef matching receiptId",
     ]));
   });
 
@@ -220,6 +242,21 @@ describe("stage_play_workstation_control_receipt/v1", () => {
 
   it("rejects control receipts whose evidence does not carry policy, source, and loop proof refs", () => {
     expect(validateWorkstationControlReceiptV1(receiptFixture({
+      evidenceRefs: [
+        "stage_play_workstation_control_receipt:change_preset:frog",
+        "allowed_actuator:change_preset",
+        "agent_goal_allowed_actuator:change_preset",
+        "visual_source:image-lens",
+        "source:visual:active",
+        "helix-ask:desktop",
+        "workstation_control:change_preset",
+        "workstation_actuator:change_preset",
+      ],
+    }))).toEqual(expect.arrayContaining([
+      "evidenceRefs must include goalContextUpdateId",
+    ]));
+
+    expect(validateWorkstationControlReceiptV1(receiptFixture({
       loopRefs: ["helix-ask:desktop"],
       evidenceRefs: [
         "stage_play_workstation_control_receipt:change_preset:frog",
@@ -259,6 +296,7 @@ describe("stage_play_workstation_control_receipt/v1", () => {
       sourceRefs: ["visual_source:image-lens", "packet:frog"],
       loopRefs: ["helix-ask:desktop", "workstation_control:focus_process_graph", "workstation_actuator:focus_process_graph"],
       evidenceRefs: [
+        "stage_play_goal_context_update:control:frog",
         "stage_play_workstation_control_receipt:focus_process_graph:frog",
         "allowed_actuator:focus_process_graph",
         "agent_goal_allowed_actuator:focus_process_graph",
@@ -315,6 +353,7 @@ describe("stage_play_workstation_control_receipt/v1", () => {
       presetId: null,
       loopRefs: ["helix-ask:desktop", "workstation_control:bind_source", "workstation_actuator:bind_source"],
       evidenceRefs: [
+        "stage_play_goal_context_update:control:frog",
         "stage_play_workstation_control_receipt:bind_source:frog",
         "allowed_actuator:bind_source",
         "agent_goal_allowed_actuator:bind_source",
@@ -385,6 +424,7 @@ describe("stage_play_workstation_control_receipt/v1", () => {
       loopState: "repaired",
       loopRefs: ["helix-ask:desktop", "workstation_control:repair_loop", "workstation_actuator:repair_loop"],
       evidenceRefs: [
+        "stage_play_goal_context_update:control:frog",
         "stage_play_workstation_control_receipt:repair_loop:frog",
         "allowed_actuator:repair_loop",
         "agent_goal_allowed_actuator:repair_loop",
@@ -429,6 +469,7 @@ describe("stage_play_workstation_control_receipt/v1", () => {
       loopState: "repaired",
       loopRefs: ["helix-ask:desktop", "workstation_control:repair_source", "workstation_actuator:repair_source"],
       evidenceRefs: [
+        "stage_play_goal_context_update:control:frog",
         "stage_play_workstation_control_receipt:repair_source:frog",
         "allowed_actuator:repair_source",
         "agent_goal_allowed_actuator:repair_source",

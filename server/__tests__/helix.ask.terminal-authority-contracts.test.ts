@@ -187,6 +187,51 @@ describe("Helix Ask terminal authority contracts", () => {
         text: "The feed query returned two visual summaries.",
       },
       {
+        terminalArtifactKind: "workstation_actuator_ref",
+        finalAnswerSource: "workstation_actuator_ref",
+        text: "The actuator ref points at the narrator binding control.",
+      },
+      {
+        terminalArtifactKind: "workstation_actuator_refs",
+        finalAnswerSource: "workstation_actuator_refs",
+        text: "Actuator refs list the live answer preset and narrator controls.",
+      },
+      {
+        terminalArtifactKind: "actuator_refs",
+        finalAnswerSource: "actuator_refs",
+        text: "Actuator refs show which controls packet traces may dispatch.",
+      },
+      {
+        terminalArtifactKind: "stage_play_workstation_actuator_refs",
+        finalAnswerSource: "stage_play_workstation_actuator_refs",
+        text: "Stage Play actuator refs show the panel controls attached to packet traffic.",
+      },
+      {
+        terminalArtifactKind: "interrupt_dispatch",
+        finalAnswerSource: "interrupt_dispatch",
+        text: "The interrupt dispatch says Ask should inspect the latest packet.",
+      },
+      {
+        terminalArtifactKind: "wake_request",
+        finalAnswerSource: "wake_request",
+        text: "The wake request says a visual packet should enter Ask.",
+      },
+      {
+        terminalArtifactKind: "stage_play_live_source_mail_wake_request",
+        finalAnswerSource: "stage_play_live_source_mail_wake_request",
+        text: "The Stage Play wake request queued a mailbox handoff.",
+      },
+      {
+        terminalArtifactKind: "stage_play_mail_wake_route_metadata",
+        finalAnswerSource: "stage_play_mail_wake_route_metadata",
+        text: "Route metadata attached the mailbox packet to an Ask handoff.",
+      },
+      {
+        terminalArtifactKind: "stage_play_mailbox_wake_result",
+        finalAnswerSource: "stage_play_mailbox_wake_result",
+        text: "The mailbox wake result completed the interrupt dispatch.",
+      },
+      {
         terminalArtifactKind: "stage_play_packet_trace_query_result.v1",
         finalAnswerSource: "stage_play_packet_trace_query_result",
         text: "Packet trace says the visual source arrived at a microdeck output.",

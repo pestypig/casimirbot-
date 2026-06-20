@@ -1823,6 +1823,15 @@ const buildCodexParityAgentSpineRailTable = (input: {
 
 const buildArtifactEntry = (artifact: RecordLike): RecordLike => {
   const payload = artifactPayload(artifact);
+  const payloadArtifactV1 = readRecord(payload?.artifact_v1);
+  const payloadArtifactAuthority = readRecord(payloadArtifactV1?.authority);
+  const replay = readRecord(payloadArtifactV1?.replay);
+  const nestedSources = readArray(payloadArtifactV1?.sources)
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry));
+  const nestedScholarlyLookupRequests = readArray(payloadArtifactV1?.scholarlyLookupRequests)
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry));
   const ref = artifactRef(artifact);
   const kind = readString(artifact.kind);
   const schema = readString(artifact.schema);
@@ -1843,6 +1852,42 @@ const buildArtifactEntry = (artifact: RecordLike): RecordLike => {
     readString(payload?.control_kind),
     readString(artifact.producer_item_id),
     readString(artifact.source_scope),
+    readString(payloadArtifactV1?.artifactId),
+    readString(payloadArtifactV1?.schemaVersion),
+    readString(payloadArtifactV1?.mapId),
+    readString(payloadArtifactV1?.searchId),
+    readString(payloadArtifactV1?.candidateId),
+    readString(payloadArtifactV1?.frontierKind),
+    readString(payloadArtifactV1?.status),
+    readString(payloadArtifactV1?.title),
+    readString(payloadArtifactV1?.graphHash),
+    readString(payloadArtifactV1?.graphId),
+    readString(payloadArtifactV1?.query),
+    readString(payloadArtifactV1?.searchSeed),
+    readString(payloadArtifactV1?.taxonomyVersion),
+    readString(payloadArtifactV1?.scoringVersion),
+    readString(payloadArtifactV1?.verifierVersion),
+    readString(replay?.graphHash),
+    readString(replay?.graphId),
+    readString(replay?.query),
+    readString(replay?.searchSeed),
+    readString(replay?.taxonomyVersion),
+    readString(replay?.scoringVersion),
+    readString(replay?.literatureMapVersion),
+    ...readStringArray(replay?.evidenceReferenceIds),
+    ...readStringArray(payloadArtifactV1?.frontierCandidateIds),
+    ...readStringArray(payloadArtifactV1?.badgeIds),
+    ...nestedScholarlyLookupRequests.flatMap((request) => [
+      readString(request.requestId),
+      readString(request.candidateId),
+      readString(request.targetSource),
+      readString(request.query),
+      ...readStringArray(request.requestedOutputs),
+      ...readStringArray(request.badgeIds),
+      ...readStringArray(request.renderChunkIds),
+      ...readStringArray(request.semanticChunkIds),
+    ]),
+    ...nestedSources.map((source) => readString(source.sourceId)),
   ]);
   return {
     ref,
@@ -1850,6 +1895,8 @@ const buildArtifactEntry = (artifact: RecordLike): RecordLike => {
     schema: schema || null,
     payload_kind: payloadKind || null,
     payload_schema: payloadSchema || null,
+    nested_artifact_id: readString(payloadArtifactV1?.artifactId) || null,
+    nested_schema_version: readString(payloadArtifactV1?.schemaVersion) || null,
     source_scope: readString(artifact.source_scope) || null,
     producer_item_id: readString(artifact.producer_item_id) || null,
     query_keys: queryKeys,
@@ -1858,8 +1905,8 @@ const buildArtifactEntry = (artifact: RecordLike): RecordLike => {
     terminal_eligible: false,
     raw_content_included: false,
     payload_authority_flags: {
-      assistant_answer: readBoolean(payload?.assistant_answer),
-      terminal_eligible: readBoolean(payload?.terminal_eligible),
+      assistant_answer: readBoolean(payload?.assistant_answer) || readBoolean(payloadArtifactAuthority?.assistant_answer),
+      terminal_eligible: readBoolean(payload?.terminal_eligible) || readBoolean(payloadArtifactAuthority?.terminal_eligible),
       raw_content_included: readBoolean(payload?.raw_content_included),
     },
   };
@@ -1891,6 +1938,8 @@ export const buildArtifactQueryIndex = (input: {
     observation_kind: readNullableString(entry.observation_kind),
     observation_ref: readNullableString(entry.observation_ref),
     satisfaction: readNullableString(entry.satisfaction),
+    contribution_role: readNullableString(entry.contribution_role),
+    terminal_contribution_kind: readNullableString(entry.terminal_contribution_kind),
     rail_status: readNullableString(entry.rail_status),
     rail_failure_code: readNullableString(entry.rail_failure_code),
     assistant_answer: false,

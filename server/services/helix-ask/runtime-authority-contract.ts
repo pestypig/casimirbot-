@@ -403,16 +403,29 @@ const repoEvidenceAnswerTerminalAllowed = (payload: Record<string, unknown>): bo
   return hasPostObservationModelDecision(payload);
 };
 
+const isVisualSituationTerminalKind = (kind: string | null): boolean =>
+  kind === "situation_context_pack" ||
+  kind === "visual_context_pack" ||
+  kind === "visual_frame_evidence";
+
+const goalRequiresVisualSituationTerminal = (
+  payload: Record<string, unknown>,
+  goal: Record<string, unknown> | null,
+): boolean => {
+  if (isVisualSituationTerminalKind(readString(payload.terminal_artifact_kind))) return true;
+  if (isVisualSituationTerminalKind(readString(payload.required_terminal_kind))) return true;
+  if (isVisualSituationTerminalKind(readString(goal?.required_terminal_kind))) return true;
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  if (isVisualSituationTerminalKind(readString(canonicalGoal?.required_terminal_kind))) return true;
+  const terminalContract = readRecord(goal?.terminal_contract);
+  return readArray(terminalContract?.required_terminal_kinds).some((kind) =>
+    isVisualSituationTerminalKind(readString(kind)),
+  );
+};
+
 const hasGoalSatisfyingVisualSituationEvidence = (payload: Record<string, unknown>): boolean => {
-  const terminalKind = readString(payload.terminal_artifact_kind);
-  if (
-    terminalKind !== "situation_context_pack" &&
-    terminalKind !== "visual_context_pack" &&
-    terminalKind !== "visual_frame_evidence"
-  ) {
-    return false;
-  }
   const goal = readRecord(payload.goal_satisfaction_evaluation);
+  if (!goalRequiresVisualSituationTerminal(payload, goal)) return false;
   if (readString(goal?.satisfaction) !== "satisfied" || readString(goal?.next_decision) !== "allow_terminal") {
     return false;
   }
@@ -610,13 +623,23 @@ export function hasAgentRuntimeLoopDecisionChain(payload: Record<string, unknown
       const record = readRecord(iteration);
       return Boolean(
         readString(record?.decision_id) ||
+          readString(record?.decision_ref) ||
           readString(record?.chosen_capability) ||
           readRecord(record?.agent_step_decision),
       );
     });
   }
   const decision = readRecord(payload.agent_step_decision);
-  return Boolean(readString(decision?.decision_id) || readString(decision?.chosen_capability));
+  if (readString(decision?.decision_id) || readString(decision?.chosen_capability)) return true;
+  const agentStepLoop = readRecord(payload.agent_step_loop);
+  return readArray(agentStepLoop?.steps).some((step) => {
+    const record = readRecord(step);
+    return Boolean(
+      readString(record?.decision_ref) ||
+        readString(record?.chosen_capability) ||
+        readString(record?.next_step),
+    );
+  });
 }
 
 export function hasSelectedCapabilityObservation(payload: Record<string, unknown>): boolean {

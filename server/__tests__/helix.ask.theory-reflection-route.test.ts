@@ -169,6 +169,56 @@ describe("Helix Ask theory reflection route", () => {
     );
   });
 
+  it("materializes frontier search candidates and exact verification as non-terminal ledger artifacts", async () => {
+    const app = createApp();
+
+    const response = await request(app)
+      .post("/api/agi/ask/turn")
+      .send({
+        question:
+          "Run the Theory Frontier Seed Finder for missing intermediate badges in the Theory Badge Graph. Keep it non-terminal evidence only.",
+        mode: "read",
+        debug: true,
+        sessionId: `theory-frontier-materialization-route-${Date.now()}`,
+      })
+      .expect(200);
+
+    const body = response.body;
+    const ledger = Array.isArray(body?.current_turn_artifact_ledger) ? body.current_turn_artifact_ledger : [];
+    const ledgerKinds = ledger.map((artifact: { kind?: string }) => artifact.kind);
+
+    expect(body?.route_reason_code).toBe("theory_context_reflection");
+    expect(body?.theory_context_reflection_tool_receipt?.frontierSearchV1?.artifactId).toBe("theory_frontier_search");
+    expect(body?.theory_context_reflection_tool_receipt?.frontierSearchV1?.candidates?.length).toBeGreaterThan(0);
+    expect(body?.theory_context_reflection_tool_receipt?.frontierExactVerificationResultsV1?.length).toBe(
+      body?.theory_context_reflection_tool_receipt?.frontierSearchV1?.candidates?.length,
+    );
+    expect(ledgerKinds).toEqual(expect.arrayContaining([
+      "helix_theory_context_reflection_tool_receipt",
+      "theory_frontier_search",
+      "theory_frontier_candidate",
+      "theory_frontier_exact_contract_verification",
+    ]));
+    expect(ledger).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "theory_frontier_candidate",
+        payload: expect.objectContaining({
+          assistant_answer: false,
+          raw_content_included: false,
+          terminal_eligible: false,
+        }),
+      }),
+      expect.objectContaining({
+        kind: "theory_frontier_exact_contract_verification",
+        payload: expect.objectContaining({
+          assistant_answer: false,
+          raw_content_included: false,
+          terminal_eligible: false,
+        }),
+      }),
+    ]));
+  });
+
   it("routes NHM2/QEI mapping prompts through reflection instead of direct answers", async () => {
     const app = createApp();
 

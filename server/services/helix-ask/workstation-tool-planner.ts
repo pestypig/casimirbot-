@@ -1291,7 +1291,7 @@ function hasContextualWorkstationGoalContextCue(prompt: string): boolean {
 const WORKSTATION_CONTROL_OBJECT_PATTERN =
   "(?:workstation\\s+presets?|presets?|sources?|source\\s+bindings?|source\\s+routes?|loops?|loop\\s+state|process\\s+loops?|live\\s+answer\\s+projection|live\\s+answer\\s+line|process\\s+graph(?:\\s+focus)?|stage\\s+play\\s+graph)";
 const WORKSTATION_CONTROL_TOOL_PATTERN =
-  "(?:live_env\\.)?(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|bind_source|unbind_workstation_source|unbind_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph)";
+  "(?:live_env\\.)?(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|bind_source|unbind_workstation_source|unbind_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|repair_source|update_live_answer_projection|focus_process_graph)";
 
 function hasContextualWorkstationControlCue(prompt: string): boolean {
   const object = WORKSTATION_CONTROL_OBJECT_PATTERN;
@@ -1306,9 +1306,10 @@ function hasContextualWorkstationControlCue(prompt: string): boolean {
 
 function selectWorkstationControlTool(prompt: string): WorkstationControlTool | null {
   if (hasContextualWorkstationControlCue(prompt)) return null;
-  const explicit = prompt.match(/\b(?:live_env\.)?(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|bind_source|unbind_workstation_source|unbind_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|update_live_answer_projection|focus_process_graph)\b/i)?.[0]?.toLowerCase().replace(/^live_env\./, "");
+  const explicit = prompt.match(/\b(?:live_env\.)?(?:change_workstation_preset|set_visual_preset|set_audio_preset|bind_workstation_source|bind_source|unbind_workstation_source|unbind_source|pause_workstation_loop|resume_workstation_loop|set_workstation_loop_state|repair_loop|repair_workstation_source|repair_source|update_live_answer_projection|focus_process_graph)\b/i)?.[0]?.toLowerCase().replace(/^live_env\./, "");
   if (explicit === "bind_source") return "live_env.bind_workstation_source";
   if (explicit === "unbind_source") return "live_env.unbind_workstation_source";
+  if (explicit === "repair_source") return "live_env.repair_workstation_source";
   if (explicit) return `live_env.${explicit}` as WorkstationControlTool;
   if (/\b(?:change|set|apply|switch)\b[\s\S]{0,120}\b(?:workstation\s+)?preset\b/i.test(prompt)) {
     if (/\b(?:audio|earbud|transcript|translation|speech|mic|microphone)\b/i.test(prompt)) {
@@ -1378,7 +1379,7 @@ function workstationControlMissingRequirements(toolId: WorkstationControlTool, a
     toolId === "live_env.set_workstation_loop_state" ||
     toolId === "live_env.repair_loop"
   ) return has("loop_ref") ? [] : ["loop_ref"];
-  if (toolId === "live_env.repair_workstation_source") return has("loop_ref") ? [] : ["loop_ref"];
+  if (toolId === "live_env.repair_workstation_source") return has("source_ref") || has("loop_ref") ? [] : ["source_ref|loop_ref"];
   if (toolId === "live_env.update_live_answer_projection") return has("line_key") ? [] : ["line_key"];
   if (toolId === "live_env.focus_process_graph") return has("node_ref") ? [] : ["node_ref"];
   return [];

@@ -1744,6 +1744,17 @@ describe("Helix Ask workstation tool planner", () => {
         },
       },
       {
+        prompt: "Run repair_source goal_id=goal:frog source_ref=source:visual:active",
+        turnId: "turn:repair-source-short-alias",
+        stepId: "repair_workstation_source",
+        toolId: "live_env.repair_workstation_source",
+        args: {
+          goal_id: "goal:frog",
+          source_ref: "source:visual:active",
+          state: "repaired",
+        },
+      },
+      {
         prompt: "Run live_env.update_live_answer_projection goal_id=goal:frog line_key=translation",
         turnId: "turn:update-live-answer",
         stepId: "update_live_answer_projection",

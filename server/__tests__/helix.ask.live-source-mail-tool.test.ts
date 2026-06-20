@@ -574,23 +574,74 @@ describe("live-source mail live environment tools", () => {
       ask_context_policy: "evidence_only",
     });
     expect(observation.summary).toMatch(/Found \d+ MicroDeck preset\(s\) and \d+ prompt\(s\)\./);
-    expect(observation.observation).toMatchObject({
+    const payload = observation.observation as any;
+    expect(payload).toMatchObject({
       schema: "stage_play_micro_reasoner_prompt_preset_query_result/v1",
       sourceId,
       source_id: sourceId,
       sourceIds: [sourceId],
       source_ids: [sourceId],
+      sourceRefs: [sourceId],
+      source_refs: [sourceId],
+      loopRefs: expect.arrayContaining([
+        "workstation_context_feed:microdeck_outputs",
+        "workstation_actuator:query_microdeck_outputs",
+        "microdeck:preset_state",
+        "microdeck:preset_query",
+      ]),
+      evidenceRefs: expect.arrayContaining([sourceId]),
+      producedRefs: expect.arrayContaining([
+        expect.stringMatching(/^stage_play_goal_context_update:microdeck:/),
+      ]),
+      goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:microdeck:/),
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      post_tool_model_step_required: true,
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
       context_role: "tool_evidence",
       ask_context_policy: "evidence_only",
     });
-    expect((observation.observation as any).presets.length).toBeGreaterThan(0);
-    expect((observation.observation as any).prompts.length).toBeGreaterThan(0);
+    expect(payload.presets.length).toBeGreaterThan(0);
+    expect(payload.prompts.length).toBeGreaterThan(0);
+    expect(payload.evidenceRefs).toContain(payload.goalContextUpdateId);
+    expect(payload.evidence_refs).toContain(payload.goalContextUpdateId);
+    expect(observation.producedRefs).toEqual(expect.arrayContaining([
+      payload.goalContextUpdateId,
+    ]));
     expect(observation.evidence_refs).toEqual(
-      expect.arrayContaining([sourceId]),
+      expect.arrayContaining([payload.goalContextUpdateId, sourceId]),
     );
+
+    const updates = listStagePlayGoalContextUpdates({
+      threadId,
+      producerKind: "microdeck",
+      updateKind: "preset_state",
+    });
+    expect(updates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        updateId: payload.goalContextUpdateId,
+        contentRef: expect.stringMatching(/^stage_play_micro_reasoner_prompt_tool_activity:/),
+        sourceRefs: [sourceId],
+        loopRefs: expect.arrayContaining([
+          "workstation_context_feed:microdeck_outputs",
+          "workstation_actuator:query_microdeck_outputs",
+          "microdeck:preset_state",
+          "microdeck:preset_query",
+        ]),
+        authority: {
+          assistantAnswer: false,
+          terminalEligible: false,
+          rawContentIncluded: false,
+          postToolModelStepRequired: true,
+        },
+      }),
+    ]));
   });
 
   it("records MicroDeck preset application as durable non-terminal goal context", () => {
@@ -621,12 +672,39 @@ describe("live-source mail live environment tools", () => {
       applied: true,
       reason: "applied",
       goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:microdeck:/),
+      sourceRefs: expect.arrayContaining([sourceId]),
+      loopRefs: expect.arrayContaining([
+        "workstation_context_feed:microdeck_outputs",
+        "workstation_actuator:query_microdeck_outputs",
+        "microdeck:preset_state",
+      ]),
+      evidenceRefs: expect.arrayContaining([
+        presetId,
+        sourceId,
+      ]),
+      producedRefs: expect.arrayContaining([
+        presetId,
+        expect.stringMatching(/^stage_play_goal_context_update:microdeck:/),
+      ]),
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      post_tool_model_step_required: true,
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
       context_role: "tool_evidence",
       ask_context_policy: "evidence_only",
     });
+    expect(payload.evidenceRefs).toContain(payload.goalContextUpdateId);
+    expect(payload.evidence_refs).toContain(payload.goalContextUpdateId);
+    expect(payload.producedRefs).toEqual(expect.arrayContaining([
+      presetId,
+      payload.goalContextUpdateId,
+    ]));
     expect(observation.producedRefs).toEqual(expect.arrayContaining([
       presetId,
       payload.goalContextUpdateId,
@@ -751,7 +829,8 @@ describe("live-source mail live environment tools", () => {
       context_role: "tool_evidence",
       ask_context_policy: "evidence_only",
     });
-    expect(observation.observation).toMatchObject({
+    const payload = observation.observation as any;
+    expect(payload).toMatchObject({
       artifactId: "stage_play_micro_reasoner_prompt_preset_draft",
       schema: "stage_play_micro_reasoner_prompt_preset_draft/v1",
       schemaVersion: "stage_play_micro_reasoner_prompt_preset_draft/v1",
@@ -767,14 +846,64 @@ describe("live-source mail live environment tools", () => {
           },
         },
       },
+      sourceRefs: [sourceId],
+      source_refs: [sourceId],
+      loopRefs: expect.arrayContaining([
+        "workstation_context_feed:microdeck_outputs",
+        "workstation_actuator:query_microdeck_outputs",
+        "microdeck:preset_draft",
+      ]),
+      evidenceRefs: expect.arrayContaining([sourceId]),
+      producedRefs: expect.arrayContaining([
+        expect.stringMatching(/^stage_play_micro_reasoner_prompt_preset_draft:/),
+        expect.stringMatching(/^stage_play_goal_context_update:microdeck:/),
+      ]),
+      goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:microdeck:/),
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      post_tool_model_step_required: true,
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
       context_role: "micro_reasoner_evidence",
       ask_context_policy: "evidence_only",
     });
-    expect((observation.observation as any).draft.candidatePrompts).toHaveLength(3);
-    expect(observation.producedRefs).toEqual([(observation.observation as any).draftId]);
+    expect(payload.draft.candidatePrompts).toHaveLength(3);
+    expect(payload.evidenceRefs).toContain(payload.goalContextUpdateId);
+    expect(payload.evidence_refs).toContain(payload.goalContextUpdateId);
+    expect(observation.producedRefs).toEqual([payload.draftId, payload.goalContextUpdateId]);
+    expect(observation.evidence_refs).toEqual(expect.arrayContaining([
+      payload.goalContextUpdateId,
+      payload.draftId,
+      sourceId,
+    ]));
+    const draftUpdates = listStagePlayGoalContextUpdates({
+      threadId,
+      producerKind: "microdeck",
+      updateKind: "suggested_action",
+    });
+    expect(draftUpdates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        updateId: payload.goalContextUpdateId,
+        contentRef: payload.draftId,
+        sourceRefs: [sourceId],
+        loopRefs: expect.arrayContaining([
+          "workstation_context_feed:microdeck_outputs",
+          "workstation_actuator:query_microdeck_outputs",
+          "microdeck:preset_draft",
+        ]),
+        authority: {
+          assistantAnswer: false,
+          terminalEligible: false,
+          rawContentIncluded: false,
+          postToolModelStepRequired: true,
+        },
+      }),
+    ]));
 
     const after = executeLiveEnvironmentTool({
       tool_name: "live_env.query_micro_reasoner_presets",
@@ -826,7 +955,64 @@ describe("live-source mail live environment tools", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
-    const preset = (create.observation as any).preset;
+    const createPayload = create.observation as any;
+    const preset = createPayload.preset;
+    expect(createPayload).toMatchObject({
+      schema: "stage_play_micro_reasoner_prompt_preset_create_response/v1",
+      created: true,
+      reason: "created_prompt_delegation_router",
+      sourceRefs: [sourceId],
+      source_refs: [sourceId],
+      loopRefs: expect.arrayContaining([
+        "workstation_context_feed:microdeck_outputs",
+        "workstation_actuator:query_microdeck_outputs",
+        "microdeck:preset_state",
+        "microdeck:preset_create",
+      ]),
+      evidenceRefs: expect.arrayContaining([sourceId]),
+      producedRefs: expect.arrayContaining([
+        expect.stringMatching(/^stage_play_micro_reasoner_prompt_preset:custom:/),
+        expect.stringMatching(/^stage_play_goal_context_update:microdeck:/),
+      ]),
+      goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:microdeck:/),
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(createPayload.evidenceRefs).toContain(createPayload.goalContextUpdateId);
+    expect(createPayload.evidence_refs).toContain(createPayload.goalContextUpdateId);
+    expect(create.producedRefs).toEqual(expect.arrayContaining([preset.presetId, createPayload.goalContextUpdateId]));
+    const createUpdates = listStagePlayGoalContextUpdates({
+      threadId,
+      producerKind: "microdeck",
+      updateKind: "preset_state",
+    });
+    expect(createUpdates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        updateId: createPayload.goalContextUpdateId,
+        contentRef: preset.presetId,
+        sourceRefs: [sourceId],
+        loopRefs: expect.arrayContaining([
+          "workstation_context_feed:microdeck_outputs",
+          "workstation_actuator:query_microdeck_outputs",
+          "microdeck:preset_state",
+          "microdeck:preset_create",
+        ]),
+        authority: {
+          assistantAnswer: false,
+          terminalEligible: false,
+          rawContentIncluded: false,
+          postToolModelStepRequired: true,
+        },
+      }),
+    ]));
     expect(preset).toMatchObject({
       deckRunPlan: "prompt_delegation_router",
       outputPolicy: "ask_prompt_delegation",
@@ -857,11 +1043,41 @@ describe("live-source mail live environment tools", () => {
       context_role: "tool_evidence",
       ask_context_policy: "evidence_only",
     });
-    expect(route.observation).toMatchObject({
+    const routePayload = route.observation as any;
+    expect(routePayload).toMatchObject({
       schema: "stage_play_micro_reasoner_prompt_delegation_result/v1",
       schemaVersion: "stage_play_micro_reasoner_prompt_delegation_result/v1",
       selectedCandidateId: "candidate_b",
       shouldHandoffToHelixAsk: true,
+      sourceRefs: [sourceId],
+      loopRefs: expect.arrayContaining([
+        "workstation_context_feed:microdeck_outputs",
+        "workstation_actuator:query_microdeck_outputs",
+        "microdeck:prompt_route",
+        `microdeck_preset:${preset.presetId}`,
+      ]),
+      evidenceRefs: expect.arrayContaining([
+        sourceId,
+        preset.presetId,
+        "candidate_b",
+      ]),
+      producedRefs: expect.arrayContaining([
+        expect.stringMatching(/^stage_play_micro_reasoner_prompt_delegation:/),
+        expect.stringMatching(/^stage_play_goal_context_update:microdeck:/),
+      ]),
+      suggestedDispatch: expect.arrayContaining([
+        expect.objectContaining({ kind: "log_receipt" }),
+        expect.objectContaining({ kind: "update_panel", panelId: "stage-play-badge-graph" }),
+        expect.objectContaining({ kind: "wake_agent", interruptKind: "policy_triggered" }),
+      ]),
+      goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:microdeck:/),
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      post_tool_model_step_required: true,
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
@@ -872,6 +1088,374 @@ describe("live-source mail live environment tools", () => {
         prompt: "Review the Minecraft visual capture for lava, mobs, low health, and urgent survival hazards.",
       },
     });
+    expect(routePayload.evidenceRefs).toContain(routePayload.goalContextUpdateId);
+    expect(routePayload.evidence_refs).toContain(routePayload.goalContextUpdateId);
+    expect(route.producedRefs).toEqual(expect.arrayContaining([
+      routePayload.delegationId,
+      routePayload.goalContextUpdateId,
+    ]));
+    const routeUpdates = listStagePlayGoalContextUpdates({
+      threadId,
+      producerKind: "microdeck",
+      updateKind: "route_evidence",
+    });
+    expect(routeUpdates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        updateId: routePayload.goalContextUpdateId,
+        contentRef: routePayload.delegationId,
+        sourceRefs: [sourceId],
+        loopRefs: expect.arrayContaining([
+          "workstation_context_feed:microdeck_outputs",
+          "workstation_actuator:query_microdeck_outputs",
+          "microdeck:prompt_route",
+          `microdeck_preset:${preset.presetId}`,
+        ]),
+        evidenceRefs: expect.arrayContaining([
+          routePayload.delegationId,
+          preset.presetId,
+          "candidate_b",
+          sourceId,
+        ]),
+        authority: {
+          assistantAnswer: false,
+          terminalEligible: false,
+          rawContentIncluded: false,
+          postToolModelStepRequired: true,
+        },
+      }),
+    ]));
+
+    const feedQuery = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_microdeck_outputs",
+      thread_id: threadId,
+      args: {
+        source_id: sourceId,
+      },
+    });
+    const feedPayload = feedQuery.observation as any;
+    expect(feedPayload).toMatchObject({
+      schema: "stage_play_workstation_context_feed_query_result/v1",
+      feedKind: "microdeck_outputs",
+      sourceRef: sourceId,
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(feedPayload.goalContextUpdates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        updateId: routePayload.goalContextUpdateId,
+        updateKind: "route_evidence",
+        suggestedDispatch: expect.arrayContaining([
+          expect.objectContaining({ kind: "wake_agent", interruptKind: "policy_triggered" }),
+        ]),
+        authority: {
+          assistantAnswer: false,
+          terminalEligible: false,
+          rawContentIncluded: false,
+          postToolModelStepRequired: true,
+        },
+      }),
+    ]));
+    expect(feedQuery.producedRefs).toEqual(expect.arrayContaining([
+      routePayload.goalContextUpdateId,
+    ]));
+  });
+
+  it("creates custom MicroDeck role presets as durable non-terminal goal context", () => {
+    const create = executeLiveEnvironmentTool({
+      tool_name: "live_env.create_micro_reasoner_preset",
+      thread_id: threadId,
+      args: {
+        source_id: sourceId,
+        title: "Frog Visual Classifier",
+        role: "observation_classifier",
+        template: "Classify visible frog morphology cues without claiming species authority.",
+        prompted_roles: ["observation_classifier"],
+      },
+    });
+
+    const payload = create.observation as any;
+    expect(create).toMatchObject({
+      tool_name: "live_env.create_micro_reasoner_preset",
+      ok: true,
+      assistant_answer: false,
+      raw_content_included: false,
+      context_role: "tool_evidence",
+      ask_context_policy: "evidence_only",
+    });
+    expect(payload).toMatchObject({
+      schema: "stage_play_micro_reasoner_prompt_preset_create_response/v1",
+      created: true,
+      reason: "created",
+      sourceRefs: [sourceId],
+      loopRefs: expect.arrayContaining([
+        "workstation_context_feed:microdeck_outputs",
+        "workstation_actuator:query_microdeck_outputs",
+        "microdeck:preset_state",
+        "microdeck:preset_create",
+        "microdeck_prompt:observation_classifier",
+      ]),
+      evidenceRefs: expect.arrayContaining([sourceId]),
+      producedRefs: expect.arrayContaining([
+        expect.stringMatching(/^stage_play_micro_reasoner_prompt_preset:custom:/),
+        expect.stringMatching(/^stage_play_micro_reasoner_prompt:custom:.*:observation_classifier:/),
+        expect.stringMatching(/^stage_play_goal_context_update:microdeck:/),
+      ]),
+      goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:microdeck:/),
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(payload.evidenceRefs).toContain(payload.goalContextUpdateId);
+    expect(payload.evidence_refs).toContain(payload.goalContextUpdateId);
+    expect(create.producedRefs).toEqual(expect.arrayContaining([
+      payload.preset.presetId,
+      payload.prompt.promptId,
+      payload.goalContextUpdateId,
+    ]));
+
+    const updates = listStagePlayGoalContextUpdates({
+      threadId,
+      producerKind: "microdeck",
+      updateKind: "preset_state",
+    });
+    expect(updates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        updateId: payload.goalContextUpdateId,
+        contentRef: payload.preset.presetId,
+        sourceRefs: [sourceId],
+        loopRefs: expect.arrayContaining([
+          "workstation_context_feed:microdeck_outputs",
+          "workstation_actuator:query_microdeck_outputs",
+          "microdeck:preset_create",
+          "microdeck_prompt:observation_classifier",
+        ]),
+        evidenceRefs: expect.arrayContaining([
+          payload.preset.presetId,
+          payload.prompt.promptId,
+          sourceId,
+        ]),
+        authority: {
+          assistantAnswer: false,
+          terminalEligible: false,
+          rawContentIncluded: false,
+          postToolModelStepRequired: true,
+        },
+      }),
+    ]));
+  });
+
+  it("records MicroDeck prompt query, update, and test results as durable non-terminal goal context", () => {
+    const query = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_micro_reasoner_prompts",
+      thread_id: threadId,
+      args: {
+        source_id: sourceId,
+        role: "observation_classifier",
+        limit: 5,
+      },
+    });
+    const queryPayload = query.observation as any;
+    expect(queryPayload).toMatchObject({
+      schema: "stage_play_micro_reasoner_prompt_query_result/v1",
+      sourceRefs: [sourceId],
+      loopRefs: expect.arrayContaining([
+        "workstation_context_feed:microdeck_outputs",
+        "workstation_actuator:query_microdeck_outputs",
+        "microdeck:preset_state",
+        "microdeck:prompt_query",
+      ]),
+      goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:microdeck:/),
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(queryPayload.evidenceRefs).toContain(queryPayload.goalContextUpdateId);
+
+    const update = executeLiveEnvironmentTool({
+      tool_name: "live_env.update_micro_reasoner_prompt",
+      thread_id: threadId,
+      args: {
+        source_id: sourceId,
+        role: "observation_classifier",
+        template: "Classify frog visual cues as bounded morphology evidence; do not claim species authority.",
+      },
+    });
+    const updatePayload = update.observation as any;
+    expect(updatePayload).toMatchObject({
+      schema: "stage_play_micro_reasoner_prompt_update_result/v1",
+      updated: true,
+      sourceRefs: [sourceId],
+      loopRefs: expect.arrayContaining([
+        "workstation_context_feed:microdeck_outputs",
+        "workstation_actuator:query_microdeck_outputs",
+        "microdeck:preset_state",
+        "microdeck:prompt_update",
+        "microdeck_prompt:observation_classifier",
+      ]),
+      producedRefs: expect.arrayContaining([
+        expect.stringMatching(/^stage_play_micro_reasoner_prompt:observation_classifier:/),
+        expect.stringMatching(/^stage_play_goal_context_update:microdeck:/),
+      ]),
+      goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:microdeck:/),
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(updatePayload.evidenceRefs).toContain(updatePayload.goalContextUpdateId);
+    expect(update.producedRefs).toEqual(expect.arrayContaining([
+      updatePayload.prompt.promptId,
+      updatePayload.goalContextUpdateId,
+    ]));
+
+    seedVisualSummaryText("ImageLens visual summary: green frog with visible toe pads.", "microdeck-prompt-test");
+    const promptTest = executeLiveEnvironmentTool({
+      tool_name: "live_env.test_micro_reasoner_prompt",
+      thread_id: threadId,
+      args: {
+        source_id: sourceId,
+        source_kind: "visual_frame",
+        role: "observation_classifier",
+        limit: 5,
+      },
+    });
+    const testPayload = promptTest.observation as any;
+    expect(testPayload).toMatchObject({
+      schema: "stage_play_micro_reasoner_prompt_test_result/v1",
+      activated: false,
+      sourceRefs: [sourceId],
+      loopRefs: expect.arrayContaining([
+        "workstation_context_feed:microdeck_outputs",
+        "workstation_actuator:query_microdeck_outputs",
+        "microdeck:prompt_test",
+        "microdeck_prompt:observation_classifier",
+      ]),
+      producedRefs: expect.arrayContaining([
+        expect.stringMatching(/^stage_play_micro_reasoner_prompt_test:/),
+        expect.stringMatching(/^stage_play_goal_context_update:microdeck:/),
+      ]),
+      goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:microdeck:/),
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(testPayload.evidenceRefs).toContain(testPayload.goalContextUpdateId);
+    expect(promptTest.producedRefs).toEqual(expect.arrayContaining([
+      testPayload.promptTestId,
+      testPayload.goalContextUpdateId,
+    ]));
+
+    const updates = listStagePlayGoalContextUpdates({
+      threadId,
+      producerKind: "microdeck",
+    });
+    expect(updates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        updateId: queryPayload.goalContextUpdateId,
+        updateKind: "preset_state",
+        sourceRefs: [sourceId],
+        authority: {
+          assistantAnswer: false,
+          terminalEligible: false,
+          rawContentIncluded: false,
+          postToolModelStepRequired: true,
+        },
+      }),
+      expect.objectContaining({
+        updateId: updatePayload.goalContextUpdateId,
+        updateKind: "preset_state",
+        contentRef: updatePayload.prompt.promptId,
+        sourceRefs: [sourceId],
+        loopRefs: expect.arrayContaining(["microdeck:prompt_update"]),
+        authority: {
+          assistantAnswer: false,
+          terminalEligible: false,
+          rawContentIncluded: false,
+          postToolModelStepRequired: true,
+        },
+      }),
+      expect.objectContaining({
+        updateId: testPayload.goalContextUpdateId,
+        updateKind: "reflection",
+        contentRef: testPayload.promptTestId,
+        sourceRefs: [sourceId],
+        loopRefs: expect.arrayContaining(["microdeck:prompt_test"]),
+        authority: {
+          assistantAnswer: false,
+          terminalEligible: false,
+          rawContentIncluded: false,
+          postToolModelStepRequired: true,
+        },
+      }),
+    ]));
+
+    const feedQuery = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_microdeck_outputs",
+      thread_id: threadId,
+      args: {
+        source_id: sourceId,
+      },
+    });
+    const feedPayload = feedQuery.observation as any;
+    expect(feedPayload).toMatchObject({
+      schema: "stage_play_workstation_context_feed_query_result/v1",
+      feedKind: "microdeck_outputs",
+      sourceRef: sourceId,
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      post_tool_model_step_required: true,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(feedPayload.goalContextUpdates).toEqual(expect.arrayContaining([
+      expect.objectContaining({ updateId: queryPayload.goalContextUpdateId, updateKind: "preset_state" }),
+      expect.objectContaining({ updateId: updatePayload.goalContextUpdateId, updateKind: "preset_state" }),
+      expect.objectContaining({ updateId: testPayload.goalContextUpdateId, updateKind: "reflection" }),
+    ]));
+    expect(feedQuery.producedRefs).toEqual(expect.arrayContaining([
+      queryPayload.goalContextUpdateId,
+      updatePayload.goalContextUpdateId,
+      testPayload.goalContextUpdateId,
+    ]));
   });
 
   it("routes wake-bound contract appender presets only into Ask handoff receipts", () => {
@@ -893,11 +1477,25 @@ describe("live-source mail live environment tools", () => {
       context_role: "tool_evidence",
       ask_context_policy: "evidence_only",
     });
-    expect(route.observation).toMatchObject({
+    const payload = route.observation as any;
+    expect(payload).toMatchObject({
       schema: "stage_play_micro_reasoner_prompt_delegation_result/v1",
       presetId: "stage_play_micro_reasoner_prompt_preset:wake-bound-contract-appender:v1",
       selectedCandidateId: "wake_contract_a",
       shouldHandoffToHelixAsk: true,
+      suggestedDispatch: expect.arrayContaining([
+        expect.objectContaining({ kind: "log_receipt" }),
+        expect.objectContaining({ kind: "update_panel", panelId: "stage-play-badge-graph" }),
+        expect.objectContaining({ kind: "wake_agent", interruptKind: "policy_triggered" }),
+      ]),
+      goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:microdeck:/),
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+        completedSolverPathRequired: true,
+        terminalAuthoritySingleWriterRequired: true,
+      },
+      post_tool_model_step_required: true,
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,
@@ -911,8 +1509,10 @@ describe("live-source mail live environment tools", () => {
         },
       },
     });
-    expect((route.observation as any).helixAskHandoff.appendedPrompt).toContain("Wake-bound contract:");
-    expect((route.observation as any).helixAskHandoff.appendedPrompt).toContain("If the packet is stale, superseded, or no longer wake-bound, ignore this contract.");
+    expect(payload.evidenceRefs).toContain(payload.goalContextUpdateId);
+    expect(payload.evidence_refs).toContain(payload.goalContextUpdateId);
+    expect(payload.helixAskHandoff.appendedPrompt).toContain("Wake-bound contract:");
+    expect(payload.helixAskHandoff.appendedPrompt).toContain("If the packet is stale, superseded, or no longer wake-bound, ignore this contract.");
   });
 
   it("rejects MicroDeck prompt delegation presets with more than three prompts", () => {
@@ -2220,6 +2820,10 @@ describe("live-source mail live environment tools", () => {
         stop_conditions: ["frog classified with terminal authority"],
         final_report_requirements: {
           completed_solver_path_required: false,
+          allowed_terminal_artifact_kinds: [
+            "final_answer",
+            "microdeck_output",
+          ],
           required_evidence_kinds: [
             "goal_context_update",
             "packet_trace",
@@ -2296,19 +2900,31 @@ describe("live-source mail live environment tools", () => {
           }),
         ]),
         authority: hardenedGoalSessionAuthority({
+          allowedTerminalArtifactKinds: ["final_answer"],
           requiredEvidenceKinds: expect.arrayContaining([
             "goal_context_update",
+            "agent_step_observation_packet",
+            "route_product_contract",
             "packet_trace",
             "terminal_authority_single_writer",
           ]),
           prohibitedReportSources: expect.arrayContaining([
             "tool_receipt",
+            "workstation_control_receipt",
             "panel_projection",
+            "live_answer_projection",
             "microdeck_output",
+            "narrator_event",
+            "narrator_binding",
+            "interrupt_dispatch",
+            "wake_request",
+            "wake_result",
+            "actuator_ref",
           ]),
         }),
       },
     });
+    expect(payload.session.authority.finalReportRequirements.allowedTerminalArtifactKinds).not.toContain("microdeck_output");
     expect(observation.producedRefs).toEqual(["goal:frog-classification"]);
     expect(observation.evidence_refs).toEqual(expect.arrayContaining([
       "goal:frog-classification",
@@ -3930,8 +4546,10 @@ describe("live-source mail live environment tools", () => {
         contentRef: queryPayload.goalContextUpdates[0].contentRef,
         packetRefs: expect.arrayContaining([queryPayload.goalContextUpdates[0].contentRef]),
         sourceRefs: expect.arrayContaining([sourceId]),
+        actuatorRefs: expect.arrayContaining(["workstation_actuator:query_visual_summaries"]),
         assistant_answer: false,
         terminal_eligible: false,
+        raw_content_included: false,
       }),
     ]);
     expect(queryPayload.goalContextUpdateId).toMatch(/^stage_play_goal_context_update:route_watch:/);
@@ -4911,6 +5529,7 @@ describe("live-source mail live environment tools", () => {
           "workstation_context_feed:audio_transcripts",
           "workstation_actuator:query_audio_transcripts",
         ]),
+        actuatorRefs: expect.arrayContaining(["workstation_actuator:query_audio_transcripts"]),
         assistant_answer: false,
         terminal_eligible: false,
       }),
@@ -4921,6 +5540,7 @@ describe("live-source mail live environment tools", () => {
           "workstation_context_feed:audio_transcripts",
           "workstation_actuator:query_audio_transcripts",
         ]),
+        actuatorRefs: expect.arrayContaining(["workstation_actuator:query_audio_transcripts"]),
         assistant_answer: false,
         terminal_eligible: false,
       }),
@@ -5057,6 +5677,11 @@ describe("live-source mail live environment tools", () => {
       ask_context_policy: "evidence_only",
     });
     expect(payload.dispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "log_receipt", receiptRef: payload.receiptId }),
+      expect.objectContaining({ kind: "update_panel", panelId: "stage-play-badge-graph" }),
+      expect.objectContaining({ kind: "change_preset", targetRef: "source:visual:active", presetId: "preset:frog-classifier" }),
+    ]));
+    expect(payload.suggestedDispatch).toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: "log_receipt", receiptRef: payload.receiptId }),
       expect.objectContaining({ kind: "update_panel", panelId: "stage-play-badge-graph" }),
       expect.objectContaining({ kind: "change_preset", targetRef: "source:visual:active", presetId: "preset:frog-classifier" }),
@@ -5939,6 +6564,8 @@ describe("live-source mail live environment tools", () => {
       expect.objectContaining({ kind: "log_receipt", receiptRef: visualPayload.receiptId }),
       expect.objectContaining({ kind: "change_preset", targetRef: "live-answer:visual", presetId: "frog-classifier-visual" }),
     ]));
+    expect(visualPayload.evidenceRefs).toContain(visualPayload.goalContextUpdateId);
+    expect(visualPayload.evidence_refs).toContain(visualPayload.goalContextUpdateId);
     expect(visualPayload.agentGoalSession.checkpoints.at(-1)).toMatchObject({
       summary: "Prepared set visual preset control dispatch for this goal session.",
       actionsTaken: expect.arrayContaining(["set_visual_preset", "live_env.set_visual_preset", "visual_preset"]),
@@ -6000,6 +6627,8 @@ describe("live-source mail live environment tools", () => {
       expect.objectContaining({ kind: "log_receipt", receiptRef: audioPayload.receiptId }),
       expect.objectContaining({ kind: "change_preset", targetRef: "live-answer:audio", presetId: "earbud-translation" }),
     ]));
+    expect(audioPayload.evidenceRefs).toContain(audioPayload.goalContextUpdateId);
+    expect(audioPayload.evidence_refs).toContain(audioPayload.goalContextUpdateId);
 
     const updates = listStagePlayGoalContextUpdates({
       threadId,
@@ -6579,6 +7208,39 @@ describe("live-source mail live environment tools", () => {
       nextStep: "continue",
     });
 
+    const sourceOnlyRepairObservation = executeLiveEnvironmentTool({
+      tool_name: "repair_source" as any,
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: sourceId,
+        goal_id: "goal:repair-source",
+        reason: "Repair the visual capture source without a loop-specific repair.",
+      },
+    });
+    const sourceOnlyRepairPayload = sourceOnlyRepairObservation.observation as any;
+    expect(sourceOnlyRepairObservation.ok).toBe(true);
+    expect(sourceOnlyRepairPayload).toMatchObject({
+      schema: "stage_play_workstation_control_receipt/v1",
+      controlKind: "repair_source",
+      status: "prepared",
+      goalId: "goal:repair-source",
+      sourceRef: sourceId,
+      loopRef: null,
+      requiredActuator: "repair_source",
+      actuatorAllowed: true,
+      missingRequirements: [],
+      contractValid: true,
+      contractValidationIssues: [],
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(sourceOnlyRepairPayload.dispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "repair_source", sourceRef: sourceId, loopRef: null }),
+    ]));
+    expect(sourceOnlyRepairPayload.dispatch.map((action: any) => action.kind)).not.toContain("repair_loop");
+
     const repairLoopObservation = executeLiveEnvironmentTool({
       tool_name: "live_env.repair_loop",
       thread_id: threadId,
@@ -6758,7 +7420,14 @@ describe("live-source mail live environment tools", () => {
       expect.objectContaining({ kind: "update_panel", panelId: "narrator" }),
       expect.objectContaining({ kind: "speak_narrator", mode: "confirm" }),
     ]));
+    expect(payload.suggestedDispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "log_receipt", receiptRef: payload.requestId }),
+      expect.objectContaining({ kind: "update_panel", panelId: "narrator" }),
+      expect.objectContaining({ kind: "speak_narrator", mode: "confirm" }),
+    ]));
     expect(payload.evidenceRefs).toContain(payload.requestId);
+    expect(payload.evidenceRefs).toContain(payload.goalContextUpdateId);
+    expect(payload.evidence_refs).toContain(payload.goalContextUpdateId);
     expect(observation.producedRefs).toEqual(expect.arrayContaining([payload.requestId, payload.goalContextUpdateId]));
     const updates = listStagePlayGoalContextUpdates({
       threadId,
@@ -6829,6 +7498,7 @@ describe("live-source mail live environment tools", () => {
     });
     expect(payload.evidenceRefs).toEqual(expect.arrayContaining([
       payload.requestId,
+      payload.goalContextUpdateId,
       "allowed_actuator:narrator_say",
       "translation_segment:alias",
     ]));
@@ -6941,7 +7611,12 @@ describe("live-source mail live environment tools", () => {
       expect.objectContaining({ kind: "log_receipt", receiptRef: payload.requestId }),
       expect.objectContaining({ kind: "update_panel", panelId: "narrator" }),
     ]));
+    expect(payload.suggestedDispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "log_receipt", receiptRef: payload.requestId }),
+      expect.objectContaining({ kind: "update_panel", panelId: "narrator" }),
+    ]));
     expect(payload.dispatch.map((action: any) => action.kind)).not.toContain("speak_narrator");
+    expect(payload.suggestedDispatch.map((action: any) => action.kind)).not.toContain("speak_narrator");
 
     const updates = listStagePlayGoalContextUpdates({
       threadId,
@@ -7054,7 +7729,15 @@ describe("live-source mail live environment tools", () => {
       authority: hardenedGoalSessionAuthority(),
     });
     expect(preparedPayload.agentGoalSession.checkpoints).toHaveLength(initialNarratorCheckpointCount + 1);
+    expect(preparedPayload.evidenceRefs).toContain(preparedPayload.goalContextUpdateId);
+    expect(preparedPayload.evidence_refs).toContain(preparedPayload.goalContextUpdateId);
     expect(preparedPayload.dispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "log_receipt", receiptRef: preparedPayload.requestId }),
+      expect.objectContaining({ kind: "bind_narrator_stream", sourceRef: "source:browser-audio", streamKind: "translated_transcript" }),
+      expect.objectContaining({ kind: "speak_narrator", mode: "visible_only" }),
+    ]));
+    expect(preparedPayload.suggestedDispatch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "log_receipt", receiptRef: preparedPayload.requestId }),
       expect.objectContaining({ kind: "bind_narrator_stream", sourceRef: "source:browser-audio", streamKind: "translated_transcript" }),
       expect.objectContaining({ kind: "speak_narrator", mode: "visible_only" }),
     ]));
@@ -7322,6 +8005,7 @@ describe("live-source mail live environment tools", () => {
         "agent_goal_allowed_actuator:query_narrator_events",
       ]),
       evidenceRefs: expect.arrayContaining([
+        expect.stringMatching(/^stage_play_goal_context_update:/),
         expect.stringMatching(/^agent_goal_feed:/),
         expect.stringMatching(/^agent_goal_context_feed:agent_goal_feed:/),
         "agent_goal_allowed_actuator:query_narrator_events",
@@ -7331,6 +8015,7 @@ describe("live-source mail live environment tools", () => {
       terminal_eligible: false,
       raw_content_included: false,
     });
+    expect(queryPayload.evidenceRefs).toContain(queryPayload.goalContextUpdateId);
     expect(queryPayload.goalContextUpdates).toEqual([
       expect.objectContaining({
         updateId: preparedPayload.goalContextUpdateId,
@@ -7370,8 +8055,13 @@ describe("live-source mail live environment tools", () => {
           "workstation_context_feed:narrator_events",
           "workstation_actuator:narrator_bind_stream",
         ]),
+        actuatorRefs: expect.arrayContaining([
+          "workstation_actuator:query_narrator_events",
+          "workstation_actuator:narrator_bind_stream",
+        ]),
         assistant_answer: false,
         terminal_eligible: false,
+        raw_content_included: false,
       }),
     ]);
     const queryUpdate = listStagePlayGoalContextUpdates({
@@ -7463,6 +8153,11 @@ describe("live-source mail live environment tools", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+    expect(payload.evidenceRefs).toContain(payload.goalContextUpdateId);
+    expect(payload.evidence_refs).toContain(payload.goalContextUpdateId);
+    const payloadEvidenceRefsForUpdate = payload.evidenceRefs.filter(
+      (ref: string) => ref !== payload.goalContextUpdateId,
+    );
 
     const updates = listStagePlayGoalContextUpdates({
       threadId,
@@ -7480,7 +8175,7 @@ describe("live-source mail live environment tools", () => {
         matchedAllowedActuators: [],
         matchedAllowedActuatorRefs: [],
       },
-      evidenceRefs: expect.arrayContaining(payload.evidenceRefs),
+      evidenceRefs: expect.arrayContaining(payloadEvidenceRefsForUpdate),
       loopRefs: expect.arrayContaining(["workstation_context_feed:source_health", "workstation_actuator:query_source_health"]),
       authority: {
         assistantAnswer: false,
@@ -7821,6 +8516,8 @@ describe("live-source mail live environment tools", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+    expect(payload.evidenceRefs).toContain(payload.goalContextUpdateId);
+    expect(payload.evidence_refs).toContain(payload.goalContextUpdateId);
 
     const updates = listStagePlayGoalContextUpdates({
       threadId,
@@ -7831,7 +8528,9 @@ describe("live-source mail live environment tools", () => {
     expect(sourceHealthUpdate).toMatchObject({
       contentRef: expect.stringMatching(/^stage_play_source_health:/),
       freshness: expect.objectContaining({ status: "blocked" }),
-      evidenceRefs: expect.arrayContaining(payload.evidenceRefs),
+      evidenceRefs: expect.arrayContaining(
+        payload.evidenceRefs.filter((ref: string) => ref !== payload.goalContextUpdateId),
+      ),
       loopRefs: expect.arrayContaining(["workstation_context_feed:source_health", "workstation_actuator:query_source_health"]),
       authority: {
         assistantAnswer: false,
@@ -7989,13 +8688,35 @@ describe("live-source mail live environment tools", () => {
     });
     expect(readPayload).toMatchObject({
       schema: "helix.live_environment_card_read.v1",
+      resultId: expect.stringMatching(/^live_answer_card_read:/),
       environment_id: environment.environment_id,
+      sourceRefs: expect.arrayContaining([
+        environment.environment_id,
+        liveAnswerSourceId,
+        "live_answer_line:scene",
+      ]),
+      loopRefs: expect.arrayContaining([
+        `live_answer_environment:${environment.environment_id}`,
+        "workstation_context_feed:live_answer_lines",
+        "workstation_actuator:query_live_answer_state",
+      ]),
+      evidenceRefs: expect.arrayContaining([
+        "visual_frame:frog-card",
+        environment.environment_id,
+      ]),
+      producedRefs: expect.arrayContaining([expect.stringMatching(/^live_answer_card_read:/)]),
       assistant_answer: false,
       terminal_eligible: false,
       post_tool_model_step_required: true,
       raw_content_included: false,
       goalContextUpdateId: expect.stringMatching(/^stage_play_goal_context_update:live_answer:/),
     });
+    expect(readPayload.evidenceRefs).toContain(readPayload.goalContextUpdateId);
+    expect(readPayload.evidence_refs).toContain(readPayload.goalContextUpdateId);
+    expect(readPayload.producedRefs).toEqual(expect.arrayContaining([
+      readPayload.resultId,
+      readPayload.goalContextUpdateId,
+    ]));
     expect(readPayload.lines).toEqual([
       expect.objectContaining({
         key: "scene",
@@ -8159,6 +8880,7 @@ describe("live-source mail live environment tools", () => {
     });
     expect(payload).toMatchObject({
       schema: "helix.live_environment_card_read.v1",
+      resultId: expect.stringMatching(/^live_answer_card_read:/),
       status: "read",
       goalId: "goal:live-answer-card-read",
       feedAllowed: true,
@@ -8176,6 +8898,12 @@ describe("live-source mail live environment tools", () => {
       terminal_eligible: false,
       raw_content_included: false,
     });
+    expect(payload.evidenceRefs).toContain(payload.goalContextUpdateId);
+    expect(payload.evidence_refs).toContain(payload.goalContextUpdateId);
+    expect(payload.producedRefs).toEqual(expect.arrayContaining([
+      payload.resultId,
+      payload.goalContextUpdateId,
+    ]));
     expect(payload.lines).toEqual([
       expect.objectContaining({
         key: "scene",
@@ -8298,6 +9026,7 @@ describe("live-source mail live environment tools", () => {
     });
     expect(payload).toMatchObject({
       schema: "helix.live_environment_card_read.v1",
+      resultId: expect.stringMatching(/^live_answer_card_read:/),
       status: "blocked",
       goalId: "goal:live-answer-card-blocked",
       missingRequirements: ["context_feed:live_answer_lines"],
@@ -8314,6 +9043,12 @@ describe("live-source mail live environment tools", () => {
       terminal_eligible: false,
       raw_content_included: false,
     });
+    expect(payload.evidenceRefs).toContain(payload.goalContextUpdateId);
+    expect(payload.evidence_refs).toContain(payload.goalContextUpdateId);
+    expect(payload.producedRefs).toEqual(expect.arrayContaining([
+      payload.resultId,
+      payload.goalContextUpdateId,
+    ]));
     expect(payload.policyEvidenceRefs).toEqual(expect.arrayContaining([
       "context_feed:live_answer_lines",
       "allowed_actuator:query_live_answer_state",
@@ -8447,6 +9182,11 @@ describe("live-source mail live environment tools", () => {
       assistant_answer: false,
       raw_content_included: false,
     });
+    expect(payload.evidenceRefs).toContain(payload.goalContextUpdateId);
+    expect(payload.evidence_refs).toContain(payload.goalContextUpdateId);
+    const payloadEvidenceRefsForUpdate = payload.evidenceRefs.filter(
+      (ref: string) => ref !== payload.goalContextUpdateId,
+    );
 
     const updates = listStagePlayGoalContextUpdates({
       threadId,
@@ -8465,7 +9205,7 @@ describe("live-source mail live environment tools", () => {
         matchedAllowedActuators: [],
         matchedAllowedActuatorRefs: [],
       },
-      evidenceRefs: expect.arrayContaining(payload.evidenceRefs),
+      evidenceRefs: expect.arrayContaining(payloadEvidenceRefsForUpdate),
       loopRefs: expect.arrayContaining(["workstation_context_feed:trace_memory", "workstation_actuator:query_trace_memory"]),
       authority: {
         assistantAnswer: false,

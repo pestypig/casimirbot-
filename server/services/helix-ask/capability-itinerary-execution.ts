@@ -339,9 +339,10 @@ export const isHelixCapabilityItineraryFamilyObserved = (
 ): boolean => {
   if (family === "scholarly_research") {
     return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
-      /scholarly_research_observation|scholarly_full_text_observation/i.test([
+      /scholarly_research_observation|scholarly_full_text_observation|theory_frontier_literature_map/i.test([
         artifactKind(artifact),
         artifactSchema(artifact),
+        artifactId(artifact),
       ].join(" ")),
     );
   }
@@ -356,7 +357,10 @@ export const isHelixCapabilityItineraryFamilyObserved = (
   }
   if (family === "theory_locator") {
     return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
-      artifactMatchesObservationKind(artifact, /helix_theory_context_reflection_tool_receipt|theory_context_reflection/i),
+      artifactMatchesObservationKind(
+        artifact,
+        /helix_theory_context_reflection_tool_receipt|theory_context_reflection|theory_frontier_search|theory_frontier_candidate|theory_frontier_exact_contract_verification/i,
+      ),
     );
   }
   if (family === "repo_code") {
@@ -515,6 +519,8 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       rail_status: satisfaction === "satisfied" ? "complete" : satisfaction === "failed" ? "fail_closed" : "pending",
       rail_failure_code: validationErrors[0] ?? (satisfaction === "pending" ? "subgoal_observation_missing" : null),
       required_observation_kinds: requiredObservationKinds,
+      contribution_role: readString(subgoal.contribution_role),
+      terminal_contribution_kind: readString(subgoal.terminal_contribution_kind) ?? readString(subgoal.required_terminal_kind),
       assistant_answer: false,
       raw_content_included: false,
     };

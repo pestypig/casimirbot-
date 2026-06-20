@@ -15,6 +15,7 @@ import {
   effectiveArtifactLedger,
   materializeDocEvidenceSynthesisAnswer,
 } from "./doc-evidence-synthesis";
+import { buildHelixCapabilityItineraryExecutionState } from "./capability-itinerary-execution";
 
 export type FinalAnswerDraftTerminalMaterializerResult = {
   schema: "helix.final_answer_draft_terminal_materializer_result.v1";
@@ -73,6 +74,8 @@ const readString = (value: unknown): string | null =>
 
 const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
 
+const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
+
 const artifactPayload = (artifact: ArtifactLike): Record<string, unknown> | null =>
   readRecord(artifact.payload);
 
@@ -124,6 +127,68 @@ const isCompleteCompoundResearchLocatorItinerary = (payload: Record<string, unkn
   if (executionState?.complete !== true) return false;
   const families = new Set(readArray(executionState?.required_observation_families).map(readString).filter(Boolean));
   return families.has("theory_locator") && (families.has("scholarly_research") || families.has("internet_search"));
+};
+
+const compoundSubgoalObservationRefs = (
+  payload: Record<string, unknown>,
+  artifactLedger: ArtifactLike[],
+): string[] => {
+  const itinerary = readRecord(payload.capability_itinerary);
+  const executionState =
+    readRecord(payload.capability_itinerary_execution_state) ??
+    readRecord(itinerary?.execution_state) ??
+    (itinerary
+      ? buildHelixCapabilityItineraryExecutionState({
+          capabilityItinerary: itinerary,
+          artifacts: artifactLedger,
+        })
+      : null);
+  return unique(
+    readArray(executionState?.compound_subgoal_ledger)
+      .map(readRecord)
+      .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+      .filter((entry) => readString(entry.satisfaction) === "satisfied")
+      .map((entry) => readString(entry.observation_ref))
+      .filter((entry): entry is string => Boolean(entry)),
+  );
+};
+
+const compoundSubgoalCount = (payload: Record<string, unknown>): number => {
+  const itinerary = readRecord(payload.capability_itinerary);
+  const contract = readRecord(payload.compound_capability_contract) ??
+    readRecord(itinerary?.compound_capability_contract);
+  return readArray(contract?.subgoals).length;
+};
+
+const capabilityFamilyFromCapability = (capability: string | null): string | null => {
+  if (!capability) return null;
+  if (capability.startsWith("docs-viewer.")) return "docs_viewer";
+  if (capability === "scientific-calculator.solve_expression") return "calculator";
+  if (capability === "workspace_os.status") return "workspace_diagnostic";
+  if (capability === "helix_ask.inspect_capability_catalog") return "capability_catalog";
+  if (capability === "repo-code.search_concept") return "repo_code";
+  if (capability === "internet_search.web_research" || capability === "internet-search.search_web") return "internet_search";
+  if (capability.startsWith("helix_ask.reflect_") || capability.includes("theory_context")) return "context_reflection";
+  if (capability.startsWith("workspace-directory.")) return "workspace_directory";
+  if (capability === "image_lens.inspect" || capability === "situation-room.describe_visual_capture") return "visual_capture";
+  return null;
+};
+
+const compoundSubgoalSourceFamilies = (payload: Record<string, unknown>): string[] => {
+  const itinerary = readRecord(payload.capability_itinerary);
+  const contract = readRecord(payload.compound_capability_contract) ??
+    readRecord(itinerary?.compound_capability_contract);
+  return unique(
+    readArray(contract?.subgoals)
+      .map(readRecord)
+      .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+      .map((entry) =>
+        readString(entry.capability_family) ??
+        readString(entry.plan_family) ??
+        capabilityFamilyFromCapability(readString(entry.requested_capability) ?? readString(entry.runtime_capability))
+      )
+      .filter((entry): entry is string => Boolean(entry)),
+  );
 };
 
 export const findLatestFinalAnswerDraftCandidate = (
@@ -867,12 +932,31 @@ export function materializeFinalAnswerDraftTerminal(input: {
   }
 
   const ref = materializedRef(input.turnId, "model_synthesized_answer");
+  const supportRefs = collectFinalAnswerDraftSupportRefs({
+    draftPayload,
+    artifactLedger,
+  });
+  const subgoalObservationRefs = compoundSubgoalObservationRefs(input.payload, artifactLedger);
+  const effectiveSubgoalObservationRefs =
+    subgoalObservationRefs.length > 0
+      ? subgoalObservationRefs
+      : compoundSubgoalCount(input.payload) > 1
+        ? supportRefs
+        : [];
   input.payload.model_synthesized_answer = {
     schema: "helix.model_synthesized_answer.v1",
     artifact_id: ref,
     turn_id: input.turnId,
     text: draft.text,
     answer_text: draft.text,
+    support_refs: supportRefs,
+    support_refs_count: supportRefs.length,
+    subgoal_observation_refs: effectiveSubgoalObservationRefs,
+    subgoal_observation_refs_count: effectiveSubgoalObservationRefs.length,
+    source_families: compoundSubgoalSourceFamilies(input.payload),
+    model_step_capability: effectiveSubgoalObservationRefs.length > 1
+      ? "model.synthesize_from_compound_subgoal_observations"
+      : "model.synthesize_from_current_observations",
     final_answer_draft_ref: draft.ref,
     assistant_answer: false,
     raw_content_included: false,

@@ -57,6 +57,10 @@ const theoryLocatorRequested = (promptText: string): boolean =>
   !/\b(?:stage\s*play|stage_play|live_env\.reflect_stage_play_context|reflect_stage_play_context|live\s+interpretation|stage\s*play\s+badge\s+graph)\b/i.test(promptText) &&
   /\b(?:theory\s+badge\s+graph|theory\s+badges?|badge\s+graph|physics\s+graph|theory\s+graph|theory_context_reflection|reflect_theory_context|helix_ask\.reflect_theory_context|graph\s+placement|scale\s+bands?|semantic\s+chunks?|uncertainty\s+mode|locate\b[\s\S]{0,80}\b(?:theory|badge|graph)|place\b[\s\S]{0,80}\b(?:theory|badge|graph|claims?)|map\b[\s\S]{0,80}\b(?:theory|badge|graph)|where\s+(?:does|do)\b[\s\S]{0,100}\b(?:fit|land|map))\b/i.test(promptText);
 
+const theoryFrontierRequested = (promptText: string): boolean =>
+  theoryLocatorRequested(promptText) &&
+  /\b(?:theory\s+frontier|frontier\s+seed|seed\s+finder|frontier\s+candidate|missing\s+intermediate\s+badges?|unresolved\s+semantic\s+regions?|in\s+between\s+(?:the\s+)?badges?|candidate\s+terrain|biome\s+fields?|probability\s+terrain|verified_frontier_yield_per_budget|frontier\s+projection)\b/i.test(promptText);
+
 const requestedResearchFamilies = (promptText: string): HelixCapabilityItineraryFamily[] => {
   const suppression = detectContextualToolAdmissionSuppression(promptText);
   const scholarlySuppressed = contextualToolSuppressionBlocksFamily(suppression, "scholarly_research");
@@ -90,6 +94,9 @@ const requestedRepoFamilies = (promptText: string): HelixCapabilityItineraryFami
     : [];
 };
 
+const explicitRepoEvidenceCueAllowedInCompound = (promptText: string): boolean =>
+  /\b(?:repo-code\.search_concept|repo\s*\/\s*code|repo\s+evidence|repository\s+evidence|code\s+evidence|source\s+code|codebase|where\s+in\s+(?:the\s+)?(?:code|repo|repository|codebase)|implementation\s+(?:path|file|location|evidence)|line-backed|line\s+backed|repo\s+grep|rg\s+search)\b/i.test(promptText);
+
 const requestedDocsFamilies = (promptText: string): HelixCapabilityItineraryFamily[] => {
   const suppression = detectContextualToolAdmissionSuppression(promptText);
   if (contextualToolSuppressionBlocksFamily(suppression, "docs_viewer")) return [];
@@ -100,13 +107,26 @@ const requestedDocsFamilies = (promptText: string): HelixCapabilityItineraryFami
 
 const observationKindsFor = (family: HelixCapabilityItineraryFamily, promptText: string): string[] => {
   if (family === "scholarly_research") {
-    return detectScholarlyResearchIntent(promptText).fullTextRequested
+    const kinds = detectScholarlyResearchIntent(promptText).fullTextRequested
       ? ["scholarly_research_observation", "scholarly_full_text_observation"]
       : ["scholarly_research_observation"];
+    return theoryFrontierRequested(promptText)
+      ? [...kinds, "theory_frontier_literature_map"]
+      : kinds;
   }
   if (family === "internet_search") return ["internet_search_observation"];
   if (family === "docs_viewer") return ["doc_search_results", "doc_candidate_validation", "doc_open_receipt"];
-  if (family === "theory_locator") return ["helix_theory_context_reflection_tool_receipt", "theory_context_reflection"];
+  if (family === "theory_locator") {
+    return theoryFrontierRequested(promptText)
+      ? [
+          "helix_theory_context_reflection_tool_receipt",
+          "theory_context_reflection",
+          "theory_frontier_search",
+          "theory_frontier_candidate",
+          "theory_frontier_exact_contract_verification",
+        ]
+      : ["helix_theory_context_reflection_tool_receipt", "theory_context_reflection"];
+  }
   if (family === "repo_code") return ["repo_code_evidence_observation"];
   return [`${family}_observation`];
 };
@@ -133,6 +153,16 @@ const allowedTerminalKindsFor = (families: HelixCapabilityItineraryFamily[]): st
   if (families.includes("theory_locator")) kinds.push("theory_context_reflection_answer", "workstation_tool_evaluation");
   return unique(kinds);
 };
+
+const compoundTerminalKindsFor = (subgoals: RecordLike[]): string[] =>
+  unique(subgoals.map((subgoal) => readString(subgoal.required_terminal_kind)).filter(Boolean));
+
+const compoundHasDocsSubgoal = (subgoals: RecordLike[]): boolean =>
+  subgoals.some((subgoal) =>
+    readString(subgoal.capability_family) === "docs_viewer" ||
+    readString(subgoal.requested_capability).startsWith("docs-viewer.") ||
+    readString(subgoal.runtime_capability).startsWith("docs-viewer.")
+  );
 
 const itineraryFamilyForContractSubgoal = (subgoal: RecordLike): HelixCapabilityItineraryFamily => {
   const capabilityFamily = readString(subgoal.capability_family);
@@ -175,6 +205,8 @@ const stepForCompoundSubgoal = (input: {
       : "Execute the explicit compound capability subgoal.",
     execution_group: "evidence",
     required_observation_kinds: requiredObservationKinds,
+    contribution_role: readString(input.subgoal.contribution_role) || null,
+    terminal_contribution_kind: readString(input.subgoal.terminal_contribution_kind) || readString(input.subgoal.required_terminal_kind) || null,
     status: input.status,
     reason:
       input.status === "missing"
@@ -241,11 +273,15 @@ const stepForFamily = (input: {
   capability_hint: capabilityHintFor(input.family, input.promptText),
   purpose:
     input.family === "theory_locator"
-      ? "Locate the prompt on the theory badge graph and expose scale/chunk/uncertainty evidence."
+      ? theoryFrontierRequested(input.promptText)
+        ? "Build non-terminal theory frontier placement evidence, exact contract status, and badge/chunk mappings before synthesis."
+        : "Locate the prompt on the theory badge graph and expose scale/chunk/uncertainty evidence."
       : input.family === "repo_code"
         ? "Collect current-turn repo/code evidence requested by the prompt."
       : input.family === "scholarly_research"
-        ? "Collect paper/citation evidence requested by the prompt."
+        ? theoryFrontierRequested(input.promptText)
+          ? "Collect paper/citation evidence for frontier mapping only; literature must not promote theory edges."
+          : "Collect paper/citation evidence requested by the prompt."
         : input.family === "internet_search"
           ? "Collect live web evidence requested by the prompt."
           : "Collect the route-required observation for this family.",
@@ -272,16 +308,27 @@ export function buildHelixCapabilityItinerary(input: {
   const forbiddenFamilies = (Array.isArray(admission?.forbidden_tool_families)
     ? admission.forbidden_tool_families
     : []) as string[];
-  const researchFamilies = requestedResearchFamilies(input.promptText);
-  const repoFamilies = requestedRepoFamilies(input.promptText);
-  const docsFamilies = requestedDocsFamilies(input.promptText);
-  const locatorFamilies: HelixCapabilityItineraryFamily[] = theoryLocatorRequested(input.promptText)
-    ? ["theory_locator"]
-    : [];
   const compoundSubgoals = Array.isArray(compoundCapabilityContract?.subgoals)
     ? compoundCapabilityContract.subgoals as unknown as RecordLike[]
     : [];
   const compoundFamilies = compoundSubgoals.map(itineraryFamilyForContractSubgoal);
+  const compoundRequestsRepoCode = compoundSubgoals.some((subgoal) =>
+    readString(subgoal.capability_family) === "repo_code" ||
+    readString(subgoal.requested_capability).startsWith("repo-code.") ||
+    readString(subgoal.runtime_capability).startsWith("repo-code.")
+  );
+  const researchFamilies = requestedResearchFamilies(input.promptText);
+  const repoFamilies = requestedRepoFamilies(input.promptText).filter((family) =>
+    family !== "repo_code" ||
+    compoundSubgoals.length === 0 ||
+    compoundRequestsRepoCode ||
+    explicitRepoEvidenceCueAllowedInCompound(input.promptText)
+  );
+  const docsFamilies = requestedDocsFamilies(input.promptText);
+  const locatorFamilies: HelixCapabilityItineraryFamily[] = theoryLocatorRequested(input.promptText)
+    ? ["theory_locator"]
+    : [];
+  const frontierRequested = theoryFrontierRequested(input.promptText);
   const relevantFamilies = unique([...compoundFamilies, ...researchFamilies, ...repoFamilies, ...docsFamilies, ...locatorFamilies]);
   const compoundSteps = compoundSubgoals.map((subgoal) => {
     const family = itineraryFamilyForContractSubgoal(subgoal);
@@ -336,6 +383,8 @@ export function buildHelixCapabilityItinerary(input: {
     ...(researchFamilies.length > 0 ? ["research_observation_missing"] : []),
     ...(docsFamilies.length > 0 ? ["docs_viewer_observation_missing"] : []),
     ...(locatorFamilies.length > 0 ? ["locator_observation_missing"] : []),
+    ...(frontierRequested ? ["theory_frontier_candidate_missing", "theory_frontier_exact_verification_missing"] : []),
+    ...(frontierRequested && researchFamilies.includes("scholarly_research") ? ["theory_frontier_literature_map_missing"] : []),
     ...(promptShape === "compound_tool" ? ["compound_evidence_not_reentered"] : []),
     ...(missingItineraryFamilies.length > 0 ? ["capability_family_not_admitted_or_visible"] : []),
     ...(compoundSubgoals.length > 1 ? ["compound_subgoal_observation_missing"] : []),
@@ -343,6 +392,14 @@ export function buildHelixCapabilityItinerary(input: {
   const compoundRequiredCapabilities = compoundSubgoals
     .map((subgoal) => readString(subgoal.requested_capability))
     .filter(Boolean);
+  const allowedTerminalArtifactKinds = unique([
+    ...allowedTerminalKindsFor(relevantFamilies),
+    ...compoundTerminalKindsFor(compoundSubgoals),
+    ...(compoundSubgoals.length > 1 ? ["model_synthesized_answer"] : []),
+    ...(compoundSubgoals.length > 1 && compoundHasDocsSubgoal(compoundSubgoals)
+      ? ["doc_evidence_synthesis_answer"]
+      : []),
+  ]);
   return {
     schema: HELIX_CAPABILITY_ITINERARY_SCHEMA,
     turn_id: input.turnId,
@@ -377,9 +434,18 @@ export function buildHelixCapabilityItinerary(input: {
         : []),
       ...(locatorFamilies.length > 0
         ? [{
-            criterion_id: "badge_graph_location_grounding",
-            description: "Graph placement must be grounded in a theory context reflection receipt before synthesis.",
+            criterion_id: frontierRequested ? "theory_frontier_candidate_grounding" : "badge_graph_location_grounding",
+            description: frontierRequested
+              ? "Frontier exploration must be grounded in non-terminal frontier candidates, exact contract status, and badge/chunk evidence before synthesis."
+              : "Graph placement must be grounded in a theory context reflection receipt before synthesis.",
             required_observation_families: locatorFamilies,
+          }]
+        : []),
+      ...(frontierRequested && researchFamilies.includes("scholarly_research")
+        ? [{
+            criterion_id: "frontier_literature_mapping_boundary",
+            description: "Scholarly evidence may support, conflict, identify missing evidence, suggest a missing badge, or remain unrelated; it must not promote theory edges.",
+            required_observation_families: ["scholarly_research", "theory_locator"] as HelixCapabilityItineraryFamily[],
           }]
         : []),
       ...(promptShape === "compound_tool"
@@ -393,7 +459,11 @@ export function buildHelixCapabilityItinerary(input: {
     terminal_success_criteria: {
       required_observation_families: relevantFamilies,
       required_capabilities: compoundRequiredCapabilities,
-      allowed_terminal_artifact_kinds: allowedTerminalKindsFor(relevantFamilies),
+      allowed_terminal_artifact_kinds: allowedTerminalArtifactKinds,
+      forbidden_terminal_artifact_kinds: compoundSubgoals.length > 1 ? ["tool_receipt"] : [],
+      ...(compoundSubgoals.length > 1
+        ? { compound_terminal_policy: "synthesize_from_satisfied_subgoal_observations" }
+        : {}),
       requires_post_observation_synthesis: relevantFamilies.length > 0,
       typed_failure_codes: unique(typedFailures),
     },

@@ -219,6 +219,46 @@ describe("helix theory context reflection tool receipt v1", () => {
     ]);
   });
 
+  it("rejects invalid frontier exact verification result artifacts", () => {
+    const receipt = {
+      ...receiptFixture(),
+      frontierExactVerificationResultsV1: [
+        {
+          verifierVersion: "theory_frontier_exact_contract/v1",
+          candidateId: "frontier:test",
+          exactContractSatisfied: true,
+          promotionAllowed: true,
+          validatesTheory: false,
+          issues: [],
+          checkedRequirements: { nonTerminalBoundary: true },
+        },
+      ],
+    };
+
+    expect(validateHelixTheoryContextReflectionToolReceiptV1(receipt)).toContain(
+      "frontierExactVerificationResultsV1[0] must be a valid theory_frontier_exact_contract_verification/v1 artifact",
+    );
+  });
+
+  it("rejects invalid frontier literature maps", () => {
+    const receipt = {
+      ...receiptFixture(),
+      frontierLiteratureMapV1: {
+        artifactId: "theory_frontier_literature_map",
+        schemaVersion: "theory_frontier_literature_map/v1",
+        authority: {
+          assistant_answer: true,
+          terminal_eligible: true,
+          promotionAllowed: true,
+        },
+      },
+    };
+
+    expect(validateHelixTheoryContextReflectionToolReceiptV1(receipt)).toContain(
+      "frontierLiteratureMapV1 must be null or a valid theory_frontier_literature_map/v1 artifact",
+    );
+  });
+
   it("rejects terminal nested authority", () => {
     const receipt = {
       ...receiptFixture(),

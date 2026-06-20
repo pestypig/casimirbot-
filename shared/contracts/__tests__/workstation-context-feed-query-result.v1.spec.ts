@@ -169,6 +169,9 @@ const resultFixture = (
         ref.startsWith("workstation_actuator:query_source_health") ||
         ref.startsWith("workstation_actuator:repair_source")
       ),
+      actuatorRefs: allRefs.filter((ref) =>
+        ref.startsWith("workstation_actuator:")
+      ),
       traceMemoryRefs: allRefs.filter((ref) =>
         ref.startsWith("trace_memory:") ||
         ref.startsWith("trace-memory:") ||
@@ -204,6 +207,7 @@ const resultFixture = (
       freshnessStatus: entry.freshness.status,
       assistant_answer: false,
       terminal_eligible: false,
+      raw_content_included: false,
     };
   });
   const agentGoalSessions = overrides.agentGoalSessions ?? [agentGoalSession];
@@ -244,6 +248,7 @@ const resultFixture = (
     ...matchedContextFeedRefs.map((feedRef) => `agent_goal_context_feed:${feedRef}`),
     ...matchedAllowedActuatorRefs,
   ];
+  const goalContextUpdateId = overrides.goalContextUpdateId ?? "stage_play_goal_context_update:route_watch:feed-query";
   const sourceRefs = overrides.sourceRefs ?? ["visual_source:image-lens"];
   const loopRefs = overrides.loopRefs ?? [
     "thread:helix-ask:desktop",
@@ -252,6 +257,7 @@ const resultFixture = (
     `workstation_actuator:${requiredActuator}`,
   ];
   const evidenceRefs = overrides.evidenceRefs ?? [
+    goalContextUpdateId,
     resultId,
     ...policyEvidenceRefs,
     ...matchedContextFeedRefs,
@@ -300,7 +306,7 @@ const resultFixture = (
       processedPacketCount: 0,
       microReasonerRunCount: 0,
     },
-    goalContextUpdateId: "stage_play_goal_context_update:route_watch:feed-query",
+    goalContextUpdateId,
     terminalAuthority: {
       status: "not_terminal",
       finalAnswerEligible: false,
@@ -362,6 +368,26 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
   });
 
   it("requires feed query results to carry source, loop, evidence, and freshness proof refs", () => {
+    expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
+      evidenceRefs: [
+        "stage_play_context_feed_query:visual_summaries:frog",
+        "context_feed:visual_summaries",
+        "allowed_actuator:query_visual_summaries",
+        "agent_goal_context_feed:feed:visual_summaries",
+        "agent_goal_allowed_actuator:query_visual_summaries",
+        "feed:visual_summaries",
+        "visual_source:image-lens",
+        "thread:helix-ask:desktop",
+        "stage_play_mail_loop:helix-ask:desktop",
+        "workstation_context_feed:visual_summaries",
+        "workstation_actuator:query_visual_summaries",
+        "stage_play_goal_context_update:visual:1",
+        "stage_play_live_source_mail:frog",
+      ],
+    }))).toEqual(expect.arrayContaining([
+      "evidenceRefs must include goalContextUpdateId",
+    ]));
+
     expect(validateWorkstationContextFeedQueryResultV1(resultFixture({
       loopRefs: ["thread:helix-ask:desktop"],
       evidenceRefs: [
@@ -562,6 +588,7 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
         transcriptRefs: [],
         projectionRefs: [],
         sourceHealthRefs: [],
+        actuatorRefs: [],
         traceMemoryRefs: [],
         narratorRefs: "not-array" as unknown as string[],
         routeWatchRefs: [],
@@ -570,12 +597,14 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
         freshnessStatus: "stale",
         assistant_answer: true as false,
         terminal_eligible: true as false,
+        raw_content_included: true as false,
       }],
     } as Partial<WorkstationContextFeedQueryResultV1>))).toEqual(expect.arrayContaining([
       "packetCircuitRefs[0].updateId must match a goalContextUpdates item",
       "packetCircuitRefs[0].narratorRefs must be an array",
       "packetCircuitRefs[0].assistant_answer must be false",
       "packetCircuitRefs[0].terminal_eligible must be false",
+      "packetCircuitRefs[0].raw_content_included must be false",
     ]));
   });
 
@@ -762,6 +791,9 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
     expect(result.packetCircuitRefs[0].automationRefs).toEqual([
       "stage_play_live_source_watch_job_policy:route-watch",
     ]);
+    expect(result.packetCircuitRefs[0].actuatorRefs).toEqual(expect.arrayContaining([
+      "workstation_actuator:query_route_evidence",
+    ]));
     expect(result.packetCircuitRefs[0].traceMemoryRefs).toEqual([]);
     expect(result.packetCircuitRefs[0].routeWatchRefs).toEqual(expect.arrayContaining([
       "workstation_context_feed:route_evidence",
@@ -812,6 +844,9 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
       "workstation_context_feed:trace_memory",
       "workstation_actuator:query_trace_memory",
       "workstation_trace_memory:frog-routing",
+    ]));
+    expect(result.packetCircuitRefs[0].actuatorRefs).toEqual(expect.arrayContaining([
+      "workstation_actuator:query_trace_memory",
     ]));
     expect(result.packetCircuitRefs[0]).toMatchObject({
       assistant_answer: false,
@@ -865,10 +900,139 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
       "workstation_context_feed:narrator_events",
       "workstation_actuator:narrator_bind_stream",
     ]));
+    expect(result.packetCircuitRefs[0].actuatorRefs).toEqual(expect.arrayContaining([
+      "workstation_actuator:query_narrator_events",
+      "workstation_actuator:narrator_bind_stream",
+    ]));
     expect(result.packetCircuitRefs[0]).toMatchObject({
       assistant_answer: false,
       terminal_eligible: false,
     });
+  });
+
+  it("accepts full reasoning-circuit updates on the packet-trace lane", () => {
+    const liveAnswerUpdate = updateFixture({
+      updateId: "stage_play_goal_context_update:packet-live-answer",
+      producerKind: "live_answer",
+      updateKind: "summary",
+      contentRef: "live_answer_projection:frog",
+      sourceRefs: ["live-answer:desktop"],
+      loopRefs: ["live_answer_projection_loop:frog"],
+      evidenceRefs: ["live_answer_projection:frog", "live-answer:desktop", "live_answer_projection_loop:frog"],
+      receiptRefs: ["live_answer_projection:frog"],
+      preview: "Live Answer projection joined the packet trace.",
+    });
+    const sourceHealthUpdate = updateFixture({
+      updateId: "stage_play_goal_context_update:packet-source-health",
+      producerKind: "source_health",
+      updateKind: "source_status",
+      contentRef: "stage_play_source_health:visual-tab",
+      sourceRefs: ["source:visual-tab"],
+      loopRefs: ["source_health_watch:visual-tab"],
+      evidenceRefs: ["stage_play_source_health:visual-tab", "source:visual-tab", "source_health_watch:visual-tab"],
+      receiptRefs: ["stage_play_source_health:visual-tab"],
+      preview: "Source health joined the packet trace.",
+    });
+    const narratorUpdate = updateFixture({
+      updateId: "stage_play_goal_context_update:packet-narrator",
+      producerKind: "narrator",
+      updateKind: "suggested_action",
+      contentRef: "helix_narrator_bind_stream_request:frog",
+      sourceRefs: ["source:browser-audio", "translated_transcript"],
+      loopRefs: ["narrator:bind_stream", "workstation_context_feed:narrator_events", "workstation_actuator:narrator_bind_stream"],
+      evidenceRefs: [
+        "helix_narrator_bind_stream_request:frog",
+        "source:browser-audio",
+        "translated_transcript",
+        "narrator:bind_stream",
+        "workstation_context_feed:narrator_events",
+        "workstation_actuator:narrator_bind_stream",
+      ],
+      receiptRefs: ["helix_narrator_bind_stream_request:frog"],
+      preview: "Narrator binding joined the packet trace.",
+    });
+    const automationUpdate = updateFixture({
+      updateId: "stage_play_goal_context_update:packet-automation",
+      producerKind: "automation",
+      updateKind: "automation_status",
+      contentRef: "automation_policy:frog-route-watch",
+      sourceRefs: ["source:visual-tab"],
+      loopRefs: ["stage_play_live_source_watch_job:frog", "automation_policy:frog-route-watch"],
+      evidenceRefs: [
+        "automation_policy:frog-route-watch",
+        "source:visual-tab",
+        "stage_play_live_source_watch_job:frog",
+      ],
+      receiptRefs: ["automation_policy:frog-route-watch"],
+      preview: "Automation policy joined the packet trace.",
+    });
+    const traceMemoryUpdate = updateFixture({
+      updateId: "stage_play_goal_context_update:packet-trace-memory",
+      producerKind: "trace_memory",
+      updateKind: "reflection",
+      contentRef: "trace_memory:frog-routing",
+      sourceRefs: ["visual_source:image-lens"],
+      loopRefs: ["workstation_context_feed:trace_memory", "workstation_actuator:query_trace_memory"],
+      evidenceRefs: [
+        "trace_memory:frog-routing",
+        "visual_source:image-lens",
+        "workstation_context_feed:trace_memory",
+        "workstation_actuator:query_trace_memory",
+      ],
+      receiptRefs: ["workstation_trace_memory:frog-routing"],
+      preview: "Trace memory joined the packet trace.",
+    });
+
+    const result = resultFixture({
+      resultId: "stage_play_context_feed_query:packet_traces:full-circuit",
+      feedKind: "packet_traces",
+      label: "packet traces",
+      requiredActuator: "query_packet_traces",
+      policyEvidenceRefs: [
+        "context_feed:packet_traces",
+        "allowed_actuator:query_packet_traces",
+        "agent_goal_context_feed:feed:packet_traces",
+        "agent_goal_allowed_actuator:query_packet_traces",
+      ],
+      goalContextUpdates: [
+        liveAnswerUpdate,
+        sourceHealthUpdate,
+        narratorUpdate,
+        automationUpdate,
+        traceMemoryUpdate,
+      ],
+      updateCount: 5,
+    });
+
+    expect(validateWorkstationContextFeedQueryResultV1(result)).toEqual([]);
+    expect(result.packetCircuitRefs).toHaveLength(5);
+    expect(result.packetCircuitRefs[0].projectionRefs).toEqual(expect.arrayContaining([
+      "live_answer_projection:frog",
+    ]));
+    expect(result.packetCircuitRefs[0].actuatorRefs).toEqual(expect.arrayContaining([
+      "workstation_actuator:query_packet_traces",
+    ]));
+    expect(result.packetCircuitRefs[1].sourceHealthRefs).toEqual(expect.arrayContaining([
+      "stage_play_source_health:visual-tab",
+    ]));
+    expect(result.packetCircuitRefs[2].narratorRefs).toEqual(expect.arrayContaining([
+      "helix_narrator_bind_stream_request:frog",
+      "narrator:bind_stream",
+    ]));
+    expect(result.packetCircuitRefs[3].automationRefs).toEqual(expect.arrayContaining([
+      "automation_policy:frog-route-watch",
+    ]));
+    expect(result.packetCircuitRefs[4].traceMemoryRefs).toEqual(expect.arrayContaining([
+      "trace_memory:frog-routing",
+      "workstation_context_feed:trace_memory",
+      "workstation_actuator:query_trace_memory",
+    ]));
+    expect(result.packetCircuitRefs).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        assistant_answer: false,
+        terminal_eligible: false,
+      }),
+    ]));
   });
 
   it("keeps audio and translated transcript feed refs in packet circuit records", () => {
@@ -894,6 +1058,9 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
     expect(validateWorkstationContextFeedQueryResultV1(audioResult)).toEqual([]);
     expect(audioResult.packetCircuitRefs[0].transcriptRefs).toEqual([
       "workstation_context_feed:audio_transcripts",
+      "workstation_actuator:query_audio_transcripts",
+    ]);
+    expect(audioResult.packetCircuitRefs[0].actuatorRefs).toEqual([
       "workstation_actuator:query_audio_transcripts",
     ]);
     expect(audioResult.packetCircuitRefs[0]).toMatchObject({
@@ -923,6 +1090,9 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
     expect(validateWorkstationContextFeedQueryResultV1(translationResult)).toEqual([]);
     expect(translationResult.packetCircuitRefs[0].transcriptRefs).toEqual([
       "workstation_context_feed:translated_transcripts",
+      "workstation_actuator:query_translation_segments",
+    ]);
+    expect(translationResult.packetCircuitRefs[0].actuatorRefs).toEqual([
       "workstation_actuator:query_translation_segments",
     ]);
     expect(translationResult.packetCircuitRefs[0]).toMatchObject({
@@ -958,6 +1128,9 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
       "workstation_context_feed:live_answer_lines",
       "workstation_actuator:query_live_answer_state",
     ]));
+    expect(liveAnswerResult.packetCircuitRefs[0].actuatorRefs).toEqual([
+      "workstation_actuator:query_live_answer_state",
+    ]);
     expect(liveAnswerResult.packetCircuitRefs[0]).toMatchObject({
       assistant_answer: false,
       terminal_eligible: false,
@@ -988,6 +1161,9 @@ describe("stage_play_workstation_context_feed_query_result/v1", () => {
       "workstation_context_feed:source_health",
       "workstation_actuator:query_source_health",
     ]));
+    expect(sourceHealthResult.packetCircuitRefs[0].actuatorRefs).toEqual([
+      "workstation_actuator:query_source_health",
+    ]);
     expect(sourceHealthResult.packetCircuitRefs[0]).toMatchObject({
       assistant_answer: false,
       terminal_eligible: false,

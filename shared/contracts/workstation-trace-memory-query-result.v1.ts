@@ -187,6 +187,9 @@ export function validateWorkstationTraceMemoryQueryResultV1(
     if (isNonEmptyString(value.resultId) && !value.evidenceRefs.includes(value.resultId)) {
       issues.push("evidenceRefs must include resultId");
     }
+    if (isNonEmptyString(value.goalContextUpdateId) && !value.evidenceRefs.includes(value.goalContextUpdateId)) {
+      issues.push("evidenceRefs must include goalContextUpdateId");
+    }
     if (Array.isArray(value.policyEvidenceRefs)) {
       for (const ref of value.policyEvidenceRefs) {
         if (!value.evidenceRefs.includes(ref)) {

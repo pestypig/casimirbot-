@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { HELIX_INTERNET_SEARCH_CAPABILITY } from "@shared/helix-internet-search-observation";
-import { HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY } from "@shared/helix-scholarly-research-observation";
+import {
+  HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+  HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+} from "@shared/helix-scholarly-research-observation";
 import type { HelixToolCallAdmissionDecision } from "@shared/helix-tool-call-admission";
 import { buildHelixCapabilityItinerary } from "../services/helix-ask/capability-itinerary";
 import { buildHelixCapabilityItineraryExecutionState } from "../services/helix-ask/capability-itinerary-execution";
@@ -573,6 +576,121 @@ describe("Helix Ask capability itinerary", () => {
     expect(itinerary.not_terminal).toBe(true);
     expect(itinerary.assistant_answer).toBe(false);
     expect(itinerary.raw_content_included).toBe(false);
+  });
+
+  it("requires frontier candidate and literature-map observations for scholarly theory frontier prompts", () => {
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:frontier-seed-finder",
+      promptText:
+        "Use scholarly papers and full text to run the Theory Frontier Seed Finder on missing intermediate badges in the theory badge graph, then map extracted equations back to semantic chunks.",
+      toolCallAdmissionDecision: scholarlyAdmission("ask:frontier-seed-finder"),
+      availableCapabilities: availableCapabilities([
+        HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+        "helix_ask.reflect_theory_context",
+      ]),
+    });
+
+    expect(itinerary.prompt_shape).toBe("compound_tool");
+    expect(itinerary.relevant_tool_families).toEqual(["scholarly_research", "theory_locator"]);
+    expect(itinerary.planned_steps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          step_id: "collect_scholarly_evidence",
+          tool_family: "scholarly_research",
+          required_observation_kinds: [
+            "scholarly_research_observation",
+            "scholarly_full_text_observation",
+            "theory_frontier_literature_map",
+          ],
+          purpose: expect.stringContaining("literature must not promote theory edges"),
+        }),
+        expect.objectContaining({
+          step_id: "locate_theory_context",
+          tool_family: "theory_locator",
+          required_observation_kinds: expect.arrayContaining([
+            "theory_frontier_search",
+            "theory_frontier_candidate",
+            "theory_frontier_exact_contract_verification",
+          ]),
+          purpose: expect.stringContaining("non-terminal theory frontier placement evidence"),
+        }),
+      ]),
+    );
+    expect(itinerary.reasoning_criteria).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ criterion_id: "theory_frontier_candidate_grounding" }),
+        expect.objectContaining({ criterion_id: "frontier_literature_mapping_boundary" }),
+      ]),
+    );
+    expect(itinerary.terminal_success_criteria.typed_failure_codes).toEqual(
+      expect.arrayContaining([
+        "theory_frontier_candidate_missing",
+        "theory_frontier_exact_verification_missing",
+        "theory_frontier_literature_map_missing",
+      ]),
+    );
+    expect(itinerary.authority).toBe("planning_only");
+    expect(itinerary.not_terminal).toBe(true);
+    expect(itinerary.assistant_answer).toBe(false);
+    expect(itinerary.raw_content_included).toBe(false);
+  });
+
+  it("counts frontier search artifacts as theory locator observations", () => {
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:frontier-observed",
+      promptText:
+        "Run the Theory Frontier Seed Finder for missing intermediate badges in the theory badge graph.",
+      toolCallAdmissionDecision: {
+        ...scholarlyAdmission("ask:frontier-observed"),
+        admitted_tool_families: ["theory_locator"],
+      },
+      availableCapabilities: availableCapabilities(["helix_ask.reflect_theory_context"]),
+    });
+
+    const state = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [
+        {
+          artifact_id: "frontier:search:test",
+          kind: "theory_frontier_search",
+          payload: {
+            schemaVersion: "theory_frontier_search/v1",
+          },
+        },
+      ],
+    });
+
+    expect(state.observed_families).toContain("theory_locator");
+    expect(state.missing_observation_families).not.toContain("theory_locator");
+  });
+
+  it("counts frontier literature maps as scholarly evidence re-entry observations", () => {
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:frontier-literature-observed",
+      promptText:
+        "Use scholarly papers and full text to run the Theory Frontier Seed Finder and map extracted equations back to semantic chunks.",
+      toolCallAdmissionDecision: scholarlyAdmission("ask:frontier-literature-observed"),
+      availableCapabilities: availableCapabilities([
+        HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+        "helix_ask.reflect_theory_context",
+      ]),
+    });
+
+    const state = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [
+        {
+          artifact_id: "frontier:literature-map:test",
+          kind: "theory_frontier_literature_map",
+          payload: {
+            schemaVersion: "theory_frontier_literature_map/v1",
+          },
+        },
+      ],
+    });
+
+    expect(state.observed_families).toContain("scholarly_research");
+    expect(state.missing_observation_families).not.toContain("scholarly_research");
   });
 
   it("marks the locator missing when a compound prompt requires graph placement but no locator is visible", () => {

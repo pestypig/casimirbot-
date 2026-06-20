@@ -627,21 +627,7 @@ const liveAnswerVisualSummaryUpdate = (update: WorkstationGoalContextUpdateV1): 
 };
 
 const liveAnswerPacketTraceUpdate = (update: WorkstationGoalContextUpdateV1): boolean => {
-  const refs = [
-    update.contentRef,
-    ...update.evidenceRefs,
-    ...update.receiptRefs,
-    ...update.loopRefs,
-    ...update.sourceRefs,
-  ];
-  return refs.some((ref) =>
-    ref.includes("stage_play_packet_trace_query") ||
-    ref.includes("packet_trace_query") ||
-    ref.includes("packet_traces") ||
-    ref.includes("live_source_trace:") ||
-    ref.includes("stage_play_processed_mail_packet:") ||
-    ref.includes("processed_mail_packet")
-  );
+  return Boolean(update.updateId && update.contentRef);
 };
 
 const liveAnswerFeedQueryUpdate = (update: WorkstationGoalContextUpdateV1): boolean => {
@@ -678,6 +664,20 @@ const liveAnswerActuatorPolicyRefsForUpdate = (update: WorkstationGoalContextUpd
 
 const liveAnswerFreshnessFilterRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
   Array.from(new Set(update.evidenceRefs.filter((ref) => ref.startsWith("freshness_filter:"))));
+
+const liveAnswerMicroDeckRefsForUpdate = (update: WorkstationGoalContextUpdateV1): string[] =>
+  Array.from(new Set([
+    update.contentRef,
+    ...update.sourceRefs,
+    ...update.loopRefs,
+    ...update.evidenceRefs,
+    ...update.receiptRefs,
+  ].filter((ref) =>
+    /^microdeck:|^microdeck[-_]|^micro_reasoner:|^stage_play_micro_reasoner_|^workstation_context_feed:microdeck_outputs|^workstation_actuator:query_microdeck_outputs|prompt_preset/i.test(ref)
+  )));
+
+const countLiveAnswerMicroDeckRefs = (refs: string[], patterns: RegExp[]): number =>
+  refs.filter((ref) => patterns.some((pattern) => pattern.test(ref))).length;
 
 const liveAnswerPacketCircuitRefsForUpdate = (update: WorkstationGoalContextUpdateV1): LiveAnswerPacketCircuitRef[] => {
   const refs = Array.from(new Set([
@@ -732,6 +732,9 @@ const liveAnswerPacketCircuitRefsForUpdate = (update: WorkstationGoalContextUpda
       ref.startsWith("workstation_actuator:query_source_health") ||
       ref.startsWith("workstation_actuator:repair_source")
     ),
+    actuatorRefs: refs.filter((ref) =>
+      ref.startsWith("workstation_actuator:")
+    ),
     traceMemoryRefs: refs.filter((ref) =>
       ref.startsWith("trace_memory:") ||
       ref.startsWith("trace-memory:") ||
@@ -769,6 +772,7 @@ const liveAnswerPacketCircuitRefsForUpdate = (update: WorkstationGoalContextUpda
     freshnessStatus: update.freshness.status,
     assistantAnswer: update.authority.assistantAnswer,
     terminalEligible: update.authority.terminalEligible,
+    rawContentIncluded: update.authority.rawContentIncluded,
   }];
 };
 
@@ -1950,6 +1954,10 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
   );
   const liveAnswerCircuitSummary = useMemo(() => {
     const dispatches = goalContextUpdates.flatMap((update: WorkstationGoalContextUpdateV1) => update.suggestedDispatch);
+    const microDeckRefs = Array.from(new Set(goalContextUpdates.flatMap(liveAnswerMicroDeckRefsForUpdate)));
+    const microDeckFeedSessionCount = agentGoalSessions.filter((session: AgentGoalSessionV1) =>
+      session.contextFeeds.some((feed) => feed.sourceKind === "microdeck_outputs")
+    ).length;
     return {
       updateCount: goalContextUpdates.length,
       observationOnlyCount: goalContextUpdates.filter((update: WorkstationGoalContextUpdateV1) =>
@@ -1987,6 +1995,14 @@ export function LiveAnswerEnvironmentPanel({ threadId = "helix-ask:desktop" }: {
         agentGoalSessions.filter((session: AgentGoalSessionV1) =>
           session.contextFeeds.some((feed) => feed.sourceKind === "microdeck_outputs")
         ).length,
+      microdeckLifecycleCount: microDeckRefs.length + microDeckFeedSessionCount,
+      microdeckPresetCreateCount: countLiveAnswerMicroDeckRefs(microDeckRefs, [/^microdeck:preset_create/i]),
+      microdeckPresetStateCount: countLiveAnswerMicroDeckRefs(microDeckRefs, [/^microdeck:preset_state/i, /^microdeck-output:/i, /^microdeck_output:/i]),
+      microdeckPresetQueryCount: countLiveAnswerMicroDeckRefs(microDeckRefs, [/^microdeck:preset_query/i, /^workstation_context_feed:microdeck_outputs/i, /^workstation_actuator:query_microdeck_outputs/i]),
+      microdeckPresetDraftCount: countLiveAnswerMicroDeckRefs(microDeckRefs, [/^microdeck:preset_draft/i]),
+      microdeckPromptRouteCount: countLiveAnswerMicroDeckRefs(microDeckRefs, [/^microdeck:prompt_route/i]),
+      microdeckPromptUpdateCount: countLiveAnswerMicroDeckRefs(microDeckRefs, [/^microdeck:prompt_update/i]),
+      microdeckPromptTestCount: countLiveAnswerMicroDeckRefs(microDeckRefs, [/^microdeck:prompt_test/i]),
       visualSummaryCount: goalContextUpdates.filter(liveAnswerVisualSummaryUpdate).length +
         agentGoalSessions.filter((session: AgentGoalSessionV1) =>
           session.contextFeeds.some((feed) => feed.sourceKind === "visual_summaries")

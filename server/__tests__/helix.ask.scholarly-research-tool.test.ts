@@ -1001,6 +1001,227 @@ describe("Helix scholarly research tool admission", () => {
     expect(afterObservation).toBeNull();
   });
 
+  it("builds a preferred scholarly lookup step from frontier search replay requests", () => {
+    const availableCapabilities = {
+      schema: "helix.available_capabilities.v1",
+      turn_id: "ask:frontier-preferred-scholarly-step",
+      manifest_role: "model_visible_tool_menu",
+      tool_manifest_version: "helix.ask.capability_manifest.v1",
+      user_goal_summary: "Run the Theory Frontier Seed Finder and inspect unresolved candidate regions.",
+      canonical_goal_kind: "theory_context_reflection",
+      recommended_capability_key: "helix_ask.reflect_theory_context",
+      classifier_hints: [],
+      capabilities: [
+        {
+          capability_key: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+          label: "Do research on papers, DOI, citations, journals, and references",
+          lane: "retrieval",
+          requires_action: true,
+          expected_artifacts: ["scholarly_research_observation"],
+          goal_fit: "primary",
+          reason: "Visible because frontier search produced a bounded scholarly lookup request.",
+          model_visible_name: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+          model_visible_description: "Lookup scholarly papers.",
+          model_visible_input_schema: { properties: { query: { type: "string" } } },
+          availability: "available",
+        },
+      ],
+      model_visible_capability_keys: [HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY],
+      assistant_answer: false,
+      raw_content_included: false,
+    } as any;
+    const frontierSearchArtifact = {
+      artifact_id: "frontier_search:preferred-scholarly",
+      kind: "theory_frontier_search",
+      producer_item_id: "agent_runtime_theory_locator_tool",
+      payload_ref: "inline",
+      payload: {
+        kind: "theory_frontier_search",
+        artifact_v1: {
+          artifactId: "theory_frontier_search",
+          schemaVersion: "theory_frontier_search/v1",
+          scholarlyLookupRequests: [
+            {
+              requestId: "scholarly_lookup:frontier-test",
+              candidateId: "frontier:test",
+              targetSource: "scholarly_research",
+              requestedOutputs: ["scholarly_paper_refs", "doi_metadata", "scholarly_full_text", "paper_pdf_pages"],
+              query: "qei_margin source residual first principles",
+              badgeIds: ["nhm2.qei.sampling_window"],
+              renderChunkIds: ["render:qei"],
+              semanticChunkIds: ["semantic:qei"],
+              reason: "High-value unresolved frontier candidate requires scholarly references as bounded evidence only.",
+              mutating: false,
+              noAutoPromoteLiterature: true,
+            },
+          ],
+        },
+      },
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+
+    const preferred = __testHelixAgentStepDecisionHints.buildHelixPreferredFrontierScholarlyLookupDecisionJson({
+      availableCapabilities,
+      currentTurnArtifacts: [frontierSearchArtifact] as any,
+    });
+
+    expect(preferred).toMatchObject({
+      next_step: "next_action",
+      chosen_capability: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      args: { query: "qei_margin source residual first principles" },
+      expected_artifacts: ["scholarly_research_observation"],
+      commentary: {
+        observation_summary: "Frontier candidate frontier:test has no scholarly observation yet.",
+      },
+    });
+
+    const afterObservation = __testHelixAgentStepDecisionHints.buildHelixPreferredFrontierScholarlyLookupDecisionJson({
+      availableCapabilities,
+      currentTurnArtifacts: [
+        frontierSearchArtifact,
+        {
+          artifact_id: "ask:frontier-preferred-scholarly-step:scholarly_research_observation",
+          kind: "scholarly_research_observation",
+          producer_item_id: "agent_runtime_scholarly_research_tool",
+          payload_ref: "inline",
+          payload: {
+            schema: "helix.scholarly_research_observation.v1",
+            papers: [],
+          },
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ] as any,
+    });
+    expect(afterObservation).toBeNull();
+  });
+
+  it("builds a preferred full-text step from frontier scholarly lookup results", () => {
+    const availableCapabilities = {
+      schema: "helix.available_capabilities.v1",
+      turn_id: "ask:frontier-preferred-full-text-step",
+      manifest_role: "model_visible_tool_menu",
+      tool_manifest_version: "helix.ask.capability_manifest.v1",
+      user_goal_summary: "Run the Theory Frontier Seed Finder and inspect unresolved candidate regions.",
+      canonical_goal_kind: "theory_context_reflection",
+      recommended_capability_key: "helix_ask.reflect_theory_context",
+      classifier_hints: [],
+      capabilities: [
+        {
+          capability_key: HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+          label: "Fetch and extract scholarly PDF or full text",
+          lane: "retrieval",
+          requires_action: true,
+          expected_artifacts: ["scholarly_full_text_observation"],
+          goal_fit: "primary",
+          reason: "Visible because frontier search requested full text for a bounded scholarly candidate.",
+          model_visible_name: HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+          model_visible_description: "Fetch scholarly full text.",
+          model_visible_input_schema: { properties: { paper_result_id: { type: "string" } } },
+          availability: "available",
+        },
+      ],
+      model_visible_capability_keys: [HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY],
+      assistant_answer: false,
+      raw_content_included: false,
+    } as any;
+    const frontierSearchArtifact = {
+      artifact_id: "frontier_search:preferred-full-text",
+      kind: "theory_frontier_search",
+      producer_item_id: "agent_runtime_theory_locator_tool",
+      payload_ref: "inline",
+      payload: {
+        kind: "theory_frontier_search",
+        artifact_v1: {
+          artifactId: "theory_frontier_search",
+          schemaVersion: "theory_frontier_search/v1",
+          scholarlyLookupRequests: [
+            {
+              requestId: "scholarly_lookup:frontier-full-text",
+              candidateId: "frontier:full-text",
+              targetSource: "scholarly_research",
+              requestedOutputs: ["scholarly_paper_refs", "doi_metadata", "scholarly_full_text", "paper_pdf_pages"],
+              query: "negative energy density quantum inequalities first principles",
+              badgeIds: ["nhm2.qei.sampling_window"],
+              renderChunkIds: ["render:qei"],
+              semanticChunkIds: ["semantic:qei"],
+              reason: "High-value unresolved frontier candidate requires full-text evidence as bounded context only.",
+              mutating: false,
+              noAutoPromoteLiterature: true,
+            },
+          ],
+        },
+      },
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const scholarlyObservation = {
+      artifact_id: "ask:frontier-preferred-full-text-step:scholarly_research_observation",
+      kind: "scholarly_research_observation",
+      producer_item_id: "agent_runtime_scholarly_research_tool",
+      payload_ref: "inline",
+      payload: {
+        schema: "helix.scholarly_research_observation.v1",
+        papers: [
+          {
+            result_id: "paper:qei-1",
+            title: "Quantum inequalities and negative energy density",
+            identifiers: {
+              doi: "10.1000/qei",
+              pdf_url: "https://example.test/qei.pdf",
+            },
+          },
+        ],
+      },
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+
+    const preferred = __testHelixAgentStepDecisionHints.buildHelixPreferredFrontierScholarlyFullTextDecisionJson({
+      availableCapabilities,
+      currentTurnArtifacts: [frontierSearchArtifact, scholarlyObservation] as any,
+    });
+
+    expect(preferred).toMatchObject({
+      next_step: "next_action",
+      chosen_capability: HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      args: {
+        query: "negative energy density quantum inequalities first principles",
+        paper_result_id: "paper:qei-1",
+        source_url: "https://example.test/qei.pdf",
+      },
+      expected_artifacts: ["scholarly_full_text_observation"],
+      commentary: {
+        observation_summary: "Frontier candidate frontier:full-text has scholarly metadata but no full-text observation yet.",
+      },
+    });
+
+    const afterFullText = __testHelixAgentStepDecisionHints.buildHelixPreferredFrontierScholarlyFullTextDecisionJson({
+      availableCapabilities,
+      currentTurnArtifacts: [
+        frontierSearchArtifact,
+        scholarlyObservation,
+        {
+          artifact_id: "ask:frontier-preferred-full-text-step:scholarly_full_text_observation",
+          kind: "scholarly_full_text_observation",
+          producer_item_id: "agent_runtime_scholarly_research_tool",
+          payload_ref: "inline",
+          payload: {
+            schema: "helix.scholarly_full_text_observation.v1",
+            pages_parsed: 1,
+            selected_chunks: [],
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ] as any,
+    });
+    expect(afterFullText).toBeNull();
+  });
+
   it("rejects runtime tool calls outside the admitted tool family", () => {
     const availableCapabilities = {
       schema: "helix.available_capabilities.v1",

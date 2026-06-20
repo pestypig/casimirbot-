@@ -166,6 +166,48 @@ describe("Helix capability plan contract", () => {
     });
   });
 
+  it("collects frontier literature maps as non-terminal capability evidence", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:frontier-literature-map",
+      promptText:
+        "Use scholarly papers and full text to run the Theory Frontier Seed Finder and map extracted equations back to semantic chunks.",
+      sourceTargetIntent: baseSourceTarget("scholarly_research"),
+      toolCallAdmissionDecision: toolAdmission("scholarly_research", ["scholarly_research", "theory_locator"]),
+      canonicalGoalFrame: canonicalGoal("scholarly_research_lookup", "scholarly_research_answer"),
+    });
+
+    const result = buildCapabilityResultGate({
+      plan,
+      terminalArtifactKind: null,
+      terminalArtifactId: null,
+      currentTurnArtifacts: [
+        {
+          artifact_id: "ask:frontier-literature-map:theory_frontier_literature_map",
+          kind: "theory_frontier_literature_map",
+          turn_id: "ask:frontier-literature-map",
+          payload: {
+            schemaVersion: "theory_frontier_literature_map/v1",
+            authority: {
+              assistant_answer: false,
+              terminal_eligible: false,
+              promotionAllowed: false,
+            },
+          },
+        },
+      ],
+      reenteredRefs: ["ask:frontier-literature-map:theory_frontier_literature_map"],
+    });
+
+    expect(result).toMatchObject({
+      status: "succeeded",
+      evidence_refs: expect.arrayContaining(["ask:frontier-literature-map:theory_frontier_literature_map"]),
+      selected_for_answer: false,
+      reentered_solver: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    });
+  });
+
   it("treats a future click mention inside a visual review prompt as contextual, not an admitted workstation action", () => {
     const plan = buildCapabilityPlan({
       turnId: "ask:visual-before-click",
@@ -1039,6 +1081,13 @@ describe("Helix capability plan contract", () => {
 
   it.each([
     {
+      label: "active goal sessions",
+      capability: "live_env.query_workstation_goal_context",
+      observationKind: "stage_play_workstation_goal_context_read_result",
+      extraObservationKinds: ["helix.agent_goal_session.v1"],
+      prompt: "Run active_goal_sessions goal_id=goal:frog context_feed_kind=packet_traces allowed_actuator=narrator_bind_stream.",
+    },
+    {
       label: "source health",
       capability: "live_env.query_source_health",
       observationKind: "helix.situation_source_capability_read.v1",
@@ -1104,7 +1153,7 @@ describe("Helix capability plan contract", () => {
       observationKind: "stage_play_workstation_context_feed_query_result/v1",
       prompt: "Run live_env.query_automation_policies goal_id=goal:frog source_ref=automation:frog-watch.",
     },
-  ])("routes explicit workstation query contract: $label", ({ prompt, capability, observationKind }) => {
+  ])("routes explicit workstation query contract: $label", ({ prompt, capability, observationKind, extraObservationKinds = [] }) => {
     const plan = buildCapabilityPlan({
       turnId: `ask:${capability.replace(/[^a-z0-9]+/gi, "-")}`,
       promptText: prompt,
@@ -1132,6 +1181,7 @@ describe("Helix capability plan contract", () => {
       required_observation_kinds: expect.arrayContaining([
         "live_environment_tool_observation",
         observationKind,
+        ...extraObservationKinds,
         "helix.workstation_goal_context_update.v1",
       ]),
       required_terminal_kind: "model_synthesized_answer",
@@ -1242,7 +1292,7 @@ describe("Helix capability plan contract", () => {
     {
       label: "source repair",
       prompt:
-        "Run live_env.repair_workstation_source goal_id=goal:frog loop_ref=loop:visual-mail.",
+        "Run live_env.repair_workstation_source goal_id=goal:frog source_ref=source:visual-tab.",
       capability: "live_env.repair_workstation_source",
       observationKind: "stage_play_workstation_control_receipt",
       terminalKind: "workstation_tool_evaluation",
@@ -1345,7 +1395,7 @@ describe("Helix capability plan contract", () => {
     },
     {
       prompt:
-        "If we run live_env.repair_workstation_source later, what loop refs should we gather?",
+        "If we run live_env.repair_source later, what source refs should we gather?",
       mandatory: "live_env.repair_workstation_source",
     },
   ])("suppresses contextual workstation control mention: $mandatory", ({ prompt, mandatory }) => {
