@@ -100,4 +100,38 @@ describe("theory_frontier_literature_map/v1", () => {
       ]),
     );
   });
+
+  it("rejects malformed retrieval outputs and authority evidence effects", () => {
+    const map = buildMap();
+    const unsafe = {
+      ...map,
+      sources: [
+        {
+          ...map.sources[0],
+          retrieval: {
+            ...map.sources[0].retrieval,
+            requestedOutputs: ["scholarly_paper_refs", "promote_theory_edge"],
+            fullTextRetrieved: true,
+            fullTextDigest: "",
+          },
+        },
+      ],
+      authority: {
+        ...map.authority,
+        allowedEvidenceEffects: ["support_existing_context", "validate_theory"],
+      },
+    };
+
+    expect(validateTheoryFrontierLiteratureMapV1(unsafe)).toEqual(
+      expect.arrayContaining([
+        "sources[0].retrieval.requestedOutputs contains invalid output promote_theory_edge",
+        "sources[0].retrieval.fullTextDigest must be non-empty when fullTextRetrieved is true",
+        "authority.allowedEvidenceEffects contains invalid effect validate_theory",
+        "authority.allowedEvidenceEffects must include conflict_with_badge",
+        "authority.allowedEvidenceEffects must include identify_missing_evidence",
+        "authority.allowedEvidenceEffects must include suggest_missing_badge",
+        "authority.allowedEvidenceEffects must include unrelated",
+      ]),
+    );
+  });
 });

@@ -14,6 +14,7 @@ export type HelixCompoundCapabilitySynthesisReadiness = {
   complete: boolean;
   synthesis_required: boolean;
   has_final_answer_draft: boolean;
+  has_materialized_terminal_artifact: boolean;
   has_docs_subgoal: boolean;
   has_failed_subgoal: boolean;
   support_refs: string[];
@@ -53,22 +54,34 @@ const hasFinalAnswerDraft = (payload: RecordLike, artifacts: ArtifactLike[]): bo
   finalAnswerDraftRecords(payload, artifacts)
     .some((draft) => Boolean(readString(draft.text) ?? readString(draft.answer_text)));
 
-const hasTerminalFinalAnswerDraft = (
+const hasMaterializedTerminalArtifact = (
   payload: RecordLike,
   artifacts: ArtifactLike[],
   requiredTerminalKind: string | undefined,
-): boolean =>
-  finalAnswerDraftRecords(payload, artifacts)
-    .some((draft) => {
-      const text = readString(draft.text) ?? readString(draft.answer_text);
-      if (!text) return false;
-      const draftTerminalKind = readString(draft.required_terminal_kind) ?? readString(draft.terminal_artifact_kind);
-      if (requiredTerminalKind === "model_synthesized_answer") {
-        return !draftTerminalKind || draftTerminalKind === requiredTerminalKind;
-      }
-      if (requiredTerminalKind) return draftTerminalKind === requiredTerminalKind;
-      return !draftTerminalKind || draftTerminalKind === "model_synthesized_answer";
-    });
+): boolean => {
+  const terminalKinds = requiredTerminalKind
+    ? [requiredTerminalKind]
+    : ["model_synthesized_answer", "doc_evidence_synthesis_answer"];
+  const terminalPayloadKeys = [
+    "model_synthesized_answer",
+    "doc_evidence_synthesis_answer",
+    "compound_research_locator_answer",
+  ];
+  const payloadTerminals = terminalPayloadKeys
+    .map((key) => readRecord(payload[key]))
+    .filter((entry): entry is RecordLike => Boolean(entry));
+  const artifactTerminals = artifacts
+    .filter((artifact) => terminalKinds.includes(artifactKind(artifact) ?? ""))
+    .map((artifact) => readRecord(artifact.payload) ?? artifact as unknown as RecordLike);
+  return [...payloadTerminals, ...artifactTerminals].some((terminal) => {
+    const kind =
+      readString(terminal.kind) ??
+      readString(terminal.terminal_artifact_kind) ??
+      readString(terminal.schema)?.replace(/^helix\.|\.[^.]+$/g, "");
+    const text = readString(terminal.text) ?? readString(terminal.answer_text) ?? readString(terminal.visible_text);
+    return Boolean(text) && (!kind || terminalKinds.includes(kind));
+  });
+};
 
 const capabilityText = (value: unknown): string =>
   readArray(value)
@@ -205,7 +218,7 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
       : "model_synthesized_answer"
     : undefined;
   const hasDraft = hasFinalAnswerDraft(input.payload, artifacts);
-  const hasTerminalDraft = hasTerminalFinalAnswerDraft(input.payload, artifacts, requiredTerminalKind);
+  const hasTerminalArtifact = hasMaterializedTerminalArtifact(input.payload, artifacts, requiredTerminalKind);
   const supportRefs = ledger.length > 0
     ? supportRefsFromLedger(ledger)
     : supportRefsFromArtifacts(artifacts);
@@ -213,8 +226,9 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
     schema: "helix.compound_capability_synthesis_readiness.v1",
     applies,
     complete,
-    synthesis_required: applies && complete && !hasTerminalDraft && !hasFailedSubgoal,
+    synthesis_required: applies && complete && !hasTerminalArtifact && !hasFailedSubgoal,
     has_final_answer_draft: hasDraft,
+    has_materialized_terminal_artifact: hasTerminalArtifact,
     has_docs_subgoal: hasDocsSubgoal,
     has_failed_subgoal: hasFailedSubgoal,
     support_refs: supportRefs,

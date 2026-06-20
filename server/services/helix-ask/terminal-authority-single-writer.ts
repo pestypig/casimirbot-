@@ -110,8 +110,8 @@ const readTerminalBlockingToolRailFailure = (
   return {
     railStatus,
     railFailureCode,
-    firstBrokenRail: readString(triage?.first_broken_rail) ?? null,
-    repairTarget: readString(triage?.repair_target) ?? null,
+    firstBrokenRail: readString(triage?.first_broken_rail) ?? readString(audit?.first_broken_rail) ?? null,
+    repairTarget: readString(triage?.repair_target) ?? readString(audit?.repair_target) ?? null,
     selectedCapability: readString(triage?.selected_capability) ?? readString(audit?.selected_capability) ?? null,
     executedCapability: readString(triage?.executed_capability) ?? readString(audit?.executed_capability) ?? null,
   };
@@ -1250,6 +1250,53 @@ const isDeterministicReceiptFallbackDraft = (artifact: ArtifactLike): boolean =>
     isDeterministicStagePlayReceiptText(artifactText(artifact))
   );
 
+const isFailureLikeFinalAnswerDraftText = (text: string | null | undefined): boolean =>
+  /\b(?:I could not complete|I could not produce|could not produce a terminal answer|terminal answer unavailable|missing required artifacts|missing requirements|was not satisfied|not satisfied due to missing|required artifacts were missing)\b/i.test(
+    text ?? "",
+  );
+
+const findFinalAnswerDraftCandidateByRef = (
+  artifacts: ArtifactLike[],
+  ref: string | null | undefined,
+): { artifact: ArtifactLike; sequence: number; text: string; ref: string } | null => {
+  if (!ref) return null;
+  for (let index = artifacts.length - 1; index >= 0; index -= 1) {
+    const artifact = artifacts[index];
+    if (!artifact || !isFinalAnswerDraft(artifact)) continue;
+    if (artifactId(artifact) !== ref) continue;
+    const text = artifactText(artifact);
+    if (!text) return null;
+    return { artifact, sequence: index, text, ref };
+  }
+  return null;
+};
+
+const findCompoundSupportedFinalAnswerDraftCandidate = (
+  payload: Record<string, unknown>,
+  artifacts: ArtifactLike[],
+): { artifact: ArtifactLike; sequence: number; text: string; ref: string } | null => {
+  if (!compoundTerminalSynthesisPolicyActive(payload)) return null;
+  for (let index = artifacts.length - 1; index >= 0; index -= 1) {
+    const artifact = artifacts[index];
+    if (!artifact || !isFinalAnswerDraft(artifact)) continue;
+    if (isDeterministicReceiptFallbackDraft(artifact)) continue;
+    const text = artifactText(artifact);
+    const ref = artifactId(artifact);
+    if (!text || !ref) continue;
+    if (isStaleWorkspaceFailureText(text) || isStaleModelOnlyNoObservationText(text)) continue;
+    if (isFailureLikeFinalAnswerDraftText(text) || isHelixGenericTypedFailureText(text)) continue;
+    const coverage = resolveCompoundSubgoalDraftSupportCoverage({
+      payload,
+      draft: artifact,
+      artifactLedger: artifacts,
+      finalAnswerDraftRef: ref,
+    });
+    if (!coverage.applies || !coverage.ok) continue;
+    return { artifact, sequence: index, text, ref };
+  }
+  return null;
+};
+
 const stagePlayReceiptPendingText =
   "Stage Play reflected the active visual source and queued a checkpoint.\nNo model-reviewed answer snapshot exists yet.";
 
@@ -2128,6 +2175,9 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const compoundCoverageGate = readRecord(input.payload.compound_prompt_coverage_gate);
   const compoundCoverageFailedClosed =
     readString(compoundCoverageGate?.decision) === "FAIL_CLOSED";
+  const compoundPreferredDraftCandidate = compoundCoverageFailedClosed
+    ? null
+    : findCompoundSupportedFinalAnswerDraftCandidate(input.payload, artifacts);
   const draftMaterialization = compoundCoverageFailedClosed
     ? null
     : materializeFinalAnswerDraftTerminal({
@@ -2135,13 +2185,18 @@ export function applyHelixTerminalAuthoritySingleWriter(
         payload: input.payload,
         artifactLedger: artifacts,
         routeProductContract: readRecord(input.payload.route_product_contract),
+        finalAnswerDraftRef: compoundPreferredDraftCandidate?.ref ?? undefined,
       });
   const missingItineraryFamilies = attachItineraryExecutionState(input.payload, artifacts);
   const itineraryObservationCriteriaSatisfied = missingItineraryFamilies.length === 0;
   const acceptedObservationArtifacts = artifacts.filter(isAcceptedObservationPacket);
   const hasAcceptedObservation = acceptedObservationArtifacts.length > 0;
   const compoundTerminalSynthesisActive = compoundTerminalSynthesisPolicyActive(input.payload);
-  const latestDraftCandidateForStaleCheck = findLatestFinalAnswerDraftCandidate(artifacts);
+  const materializedDraftCandidate =
+    findFinalAnswerDraftCandidateByRef(artifacts, draftMaterialization?.final_answer_draft_ref) ??
+    compoundPreferredDraftCandidate;
+  const latestDraftCandidateForStaleCheck =
+    materializedDraftCandidate ?? findLatestFinalAnswerDraftCandidate(artifacts);
   const materializedDraftRejectedForStaleObservation =
     draftMaterialization?.ok === true &&
     hasAcceptedObservation &&
@@ -2197,6 +2252,8 @@ export function applyHelixTerminalAuthoritySingleWriter(
       candidate_count: artifacts.filter(isFinalAnswerDraft).length,
       latest_final_answer_draft_ref: draftMaterialization.final_answer_draft_ref,
       latest_final_answer_draft_sequence: findLatestFinalAnswerDraftCandidate(artifacts)?.sequence ?? null,
+      selected_final_answer_draft_ref: materializedDraftCandidate?.ref ?? draftMaterialization.final_answer_draft_ref,
+      selected_final_answer_draft_sequence: materializedDraftCandidate?.sequence ?? null,
       latest_final_answer_draft_quality_ok: draftMaterialization.final_answer_draft_quality_gate.ok,
       latest_final_answer_draft_quality_violations: draftMaterialization.final_answer_draft_quality_gate.violations,
       materialized_terminal_artifact_kind: draftMaterialization.materialized_terminal_artifact_kind ?? null,
@@ -2247,6 +2304,14 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const goalAllowsTerminal =
     readString(goalEvaluation?.satisfaction) === "satisfied" ||
     readString(goalEvaluation?.next_decision) === "allow_terminal";
+  const compoundMaterializedDraftCanSatisfyTerminal =
+    usableDraftMaterialization &&
+    compoundTerminalSynthesisActive &&
+    itineraryObservationCriteriaSatisfied &&
+    (
+      !compoundSubgoalDraftSupportCoverage.applies ||
+      compoundSubgoalDraftSupportCoverage.ok
+    );
   const selectedDirectAnswerTerminal =
     goalAllowsTerminal
       ? findLatestDirectAnswerTerminal(input.payload, artifacts)
@@ -2313,6 +2378,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       docsTerminalMatchesRequiredGoal ||
       (scholarlyTerminalMaterialized && goalAllowsTerminal) ||
       (stagePlayTerminalMaterialized && goalAllowsTerminal) ||
+      compoundMaterializedDraftCanSatisfyTerminal ||
       workstationTerminalMaterialized ||
       noteMutationTerminalMaterialized
     );
@@ -2545,7 +2611,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       usableDraftMaterialization &&
       compoundSubgoalDraftSupportCoverage.applies &&
       compoundSubgoalDraftSupportCoverage.ok &&
-      goalAllowsTerminal &&
+      compoundMaterializedDraftCanSatisfyTerminal &&
       rawTerminalBlockingToolRailFailure &&
       (
         rawTerminalBlockingToolRailFailure.firstBrokenRail === "terminal_materialization" ||
@@ -2720,6 +2786,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     input.payload.answer = terminalErrorText;
     input.payload.text = terminalErrorText;
     input.payload.assistant_answer = terminalErrorText;
+    delete input.payload.model_synthesized_answer;
     input.payload.typed_failure = {
       ...(readRecord(input.payload.typed_failure) ?? {}),
       schema: "helix.typed_failure.v1",
@@ -2779,6 +2846,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     input.payload.answer = terminalErrorText;
     input.payload.text = terminalErrorText;
     input.payload.assistant_answer = terminalErrorText;
+    delete input.payload.model_synthesized_answer;
     input.payload.typed_failure = {
       ...(readRecord(input.payload.typed_failure) ?? {}),
       schema: "helix.typed_failure.v1",
@@ -2950,6 +3018,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       assistant_answer: false,
       raw_content_included: false,
     };
+    delete input.payload.model_synthesized_answer;
     input.payload.terminal_presentation = {
       ...(readRecord(input.payload.terminal_presentation) ?? {}),
       schema: "helix.terminal_presentation.v1",
@@ -3184,8 +3253,9 @@ export function applyHelixTerminalAuthoritySingleWriter(
     };
     delete input.payload.terminal_error_code;
   } else if (!solverContinuationPending && usableDraftMaterialization) {
-    const latestDraft = findLatestFinalAnswerDraftCandidate(artifacts);
-    selectedArtifactRef = draftMaterialization.materialized_terminal_artifact_ref ?? latestDraft?.ref ?? null;
+    const selectedMaterializationDraft =
+      materializedDraftCandidate ?? findLatestFinalAnswerDraftCandidate(artifacts);
+    selectedArtifactRef = draftMaterialization.materialized_terminal_artifact_ref ?? selectedMaterializationDraft?.ref ?? null;
     selectedArtifactKind = draftMaterialization.materialized_terminal_artifact_kind ?? "model_synthesized_answer";
     const materializedScholarlyAnswer =
       selectedArtifactKind === "scholarly_research_answer"
@@ -3212,7 +3282,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       readString(materializedScholarlyAnswer?.text) ??
       readString(materializedInternetSearchAnswer?.answer_text) ??
       readString(materializedInternetSearchAnswer?.text) ??
-      latestDraft?.text ??
+      selectedMaterializationDraft?.text ??
       readString(input.payload.selected_final_answer) ??
       "I could not produce a terminal answer for this turn.";
     const citationFooter =
@@ -3242,12 +3312,18 @@ export function applyHelixTerminalAuthoritySingleWriter(
       materializedDocEvidenceSynthesisAnswer.answer_text = text;
     }
     selectedSource = "final_answer_draft";
+    quarantineStaleRequestUserInput(input.payload);
+    input.payload.ok = true;
+    input.payload.response_type = "final_answer";
+    input.payload.final_status = "final_answer";
+    input.payload.status = "final_answer";
     input.payload.terminal_artifact_kind = selectedArtifactKind;
     input.payload.final_answer_source = "final_answer_draft";
     input.payload.selected_final_answer = text;
     input.payload.answer = text;
     input.payload.text = text;
     input.payload.assistant_answer = text;
+    input.payload.terminal_artifact_id = selectedArtifactRef ?? undefined;
     input.payload.terminal_presentation = {
       ...(readRecord(input.payload.terminal_presentation) ?? {}),
       schema: "helix.terminal_presentation.v1",
@@ -3257,6 +3333,9 @@ export function applyHelixTerminalAuthoritySingleWriter(
       assistant_answer: false,
       raw_content_included: false,
     };
+    delete input.payload.terminal_error_code;
+    delete input.payload.terminal_failure_text;
+    delete input.payload.typed_failure;
     const directSequence = latestDirectAnswerSequence(artifacts);
     if (directSequence >= 0) {
       const direct = artifacts[directSequence];
@@ -3379,15 +3458,24 @@ export function applyHelixTerminalAuthoritySingleWriter(
     delete input.payload.typed_failure;
   }
 
+  if (
+    readString(input.payload.terminal_artifact_kind) === "typed_failure" ||
+    readString(input.payload.final_answer_source) === "typed_failure"
+  ) {
+    delete input.payload.model_synthesized_answer;
+  }
+
   const envelope = resolveTerminalAnswerEnvelope(input.payload, {
     threadId: input.threadId,
     turnId: input.turnId,
   });
   const appliedEnvelope = applyTerminalAnswerEnvelope(input.payload, envelope);
   const visibleText = appliedEnvelope.terminal_text;
-  const latestDraftForIntegrity = findLatestFinalAnswerDraftCandidate(artifacts);
+  const latestDraftForIntegrity =
+    materializedDraftCandidate ?? findLatestFinalAnswerDraftCandidate(artifacts);
   const draftText = latestDraftForIntegrity?.text ?? (selectedDraft ? artifactText(selectedDraft.artifact) : null);
   const selectedMaterializedAnswerText =
+    readString(readRecord(input.payload.model_synthesized_answer)?.answer_text) ??
     readString(readRecord(input.payload.compound_research_locator_answer)?.answer_text) ??
     readString(readRecord(input.payload.doc_evidence_synthesis_answer)?.answer_text) ??
     readString(readRecord(input.payload.scholarly_research_answer)?.answer_text) ??
@@ -3502,6 +3590,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       materialization_blocked_reason: draftMaterialization?.blocked_reason ?? null,
       itinerary_observation_criteria_satisfied: itineraryObservationCriteriaSatisfied,
       missing_itinerary_families: missingItineraryFamilies,
+      compound_materialized_draft_can_satisfy_terminal: compoundMaterializedDraftCanSatisfyTerminal,
       docs_draft_materialization_matches_required_goal: docsDraftMaterializationMatchesRequiredGoal,
       repo_draft_materialization_matches_required_goal: repoDraftMaterializationMatchesRequiredGoal,
     },

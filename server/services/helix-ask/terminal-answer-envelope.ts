@@ -196,6 +196,11 @@ const readFinalAnswerDraftText = (payload: Record<string, unknown>): string | nu
   return readString(draft?.text) ?? readString(draft?.answer_text);
 };
 
+const readModelSynthesizedAnswerText = (payload: Record<string, unknown>): string | null => {
+  const answer = readRecord(payload.model_synthesized_answer);
+  return readString(answer?.answer_text) ?? readString(answer?.text);
+};
+
 const directAnswerFinalAnswerSource = (payload: Record<string, unknown>): "model_direct_answer" | "final_answer_draft" =>
   readDirectAnswerArtifactText(payload) ? "model_direct_answer" : "final_answer_draft";
 
@@ -741,6 +746,14 @@ export function resolveTerminalAnswerEnvelope(
     authorityOrigin = terminalText === readFinalAnswerDraftText(payload) || terminalText === readString(payload.selected_final_answer)
       ? "selected_final_answer"
       : "terminal_presentation";
+  } else if (terminalArtifactKind === "model_synthesized_answer") {
+    const modelSynthesizedText = readModelSynthesizedAnswerText(payload);
+    terminalText =
+      modelSynthesizedText ??
+      readString(payload.selected_final_answer) ??
+      readFinalAnswerDraftText(payload) ??
+      readTerminalPresentationText(payload);
+    authorityOrigin = modelSynthesizedText ? "selected_final_answer" : "terminal_presentation";
   } else {
     terminalText = readTerminalPresentationText(payload);
   }

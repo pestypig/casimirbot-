@@ -136,6 +136,32 @@ describe("theory_frontier_search/v1", () => {
     );
   });
 
+  it("rejects scholarly lookup requests with non-frontier output kinds", () => {
+    const graph = buildHelixTheoryBadgeGraphV1();
+    const search = buildTheoryFrontierSearch({
+      graph,
+      query: "source residual",
+      searchSeed: "frontier-test-seed",
+      generatedAt: "2026-06-19T00:00:00.000Z",
+      limit: 3,
+    });
+    const unsafe = {
+      ...search,
+      scholarlyLookupRequests: [
+        {
+          ...search.scholarlyLookupRequests[0],
+          requestedOutputs: ["scholarly_paper_refs", "promote_theory_edge"],
+        },
+      ],
+    };
+
+    expect(validateTheoryFrontierSearchV1(unsafe)).toEqual(
+      expect.arrayContaining([
+        "scholarlyLookupRequests[0].requestedOutputs must contain only frontier scholarly output kinds",
+      ]),
+    );
+  });
+
   it("rejects frontier searches that omit required method-anchor citations", () => {
     const graph = buildHelixTheoryBadgeGraphV1();
     const search = buildTheoryFrontierSearch({

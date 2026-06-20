@@ -3546,7 +3546,6 @@ describe("Helix Ask tool lifecycle trace", () => {
     expect(index.required_observation_coverage).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ kind: "capability_registry", present: true }),
-        expect.objectContaining({ kind: "capability_help_summary", present: true }),
       ]),
     );
   });
@@ -3851,7 +3850,7 @@ describe("Helix Ask tool lifecycle trace", () => {
           sourceTarget: "runtime_evidence",
           goalKind: "capability_help",
           terminalKind: "model_synthesized_answer",
-          observationKinds: ["capability_registry", "capability_help_summary"],
+          observationKinds: ["capability_registry"],
           visibleTools: [
             "helix_ask.inspect_capability_catalog",
             "repo-code.search_concept",

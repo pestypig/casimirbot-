@@ -44,6 +44,13 @@ export const THEORY_FRONTIER_METHOD_ANCHORS_V1 = [
   },
 ] as const;
 
+const THEORY_FRONTIER_SCHOLARLY_REQUEST_OUTPUTS = [
+  "scholarly_paper_refs",
+  "doi_metadata",
+  "scholarly_full_text",
+  "paper_pdf_pages",
+] as const;
+
 export type TheoryFrontierMethodAnchorV1 = (typeof THEORY_FRONTIER_METHOD_ANCHORS_V1)[number];
 
 export type TheoryFrontierScholarlyLookupRequestV1 = {
@@ -229,7 +236,18 @@ function validateScholarlyLookupRequests(value: unknown, issues: string[]): void
     if (request.targetSource !== "scholarly_research") {
       issues.push(`${prefix}.targetSource must be scholarly_research`);
     }
-    for (const field of ["requestedOutputs", "badgeIds", "renderChunkIds", "semanticChunkIds"] as const) {
+    if (
+      !Array.isArray(request.requestedOutputs) ||
+      !request.requestedOutputs.every((item: unknown) =>
+        typeof item === "string" && THEORY_FRONTIER_SCHOLARLY_REQUEST_OUTPUTS.includes(item as never)
+      )
+    ) {
+      issues.push(`${prefix}.requestedOutputs must contain only frontier scholarly output kinds`);
+    }
+    if (!Array.isArray(request.requestedOutputs) || request.requestedOutputs.length === 0) {
+      issues.push(`${prefix}.requestedOutputs must be non-empty`);
+    }
+    for (const field of ["badgeIds", "renderChunkIds", "semanticChunkIds"] as const) {
       if (!Array.isArray(request[field]) || !request[field].every((item: unknown) => typeof item === "string")) {
         issues.push(`${prefix}.${field} must be an array of strings`);
       }

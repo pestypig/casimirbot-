@@ -313,6 +313,25 @@ function synthesizeCompoundCalculatorAnswer(
 ): string {
   const observation = buildCalculatorObservation(prompt, plan, evaluation);
   const result = observation.result ?? "available in the calculator receipt";
+  if (/\b(?:casimir|cavity)\b/i.test(prompt) && /\bmode\b/i.test(prompt) && /\bphoton\s+energy\b/i.test(prompt)) {
+    const frequency = Number(String(result).replace(/,/g, ""));
+    const photonEnergy = Number.isFinite(frequency) ? normalizeNumberText(6.62607015e-34 * frequency) : "requires the validated mode frequency";
+    const lines = [
+      "Calculator compound plan completed.",
+      `Mode frequency: ${result} Hz.`,
+      `Photon energy: ${photonEnergy} J.`,
+      "Interpretation: the answer treats the calculator result as the idealized cavity-mode frequency, then applies E = hf for the photon-energy scalar cut. This is not a backend Casimir field solve.",
+      `Trace source: ${observation.traceSource}.`,
+    ];
+    if (/\b(?:first\s+principles|theory\s+(?:graph|badge)|map)\b/i.test(prompt)) {
+      lines.push(
+        "Theory context: theory graph reflection supplied first-principles placement context for the scalar calculation.",
+        "This graph reflection is context evidence only; the numeric value above comes from Scientific Calculator receipts.",
+        "Evidence note: theory graph reflection supplied context; Scientific Calculator receipts supplied the numeric result.",
+      );
+    }
+    return lines.join("\n");
+  }
   if (/\bphoton\b/i.test(prompt) || /\be\s*=\s*h\s*f\b/i.test(prompt)) {
     const frequency = prompt.match(/\bf(?:requency)?\s*(?:=|is|of)?\s*([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)(?:\s*(?:hz|hertz))?\b/i)?.[1] ??
       prompt.match(/([-+]?\d+(?:\.\d+)?(?:e[-+]?\d+)?)\s*(?:hz|hertz)\b/i)?.[1] ??

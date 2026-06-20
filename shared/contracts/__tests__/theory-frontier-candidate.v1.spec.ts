@@ -106,4 +106,27 @@ describe("theory_frontier_candidate/v1", () => {
     expect(issues).toContain("claimBoundary.promotionAllowed must be false");
     expect(issues.some((issue) => issue.includes("forbidden frontier validation phrase matched"))).toBe(true);
   });
+
+  it("rejects malformed literature policies that could widen evidence authority", () => {
+    const candidate = buildCompleteCandidate();
+    const unsafe = {
+      ...candidate,
+      literaturePolicy: {
+        scholarlyLookupAllowed: "yes",
+        noAutoPromoteLiterature: true,
+        allowedEvidenceEffects: ["support_existing_context", "promote_theory_edge"],
+      },
+    };
+
+    expect(validateTheoryFrontierCandidateV1(unsafe)).toEqual(
+      expect.arrayContaining([
+        "literaturePolicy.scholarlyLookupAllowed must be boolean",
+        "literaturePolicy.allowedEvidenceEffects contains invalid effect promote_theory_edge",
+        "literaturePolicy.allowedEvidenceEffects must include conflict_with_badge",
+        "literaturePolicy.allowedEvidenceEffects must include identify_missing_evidence",
+        "literaturePolicy.allowedEvidenceEffects must include suggest_missing_badge",
+        "literaturePolicy.allowedEvidenceEffects must include unrelated",
+      ]),
+    );
+  });
 });

@@ -398,7 +398,7 @@ describe("Helix Ask compound capability family matrix", () => {
     }
   });
 
-  it("keeps catalog single-turn terminal help while using registry-only evidence inside compounds", () => {
+  it("keeps catalog terminal help as synthesis over registry-only evidence", () => {
     const catalog = explicitCapabilityContractsForTests.find((contract) =>
       contract.capability === "helix_ask.inspect_capability_catalog"
     );
@@ -412,10 +412,7 @@ describe("Helix Ask compound capability family matrix", () => {
       turnId: "ask:catalog:single",
       promptText: promptFor(catalog as ExplicitContract),
     });
-    expect(single?.subgoals[0]?.required_observation_kinds).toEqual([
-      "capability_registry",
-      "capability_help_summary",
-    ]);
+    expect(single?.subgoals[0]?.required_observation_kinds).toEqual(["capability_registry"]);
 
     const compound = buildHelixCompoundCapabilityContract({
       turnId: "ask:catalog:compound",

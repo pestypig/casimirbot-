@@ -16,6 +16,13 @@ export const THEORY_FRONTIER_EXTRACTED_EVIDENCE_KINDS = [
   "limitation",
 ] as const;
 
+const THEORY_FRONTIER_LITERATURE_REQUESTED_OUTPUTS = [
+  "scholarly_paper_refs",
+  "doi_metadata",
+  "scholarly_full_text",
+  "paper_pdf_pages",
+] as const;
+
 export type TheoryFrontierLiteratureEffectV1 = (typeof THEORY_FRONTIER_LITERATURE_EFFECTS)[number];
 export type TheoryFrontierExtractedEvidenceKindV1 = (typeof THEORY_FRONTIER_EXTRACTED_EVIDENCE_KINDS)[number];
 
@@ -143,6 +150,21 @@ function validateStringArrayField(prefix: string, value: unknown, issues: string
   }
 }
 
+function validateLiteratureEffects(prefix: string, value: unknown, issues: string[]): void {
+  if (!Array.isArray(value) || !value.every((item: unknown) => typeof item === "string")) {
+    issues.push(`${prefix} must be an array of allowed literature effects`);
+    return;
+  }
+  for (const effect of value) {
+    if (!THEORY_FRONTIER_LITERATURE_EFFECTS.includes(effect as never)) {
+      issues.push(`${prefix} contains invalid effect ${effect}`);
+    }
+  }
+  for (const effect of THEORY_FRONTIER_LITERATURE_EFFECTS) {
+    if (!value.includes(effect)) issues.push(`${prefix} must include ${effect}`);
+  }
+}
+
 export function buildTheoryFrontierLiteratureMapV1(
   input: BuildTheoryFrontierLiteratureMapV1Input,
 ): TheoryFrontierLiteratureMapV1 {
@@ -233,9 +255,17 @@ export function validateTheoryFrontierLiteratureMapV1(value: unknown): string[] 
         }
         if (!Array.isArray(source.retrieval.requestedOutputs)) {
           issues.push(`${prefix}.retrieval.requestedOutputs must be an array`);
+        } else {
+          for (const output of source.retrieval.requestedOutputs) {
+            if (!THEORY_FRONTIER_LITERATURE_REQUESTED_OUTPUTS.includes(output as never)) {
+              issues.push(`${prefix}.retrieval.requestedOutputs contains invalid output ${output}`);
+            }
+          }
         }
         if (typeof source.retrieval.fullTextRetrieved !== "boolean") {
           issues.push(`${prefix}.retrieval.fullTextRetrieved must be boolean`);
+        } else if (source.retrieval.fullTextRetrieved === true && !isNonEmptyString(source.retrieval.fullTextDigest)) {
+          issues.push(`${prefix}.retrieval.fullTextDigest must be non-empty when fullTextRetrieved is true`);
         }
       }
     }
@@ -318,6 +348,7 @@ export function validateTheoryFrontierLiteratureMapV1(value: unknown): string[] 
     if (value.authority.deterministicContentRole !== "scholarly_evidence_map_not_answer") {
       issues.push("authority.deterministicContentRole must be scholarly_evidence_map_not_answer");
     }
+    validateLiteratureEffects("authority.allowedEvidenceEffects", value.authority.allowedEvidenceEffects, issues);
   }
 
   return issues;

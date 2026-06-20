@@ -27,6 +27,14 @@ export const THEORY_FRONTIER_UNIT_COMPATIBILITY = [
   "incompatible",
 ] as const;
 
+export const THEORY_FRONTIER_ALLOWED_LITERATURE_EFFECTS = [
+  "support_existing_context",
+  "conflict_with_badge",
+  "identify_missing_evidence",
+  "suggest_missing_badge",
+  "unrelated",
+] as const;
+
 const FORBIDDEN_FRONTIER_CLAIM_PATTERNS = [
   /\bvalidated propulsion\b/i,
   /\bworking warp drive\b/i,
@@ -112,9 +120,7 @@ export type TheoryFrontierCandidateV1 = {
   literaturePolicy: {
     scholarlyLookupAllowed: boolean;
     noAutoPromoteLiterature: true;
-    allowedEvidenceEffects: Array<
-      "support_existing_context" | "conflict_with_badge" | "identify_missing_evidence" | "suggest_missing_badge" | "unrelated"
-    >;
+    allowedEvidenceEffects: Array<(typeof THEORY_FRONTIER_ALLOWED_LITERATURE_EFFECTS)[number]>;
   };
   claimBoundary: {
     validatesTheory: false;
@@ -147,6 +153,20 @@ const isStringArray = (value: unknown): value is string[] =>
 
 const includes = <T extends readonly string[]>(items: T, value: unknown): value is T[number] =>
   typeof value === "string" && items.includes(value);
+
+function validateAllowedLiteratureEffects(prefix: string, value: unknown, issues: string[]): void {
+  if (!Array.isArray(value) || !value.every((item: unknown) => typeof item === "string")) {
+    issues.push(`${prefix} must be an array of allowed literature effects`);
+    return;
+  }
+  const invalid = value.filter((item) => !THEORY_FRONTIER_ALLOWED_LITERATURE_EFFECTS.includes(item as never));
+  for (const effect of invalid) {
+    issues.push(`${prefix} contains invalid effect ${effect}`);
+  }
+  for (const effect of THEORY_FRONTIER_ALLOWED_LITERATURE_EFFECTS) {
+    if (!value.includes(effect)) issues.push(`${prefix} must include ${effect}`);
+  }
+}
 
 function validateNumberRange(prefix: string, value: unknown, issues: string[]): void {
   if (!isFiniteNumber(value)) {
@@ -284,8 +304,18 @@ export function validateTheoryFrontierCandidateV1(value: unknown): string[] {
 
   if (!isRecord(value.literaturePolicy)) {
     issues.push("literaturePolicy must be an object");
-  } else if (value.literaturePolicy.noAutoPromoteLiterature !== true) {
-    issues.push("literaturePolicy.noAutoPromoteLiterature must be true");
+  } else {
+    if (typeof value.literaturePolicy.scholarlyLookupAllowed !== "boolean") {
+      issues.push("literaturePolicy.scholarlyLookupAllowed must be boolean");
+    }
+    if (value.literaturePolicy.noAutoPromoteLiterature !== true) {
+      issues.push("literaturePolicy.noAutoPromoteLiterature must be true");
+    }
+    validateAllowedLiteratureEffects(
+      "literaturePolicy.allowedEvidenceEffects",
+      value.literaturePolicy.allowedEvidenceEffects,
+      issues,
+    );
   }
 
   if (!isRecord(value.claimBoundary)) {

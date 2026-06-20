@@ -1,1 +1,3 @@
 import NHM2Formal.ClaimBoundary
+import NHM2Formal.Certificate
+import NHM2Formal.Generated.CurrentCampaignCertificate

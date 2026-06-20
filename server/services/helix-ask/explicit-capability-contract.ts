@@ -132,7 +132,7 @@ const explicitCapabilityContracts: ExplicitCapabilityContract[] = [
     plan_family: "capability_catalog",
     source_target: "runtime_evidence",
     admission_families: ["capability_catalog", "runtime_evidence"],
-    required_observation_kinds: ["capability_registry", "capability_help_summary"],
+    required_observation_kinds: ["capability_registry"],
     required_terminal_kind: "capability_help_summary",
     allowed_substitutions: [],
     forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],

@@ -35,6 +35,11 @@ describe("Warp / GR / NHM2 map", () => {
         "nhm2.source.same_basis_tensor_authority",
         "nhm2.closure.coupled_pass_candidate",
         "nhm2.closure.regional_tensor_pass_path_harness",
+        "nhm2.formal.lean_certificate",
+        "nhm2.formal.certificate_hashes_pinned",
+        "nhm2.formal.diagnostic_campaign_admissible",
+        "nhm2.formal.claim_locks_closed",
+        "nhm2.formal.negative_fixtures_fail_closed",
         "nhm2.qei.worldline_dossier",
         "nhm2.natario.curvature_invariants",
         "nhm2.natario.invariant_audit",
@@ -44,7 +49,16 @@ describe("Warp / GR / NHM2 map", () => {
     );
     for (const ref of path?.calculatorPayloadRefs ?? []) {
       expect(ref.badgeId.startsWith("nhm2.regional_atlas.")).toBe(false);
+      expect(ref.badgeId.startsWith("nhm2.formal.")).toBe(false);
     }
     expect(path?.claimBoundaryBadgeIds).toContain("nhm2.claim_boundary.diagnostic_only");
+
+    const claimBoundary = WARP_GR_NHM2_GROUPS.find((group) => group.id === "warp.nhm2.claim_boundary");
+    expect(claimBoundary?.theoryBadgeIds).toEqual(
+      expect.arrayContaining([
+        "nhm2.formal.claim_locks_closed",
+        "nhm2.formal.diagnostic_campaign_admissible",
+      ]),
+    );
   });
 });

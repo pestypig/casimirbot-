@@ -393,6 +393,42 @@
       ]
     },
     {
+      "equationId": "nhm2-lean-campaign-certificate-workflow",
+      "label": "Lean diagnostic campaign certificate workflow",
+      "aliases": [
+        "runtime campaign artifacts -> certificate export -> Lean verification -> diagnostic admissibility -> claim locks remain closed",
+        "DiagnosticCampaignAdmissible",
+        "Lean verifies diagnostic campaign admissibility from the emitted certificate"
+      ],
+      "actions": [
+        {
+          "actionId": "open-lean-campaign-certificate-theory-path",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open Lean campaign certificate path",
+          "badgeIds": [
+            "nhm2.dynamic.time_dependent_source_campaign",
+            "nhm2.formal.certificate_hashes_pinned",
+            "nhm2.formal.lean_certificate",
+            "nhm2.formal.negative_fixtures_fail_closed",
+            "nhm2.formal.claim_locks_closed",
+            "nhm2.formal.diagnostic_campaign_admissible",
+            "nhm2.claim_boundary.diagnostic_only"
+          ],
+          "preferredBadgeId": "nhm2.formal.lean_certificate",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": ["theory-badge-graph"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "Lean verifies diagnostic campaign admissibility from the emitted certificate; claim locks remain closed."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "The Lean certificate lane is a diagnostic formal bridge and does not widen NHM2 claims.",
+        "The Lean lane does not verify the floating-point GR solver or physical source credibility."
+      ]
+    },
+    {
       "equationId": "nhm2-trip-clocking-tau",
       "label": "Trip clocking proper time",
       "aliases": [

@@ -230,7 +230,7 @@ const buildCapabilityCatalogAskFixture = (input: { includeRuntimeMarker: boolean
     executed_capability: "helix_ask.inspect_capability_catalog",
     observation_kind: "capability_registry",
     observation_ref: `${turnId}:capability_registry_inspect:capability_registry:1`,
-    required_observation_kinds_for_requested_capability: ["capability_registry", "capability_help_summary"],
+    required_observation_kinds_for_requested_capability: ["capability_registry"],
     observed_artifact_supports_requested_capability: true,
     reentry_status: "reentered",
     reentry_proof_source: "capability_help_summary_materialized_from_catalog_observation",

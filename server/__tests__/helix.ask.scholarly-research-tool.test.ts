@@ -489,6 +489,20 @@ describe("Helix scholarly research tool admission", () => {
             ],
           },
         },
+        {
+          artifact_id: `${turnId}:model_synthesized_answer`,
+          turn_id: turnId,
+          kind: "model_synthesized_answer",
+          payload: {
+            schema: "helix.model_synthesized_answer.v1",
+            kind: "model_synthesized_answer",
+            text: "Synthesized uncertainty from both observed subgoals.",
+            support_refs: [
+              `${turnId}:lookup:scholarly_research_observation`,
+              `${turnId}:theory:helix_theory_context_reflection_tool_receipt`,
+            ],
+          },
+        },
       ] as any,
       goalSatisfactionEvaluation: {
         schema: "helix.goal_satisfaction_evaluation.v1",

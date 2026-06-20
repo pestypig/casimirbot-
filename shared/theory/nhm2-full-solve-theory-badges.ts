@@ -80,6 +80,26 @@ const NHM2_BACKREACTION_RESIDUAL_RECEIPT =
   `${NHM2_QEI_RECEIPTED_SMOKE_ROOT}/nhm2-backreaction-residual-receipt.json`;
 const NHM2_TRIP_CLOCKING_PROFILE_INDEX =
   "artifacts/research/full-solve/selected-family/nhm2-shift-lapse/nhm2-trip-clocking-profile-index-latest.json";
+const NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_PROFILE_ID =
+  "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1";
+const NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT =
+  `artifacts/research/full-solve/profile-campaign-runs/${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_PROFILE_ID}`;
+const NHM2_LEAN_CAMPAIGN_CERTIFICATE =
+  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-lean-campaign-certificate.json`;
+const NHM2_LEAN_GENERATED_CAMPAIGN_CERTIFICATE =
+  "formal/lean/NHM2Formal/Generated/CurrentCampaignCertificate.lean";
+const NHM2_LEAN_CERTIFICATE_MODULE =
+  "formal/lean/NHM2Formal/Certificate.lean";
+const NHM2_LEAN_CLAIM_BOUNDARY_MODULE =
+  "formal/lean/NHM2Formal/ClaimBoundary.lean";
+const NHM2_LEAN_CERTIFICATE_EXPORTER =
+  "tools/nhm2/emit-lean-campaign-certificate.ts";
+const NHM2_LEAN_CERTIFICATE_CONTRACT =
+  "shared/contracts/nhm2-lean-campaign-certificate.v1.ts";
+const NHM2_LEAN_CERTIFICATE_TEST =
+  "tests/nhm2/lean-campaign-certificate.spec.ts";
+const NHM2_LEAN_CERTIFICATE_CHECK_COMMAND =
+  "npm run formal:nhm2:certificate:check";
 
 const NHM2_FULL_SOLVE_BOUNDARY: TheoryBadgeClaimBoundaryV1 = {
   diagnosticOnly: true,
@@ -98,6 +118,13 @@ const COMMON_ASSUMPTIONS = [
 
 const docRef = (path: string, id?: string, note?: string): TheoryBadgeV1["sourceRefs"][number] => ({
   kind: "doc",
+  path,
+  id: id ?? null,
+  note: note ?? null,
+});
+
+const repoRef = (path: string, id?: string, note?: string): TheoryBadgeV1["sourceRefs"][number] => ({
+  kind: "repo_module",
   path,
   id: id ?? null,
   note: note ?? null,
@@ -580,7 +607,7 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     units: [],
     assumptions: [
       ...COMMON_ASSUMPTIONS,
-      "The ledger is an evidence-admission surface, not a material realization proof.",
+      "The ledger is an evidence-admission surface, not a material-source proof.",
       "A complete component ledger cannot override residual, conservation, QEI, observer, material, reproducibility, or claim gates.",
       "The current smoke-chain ledger is local pinned evidence and still requires frozen reference-chain promotion review.",
     ],
@@ -1929,6 +1956,332 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   nhm2FullSolveBadge({
+    id: "nhm2.formal.lean_certificate",
+    title: "Lean Campaign Certificate",
+    plainMeaning:
+      "Runtime artifacts are exported into a Lean-facing certificate for the current 0p7000 diagnostic campaign profile.",
+    whyItMatters:
+      "It makes the campaign pass reusable as pinned rational and Boolean proof facts instead of UI-only wording.",
+    subjects: ["nhm2", "lean", "formal_certificate", "artifact_governance", "diagnostic_campaign"],
+    level: "diagnostic_gate",
+    status: "diagnostic",
+    simulationOwners: ["NHM2", "formal_methods"],
+    equationFamilies: ["lean_campaign_certificate", "claim_boundary"],
+    tags: ["lean", "certificate", "runtime_reference", "noncomputable_reference", "claim_boundary"],
+    equations: [
+      {
+        id: "lean_campaign_certificate_runtime_reference",
+        role: "noncomputable_reference",
+        displayLatex:
+          "\\mathrm{Certificate}_{Lean}=\\mathrm{emit}(artifacts,hashes,bounds,locks)",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["artifacts", "hashes", "bounds", "claimLocks"],
+        outputSymbols: ["LeanCertificate"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Lean checks the emitted certificate facts and does not rerun the floating-point GR solver.",
+      "The certificate is runtime/reference evidence and has no scalar calculator payload.",
+      `The formal check command is ${NHM2_LEAN_CERTIFICATE_CHECK_COMMAND}.`,
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef(
+        NHM2_LEAN_CAMPAIGN_CERTIFICATE,
+        "nhm2-lean-campaign-certificate-json",
+        "Generated JSON certificate with artifact hashes, rational bounds, observer/QEI/stability receipts, and closed claim locks.",
+      ),
+      artifactRef(
+        NHM2_LEAN_GENERATED_CAMPAIGN_CERTIFICATE,
+        "current0p7000Certificate",
+        "Generated Lean module for the current 0p7000 diagnostic campaign certificate.",
+      ),
+      repoRef(
+        NHM2_LEAN_CERTIFICATE_EXPORTER,
+        "emit-lean-campaign-certificate",
+        "Runtime exporter that converts JSON artifacts into exact Lean-facing facts.",
+      ),
+      repoRef(
+        NHM2_LEAN_CERTIFICATE_CONTRACT,
+        "nhm2_lean_campaign_certificate/v1",
+        "Typed certificate contract.",
+      ),
+      repoRef(
+        "package.json",
+        NHM2_LEAN_CERTIFICATE_CHECK_COMMAND,
+        "Formal certificate emit plus Lean build command.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "lean", "formal_certificate", "artifact_governance", "diagnostic_campaign"],
+      symbols: ["LeanCertificate", "artifacts", "hashes", "bounds", "claimLocks"],
+      unitSignatures: [],
+      repoPaths: [
+        NHM2_LEAN_CAMPAIGN_CERTIFICATE,
+        NHM2_LEAN_GENERATED_CAMPAIGN_CERTIFICATE,
+        NHM2_LEAN_CERTIFICATE_EXPORTER,
+        NHM2_LEAN_CERTIFICATE_CONTRACT,
+        "package.json",
+      ],
+      equationFamilies: ["lean_campaign_certificate", "claim_boundary"],
+      simulationOwners: ["NHM2", "formal_methods"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.formal.diagnostic_campaign_admissible",
+    title: "Lean Diagnostic Campaign Admissibility",
+    plainMeaning:
+      "Lean verifies diagnostic campaign admissibility from the emitted certificate for the current 0p7000 profile.",
+    whyItMatters:
+      "It gives the campaign pass a machine-checked policy meaning while keeping stronger claims locked.",
+    subjects: ["nhm2", "lean", "diagnostic_campaign", "admissibility", "proof_policy"],
+    level: "diagnostic_gate",
+    status: "diagnostic",
+    simulationOwners: ["NHM2", "formal_methods"],
+    equationFamilies: ["lean_campaign_certificate", "diagnostic_admissibility"],
+    tags: ["lean", "diagnostic_admissible", "noncomputable_reference", "claim_safe"],
+    equations: [
+      {
+        id: "lean_diagnostic_campaign_admissible_theorem",
+        role: "noncomputable_reference",
+        displayLatex:
+          "\\mathrm{Gates}_{cert}\\land\\mathrm{Bounds}_{cert}\\land\\mathrm{Locks}_{closed}\\Rightarrow\\mathrm{DiagnosticCampaignAdmissible}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["Gates_cert", "Bounds_cert", "Locks_closed"],
+        outputSymbols: ["DiagnosticCampaignAdmissible"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Diagnostic campaign admissibility is a policy theorem over certificate facts.",
+      "The theorem does not establish material-source credibility, transport, route result, propulsion, or speed authority.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef(
+        NHM2_LEAN_GENERATED_CAMPAIGN_CERTIFICATE,
+        "current0p7000_diagnosticCampaignAdmissible",
+        "Generated theorem proving DiagnosticCampaignAdmissible for the emitted certificate.",
+      ),
+      repoRef(
+        NHM2_LEAN_CERTIFICATE_MODULE,
+        "diagnosticCampaignAdmissible_of_certificate",
+        "Lean theorem from bounds, gates, and closed claim locks.",
+      ),
+      artifactRef(
+        NHM2_LEAN_CAMPAIGN_CERTIFICATE,
+        "diagnosticCampaignAdmissible=true",
+        "Certificate JSON records the runtime-facing admissibility bit and failed-field list.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "lean", "diagnostic_campaign", "admissibility", "proof_policy"],
+      symbols: ["Gates_cert", "Bounds_cert", "Locks_closed", "DiagnosticCampaignAdmissible"],
+      unitSignatures: [],
+      repoPaths: [
+        NHM2_LEAN_GENERATED_CAMPAIGN_CERTIFICATE,
+        NHM2_LEAN_CERTIFICATE_MODULE,
+        NHM2_LEAN_CAMPAIGN_CERTIFICATE,
+      ],
+      equationFamilies: ["lean_campaign_certificate", "diagnostic_admissibility"],
+      simulationOwners: ["NHM2", "formal_methods"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.formal.claim_locks_closed",
+    title: "Lean Claim Locks Closed",
+    plainMeaning:
+      "Lean carries the claim locks as part of the certificate proof, so diagnostic admissibility keeps physical, route, propulsion, transport, and speed locks closed.",
+    whyItMatters:
+      "It prevents a formal diagnostic pass from being represented as a stronger NHM2 claim.",
+    subjects: ["nhm2", "lean", "claim_boundary", "claim_locks", "diagnostic_campaign"],
+    level: "claim_boundary",
+    status: "blocked",
+    simulationOwners: ["NHM2", "formal_methods"],
+    equationFamilies: ["claim_boundary", "lean_campaign_certificate"],
+    tags: ["lean", "claim_locks", "diagnostic_only", "noncomputable_reference"],
+    equations: [
+      {
+        id: "lean_claim_locks_closed_theorem",
+        role: "noncomputable_reference",
+        displayLatex:
+          "\\mathrm{DiagnosticCampaignAdmissible}\\Rightarrow\\mathrm{ClaimLocksClosed}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["DiagnosticCampaignAdmissible"],
+        outputSymbols: ["ClaimLocksClosed"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Claim locks are part of the Lean certificate conclusion, not UI copy convention.",
+      "Closed locks forbid physical viability, transport, route result, propulsion, and speed promotion from this certificate.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      repoRef(
+        NHM2_LEAN_CERTIFICATE_MODULE,
+        "diagnosticCampaignAdmissible_preserves_claim_locks",
+        "Lean theorem preserving closed claim locks from diagnostic certificate admissibility.",
+      ),
+      repoRef(
+        NHM2_LEAN_CLAIM_BOUNDARY_MODULE,
+        "AllClaimLocksClosed",
+        "Base claim-boundary module defining closed locks.",
+      ),
+      artifactRef(
+        NHM2_LEAN_CAMPAIGN_CERTIFICATE,
+        "claimLocks",
+        "JSON certificate field with all claim locks false.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "lean", "claim_boundary", "claim_locks", "diagnostic_campaign"],
+      symbols: ["DiagnosticCampaignAdmissible", "ClaimLocksClosed"],
+      unitSignatures: [],
+      repoPaths: [
+        NHM2_LEAN_CERTIFICATE_MODULE,
+        NHM2_LEAN_CLAIM_BOUNDARY_MODULE,
+        NHM2_LEAN_CAMPAIGN_CERTIFICATE,
+      ],
+      equationFamilies: ["claim_boundary", "lean_campaign_certificate"],
+      simulationOwners: ["NHM2", "formal_methods"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.formal.negative_fixtures_fail_closed",
+    title: "Lean Negative Fixtures Fail Closed",
+    plainMeaning:
+      "Static Lean examples and runtime fixture tests reject missing tensor components, stale hashes, Eulerian-only observers, scalar-only QEI, target echo, and open claim locks.",
+    whyItMatters:
+      "It makes the formal lane falsifiable instead of only proving the current happy-path certificate.",
+    subjects: ["nhm2", "lean", "negative_fixtures", "fail_closed", "falsifiability"],
+    level: "diagnostic_gate",
+    status: "diagnostic",
+    simulationOwners: ["NHM2", "formal_methods"],
+    equationFamilies: ["fail_closed_certificate", "claim_boundary"],
+    tags: ["lean", "negative_fixture", "fail_closed", "noncomputable_reference"],
+    equations: [
+      {
+        id: "lean_negative_fixture_rejection",
+        role: "noncomputable_reference",
+        displayLatex:
+          "\\neg fields_{required}\\lor staleHash\\lor scalarQEI\\lor openLocks\\Rightarrow\\neg admissible",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["fields_required", "staleHash", "scalarQEI", "openLocks"],
+        outputSymbols: ["notAdmissible"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Negative fixtures are proof-policy coverage, not numerical physics evidence.",
+      "Fail-closed behavior keeps stale, scalar-only, or narrow-frame evidence from entering stronger language.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      repoRef(
+        NHM2_LEAN_CERTIFICATE_MODULE,
+        "negative-fixture-examples",
+        "Lean examples for missing T0i, stale atlas hash, Eulerian-only observer, scalar-only QEI, and open claim locks.",
+      ),
+      repoRef(
+        NHM2_LEAN_CERTIFICATE_TEST,
+        "lean-campaign-certificate-negative-fixtures",
+        "Vitest fixtures for missing T0i, off-diagonal stress, source echo, frequency/dynamic bounds, stale hash, Eulerian-only observer, scalar-only QEI, and open locks.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "lean", "negative_fixtures", "fail_closed", "falsifiability"],
+      symbols: ["fields_required", "staleHash", "scalarQEI", "openLocks", "notAdmissible"],
+      unitSignatures: [],
+      repoPaths: [NHM2_LEAN_CERTIFICATE_MODULE, NHM2_LEAN_CERTIFICATE_TEST],
+      equationFamilies: ["fail_closed_certificate", "claim_boundary"],
+      simulationOwners: ["NHM2", "formal_methods"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.formal.certificate_hashes_pinned",
+    title: "Lean Certificate Hashes Pinned",
+    plainMeaning:
+      "The Lean certificate JSON records the campaign artifact paths and SHA-256 hashes used to produce the generated Lean module.",
+    whyItMatters:
+      "It prevents the formal result from floating across mismatched profiles, charts, atlases, or runtime evidence bundles.",
+    subjects: ["nhm2", "lean", "artifact_hashes", "provenance", "diagnostic_campaign"],
+    level: "diagnostic_gate",
+    status: "diagnostic",
+    simulationOwners: ["NHM2", "formal_methods"],
+    equationFamilies: ["certificate_provenance", "artifact_hashes"],
+    tags: ["lean", "sha256", "profile_scoped", "same_run", "noncomputable_reference"],
+    equations: [
+      {
+        id: "lean_certificate_hash_pin",
+        role: "noncomputable_reference",
+        displayLatex:
+          "\\mathrm{hashesPresent}\\land\\mathrm{profileMatch}\\land\\mathrm{atlasMatch}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["artifactHashes", "profileId", "atlasHash"],
+        outputSymbols: ["certificateIdentity"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Hash pinning is provenance discipline and does not make the runtime artifacts physically complete.",
+      "The certificate is scoped to the current 0p7000 diagnostic campaign profile.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      artifactRef(
+        NHM2_LEAN_CAMPAIGN_CERTIFICATE,
+        "artifactHashes",
+        "Certificate JSON artifact-hash table.",
+      ),
+      artifactRef(
+        `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-time-dependent-source-campaign.json`,
+        "time-dependent-source-campaign",
+        "Runtime campaign artifact included in the Lean certificate hash ledger.",
+      ),
+      artifactRef(
+        `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-regional-full-tensor-residual.json`,
+        "regional-full-tensor-residual",
+        "Full regional tensor residual artifact included in the Lean certificate hash ledger.",
+      ),
+      artifactRef(
+        `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-observer-robust-energy-conditions.json`,
+        "observer-robust-energy-conditions",
+        "Observer-family evidence included in the Lean certificate hash ledger.",
+      ),
+      artifactRef(
+        `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-qei-worldline-dossier.json`,
+        "qei-worldline-dossier",
+        "QEI dossier included in the Lean certificate hash ledger.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "lean", "artifact_hashes", "provenance", "diagnostic_campaign"],
+      symbols: ["artifactHashes", "profileId", "atlasHash", "certificateIdentity"],
+      unitSignatures: [],
+      repoPaths: [
+        NHM2_LEAN_CAMPAIGN_CERTIFICATE,
+        `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-time-dependent-source-campaign.json`,
+        `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-regional-full-tensor-residual.json`,
+        `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-observer-robust-energy-conditions.json`,
+        `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-qei-worldline-dossier.json`,
+      ],
+      equationFamilies: ["certificate_provenance", "artifact_hashes"],
+      simulationOwners: ["NHM2", "formal_methods"],
+    },
+  }),
+  nhm2FullSolveBadge({
     id: "nhm2.regional_atlas.available",
     title: "Regional Support-Function Atlas",
     plainMeaning:
@@ -3145,7 +3498,7 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     to: "nhm2.source.component_authority_ledger",
     relation: "requires",
     label: "The tile-effective counterpart supplies component rows for the source component authority ledger.",
-    claimBoundaryNote: "Component authority is evidence admission, not material realization.",
+    claimBoundaryNote: "Component authority is evidence admission, not material-source proof.",
   },
   {
     id: "component_authority_ledger_feeds_source_side_authority",
@@ -3514,6 +3867,62 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "blocks",
     label: "The time-dependent source campaign keeps NHM2 behind diagnostic-only language until dynamic gates pass together.",
     claimBoundaryNote: "A campaign artifact cannot grant transport, route ETA, propulsion, or physical viability claims.",
+  },
+  {
+    id: "time_dependent_campaign_feeds_lean_certificate",
+    from: "nhm2.dynamic.time_dependent_source_campaign",
+    to: "nhm2.formal.lean_certificate",
+    relation: "requires",
+    label: "The Lean certificate exporter consumes the pinned time-dependent campaign artifacts as certificate inputs.",
+    claimBoundaryNote: "The Lean certificate is a formal diagnostic bridge and does not rerun the numerical solver.",
+  },
+  {
+    id: "lean_certificate_requires_hash_pins",
+    from: "nhm2.formal.certificate_hashes_pinned",
+    to: "nhm2.formal.lean_certificate",
+    relation: "requires",
+    label: "The Lean certificate is scoped by profile, atlas, and artifact hash provenance.",
+    claimBoundaryNote: "Hash pinning prevents stale evidence from being promoted into certificate language.",
+  },
+  {
+    id: "lean_certificate_feeds_diagnostic_admissibility",
+    from: "nhm2.formal.lean_certificate",
+    to: "nhm2.formal.diagnostic_campaign_admissible",
+    relation: "requires",
+    label: "Lean checks the emitted certificate facts before the diagnostic campaign admissibility theorem is available.",
+    claimBoundaryNote: "Diagnostic admissibility is policy-scoped and cannot grant physical, transport, route, propulsion, or speed claims.",
+  },
+  {
+    id: "negative_fixtures_document_lean_certificate",
+    from: "nhm2.formal.negative_fixtures_fail_closed",
+    to: "nhm2.formal.lean_certificate",
+    relation: "documents",
+    label: "Negative fixtures document that missing, stale, scalar-only, narrow-frame, or open-lock evidence fails closed.",
+    claimBoundaryNote: "Fail-closed tests are proof-policy coverage, not physical-source evidence.",
+  },
+  {
+    id: "diagnostic_admissibility_requires_claim_locks",
+    from: "nhm2.formal.claim_locks_closed",
+    to: "nhm2.formal.diagnostic_campaign_admissible",
+    relation: "requires",
+    label: "The Lean diagnostic-admissibility theorem requires closed claim locks.",
+    claimBoundaryNote: "Open physical, route, propulsion, transport, or speed locks block the certificate.",
+  },
+  {
+    id: "lean_claim_locks_block_diagnostic_boundary",
+    from: "nhm2.formal.claim_locks_closed",
+    to: "nhm2.claim_boundary.diagnostic_only",
+    relation: "blocks",
+    label: "Lean claim locks keep formal campaign admissibility behind the diagnostic-only boundary.",
+    claimBoundaryNote: "Formal certificate admissibility cannot widen NHM2 claims.",
+  },
+  {
+    id: "lean_diagnostic_admissibility_documents_boundary",
+    from: "nhm2.formal.diagnostic_campaign_admissible",
+    to: "nhm2.claim_boundary.diagnostic_only",
+    relation: "documents",
+    label: "Lean diagnostic admissibility documents the policy-scoped campaign result.",
+    claimBoundaryNote: "The result remains diagnostic/reduced-order evidence only.",
   },
   {
     id: "natario_invariants_document_observer_authority",

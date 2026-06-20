@@ -743,6 +743,18 @@ export function applyPostToolAuthorityBridgeRepair(input: {
   const bridge = input.bridge ?? buildPostToolAuthorityBridge({ turnId: input.turnId, payload: input.payload });
   input.payload.post_tool_authority_bridge = bridge as unknown as RecordLike;
   if (!bridge.applies) return bridge;
+  const itinerary = readRecord(input.payload.capability_itinerary);
+  const executionState =
+    readRecord(input.payload.capability_itinerary_execution_state) ??
+    readRecord(itinerary?.execution_state);
+  if (executionState?.applies === true && executionState?.complete === false) {
+    return {
+      ...bridge,
+      observation_support_status: "not_enough_information",
+      terminal_repair_action: "none",
+      reason: "compound_itinerary_incomplete",
+    };
+  }
 
   if (bridge.observation_support_status === "supports_answer" && bridge.required_terminal_kind === "model_synthesized_answer") {
     const text =

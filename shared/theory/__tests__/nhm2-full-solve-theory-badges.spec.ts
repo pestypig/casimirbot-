@@ -26,6 +26,13 @@ describe("NHM2 full-solve theory badges", () => {
     "casimir.geometry.beyond_pfa_validity",
     "nhm2.natario.invariant_audit",
   ];
+  const leanFormalBadgeIds = [
+    "nhm2.formal.lean_certificate",
+    "nhm2.formal.diagnostic_campaign_admissible",
+    "nhm2.formal.claim_locks_closed",
+    "nhm2.formal.negative_fixtures_fail_closed",
+    "nhm2.formal.certificate_hashes_pinned",
+  ];
 
   it("builds NHM2 full-solve badges with no validation or promotion boundary", () => {
     const { badges, edges } = buildNhm2FullSolveTheoryBadgesV1();
@@ -78,6 +85,7 @@ describe("NHM2 full-solve theory badges", () => {
     expect(ids).toContain("nhm2.clock.twin_paradox_trip_clocking");
     expect(ids).toContain("nhm2.clock.trip_clocking_profile_index");
     expect(ids).toContain("nhm2.artifact.frozen_reference_run_provenance");
+    expect(ids).toEqual(expect.arrayContaining(leanFormalBadgeIds));
   });
 
   it("keeps promotion-sensitive routes blocked by claim boundaries", () => {
@@ -223,6 +231,41 @@ describe("NHM2 full-solve theory badges", () => {
           to: "nhm2.claim_boundary.diagnostic_only",
           relation: "blocks",
         }),
+        expect.objectContaining({
+          from: "nhm2.dynamic.time_dependent_source_campaign",
+          to: "nhm2.formal.lean_certificate",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.formal.certificate_hashes_pinned",
+          to: "nhm2.formal.lean_certificate",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.formal.lean_certificate",
+          to: "nhm2.formal.diagnostic_campaign_admissible",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.formal.negative_fixtures_fail_closed",
+          to: "nhm2.formal.lean_certificate",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "nhm2.formal.claim_locks_closed",
+          to: "nhm2.formal.diagnostic_campaign_admissible",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.formal.claim_locks_closed",
+          to: "nhm2.claim_boundary.diagnostic_only",
+          relation: "blocks",
+        }),
+        expect.objectContaining({
+          from: "nhm2.formal.diagnostic_campaign_admissible",
+          to: "nhm2.claim_boundary.diagnostic_only",
+          relation: "documents",
+        }),
       ]),
     );
   });
@@ -247,12 +290,56 @@ describe("NHM2 full-solve theory badges", () => {
       "nhm2.qei.worldline_dossier",
       "nhm2.natario.invariant_audit",
       "nhm2.clock.trip_clocking_profile_index",
+      ...leanFormalBadgeIds,
     ];
 
     for (const badgeId of nonScalarIds) {
       const badge = badges.find((candidate: TheoryBadgeV1) => candidate.id === badgeId);
       expect(badge?.calculatorPayloads).toEqual([]);
     }
+  });
+
+  it("wires Lean certificate badges to runtime refs without calculator payloads", () => {
+    const badges = buildNhm2FullSolveTheoryBadgesV1().badges;
+    const byId = new Map(badges.map((badge: TheoryBadgeV1) => [badge.id, badge]));
+
+    for (const badgeId of leanFormalBadgeIds) {
+      const badge = byId.get(badgeId);
+      expect(badge, badgeId).toBeDefined();
+      expect(badge?.calculatorPayloads).toEqual([]);
+      expect(badge?.equations.every((equation) => equation.computableExpression == null)).toBe(true);
+      expect(
+        badge?.equations.every((equation) => equation.operatorKind === "noncomputable_reference"),
+      ).toBe(true);
+      expect(badge?.claimBoundary).toMatchObject({
+        diagnosticOnly: true,
+        doesValidateNHM2: false,
+        validationClaimAllowed: false,
+        physicalMechanismClaimAllowed: false,
+        promotionAllowed: false,
+      });
+    }
+
+    const leanCertificate = byId.get("nhm2.formal.lean_certificate");
+    const refsText = JSON.stringify(leanCertificate?.sourceRefs);
+    expect(refsText).toMatch(/nhm2-lean-campaign-certificate\.json/);
+    expect(refsText).toMatch(/CurrentCampaignCertificate\.lean/);
+    expect(refsText).toMatch(/npm run formal:nhm2:certificate:check/);
+  });
+
+  it("keeps Lean formal certificate copy claim-safe", () => {
+    const badges = buildNhm2FullSolveTheoryBadgesV1().badges.filter((badge: TheoryBadgeV1) =>
+      leanFormalBadgeIds.includes(badge.id),
+    );
+    const text = JSON.stringify(badges);
+
+    expect(text).toMatch(/Lean verifies diagnostic campaign admissibility from the emitted certificate/);
+    expect(text).not.toMatch(/Lean proves NHM2 is physically viable/i);
+    expect(text).not.toMatch(/certified warp speed/i);
+    expect(text).not.toMatch(/transport certified/i);
+    expect(text).not.toMatch(/route ETA certified/i);
+    expect(text).not.toMatch(/\bcertified speed\b/i);
+    expect(text).not.toMatch(/material realization/i);
   });
 
   it("keeps the centerline clocking target calculator-loadable but bounded", () => {
@@ -356,6 +443,11 @@ describe("NHM2 full-solve theory badges", () => {
         "nhm2.energy_condition.observer_robust_gate",
         "nhm2.clock.twin_paradox_trip_clocking",
         "nhm2.clock.trip_clocking_profile_index",
+        "nhm2.formal.lean_certificate",
+        "nhm2.formal.diagnostic_campaign_admissible",
+        "nhm2.formal.claim_locks_closed",
+        "nhm2.formal.negative_fixtures_fail_closed",
+        "nhm2.formal.certificate_hashes_pinned",
         "nhm2.claim_boundary.diagonal_proxy_not_full_tensor",
       ]),
     );
@@ -550,6 +642,26 @@ describe("NHM2 full-solve theory badges", () => {
           to: "nhm2.claim_boundary.expected_clocking_not_route_result",
           relation: "blocks",
         }),
+        expect.objectContaining({
+          from: "nhm2.dynamic.time_dependent_source_campaign",
+          to: "nhm2.formal.lean_certificate",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.formal.lean_certificate",
+          to: "nhm2.formal.diagnostic_campaign_admissible",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.formal.claim_locks_closed",
+          to: "nhm2.formal.diagnostic_campaign_admissible",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.formal.claim_locks_closed",
+          to: "nhm2.claim_boundary.diagnostic_only",
+          relation: "blocks",
+        }),
       ]),
     );
   });
@@ -567,5 +679,10 @@ describe("NHM2 full-solve theory badges", () => {
     expect(text).not.toMatch(/\bcertified speed\b/i);
     expect(text).not.toMatch(/\btrue ETA\b/i);
     expect(text).not.toMatch(/\bphysical warp trip\b/i);
+    expect(text).not.toMatch(/Lean proves NHM2 is physically viable/i);
+    expect(text).not.toMatch(/certified warp speed/i);
+    expect(text).not.toMatch(/transport certified/i);
+    expect(text).not.toMatch(/route ETA certified/i);
+    expect(text).not.toMatch(/material realization/i);
   });
 });

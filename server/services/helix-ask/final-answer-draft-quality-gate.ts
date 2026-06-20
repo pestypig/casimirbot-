@@ -13,6 +13,7 @@ export type FinalAnswerDraftQualityViolation =
 
 export type FinalAnswerDraftRouteFamily =
   | "model_only"
+  | "capability_catalog"
   | "repo_evidence"
   | "scholarly_research"
   | "internet_search"
@@ -54,6 +55,25 @@ const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
 const textIncludesAny = (text: string, patterns: RegExp[]): boolean =>
   patterns.some((pattern) => pattern.test(text));
 
+const compoundTerminalPolicyActive = (payload?: Record<string, unknown> | null): boolean => {
+  const itinerary = readRecord(payload?.capability_itinerary);
+  const contract =
+    readRecord(payload?.compound_capability_contract) ??
+    readRecord(itinerary?.compound_capability_contract);
+  const executionState =
+    readRecord(payload?.capability_itinerary_execution_state) ??
+    readRecord(itinerary?.execution_state);
+  const terminalCriteria = readRecord(itinerary?.terminal_success_criteria);
+  const synthesisReadiness = readRecord(payload?.compound_capability_synthesis_readiness);
+  return (
+    readArray(contract?.subgoals).length > 1 ||
+    readArray(executionState?.compound_subgoal_ledger).length > 1 ||
+    terminalCriteria?.compound_terminal_policy === "synthesize_from_satisfied_subgoal_observations" ||
+    terminalCriteria?.requires_post_observation_synthesis === true ||
+    synthesisReadiness?.applies === true
+  );
+};
+
 export const inferFinalAnswerDraftRouteFamily = (input: {
   routeProductContract?: Record<string, unknown> | null;
   payload?: Record<string, unknown> | null;
@@ -64,8 +84,23 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
   const committedGoal = readRecord(committedRoute?.canonical_goal);
   const committedSourceTarget = readString(committedRouteSource?.source_target);
   const committedGoalKind = readString(committedGoal?.goal_kind);
+  if (
+    compoundTerminalPolicyActive(input.payload) &&
+    (
+      readString(readRecord(input.payload?.compound_capability_synthesis_readiness)?.required_terminal_kind) === "model_synthesized_answer" ||
+      readString(readRecord(input.payload?.compound_capability_synthesis_readiness)?.synthesis_terminal_kind) === "model_synthesized_answer"
+    )
+  ) {
+    return "unknown";
+  }
   if (committedSourceTarget === "model_only" || committedGoalKind === "model_only_concept") {
     return "model_only";
+  }
+  if (
+    committedSourceTarget === "runtime_evidence" &&
+    /capability_(?:help|catalog)|runtime_capability_catalog/i.test(committedGoalKind ?? "")
+  ) {
+    return "capability_catalog";
   }
   if (committedSourceTarget === "repo_code" || committedSourceTarget === "runtime_evidence") {
     return "repo_evidence";
@@ -118,6 +153,12 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
     readString(input.payload?.route_reason_code),
     readString(input.payload?.route),
   ].join(" ");
+  if (
+    sourceTarget === "runtime_evidence" &&
+    /capability_(?:help|catalog)|inspect_capability_catalog/i.test(routeText)
+  ) {
+    return "capability_catalog";
+  }
   if (sourceTarget === "repo_code" || sourceTarget === "runtime_evidence" || /repo_code|repo_evidence/i.test(routeText)) {
     return "repo_evidence";
   }
@@ -180,7 +221,7 @@ export const collectFinalAnswerDraftSupportRefs = (input: {
     const payload = readRecord(artifact.payload);
     const kind = readString(artifact.kind);
     const schema = readString(payload?.schema);
-    if (!/repo_code_evidence_observation|scholarly_research_observation|scholarly_full_text_observation|internet_search_observation|helix_theory_context_reflection_tool_receipt|theory_context_reflection|reflect_theory_context|doc_|docs|calculator|workspace_action|agent_step_observation/i.test([kind, schema].join(" "))) return [];
+    if (!/repo_code_evidence_observation|scholarly_research_observation|scholarly_full_text_observation|internet_search_observation|helix_theory_context_reflection_tool_receipt|theory_context_reflection|reflect_theory_context|capability_registry|capability_catalog|workspace_os_status_observation|workspace_status|doc_|docs|calculator|workspace_action|agent_step_observation/i.test([kind, schema].join(" "))) return [];
     return [
       readString(artifact.artifact_id),
       ...readArray(payload?.evidence_refs).map(readString),
