@@ -25,6 +25,10 @@ describe("theory_frontier_search/v1", () => {
     expect(search.scholarlyLookupRequests.every((request) => request.mutating === false)).toBe(true);
     expect(search.scholarlyLookupRequests.every((request) => request.noAutoPromoteLiterature === true)).toBe(true);
     expect(search.probabilityTerrain.interpretation).toBe("placement_probability_not_truth_claim");
+    expect(search.vectorFieldTrace.vectors.length).toBe(graph.badges.length);
+    expect(search.vectorFieldTrace.candidateTraces.length).toBe(search.candidates.length);
+    expect(search.vectorFieldTrace.interpretation.tensorsAreRelationTransformsOnly).toBe(true);
+    expect(search.vectorFieldTrace.interpretation.noTheoryValidation).toBe(true);
     expect(search.stageTrace.proceduralModel).toBe("coarse_to_fine_seed_finding_precedent");
     expect(search.stageTrace.cheapBiomeFields).toEqual([
       "scale_envelope",
@@ -45,6 +49,7 @@ describe("theory_frontier_search/v1", () => {
       strategy: "shared_biome_layout_and_connection_trace_cache",
       amortizedAcrossCandidatePairs: true,
     });
+    expect(search.stageTrace.contextReuse.reusedContextKeys).toContain("theory_frontier_vector_field");
     expect(search.stageTrace.stages.map((stage) => stage.stageName)).toEqual([
       "cheap_biome_field_scan",
       "unit_dimensional_filter",

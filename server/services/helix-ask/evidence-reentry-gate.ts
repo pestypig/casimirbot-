@@ -296,7 +296,7 @@ const collectCapabilityItineraryEvidenceRefs = (payload: RecordLike): string[] =
           /scholarly_research_observation|scholarly_full_text_observation/i.test(haystack)) ||
         (requiredObserved.has("internet_search") && /internet_search_observation/i.test(haystack)) ||
         (requiredObserved.has("theory_locator") &&
-          /helix_theory_context_reflection_tool_receipt|theory_context_reflection|reflect_theory_context/i.test(haystack))
+          /helix_theory_context_reflection_tool_receipt|theory_context_reflection|reflect_theory_context|helix_theory_frontier_vector_field_tool_receipt|theory_frontier_vector_field|frontierVectorFieldTrace/i.test(haystack))
       );
     })
     .flatMap((entry) => {

@@ -37,6 +37,10 @@ import { resolveAskCapabilityContractArbitration } from "./capability-contract-a
 import { buildHelixCompoundCapabilityContract } from "./compound-capability-contract";
 import { isAskCapabilityCatalogPrompt } from "./capability-catalog-intent";
 import { hasExplicitRepoEvidenceRequest } from "./repo-code-intent-detector";
+import {
+  HELIX_THEORY_FRONTIER_VECTOR_FIELD_TRACE_CAPABILITY,
+  isTheoryFrontierVectorFieldTracePrompt,
+} from "./theory-frontier-vector-field-intent";
 
 type RecordLike = Record<string, unknown>;
 
@@ -106,9 +110,11 @@ const classifySourceFamily = (input: {
   if (
     input.sourceTarget === "context_reflection" ||
     input.sourceTarget === "context_attachment" ||
+    input.sourceTarget === "theory_locator" ||
     input.targetKind === "context_reflection" ||
     input.targetKind === "context_attachment" ||
     input.admittedFamilies.includes("context_reflection") ||
+    input.admittedFamilies.includes("theory_locator") ||
     /\b(?:selected\s+context|context\s+attachment|dragged\s+cutout|selected\s+ui\s+region|this\s+microreasoner|this\s+micro[-\s]?deck|macro[-\s]?reasoner\s+deck)\b/.test(prompt)
   ) {
     return "context_reflection";
@@ -182,6 +188,7 @@ const requestedActionFor = (
   sourceTarget?: string,
 ): string => {
   const prompt = normalize(promptText);
+  if (isTheoryFrontierVectorFieldTracePrompt(promptText)) return HELIX_THEORY_FRONTIER_VECTOR_FIELD_TRACE_CAPABILITY;
   if (family === "docs") {
     if (/\b(?:summari[sz]e|summary|overview|takeaways?|gist|describe|explain)\b/.test(prompt)) {
       if (/(?:^|[\s"'(])(?:\/docs\/|docs[\\/])\S+/.test(prompt) || /\b(?:current|active|this|that)\s+(?:doc|document|paper)\b/.test(prompt)) {
@@ -528,6 +535,12 @@ export const buildCapabilityPlan = (input: {
     !contextualToolSuppressionBlocksFamily(contextualSuppression, "internet_search") &&
     !requiresRepoConceptEvidence &&
     toolUseRestatement.requiredToolFamilies.includes("internet_search");
+  const sourceTargetIntentSource = readString(sourceTargetIntent?.target_source);
+  const sourceTargetIntentSuppressesGenericInternet =
+    Boolean(sourceTargetIntentSource) &&
+    !["unknown", "internet_search", "model_only"].includes(sourceTargetIntentSource ?? "");
+  const internetEvidenceDrivesPlan =
+    requiresInternetEvidence && !sourceTargetIntentSuppressesGenericInternet;
   const requiresCapabilityCatalog =
     !hardLiveSourceMailboxRoute &&
     isAskCapabilityCatalogPrompt(input.promptText);
@@ -535,17 +548,17 @@ export const buildCapabilityPlan = (input: {
     !hardLiveSourceMailboxRoute &&
     !contextualToolSuppressionBlocksFamily(contextualSuppression, "docs_viewer") &&
     !requiresRepoConceptEvidence &&
-    !requiresInternetEvidence &&
+    !internetEvidenceDrivesPlan &&
     toolUseRestatement.requiredToolFamilies.includes("docs_viewer");
   const fallbackSourceTarget =
     (hardLiveSourceMailboxRoute ? "live_source_mailbox" : "") ||
     (requestedCapabilityContract?.source_target ?? "") ||
     (requiresDocsViewerEvidence ? "docs_viewer" : "") ||
-    (requiresInternetEvidence ? "internet_search" : "") ||
+    readString(sourceTargetIntent?.target_source) ||
+    (internetEvidenceDrivesPlan ? "internet_search" : "") ||
     (requiresCapabilityCatalog ? "runtime_evidence" : "") ||
     (requiresRepoConceptEvidence ? "repo_code" : "") ||
     (explicitDocsPathOperation ? "" : routeMetadataSourceTarget(routeMetadata)) ||
-    readString(sourceTargetIntent?.target_source) ||
     readString(routeProductContract?.source_target) ||
     readString(toolCallAdmissionDecision?.source_target) ||
     (contextualSuppression ? "model_only" : "") ||
@@ -569,7 +582,7 @@ export const buildCapabilityPlan = (input: {
     ? "docs"
     : requiresRepoConceptEvidence
     ? "repo_evidence"
-    : requiresInternetEvidence
+    : internetEvidenceDrivesPlan
       ? "internet_search"
       : contextualSuppression && fallbackSourceTarget === "model_only"
         ? "debug_export"
@@ -582,14 +595,14 @@ export const buildCapabilityPlan = (input: {
     ? "capability_help"
     : requiresDocsViewerEvidence
       ? "doc_open_best"
-    : requiresInternetEvidence
+    : internetEvidenceDrivesPlan
       ? "internet_search_lookup"
       : originalCanonicalGoalKind || "unknown";
   const fallbackRequiredTerminalKind = requiresRepoConceptEvidence
     ? "repo_code_evidence_answer"
     : requiresCapabilityCatalog
       ? "capability_help_summary"
-    : requiresInternetEvidence
+    : internetEvidenceDrivesPlan
       ? "internet_search_answer"
       : readString(canonicalGoalFrame?.required_terminal_kind) || null;
   const contractArbitration = resolveAskCapabilityContractArbitration({

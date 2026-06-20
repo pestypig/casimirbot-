@@ -7,6 +7,10 @@ import {
   type TheoryFrontierCandidateV1,
   validateTheoryFrontierCandidateV1,
 } from "./theory-frontier-candidate.v1";
+import {
+  type TheoryFrontierVectorFieldTraceV1,
+  validateTheoryFrontierVectorFieldTraceV1,
+} from "./theory-frontier-vector-field.v1";
 
 export const THEORY_FRONTIER_SEARCH_ARTIFACT_ID = "theory_frontier_search" as const;
 export const THEORY_FRONTIER_SEARCH_SCHEMA_VERSION = "theory_frontier_search/v1" as const;
@@ -158,6 +162,7 @@ export type TheoryFrontierSearchV1 = {
   scoringVersion: string;
   verifierVersion: string;
   candidates: TheoryFrontierCandidateV1[];
+  vectorFieldTrace: TheoryFrontierVectorFieldTraceV1;
   scholarlyLookupRequests: TheoryFrontierScholarlyLookupRequestV1[];
   probabilityTerrain: ProbabilityTerrainV1;
   stageTrace: TheoryFrontierSearchStageTraceV1;
@@ -427,6 +432,7 @@ function buildStageTrace(input: BuildTheoryFrontierSearchV1Input): TheoryFrontie
         input.scoringVersion,
         "theory_biome_layout",
         "theory_badge_connection_trace",
+        "theory_frontier_vector_field",
       ],
     },
     stages: [
@@ -438,7 +444,7 @@ function buildStageTrace(input: BuildTheoryFrontierSearchV1Input): TheoryFrontie
         inputCandidateCount: initialCount,
         candidates,
         passes: (candidate) => candidate.scores.cheapBiomeScore > 0,
-        evidenceFields: ["biomeRegion.scaleEnvelopeLog10M", "biomeRegion.domainKeys", "biomeRegion.fidelityKeys", "biomeRegion.semanticChunkIds", "biomeRegion.averageClaimPressure"],
+        evidenceFields: ["biomeRegion.scaleEnvelopeLog10M", "vectorFieldTrace.vectors.scaleEnvelopeLog10M", "biomeRegion.domainKeys", "biomeRegion.fidelityKeys", "biomeRegion.semanticChunkIds", "biomeRegion.averageClaimPressure"],
       }),
       stageRecord({
         order: 2,
@@ -448,7 +454,7 @@ function buildStageTrace(input: BuildTheoryFrontierSearchV1Input): TheoryFrontie
         inputCandidateCount: candidates.length,
         candidates,
         passes: (candidate) => candidate.congruence.unitCompatibility === "compatible" || candidate.congruence.unitCompatibility === "partial",
-        evidenceFields: ["congruence.unitCompatibility", "congruence.sharedUnitSignatures", "congruence.dimensionalIssues"],
+        evidenceFields: ["congruence.unitCompatibility", "congruence.sharedUnitSignatures", "vectorFieldTrace.candidateTraces.vectorDelta.dimensionalDistance", "congruence.dimensionalIssues"],
       }),
       stageRecord({
         order: 3,
@@ -458,7 +464,7 @@ function buildStageTrace(input: BuildTheoryFrontierSearchV1Input): TheoryFrontie
         inputCandidateCount: candidates.length,
         candidates,
         passes: (candidate) => candidate.congruence.symbolCompatibilityScore > 0 || candidate.congruence.equationFamilyCompatibilityScore > 0,
-        evidenceFields: ["congruence.sharedSymbols", "congruence.sharedEquationFamilies"],
+        evidenceFields: ["congruence.sharedSymbols", "congruence.sharedEquationFamilies", "vectorFieldTrace.candidateTraces.vectorDelta.equationFamilyDistance"],
       }),
       stageRecord({
         order: 4,
@@ -508,7 +514,7 @@ function buildStageTrace(input: BuildTheoryFrontierSearchV1Input): TheoryFrontie
         inputCandidateCount: candidates.length,
         candidates,
         passes: (candidate) => candidate.status === "exact_verification_pending",
-        evidenceFields: ["status", "replay", "congruence", "claimBoundary"],
+        evidenceFields: ["status", "replay", "congruence", "vectorFieldTrace.relationTensors", "claimBoundary"],
       }),
     ],
   };
@@ -543,6 +549,7 @@ export function buildTheoryFrontierSearchV1(input: BuildTheoryFrontierSearchV1In
     scoringVersion: input.scoringVersion,
     verifierVersion: input.verifierVersion,
     candidates: input.candidates,
+    vectorFieldTrace: input.vectorFieldTrace,
     scholarlyLookupRequests: input.scholarlyLookupRequests ?? [],
     probabilityTerrain: input.probabilityTerrain,
     stageTrace: input.stageTrace ?? buildStageTrace(input),
@@ -591,6 +598,23 @@ export function validateTheoryFrontierSearchV1(value: unknown): string[] {
       for (const issue of validateTheoryFrontierCandidateV1(candidate)) {
         issues.push(`candidates[${index}].${issue}`);
       }
+    }
+  }
+
+  if (!isRecord(value.vectorFieldTrace)) {
+    issues.push("vectorFieldTrace must be an object");
+  } else {
+    for (const issue of validateTheoryFrontierVectorFieldTraceV1(value.vectorFieldTrace)) {
+      issues.push(`vectorFieldTrace.${issue}`);
+    }
+    if (value.vectorFieldTrace.graphHash !== value.graphHash) {
+      issues.push("vectorFieldTrace.graphHash must match graphHash");
+    }
+    if (value.vectorFieldTrace.query !== value.query) {
+      issues.push("vectorFieldTrace.query must match query");
+    }
+    if (value.vectorFieldTrace.searchSeed !== value.searchSeed) {
+      issues.push("vectorFieldTrace.searchSeed must match searchSeed");
     }
   }
 

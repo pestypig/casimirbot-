@@ -585,6 +585,31 @@ export function arbitrateAskSourceTarget(input: {
   const selectedEvidenceCandidate = evidenceTargetArbitration.evidence_target_candidates.find(
     (candidate) => candidate.candidate_id === evidenceTargetArbitration.selected_candidate_id,
   );
+  if (isDeicticDocsIdentityPrompt(prompt)) {
+    const activeWorkspaceResolution = input.activeWorkspaceSourceResolution as Record<string, unknown> | null | undefined;
+    const sourceBound =
+      typeof activeWorkspaceResolution?.active_doc_path === "string" &&
+      activeWorkspaceResolution.active_doc_path.trim().length > 0;
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "active_doc",
+      targetKind: "active_doc",
+      strength: "hard",
+      explicitCues: ["active_doc_identity"],
+      reasons: [
+        "active_doc_identity_source_target",
+        "deictic_doc_identity_suppresses_evidence_target_freshness",
+        sourceBound ? "active_doc_path_bound_from_workspace_snapshot" : "active_doc_path_required",
+      ],
+      requestedOutputs: ["file_path", "typed_failure"],
+      suppressedRoutes: ["internet_search_lookup", "scholarly_research_lookup", "repo_code_evidence_question", "situation_context_question", "visual_deictic", "visual_frame_evidence", "model_only_concept", "no_tool_direct"],
+      precedenceReason: "active_doc_identity_source_target",
+      confidence: sourceBound ? 0.99 : 0.94,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
   if (selectedEvidenceCandidate?.target_source === "repo_code") {
     const repoPrecedenceReason =
       selectedEvidenceCandidate.strength === "hard"
@@ -1055,6 +1080,31 @@ export function arbitrateAskSourceTarget(input: {
       suppressedRoutes: ["internet_search_lookup", "scholarly_research_lookup", "situation_context_question", "visual_deictic", "visual_frame_evidence", "active_doc_identity", "model_only_concept", "no_tool_direct"],
       precedenceReason: "explicit_docs_search_source_target",
       confidence: 0.96,
+      allowClientShortcut: false,
+      allowNoToolDirect: false,
+    });
+  }
+  if (isDeicticDocsIdentityPrompt(prompt)) {
+    const activeWorkspaceResolution = input.activeWorkspaceSourceResolution as Record<string, unknown> | null | undefined;
+    const sourceBound =
+      typeof activeWorkspaceResolution?.active_doc_path === "string" &&
+      activeWorkspaceResolution.active_doc_path.trim().length > 0;
+    return toSourceTargetIntent({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      target: "active_doc",
+      targetKind: "active_doc",
+      strength: "hard",
+      explicitCues: ["active_doc_identity"],
+      reasons: [
+        "active_doc_identity_source_target",
+        "deictic_doc_identity_suppresses_freshness_search",
+        sourceBound ? "active_doc_path_bound_from_workspace_snapshot" : "active_doc_path_required",
+      ],
+      requestedOutputs: ["file_path", "typed_failure"],
+      suppressedRoutes: ["internet_search_lookup", "scholarly_research_lookup", "repo_code_evidence_question", "situation_context_question", "visual_deictic", "visual_frame_evidence", "model_only_concept", "no_tool_direct"],
+      precedenceReason: "active_doc_identity_source_target",
+      confidence: sourceBound ? 0.99 : 0.94,
       allowClientShortcut: false,
       allowNoToolDirect: false,
     });

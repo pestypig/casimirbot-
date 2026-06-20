@@ -655,6 +655,29 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     allowed_substitutions: [],
     forbidden_nearby_capabilities: ["model.direct_answer"],
   },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: "helix.theory.frontierVectorFieldTrace",
+    aliases: [
+      "frontierVectorFieldTrace",
+      "frontier_vector_field_trace",
+      "theory_frontier_vector_field",
+      "theory_frontier_vector_field_trace",
+      "badge_coordinate_vector_trace",
+      "relation_tensor_trace",
+    ],
+    capability_family: "theory_locator",
+    plan_family: "context_reflection",
+    source_target: "theory_locator",
+    admission_families: ["theory_locator"],
+    required_observation_kinds: [
+      "helix_theory_frontier_vector_field_tool_receipt",
+      "theory_frontier_vector_field",
+    ],
+    required_terminal_kind: "model_synthesized_answer",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["model.direct_answer"],
+  },
   contextReflectionEvidenceContract({
     capability: "helix_ask.reflect_live_synthetic_data",
     aliases: [

@@ -58,6 +58,15 @@ const readString = (value: unknown): string =>
 
 const unique = (values: string[]): string[] => Array.from(new Set(values.filter(Boolean)));
 
+const stableTextHash = (input: string): string => {
+  let h = 2166136261;
+  for (let index = 0; index < input.length; index += 1) {
+    h ^= input.charCodeAt(index);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(16).padStart(8, "0");
+};
+
 const normalizeSpace = (value: string): string => value.replace(/\s+/g, " ").trim();
 
 const stripBoundaryPunctuation = (value: string): string =>
@@ -194,6 +203,12 @@ const argsHintForSubgoal = (input: {
       sync_panel: true,
       panel_overlay_mode: "live_answer_context",
       open_panel: false,
+    };
+  }
+  if (capability === "helix.theory.frontierVectorFieldTrace") {
+    return {
+      query: normalizeSpace(input.promptText),
+      searchSeed: `ask:${stableTextHash(input.turnId)}:theory-frontier-vector-field`,
     };
   }
   if (capability === "helix_ask.reflect_ideology_context") {

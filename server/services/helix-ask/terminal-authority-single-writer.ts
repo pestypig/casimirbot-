@@ -1096,6 +1096,162 @@ const artifactText = (artifact: ArtifactLike): string | null => {
   );
 };
 
+const CONTRACT_AUTHORIZED_RECEIPT_TERMINAL_KINDS = new Set([
+  "workspace_action_receipt",
+  "doc_open_receipt",
+  "note_update_receipt",
+  "note_action_receipt",
+  "note_create_receipt",
+]);
+
+const isContractAuthorizedReceiptTerminalKind = (kind: string | null | undefined): kind is string =>
+  Boolean(kind && CONTRACT_AUTHORIZED_RECEIPT_TERMINAL_KINDS.has(kind));
+
+const terminalContractKindValues = (payload: Record<string, unknown>): string[] => {
+  const committedRoute = readRecord(payload.committed_ask_route);
+  const committedGoal = readRecord(committedRoute?.canonical_goal);
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  const routeProduct = readRecord(payload.route_product_contract);
+  const goalSatisfaction = readRecord(payload.goal_satisfaction_evaluation);
+  const terminalContract = readRecord(goalSatisfaction?.terminal_contract);
+  const satisfactionReport = readRecord(payload.satisfaction_report);
+  return [
+    readString(committedGoal?.required_terminal_kind),
+    readString(canonicalGoal?.required_terminal_kind),
+    readString(routeProduct?.required_terminal_kind),
+    readString(goalSatisfaction?.required_terminal_kind),
+    readString(goalSatisfaction?.terminal_artifact_kind),
+    readString(satisfactionReport?.terminal_artifact_kind),
+    ...readArray(committedGoal?.allowed_terminal_artifact_kinds).map(readString),
+    ...readArray(routeProduct?.allowed_terminal_artifact_kinds).map(readString),
+    ...readArray(routeProduct?.required_terminal_kinds).map(readString),
+    ...readArray(terminalContract?.required_terminal_kinds).map(readString),
+    ...readArray(terminalContract?.allowed_terminal_kinds).map(readString),
+    ...readArray(terminalContract?.allowed_terminal_artifact_kinds).map(readString),
+    ...routeContractAllowedTerminalKinds(payload),
+    ...routeProductContractAllowedTerminalKinds(payload),
+  ].filter((entry): entry is string => Boolean(entry));
+};
+
+const goalSatisfactionAllowsTerminal = (payload: Record<string, unknown>): boolean => {
+  const goalSatisfaction = readRecord(payload.goal_satisfaction_evaluation);
+  const satisfactionReport = readRecord(payload.satisfaction_report);
+  return (
+    readString(goalSatisfaction?.satisfaction) === "satisfied" ||
+    readString(goalSatisfaction?.next_decision) === "allow_terminal" ||
+    satisfactionReport?.satisfied === true
+  );
+};
+
+const goalObservedResultsSupportKind = (
+  payload: Record<string, unknown>,
+  kind: string,
+): boolean =>
+  readArray(readRecord(payload.goal_satisfaction_evaluation)?.observed_results)
+    .map(readRecord)
+    .some((entry) =>
+      Boolean(
+        entry &&
+          readString(entry.kind) === kind &&
+          entry.supports_goal === true,
+      ));
+
+const goalContractAllowsReceiptTerminal = (
+  payload: Record<string, unknown>,
+  kind: string | null | undefined,
+): kind is string => {
+  if (!isContractAuthorizedReceiptTerminalKind(kind)) return false;
+  if (!routeContractAllowsTerminalKind(payload, kind)) return false;
+  if (committedRouteForbiddenTerminalKinds(payload).includes(kind)) return false;
+  if (!terminalContractKindValues(payload).includes(kind)) return false;
+  return goalSatisfactionAllowsTerminal(payload) || goalObservedResultsSupportKind(payload, kind);
+};
+
+const artifactMatchesReceiptTerminalKind = (artifact: ArtifactLike, kind: string): boolean => {
+  const payload = artifactPayload(artifact);
+  const result = readRecord(payload?.result);
+  const observation = readRecord(payload?.observation);
+  return [
+    artifactKind(artifact),
+    artifactSchema(artifact),
+    readString(payload?.kind),
+    readString(payload?.receipt_kind),
+    readString(payload?.terminal_artifact_kind),
+    readString(result?.kind),
+    readString(result?.receipt_kind),
+    readString(observation?.kind),
+    readString(observation?.receipt_kind),
+  ]
+    .filter((entry): entry is string => Boolean(entry))
+    .includes(kind);
+};
+
+const receiptTerminalText = (
+  payload: Record<string, unknown>,
+  artifact: ArtifactLike,
+  kind: string,
+): string | null => {
+  const artifactPayloadRecord = artifactPayload(artifact);
+  const candidateText =
+    artifactText(artifact) ??
+    readString(artifactPayloadRecord?.label) ??
+    readString(artifactPayloadRecord?.title);
+  if (candidateText && !isStaleWorkspaceFailureText(candidateText)) return candidateText;
+  const selectedText = readString(payload.selected_final_answer);
+  if (selectedText && !isStaleWorkspaceFailureText(selectedText) && !isHelixGenericTypedFailureText(selectedText)) {
+    return selectedText;
+  }
+  if (kind === "workspace_action_receipt") return "Workspace action completed.";
+  if (kind === "doc_open_receipt") return "Document opened.";
+  if (/note/i.test(kind)) return "Note action completed.";
+  return null;
+};
+
+const findGoalSatisfyingReceiptTerminalArtifact = (
+  payload: Record<string, unknown>,
+  artifacts: ArtifactLike[],
+): { artifact: ArtifactLike; kind: string; text: string; ref: string | null } | null => {
+  const allowedKinds = Array.from(new Set(
+    terminalContractKindValues(payload).filter((kind) => goalContractAllowsReceiptTerminal(payload, kind)),
+  ));
+  if (allowedKinds.length === 0) return null;
+
+  const stepResultReceiptArtifacts = readArray(payload.step_results)
+    .map(readRecord)
+    .filter((step): step is Record<string, unknown> => Boolean(step))
+    .map((step) => {
+      const resultArtifact = readRecord(step.result_artifact);
+      const kind = readString(resultArtifact?.kind);
+      if (!resultArtifact || !kind || !allowedKinds.includes(kind)) return null;
+      return {
+        artifact_id:
+          readString(resultArtifact.artifact_id) ??
+          readString(resultArtifact.receipt_id) ??
+          `${readString(step.step_id) ?? "step_result"}:${kind}`,
+        kind,
+        payload: resultArtifact,
+      } satisfies ArtifactLike;
+    })
+    .filter((artifact): artifact is ArtifactLike => Boolean(artifact));
+
+  const candidates = [...artifacts, ...stepResultReceiptArtifacts];
+  for (let index = candidates.length - 1; index >= 0; index -= 1) {
+    const artifact = candidates[index];
+    if (!artifact) continue;
+    const kind = allowedKinds.find((candidateKind) => artifactMatchesReceiptTerminalKind(artifact, candidateKind));
+    if (!kind) continue;
+    const text = receiptTerminalText(payload, artifact, kind);
+    if (!text) continue;
+    return {
+      artifact,
+      kind,
+      text,
+      ref: artifactId(artifact) ?? readString(artifactPayload(artifact)?.receipt_id),
+    };
+  }
+  return null;
+};
+
 const isPostToolObservation = (artifact: ArtifactLike): boolean => {
   const payload = artifactPayload(artifact);
   if (!(
@@ -2343,6 +2499,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const selectedWorkstationToolEvaluation = findGoalSatisfyingWorkstationToolEvaluationArtifact(input.payload, artifacts);
   const workstationTerminalMaterialized =
     Boolean(selectedWorkstationToolEvaluation) && goalAllowsTerminal;
+  const selectedReceiptTerminal = findGoalSatisfyingReceiptTerminalArtifact(input.payload, artifacts);
   const pendingRequestCandidate =
     readRecord(input.payload.request_user_input) ??
     readRecord(input.payload.pending_server_request) ??
@@ -2380,6 +2537,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       (stagePlayTerminalMaterialized && goalAllowsTerminal) ||
       compoundMaterializedDraftCanSatisfyTerminal ||
       workstationTerminalMaterialized ||
+      Boolean(selectedReceiptTerminal && goalAllowsTerminal) ||
       noteMutationTerminalMaterialized
     );
   if (solverContinuationPending) {
@@ -2425,6 +2583,11 @@ export function applyHelixTerminalAuthoritySingleWriter(
     rejectedCandidates.push({
       kind: "typed_failure",
       reason: "stale_solver_continuation_superseded_by_workstation_terminal",
+    });
+  } else if (rawSolverContinuationPending && selectedReceiptTerminal && goalAllowsTerminal) {
+    rejectedCandidates.push({
+      kind: "typed_failure",
+      reason: "stale_solver_continuation_superseded_by_required_receipt_terminal",
     });
   } else if (rawSolverContinuationPending && noteMutationTerminalMaterialized) {
     rejectedCandidates.push({
@@ -2547,6 +2710,18 @@ export function applyHelixTerminalAuthoritySingleWriter(
 
   for (const artifact of artifacts) {
     if (!isForbiddenReceiptOrProjection(artifact)) continue;
+    if (
+      selectedReceiptTerminal &&
+      (
+        artifact === selectedReceiptTerminal.artifact ||
+        (
+          selectedReceiptTerminal.ref &&
+          artifactId(artifact) === selectedReceiptTerminal.ref
+        )
+      )
+    ) {
+      continue;
+    }
     rejectedCandidates.push({
       ref: artifactId(artifact) ?? undefined,
       kind: artifactKind(artifact),
@@ -2628,6 +2803,25 @@ export function applyHelixTerminalAuthoritySingleWriter(
     terminal: selectedWorkstationToolEvaluation,
     workstationTerminalMaterialized,
   });
+  const receiptTerminalSupersedesToolRailFailure =
+    Boolean(
+      selectedReceiptTerminal &&
+      goalAllowsTerminal &&
+      rawTerminalBlockingToolRailFailure &&
+      (
+        rawTerminalBlockingToolRailFailure.railFailureCode === "observation_missing" ||
+        rawTerminalBlockingToolRailFailure.railFailureCode === "terminal_not_materialized" ||
+        rawTerminalBlockingToolRailFailure.railFailureCode === "terminal_projection_mismatch" ||
+        rawTerminalBlockingToolRailFailure.firstBrokenRail === "observation_artifact" ||
+        rawTerminalBlockingToolRailFailure.firstBrokenRail === "terminal_materialization" ||
+        rawTerminalBlockingToolRailFailure.firstBrokenRail === "terminal_authority" ||
+        rawTerminalBlockingToolRailFailure.firstBrokenRail === "visible_projection" ||
+        rawTerminalBlockingToolRailFailure.repairTarget === "observation_materializer" ||
+        rawTerminalBlockingToolRailFailure.repairTarget === "terminal_materializer" ||
+        rawTerminalBlockingToolRailFailure.repairTarget === "terminal_authority" ||
+        rawTerminalBlockingToolRailFailure.repairTarget === "presenter_boundary"
+      ),
+    );
   const visualGoalArtifactSupersedesToolRailFailure =
     Boolean(
       selectedGoalArtifact &&
@@ -2649,6 +2843,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     repoDraftSupersedesToolRailFailure ||
     compoundDraftSupersedesToolRailFailure ||
     workstationTerminalSupersedesToolRailFailure ||
+    receiptTerminalSupersedesToolRailFailure ||
     visualGoalArtifactSupersedesToolRailFailure
       ? null
       : rawTerminalBlockingToolRailFailure?.railFailureCode === "terminal_projection_mismatch" &&
@@ -2983,6 +3178,42 @@ export function applyHelixTerminalAuthoritySingleWriter(
     };
     delete input.payload.terminal_error_code;
     delete input.payload.terminal_failure_text;
+    if (selectedDraft) {
+      rejectedCandidates.push({
+        ref: artifactId(selectedDraft.artifact) ?? undefined,
+        kind: "model_synthesized_answer",
+        source: "final_answer_draft",
+        reason: "later_valid_final_answer_draft",
+      });
+    }
+  } else if (!solverContinuationPending && selectedReceiptTerminal) {
+    selectedArtifactRef = selectedReceiptTerminal.ref;
+    selectedArtifactKind = selectedReceiptTerminal.kind as HelixTerminalAuthoritySingleWriterResult["selected_terminal_artifact_kind"];
+    selectedSource = selectedReceiptTerminal.kind as HelixTerminalAuthoritySingleWriterResult["source"];
+    quarantineStaleRequestUserInput(input.payload);
+    input.payload.ok = true;
+    input.payload.response_type = "final_answer";
+    input.payload.final_status = "final_answer";
+    input.payload.status = "final_answer";
+    input.payload.terminal_artifact_kind = selectedReceiptTerminal.kind;
+    input.payload.final_answer_source = selectedReceiptTerminal.kind;
+    input.payload.selected_final_answer = selectedReceiptTerminal.text;
+    input.payload.answer = selectedReceiptTerminal.text;
+    input.payload.text = selectedReceiptTerminal.text;
+    input.payload.assistant_answer = selectedReceiptTerminal.text;
+    input.payload.terminal_artifact_id = selectedReceiptTerminal.ref ?? undefined;
+    input.payload.terminal_presentation = {
+      ...(readRecord(input.payload.terminal_presentation) ?? {}),
+      schema: "helix.terminal_presentation.v1",
+      turn_id: input.turnId,
+      terminal_artifact_kind: selectedReceiptTerminal.kind,
+      concise_text: selectedReceiptTerminal.text,
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    delete input.payload.terminal_error_code;
+    delete input.payload.terminal_failure_text;
+    delete input.payload.typed_failure;
     if (selectedDraft) {
       rejectedCandidates.push({
         ref: artifactId(selectedDraft.artifact) ?? undefined,
@@ -3465,10 +3696,27 @@ export function applyHelixTerminalAuthoritySingleWriter(
     delete input.payload.model_synthesized_answer;
   }
 
-  const envelope = resolveTerminalAnswerEnvelope(input.payload, {
+  const workstationAuthorityEnvelopeText =
+    selectedArtifactKind === "workstation_tool_evaluation" && selectedSource === "workstation_tool_evaluation"
+      ? readString(input.payload.selected_final_answer) ??
+        readString(input.payload.answer) ??
+        readString(input.payload.text)
+      : null;
+  let envelope = resolveTerminalAnswerEnvelope(input.payload, {
     threadId: input.threadId,
     turnId: input.turnId,
   });
+  if (selectedArtifactKind === "workstation_tool_evaluation" && workstationAuthorityEnvelopeText) {
+    envelope = {
+      ...envelope,
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_text: workstationAuthorityEnvelopeText,
+      terminal_text_hash: hashHelixTerminalText(workstationAuthorityEnvelopeText),
+      terminal_kind: "tool_evaluation",
+      authority_origin: "workstation_tool_evaluation",
+    };
+  }
   const appliedEnvelope = applyTerminalAnswerEnvelope(input.payload, envelope);
   const visibleText = appliedEnvelope.terminal_text;
   const latestDraftForIntegrity =
@@ -3484,6 +3732,18 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const selectedArtifactTextForIntegrity = selectedMaterializedAnswerText ?? draftText;
   const receiptVisibleAsAnswer = artifacts.some((artifact) => {
     if (!isForbiddenReceiptOrProjection(artifact)) return false;
+    if (
+      selectedReceiptTerminal &&
+      (
+        artifact === selectedReceiptTerminal.artifact ||
+        (
+          selectedReceiptTerminal.ref &&
+          artifactId(artifact) === selectedReceiptTerminal.ref
+        )
+      )
+    ) {
+      return false;
+    }
     const text = artifactText(artifact);
     return Boolean(text && text === visibleText);
   });
@@ -3573,6 +3833,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       post_tool_model_step_satisfied: latestRequiredObservationSequence < 0 || Boolean(
         usableDraftMaterialization ||
         selectedGoalArtifact ||
+        selectedReceiptTerminal ||
         (selectedDraft && routeAllowsModelSynthesizedAnswer)
       ),
       legacy_terminal_candidate_count: legacyCandidates.length,

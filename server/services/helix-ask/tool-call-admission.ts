@@ -27,6 +27,7 @@ import {
 } from "./stage-play-prompt-intent";
 import { isWorkspaceOsStatusPrompt } from "./workspace-os-status-intent";
 import { isAskCapabilityCatalogPrompt } from "./capability-catalog-intent";
+import { isTheoryFrontierVectorFieldTracePrompt } from "./theory-frontier-vector-field-intent";
 
 const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
 
@@ -181,7 +182,10 @@ const sourceTargetToolFamilies = (
     ].join(" ");
     if (
       !/\b(?:stage\s*play|stage_play|live_env\.reflect_stage_play_context|reflect_stage_play_context|live\s+interpretation|stage\s*play\s+badge\s+graph)\b/i.test(joined) &&
-      /theory_context_reflection|reflect_theory_context|theory\s+badge\s+graph|theory\s+graph|badge\s+graph|scale\s+bands?|uncertainty\s+mode/i.test(joined)
+      (
+        /theory_context_reflection|reflect_theory_context|theory\s+badge\s+graph|theory\s+graph|badge\s+graph|scale\s+bands?|uncertainty\s+mode/i.test(joined) ||
+        isTheoryFrontierVectorFieldTracePrompt(joined)
+      )
     ) {
       return ["theory_locator"];
     }
@@ -199,6 +203,7 @@ const theoryLocatorRequested = (promptText: string): boolean => {
   if (/\b(?:do\s+not|don't|dont|never|without|no)\b[^.!?;\n]{0,120}\b(?:theory\s+badge\s+graph|badge\s+graph|theory\s+graph|theory_context_reflection|reflect_theory_context|scale\s+bands?|uncertainty\s+mode)\b/i.test(prompt)) {
     return false;
   }
+  if (isTheoryFrontierVectorFieldTracePrompt(prompt)) return true;
   return /\b(?:theory\s+badge\s+graph|theory\s+badges?|badge\s+graph|physics\s+graph|theory\s+graph|theory_context_reflection|reflect_theory_context|helix_ask\.reflect_theory_context|graph\s+placement|scale\s+bands?|semantic\s+chunks?|uncertainty\s+mode|locate\b[\s\S]{0,80}\b(?:theory|badge|graph)|place\b[\s\S]{0,80}\b(?:theory|badge|graph|claims?)|map\b[\s\S]{0,80}\b(?:theory|badge|graph)|where\s+(?:does|do)\b[\s\S]{0,100}\b(?:fit|land|map))\b/i.test(prompt);
 };
 
@@ -328,8 +333,21 @@ export function buildToolCallAdmissionDecision(input: {
   };
   const contextualSuppression = detectContextualToolAdmissionSuppression(promptText);
   const toolUseRestatement = buildToolUseRestatement(promptText);
+  const unknownSourceArtifactDiscoveryRequested = hasUnknownSourceArtifactDiscoveryIntent(promptText);
+  const explicitLocalDocsScope =
+    /\b(?:from|in|within)\s+(?:the\s+)?docs?\b/i.test(promptText) ||
+    /\b(?:current|active|this)\s+(?:doc|document)\b/i.test(promptText) ||
+    /\b(?:doc|document)\s+(?:we|i|you|we're|are)\s+(?:looking|viewing|reading)\b/i.test(promptText) ||
+    /\b(?:docs[-_\s]?viewer|docs?\s+panel)\b/i.test(promptText);
   const unknownSourceArtifactDiscoveryIntent =
-    sourceTarget === "unknown" && hasUnknownSourceArtifactDiscoveryIntent(promptText);
+    unknownSourceArtifactDiscoveryRequested &&
+    (
+      sourceTarget === "unknown" ||
+      (
+        !explicitLocalDocsScope &&
+        (sourceTarget === "docs_viewer" || sourceTarget === "active_doc")
+      )
+    );
   const calculatorSolveIntent = calculatorSolveRequested(promptText, input.sourceTargetIntent);
   const mandatoryToolName = readMandatoryToolName(mandatoryNextToolRecord);
   const promptExplicitCapabilityMatches = extractExplicitCapabilityContracts(promptText);
@@ -400,6 +418,8 @@ export function buildToolCallAdmissionDecision(input: {
       ? explicitCapabilityContract.source_target
       : calculatorAdmissionDominatesSourceTarget
       ? "calculator_stream"
+      : unknownSourceArtifactDiscoveryIntent
+      ? "unknown"
       : sourceTarget === "unknown" && !unknownSourceArtifactDiscoveryIntent && toolUseRestatement.requiredToolFamilies.includes("docs_viewer")
       ? "docs_viewer"
       : sourceTarget === "unknown" && toolUseRestatement.requiredToolFamilies.includes("internet_search")

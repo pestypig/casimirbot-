@@ -28,6 +28,7 @@ export type HelixTerminalAnswerEnvelope = {
     | "terminal_presentation"
     | "repo_code_evidence_answer"
     | "selected_final_answer"
+    | "workstation_tool_evaluation"
     | "request_user_input"
     | "tool_receipt"
     | "typed_failure";
@@ -51,6 +52,47 @@ const readTerminalPresentationText = (payload: Record<string, unknown>): string 
   return presentation?.schema === "helix.terminal_presentation.v1"
     ? readString(presentation.concise_text)
     : null;
+};
+
+const readWorkstationToolEvaluationText = (payload: Record<string, unknown>): string | null => {
+  const synthesis = readRecord(payload.workstation_tool_terminal_synthesis);
+  const synthesizedText =
+    readString(synthesis?.text) ??
+    readString(synthesis?.answer_text) ??
+    readString(synthesis?.terminal_text) ??
+    readString(synthesis?.synthesized_text);
+  if (synthesizedText) return synthesizedText;
+
+  const evaluation = readRecord(payload.workstation_tool_evaluation);
+  const topLevelText =
+    readString(evaluation?.answer_text) ??
+    readString(evaluation?.text) ??
+    readString(evaluation?.terminal_text) ??
+    readString(evaluation?.summary);
+  if (topLevelText) return topLevelText;
+
+  const terminalArtifactId = readString(payload.terminal_artifact_id);
+  const ledgerRecords = readArray(payload.current_turn_artifact_ledger)
+    .map(readRecord)
+    .filter((artifact): artifact is Record<string, unknown> => Boolean(artifact));
+  const matchingLedgerEvaluation = ledgerRecords
+    .filter((artifact) => readString(artifact.kind) === "workstation_tool_evaluation")
+    .find((artifact) => {
+      if (!terminalArtifactId) return true;
+      return (
+        readString(artifact.artifact_id) === terminalArtifactId ||
+        readString(readRecord(artifact.payload)?.evaluation_id) === terminalArtifactId
+      );
+    }) ?? ledgerRecords
+    .filter((artifact) => readString(artifact.kind) === "workstation_tool_evaluation")
+    .at(-1);
+  const ledgerPayload = readRecord(matchingLedgerEvaluation?.payload) ?? matchingLedgerEvaluation;
+  return (
+    readString(ledgerPayload?.answer_text) ??
+    readString(ledgerPayload?.text) ??
+    readString(ledgerPayload?.terminal_text) ??
+    readString(ledgerPayload?.summary)
+  );
 };
 
 const readSourceTarget = (payload: Record<string, unknown>): string =>
@@ -656,7 +698,16 @@ function terminalKindForArtifact(terminalArtifactKind: string): HelixTerminalAut
   if (terminalArtifactKind === "request_user_input") return "request_user_input";
   if (terminalArtifactKind === "typed_failure") return "failure";
   if (terminalArtifactKind === "tool_receipt") return "tool_receipt";
-  if (terminalArtifactKind === "live_pipeline_receipt") return "workspace_action_receipt";
+  if (
+    terminalArtifactKind === "live_pipeline_receipt" ||
+    terminalArtifactKind === "workspace_action_receipt" ||
+    terminalArtifactKind === "doc_open_receipt" ||
+    terminalArtifactKind === "note_update_receipt" ||
+    terminalArtifactKind === "note_action_receipt" ||
+    terminalArtifactKind === "note_create_receipt"
+  ) {
+    return "workspace_action_receipt";
+  }
   if (terminalArtifactKind === "situation_context_pack") return "situation_context_pack";
   if (terminalArtifactKind === "live_environment_binding_diagnosis") return "live_answer_environment";
   if (terminalArtifactKind === "tool_evaluation" || terminalArtifactKind === "workstation_tool_evaluation") {
@@ -736,6 +787,13 @@ export function resolveTerminalAnswerEnvelope(
     terminalText = readValidRepoEvidenceAnswerText(payload) ?? readTerminalPresentationText(payload);
     authorityOrigin = terminalText === readValidRepoEvidenceAnswerText(payload)
       ? "repo_code_evidence_answer"
+      : "terminal_presentation";
+  } else if (terminalArtifactKind === "workstation_tool_evaluation" || finalAnswerSource === "workstation_tool_evaluation") {
+    terminalArtifactKind = "workstation_tool_evaluation";
+    finalAnswerSource = "workstation_tool_evaluation";
+    terminalText = readWorkstationToolEvaluationText(payload) ?? readTerminalPresentationText(payload);
+    authorityOrigin = terminalText === readWorkstationToolEvaluationText(payload)
+      ? "workstation_tool_evaluation"
       : "terminal_presentation";
   } else if (terminalArtifactKind === "doc_open_receipt") {
     terminalText = readDocOpenReceiptTerminalText(payload) ?? readTerminalPresentationText(payload);

@@ -46,6 +46,7 @@ const SCHOLARLY_ACTION_WITH_CUE_RE = /\b(?:do\s+research|research|find|search|lo
 const SCHOLARLY_EXPLANATION_RE = /\b(?:just\s+)?(?:explain|describe|tell\s+me|what\s+is|what\s+are|what(?:'s|\s+is)?|what\s+does)\b[\s\S]{0,120}\b(?:doi|arxiv|crossref|openalex|semantic\s+scholar|citation|reference|journal)\b[\s\S]{0,80}\b(?:for|mean|do|does|is|are|used\s+for|purpose)\b/i;
 const INTERNET_SEARCH_CUE_RE = /\b(?:browse|browsing|search|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|search\s+online|verify\s+online|latest|current|recent|today|breaking|ongoing\s+(?:conflict|war|crisis)|ceasefire|election|law|prices?|schedules?)\b/i;
 const INTERNET_SEARCH_ACTION_RE = /\b(?:browse|search|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|search\s+online|verify\s+online)\b/i;
+const THEORY_LOCATOR_CUE_RE = /\b(?:helix\.theory\.frontierVectorFieldTrace|frontierVectorFieldTrace|frontier\s+vector\s+field|badge\s+coordinate\s+vectors?|relation\s+tensors?|dimensional\s+connections?|candidate\s+badge\s+connections?|theory\s+frontiers?|theory\s+badge\s+graph|theory_context_reflection|reflect_theory_context)\b/i;
 const REWRITE_ONLY_CURRENT_TEXT_RE = /\b(?:do\s+not|don't|dont|without|no)\s+(?:browse|browsing|search(?:ing)?|web|internet|look\s*up|lookup|google|check\s+online)\b[\s\S]{0,160}\b(?:rewrite|reword|copyedit|summari[sz]e|quote|format|polish)\b|\b(?:rewrite|reword|copyedit|summari[sz]e|quote|format|polish)\b[\s\S]{0,160}\b(?:this|the)\s+(?:paragraph|passage|prompt|text|quote)\b[\s\S]{0,120}\b(?:about\s+(?:current|recent|latest)|current\s+events?|ongoing\s+(?:conflict|war|crisis))/i;
 const NEGATED_MUTATING_WRITE_CLAUSE_RE =
   /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no)\b[^.!?;\n]{0,180}/gi;
@@ -85,7 +86,7 @@ export function contextualToolSuppressionBlocksFamily(
   if (family === "scientific_calculator" || family === "calculator") return /scientific[_-]calculator|calculator/i.test(cue);
   if (family === "scholarly_research") return /scholarly|doi|arxiv|paper|citation|research/i.test(cue);
   if (family === "internet_search") return /internet|web|search|browse|google|bing/i.test(cue);
-  if (family === "theory_locator") return /theory|locator|badge|graph|reflection/i.test(cue);
+  if (family === "theory_locator") return /theory|locator|badge|graph|reflection|frontier|tensor|dimensional|candidate/i.test(cue);
   if (family === "workstation_action" || family === "notes") return /workstation|workspace|note|write|file/i.test(cue);
   if (family === "repo_code") return /repo|code/i.test(cue) || DOCS_MD_PATH_CUE_RE.test(suppression.text);
   if (family === "live_environment") return /live|stage_play/i.test(cue);
@@ -105,6 +106,7 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       !SCIENTIFIC_CALCULATOR_CUE_RE.test(prompt) &&
       !SCHOLARLY_CUE_RE.test(prompt) &&
       !INTERNET_SEARCH_CUE_RE.test(prompt) &&
+      !THEORY_LOCATOR_CUE_RE.test(prompt) &&
       !LIVE_ENV_CONTROL_CUE_RE.test(prompt) &&
       !MUTATING_WRITE_NEGATION_RE.test(prompt)
     )
@@ -223,6 +225,26 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       suppression_reason: "quoted_tool_command",
       verb_or_cue: "internet_search.web_research",
       text: quotedInternet,
+    };
+  }
+
+  const contextualTheoryLocator = prompt.match(
+    /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to|no)\b[\s\S]{0,180}(?:helix\.theory\.frontierVectorFieldTrace|frontierVectorFieldTrace|frontier\s+vector\s+field|badge\s+coordinate\s+vectors?|relation\s+tensors?|dimensional\s+connections?|candidate\s+badge\s+connections?|theory\s+frontiers?|theory\s+badge\s+graph|theory_context_reflection|reflect_theory_context)\b|["'`][^"'`]*(?:helix\.theory\.frontierVectorFieldTrace|frontierVectorFieldTrace|frontier\s+vector\s+field|badge\s+coordinate\s+vectors?|relation\s+tensors?|dimensional\s+connections?|candidate\s+badge\s+connections?|theory\s+frontiers?)[^"'`]*["'`]|(?:\b(?:if|when|before|after|would|could|might|hypothetically|later|next\s+time|in\s+the\s+future)\b[\s\S]{0,180}(?:helix\.theory\.frontierVectorFieldTrace|frontierVectorFieldTrace|frontier\s+vector\s+field|badge\s+coordinate\s+vectors?|relation\s+tensors?|dimensional\s+connections?|candidate\s+badge\s+connections?|theory\s+frontiers?))|(?:\b(?:earlier|previously|last\s+turn|historically|already)\b[\s\S]{0,180}(?:helix\.theory\.frontierVectorFieldTrace|frontierVectorFieldTrace|frontier\s+vector\s+field|badge\s+coordinate\s+vectors?|relation\s+tensors?|dimensional\s+connections?|candidate\s+badge\s+connections?|theory\s+frontiers?))|(?:\b(?:screen|visible|label|button|phrase|text)\b[\s\S]{0,180}(?:helix\.theory\.frontierVectorFieldTrace|frontierVectorFieldTrace|frontier\s+vector\s+field|badge\s+coordinate\s+vectors?|relation\s+tensors?|dimensional\s+connections?|candidate\s+badge\s+connections?|theory\s+frontiers?))/i,
+  )?.[0];
+  if (contextualTheoryLocator) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to|no)\b/i.test(contextualTheoryLocator)
+        ? "negated_tool_instruction"
+        : /["'`]/.test(contextualTheoryLocator)
+          ? "quoted_tool_command"
+          : /\b(?:earlier|previously|last\s+turn|historically|already)\b/i.test(contextualTheoryLocator)
+            ? "historical_tool_reference"
+            : /\b(?:screen|visible|label|button|phrase|text)\b/i.test(contextualTheoryLocator)
+              ? "screen_visible_tool_reference"
+              : "hypothetical_tool_reference",
+      verb_or_cue: THEORY_LOCATOR_CUE_RE.exec(contextualTheoryLocator)?.[0] ?? "theory_locator",
+      text: contextualTheoryLocator,
     };
   }
 

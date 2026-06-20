@@ -192,6 +192,9 @@ const artifactKindMatchesCapability = (
   if (capability === "helix_ask.reflect_theory_context") {
     return /helix_theory_context_reflection_tool_receipt|theory_context_reflection|reflect_theory_context/i.test(joined);
   }
+  if (capability === "helix.theory.frontierVectorFieldTrace") {
+    return /helix_theory_frontier_vector_field_tool_receipt|theory_frontier_vector_field|frontierVectorFieldTrace|relation_tensor_trace/i.test(joined);
+  }
   if (capability === "helix_ask.reflect_ideology_context") {
     return /helix_zen_graph_reflection_tool_result|ideology_context_reflection|procedural_zen_classification|zen_badge_locator|fruition_procedure_expression|reflect_ideology_context|workstation_tool_evaluation/i.test(joined);
   }

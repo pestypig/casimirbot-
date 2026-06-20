@@ -19,6 +19,10 @@ import { buildToolUseRestatement, detectInternetSearchIntent } from "./internet-
 import { buildHelixCompoundCapabilityContract } from "./compound-capability-contract";
 import { detectRepoCodeEvidenceIntent } from "./repo-code-intent-detector";
 import { detectScholarlyResearchIntent } from "./scholarly-research-intent";
+import {
+  HELIX_THEORY_FRONTIER_VECTOR_FIELD_TRACE_CAPABILITY,
+  isTheoryFrontierVectorFieldTracePrompt,
+} from "./theory-frontier-vector-field-intent";
 
 type RecordLike = Record<string, unknown>;
 
@@ -58,7 +62,7 @@ const theoryLocatorRequested = (promptText: string): boolean =>
   /\b(?:theory\s+badge\s+graph|theory\s+badges?|badge\s+graph|physics\s+graph|theory\s+graph|theory_context_reflection|reflect_theory_context|helix_ask\.reflect_theory_context|graph\s+placement|scale\s+bands?|semantic\s+chunks?|uncertainty\s+mode|locate\b[\s\S]{0,80}\b(?:theory|badge|graph)|place\b[\s\S]{0,80}\b(?:theory|badge|graph|claims?)|map\b[\s\S]{0,80}\b(?:theory|badge|graph)|where\s+(?:does|do)\b[\s\S]{0,100}\b(?:fit|land|map))\b/i.test(promptText);
 
 const theoryFrontierRequested = (promptText: string): boolean =>
-  theoryLocatorRequested(promptText) &&
+  (theoryLocatorRequested(promptText) || isTheoryFrontierVectorFieldTracePrompt(promptText)) &&
   /\b(?:theory\s+frontier|frontier\s+seed|seed\s+finder|frontier\s+candidate|missing\s+intermediate\s+badges?|unresolved\s+semantic\s+regions?|in\s+between\s+(?:the\s+)?badges?|candidate\s+terrain|biome\s+fields?|probability\s+terrain|verified_frontier_yield_per_budget|frontier\s+projection)\b/i.test(promptText);
 
 const requestedResearchFamilies = (promptText: string): HelixCapabilityItineraryFamily[] => {
@@ -117,6 +121,12 @@ const observationKindsFor = (family: HelixCapabilityItineraryFamily, promptText:
   if (family === "internet_search") return ["internet_search_observation"];
   if (family === "docs_viewer") return ["doc_search_results", "doc_candidate_validation", "doc_open_receipt"];
   if (family === "theory_locator") {
+    if (isTheoryFrontierVectorFieldTracePrompt(promptText)) {
+      return [
+        "helix_theory_frontier_vector_field_tool_receipt",
+        "theory_frontier_vector_field",
+      ];
+    }
     return theoryFrontierRequested(promptText)
       ? [
           "helix_theory_context_reflection_tool_receipt",
@@ -139,7 +149,11 @@ const capabilityHintFor = (family: HelixCapabilityItineraryFamily, promptText: s
   }
   if (family === "internet_search") return HELIX_INTERNET_SEARCH_CAPABILITY;
   if (family === "docs_viewer") return "docs-viewer.search_docs";
-  if (family === "theory_locator") return THEORY_CONTEXT_REFLECTION_CAPABILITY;
+  if (family === "theory_locator") {
+    return isTheoryFrontierVectorFieldTracePrompt(promptText)
+      ? HELIX_THEORY_FRONTIER_VECTOR_FIELD_TRACE_CAPABILITY
+      : THEORY_CONTEXT_REFLECTION_CAPABILITY;
+  }
   if (family === "repo_code") return "repo-code.search_concept";
   return null;
 };
@@ -223,7 +237,10 @@ const statusForFamily = (input: {
 }): HelixCapabilityItineraryStepStatus => {
   if (input.forbiddenFamilies.includes(input.family)) return "forbidden";
   if (input.family === "theory_locator") {
-    return hasCapability(input.availableCapabilities, THEORY_CONTEXT_REFLECTION_CAPABILITY) ? "planned" : "missing";
+    return hasAnyCapability(input.availableCapabilities, [
+      THEORY_CONTEXT_REFLECTION_CAPABILITY,
+      HELIX_THEORY_FRONTIER_VECTOR_FIELD_TRACE_CAPABILITY,
+    ]) ? "planned" : "missing";
   }
   if (input.family === "repo_code" && hasCapability(input.availableCapabilities, "repo-code.search_concept")) {
     return "planned";
@@ -273,8 +290,10 @@ const stepForFamily = (input: {
   capability_hint: capabilityHintFor(input.family, input.promptText),
   purpose:
     input.family === "theory_locator"
-      ? theoryFrontierRequested(input.promptText)
-        ? "Build non-terminal theory frontier placement evidence, exact contract status, and badge/chunk mappings before synthesis."
+      ? isTheoryFrontierVectorFieldTracePrompt(input.promptText)
+        ? "Trace non-terminal badge coordinate vectors, relation tensors, evidence gaps, and exact-verification requirements before synthesis."
+        : theoryFrontierRequested(input.promptText)
+          ? "Build non-terminal theory frontier placement evidence, exact contract status, and badge/chunk mappings before synthesis."
         : "Locate the prompt on the theory badge graph and expose scale/chunk/uncertainty evidence."
       : input.family === "repo_code"
         ? "Collect current-turn repo/code evidence requested by the prompt."
@@ -308,6 +327,16 @@ export function buildHelixCapabilityItinerary(input: {
   const forbiddenFamilies = (Array.isArray(admission?.forbidden_tool_families)
     ? admission.forbidden_tool_families
     : []) as string[];
+  const admissionSourceTarget = readString(admission?.source_target);
+  const localAdmissionSuppressesGenericResearch =
+    [
+      "active_doc",
+      "workspace_panel",
+      "workspace_action",
+      "workspace_diagnostic",
+      "calculator_stream",
+      "model_only",
+    ].includes(admissionSourceTarget);
   const compoundSubgoals = Array.isArray(compoundCapabilityContract?.subgoals)
     ? compoundCapabilityContract.subgoals as unknown as RecordLike[]
     : [];
@@ -317,7 +346,9 @@ export function buildHelixCapabilityItinerary(input: {
     readString(subgoal.requested_capability).startsWith("repo-code.") ||
     readString(subgoal.runtime_capability).startsWith("repo-code.")
   );
-  const researchFamilies = requestedResearchFamilies(input.promptText);
+  const researchFamilies = localAdmissionSuppressesGenericResearch
+    ? []
+    : requestedResearchFamilies(input.promptText);
   const repoFamilies = requestedRepoFamilies(input.promptText).filter((family) =>
     family !== "repo_code" ||
     compoundSubgoals.length === 0 ||
@@ -325,7 +356,8 @@ export function buildHelixCapabilityItinerary(input: {
     explicitRepoEvidenceCueAllowedInCompound(input.promptText)
   );
   const docsFamilies = requestedDocsFamilies(input.promptText);
-  const locatorFamilies: HelixCapabilityItineraryFamily[] = theoryLocatorRequested(input.promptText)
+  const locatorFamilies: HelixCapabilityItineraryFamily[] =
+    theoryLocatorRequested(input.promptText) || isTheoryFrontierVectorFieldTracePrompt(input.promptText)
     ? ["theory_locator"]
     : [];
   const frontierRequested = theoryFrontierRequested(input.promptText);

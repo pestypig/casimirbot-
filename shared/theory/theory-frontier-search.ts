@@ -17,6 +17,7 @@ import {
 } from "../contracts/theory-frontier-search.v1";
 import { buildTheoryBiomeLayoutV1, hashTheoryBiome01 } from "./theory-biome-layout";
 import { locateTheoryBadges, traceTheoryBadgeConnections } from "./theory-badge-overlap-locator";
+import { traceTheoryFrontierVectorField } from "./theory-frontier-vector-field";
 
 export const THEORY_FRONTIER_TAXONOMY_VERSION = "theory_frontier_taxonomy/v1" as const;
 export const THEORY_FRONTIER_SCORING_VERSION = "theory_frontier_scoring/v1" as const;
@@ -613,6 +614,15 @@ export function buildTheoryFrontierSearch(input: BuildTheoryFrontierSearchInput)
       coordinatesByBadgeId,
     }),
   );
+  const vectorFieldTrace = traceTheoryFrontierVectorField({
+    graph: input.graph,
+    query,
+    searchSeed,
+    generatedAt,
+    originBadgeIds: input.originBadgeIds ?? [],
+    candidateBadgePairs: pairs,
+    limit: candidateLimit,
+  });
   const probabilityTerrain = buildProbabilityTerrainV1({
     graphKind: "theory_badge_graph",
     candidates: rawCandidates.map((candidate) => ({
@@ -649,6 +659,7 @@ export function buildTheoryFrontierSearch(input: BuildTheoryFrontierSearchInput)
     scoringVersion: THEORY_FRONTIER_SCORING_VERSION,
     verifierVersion: THEORY_FRONTIER_VERIFIER_VERSION,
     candidates,
+    vectorFieldTrace,
     scholarlyLookupRequests: buildTheoryFrontierScholarlyLookupRequests(candidates),
     probabilityTerrain,
     optimization: {
