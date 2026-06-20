@@ -83,6 +83,58 @@ describe("compound capability synthesis readiness", () => {
     expect(readiness.synthesis_required).toBe(false);
   });
 
+  it("includes resolved bound input refs in synthesis support refs", () => {
+    const turnId = "ask:test:compound-bound-support-refs";
+    const researchSubgoalId = `${turnId}:compound_capability_subgoal:1:internet_search_web_research`;
+    const calculatorSubgoalId = `${turnId}:compound_capability_subgoal:2:scientific-calculator_solve_expression`;
+    const readiness = resolveCompoundCapabilitySynthesisReadiness({
+      payload: {
+        capability_itinerary_execution_state: {
+          schema: "helix.capability_itinerary_execution_state.v1",
+          applies: true,
+          complete: true,
+          compound_subgoal_ledger: [
+            {
+              subgoal_id: researchSubgoalId,
+              requested_capability: "internet_search.web_research",
+              executed_capability: "internet_search.web_research",
+              observation_kind: "internet_search_observation",
+              observation_ref: "obs:research",
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+            {
+              subgoal_id: calculatorSubgoalId,
+              requested_capability: "scientific-calculator.solve_expression",
+              executed_capability: "scientific-calculator.solve_expression",
+              observation_kind: "calculator_receipt",
+              observation_ref: "obs:calculator",
+              bound_input_refs: [
+                {
+                  binding_id: `${calculatorSubgoalId}:input_binding:1`,
+                  arg_name: "support_refs",
+                  binding_kind: "support_ref",
+                  from_subgoal_id: researchSubgoalId,
+                  from_capability: "internet_search.web_research",
+                  ref: "obs:research-selected-passage",
+                },
+              ],
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+          ],
+        },
+      },
+      artifacts: [],
+    });
+
+    expect(readiness.support_refs).toEqual([
+      "obs:research",
+      "obs:calculator",
+      "obs:research-selected-passage",
+    ]);
+  });
+
   it("requires synthesis for complete family-based compound itineraries without a draft", () => {
     const turnId = "ask:test:family-compound-synthesis";
     const readiness = resolveCompoundCapabilitySynthesisReadiness({
@@ -174,6 +226,108 @@ describe("compound capability synthesis readiness", () => {
       "model_synthesized_answer",
       "workstation_tool_evaluation",
     ]);
+  });
+
+  it("does not let stale generic terminal suppress non-doc compound synthesis without subgoal support refs", () => {
+    const ledger = [
+      {
+        requested_capability: "internet_search.web_research",
+        executed_capability: "internet_search.web_research",
+        observation_kind: "internet_search_observation",
+        observation_ref: "obs:web",
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        terminal_contribution_kind: "model_synthesized_answer",
+      },
+      {
+        requested_capability: "helix_ask.reflect_theory_context",
+        executed_capability: "helix_ask.reflect_theory_context",
+        observation_kind: "helix_theory_context_reflection_tool_receipt",
+        observation_ref: "obs:reflection",
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        terminal_contribution_kind: "model_synthesized_answer",
+      },
+      {
+        requested_capability: "scientific-calculator.solve_expression",
+        executed_capability: "scientific-calculator.solve_expression",
+        observation_kind: "calculator_receipt",
+        observation_ref: "obs:calculator",
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        terminal_contribution_kind: "workstation_tool_evaluation",
+      },
+    ];
+    const readiness = resolveCompoundCapabilitySynthesisReadiness({
+      payload: {
+        capability_itinerary_execution_state: {
+          schema: "helix.capability_itinerary_execution_state.v1",
+          applies: true,
+          complete: true,
+          compound_subgoal_ledger: ledger,
+        },
+        model_synthesized_answer: {
+          text: "This terminal predates the complete compound evidence set.",
+          support_refs: ["obs:web"],
+        },
+      },
+      artifacts: [],
+    });
+
+    expect(readiness).toMatchObject({
+      applies: true,
+      complete: true,
+      has_docs_subgoal: false,
+      has_materialized_terminal_artifact: false,
+      synthesis_required: true,
+      required_terminal_kind: "model_synthesized_answer",
+    });
+    expect(readiness.support_refs).toEqual(["obs:web", "obs:reflection", "obs:calculator"]);
+  });
+
+  it("accepts a materialized non-doc compound terminal only when it covers all subgoal refs", () => {
+    const ledger = [
+      {
+        requested_capability: "helix_ask.inspect_capability_catalog",
+        executed_capability: "helix_ask.inspect_capability_catalog",
+        observation_kind: "capability_registry",
+        observation_ref: "obs:capability-registry",
+        satisfaction: "satisfied",
+        rail_status: "complete",
+      },
+      {
+        requested_capability: "workspace_os.status",
+        executed_capability: "workspace_os.status",
+        observation_kind: "workspace_os_status_observation",
+        observation_ref: "obs:workspace-status",
+        satisfaction: "satisfied",
+        rail_status: "complete",
+      },
+    ];
+    const readiness = resolveCompoundCapabilitySynthesisReadiness({
+      payload: {
+        capability_itinerary_execution_state: {
+          schema: "helix.capability_itinerary_execution_state.v1",
+          applies: true,
+          complete: true,
+          compound_subgoal_ledger: ledger,
+        },
+        model_synthesized_answer: {
+          text: "Catalog plus workspace status were synthesized from both observations.",
+          support_refs: ["obs:capability-registry", "obs:workspace-status"],
+        },
+      },
+      artifacts: [],
+    });
+
+    expect(readiness).toMatchObject({
+      applies: true,
+      complete: true,
+      has_materialized_terminal_artifact: true,
+      synthesis_required: false,
+      required_terminal_kind: "model_synthesized_answer",
+    });
+    expect(readiness.support_refs).toEqual(["obs:capability-registry", "obs:workspace-status"]);
   });
 
   it("requires synthesis from visual capture and calculator observations together", () => {
@@ -542,6 +696,50 @@ describe("compound capability synthesis readiness", () => {
     });
   });
 
+  it("does not let a stale generic terminal suppress required docs compound synthesis", () => {
+    const readiness = resolveCompoundCapabilitySynthesisReadiness({
+      payload: {
+        capability_itinerary_execution_state: {
+          schema: "helix.capability_itinerary_execution_state.v1",
+          applies: true,
+          complete: true,
+          compound_subgoal_ledger: [
+            {
+              requested_capability: "docs-viewer.locate_in_doc",
+              executed_capability: "docs-viewer.locate_in_doc",
+              observation_kind: "doc_location_matches",
+              observation_ref: "obs:doc-location",
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+            {
+              requested_capability: "scientific-calculator.solve_expression",
+              executed_capability: "scientific-calculator.solve_expression",
+              observation_kind: "calculator_receipt",
+              observation_ref: "obs:calculator",
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+          ],
+        },
+        model_synthesized_answer: {
+          text: "This generic terminal came from a stale non-doc projection.",
+          support_refs: ["obs:doc-location", "obs:calculator"],
+        },
+      },
+      artifacts: [],
+    });
+
+    expect(readiness).toMatchObject({
+      applies: true,
+      complete: true,
+      has_docs_subgoal: true,
+      has_materialized_terminal_artifact: false,
+      synthesis_required: true,
+      required_terminal_kind: "doc_evidence_synthesis_answer",
+    });
+  });
+
   it("uses capability_registry as the catalog observation inside compound contracts", () => {
     const contract = buildHelixCompoundCapabilityContract({
       turnId: "ask:test:catalog-workspace",
@@ -714,6 +912,197 @@ describe("compound capability synthesis readiness", () => {
       support_refs: ["obs:capability-registry", "obs:workspace-status"],
       subgoal_observation_refs: ["obs:capability-registry", "obs:workspace-status"],
       model_step_capability: "model.synthesize_from_compound_subgoal_observations",
+    });
+  });
+
+  it("materializes compound research locator answers with ordered subgoal support refs", () => {
+    const turnId = "ask:test:compound-research-locator-materializer";
+    const finalAnswerDraft = {
+      artifact_id: `${turnId}:final_answer_draft`,
+      kind: "final_answer_draft",
+      payload: {
+        schema: "helix.final_answer_draft.v1",
+        text: "The cited research observation and reflected theory context support the requested connection.",
+        answer_text: "The cited research observation and reflected theory context support the requested connection.",
+        goal_kind: "compound_research_locator",
+        required_terminal_kind: "compound_research_locator_answer",
+        support_refs: ["obs:scholarly"],
+        artifact_refs: ["obs:scholarly"],
+        authority: "llm_post_observation_compound_synthesis",
+      },
+    };
+    const artifactLedger = [
+      {
+        artifact_id: "obs:scholarly",
+        kind: "scholarly_research_observation",
+        payload: { schema: "helix.scholarly_research_observation.v1" },
+      },
+      {
+        artifact_id: "obs:reflection",
+        kind: "helix_theory_context_reflection_tool_receipt",
+        payload: { schema: "helix.theory_context_reflection_tool_receipt.v1" },
+      },
+      finalAnswerDraft,
+    ];
+    const payload: Record<string, unknown> = {
+      route_product_contract: {
+        source_target: "scholarly_research",
+        allowed_terminal_artifact_kinds: ["compound_research_locator_answer"],
+      },
+      compound_capability_contract: {
+        subgoals: [
+          {
+            requested_capability: "scholarly-research.lookup_papers",
+            capability_family: "scholarly_research",
+          },
+          {
+            requested_capability: "helix_ask.reflect_theory_context",
+            capability_family: "theory_locator",
+          },
+        ],
+      },
+      compound_capability_synthesis_readiness: {
+        applies: true,
+        complete: true,
+        support_refs: ["obs:scholarly", "obs:reflection"],
+        required_terminal_kind: "compound_research_locator_answer",
+        synthesis_terminal_kind: "compound_research_locator_answer",
+      },
+      capability_itinerary: {
+        execution_state: {
+          complete: true,
+          required_observation_families: ["scholarly_research", "theory_locator"],
+          compound_subgoal_ledger: [
+            {
+              requested_capability: "scholarly-research.lookup_papers",
+              executed_capability: "scholarly-research.lookup_papers",
+              observation_kind: "scholarly_research_observation",
+              observation_ref: "obs:scholarly",
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+            {
+              requested_capability: "helix_ask.reflect_theory_context",
+              executed_capability: "helix_ask.reflect_theory_context",
+              observation_kind: "helix_theory_context_reflection_tool_receipt",
+              observation_ref: "obs:reflection",
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+          ],
+        },
+      },
+      current_turn_artifact_ledger: artifactLedger,
+    };
+
+    const result = materializeFinalAnswerDraftTerminal({
+      turnId,
+      payload,
+      artifactLedger,
+      routeProductContract: payload.route_product_contract as Record<string, unknown>,
+      finalAnswerDraftRef: `${turnId}:final_answer_draft`,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      materialized_terminal_artifact_kind: "compound_research_locator_answer",
+    });
+    expect(payload.compound_research_locator_answer).toMatchObject({
+      support_refs: ["obs:scholarly", "obs:reflection"],
+      support_refs_count: 2,
+      subgoal_observation_refs: ["obs:scholarly", "obs:reflection"],
+      subgoal_observation_refs_count: 2,
+      source_families: ["scholarly_research", "theory_locator"],
+    });
+  });
+
+  it("recognizes top-level compound execution state when materializing research locator answers", () => {
+    const turnId = "ask:test:compound-research-locator-top-level-state";
+    const finalAnswerDraft = {
+      artifact_id: `${turnId}:final_answer_draft`,
+      kind: "final_answer_draft",
+      payload: {
+        schema: "helix.final_answer_draft.v1",
+        text: "The web research and reflected theory context support the requested synthesis.",
+        answer_text: "The web research and reflected theory context support the requested synthesis.",
+        goal_kind: "compound_research_locator",
+        required_terminal_kind: "compound_research_locator_answer",
+        support_refs: ["obs:web"],
+        artifact_refs: ["obs:web"],
+        authority: "llm_post_observation_compound_synthesis",
+      },
+    };
+    const artifactLedger = [
+      {
+        artifact_id: "obs:web",
+        kind: "internet_search_observation",
+        payload: { schema: "helix.internet_search_observation.v1" },
+      },
+      {
+        artifact_id: "obs:reflection",
+        kind: "helix_theory_context_reflection_tool_receipt",
+        payload: { schema: "helix.theory_context_reflection_tool_receipt.v1" },
+      },
+      finalAnswerDraft,
+    ];
+    const payload: Record<string, unknown> = {
+      route_product_contract: {
+        source_target: "internet_search",
+        allowed_terminal_artifact_kinds: ["compound_research_locator_answer"],
+      },
+      compound_capability_synthesis_readiness: {
+        applies: true,
+        complete: true,
+        support_refs: ["obs:web", "obs:reflection"],
+        required_terminal_kind: "compound_research_locator_answer",
+        synthesis_terminal_kind: "compound_research_locator_answer",
+      },
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+      },
+      capability_itinerary_execution_state: {
+        complete: true,
+        required_observation_families: ["internet_search", "theory_locator"],
+        compound_subgoal_ledger: [
+          {
+            requested_capability: "internet_search.web_research",
+            executed_capability: "internet-search.search_web",
+            observation_kind: "internet_search_observation",
+            observation_ref: "obs:web",
+            satisfaction: "satisfied",
+            rail_status: "complete",
+          },
+          {
+            requested_capability: "helix_ask.reflect_theory_context",
+            executed_capability: "helix_ask.reflect_theory_context",
+            observation_kind: "helix_theory_context_reflection_tool_receipt",
+            observation_ref: "obs:reflection",
+            satisfaction: "satisfied",
+            rail_status: "complete",
+          },
+        ],
+      },
+      current_turn_artifact_ledger: artifactLedger,
+    };
+
+    const result = materializeFinalAnswerDraftTerminal({
+      turnId,
+      payload,
+      artifactLedger,
+      routeProductContract: payload.route_product_contract as Record<string, unknown>,
+      finalAnswerDraftRef: `${turnId}:final_answer_draft`,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      materialized_terminal_artifact_kind: "compound_research_locator_answer",
+    });
+    expect(payload.compound_research_locator_answer).toMatchObject({
+      support_refs: ["obs:web", "obs:reflection"],
+      support_refs_count: 2,
+      subgoal_observation_refs: ["obs:web", "obs:reflection"],
+      subgoal_observation_refs_count: 2,
+      source_families: ["internet_search", "theory_locator"],
     });
   });
 });

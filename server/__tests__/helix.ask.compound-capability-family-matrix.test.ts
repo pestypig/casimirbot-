@@ -105,6 +105,40 @@ const expectedTerminalKindsByFamily: Record<string, string[]> = {
   workstation: ["model_synthesized_answer"],
 };
 
+const argValuePresent = (value: unknown): boolean => {
+  if (typeof value === "string") return value.trim().length > 0;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value === "boolean") return value;
+  if (Array.isArray(value)) return value.length > 0;
+  if (value && typeof value === "object") return Object.keys(value).length > 0;
+  return false;
+};
+
+const requiredArgAliasesFor = (contract: ExplicitContract, requiredArg: string): string[] => {
+  const names = [requiredArg];
+  const runtimeCapability = runtimeCapabilityFor(contract);
+  if (requiredArg === "latex" && runtimeCapability === "scientific-calculator.solve_expression") {
+    names.push("expression", "equation");
+  }
+  if (requiredArg === "query") {
+    if (runtimeCapability === "repo-code.search_concept") names.push("concept");
+    if (runtimeCapability === "workspace-directory.resolve") names.push("uri", "path", "target");
+    if (runtimeCapability === "internet-search.search_web" || runtimeCapability === "internet_search.web_research") {
+      names.push("question", "prompt", "topic", "search_query");
+    }
+    if (runtimeCapability === "scholarly-research.lookup_papers") {
+      names.push("doi", "arxiv_id", "arxivId", "title", "journal", "reference", "citation");
+    }
+  }
+  if (requiredArg === "paper_result_or_source" && runtimeCapability === "scholarly-research.fetch_full_text") {
+    names.push("paper_result_id", "paper_id", "result_id", "doi", "arxiv_id", "arxivId", "source_url", "pdf_url", "full_text_url", "url");
+  }
+  if (requiredArg === "text" && runtimeCapability === "workstation-notes.append_to_note") {
+    names.push("body", "content");
+  }
+  return names;
+};
+
 const admissionFor = (turnId: string, contracts: ExplicitContract[]): HelixToolCallAdmissionDecision => ({
   schema: "helix.tool_call_admission_decision.v1",
   turn_id: turnId,
@@ -157,8 +191,15 @@ const schemaForKind = (kind: string): string =>
 const familyObservationKind = (family: string): string | null => {
   if (family === "workstation_action") return "workstation_tool_evaluation";
   if (family === "live_environment") return "live_environment_tool_observation";
+  if (family === "live_source_mail") return "stage_play_processed_mail_packet";
+  if (family === "live_source_decision") return "stage_play_live_source_mail_decision";
+  if (family === "voice_delivery") return "voice_receipt";
   if (family === "runtime_evidence") return "capability_registry";
   if (family === "situation_run") return "situation_context_pack";
+  if (family === "visual_capture") return "situation_context_pack";
+  if (family === "zen_graph_reflection") return "helix_zen_graph_reflection_tool_result";
+  if (family === "civilization_bounds") return "helix_civilization_bounds_tool_result";
+  if (family === "workstation") return "note_action_receipt";
   return null;
 };
 
@@ -364,6 +405,108 @@ const assertCompletedSingleCapabilityRail = (contract: ExplicitContract): void =
 };
 
 describe("Helix Ask compound capability family matrix", () => {
+  it("accepts capability-bound declared observations as execution proof without a runtime wrapper", () => {
+    const contract = contractByCapability("workspace_os.status");
+    const turnId = "ask:compound-family:workspace-status-declared-observation";
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId,
+      promptText: promptFor(contract),
+      toolCallAdmissionDecision: admissionFor(turnId, [contract]),
+      availableCapabilities: availableCapabilities([contract]),
+    });
+    const subgoal = ((itinerary.compound_capability_contract?.subgoals ?? []) as Array<Record<string, unknown>>)
+      .find((entry) => entry.requested_capability === contract.capability);
+    const runtime = runtimeCapabilityFor(contract);
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:workspace_status:runtime_tool_call`,
+        kind: "runtime_tool_call",
+        payload: {
+          capability_key: runtime,
+          compound_subgoal_id: subgoal?.subgoal_id,
+          args: subgoal?.args_hint ?? {},
+        },
+      },
+      {
+        artifact_id: `${turnId}:workspace_status:declared_observation`,
+        kind: "workspace_os_status_observation",
+        payload: {
+          schema: "helix.workspace_os_status_observation.v1",
+          capability_key: runtime,
+          compound_subgoal_id: subgoal?.subgoal_id,
+          status: "completed",
+        },
+      },
+    ];
+    const state = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts,
+    });
+    const ledgerEntry = state.compound_subgoal_ledger.find((entry) =>
+      entry.requested_capability === contract.capability
+    );
+
+    expect(state.complete).toBe(true);
+    expect(ledgerEntry).toMatchObject({
+      requested_capability: "workspace_os.status",
+      selected_capability: "workspace_os.status",
+      executed_capability: "workspace_os.status",
+      observation_kind: "workspace_os_status_observation",
+      observation_provenance: "compound_subgoal_id",
+      satisfaction: "satisfied",
+      rail_status: "complete",
+    });
+  });
+
+  it("does not treat unbound lookalike observations as explicit docs execution proof", () => {
+    const contract = contractByCapability("docs-viewer.locate_in_doc");
+    const turnId = "ask:compound-family:docs-unbound-lookalike-observation";
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId,
+      promptText: promptFor(contract),
+      toolCallAdmissionDecision: admissionFor(turnId, [contract]),
+      availableCapabilities: availableCapabilities([contract]),
+    });
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:docs:runtime_tool_call`,
+        kind: "runtime_tool_call",
+        payload: {
+          capability_key: runtimeCapabilityFor(contract),
+          args: { query: "rule of thumb" },
+        },
+      },
+      {
+        artifact_id: `${turnId}:docs:model_location_guess`,
+        kind: "doc_location_matches",
+        payload: {
+          schema: "helix.doc_location_matches.v1",
+          status: "completed",
+        },
+      },
+    ];
+    const state = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts,
+    });
+    const ledgerEntry = state.compound_subgoal_ledger.find((entry) =>
+      entry.requested_capability === contract.capability
+    );
+
+    expect(state.complete).toBe(false);
+    expect(state.missing_required_capabilities).toContain("docs-viewer.locate_in_doc");
+    expect(ledgerEntry).toMatchObject({
+      requested_capability: "docs-viewer.locate_in_doc",
+      selected_capability: "docs-viewer.locate_in_doc",
+      executed_capability: null,
+      observation_kind: null,
+      observation_ref: null,
+      observation_provenance: null,
+      satisfaction: "pending",
+      rail_status: "pending",
+    });
+  });
+
   it("inventories the current explicit capability surface by family", () => {
     const families = Array.from(new Set(explicitCapabilityContractsForTests.map((contract) => contract.capability_family)));
 
@@ -401,6 +544,48 @@ describe("Helix Ask compound capability family matrix", () => {
     expect(missing).toEqual([]);
   });
 
+  it("preserves semantic objective families in compound itineraries instead of flattening to admission lanes", () => {
+    const cases = [
+      {
+        capability: "image_lens.inspect",
+        family: "visual_capture",
+        notFamily: "situation_run",
+      },
+      {
+        capability: "live_env.query_micro_reasoner_presets",
+        family: "live_source_mail",
+        notFamily: "live_environment",
+      },
+      {
+        capability: "helix_ask.reflect_ideology_context",
+        family: "zen_graph_reflection",
+        notFamily: "workstation_action",
+      },
+      {
+        capability: "helix_ask.reflect_civilization_bounds",
+        family: "civilization_bounds",
+        notFamily: "workstation_action",
+      },
+    ];
+
+    for (const entry of cases) {
+      const contract = contractByCapability(entry.capability);
+      const itinerary = buildHelixCapabilityItinerary({
+        turnId: `ask:semantic-family:${entry.capability}`.replace(/[^A-Za-z0-9:_-]+/g, "_"),
+        promptText: promptFor(contract),
+        toolCallAdmissionDecision: admissionFor(`ask:semantic-family:${entry.capability}`, [contract]),
+        availableCapabilities: availableCapabilities([contract]),
+      });
+
+      expect(itinerary.relevant_tool_families, entry.capability).toContain(entry.family);
+      expect(itinerary.relevant_tool_families, entry.capability).not.toContain(entry.notFamily);
+      expect(itinerary.planned_steps[0], entry.capability).toMatchObject({
+        requested_capability: entry.capability,
+        tool_family: entry.family,
+      });
+    }
+  });
+
   it("builds a single-capability contract for every explicit capability", () => {
     for (const contract of explicitCapabilityContractsForTests) {
       const compound = buildHelixCompoundCapabilityContract({
@@ -418,7 +603,97 @@ describe("Helix Ask compound capability family matrix", () => {
       expect(subgoals[0]?.required_terminal_kind, contract.capability).toBe(contract.required_terminal_kind);
       expect(subgoals[0]?.required_observation_kinds, contract.capability).toEqual(contract.required_observation_kinds);
       expect(compound?.requires_all_subgoals, contract.capability).toBe(false);
+      const argsHint = subgoals[0]?.args_hint as Record<string, unknown> | undefined;
+      for (const requiredArg of contract.required_args) {
+        expect(
+          requiredArgAliasesFor(contract, requiredArg).some((argName) => argValuePresent(argsHint?.[argName])),
+          `${contract.capability}:required_arg:${requiredArg}`,
+        ).toBe(true);
+      }
     }
+  });
+
+  it("extracts narrow required args for retrieval-style subgoals", () => {
+    const turnId = "ask:compound-family:narrow-retrieval-args";
+    const compound = buildHelixCompoundCapabilityContract({
+      turnId,
+      promptText:
+        "Call workspace-directory.resolve for docs/helix-ask-codex-loop-discipline.md. " +
+        "Then call docs-viewer.locate_in_doc to locate the rule of thumb in docs/helix-ask-codex-loop-discipline.md. " +
+        "Then call repo-code.search_concept to find terminal authority enforcement. " +
+        "Then call internet_search.web_research for OpenAI Codex documentation.",
+    });
+    const subgoals = compound?.subgoals ?? [];
+    const argsFor = (capability: string) =>
+      subgoals.find((subgoal) => subgoal.requested_capability === capability)?.args_hint ?? {};
+
+    expect(argsFor("workspace-directory.resolve")).toEqual(expect.objectContaining({
+      query: "docs/helix-ask-codex-loop-discipline.md",
+      path: "docs/helix-ask-codex-loop-discipline.md",
+      limit: 8,
+    }));
+    expect(argsFor("docs-viewer.locate_in_doc")).toEqual(expect.objectContaining({
+      query: "rule of thumb",
+      target_transcript: "rule of thumb",
+      path: "docs/helix-ask-codex-loop-discipline.md",
+    }));
+    expect(argsFor("repo-code.search_concept")).toEqual(expect.objectContaining({
+      query: "terminal authority enforcement",
+      concept: "terminal authority enforcement",
+      limit: 5,
+    }));
+    expect(argsFor("internet_search.web_research")).toEqual({
+      query: "OpenAI Codex documentation",
+    });
+
+    for (const subgoal of subgoals) {
+      const serializedArgs = JSON.stringify(subgoal.args_hint);
+      expect(serializedArgs, subgoal.requested_capability).not.toMatch(
+        /Then call|workspace-directory\.resolve|docs-viewer\.locate_in_doc|repo-code\.search_concept|internet_search\.web_research/,
+      );
+    }
+  });
+
+  it("removes explicit query labels and compound connectors from extracted args", () => {
+    const docs = buildHelixCompoundCapabilityContract({
+      turnId: "ask:compound-family:docs-query-label",
+      promptText: "Call docs-viewer.locate_in_doc to locate query: rule of thumb.",
+    });
+    expect(docs?.subgoals[0]?.args_hint).toEqual(expect.objectContaining({
+      query: "rule of thumb",
+      target_transcript: "rule of thumb",
+    }));
+
+    const compound = buildHelixCompoundCapabilityContract({
+      turnId: "ask:compound-family:repo-plus-docs-clean-query",
+      promptText:
+        "Use repo-code.search_concept to find where terminal authority is enforced, plus docs-viewer.locate_in_doc to locate the same rule in the active document.",
+    });
+    const repoSubgoal = compound?.subgoals.find((subgoal) =>
+      subgoal.requested_capability === "repo-code.search_concept"
+    );
+    expect(repoSubgoal?.args_hint).toEqual(expect.objectContaining({
+      query: "terminal authority is enforced",
+      concept: "terminal authority is enforced",
+    }));
+    expect(JSON.stringify(repoSubgoal?.args_hint)).not.toMatch(/\bplus\b|docs-viewer/i);
+
+    const internet = buildHelixCompoundCapabilityContract({
+      turnId: "ask:compound-family:internet-query-label",
+      promptText: "Call internet_search.web_research for query: Alcubierre metric energy estimates.",
+    });
+    expect(internet?.subgoals[0]?.args_hint).toEqual({
+      query: "Alcubierre metric energy estimates",
+    });
+
+    const scholarly = buildHelixCompoundCapabilityContract({
+      turnId: "ask:compound-family:scholarly-query-label",
+      promptText: "Call scholarly-research.lookup_papers for query: Alcubierre metric energy estimates.",
+    });
+    expect(scholarly?.subgoals[0]?.args_hint).toEqual({
+      query: "Alcubierre metric energy estimates",
+      limit: 5,
+    });
   });
 
   it("exposes required and optional argument rails for every explicit capability contract", () => {
@@ -815,6 +1090,42 @@ describe("Helix Ask compound capability family matrix", () => {
     ));
   });
 
+  it("binds workspace directory resolution into later docs-viewer target refs", () => {
+    const contracts = [
+      "workspace-directory.resolve",
+      "docs-viewer.locate_in_doc",
+    ].map(contractByCapability);
+    const turnId = "ask:named-binding:workspace-directory-to-docs-target";
+    const compound = buildHelixCompoundCapabilityContract({
+      turnId,
+      promptText: promptForChain(contracts),
+    });
+    const subgoals = (compound?.subgoals ?? []) as Array<Record<string, unknown>>;
+    const directorySubgoal = subgoals.find((subgoal) =>
+      subgoal.requested_capability === "workspace-directory.resolve"
+    );
+    const docsSubgoal = subgoals.find((subgoal) =>
+      subgoal.requested_capability === "docs-viewer.locate_in_doc"
+    );
+    const inputBindings = Array.isArray(docsSubgoal?.input_bindings)
+      ? docsSubgoal.input_bindings as Array<Record<string, unknown>>
+      : [];
+
+    expect(directorySubgoal).toBeTruthy();
+    expect(docsSubgoal).toBeTruthy();
+    expect(inputBindings).toEqual([
+      expect.objectContaining({
+        arg_name: "target_ref",
+        binding_kind: "target_ref",
+        from_subgoal_id: directorySubgoal?.subgoal_id,
+        from_capability: "workspace-directory.resolve",
+        required_observation_kinds: ["workspace_directory_resolution"],
+        required: true,
+        status: "pending",
+      }),
+    ]);
+  });
+
   it("binds prior evidence observations into later calculator support refs", () => {
     const scenarios = [
       {
@@ -872,6 +1183,44 @@ describe("Helix Ask compound capability family matrix", () => {
         }),
       ]));
     }
+  });
+
+  it("binds retrieval and reflection observations into later calculator support refs", () => {
+    const contracts = [
+      "internet_search.web_research",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ].map(contractByCapability);
+    const turnId = "ask:named-calculator-binding:internet-reflection-calculator";
+    const compound = buildHelixCompoundCapabilityContract({
+      turnId,
+      promptText: promptForChain(contracts),
+    });
+    const subgoals = (compound?.subgoals ?? []) as Array<Record<string, unknown>>;
+    const calculatorSubgoal = subgoals.find((subgoal) =>
+      subgoal.requested_capability === "scientific-calculator.solve_expression"
+    );
+    const inputBindings = Array.isArray(calculatorSubgoal?.input_bindings)
+      ? calculatorSubgoal.input_bindings as Array<Record<string, unknown>>
+      : [];
+
+    expect(calculatorSubgoal).toBeTruthy();
+    expect(inputBindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        arg_name: "support_refs",
+        binding_kind: "support_ref",
+        from_capability: "internet_search.web_research",
+        required: true,
+        status: "pending",
+      }),
+      expect.objectContaining({
+        arg_name: "support_refs",
+        binding_kind: "support_ref",
+        from_capability: "helix_ask.reflect_theory_context",
+        required: true,
+        status: "pending",
+      }),
+    ]));
   });
 
   it("fails a later calculator subgoal when its required evidence binding is unresolved", () => {
@@ -1061,6 +1410,48 @@ describe("Helix Ask compound capability family matrix", () => {
     expect(state.missing_required_capabilities).toContain("scientific-calculator.solve_expression");
   });
 
+  it("does not extract prose after exact expression as calculator math", () => {
+    const docs = explicitCapabilityContractsForTests.find((contract) =>
+      contract.capability === "docs-viewer.locate_in_doc"
+    ) as ExplicitContract;
+    const calculator = explicitCapabilityContractsForTests.find((contract) =>
+      contract.capability === "scientific-calculator.solve_expression"
+    ) as ExplicitContract;
+    const turnId = "ask:compound-family:calculator-prose-expression";
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId,
+      promptText:
+        "Use docs-viewer.locate_in_doc to cite the claim, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
+      toolCallAdmissionDecision: admissionFor(turnId, [docs, calculator]),
+      availableCapabilities: availableCapabilities([docs, calculator]),
+    });
+    const calculatorSubgoal = ((itinerary.compound_capability_contract?.subgoals ?? []) as Array<Record<string, unknown>>)
+      .find((subgoal) => subgoal.requested_capability === calculator.capability);
+    const state = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [],
+    });
+    const failedEntry = state.compound_subgoal_ledger.find((entry) =>
+      entry.requested_capability === calculator.capability
+    );
+
+    expect(calculatorSubgoal?.args_hint).toEqual({});
+    expect(state.complete).toBe(false);
+    expect(failedEntry).toMatchObject({
+      requested_capability: "scientific-calculator.solve_expression",
+      args: {},
+      executed_capability: null,
+      observation_kind: null,
+      observation_ref: null,
+      satisfaction: "failed",
+      rail_status: "fail_closed",
+      rail_failure_code: "missing_required_arg:latex",
+      first_broken_rail: "capability_execution",
+      repair_target: "subgoal_argument_extraction",
+    });
+    expect(state.missing_required_capabilities).toContain("scientific-calculator.solve_expression");
+  });
+
   it("fails internet-search compounds closed on provider config without consuming loop budget", () => {
     const internetSearch = explicitCapabilityContractsForTests.find((contract) =>
       contract.capability === "internet_search.web_research"
@@ -1110,7 +1501,9 @@ describe("Helix Ask compound capability family matrix", () => {
       requested_capability: "internet_search.web_research",
       satisfaction: "failed",
       rail_status: "fail_closed",
+      first_broken_rail: "config",
       rail_failure_code: "config_missing",
+      repair_target: "operator_config",
     });
     expect(failedEntry?.rail_failure_code).not.toBe("agent_loop_budget_exhausted");
     expect(state.missing_required_capabilities).toContain("internet_search.web_research");
@@ -1166,7 +1559,9 @@ describe("Helix Ask compound capability family matrix", () => {
       required_observation_kinds: repo.required_observation_kinds,
       satisfaction: "failed",
       rail_status: "fail_closed",
+      first_broken_rail: "evidence_reentry",
       rail_failure_code: "weak_evidence_repair_loop",
+      repair_target: "repo_retrieval_repair_policy",
     });
     expect(failedEntry?.rail_failure_code).not.toBe("agent_loop_budget_exhausted");
     expect(state.missing_required_capabilities).toContain("repo-code.search_concept");

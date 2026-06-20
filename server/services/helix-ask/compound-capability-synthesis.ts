@@ -54,21 +54,46 @@ const hasFinalAnswerDraft = (payload: RecordLike, artifacts: ArtifactLike[]): bo
   finalAnswerDraftRecords(payload, artifacts)
     .some((draft) => Boolean(readString(draft.text) ?? readString(draft.answer_text)));
 
+const terminalSupportRefs = (terminal: RecordLike): string[] =>
+  unique([
+    ...readArray(terminal.support_refs).map(readString),
+    ...readArray(terminal.artifact_refs).map(readString),
+    ...readArray(terminal.observation_refs).map(readString),
+    ...readArray(terminal.evidence_refs).map(readString),
+    ...readArray(terminal.subgoal_observation_refs).map(readString),
+    ...readArray(terminal.bound_input_refs)
+      .map(readRecord)
+      .map((binding) => readString(binding?.ref)),
+  ].filter((ref): ref is string => Boolean(ref)));
+
+const terminalCoversRequiredRefs = (
+  terminal: RecordLike,
+  requiredSupportRefs: string[],
+): boolean => {
+  if (requiredSupportRefs.length === 0) return true;
+  const refs = new Set(terminalSupportRefs(terminal));
+  return requiredSupportRefs.every((ref) => refs.has(ref));
+};
+
 const hasMaterializedTerminalArtifact = (
   payload: RecordLike,
   artifacts: ArtifactLike[],
   requiredTerminalKind: string | undefined,
+  requiredSupportRefs: string[],
 ): boolean => {
   const terminalKinds = requiredTerminalKind
     ? [requiredTerminalKind]
-    : ["model_synthesized_answer", "doc_evidence_synthesis_answer"];
+    : ["model_synthesized_answer", "doc_evidence_synthesis_answer", "compound_research_locator_answer"];
   const terminalPayloadKeys = [
     "model_synthesized_answer",
     "doc_evidence_synthesis_answer",
     "compound_research_locator_answer",
   ];
   const payloadTerminals = terminalPayloadKeys
-    .map((key) => readRecord(payload[key]))
+    .map((key) => {
+      const entry = readRecord(payload[key]);
+      return entry ? { ...entry, kind: readString(entry.kind) ?? key } : null;
+    })
     .filter((entry): entry is RecordLike => Boolean(entry));
   const artifactTerminals = artifacts
     .filter((artifact) => terminalKinds.includes(artifactKind(artifact) ?? ""))
@@ -79,7 +104,7 @@ const hasMaterializedTerminalArtifact = (
       readString(terminal.terminal_artifact_kind) ??
       readString(terminal.schema)?.replace(/^helix\.|\.[^.]+$/g, "");
     const text = readString(terminal.text) ?? readString(terminal.answer_text) ?? readString(terminal.visible_text);
-    return Boolean(text) && (!kind || terminalKinds.includes(kind));
+    return Boolean(text) && (!kind || terminalKinds.includes(kind)) && terminalCoversRequiredRefs(terminal, requiredSupportRefs);
   });
 };
 
@@ -110,6 +135,9 @@ const supportRefsFromLedger = (ledger: RecordLike[]): string[] =>
     ...readArray(entry.receipt_refs).map(readString),
     ...readArray(entry.receipt_ids).map(readString),
     ...readArray(entry.coverage_refs).map(readString),
+    ...readArray(entry.bound_input_refs)
+      .map(readRecord)
+      .map((binding) => readString(binding?.ref)),
   ].filter((ref): ref is string => Boolean(ref))));
 
 const supportRefsFromArtifacts = (artifacts: ArtifactLike[]): string[] =>
@@ -218,10 +246,10 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
       : "model_synthesized_answer"
     : undefined;
   const hasDraft = hasFinalAnswerDraft(input.payload, artifacts);
-  const hasTerminalArtifact = hasMaterializedTerminalArtifact(input.payload, artifacts, requiredTerminalKind);
   const supportRefs = ledger.length > 0
     ? supportRefsFromLedger(ledger)
     : supportRefsFromArtifacts(artifacts);
+  const hasTerminalArtifact = hasMaterializedTerminalArtifact(input.payload, artifacts, requiredTerminalKind, supportRefs);
   return {
     schema: "helix.compound_capability_synthesis_readiness.v1",
     applies,

@@ -123,7 +123,9 @@ const isDocsEvidenceObservation = (artifact: ArtifactLike): boolean =>
 
 const isCompleteCompoundResearchLocatorItinerary = (payload: Record<string, unknown>): boolean => {
   const itinerary = readRecord(payload.capability_itinerary);
-  const executionState = readRecord(itinerary?.execution_state);
+  const executionState =
+    readRecord(payload.capability_itinerary_execution_state) ??
+    readRecord(itinerary?.execution_state);
   if (executionState?.complete !== true) return false;
   const families = new Set(readArray(executionState?.required_observation_families).map(readString).filter(Boolean));
   return families.has("theory_locator") && (families.has("scholarly_research") || families.has("internet_search"));
@@ -168,8 +170,17 @@ const capabilityFamilyFromCapability = (capability: string | null): string | nul
   if (capability === "helix_ask.inspect_capability_catalog") return "capability_catalog";
   if (capability === "repo-code.search_concept") return "repo_code";
   if (capability === "internet_search.web_research" || capability === "internet-search.search_web") return "internet_search";
-  if (capability.startsWith("helix_ask.reflect_") || capability.includes("theory_context")) return "context_reflection";
+  if (capability.startsWith("scholarly-research.") || capability.startsWith("scholarly_research.")) return "scholarly_research";
+  if (capability === "helix_ask.reflect_theory_context" || capability.includes("theory_context")) return "theory_locator";
+  if (capability === "helix_ask.reflect_ideology_context" || capability === "helix_ask.bridge_theory_ideology_context") {
+    return "zen_graph_reflection";
+  }
+  if (capability === "helix_ask.build_civilization_scenario_frame" || capability === "helix_ask.reflect_civilization_bounds") {
+    return "civilization_bounds";
+  }
+  if (capability.startsWith("helix_ask.reflect_")) return "context_reflection";
   if (capability.startsWith("workspace-directory.")) return "workspace_directory";
+  if (capability.startsWith("live_env.")) return "live_environment";
   if (capability === "image_lens.inspect" || capability === "situation-room.describe_visual_capture") return "visual_capture";
   return null;
 };
@@ -178,17 +189,76 @@ const compoundSubgoalSourceFamilies = (payload: Record<string, unknown>): string
   const itinerary = readRecord(payload.capability_itinerary);
   const contract = readRecord(payload.compound_capability_contract) ??
     readRecord(itinerary?.compound_capability_contract);
-  return unique(
-    readArray(contract?.subgoals)
-      .map(readRecord)
-      .filter((entry): entry is Record<string, unknown> => Boolean(entry))
-      .map((entry) =>
-        readString(entry.capability_family) ??
-        readString(entry.plan_family) ??
-        capabilityFamilyFromCapability(readString(entry.requested_capability) ?? readString(entry.runtime_capability))
+  const executionState =
+    readRecord(payload.capability_itinerary_execution_state) ??
+    readRecord(itinerary?.execution_state);
+  const contractFamilies = readArray(contract?.subgoals)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .map((entry) =>
+      readString(entry.capability_family) ??
+      readString(entry.plan_family) ??
+      capabilityFamilyFromCapability(readString(entry.requested_capability) ?? readString(entry.runtime_capability))
+    )
+    .filter((entry): entry is string => Boolean(entry));
+  const executionFamilies = readArray(executionState?.compound_subgoal_ledger)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .map((entry) =>
+      readString(entry.capability_family) ??
+      readString(entry.plan_family) ??
+      capabilityFamilyFromCapability(
+        readString(entry.requested_capability) ??
+        readString(entry.executed_capability) ??
+        readString(entry.selected_capability),
       )
-      .filter((entry): entry is string => Boolean(entry)),
+    )
+    .filter((entry): entry is string => Boolean(entry));
+  return unique(
+    contractFamilies.length > 0
+      ? [...contractFamilies, ...executionFamilies]
+      : executionFamilies,
   );
+};
+
+const compoundTerminalSupportRefs = (input: {
+  payload: Record<string, unknown>;
+  artifactLedger: ArtifactLike[];
+  draftPayload?: Record<string, unknown> | null;
+}): { supportRefs: string[]; subgoalObservationRefs: string[]; sourceFamilies: string[] } => {
+  const synthesisReadiness = readRecord(input.payload.compound_capability_synthesis_readiness);
+  const readinessSupportRefs = readArray(synthesisReadiness?.support_refs)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  const supportRefs = collectFinalAnswerDraftSupportRefs({
+    draftPayload: input.draftPayload,
+    artifactLedger: input.artifactLedger,
+  });
+  const subgoalObservationRefs = compoundSubgoalObservationRefs(input.payload, input.artifactLedger);
+  return {
+    supportRefs: unique([...supportRefs, ...readinessSupportRefs, ...subgoalObservationRefs]),
+    subgoalObservationRefs,
+    sourceFamilies: compoundSubgoalSourceFamilies(input.payload),
+  };
+};
+
+const mirrorCompoundTerminalSupport = (input: {
+  terminal: Record<string, unknown>;
+  supportRefs: string[];
+  subgoalObservationRefs: string[];
+  sourceFamilies: string[];
+}): void => {
+  if (input.supportRefs.length > 0) {
+    input.terminal.support_refs = input.supportRefs;
+    input.terminal.support_refs_count = input.supportRefs.length;
+  }
+  if (input.subgoalObservationRefs.length > 0) {
+    input.terminal.subgoal_observation_refs = input.subgoalObservationRefs;
+    input.terminal.subgoal_observation_refs_count = input.subgoalObservationRefs.length;
+  }
+  if (input.sourceFamilies.length > 0) {
+    input.terminal.source_families = input.sourceFamilies;
+  }
 };
 
 export const findLatestFinalAnswerDraftCandidate = (
@@ -658,6 +728,14 @@ export function materializeFinalAnswerDraftTerminal(input: {
       };
     }
     const scholarlyAnswerRef = materializedRef(input.turnId, targetKind);
+    const compoundTerminalSupport = compoundTerminalSupportRefs({
+      payload: input.payload,
+      artifactLedger,
+      draftPayload,
+    });
+    const supportRefsForTerminal = compoundTerminalSupport.supportRefs.length > 0
+      ? compoundTerminalSupport.supportRefs
+      : supportRefs;
     const answerPayload = {
       schema: compoundResearchLocator
         ? "helix.compound_research_locator_answer.v1"
@@ -666,15 +744,20 @@ export function materializeFinalAnswerDraftTerminal(input: {
       turn_id: input.turnId,
       text: draft.text,
       answer_text: draft.text,
-      support_refs: supportRefs,
+      support_refs: supportRefsForTerminal,
+      support_refs_count: supportRefsForTerminal.length,
+      subgoal_observation_refs: compoundTerminalSupport.subgoalObservationRefs,
+      subgoal_observation_refs_count: compoundTerminalSupport.subgoalObservationRefs.length,
       model_authored: true,
       model_step_capability: compoundResearchLocator
         ? "model.synthesize_from_compound_research_locator"
         : "model.synthesize_from_scholarly_research",
       final_answer_draft_ref: draft.ref,
-      source_families: compoundResearchLocator
-        ? ["scholarly_research", "theory_locator"]
-        : ["scholarly_research"],
+      source_families: compoundTerminalSupport.sourceFamilies.length > 0
+        ? compoundTerminalSupport.sourceFamilies
+        : compoundResearchLocator
+          ? ["scholarly_research", "theory_locator"]
+          : ["scholarly_research"],
       assistant_answer: false,
       raw_content_included: false,
     };
@@ -746,6 +829,14 @@ export function materializeFinalAnswerDraftTerminal(input: {
       };
     }
     const internetAnswerRef = materializedRef(input.turnId, targetKind);
+    const compoundTerminalSupport = compoundTerminalSupportRefs({
+      payload: input.payload,
+      artifactLedger,
+      draftPayload,
+    });
+    const supportRefsForTerminal = compoundTerminalSupport.supportRefs.length > 0
+      ? compoundTerminalSupport.supportRefs
+      : supportRefs;
     const answerPayload = {
       schema: compoundResearchLocator
         ? "helix.compound_research_locator_answer.v1"
@@ -754,15 +845,20 @@ export function materializeFinalAnswerDraftTerminal(input: {
       turn_id: input.turnId,
       text: draft.text,
       answer_text: draft.text,
-      support_refs: supportRefs,
+      support_refs: supportRefsForTerminal,
+      support_refs_count: supportRefsForTerminal.length,
+      subgoal_observation_refs: compoundTerminalSupport.subgoalObservationRefs,
+      subgoal_observation_refs_count: compoundTerminalSupport.subgoalObservationRefs.length,
       model_authored: true,
       model_step_capability: compoundResearchLocator
         ? "model.synthesize_from_compound_research_locator"
         : "model.synthesize_from_internet_search",
       final_answer_draft_ref: draft.ref,
-      source_families: compoundResearchLocator
-        ? ["internet_search", "theory_locator"]
-        : ["internet_search"],
+      source_families: compoundTerminalSupport.sourceFamilies.length > 0
+        ? compoundTerminalSupport.sourceFamilies
+        : compoundResearchLocator
+          ? ["internet_search", "theory_locator"]
+          : ["internet_search"],
       assistant_answer: false,
       raw_content_included: false,
     };
@@ -921,6 +1017,23 @@ export function materializeFinalAnswerDraftTerminal(input: {
         raw_content_included: false,
       };
     }
+    const compoundTerminalSupport = compoundTerminalSupportRefs({
+      payload: input.payload,
+      artifactLedger,
+      draftPayload,
+    });
+    mirrorCompoundTerminalSupport({
+      terminal: materialized.answer as unknown as Record<string, unknown>,
+      supportRefs: unique([
+        ...readArray((materialized.answer as unknown as Record<string, unknown>).support_refs)
+          .map(readString)
+          .filter((entry): entry is string => Boolean(entry)),
+        ...supportRefs,
+        ...compoundTerminalSupport.supportRefs,
+      ]),
+      subgoalObservationRefs: compoundTerminalSupport.subgoalObservationRefs,
+      sourceFamilies: compoundTerminalSupport.sourceFamilies,
+    });
     persistDocEvidenceSynthesisAnswerArtifact({
       turnId: input.turnId,
       payload: input.payload,

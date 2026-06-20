@@ -35,6 +35,10 @@ export type CompoundCapabilityScenarioSummary = {
   executed_capabilities: Array<string | null>;
   observation_kinds: Array<string | null>;
   observation_refs: Array<string | null>;
+  observation_provenance: Array<string | null>;
+  rail_observation_kinds: Array<string | null>;
+  rail_observation_refs: Array<string | null>;
+  rail_observation_provenance: Array<string | null>;
   subgoal_satisfactions: Array<string | null>;
   subgoal_rail_statuses: Array<string | null>;
   subgoal_first_broken_rails: Array<string | null>;
@@ -114,6 +118,7 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
       "Use docs-viewer.locate_in_doc to locate the rule of thumb in docs/helix-ask-codex-loop-discipline.md, then run scientific-calculator.solve_expression with this exact expression: 19+23.",
     expectedRequested: ["docs-viewer.locate_in_doc", "scientific-calculator.solve_expression"],
     expectedRuntime: ["docs-viewer.locate_in_doc", "scientific-calculator.solve_expression"],
+    expectedInputBindingFromCapabilities: [null, "docs-viewer.locate_in_doc"],
     expectedCalculatorExpression: "19+23",
   },
   {
@@ -122,6 +127,7 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
       "Call workspace-directory.resolve for docs/helix-ask-codex-loop-discipline.md, then use docs-viewer.locate_in_doc to locate the rule of thumb in docs/helix-ask-codex-loop-discipline.md.",
     expectedRequested: ["workspace-directory.resolve", "docs-viewer.locate_in_doc"],
     expectedRuntime: ["workspace-directory.resolve", "docs-viewer.locate_in_doc"],
+    expectedInputBindingFromCapabilities: [null, "workspace-directory.resolve"],
   },
   {
     id: "catalog_then_workspace",
@@ -157,7 +163,11 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
       "helix_ask.reflect_theory_context",
       "scientific-calculator.solve_expression",
     ],
-    expectedInputBindingFromCapabilities: [null, "internet_search.web_research", null],
+    expectedInputBindingFromCapabilities: [
+      null,
+      "internet_search.web_research",
+      ["internet_search.web_research", "helix_ask.reflect_theory_context"],
+    ],
     expectedCalculatorExpression: "(9+3)*7-25",
   },
   {
@@ -174,7 +184,11 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
       "helix_ask.reflect_theory_context",
       "scientific-calculator.solve_expression",
     ],
-    expectedInputBindingFromCapabilities: [null, "scholarly-research.lookup_papers", null],
+    expectedInputBindingFromCapabilities: [
+      null,
+      "scholarly-research.lookup_papers",
+      ["scholarly-research.lookup_papers", "helix_ask.reflect_theory_context"],
+    ],
     expectedCalculatorExpression: "(12+5)*3",
   },
   {
@@ -184,6 +198,7 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
       "Use situation-room.describe_visual_capture, then run scientific-calculator.solve_expression with this exact expression: 5*9.",
     expectedRequested: [["situation-room.describe_visual_capture", "image_lens.inspect"], "scientific-calculator.solve_expression"],
     expectedRuntime: ["situation-room.describe_visual_capture", "scientific-calculator.solve_expression"],
+    expectedInputBindingFromCapabilities: [null, "image_lens.inspect"],
     expectedCalculatorExpression: "5*9",
   },
   {
@@ -502,6 +517,10 @@ export const evaluateCompoundCapabilityScenario = (input: {
   const executedCapabilities = ledger.map((entry) => maybeCapability(entry, "executed_capability"));
   const observationKinds = ledger.map((entry) => maybeCapability(entry, "observation_kind"));
   const observationRefs = ledger.map((entry) => maybeCapability(entry, "observation_ref"));
+  const observationProvenance = ledger.map((entry) => maybeCapability(entry, "observation_provenance"));
+  const railObservationKinds = railStatuses.map((entry) => maybeCapability(entry, "observation_kind"));
+  const railObservationRefs = railStatuses.map((entry) => maybeCapability(entry, "observation_ref"));
+  const railObservationProvenance = railStatuses.map((entry) => maybeCapability(entry, "observation_provenance"));
   const subgoalSatisfactions = ledger.map((entry) => maybeCapability(entry, "satisfaction"));
   const subgoalRailStatuses = railStatuses.map((entry) => maybeCapability(entry, "rail_status"));
   const subgoalFirstBrokenRails = ledger.map((entry) => maybeCapability(entry, "first_broken_rail"));
@@ -517,11 +536,13 @@ export const evaluateCompoundCapabilityScenario = (input: {
     const executed = maybeCapability(ledgerEntry ?? {}, "executed_capability");
     const observationKind = maybeCapability(ledgerEntry ?? {}, "observation_kind");
     const observationRef = maybeCapability(ledgerEntry ?? {}, "observation_ref");
+    const observationProvenance = maybeCapability(ledgerEntry ?? {}, "observation_provenance");
     const satisfaction = maybeCapability(ledgerEntry ?? {}, "satisfaction");
     const railRequested = maybeCapability(railEntry ?? {}, "requested_capability");
     const railExecuted = maybeCapability(railEntry ?? {}, "executed_capability");
     const railObservationKind = maybeCapability(railEntry ?? {}, "observation_kind");
     const railObservationRef = maybeCapability(railEntry ?? {}, "observation_ref");
+    const railObservationProvenance = maybeCapability(railEntry ?? {}, "observation_provenance");
     const railSatisfaction = maybeCapability(railEntry ?? {}, "satisfaction");
     const railStatus = maybeCapability(railEntry ?? {}, "rail_status");
     const firstBrokenRail = maybeCapability(ledgerEntry ?? {}, "first_broken_rail");
@@ -559,6 +580,7 @@ export const evaluateCompoundCapabilityScenario = (input: {
     if (expectedSatisfaction === "satisfied") {
       if (!observationKind) failures.push(`subgoal_${index + 1}_observation_kind_missing`);
       if (!observationRef) failures.push(`subgoal_${index + 1}_observation_ref_missing`);
+      if (!observationProvenance) failures.push(`subgoal_${index + 1}_observation_provenance_missing`);
     }
     if (!matchesExpected(satisfaction, expectedSatisfaction)) {
       failures.push(`subgoal_${index + 1}_satisfaction_mismatch:${satisfaction ?? "null"}`);
@@ -599,6 +621,12 @@ export const evaluateCompoundCapabilityScenario = (input: {
       if (expectedSatisfaction === "satisfied") {
         if (!railObservationKind) failures.push(`subgoal_${index + 1}_rail_observation_kind_missing`);
         if (!railObservationRef) failures.push(`subgoal_${index + 1}_rail_observation_ref_missing`);
+        if (!railObservationProvenance) failures.push(`subgoal_${index + 1}_rail_observation_provenance_missing`);
+      }
+      if (railObservationProvenance !== observationProvenance) {
+        failures.push(
+          `subgoal_${index + 1}_rail_observation_provenance_mismatch:${railObservationProvenance ?? "null"}!=${observationProvenance ?? "null"}`,
+        );
       }
       if (railSatisfaction !== satisfaction) {
         failures.push(`subgoal_${index + 1}_rail_satisfaction_mismatch:${railSatisfaction ?? "null"}!=${satisfaction ?? "null"}`);
@@ -714,6 +742,10 @@ export const evaluateCompoundCapabilityScenario = (input: {
     executed_capabilities: executedCapabilities,
     observation_kinds: observationKinds,
     observation_refs: observationRefs,
+    observation_provenance: observationProvenance,
+    rail_observation_kinds: railObservationKinds,
+    rail_observation_refs: railObservationRefs,
+    rail_observation_provenance: railObservationProvenance,
     subgoal_satisfactions: subgoalSatisfactions,
     subgoal_rail_statuses: subgoalRailStatuses,
     subgoal_first_broken_rails: subgoalFirstBrokenRails,
@@ -795,6 +827,10 @@ const renderMarkdownSummary = (input: {
       `- executed_capabilities: ${JSON.stringify(result.executed_capabilities)}`,
       `- observation_kinds: ${JSON.stringify(result.observation_kinds)}`,
       `- observation_refs: ${JSON.stringify(result.observation_refs)}`,
+      `- observation_provenance: ${JSON.stringify(result.observation_provenance)}`,
+      `- rail_observation_kinds: ${JSON.stringify(result.rail_observation_kinds)}`,
+      `- rail_observation_refs: ${JSON.stringify(result.rail_observation_refs)}`,
+      `- rail_observation_provenance: ${JSON.stringify(result.rail_observation_provenance)}`,
       `- subgoal_satisfactions: ${JSON.stringify(result.subgoal_satisfactions)}`,
       `- subgoal_rail_statuses: ${JSON.stringify(result.subgoal_rail_statuses)}`,
       `- subgoal_first_broken_rails: ${JSON.stringify(result.subgoal_first_broken_rails)}`,

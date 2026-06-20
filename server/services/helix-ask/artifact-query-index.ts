@@ -1936,6 +1936,9 @@ export const buildArtifactQueryIndex = (input: {
     selected_capability: readNullableString(entry.selected_capability),
     executed_capability: readNullableString(entry.executed_capability),
     args: readRecord(entry.args),
+    args_source: readNullableString(entry.args_source),
+    planned_args: readRecord(entry.planned_args),
+    selected_args: readRecord(entry.selected_args),
     required_args: readStringArray(entry.required_args),
     optional_args: readStringArray(entry.optional_args),
     input_bindings: readArray(entry.input_bindings)
@@ -1943,6 +1946,7 @@ export const buildArtifactQueryIndex = (input: {
       .filter((binding): binding is RecordLike => Boolean(binding)),
     observation_kind: readNullableString(entry.observation_kind),
     observation_ref: readNullableString(entry.observation_ref),
+    observation_provenance: readNullableString(entry.observation_provenance),
     support_refs: readStringArray(entry.support_refs),
     bound_input_refs: readArray(entry.bound_input_refs)
       .map((binding) => readRecord(binding))

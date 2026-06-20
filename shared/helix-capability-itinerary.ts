@@ -5,7 +5,13 @@ export const HELIX_CAPABILITY_ITINERARY_SCHEMA =
 
 export type HelixCapabilityItineraryFamily =
   | HelixToolCallAdmissionFamily
-  | "theory_locator";
+  | "visual_capture"
+  | "live_source_mail"
+  | "live_source_decision"
+  | "voice_delivery"
+  | "zen_graph_reflection"
+  | "civilization_bounds"
+  | "workstation";
 
 export type HelixCapabilityItineraryStepStatus =
   | "admitted"

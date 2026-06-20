@@ -178,8 +178,34 @@ const compoundHasDocsSubgoal = (subgoals: RecordLike[]): boolean =>
     readString(subgoal.runtime_capability).startsWith("docs-viewer.")
   );
 
+const SEMANTIC_CAPABILITY_ITINERARY_FAMILIES = new Set([
+  "visual_capture",
+  "live_source_mail",
+  "live_source_decision",
+  "voice_delivery",
+  "zen_graph_reflection",
+  "civilization_bounds",
+  "workstation",
+]);
+
+const admissionEquivalentFamiliesFor = (
+  family: HelixCapabilityItineraryFamily,
+): HelixCapabilityItineraryFamily[] => {
+  if (family === "visual_capture") return ["situation_run"];
+  if (family === "live_source_mail") return ["live_environment"];
+  if (family === "live_source_decision") return ["live_environment", "workstation_action"];
+  if (family === "voice_delivery") return ["live_environment", "workstation_action"];
+  if (family === "zen_graph_reflection") return ["workstation_action"];
+  if (family === "civilization_bounds") return ["workstation_action"];
+  if (family === "workstation") return ["workstation_action", "notes"];
+  return [];
+};
+
 const itineraryFamilyForContractSubgoal = (subgoal: RecordLike): HelixCapabilityItineraryFamily => {
   const capabilityFamily = readString(subgoal.capability_family);
+  if (SEMANTIC_CAPABILITY_ITINERARY_FAMILIES.has(capabilityFamily)) {
+    return capabilityFamily as HelixCapabilityItineraryFamily;
+  }
   const admissionFamilies = Array.isArray(subgoal.admission_families)
     ? subgoal.admission_families.map(readString).filter(Boolean)
     : [];
@@ -236,6 +262,9 @@ const statusForFamily = (input: {
   availableCapabilities?: unknown;
 }): HelixCapabilityItineraryStepStatus => {
   if (input.forbiddenFamilies.includes(input.family)) return "forbidden";
+  if (admissionEquivalentFamiliesFor(input.family).some((family) => input.forbiddenFamilies.includes(family))) {
+    return "forbidden";
+  }
   if (input.family === "theory_locator") {
     return hasAnyCapability(input.availableCapabilities, [
       THEORY_CONTEXT_REFLECTION_CAPABILITY,
@@ -246,6 +275,9 @@ const statusForFamily = (input: {
     return "planned";
   }
   if (input.admittedFamilies.includes(input.family)) return "admitted";
+  if (admissionEquivalentFamiliesFor(input.family).some((family) => input.admittedFamilies.includes(family))) {
+    return "admitted";
+  }
   if (
     input.family === "scholarly_research" &&
     hasAnyCapability(input.availableCapabilities, [

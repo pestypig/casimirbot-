@@ -32,6 +32,7 @@ const workspaceThenCalculatorDebug = (overrides: Record<string, unknown> = {}) =
       input_bindings: [],
       observation_kind: "workspace_os_status_observation",
       observation_ref: "obs:workspace-status",
+      observation_provenance: "compound_subgoal_id",
       support_refs: ["obs:workspace-status"],
       bound_input_refs: [],
       unresolved_input_bindings: [],
@@ -56,6 +57,7 @@ const workspaceThenCalculatorDebug = (overrides: Record<string, unknown> = {}) =
       input_bindings: [],
       observation_kind: "calculator_receipt",
       observation_ref: "obs:calculator",
+      observation_provenance: "capability_key",
       support_refs: ["obs:calculator"],
       bound_input_refs: [],
       unresolved_input_bindings: [],
@@ -78,6 +80,7 @@ const workspaceThenCalculatorDebug = (overrides: Record<string, unknown> = {}) =
     input_bindings: entry.input_bindings,
     observation_kind: entry.observation_kind,
     observation_ref: entry.observation_ref,
+    observation_provenance: entry.observation_provenance,
     support_refs: entry.support_refs,
     bound_input_refs: entry.bound_input_refs,
     unresolved_input_bindings: entry.unresolved_input_bindings,
@@ -163,6 +166,7 @@ const invalidCalculatorArgsFailClosedDebug = (overrides: Record<string, unknown>
       input_bindings: [],
       observation_kind: "doc_location_matches",
       observation_ref: "obs:doc-location",
+      observation_provenance: "compound_subgoal_id",
       support_refs: ["obs:doc-location"],
       bound_input_refs: [],
       unresolved_input_bindings: [],
@@ -187,6 +191,7 @@ const invalidCalculatorArgsFailClosedDebug = (overrides: Record<string, unknown>
       input_bindings: [],
       observation_kind: null,
       observation_ref: null,
+      observation_provenance: null,
       support_refs: [],
       bound_input_refs: [],
       unresolved_input_bindings: [],
@@ -209,6 +214,7 @@ const invalidCalculatorArgsFailClosedDebug = (overrides: Record<string, unknown>
     input_bindings: entry.input_bindings,
     observation_kind: entry.observation_kind,
     observation_ref: entry.observation_ref,
+    observation_provenance: entry.observation_provenance,
     support_refs: entry.support_refs,
     bound_input_refs: entry.bound_input_refs,
     unresolved_input_bindings: entry.unresolved_input_bindings,
@@ -292,6 +298,7 @@ const compoundDebug = (input: {
     input_bindings?: Array<Record<string, unknown>>;
     observation_kind: string | null;
     observation_ref: string | null;
+    observation_provenance?: string | null;
     support_refs?: string[];
     bound_input_refs?: Array<Record<string, unknown>>;
     unresolved_input_bindings?: Array<Record<string, unknown>>;
@@ -319,6 +326,9 @@ const compoundDebug = (input: {
       input_bindings: entry.input_bindings ?? [],
       observation_kind: entry.observation_kind,
       observation_ref: entry.observation_ref,
+      observation_provenance:
+        entry.observation_provenance ??
+        (entry.observation_ref && (entry.satisfaction ?? "satisfied") === "satisfied" ? "capability_key" : null),
       support_refs: entry.support_refs ?? (entry.observation_ref ? [entry.observation_ref] : []),
       bound_input_refs: entry.bound_input_refs ?? [],
       unresolved_input_bindings: entry.unresolved_input_bindings ?? [],
@@ -382,6 +392,9 @@ const internetReflectionCalculatorDebug = (overrides: Record<string, unknown> = 
   const researchSubgoalId = `${turnId}:compound_capability_subgoal:1:internet_search_web_research`;
   const reflectionSubgoalId = `${turnId}:compound_capability_subgoal:2:helix_ask_reflect_theory_context`;
   const bindingId = `${reflectionSubgoalId}:input_binding:1`;
+  const calculatorSubgoalId = `${turnId}:compound_capability_subgoal:3:scientific-calculator_solve_expression`;
+  const calculatorResearchBindingId = `${calculatorSubgoalId}:input_binding:1`;
+  const calculatorReflectionBindingId = `${calculatorSubgoalId}:input_binding:2`;
   return compoundDebug({
     turnId,
     subgoals: [
@@ -437,8 +450,49 @@ const internetReflectionCalculatorDebug = (overrides: Record<string, unknown> = 
         },
         required_args: ["latex"],
         optional_args: ["expression", "equation"],
+        input_bindings: [
+          {
+            binding_id: calculatorResearchBindingId,
+            arg_name: "support_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: researchSubgoalId,
+            from_capability: "internet_search.web_research",
+            required_observation_kinds: ["internet_search_observation"],
+            required: true,
+            status: "pending",
+          },
+          {
+            binding_id: calculatorReflectionBindingId,
+            arg_name: "support_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: reflectionSubgoalId,
+            from_capability: "helix_ask.reflect_theory_context",
+            required_observation_kinds: ["helix_theory_context_reflection_tool_receipt", "theory_context_reflection"],
+            required: true,
+            status: "pending",
+          },
+        ],
         observation_kind: "calculator_receipt",
         observation_ref: "obs:calculator",
+        support_refs: ["obs:web-search", "obs:reflection", "obs:calculator"],
+        bound_input_refs: [
+          {
+            binding_id: calculatorResearchBindingId,
+            arg_name: "support_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: researchSubgoalId,
+            from_capability: "internet_search.web_research",
+            ref: "obs:web-search",
+          },
+          {
+            binding_id: calculatorReflectionBindingId,
+            arg_name: "support_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: reflectionSubgoalId,
+            from_capability: "helix_ask.reflect_theory_context",
+            ref: "obs:reflection",
+          },
+        ],
       },
     ],
     overrides,
@@ -450,6 +504,9 @@ const scholarlyReflectionCalculatorDebug = (overrides: Record<string, unknown> =
   const researchSubgoalId = `${turnId}:compound_capability_subgoal:1:scholarly-research_lookup_papers`;
   const reflectionSubgoalId = `${turnId}:compound_capability_subgoal:2:helix_ask_reflect_theory_context`;
   const bindingId = `${reflectionSubgoalId}:input_binding:1`;
+  const calculatorSubgoalId = `${turnId}:compound_capability_subgoal:3:scientific-calculator_solve_expression`;
+  const calculatorResearchBindingId = `${calculatorSubgoalId}:input_binding:1`;
+  const calculatorReflectionBindingId = `${calculatorSubgoalId}:input_binding:2`;
   return compoundDebug({
     turnId,
     subgoals: [
@@ -504,8 +561,49 @@ const scholarlyReflectionCalculatorDebug = (overrides: Record<string, unknown> =
         },
         required_args: ["latex"],
         optional_args: ["expression", "equation"],
+        input_bindings: [
+          {
+            binding_id: calculatorResearchBindingId,
+            arg_name: "support_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: researchSubgoalId,
+            from_capability: "scholarly-research.lookup_papers",
+            required_observation_kinds: ["scholarly_research_observation"],
+            required: true,
+            status: "pending",
+          },
+          {
+            binding_id: calculatorReflectionBindingId,
+            arg_name: "support_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: reflectionSubgoalId,
+            from_capability: "helix_ask.reflect_theory_context",
+            required_observation_kinds: ["helix_theory_context_reflection_tool_receipt", "theory_context_reflection"],
+            required: true,
+            status: "pending",
+          },
+        ],
         observation_kind: "calculator_receipt",
         observation_ref: "obs:calculator",
+        support_refs: ["obs:scholarly-lookup", "obs:reflection", "obs:calculator"],
+        bound_input_refs: [
+          {
+            binding_id: calculatorResearchBindingId,
+            arg_name: "support_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: researchSubgoalId,
+            from_capability: "scholarly-research.lookup_papers",
+            ref: "obs:scholarly-lookup",
+          },
+          {
+            binding_id: calculatorReflectionBindingId,
+            arg_name: "support_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: reflectionSubgoalId,
+            from_capability: "helix_ask.reflect_theory_context",
+            ref: "obs:reflection",
+          },
+        ],
       },
     ],
     overrides,
@@ -514,6 +612,9 @@ const scholarlyReflectionCalculatorDebug = (overrides: Record<string, unknown> =
 
 const workspaceDirectoryThenDocsDebug = (overrides: Record<string, unknown> = {}) => {
   const turnId = "ask:test:workspace-directory-then-docs";
+  const directorySubgoalId = `${turnId}:compound_capability_subgoal:1:workspace-directory_resolve`;
+  const docsSubgoalId = `${turnId}:compound_capability_subgoal:2:docs-viewer_locate_in_doc`;
+  const docsTargetBindingId = `${docsSubgoalId}:input_binding:1`;
   return compoundDebug({
     turnId,
     subgoals: [
@@ -537,8 +638,30 @@ const workspaceDirectoryThenDocsDebug = (overrides: Record<string, unknown> = {}
         },
         required_args: ["query"],
         optional_args: ["path", "anchor", "term", "text"],
+        input_bindings: [
+          {
+            binding_id: docsTargetBindingId,
+            arg_name: "target_ref",
+            binding_kind: "target_ref",
+            from_subgoal_id: directorySubgoalId,
+            from_capability: "workspace-directory.resolve",
+            required_observation_kinds: ["workspace_directory_resolution"],
+            required: true,
+            status: "pending",
+          },
+        ],
         observation_kind: "doc_location_matches",
         observation_ref: "obs:doc-location",
+        bound_input_refs: [
+          {
+            binding_id: docsTargetBindingId,
+            arg_name: "target_ref",
+            binding_kind: "target_ref",
+            from_subgoal_id: directorySubgoalId,
+            from_capability: "workspace-directory.resolve",
+            ref: "obs:workspace-directory",
+          },
+        ],
       },
     ],
     overrides,
@@ -786,6 +909,22 @@ describe("Helix Ask compound capability live probe", () => {
       "obs:workspace-status",
       "obs:calculator",
     ]);
+    expect(result.observation_provenance).toEqual([
+      "compound_subgoal_id",
+      "capability_key",
+    ]);
+    expect(result.rail_observation_kinds).toEqual([
+      "workspace_os_status_observation",
+      "calculator_receipt",
+    ]);
+    expect(result.rail_observation_refs).toEqual([
+      "obs:workspace-status",
+      "obs:calculator",
+    ]);
+    expect(result.rail_observation_provenance).toEqual([
+      "compound_subgoal_id",
+      "capability_key",
+    ]);
     expect(result.subgoal_satisfactions).toEqual(["satisfied", "satisfied"]);
     expect(result.subgoal_rail_statuses).toEqual(["complete", "complete"]);
     expect(result.subgoal_first_broken_rails).toEqual([null, null]);
@@ -943,6 +1082,29 @@ describe("Helix Ask compound capability live probe", () => {
 
     expect(result.ok).toBe(false);
     expect(result.failures).toContain("subgoal_2_bound_input_refs_missing");
+  });
+
+  it("catches calculator subgoals that lose upstream research/reflection support bindings", () => {
+    const base = internetReflectionCalculatorDebug();
+    const payload = (base.debugExport as any).payload;
+    payload.capability_itinerary_execution_state.compound_subgoal_ledger[2].input_bindings =
+      payload.capability_itinerary_execution_state.compound_subgoal_ledger[2].input_bindings.slice(1);
+    payload.artifact_query_index.compound_subgoal_rail_statuses[2].input_bindings =
+      payload.artifact_query_index.compound_subgoal_rail_statuses[2].input_bindings.slice(1);
+    payload.capability_itinerary_execution_state.compound_subgoal_ledger[2].bound_input_refs = [];
+    payload.artifact_query_index.compound_subgoal_rail_statuses[2].bound_input_refs = [];
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("internet_reflection_calculator"),
+      ask: base.ask,
+      debugExport: base.debugExport,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.failures).toContain(
+      "subgoal_3_input_binding_from_capability_missing:internet_search.web_research",
+    );
+    expect(result.failures).toContain("subgoal_3_bound_input_refs_missing");
   });
 
   it("catches reflection subgoals bound to the wrong upstream capability", () => {
@@ -1110,6 +1272,23 @@ describe("Helix Ask compound capability live probe", () => {
 
     expect(result.ok).toBe(false);
     expect(result.failures).toContain("subgoal_1_rail_support_refs_missing");
+  });
+
+  it("catches missing observation provenance for satisfied subgoals", () => {
+    const base = workspaceThenCalculatorDebug();
+    const payload = (base.debugExport as any).payload;
+    delete payload.capability_itinerary_execution_state.compound_subgoal_ledger[0].observation_provenance;
+    delete payload.artifact_query_index.compound_subgoal_rail_statuses[0].observation_provenance;
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("workspace_then_calculator"),
+      ask: base.ask,
+      debugExport: base.debugExport,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.failures).toContain("subgoal_1_observation_provenance_missing");
+    expect(result.failures).toContain("subgoal_1_rail_observation_provenance_missing");
   });
 
   it("catches calculator rail args that include non-math prompt text", () => {

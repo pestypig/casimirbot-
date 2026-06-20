@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 
 import { COMPOUND_CAPABILITY_LIVE_SCENARIOS } from "../../scripts/helix-ask-compound-capability-live-probe";
+import { buildHelixCompoundCapabilityContract } from "../services/helix-ask/compound-capability-contract";
 import { explicitCapabilityContractsForTests } from "../services/helix-ask/explicit-capability-contract";
 
 type ExpectedCapability = string | string[] | null;
@@ -11,6 +12,16 @@ const flattenExpectedCapabilities = (values: ExpectedCapability[]): string[] =>
     if (value === null) return [];
     return Array.isArray(value) ? value : [value];
   });
+
+const expectedCapabilityMatches = (
+  actual: string | null | undefined,
+  expected: ExpectedCapability,
+): boolean => {
+  if (expected === null) return actual === null || actual === undefined;
+  return Array.isArray(expected)
+    ? expected.includes(String(actual ?? ""))
+    : actual === expected;
+};
 
 const contractCapabilities = new Set(
   explicitCapabilityContractsForTests.flatMap((contract) => [
@@ -42,21 +53,53 @@ const liveProbeRuntimeCapabilities = new Set(
   ),
 );
 
+const promptForRepresentativeCapability = (capability: string): string => {
+  if (capability === "scientific-calculator.solve_expression") {
+    return `Call ${capability} with this exact expression: 2+2.`;
+  }
+  if (capability === "docs-viewer.locate_in_doc") {
+    return `Call ${capability} to locate query: rule of thumb.`;
+  }
+  if (capability === "docs-viewer.doc_equation_context") {
+    return `Call ${capability} for query: Alcubierre metric equation.`;
+  }
+  if (capability === "repo-code.search_concept") {
+    return `Call ${capability} for query: terminal authority.`;
+  }
+  if (capability === "workspace-directory.resolve") {
+    return `Call ${capability} for query: docs/helix-ask-codex-loop-discipline.md.`;
+  }
+  if (capability === "internet_search.web_research") {
+    return `Call ${capability} for query: Alcubierre metric energy estimates.`;
+  }
+  if (capability === "scholarly-research.lookup_papers") {
+    return `Call ${capability} for query: Alcubierre metric energy estimates.`;
+  }
+  return `Call ${capability} for Helix Ask parity coverage.`;
+};
+
 const auditedExplicitCapabilities = [
   "scientific-calculator.solve_expression",
+  "helix_ask.inspect_capability_catalog",
   "repo-code.search_concept",
   "docs-viewer.locate_in_doc",
   "docs-viewer.doc_equation_context",
   "workspace-directory.resolve",
   "internet_search.web_research",
+  "scholarly-research.lookup_papers",
+  "helix_ask.reflect_theory_context",
+  "helix_ask.reflect_context_attachments",
   "live_env.query_micro_reasoner_presets",
   "live_env.draft_micro_reasoner_preset",
   "live_env.route_micro_reasoner_prompt",
   "live_env.read_processed_live_source_mail",
   "live_env.reflect_live_source_mail_loop",
   "live_env.process_live_source_mail",
+  "image_lens.inspect",
   "helix_ask.build_civilization_scenario_frame",
   "helix_ask.reflect_civilization_bounds",
+  "helix_ask.reflect_ideology_context",
+  "helix_ask.bridge_theory_ideology_context",
   "workspace_os.status",
 ] as const;
 
@@ -163,6 +206,10 @@ const objectiveFamilyCoverage = [
   },
 ] as const;
 
+const objectiveRepresentativeCapabilities = new Set(
+  objectiveFamilyCoverage.flatMap((entry) => entry.representativeCapabilities),
+);
+
 describe("Helix Ask tool-family parity goal coverage", () => {
   it("keeps the local Codex lifecycle reference anchors available", () => {
     expect(readCodexReference("codex-rs/core/src/client_common.rs")).toEqual(
@@ -207,6 +254,45 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     for (const capability of auditedExplicitCapabilities) {
       expect(contractCapabilities.has(capability), capability).toBe(true);
     }
+    for (const capability of objectiveRepresentativeCapabilities) {
+      expect(auditedExplicitCapabilities).toContain(capability);
+    }
+  });
+
+  it("extracts representative explicit capability prompts into usable single-subgoal contracts", () => {
+    for (const entry of objectiveFamilyCoverage) {
+      for (const capability of entry.representativeCapabilities) {
+        const contract = explicitCapabilityContractsForTests.find((candidate) =>
+          candidate.capability === capability ||
+          candidate.runtime_capability === capability ||
+          (candidate.aliases ?? []).includes(capability)
+        );
+        expect(contract, `${entry.label}:${capability}:contract`).toBeTruthy();
+        expect(contract?.required_observation_kinds.length, `${entry.label}:${capability}:observations`)
+          .toBeGreaterThan(0);
+        expect(contract?.required_terminal_kind, `${entry.label}:${capability}:terminal_kind`).toBeTruthy();
+        expect(Array.isArray(contract?.forbidden_nearby_capabilities), `${entry.label}:${capability}:forbidden`)
+          .toBe(true);
+
+        const compound = buildHelixCompoundCapabilityContract({
+          turnId: `ask:tool-family-parity:${entry.label}:${capability}`.replace(/[^A-Za-z0-9:_-]+/g, "_"),
+          promptText: promptForRepresentativeCapability(capability),
+        });
+        const subgoals = compound?.subgoals ?? [];
+        expect(compound?.schema, `${entry.label}:${capability}:schema`)
+          .toBe("helix.compound_capability_contract.v1");
+        expect(compound?.prompt_shape, `${entry.label}:${capability}:shape`).toBe("single_capability");
+        expect(subgoals, `${entry.label}:${capability}:subgoals`).toHaveLength(1);
+        expect(subgoals[0]).toEqual(expect.objectContaining({
+          requested_capability: contract?.capability,
+          runtime_capability: contract?.runtime_capability ?? contract?.capability,
+          required_observation_kinds: contract?.required_observation_kinds,
+          required_terminal_kind: contract?.required_terminal_kind,
+          mandatory: true,
+          status: "pending",
+        }));
+      }
+    }
   });
 
   it("has representative compound live-probe coverage for every objective family", () => {
@@ -233,9 +319,53 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     for (const scenario of COMPOUND_CAPABILITY_LIVE_SCENARIOS) {
       expect(scenario.expectedRequested.length, scenario.id).toBeGreaterThan(0);
       expect(scenario.expectedRuntime.length, scenario.id).toBe(scenario.expectedRequested.length);
+      expect(
+        scenario.expectedInputBindingFromCapabilities?.length ?? scenario.expectedRequested.length,
+        scenario.id,
+      ).toBe(scenario.expectedRequested.length);
+
+      const compound = buildHelixCompoundCapabilityContract({
+        turnId: `ask:tool-family-parity:live-probe:${scenario.id}`,
+        promptText: scenario.prompt,
+      });
+      const subgoals = compound?.subgoals ?? [];
+      expect(subgoals, `${scenario.id}:contract_subgoals`).toHaveLength(scenario.expectedRequested.length);
+      expect(compound?.requires_all_subgoals, `${scenario.id}:requires_all_subgoals`)
+        .toBe(scenario.expectedRequested.length > 1);
+      scenario.expectedRequested.forEach((expectedCapability, index) => {
+        const subgoal = subgoals[index];
+        expect(
+          expectedCapabilityMatches(subgoal?.requested_capability, expectedCapability),
+          `${scenario.id}:subgoal_${index + 1}:requested:${String(subgoal?.requested_capability ?? "")}`,
+        ).toBe(true);
+        expect(subgoal?.mandatory, `${scenario.id}:subgoal_${index + 1}:mandatory`).toBe(true);
+        expect(subgoal?.required_observation_kinds.length, `${scenario.id}:subgoal_${index + 1}:observations`)
+          .toBeGreaterThan(0);
+      });
+
       for (const capability of flattenExpectedCapabilities(scenario.expectedInputBindingFromCapabilities ?? [])) {
         expect(liveProbeCapabilities.has(capability), `${scenario.id}:input_binding:${capability}`).toBe(true);
       }
+      scenario.expectedInputBindingFromCapabilities?.forEach((expectedBinding, index) => {
+        if (expectedBinding === null) return;
+        const priorRequestedCapabilities = new Set(
+          flattenExpectedCapabilities(scenario.expectedRequested.slice(0, index)),
+        );
+        for (const capability of flattenExpectedCapabilities([expectedBinding])) {
+          expect(
+            priorRequestedCapabilities.has(capability),
+            `${scenario.id}:subgoal_${index + 1}:input_binding:${capability}`,
+          ).toBe(true);
+          const subgoal = subgoals[index];
+          const subgoalBindings = Array.isArray(subgoal?.input_bindings)
+            ? subgoal.input_bindings
+            : [];
+          expect(
+            subgoalBindings.some((binding) => binding.from_capability === capability),
+            `${scenario.id}:subgoal_${index + 1}:contract_input_binding:${capability}`,
+          ).toBe(true);
+        }
+      });
       expect(
         scenario.expectedSubgoalSatisfaction?.length ?? scenario.expectedRequested.length,
         scenario.id,

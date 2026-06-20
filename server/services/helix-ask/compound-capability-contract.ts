@@ -118,16 +118,6 @@ export const extractCalculatorSubgoalExpression = (
   return best || null;
 };
 
-const docsLocateArgs = (promptText: string): RecordLike => {
-  const query =
-    promptText.match(/\b(?:locate|find|cite|where)\b[\s\S]{0,80}?\b(?:claim|text|phrase|where)\b\s*[:=]?\s*["']?([^"'\n.;]+)["']?/i)?.[1] ??
-    promptText;
-  return {
-    query: normalizeSpace(stripBoundaryPunctuation(query)),
-    target_transcript: normalizeSpace(stripBoundaryPunctuation(query)),
-  };
-};
-
 const segmentForMatch = (
   promptText: string,
   match: Pick<ExtractedExplicitCapabilityContract, "match_end_index" | "match_index">,
@@ -136,6 +126,104 @@ const segmentForMatch = (
   const nextCapabilityIndex = findNextCapabilityIndex(promptText, match, ordered);
   const segmentEnd = nextCapabilityIndex > match.match_index ? nextCapabilityIndex : promptText.length;
   return promptText.slice(match.match_end_index, segmentEnd);
+};
+
+const boundedSegmentForMatch = (
+  promptText: string,
+  match: ExtractedExplicitCapabilityContract,
+  ordered: ExtractedExplicitCapabilityContract[],
+): string => {
+  const segment = segmentForMatch(promptText, match, ordered);
+  return normalizeSpace(
+    stripBoundaryPunctuation(
+      (segment.split(/\s*,?\s*\b(?:then|next|followed\s+by|and\s+then|plus)\b\s+(?:call|use|run|invoke|execute)?\b/i)[0] ?? segment)
+        .replace(/\b(?:then|next|plus|and)\s*$/i, ""),
+    ),
+  );
+};
+
+const firstWorkspacePath = (value: string): string | null =>
+  value.match(/\b((?:docs|server|client|shared|scripts|external)\/[^\s,.;)]+)/i)?.[1] ?? null;
+
+const stripLeadingArgLabel = (value: string): string =>
+  normalizeSpace(
+    stripBoundaryPunctuation(value)
+      .replace(/^(?:query|concept|claim|text|phrase|term|where|path|target|for|about|on)\s*[:=]\s*/i, ""),
+  );
+
+const queryAfterMarker = (value: string, markerPattern: RegExp): string => {
+  const markerMatch = value.match(markerPattern)?.[1] ?? value;
+  return stripLeadingArgLabel(markerMatch);
+};
+
+const docsLocateArgs = (
+  promptText: string,
+  match: ExtractedExplicitCapabilityContract,
+  ordered: ExtractedExplicitCapabilityContract[],
+): RecordLike => {
+  const segment = boundedSegmentForMatch(promptText, match, ordered);
+  const path = firstWorkspacePath(segment);
+  const quoted = segment.match(/["']([^"'\n]+)["']/)?.[1];
+  const explicitQuery = segment.match(/\b(?:query|claim|text|phrase|term|where)\b\s*[:=]\s*["']?([^"'\n.;]+)["']?/i)?.[1];
+  const locateQuery =
+    quoted ??
+    explicitQuery ??
+    segment.match(/\b(?:locate|find|cite|where)\b\s+(?:the\s+)?([\s\S]+?)(?:\s+in\s+(?:docs|server|client|shared|scripts|external)\/|$)/i)?.[1] ??
+    queryAfterMarker(segment, /\b(?:query|claim|text|phrase|term|where)\b\s*[:=]?\s*["']?([^"'\n.;]+)["']?/i);
+  const query = normalizeSpace(stripBoundaryPunctuation(locateQuery));
+  return {
+    query,
+    target_transcript: query,
+    ...(path ? { path } : {}),
+  };
+};
+
+const repoSearchArgs = (
+  promptText: string,
+  match: ExtractedExplicitCapabilityContract,
+  ordered: ExtractedExplicitCapabilityContract[],
+): RecordLike => {
+  const segment = boundedSegmentForMatch(promptText, match, ordered);
+  const rawQuery = queryAfterMarker(
+    segment,
+    /\b(?:query|concept|for|about|on|find|search(?:\s+for)?|where)\b\s*[:=]?\s*["']?([^"'\n.;]+)["']?/i,
+  );
+  const query = normalizeSpace(rawQuery.replace(/^where\s+/i, ""));
+  return {
+    query,
+    concept: query,
+    limit: 5,
+  };
+};
+
+const workspaceResolveArgs = (
+  promptText: string,
+  match: ExtractedExplicitCapabilityContract,
+  ordered: ExtractedExplicitCapabilityContract[],
+): RecordLike => {
+  const segment = boundedSegmentForMatch(promptText, match, ordered);
+  const path = firstWorkspacePath(segment);
+  const query = path ??
+    queryAfterMarker(segment, /\b(?:query|for|resolve|path|target)\b\s*[:=]?\s*["']?([^"'\n.;]+)["']?/i);
+  return {
+    query,
+    ...(path ? { path } : {}),
+    limit: 8,
+    target_kinds: ["doc", "panel", "path"],
+  };
+};
+
+const internetSearchArgs = (
+  promptText: string,
+  match: ExtractedExplicitCapabilityContract,
+  ordered: ExtractedExplicitCapabilityContract[],
+): RecordLike => {
+  const segment = boundedSegmentForMatch(promptText, match, ordered);
+  const query = queryAfterMarker(
+    segment,
+    /\b(?:query|for|about|on|search(?:\s+for)?|find)\b\s*[:=]?\s*["']?([^"'\n.;]+)["']?/i,
+  );
+  return { query };
 };
 
 const scholarlyLookupArgs = (
@@ -149,7 +237,7 @@ const scholarlyLookupArgs = (
     (segment || promptText);
   const boundedQuery = query.split(/\s*,?\s*\b(?:then|next|followed\s+by)\b\s+(?:call|use|run)\b/i)[0] ?? query;
   return {
-    query: normalizeSpace(stripBoundaryPunctuation(boundedQuery)),
+    query: stripLeadingArgLabel(boundedQuery),
     limit: 5,
   };
 };
@@ -280,20 +368,17 @@ const argsHintForSubgoal = (input: {
       refs: ["helix-ask:current-turn"],
     };
   }
-  if (capability === "docs-viewer.locate_in_doc") return docsLocateArgs(input.promptText);
+  if (capability === "docs-viewer.locate_in_doc") {
+    return docsLocateArgs(input.promptText, input.match, input.ordered);
+  }
   if (capability === "repo-code.search_concept") {
-    return {
-      query: normalizeSpace(input.promptText),
-      concept: normalizeSpace(input.promptText),
-      limit: 5,
-    };
+    return repoSearchArgs(input.promptText, input.match, input.ordered);
   }
   if (capability === "workspace-directory.resolve") {
-    return {
-      query: normalizeSpace(input.promptText),
-      limit: 8,
-      target_kinds: ["doc", "panel", "path"],
-    };
+    return workspaceResolveArgs(input.promptText, input.match, input.ordered);
+  }
+  if (capability === "internet_search.web_research") {
+    return internetSearchArgs(input.promptText, input.match, input.ordered);
   }
   if (capability === "image_lens.inspect") return {};
   return {};
@@ -349,6 +434,7 @@ const SUBGOAL_BINDING_SOURCE_FAMILIES = new Set([
 
 const SUBGOAL_BINDING_CONSUMER_FAMILIES = new Set([
   "calculator",
+  "docs_viewer",
   "context_reflection",
   "theory_locator",
   "zen_graph_reflection",
@@ -368,10 +454,26 @@ const bindingShapeForConsumer = (
       binding_kind: "support_ref",
     };
   }
+  if (contract.capability_family === "docs_viewer") {
+    return {
+      arg_name: "target_ref",
+      binding_kind: "target_ref",
+    };
+  }
   return {
     arg_name: sourceCount === 1 ? "source_ref" : "source_refs",
     binding_kind: "source_ref",
   };
+};
+
+const canBindSourceToConsumer = (
+  source: ExplicitCapabilityContract,
+  consumer: ExplicitCapabilityContract,
+): boolean => {
+  if (consumer.capability_family === "docs_viewer") {
+    return source.capability_family === "workspace_directory";
+  }
+  return SUBGOAL_BINDING_SOURCE_FAMILIES.has(source.capability_family);
 };
 
 const inputBindingsForSubgoal = (input: {
@@ -384,7 +486,7 @@ const inputBindingsForSubgoal = (input: {
   if (!SUBGOAL_BINDING_CONSUMER_FAMILIES.has(contract.capability_family)) return [];
   const priorEvidenceSubgoals = input.ordered.slice(0, input.index)
     .map((entry: ExtractedExplicitCapabilityContract, priorIndex: number) => ({ entry, priorIndex }))
-    .filter(({ entry }) => SUBGOAL_BINDING_SOURCE_FAMILIES.has(entry.contract.capability_family));
+    .filter(({ entry }) => canBindSourceToConsumer(entry.contract, contract));
   const bindingShape = bindingShapeForConsumer(contract, priorEvidenceSubgoals.length);
   return priorEvidenceSubgoals.map(({ entry, priorIndex }, bindingIndex: number) => ({
     binding_id: `${subgoalIdFor(input.turnId, input.index + 1, contract.capability)}:input_binding:${bindingIndex + 1}`,
