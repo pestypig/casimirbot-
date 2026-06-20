@@ -406,6 +406,29 @@ const repoEvidenceAnswerTerminalAllowed = (payload: Record<string, unknown>): bo
   return hasPostObservationModelDecision(payload);
 };
 
+const activeDocIdentityTerminalAllowed = (payload: Record<string, unknown>): boolean => {
+  if (readString(payload.terminal_artifact_kind) !== "active_doc_identity") return false;
+  const goal = readRecord(payload.canonical_goal_frame);
+  if (readString(goal?.goal_kind) !== "active_doc_identity") return false;
+  if (readString(goal?.required_terminal_kind) !== "active_doc_identity") return false;
+  if (!goalSatisfactionAllowsTerminal(payload)) return false;
+
+  const directIdentity = readRecord(payload.active_doc_identity);
+  if (readString(directIdentity?.active_doc_path)) return true;
+
+  return readArray(payload.current_turn_artifact_ledger)
+    .map(readRecord)
+    .some((artifact) => {
+      const record = artifact;
+      const artifactPayload = readRecord(record?.payload);
+      return Boolean(
+        record &&
+          readString(record.kind) === "active_doc_identity" &&
+          readString(artifactPayload?.active_doc_path),
+      );
+    });
+};
+
 const isVisualSituationTerminalKind = (kind: string | null): boolean =>
   kind === "situation_context_pack" ||
   kind === "visual_context_pack" ||
@@ -646,6 +669,7 @@ export function hasAgentRuntimeLoopDecisionChain(payload: Record<string, unknown
 }
 
 export function hasSelectedCapabilityObservation(payload: Record<string, unknown>): boolean {
+  if (activeDocIdentityTerminalAllowed(payload)) return true;
   if (hasGoalSatisfyingVisualSituationEvidence(payload)) return true;
   const loop = readRecord(payload.agent_runtime_loop);
   const iterations = readArray(loop?.iterations);

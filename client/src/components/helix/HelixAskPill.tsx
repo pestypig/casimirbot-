@@ -16256,6 +16256,8 @@ function copyHelixRailCriticalDebugFieldsForUi(
     "tool_turn_chain_audit",
     "tool_rail_failure_triage",
     "tool_turn_chain_family_matrix",
+    "compound_subgoal_ledger",
+    "compound_subgoal_rail_statuses",
     "artifact_query_index",
     "goal_satisfaction_evaluation",
     "post_tool_authority_bridge",

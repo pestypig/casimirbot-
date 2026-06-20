@@ -172,7 +172,21 @@ const scholarlyFullTextArgs = (
   };
 };
 
+const workstationNoteArgs = (
+  promptText: string,
+  match: ExtractedExplicitCapabilityContract,
+  ordered: ExtractedExplicitCapabilityContract[],
+): RecordLike => {
+  const segment = segmentForMatch(promptText, match, ordered);
+  const text =
+    segment.match(/\b(?:with\s+text|text|body|content)\b\s*[:=]?\s*["']?([^"'\n]+)["']?/i)?.[1] ??
+    segment;
+  const normalized = normalizeSpace(stripBoundaryPunctuation(text));
+  return normalized ? { text: normalized } : {};
+};
+
 const argsHintForSubgoal = (input: {
+  turnId: string;
   promptText: string;
   match: ExtractedExplicitCapabilityContract;
   ordered: ExtractedExplicitCapabilityContract[];
@@ -195,6 +209,9 @@ const argsHintForSubgoal = (input: {
   }
   if (capability === "scholarly-research.fetch_full_text") {
     return scholarlyFullTextArgs(input.promptText, input.match, input.ordered);
+  }
+  if (capability === "workstation-notes.append_to_note") {
+    return workstationNoteArgs(input.promptText, input.match, input.ordered);
   }
   if (capability === "helix_ask.reflect_theory_context") {
     return {
@@ -331,11 +348,31 @@ const SUBGOAL_BINDING_SOURCE_FAMILIES = new Set([
 ]);
 
 const SUBGOAL_BINDING_CONSUMER_FAMILIES = new Set([
+  "calculator",
   "context_reflection",
   "theory_locator",
   "zen_graph_reflection",
   "civilization_bounds",
 ]);
+
+const bindingShapeForConsumer = (
+  contract: ExplicitCapabilityContract,
+  sourceCount: number,
+): {
+  arg_name: "source_ref" | "source_refs" | "target_ref" | "support_refs";
+  binding_kind: "source_ref" | "target_ref" | "support_ref";
+} => {
+  if (contract.capability_family === "calculator") {
+    return {
+      arg_name: "support_refs",
+      binding_kind: "support_ref",
+    };
+  }
+  return {
+    arg_name: sourceCount === 1 ? "source_ref" : "source_refs",
+    binding_kind: "source_ref",
+  };
+};
 
 const inputBindingsForSubgoal = (input: {
   turnId: string;
@@ -348,10 +385,11 @@ const inputBindingsForSubgoal = (input: {
   const priorEvidenceSubgoals = input.ordered.slice(0, input.index)
     .map((entry: ExtractedExplicitCapabilityContract, priorIndex: number) => ({ entry, priorIndex }))
     .filter(({ entry }) => SUBGOAL_BINDING_SOURCE_FAMILIES.has(entry.contract.capability_family));
+  const bindingShape = bindingShapeForConsumer(contract, priorEvidenceSubgoals.length);
   return priorEvidenceSubgoals.map(({ entry, priorIndex }, bindingIndex: number) => ({
     binding_id: `${subgoalIdFor(input.turnId, input.index + 1, contract.capability)}:input_binding:${bindingIndex + 1}`,
-    arg_name: priorEvidenceSubgoals.length === 1 ? "source_ref" as const : "source_refs" as const,
-    binding_kind: "source_ref" as const,
+    arg_name: bindingShape.arg_name,
+    binding_kind: bindingShape.binding_kind,
     from_subgoal_id: subgoalIdFor(input.turnId, priorIndex + 1, entry.contract.capability),
     from_capability: entry.contract.capability,
     required_observation_kinds: requiredObservationKindsForCompoundSubgoal(entry.contract, input.ordered.length),
@@ -388,6 +426,7 @@ export const buildHelixCompoundCapabilityContract = (input: {
       required_args: [...contract.required_args],
       optional_args: [...contract.optional_args],
       args_hint: argsHintForSubgoal({
+        turnId: input.turnId,
         promptText: input.promptText,
         match,
         ordered,

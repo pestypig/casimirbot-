@@ -674,7 +674,7 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
       "helix_theory_frontier_vector_field_tool_receipt",
       "theory_frontier_vector_field",
     ],
-    required_terminal_kind: "model_synthesized_answer",
+    required_terminal_kind: "theory_context_reflection_answer",
     allowed_substitutions: [],
     forbidden_nearby_capabilities: ["model.direct_answer"],
   },

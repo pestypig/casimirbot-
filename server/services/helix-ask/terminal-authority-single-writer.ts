@@ -75,6 +75,28 @@ const compoundTerminalSynthesisPolicyActive = (payload: Record<string, unknown>)
   );
 };
 
+const multiSubgoalCompoundTerminalSynthesisActive = (payload: Record<string, unknown>): boolean => {
+  const itinerary = readRecord(payload.capability_itinerary);
+  const contract =
+    readRecord(payload.compound_capability_contract) ??
+    readRecord(itinerary?.compound_capability_contract);
+  const executionState =
+    readRecord(payload.capability_itinerary_execution_state) ??
+    readRecord(itinerary?.execution_state);
+  const terminalCriteria = readRecord(itinerary?.terminal_success_criteria);
+  const subgoalCount = readArray(contract?.subgoals).length;
+  const ledgerCount = readArray(executionState?.compound_subgoal_ledger).length;
+  const requiredCapabilityCount = readArray(terminalCriteria?.required_capabilities).length;
+  return (
+    subgoalCount > 1 ||
+    ledgerCount > 1 ||
+    (
+      requiredCapabilityCount > 1 &&
+      terminalCriteria?.compound_terminal_policy === "synthesize_from_satisfied_subgoal_observations"
+    )
+  );
+};
+
 const isContextualToolReferenceSuppressed = (payload: Record<string, unknown>): boolean => {
   const capabilityPlan = readRecord(payload.capability_plan);
   const arbitration = readRecord(capabilityPlan?.capability_contract_arbitration);
@@ -2222,6 +2244,46 @@ const findGoalSatisfyingWorkstationToolEvaluationArtifact = (
   };
 };
 
+const calculatorCompoundSupportedDraftText = (
+  payload: Record<string, unknown>,
+  artifacts: ArtifactLike[],
+): string | null => {
+  const route = readString(payload.route_reason_code) ?? readString(payload.route);
+  if (route !== "calculator_solve / calculator_compound_chain") return null;
+  if (readString(readRecord(payload.canonical_goal_frame)?.required_terminal_kind) !== "workstation_tool_evaluation") {
+    return null;
+  }
+  const coverage =
+    readRecord(payload.calculator_plan_coverage) ??
+    artifacts
+      .map(artifactPayload)
+      .find((entry) => readString(entry?.schema) === "helix.calculator_plan_coverage.v1" || readString(entry?.kind) === "calculator_plan_coverage") ??
+    null;
+  if (readString(coverage?.coverage) !== "complete") return null;
+  const promptCoverage = readRecord(payload.prompt_requirement_coverage);
+  if (promptCoverage && readString(promptCoverage.coverage) && readString(promptCoverage.coverage) !== "complete") {
+    return null;
+  }
+  const receipts =
+    readArray(payload.calculator_subgoal_receipts).length > 0 ||
+    artifacts.some((artifact) => artifactKind(artifact) === "calculator_subgoal_receipt" || artifactKind(artifact) === "calculator_receipt");
+  if (!receipts) return null;
+  const draft =
+    readRecord(payload.calculator_final_answer_draft) ??
+    readRecord(payload.final_answer_draft) ??
+    artifacts
+      .map(artifactPayload)
+      .find((entry) => readString(entry?.schema) === "helix.final_answer_draft.v1") ??
+    null;
+  const text =
+    readString(draft?.text) ??
+    readString(draft?.answer_text) ??
+    readString(payload.selected_final_answer) ??
+    readString(payload.answer);
+  if (!text || isStaleWorkspaceFailureText(text) || isStaleModelOnlyNoObservationText(text)) return null;
+  return text;
+};
+
 const quarantineStaleRequestUserInput = (payload: Record<string, unknown>): void => {
   const staleRequest =
     readRecord(payload.request_user_input) ??
@@ -2499,7 +2561,17 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const selectedWorkstationToolEvaluation = findGoalSatisfyingWorkstationToolEvaluationArtifact(input.payload, artifacts);
   const workstationTerminalMaterialized =
     Boolean(selectedWorkstationToolEvaluation) && goalAllowsTerminal;
-  const selectedReceiptTerminal = findGoalSatisfyingReceiptTerminalArtifact(input.payload, artifacts);
+  const rawSelectedReceiptTerminal = findGoalSatisfyingReceiptTerminalArtifact(input.payload, artifacts);
+  const compoundReceiptTerminalBlocked =
+    Boolean(rawSelectedReceiptTerminal) &&
+    multiSubgoalCompoundTerminalSynthesisActive(input.payload);
+  const selectedReceiptTerminal = compoundReceiptTerminalBlocked ? null : rawSelectedReceiptTerminal;
+  const selectedGoalArtifact =
+    findGoalSatisfyingCapabilityHelpArtifact(input.payload, artifacts) ??
+    findGoalSatisfyingDocumentArtifact(input.payload, artifacts) ??
+    findGoalSatisfyingVisualSituationArtifact(input.payload, artifacts);
+  const goalArtifactTerminalMaterialized =
+    Boolean(selectedGoalArtifact) && goalAllowsTerminal;
   const pendingRequestCandidate =
     readRecord(input.payload.request_user_input) ??
     readRecord(input.payload.pending_server_request) ??
@@ -2537,6 +2609,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       (stagePlayTerminalMaterialized && goalAllowsTerminal) ||
       compoundMaterializedDraftCanSatisfyTerminal ||
       workstationTerminalMaterialized ||
+      goalArtifactTerminalMaterialized ||
       Boolean(selectedReceiptTerminal && goalAllowsTerminal) ||
       noteMutationTerminalMaterialized
     );
@@ -2583,6 +2656,11 @@ export function applyHelixTerminalAuthoritySingleWriter(
     rejectedCandidates.push({
       kind: "typed_failure",
       reason: "stale_solver_continuation_superseded_by_workstation_terminal",
+    });
+  } else if (rawSolverContinuationPending && goalArtifactTerminalMaterialized) {
+    rejectedCandidates.push({
+      kind: "typed_failure",
+      reason: "stale_solver_continuation_superseded_by_goal_terminal",
     });
   } else if (rawSolverContinuationPending && selectedReceiptTerminal && goalAllowsTerminal) {
     rejectedCandidates.push({
@@ -2639,10 +2717,6 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const deterministicReceiptFallbackDraft = selectedDraft
     ? null
     : findDeterministicReceiptFallbackDraftAfterRequiredObservation(artifacts);
-  const selectedGoalArtifact =
-    findGoalSatisfyingCapabilityHelpArtifact(input.payload, artifacts) ??
-    findGoalSatisfyingDocumentArtifact(input.payload, artifacts) ??
-    findGoalSatisfyingVisualSituationArtifact(input.payload, artifacts);
   const selectedLiveEnvironmentBindingDiagnosis = findLiveEnvironmentBindingDiagnosisTerminal(input.payload);
   const latestRequiredObservationSequence = selectedDraft?.latestObservationSequence ??
     artifacts.reduce((latest, artifact, index) => isAcceptedObservationPacket(artifact) ? index : latest, -1);
@@ -2705,6 +2779,14 @@ export function applyHelixTerminalAuthoritySingleWriter(
       kind: "final_answer_draft",
       source: "final_answer_draft",
       reason: "deterministic_receipt_fallback_nonterminal",
+    });
+  }
+  if (compoundReceiptTerminalBlocked && rawSelectedReceiptTerminal) {
+    rejectedCandidates.push({
+      ref: rawSelectedReceiptTerminal.ref ?? undefined,
+      kind: rawSelectedReceiptTerminal.kind,
+      source: rawSelectedReceiptTerminal.kind as HelixTerminalCandidate["source"],
+      reason: "receipt_or_projection",
     });
   }
 
@@ -3140,12 +3222,30 @@ export function applyHelixTerminalAuthoritySingleWriter(
       payload: input.payload,
       terminal: selectedWorkstationToolEvaluation,
     });
-    const selectedWorkstationTerminalText = workstationTerminalText.text;
+    const calculatorDraftText = calculatorCompoundSupportedDraftText(input.payload, artifacts);
+    const selectedWorkstationTerminalText = calculatorDraftText ?? workstationTerminalText.text;
     if (workstationTerminalText.audit) {
       input.payload.workstation_tool_terminal_synthesis = workstationTerminalText.audit;
       const debug = readRecord(input.payload.debug);
       if (debug) {
         debug.workstation_tool_terminal_synthesis = workstationTerminalText.audit;
+      }
+    } else if (calculatorDraftText) {
+      const audit = {
+        schema: "helix.workstation_tool_terminal_synthesis.v1",
+        turn_id: input.turnId,
+        applied: true,
+        source: "calculator_compound_supported_final_answer_draft",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        terminal_artifact_ref: selectedWorkstationToolEvaluation.ref,
+        reason: "calculator_compound_workstation_terminal_uses_coverage_backed_draft_text",
+        assistant_answer: false,
+        raw_content_included: false,
+      };
+      input.payload.workstation_tool_terminal_synthesis = audit;
+      const debug = readRecord(input.payload.debug);
+      if (debug) {
+        debug.workstation_tool_terminal_synthesis = audit;
       }
     }
     selectedArtifactRef = selectedWorkstationToolEvaluation.ref;

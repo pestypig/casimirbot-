@@ -1410,6 +1410,125 @@ describe("Helix terminal authority single writer", () => {
     expect(payload.final_answer_source).toBe("final_answer_draft");
   });
 
+  it("blocks receipt terminals for multi-subgoal compound synthesis turns", () => {
+    const turnId = "ask:test:compound-receipt-not-terminal";
+    const receiptRef = `${turnId}:workspace_action_receipt`;
+    const artifacts = [
+      {
+        artifact_id: receiptRef,
+        kind: "workspace_action_receipt",
+        payload: {
+          schema: "helix.workspace_action_receipt.v1",
+          kind: "workspace_action_receipt",
+          receipt_kind: "workspace_action_receipt",
+          receipt_id: receiptRef,
+          text: "Workspace status returned 34 capability records.",
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        turn_id: turnId,
+        source_target: "compound_capability",
+        required_terminal_kind: "workspace_action_receipt",
+        allowed_terminal_artifact_kinds: [
+          "workspace_action_receipt",
+          "workstation_tool_evaluation",
+          "model_synthesized_answer",
+          "typed_failure",
+        ],
+        forbidden_terminal_artifact_kinds: ["tool_receipt"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        goal_kind: "compound_capability",
+        required_terminal_kind: "workspace_action_receipt",
+      },
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+        terminal_success_criteria: {
+          requires_post_observation_synthesis: true,
+          compound_terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          required_capabilities: [
+            "workspace_os.status",
+            "scientific-calculator.solve_expression",
+          ],
+          required_observation_families: ["workspace_diagnostic", "calculator"],
+          allowed_terminal_artifact_kinds: [
+            "workspace_action_receipt",
+            "workstation_tool_evaluation",
+            "model_synthesized_answer",
+            "typed_failure",
+          ],
+          forbidden_terminal_artifact_kinds: ["tool_receipt"],
+        },
+        compound_capability_contract: {
+          schema: "helix.compound_capability_contract.v1",
+          terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          requires_all_subgoals: true,
+          subgoals: [
+            {
+              subgoal_id: `${turnId}:subgoal:workspace`,
+              order: 1,
+              requested_capability: "workspace_os.status",
+              runtime_capability: "workspace_os.status",
+              required_observation_kinds: ["workspace_os_status_observation"],
+              required_terminal_kind: "workstation_tool_evaluation",
+            },
+            {
+              subgoal_id: `${turnId}:subgoal:calculator`,
+              order: 2,
+              requested_capability: "scientific-calculator.solve_expression",
+              runtime_capability: "scientific-calculator.solve_expression",
+              required_observation_kinds: ["calculator_receipt"],
+              required_terminal_kind: "workstation_tool_evaluation",
+            },
+          ],
+        },
+      },
+      current_turn_artifact_ledger: artifacts,
+      step_results: [
+        {
+          step_id: `${turnId}:step:workspace`,
+          result_artifact: {
+            kind: "workspace_action_receipt",
+            artifact_id: receiptRef,
+            receipt_id: receiptRef,
+            text: "Workspace status returned 34 capability records.",
+          },
+        },
+      ],
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      selected_final_answer: "Workspace status returned 34 capability records.",
+      terminal_artifact_kind: "workspace_action_receipt",
+      final_answer_source: "workspace_action_receipt",
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(result.selected_terminal_artifact_kind).not.toBe("workspace_action_receipt");
+    expect(result.rejected_candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "workspace_action_receipt", reason: "receipt_or_projection" }),
+      ]),
+    );
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.final_answer_source).toBe("typed_failure");
+  });
+
   it("fails closed when a required tool observation has no later answer draft", () => {
     const turnId = "ask:test:missing-post-tool-answer";
     const artifacts = [makePostToolObservation(turnId)];

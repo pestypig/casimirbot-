@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  BROAD_LIVE_PROBE_BLOCK_MESSAGE,
   COMPOUND_CAPABILITY_LIVE_SCENARIOS,
   evaluateCompoundCapabilityScenario,
+  resolveCompoundCapabilityLiveRunPolicy,
   selectCompoundCapabilityLiveScenarios,
   type CompoundCapabilityScenario,
 } from "../../scripts/helix-ask-compound-capability-live-probe";
@@ -711,6 +713,48 @@ describe("Helix Ask compound capability live probe", () => {
     expect(filtered.availableIds).toContain("zen_graph_reflection_bridge");
   });
 
+  it("blocks broad keyed live execution unless scenarios are filtered or explicitly allowed", () => {
+    expect(resolveCompoundCapabilityLiveRunPolicy({
+      dryRun: true,
+      scenarioFilter: [],
+      allowAllLiveScenarios: false,
+    })).toEqual({
+      blocked: false,
+      blocked_reason: null,
+      message: null,
+    });
+
+    expect(resolveCompoundCapabilityLiveRunPolicy({
+      dryRun: false,
+      scenarioFilter: [],
+      allowAllLiveScenarios: false,
+    })).toEqual({
+      blocked: true,
+      blocked_reason: "scenario_filter_required_for_live_probe",
+      message: BROAD_LIVE_PROBE_BLOCK_MESSAGE,
+    });
+
+    expect(resolveCompoundCapabilityLiveRunPolicy({
+      dryRun: false,
+      scenarioFilter: ["docs_then_calculator"],
+      allowAllLiveScenarios: false,
+    })).toEqual({
+      blocked: false,
+      blocked_reason: null,
+      message: null,
+    });
+
+    expect(resolveCompoundCapabilityLiveRunPolicy({
+      dryRun: false,
+      scenarioFilter: [],
+      allowAllLiveScenarios: true,
+    })).toEqual({
+      blocked: false,
+      blocked_reason: null,
+      message: null,
+    });
+  });
+
   it("accepts a complete ordered compound ledger with bounded calculator args", () => {
     const { ask, debugExport } = workspaceThenCalculatorDebug();
 
@@ -726,12 +770,27 @@ describe("Helix Ask compound capability live probe", () => {
       "workspace_os.status",
       "scientific-calculator.solve_expression",
     ]);
+    expect(result.selected_capabilities).toEqual([
+      "workspace_os.status",
+      "scientific-calculator.solve_expression",
+    ]);
     expect(result.executed_capabilities).toEqual([
       "workspace_os.status",
       "scientific-calculator.solve_expression",
     ]);
+    expect(result.observation_kinds).toEqual([
+      "workspace_os_status_observation",
+      "calculator_receipt",
+    ]);
+    expect(result.observation_refs).toEqual([
+      "obs:workspace-status",
+      "obs:calculator",
+    ]);
     expect(result.subgoal_satisfactions).toEqual(["satisfied", "satisfied"]);
     expect(result.subgoal_rail_statuses).toEqual(["complete", "complete"]);
+    expect(result.subgoal_first_broken_rails).toEqual([null, null]);
+    expect(result.subgoal_rail_failure_codes).toEqual([null, null]);
+    expect(result.subgoal_repair_targets).toEqual([null, null]);
   });
 
   it("accepts internet search plus theory reflection plus calculator with source binding", () => {
@@ -755,6 +814,12 @@ describe("Helix Ask compound capability live probe", () => {
       "helix_ask.reflect_theory_context",
       "scientific-calculator.solve_expression",
     ]);
+    expect(result.observation_kinds).toEqual([
+      "internet_search_observation",
+      "theory_context_reflection",
+      "calculator_receipt",
+    ]);
+    expect(result.observation_refs).toEqual(["obs:web-search", "obs:reflection", "obs:calculator"]);
   });
 
   it("accepts scholarly research plus theory reflection plus calculator with source binding", () => {
@@ -1175,6 +1240,9 @@ describe("Helix Ask compound capability live probe", () => {
     expect(result.executed_capabilities).toEqual(["docs-viewer.locate_in_doc", null]);
     expect(result.subgoal_satisfactions).toEqual(["satisfied", "failed"]);
     expect(result.subgoal_rail_statuses).toEqual(["complete", "fail_closed"]);
+    expect(result.subgoal_first_broken_rails).toEqual([null, "capability_execution"]);
+    expect(result.subgoal_rail_failure_codes).toEqual([null, "invalid_arg:latex_is_prose"]);
+    expect(result.subgoal_repair_targets).toEqual([null, "tool_execution"]);
   });
 
   it("catches failed subgoals missing first-broken-rail metadata", () => {

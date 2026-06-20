@@ -107,6 +107,9 @@ const classifySourceFamily = (input: {
     return "debug_export";
   }
   if (input.sourceTarget === "runtime_evidence") return "debug_export";
+  if (input.sourceTarget === "scholarly_research") {
+    return "scholarly_research";
+  }
   if (
     input.sourceTarget === "context_reflection" ||
     input.sourceTarget === "context_attachment" ||
@@ -536,6 +539,10 @@ export const buildCapabilityPlan = (input: {
     !requiresRepoConceptEvidence &&
     toolUseRestatement.requiredToolFamilies.includes("internet_search");
   const sourceTargetIntentSource = readString(sourceTargetIntent?.target_source);
+  const sourceTargetIntentFallback =
+    sourceTargetIntentSource && sourceTargetIntentSource !== "unknown"
+      ? sourceTargetIntentSource
+      : "";
   const sourceTargetIntentSuppressesGenericInternet =
     Boolean(sourceTargetIntentSource) &&
     !["unknown", "internet_search", "model_only"].includes(sourceTargetIntentSource ?? "");
@@ -554,10 +561,10 @@ export const buildCapabilityPlan = (input: {
     (hardLiveSourceMailboxRoute ? "live_source_mailbox" : "") ||
     (requestedCapabilityContract?.source_target ?? "") ||
     (requiresDocsViewerEvidence ? "docs_viewer" : "") ||
-    readString(sourceTargetIntent?.target_source) ||
     (internetEvidenceDrivesPlan ? "internet_search" : "") ||
     (requiresCapabilityCatalog ? "runtime_evidence" : "") ||
     (requiresRepoConceptEvidence ? "repo_code" : "") ||
+    sourceTargetIntentFallback ||
     (explicitDocsPathOperation ? "" : routeMetadataSourceTarget(routeMetadata)) ||
     readString(routeProductContract?.source_target) ||
     readString(toolCallAdmissionDecision?.source_target) ||

@@ -91,5 +91,23 @@ describe("Helix Ask legacy API capability catalog", () => {
         "helix.workstation_goal_context_update.v1",
       ]),
     });
+    expect(capabilityByKey("live_env.repair_loop")).toMatchObject({
+      expected_artifacts: expect.arrayContaining([
+        "live_environment_tool_observation",
+        "stage_play_workstation_control_receipt",
+      ]),
+      model_visible_input_schema: expect.objectContaining({
+        properties: expect.objectContaining({
+          loop_ref: expect.any(Object),
+          state: expect.any(Object),
+        }),
+      }),
+    });
+    expect(capabilityByKey("live_env.repair_workstation_source")).toMatchObject({
+      expected_artifacts: expect.arrayContaining([
+        "live_environment_tool_observation",
+        "stage_play_workstation_control_receipt",
+      ]),
+    });
   }, 60_000);
 });

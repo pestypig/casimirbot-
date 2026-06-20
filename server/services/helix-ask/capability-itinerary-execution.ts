@@ -41,7 +41,7 @@ const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
 
 const subgoalFirstBrokenRailFor = (failureCode: string | null, satisfaction: string): string | null => {
   if (satisfaction === "satisfied" || !failureCode) return null;
-  if (failureCode.startsWith("invalid_arg:")) return "capability_execution";
+  if (failureCode.startsWith("invalid_arg:") || failureCode.startsWith("missing_required_arg:")) return "capability_execution";
   if (failureCode === "input_binding_missing") return "evidence_reentry";
   if (failureCode === "subgoal_observation_missing") return "observation_artifact";
   return "capability_execution";
@@ -50,6 +50,7 @@ const subgoalFirstBrokenRailFor = (failureCode: string | null, satisfaction: str
 const subgoalRepairTargetFor = (failureCode: string | null, satisfaction: string): string | null => {
   if (satisfaction === "satisfied" || !failureCode) return null;
   if (failureCode.startsWith("invalid_arg:")) return "tool_execution";
+  if (failureCode.startsWith("missing_required_arg:")) return "subgoal_argument_extraction";
   if (failureCode === "input_binding_missing") return "reentry_gate";
   if (failureCode === "subgoal_observation_missing") return "observation_materializer";
   return "tool_execution";
@@ -315,6 +316,77 @@ const artifactArgs = (artifact: HelixCapabilityItineraryArtifactLike): Record<st
   return readRecord(payload?.args);
 };
 
+const argValuePresent = (value: unknown): boolean => {
+  if (typeof value === "string") return value.trim().length > 0;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value === "boolean") return value;
+  if (Array.isArray(value)) return value.length > 0;
+  if (value && typeof value === "object") return Object.keys(value).length > 0;
+  return false;
+};
+
+const argsHaveAny = (args: Record<string, unknown> | null, names: string[]): boolean =>
+  Boolean(args && names.some((name) => argValuePresent(args[name])));
+
+const requiredArgAliasesForCapability = (
+  capability: string,
+  runtimeCapability: string,
+  requiredArg: string,
+): string[] => {
+  const keys = [requiredArg];
+  if (requiredArg === "latex" && (
+    capability === "scientific-calculator.solve_expression" ||
+    runtimeCapability === "scientific-calculator.solve_expression"
+  )) {
+    keys.push("expression", "equation");
+  }
+  if (requiredArg === "query") {
+    if (
+      capability === "repo-code.search_concept" ||
+      runtimeCapability === "repo-code.search_concept"
+    ) keys.push("concept");
+    if (
+      capability === "workspace-directory.resolve" ||
+      runtimeCapability === "workspace-directory.resolve"
+    ) keys.push("uri", "path", "target");
+    if (
+      capability === "internet_search.web_research" ||
+      runtimeCapability === "internet_search.web_research" ||
+      runtimeCapability === "internet-search.search_web"
+    ) keys.push("question", "prompt", "topic", "search_query");
+    if (
+      capability === "scholarly-research.lookup_papers" ||
+      runtimeCapability === "scholarly-research.lookup_papers"
+    ) keys.push("doi", "arxiv_id", "arxivId", "title", "journal", "reference", "citation");
+  }
+  if (requiredArg === "paper_result_or_source" && (
+    capability === "scholarly-research.fetch_full_text" ||
+    runtimeCapability === "scholarly-research.fetch_full_text"
+  )) {
+    keys.push("paper_result_id", "paper_id", "result_id", "doi", "arxiv_id", "arxivId", "source_url", "pdf_url", "full_text_url", "url");
+  }
+  if (requiredArg === "text" && (
+    capability === "workstation-notes.append_to_note" ||
+    runtimeCapability === "workstation-notes.append_to_note"
+  )) {
+    keys.push("body", "content");
+  }
+  return uniqueStrings(keys);
+};
+
+const missingRequiredArgsForSubgoal = (input: {
+  capability: string;
+  runtimeCapability: string;
+  requiredArgs: string[];
+  args: Record<string, unknown> | null;
+}): string[] =>
+  input.requiredArgs.filter((requiredArg) =>
+    !argsHaveAny(
+      input.args,
+      requiredArgAliasesForCapability(input.capability, input.runtimeCapability, requiredArg),
+    )
+  );
+
 const artifactSupportRefs = (artifact: HelixCapabilityItineraryArtifactLike | null): string[] => {
   if (!artifact) return [];
   const payload = artifactPayload(artifact);
@@ -551,7 +623,20 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       artifactKind(artifact) === "runtime_tool_call_validation" &&
       artifactMatchesCapability(artifact, requestedCapability, runtimeCapability, substitutions)
     );
+    const selectedArgs = runtimeCalls.length > 0
+      ? artifactArgs(runtimeCalls[0] as HelixCapabilityItineraryArtifactLike)
+      : argsHint ?? {};
+    const missingRequiredArgs = missingRequiredArgsForSubgoal({
+      capability: requestedCapability,
+      runtimeCapability,
+      requiredArgs,
+      args: selectedArgs,
+    });
     const validationErrors = validations.flatMap(artifactValidationErrors);
+    const railErrors = uniqueStrings([
+      ...validationErrors,
+      ...missingRequiredArgs.map((arg) => `missing_required_arg:${arg}`),
+    ]);
     const observationArtifact = artifacts.find((artifact: HelixCapabilityItineraryArtifactLike) =>
       artifactSupportsSubgoalObservation(
         artifact,
@@ -568,32 +653,34 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
     ) ?? (observationArtifact && artifactProvesCompletedCapability(observationArtifact, requestedCapability, runtimeCapability, substitutions)
       ? observationArtifact
       : null);
-    const executed = Boolean(executedArtifact);
+    const missingRequiredArgsBlockExecution = missingRequiredArgs.length > 0;
+    const countedObservationArtifact = missingRequiredArgsBlockExecution ? null : observationArtifact;
+    const executed = Boolean(executedArtifact) && !missingRequiredArgsBlockExecution;
     const selectedCapability = runtimeCalls.length > 0
       ? artifactCapability(runtimeCalls[0] as HelixCapabilityItineraryArtifactLike)
       : executedArtifact
         ? artifactCapability(executedArtifact as HelixCapabilityItineraryArtifactLike) ?? runtimeCapability
         : null;
     const executedCapability = executed ? artifactCapability(executedArtifact as HelixCapabilityItineraryArtifactLike) ?? runtimeCapability : null;
-    const satisfaction = executed && observationArtifact
+    const satisfaction = executed && countedObservationArtifact
       ? "satisfied"
-      : validationErrors.length > 0
+      : railErrors.length > 0
         ? "failed"
         : "pending";
-    const railFailureCode = validationErrors[0] ?? (satisfaction === "pending" ? "subgoal_observation_missing" : null);
-    const supportRefs = artifactSupportRefs(observationArtifact);
+    const railFailureCode = railErrors[0] ?? (satisfaction === "pending" ? "subgoal_observation_missing" : null);
+    const supportRefs = artifactSupportRefs(countedObservationArtifact);
     return {
       subgoal_id: subgoalId,
       order: Number(subgoal.order) || 0,
       requested_capability: requestedCapability,
       selected_capability: selectedCapability,
       executed_capability: executedCapability,
-      args: runtimeCalls.length > 0 ? artifactArgs(runtimeCalls[0] as HelixCapabilityItineraryArtifactLike) : argsHint ?? {},
+      args: selectedArgs,
       required_args: requiredArgs,
       optional_args: optionalArgs,
       input_bindings: readArray(subgoal.input_bindings),
-      observation_kind: observationArtifact ? artifactKind(observationArtifact) : null,
-      observation_ref: observationArtifact ? artifactId(observationArtifact) : null,
+      observation_kind: countedObservationArtifact ? artifactKind(countedObservationArtifact) : null,
+      observation_ref: countedObservationArtifact ? artifactId(countedObservationArtifact) : null,
       support_refs: supportRefs,
       satisfaction,
       rail_status: satisfaction === "satisfied" ? "complete" : satisfaction === "failed" ? "fail_closed" : "pending",

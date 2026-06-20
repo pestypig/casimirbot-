@@ -3579,6 +3579,7 @@ export const DOC_FILE_METADATA: Record<string, DocFileMetadata> = {
   "docs/theory-claim-boundaries.md": {"mtimeMs":1780047761723,"mtimeIso":"2026-05-29T09:42:41.723Z","sizeBytes":4906},
   "docs/theory-compound-run-implementation-plan.md": {"mtimeMs":1780047761723,"mtimeIso":"2026-05-29T09:42:41.723Z","sizeBytes":9597},
   "docs/theory-compound-run-workbench.md": {"mtimeMs":1780047761721,"mtimeIso":"2026-05-29T09:42:41.721Z","sizeBytes":6302},
+  "docs/theory-frontier-vector-field-tool.md": {"mtimeMs":1781977017067,"mtimeIso":"2026-06-20T17:36:57.067Z","sizeBytes":12122},
   "docs/theory-long-runtime-execution-safety.md": {"mtimeMs":1780047238639,"mtimeIso":"2026-05-29T09:33:58.639Z","sizeBytes":2093},
   "docs/theory-physics-inventory-audit.md": {"mtimeMs":1780778124958,"mtimeIso":"2026-06-06T20:35:24.958Z","sizeBytes":3671},
   "docs/theory-runtime-adapter-gap-report.md": {"mtimeMs":1780125189011,"mtimeIso":"2026-05-30T07:13:09.011Z","sizeBytes":4385},

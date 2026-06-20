@@ -39,11 +39,29 @@ const promptFor = (contract: ExplicitContract): string => {
   if (contract.capability === "image_lens.inspect") {
     return "Call image_lens.inspect to inspect the current visual frame.";
   }
+  if (contract.capability === "workstation-notes.append_to_note") {
+    return "Call workstation-notes.append_to_note with text: record this Helix Ask parity note.";
+  }
   return `Call ${contract.capability}.`;
 };
 
 const promptForPair = (first: ExplicitContract, second: ExplicitContract): string =>
   `${promptFor(first)} Then ${promptFor(second).replace(/^Call\b/, "call")}`;
+
+const promptForChain = (contracts: ExplicitContract[]): string =>
+  contracts
+    .map((contract, index) =>
+      index === 0
+        ? promptFor(contract)
+        : `Then ${promptFor(contract).replace(/^Call\b/, "call")}`
+    )
+    .join(" ");
+
+const contractByCapability = (capability: string): ExplicitContract => {
+  const contract = explicitCapabilityContractsForTests.find((entry) => entry.capability === capability);
+  if (!contract) throw new Error(`missing_explicit_capability_contract:${capability}`);
+  return contract;
+};
 
 const representativesByCapabilityFamily = (): ExplicitContract[] => {
   const byFamily = new Map<string, ExplicitContract>();
@@ -258,6 +276,93 @@ const assertPairContract = (first: ExplicitContract, second: ExplicitContract): 
   }
 };
 
+const assertCompletedNamedScenario = (
+  scenarioName: string,
+  capabilities: string[],
+  expectedSynthesisKind?: "doc_evidence_synthesis_answer" | "model_synthesized_answer",
+): void => {
+  const contracts = capabilities.map(contractByCapability);
+  const turnId = `ask:named-compound:${scenarioName}`.replace(/[^A-Za-z0-9:_-]+/g, "_");
+  const itinerary = buildHelixCapabilityItinerary({
+    turnId,
+    promptText: promptForChain(contracts),
+    toolCallAdmissionDecision: admissionFor(turnId, contracts),
+    availableCapabilities: availableCapabilities(contracts),
+  });
+  const subgoals = (itinerary.compound_capability_contract?.subgoals ?? []) as Array<Record<string, unknown>>;
+
+  expect(itinerary.prompt_shape, scenarioName).toBe("compound_tool");
+  expect(subgoals.map((subgoal) => subgoal.requested_capability), scenarioName).toEqual(capabilities);
+  expect(subgoals.map((subgoal) => subgoal.runtime_capability), scenarioName).toEqual(
+    contracts.map(runtimeCapabilityFor),
+  );
+  expect(itinerary.terminal_success_criteria.required_capabilities, scenarioName).toEqual(capabilities);
+  expect(itinerary.terminal_success_criteria.forbidden_terminal_artifact_kinds, scenarioName)
+    .toEqual(expect.arrayContaining(["tool_receipt"]));
+
+  const artifacts = completedArtifactsForItinerary(turnId, itinerary);
+  const state = buildHelixCapabilityItineraryExecutionState({
+    capabilityItinerary: itinerary,
+    artifacts,
+  });
+  const readiness = resolveCompoundCapabilitySynthesisReadiness({
+    payload: {
+      capability_itinerary: {
+        ...itinerary,
+        execution_state: state,
+      },
+      capability_itinerary_execution_state: state,
+    },
+    artifacts,
+  });
+
+  expect(state.complete, scenarioName).toBe(true);
+  expect(state.missing_required_capabilities, scenarioName).toEqual([]);
+  expect(state.compound_subgoal_ledger.map((entry) => entry.requested_capability), scenarioName).toEqual(capabilities);
+  expect(state.compound_subgoal_ledger.map((entry) => entry.satisfaction), scenarioName)
+    .toEqual(capabilities.map(() => "satisfied"));
+  expect(state.compound_subgoal_ledger.map((entry) => entry.rail_status), scenarioName)
+    .toEqual(capabilities.map(() => "complete"));
+  expect(readiness.complete, scenarioName).toBe(true);
+  expect(readiness.synthesis_required, scenarioName).toBe(true);
+  expect(readiness.support_refs.length, scenarioName).toBeGreaterThanOrEqual(capabilities.length);
+  if (expectedSynthesisKind) {
+    expect(readiness.synthesis_terminal_kind, scenarioName).toBe(expectedSynthesisKind);
+  }
+};
+
+const assertCompletedSingleCapabilityRail = (contract: ExplicitContract): void => {
+  const turnId = `ask:single-family:${contract.capability_family}:${contract.capability}`
+    .replace(/[^A-Za-z0-9:_-]+/g, "_");
+  const itinerary = buildHelixCapabilityItinerary({
+    turnId,
+    promptText: promptFor(contract),
+    toolCallAdmissionDecision: admissionFor(turnId, [contract]),
+    availableCapabilities: availableCapabilities([contract]),
+  });
+  const artifacts = completedArtifactsForItinerary(turnId, itinerary);
+  const state = buildHelixCapabilityItineraryExecutionState({
+    capabilityItinerary: itinerary,
+    artifacts,
+  });
+  const ledgerEntry = state.compound_subgoal_ledger.find((entry) =>
+    entry.requested_capability === contract.capability
+  );
+
+  expect(itinerary.prompt_shape, contract.capability).toBe("single_tool");
+  expect(state.complete, contract.capability).toBe(true);
+  expect(state.missing_required_capabilities, contract.capability).toEqual([]);
+  expect(ledgerEntry, contract.capability).toMatchObject({
+    requested_capability: contract.capability,
+    selected_capability: runtimeCapabilityFor(contract),
+    executed_capability: runtimeCapabilityFor(contract),
+    satisfaction: "satisfied",
+    rail_status: "complete",
+  });
+  expect(ledgerEntry?.observation_kind, contract.capability).toBeTruthy();
+  expect(ledgerEntry?.observation_ref, contract.capability).toBeTruthy();
+};
+
 describe("Helix Ask compound capability family matrix", () => {
   it("inventories the current explicit capability surface by family", () => {
     const families = Array.from(new Set(explicitCapabilityContractsForTests.map((contract) => contract.capability_family)));
@@ -333,12 +438,33 @@ describe("Helix Ask compound capability family matrix", () => {
     )?.required_args).toEqual(["paper_result_or_source"]);
   });
 
+  it("keeps every explicit capability contract structurally complete for the rail contract", () => {
+    for (const contract of explicitCapabilityContractsForTests) {
+      expect(contract.schema, contract.capability).toBe("helix.explicit_capability_contract.v1");
+      expect(contract.capability, contract.capability).toBeTruthy();
+      expect(contract.capability_family, contract.capability).toBeTruthy();
+      expect(contract.plan_family, contract.capability).toBeTruthy();
+      expect(contract.source_target, contract.capability).toBeTruthy();
+      expect(contract.admission_families.length, contract.capability).toBeGreaterThan(0);
+      expect(contract.required_observation_kinds.length, contract.capability).toBeGreaterThan(0);
+      expect(contract.required_terminal_kind, contract.capability).toBeTruthy();
+      expect(Array.isArray(contract.allowed_substitutions), contract.capability).toBe(true);
+      expect(Array.isArray(contract.forbidden_nearby_capabilities), contract.capability).toBe(true);
+    }
+  });
+
   it("keeps every explicit capability on its family-specific terminal product contract", () => {
     for (const contract of explicitCapabilityContractsForTests) {
       expect(
         expectedTerminalKindsByFamily[contract.capability_family],
         contract.capability_family,
       ).toContain(contract.required_terminal_kind);
+    }
+  });
+
+  it("proves a representative single-capability rail for every explicit tool family", () => {
+    for (const contract of representativesByCapabilityFamily()) {
+      assertCompletedSingleCapabilityRail(contract);
     }
   });
 
@@ -535,6 +661,280 @@ describe("Helix Ask compound capability family matrix", () => {
     }
   });
 
+  it("passes the named compound parity acceptance scenarios", () => {
+    assertCompletedNamedScenario("docs_then_calculator", [
+      "docs-viewer.locate_in_doc",
+      "scientific-calculator.solve_expression",
+    ], "doc_evidence_synthesis_answer");
+    assertCompletedNamedScenario("catalog_then_workspace_status", [
+      "helix_ask.inspect_capability_catalog",
+      "workspace_os.status",
+    ], "model_synthesized_answer");
+    assertCompletedNamedScenario("repo_then_docs", [
+      "repo-code.search_concept",
+      "docs-viewer.locate_in_doc",
+    ], "doc_evidence_synthesis_answer");
+    assertCompletedNamedScenario("internet_reflection_then_calculator", [
+      "internet_search.web_research",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ], "model_synthesized_answer");
+    assertCompletedNamedScenario("visual_then_calculator", [
+      "image_lens.inspect",
+      "scientific-calculator.solve_expression",
+    ], "model_synthesized_answer");
+    assertCompletedNamedScenario("civilization_frame_then_bounds_reflection", [
+      "helix_ask.build_civilization_scenario_frame",
+      "helix_ask.reflect_civilization_bounds",
+    ], "model_synthesized_answer");
+  });
+
+  it("binds later reflection subgoals to earlier evidence observations", () => {
+    const scenarios = [
+      {
+        name: "internet_to_theory_reflection",
+        capabilities: [
+          "internet_search.web_research",
+          "helix_ask.reflect_theory_context",
+          "scientific-calculator.solve_expression",
+        ],
+        consumer: "helix_ask.reflect_theory_context",
+        source: "internet_search.web_research",
+      },
+      {
+        name: "scholarly_to_theory_reflection",
+        capabilities: [
+          "scholarly-research.lookup_papers",
+          "helix_ask.reflect_theory_context",
+        ],
+        consumer: "helix_ask.reflect_theory_context",
+        source: "scholarly-research.lookup_papers",
+      },
+      {
+        name: "docs_to_theory_reflection",
+        capabilities: [
+          "docs-viewer.locate_in_doc",
+          "helix_ask.reflect_theory_context",
+        ],
+        consumer: "helix_ask.reflect_theory_context",
+        source: "docs-viewer.locate_in_doc",
+      },
+      {
+        name: "repo_to_theory_reflection",
+        capabilities: [
+          "repo-code.search_concept",
+          "helix_ask.reflect_theory_context",
+        ],
+        consumer: "helix_ask.reflect_theory_context",
+        source: "repo-code.search_concept",
+      },
+      {
+        name: "repo_to_zen_reflection",
+        capabilities: [
+          "repo-code.search_concept",
+          "helix_ask.reflect_ideology_context",
+        ],
+        consumer: "helix_ask.reflect_ideology_context",
+        source: "repo-code.search_concept",
+      },
+      {
+        name: "civilization_frame_to_bounds_reflection",
+        capabilities: [
+          "helix_ask.build_civilization_scenario_frame",
+          "helix_ask.reflect_civilization_bounds",
+        ],
+        consumer: "helix_ask.reflect_civilization_bounds",
+        source: "helix_ask.build_civilization_scenario_frame",
+      },
+    ];
+
+    for (const scenario of scenarios) {
+      const contracts = scenario.capabilities.map(contractByCapability);
+      const turnId = `ask:named-binding:${scenario.name}`.replace(/[^A-Za-z0-9:_-]+/g, "_");
+      const compound = buildHelixCompoundCapabilityContract({
+        turnId,
+        promptText: promptForChain(contracts),
+      });
+      const subgoals = (compound?.subgoals ?? []) as Array<Record<string, unknown>>;
+      const sourceSubgoal = subgoals.find((subgoal) => subgoal.requested_capability === scenario.source);
+      const consumerSubgoal = subgoals.find((subgoal) => subgoal.requested_capability === scenario.consumer);
+      const inputBindings = Array.isArray(consumerSubgoal?.input_bindings)
+        ? consumerSubgoal.input_bindings as Array<Record<string, unknown>>
+        : [];
+
+      expect(sourceSubgoal, scenario.name).toBeTruthy();
+      expect(consumerSubgoal, scenario.name).toBeTruthy();
+      expect(inputBindings, scenario.name).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          from_subgoal_id: sourceSubgoal?.subgoal_id,
+          from_capability: scenario.source,
+          required: true,
+          status: "pending",
+        }),
+      ]));
+    }
+  });
+
+  it("binds multiple prior evidence observations into reflection source refs", () => {
+    const contracts = [
+      "repo-code.search_concept",
+      "docs-viewer.locate_in_doc",
+      "helix_ask.reflect_theory_context",
+    ].map(contractByCapability);
+    const turnId = "ask:named-binding:repo-docs-to-theory-reflection";
+    const compound = buildHelixCompoundCapabilityContract({
+      turnId,
+      promptText: promptForChain(contracts),
+    });
+    const subgoals = (compound?.subgoals ?? []) as Array<Record<string, unknown>>;
+    const sourceSubgoals = subgoals.filter((subgoal) =>
+      subgoal.requested_capability === "repo-code.search_concept" ||
+      subgoal.requested_capability === "docs-viewer.locate_in_doc"
+    );
+    const reflectionSubgoal = subgoals.find((subgoal) =>
+      subgoal.requested_capability === "helix_ask.reflect_theory_context"
+    );
+    const inputBindings = Array.isArray(reflectionSubgoal?.input_bindings)
+      ? reflectionSubgoal.input_bindings as Array<Record<string, unknown>>
+      : [];
+
+    expect(sourceSubgoals).toHaveLength(2);
+    expect(reflectionSubgoal).toBeTruthy();
+    expect(inputBindings).toHaveLength(2);
+    expect(inputBindings).toEqual(expect.arrayContaining(
+      sourceSubgoals.map((sourceSubgoal) =>
+        expect.objectContaining({
+          arg_name: "source_refs",
+          binding_kind: "source_ref",
+          from_subgoal_id: sourceSubgoal.subgoal_id,
+          from_capability: sourceSubgoal.requested_capability,
+          required: true,
+          status: "pending",
+        })
+      ),
+    ));
+  });
+
+  it("binds prior evidence observations into later calculator support refs", () => {
+    const scenarios = [
+      {
+        name: "docs_to_calculator",
+        capabilities: [
+          "docs-viewer.locate_in_doc",
+          "scientific-calculator.solve_expression",
+        ],
+        source: "docs-viewer.locate_in_doc",
+      },
+      {
+        name: "internet_to_calculator",
+        capabilities: [
+          "internet_search.web_research",
+          "scientific-calculator.solve_expression",
+        ],
+        source: "internet_search.web_research",
+      },
+      {
+        name: "visual_to_calculator",
+        capabilities: [
+          "image_lens.inspect",
+          "scientific-calculator.solve_expression",
+        ],
+        source: "image_lens.inspect",
+      },
+    ];
+
+    for (const scenario of scenarios) {
+      const contracts = scenario.capabilities.map(contractByCapability);
+      const turnId = `ask:named-calculator-binding:${scenario.name}`.replace(/[^A-Za-z0-9:_-]+/g, "_");
+      const compound = buildHelixCompoundCapabilityContract({
+        turnId,
+        promptText: promptForChain(contracts),
+      });
+      const subgoals = (compound?.subgoals ?? []) as Array<Record<string, unknown>>;
+      const sourceSubgoal = subgoals.find((subgoal) => subgoal.requested_capability === scenario.source);
+      const calculatorSubgoal = subgoals.find((subgoal) =>
+        subgoal.requested_capability === "scientific-calculator.solve_expression"
+      );
+      const inputBindings = Array.isArray(calculatorSubgoal?.input_bindings)
+        ? calculatorSubgoal.input_bindings as Array<Record<string, unknown>>
+        : [];
+
+      expect(sourceSubgoal, scenario.name).toBeTruthy();
+      expect(calculatorSubgoal, scenario.name).toBeTruthy();
+      expect(inputBindings, scenario.name).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          arg_name: "support_refs",
+          binding_kind: "support_ref",
+          from_subgoal_id: sourceSubgoal?.subgoal_id,
+          from_capability: scenario.source,
+          required: true,
+          status: "pending",
+        }),
+      ]));
+    }
+  });
+
+  it("fails a later calculator subgoal when its required evidence binding is unresolved", () => {
+    const docs = contractByCapability("docs-viewer.locate_in_doc");
+    const calculator = contractByCapability("scientific-calculator.solve_expression");
+    const turnId = "ask:compound-family:calculator-unresolved-evidence-binding";
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId,
+      promptText: promptForPair(docs, calculator),
+      toolCallAdmissionDecision: admissionFor(turnId, [docs, calculator]),
+      availableCapabilities: availableCapabilities([docs, calculator]),
+    });
+    const calculatorSubgoal = ((itinerary.compound_capability_contract?.subgoals ?? []) as Array<Record<string, unknown>>)
+      .find((subgoal) => subgoal.requested_capability === calculator.capability);
+    const state = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [
+        {
+          artifact_id: `${turnId}:calculator:runtime_tool_call`,
+          kind: "runtime_tool_call",
+          payload: {
+            capability_key: runtimeCapabilityFor(calculator),
+            compound_subgoal_id: calculatorSubgoal?.subgoal_id,
+            args: calculatorSubgoal?.args_hint ?? {},
+          },
+        },
+        {
+          artifact_id: `${turnId}:calculator:runtime_tool_observation`,
+          kind: "runtime_tool_observation",
+          payload: {
+            capability_key: runtimeCapabilityFor(calculator),
+            compound_subgoal_id: calculatorSubgoal?.subgoal_id,
+            status: "completed",
+          },
+        },
+        {
+          artifact_id: `${turnId}:calculator:receipt`,
+          kind: "calculator_receipt",
+          payload: {
+            schema: "helix.calculator_receipt.v1",
+            capability_key: runtimeCapabilityFor(calculator),
+            compound_subgoal_id: calculatorSubgoal?.subgoal_id,
+            status: "completed",
+            calculator_setup: calculatorSubgoal?.args_hint ?? {},
+          },
+        },
+      ],
+    });
+    const calculatorEntry = state.compound_subgoal_ledger.find((entry) =>
+      entry.requested_capability === calculator.capability
+    );
+
+    expect(state.complete).toBe(false);
+    expect(calculatorEntry).toMatchObject({
+      requested_capability: "scientific-calculator.solve_expression",
+      rail_status: "fail_closed",
+      rail_failure_code: "input_binding_missing",
+      first_broken_rail: "evidence_reentry",
+      repair_target: "reentry_gate",
+    });
+    expect(state.missing_required_capabilities).toContain("scientific-calculator.solve_expression");
+  });
+
   it("fails representative-family invalid runtime arguments closed at the subgoal rail", () => {
     const calculator = explicitCapabilityContractsForTests.find((contract) =>
       contract.capability === "scientific-calculator.solve_expression"
@@ -592,6 +992,73 @@ describe("Helix Ask compound capability family matrix", () => {
       expect(state.missing_required_capabilities, contract.capability_family)
         .toContain(contract.capability);
     }
+  });
+
+  it("does not count runtime observations when a required subgoal arg is missing", () => {
+    const calculator = explicitCapabilityContractsForTests.find((contract) =>
+      contract.capability === "scientific-calculator.solve_expression"
+    ) as ExplicitContract;
+    const turnId = "ask:compound-family:calculator-missing-required-arg";
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId,
+      promptText: "Call scientific-calculator.solve_expression.",
+      toolCallAdmissionDecision: admissionFor(turnId, [calculator]),
+      availableCapabilities: availableCapabilities([calculator]),
+    });
+    const calculatorSubgoal = ((itinerary.compound_capability_contract?.subgoals ?? []) as Array<Record<string, unknown>>)
+      .find((subgoal) => subgoal.requested_capability === calculator.capability);
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:calculator:runtime_tool_call`,
+        kind: "runtime_tool_call",
+        payload: {
+          capability_key: runtimeCapabilityFor(calculator),
+          compound_subgoal_id: calculatorSubgoal?.subgoal_id,
+          args: {},
+        },
+      },
+      {
+        artifact_id: `${turnId}:calculator:runtime_tool_observation`,
+        kind: "runtime_tool_observation",
+        payload: {
+          capability_key: runtimeCapabilityFor(calculator),
+          compound_subgoal_id: calculatorSubgoal?.subgoal_id,
+          status: "completed",
+        },
+      },
+      {
+        artifact_id: `${turnId}:calculator:declared_observation`,
+        kind: "calculator_receipt",
+        payload: {
+          schema: "helix.calculator_receipt.v1",
+          capability_key: runtimeCapabilityFor(calculator),
+          compound_subgoal_id: calculatorSubgoal?.subgoal_id,
+          status: "completed",
+        },
+      },
+    ];
+    const state = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts,
+    });
+    const failedEntry = state.compound_subgoal_ledger.find((entry) =>
+      entry.requested_capability === calculator.capability
+    );
+
+    expect(state.complete).toBe(false);
+    expect(failedEntry).toMatchObject({
+      requested_capability: "scientific-calculator.solve_expression",
+      selected_capability: "scientific-calculator.solve_expression",
+      executed_capability: null,
+      observation_kind: null,
+      observation_ref: null,
+      satisfaction: "failed",
+      rail_status: "fail_closed",
+      rail_failure_code: "missing_required_arg:latex",
+      first_broken_rail: "capability_execution",
+      repair_target: "subgoal_argument_extraction",
+    });
+    expect(state.missing_required_capabilities).toContain("scientific-calculator.solve_expression");
   });
 
   it("fails internet-search compounds closed on provider config without consuming loop budget", () => {

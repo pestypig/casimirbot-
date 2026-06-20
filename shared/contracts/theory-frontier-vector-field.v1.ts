@@ -101,6 +101,28 @@ export type TheoryFrontierVectorDeltaV1 = {
   firstPrinciplesDepthDelta: number;
 };
 
+export type TheoryFrontierFitClassV1 =
+  | "strong_local_fit"
+  | "moderate_local_fit"
+  | "weak_cross_domain_fit"
+  | "off_manifold"
+  | "missing_region_suspected";
+
+export type TheoryFrontierPlacementDiagnosticV1 = {
+  fitClass: TheoryFrontierFitClassV1;
+  fitScore: number;
+  localCongruenceScore: number;
+  evidenceReadinessScore: number;
+  uncertaintyPressureScore: number;
+  positiveSignals: string[];
+  blockingSignals: string[];
+  missingStructureHints: string[];
+  interpretation:
+    | "candidate_region_has_local_support"
+    | "candidate_region_is_cross_domain"
+    | "candidate_region_probably_missing_graph_structure";
+};
+
 export type TheoryBadgeRelationTensorV1 = {
   tensorId: string;
   fromBadgeId: string;
@@ -162,6 +184,23 @@ export type TheoryFrontierVectorCandidateTraceV1 = {
   uncertaintyReductionPotential: number;
   expectedEvidenceClosureCost: number;
   verifiedFrontierYieldPerBudget: number;
+  placementDiagnostic: TheoryFrontierPlacementDiagnosticV1;
+};
+
+export type TheoryFrontierTraceDiagnosticsV1 = {
+  overallFitClass: TheoryFrontierFitClassV1;
+  strongestCandidateId: string | null;
+  weakestCandidateId: string | null;
+  candidateFitHistogram: Record<TheoryFrontierFitClassV1, number>;
+  averageFitScore: number;
+  averageLocalCongruenceScore: number;
+  strongestSignals: string[];
+  weakestSignals: string[];
+  missingStructureHints: string[];
+  interpretation:
+    | "frontier_region_has_local_support"
+    | "frontier_region_is_cross_domain"
+    | "frontier_region_probably_missing_graph_structure";
 };
 
 export type TheoryFrontierVectorFieldTraceV1 = {
@@ -179,6 +218,7 @@ export type TheoryFrontierVectorFieldTraceV1 = {
   vectors: TheoryBadgeCoordinateVectorV1[];
   relationTensors: TheoryBadgeRelationTensorV1[];
   candidateTraces: TheoryFrontierVectorCandidateTraceV1[];
+  traceDiagnostics: TheoryFrontierTraceDiagnosticsV1;
   replay: {
     graphHash: string;
     query: string;
@@ -249,6 +289,44 @@ function validateVectorDelta(prefix: string, value: unknown, issues: string[]): 
     ] as const
   ) {
     if (!isFiniteNumber(value[field])) issues.push(`${prefix}.${field} must be a finite number`);
+  }
+}
+
+const FIT_CLASSES: TheoryFrontierFitClassV1[] = [
+  "strong_local_fit",
+  "moderate_local_fit",
+  "weak_cross_domain_fit",
+  "off_manifold",
+  "missing_region_suspected",
+];
+
+function validatePlacementDiagnostic(prefix: string, value: unknown, issues: string[]): void {
+  if (!isRecord(value)) {
+    issues.push(`${prefix} must be an object`);
+    return;
+  }
+  if (!FIT_CLASSES.includes(value.fitClass as TheoryFrontierFitClassV1)) {
+    issues.push(`${prefix}.fitClass must be a known frontier fit class`);
+  }
+  for (
+    const field of [
+      "fitScore",
+      "localCongruenceScore",
+      "evidenceReadinessScore",
+      "uncertaintyPressureScore",
+    ] as const
+  ) {
+    validateUnitInterval(`${prefix}.${field}`, value[field], issues);
+  }
+  for (const field of ["positiveSignals", "blockingSignals", "missingStructureHints"] as const) {
+    if (!isStringArray(value[field])) issues.push(`${prefix}.${field} must be an array of strings`);
+  }
+  if (
+    value.interpretation !== "candidate_region_has_local_support" &&
+    value.interpretation !== "candidate_region_is_cross_domain" &&
+    value.interpretation !== "candidate_region_probably_missing_graph_structure"
+  ) {
+    issues.push(`${prefix}.interpretation is invalid`);
   }
 }
 
@@ -381,6 +459,55 @@ export function validateTheoryFrontierVectorFieldTraceV1(value: unknown): string
       if (!isFiniteNumber(trace.verifiedFrontierYieldPerBudget)) {
         issues.push(`${prefix}.verifiedFrontierYieldPerBudget must be a finite number`);
       }
+      validatePlacementDiagnostic(`${prefix}.placementDiagnostic`, trace.placementDiagnostic, issues);
+    }
+  }
+
+  if (!isRecord(value.traceDiagnostics)) {
+    issues.push("traceDiagnostics must be an object");
+  } else {
+    if (!FIT_CLASSES.includes(value.traceDiagnostics.overallFitClass as TheoryFrontierFitClassV1)) {
+      issues.push("traceDiagnostics.overallFitClass must be a known frontier fit class");
+    }
+    if (
+      value.traceDiagnostics.strongestCandidateId !== null &&
+      !isNonEmptyString(value.traceDiagnostics.strongestCandidateId)
+    ) {
+      issues.push("traceDiagnostics.strongestCandidateId must be a non-empty string or null");
+    }
+    if (
+      value.traceDiagnostics.weakestCandidateId !== null &&
+      !isNonEmptyString(value.traceDiagnostics.weakestCandidateId)
+    ) {
+      issues.push("traceDiagnostics.weakestCandidateId must be a non-empty string or null");
+    }
+    if (!isRecord(value.traceDiagnostics.candidateFitHistogram)) {
+      issues.push("traceDiagnostics.candidateFitHistogram must be an object");
+    } else {
+      for (const fitClass of FIT_CLASSES) {
+        const count = value.traceDiagnostics.candidateFitHistogram[fitClass];
+        if (!Number.isInteger(count) || (count as number) < 0) {
+          issues.push(`traceDiagnostics.candidateFitHistogram.${fitClass} must be a non-negative integer`);
+        }
+      }
+    }
+    validateUnitInterval("traceDiagnostics.averageFitScore", value.traceDiagnostics.averageFitScore, issues);
+    validateUnitInterval(
+      "traceDiagnostics.averageLocalCongruenceScore",
+      value.traceDiagnostics.averageLocalCongruenceScore,
+      issues,
+    );
+    for (const field of ["strongestSignals", "weakestSignals", "missingStructureHints"] as const) {
+      if (!isStringArray(value.traceDiagnostics[field])) {
+        issues.push(`traceDiagnostics.${field} must be an array of strings`);
+      }
+    }
+    if (
+      value.traceDiagnostics.interpretation !== "frontier_region_has_local_support" &&
+      value.traceDiagnostics.interpretation !== "frontier_region_is_cross_domain" &&
+      value.traceDiagnostics.interpretation !== "frontier_region_probably_missing_graph_structure"
+    ) {
+      issues.push("traceDiagnostics.interpretation is invalid");
     }
   }
 

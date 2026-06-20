@@ -46,6 +46,7 @@ import { resolvePhysicsAtlasLens } from "@shared/theory/physics-atlas-lens";
 import { buildHelixPhysicsAtlasV1 } from "@shared/theory/physics-atlas-blocks";
 import { buildTheoryCalculatorLoadout } from "@shared/theory/theory-calculator-loadout";
 import { buildTheoryCompoundRun } from "@shared/theory/theory-compound-run-builder";
+import { traceTheoryFrontierVectorField } from "@shared/theory/theory-frontier-vector-field";
 import {
   resolveTheoryRouteEligibility,
   type TheoryRouteBadgeEligibilityV1,
@@ -1161,6 +1162,27 @@ export default function TheoryBadgeGraphPanel() {
     () => (graph?.badges ?? []).find((badge: TheoryBadgeV1) => badge.id === selectedId) ?? null,
     [graph?.badges, selectedId],
   );
+
+  const seedAtlasFrontierTrace = useMemo(() => {
+    if (!graph) return null;
+    const originBadgeIds = selectedBadgeIds.length > 0 ? selectedBadgeIds : selectedId ? [selectedId] : [];
+    const atlasQuery = [
+      selectedBadge?.title,
+      ...(selectedBadge?.subjects.slice(0, 4) ?? []),
+      query.trim() || "theory badge graph frontier map",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    return traceTheoryFrontierVectorField({
+      graph,
+      query: atlasQuery,
+      originBadgeIds,
+      searchSeed: `seed-atlas:${graph.graphId}:${originBadgeIds.join("+") || "global"}:${query.trim() || "all"}`,
+      generatedAt: graph.generatedAt,
+      limit: 8,
+      maxDepth: 8,
+    });
+  }, [graph, query, selectedBadge, selectedBadgeIds, selectedId]);
 
   const singlePlaybackPlan = useMemo(() => {
     if (!graph || !selectedId || selectedBadgeIds.length > 1) return null;
@@ -2503,6 +2525,7 @@ export default function TheoryBadgeGraphPanel() {
                   rippleBadgeIds={mapOverlay.rippleBadgeIds}
                   heatByBadgeId={mapOverlay.heatByBadgeId}
                   probabilityTerrain={theoryProbabilityTerrain}
+                  frontierTrace={seedAtlasFrontierTrace}
                   routeBadgeLabels={routeBadgeLabels}
                   activeAtlasLensId={rememberedAtlasLensId}
                   onSelectBadge={selectBadge}

@@ -4692,6 +4692,182 @@ describe("live-source mail live environment tools", () => {
     ]));
   });
 
+  it("keeps simultaneous visual and audio MicroDeck output queries source-scoped", () => {
+    const visualSourceRef = "visual_source:frog-lens";
+    const audioSourceRef = "audio_source:earbuds-translation";
+    const authority = {
+      assistantAnswer: false,
+      terminalEligible: false,
+      rawContentIncluded: false,
+      postToolModelStepRequired: true,
+    } as const;
+
+    recordStagePlayGoalContextUpdate({
+      schemaVersion: "helix.workstation_goal_context_update.v1",
+      updateId: "stage_play_goal_context_update:microdeck:visual-frog-source-boundary",
+      createdAtMs: Date.parse("2026-06-17T14:05:00.000Z"),
+      sourceRefs: [visualSourceRef, "stage_play_processed_mail_packet:visual-frog-source-boundary"],
+      loopRefs: [
+        `thread:${threadId}`,
+        "stage_play_mail_loop:visual-frog-source-boundary",
+        "microdeck:preset_state:frog-classifier:v1",
+        "microdeck:prompt_route:frog-classifier",
+        "workstation_context_feed:microdeck_outputs",
+        "workstation_actuator:query_microdeck_outputs",
+      ],
+      producerKind: "microdeck",
+      updateKind: "visual_observation",
+      contentRef: "microdeck_output:visual-frog-source-boundary",
+      preview: "Visual frog classifier deck output for ImageLens source.",
+      evidenceRefs: [
+        "stage_play_processed_mail_packet:visual-frog-source-boundary",
+        "microdeck_run:visual-frog-source-boundary",
+        "context_feed:microdeck_outputs",
+        "allowed_actuator:query_microdeck_outputs",
+      ],
+      receiptRefs: ["microdeck_receipt:visual-frog-source-boundary"],
+      freshness: {
+        observedAtMs: Date.parse("2026-06-17T14:05:00.000Z"),
+        staleAfterMs: 30_000,
+        status: "fresh",
+      },
+      goalRelevance: null,
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: "microdeck_receipt:visual-frog-source-boundary" },
+        { kind: "update_panel", panelId: "live-answer-environment" },
+      ],
+      authority,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    recordStagePlayGoalContextUpdate({
+      schemaVersion: "helix.workstation_goal_context_update.v1",
+      updateId: "stage_play_goal_context_update:microdeck:audio-translation-source-boundary",
+      createdAtMs: Date.parse("2026-06-17T14:05:01.000Z"),
+      sourceRefs: [audioSourceRef, "stage_play_processed_mail_packet:audio-translation-source-boundary"],
+      loopRefs: [
+        `thread:${threadId}`,
+        "stage_play_translation_loop:audio-translation-source-boundary",
+        "microdeck:preset_state:earbud-translation:v1",
+        "microdeck:prompt_route:earbud-translation",
+        "workstation_context_feed:narrator_events",
+        "workstation_actuator:narrator_bind_stream",
+        "workstation_context_feed:microdeck_outputs",
+        "workstation_actuator:query_microdeck_outputs",
+      ],
+      producerKind: "microdeck",
+      updateKind: "translated_transcript",
+      contentRef: "microdeck_output:audio-translation-source-boundary",
+      preview: "Earbud translation deck output for audio source.",
+      evidenceRefs: [
+        "stage_play_processed_mail_packet:audio-translation-source-boundary",
+        "microdeck_run:audio-translation-source-boundary",
+        "workstation_context_feed:narrator_events",
+        "workstation_actuator:narrator_bind_stream",
+        "context_feed:microdeck_outputs",
+        "allowed_actuator:query_microdeck_outputs",
+      ],
+      receiptRefs: ["microdeck_receipt:audio-translation-source-boundary"],
+      freshness: {
+        observedAtMs: Date.parse("2026-06-17T14:05:01.000Z"),
+        staleAfterMs: 30_000,
+        status: "fresh",
+      },
+      goalRelevance: null,
+      suggestedDispatch: [
+        { kind: "log_receipt", receiptRef: "microdeck_receipt:audio-translation-source-boundary" },
+        { kind: "update_panel", panelId: "live-answer-environment" },
+        { kind: "bind_narrator_stream", sourceRef: audioSourceRef, streamKind: "translated_transcript" },
+      ],
+      authority,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+
+    const visualObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_microdeck_outputs",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: visualSourceRef,
+      },
+    });
+    const audioObservation = executeLiveEnvironmentTool({
+      tool_name: "live_env.query_microdeck_outputs",
+      thread_id: threadId,
+      args: {
+        room_id: roomId,
+        source_id: audioSourceRef,
+      },
+    });
+
+    const visualPayload = visualObservation.observation as any;
+    const audioPayload = audioObservation.observation as any;
+    expect(visualPayload).toMatchObject({
+      feedKind: "microdeck_outputs",
+      sourceRef: visualSourceRef,
+      updateCount: 1,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+      },
+    });
+    expect(audioPayload).toMatchObject({
+      feedKind: "microdeck_outputs",
+      sourceRef: audioSourceRef,
+      updateCount: 1,
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+      terminalAuthority: {
+        status: "not_terminal",
+        finalAnswerEligible: false,
+      },
+    });
+    expect(visualPayload.goalContextUpdates.map((update: any) => update.updateId)).toEqual([
+      "stage_play_goal_context_update:microdeck:visual-frog-source-boundary",
+    ]);
+    expect(audioPayload.goalContextUpdates.map((update: any) => update.updateId)).toEqual([
+      "stage_play_goal_context_update:microdeck:audio-translation-source-boundary",
+    ]);
+    expect(visualPayload.goalContextUpdates[0].authority).toEqual(authority);
+    expect(audioPayload.goalContextUpdates[0].authority).toEqual(authority);
+    expect(visualPayload.packetCircuitRefs[0]).toMatchObject({
+      updateId: "stage_play_goal_context_update:microdeck:visual-frog-source-boundary",
+      microDeckRefs: expect.arrayContaining([
+        "microdeck:preset_state:frog-classifier:v1",
+        "microdeck:prompt_route:frog-classifier",
+      ]),
+      sourceRefs: expect.arrayContaining([visualSourceRef]),
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(audioPayload.packetCircuitRefs[0]).toMatchObject({
+      updateId: "stage_play_goal_context_update:microdeck:audio-translation-source-boundary",
+      microDeckRefs: expect.arrayContaining([
+        "microdeck:preset_state:earbud-translation:v1",
+        "microdeck:prompt_route:earbud-translation",
+      ]),
+      narratorRefs: expect.arrayContaining(["workstation_context_feed:narrator_events"]),
+      sourceRefs: expect.arrayContaining([audioSourceRef]),
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    });
+    expect(visualPayload.goalContextUpdates.map((update: any) => update.updateId)).not.toContain(
+      "stage_play_goal_context_update:microdeck:audio-translation-source-boundary",
+    );
+    expect(audioPayload.goalContextUpdates.map((update: any) => update.updateId)).not.toContain(
+      "stage_play_goal_context_update:microdeck:visual-frog-source-boundary",
+    );
+  });
+
   it("filters feed-specific goal-context query results by requested freshness status", () => {
     const threadLoopRef = `thread:${threadId}`;
     const mailLoopRef = `stage_play_mail_loop:${threadId}`;

@@ -9,9 +9,12 @@ import {
   THEORY_BADGE_COORDINATE_BASIS_VERSION,
   type TheoryBadgeCoordinateVectorV1,
   type TheoryBadgeRelationTensorV1,
+  type TheoryFrontierFitClassV1,
+  type TheoryFrontierPlacementDiagnosticV1,
   type TheoryFrontierVectorCandidateTraceV1,
   type TheoryFrontierVectorDeltaV1,
   type TheoryFrontierVectorFieldTraceV1,
+  type TheoryFrontierTraceDiagnosticsV1,
 } from "../contracts/theory-frontier-vector-field.v1";
 import { buildTheoryBiomeLayoutV1, computeTheoryBiomeDepths } from "./theory-biome-layout";
 import { locateTheoryBadges, traceTheoryBadgeConnections } from "./theory-badge-overlap-locator";
@@ -65,6 +68,9 @@ const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
 const round6 = (value: number): number => Number(value.toFixed(6));
 
 const unique = (values: string[]): string[] => Array.from(new Set(values.filter(Boolean))).sort();
+
+const average = (values: number[]): number =>
+  values.length > 0 ? round6(values.reduce((sum, value) => sum + value, 0) / values.length) : 0;
 
 const normalizeKey = (value: string): string =>
   value
@@ -410,6 +416,166 @@ function frontierCandidateId(args: {
   return `frontier:${stableHashHex([args.graphHash, args.searchSeed, args.query, ...args.badgeIds].join("|"))}`;
 }
 
+function missingStructureHintsFor(args: {
+  query: string;
+  delta: TheoryFrontierVectorDeltaV1;
+  evidenceGaps: string[];
+}): string[] {
+  const queryKey = normalizeKey(args.query);
+  return unique([
+    ...(args.delta.dimensionalDistance > 0.5 ? ["add explicit unit or dimensional-basis bridge"] : []),
+    ...(args.delta.equationFamilyDistance > 0.5 ? ["add equation-family mapping badge or variable map"] : []),
+    ...(args.delta.domainDistance > 0.75 ? ["add intermediate domain bridge badge"] : []),
+    ...(args.evidenceGaps.some((gap) => /scale/i.test(gap)) ? ["add bounded scale-envelope evidence"] : []),
+    ...(args.evidenceGaps.some((gap) => /source|reference/i.test(gap)) ? ["add source-reference evidence"] : []),
+    ...(queryKey.includes("holographic") || queryKey.includes("ads_cft")
+      ? ["add boundary-bulk mapping badge", "add entropy-area relation badge", "add minimal-surface geometry badge"]
+      : []),
+    ...(queryKey.includes("weyl")
+      ? ["add conformal-curvature decomposition badge", "add Weyl/Ricci/Riemann variable mapping"]
+      : []),
+    ...(queryKey.includes("tensor_network") || queryKey.includes("error_correction")
+      ? ["add tensor-network encoding badge", "add quantum-error-correction boundary badge"]
+      : []),
+  ]);
+}
+
+function placementDiagnostic(args: {
+  query: string;
+  delta: TheoryFrontierVectorDeltaV1;
+  evidenceGaps: string[];
+  uncertaintyReductionPotential: number;
+  verifiedFrontierYieldPerBudget: number;
+}): TheoryFrontierPlacementDiagnosticV1 {
+  const localCongruenceScore = round6(
+    clamp01(
+      1 -
+        (args.delta.dimensionalDistance * 0.35 +
+          args.delta.equationFamilyDistance * 0.25 +
+          args.delta.domainDistance * 0.2 +
+          args.delta.fidelityMismatch * 0.1 +
+          (args.delta.scaleGapLog10M != null && args.delta.scaleGapLog10M > 0 ? 0.1 : 0)),
+    ),
+  );
+  const evidenceReadinessScore = round6(clamp01(1 / (1 + args.evidenceGaps.length * 0.75)));
+  const uncertaintyPressureScore = round6(clamp01(args.uncertaintyReductionPotential));
+  const fitScore = round6(
+    clamp01(
+      args.verifiedFrontierYieldPerBudget * 0.35 +
+        localCongruenceScore * 0.4 +
+        evidenceReadinessScore * 0.15 +
+        (1 - uncertaintyPressureScore) * 0.1,
+    ),
+  );
+  const missingStructureHints = missingStructureHintsFor({
+    query: args.query,
+    delta: args.delta,
+    evidenceGaps: args.evidenceGaps,
+  });
+  const blockingSignals = unique([
+    ...args.evidenceGaps,
+    ...(args.delta.dimensionalDistance > 0 ? [`dimensional distance ${args.delta.dimensionalDistance}`] : []),
+    ...(args.delta.equationFamilyDistance > 0 ? [`equation-family distance ${args.delta.equationFamilyDistance}`] : []),
+    ...(args.delta.domainDistance > 0.75 ? [`domain distance ${args.delta.domainDistance}`] : []),
+    ...(args.delta.scaleGapLog10M != null && args.delta.scaleGapLog10M > 0
+      ? [`scale gap ${args.delta.scaleGapLog10M} log10(m)`]
+      : []),
+  ]);
+  const positiveSignals = unique([
+    ...(args.delta.dimensionalDistance === 0 ? ["unit dimensions align"] : []),
+    ...(args.delta.scaleOverlapLog10M != null && args.delta.scaleOverlapLog10M > 0
+      ? [`scale envelopes overlap ${args.delta.scaleOverlapLog10M} log10(m)`]
+      : []),
+    ...(args.delta.fidelityMismatch === 0 ? ["fidelity class aligns"] : []),
+    ...(args.delta.claimPressureIncrease === 0 ? ["no added claim pressure"] : []),
+    ...(args.verifiedFrontierYieldPerBudget >= 0.4 ? ["high verified-yield-per-budget score"] : []),
+    ...(args.evidenceGaps.length <= 1 ? ["limited evidence-gap count"] : []),
+  ]);
+
+  const fitClass: TheoryFrontierFitClassV1 =
+    localCongruenceScore >= 0.72 && evidenceReadinessScore >= 0.55
+      ? "strong_local_fit"
+      : localCongruenceScore >= 0.52 && fitScore >= 0.32
+        ? "moderate_local_fit"
+        : missingStructureHints.length >= 3 && localCongruenceScore < 0.45
+          ? "missing_region_suspected"
+          : localCongruenceScore < 0.25 && fitScore < 0.2
+            ? "off_manifold"
+            : "weak_cross_domain_fit";
+  const interpretation =
+    fitClass === "strong_local_fit" || fitClass === "moderate_local_fit"
+      ? "candidate_region_has_local_support"
+      : fitClass === "missing_region_suspected" || fitClass === "off_manifold"
+        ? "candidate_region_probably_missing_graph_structure"
+        : "candidate_region_is_cross_domain";
+
+  return {
+    fitClass,
+    fitScore,
+    localCongruenceScore,
+    evidenceReadinessScore,
+    uncertaintyPressureScore,
+    positiveSignals,
+    blockingSignals,
+    missingStructureHints,
+    interpretation,
+  };
+}
+
+function emptyFitHistogram(): Record<TheoryFrontierFitClassV1, number> {
+  return {
+    strong_local_fit: 0,
+    moderate_local_fit: 0,
+    weak_cross_domain_fit: 0,
+    off_manifold: 0,
+    missing_region_suspected: 0,
+  };
+}
+
+function traceDiagnostics(candidateTraces: TheoryFrontierVectorCandidateTraceV1[]): TheoryFrontierTraceDiagnosticsV1 {
+  const histogram = emptyFitHistogram();
+  for (const candidate of candidateTraces) histogram[candidate.placementDiagnostic.fitClass] += 1;
+  const sortedByFit = [...candidateTraces].sort((left, right) =>
+    right.placementDiagnostic.fitScore - left.placementDiagnostic.fitScore,
+  );
+  const strongest = sortedByFit[0] ?? null;
+  const weakest = sortedByFit[sortedByFit.length - 1] ?? null;
+  const missingStructureHints = unique(candidateTraces.flatMap((candidate) => candidate.placementDiagnostic.missingStructureHints));
+  const averageFitScore = average(candidateTraces.map((candidate) => candidate.placementDiagnostic.fitScore));
+  const averageLocalCongruenceScore = average(
+    candidateTraces.map((candidate) => candidate.placementDiagnostic.localCongruenceScore),
+  );
+  const overallFitClass: TheoryFrontierFitClassV1 =
+    histogram.strong_local_fit > 0 && averageLocalCongruenceScore >= 0.55
+      ? "strong_local_fit"
+      : histogram.moderate_local_fit > 0 && averageFitScore >= 0.32
+        ? "moderate_local_fit"
+        : histogram.missing_region_suspected > 0 && averageLocalCongruenceScore < 0.45
+          ? "missing_region_suspected"
+          : histogram.off_manifold > candidateTraces.length / 2
+            ? "off_manifold"
+            : "weak_cross_domain_fit";
+  const interpretation =
+    overallFitClass === "strong_local_fit" || overallFitClass === "moderate_local_fit"
+      ? "frontier_region_has_local_support"
+      : overallFitClass === "missing_region_suspected" || overallFitClass === "off_manifold"
+        ? "frontier_region_probably_missing_graph_structure"
+        : "frontier_region_is_cross_domain";
+
+  return {
+    overallFitClass,
+    strongestCandidateId: strongest?.candidateId ?? null,
+    weakestCandidateId: weakest?.candidateId ?? null,
+    candidateFitHistogram: histogram,
+    averageFitScore,
+    averageLocalCongruenceScore,
+    strongestSignals: unique(strongest?.placementDiagnostic.positiveSignals ?? []),
+    weakestSignals: unique(weakest?.placementDiagnostic.blockingSignals ?? []),
+    missingStructureHints,
+    interpretation,
+  };
+}
+
 function selectCandidatePairs(args: {
   graph: TheoryBadgeGraphV1;
   query: string;
@@ -477,6 +643,13 @@ function candidateTrace(args: {
     (1 - clamp01(delta.dimensionalDistance * 0.35 + delta.equationFamilyDistance * 0.25 + delta.domainDistance * 0.15)) /
       Math.max(1, expectedEvidenceClosureCost),
   );
+  const diagnostic = placementDiagnostic({
+    query: args.query,
+    delta,
+    evidenceGaps,
+    uncertaintyReductionPotential,
+    verifiedFrontierYieldPerBudget,
+  });
 
   return {
     candidateId: frontierCandidateId(args),
@@ -498,6 +671,7 @@ function candidateTrace(args: {
     uncertaintyReductionPotential,
     expectedEvidenceClosureCost,
     verifiedFrontierYieldPerBudget,
+    placementDiagnostic: diagnostic,
   };
 }
 
@@ -564,6 +738,7 @@ export function traceTheoryFrontierVectorField(
     vectors,
     relationTensors,
     candidateTraces,
+    traceDiagnostics: traceDiagnostics(candidateTraces),
     replay: {
       graphHash,
       query,

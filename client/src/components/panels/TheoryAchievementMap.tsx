@@ -5,6 +5,7 @@ import type {
   TheoryBadgeV1,
 } from "@shared/contracts/theory-badge-graph.v1";
 import type { ProbabilityTerrainV1 } from "@shared/contracts/probability-terrain.v1";
+import type { TheoryFrontierVectorFieldTraceV1 } from "@shared/contracts/theory-frontier-vector-field.v1";
 import type { PhysicsAtlasBlockId, PhysicsAtlasBlockV1 } from "@shared/contracts/physics-atlas.v1";
 import type { TheoryBiomeBand, TheoryBiomeChunkV1 } from "@shared/contracts/theory-biome-layout.v1";
 import { THEORY_BIOME_LAYOUT_SPACING_CONTRACT_V1 } from "@shared/contracts/theory-biome-layout.v1";
@@ -17,6 +18,11 @@ import {
   type TheoryAchievementLayoutNode,
 } from "@/lib/theory/theoryAchievementLayout";
 import { biomeNoise2D } from "@/lib/theory/theoryBiomeField";
+import {
+  buildTheoryFrontierMapOverlay,
+  type TheoryFrontierMapCandidateRegion,
+  type TheoryFrontierMapTensorPath,
+} from "@/lib/theory/theoryFrontierMapOverlay";
 
 type TheoryAchievementMapProps = {
   graph: TheoryBadgeGraphV1;
@@ -40,6 +46,7 @@ type TheoryAchievementMapProps = {
   rippleBadgeIds: string[];
   heatByBadgeId: Record<string, number>;
   probabilityTerrain?: ProbabilityTerrainV1;
+  frontierTrace?: TheoryFrontierVectorFieldTraceV1 | null;
   routeBadgeLabels?: Record<string, {
     label: string;
     tone: "cyan" | "emerald" | "amber" | "rose" | "slate";
@@ -196,6 +203,10 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+function fitClassLabel(value: string): string {
+  return value.replace(/_/g, " ");
+}
+
 function easeInOutCubic(value: number): number {
   return value < 0.5 ? 4 * value * value * value : 1 - Math.pow(-2 * value + 2, 3) / 2;
 }
@@ -305,6 +316,7 @@ export default function TheoryAchievementMap({
   rippleBadgeIds,
   heatByBadgeId,
   probabilityTerrain,
+  frontierTrace = null,
   routeBadgeLabels = {},
   activeAtlasLensId,
   onSelectBadge,
@@ -322,6 +334,10 @@ export default function TheoryAchievementMap({
   const [zoom, setZoom] = useState(1);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const layout = useMemo(() => layoutTheoryAchievementMap(graph), [graph]);
+  const frontierOverlay = useMemo(
+    () => (frontierTrace ? buildTheoryFrontierMapOverlay({ trace: frontierTrace, nodes: layout.nodes }) : null),
+    [frontierTrace, layout.nodes],
+  );
   const nodesById = useMemo(
     () => new Map<string, TheoryAchievementLayoutNode>(layout.nodes.map((node) => [node.badgeId, node])),
     [layout.nodes],
@@ -606,6 +622,188 @@ export default function TheoryAchievementMap({
               seed={layout.biome?.seed ?? graph.graphId}
               testId="theory-probability-terrain-field"
             />
+            {frontierOverlay ? (
+              <svg
+                aria-label="Theory Seed Atlas frontier diagnostics"
+                className="pointer-events-none absolute inset-0"
+                data-testid="theory-seed-atlas-overlay"
+                data-overall-fit-class={frontierOverlay.diagnostics.overallFitClass}
+                data-replay-graph-hash={frontierOverlay.replay.graphHash}
+                data-replay-query={frontierOverlay.replay.query}
+                data-replay-search-seed={frontierOverlay.replay.searchSeed}
+                data-replay-basis-version={frontierOverlay.replay.basisVersion}
+                data-replay-scoring-version={frontierOverlay.replay.scoringVersion}
+                data-replay-taxonomy-version={frontierOverlay.replay.taxonomyVersion}
+                data-replay-evidence-reference-count={frontierOverlay.replay.evidenceReferenceCount}
+                width={layout.width}
+                height={layout.height}
+              >
+                <defs>
+                  <pattern
+                    id="theory-seed-atlas-hatch"
+                    width="10"
+                    height="10"
+                    patternUnits="userSpaceOnUse"
+                    patternTransform="rotate(35)"
+                  >
+                    <line x1="0" x2="0" y1="0" y2="10" stroke="rgba(226,232,240,0.28)" strokeWidth="2" />
+                  </pattern>
+                  <marker id="theory-seed-atlas-arrow" markerHeight="7" markerWidth="7" orient="auto" refX="6" refY="3.5">
+                    <path d="M 0 0 L 7 3.5 L 0 7 z" fill="rgba(226,232,240,0.72)" />
+                  </marker>
+                </defs>
+                {frontierOverlay.candidateRegions.map((region: TheoryFrontierMapCandidateRegion) => (
+                  <ellipse
+                    key={`${region.id}:entropy`}
+                    data-testid="theory-seed-atlas-entropy"
+                    cx={region.x}
+                    cy={region.y}
+                    rx={region.rx * (1.12 + region.entropyRoughness * 0.28)}
+                    ry={region.ry * (1.08 + region.entropyRoughness * 0.22)}
+                    fill="none"
+                    stroke="rgba(226,232,240,0.22)"
+                    strokeWidth={1.4 + region.entropyRoughness * 1.2}
+                    strokeDasharray="2 12"
+                    opacity={0.24 + region.entropyRoughness * 0.44}
+                  />
+                ))}
+                {frontierOverlay.candidateRegions.map((region: TheoryFrontierMapCandidateRegion) => (
+                  <ellipse
+                    key={`${region.id}:certainty`}
+                    data-testid="theory-seed-atlas-certainty"
+                    cx={region.x}
+                    cy={region.y}
+                    rx={region.rx * (0.86 + region.certainty * 0.12)}
+                    ry={region.ry * (0.84 + region.certainty * 0.12)}
+                    fill={region.fill}
+                    opacity={0.18 + region.certainty * 0.36}
+                  />
+                ))}
+                {frontierOverlay.candidateRegions.map((region: TheoryFrontierMapCandidateRegion) => (
+                      <g
+                        key={region.id}
+                        data-testid="theory-seed-atlas-candidate"
+                        data-fit-class={region.fitClass}
+                      >
+                        <title>
+                          {[
+                            fitClassLabel(region.fitClass),
+                            `fit ${region.certainty.toFixed(2)}`,
+                            `congruence ${region.localCongruence.toFixed(2)}`,
+                            `evidence ${region.evidenceReadiness.toFixed(2)}`,
+                            ...region.missingStructureHints.slice(0, 3),
+                          ].join(" | ")}
+                        </title>
+                        <ellipse
+                          cx={region.x}
+                          cy={region.y}
+                          rx={region.rx}
+                          ry={region.ry}
+                          fill={region.fill}
+                          stroke={region.stroke}
+                          strokeWidth={region.strokeWidth}
+                          strokeDasharray={region.strokeDasharray}
+                          opacity={region.opacity}
+                        />
+                        {region.hatch ? (
+                          <ellipse
+                            cx={region.x}
+                            cy={region.y}
+                            rx={region.rx * 0.96}
+                            ry={region.ry * 0.92}
+                            fill="url(#theory-seed-atlas-hatch)"
+                            opacity={0.5}
+                          />
+                        ) : null}
+                        {Array.from({ length: region.contourCount }).map((_: unknown, index: number) => {
+                          const contourScale = 0.58 + index * 0.14;
+                          return (
+                            <ellipse
+                              key={`${region.id}:contour:${index}`}
+                              cx={region.x}
+                              cy={region.y}
+                              rx={region.rx * contourScale}
+                              ry={region.ry * contourScale}
+                              fill="none"
+                              stroke={region.stroke}
+                              strokeWidth={1}
+                              strokeOpacity={0.2 + region.localCongruence * 0.22}
+                            />
+                          );
+                        })}
+                        <text
+                          x={region.labelX}
+                          y={region.labelY}
+                          fill="rgba(241,245,249,0.86)"
+                          fontSize={11}
+                          fontWeight={800}
+                          letterSpacing={0}
+                        >
+                          {fitClassLabel(region.fitClass)}
+                        </text>
+                      </g>
+                    ))}
+                {frontierOverlay.candidateRegions.map((region: TheoryFrontierMapCandidateRegion) => (
+                  <ellipse
+                    key={`${region.id}:claim-pressure`}
+                    data-testid="theory-seed-atlas-claim-pressure"
+                    cx={region.x}
+                    cy={region.y}
+                    rx={region.rx * 1.04}
+                    ry={region.ry * 1.02}
+                    fill="none"
+                    stroke="rgba(251,191,36,0.74)"
+                    strokeWidth={1.2 + region.claimPressure * 2.6}
+                    strokeDasharray="12 9"
+                    opacity={0.1 + region.claimPressure * 0.56}
+                  />
+                ))}
+                {frontierOverlay.tensorPaths.map((path: TheoryFrontierMapTensorPath) => (
+                      <path
+                        key={path.id}
+                        data-testid="theory-seed-atlas-tensor-path"
+                        d={path.path}
+                        fill="none"
+                        stroke={path.stroke}
+                        strokeWidth={path.strokeWidth}
+                        strokeDasharray={path.strokeDasharray}
+                        strokeOpacity={path.opacity}
+                        strokeLinecap="round"
+                        markerEnd="url(#theory-seed-atlas-arrow)"
+                      >
+                        <title>
+                          {[
+                            path.relation,
+                            path.transformKind,
+                            `${path.fromBadgeId} -> ${path.toBadgeId}`,
+                          ].join(" | ")}
+                        </title>
+                      </path>
+                    ))}
+                <text
+                  x={18}
+                  y={layout.height - 38}
+                  fill="rgba(226,232,240,0.54)"
+                  fontSize={11}
+                  fontWeight={700}
+                  letterSpacing={0}
+                >
+                  Seed Atlas / {fitClassLabel(frontierOverlay.diagnostics.overallFitClass)} / candidates{" "}
+                  {frontierOverlay.candidateRegions.length} / evidence refs{" "}
+                  {frontierOverlay.replay.evidenceReferenceCount}
+                </text>
+                <text
+                  x={18}
+                  y={layout.height - 20}
+                  fill="rgba(226,232,240,0.42)"
+                  fontSize={10}
+                  fontWeight={700}
+                  letterSpacing={0}
+                >
+                  {frontierOverlay.replay.graphHash} / {frontierOverlay.replay.searchSeed}
+                </text>
+              </svg>
+            ) : null}
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_24%,rgba(255,255,255,0.08),transparent_36%),radial-gradient(circle_at_50%_82%,rgba(0,0,0,0.48),transparent_42%)]" />
             <svg className="pointer-events-none absolute inset-0" width={layout.width} height={layout.height}>
             <defs>

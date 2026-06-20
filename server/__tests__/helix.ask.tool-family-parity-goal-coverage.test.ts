@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import fs from "node:fs";
 
 import { COMPOUND_CAPABILITY_LIVE_SCENARIOS } from "../../scripts/helix-ask-compound-capability-live-probe";
 import { explicitCapabilityContractsForTests } from "../services/helix-ask/explicit-capability-contract";
@@ -23,11 +24,41 @@ const contractsByFamily = new Set(
   explicitCapabilityContractsForTests.map((contract) => contract.capability_family),
 );
 
+const readCodexReference = (relativePath: string): string =>
+  fs.readFileSync(`external/openai-codex-compare/${relativePath}`, "utf8");
+
+const readRepoSource = (relativePath: string): string =>
+  fs.readFileSync(relativePath, "utf8");
+
 const liveProbeCapabilities = new Set(
   COMPOUND_CAPABILITY_LIVE_SCENARIOS.flatMap((scenario) =>
     flattenExpectedCapabilities(scenario.expectedRequested),
   ),
 );
+
+const liveProbeRuntimeCapabilities = new Set(
+  COMPOUND_CAPABILITY_LIVE_SCENARIOS.flatMap((scenario) =>
+    flattenExpectedCapabilities(scenario.expectedRuntime),
+  ),
+);
+
+const auditedExplicitCapabilities = [
+  "scientific-calculator.solve_expression",
+  "repo-code.search_concept",
+  "docs-viewer.locate_in_doc",
+  "docs-viewer.doc_equation_context",
+  "workspace-directory.resolve",
+  "internet_search.web_research",
+  "live_env.query_micro_reasoner_presets",
+  "live_env.draft_micro_reasoner_preset",
+  "live_env.route_micro_reasoner_prompt",
+  "live_env.read_processed_live_source_mail",
+  "live_env.reflect_live_source_mail_loop",
+  "live_env.process_live_source_mail",
+  "helix_ask.build_civilization_scenario_frame",
+  "helix_ask.reflect_civilization_bounds",
+  "workspace_os.status",
+] as const;
 
 const objectiveFamilyCoverage = [
   {
@@ -133,6 +164,34 @@ const objectiveFamilyCoverage = [
 ] as const;
 
 describe("Helix Ask tool-family parity goal coverage", () => {
+  it("keeps the local Codex lifecycle reference anchors available", () => {
+    expect(readCodexReference("codex-rs/core/src/client_common.rs")).toEqual(
+      expect.stringContaining("pub struct Prompt"),
+    );
+    expect(readCodexReference("codex-rs/core/src/client_common.rs")).toEqual(
+      expect.stringContaining("tools: Vec<ToolSpec>"),
+    );
+    expect(readCodexReference("codex-rs/core/src/session/turn.rs")).toEqual(
+      expect.stringContaining("If the model requests a function call, we execute it and send the output"),
+    );
+    expect(readCodexReference("codex-rs/core/src/tools/context.rs")).toEqual(
+      expect.stringContaining("ResponseInputItem::FunctionCallOutput"),
+    );
+    const normalizeSource = readCodexReference("codex-rs/core/src/context_manager/normalize.rs");
+    expect(normalizeSource).toEqual(expect.stringContaining("missing_outputs_to_insert"));
+    expect(normalizeSource).toEqual(expect.stringContaining("remove_orphan_outputs"));
+  });
+
+  it("keeps the route entrypoint on the shared capability-catalog detector", () => {
+    const routeSource = readRepoSource("server/routes/agi.plan.ts");
+    expect(routeSource).toEqual(
+      expect.stringContaining('import { isAskCapabilityCatalogPrompt } from "../services/helix-ask/capability-catalog-intent";'),
+    );
+    expect(routeSource).toEqual(
+      expect.stringContaining("return isAskCapabilityCatalogPrompt(transcript);"),
+    );
+  });
+
   it("has explicit capability contracts for every objective family", () => {
     for (const entry of objectiveFamilyCoverage) {
       for (const family of entry.contractFamilies) {
@@ -141,6 +200,12 @@ describe("Helix Ask tool-family parity goal coverage", () => {
       for (const capability of entry.representativeCapabilities) {
         expect(contractCapabilities.has(capability), `${entry.label}:${capability}`).toBe(true);
       }
+    }
+  });
+
+  it("keeps every named audit tool call backed by an explicit capability contract", () => {
+    for (const capability of auditedExplicitCapabilities) {
+      expect(contractCapabilities.has(capability), capability).toBe(true);
     }
   });
 
@@ -155,10 +220,22 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     }
   });
 
+  it("backs every live-probe requested and runtime capability with an explicit contract", () => {
+    for (const capability of liveProbeCapabilities) {
+      expect(contractCapabilities.has(capability), `requested:${capability}`).toBe(true);
+    }
+    for (const capability of liveProbeRuntimeCapabilities) {
+      expect(contractCapabilities.has(capability), `runtime:${capability}`).toBe(true);
+    }
+  });
+
   it("keeps live-probe scenarios structurally aligned with ordered subgoal expectations", () => {
     for (const scenario of COMPOUND_CAPABILITY_LIVE_SCENARIOS) {
       expect(scenario.expectedRequested.length, scenario.id).toBeGreaterThan(0);
       expect(scenario.expectedRuntime.length, scenario.id).toBe(scenario.expectedRequested.length);
+      for (const capability of flattenExpectedCapabilities(scenario.expectedInputBindingFromCapabilities ?? [])) {
+        expect(liveProbeCapabilities.has(capability), `${scenario.id}:input_binding:${capability}`).toBe(true);
+      }
       expect(
         scenario.expectedSubgoalSatisfaction?.length ?? scenario.expectedRequested.length,
         scenario.id,

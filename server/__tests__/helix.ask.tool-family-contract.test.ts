@@ -84,6 +84,7 @@ describe("Helix Ask tool-family contract registry", () => {
       ["live_env.pause_workstation_loop", "live_source_mail", "control_receipt"],
       ["live_env.resume_workstation_loop", "live_source_mail", "control_receipt"],
       ["live_env.set_workstation_loop_state", "live_source_mail", "control_receipt"],
+      ["live_env.repair_loop", "live_source_mail", "control_receipt"],
       ["live_env.repair_workstation_source", "live_source_mail", "control_receipt"],
       ["live_env.update_live_answer_projection", "live_source_mail", "control_receipt"],
       ["live_env.focus_process_graph", "live_source_mail", "control_receipt"],

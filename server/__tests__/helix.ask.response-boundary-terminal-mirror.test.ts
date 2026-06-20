@@ -103,6 +103,115 @@ describe("Helix Ask response-boundary terminal mirrors", () => {
     });
   });
 
+  it("mirrors compound subgoal rails at the debug export boundary", () => {
+    const turnId = "ask:test-compound-subgoal-debug-mirror";
+    const compoundLedger = [
+      {
+        subgoal_id: `${turnId}:subgoal:docs`,
+        order: 1,
+        requested_capability: "docs-viewer.locate_in_doc",
+        selected_capability: "docs-viewer.locate_in_doc",
+        executed_capability: "docs-viewer.locate_in_doc",
+        args: { query: "rule of thumb" },
+        observation_kind: "doc_location_matches",
+        observation_ref: `${turnId}:doc_location_matches`,
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        first_broken_rail: null,
+        rail_failure_code: null,
+        repair_target: null,
+      },
+      {
+        subgoal_id: `${turnId}:subgoal:calculator`,
+        order: 2,
+        requested_capability: "scientific-calculator.solve_expression",
+        selected_capability: "scientific-calculator.solve_expression",
+        executed_capability: "scientific-calculator.solve_expression",
+        args: { latex: "6*7", expression: "6*7" },
+        observation_kind: "calculator_receipt",
+        observation_ref: `${turnId}:calculator_receipt`,
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        first_broken_rail: null,
+        rail_failure_code: null,
+        repair_target: null,
+      },
+    ];
+    const payload = {
+      turn_id: turnId,
+      terminal_artifact_kind: "doc_evidence_synthesis_answer",
+      final_answer_source: "final_answer_draft",
+      selected_final_answer: "Located the doc anchor and calculated 42.",
+      answer: "Located the doc anchor and calculated 42.",
+      text: "Located the doc anchor and calculated 42.",
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+        terminal_success_criteria: {
+          requires_post_observation_synthesis: true,
+          compound_terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          required_capabilities: [
+            "docs-viewer.locate_in_doc",
+            "scientific-calculator.solve_expression",
+          ],
+        },
+        compound_capability_contract: {
+          schema: "helix.compound_capability_contract.v1",
+          terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          requires_all_subgoals: true,
+          subgoals: [
+            {
+              subgoal_id: `${turnId}:subgoal:docs`,
+              requested_capability: "docs-viewer.locate_in_doc",
+              runtime_capability: "docs-viewer.locate_in_doc",
+              required_observation_kinds: ["doc_location_matches"],
+            },
+            {
+              subgoal_id: `${turnId}:subgoal:calculator`,
+              requested_capability: "scientific-calculator.solve_expression",
+              runtime_capability: "scientific-calculator.solve_expression",
+              required_observation_kinds: ["calculator_receipt"],
+            },
+          ],
+        },
+      },
+      capability_itinerary_execution_state: {
+        schema: "helix.capability_itinerary_execution_state.v1",
+        applies: true,
+        complete: true,
+        compound_subgoal_ledger: compoundLedger,
+      },
+      current_turn_artifact_ledger: [],
+      debug: {},
+    };
+
+    const envelope = __testHelixAskOutputContract.buildHelixDebugExportEnvelope({
+      payload,
+      prompt: "Call docs-viewer.locate_in_doc then call scientific-calculator.solve_expression.",
+      sessionId: "test-session",
+    }) as Record<string, any>;
+
+    expect(envelope.compound_subgoal_ledger).toEqual(compoundLedger);
+    expect(envelope.compound_subgoal_rail_statuses).toEqual([
+      expect.objectContaining({
+        requested_capability: "docs-viewer.locate_in_doc",
+        executed_capability: "docs-viewer.locate_in_doc",
+        observation_kind: "doc_location_matches",
+        rail_status: "complete",
+      }),
+      expect.objectContaining({
+        requested_capability: "scientific-calculator.solve_expression",
+        executed_capability: "scientific-calculator.solve_expression",
+        observation_kind: "calculator_receipt",
+        rail_status: "complete",
+      }),
+    ]);
+    expect(envelope.debug.compound_subgoal_ledger).toEqual(envelope.compound_subgoal_ledger);
+    expect(envelope.debug.compound_subgoal_rail_statuses).toEqual(envelope.compound_subgoal_rail_statuses);
+    expect(envelope.artifact_query_index.compound_subgoal_rail_statuses).toEqual(
+      envelope.compound_subgoal_rail_statuses,
+    );
+  });
+
   it("normalizes stale top-level final-draft mirrors from typed-failure authority", () => {
     const failureText = "I could not produce a terminal answer for this turn.";
     const payload = {

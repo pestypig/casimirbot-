@@ -31,15 +31,24 @@ export type CompoundCapabilityScenarioSummary = {
   visible_terminal_kind: string | null;
   final_answer_source: string | null;
   requested_capabilities: string[];
+  selected_capabilities: Array<string | null>;
   executed_capabilities: Array<string | null>;
+  observation_kinds: Array<string | null>;
+  observation_refs: Array<string | null>;
   subgoal_satisfactions: Array<string | null>;
   subgoal_rail_statuses: Array<string | null>;
+  subgoal_first_broken_rails: Array<string | null>;
+  subgoal_rail_failure_codes: Array<string | null>;
+  subgoal_repair_targets: Array<string | null>;
 };
 
 const BASE_URL = (process.env.HELIX_ASK_BASE_URL ?? "http://127.0.0.1:1498").replace(/\/+$/, "");
 const OUT_DIR = process.env.HELIX_ASK_COMPOUND_LIVE_OUT ?? "artifacts/helix-ask-compound-capability-live";
 const TIMEOUT_MS = Math.max(1000, Number(process.env.HELIX_ASK_COMPOUND_LIVE_TIMEOUT_MS ?? 300_000));
 const DRY_RUN = process.argv.includes("--dry-run") || process.env.HELIX_ASK_COMPOUND_LIVE_DRY_RUN === "1";
+const ALLOW_ALL_LIVE_SCENARIOS =
+  process.argv.includes("--allow-all-live-scenarios") ||
+  process.env.HELIX_ASK_COMPOUND_LIVE_ALLOW_ALL === "1";
 const SCENARIO_FILTER = (process.env.HELIX_ASK_COMPOUND_LIVE_SCENARIOS ?? "")
   .split(",")
   .map((entry) => entry.trim())
@@ -50,6 +59,44 @@ export type CompoundCapabilityScenarioSelection = {
   requestedIds: string[];
   unknownIds: string[];
   availableIds: string[];
+};
+
+export type CompoundCapabilityLiveRunPolicy = {
+  blocked: boolean;
+  blocked_reason: string | null;
+  message: string | null;
+};
+
+export const BROAD_LIVE_PROBE_BLOCK_MESSAGE =
+  "Refusing to run every live compound scenario against a keyed server. Set HELIX_ASK_COMPOUND_LIVE_SCENARIOS to a comma-separated scenario list, or pass --allow-all-live-scenarios / HELIX_ASK_COMPOUND_LIVE_ALLOW_ALL=1.";
+
+export const resolveCompoundCapabilityLiveRunPolicy = (input: {
+  dryRun: boolean;
+  scenarioFilter: string[];
+  allowAllLiveScenarios: boolean;
+}): CompoundCapabilityLiveRunPolicy => {
+  if (input.dryRun) {
+    return {
+      blocked: false,
+      blocked_reason: null,
+      message: null,
+    };
+  }
+  const filteredScenarioCount = input.scenarioFilter
+    .map((entry) => entry.trim())
+    .filter(Boolean).length;
+  if (filteredScenarioCount > 0 || input.allowAllLiveScenarios) {
+    return {
+      blocked: false,
+      blocked_reason: null,
+      message: null,
+    };
+  }
+  return {
+    blocked: true,
+    blocked_reason: "scenario_filter_required_for_live_probe",
+    message: BROAD_LIVE_PROBE_BLOCK_MESSAGE,
+  };
 };
 
 export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = [
@@ -451,9 +498,15 @@ export const evaluateCompoundCapabilityScenario = (input: {
   }
 
   const requestedCapabilities = contractSubgoals.map((entry) => maybeCapability(entry, "requested_capability") ?? "");
+  const selectedCapabilities = ledger.map((entry) => maybeCapability(entry, "selected_capability"));
   const executedCapabilities = ledger.map((entry) => maybeCapability(entry, "executed_capability"));
+  const observationKinds = ledger.map((entry) => maybeCapability(entry, "observation_kind"));
+  const observationRefs = ledger.map((entry) => maybeCapability(entry, "observation_ref"));
   const subgoalSatisfactions = ledger.map((entry) => maybeCapability(entry, "satisfaction"));
   const subgoalRailStatuses = railStatuses.map((entry) => maybeCapability(entry, "rail_status"));
+  const subgoalFirstBrokenRails = ledger.map((entry) => maybeCapability(entry, "first_broken_rail"));
+  const subgoalRailFailureCodes = ledger.map((entry) => maybeCapability(entry, "rail_failure_code"));
+  const subgoalRepairTargets = ledger.map((entry) => maybeCapability(entry, "repair_target"));
 
   input.scenario.expectedRequested.forEach((expected, index) => {
     const contractSubgoal = contractSubgoals[index] ?? null;
@@ -657,9 +710,15 @@ export const evaluateCompoundCapabilityScenario = (input: {
     visible_terminal_kind: visibleTerminalKind,
     final_answer_source: finalAnswerSource,
     requested_capabilities: requestedCapabilities,
+    selected_capabilities: selectedCapabilities,
     executed_capabilities: executedCapabilities,
+    observation_kinds: observationKinds,
+    observation_refs: observationRefs,
     subgoal_satisfactions: subgoalSatisfactions,
     subgoal_rail_statuses: subgoalRailStatuses,
+    subgoal_first_broken_rails: subgoalFirstBrokenRails,
+    subgoal_rail_failure_codes: subgoalRailFailureCodes,
+    subgoal_repair_targets: subgoalRepairTargets,
   };
 };
 
@@ -732,9 +791,15 @@ const renderMarkdownSummary = (input: {
       `- visible_terminal_kind: ${result.visible_terminal_kind ?? "missing"}`,
       `- final_answer_source: ${result.final_answer_source ?? "missing"}`,
       `- requested_capabilities: ${JSON.stringify(result.requested_capabilities)}`,
+      `- selected_capabilities: ${JSON.stringify(result.selected_capabilities)}`,
       `- executed_capabilities: ${JSON.stringify(result.executed_capabilities)}`,
+      `- observation_kinds: ${JSON.stringify(result.observation_kinds)}`,
+      `- observation_refs: ${JSON.stringify(result.observation_refs)}`,
       `- subgoal_satisfactions: ${JSON.stringify(result.subgoal_satisfactions)}`,
       `- subgoal_rail_statuses: ${JSON.stringify(result.subgoal_rail_statuses)}`,
+      `- subgoal_first_broken_rails: ${JSON.stringify(result.subgoal_first_broken_rails)}`,
+      `- subgoal_rail_failure_codes: ${JSON.stringify(result.subgoal_rail_failure_codes)}`,
+      `- subgoal_repair_targets: ${JSON.stringify(result.subgoal_repair_targets)}`,
       `- failures: ${JSON.stringify(result.failures)}`,
     );
   }
@@ -781,6 +846,33 @@ const main = async (): Promise<void> => {
       selected_scenarios: selectedScenarioIds,
       scenario_count: selection.scenarios.length,
       unknown_scenarios: selection.unknownIds,
+      available_scenarios: selection.availableIds,
+      results: [],
+    };
+    await fs.writeFile(path.join(outputDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
+    await fs.writeFile(path.join(outputDir, "summary.md"), renderMarkdownSummary({ runId, outputDir, selectedScenarioIds, results: [] }));
+    console.log(JSON.stringify(summary, null, 2));
+    process.exitCode = 1;
+    return;
+  }
+
+  const liveRunPolicy = resolveCompoundCapabilityLiveRunPolicy({
+    dryRun: DRY_RUN,
+    scenarioFilter: SCENARIO_FILTER,
+    allowAllLiveScenarios: ALLOW_ALL_LIVE_SCENARIOS,
+  });
+
+  if (liveRunPolicy.blocked) {
+    const summary = {
+      ok: false,
+      blocked: true,
+      blocked_reason: liveRunPolicy.blocked_reason,
+      message: liveRunPolicy.message,
+      run_id: runId,
+      base_url: BASE_URL,
+      output_dir: outputDir,
+      selected_scenarios: selectedScenarioIds,
+      scenario_count: selection.scenarios.length,
       available_scenarios: selection.availableIds,
       results: [],
     };
@@ -846,9 +938,15 @@ const main = async (): Promise<void> => {
         visible_terminal_kind: null,
         final_answer_source: null,
         requested_capabilities: [],
+        selected_capabilities: [],
         executed_capabilities: [],
+        observation_kinds: [],
+        observation_refs: [],
         subgoal_satisfactions: [],
         subgoal_rail_statuses: [],
+        subgoal_first_broken_rails: [],
+        subgoal_rail_failure_codes: [],
+        subgoal_repair_targets: [],
       });
     }
   }
