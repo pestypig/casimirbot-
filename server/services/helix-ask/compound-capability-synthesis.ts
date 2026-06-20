@@ -129,6 +129,33 @@ const terminalContributionKindsFromLedger = (ledger: RecordLike[]): string[] =>
     .map((entry) => readString(entry.terminal_contribution_kind))
     .filter((kind): kind is string => Boolean(kind)));
 
+const satisfiedSubgoalCount = (state: RecordLike | null): number =>
+  readArray(state?.compound_subgoal_ledger)
+    .map(readRecord)
+    .filter((entry) => readString(entry?.satisfaction) === "satisfied" || readString(entry?.rail_status) === "complete")
+    .length;
+
+const preferFreshExecutionState = (args: {
+  existingState: RecordLike | null;
+  rebuiltState: RecordLike;
+}): RecordLike => {
+  if (!args.existingState) return args.rebuiltState;
+  if (
+    args.rebuiltState.applies === true &&
+    args.existingState.complete !== true &&
+    args.rebuiltState.complete === true
+  ) {
+    return args.rebuiltState;
+  }
+  if (
+    args.rebuiltState.applies === true &&
+    satisfiedSubgoalCount(args.rebuiltState) > satisfiedSubgoalCount(args.existingState)
+  ) {
+    return args.rebuiltState;
+  }
+  return args.existingState;
+};
+
 export function resolveCompoundCapabilitySynthesisReadiness(input: {
   payload: RecordLike;
   capabilityItinerary?: unknown;
@@ -141,10 +168,11 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
   const existingState =
     readRecord(input.payload.capability_itinerary_execution_state) ??
     readRecord(itinerary?.execution_state);
-  const state = existingState ?? buildHelixCapabilityItineraryExecutionState({
+  const rebuiltState = buildHelixCapabilityItineraryExecutionState({
     capabilityItinerary: input.capabilityItinerary ?? input.payload.capability_itinerary,
     artifacts,
   }) as unknown as RecordLike;
+  const state = preferFreshExecutionState({ existingState, rebuiltState });
   const ledger = readArray(state.compound_subgoal_ledger)
     .map(readRecord)
     .filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry));

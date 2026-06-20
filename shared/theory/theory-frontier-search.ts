@@ -632,5 +632,12 @@ export function buildTheoryFrontierSearch(input: BuildTheoryFrontierSearchInput)
     candidates,
     scholarlyLookupRequests: buildTheoryFrontierScholarlyLookupRequests(candidates),
     probabilityTerrain,
+    optimization: {
+      candidateBudget: {
+        requestedLimit: candidateLimit,
+        evaluatedPairCount: pairs.length,
+        emittedCandidateCount: candidates.length,
+      },
+    },
   });
 }

@@ -36,6 +36,37 @@ describe("theory frontier search", () => {
     expect(first.scholarlyLookupRequests.map((request) => request.requestId)).toEqual(
       second.scholarlyLookupRequests.map((request) => request.requestId),
     );
+    expect(first.stageTrace).toEqual(second.stageTrace);
+    expect(first.stageTrace.contextReuse.reusedContextKeys).toEqual(
+      expect.arrayContaining([
+        first.graphHash,
+        first.taxonomyVersion,
+        first.scoringVersion,
+        "theory_biome_layout",
+        "theory_badge_connection_trace",
+      ]),
+    );
+    expect(first.stageTrace.stages[0]).toMatchObject({
+      stageName: "cheap_biome_field_scan",
+      mode: "candidate_generation",
+      costTier: "cheap",
+    });
+    expect(first.stageTrace.stages.at(-1)).toMatchObject({
+      stageName: "exact_contract_verification_queue",
+      mode: "verification_gate",
+      costTier: "exact",
+    });
+    expect(first.optimization).toEqual(second.optimization);
+    expect(first.optimization.objectiveMetric).toBe("verified_frontier_yield_per_budget");
+    expect(first.optimization.rawCandidateCountOptimized).toBe(false);
+    expect(first.optimization.candidateBudget).toMatchObject({
+      requestedLimit: 8,
+      emittedCandidateCount: first.candidates.length,
+    });
+    expect(first.optimization.records.length).toBeGreaterThan(0);
+    expect(first.optimization.records.map((record) => record.recordId)).toEqual(
+      [...first.optimization.records.map((record) => record.recordId)].sort(),
+    );
     expect(first.scholarlyLookupRequests.every((request) =>
       first.candidates.some((candidate) => candidate.candidateId === request.candidateId),
     )).toBe(true);
@@ -160,6 +191,18 @@ describe("theory frontier search", () => {
     const generatedCheck = verifyTheoryFrontierCandidateExactContract(candidate);
     expect(generatedCheck.promotionAllowed).toBe(false);
     expect(generatedCheck.validatesTheory).toBe(false);
+    expect(generatedCheck.requirementDetails.map((detail) => detail.requirement)).toEqual([
+      "validCandidateContract",
+      "completeFirstPrinciplesPath",
+      "dimensionalChecks",
+      "equationAndVariableMappings",
+      "requiredObservables",
+      "uncertaintyBudget",
+      "falsificationChecks",
+      "evidenceProvenance",
+      "activeClaimBoundaries",
+      "nonTerminalBoundary",
+    ]);
 
     const completeCandidate = {
       ...candidate,
@@ -204,6 +247,22 @@ describe("theory frontier search", () => {
     expect(verified.exactContractSatisfied).toBe(true);
     expect(verified.promotionAllowed).toBe(false);
     expect(verified.validatesTheory).toBe(false);
+    expect(verified.requirementDetails.every((detail) => detail.status === "passed")).toBe(true);
+    expect(
+      verified.requirementDetails.find((detail) => detail.requirement === "completeFirstPrinciplesPath")?.evidenceRefs,
+    ).toEqual(expect.arrayContaining(completeCandidate.congruence.firstPrinciplesPathBadgeIds));
+    expect(
+      verified.requirementDetails.find((detail) => detail.requirement === "dimensionalChecks")?.evidenceRefs,
+    ).toEqual(expect.arrayContaining(completeCandidate.congruence.sharedUnitSignatures));
+    expect(
+      verified.requirementDetails.find((detail) => detail.requirement === "requiredObservables")?.evidenceRefs,
+    ).toEqual(expect.arrayContaining(completeCandidate.congruence.requiredObservables));
+    expect(
+      verified.requirementDetails.find((detail) => detail.requirement === "evidenceProvenance")?.evidenceRefs,
+    ).toEqual(expect.arrayContaining(completeCandidate.replay.evidenceReferenceIds));
+    expect(
+      verified.requirementDetails.find((detail) => detail.requirement === "activeClaimBoundaries")?.evidenceRefs,
+    ).toEqual(expect.arrayContaining(completeCandidate.congruence.claimBoundaryNotes));
 
     const incomplete = {
       ...completeCandidate,

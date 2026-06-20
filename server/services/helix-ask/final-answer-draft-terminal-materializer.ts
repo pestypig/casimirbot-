@@ -213,6 +213,34 @@ const allowedKinds = (contract?: HelixRouteProductContract | Record<string, unkn
     .map(readString)
     .filter((entry): entry is string => Boolean(entry));
 
+const compoundTerminalPolicyActive = (payload: Record<string, unknown>): boolean => {
+  const itinerary = readRecord(payload.capability_itinerary);
+  const contract =
+    readRecord(payload.compound_capability_contract) ??
+    readRecord(itinerary?.compound_capability_contract);
+  const terminalCriteria = readRecord(itinerary?.terminal_success_criteria);
+  const synthesisReadiness = readRecord(payload.compound_capability_synthesis_readiness);
+  return (
+    readArray(contract?.subgoals).length > 1 ||
+    terminalCriteria?.compound_terminal_policy === "synthesize_from_satisfied_subgoal_observations" ||
+    synthesisReadiness?.applies === true
+  );
+};
+
+const compoundAllowedTerminalKinds = (payload: Record<string, unknown>): string[] => {
+  if (!compoundTerminalPolicyActive(payload)) return [];
+  const itinerary = readRecord(payload.capability_itinerary);
+  const terminalCriteria = readRecord(itinerary?.terminal_success_criteria);
+  const synthesisReadiness = readRecord(payload.compound_capability_synthesis_readiness);
+  return unique([
+    ...readArray(terminalCriteria?.allowed_terminal_artifact_kinds)
+      .map(readString)
+      .filter((entry): entry is string => Boolean(entry)),
+    readString(synthesisReadiness?.required_terminal_kind),
+    readString(synthesisReadiness?.synthesis_terminal_kind),
+  ].filter((entry): entry is string => Boolean(entry)));
+};
+
 const readCommittedRoute = (payload: Record<string, unknown>): HelixCommittedAskRoute | null => {
   const committedRoute = readRecord(payload.committed_ask_route);
   return committedRoute?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA
@@ -226,7 +254,10 @@ const effectiveAllowedKinds = (
 ): string[] => {
   const committedRoute = readCommittedRoute(payload);
   const committedAllowed = committedRoute?.canonical_goal.allowed_terminal_artifact_kinds ?? [];
-  return committedAllowed.length > 0 ? committedAllowed : allowedKinds(contract);
+  return unique([
+    ...(committedAllowed.length > 0 ? committedAllowed : allowedKinds(contract)),
+    ...compoundAllowedTerminalKinds(payload),
+  ]);
 };
 
 const contractAllows = (
@@ -234,6 +265,13 @@ const contractAllows = (
   contract: HelixRouteProductContract | Record<string, unknown> | null | undefined,
   kind: string,
 ): boolean => {
+  const compoundAllowed = compoundAllowedTerminalKinds(payload);
+  if (
+    compoundAllowed.includes(kind) ||
+    (kind === "doc_evidence_synthesis_answer" && compoundAllowed.includes("doc_evidence_synthesis"))
+  ) {
+    return true;
+  }
   const committedRoute = readCommittedRoute(payload);
   if (committedRoute) {
     return committedRouteAllowsTerminalKind({

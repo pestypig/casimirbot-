@@ -1828,6 +1828,222 @@ describe("Helix scholarly research tool admission", () => {
     ]);
   });
 
+  it("keeps frontier scholarly observations incomplete until literature is mapped back to the graph", () => {
+    const turnId = "ask:frontier-scholarly-map-required";
+    const promptText =
+      "Use scholarly papers and full text to run the Theory Frontier Seed Finder, then map extracted equations back to semantic chunks.";
+    const baseArtifacts = [
+      {
+        artifact_id: `${turnId}:lookup:scholarly_research_observation`,
+        turn_id: turnId,
+        producer_item_id: "agent_runtime_scholarly_research_tool",
+        kind: "scholarly_research_observation",
+        created_at_ms: 1,
+        source_scope: "current_turn",
+        payload: {
+          schema: "helix.scholarly_research_observation.v1",
+          capability: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+          selected_for_answer: true,
+          papers: [{ result_id: "arxiv:frontier", title: "Frontier Evidence" }],
+          evidence_refs: ["arxiv:frontier"],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: `${turnId}:full-text:scholarly_full_text_observation`,
+        turn_id: turnId,
+        producer_item_id: "agent_runtime_scholarly_research_tool",
+        kind: "scholarly_full_text_observation",
+        created_at_ms: 2,
+        source_scope: "current_turn",
+        payload: {
+          schema: "helix.scholarly_full_text_observation.v1",
+          capability: HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+          selected_for_answer: true,
+          paper_result_id: "arxiv:frontier",
+          selected_chunks: [{ chunk_ref: "page:2#chunk:1", page_start: 2, text_excerpt: "qei_margin requires source residual closure." }],
+          page_text_refs: ["page:2#text"],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+
+    const evaluation = __testHelixGoalSatisfaction.buildHelixGoalSatisfactionEvaluation({
+      turnId,
+      transcript: promptText,
+      canonicalGoalFrame: {
+        ...canonicalGoal("scholarly_research_lookup", "scholarly_research_answer"),
+        turn_id: turnId,
+        concept_tokens: ["paper_search", "scholarly_full_text_or_pdf", "theory_frontier"],
+      },
+      currentTurnArtifacts: baseArtifacts as any,
+      satisfactionReport: {
+        satisfied: false,
+        terminal_kind: "final_failure",
+        terminal_source: "typed_failure",
+        missing_artifacts: ["theory_frontier_literature_map"],
+        missing_reason: "frontier_literature_map_required",
+        confidence: "medium",
+        rejected_terminal_candidates: [],
+      } as any,
+    });
+
+    expect(evaluation.terminal_contract.required_actions).toEqual([
+      HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+      HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+      "helix_ask.reflect_theory_context",
+    ]);
+    expect(evaluation.terminal_contract.required_evidence).toEqual([
+      "scholarly_research_observation",
+      "scholarly_full_text_observation",
+      "theory_frontier_search",
+      "theory_frontier_candidate",
+      "theory_frontier_exact_contract_verification",
+      "theory_frontier_literature_map",
+    ]);
+    expect(evaluation.required_evidence.find((entry) => entry.kind === "scholarly_research_observation")?.satisfied).toBe(true);
+    expect(evaluation.required_evidence.find((entry) => entry.kind === "scholarly_full_text_observation")?.satisfied).toBe(true);
+    expect(evaluation.required_evidence.find((entry) => entry.kind === "theory_frontier_literature_map")?.satisfied).toBe(false);
+    expect(evaluation.satisfaction).toBe("partially_satisfied");
+    expect(evaluation.next_decision).toBe("continue");
+  });
+
+  it("allows frontier scholarly turns to proceed only after mapped literature evidence exists", () => {
+    const turnId = "ask:frontier-scholarly-map-complete";
+    const promptText =
+      "Use scholarly papers and full text to run the Theory Frontier Seed Finder, then map extracted equations back to semantic chunks.";
+    const currentTurnArtifacts = [
+      {
+        artifact_id: `${turnId}:lookup:scholarly_research_observation`,
+        turn_id: turnId,
+        producer_item_id: "agent_runtime_scholarly_research_tool",
+        kind: "scholarly_research_observation",
+        created_at_ms: 1,
+        source_scope: "current_turn",
+        payload: {
+          schema: "helix.scholarly_research_observation.v1",
+          capability: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
+          selected_for_answer: true,
+          papers: [{ result_id: "arxiv:frontier", title: "Frontier Evidence" }],
+          evidence_refs: ["arxiv:frontier"],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: `${turnId}:full-text:scholarly_full_text_observation`,
+        turn_id: turnId,
+        producer_item_id: "agent_runtime_scholarly_research_tool",
+        kind: "scholarly_full_text_observation",
+        created_at_ms: 2,
+        source_scope: "current_turn",
+        payload: {
+          schema: "helix.scholarly_full_text_observation.v1",
+          capability: HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+          selected_for_answer: true,
+          paper_result_id: "arxiv:frontier",
+          selected_chunks: [{ chunk_ref: "page:2#chunk:1", page_start: 2, text_excerpt: "qei_margin requires source residual closure." }],
+          page_text_refs: ["page:2#text"],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: `${turnId}:theory-reflection`,
+        turn_id: turnId,
+        producer_item_id: "agent_runtime_theory_locator_tool",
+        kind: "helix_theory_context_reflection_tool_receipt",
+        created_at_ms: 3,
+        source_scope: "current_turn",
+        payload: {
+          kind: "helix_theory_context_reflection_tool_receipt",
+          tool_id: "helix_ask.reflect_theory_context",
+          assistant_answer: false,
+          raw_content_included: false,
+          terminal_eligible: false,
+        },
+      },
+      {
+        artifact_id: `${turnId}:frontier-search`,
+        turn_id: turnId,
+        producer_item_id: "agent_runtime_theory_locator_tool",
+        kind: "theory_frontier_search",
+        created_at_ms: 4,
+        source_scope: "current_turn",
+        payload: { artifact_v1: { artifactId: "theory_frontier_search", schemaVersion: "theory_frontier_search/v1" } },
+      },
+      {
+        artifact_id: `${turnId}:frontier-candidate`,
+        turn_id: turnId,
+        producer_item_id: "agent_runtime_theory_locator_tool",
+        kind: "theory_frontier_candidate",
+        created_at_ms: 5,
+        source_scope: "current_turn",
+        payload: { artifact_v1: { artifactId: "theory_frontier_candidate", schemaVersion: "theory_frontier_candidate/v1" } },
+      },
+      {
+        artifact_id: `${turnId}:frontier-exact`,
+        turn_id: turnId,
+        producer_item_id: "agent_runtime_theory_locator_tool",
+        kind: "theory_frontier_exact_contract_verification",
+        created_at_ms: 6,
+        source_scope: "current_turn",
+        payload: { artifact_v1: { artifactId: "theory_frontier_exact_contract_verification", schemaVersion: "theory_frontier_exact_contract_verification/v1" } },
+      },
+      {
+        artifact_id: `${turnId}:frontier-literature-map`,
+        turn_id: turnId,
+        producer_item_id: "agent_runtime_theory_locator_tool",
+        kind: "theory_frontier_literature_map",
+        created_at_ms: 7,
+        source_scope: "current_turn",
+        payload: {
+          artifact_v1: {
+            artifactId: "theory_frontier_literature_map",
+            schemaVersion: "theory_frontier_literature_map/v1",
+            authority: {
+              assistant_answer: false,
+              terminal_eligible: false,
+              promotionAllowed: false,
+            },
+          },
+        },
+      },
+    ];
+
+    const evaluation = __testHelixGoalSatisfaction.buildHelixGoalSatisfactionEvaluation({
+      turnId,
+      transcript: promptText,
+      canonicalGoalFrame: {
+        ...canonicalGoal("scholarly_research_lookup", "scholarly_research_answer"),
+        turn_id: turnId,
+        concept_tokens: ["paper_search", "scholarly_full_text_or_pdf", "theory_frontier"],
+      },
+      currentTurnArtifacts: currentTurnArtifacts as any,
+      satisfactionReport: {
+        satisfied: false,
+        terminal_kind: "final_failure",
+        terminal_source: "typed_failure",
+        missing_artifacts: ["scholarly_research_answer"],
+        missing_reason: "terminal_artifact_unavailable",
+        confidence: "medium",
+        rejected_terminal_candidates: [],
+      } as any,
+    });
+
+    expect(evaluation.required_actions.every((action) => action.satisfied)).toBe(true);
+    expect(evaluation.required_evidence.every((evidence) => evidence.satisfied)).toBe(true);
+    expect(evaluation.satisfaction).toBe("satisfied");
+    expect(evaluation.next_decision).toBe("allow_terminal");
+    expect(evaluation.observed_results.find((result) => result.kind === "theory_frontier_literature_map")).toEqual(
+      expect.objectContaining({
+        supports_goal: true,
+      }),
+    );
+  });
+
   it("keeps failed zero-chunk full-text observations from satisfying page-evidence requirements", () => {
     const turnId = "ask:scholarly-full-text-403";
     const promptText = "Do research: fetch a Hawking radiation paper with PDF/full text and summarize it with page evidence.";

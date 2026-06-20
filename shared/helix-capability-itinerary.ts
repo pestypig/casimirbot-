@@ -66,10 +66,13 @@ export type HelixCapabilityItinerary = {
   compound_capability_contract?: Record<string, unknown>;
   execution_state?: {
     required_observation_families: HelixCapabilityItineraryFamily[];
+    required_observation_kinds?: string[];
     required_capabilities?: string[];
     admitted_tool_families: HelixCapabilityItineraryFamily[];
     observed_families: HelixCapabilityItineraryFamily[];
     missing_observation_families: HelixCapabilityItineraryFamily[];
+    missing_required_observation_kinds?: string[];
+    next_missing_required_observation_kind?: string | null;
     missing_compound_subgoal_ids?: string[];
     missing_required_capabilities?: string[];
     compound_subgoal_ledger?: Array<Record<string, unknown>>;

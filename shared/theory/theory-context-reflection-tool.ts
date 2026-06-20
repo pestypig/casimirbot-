@@ -5,6 +5,7 @@ import {
 } from "../contracts/helix-theory-context-reflection-tool-receipt.v1";
 import type {
   TheoryContextReflectionConfidenceMode,
+  TheoryContextReflectionRecommendedActionV1,
   TheoryContextReflectionSource,
 } from "../contracts/theory-context-reflection.v1";
 import type { TheoryBadgeGraphV1 } from "../contracts/theory-badge-graph.v1";
@@ -48,6 +49,37 @@ export type RunHelixTheoryContextReflectionToolInput = {
 
 const theoryFrontierRequested = (prompt: string): boolean =>
   /\b(?:theory\s+frontier|frontier\s+seed|seed\s+finder|frontier\s+candidate|missing\s+intermediate\s+badges?|unresolved\s+semantic\s+regions?|in\s+between\s+(?:the\s+)?badges?|candidate\s+terrain|biome\s+fields?|probability\s+terrain|verified_frontier_yield_per_budget|frontier\s+projection)\b/i.test(prompt);
+
+function frontierScholarlyRecommendedActions(
+  frontierSearchV1: ReturnType<typeof buildTheoryFrontierSearch> | null,
+): TheoryContextReflectionRecommendedActionV1[] {
+  if (!frontierSearchV1 || frontierSearchV1.scholarlyLookupRequests.length === 0) return [];
+  return frontierSearchV1.scholarlyLookupRequests.map((request) => ({
+    actionId: "theory-badge-graph.request_frontier_scholarly_lookup",
+    label: "Run frontier scholarly lookup",
+    panelId: "theory-badge-graph",
+    args: {
+      request_id: request.requestId,
+      candidate_id: request.candidateId,
+      target_source: request.targetSource,
+      requested_outputs: request.requestedOutputs,
+      query: request.query,
+      badge_ids: request.badgeIds,
+      render_chunk_ids: request.renderChunkIds,
+      semantic_chunk_ids: request.semanticChunkIds,
+      reason: request.reason,
+      mutating: request.mutating,
+      no_auto_promote_literature: request.noAutoPromoteLiterature,
+      expected_artifacts: request.requestedOutputs.some(
+        (output) => output === "scholarly_full_text" || output === "paper_pdf_pages",
+      )
+        ? ["scholarly_research_observation", "scholarly_full_text_observation", "theory_frontier_literature_map"]
+        : ["scholarly_research_observation", "theory_frontier_literature_map"],
+    },
+    mutatesCalculator: false,
+    solves: false,
+  }));
+}
 
 export function runHelixTheoryContextReflectionTool(
   input: RunHelixTheoryContextReflectionToolInput,
@@ -120,6 +152,7 @@ export function runHelixTheoryContextReflectionTool(
     recommendedNextActions: [
       ...reflectionV1.evidenceForAsk.recommendedNextActions,
       ...(explanationPlanV1?.recommendedNextActions ?? []),
+      ...frontierScholarlyRecommendedActions(frontierSearchV1),
     ],
   });
 }

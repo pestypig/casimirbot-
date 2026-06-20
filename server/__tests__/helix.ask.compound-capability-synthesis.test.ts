@@ -174,6 +174,163 @@ describe("compound capability synthesis readiness", () => {
     ]);
   });
 
+  it("requires synthesis after catalog and workspace subgoals are both observed", () => {
+    const readiness = resolveCompoundCapabilitySynthesisReadiness({
+      payload: {
+        capability_itinerary_execution_state: {
+          schema: "helix.capability_itinerary_execution_state.v1",
+          applies: true,
+          complete: true,
+          required_observation_families: ["capability_catalog", "workspace_diagnostic"],
+          required_capabilities: ["helix_ask.inspect_capability_catalog", "workspace_os.status"],
+          compound_subgoal_ledger: [
+            {
+              requested_capability: "helix_ask.inspect_capability_catalog",
+              executed_capability: "helix_ask.inspect_capability_catalog",
+              observation_kind: "capability_registry",
+              observation_ref: "obs:capability-registry",
+              satisfaction: "satisfied",
+              rail_status: "complete",
+              terminal_contribution_kind: "capability_help_summary",
+            },
+            {
+              requested_capability: "workspace_os.status",
+              executed_capability: "workspace_os.status",
+              observation_kind: "workspace_os_status_observation",
+              observation_ref: "obs:workspace-status",
+              satisfaction: "satisfied",
+              rail_status: "complete",
+              terminal_contribution_kind: "model_synthesized_answer",
+            },
+          ],
+        },
+      },
+      artifacts: [],
+    });
+
+    expect(readiness).toMatchObject({
+      applies: true,
+      complete: true,
+      synthesis_required: true,
+      has_docs_subgoal: false,
+      goal_kind: "compound_evidence_synthesis",
+      required_terminal_kind: "model_synthesized_answer",
+      synthesis_terminal_kind: "model_synthesized_answer",
+    });
+    expect(readiness.support_refs).toEqual(["obs:capability-registry", "obs:workspace-status"]);
+    expect(readiness.terminal_contribution_kinds).toEqual([
+      "capability_help_summary",
+      "model_synthesized_answer",
+    ]);
+  });
+
+  it("prefers rebuilt complete state over a stale incomplete payload mirror", () => {
+    const turnId = "ask:test:stale-catalog-workspace-state";
+    const itinerary = {
+      schema: "helix.capability_itinerary.v1",
+      terminal_success_criteria: {
+        requires_post_observation_synthesis: true,
+        required_observation_families: ["capability_catalog", "workspace_diagnostic"],
+        required_capabilities: ["helix_ask.inspect_capability_catalog", "workspace_os.status"],
+      },
+      compound_capability_contract: {
+        schema: "helix.compound_capability_contract.v1",
+        subgoals: [
+          {
+            subgoal_id: `${turnId}:compound_capability_subgoal:1:helix_ask_inspect_capability_catalog`,
+            requested_capability: "helix_ask.inspect_capability_catalog",
+            runtime_capability: "helix_ask.inspect_capability_catalog",
+            required_observation_kinds: ["capability_registry"],
+            terminal_contribution_kind: "capability_help_summary",
+          },
+          {
+            subgoal_id: `${turnId}:compound_capability_subgoal:2:workspace_os_status`,
+            requested_capability: "workspace_os.status",
+            runtime_capability: "workspace_os.status",
+            required_observation_kinds: ["workspace_os_status_observation"],
+            terminal_contribution_kind: "model_synthesized_answer",
+          },
+        ],
+      },
+    };
+    const readiness = resolveCompoundCapabilitySynthesisReadiness({
+      payload: {
+        capability_itinerary: itinerary,
+        capability_itinerary_execution_state: {
+          schema: "helix.capability_itinerary_execution_state.v1",
+          applies: true,
+          complete: false,
+          required_observation_families: ["capability_catalog", "workspace_diagnostic"],
+          missing_observation_families: ["workspace_diagnostic"],
+          compound_subgoal_ledger: [
+            {
+              requested_capability: "helix_ask.inspect_capability_catalog",
+              executed_capability: "helix_ask.inspect_capability_catalog",
+              observation_kind: "capability_registry",
+              observation_ref: "obs:capability-registry",
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+            {
+              requested_capability: "workspace_os.status",
+              executed_capability: null,
+              observation_kind: null,
+              observation_ref: null,
+              satisfaction: "pending",
+              rail_status: "pending",
+            },
+          ],
+        },
+      },
+      capabilityItinerary: itinerary,
+      artifacts: [
+        {
+          artifact_id: "obs:capability-registry",
+          kind: "capability_registry",
+          payload: {
+            kind: "capability_registry",
+            capability_key: "helix_ask.inspect_capability_catalog",
+          },
+        },
+        {
+          artifact_id: "obs:catalog-runtime",
+          kind: "runtime_tool_observation",
+          payload: {
+            capability_key: "helix_ask.inspect_capability_catalog",
+            status: "completed",
+            artifact_refs: ["obs:capability-registry"],
+          },
+        },
+        {
+          artifact_id: "obs:workspace-status",
+          kind: "workspace_os_status_observation",
+          payload: {
+            schema: "helix.workspace_os_status_observation.v1",
+            capability_key: "workspace_os.status",
+          },
+        },
+        {
+          artifact_id: "obs:workspace-runtime",
+          kind: "runtime_tool_observation",
+          payload: {
+            capability_key: "workspace_os.status",
+            status: "completed",
+            artifact_refs: ["obs:workspace-status"],
+          },
+        },
+      ],
+    });
+
+    expect(readiness).toMatchObject({
+      applies: true,
+      complete: true,
+      synthesis_required: true,
+      goal_kind: "compound_evidence_synthesis",
+      required_terminal_kind: "model_synthesized_answer",
+    });
+    expect(readiness.support_refs).toEqual(["obs:capability-registry", "obs:workspace-status"]);
+  });
+
   it("uses the runtime itinerary argument when the payload mirror is absent", () => {
     const turnId = "ask:test:runtime-itinerary-argument";
     const readiness = resolveCompoundCapabilitySynthesisReadiness({

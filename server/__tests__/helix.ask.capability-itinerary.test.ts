@@ -662,6 +662,11 @@ describe("Helix Ask capability itinerary", () => {
 
     expect(state.observed_families).toContain("theory_locator");
     expect(state.missing_observation_families).not.toContain("theory_locator");
+    expect(state.complete).toBe(false);
+    expect(state.missing_required_observation_kinds).toEqual([
+      "theory_frontier_candidate",
+      "theory_frontier_exact_contract_verification",
+    ]);
   });
 
   it("counts frontier literature maps as scholarly evidence re-entry observations", () => {
@@ -691,6 +696,74 @@ describe("Helix Ask capability itinerary", () => {
 
     expect(state.observed_families).toContain("scholarly_research");
     expect(state.missing_observation_families).not.toContain("scholarly_research");
+    expect(state.complete).toBe(false);
+    expect(state.missing_required_observation_kinds).toEqual([
+      "scholarly_full_text_observation",
+      "scholarly_research_observation",
+      "theory_frontier_candidate",
+      "theory_frontier_exact_contract_verification",
+      "theory_frontier_search",
+    ]);
+  });
+
+  it("requires every frontier artifact kind before itinerary completion", () => {
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId: "ask:frontier-complete",
+      promptText:
+        "Use scholarly papers and full text to run the Theory Frontier Seed Finder and map extracted equations back to semantic chunks.",
+      toolCallAdmissionDecision: scholarlyAdmission("ask:frontier-complete"),
+      availableCapabilities: availableCapabilities([
+        HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
+        "helix_ask.reflect_theory_context",
+      ]),
+    });
+
+    const state = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [
+        {
+          artifact_id: "frontier:scholarly:test",
+          kind: "scholarly_research_observation",
+          payload: { schema: "helix.scholarly_research_observation.v1" },
+        },
+        {
+          artifact_id: "frontier:full-text:test",
+          kind: "scholarly_full_text_observation",
+          payload: { schema: "helix.scholarly_full_text_observation.v1" },
+        },
+        {
+          artifact_id: "frontier:search:test",
+          kind: "theory_frontier_search",
+          payload: { schemaVersion: "theory_frontier_search/v1" },
+        },
+        {
+          artifact_id: "frontier:candidate:test",
+          kind: "theory_frontier_candidate",
+          payload: { schemaVersion: "theory_frontier_candidate/v1" },
+        },
+        {
+          artifact_id: "frontier:exact:test",
+          kind: "theory_frontier_exact_contract_verification",
+          payload: { schemaVersion: "theory_frontier_exact_contract_verification/v1" },
+        },
+        {
+          artifact_id: "frontier:literature-map:test",
+          kind: "theory_frontier_literature_map",
+          payload: { schemaVersion: "theory_frontier_literature_map/v1" },
+        },
+      ],
+    });
+
+    expect(state.required_observation_kinds).toEqual([
+      "scholarly_full_text_observation",
+      "scholarly_research_observation",
+      "theory_frontier_candidate",
+      "theory_frontier_exact_contract_verification",
+      "theory_frontier_literature_map",
+      "theory_frontier_search",
+    ]);
+    expect(state.missing_required_observation_kinds).toEqual([]);
+    expect(state.complete).toBe(true);
   });
 
   it("marks the locator missing when a compound prompt requires graph placement but no locator is visible", () => {

@@ -9,11 +9,14 @@ export type HelixCapabilityItineraryExecutionState = {
   schema: "helix.capability_itinerary_execution_state.v1";
   applies: boolean;
   required_observation_families: string[];
+  required_observation_kinds: string[];
   required_capabilities: string[];
   admitted_tool_families: string[];
   observed_families: string[];
   missing_observation_families: string[];
   next_missing_family: string | null;
+  missing_required_observation_kinds: string[];
+  next_missing_required_observation_kind: string | null;
   missing_compound_subgoal_ids: string[];
   missing_required_capabilities: string[];
   compound_subgoal_ledger: Array<Record<string, unknown>>;
@@ -454,9 +457,30 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
   const admittedFamilies = readArray(itinerary?.admitted_tool_families)
     .map(readString)
     .filter((entry: string | null): entry is string => Boolean(entry));
+  const plannedSteps = readArray(itinerary?.planned_steps)
+    .map(readRecord)
+    .filter((entry: Record<string, unknown> | null): entry is Record<string, unknown> => Boolean(entry));
   const artifacts = args.artifacts ?? [];
   const observedFamilies = requiredFamilies.filter((family: string) =>
     isHelixCapabilityItineraryFamilyObserved(family, artifacts),
+  );
+  const requiredObservationKinds = Array.from(new Set(
+    plannedSteps
+      .map((step: Record<string, unknown>) => readArray(step.required_observation_kinds)
+        .map(readString)
+        .filter((entry: string | null): entry is string => Boolean(entry)))
+      .filter((kinds: string[]) => kinds.some((kind: string) => /^theory_frontier_/i.test(kind)))
+      .flat()
+      .filter((kind: string) =>
+        /^theory_frontier_/i.test(kind) ||
+        kind === "scholarly_research_observation" ||
+        kind === "scholarly_full_text_observation"
+      )
+  )).sort();
+  const missingRequiredObservationKinds = requiredObservationKinds.filter((kind: string) =>
+    !artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
+      artifactMatchesObservationKind(artifact, escapedFamilyPattern(kind))
+    )
   );
   const compoundSubgoalLedger: Array<Record<string, unknown>> = compoundSubgoals.map((subgoal: Record<string, unknown>) => {
     const subgoalId = readString(subgoal.subgoal_id);
@@ -533,16 +557,21 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
   const missingRequiredCapabilities = missingSubgoals
     .map((entry: Record<string, unknown>) => readString(entry.requested_capability))
     .filter((entry: string | null): entry is string => Boolean(entry));
-  const complete = (!applies || missingFamilies.length === 0) && missingSubgoals.length === 0;
+  const complete = (!applies || missingFamilies.length === 0) &&
+    missingRequiredObservationKinds.length === 0 &&
+    missingSubgoals.length === 0;
   return {
     schema: "helix.capability_itinerary_execution_state.v1",
     applies,
     required_observation_families: requiredFamilies,
+    required_observation_kinds: requiredObservationKinds,
     required_capabilities: requiredCapabilities,
     admitted_tool_families: admittedFamilies,
     observed_families: observedFamilies,
     missing_observation_families: missingFamilies,
     next_missing_family: missingFamilies[0] ?? null,
+    missing_required_observation_kinds: missingRequiredObservationKinds,
+    next_missing_required_observation_kind: missingRequiredObservationKinds[0] ?? null,
     missing_compound_subgoal_ids: missingSubgoalIds,
     missing_required_capabilities: missingRequiredCapabilities,
     compound_subgoal_ledger: compoundSubgoalLedger,
@@ -567,11 +596,14 @@ export const attachHelixCapabilityItineraryExecutionState = (
   if (itinerary) {
     itinerary.execution_state = {
       required_observation_families: executionState.required_observation_families,
+      required_observation_kinds: executionState.required_observation_kinds,
       required_capabilities: executionState.required_capabilities,
       admitted_tool_families: executionState.admitted_tool_families,
       observed_families: executionState.observed_families,
       missing_observation_families: executionState.missing_observation_families,
       next_missing_family: executionState.next_missing_family,
+      missing_required_observation_kinds: executionState.missing_required_observation_kinds,
+      next_missing_required_observation_kind: executionState.next_missing_required_observation_kind,
       missing_compound_subgoal_ids: executionState.missing_compound_subgoal_ids,
       missing_required_capabilities: executionState.missing_required_capabilities,
       compound_subgoal_ledger: executionState.compound_subgoal_ledger,

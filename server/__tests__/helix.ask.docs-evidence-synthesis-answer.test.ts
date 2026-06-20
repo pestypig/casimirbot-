@@ -643,6 +643,139 @@ describe("Helix Ask docs evidence synthesis answer", () => {
     });
   });
 
+  it("lets compound docs+calculator synthesis override stale single-doc terminal metadata", () => {
+    const prompt =
+      "Use docs-viewer.locate_in_doc to locate the rule of thumb, then run scientific-calculator.solve_expression with 19+23.";
+    const payload: Record<string, unknown> = {
+      ...synthesisPayload(prompt),
+      canonical_goal_frame: {
+        turn_id: turnId,
+        goal_kind: "locate_in_doc",
+        answer_scope: "current_turn_doc",
+        required_terminal_kind: "doc_location_matches",
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        turn_id: turnId,
+        thread_id: threadId,
+        source_target: "docs_viewer",
+        allowed_terminal_artifact_kinds: ["doc_location_matches", "typed_failure"],
+        forbidden_terminal_artifact_kinds: ["direct_answer_text", "model_only_concept", "doc_summary"],
+        required_artifact_refs: [],
+        precedence_reason: "explicit_docs_path_locate_source_target",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+        prompt_shape: "compound_tool",
+        terminal_success_criteria: {
+          required_observation_families: ["docs_viewer", "calculator"],
+          required_capabilities: ["docs-viewer.locate_in_doc", "scientific-calculator.solve_expression"],
+          allowed_terminal_artifact_kinds: [
+            "doc_location_matches",
+            "workstation_tool_evaluation",
+            "model_synthesized_answer",
+            "doc_evidence_synthesis_answer",
+          ],
+          forbidden_terminal_artifact_kinds: ["tool_receipt"],
+          compound_terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          requires_post_observation_synthesis: true,
+        },
+        compound_capability_contract: {
+          schema: "helix.compound_capability_contract.v1",
+          subgoals: [
+            {
+              requested_capability: "docs-viewer.locate_in_doc",
+              required_terminal_kind: "doc_location_matches",
+              terminal_contribution_kind: "doc_location_matches",
+            },
+            {
+              requested_capability: "scientific-calculator.solve_expression",
+              required_terminal_kind: "workstation_tool_evaluation",
+              terminal_contribution_kind: "workstation_tool_evaluation",
+            },
+          ],
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      compound_capability_synthesis_readiness: {
+        schema: "helix.compound_capability_synthesis_readiness.v1",
+        applies: true,
+        complete: true,
+        synthesis_required: false,
+        has_docs_subgoal: true,
+        support_refs: ["doc-summary:discipline", "calculator:19-plus-23"],
+        goal_kind: "doc_evidence_synthesis",
+        required_terminal_kind: "doc_evidence_synthesis_answer",
+        synthesis_terminal_kind: "doc_evidence_synthesis_answer",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+    const committedRoute = buildCommittedAskRoute({
+      turnId,
+      promptText: prompt,
+      selectedRoute: "docs_viewer.locate_in_doc",
+      payload,
+      promptInterpretation: interpretHelixAskPrompt(prompt),
+    });
+    payload.committed_ask_route = {
+      ...committedRoute,
+      canonical_goal: {
+        ...committedRoute.canonical_goal,
+        goal_kind: "locate_in_doc",
+        required_terminal_kind: "doc_location_matches",
+        allowed_terminal_artifact_kinds: ["doc_location_matches", "typed_failure"],
+        forbidden_terminal_artifact_kinds: ["direct_answer_text", "model_only_concept", "doc_summary"],
+      },
+    };
+    const finalDraft = {
+      artifact_id: "draft:compound-docs-calculator",
+      turn_id: turnId,
+      kind: "final_answer_draft",
+      payload: {
+        schema: "helix.final_answer_draft.v1",
+        artifact_id: "draft:compound-docs-calculator",
+        text: "The rule was located in the discipline doc, and 19+23 evaluates to 42.",
+        artifact_refs: ["doc-summary:discipline", "calculator:19-plus-23"],
+        support_refs: ["doc-summary:discipline", "calculator:19-plus-23"],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+
+    const result = materializeFinalAnswerDraftTerminal({
+      turnId,
+      payload,
+      artifactLedger: [
+        docsEvidenceArtifacts[1],
+        {
+          artifact_id: "calculator:19-plus-23",
+          turn_id: turnId,
+          kind: "calculator_receipt",
+          payload: {
+            schema: "helix.calculator_receipt.v1",
+            result_text: "42",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        finalDraft,
+      ],
+      routeProductContract: payload.route_product_contract as Record<string, unknown>,
+    });
+
+    expect(result?.ok).toBe(true);
+    expect(result?.materialized_terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+    expect(payload.docs_synthesis_debug).toMatchObject({
+      materializer_contract_allowed: true,
+      materializer_goal_kind_source: "route_product_contract.allowed_terminal_artifact_kinds",
+      materializer_required_terminal_kind_source: "route_product_contract.allowed_terminal_artifact_kinds",
+    });
+  });
+
   it("rejects doc_summary as the terminal product for a synthesis route", () => {
     const prompt =
       "Compare docs/helix-ask-flow.md and docs/helix-ask-codex-loop-discipline.md.";

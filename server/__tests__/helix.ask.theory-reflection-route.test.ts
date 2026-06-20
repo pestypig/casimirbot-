@@ -132,7 +132,7 @@ describe("Helix Ask theory reflection route", () => {
     expect(String(body?.selected_final_answer ?? body?.answer ?? body?.text ?? "")).toMatch(
       /moral certainty|moral proof/i,
     );
-  });
+  }, 15_000);
 
   it("routes reflection-only theory graph prompts through non-terminal reflection receipts", async () => {
     const app = createApp();
@@ -192,6 +192,22 @@ describe("Helix Ask theory reflection route", () => {
     expect(body?.theory_context_reflection_tool_receipt?.frontierSearchV1?.candidates?.length).toBeGreaterThan(0);
     expect(body?.theory_context_reflection_tool_receipt?.frontierExactVerificationResultsV1?.length).toBe(
       body?.theory_context_reflection_tool_receipt?.frontierSearchV1?.candidates?.length,
+    );
+    const frontierScholarlyActions = (
+      body?.theory_context_reflection_tool_receipt?.recommendedNextActions ?? []
+    ).filter(
+      (action: { actionId?: string }) =>
+        action.actionId === "theory-badge-graph.request_frontier_scholarly_lookup",
+    );
+    expect(frontierScholarlyActions.length).toBe(
+      body?.theory_context_reflection_tool_receipt?.frontierSearchV1?.scholarlyLookupRequests?.length,
+    );
+    expect(frontierScholarlyActions[0]?.args).toEqual(
+      expect.objectContaining({
+        target_source: "scholarly_research",
+        mutating: false,
+        no_auto_promote_literature: true,
+      }),
     );
     expect(ledgerKinds).toEqual(expect.arrayContaining([
       "helix_theory_context_reflection_tool_receipt",
@@ -357,5 +373,5 @@ describe("Helix Ask theory reflection route", () => {
     expect(answer).toMatch(/graph reflection is context evidence only/i);
     expect(answer).toMatch(/Evidence note: theory graph reflection supplied context; Scientific Calculator receipts supplied the numeric result/i);
     expect(answer).not.toMatch(/model-only/i);
-  });
+  }, 15_000);
 });

@@ -41,6 +41,9 @@ describe("theory frontier exact contract verification v1", () => {
       terminal_eligible: false,
       raw_content_included: false,
     });
+    expect(verification.requirementDetails).toHaveLength(Object.keys(checkedRequirements).length);
+    expect(verification.requirementDetails.every((detail) => detail.status === "passed")).toBe(true);
+    expect(verification.requirementDetails.map((detail) => detail.requirement)).toEqual(Object.keys(checkedRequirements));
     expect(validateTheoryFrontierExactContractVerificationV1(verification)).toEqual([]);
     expect(isTheoryFrontierExactContractVerificationV1(verification)).toBe(true);
   });
@@ -95,5 +98,31 @@ describe("theory frontier exact contract verification v1", () => {
       ]),
     );
     expect(isTheoryFrontierExactContractVerificationV1(inconsistent)).toBe(false);
+  });
+
+  it("rejects requirement details that omit or contradict checked requirements", () => {
+    const verification = buildTheoryFrontierExactContractVerificationV1({
+      candidateId: "frontier:test",
+      exactContractSatisfied: false,
+      issues: ["missing required observables"],
+      checkedRequirements: {
+        ...checkedRequirements,
+        requiredObservables: false,
+      },
+      requirementDetails: [{
+        requirement: "validCandidateContract",
+        status: "failed",
+        evidenceRefs: [],
+        notes: ["contradicts checked requirement"],
+      }],
+    });
+
+    expect(validateTheoryFrontierExactContractVerificationV1(verification)).toEqual(
+      expect.arrayContaining([
+        "requirementDetails[0].status must match checkedRequirements.validCandidateContract",
+        "requirementDetails must include completeFirstPrinciplesPath",
+        "requirementDetails must include requiredObservables",
+      ]),
+    );
   });
 });

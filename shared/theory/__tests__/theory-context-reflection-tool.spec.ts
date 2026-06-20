@@ -88,6 +88,31 @@ describe("Helix theory context reflection tool runner", () => {
     expect(receipt.frontierSearchV1?.interpretation.noTheoryValidation).toBe(true);
     expect(receipt.frontierSearchV1?.probabilityTerrain.interpretation).toBe("placement_probability_not_truth_claim");
     expect(receipt.frontierExactVerificationResultsV1.length).toBe(receipt.frontierSearchV1?.candidates.length);
+    const frontierScholarlyActions = receipt.recommendedNextActions.filter(
+      (action) => action.actionId === "theory-badge-graph.request_frontier_scholarly_lookup",
+    );
+    expect(frontierScholarlyActions.length).toBe(receipt.frontierSearchV1?.scholarlyLookupRequests.length);
+    expect(frontierScholarlyActions.length).toBeGreaterThan(0);
+    expect(frontierScholarlyActions.every((action) => action.solves === false)).toBe(true);
+    expect(frontierScholarlyActions.every((action) => action.mutatesCalculator === false)).toBe(true);
+    const firstLookupRequest = receipt.frontierSearchV1?.scholarlyLookupRequests[0];
+    expect(frontierScholarlyActions[0]?.args).toEqual(
+      expect.objectContaining({
+        request_id: firstLookupRequest?.requestId,
+        candidate_id: firstLookupRequest?.candidateId,
+        target_source: "scholarly_research",
+        requested_outputs: firstLookupRequest?.requestedOutputs,
+        query: firstLookupRequest?.query,
+        badge_ids: firstLookupRequest?.badgeIds,
+        render_chunk_ids: firstLookupRequest?.renderChunkIds,
+        semantic_chunk_ids: firstLookupRequest?.semanticChunkIds,
+        mutating: false,
+        no_auto_promote_literature: true,
+      }),
+    );
+    expect(frontierScholarlyActions[0]?.args.expected_artifacts).toEqual(
+      expect.arrayContaining(["scholarly_research_observation", "theory_frontier_literature_map"]),
+    );
     expect(
       receipt.frontierExactVerificationResultsV1.every(
         (result: TheoryFrontierExactContractVerificationV1) => result.promotionAllowed === false,
