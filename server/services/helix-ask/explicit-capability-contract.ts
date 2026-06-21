@@ -1491,6 +1491,15 @@ const commandMentionsCapabilityAt = (prompt: string, capability: string, matchIn
     commandMentionsCapability(prompt.slice(Math.max(0, matchIndex - 20), matchIndex + capability.length + 90), capability);
 };
 
+const negatedCommandMentionsCapabilityAt = (prompt: string, matchIndex: number): boolean => {
+  const before = prompt.slice(Math.max(0, matchIndex - 140), matchIndex);
+  const clausePrefix = before.split(/[.!?;\n]/).pop() ?? before;
+  return new RegExp(
+    String.raw`\b(?:do\s+not|don't|dont|never|avoid|without|no)\b[\s\S]{0,80}\b(?:${commandVerb})?\b[\s\S]{0,80}$`,
+    "i",
+  ).test(clausePrefix);
+};
+
 const compoundCommandChainMentionsCapabilityAt = (prompt: string, matchIndex: number): boolean => {
   const before = prompt.slice(Math.max(0, matchIndex - 120), matchIndex);
   if (!new RegExp(String.raw`\b${commandVerb}\b`, "i").test(prompt)) return false;
@@ -1510,7 +1519,16 @@ const commandMentionsContract = (prompt: string, contract: ExplicitCapabilityCon
     contract.runtime_capability ?? "",
     ...(contract.aliases ?? []),
   ]);
-  return names.some((name) => commandMentionsCapability(prompt, name));
+  return names.some((name) => {
+    const matcher = capabilityMentionRegex(name);
+    for (const match of prompt.matchAll(matcher)) {
+      const matchIndex = typeof match.index === "number" ? match.index : -1;
+      if (matchIndex < 0) continue;
+      if (negatedCommandMentionsCapabilityAt(prompt, matchIndex)) continue;
+      if (commandMentionsCapabilityAt(prompt, name, matchIndex)) return true;
+    }
+    return false;
+  });
 };
 
 const familySuppressed = (prompt: string, contract: ExplicitCapabilityContract): boolean => {
@@ -1578,6 +1596,7 @@ export const extractExplicitCapabilityContracts = (
         if (matchIndex < 0) continue;
         const commandMention = commandMentionsCapabilityAt(prompt, name, matchIndex);
         const compoundMention = compoundCommandChainMentionsCapabilityAt(prompt, matchIndex);
+        if ((commandMention || compoundMention) && negatedCommandMentionsCapabilityAt(prompt, matchIndex)) continue;
         if (!commandMention && !compoundMention) continue;
         const candidate: ExtractedExplicitCapabilityContract = {
           contract,

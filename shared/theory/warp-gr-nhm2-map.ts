@@ -167,6 +167,7 @@ export const WARP_GR_NHM2_GROUPS: WarpGrNhm2Group[] = [
       "nhm2.formal.negative_fixtures_fail_closed",
       "nhm2.experimental.physical_viability_campaign",
       "nhm2.experimental.theory_solve_roadmap",
+      "nhm2.experimental.parameter_targets",
       "nhm2.experimental.prediction_freeze",
       "nhm2.experimental.tile_force_receipt",
       "nhm2.experimental.tile_cycle_energy_balance",

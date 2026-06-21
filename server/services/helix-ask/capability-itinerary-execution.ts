@@ -377,6 +377,24 @@ const calculatorSubgoalIdMismatchIsExpressionMatch = (
   return Boolean(artifactExpression && expectedExpression && artifactExpression === expectedExpression);
 };
 
+const runtimeProvenDocsLocateObservation = (
+  artifact: HelixCapabilityItineraryArtifactLike,
+  capability: string,
+  runtimeCapability: string,
+): boolean => {
+  if (capability !== "docs-viewer.locate_in_doc" && runtimeCapability !== "docs-viewer.locate_in_doc") {
+    return false;
+  }
+  const kind = artifactKind(artifact);
+  if (!/^doc_(?:location|evidence)/i.test(kind)) return false;
+  const haystack = artifactCapabilityHaystack(artifact);
+  return (
+    /docs[-_]viewer[-_.:]locate[-_]in[-_]doc|docs_viewer_locate_in_doc/i.test(haystack) &&
+    /agent_runtime|runtime_tool_observation|agent_step_observation_packet/i.test(haystack) &&
+    !/model_step/i.test(haystack)
+  );
+};
+
 const artifactSubgoalObservationProvenance = (
   artifact: HelixCapabilityItineraryArtifactLike,
   subgoalId: string | null,
@@ -399,6 +417,9 @@ const artifactSubgoalObservationProvenance = (
   if (actualCapability) return "capability_key";
   if (calculatorSubgoalIdMismatchIsExpressionMatch(artifact, capability, runtimeCapability, argsHint)) {
     return "calculator_expression_match";
+  }
+  if (runtimeProvenDocsLocateObservation(artifact, capability, runtimeCapability)) {
+    return "runtime_docs_location_observation";
   }
   if (capability === "docs-viewer.locate_in_doc" || runtimeCapability === "docs-viewer.locate_in_doc") {
     return null;
@@ -595,6 +616,9 @@ const artifactProvesCompletedCapability = (
     !/^(?:failed|rejected|error|blocked)$/i.test(status ?? "") &&
     artifactMatchesRequiredObservationKind(artifact, requiredObservationKinds, capability, runtimeCapability)
   ) {
+    return true;
+  }
+  if (runtimeProvenDocsLocateObservation(artifact, capability, runtimeCapability)) {
     return true;
   }
   if (capability !== "scientific-calculator.solve_expression" && runtimeCapability !== "scientific-calculator.solve_expression") {

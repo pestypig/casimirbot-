@@ -328,6 +328,7 @@ const assertPairContract = (first: ExplicitContract, second: ExplicitContract): 
   expect(itinerary.terminal_success_criteria.allowed_terminal_artifact_kinds).toEqual(
     expect.arrayContaining([
       "final_answer_draft",
+      "compound_evidence_synthesis_answer",
       "model_synthesized_answer",
     ]),
   );
@@ -356,7 +357,7 @@ const assertPairContract = (first: ExplicitContract, second: ExplicitContract): 
 const assertCompletedNamedScenario = (
   scenarioName: string,
   capabilities: string[],
-  expectedSynthesisKind?: "doc_evidence_synthesis_answer" | "model_synthesized_answer",
+  expectedSynthesisKind?: "compound_evidence_synthesis_answer" | "doc_evidence_synthesis_answer" | "model_synthesized_answer",
 ): void => {
   const contracts = capabilities.map(contractByCapability);
   const turnId = `ask:named-compound:${scenarioName}`.replace(/[^A-Za-z0-9:_-]+/g, "_");
@@ -611,6 +612,7 @@ describe("Helix Ask compound capability family matrix", () => {
     expect(policy.source).toBe("compound_capability_contract_or_execution_state");
     expect(policy.allowed_terminal_artifact_kinds).toEqual(expect.arrayContaining([
       "final_answer_draft",
+      "compound_evidence_synthesis_answer",
       "model_synthesized_answer",
       "doc_evidence_synthesis_answer",
     ]));
@@ -675,6 +677,7 @@ describe("Helix Ask compound capability family matrix", () => {
     expect(policy.active).toBe(true);
     expect(policy.allowed_terminal_artifact_kinds).toEqual([
       "final_answer_draft",
+      "compound_evidence_synthesis_answer",
       "model_synthesized_answer",
     ]);
     expect(policy.allowed_terminal_artifact_kinds).not.toContain("compound_research_locator_answer");
@@ -682,12 +685,13 @@ describe("Helix Ask compound capability family matrix", () => {
       "tool_receipt",
       "calculator_receipt",
     ]));
-    expect(policy.required_terminal_kind).toBe("model_synthesized_answer");
+    expect(policy.required_terminal_kind).toBe("compound_evidence_synthesis_answer");
     expect(applied.allowed).toEqual([
       "final_answer_draft",
+      "compound_evidence_synthesis_answer",
       "model_synthesized_answer",
     ]);
-    expect(applied.requiredTerminalKind).toBe("model_synthesized_answer");
+    expect(applied.requiredTerminalKind).toBe("compound_evidence_synthesis_answer");
   });
 
   it("allows compound research locator terminal only for research plus theory without docs or calculator", () => {
@@ -723,6 +727,7 @@ describe("Helix Ask compound capability family matrix", () => {
     expect(policy.active).toBe(true);
     expect(policy.allowed_terminal_artifact_kinds).toEqual(expect.arrayContaining([
       "final_answer_draft",
+      "compound_evidence_synthesis_answer",
       "model_synthesized_answer",
       "compound_research_locator_answer",
     ]));
@@ -759,6 +764,7 @@ describe("Helix Ask compound capability family matrix", () => {
     expect(policy.active).toBe(true);
     expect(policy.allowed_terminal_artifact_kinds).toEqual(expect.arrayContaining([
       "final_answer_draft",
+      "compound_evidence_synthesis_answer",
       "model_synthesized_answer",
       "doc_evidence_synthesis_answer",
     ]));
@@ -1319,13 +1325,13 @@ describe("Helix Ask compound capability family matrix", () => {
       expect(readiness.synthesis_terminal_kind, contract.capability_family).toBe(
         requiresDocEvidenceSynthesis([contract, partner])
           ? "doc_evidence_synthesis_answer"
-          : "model_synthesized_answer",
+          : "compound_evidence_synthesis_answer",
       );
       expect(itinerary.terminal_success_criteria.allowed_terminal_artifact_kinds, contract.capability_family)
         .toEqual(expect.arrayContaining([
           requiresDocEvidenceSynthesis([contract, partner])
             ? "doc_evidence_synthesis_answer"
-            : "model_synthesized_answer",
+            : "compound_evidence_synthesis_answer",
         ]));
     }
   });
@@ -1338,7 +1344,7 @@ describe("Helix Ask compound capability family matrix", () => {
     assertCompletedNamedScenario("catalog_then_workspace_status", [
       "helix_ask.inspect_capability_catalog",
       "workspace_os.status",
-    ], "model_synthesized_answer");
+    ], "compound_evidence_synthesis_answer");
     assertCompletedNamedScenario("repo_then_docs", [
       "repo-code.search_concept",
       "docs-viewer.locate_in_doc",
@@ -1347,25 +1353,25 @@ describe("Helix Ask compound capability family matrix", () => {
       "internet_search.web_research",
       "helix_ask.reflect_theory_context",
       "scientific-calculator.solve_expression",
-    ], "model_synthesized_answer");
+    ], "compound_evidence_synthesis_answer");
     assertCompletedNamedScenario("scholarly_reflection_then_calculator", [
       "scholarly-research.lookup_papers",
       "helix_ask.reflect_theory_context",
       "scientific-calculator.solve_expression",
-    ], "model_synthesized_answer");
+    ], "compound_evidence_synthesis_answer");
     assertCompletedNamedScenario("visual_then_calculator", [
       "image_lens.inspect",
       "scientific-calculator.solve_expression",
-    ], "model_synthesized_answer");
+    ], "compound_evidence_synthesis_answer");
     assertCompletedNamedScenario("civilization_frame_then_bounds_reflection", [
       "helix_ask.build_civilization_scenario_frame",
       "helix_ask.reflect_civilization_bounds",
-    ], "model_synthesized_answer");
+    ], "compound_evidence_synthesis_answer");
     assertCompletedNamedScenario("zen_graph_reflection_bridge", [
       "helix_ask.reflect_theory_context",
       "helix_ask.reflect_ideology_context",
       "helix_ask.bridge_theory_ideology_context",
-    ], "model_synthesized_answer");
+    ], "compound_evidence_synthesis_answer");
   });
 
   it("binds later reflection subgoals to earlier evidence observations", () => {

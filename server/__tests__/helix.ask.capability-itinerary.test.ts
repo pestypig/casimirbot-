@@ -168,6 +168,91 @@ describe("Helix Ask capability itinerary", () => {
     });
   });
 
+  it("reconciles runtime-proven docs location artifacts into compound subgoal progress", () => {
+    const turnId = "ask:docs-runtime-observation-reconcile";
+    const itinerary = buildHelixCapabilityItinerary({
+      turnId,
+      promptText:
+        "Use docs-viewer.locate_in_doc to locate the rule of thumb in docs/helix-ask-codex-loop-discipline.md, then call scientific-calculator.solve_expression with expression 2 + 2.",
+      toolCallAdmissionDecision: {
+        ...scholarlyAdmission(turnId),
+        source_target: "docs_viewer",
+        admitted_tool_families: ["docs_viewer", "calculator", "workstation_action"],
+      },
+      availableCapabilities: availableCapabilities([
+        "docs-viewer.locate_in_doc",
+        "scientific-calculator.solve_expression",
+      ]),
+    });
+    const subgoals = (itinerary.compound_capability_contract?.subgoals ?? []) as Array<Record<string, unknown>>;
+    const docsSubgoalId = String(subgoals[0]?.subgoal_id);
+    const calculatorSubgoalId = String(subgoals[1]?.subgoal_id);
+
+    const state = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: itinerary,
+      artifacts: [
+        {
+          artifact_id: `${turnId}:runtime_tool_call:2:docs`,
+          kind: "runtime_tool_call",
+          payload: {
+            capability_key: "docs-viewer.locate_in_doc",
+            call_id: `${turnId}:runtime_tool_call:2:docs`,
+            args: {
+              query: "rule of thumb",
+              path: "docs/helix-ask-codex-loop-discipline.md",
+            },
+          },
+        },
+        {
+          artifact_id: `${turnId}:runtime_tool_call:2:docs:runtime_tool_call_validation`,
+          kind: "runtime_tool_call_validation",
+          payload: {
+            capability_key: "docs-viewer.locate_in_doc",
+            call_id: `${turnId}:runtime_tool_call:2:docs`,
+            valid: true,
+            errors: [],
+          },
+        },
+        {
+          artifact_id: `${turnId}:agent_runtime_2_docs_viewer_locate_in_doc:doc_location_matches:1`,
+          kind: "doc_location_matches",
+          payload: {
+            kind: "doc_location_matches",
+          },
+        },
+      ],
+    });
+
+    const docsEntry = state.compound_subgoal_ledger.find((entry) => entry.subgoal_id === docsSubgoalId);
+    const calculatorEntry = state.compound_subgoal_ledger.find((entry) => entry.subgoal_id === calculatorSubgoalId);
+    expect(docsEntry).toMatchObject({
+      requested_capability: "docs-viewer.locate_in_doc",
+      selected_capability: "docs-viewer.locate_in_doc",
+      executed_capability: "docs-viewer.locate_in_doc",
+      observation_kind: "doc_location_matches",
+      observation_ref: `${turnId}:agent_runtime_2_docs_viewer_locate_in_doc:doc_location_matches:1`,
+      observation_provenance: "runtime_docs_location_observation",
+      satisfaction: "satisfied",
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
+    expect(calculatorEntry).toMatchObject({
+      requested_capability: "scientific-calculator.solve_expression",
+      satisfaction: "pending",
+      rail_status: "pending",
+      bound_input_refs: expect.arrayContaining([
+        expect.objectContaining({
+          from_subgoal_id: docsSubgoalId,
+          from_capability: "docs-viewer.locate_in_doc",
+          ref: `${turnId}:agent_runtime_2_docs_viewer_locate_in_doc:doc_location_matches:1`,
+        }),
+      ]),
+      unresolved_input_bindings: [],
+    });
+    expect(state.missing_compound_subgoal_ids).toEqual([calculatorSubgoalId]);
+    expect(state.missing_required_capabilities).toEqual(["scientific-calculator.solve_expression"]);
+  });
+
   it("keeps research, theory reflection, and calculator subgoals in order", () => {
     const promptText =
       "Use internet_search.web_research to find a cited research-paper source for the Alcubierre metric or warp-drive energy estimates. " +

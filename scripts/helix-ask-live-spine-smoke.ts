@@ -33,24 +33,34 @@ export type LiveSpineCoverage =
   | "calculator"
   | "docs"
   | "repo_code"
+  | "workspace_directory"
   | "workspace_status"
   | "live_source_mail"
   | "internet_search"
+  | "scholarly_research"
+  | "theory_context_reflection"
   | "visual_capture"
   | "image_lens"
   | "capability_catalog"
+  | "civilization_bounds"
+  | "zen_graph_reflection"
   | "negated_contextual_tool_mentions";
 
 export const REQUIRED_LIVE_SPINE_COVERAGE: LiveSpineCoverage[] = [
   "calculator",
   "docs",
   "repo_code",
+  "workspace_directory",
   "workspace_status",
   "live_source_mail",
   "internet_search",
+  "scholarly_research",
+  "theory_context_reflection",
   "visual_capture",
   "image_lens",
   "capability_catalog",
+  "civilization_bounds",
+  "zen_graph_reflection",
   "negated_contextual_tool_mentions",
 ];
 
@@ -199,6 +209,28 @@ export const LIVE_SPINE_SMOKE_SCENARIOS: LiveSpineScenario[] = [
     },
   },
   {
+    id: "workspace_directory_resolve_explicit",
+    coverage: ["workspace_directory"],
+    prompt: "Use workspace-directory.resolve to resolve docs/helix-ask-codex-loop-discipline.md.",
+    expected: {
+      requestedCapability: "workspace-directory.resolve",
+      selectedCapability: "workspace-directory.resolve",
+      admittedCapability: "workspace-directory.resolve",
+      executedCapability: "workspace-directory.resolve",
+      observationKind: "workspace_directory_resolution",
+      reentryStatus: "reentered",
+      goalSatisfaction: "satisfied",
+      requiredTerminalKind: ["workspace_directory_resolution", "model_synthesized_answer"],
+      selectedTerminalKind: ["workspace_directory_resolution", "model_synthesized_answer"],
+      visibleTerminalKind: ["workspace_directory_resolution", "model_synthesized_answer"],
+      railStatus: "complete",
+      codexParityClass: "complete",
+      firstBrokenRail: null,
+      visibleToolSurfaceIncludes: ["workspace-directory.resolve"],
+      forbidTerminalErrorCodes: ["agent_loop_budget_exhausted"],
+    },
+  },
+  {
     id: "internet_search_config_or_complete",
     coverage: ["internet_search"],
     prompt: "Use internet_search.web_research to find current public evidence about OpenAI Codex.",
@@ -215,6 +247,27 @@ export const LIVE_SPINE_SMOKE_SCENARIOS: LiveSpineScenario[] = [
       firstBrokenRail: [null, "config"],
       repairTarget: [null, "operator_config"],
       visibleToolSurfaceIncludes: ["internet_search.web_research"],
+    },
+  },
+  {
+    id: "scholarly_research_lookup_config_or_complete",
+    coverage: ["scholarly_research"],
+    prompt:
+      "Use scholarly-research.lookup_papers to find scholarly papers about Alcubierre metric energy estimates.",
+    expected: {
+      requestedCapability: "scholarly-research.lookup_papers",
+      selectedCapability: "scholarly-research.lookup_papers",
+      admittedCapability: "scholarly-research.lookup_papers",
+      executedCapability: "scholarly-research.lookup_papers",
+      observationKind: ["scholarly_research_observation", "reasoning_context"],
+      reentryStatus: ["reentered", "no_observation"],
+      requiredTerminalKind: ["scholarly_research_answer", "compound_research_locator_answer"],
+      railStatus: ["complete", "fail_closed"],
+      codexParityClass: ["complete", "provider_config_missing", "observation_missing"],
+      firstBrokenRail: [null, "config", "observation_artifact"],
+      repairTarget: [null, "operator_config", "observation_materializer"],
+      visibleToolSurfaceIncludes: ["scholarly-research.lookup_papers"],
+      forbidTerminalErrorCodes: ["agent_loop_budget_exhausted"],
     },
   },
   {
@@ -254,6 +307,79 @@ export const LIVE_SPINE_SMOKE_SCENARIOS: LiveSpineScenario[] = [
       firstBrokenRail: null,
       visibleToolSurfaceIncludes: ["helix_ask.inspect_capability_catalog"],
       forbidTerminalErrorCodes: ["terminal_kind_not_required", "agent_loop_budget_exhausted"],
+    },
+  },
+  {
+    id: "theory_context_reflection_explicit",
+    coverage: ["theory_context_reflection"],
+    prompt: "Use helix_ask.reflect_theory_context to reflect on the Alcubierre metric theory context.",
+    expected: {
+      requestedCapability: "helix_ask.reflect_theory_context",
+      selectedCapability: "helix_ask.reflect_theory_context",
+      admittedCapability: "helix_ask.reflect_theory_context",
+      executedCapability: "helix_ask.reflect_theory_context",
+      observationKind: ["helix_theory_context_reflection_tool_receipt", "theory_context_reflection"],
+      reentryStatus: "reentered",
+      goalSatisfaction: "satisfied",
+      requiredTerminalKind: ["theory_context_reflection_answer", "model_synthesized_answer"],
+      selectedTerminalKind: ["theory_context_reflection_answer", "model_synthesized_answer"],
+      visibleTerminalKind: ["theory_context_reflection_answer", "model_synthesized_answer"],
+      railStatus: "complete",
+      codexParityClass: "complete",
+      firstBrokenRail: null,
+      visibleToolSurfaceIncludes: ["helix_ask.reflect_theory_context"],
+      forbidTerminalErrorCodes: ["agent_loop_budget_exhausted", "solver_path_incomplete_before_terminal"],
+    },
+  },
+  {
+    id: "civilization_bounds_reflection_explicit",
+    coverage: ["civilization_bounds"],
+    prompt:
+      "Use helix_ask.reflect_civilization_bounds to reflect civilization bounds for energy budget, material inventory, and governance review.",
+    expected: {
+      requestedCapability: "helix_ask.reflect_civilization_bounds",
+      selectedCapability: "helix_ask.reflect_civilization_bounds",
+      admittedCapability: "helix_ask.reflect_civilization_bounds",
+      executedCapability: "helix_ask.reflect_civilization_bounds",
+      observationKind: ["civilization_bounds_roadmap/v1", "helix_civilization_bounds_tool_result"],
+      reentryStatus: "reentered",
+      goalSatisfaction: "satisfied",
+      requiredTerminalKind: ["model_synthesized_answer", "compound_evidence_synthesis_answer"],
+      selectedTerminalKind: ["model_synthesized_answer", "compound_evidence_synthesis_answer"],
+      visibleTerminalKind: ["model_synthesized_answer", "compound_evidence_synthesis_answer"],
+      railStatus: "complete",
+      codexParityClass: "complete",
+      firstBrokenRail: null,
+      visibleToolSurfaceIncludes: ["helix_ask.reflect_civilization_bounds"],
+      forbidTerminalErrorCodes: ["agent_loop_budget_exhausted", "solver_path_incomplete_before_terminal"],
+    },
+  },
+  {
+    id: "zen_graph_reflection_explicit",
+    coverage: ["zen_graph_reflection"],
+    prompt:
+      "Use helix_ask.reflect_ideology_context to reflect through the zen graph on this rule: receipts are observations and terminal authority selects the answer.",
+    expected: {
+      requestedCapability: "helix_ask.reflect_ideology_context",
+      selectedCapability: "helix_ask.reflect_ideology_context",
+      admittedCapability: "helix_ask.reflect_ideology_context",
+      executedCapability: "helix_ask.reflect_ideology_context",
+      observationKind: [
+        "ideology_context_reflection/v1",
+        "procedural_zen_classification/v1",
+        "helix_zen_graph_reflection_tool_result",
+        "workstation_tool_evaluation",
+      ],
+      reentryStatus: "reentered",
+      goalSatisfaction: "satisfied",
+      requiredTerminalKind: ["model_synthesized_answer", "compound_evidence_synthesis_answer"],
+      selectedTerminalKind: ["model_synthesized_answer", "compound_evidence_synthesis_answer"],
+      visibleTerminalKind: ["model_synthesized_answer", "compound_evidence_synthesis_answer"],
+      railStatus: "complete",
+      codexParityClass: "complete",
+      firstBrokenRail: null,
+      visibleToolSurfaceIncludes: ["helix_ask.reflect_ideology_context"],
+      forbidTerminalErrorCodes: ["agent_loop_budget_exhausted", "solver_path_incomplete_before_terminal"],
     },
   },
   {

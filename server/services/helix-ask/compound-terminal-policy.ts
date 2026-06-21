@@ -23,6 +23,7 @@ const payloadArtifactPayloadByKind = (
 
 const COMPOUND_SYNTHESIS_TERMINAL_KINDS = [
   "final_answer_draft",
+  "compound_evidence_synthesis_answer",
   "model_synthesized_answer",
 ] as const;
 
@@ -156,21 +157,29 @@ export const readCompoundTerminalPolicy = (
     readString(synthesisReadiness?.synthesis_terminal_kind) ||
     (allowed.includes("doc_evidence_synthesis_answer")
       ? "doc_evidence_synthesis_answer"
+      : allowed.includes("compound_evidence_synthesis_answer")
+        ? "compound_evidence_synthesis_answer"
       : allowed.includes("model_synthesized_answer")
         ? "model_synthesized_answer"
         : allowed[0] ?? null);
   const requiredTerminalKind =
     hasDocsSubgoal && allowed.includes("doc_evidence_synthesis_answer")
       ? "doc_evidence_synthesis_answer"
+      : hasResearchLocatorSubgoal && allowed.includes("compound_research_locator_answer")
+        ? "compound_research_locator_answer"
+      : allowed.includes("compound_evidence_synthesis_answer")
+        ? "compound_evidence_synthesis_answer"
       : rawRequiredTerminalKind &&
           allowed.includes(rawRequiredTerminalKind) &&
           !forbidden.includes(rawRequiredTerminalKind)
         ? rawRequiredTerminalKind
         : allowed.includes("doc_evidence_synthesis_answer")
           ? "doc_evidence_synthesis_answer"
-          : allowed.includes("model_synthesized_answer")
-            ? "model_synthesized_answer"
-            : allowed[0] ?? null;
+          : allowed.includes("compound_evidence_synthesis_answer")
+            ? "compound_evidence_synthesis_answer"
+            : allowed.includes("model_synthesized_answer")
+              ? "model_synthesized_answer"
+              : allowed[0] ?? null;
 
   return {
     active: true,

@@ -108,6 +108,10 @@ const NHM2_EXPERIMENT_FACING_THEORY_ROADMAP =
   `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-experiment-facing-theory-roadmap.json`;
 const NHM2_EXPERIMENT_FACING_THEORY_ROADMAP_CONTRACT =
   "shared/contracts/nhm2-experiment-facing-theory-roadmap.v1.ts";
+const NHM2_EXPERIMENT_PARAMETER_TARGETS =
+  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-experiment-parameter-targets.json`;
+const NHM2_EXPERIMENT_PARAMETER_TARGETS_CONTRACT =
+  "shared/contracts/nhm2-experiment-parameter-targets.v1.ts";
 const NHM2_RESEARCH_DYNAMICAL_CASIMIR_NATURE_2011 =
   "https://www.nature.com/articles/nature10561";
 const NHM2_RESEARCH_CASIMIR_GRAVITATIONAL_MASS = "https://arxiv.org/abs/0710.3841";
@@ -126,6 +130,12 @@ const NHM2_RESEARCH_REAL_MATERIAL_CASIMIR = "https://arxiv.org/abs/0902.4022";
 const NHM2_RESEARCH_ARBITRARY_MATERIAL_CASIMIR = "https://arxiv.org/abs/1010.5539";
 const NHM2_RESEARCH_STATIONARY_WORLDLINE_QEI = "https://arxiv.org/abs/2301.01698";
 const NHM2_RESEARCH_GENERIC_WARP_NEC = "https://arxiv.org/abs/2105.03079";
+const NHM2_RESEARCH_HIGH_STRESS_NANOMECHANICAL_RESONATORS =
+  "https://link.aps.org/doi/10.1103/PhysRevApplied.15.034063";
+const NHM2_RESEARCH_ALN_CMOS_MEMS_REVIEW =
+  "https://www.tandfonline.com/doi/full/10.1080/10408436.2024.2406247";
+const NHM2_RESEARCH_TIN_MEMBRANE_RESONATORS =
+  "https://pubs.aip.org/aip/apl/article/127/22/222202/3373788/High-Q-membrane-resonators-using-ultra-high-stress";
 
 const NHM2_FULL_SOLVE_BOUNDARY: TheoryBadgeClaimBoundaryV1 = {
   diagnosticOnly: true,
@@ -2539,6 +2549,150 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   nhm2FullSolveBadge({
+    id: "nhm2.experimental.parameter_targets",
+    title: "Experiment Parameter Targets",
+    plainMeaning:
+      "Lists the NHM2 numerical and qualitative targets, independent research comparators, required receipts, and blockers for each experiment-facing roadmap stage.",
+    whyItMatters:
+      "It turns the roadmap into a measurable planning ledger without treating modeled scalars, literature ranges, or feasibility notes as experimental success.",
+    subjects: ["nhm2", "experiment", "parameter_targets", "roadmap", "claim_boundary"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    equationFamilies: ["experiment_parameter_targets", "experiment_facing_theory_roadmap"],
+    tags: [
+      "experimental_ladder",
+      "parameter_targets",
+      "runtime_reference",
+      "noncomputable_reference",
+      "claim_boundary",
+    ],
+    equations: [
+      {
+        id: "experiment_parameter_target_row",
+        role: "noncomputable_reference",
+        displayLatex:
+          "\\mathrm{Target}_{stage,parameter}=\\{\\mathrm{NHM2Target},\\mathrm{LiteratureRange},\\mathrm{Receipt},\\mathrm{Blocker}\\}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["stageId", "parameterId", "NHM2Target", "LiteratureRange", "Receipt"],
+        outputSymbols: ["ParameterTargetStatus"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Parameter targets are planning and falsification rows, not measurements.",
+      "Modeled scalar rows such as ideal tile energy, pressure, layer count, weight equivalent, and weak-field h00 remain sanity targets only.",
+      "Parameter targets, scalar rows, and literature comparators cannot substitute for experimental receipts.",
+      "Independent literature ranges are comparators for feasibility and systematics; they do not validate NHM2 artifacts.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      repoRef(
+        NHM2_EXPERIMENT_PARAMETER_TARGETS_CONTRACT,
+        "nhm2_experiment_parameter_targets/v1",
+        "Typed parameter-target layer for the experiment-facing roadmap.",
+      ),
+      artifactRef(
+        NHM2_EXPERIMENT_PARAMETER_TARGETS,
+        "experiment-parameter-targets-target",
+        "Expected runtime artifact target for parameter/comparator/receipt/blocker rows.",
+      ),
+      repoRef(
+        NHM2_EXPERIMENT_FACING_THEORY_ROADMAP_CONTRACT,
+        "nhm2_experiment_facing_theory_roadmap/v1",
+        "Roadmap stage IDs consumed by the parameter-target rows.",
+      ),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "parameter-targets-and-feasibility-ranges",
+        "Whitepaper parameter-target section.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_REAL_MATERIAL_CASIMIR,
+        "arxiv_0902_4022_real_material_casimir_review",
+        "Real-material Lifshitz/Casimir systematics and comparison methodology.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_ARBITRARY_MATERIAL_CASIMIR,
+        "arxiv_1010_5539_arbitrary_material_casimir",
+        "Arbitrary geometry and material Casimir computation comparator.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_SILICON_CASIMIR_CHIP,
+        "nature_communications_2013_silicon_casimir_chip",
+        "Chip-level Casimir force sensing and lithographic parallelism precedent.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_PATCH_POTENTIALS,
+        "arxiv_1409_5012_patch_potentials",
+        "Patch-potential metrology systematic.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_HIGH_STRESS_NANOMECHANICAL_RESONATORS,
+        "physrevapplied_2021_high_stress_nanomechanical_resonators",
+        "High-stress film resonator comparator for mechanical plausibility.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_ALN_CMOS_MEMS_REVIEW,
+        "critical_reviews_2024_aln_cmos_mems",
+        "AlN MEMS material comparator.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_ARCHIMEDES_BALANCE_PROTOTYPE,
+        "epjp_2024_archimedes_balance_prototype",
+        "Vacuum-weight balance comparator.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_ADVANCED_LIGO_SENSITIVITY,
+        "ligo_p1500260_advanced_ligo_sensitivity",
+        "Metric-response detector sensitivity comparator.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_MILLIMETRE_GRAVITY,
+        "nature_2021_millimetre_scale_gravitational_coupling",
+        "Small-source gravity metrology comparator.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_PFENNING_FORD_QI,
+        "gr-qc_9702026_pfenning_ford_warp_qi",
+        "Quantum inequality caution for negative-energy targets.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_STATIONARY_WORLDLINE_QEI,
+        "arxiv_2301_01698_stationary_worldline_qei",
+        "Stationary-worldline QEI bound planning reference.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_GENERIC_WARP_NEC,
+        "arxiv_2105_03079_generic_warp_nec",
+        "Generic warp NEC and observer-family caution.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "experiment", "parameter_targets", "roadmap", "claim_boundary"],
+      symbols: [
+        "gap",
+        "E_tile",
+        "pressure",
+        "N_layer",
+        "DeltaF",
+        "h00_proxy",
+        "QEI",
+      ],
+      unitSignatures: ["m", "m^2", "J", "Pa", "N", "strain"],
+      repoPaths: [
+        NHM2_EXPERIMENT_PARAMETER_TARGETS_CONTRACT,
+        NHM2_EXPERIMENT_PARAMETER_TARGETS,
+        NHM2_EXPERIMENT_FACING_THEORY_ROADMAP_CONTRACT,
+        NHM2_FULL_SOLVE_WHITEPAPER,
+      ],
+      equationFamilies: ["experiment_parameter_targets", "experiment_facing_theory_roadmap"],
+      simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
     id: "nhm2.experimental.prediction_freeze",
     title: "Experimental Prediction Freeze",
     plainMeaning:
@@ -4727,6 +4881,38 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "documents",
     label: "The physical evidence campaign points to the experiment-facing theory roadmap for pre-hardware observables, receipts, and falsifiers.",
     claimBoundaryNote: "A roadmap is planning evidence only and cannot substitute for experimental receipts.",
+  },
+  {
+    id: "theory_solve_roadmap_documents_parameter_targets",
+    from: "nhm2.experimental.theory_solve_roadmap",
+    to: "nhm2.experimental.parameter_targets",
+    relation: "documents",
+    label: "The experiment-facing roadmap is refined into stage-level parameter targets, literature comparators, receipts, and blockers.",
+    claimBoundaryNote: "Parameter targets are planning rows and cannot substitute for experimental receipts.",
+  },
+  {
+    id: "parameter_targets_feed_prediction_freeze",
+    from: "nhm2.experimental.parameter_targets",
+    to: "nhm2.experimental.prediction_freeze",
+    relation: "documents",
+    label: "Parameter targets identify which predictions and uncertainty bounds must be frozen before data collection.",
+    claimBoundaryNote: "Freezing a target is not a measured result.",
+  },
+  {
+    id: "parameter_targets_feed_tile_metrology",
+    from: "nhm2.experimental.parameter_targets",
+    to: "nhm2.experimental.tile_force_receipt",
+    relation: "documents",
+    label: "Parameter targets expose the gap, area, pressure, material, and systematic receipts required by tile metrology.",
+    claimBoundaryNote: "Ideal scalar tile rows remain non-receipted targets.",
+  },
+  {
+    id: "parameter_targets_feed_metric_response",
+    from: "nhm2.experimental.parameter_targets",
+    to: "nhm2.experimental.invariant_metric_response",
+    relation: "documents",
+    label: "Parameter targets connect the weak-field h00 proxy to detector and multi-probe metric-response planning.",
+    claimBoundaryNote: "A target scale is not detector evidence.",
   },
   {
     id: "theory_solve_roadmap_feeds_prediction_freeze",

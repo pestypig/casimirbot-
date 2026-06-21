@@ -485,7 +485,7 @@ export function buildHelixCapabilityItinerary(input: {
   const allowedTerminalArtifactKinds = unique([
     ...(compoundRequiresSynthesis ? ["final_answer_draft"] : allowedTerminalKindsFor(relevantFamilies)),
     ...(compoundRequiresSynthesis ? [] : compoundTerminalKindsFor(compoundSubgoals)),
-    ...(compoundRequiresSynthesis ? ["model_synthesized_answer"] : []),
+    ...(compoundRequiresSynthesis ? ["compound_evidence_synthesis_answer", "model_synthesized_answer"] : []),
     ...(compoundRequiresSynthesis && compoundHasDocsSubgoal(compoundSubgoals)
       ? ["doc_evidence_synthesis_answer"]
       : []),

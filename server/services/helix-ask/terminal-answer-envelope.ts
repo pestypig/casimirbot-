@@ -244,6 +244,11 @@ const readModelSynthesizedAnswerText = (payload: Record<string, unknown>): strin
   return readString(answer?.answer_text) ?? readString(answer?.text);
 };
 
+const readCompoundEvidenceSynthesisAnswerText = (payload: Record<string, unknown>): string | null => {
+  const answer = readRecord(payload.compound_evidence_synthesis_answer);
+  return readString(answer?.answer_text) ?? readString(answer?.text);
+};
+
 const directAnswerFinalAnswerSource = (payload: Record<string, unknown>): "model_direct_answer" | "final_answer_draft" =>
   readDirectAnswerArtifactText(payload) ? "model_direct_answer" : "final_answer_draft";
 
@@ -567,7 +572,12 @@ const readDirectAnswerArtifactText = (payload: Record<string, unknown>): string 
   for (const entry of readArray(payload.current_turn_artifact_ledger)) {
     const artifact = readRecord(entry);
     const kind = readString(artifact?.kind);
-    if (kind !== "direct_answer_text" && kind !== "final_answer_draft" && kind !== "model_synthesized_answer") {
+    if (
+      kind !== "direct_answer_text" &&
+      kind !== "final_answer_draft" &&
+      kind !== "model_synthesized_answer" &&
+      kind !== "compound_evidence_synthesis_answer"
+    ) {
       continue;
     }
     const artifactPayload = readRecord(artifact?.payload);
@@ -805,6 +815,14 @@ export function resolveTerminalAnswerEnvelope(
     authorityOrigin = terminalText === readFinalAnswerDraftText(payload) || terminalText === readString(payload.selected_final_answer)
       ? "selected_final_answer"
       : "terminal_presentation";
+  } else if (terminalArtifactKind === "compound_evidence_synthesis_answer") {
+    const compoundSynthesisText = readCompoundEvidenceSynthesisAnswerText(payload);
+    terminalText =
+      compoundSynthesisText ??
+      readString(payload.selected_final_answer) ??
+      readFinalAnswerDraftText(payload) ??
+      readTerminalPresentationText(payload);
+    authorityOrigin = compoundSynthesisText ? "selected_final_answer" : "terminal_presentation";
   } else if (terminalArtifactKind === "model_synthesized_answer") {
     const modelSynthesizedText = readModelSynthesizedAnswerText(payload);
     terminalText =

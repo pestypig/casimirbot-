@@ -154,6 +154,9 @@ describe("Helix Ask theory reflection route", () => {
     expect(body?.route_reason_code).toBe("theory_context_reflection");
     expect(body?.final_answer_source).toBe("workstation_tool_evaluation");
     expect(body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(body?.canonical_goal_frame?.goal_kind).toBe("theory_context_reflection");
+    expect(body?.goal_satisfaction_evaluation?.canonical_goal_kind).toBe("theory_context_reflection");
+    expect(body?.goal_satisfaction_evaluation?.terminal_contract?.goal_kind).toBe("theory_context_reflection");
     expect(body?.workstation_tool_plan?.intent).toBe("theory_context_reflection");
     expect(body?.workstation_tool_evaluation?.supports_goal).toBe(true);
     expect(actions).toEqual([]);

@@ -411,7 +411,12 @@ function synthesizeTheoryContextReflectionAnswer(input: SynthesizeWorkstationAns
     .replace(/^Theory reflection located discussion context as evidence only\.\s*/i, "")
     .replace(/^Theory explanation plan traced reflected context\s*/i, "traced reflected context ")
     .trim();
+  const promptMentionsPhotonEnergyRelation =
+    /\be\s*=\s*h\s*f\b/i.test(input.prompt) ||
+    /\bplanck\b[\s\S]{0,80}\b(?:relation|photon|energy|frequency)\b/i.test(input.prompt) ||
+    /\b(?:photon|light)\b[\s\S]{0,80}\b(?:energy|frequency)\b/i.test(input.prompt);
   const shouldLeadWithConcept =
+    promptMentionsPhotonEnergyRelation ||
     input.postToolSynthesisPlan?.answerIntent === "mixed" ||
     input.postToolSynthesisPlan?.answerIntent === "concept_explanation" ||
     input.postToolSynthesisPlan?.secondaryIntents.includes("concept_explanation") === true;
@@ -422,7 +427,7 @@ function synthesizeTheoryContextReflectionAnswer(input: SynthesizeWorkstationAns
       "I should answer from the prompt directly or rerun the reflection with a valid non-terminal receipt before using it as context.",
     ].join("\n");
   }
-  if (shouldLeadWithConcept && /\be\s*=\s*h\s*f\b/i.test(input.prompt)) {
+  if (shouldLeadWithConcept && promptMentionsPhotonEnergyRelation) {
     return [
       "E = hf means a photon's energy is proportional to its frequency.",
       "Here, E is the photon energy, h is Planck's constant, and f is the light frequency. It is the scalar bridge between wave behavior and quantum energy packets; higher-frequency light carries more energy per photon.",

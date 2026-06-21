@@ -124,6 +124,11 @@ const readStringArray = (value: unknown): string[] =>
 const readBoolean = (value: unknown): boolean | null =>
   typeof value === "boolean" ? value : null;
 
+const ledgerHasArtifactKind = (payload: Record<string, unknown>, kind: string): boolean =>
+  readArray(payload.current_turn_artifact_ledger)
+    .map(readRecord)
+    .some((artifact) => readString(artifact?.kind) === kind);
+
 const payloadGoalKind = (payload: Record<string, unknown>): string | null =>
   readCommittedAskRoute(payload)?.canonical_goal.goal_kind ??
   readString(readRecord(payload.canonical_goal_frame)?.goal_kind) ??
@@ -1145,6 +1150,15 @@ export function goalSatisfactionAllowsTerminal(payload: Record<string, unknown>)
     readString(canonicalGoal?.required_terminal_kind) === "doc_evidence_synthesis_answer" &&
     readString(docsSynthesisAnswer?.terminal_artifact_kind) === "doc_evidence_synthesis_answer" &&
     readString(docsSynthesisAnswer?.answer_text)
+  ) {
+    return true;
+  }
+  if (
+    terminalKind === "capability_help_summary" &&
+    readString(canonicalGoal?.goal_kind) === "capability_help" &&
+    readString(canonicalGoal?.required_terminal_kind) === "capability_help_summary" &&
+    ledgerHasArtifactKind(payload, "capability_registry") &&
+    ledgerHasArtifactKind(payload, "capability_help_summary")
   ) {
     return true;
   }

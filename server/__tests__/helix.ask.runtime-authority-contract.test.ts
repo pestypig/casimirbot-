@@ -117,6 +117,41 @@ describe("helix ask runtime authority contract", () => {
     expect(report.blocking_reasons).toEqual([]);
   });
 
+  it("allows capability help terminal satisfaction from registry-backed summary artifacts", () => {
+    const payload = {
+      canonical_goal_frame: {
+        goal_kind: "capability_help",
+        required_terminal_kind: "capability_help_summary",
+      },
+      terminal_artifact_kind: "capability_help_summary",
+      final_answer_source: "capability_help_summary",
+      goal_satisfaction_evaluation: {
+        canonical_goal_kind: "capability_help",
+        satisfaction: "pending",
+        next_decision: "continue",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "obs:capability-registry",
+          kind: "capability_registry",
+          payload: {
+            kind: "capability_registry",
+          },
+        },
+        {
+          artifact_id: "obs:capability-help-summary",
+          kind: "capability_help_summary",
+          payload: {
+            kind: "capability_help_summary",
+            text: "The runtime capability catalog is available.",
+          },
+        },
+      ],
+    };
+
+    expect(goalSatisfactionAllowsTerminal(payload)).toBe(true);
+  });
+
   it("blocks source/capability terminals that skip the runtime loop", () => {
     const report = evaluateTerminalBoundaryEligibility({
       canonical_goal_frame: { goal_kind: "docs_panel_open" },

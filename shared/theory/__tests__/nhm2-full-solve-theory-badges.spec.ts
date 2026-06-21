@@ -36,6 +36,7 @@ describe("NHM2 full-solve theory badges", () => {
   const physicalEvidenceBadgeIds = [
     "nhm2.experimental.physical_viability_campaign",
     "nhm2.experimental.theory_solve_roadmap",
+    "nhm2.experimental.parameter_targets",
     "nhm2.experimental.prediction_freeze",
     "nhm2.experimental.tile_force_receipt",
     "nhm2.experimental.tile_cycle_energy_balance",
@@ -339,6 +340,7 @@ describe("NHM2 full-solve theory badges", () => {
       "nhm2.clock.trip_clocking_profile_index",
       ...leanFormalBadgeIds,
       "nhm2.experimental.physical_viability_campaign",
+      "nhm2.experimental.parameter_targets",
       "nhm2.experimental.prediction_freeze",
       "nhm2.experimental.tile_force_receipt",
       "nhm2.experimental.full_apparatus_tensor",
@@ -433,6 +435,15 @@ describe("NHM2 full-solve theory badges", () => {
     expect(JSON.stringify(roadmap?.sourceRefs)).toMatch(/0902\.4022/);
     expect(JSON.stringify(roadmap?.sourceRefs)).toMatch(/gr-qc\/9702026/);
     expect(JSON.stringify(roadmap)).toMatch(/roadmap is an experiment-planning artifact/i);
+
+    const parameterTargets = byId.get("nhm2.experimental.parameter_targets");
+    expect(parameterTargets?.calculatorPayloads).toEqual([]);
+    expect(JSON.stringify(parameterTargets?.sourceRefs)).toMatch(
+      /nhm2-experiment-parameter-targets\.v1\.ts/,
+    );
+    expect(JSON.stringify(parameterTargets?.sourceRefs)).toMatch(/PhysRevApplied\.15\.034063/);
+    expect(JSON.stringify(parameterTargets)).toMatch(/modeled scalar rows/i);
+    expect(JSON.stringify(parameterTargets)).toMatch(/cannot substitute/i);
 
     expect(byId.get("nhm2.experimental.tile_cycle_energy_balance")?.calculatorPayloads.map(
       (payload) => payload.expression,
@@ -552,6 +563,7 @@ describe("NHM2 full-solve theory badges", () => {
         "nhm2.formal.negative_fixtures_fail_closed",
         "nhm2.formal.certificate_hashes_pinned",
         "nhm2.experimental.physical_viability_campaign",
+        "nhm2.experimental.parameter_targets",
         "nhm2.experimental.prediction_freeze",
         "nhm2.experimental.tile_force_receipt",
         "nhm2.experimental.tile_cycle_energy_balance",
@@ -781,6 +793,16 @@ describe("NHM2 full-solve theory badges", () => {
         expect.objectContaining({
           from: "nhm2.dynamic.time_dependent_source_campaign",
           to: "nhm2.experimental.physical_viability_campaign",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.theory_solve_roadmap",
+          to: "nhm2.experimental.parameter_targets",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.parameter_targets",
+          to: "nhm2.experimental.tile_force_receipt",
           relation: "documents",
         }),
         expect.objectContaining({

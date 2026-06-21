@@ -25,6 +25,7 @@ export type FinalAnswerDraftTerminalMaterializerResult = {
   ok: boolean;
   materialized_terminal_artifact_ref?: string;
   materialized_terminal_artifact_kind?:
+    | "compound_evidence_synthesis_answer"
     | "model_synthesized_answer"
     | "repo_code_evidence_answer"
     | "compound_research_locator_answer"
@@ -1341,7 +1342,12 @@ export function materializeFinalAnswerDraftTerminal(input: {
     };
   }
 
-  if (!contractAllows(input.payload, contract, "model_synthesized_answer")) {
+  const compoundPolicy = readCompoundTerminalPolicy(input.payload);
+  const genericCompoundTargetKind =
+    compoundPolicy.active && compoundPolicy.required_terminal_kind === "compound_evidence_synthesis_answer"
+      ? "compound_evidence_synthesis_answer"
+      : "model_synthesized_answer";
+  if (!contractAllows(input.payload, contract, genericCompoundTargetKind)) {
     return {
       schema: "helix.final_answer_draft_terminal_materializer_result.v1",
       turn_id: input.turnId,
@@ -1355,7 +1361,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
     };
   }
 
-  const ref = materializedRef(input.turnId, "model_synthesized_answer");
+  const ref = materializedRef(input.turnId, genericCompoundTargetKind);
   const supportRefs = collectFinalAnswerDraftSupportRefs({
     draftPayload,
     artifactLedger,
@@ -1388,31 +1394,41 @@ export function materializeFinalAnswerDraftTerminal(input: {
       : compoundSubgoalCount(input.payload, artifactLedger) > 1
         ? terminalSupportRefs
         : [];
-  input.payload.model_synthesized_answer = {
-    schema: "helix.model_synthesized_answer.v1",
+  const terminalPayload = {
+    schema: genericCompoundTargetKind === "compound_evidence_synthesis_answer"
+      ? "helix.compound_evidence_synthesis_answer.v1"
+      : "helix.model_synthesized_answer.v1",
     artifact_id: ref,
     turn_id: input.turnId,
     text: draft.text,
     answer_text: draft.text,
+    terminal_artifact_kind: genericCompoundTargetKind,
     support_refs: terminalSupportRefs,
     support_refs_count: terminalSupportRefs.length,
     subgoal_observation_refs: effectiveSubgoalObservationRefs,
     subgoal_observation_refs_count: effectiveSubgoalObservationRefs.length,
     source_families: compoundTerminalSupport.sourceFamilies,
-    model_step_capability: effectiveSubgoalObservationRefs.length > 1
+    model_step_capability: genericCompoundTargetKind === "compound_evidence_synthesis_answer"
+      ? "model.synthesize_from_compound_subgoal_observations"
+      : effectiveSubgoalObservationRefs.length > 1
       ? "model.synthesize_from_compound_subgoal_observations"
       : "model.synthesize_from_current_observations",
     final_answer_draft_ref: draft.ref,
     assistant_answer: false,
     raw_content_included: false,
   };
+  if (genericCompoundTargetKind === "compound_evidence_synthesis_answer") {
+    input.payload.compound_evidence_synthesis_answer = terminalPayload;
+  } else {
+    input.payload.model_synthesized_answer = terminalPayload;
+  }
   return {
     schema: "helix.final_answer_draft_terminal_materializer_result.v1",
     turn_id: input.turnId,
     final_answer_draft_ref: draft.ref,
     ok: true,
     materialized_terminal_artifact_ref: ref,
-    materialized_terminal_artifact_kind: "model_synthesized_answer",
+    materialized_terminal_artifact_kind: genericCompoundTargetKind,
     route_allowed_terminal_artifact_kinds: routeAllowed,
     final_answer_draft_quality_gate: qualityGate,
     assistant_answer: false,

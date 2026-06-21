@@ -52,6 +52,96 @@ describe("compound capability synthesis readiness", () => {
     expect(readiness.support_refs).toEqual(["obs:doc-location", "obs:calculator"]);
   });
 
+  it("filters stale missing summaries with artifact-query-index subgoal rails", () => {
+    const turnId = "ask:test:compound-stale-missing-summary";
+    const docsSubgoalId = `${turnId}:compound_capability_subgoal:1:docs-viewer_locate_in_doc`;
+    const calculatorSubgoalId = `${turnId}:compound_capability_subgoal:2:scientific-calculator_solve_expression`;
+    const readiness = resolveCompoundCapabilitySynthesisReadiness({
+      payload: {
+        capability_itinerary_execution_state: {
+          schema: "helix.capability_itinerary_execution_state.v1",
+          applies: true,
+          complete: false,
+          compound_subgoal_ledger: [
+            {
+              subgoal_id: docsSubgoalId,
+              requested_capability: "docs-viewer.locate_in_doc",
+              runtime_capability: "docs-viewer.locate_in_doc",
+              selected_capability: "docs-viewer.locate_in_doc",
+              executed_capability: "docs-viewer.locate_in_doc",
+              satisfaction: "failed",
+              rail_status: "fail_closed",
+              rail_failure_code: "subgoal_observation_missing",
+            },
+            {
+              subgoal_id: calculatorSubgoalId,
+              requested_capability: "scientific-calculator.solve_expression",
+              runtime_capability: "scientific-calculator.solve_expression",
+              satisfaction: "pending",
+              rail_status: "pending",
+              rail_failure_code: "subgoal_observation_missing",
+            },
+          ],
+        },
+        compound_capability_contract: {
+          schema: "helix.compound_capability_contract.v1",
+          requires_all_subgoals: true,
+          subgoals: [
+            {
+              subgoal_id: docsSubgoalId,
+              capability_family: "docs_viewer",
+              requested_capability: "docs-viewer.locate_in_doc",
+              runtime_capability: "docs-viewer.locate_in_doc",
+            },
+            {
+              subgoal_id: calculatorSubgoalId,
+              capability_family: "calculator",
+              requested_capability: "scientific-calculator.solve_expression",
+              runtime_capability: "scientific-calculator.solve_expression",
+            },
+          ],
+        },
+        artifact_query_index: {
+          compound_subgoal_rail_statuses: [
+            {
+              subgoal_id: docsSubgoalId,
+              requested_capability: "docs-viewer.locate_in_doc",
+              runtime_capability: "docs-viewer.locate_in_doc",
+              selected_capability: "docs-viewer.locate_in_doc",
+              executed_capability: "docs-viewer.locate_in_doc",
+              observation_kind: "doc_location_matches",
+              observation_ref: "obs:doc-location-runtime",
+              support_refs: ["obs:doc-location-runtime"],
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+            {
+              subgoal_id: calculatorSubgoalId,
+              requested_capability: "scientific-calculator.solve_expression",
+              runtime_capability: "scientific-calculator.solve_expression",
+              satisfaction: "pending",
+              rail_status: "pending",
+              rail_failure_code: "subgoal_observation_missing",
+            },
+          ],
+          compound_subgoal_missing_summary: {
+            missing_compound_subgoal_ids: [docsSubgoalId, calculatorSubgoalId],
+            missing_required_capabilities: [
+              "docs-viewer.locate_in_doc",
+              "scientific-calculator.solve_expression",
+            ],
+          },
+        },
+      },
+      artifacts: [],
+    });
+
+    expect(readiness.complete).toBe(false);
+    expect(readiness.missing_compound_subgoal_ids).toEqual([calculatorSubgoalId]);
+    expect(readiness.missing_required_capabilities).toEqual(["scientific-calculator.solve_expression"]);
+    expect(readiness.support_refs).toContain("obs:doc-location-runtime");
+  });
+
   it("recovers synthesis readiness from ledger-only compound itinerary artifacts", () => {
     const turnId = "ask:test:compound-synthesis-ledger-only-state";
     const docsSubgoalId = `${turnId}:compound_capability_subgoal:1:docs-viewer_locate_in_doc`;
@@ -532,7 +622,7 @@ describe("compound capability synthesis readiness", () => {
       complete: true,
       synthesis_required: true,
       goal_kind: "compound_evidence_synthesis",
-      required_terminal_kind: "model_synthesized_answer",
+      required_terminal_kind: "compound_evidence_synthesis_answer",
     });
     expect(readiness.support_refs).toEqual(["obs:capability-registry", "obs:workspace-status"]);
     expect(readiness.terminal_contribution_kinds).toEqual([
@@ -669,7 +759,7 @@ describe("compound capability synthesis readiness", () => {
       complete: true,
       synthesis_required: true,
       has_failed_subgoal: false,
-      required_terminal_kind: "model_synthesized_answer",
+      required_terminal_kind: "compound_evidence_synthesis_answer",
     });
     expect(readiness.support_refs).toEqual(["obs:capability-registry", "obs:workspace-status"]);
   });
@@ -823,7 +913,7 @@ describe("compound capability synthesis readiness", () => {
     expect(readiness.support_refs).toEqual(["obs:scholarly", "obs:theory"]);
   });
 
-  it("requires model synthesis for non-doc heterogeneous compound observations", () => {
+  it("requires compound evidence synthesis for non-doc heterogeneous compound observations", () => {
     const readiness = resolveCompoundCapabilitySynthesisReadiness({
       payload: {
         capability_itinerary_execution_state: {
@@ -870,8 +960,8 @@ describe("compound capability synthesis readiness", () => {
       synthesis_required: true,
       has_docs_subgoal: false,
       goal_kind: "compound_evidence_synthesis",
-      required_terminal_kind: "model_synthesized_answer",
-      synthesis_terminal_kind: "model_synthesized_answer",
+      required_terminal_kind: "compound_evidence_synthesis_answer",
+      synthesis_terminal_kind: "compound_evidence_synthesis_answer",
     });
     expect(readiness.support_refs).toEqual(["obs:web", "obs:reflection", "obs:calculator"]);
     expect(readiness.terminal_contribution_kinds).toEqual([
@@ -880,7 +970,7 @@ describe("compound capability synthesis readiness", () => {
     ]);
   });
 
-  it("requires model synthesis for scholarly research plus reflection plus calculator observations", () => {
+  it("requires compound evidence synthesis for scholarly research plus reflection plus calculator observations", () => {
     const readiness = resolveCompoundCapabilitySynthesisReadiness({
       payload: {
         capability_itinerary_execution_state: {
@@ -927,8 +1017,8 @@ describe("compound capability synthesis readiness", () => {
       synthesis_required: true,
       has_docs_subgoal: false,
       goal_kind: "compound_evidence_synthesis",
-      required_terminal_kind: "model_synthesized_answer",
-      synthesis_terminal_kind: "model_synthesized_answer",
+      required_terminal_kind: "compound_evidence_synthesis_answer",
+      synthesis_terminal_kind: "compound_evidence_synthesis_answer",
     });
     expect(readiness.support_refs).toEqual(["obs:scholarly", "obs:reflection", "obs:calculator"]);
     expect(readiness.terminal_contribution_kinds).toEqual([
@@ -990,7 +1080,7 @@ describe("compound capability synthesis readiness", () => {
       has_docs_subgoal: false,
       has_materialized_terminal_artifact: false,
       synthesis_required: true,
-      required_terminal_kind: "model_synthesized_answer",
+      required_terminal_kind: "compound_evidence_synthesis_answer",
     });
     expect(readiness.support_refs).toEqual(["obs:web", "obs:reflection", "obs:calculator"]);
   });
@@ -1022,7 +1112,7 @@ describe("compound capability synthesis readiness", () => {
           complete: true,
           compound_subgoal_ledger: ledger,
         },
-        model_synthesized_answer: {
+        compound_evidence_synthesis_answer: {
           text: "Catalog plus workspace status were synthesized from both observations.",
           support_refs: ["obs:capability-registry", "obs:workspace-status"],
         },
@@ -1035,7 +1125,7 @@ describe("compound capability synthesis readiness", () => {
       complete: true,
       has_materialized_terminal_artifact: true,
       synthesis_required: false,
-      required_terminal_kind: "model_synthesized_answer",
+      required_terminal_kind: "compound_evidence_synthesis_answer",
     });
     expect(readiness.support_refs).toEqual(["obs:capability-registry", "obs:workspace-status"]);
   });
@@ -1080,8 +1170,8 @@ describe("compound capability synthesis readiness", () => {
       synthesis_required: true,
       has_docs_subgoal: false,
       goal_kind: "compound_evidence_synthesis",
-      required_terminal_kind: "model_synthesized_answer",
-      synthesis_terminal_kind: "model_synthesized_answer",
+      required_terminal_kind: "compound_evidence_synthesis_answer",
+      synthesis_terminal_kind: "compound_evidence_synthesis_answer",
     });
     expect(readiness.support_refs).toEqual(["obs:visual-context", "obs:calculator"]);
     expect(readiness.terminal_contribution_kinds).toEqual([
@@ -1130,8 +1220,8 @@ describe("compound capability synthesis readiness", () => {
       synthesis_required: true,
       has_docs_subgoal: false,
       goal_kind: "compound_evidence_synthesis",
-      required_terminal_kind: "model_synthesized_answer",
-      synthesis_terminal_kind: "model_synthesized_answer",
+      required_terminal_kind: "compound_evidence_synthesis_answer",
+      synthesis_terminal_kind: "compound_evidence_synthesis_answer",
     });
     expect(readiness.support_refs).toEqual(["obs:capability-registry", "obs:workspace-status"]);
     expect(readiness.terminal_contribution_kinds).toEqual([
@@ -1174,7 +1264,7 @@ describe("compound capability synthesis readiness", () => {
         final_answer_draft: {
           artifact_id: `${turnId}:final_answer_draft`,
           text: "The catalog and workspace status observations are ready for synthesis.",
-          required_terminal_kind: "model_synthesized_answer",
+          required_terminal_kind: "compound_evidence_synthesis_answer",
           support_refs: ["obs:capability-registry", "obs:workspace-status"],
         },
       },
@@ -1184,7 +1274,7 @@ describe("compound capability synthesis readiness", () => {
           kind: "final_answer_draft",
           payload: {
             text: "The catalog and workspace status observations are ready for synthesis.",
-            required_terminal_kind: "model_synthesized_answer",
+            required_terminal_kind: "compound_evidence_synthesis_answer",
             support_refs: ["obs:capability-registry", "obs:workspace-status"],
           },
         },
@@ -1198,7 +1288,7 @@ describe("compound capability synthesis readiness", () => {
       has_materialized_terminal_artifact: false,
       synthesis_required: true,
       goal_kind: "compound_evidence_synthesis",
-      required_terminal_kind: "model_synthesized_answer",
+      required_terminal_kind: "compound_evidence_synthesis_answer",
     });
   });
 
@@ -1304,7 +1394,7 @@ describe("compound capability synthesis readiness", () => {
       complete: true,
       synthesis_required: true,
       goal_kind: "compound_evidence_synthesis",
-      required_terminal_kind: "model_synthesized_answer",
+      required_terminal_kind: "compound_evidence_synthesis_answer",
     });
     expect(readiness.support_refs).toEqual(["obs:capability-registry", "obs:workspace-status"]);
   });
@@ -1588,7 +1678,7 @@ describe("compound capability synthesis readiness", () => {
         text: "The capability catalog reported the active tool surface, and workspace status reported the current workstation capability counts.",
         answer_text: "The capability catalog reported the active tool surface, and workspace status reported the current workstation capability counts.",
         goal_kind: "compound_evidence_synthesis",
-        required_terminal_kind: "model_synthesized_answer",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
         support_refs: ["obs:capability-registry", "obs:workspace-status"],
         artifact_refs: ["obs:capability-registry", "obs:workspace-status"],
         authority: "llm_post_observation_compound_synthesis",
@@ -1612,8 +1702,8 @@ describe("compound capability synthesis readiness", () => {
       compound_capability_synthesis_readiness: {
         applies: true,
         complete: true,
-        required_terminal_kind: "model_synthesized_answer",
-        synthesis_terminal_kind: "model_synthesized_answer",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+        synthesis_terminal_kind: "compound_evidence_synthesis_answer",
       },
       capability_itinerary_execution_state: {
         applies: true,
@@ -1665,9 +1755,9 @@ describe("compound capability synthesis readiness", () => {
 
     expect(result).toMatchObject({
       ok: true,
-      materialized_terminal_artifact_kind: "model_synthesized_answer",
+      materialized_terminal_artifact_kind: "compound_evidence_synthesis_answer",
     });
-    expect(payload.model_synthesized_answer).toMatchObject({
+    expect(payload.compound_evidence_synthesis_answer).toMatchObject({
       support_refs: ["obs:capability-registry", "obs:workspace-status"],
       subgoal_observation_refs: ["obs:capability-registry", "obs:workspace-status"],
       model_step_capability: "model.synthesize_from_compound_subgoal_observations",
@@ -1684,7 +1774,7 @@ describe("compound capability synthesis readiness", () => {
         text: "The capability catalog and workspace status observations are ready for synthesis.",
         answer_text: "The capability catalog and workspace status observations are ready for synthesis.",
         goal_kind: "compound_evidence_synthesis",
-        required_terminal_kind: "model_synthesized_answer",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
         support_refs: ["obs:capability-registry"],
         artifact_refs: ["obs:capability-registry"],
         authority: "llm_post_observation_compound_synthesis",
@@ -1693,15 +1783,15 @@ describe("compound capability synthesis readiness", () => {
     const payload = {
       route_product_contract: {
         source_target: "runtime_evidence",
-        allowed_terminal_artifact_kinds: ["model_synthesized_answer"],
+        allowed_terminal_artifact_kinds: ["compound_evidence_synthesis_answer"],
       },
       compound_capability_synthesis_readiness: {
         applies: true,
         complete: false,
         has_failed_subgoal: true,
         support_refs: ["obs:capability-registry"],
-        required_terminal_kind: "model_synthesized_answer",
-        synthesis_terminal_kind: "model_synthesized_answer",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+        synthesis_terminal_kind: "compound_evidence_synthesis_answer",
       },
       capability_itinerary_execution_state: {
         applies: true,
@@ -1752,6 +1842,7 @@ describe("compound capability synthesis readiness", () => {
       blocked_reason: "compound_subgoal_incomplete",
     });
     expect(payload.model_synthesized_answer).toBeUndefined();
+    expect(payload.compound_evidence_synthesis_answer).toBeUndefined();
   });
 
   it("blocks compound final draft materialization when a satisfied subgoal lacks an observation ref", () => {
@@ -1764,7 +1855,7 @@ describe("compound capability synthesis readiness", () => {
         text: "The capability catalog and workspace status observations are ready for synthesis.",
         answer_text: "The capability catalog and workspace status observations are ready for synthesis.",
         goal_kind: "compound_evidence_synthesis",
-        required_terminal_kind: "model_synthesized_answer",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
         support_refs: ["obs:capability-registry"],
         artifact_refs: ["obs:capability-registry"],
         authority: "llm_post_observation_compound_synthesis",
@@ -1773,14 +1864,14 @@ describe("compound capability synthesis readiness", () => {
     const payload = {
       route_product_contract: {
         source_target: "runtime_evidence",
-        allowed_terminal_artifact_kinds: ["model_synthesized_answer"],
+        allowed_terminal_artifact_kinds: ["compound_evidence_synthesis_answer"],
       },
       compound_capability_synthesis_readiness: {
         applies: true,
         complete: true,
         support_refs: ["obs:capability-registry"],
-        required_terminal_kind: "model_synthesized_answer",
-        synthesis_terminal_kind: "model_synthesized_answer",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+        synthesis_terminal_kind: "compound_evidence_synthesis_answer",
       },
       capability_itinerary_execution_state: {
         applies: true,
@@ -1827,6 +1918,7 @@ describe("compound capability synthesis readiness", () => {
       blocked_reason: "compound_subgoal_incomplete",
     });
     expect(payload.model_synthesized_answer).toBeUndefined();
+    expect(payload.compound_evidence_synthesis_answer).toBeUndefined();
   });
 
   it("blocks compound final draft materialization when the execution ledger drops a required later subgoal", () => {
@@ -1841,7 +1933,7 @@ describe("compound capability synthesis readiness", () => {
         text: "The capability catalog observation is ready for synthesis.",
         answer_text: "The capability catalog observation is ready for synthesis.",
         goal_kind: "compound_evidence_synthesis",
-        required_terminal_kind: "model_synthesized_answer",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
         support_refs: ["obs:capability-registry"],
         artifact_refs: ["obs:capability-registry"],
         authority: "llm_post_observation_compound_synthesis",
@@ -1850,7 +1942,7 @@ describe("compound capability synthesis readiness", () => {
     const payload = {
       route_product_contract: {
         source_target: "runtime_evidence",
-        allowed_terminal_artifact_kinds: ["model_synthesized_answer"],
+        allowed_terminal_artifact_kinds: ["compound_evidence_synthesis_answer"],
       },
       compound_capability_contract: {
         schema: "helix.compound_capability_contract.v1",
@@ -1866,7 +1958,7 @@ describe("compound capability synthesis readiness", () => {
             subgoal_id: workspaceSubgoalId,
             requested_capability: "workspace_os.status",
             required_observation_kinds: ["workspace_os_status_observation"],
-            required_terminal_kind: "model_synthesized_answer",
+            required_terminal_kind: "compound_evidence_synthesis_answer",
           },
         ],
       },
@@ -1874,8 +1966,8 @@ describe("compound capability synthesis readiness", () => {
         applies: true,
         complete: true,
         support_refs: ["obs:capability-registry"],
-        required_terminal_kind: "model_synthesized_answer",
-        synthesis_terminal_kind: "model_synthesized_answer",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+        synthesis_terminal_kind: "compound_evidence_synthesis_answer",
       },
       capability_itinerary_execution_state: {
         applies: true,
@@ -1915,9 +2007,10 @@ describe("compound capability synthesis readiness", () => {
       blocked_reason: "compound_subgoal_incomplete",
     });
     expect(payload.model_synthesized_answer).toBeUndefined();
+    expect(payload.compound_evidence_synthesis_answer).toBeUndefined();
   });
 
-  it("promotes satisfied compound subgoal observations into model terminal support refs", () => {
+  it("promotes satisfied compound subgoal observations into compound terminal support refs", () => {
     const turnId = "ask:test:compound-terminal-support-coverage";
     const finalAnswerDraft = {
       artifact_id: `${turnId}:final_answer_draft`,
@@ -1927,7 +2020,7 @@ describe("compound capability synthesis readiness", () => {
         text: "The capability catalog and workspace status observations are ready for synthesis.",
         answer_text: "The capability catalog and workspace status observations are ready for synthesis.",
         goal_kind: "compound_evidence_synthesis",
-        required_terminal_kind: "model_synthesized_answer",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
         support_refs: ["obs:capability-registry"],
         artifact_refs: ["obs:capability-registry"],
         authority: "llm_post_observation_compound_synthesis",
@@ -1936,14 +2029,14 @@ describe("compound capability synthesis readiness", () => {
     const payload = {
       route_product_contract: {
         source_target: "runtime_evidence",
-        allowed_terminal_artifact_kinds: ["model_synthesized_answer"],
+        allowed_terminal_artifact_kinds: ["compound_evidence_synthesis_answer"],
       },
       compound_capability_synthesis_readiness: {
         applies: true,
         complete: true,
         support_refs: ["obs:capability-registry", "obs:workspace-status"],
-        required_terminal_kind: "model_synthesized_answer",
-        synthesis_terminal_kind: "model_synthesized_answer",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+        synthesis_terminal_kind: "compound_evidence_synthesis_answer",
       },
       capability_itinerary_execution_state: {
         applies: true,
@@ -1992,9 +2085,9 @@ describe("compound capability synthesis readiness", () => {
 
     expect(result).toMatchObject({
       ok: true,
-      materialized_terminal_artifact_kind: "model_synthesized_answer",
+      materialized_terminal_artifact_kind: "compound_evidence_synthesis_answer",
     });
-    expect(payload.model_synthesized_answer).toMatchObject({
+    expect(payload.compound_evidence_synthesis_answer).toMatchObject({
       support_refs: ["obs:capability-registry", "obs:workspace-status"],
       support_refs_count: 2,
       subgoal_observation_refs: ["obs:capability-registry", "obs:workspace-status"],
@@ -2013,7 +2106,7 @@ describe("compound capability synthesis readiness", () => {
         text: "The visual capture and calculator observations are ready for synthesis.",
         answer_text: "The visual capture and calculator observations are ready for synthesis.",
         goal_kind: "compound_evidence_synthesis",
-        required_terminal_kind: "model_synthesized_answer",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
         support_refs: ["obs:visual-context"],
         artifact_refs: ["obs:visual-context"],
         authority: "llm_post_observation_compound_synthesis",
@@ -2022,7 +2115,7 @@ describe("compound capability synthesis readiness", () => {
     const payload = {
       route_product_contract: {
         source_target: "runtime_evidence",
-        allowed_terminal_artifact_kinds: ["model_synthesized_answer"],
+        allowed_terminal_artifact_kinds: ["compound_evidence_synthesis_answer"],
       },
       capability_itinerary_execution_state: {
         applies: true,
@@ -2071,9 +2164,9 @@ describe("compound capability synthesis readiness", () => {
 
     expect(result).toMatchObject({
       ok: true,
-      materialized_terminal_artifact_kind: "model_synthesized_answer",
+      materialized_terminal_artifact_kind: "compound_evidence_synthesis_answer",
     });
-    expect(payload.model_synthesized_answer).toMatchObject({
+    expect(payload.compound_evidence_synthesis_answer).toMatchObject({
       support_refs: ["obs:visual-context", "obs:calculator"],
       subgoal_observation_refs: ["obs:visual-context", "obs:calculator"],
       source_families: ["visual_capture", "calculator"],
@@ -2091,7 +2184,7 @@ describe("compound capability synthesis readiness", () => {
         text: "The live-source mailbox read, process, and reflection observations are ready for operator review.",
         answer_text: "The live-source mailbox read, process, and reflection observations are ready for operator review.",
         goal_kind: "compound_evidence_synthesis",
-        required_terminal_kind: "model_synthesized_answer",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
         support_refs: ["obs:mail-read", "obs:mail-process", "obs:mail-reflect"],
         artifact_refs: ["obs:mail-read", "obs:mail-process", "obs:mail-reflect"],
         authority: "llm_post_observation_compound_synthesis",
@@ -2100,11 +2193,11 @@ describe("compound capability synthesis readiness", () => {
     const payload = {
       canonical_goal_frame: {
         goal_kind: "compound_evidence_synthesis",
-        required_terminal_kind: "model_synthesized_answer",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
       },
       route_product_contract: {
         source_target: "live_source_mailbox",
-        allowed_terminal_artifact_kinds: ["model_synthesized_answer"],
+        allowed_terminal_artifact_kinds: ["compound_evidence_synthesis_answer"],
       },
       capability_itinerary_execution_state: {
         applies: true,
@@ -2162,16 +2255,16 @@ describe("compound capability synthesis readiness", () => {
       artifactLedger: payload.current_turn_artifact_ledger,
       routeProductContract: {
         source_target: "live_source_mailbox",
-        allowed_terminal_artifact_kinds: ["model_synthesized_answer"],
+        allowed_terminal_artifact_kinds: ["compound_evidence_synthesis_answer"],
       },
       finalAnswerDraftRef: `${turnId}:final_answer_draft`,
     });
 
     expect(result).toMatchObject({
       ok: true,
-      materialized_terminal_artifact_kind: "model_synthesized_answer",
+      materialized_terminal_artifact_kind: "compound_evidence_synthesis_answer",
     });
-    expect(payload.model_synthesized_answer).toMatchObject({
+    expect(payload.compound_evidence_synthesis_answer).toMatchObject({
       source_families: ["live_source_mail"],
       support_refs: ["obs:mail-read", "obs:mail-process", "obs:mail-reflect"],
       subgoal_observation_refs: ["obs:mail-read", "obs:mail-process", "obs:mail-reflect"],
@@ -2370,7 +2463,7 @@ describe("compound capability synthesis readiness", () => {
     });
   });
 
-  it("materializes research plus reflection plus calculator as model compound synthesis", () => {
+  it("materializes research plus reflection plus calculator as compound evidence synthesis", () => {
     const turnId = "ask:test:internet-reflection-calculator-materializer";
     const finalAnswerDraft = {
       artifact_id: `${turnId}:final_answer_draft`,
@@ -2380,7 +2473,7 @@ describe("compound capability synthesis readiness", () => {
         text: "The web research, theory reflection, and calculator observations jointly support the final synthesis.",
         answer_text: "The web research, theory reflection, and calculator observations jointly support the final synthesis.",
         goal_kind: "compound_evidence_synthesis",
-        required_terminal_kind: "model_synthesized_answer",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
         support_refs: ["obs:web", "obs:reflection", "obs:calculator"],
         artifact_refs: ["obs:web", "obs:reflection", "obs:calculator"],
         authority: "llm_post_observation_compound_synthesis",
@@ -2408,6 +2501,7 @@ describe("compound capability synthesis readiness", () => {
       route_product_contract: {
         source_target: "internet_search",
         allowed_terminal_artifact_kinds: [
+          "compound_evidence_synthesis_answer",
           "model_synthesized_answer",
           "tool_receipt",
           "calculator_receipt",
@@ -2418,6 +2512,7 @@ describe("compound capability synthesis readiness", () => {
           requires_post_observation_synthesis: true,
           compound_terminal_policy: "synthesize_from_satisfied_subgoal_observations",
           allowed_terminal_artifact_kinds: [
+            "compound_evidence_synthesis_answer",
             "model_synthesized_answer",
             "tool_receipt",
             "calculator_receipt",
@@ -2432,8 +2527,8 @@ describe("compound capability synthesis readiness", () => {
         applies: true,
         complete: true,
         support_refs: ["obs:web", "obs:reflection", "obs:calculator"],
-        required_terminal_kind: "model_synthesized_answer",
-        synthesis_terminal_kind: "model_synthesized_answer",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+        synthesis_terminal_kind: "compound_evidence_synthesis_answer",
       },
       capability_itinerary_execution_state: {
         complete: true,
@@ -2478,13 +2573,13 @@ describe("compound capability synthesis readiness", () => {
 
     expect(result).toMatchObject({
       ok: true,
-      materialized_terminal_artifact_kind: "model_synthesized_answer",
+      materialized_terminal_artifact_kind: "compound_evidence_synthesis_answer",
     });
-    expect(result.route_allowed_terminal_artifact_kinds).toContain("model_synthesized_answer");
+    expect(result.route_allowed_terminal_artifact_kinds).toContain("compound_evidence_synthesis_answer");
     expect(result.route_allowed_terminal_artifact_kinds).not.toContain("tool_receipt");
     expect(result.route_allowed_terminal_artifact_kinds).not.toContain("calculator_receipt");
     expect(payload.compound_research_locator_answer).toBeUndefined();
-    expect(payload.model_synthesized_answer).toMatchObject({
+    expect(payload.compound_evidence_synthesis_answer).toMatchObject({
       support_refs: ["obs:web", "obs:reflection", "obs:calculator"],
       support_refs_count: 3,
       subgoal_observation_refs: ["obs:web", "obs:reflection", "obs:calculator"],

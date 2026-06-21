@@ -25,6 +25,7 @@ export type HelixCompoundCapabilitySynthesisReadiness = {
   subgoal_terminal_kinds: string[];
   terminal_contribution_kinds: string[];
   synthesis_terminal_kind:
+    | "compound_evidence_synthesis_answer"
     | "compound_research_locator_answer"
     | "doc_evidence_synthesis_answer"
     | "model_synthesized_answer"
@@ -35,6 +36,7 @@ export type HelixCompoundCapabilitySynthesisReadiness = {
     | "compound_evidence_synthesis"
     | undefined;
   required_terminal_kind:
+    | "compound_evidence_synthesis_answer"
     | "compound_research_locator_answer"
     | "doc_evidence_synthesis_answer"
     | "model_synthesized_answer"
@@ -55,6 +57,9 @@ const unique = (values: string[]): string[] => Array.from(new Set(values.filter(
 
 const artifactKind = (artifact: ArtifactLike): string | null =>
   readString(artifact.kind) ?? readString(readRecord(artifact.payload)?.kind);
+
+const artifactSchema = (artifact: ArtifactLike): string | null =>
+  readString(readRecord(artifact.payload)?.schema);
 
 const artifactId = (artifact: ArtifactLike): string | null =>
   readString(artifact.artifact_id) ?? readString(readRecord(artifact.payload)?.artifact_id);
@@ -107,9 +112,10 @@ const hasMaterializedTerminalArtifact = (
 ): boolean => {
   const terminalKinds = requiredTerminalKind
     ? [requiredTerminalKind]
-    : ["model_synthesized_answer", "doc_evidence_synthesis_answer", "compound_research_locator_answer"];
+    : ["model_synthesized_answer", "compound_evidence_synthesis_answer", "doc_evidence_synthesis_answer", "compound_research_locator_answer"];
   const terminalPayloadKeys = [
     "model_synthesized_answer",
+    "compound_evidence_synthesis_answer",
     "doc_evidence_synthesis_answer",
     "compound_research_locator_answer",
   ];
@@ -177,8 +183,13 @@ const supportRefsFromLedger = (ledger: RecordLike[]): string[] =>
 const supportRefsFromArtifacts = (artifacts: ArtifactLike[]): string[] =>
   unique(artifacts.flatMap((artifact) => {
     const kind = artifactKind(artifact);
+    const schema = artifactSchema(artifact);
+    const evidenceLikeKind = /(?:observation|evidence|result|context|reflection|validation|trace|packet|resolution|registry|summary)/i.test(
+      [kind, schema].join(" "),
+    );
     if (
       !kind ||
+      (/(?:^|_)(?:receipt|receipts)$/i.test(kind) && !evidenceLikeKind) ||
       [
         "agent_step_decision",
         "available_capabilities",
@@ -186,7 +197,6 @@ const supportRefsFromArtifacts = (artifacts: ArtifactLike[]): string[] =>
         "final_answer_draft",
         "typed_failure",
       ].includes(kind)
-      || /(?:^|_)(?:receipt|receipts)$/i.test(kind)
     ) {
       return [];
     }
@@ -255,20 +265,44 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
   const ledger = readArray(state.compound_subgoal_ledger)
     .map(readRecord)
     .filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry));
-  const railStatuses = readArray(input.payload.compound_subgoal_rail_statuses)
+  const artifactQueryIndex = readRecord(input.payload.artifact_query_index);
+  const railStatuses = [
+    ...readArray(input.payload.compound_subgoal_rail_statuses),
+    ...readArray(artifactQueryIndex?.compound_subgoal_rail_statuses),
+  ]
     .map(readRecord)
     .filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry));
-  const artifactQueryIndex = readRecord(input.payload.artifact_query_index);
   const missingSummary =
     readRecord(input.payload.compound_subgoal_missing_summary) ??
     readRecord(artifactQueryIndex?.compound_subgoal_missing_summary);
-  const missingSummaryIds = readArray(missingSummary?.missing_compound_subgoal_ids)
+  const rawMissingSummaryIds = readArray(missingSummary?.missing_compound_subgoal_ids)
     .map(readString)
     .filter((entry: string | null): entry is string => Boolean(entry));
-  const missingSummaryCapabilities = readArray(missingSummary?.missing_required_capabilities)
+  const rawMissingSummaryCapabilities = readArray(missingSummary?.missing_required_capabilities)
     .map(readString)
     .filter((entry: string | null): entry is string => Boolean(entry));
   const compoundRows = [...ledger, ...railStatuses];
+  const satisfiedCompoundRowIds = new Set(
+    compoundRows
+      .filter(ledgerEntryHasSatisfiedObservation)
+      .map((entry) => readString(entry.subgoal_id))
+      .filter((entry): entry is string => Boolean(entry)),
+  );
+  const satisfiedCompoundRowCapabilities = new Set(
+    compoundRows
+      .filter(ledgerEntryHasSatisfiedObservation)
+      .flatMap((entry) => [
+        readString(entry.requested_capability),
+        readString(entry.runtime_capability),
+        readString(entry.selected_capability),
+        readString(entry.executed_capability),
+      ])
+      .filter((entry): entry is string => Boolean(entry)),
+  );
+  const missingSummaryIds = rawMissingSummaryIds.filter((id) => !satisfiedCompoundRowIds.has(id));
+  const missingSummaryCapabilities = rawMissingSummaryCapabilities.filter((capability) =>
+    !satisfiedCompoundRowCapabilities.has(capability)
+  );
   const requiredFamilies = readArray(state.required_observation_families)
     .map(readString)
     .filter((entry: string | null): entry is string => Boolean(entry));
@@ -332,6 +366,9 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
       readString(entry.selected_capability)
     )
     .filter((entry: string | null): entry is string => Boolean(entry));
+  const effectiveIncompleteCompoundRowCapabilities = incompleteCompoundRowCapabilities.filter((capability) =>
+    !satisfiedCompoundRowCapabilities.has(capability)
+  );
   const missingCompoundSubgoalIds = unique([
     ...missingSummaryIds,
     ...missingContractSubgoalIds,
@@ -384,14 +421,14 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
       ? "doc_evidence_synthesis_answer"
       : hasResearchLocatorSubgoal
         ? "compound_research_locator_answer"
-        : "model_synthesized_answer"
+        : "compound_evidence_synthesis_answer"
     : undefined;
   const synthesisTerminalKind = complete
     ? hasDocsSubgoal
       ? "doc_evidence_synthesis_answer"
       : hasResearchLocatorSubgoal
         ? "compound_research_locator_answer"
-        : "model_synthesized_answer"
+        : "compound_evidence_synthesis_answer"
     : undefined;
   const hasDraft = hasFinalAnswerDraft(input.payload, artifacts);
   const supportRefs = compoundRows.length > 0
@@ -410,7 +447,7 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
     missing_compound_subgoal_ids: missingCompoundSubgoalIds,
     missing_required_capabilities: unique([
       ...missingRequiredCapabilities,
-      ...incompleteCompoundRowCapabilities,
+      ...effectiveIncompleteCompoundRowCapabilities,
     ]),
     incomplete_compound_subgoal_ids: incompleteCompoundSubgoalIds,
     support_refs: supportRefs,

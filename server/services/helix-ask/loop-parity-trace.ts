@@ -85,6 +85,7 @@ const readStringArray = (value: unknown): string[] =>
 const unique = <T>(entries: T[]): T[] => Array.from(new Set(entries));
 
 const inferToolFamily = (toolId: string): string => {
+  if (/helix_ask\.inspect_capability_catalog|inspect_capability_catalog|capability[_-]?catalog|capability[_-]?registry/i.test(toolId)) return "capability_catalog";
   if (/scholarly[-_.]?research|lookup[_-]?papers|fetch[_-]?full[_-]?text|semantic[-_.]?scholar|openalex|pubmed|crossref/i.test(toolId)) return "scholarly_research";
   if (/theory[-_.]?locator|reflect[_-]?theory[_-]?context|theory[_-]?context[_-]?reflection|badge[_-]?graph|frontierVectorFieldTrace|frontier[_-]?vector[_-]?field|relation[_-]?tensor/i.test(toolId)) return "theory_locator";
   if (/internet[-_.]?search|web[-_.]?research|web\.search/i.test(toolId)) return "internet_search";
@@ -94,7 +95,7 @@ const inferToolFamily = (toolId: string): string => {
   if (/workspace[-_.]?directory/i.test(toolId)) return "workspace_directory";
   if (/situation[-_. ]?run|situation-room\.(?:attach|repair|replay|source-binding)/i.test(toolId)) return "situation_run";
   if (/^docs-viewer\.|doc[_-]?viewer|docs_viewer/i.test(toolId)) return "docs_viewer";
-  if (/calculator/i.test(toolId)) return "calculator";
+  if (/calculator|^solve_expression$/i.test(toolId)) return "calculator";
   if (/workstation-notes|note/i.test(toolId)) return "notes";
   if (/process[-_. ]?graph|workstation\.process/i.test(toolId)) return "process_graph";
   if (/repo|code|source-tree/i.test(toolId)) return "repo_code";
@@ -161,6 +162,30 @@ const isAdmissionDeniedValidation = (validation: RecordLike | null): boolean => 
   );
 };
 
+const canonicalToolIdForArtifactContext = (
+  toolId: string,
+  artifactRecord: RecordLike | null,
+  artifactPayload: RecordLike | null,
+): string => {
+  const normalized = toolId.trim();
+  if (!normalized) return "";
+  const haystack = [
+    normalized,
+    readString(artifactRecord?.kind),
+    readString(artifactRecord?.artifact_id),
+    readString(artifactPayload?.kind),
+    readString(artifactPayload?.schema),
+    readString(artifactPayload?.trace_source),
+    readString(artifactPayload?.source_kind),
+    readString(artifactPayload?.receipt_id),
+    readString(artifactPayload?.result_ref),
+  ].join(" ");
+  if (/^solve_expression$/i.test(normalized) && /calculator|scientific[-_.:]calculator/i.test(haystack)) {
+    return "scientific-calculator.solve_expression";
+  }
+  return normalized;
+};
+
 const collectRejectedToolCalls = (payload: RecordLike): HelixLoopParityTrace["rejected_tool_calls"] => {
   const rejected = new Map<string, HelixLoopParityTrace["rejected_tool_calls"][number]>();
   const ledger = Array.isArray(payload.current_turn_artifact_ledger) ? payload.current_turn_artifact_ledger : [];
@@ -219,9 +244,14 @@ const collectActualToolCalls = (
       }
     }
     pushToolCall(calls, readString(artifactPayload?.capability_key), admittedFamilies, resultRef);
-    pushToolCall(calls, readString(artifactPayload?.action_id) || readString(artifactPayload?.action_key), admittedFamilies, resultRef);
+    const artifactActionToolId = canonicalToolIdForArtifactContext(
+      readString(artifactPayload?.action_id) || readString(artifactPayload?.action_key),
+      artifactRecord,
+      artifactPayload,
+    );
+    pushToolCall(calls, artifactActionToolId, admittedFamilies, resultRef);
     for (const action of readStringArray(artifactPayload?.actions)) {
-      pushToolCall(calls, action, admittedFamilies, resultRef);
+      pushToolCall(calls, canonicalToolIdForArtifactContext(action, artifactRecord, artifactPayload), admittedFamilies, resultRef);
     }
   }
   return Array.from(calls.values());
@@ -391,7 +421,12 @@ export function buildLoopParityTrace(input: {
       }
     : null;
   const admission = readRecord(payload.tool_call_admission_decision);
-  const admittedToolFamilies = readStringArray(admission?.admitted_tool_families);
+  const operationalTrace = readRecord(payload.operational_capability_trace);
+  const policyAdmittedCapability = readString(operationalTrace?.policy_admitted_capability);
+  const admittedToolFamilies = unique([
+    ...readStringArray(admission?.admitted_tool_families),
+    policyAdmittedCapability ? inferToolFamily(policyAdmittedCapability) : "",
+  ].filter(Boolean));
   const rejectedToolCalls = collectRejectedToolCalls(payload);
   const actualToolCalls = collectActualToolCalls(payload, admittedToolFamilies, rejectedToolCalls);
   const unexpectedToolCalls = actualToolCalls.filter((call) => !call.admitted).map((call) => call.tool_id);

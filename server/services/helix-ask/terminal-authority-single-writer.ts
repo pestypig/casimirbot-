@@ -2319,10 +2319,14 @@ const findGoalSatisfyingCapabilityHelpArtifact = (
   const satisfactionReportAllowsCapabilityHelp =
     satisfactionReport?.satisfied === true ||
     readString(satisfactionReport?.terminal_artifact_kind) === "capability_help_summary";
+  const capabilityHelpMaterializedByLedger =
+    artifacts.some((artifact) => artifactKind(artifact) === "capability_registry") &&
+    artifacts.some((artifact) => artifactKind(artifact) === "capability_help_summary");
   if (
     readString(goalEvaluation?.satisfaction) !== "satisfied" &&
     readString(goalEvaluation?.next_decision) !== "allow_terminal" &&
-    !satisfactionReportAllowsCapabilityHelp
+    !satisfactionReportAllowsCapabilityHelp &&
+    !capabilityHelpMaterializedByLedger
   ) {
     return null;
   }
@@ -3895,11 +3899,17 @@ export function applyHelixTerminalAuthoritySingleWriter(
       selectedArtifactKind === "compound_research_locator_answer"
         ? readRecord(input.payload.compound_research_locator_answer)
         : null;
+    const materializedCompoundEvidenceSynthesisAnswer =
+      selectedArtifactKind === "compound_evidence_synthesis_answer"
+        ? readRecord(input.payload.compound_evidence_synthesis_answer)
+        : null;
     const materializedTheoryContextReflectionAnswer =
       selectedArtifactKind === "theory_context_reflection_answer"
         ? readRecord(input.payload.theory_context_reflection_answer)
         : null;
     const baseText =
+      readString(materializedCompoundEvidenceSynthesisAnswer?.answer_text) ??
+      readString(materializedCompoundEvidenceSynthesisAnswer?.text) ??
       readString(materializedCompoundResearchLocatorAnswer?.answer_text) ??
       readString(materializedCompoundResearchLocatorAnswer?.text) ??
       readString(materializedDocEvidenceSynthesisAnswer?.answer_text) ??
@@ -3924,6 +3934,10 @@ export function applyHelixTerminalAuthoritySingleWriter(
       materializedCompoundResearchLocatorAnswer.answer_text = text;
       materializedCompoundResearchLocatorAnswer.citations = citationFooter.citations;
       materializedCompoundResearchLocatorAnswer.citation_footer = citationFooter.footer;
+    }
+    if (materializedCompoundEvidenceSynthesisAnswer) {
+      materializedCompoundEvidenceSynthesisAnswer.text = text;
+      materializedCompoundEvidenceSynthesisAnswer.answer_text = text;
     }
     if (materializedScholarlyAnswer) {
       materializedScholarlyAnswer.text = text;
@@ -4124,6 +4138,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     materializedDraftCandidate ?? findLatestFinalAnswerDraftCandidate(artifacts);
   const draftText = latestDraftForIntegrity?.text ?? (selectedDraft ? artifactText(selectedDraft.artifact) : null);
   const selectedMaterializedAnswerText =
+    readString(readRecord(input.payload.compound_evidence_synthesis_answer)?.answer_text) ??
     readString(readRecord(input.payload.model_synthesized_answer)?.answer_text) ??
     readString(readRecord(input.payload.compound_research_locator_answer)?.answer_text) ??
     readString(readRecord(input.payload.doc_evidence_synthesis_answer)?.answer_text) ??

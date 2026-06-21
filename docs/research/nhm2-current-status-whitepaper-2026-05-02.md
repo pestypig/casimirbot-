@@ -1194,6 +1194,31 @@ Any measured or simulated apparatus tensor must still pass QEI and observer-fami
 
 Independent replication is a stage, not an afterthought. A positive local result remains unpromoted until a separate apparatus and analysis team reproduces the amplitude, phase, sign, scaling, spatial falloff, and null-control behavior. A null result is also useful if it reaches pre-registered sensitivity: it can falsify a tile model, array scaling law, vacuum-weight prediction, metric-response claim, or NHM2 source architecture. The artifact should record the falsified model ID rather than merely saying "no signal." Until replication and falsification disposition exist, physical viability and transport claim locks remain closed.
 
+### 9.10 Parameter targets and feasibility ranges
+
+The roadmap now has a companion parameter-target layer, `nhm2_experiment_parameter_targets/v1`. Its purpose is to make each roadmap stage answer four questions: what NHM2 is trying to hit, what independent research says about realistic ranges or limits, what receipt would move the stage, and what blocker remains. These rows are planning targets, not measurements. Literature ranges are comparators, not NHM2 validation, and scalar values remain sanity checks until receipted by experiment.
+
+<!-- helix-doc-equation-action/v1 id=nhm2-experiment-parameter-targets -->
+
+\[
+\mathrm{Target}_{stage,parameter}=
+\{\mathrm{NHM2Target},\mathrm{LiteratureRange},\mathrm{Receipt},\mathrm{Blocker}\}.
+\]
+
+| roadmap stage | current NHM2 target | independent comparator | receipt that would move the stage |
+|---|---|---|---|
+| prediction freeze | freeze `DeltaTmunu_xt`, `delta_phi_f`, `delta_tau`, `delta_F`, `h00_proxy`, `R_0i0j` before data | Casimir gravitational-mass proposals, LIGO-scale sensitivity planning, and millimetre gravity experiments show why pre-registered weak-signal observables matter | pre-registered prediction, uncertainty budget, null controls, and falsifier receipt |
+| tile metrology | `8 nm` gap, `10 mm x 10 mm` area, ideal `8 nm` pressure scale about `3.17e5 Pa`, `Au-SiN-AlN` engineering-freeze stack | Lifshitz/real-material Casimir reviews, arbitrary-material Casimir computation, chip-level Casimir sensors, patch-potential/KPFM work, and high-stress SiN/AlN/TiN MEMS literature bound plausible systematics | gap, force-gap, dielectric response, roughness, patch potential, material coupon, pull-in, hysteresis, and stress receipts |
+| cycle energy balance | ideal one-tile scalar replay energy magnitude about `8.46e-8 J` | dynamical Casimir work and gravitational-mass discussions motivate energy-ledger accounting but do not close NHM2 source authority | electrical input, mechanical work, heat, radiation, elastic energy, and loss ledger receipt |
+| array scaling | `447` fixed-control-volume ideal layers, about `1.345 mm` stack thickness | arbitrary-geometry/material Casimir work warns that arrays need geometry, support, coupling, thermal, and material corrections | module scaling, cross-coupling, support-stress, heat-flow, and packing/orientation receipts |
+| full apparatus tensor | source-side `T00`, `T0i`, diagonal `Tij`, and off-diagonal `Tij` for plates, supports, drive fields, material stresses, and interaction energy | whole-apparatus gravitational-source arguments and arbitrary-material Casimir methods reject scalar interaction energy as enough | full apparatus tensor, component authority ledger, same-basis metadata, and no-target-echo receipt |
+| vacuum weight | `DeltaF = g DeltaE/c^2`; one ideal 8 nm tile gives only about `9.24e-24 N` weight-equivalent force | Archimedes-style vacuum-weight balance work is the closest direct comparator for modulated vacuum-energy weight tests | active/dummy sample balance receipt with sign, phase, scaling, orientation, and environmental nulls |
+| metric response | weak-field `h00_proxy = 2G DeltaE/(r c^4)` sensitivity triage | Advanced LIGO strain sensitivity and millimetre-scale gravitational coupling experiments are detector-scale comparators, not NHM2 metric evidence | multi-probe optical, clock/atom, and mechanical free-mass response fitted to one invariant metric model |
+| QEI and observer admissibility | worldline QEI dossier plus WEC/NEC/SEC/DEC observer-family checks over the same apparatus tensor | Pfenning-Ford QI limits, stationary-worldline QEI work, and generic warp NEC analysis set caution rails | QEI bound provenance, tau/applicability, wall/transition worldlines, and robust observer-family receipt |
+| independent replication | independent apparatus, blind analysis, null-result bound, and falsified model ID | balance, detector, and small-gravity experiments all require separate systematics and replication before stronger interpretation | independent lab receipt and falsification disposition receipt |
+
+The target layer does not change claim status. It makes the experimental next steps more inspectable: missing receipts produce blockers, scalar targets cannot substitute for measurements, and physical viability, transport, route ETA, propulsion, and speed-authority claims remain false.
+
 ## Appendix A. Repository artifact status and claim-tier table
 
 The detailed implementation state belongs in an appendix because it is evidence metadata, not the scientific argument itself.

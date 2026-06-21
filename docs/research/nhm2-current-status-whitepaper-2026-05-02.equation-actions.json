@@ -519,6 +519,7 @@
           "label": "Open experiment-facing roadmap",
           "badgeIds": [
             "nhm2.experimental.theory_solve_roadmap",
+            "nhm2.experimental.parameter_targets",
             "nhm2.experimental.prediction_freeze",
             "nhm2.experimental.tile_force_receipt",
             "nhm2.experimental.tile_cycle_energy_balance",
@@ -547,6 +548,52 @@
       "claimBoundaryNotes": [
         "Roadmap rows are planning surfaces, not measured source evidence.",
         "Scalar calculator rows remain sanity checks and cannot substitute for receipts."
+      ]
+    },
+    {
+      "equationId": "nhm2-experiment-parameter-targets",
+      "label": "NHM2 experiment parameter targets",
+      "sectionAnchor": "910-parameter-targets-and-feasibility-ranges",
+      "latex": "\\mathrm{Target}_{stage,parameter}= \\{\\mathrm{NHM2Target},\\mathrm{LiteratureRange},\\mathrm{Receipt},\\mathrm{Blocker}\\}.",
+      "aliases": [
+        "Target_stage_parameter = {NHM2Target, LiteratureRange, Receipt, Blocker}",
+        "nhm2_experiment_parameter_targets/v1",
+        "parameter targets and feasibility ranges"
+      ],
+      "actions": [
+        {
+          "actionId": "open-experiment-parameter-targets",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open experiment parameter targets",
+          "badgeIds": [
+            "nhm2.experimental.theory_solve_roadmap",
+            "nhm2.experimental.parameter_targets",
+            "nhm2.experimental.tile_force_receipt",
+            "nhm2.experimental.tile_cycle_energy_balance",
+            "nhm2.experimental.array_scaling",
+            "nhm2.experimental.full_apparatus_tensor",
+            "nhm2.experimental.vacuum_weight",
+            "nhm2.experimental.metric_upper_bound",
+            "nhm2.experimental.invariant_metric_response",
+            "nhm2.experimental.independent_replication",
+            "nhm2.claim_boundary.physical_viability_locked",
+            "nhm2.claim_boundary.transport_locked"
+          ],
+          "preferredBadgeId": "nhm2.experimental.parameter_targets",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": [
+            "theory-badge-graph",
+            "scientific-calculator"
+          ],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "Parameter targets are planning rows; modeled scalar values, literature ranges, and feasibility notes cannot substitute for experimental receipts."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Parameter targets are not measurements.",
+        "Literature comparators and scalar target rows cannot unlock physical, transport, route, propulsion, or speed claims."
       ]
     },
     {

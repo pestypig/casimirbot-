@@ -71,6 +71,41 @@ const compoundTerminalPolicyActive = (payload?: Record<string, unknown> | null):
   return readCompoundTerminalPolicy(payload).active;
 };
 
+const artifactKind = (artifact: ArtifactLike): string | null =>
+  readString(artifact.kind) ?? readString(readRecord(artifact.payload)?.kind);
+
+const artifactPayloadByKind = (
+  artifacts: ArtifactLike[] | null | undefined,
+  kind: string,
+): Record<string, unknown> | null => {
+  const artifact = (artifacts ?? []).find((entry) => artifactKind(entry) === kind);
+  return readRecord(artifact?.payload);
+};
+
+const compoundLedgerEntryHasSatisfiedObservation = (entry: Record<string, unknown>): boolean => {
+  const satisfaction = readString(entry.satisfaction);
+  const railStatus = readString(entry.rail_status);
+  return (
+    satisfaction === "satisfied" &&
+    Boolean(readString(entry.observation_ref)) &&
+    (!railStatus || railStatus === "complete")
+  );
+};
+
+const hasCompleteMultiSubgoalExecutionLedger = (
+  payload?: Record<string, unknown> | null,
+  artifactLedger?: ArtifactLike[] | null,
+): boolean => {
+  const executionState =
+    readRecord(payload?.capability_itinerary_execution_state) ??
+    artifactPayloadByKind(artifactLedger, "capability_itinerary_execution_state");
+  const ledger = readArray(executionState?.compound_subgoal_ledger)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  if (ledger.length < 2 || executionState?.complete !== true) return false;
+  return ledger.every(compoundLedgerEntryHasSatisfiedObservation);
+};
+
 export const inferFinalAnswerDraftRouteFamily = (input: {
   routeProductContract?: Record<string, unknown> | null;
   payload?: Record<string, unknown> | null;
@@ -84,8 +119,19 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
   if (
     compoundTerminalPolicyActive(input.payload) &&
     (
+      readString(readRecord(input.payload?.compound_capability_synthesis_readiness)?.required_terminal_kind) === "compound_evidence_synthesis_answer" ||
+      readString(readRecord(input.payload?.compound_capability_synthesis_readiness)?.synthesis_terminal_kind) === "compound_evidence_synthesis_answer" ||
       readString(readRecord(input.payload?.compound_capability_synthesis_readiness)?.required_terminal_kind) === "model_synthesized_answer" ||
       readString(readRecord(input.payload?.compound_capability_synthesis_readiness)?.synthesis_terminal_kind) === "model_synthesized_answer"
+    )
+  ) {
+    return "unknown";
+  }
+  if (
+    hasCompleteMultiSubgoalExecutionLedger(input.payload, input.artifactLedger) &&
+    (
+      committedSourceTarget === "runtime_evidence" ||
+      /compound|compound_evidence_synthesis_answer|model_synthesized_answer/i.test(committedGoalKind ?? "")
     )
   ) {
     return "unknown";
@@ -177,6 +223,15 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
     readString(input.payload?.route_reason_code),
     readString(input.payload?.route),
   ].join(" ");
+  if (
+    hasCompleteMultiSubgoalExecutionLedger(input.payload, input.artifactLedger) &&
+    (
+      sourceTarget === "runtime_evidence" ||
+      /compound|compound_evidence_synthesis_answer|model_synthesized_answer/i.test(routeText)
+    )
+  ) {
+    return "unknown";
+  }
   if (
     sourceTarget === "runtime_evidence" &&
     /capability_(?:help|catalog)|inspect_capability_catalog/i.test(routeText)
