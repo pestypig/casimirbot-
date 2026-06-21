@@ -2227,16 +2227,23 @@ export const buildArtifactQueryIndex = (input: {
   turnId: string;
   payload: RecordLike;
 }): RecordLike => {
+  const artifacts = artifactsForPayload(input.payload);
+  const artifactPayloadByKind = (kind: string): RecordLike | null =>
+    artifactPayload(artifacts.find((artifact) => readString(artifact.kind) === kind) ?? {});
   const lifecycleTrace = readRecord(input.payload.tool_lifecycle_trace);
   const followupDecision = readRecord(input.payload.tool_followup_decision);
   const capabilityPlan = readRecord(input.payload.capability_plan);
-  const capabilityItinerary = readRecord(input.payload.capability_itinerary);
+  const capabilityItinerary =
+    readRecord(input.payload.capability_itinerary) ??
+    artifactPayloadByKind("capability_itinerary");
   const compoundCapabilityContract =
     readRecord(input.payload.compound_capability_contract) ??
-    readRecord(capabilityItinerary?.compound_capability_contract);
+    readRecord(capabilityItinerary?.compound_capability_contract) ??
+    artifactPayloadByKind("compound_capability_contract");
   const capabilityItineraryExecutionState =
     readRecord(input.payload.capability_itinerary_execution_state) ??
-    readRecord(capabilityItinerary?.execution_state);
+    readRecord(capabilityItinerary?.execution_state) ??
+    artifactPayloadByKind("capability_itinerary_execution_state");
   const compoundSubgoalLedger = readArray(capabilityItineraryExecutionState?.compound_subgoal_ledger)
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry));
@@ -2387,7 +2394,6 @@ export const buildArtifactQueryIndex = (input: {
     effectiveMissingCompoundSubgoalIds.length === 0 &&
     effectiveMissingRequiredCapabilities.length === 0;
   const admission = readRecord(input.payload.tool_call_admission_decision);
-  const artifacts = artifactsForPayload(input.payload);
   const lifecycleCapability = capabilityFromPayload(input.payload, lifecycleTrace);
   const artifactCapability = capabilityFromArtifacts(artifacts);
   const capability =

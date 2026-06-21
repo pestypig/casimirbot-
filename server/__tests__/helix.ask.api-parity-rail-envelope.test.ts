@@ -283,6 +283,59 @@ describe("Helix Ask API parity rail envelope invariants", () => {
     ]);
   });
 
+  it("rejects complete compound subgoal rails without observation proof", () => {
+    const scenario = liveSourceFailClosedScenario();
+    const askTurn = buildLiveSourceFailClosedTurn({ projectAsTypedFailure: true });
+    askTurn.codex_parity_agent_spine_rail_table = {
+      ...(askTurn.codex_parity_agent_spine_rail_table as Record<string, unknown>),
+      compound_subgoal_count: 1,
+      first_incomplete_compound_subgoal_id: "ask:test:subgoal:catalog",
+      first_incomplete_compound_requested_capability: "helix_ask.inspect_capability_catalog",
+      first_incomplete_compound_runtime_capability: "helix_ask.inspect_capability_catalog",
+      first_incomplete_compound_selected_capability: "helix_ask.inspect_capability_catalog",
+      first_incomplete_compound_executed_capability: "helix_ask.inspect_capability_catalog",
+      compound_first_broken_rail: "observation_artifact",
+      compound_rail_failure_code: "required_observation_missing",
+      compound_repair_target: "observation_materializer",
+      compound_incomplete_subgoal_did_tool_run: true,
+    };
+    askTurn.compound_subgoal_rail_statuses = [
+      {
+        subgoal_id: "ask:test:subgoal:catalog",
+        order: 1,
+        requested_capability: "helix_ask.inspect_capability_catalog",
+        runtime_capability: "helix_ask.inspect_capability_catalog",
+        selected_capability: "helix_ask.inspect_capability_catalog",
+        executed_capability: "helix_ask.inspect_capability_catalog",
+        args: {},
+        observation_kind: "capability_registry",
+        observation_ref: null,
+        observation_provenance: null,
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        first_broken_rail: null,
+        rail_failure_code: null,
+        repair_target: null,
+      },
+    ];
+
+    const probe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: { payload: askTurn },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(probe.procedural_ok).toBe(false);
+    expect(probe.failures).toEqual(
+      expect.arrayContaining([
+        "rail_compound_subgoal_1_satisfied_observation_ref_missing",
+        "rail_compound_subgoal_1_complete_observation_ref_missing",
+      ]),
+    );
+  });
+
   it("rejects compound rails when the ordered subgoal rail statuses are dropped", () => {
     const scenario = liveSourceFailClosedScenario();
     const askTurn = buildLiveSourceFailClosedTurn({ projectAsTypedFailure: true });

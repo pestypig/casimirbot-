@@ -140,6 +140,9 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
     case "live_env.query_live_source_quality":
     case "live_env.summarize_live_source_current_state":
       return "live_source_mailbox_review";
+    case "live_env.record_live_source_mail_decision":
+    case "live_env.request_interim_voice_callout":
+      return "processed_mail_voice_decision";
     case "image_lens.inspect":
     case "situation-room.describe_visual_capture":
       return "visual_capture_describe";
@@ -179,7 +182,7 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
     case "docs-viewer.locate_in_doc":
       return "current_turn_doc";
     case "repo-code.search_concept":
-      return "current_turn_doc";
+      return "repo_evidence";
     case "internet_search.web_research":
     case "internet-search.search_web":
       return "external_internet_search";
@@ -191,12 +194,15 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
     case "live_env.read_processed_live_source_mail":
     case "live_env.process_live_source_mail":
     case "live_env.reflect_live_source_mail_loop":
+    case "live_env.record_live_source_mail_decision":
     case "live_env.query_micro_reasoner_presets":
     case "live_env.draft_micro_reasoner_preset":
     case "live_env.route_micro_reasoner_prompt":
     case "live_env.query_live_source_quality":
     case "live_env.summarize_live_source_current_state":
       return "live_source_mail";
+    case "live_env.request_interim_voice_callout":
+      return "live_environment_state";
     case "image_lens.inspect":
     case "situation-room.describe_visual_capture":
       return "visual_capture";
@@ -248,7 +254,7 @@ const suppressionBlocksFallback = (
     fallbackSourceTarget === "calculator_stream" || fallbackSourceTarget === "calculator" || fallbackSourceTarget === "calculator_solve"
       ? ["calculator", "workstation_action"]
       : fallbackSourceTarget === "live_source_mailbox"
-        ? ["live_environment"]
+        ? ["live_environment", "live_source_mail"]
       : fallbackSourceTarget === "docs_viewer" || fallbackSourceTarget === "active_doc"
         ? ["docs_viewer"]
       : fallbackSourceTarget === "repo_code" || fallbackSourceTarget === "runtime_evidence"

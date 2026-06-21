@@ -52,6 +52,111 @@ describe("compound capability synthesis readiness", () => {
     expect(readiness.support_refs).toEqual(["obs:doc-location", "obs:calculator"]);
   });
 
+  it("recovers synthesis readiness from ledger-only compound itinerary artifacts", () => {
+    const turnId = "ask:test:compound-synthesis-ledger-only-state";
+    const docsSubgoalId = `${turnId}:compound_capability_subgoal:1:docs-viewer_locate_in_doc`;
+    const calculatorSubgoalId = `${turnId}:compound_capability_subgoal:2:scientific-calculator_solve_expression`;
+    const capabilityItinerary = {
+      schema: "helix.capability_itinerary.v1",
+      terminal_success_criteria: {
+        requires_post_observation_synthesis: true,
+        compound_terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+        required_observation_families: ["docs_viewer", "calculator"],
+        required_capabilities: ["docs-viewer.locate_in_doc", "scientific-calculator.solve_expression"],
+        required_terminal_kind: "doc_evidence_synthesis_answer",
+        allowed_terminal_artifact_kinds: ["doc_evidence_synthesis_answer", "model_synthesized_answer"],
+        forbidden_terminal_artifact_kinds: ["tool_receipt", "calculator_receipt"],
+      },
+    };
+    const compoundContract = {
+      schema: "helix.compound_capability_contract.v1",
+      requires_all_subgoals: true,
+      subgoals: [
+        {
+          subgoal_id: docsSubgoalId,
+          capability_family: "docs_viewer",
+          requested_capability: "docs-viewer.locate_in_doc",
+          runtime_capability: "docs-viewer.locate_in_doc",
+        },
+        {
+          subgoal_id: calculatorSubgoalId,
+          capability_family: "calculator",
+          requested_capability: "scientific-calculator.solve_expression",
+          runtime_capability: "scientific-calculator.solve_expression",
+        },
+      ],
+    };
+    const executionState = {
+      schema: "helix.capability_itinerary_execution_state.v1",
+      applies: true,
+      complete: true,
+      required_observation_families: ["docs_viewer", "calculator"],
+      observed_families: ["docs_viewer", "calculator"],
+      compound_subgoal_ledger: [
+        {
+          subgoal_id: docsSubgoalId,
+          requested_capability: "docs-viewer.locate_in_doc",
+          executed_capability: "docs-viewer.locate_in_doc",
+          observation_kind: "doc_location_matches",
+          observation_ref: "obs:doc-location",
+          satisfaction: "satisfied",
+          rail_status: "complete",
+        },
+        {
+          subgoal_id: calculatorSubgoalId,
+          requested_capability: "scientific-calculator.solve_expression",
+          executed_capability: "scientific-calculator.solve_expression",
+          observation_kind: "calculator_receipt",
+          observation_ref: "obs:calculator",
+          satisfaction: "satisfied",
+          rail_status: "complete",
+        },
+      ],
+    };
+    const readiness = resolveCompoundCapabilitySynthesisReadiness({
+      payload: {
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: `${turnId}:capability_itinerary`,
+            kind: "capability_itinerary",
+            payload: capabilityItinerary,
+          },
+          {
+            artifact_id: `${turnId}:compound_capability_contract`,
+            kind: "compound_capability_contract",
+            payload: compoundContract,
+          },
+          {
+            artifact_id: `${turnId}:capability_itinerary_execution_state`,
+            kind: "capability_itinerary_execution_state",
+            payload: executionState,
+          },
+          {
+            artifact_id: "obs:doc-location",
+            kind: "doc_location_matches",
+            payload: { schema: "helix.doc_location_matches.v1" },
+          },
+          {
+            artifact_id: "obs:calculator",
+            kind: "calculator_receipt",
+            payload: { schema: "helix.calculator_receipt.v1" },
+          },
+        ],
+      },
+    });
+
+    expect(readiness).toMatchObject({
+      applies: true,
+      complete: true,
+      synthesis_required: true,
+      has_docs_subgoal: true,
+      goal_kind: "doc_evidence_synthesis",
+      required_terminal_kind: "doc_evidence_synthesis_answer",
+      synthesis_terminal_kind: "doc_evidence_synthesis_answer",
+    });
+    expect(readiness.support_refs).toEqual(["obs:doc-location", "obs:calculator"]);
+  });
+
   it("does not require synthesis for failed compound subgoals", () => {
     const readiness = resolveCompoundCapabilitySynthesisReadiness({
       payload: {

@@ -51,6 +51,17 @@ const clip = (value: string | undefined, max = 1200): string | undefined => {
   return value.length > max ? `${value.slice(0, max)}...` : value;
 };
 
+const artifactPayloadByKind = (
+  artifactLedger: Array<RecordLike>,
+  kind: string,
+): RecordLike | undefined => {
+  const artifact = artifactLedger.find((entry) => {
+    const payload = readRecord(entry.payload);
+    return readString(entry.kind) === kind || readString(payload?.kind) === kind;
+  });
+  return readRecord(artifact?.payload);
+};
+
 const capabilityAllowsToolUse = (capability: unknown): boolean => {
   const record = readRecord(capability);
   if (!record) return false;
@@ -89,8 +100,12 @@ export function buildHelixModelTurnPacket(input: {
   outputBudget?: RecordLike;
 }): HelixModelTurnPacket {
   const trace = readRecord(input.payload.ask_turn_solver_trace);
+  const capabilityItinerary =
+    readRecord(input.payload.capability_itinerary) ??
+    artifactPayloadByKind(input.artifactLedger, "capability_itinerary");
   const compoundPromptContract =
     readRecord(input.payload.compound_prompt_contract) ??
+    readRecord(capabilityItinerary?.compound_prompt_contract) ??
     readRecord(readRecord(input.payload.prompt_interpretation)?.compound_contract) ??
     readRecord(trace?.compound_prompt_contract);
   const modelVisibleArtifacts = input.artifactLedger
@@ -144,7 +159,7 @@ export function buildHelixModelTurnPacket(input: {
     route_product_contract: readRecord(input.payload.route_product_contract),
     committed_ask_route: committedAskRoute,
     compound_prompt_contract: compoundPromptContract,
-    capability_itinerary: readRecord(input.payload.capability_itinerary),
+    capability_itinerary: capabilityItinerary,
     available_capabilities: availableCapabilities,
     artifact_refs: artifactRefs,
     model_visible_artifacts: modelVisibleArtifacts,

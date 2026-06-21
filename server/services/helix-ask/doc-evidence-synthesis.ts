@@ -102,6 +102,25 @@ const artifactText = (artifact: ArtifactLike): string | null => {
   return readString(payload?.answer_text) ?? readString(payload?.text) ?? readString(payload?.summary);
 };
 
+const artifactPayloadByKind = (
+  artifacts: ArtifactLike[],
+  kind: string,
+): RecordLike | null => {
+  const artifact = artifacts.find((entry) => artifactKind(entry) === kind);
+  return readRecord(artifact?.payload);
+};
+
+const payloadArtifactPayloadByKind = (
+  payload: RecordLike,
+  kind: string,
+): RecordLike | null =>
+  artifactPayloadByKind(
+    readArray(payload.current_turn_artifact_ledger)
+      .map(readRecord)
+      .filter((entry): entry is RecordLike => Boolean(entry)) as ArtifactLike[],
+    kind,
+  );
+
 const stringArray = (value: unknown): string[] =>
   readArray(value).map(readString).filter((entry): entry is string => Boolean(entry));
 
@@ -171,12 +190,18 @@ const resolveCompoundDocsSynthesisTerminalContract = (
     };
   }
 
-  const itinerary = readRecord(payload.capability_itinerary);
+  const itinerary =
+    readRecord(payload.capability_itinerary) ??
+    payloadArtifactPayloadByKind(payload, "capability_itinerary");
   const terminalCriteria = readRecord(itinerary?.terminal_success_criteria);
   const executionState =
     readRecord(payload.capability_itinerary_execution_state) ??
-    readRecord(itinerary?.execution_state);
-  const contract = readRecord(itinerary?.compound_capability_contract);
+    readRecord(itinerary?.execution_state) ??
+    payloadArtifactPayloadByKind(payload, "capability_itinerary_execution_state");
+  const contract =
+    readRecord(payload.compound_capability_contract) ??
+    readRecord(itinerary?.compound_capability_contract) ??
+    payloadArtifactPayloadByKind(payload, "compound_capability_contract");
   const requiredFamilies = readArray(terminalCriteria?.required_observation_families)
     .map(readString)
     .filter((entry): entry is string => Boolean(entry));

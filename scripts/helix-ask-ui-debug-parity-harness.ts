@@ -488,6 +488,17 @@ const firstNonEmptyString = (...values: unknown[]): string => {
   return "";
 };
 
+const expectedCompoundSubgoalCount = (
+  ...rails: Array<Record<string, unknown> | null | undefined>
+): number => {
+  let count = 0;
+  for (const rail of rails) {
+    const value = readNonNegativeInteger(rail?.compound_subgoal_count);
+    if (value !== null && value > count) count = value;
+  }
+  return count;
+};
+
 export const buildUiApiParitySessionId = (input: {
   configuredSessionId?: string | null;
   prompt: string;
@@ -584,8 +595,24 @@ const compoundSubgoalRailComparisonFields = [
   "selected_capability",
   "executed_capability",
   "args",
+  "args_source",
+  "planned_args",
+  "selected_args",
+  "required_args",
+  "optional_args",
+  "input_bindings",
+  "bound_input_refs",
+  "unresolved_input_bindings",
   "observation_kind",
   "observation_ref",
+  "observation_provenance",
+  "support_refs",
+  "required_observation_kinds",
+  "required_terminal_kind",
+  "terminal_contribution_kind",
+  "contribution_role",
+  "allowed_substitutions",
+  "forbidden_nearby_capabilities",
   "satisfaction",
   "rail_status",
   "first_broken_rail",
@@ -604,6 +631,27 @@ const comparableCompoundSubgoalRails = (
       ]),
     ),
   );
+
+const compoundSubgoalRailProofViolations = (
+  source: "ui" | "api",
+  rails: Record<string, unknown>[],
+): string[] => {
+  const violations: string[] = [];
+  rails.forEach((rail, index) => {
+    const prefix = `${source}_compound_subgoal_${index + 1}`;
+    const satisfaction = readString(rail.satisfaction);
+    const railStatus = readString(rail.rail_status);
+    const observationRef = readString(rail.observation_ref);
+    if (satisfaction === "satisfied" && !observationRef) {
+      violations.push(`${prefix}_satisfied_observation_ref_missing`);
+    }
+    if (railStatus === "complete") {
+      if (satisfaction !== "satisfied") violations.push(`${prefix}_complete_satisfaction_not_satisfied`);
+      if (!observationRef) violations.push(`${prefix}_complete_observation_ref_missing`);
+    }
+  });
+  return violations;
+};
 
 const collectApiCompoundSubgoalRailStatuses = (
   apiResponse: Record<string, unknown> | null,
@@ -750,6 +798,21 @@ export const collectUiApiTerminalParityViolations = (input: {
   }
   const uiCompoundSubgoalRails = collectUiDebugCompoundSubgoalRailStatuses(uiDebugExport);
   const apiCompoundSubgoalRails = collectApiCompoundSubgoalRailStatuses(apiResponse, apiDebugExport);
+  violations.push(...compoundSubgoalRailProofViolations("ui", uiCompoundSubgoalRails));
+  violations.push(...compoundSubgoalRailProofViolations("api", apiCompoundSubgoalRails));
+  const expectedSubgoalCount = expectedCompoundSubgoalCount(uiRail, apiRail);
+  if (expectedSubgoalCount > 0) {
+    if (uiCompoundSubgoalRails.length < expectedSubgoalCount) {
+      violations.push(
+        `ui_compound_subgoal_rails_missing:${uiCompoundSubgoalRails.length}<${expectedSubgoalCount}`,
+      );
+    }
+    if (apiCompoundSubgoalRails.length < expectedSubgoalCount) {
+      violations.push(
+        `api_compound_subgoal_rails_missing:${apiCompoundSubgoalRails.length}<${expectedSubgoalCount}`,
+      );
+    }
+  }
   if (uiCompoundSubgoalRails.length > 0 || apiCompoundSubgoalRails.length > 0) {
     const uiComparableRails = comparableCompoundSubgoalRails(uiCompoundSubgoalRails);
     const apiComparableRails = comparableCompoundSubgoalRails(apiCompoundSubgoalRails);

@@ -481,11 +481,12 @@ export function buildHelixCapabilityItinerary(input: {
     ? [...COMPOUND_FORBIDDEN_RECEIPT_TERMINAL_KINDS]
     : [];
   const forbiddenTerminalArtifactKindSet = new Set<string>(forbiddenTerminalArtifactKinds);
+  const compoundRequiresSynthesis = compoundSubgoals.length > 1;
   const allowedTerminalArtifactKinds = unique([
-    ...allowedTerminalKindsFor(relevantFamilies),
-    ...compoundTerminalKindsFor(compoundSubgoals),
-    ...(compoundSubgoals.length > 1 ? ["model_synthesized_answer"] : []),
-    ...(compoundSubgoals.length > 1 && compoundHasDocsSubgoal(compoundSubgoals)
+    ...(compoundRequiresSynthesis ? ["final_answer_draft"] : allowedTerminalKindsFor(relevantFamilies)),
+    ...(compoundRequiresSynthesis ? [] : compoundTerminalKindsFor(compoundSubgoals)),
+    ...(compoundRequiresSynthesis ? ["model_synthesized_answer"] : []),
+    ...(compoundRequiresSynthesis && compoundHasDocsSubgoal(compoundSubgoals)
       ? ["doc_evidence_synthesis_answer"]
       : []),
   ]).filter((kind) => !forbiddenTerminalArtifactKindSet.has(kind));

@@ -1467,6 +1467,99 @@ describe("Helix capability plan contract", () => {
     });
   });
 
+  it("lets negated visual-capture references suppress hard visual metadata", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:negated-visual-capture-reference",
+      promptText:
+        "Do not use image_lens.inspect or situation-room.describe_visual_capture; explain what visual evidence would be needed first.",
+      sourceTargetIntent: baseSourceTarget("visual_capture", "visual_capture"),
+      toolCallAdmissionDecision: toolAdmission("visual_capture", ["situation_run"]),
+      canonicalGoalFrame: canonicalGoal("visual_capture_describe", "situation_context_pack"),
+      routeMetadata: {
+        schema: "helix.ask.route_metadata.v1",
+        sourceTarget: "visual_capture",
+        mandatoryNextTool: { name: "situation-room.describe_visual_capture" },
+      },
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "debug_export",
+      source_target: "model_only",
+      requested_action: "suppressed_contextual_tool_reference",
+      selected_capability: "suppressed_contextual_tool_reference",
+      goal_kind: "model_only_concept",
+      required_terminal_kind: "direct_answer_text",
+      tool_admission_suppressed: true,
+    });
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "suppressed_contextual_reference",
+      route_metadata_demoted: true,
+      demotion_reason: "contextual_tool_reference_demoted_route_metadata",
+    });
+  });
+
+  it("lets negated workspace status references suppress hard workspace diagnostic metadata", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:negated-workspace-status-reference",
+      promptText:
+        "Do not use workspace_os.status; explain what a workspace status observation would prove before running it.",
+      sourceTargetIntent: baseSourceTarget("workspace_diagnostic", "workspace_diagnostic"),
+      toolCallAdmissionDecision: toolAdmission("workspace_diagnostic", ["workspace_diagnostic"]),
+      canonicalGoalFrame: canonicalGoal("workspace_status_diagnostic", "model_synthesized_answer"),
+      routeMetadata: {
+        schema: "helix.ask.route_metadata.v1",
+        sourceTarget: "workspace_diagnostic",
+        mandatoryNextTool: { name: "workspace_os.status" },
+      },
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "debug_export",
+      source_target: "model_only",
+      requested_action: "suppressed_contextual_tool_reference",
+      selected_capability: "suppressed_contextual_tool_reference",
+      goal_kind: "model_only_concept",
+      required_terminal_kind: "direct_answer_text",
+      tool_admission_suppressed: true,
+    });
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "suppressed_contextual_reference",
+      route_metadata_demoted: true,
+      demotion_reason: "contextual_tool_reference_demoted_route_metadata",
+    });
+  });
+
+  it("lets negated capability catalog references suppress hard runtime catalog metadata", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:negated-capability-catalog-reference",
+      promptText:
+        "Do not call helix_ask.inspect_capability_catalog; explain why the runtime catalog matters first.",
+      sourceTargetIntent: baseSourceTarget("runtime_evidence", "runtime_evidence"),
+      toolCallAdmissionDecision: toolAdmission("runtime_evidence", ["capability_catalog", "runtime_evidence"]),
+      canonicalGoalFrame: canonicalGoal("capability_help", "capability_help_summary"),
+      routeMetadata: {
+        schema: "helix.ask.route_metadata.v1",
+        sourceTarget: "runtime_evidence",
+        mandatoryNextTool: { name: "helix_ask.inspect_capability_catalog" },
+      },
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "debug_export",
+      source_target: "model_only",
+      requested_action: "suppressed_contextual_tool_reference",
+      selected_capability: "suppressed_contextual_tool_reference",
+      goal_kind: "model_only_concept",
+      required_terminal_kind: "direct_answer_text",
+      tool_admission_suppressed: true,
+    });
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "suppressed_contextual_reference",
+      route_metadata_demoted: true,
+      demotion_reason: "contextual_tool_reference_demoted_route_metadata",
+    });
+  });
+
   it("lets explicit docs locate capability beat stale panel-control canonical goal", () => {
     const plan = buildCapabilityPlan({
       turnId: "ask:docs-locate-explicit",
@@ -1595,6 +1688,39 @@ describe("Helix capability plan contract", () => {
     });
   });
 
+  it("lets negated live-source mailbox references suppress hard mailbox metadata", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:negated-live-source-mailbox-reference",
+      promptText:
+        "Do not read processed mail; explain what processed mailbox evidence would be needed first.",
+      sourceTargetIntent: baseSourceTarget("live_source_mailbox", "live_source_mailbox"),
+      toolCallAdmissionDecision: toolAdmission("live_source_mailbox", ["live_environment"]),
+      canonicalGoalFrame: canonicalGoal("live_source_processed_mail_interpretation", "model_synthesized_answer"),
+      routeMetadata: {
+        schema: "helix.ask.route_metadata.v1",
+        invocationKind: "stage_play_mail_wake",
+        sourceTarget: "live_source_mailbox",
+        mandatoryNextTool: { name: "live_env.read_processed_live_source_mail" },
+        requiredPhase: "read_processed_mail",
+      },
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "debug_export",
+      source_target: "model_only",
+      requested_action: "suppressed_contextual_tool_reference",
+      selected_capability: "suppressed_contextual_tool_reference",
+      goal_kind: "model_only_concept",
+      required_terminal_kind: "direct_answer_text",
+      tool_admission_suppressed: true,
+    });
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "suppressed_contextual_reference",
+      route_metadata_demoted: true,
+      demotion_reason: "contextual_tool_reference_demoted_route_metadata",
+    });
+  });
+
   it("plans selected context attachments through context reflection", () => {
     const plan = buildCapabilityPlan({
       turnId: "ask:context-reflection",
@@ -1616,6 +1742,40 @@ describe("Helix capability plan contract", () => {
       operator_command_present: true,
       source_target: "context_reflection",
       admission_status: "needs_evidence",
+    });
+  });
+
+  it("lets negated context-reflection references suppress hard context metadata", () => {
+    const plan = buildCapabilityPlan({
+      turnId: "ask:negated-context-reflection-reference",
+      promptText:
+        "Do not use helix_ask.reflect_context_attachments; explain what bounded context evidence would be needed first.",
+      sourceTargetIntent: {
+        ...baseSourceTarget("context_reflection", "context_attachment"),
+        requested_outputs: ["context_attachment_reflection", "bounded_context_reference"],
+      },
+      toolCallAdmissionDecision: toolAdmission("context_reflection", ["context_reflection"]),
+      canonicalGoalFrame: canonicalGoal("context_attachment_reflection", "model_synthesized_answer"),
+      routeMetadata: {
+        schema: "helix.ask.route_metadata.v1",
+        sourceTarget: "context_reflection",
+        mandatoryNextTool: { name: "helix_ask.reflect_context_attachments" },
+      },
+    });
+
+    expect(plan).toMatchObject({
+      capability_family: "debug_export",
+      source_target: "model_only",
+      requested_action: "suppressed_contextual_tool_reference",
+      selected_capability: "suppressed_contextual_tool_reference",
+      goal_kind: "model_only_concept",
+      required_terminal_kind: "direct_answer_text",
+      tool_admission_suppressed: true,
+    });
+    expect(plan.capability_contract_arbitration).toMatchObject({
+      contract_state: "suppressed_contextual_reference",
+      route_metadata_demoted: true,
+      demotion_reason: "contextual_tool_reference_demoted_route_metadata",
     });
   });
 });

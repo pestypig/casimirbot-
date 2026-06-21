@@ -13,6 +13,7 @@ import { liveSourceModelSynthesisMissingFailure } from "./live-source-terminal-f
 import type { HelixTerminalAuthority } from "@shared/helix-turn-poison-guard";
 import { committedRouteAllowsTerminalKind, readCommittedAskRoute } from "./committed-ask-route";
 import { isWorkstationObservationTerminalKind } from "./tool-family-terminal-policy";
+import { applyCompoundTerminalPolicy } from "./compound-terminal-policy";
 
 export type HelixTerminalAnswerEnvelope = {
   schema: "helix.terminal_answer_envelope.v1";
@@ -856,11 +857,38 @@ export function resolveTerminalAnswerEnvelope(
     terminalText = typedFailureText(payload);
     authorityOrigin = "typed_failure";
   }
-  if (!committedRouteAllowsTerminalKind({
-    committedRoute: readCommittedAskRoute(payload),
-    terminalArtifactKind,
-    finalAnswerSource,
-  }) && !directAnswerContractSatisfied(payload) && !workstationToolEvaluationTerminalContractSatisfied(payload)) {
+  const committedRoute = readCommittedAskRoute(payload);
+  const committedGoal = readRecord(committedRoute?.canonical_goal);
+  const routeProductContract = readRecord(payload.route_product_contract);
+  const compoundTerminalPolicy = applyCompoundTerminalPolicy(payload, {
+    allowed: [
+      ...readArray(committedGoal?.allowed_terminal_artifact_kinds).map(readString),
+      ...readArray(routeProductContract?.allowed_terminal_artifact_kinds).map(readString),
+    ].filter((entry): entry is string => Boolean(entry)),
+    forbidden: [
+      ...readArray(committedGoal?.forbidden_terminal_artifact_kinds).map(readString),
+      ...readArray(routeProductContract?.forbidden_terminal_artifact_kinds).map(readString),
+    ].filter((entry): entry is string => Boolean(entry)),
+    requiredTerminalKind:
+      readString(committedGoal?.required_terminal_kind) ??
+      readString(routeProductContract?.required_terminal_kind),
+  });
+  const compoundPolicyAllowsTerminal =
+    compoundTerminalPolicy.policy.active &&
+    !compoundTerminalPolicy.forbidden.includes(terminalArtifactKind) &&
+    (
+      compoundTerminalPolicy.allowed.length === 0 ||
+      compoundTerminalPolicy.allowed.includes(terminalArtifactKind)
+    );
+  const committedRouteAllowsTerminal =
+    compoundTerminalPolicy.policy.active
+      ? compoundPolicyAllowsTerminal
+      : committedRouteAllowsTerminalKind({
+          committedRoute,
+          terminalArtifactKind,
+          finalAnswerSource,
+        });
+  if (!committedRouteAllowsTerminal && !directAnswerContractSatisfied(payload) && !workstationToolEvaluationTerminalContractSatisfied(payload)) {
     payload.committed_route_terminal_rejection = {
       schema: "helix.committed_route_terminal_rejection.v1",
       turn_id: turnId,

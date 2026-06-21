@@ -1,3 +1,5 @@
+import { readCompoundTerminalPolicy } from "./compound-terminal-policy";
+
 export type FinalAnswerDraftQualityViolation =
   | "empty_draft"
   | "refusal_without_error"
@@ -25,6 +27,7 @@ export type FinalAnswerDraftRouteFamily =
   | "workspace_directory"
   | "workspace_diagnostic"
   | "visual_capture"
+  | "live_source_mail"
   | "live_environment"
   | "docs_source"
   | "workstation_tool"
@@ -65,22 +68,7 @@ const textIncludesAny = (text: string, patterns: RegExp[]): boolean =>
   patterns.some((pattern) => pattern.test(text));
 
 const compoundTerminalPolicyActive = (payload?: Record<string, unknown> | null): boolean => {
-  const itinerary = readRecord(payload?.capability_itinerary);
-  const contract =
-    readRecord(payload?.compound_capability_contract) ??
-    readRecord(itinerary?.compound_capability_contract);
-  const executionState =
-    readRecord(payload?.capability_itinerary_execution_state) ??
-    readRecord(itinerary?.execution_state);
-  const terminalCriteria = readRecord(itinerary?.terminal_success_criteria);
-  const synthesisReadiness = readRecord(payload?.compound_capability_synthesis_readiness);
-  return (
-    readArray(contract?.subgoals).length > 1 ||
-    readArray(executionState?.compound_subgoal_ledger).length > 1 ||
-    terminalCriteria?.compound_terminal_policy === "synthesize_from_satisfied_subgoal_observations" ||
-    terminalCriteria?.requires_post_observation_synthesis === true ||
-    synthesisReadiness?.applies === true
-  );
+  return readCompoundTerminalPolicy(payload).active;
 };
 
 export const inferFinalAnswerDraftRouteFamily = (input: {
@@ -153,7 +141,10 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
   if (committedSourceTarget === "workstation_panel" || committedSourceTarget === "workspace_action" || committedSourceTarget === "workstation_state") {
     return "workstation_tool";
   }
-  if (committedSourceTarget === "live_environment" || committedSourceTarget === "live_source_mailbox" || committedSourceTarget === "live_pipeline" || committedSourceTarget === "world_event") {
+  if (committedSourceTarget === "live_source_mailbox" || /live_source_mailbox|live_source_mail/i.test(committedGoalKind ?? "")) {
+    return "live_source_mail";
+  }
+  if (committedSourceTarget === "live_environment" || committedSourceTarget === "live_pipeline" || committedSourceTarget === "world_event") {
     return "situation_room";
   }
 
@@ -234,7 +225,10 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
   if (/live_environment|micro_reasoner|workstation_goal|agent_goal|route_watch|loop_state/i.test(routeText)) {
     return "live_environment";
   }
-  if (sourceTarget === "live_environment" || sourceTarget === "live_source_mailbox" || sourceTarget === "live_pipeline" || sourceTarget === "world_event" || /situation|live_source_mailbox|live_job|dottie/i.test(routeText)) {
+  if (sourceTarget === "live_source_mailbox" || /live_source_mailbox|live_source_mail/i.test(routeText)) {
+    return "live_source_mail";
+  }
+  if (sourceTarget === "live_environment" || sourceTarget === "live_pipeline" || sourceTarget === "world_event" || /situation|live_job|dottie/i.test(routeText)) {
     return "situation_room";
   }
   if (sourceTarget === "model_only" || sourceTarget === "general_background" || goalKind === "model_only_concept") {
@@ -364,6 +358,7 @@ const sourceBackedModelSynthesisRouteFamilies = new Set<FinalAnswerDraftRouteFam
   "workspace_directory",
   "workspace_diagnostic",
   "visual_capture",
+  "live_source_mail",
   "live_environment",
   "workstation_tool",
   "calculator_tool",

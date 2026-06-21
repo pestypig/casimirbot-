@@ -26,11 +26,18 @@ export type HelixContextualToolSuppressionFamily =
   | "scholarly_research"
   | "internet_search"
   | "theory_locator"
+  | "context_reflection"
   | "zen_graph_reflection"
   | "civilization_bounds"
+  | "visual_capture"
+  | "situation_run"
+  | "workspace_diagnostic"
+  | "capability_catalog"
+  | "runtime_evidence"
   | "workstation_action"
   | "notes"
   | "repo_code"
+  | "live_source_mail"
   | "live_environment"
   | "live_pipeline"
   | "process_graph"
@@ -49,8 +56,13 @@ const SCHOLARLY_EXPLANATION_RE = /\b(?:just\s+)?(?:explain|describe|tell\s+me|wh
 const INTERNET_SEARCH_CUE_RE = /\b(?:browse|browsing|search|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|search\s+online|verify\s+online|latest|current|recent|today|breaking|ongoing\s+(?:conflict|war|crisis)|ceasefire|election|law|prices?|schedules?)\b/i;
 const INTERNET_SEARCH_ACTION_RE = /\b(?:browse|search|find|look\s*up|lookup|google|bing|web\s+search|internet\s+search|check\s+online|search\s+online|verify\s+online)\b/i;
 const THEORY_LOCATOR_CUE_RE = /\b(?:helix\.theory\.frontierVectorFieldTrace|frontierVectorFieldTrace|frontier\s+vector\s+field|badge\s+coordinate\s+vectors?|relation\s+tensors?|dimensional\s+connections?|candidate\s+badge\s+connections?|theory\s+frontiers?|theory\s+badge\s+graph|theory_context_reflection|reflect_theory_context)\b/i;
+const CONTEXT_REFLECTION_CUE_RE = /\b(?:helix_ask\.reflect_live_synthetic_data|reflect_live_synthetic_data|live_synthetic_data_reflection|helix_ask\.reflect_context_attachments|reflect_context_attachments|context_reflection(?:\s+attachments)?|context_attachment_reflection|bounded_context_reference|context\s+attachments?|attachment\s+reflection)\b/i;
 const ZEN_GRAPH_CUE_RE = /\b(?:zen_graph_reflection|zen\s+graph|reflect_ideology_context|ideology_context_reflection|procedural_zen_classification|bridge_theory_ideology_context|theory_ideology_bridge|theory\s+ideology\s+bridge|theory\s+zen\s+bridge)\b/i;
 const CIVILIZATION_BOUNDS_CUE_RE = /\b(?:civilization_bounds|civilization\s+bounds|civilization_bounds_reflection|reflect_civilization_bounds|civilization_bounds_roadmap|build_civilization_scenario_frame|civilization\s+scenario\s+frame)\b/i;
+const VISUAL_CAPTURE_CUE_RE = /\b(?:image_lens|image\s+lens|image-lens|visual_capture|visual\s+capture|situation-room\.describe_visual_capture|situation\s+room\s+visual\s+capture|current\s+visual\s+frame|visual\s+frame|ImageLens)\b/i;
+const WORKSPACE_STATUS_CUE_RE = /\b(?:workspace_os\.status|workspace[_\s-]?os[_\s-]?status|workspace\s+status|workstation\s+status|capability\s+records?)\b/i;
+const CAPABILITY_CATALOG_CUE_RE = /\b(?:helix_ask\.inspect_capability_catalog|inspect_capability_catalog|capability_catalog|runtime_capability_catalog|capability\s+catalog|capability\s+registry|runtime\s+catalog|visible\s+tools?|available\s+tools?|available\s+capabilities|agent\s+capabilities|tool\s+calls?)\b/i;
+const LIVE_SOURCE_MAIL_CUE_RE = /\b(?:live_env\.(?:check_live_source_mail|read_live_source_mail|read_processed_live_source_mail|process_live_source_mail|reflect_live_source_mail_loop|query_micro_reasoner_presets|draft_micro_reasoner_preset|route_micro_reasoner_prompt|query_live_source_quality|summarize_live_source_current_state)|live_source_mail(?:box)?|live\s+source\s+mail(?:box)?|processed_live_source_mail|processed\s+mail|source\s+mail|mailbox\s+loop|micro[_\s-]?reasoner)\b/i;
 const REWRITE_ONLY_CURRENT_TEXT_RE = /\b(?:do\s+not|don't|dont|without|no)\s+(?:browse|browsing|search(?:ing)?|web|internet|look\s*up|lookup|google|check\s+online)\b[\s\S]{0,160}\b(?:rewrite|reword|copyedit|summari[sz]e|quote|format|polish)\b|\b(?:rewrite|reword|copyedit|summari[sz]e|quote|format|polish)\b[\s\S]{0,160}\b(?:this|the)\s+(?:paragraph|passage|prompt|text|quote)\b[\s\S]{0,120}\b(?:about\s+(?:current|recent|latest)|current\s+events?|ongoing\s+(?:conflict|war|crisis))/i;
 const NEGATED_MUTATING_WRITE_CLAUSE_RE =
   /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no)\b[^.!?;\n]{0,180}/gi;
@@ -91,10 +103,15 @@ export function contextualToolSuppressionBlocksFamily(
   if (family === "scholarly_research") return /scholarly|doi|arxiv|paper|citation|research/i.test(cue);
   if (family === "internet_search") return /internet|web|search|browse|google|bing/i.test(cue);
   if (family === "theory_locator") return /theory|locator|badge|graph|reflection|frontier|tensor|dimensional|candidate/i.test(cue);
+  if (family === "context_reflection") return /context|attachment|synthetic|bounded/i.test(cue);
   if (family === "zen_graph_reflection") return /zen|ideology|theory_ideology|theory\s+ideology|procedural/i.test(cue);
   if (family === "civilization_bounds") return /civilization|bounds|roadmap|scenario/i.test(cue);
+  if (family === "visual_capture" || family === "situation_run") return /image[_\s-]?lens|visual|situation[-_. ]?room|frame/i.test(cue);
+  if (family === "workspace_diagnostic") return /workspace[_\s-]?os|workspace|workstation|status|capability\s+records?/i.test(cue);
+  if (family === "capability_catalog" || family === "runtime_evidence") return /capability|catalog|registry|runtime|available|visible|tools?|tool\s+calls?|agent/i.test(cue);
   if (family === "workstation_action" || family === "notes") return /workstation|workspace|note|write|file/i.test(cue);
   if (family === "repo_code") return /repo|code/i.test(cue) || DOCS_MD_PATH_CUE_RE.test(suppression.text);
+  if (family === "live_source_mail") return /live[_\s-]?source|source\s+mail|mailbox|processed\s+mail|micro[_\s-]?reasoner/i.test(cue);
   if (family === "live_environment") return /live|stage_play/i.test(cue);
   if (family === "live_pipeline") return /live[_-]?pipeline|live[_-]?source|situation-room\.live-source|stage_play/i.test(cue);
   if (family === "process_graph") return /process[_-]?graph|workstation|workspace/i.test(cue);
@@ -113,8 +130,13 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
       !SCHOLARLY_CUE_RE.test(prompt) &&
       !INTERNET_SEARCH_CUE_RE.test(prompt) &&
       !THEORY_LOCATOR_CUE_RE.test(prompt) &&
+      !CONTEXT_REFLECTION_CUE_RE.test(prompt) &&
       !ZEN_GRAPH_CUE_RE.test(prompt) &&
       !CIVILIZATION_BOUNDS_CUE_RE.test(prompt) &&
+      !VISUAL_CAPTURE_CUE_RE.test(prompt) &&
+      !WORKSPACE_STATUS_CUE_RE.test(prompt) &&
+      !CAPABILITY_CATALOG_CUE_RE.test(prompt) &&
+      !LIVE_SOURCE_MAIL_CUE_RE.test(prompt) &&
       !LIVE_ENV_CONTROL_CUE_RE.test(prompt) &&
       !MUTATING_WRITE_NEGATION_RE.test(prompt)
     )
@@ -161,6 +183,26 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
               : "hypothetical_tool_reference",
       verb_or_cue: LIVE_ENV_CONTROL_CUE_RE.exec(liveEnvControlReference)?.[0] ?? "live_env.control",
       text: liveEnvControlReference,
+    };
+  }
+
+  const liveSourceMailReference = prompt.match(
+    /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to|no)\b[^.!?;\n]{0,180}(?:run|call|use|execute|check|read|process|reflect|query|draft|route|summarize)?[^.!?;\n]{0,120}(?:live_env\.(?:check_live_source_mail|read_live_source_mail|read_processed_live_source_mail|process_live_source_mail|reflect_live_source_mail_loop|query_micro_reasoner_presets|draft_micro_reasoner_preset|route_micro_reasoner_prompt|query_live_source_quality|summarize_live_source_current_state)|live_source_mail(?:box)?|live\s+source\s+mail(?:box)?|processed_live_source_mail|processed\s+mail|source\s+mail|mailbox\s+loop|micro[_\s-]?reasoner)\b|["'`][^"'`]*(?:live_env\.(?:check_live_source_mail|read_live_source_mail|read_processed_live_source_mail|process_live_source_mail|reflect_live_source_mail_loop|query_micro_reasoner_presets|draft_micro_reasoner_preset|route_micro_reasoner_prompt|query_live_source_quality|summarize_live_source_current_state)|live_source_mail(?:box)?|live\s+source\s+mail(?:box)?|processed_live_source_mail|processed\s+mail|source\s+mail|mailbox\s+loop|micro[_\s-]?reasoner)[^"'`]*["'`]|(?:\b(?:if|when|before|after|would|could|might|hypothetically|later|next\s+time|in\s+the\s+future)\b[^.!?;\n]{0,180}(?:live_env\.(?:check_live_source_mail|read_live_source_mail|read_processed_live_source_mail|process_live_source_mail|reflect_live_source_mail_loop|query_micro_reasoner_presets|draft_micro_reasoner_preset|route_micro_reasoner_prompt|query_live_source_quality|summarize_live_source_current_state)|live_source_mail(?:box)?|live\s+source\s+mail(?:box)?|processed_live_source_mail|processed\s+mail|source\s+mail|mailbox\s+loop|micro[_\s-]?reasoner)\b)|(?:\b(?:earlier|previously|last\s+turn|historically|already)\b[^.!?;\n]{0,180}(?:live_env\.(?:check_live_source_mail|read_live_source_mail|read_processed_live_source_mail|process_live_source_mail|reflect_live_source_mail_loop|query_micro_reasoner_presets|draft_micro_reasoner_preset|route_micro_reasoner_prompt|query_live_source_quality|summarize_live_source_current_state)|live_source_mail(?:box)?|live\s+source\s+mail(?:box)?|processed_live_source_mail|processed\s+mail|source\s+mail|mailbox\s+loop|micro[_\s-]?reasoner)\b)|(?:\b(?:screen|visible|label|button|phrase|text|document|debug)\b[^.!?;\n]{0,180}(?:live_env\.(?:check_live_source_mail|read_live_source_mail|read_processed_live_source_mail|process_live_source_mail|reflect_live_source_mail_loop|query_micro_reasoner_presets|draft_micro_reasoner_preset|route_micro_reasoner_prompt|query_live_source_quality|summarize_live_source_current_state)|live_source_mail(?:box)?|live\s+source\s+mail(?:box)?|processed_live_source_mail|processed\s+mail|source\s+mail|mailbox\s+loop|micro[_\s-]?reasoner)\b)/i,
+  )?.[0];
+  if (liveSourceMailReference) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to|no)\b/i.test(liveSourceMailReference)
+        ? "negated_tool_instruction"
+        : /["'`]/.test(liveSourceMailReference)
+          ? "quoted_tool_command"
+          : /\b(?:earlier|previously|last\s+turn|historically|already)\b/i.test(liveSourceMailReference)
+            ? "historical_tool_reference"
+            : /\b(?:screen|visible|label|button|phrase|text|document|debug)\b/i.test(liveSourceMailReference)
+              ? "screen_visible_tool_reference"
+              : "hypothetical_tool_reference",
+      verb_or_cue: LIVE_SOURCE_MAIL_CUE_RE.exec(liveSourceMailReference)?.[0] ?? "live_source_mail",
+      text: liveSourceMailReference,
     };
   }
 
@@ -256,6 +298,69 @@ export function detectContextualToolAdmissionSuppression(promptText: string): He
         CIVILIZATION_BOUNDS_CUE_RE.exec(contextualDomainReflection)?.[0] ??
         "domain_reflection",
       text: contextualDomainReflection,
+    };
+  }
+
+  const contextualVisualCapture = prompt.match(
+    /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to|no)\b[\s\S]{0,180}(?:image_lens|image\s+lens|image-lens|visual_capture|visual\s+capture|situation-room\.describe_visual_capture|situation\s+room\s+visual\s+capture|current\s+visual\s+frame|visual\s+frame|ImageLens)\b|["'`][^"'`]*(?:image_lens|image\s+lens|image-lens|visual_capture|visual\s+capture|situation-room\.describe_visual_capture|situation\s+room\s+visual\s+capture|current\s+visual\s+frame|visual\s+frame|ImageLens)[^"'`]*["'`]|(?:\b(?:if|when|before|after|would|could|might|hypothetically|later|next\s+time|in\s+the\s+future)\b[\s\S]{0,180}(?:image_lens|image\s+lens|image-lens|visual_capture|visual\s+capture|situation-room\.describe_visual_capture|situation\s+room\s+visual\s+capture|current\s+visual\s+frame|visual\s+frame|ImageLens))|(?:\b(?:earlier|previously|last\s+turn|historically|already)\b[\s\S]{0,180}(?:image_lens|image\s+lens|image-lens|visual_capture|visual\s+capture|situation-room\.describe_visual_capture|situation\s+room\s+visual\s+capture|current\s+visual\s+frame|visual\s+frame|ImageLens))|(?:\b(?:screen|visible|label|button|phrase|text)\b[\s\S]{0,180}(?:image_lens|image\s+lens|image-lens|visual_capture|visual\s+capture|situation-room\.describe_visual_capture|situation\s+room\s+visual\s+capture|current\s+visual\s+frame|visual\s+frame|ImageLens))/i,
+  )?.[0];
+  if (contextualVisualCapture) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to|no)\b/i.test(contextualVisualCapture)
+        ? "negated_tool_instruction"
+        : /["'`]/.test(contextualVisualCapture)
+          ? "quoted_tool_command"
+          : /\b(?:earlier|previously|last\s+turn|historically|already)\b/i.test(contextualVisualCapture)
+            ? "historical_tool_reference"
+            : /\b(?:screen|visible|label|button|phrase|text)\b/i.test(contextualVisualCapture)
+              ? "screen_visible_tool_reference"
+              : "hypothetical_tool_reference",
+      verb_or_cue: VISUAL_CAPTURE_CUE_RE.exec(contextualVisualCapture)?.[0] ?? "visual_capture",
+      text: contextualVisualCapture,
+    };
+  }
+
+  const contextualContextReflection = prompt.match(
+    /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to|no)\b[\s\S]{0,180}(?:helix_ask\.reflect_live_synthetic_data|reflect_live_synthetic_data|live_synthetic_data_reflection|helix_ask\.reflect_context_attachments|reflect_context_attachments|context_reflection(?:\s+attachments)?|context_attachment_reflection|bounded_context_reference|context\s+attachments?|attachment\s+reflection)\b|["'`][^"'`]*(?:helix_ask\.reflect_live_synthetic_data|reflect_live_synthetic_data|live_synthetic_data_reflection|helix_ask\.reflect_context_attachments|reflect_context_attachments|context_reflection(?:\s+attachments)?|context_attachment_reflection|bounded_context_reference|context\s+attachments?|attachment\s+reflection)[^"'`]*["'`]|(?:\b(?:if|when|before|after|would|could|might|hypothetically|later|next\s+time|in\s+the\s+future)\b[\s\S]{0,180}(?:helix_ask\.reflect_live_synthetic_data|reflect_live_synthetic_data|live_synthetic_data_reflection|helix_ask\.reflect_context_attachments|reflect_context_attachments|context_reflection(?:\s+attachments)?|context_attachment_reflection|bounded_context_reference|context\s+attachments?|attachment\s+reflection))|(?:\b(?:earlier|previously|last\s+turn|historically|already)\b[\s\S]{0,180}(?:helix_ask\.reflect_live_synthetic_data|reflect_live_synthetic_data|live_synthetic_data_reflection|helix_ask\.reflect_context_attachments|reflect_context_attachments|context_reflection(?:\s+attachments)?|context_attachment_reflection|bounded_context_reference|context\s+attachments?|attachment\s+reflection))|(?:\b(?:screen|visible|label|button|phrase|text|document)\b[\s\S]{0,180}(?:helix_ask\.reflect_live_synthetic_data|reflect_live_synthetic_data|live_synthetic_data_reflection|helix_ask\.reflect_context_attachments|reflect_context_attachments|context_reflection(?:\s+attachments)?|context_attachment_reflection|bounded_context_reference|context\s+attachments?|attachment\s+reflection))/i,
+  )?.[0];
+  if (contextualContextReflection) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to|no)\b/i.test(contextualContextReflection)
+        ? "negated_tool_instruction"
+        : /["'`]/.test(contextualContextReflection)
+          ? "quoted_tool_command"
+          : /\b(?:earlier|previously|last\s+turn|historically|already)\b/i.test(contextualContextReflection)
+            ? "historical_tool_reference"
+            : /\b(?:screen|visible|label|button|phrase|text|document)\b/i.test(contextualContextReflection)
+              ? "screen_visible_tool_reference"
+              : "hypothetical_tool_reference",
+      verb_or_cue: CONTEXT_REFLECTION_CUE_RE.exec(contextualContextReflection)?.[0] ?? "context_reflection",
+      text: contextualContextReflection,
+    };
+  }
+
+  const contextualRuntimeStatusOrCatalog = prompt.match(
+    /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to|no)\b[\s\S]{0,180}(?:workspace_os\.status|workspace[_\s-]?os[_\s-]?status|workspace\s+status|workstation\s+status|helix_ask\.inspect_capability_catalog|inspect_capability_catalog|capability_catalog|runtime_capability_catalog|capability\s+catalog|capability\s+registry|runtime\s+catalog|visible\s+tools?|available\s+tools?|available\s+capabilities|agent\s+capabilities|tool\s+calls?)\b|["'`][^"'`]*(?:workspace_os\.status|workspace[_\s-]?os[_\s-]?status|helix_ask\.inspect_capability_catalog|inspect_capability_catalog|capability_catalog|runtime_capability_catalog)[^"'`]*["'`]|(?:\b(?:if|when|before|after|would|could|might|hypothetically|later|next\s+time|in\s+the\s+future)\b[\s\S]{0,180}(?:workspace_os\.status|workspace[_\s-]?os[_\s-]?status|workspace\s+status|workstation\s+status|helix_ask\.inspect_capability_catalog|inspect_capability_catalog|capability_catalog|runtime_capability_catalog|capability\s+catalog|capability\s+registry|runtime\s+catalog|visible\s+tools?|available\s+tools?|available\s+capabilities|agent\s+capabilities|tool\s+calls?))|(?:\b(?:earlier|previously|last\s+turn|historically|already)\b[\s\S]{0,180}(?:workspace_os\.status|workspace[_\s-]?os[_\s-]?status|workspace\s+status|workstation\s+status|helix_ask\.inspect_capability_catalog|inspect_capability_catalog|capability_catalog|runtime_capability_catalog|capability\s+catalog|capability\s+registry|runtime\s+catalog|visible\s+tools?|available\s+tools?|available\s+capabilities|agent\s+capabilities|tool\s+calls?))|(?:\b(?:screen|visible|label|button|phrase|text|document)\b[\s\S]{0,180}(?:workspace_os\.status|workspace[_\s-]?os[_\s-]?status|workspace\s+status|workstation\s+status|helix_ask\.inspect_capability_catalog|inspect_capability_catalog|capability_catalog|runtime_capability_catalog|capability\s+catalog|capability\s+registry|runtime\s+catalog|visible\s+tools?|available\s+tools?|available\s+capabilities|agent\s+capabilities|tool\s+calls?))/i,
+  )?.[0];
+  if (contextualRuntimeStatusOrCatalog) {
+    return {
+      tool_admission_suppressed: true,
+      suppression_reason: /\b(?:do\s+not|don't|dont|never|without|not\s+asking\s+to|no\s+need\s+to|no)\b/i.test(contextualRuntimeStatusOrCatalog)
+        ? "negated_tool_instruction"
+        : /["'`]/.test(contextualRuntimeStatusOrCatalog)
+          ? "quoted_tool_command"
+          : /\b(?:earlier|previously|last\s+turn|historically|already)\b/i.test(contextualRuntimeStatusOrCatalog)
+            ? "historical_tool_reference"
+            : /\b(?:screen|visible|label|button|phrase|text|document)\b/i.test(contextualRuntimeStatusOrCatalog)
+              ? "screen_visible_tool_reference"
+              : "hypothetical_tool_reference",
+      verb_or_cue:
+        WORKSPACE_STATUS_CUE_RE.exec(contextualRuntimeStatusOrCatalog)?.[0] ??
+        CAPABILITY_CATALOG_CUE_RE.exec(contextualRuntimeStatusOrCatalog)?.[0] ??
+        "runtime_evidence",
+      text: contextualRuntimeStatusOrCatalog,
     };
   }
 

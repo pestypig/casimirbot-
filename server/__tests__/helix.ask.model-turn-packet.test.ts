@@ -112,6 +112,63 @@ describe("Helix Ask model turn packet", () => {
     });
   });
 
+  it("recovers ledger-only capability itinerary into the model-visible turn packet", () => {
+    const turnId = "turn-ledger-itinerary-1";
+    const capabilityItinerary = {
+      schema: "helix.capability_itinerary.v1",
+      prompt_shape: "compound_tool",
+      compound_prompt_contract: {
+        schema: "helix.compound_prompt_contract.v1",
+        prompt_shape: "compound_tool",
+        requires_ordered_subgoals: true,
+      },
+      planned_steps: [
+        {
+          order: 1,
+          requested_capability: "docs-viewer.locate_in_doc",
+          runtime_capability: "docs-viewer.locate_in_doc",
+        },
+        {
+          order: 2,
+          requested_capability: "scientific-calculator.solve_expression",
+          runtime_capability: "scientific-calculator.solve_expression",
+        },
+      ],
+    };
+    const packet = buildHelixModelTurnPacket({
+      turnId,
+      promptText: "Use docs-viewer.locate_in_doc, then scientific-calculator.solve_expression.",
+      payload: {},
+      artifactLedger: [
+        {
+          artifact_id: `${turnId}:capability_itinerary`,
+          kind: "capability_itinerary",
+          payload: capabilityItinerary,
+        },
+      ],
+      availableCapabilities: [
+        {
+          capability_key: "docs-viewer.locate_in_doc",
+          requires_action: true,
+          goal_fit: "primary",
+        },
+        {
+          capability_key: "scientific-calculator.solve_expression",
+          requires_action: true,
+          goal_fit: "primary",
+        },
+      ],
+    });
+
+    expect(packet.capability_itinerary).toBe(capabilityItinerary);
+    expect(packet.compound_prompt_contract).toMatchObject({
+      schema: "helix.compound_prompt_contract.v1",
+      requires_ordered_subgoals: true,
+    });
+    expect(packet.loop_policy.allow_tools).toBe(true);
+    expect(packet.artifact_refs).toEqual([`${turnId}:capability_itinerary`]);
+  });
+
   it("materializes model turn assistant messages as final_answer_draft", () => {
     const packet = buildHelixModelTurnPacket({
       turnId: "turn-2",

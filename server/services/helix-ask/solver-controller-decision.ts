@@ -10,6 +10,7 @@ import {
   normalizeCommittedRouteTerminalKind,
   readCommittedAskRoute,
 } from "./committed-ask-route";
+import { applyCompoundTerminalPolicy } from "./compound-terminal-policy";
 
 type RecordLike = Record<string, unknown>;
 
@@ -35,6 +36,16 @@ const hasSatisfiedRequiredEvidenceKind = (goalSatisfaction: RecordLike | null, k
 
 const hasCurrentTurnArtifactKind = (payload: RecordLike, kind: string): boolean =>
   readArray(payload.current_turn_artifact_ledger).some((entry) => readString(readRecord(entry)?.kind) === kind);
+
+const payloadArtifactPayloadByKind = (
+  payload: RecordLike,
+  kind: string,
+): RecordLike | null => {
+  const artifact = readArray(payload.current_turn_artifact_ledger)
+    .map(readRecord)
+    .find((entry) => readString(entry?.kind) === kind);
+  return readRecord(artifact?.payload);
+};
 
 const resolveAuthoritativeWorkstationToolTerminal = (
   payload: RecordLike,
@@ -304,8 +315,14 @@ const hasMaterializedScholarlyResearchAnswer = (payload: RecordLike, terminalArt
   if (readString(canonicalGoal?.required_terminal_kind) !== "scholarly_research_answer") return false;
   const consistency = readRecord(payload.terminal_consistency_check);
   if (readBoolean(consistency?.consistent) === false) return false;
-  const itinerary = readRecord(payload.capability_itinerary_execution_state);
-  if (readBoolean(itinerary?.applies) === true && readBoolean(itinerary?.complete) !== true) return false;
+  const capabilityItinerary =
+    readRecord(payload.capability_itinerary) ??
+    payloadArtifactPayloadByKind(payload, "capability_itinerary");
+  const executionState =
+    readRecord(payload.capability_itinerary_execution_state) ??
+    readRecord(capabilityItinerary?.execution_state) ??
+    payloadArtifactPayloadByKind(payload, "capability_itinerary_execution_state");
+  if (readBoolean(executionState?.applies) === true && readBoolean(executionState?.complete) !== true) return false;
 
   const finalDraft =
     readRecord(payload.final_answer_draft) ??
@@ -739,30 +756,39 @@ export function buildSolverControllerDecision(input: {
   const terminalArtifactKind =
     authoritativeWorkstationTerminal?.terminalArtifactKind ??
     readString(payload.terminal_artifact_kind);
-  const requiredTerminalKind =
+  const rawRequiredTerminalKind =
     authoritativeWorkstationTerminal?.terminalArtifactKind ??
     committedRoute?.canonical_goal.required_terminal_kind ??
     readString(canonicalGoal?.required_terminal_kind);
   const requiredTerminalKindsFromContract = readStringArray(terminalContract?.required_terminal_kinds);
-  const requiredTerminalKinds =
+  const rawRequiredTerminalKinds =
     authoritativeWorkstationTerminal
       ? [authoritativeWorkstationTerminal.terminalArtifactKind]
       : committedRoute?.canonical_goal.allowed_terminal_artifact_kinds.length
       ? committedRoute.canonical_goal.allowed_terminal_artifact_kinds
       : requiredTerminalKindsFromContract.length > 0
       ? requiredTerminalKindsFromContract
-      : requiredTerminalKind
-        ? [requiredTerminalKind]
+      : rawRequiredTerminalKind
+        ? [rawRequiredTerminalKind]
         : [];
+  const compoundTerminalPolicy = applyCompoundTerminalPolicy(payload, {
+    allowed: rawRequiredTerminalKinds,
+    forbidden:
+      committedRoute?.canonical_goal.forbidden_terminal_artifact_kinds ??
+      readStringArray(terminalContract?.forbidden_terminal_kinds),
+    requiredTerminalKind: rawRequiredTerminalKind,
+  });
+  const requiredTerminalKind = compoundTerminalPolicy.requiredTerminalKind;
+  const requiredTerminalKinds = compoundTerminalPolicy.allowed.length > 0
+    ? compoundTerminalPolicy.allowed
+    : rawRequiredTerminalKinds;
   const allowedTerminalKinds = Array.from(new Set([
     ...requiredTerminalKinds,
     ...readStringArray(terminalContract?.acceptable_fallbacks),
   ].map(normalizeCommittedRouteTerminalKind)));
-  const forbiddenTerminalKinds =
-    (committedRoute?.canonical_goal.forbidden_terminal_artifact_kinds ??
-    readStringArray(terminalContract?.forbidden_terminal_kinds))
-      .map(normalizeCommittedRouteTerminalKind)
-      .filter((kind) => !authoritativeWorkstationTerminal || kind !== authoritativeWorkstationTerminal.terminalArtifactKind);
+  const forbiddenTerminalKinds = compoundTerminalPolicy.forbidden
+    .map(normalizeCommittedRouteTerminalKind)
+    .filter((kind) => !authoritativeWorkstationTerminal || kind !== authoritativeWorkstationTerminal.terminalArtifactKind);
   const goalSatisfactionState = readString(goalSatisfaction?.satisfaction);
   const goalNextDecision = readString(goalSatisfaction?.next_decision);
   const terminalContractGoalKind = readString(terminalContract?.goal_kind);
@@ -927,11 +953,20 @@ export function buildSolverControllerDecision(input: {
     const committedRouteAllowsTerminal = committedRoute
       ? authoritativeWorkstationTerminal
         ? true
-        : committedRouteAllowsTerminalKind({
-            committedRoute,
-            terminalArtifactKind,
-            finalAnswerSource: readString(payload.final_answer_source),
-          })
+        : compoundTerminalPolicy.policy.active
+          ? Boolean(
+              terminalArtifactKind &&
+              !forbiddenTerminalKinds.includes(normalizeCommittedRouteTerminalKind(terminalArtifactKind)) &&
+              (
+                allowedTerminalKinds.length === 0 ||
+                allowedTerminalKinds.includes(normalizeCommittedRouteTerminalKind(terminalArtifactKind))
+              ),
+            )
+          : committedRouteAllowsTerminalKind({
+              committedRoute,
+              terminalArtifactKind,
+              finalAnswerSource: readString(payload.final_answer_source),
+            })
       : true;
     if (terminalArtifactKind && committedRoute && !committedRouteAllowsTerminal && !modelDirectAnswerTerminal) {
       pushUnique(blockingReasons, "committed_route_terminal_product_mismatch");

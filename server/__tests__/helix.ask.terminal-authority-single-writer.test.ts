@@ -2148,6 +2148,116 @@ describe("Helix terminal authority single writer", () => {
     });
   });
 
+  it("recovers compound draft support coverage from ledger execution-state artifacts", () => {
+    const turnId = "ask:test:compound-support-ledger-execution-state";
+    const workspaceSubgoalId = `${turnId}:compound_capability_subgoal:1:workspace_os_status`;
+    const docsSubgoalId = `${turnId}:compound_capability_subgoal:2:docs-viewer_locate_in_doc`;
+    const workspaceObservationRef = `${turnId}:workspace_os_status_observation`;
+    const docsObservationRef = `${turnId}:doc_location_matches`;
+    const draftRef = `${turnId}:final_answer_draft`;
+    const draftText = "Workspace status was available, and the requested document anchor was located.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:capability_itinerary_execution_state`,
+        kind: "capability_itinerary_execution_state",
+        payload: {
+          schema: "helix.capability_itinerary_execution_state.v1",
+          turn_id: turnId,
+          applies: true,
+          complete: true,
+          compound_subgoal_ledger: [
+            {
+              subgoal_id: workspaceSubgoalId,
+              requested_capability: "workspace_os.status",
+              selected_capability: "workspace_os.status",
+              executed_capability: "workspace_os.status",
+              observation_kind: "workspace_os_status_observation",
+              observation_ref: workspaceObservationRef,
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+            {
+              subgoal_id: docsSubgoalId,
+              requested_capability: "docs-viewer.locate_in_doc",
+              selected_capability: "docs-viewer.locate_in_doc",
+              executed_capability: "docs-viewer.locate_in_doc",
+              observation_kind: "doc_location_matches",
+              observation_ref: docsObservationRef,
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+          ],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: workspaceObservationRef,
+        kind: "workspace_os_status_observation",
+        payload: {
+          schema: "helix.workspace_os_status_observation.v1",
+          capability_key: "workspace_os.status",
+          compound_subgoal_id: workspaceSubgoalId,
+        },
+      },
+      {
+        artifact_id: docsObservationRef,
+        kind: "doc_location_matches",
+        payload: {
+          schema: "helix.doc_location_matches.v1",
+          capability_key: "docs-viewer.locate_in_doc",
+          compound_subgoal_id: docsSubgoalId,
+          matches: [{ path: "docs/helix-ask-codex-loop-discipline.md", line: 196 }],
+        },
+      },
+      {
+        artifact_id: draftRef,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: draftText,
+          answer_text: draftText,
+          support_refs: [workspaceObservationRef],
+          artifact_refs: [workspaceObservationRef],
+          authority: "llm_post_observation_compound_synthesis",
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        source_target: "model_only",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure"],
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: draftText,
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("compound_subgoal_support_refs_missing");
+    expect(payload.compound_subgoal_draft_support_coverage).toMatchObject({
+      applies: true,
+      ok: false,
+      required_observation_refs: [workspaceObservationRef, docsObservationRef],
+      draft_support_refs: [workspaceObservationRef],
+      missing_observation_refs: [docsObservationRef],
+    });
+  });
+
   it("allows compound final drafts grounded in every satisfied subgoal observation", () => {
     const turnId = "ask:test:compound-draft-complete-subgoal-support";
     const workspaceSubgoalId = `${turnId}:compound_capability_subgoal:1:workspace_os_status`;

@@ -40,6 +40,19 @@ const readStringArray = (value: unknown): string[] =>
 
 const unique = <T>(entries: T[]): T[] => Array.from(new Set(entries));
 
+const payloadArtifactPayloadByKind = (
+  payload: RecordLike,
+  kind: string,
+): RecordLike | null => {
+  const ledger = Array.isArray(payload.current_turn_artifact_ledger)
+    ? payload.current_turn_artifact_ledger
+    : [];
+  const matched = ledger
+    .map((entry) => readRecord(entry))
+    .find((entry) => readString(entry?.kind) === kind);
+  return readRecord(matched?.payload);
+};
+
 const isReceiptKind = (value: string): boolean =>
   /receipt|tool_evaluation|workstation_tool_evaluation/i.test(value);
 
@@ -383,8 +396,13 @@ const capabilityItineraryEntryMatchesObservedFamily = (entry: RecordLike, requir
 };
 
 const collectCapabilityItineraryEvidenceRefs = (payload: RecordLike): string[] => {
-  const itinerary = readRecord(payload.capability_itinerary);
-  const executionState = readRecord(itinerary?.execution_state);
+  const itinerary =
+    readRecord(payload.capability_itinerary) ??
+    payloadArtifactPayloadByKind(payload, "capability_itinerary");
+  const executionState =
+    readRecord(payload.capability_itinerary_execution_state) ??
+    readRecord(itinerary?.execution_state) ??
+    payloadArtifactPayloadByKind(payload, "capability_itinerary_execution_state");
   const requiredFamilies = readStringArray(
     executionState?.required_observation_families ??
       readRecord(itinerary?.terminal_success_criteria)?.required_observation_families,

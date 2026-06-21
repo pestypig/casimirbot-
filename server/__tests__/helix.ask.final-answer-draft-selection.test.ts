@@ -50,6 +50,20 @@ const scholarlyContract = (turnId: string) => ({
   raw_content_included: false,
 });
 
+const liveSourceMailContract = (turnId: string) => ({
+  schema: "helix.route_product_contract.v1",
+  turn_id: turnId,
+  thread_id: "thread:test",
+  source_target: "live_source_mailbox",
+  allowed_terminal_artifact_kinds: ["model_synthesized_answer", "typed_failure", "request_user_input"],
+  forbidden_terminal_artifact_kinds: ["tool_receipt", "workspace_action_receipt", "live_environment_tool_observation"],
+  side_artifact_kinds_allowed: ["stage_play_processed_mail_packet", "final_answer_draft"],
+  required_artifact_refs: [],
+  precedence_reason: "test",
+  assistant_answer: false,
+  raw_content_included: false,
+});
+
 const addModelOnlyRuntimeProof = (payload: Record<string, unknown>): void => {
   payload.agent_runtime_loop = {
     iterations: [
@@ -334,6 +348,80 @@ describe("final_answer_draft terminal selection", () => {
     );
   });
 
+  it("uses the first incomplete compound subgoal rail as the terminal typed failure", () => {
+    const turnId = "ask:test:compound-subgoal-rail-terminal-failure";
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      ok: true,
+      response_type: "final_answer",
+      final_status: "final_answer",
+      status: "final_answer",
+      selected_final_answer: "Stale compound draft.",
+      final_answer_source: "final_answer_draft",
+      terminal_artifact_kind: "model_synthesized_answer",
+      compound_prompt_coverage_gate: {
+        schema: "helix.compound_prompt_coverage_gate.v1",
+        applies: true,
+        passed: false,
+        decision: "FAIL_CLOSED",
+        unresolved_requirement_ids: ["calculator-subgoal"],
+      },
+      capability_itinerary_execution_state: {
+        schema: "helix.capability_itinerary_execution_state.v1",
+        applies: true,
+        compound_subgoal_ledger: [
+          {
+            subgoal_id: "docs-subgoal",
+            requested_capability: "docs-viewer.locate_in_doc",
+            selected_capability: "docs-viewer.locate_in_doc",
+            executed_capability: "docs-viewer.locate_in_doc",
+            observation_ref: `${turnId}:docs-location`,
+            satisfaction: "satisfied",
+            rail_status: "complete",
+            rail_failure_code: null,
+          },
+          {
+            subgoal_id: "calculator-subgoal",
+            requested_capability: "scientific-calculator.solve_expression",
+            selected_capability: "scientific-calculator.solve_expression",
+            executed_capability: null,
+            observation_ref: null,
+            satisfaction: "failed",
+            rail_status: "fail_closed",
+            rail_failure_code: "missing_required_arg:latex",
+            first_broken_rail: "capability_execution",
+            repair_target: "subgoal_argument_extraction",
+          },
+        ],
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "not_satisfied",
+        next_decision: "fail_closed",
+      },
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: [],
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.final_status).toBe("final_failure");
+    expect(payload.terminal_error_code).toBe("missing_required_arg:latex");
+    expect(payload.selected_final_answer).toContain("scientific-calculator.solve_expression");
+    expect(payload.selected_final_answer).toContain("missing required argument latex");
+    expect(payload.typed_failure).toMatchObject({
+      error_code: "missing_required_arg:latex",
+      compound_rail_failure_code: "missing_required_arg:latex",
+      compound_first_broken_rail: "capability_execution",
+      compound_repair_target: "subgoal_argument_extraction",
+      first_incomplete_compound_subgoal_id: "calculator-subgoal",
+    });
+  });
+
   it("syncs public mirrors from typed-failure authority after stale final-draft projection", () => {
     const turnId = "ask:test:typed-failure-authority-public-mirror";
     const staleDraft = "This stale draft should not remain the public answer.";
@@ -441,6 +529,111 @@ describe("final_answer_draft terminal selection", () => {
     expect(JSON.stringify(payload.current_turn_artifact_ledger)).not.toContain("terminal_consistency_violation");
   });
 
+  it("syncs public mirrors to the exact compound subgoal rail failure when authority is typed failure", () => {
+    const turnId = "ask:test:typed-failure-authority-subgoal-rail-public-mirror";
+    const staleDraft = "This stale draft should not remain the public answer.";
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      ok: true,
+      response_type: "final_answer",
+      final_status: "final_answer",
+      status: "final_answer",
+      selected_final_answer: staleDraft,
+      answer: staleDraft,
+      text: staleDraft,
+      assistant_answer: staleDraft,
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      terminal_error_code: "terminal_consistency_violation",
+      compound_prompt_coverage_gate: {
+        schema: "helix.compound_prompt_coverage_gate.v1",
+        applies: true,
+        passed: false,
+        decision: "FAIL_CLOSED",
+        unresolved_requirement_ids: ["calculator-subgoal"],
+      },
+      capability_itinerary_execution_state: {
+        schema: "helix.capability_itinerary_execution_state.v1",
+        applies: true,
+        compound_subgoal_ledger: [
+          {
+            subgoal_id: "calculator-subgoal",
+            requested_capability: "scientific-calculator.solve_expression",
+            selected_capability: "scientific-calculator.solve_expression",
+            executed_capability: null,
+            observation_ref: null,
+            satisfaction: "failed",
+            rail_status: "fail_closed",
+            rail_failure_code: "invalid_arg:latex_is_prose",
+            first_broken_rail: "capability_execution",
+            repair_target: "subgoal_argument_extraction",
+          },
+        ],
+      },
+      terminal_answer_authority: {
+        schema: "helix.terminal_authority.v1",
+        thread_id: "thread:test",
+        turn_id: turnId,
+        terminal_kind: "failure",
+        terminal_artifact_kind: "typed_failure",
+        final_answer_source: "typed_failure",
+        terminal_text_preview: "Old consistency failure.",
+        server_authoritative: true,
+        assistant_answer: false,
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        turn_id: turnId,
+        terminal_artifact_kind: "model_synthesized_answer",
+        concise_text: staleDraft,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      typed_failure: {
+        schema: "helix.typed_failure.v1",
+        error_code: "terminal_consistency_violation",
+        text: "Old consistency failure.",
+        answer_text: "Old consistency failure.",
+      },
+      debug: {
+        ok: true,
+        response_type: "final_answer",
+        final_status: "final_answer",
+        terminal_artifact_kind: "model_synthesized_answer",
+        final_answer_source: "final_answer_draft",
+        terminal_error_code: "terminal_consistency_violation",
+        selected_final_answer: staleDraft,
+      },
+    };
+
+    expect(syncHelixTypedFailureAuthorityPublicMirrors(payload)).toBe(true);
+
+    expect(payload.ok).toBe(false);
+    expect(payload.response_type).toBe("final_failure");
+    expect(payload.final_status).toBe("final_failure");
+    expect(payload.terminal_artifact_kind).toBe("typed_failure");
+    expect(payload.final_answer_source).toBe("typed_failure");
+    expect(payload.terminal_error_code).toBe("invalid_arg:latex_is_prose");
+    expect(payload.selected_final_answer).toContain("scientific-calculator.solve_expression");
+    expect(payload.selected_final_answer).toContain("invalid argument latex_is_prose");
+    expect(payload.typed_failure).toMatchObject({
+      error_code: "invalid_arg:latex_is_prose",
+      compound_rail_failure_code: "invalid_arg:latex_is_prose",
+      compound_first_broken_rail: "capability_execution",
+      compound_repair_target: "subgoal_argument_extraction",
+      first_incomplete_compound_subgoal_id: "calculator-subgoal",
+    });
+    expect(payload.debug).toMatchObject({
+      ok: false,
+      response_type: "final_failure",
+      final_status: "final_failure",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "invalid_arg:latex_is_prose",
+    });
+  });
+
   it("localizes typed failure public mirrors from the Ask language contract", () => {
     const turnId = "ask:test:localized-typed-failure";
     const localizedFailure = "No pude producir una respuesta terminal para este turno.";
@@ -507,6 +700,61 @@ describe("final_answer_draft terminal selection", () => {
       selected_final_answer: localizedFailure,
       answer: localizedFailure,
     });
+  });
+
+  it("blocks unsupported live-source mail drafts as source-backed synthesis", () => {
+    const turnId = "ask:test:live-source-mail-unsupported-draft";
+    const draftText = "The live-source mailbox looks healthy and no more action is needed.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: draftText,
+          authority: "llm_post_observation_composer",
+          model_step_capability: "model.synthesize_from_live_source_mail",
+          artifact_refs: [],
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      route_product_contract: liveSourceMailContract(turnId),
+      canonical_goal_frame: {
+        goal_kind: "live_source_mailbox_review",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: "I could not produce a terminal answer for this turn.",
+      final_answer_source: "typed_failure",
+      terminal_artifact_kind: "typed_failure",
+      terminal_error_code: "missing_allowed_terminal_artifact",
+    };
+    const gate = evaluateFinalAnswerDraftQualityGate({
+      turnId,
+      finalAnswerDraftRef: `${turnId}:draft`,
+      draftText,
+      draftPayload: artifacts[0]?.payload,
+      routeProductContract: liveSourceMailContract(turnId),
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(gate.route_family).toBe("live_source_mail");
+    expect(gate.violations).toContain("missing_support_refs_for_source_route");
+
+    const materialized = materializeFinalAnswerDraftTerminal({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+      routeProductContract: liveSourceMailContract(turnId),
+    });
+
+    expect(materialized?.ok).toBe(false);
+    expect(materialized?.blocked_reason).toBe("source_support_refs_missing");
+    expect(payload.model_synthesized_answer).toBeUndefined();
   });
 
   it("materializes a supported repo draft into repo_code_evidence_answer", () => {
@@ -584,6 +832,164 @@ describe("final_answer_draft terminal selection", () => {
     expect(result.visible_text).toBe(draftText);
     expect(payload.terminal_error_code).toBeUndefined();
     expect(payload.repo_answer_text_quality_gate).toMatchObject({ ok: true });
+  });
+
+  it("materializes compound drafts from ledger-only itinerary execution state", () => {
+    const turnId = "ask:test:compound-draft-ledger-only-execution-state";
+    const workspaceSubgoalId = `${turnId}:compound_capability_subgoal:1:workspace_os_status`;
+    const calculatorSubgoalId = `${turnId}:compound_capability_subgoal:2:scientific-calculator_solve_expression`;
+    const workspaceObservationRef = `${turnId}:workspace_os_status_observation`;
+    const calculatorObservationRef = `${turnId}:calculator_receipt`;
+    const draftText = "Workspace status was inspected, and the calculator result was 45.";
+    const artifacts = [
+      {
+        artifact_id: `${turnId}:compound_capability_contract`,
+        kind: "compound_capability_contract",
+        payload: {
+          schema: "helix.compound_capability_contract.v1",
+          turn_id: turnId,
+          prompt_shape: "compound_capability",
+          requires_all_subgoals: true,
+          terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          subgoals: [
+            {
+              subgoal_id: workspaceSubgoalId,
+              order: 1,
+              requested_capability: "workspace_os.status",
+              runtime_capability: "workspace_os.status",
+              capability_family: "workspace_diagnostic",
+              required_observation_kinds: ["workspace_os_status_observation"],
+              required_terminal_kind: "model_synthesized_answer",
+              mandatory: true,
+            },
+            {
+              subgoal_id: calculatorSubgoalId,
+              order: 2,
+              requested_capability: "scientific-calculator.solve_expression",
+              runtime_capability: "scientific-calculator.solve_expression",
+              capability_family: "calculator",
+              required_observation_kinds: ["calculator_receipt", "workstation_tool_evaluation"],
+              required_terminal_kind: "workstation_tool_evaluation",
+              mandatory: true,
+            },
+          ],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: `${turnId}:capability_itinerary_execution_state`,
+        kind: "capability_itinerary_execution_state",
+        payload: {
+          schema: "helix.capability_itinerary_execution_state.v1",
+          turn_id: turnId,
+          applies: true,
+          complete: true,
+          required_observation_families: ["workspace_diagnostic", "calculator"],
+          missing_observation_families: [],
+          missing_compound_subgoal_ids: [],
+          missing_required_capabilities: [],
+          compound_subgoal_ledger: [
+            {
+              subgoal_id: workspaceSubgoalId,
+              order: 1,
+              requested_capability: "workspace_os.status",
+              runtime_capability: "workspace_os.status",
+              selected_capability: "workspace_os.status",
+              executed_capability: "workspace_os.status",
+              capability_family: "workspace_diagnostic",
+              observation_kind: "workspace_os_status_observation",
+              observation_ref: workspaceObservationRef,
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+            {
+              subgoal_id: calculatorSubgoalId,
+              order: 2,
+              requested_capability: "scientific-calculator.solve_expression",
+              runtime_capability: "scientific-calculator.solve_expression",
+              selected_capability: "scientific-calculator.solve_expression",
+              executed_capability: "scientific-calculator.solve_expression",
+              capability_family: "calculator",
+              observation_kind: "calculator_receipt",
+              observation_ref: calculatorObservationRef,
+              satisfaction: "satisfied",
+              rail_status: "complete",
+            },
+          ],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: workspaceObservationRef,
+        kind: "workspace_os_status_observation",
+        payload: {
+          schema: "helix.workspace_os_status_observation.v1",
+          capability_key: "workspace_os.status",
+          compound_subgoal_id: workspaceSubgoalId,
+        },
+      },
+      {
+        artifact_id: calculatorObservationRef,
+        kind: "calculator_receipt",
+        payload: {
+          schema: "helix.calculator_receipt.v1",
+          capability_key: "scientific-calculator.solve_expression",
+          compound_subgoal_id: calculatorSubgoalId,
+          result: "45",
+          expression: "5*9",
+        },
+      },
+      {
+        artifact_id: `${turnId}:draft`,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: draftText,
+          authority: "llm_post_observation_compound_synthesis",
+          model_step_capability: "model.synthesize_from_compound_subgoal_observations",
+          support_refs: [workspaceObservationRef, calculatorObservationRef],
+          artifact_refs: [workspaceObservationRef, calculatorObservationRef],
+          grounded_in_observation_refs: [workspaceObservationRef, calculatorObservationRef],
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      route_product_contract: modelOnlyContract(turnId),
+      canonical_goal_frame: {
+        goal_kind: "compound_tool",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: draftText,
+      final_answer_source: "final_answer_draft",
+      terminal_artifact_kind: "model_synthesized_answer",
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+    };
+
+    const materialized = materializeFinalAnswerDraftTerminal({
+      turnId,
+      payload,
+      artifactLedger: artifacts,
+      routeProductContract: modelOnlyContract(turnId),
+    });
+
+    expect(materialized?.ok).toBe(true);
+    expect(materialized?.materialized_terminal_artifact_kind).toBe("model_synthesized_answer");
+    expect(payload.model_synthesized_answer).toMatchObject({
+      schema: "helix.model_synthesized_answer.v1",
+      answer_text: draftText,
+      subgoal_observation_refs: [workspaceObservationRef, calculatorObservationRef],
+      subgoal_observation_refs_count: 2,
+      source_families: ["workspace_diagnostic", "calculator"],
+      model_step_capability: "model.synthesize_from_compound_subgoal_observations",
+    });
   });
 
   it("publishes a valid repo evidence answer instead of a stale continuation failure", () => {

@@ -9,6 +9,7 @@ import type { HelixToolCallAdmissionDecision } from "@shared/helix-tool-call-adm
 import { committedRouteAllowsTerminalKind } from "./committed-ask-route";
 import type { HelixTerminalArtifactSelectionGuard } from "./terminal-artifact-selection-guard";
 import type { HelixProductAuthorityGuard } from "./product-authority-guard";
+import { applyCompoundTerminalPolicy } from "./compound-terminal-policy";
 
 export type HelixRouteAuthorityViolationCode =
   | "terminal_product_authority_mismatch"
@@ -159,6 +160,7 @@ export function auditRouteAuthority(input: {
   turnId: string;
   promptText: string;
   selectedRoute: string;
+  payload?: Record<string, unknown> | null;
   terminalArtifactKind: string | null | undefined;
   finalAnswerSource: string | null | undefined;
   sourceTargetIntent?: HelixAskSourceTargetIntent | Record<string, unknown> | null;
@@ -197,28 +199,48 @@ export function auditRouteAuthority(input: {
     !committedRoute && (!contract || readString(contract.schema) !== "helix.route_product_contract.v1");
   const terminalArtifactKind = readString(input.terminalArtifactKind) || "unknown";
   const finalAnswerSource = readString(input.finalAnswerSource) || "unknown";
-  const allowedTerminalArtifactKinds =
+  const rawAllowedTerminalArtifactKinds =
     readStringArray(committedCanonicalGoal?.allowed_terminal_artifact_kinds).length > 0
       ? readStringArray(committedCanonicalGoal?.allowed_terminal_artifact_kinds)
       : readStringArray(contract?.allowed_terminal_artifact_kinds);
-  const forbiddenTerminalArtifactKinds =
+  const rawForbiddenTerminalArtifactKinds =
     readStringArray(committedCanonicalGoal?.forbidden_terminal_artifact_kinds).length > 0
       ? readStringArray(committedCanonicalGoal?.forbidden_terminal_artifact_kinds)
       : readStringArray(contract?.forbidden_terminal_artifact_kinds);
+  const compoundTerminalPolicy = applyCompoundTerminalPolicy(input.payload, {
+    allowed: rawAllowedTerminalArtifactKinds,
+    forbidden: rawForbiddenTerminalArtifactKinds,
+    requiredTerminalKind:
+      readString(committedCanonicalGoal?.required_terminal_kind) ||
+      readString(contract?.required_terminal_kind),
+  });
+  const allowedTerminalArtifactKinds = compoundTerminalPolicy.allowed;
+  const forbiddenTerminalArtifactKinds = compoundTerminalPolicy.forbidden;
   const livePipelineProcedureReceipt =
     terminalArtifactKind === "live_pipeline_receipt" &&
     isLivePipelineProcedurePrompt(input.promptText, input.selectedRoute);
+  const terminalAllowedByCompoundPolicy =
+    compoundTerminalPolicy.policy.active &&
+    !forbiddenTerminalArtifactKinds.includes(terminalArtifactKind) &&
+    (
+      allowedTerminalArtifactKinds.length === 0 ||
+      allowedTerminalArtifactKinds.includes(terminalArtifactKind)
+    );
   const terminalArtifactAllowed =
     livePipelineProcedureReceipt ||
     (
       Boolean(committedRoute) &&
       selectionGuard?.allowed !== false &&
       productGuard?.allowed !== false &&
-      committedRouteAllowsTerminalKind({
-        committedRoute,
-        terminalArtifactKind,
-        finalAnswerSource,
-      })
+      (
+        compoundTerminalPolicy.policy.active
+          ? terminalAllowedByCompoundPolicy
+          : committedRouteAllowsTerminalKind({
+              committedRoute,
+              terminalArtifactKind,
+              finalAnswerSource,
+            })
+      )
     ) ||
     (
       !committedRoute &&

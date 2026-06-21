@@ -16,6 +16,7 @@ import {
   materializeDocEvidenceSynthesisAnswer,
 } from "./doc-evidence-synthesis";
 import { buildHelixCapabilityItineraryExecutionState } from "./capability-itinerary-execution";
+import { readCompoundTerminalPolicy } from "./compound-terminal-policy";
 
 export type FinalAnswerDraftTerminalMaterializerResult = {
   schema: "helix.final_answer_draft_terminal_materializer_result.v1";
@@ -93,6 +94,65 @@ const artifactSchema = (artifact: ArtifactLike): string =>
 const artifactId = (artifact: ArtifactLike): string | null =>
   readString(artifact.artifact_id) ?? readString(artifactPayload(artifact)?.artifact_id);
 
+const artifactPayloadByKind = (
+  artifactLedger: ArtifactLike[],
+  kind: string,
+): Record<string, unknown> | null => {
+  const artifact = artifactLedger.find((entry) => artifactKind(entry) === kind);
+  return artifact ? artifactPayload(artifact) : null;
+};
+
+const payloadArtifactPayloadByKind = (
+  payload: Record<string, unknown>,
+  kind: string,
+): Record<string, unknown> | null =>
+  artifactPayloadByKind(
+    readArray(payload.current_turn_artifact_ledger)
+      .map(readRecord)
+      .filter((entry): entry is ArtifactLike => Boolean(entry)),
+    kind,
+  );
+
+const readCompoundItinerary = (
+  payload: Record<string, unknown>,
+  artifactLedger: ArtifactLike[] = [],
+): Record<string, unknown> | null =>
+  readRecord(payload.capability_itinerary) ??
+  artifactPayloadByKind(artifactLedger, "capability_itinerary") ??
+  payloadArtifactPayloadByKind(payload, "capability_itinerary");
+
+const readCompoundContract = (
+  payload: Record<string, unknown>,
+  artifactLedger: ArtifactLike[] = [],
+): Record<string, unknown> | null => {
+  const itinerary = readCompoundItinerary(payload, artifactLedger);
+  return (
+    readRecord(payload.compound_capability_contract) ??
+    readRecord(itinerary?.compound_capability_contract) ??
+    artifactPayloadByKind(artifactLedger, "compound_capability_contract") ??
+    payloadArtifactPayloadByKind(payload, "compound_capability_contract")
+  );
+};
+
+const readCompoundExecutionState = (
+  payload: Record<string, unknown>,
+  artifactLedger: ArtifactLike[] = [],
+): Record<string, unknown> | null => {
+  const itinerary = readCompoundItinerary(payload, artifactLedger);
+  return (
+    readRecord(payload.capability_itinerary_execution_state) ??
+    readRecord(itinerary?.execution_state) ??
+    artifactPayloadByKind(artifactLedger, "capability_itinerary_execution_state") ??
+    payloadArtifactPayloadByKind(payload, "capability_itinerary_execution_state") ??
+    (itinerary
+      ? buildHelixCapabilityItineraryExecutionState({
+          capabilityItinerary: itinerary,
+          artifacts: artifactLedger,
+        })
+      : null)
+  );
+};
+
 const artifactText = (artifact: ArtifactLike): string | null => {
   const payload = artifactPayload(artifact);
   return readString(payload?.answer_text) ?? readString(payload?.text) ?? readString(payload?.visible_text);
@@ -131,11 +191,12 @@ const isDocsEvidenceObservation = (artifact: ArtifactLike): boolean =>
     [artifactKind(artifact), artifactSchema(artifact), artifactId(artifact)].join(" "),
   );
 
-const isCompleteCompoundResearchLocatorItinerary = (payload: Record<string, unknown>): boolean => {
-  const itinerary = readRecord(payload.capability_itinerary);
-  const executionState =
-    readRecord(payload.capability_itinerary_execution_state) ??
-    readRecord(itinerary?.execution_state);
+const isCompleteCompoundResearchLocatorItinerary = (
+  payload: Record<string, unknown>,
+  artifactLedger: ArtifactLike[] = [],
+): boolean => {
+  const itinerary = readCompoundItinerary(payload, artifactLedger);
+  const executionState = readCompoundExecutionState(payload, artifactLedger);
   if (executionState?.complete !== true) return false;
   const synthesisReadiness = readRecord(payload.compound_capability_synthesis_readiness);
   const terminalCriteria = readRecord(itinerary?.terminal_success_criteria);
@@ -179,16 +240,7 @@ const compoundSubgoalObservationRefs = (
   payload: Record<string, unknown>,
   artifactLedger: ArtifactLike[],
 ): string[] => {
-  const itinerary = readRecord(payload.capability_itinerary);
-  const executionState =
-    readRecord(payload.capability_itinerary_execution_state) ??
-    readRecord(itinerary?.execution_state) ??
-    (itinerary
-      ? buildHelixCapabilityItineraryExecutionState({
-          capabilityItinerary: itinerary,
-          artifacts: artifactLedger,
-        })
-      : null);
+  const executionState = readCompoundExecutionState(payload, artifactLedger);
   return unique(
     readArray(executionState?.compound_subgoal_ledger)
       .map(readRecord)
@@ -199,10 +251,11 @@ const compoundSubgoalObservationRefs = (
   );
 };
 
-const compoundSubgoalCount = (payload: Record<string, unknown>): number => {
-  const itinerary = readRecord(payload.capability_itinerary);
-  const contract = readRecord(payload.compound_capability_contract) ??
-    readRecord(itinerary?.compound_capability_contract);
+const compoundSubgoalCount = (
+  payload: Record<string, unknown>,
+  artifactLedger: ArtifactLike[] = [],
+): number => {
+  const contract = readCompoundContract(payload, artifactLedger);
   return readArray(contract?.subgoals).length;
 };
 
@@ -239,13 +292,12 @@ const capabilityFamilyFromCapability = (capability: string | null): string | nul
   return null;
 };
 
-const compoundSubgoalSourceFamilies = (payload: Record<string, unknown>): string[] => {
-  const itinerary = readRecord(payload.capability_itinerary);
-  const contract = readRecord(payload.compound_capability_contract) ??
-    readRecord(itinerary?.compound_capability_contract);
-  const executionState =
-    readRecord(payload.capability_itinerary_execution_state) ??
-    readRecord(itinerary?.execution_state);
+const compoundSubgoalSourceFamilies = (
+  payload: Record<string, unknown>,
+  artifactLedger: ArtifactLike[] = [],
+): string[] => {
+  const contract = readCompoundContract(payload, artifactLedger);
+  const executionState = readCompoundExecutionState(payload, artifactLedger);
   const contractFamilies = readArray(contract?.subgoals)
     .map(readRecord)
     .filter((entry): entry is Record<string, unknown> => Boolean(entry))
@@ -292,7 +344,7 @@ const compoundTerminalSupportRefs = (input: {
   return {
     supportRefs: unique([...supportRefs, ...readinessSupportRefs, ...subgoalObservationRefs]),
     subgoalObservationRefs,
-    sourceFamilies: compoundSubgoalSourceFamilies(input.payload),
+    sourceFamilies: compoundSubgoalSourceFamilies(input.payload, input.artifactLedger),
   };
 };
 
@@ -338,59 +390,24 @@ const allowedKinds = (contract?: HelixRouteProductContract | Record<string, unkn
     .filter((entry): entry is string => Boolean(entry));
 
 const compoundTerminalPolicyActive = (payload: Record<string, unknown>): boolean => {
-  const itinerary = readRecord(payload.capability_itinerary);
-  const contract =
-    readRecord(payload.compound_capability_contract) ??
-    readRecord(itinerary?.compound_capability_contract);
-  const executionState =
-    readRecord(payload.capability_itinerary_execution_state) ??
-    readRecord(itinerary?.execution_state);
-  const terminalCriteria = readRecord(itinerary?.terminal_success_criteria);
-  const synthesisReadiness = readRecord(payload.compound_capability_synthesis_readiness);
-  return (
-    readArray(contract?.subgoals).length > 1 ||
-    readArray(executionState?.compound_subgoal_ledger).length > 1 ||
-    terminalCriteria?.compound_terminal_policy === "synthesize_from_satisfied_subgoal_observations" ||
-    synthesisReadiness?.applies === true
-  );
+  return readCompoundTerminalPolicy(payload).active;
 };
 
 const compoundAllowedTerminalKinds = (payload: Record<string, unknown>): string[] => {
-  if (!compoundTerminalPolicyActive(payload)) return [];
-  const itinerary = readRecord(payload.capability_itinerary);
-  const terminalCriteria = readRecord(itinerary?.terminal_success_criteria);
-  const synthesisReadiness = readRecord(payload.compound_capability_synthesis_readiness);
-  return unique([
-    ...readArray(terminalCriteria?.allowed_terminal_artifact_kinds)
-      .map(readString)
-      .filter((entry): entry is string => Boolean(entry)),
-    readString(synthesisReadiness?.required_terminal_kind),
-    readString(synthesisReadiness?.synthesis_terminal_kind),
-  ].filter((entry): entry is string => Boolean(entry)));
+  return readCompoundTerminalPolicy(payload).allowed_terminal_artifact_kinds;
 };
 
 const compoundForbiddenTerminalKinds = (payload: Record<string, unknown>): string[] => {
-  if (!compoundTerminalPolicyActive(payload)) return [];
-  const itinerary = readRecord(payload.capability_itinerary);
-  const terminalCriteria = readRecord(itinerary?.terminal_success_criteria);
-  return unique(
-    readArray(terminalCriteria?.forbidden_terminal_artifact_kinds)
-      .map(readString)
-      .filter((entry): entry is string => Boolean(entry)),
-  );
+  return readCompoundTerminalPolicy(payload).forbidden_terminal_artifact_kinds;
 };
 
 const compoundTerminalReadinessBlockedReason = (
   payload: Record<string, unknown>,
+  artifactLedger: ArtifactLike[] = [],
 ): "compound_subgoal_incomplete" | null => {
   if (!compoundTerminalPolicyActive(payload)) return null;
-  const itinerary = readRecord(payload.capability_itinerary);
-  const contract =
-    readRecord(payload.compound_capability_contract) ??
-    readRecord(itinerary?.compound_capability_contract);
-  const executionState =
-    readRecord(payload.capability_itinerary_execution_state) ??
-    readRecord(itinerary?.execution_state);
+  const contract = readCompoundContract(payload, artifactLedger);
+  const executionState = readCompoundExecutionState(payload, artifactLedger);
   const readiness = readRecord(payload.compound_capability_synthesis_readiness);
   if (readiness?.has_failed_subgoal === true) return "compound_subgoal_incomplete";
   if (readiness?.applies === true && readiness.complete !== true) return "compound_subgoal_incomplete";
@@ -446,6 +463,8 @@ const sourceBackedModelSynthesisRouteFamilies = new Set<string>([
   "workspace_directory",
   "workspace_diagnostic",
   "visual_capture",
+  "live_source_mail",
+  "live_source_decision",
   "live_environment",
   "workstation_tool",
   "calculator_tool",
@@ -469,9 +488,12 @@ const effectiveAllowedKinds = (
   const committedRoute = readCommittedRoute(payload);
   const committedAllowed = committedRoute?.canonical_goal.allowed_terminal_artifact_kinds ?? [];
   const compoundForbidden = new Set(compoundForbiddenTerminalKinds(payload));
+  const compoundAllowed = compoundAllowedTerminalKinds(payload);
+  if (compoundAllowed.length > 0) {
+    return compoundAllowed.filter((kind) => !compoundForbidden.has(kind));
+  }
   return unique([
     ...(committedAllowed.length > 0 ? committedAllowed : allowedKinds(contract)),
-    ...compoundAllowedTerminalKinds(payload),
   ]).filter((kind) => !compoundForbidden.has(kind));
 };
 
@@ -489,6 +511,7 @@ const contractAllows = (
   ) {
     return true;
   }
+  if (compoundTerminalPolicyActive(payload)) return false;
   const committedRoute = readCommittedRoute(payload);
   if (committedRoute) {
     return committedRouteAllowsTerminalKind({
@@ -739,7 +762,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
       raw_content_included: false,
     };
   }
-  const compoundReadinessBlockedReason = compoundTerminalReadinessBlockedReason(input.payload);
+  const compoundReadinessBlockedReason = compoundTerminalReadinessBlockedReason(input.payload, artifactLedger);
   if (compoundReadinessBlockedReason) {
     return {
       schema: "helix.final_answer_draft_terminal_materializer_result.v1",
@@ -873,7 +896,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
         raw_content_included: false,
       };
     }
-    const compoundResearchLocator = isCompleteCompoundResearchLocatorItinerary(input.payload);
+    const compoundResearchLocator = isCompleteCompoundResearchLocatorItinerary(input.payload, artifactLedger);
     const targetKind = compoundResearchLocator
       ? "compound_research_locator_answer"
       : "scholarly_research_answer";
@@ -974,7 +997,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
         raw_content_included: false,
       };
     }
-    const compoundResearchLocator = isCompleteCompoundResearchLocatorItinerary(input.payload);
+    const compoundResearchLocator = isCompleteCompoundResearchLocatorItinerary(input.payload, artifactLedger);
     const targetKind = compoundResearchLocator
       ? "compound_research_locator_answer"
       : "internet_search_answer";
@@ -1362,7 +1385,7 @@ export function materializeFinalAnswerDraftTerminal(input: {
   const effectiveSubgoalObservationRefs =
     subgoalObservationRefs.length > 0
       ? subgoalObservationRefs
-      : compoundSubgoalCount(input.payload) > 1
+      : compoundSubgoalCount(input.payload, artifactLedger) > 1
         ? terminalSupportRefs
         : [];
   input.payload.model_synthesized_answer = {

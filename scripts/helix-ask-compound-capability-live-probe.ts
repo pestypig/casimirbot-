@@ -151,7 +151,7 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
       "Use workspace_os.status to inspect workstation status, then call scientific-calculator.solve_expression with this exact expression: 14*23+8.",
     expectedRequested: ["workspace_os.status", "scientific-calculator.solve_expression"],
     expectedRuntime: ["workspace_os.status", "scientific-calculator.solve_expression"],
-    expectedInputBindingFromCapabilities: [null, null],
+    expectedInputBindingFromCapabilities: [null, "workspace_os.status"],
     expectedCalculatorExpression: "14*23+8",
     expectedTerminalKind: "model_synthesized_answer",
   },
@@ -262,6 +262,63 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
     expectedTerminalKind: "model_synthesized_answer",
   },
   {
+    id: "live_source_mail_read_process_decision",
+    prompt:
+      "Call live_env.read_processed_live_source_mail, then call live_env.process_live_source_mail, then call live_env.record_live_source_mail_decision.",
+    expectedRequested: [
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.record_live_source_mail_decision",
+    ],
+    expectedRuntime: [
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.record_live_source_mail_decision",
+    ],
+    expectedInputBindingFromCapabilities: [
+      null,
+      "live_env.read_processed_live_source_mail",
+      ["live_env.read_processed_live_source_mail", "live_env.process_live_source_mail"],
+    ],
+    expectedTerminalKind: "model_synthesized_answer",
+  },
+  {
+    id: "live_source_mail_check_then_raw_read",
+    prompt:
+      "Call live_env.check_live_source_mail, then call live_env.read_live_source_mail.",
+    expectedRequested: [
+      "live_env.check_live_source_mail",
+      "live_env.read_live_source_mail",
+    ],
+    expectedRuntime: [
+      "live_env.check_live_source_mail",
+      "live_env.read_live_source_mail",
+    ],
+    expectedInputBindingFromCapabilities: [
+      null,
+      "live_env.check_live_source_mail",
+    ],
+    expectedTerminalKind: "model_synthesized_answer",
+  },
+  {
+    id: "live_source_decision_then_voice_callout",
+    prompt:
+      "Call live_env.record_live_source_mail_decision, then call live_env.request_interim_voice_callout with message: Summarize the mailbox decision for the operator.",
+    expectedRequested: [
+      "live_env.record_live_source_mail_decision",
+      "live_env.request_interim_voice_callout",
+    ],
+    expectedRuntime: [
+      "live_env.record_live_source_mail_decision",
+      "live_env.request_interim_voice_callout",
+    ],
+    expectedInputBindingFromCapabilities: [
+      null,
+      "live_env.record_live_source_mail_decision",
+    ],
+    expectedTerminalKind: "model_synthesized_answer",
+  },
+  {
     id: "live_source_quality_goal_context_state",
     prompt:
       "Call live_env.query_live_source_quality, then call live_env.query_workstation_goal_context, then call live_env.summarize_live_source_current_state.",
@@ -289,6 +346,50 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
     expectedRequested: ["repo-code.search_concept", "docs-viewer.locate_in_doc"],
     expectedRuntime: ["repo-code.search_concept", "docs-viewer.locate_in_doc"],
     expectedInputBindingFromCapabilities: [null, null],
+    expectedTerminalKind: "doc_evidence_synthesis_answer",
+  },
+  {
+    id: "repo_reflection_calculator",
+    prompt:
+      "Use repo-code.search_concept for query: terminal authority, then use helix_ask.reflect_theory_context to explain the repo evidence, then run scientific-calculator.solve_expression with this exact expression: 4*13.",
+    expectedRequested: [
+      "repo-code.search_concept",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ],
+    expectedRuntime: [
+      "repo-code.search_concept",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ],
+    expectedInputBindingFromCapabilities: [
+      null,
+      "repo-code.search_concept",
+      ["repo-code.search_concept", "helix_ask.reflect_theory_context"],
+    ],
+    expectedCalculatorExpression: "4*13",
+    expectedTerminalKind: "model_synthesized_answer",
+  },
+  {
+    id: "docs_reflection_calculator",
+    prompt:
+      "Use docs-viewer.locate_in_doc to locate query: receipts are observations, then use helix_ask.reflect_theory_context to explain the document evidence, then run scientific-calculator.solve_expression with this exact expression: 7*8.",
+    expectedRequested: [
+      "docs-viewer.locate_in_doc",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ],
+    expectedRuntime: [
+      "docs-viewer.locate_in_doc",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ],
+    expectedInputBindingFromCapabilities: [
+      null,
+      "docs-viewer.locate_in_doc",
+      ["docs-viewer.locate_in_doc", "helix_ask.reflect_theory_context"],
+    ],
+    expectedCalculatorExpression: "7*8",
     expectedTerminalKind: "doc_evidence_synthesis_answer",
   },
   {
@@ -476,7 +577,7 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
     expectedFirstBrokenRail: [null, "capability_execution"],
     expectedRailFailureCode: [null, "invalid_arg:latex_is_prose"],
     expectedRepairTarget: [null, "subgoal_argument_extraction"],
-    expectedTerminalErrorCode: "compound_subgoal_invalid_args_after_repair",
+    expectedTerminalErrorCode: "invalid_arg:latex_is_prose",
     expectedTerminalKind: "typed_failure",
     expectedFinalAnswerSource: "typed_failure",
   },
@@ -492,7 +593,7 @@ export const COMPOUND_CAPABILITY_LIVE_SCENARIOS: CompoundCapabilityScenario[] = 
     expectedFirstBrokenRail: [null, "capability_execution"],
     expectedRailFailureCode: [null, "missing_required_arg:latex"],
     expectedRepairTarget: [null, "subgoal_argument_extraction"],
-    expectedTerminalErrorCode: "compound_subgoal_missing_required_args",
+    expectedTerminalErrorCode: "missing_required_arg:latex",
     expectedTerminalKind: "typed_failure",
     expectedFinalAnswerSource: "typed_failure",
   },
@@ -746,6 +847,10 @@ const matchesExpected = (actual: string | null, expected: ExpectedValue): boolea
 
 const maybeCapability = (entry: RecordLike, key: string): string | null => readString(entry[key]);
 
+const subgoalHasSatisfiedObservation = (entry: RecordLike | null | undefined): boolean =>
+  maybeCapability(entry ?? {}, "satisfaction") === "satisfied" &&
+  Boolean(maybeCapability(entry ?? {}, "observation_ref"));
+
 const subgoalArgsFor = (contractSubgoal: RecordLike | null, ledgerEntry: RecordLike | null): RecordLike | null =>
   firstRecord(
     ledgerEntry?.args,
@@ -756,6 +861,9 @@ const subgoalArgsFor = (contractSubgoal: RecordLike | null, ledgerEntry: RecordL
 
 const expressionFor = (args: RecordLike | null): string | null =>
   readString(args?.latex) ?? readString(args?.expression) ?? readString(args?.input);
+
+const NON_MATH_CALCULATOR_ARG_PATTERN =
+  /workspace_os\.status|workspace[-_.]?directory|docs[-_.]?viewer|repo[-_.]?code|situation[-_.]?room|image[_-]?lens|visual\s+capture|internet[_-]?search|scholarly[-_]?research|helix_ask|reflect[_-]?theory|civilization[_-]?bounds|zen[_-]?graph|scientific[-_.]?calculator|then|plus|call|use|run/i;
 
 const RECEIPT_TERMINAL_KINDS = new Set([
   "tool_receipt",
@@ -932,8 +1040,8 @@ export const evaluateCompoundCapabilityScenario = (input: {
   const nextMissingSubgoalId = readString(missingSummary?.next_missing_subgoal_id);
   const compoundComplete = typeof missingSummary?.complete === "boolean" ? missingSummary.complete : null;
   const firstMissingSubgoal =
-    railStatuses.find((entry) => maybeCapability(entry, "satisfaction") !== "satisfied") ??
-    ledger.find((entry) => maybeCapability(entry, "satisfaction") !== "satisfied") ??
+    railStatuses.find((entry) => !subgoalHasSatisfiedObservation(entry)) ??
+    ledger.find((entry) => !subgoalHasSatisfiedObservation(entry)) ??
     null;
   const firstMissingSubgoalId = readString(firstMissingSubgoal?.subgoal_id);
   const firstMissingSubgoalFirstBrokenRail = readString(firstMissingSubgoal?.first_broken_rail);
@@ -1180,6 +1288,9 @@ export const evaluateCompoundCapabilityScenario = (input: {
     if (!matchesExpected(satisfaction, expectedSatisfaction)) {
       failures.push(`subgoal_${index + 1}_satisfaction_mismatch:${satisfaction ?? "null"}`);
     }
+    if (satisfaction === "satisfied" && !observationRef) {
+      failures.push(`subgoal_${index + 1}_satisfied_observation_ref_missing`);
+    }
     if (expectedFirstBrokenRail !== undefined && !matchesExpected(firstBrokenRail, expectedFirstBrokenRail)) {
       failures.push(`subgoal_${index + 1}_first_broken_rail_mismatch:${firstBrokenRail ?? "null"}`);
     }
@@ -1297,8 +1408,15 @@ export const evaluateCompoundCapabilityScenario = (input: {
       if (railSatisfaction !== satisfaction) {
         failures.push(`subgoal_${index + 1}_rail_satisfaction_mismatch:${railSatisfaction ?? "null"}!=${satisfaction ?? "null"}`);
       }
+      if (railSatisfaction === "satisfied" && !railObservationRef) {
+        failures.push(`subgoal_${index + 1}_rail_satisfied_observation_ref_missing`);
+      }
       if (!matchesExpected(railStatus, expectedRailStatus)) {
         failures.push(`subgoal_${index + 1}_rail_status_mismatch:${railStatus ?? "null"}`);
+      }
+      if (railStatus === "complete") {
+        if (railSatisfaction !== "satisfied") failures.push(`subgoal_${index + 1}_rail_complete_satisfaction_not_satisfied`);
+        if (!railObservationRef) failures.push(`subgoal_${index + 1}_rail_complete_observation_ref_missing`);
       }
       if (railRequiredObservationKindsForSubgoal.length === 0) failures.push(`subgoal_${index + 1}_rail_required_observation_kinds_missing`);
       if (!railRequiredTerminalKind) failures.push(`subgoal_${index + 1}_rail_required_terminal_kind_missing`);
@@ -1391,14 +1509,14 @@ export const evaluateCompoundCapabilityScenario = (input: {
     if (expression !== input.scenario.expectedCalculatorExpression) {
       failures.push(`calculator_expression_mismatch:${expression ?? "null"}`);
     }
-    if (expression && /workspace_os\.status|docs-viewer|repo-code|situation-room|then|plus/i.test(expression)) {
+    if (expression && NON_MATH_CALCULATOR_ARG_PATTERN.test(expression)) {
       failures.push("calculator_expression_contains_non_math_prompt_text");
     }
     const railExpression = expressionFor(readRecord(railStatuses[calculatorIndex]?.args));
     if (railExpression !== input.scenario.expectedCalculatorExpression) {
       failures.push(`calculator_rail_expression_mismatch:${railExpression ?? "null"}`);
     }
-    if (railExpression && /workspace_os\.status|docs-viewer|repo-code|situation-room|then|plus/i.test(railExpression)) {
+    if (railExpression && NON_MATH_CALCULATOR_ARG_PATTERN.test(railExpression)) {
       failures.push("calculator_rail_expression_contains_non_math_prompt_text");
     }
   }

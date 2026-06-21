@@ -3699,6 +3699,192 @@ describe("Helix Ask tool lifecycle trace", () => {
     );
   });
 
+  it("recovers compound rail state from ledger artifacts when payload mirrors are absent", () => {
+    const turnId = "ask:test:compound-debug-index:ledger-artifact-fallback";
+    const workspaceSubgoalId = `${turnId}:compound_capability_subgoal:1:workspace_os_status`;
+    const calculatorSubgoalId = `${turnId}:compound_capability_subgoal:2:scientific-calculator_solve_expression`;
+    const compoundContract = {
+      schema: "helix.compound_capability_contract.v1",
+      turn_id: turnId,
+      prompt_shape: "compound_capability",
+      requires_all_subgoals: true,
+      terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+      subgoals: [
+        {
+          subgoal_id: workspaceSubgoalId,
+          order: 1,
+          requested_capability: "workspace_os.status",
+          runtime_capability: "workspace_os.status",
+          required_args: [],
+          optional_args: [],
+          required_observation_kinds: ["workspace_os_status_observation"],
+          required_terminal_kind: "model_synthesized_answer",
+          contribution_role: "evidence",
+          terminal_contribution_kind: "model_synthesized_answer",
+          allowed_substitutions: [],
+          forbidden_nearby_capabilities: ["debug.inspect_current_turn", "model.direct_answer"],
+          mandatory: true,
+        },
+        {
+          subgoal_id: calculatorSubgoalId,
+          order: 2,
+          requested_capability: "scientific-calculator.solve_expression",
+          runtime_capability: "scientific-calculator.solve_expression",
+          required_args: ["latex"],
+          optional_args: ["expression", "equation"],
+          args_hint: { latex: "2+2", expression: "2+2" },
+          required_observation_kinds: ["calculator_receipt", "workstation_tool_evaluation"],
+          required_terminal_kind: "workstation_tool_evaluation",
+          contribution_role: "terminal_component",
+          terminal_contribution_kind: "workstation_tool_evaluation",
+          allowed_substitutions: [],
+          forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
+          mandatory: true,
+        },
+      ],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const executionState = {
+      schema: "helix.capability_itinerary_execution_state.v1",
+      applies: true,
+      complete: true,
+      compound_subgoal_ledger: [
+        {
+          subgoal_id: workspaceSubgoalId,
+          order: 1,
+          requested_capability: "workspace_os.status",
+          runtime_capability: "workspace_os.status",
+          selected_capability: "workspace_os.status",
+          executed_capability: "workspace_os.status",
+          args: {},
+          planned_args: {},
+          selected_args: {},
+          required_args: [],
+          optional_args: [],
+          required_observation_kinds: ["workspace_os_status_observation"],
+          required_terminal_kind: "model_synthesized_answer",
+          observation_kind: "workspace_os_status_observation",
+          observation_ref: `${turnId}:workspace_status`,
+          support_refs: [`${turnId}:workspace_status`],
+          satisfaction: "satisfied",
+          rail_status: "complete",
+          first_broken_rail: null,
+          rail_failure_code: null,
+          repair_target: null,
+        },
+        {
+          subgoal_id: calculatorSubgoalId,
+          order: 2,
+          requested_capability: "scientific-calculator.solve_expression",
+          runtime_capability: "scientific-calculator.solve_expression",
+          selected_capability: "scientific-calculator.solve_expression",
+          executed_capability: "scientific-calculator.solve_expression",
+          args: { latex: "2+2", expression: "2+2" },
+          planned_args: { latex: "2+2", expression: "2+2" },
+          selected_args: { latex: "2+2", expression: "2+2" },
+          required_args: ["latex"],
+          optional_args: ["expression", "equation"],
+          required_observation_kinds: ["calculator_receipt", "workstation_tool_evaluation"],
+          required_terminal_kind: "workstation_tool_evaluation",
+          observation_kind: "calculator_receipt",
+          observation_ref: `${turnId}:calculator_receipt`,
+          support_refs: [`${turnId}:calculator_receipt`],
+          satisfaction: "satisfied",
+          rail_status: "complete",
+          first_broken_rail: null,
+          rail_failure_code: null,
+          repair_target: null,
+        },
+      ],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+
+    const index = buildArtifactQueryIndex({
+      turnId,
+      payload: {
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: `${turnId}:capability_itinerary`,
+            kind: "capability_itinerary",
+            payload: {
+              schema: "helix.capability_itinerary.v1",
+              compound_capability_contract: compoundContract,
+              terminal_success_criteria: {
+                required_capabilities: [
+                  "workspace_os.status",
+                  "scientific-calculator.solve_expression",
+                ],
+                compound_terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+              },
+            },
+          },
+          {
+            artifact_id: `${turnId}:compound_capability_contract`,
+            kind: "compound_capability_contract",
+            payload: compoundContract,
+          },
+          {
+            artifact_id: `${turnId}:capability_itinerary_execution_state`,
+            kind: "capability_itinerary_execution_state",
+            payload: executionState,
+          },
+          {
+            artifact_id: `${turnId}:workspace_status`,
+            kind: "workspace_os_status_observation",
+            payload: {
+              schema: "helix.workspace_os_status_observation.v1",
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          },
+          {
+            artifact_id: `${turnId}:calculator_receipt`,
+            kind: "calculator_receipt",
+            payload: {
+              schema: "helix.calculator_receipt.v1",
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          },
+        ],
+      },
+    });
+
+    expect(index.compound_capability_contract).toMatchObject({
+      schema: "helix.compound_capability_contract.v1",
+      prompt_shape: "compound_capability",
+    });
+    expect(index.capability_itinerary_execution_state).toMatchObject({
+      schema: "helix.capability_itinerary_execution_state.v1",
+      complete: true,
+    });
+    expect(index.compound_subgoal_rail_statuses).toEqual([
+      expect.objectContaining({
+        subgoal_id: workspaceSubgoalId,
+        requested_capability: "workspace_os.status",
+        executed_capability: "workspace_os.status",
+        observation_ref: `${turnId}:workspace_status`,
+        satisfaction: "satisfied",
+        rail_status: "complete",
+      }),
+      expect.objectContaining({
+        subgoal_id: calculatorSubgoalId,
+        requested_capability: "scientific-calculator.solve_expression",
+        executed_capability: "scientific-calculator.solve_expression",
+        observation_ref: `${turnId}:calculator_receipt`,
+        satisfaction: "satisfied",
+        rail_status: "complete",
+      }),
+    ]);
+    expect(index.compound_subgoal_missing_summary).toMatchObject({
+      missing_compound_subgoal_ids: [],
+      missing_required_capabilities: [],
+      complete: true,
+    });
+  });
+
   it("exposes extended compound subgoal families in the family matrix", () => {
     const turnId = "ask:test:compound-debug-index:extended-families";
     const compoundSubgoalLedger = [

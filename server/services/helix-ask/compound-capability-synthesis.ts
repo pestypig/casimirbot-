@@ -1,4 +1,5 @@
 import { buildHelixCapabilityItineraryExecutionState } from "./capability-itinerary-execution";
+import { readCompoundTerminalPolicy } from "./compound-terminal-policy";
 
 type RecordLike = Record<string, unknown>;
 
@@ -57,6 +58,14 @@ const artifactKind = (artifact: ArtifactLike): string | null =>
 
 const artifactId = (artifact: ArtifactLike): string | null =>
   readString(artifact.artifact_id) ?? readString(readRecord(artifact.payload)?.artifact_id);
+
+const artifactPayloadByKind = (
+  artifacts: ArtifactLike[],
+  kind: string,
+): RecordLike | null => {
+  const artifact = artifacts.find((entry) => artifactKind(entry) === kind);
+  return readRecord(artifact?.payload);
+};
 
 const finalAnswerDraftRecords = (payload: RecordLike, artifacts: ArtifactLike[]): RecordLike[] => [
   readRecord(payload.final_answer_draft),
@@ -232,12 +241,14 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
   const artifacts = input.artifacts ?? readArray(input.payload.current_turn_artifact_ledger).map(readRecord).filter(Boolean) as ArtifactLike[];
   const itinerary =
     readRecord(input.capabilityItinerary) ??
-    readRecord(input.payload.capability_itinerary);
+    readRecord(input.payload.capability_itinerary) ??
+    artifactPayloadByKind(artifacts, "capability_itinerary");
   const existingState =
     readRecord(input.payload.capability_itinerary_execution_state) ??
-    readRecord(itinerary?.execution_state);
+    readRecord(itinerary?.execution_state) ??
+    artifactPayloadByKind(artifacts, "capability_itinerary_execution_state");
   const rebuiltState = buildHelixCapabilityItineraryExecutionState({
-    capabilityItinerary: input.capabilityItinerary ?? input.payload.capability_itinerary,
+    capabilityItinerary: input.capabilityItinerary ?? itinerary ?? input.payload.capability_itinerary,
     artifacts,
   }) as unknown as RecordLike;
   const state = preferFreshExecutionState({ existingState, rebuiltState });
@@ -261,16 +272,24 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
   const requiredFamilies = readArray(state.required_observation_families)
     .map(readString)
     .filter((entry: string | null): entry is string => Boolean(entry));
-  const contract = readRecord(input.payload.compound_capability_contract) ??
-    readRecord(itinerary?.compound_capability_contract);
+  const contract =
+    readRecord(input.payload.compound_capability_contract) ??
+    readRecord(itinerary?.compound_capability_contract) ??
+    artifactPayloadByKind(artifacts, "compound_capability_contract");
   const terminalCriteria = readRecord(itinerary?.terminal_success_criteria);
   const itineraryRequiresSynthesis = terminalCriteria?.requires_post_observation_synthesis === true;
   const subgoals = readArray(contract?.subgoals);
   const contractSubgoals = subgoals
     .map(readRecord)
     .filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry));
+  const compoundPolicy = readCompoundTerminalPolicy({
+    ...input.payload,
+    ...(itinerary ? { capability_itinerary: itinerary } : {}),
+    ...(contract ? { compound_capability_contract: contract } : {}),
+    capability_itinerary_execution_state: state,
+  });
   const contractRequiresSynthesis =
-    readString(contract?.terminal_policy) === "synthesize_from_satisfied_subgoal_observations" ||
+    compoundPolicy.active ||
     (contract?.requires_all_subgoals !== false && contractSubgoals.length > 1);
   const compoundRowRepresentsContractSubgoal = (subgoal: RecordLike): boolean => {
     const subgoalId = readString(subgoal.subgoal_id);

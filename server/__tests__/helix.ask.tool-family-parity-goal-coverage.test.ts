@@ -45,6 +45,12 @@ const expectedBindingShapeForConsumer = (
   if (contract?.capability_family === "docs_viewer") {
     return { argName: "target_ref", bindingKind: "target_ref" };
   }
+  if (contract?.capability === "live_env.request_interim_voice_callout") {
+    return { argName: "evidence_refs", bindingKind: "support_ref" };
+  }
+  if (contract?.capability === "live_env.record_live_source_mail_decision") {
+    return { argName: "evidence_refs", bindingKind: "support_ref" };
+  }
   if (
     contract?.capability === "helix_ask.reflect_civilization_bounds" &&
     fromCapability === "helix_ask.build_civilization_scenario_frame"
@@ -471,8 +477,13 @@ const requiredAcceptanceCompoundScenarioIds = [
   "micro_reasoner_presets_then_draft",
   "micro_reasoner_presets_draft_route",
   "live_source_mail_read_process_reflect",
+  "live_source_mail_read_process_decision",
+  "live_source_mail_check_then_raw_read",
+  "live_source_decision_then_voice_callout",
   "live_source_quality_goal_context_state",
   "repo_plus_docs",
+  "repo_reflection_calculator",
+  "docs_reflection_calculator",
   "internet_reflection_calculator",
   "scholarly_reflection_calculator",
   "scholarly_full_text_reflection_calculator",
@@ -548,6 +559,15 @@ const governedLiveEnvironmentCapabilities = [
 const specializedLiveEnvironmentCapabilities = [
   "live_env.record_live_source_mail_decision",
   "live_env.request_interim_voice_callout",
+] as const;
+
+const specializedLiveEnvironmentReceiptTerminalKinds = [
+  "stage_play_live_source_mail_decision",
+  "live_pipeline_receipt",
+  "live_source_interim_voice_callout_receipt",
+  "voice_hold_receipt",
+  "voice_block_receipt",
+  "voice_receipt",
 ] as const;
 
 const objectiveScopeFamilyLabels = [
@@ -651,7 +671,7 @@ const objectiveFamilyCoverage = [
   },
   {
     label: "live_env/mailbox",
-    contractFamilies: ["live_source_mail", "live_environment"],
+    contractFamilies: ["live_source_mail", "live_environment", "live_source_decision", "voice_delivery"],
     representativeCapabilities: [
       "live_env.query_micro_reasoner_presets",
       "live_env.draft_micro_reasoner_preset",
@@ -664,6 +684,8 @@ const objectiveFamilyCoverage = [
       "live_env.query_live_source_quality",
       "live_env.query_workstation_goal_context",
       "live_env.summarize_live_source_current_state",
+      "live_env.record_live_source_mail_decision",
+      "live_env.request_interim_voice_callout",
     ],
     liveProbeCapabilities: [
       "live_env.query_micro_reasoner_presets",
@@ -677,6 +699,8 @@ const objectiveFamilyCoverage = [
       "live_env.query_live_source_quality",
       "live_env.query_workstation_goal_context",
       "live_env.summarize_live_source_current_state",
+      "live_env.record_live_source_mail_decision",
+      "live_env.request_interim_voice_callout",
     ],
   },
   {
@@ -834,6 +858,44 @@ const objectiveAcceptanceCompoundScenarioCoverage = [
         terminalKind: "model_synthesized_answer",
       },
       {
+        id: "live_source_mail_read_process_decision",
+        requestedCapabilities: [
+          "live_env.read_processed_live_source_mail",
+          "live_env.process_live_source_mail",
+          "live_env.record_live_source_mail_decision",
+        ],
+        runtimeCapabilities: [
+          "live_env.read_processed_live_source_mail",
+          "live_env.process_live_source_mail",
+          "live_env.record_live_source_mail_decision",
+        ],
+        terminalKind: "model_synthesized_answer",
+      },
+      {
+        id: "live_source_mail_check_then_raw_read",
+        requestedCapabilities: [
+          "live_env.check_live_source_mail",
+          "live_env.read_live_source_mail",
+        ],
+        runtimeCapabilities: [
+          "live_env.check_live_source_mail",
+          "live_env.read_live_source_mail",
+        ],
+        terminalKind: "model_synthesized_answer",
+      },
+      {
+        id: "live_source_decision_then_voice_callout",
+        requestedCapabilities: [
+          "live_env.record_live_source_mail_decision",
+          "live_env.request_interim_voice_callout",
+        ],
+        runtimeCapabilities: [
+          "live_env.record_live_source_mail_decision",
+          "live_env.request_interim_voice_callout",
+        ],
+        terminalKind: "model_synthesized_answer",
+      },
+      {
         id: "live_source_quality_goal_context_state",
         requestedCapabilities: [
           "live_env.query_live_source_quality",
@@ -856,6 +918,39 @@ const objectiveAcceptanceCompoundScenarioCoverage = [
         id: "repo_plus_docs",
         requestedCapabilities: ["repo-code.search_concept", "docs-viewer.locate_in_doc"],
         runtimeCapabilities: ["repo-code.search_concept", "docs-viewer.locate_in_doc"],
+        terminalKind: "doc_evidence_synthesis_answer",
+      },
+    ],
+  },
+  {
+    label: "docs/repo evidence + reflection + calculator",
+    scenarios: [
+      {
+        id: "repo_reflection_calculator",
+        requestedCapabilities: [
+          "repo-code.search_concept",
+          "helix_ask.reflect_theory_context",
+          "scientific-calculator.solve_expression",
+        ],
+        runtimeCapabilities: [
+          "repo-code.search_concept",
+          "helix_ask.reflect_theory_context",
+          "scientific-calculator.solve_expression",
+        ],
+        terminalKind: "model_synthesized_answer",
+      },
+      {
+        id: "docs_reflection_calculator",
+        requestedCapabilities: [
+          "docs-viewer.locate_in_doc",
+          "helix_ask.reflect_theory_context",
+          "scientific-calculator.solve_expression",
+        ],
+        runtimeCapabilities: [
+          "docs-viewer.locate_in_doc",
+          "helix_ask.reflect_theory_context",
+          "scientific-calculator.solve_expression",
+        ],
         terminalKind: "doc_evidence_synthesis_answer",
       },
     ],
@@ -1161,6 +1256,34 @@ const modelVisibleRequiredArgSchemaCoverage = [
   },
 ] as const;
 
+const modelVisibleSupportBindingSchemaCoverage = [
+  {
+    capability: "live_env.record_live_source_mail_decision",
+    routeSnippets: [
+      'case "live_env.record_live_source_mail_decision":',
+      'decision: { type: "string"',
+      'mail_ids: { type: "array", items: { type: "string" }',
+      'processed_packet_ids: { type: "array", items: { type: "string" }',
+      'evidence_refs: { type: "array", items: { type: "string" }',
+      'wake_request_id: { type: "string"',
+      'mailbox_thread_id: { type: "string"',
+      'route_metadata: { type: "object"',
+    ],
+  },
+  {
+    capability: "live_env.request_interim_voice_callout",
+    routeSnippets: [
+      'case "live_env.request_interim_voice_callout":',
+      'text: { type: "string"',
+      'message: { type: "string"',
+      'callout_text: { type: "string"',
+      'max_chars: { type: "number"',
+      'evidence_refs: { type: "array", items: { type: "string" }',
+      'reason_codes: { type: "array", items: { type: "string" }',
+    ],
+  },
+] as const;
+
 describe("Helix Ask tool-family parity goal coverage", () => {
   it("keeps the local Codex lifecycle reference anchors available", () => {
     expect(readCodexReference("codex-rs/core/src/client_common.rs")).toEqual(
@@ -1190,21 +1313,85 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     );
   });
 
-  it("keeps compound invalid-argument typed failures rail-coded separately from terminal error", () => {
+  it("materializes compound input bindings before forced runtime subgoal execution", () => {
+    const routeSource = readRepoSource("server/routes/agi.plan.ts");
+    expect(routeSource).toEqual(expect.stringContaining("const materializePendingSubgoalInputBindings"));
+    expect(routeSource).toEqual(expect.stringContaining("pendingSubgoal.input_bindings"));
+    expect(routeSource).toEqual(expect.stringContaining('readAskTurnString(sourceEntry?.satisfaction) !== "satisfied"'));
+    expect(routeSource).toEqual(expect.stringContaining("readAskTurnString(sourceEntry?.observation_ref)"));
+    expect(routeSource).toEqual(expect.stringContaining("const sourceSupportRefs = Array.isArray(sourceEntry?.support_refs)"));
+    expect(routeSource).toEqual(expect.stringContaining("...sourceSupportRefs.map"));
+    expect(routeSource).toEqual(expect.stringContaining("const materializedSubgoalArgs = materializePendingSubgoalInputBindings"));
+    expect(routeSource).toEqual(expect.stringContaining("...materializedSubgoalArgs"));
+    expect(routeSource).not.toMatch(/\.\.\.subgoalArgs,\s*compound_subgoal_id/);
+  });
+
+  it("itemizes capability execution state as a current-turn rail artifact", () => {
+    const routeSource = readRepoSource("server/routes/agi.plan.ts");
+    expect(routeSource).toEqual(expect.stringContaining("publishRuntimeCapabilityItineraryExecutionState"));
+    expect(routeSource).toEqual(expect.stringContaining('producer_item_id: "helix_capability_itinerary_execution_state"'));
+    expect(routeSource).toEqual(expect.stringContaining('kind: "capability_itinerary_execution_state"'));
+    expect(routeSource).toEqual(expect.stringContaining("debug.capability_itinerary_execution_state = executionState"));
+    expect(routeSource).toEqual(expect.stringContaining("debug.current_turn_artifact_ledger = currentTurnArtifacts"));
+    expect(routeSource).toEqual(expect.stringContaining("publishRuntimeCapabilityItineraryExecutionState(postToolItineraryExecutionState)"));
+  });
+
+  it("keeps compound terminal policy centralized across readiness, materialization, and authority", () => {
+    const policySource = readRepoSource("server/services/helix-ask/compound-terminal-policy.ts");
+    const synthesisSource = readRepoSource("server/services/helix-ask/compound-capability-synthesis.ts");
+    const qualityGateSource = readRepoSource("server/services/helix-ask/final-answer-draft-quality-gate.ts");
+    const materializerSource = readRepoSource("server/services/helix-ask/final-answer-draft-terminal-materializer.ts");
+    const singleWriterSource = readRepoSource("server/services/helix-ask/terminal-authority-single-writer.ts");
+
+    expect(policySource).toEqual(expect.stringContaining("COMPOUND_FORBIDDEN_RECEIPT_TERMINAL_KINDS"));
+    expect(policySource).toEqual(expect.stringContaining("COMPOUND_SYNTHESIS_TERMINAL_KINDS"));
+    expect(policySource).toEqual(expect.stringContaining("compound_capability_contract_or_execution_state"));
+    expect(policySource).toEqual(expect.stringContaining("compound_capability_synthesis_readiness"));
+    expect(synthesisSource).toEqual(expect.stringContaining('import { readCompoundTerminalPolicy } from "./compound-terminal-policy";'));
+    expect(synthesisSource).toEqual(expect.stringContaining("const compoundPolicy = readCompoundTerminalPolicy"));
+    expect(qualityGateSource).toEqual(expect.stringContaining('import { readCompoundTerminalPolicy } from "./compound-terminal-policy";'));
+    expect(materializerSource).toEqual(expect.stringContaining('import { readCompoundTerminalPolicy } from "./compound-terminal-policy";'));
+    expect(singleWriterSource).toEqual(expect.stringContaining("readCompoundTerminalPolicy(payload).active"));
+    expect([
+      synthesisSource,
+      qualityGateSource,
+      materializerSource,
+      singleWriterSource,
+    ].join("\n")).not.toEqual(expect.stringContaining("readString(contract?.terminal_policy)"));
+  });
+
+  it("keeps compound invalid-argument typed failures terminal-coded by the first broken subgoal rail", () => {
     const routeSource = readRepoSource("server/routes/agi.plan.ts");
     const contractSource = readRepoSource("server/services/helix-ask/codex-parity-agent-spine-contract.ts");
     const executionSource = readRepoSource("server/services/helix-ask/capability-itinerary-execution.ts");
+    const liveProbeSource = readRepoSource("scripts/helix-ask-compound-capability-live-probe.ts");
+    const liveProbeTestSource = readRepoSource("server/__tests__/helix.ask.compound-capability-live-probe.test.ts");
+    expect(routeSource).toEqual(
+      expect.stringContaining("const terminalErrorCode = railFailureCode"),
+    );
+    expect(routeSource).toEqual(
+      expect.stringContaining("terminal_error_category: terminalErrorCategory"),
+    );
     expect(routeSource).toEqual(
       expect.stringContaining("compound_subgoal_invalid_args_after_repair"),
     );
-    expect(routeSource).toEqual(
-      expect.stringContaining("compound_subgoal_missing_required_args"),
-    );
-    expect(readRepoSource("scripts/helix-ask-compound-capability-live-probe.ts")).toEqual(
+    expect(liveProbeSource).toEqual(
       expect.stringContaining("missing_calculator_args_fail_closed"),
     );
-    expect(readRepoSource("scripts/helix-ask-compound-capability-live-probe.ts")).toEqual(
+    expect(liveProbeSource).toEqual(
       expect.stringContaining("missing_required_arg:latex"),
+    );
+    expect(liveProbeSource).toEqual(
+      expect.stringContaining('expectedTerminalErrorCode: "invalid_arg:latex_is_prose"'),
+    );
+    expect(liveProbeSource).toEqual(
+      expect.stringContaining('failures.push(`budget_exhaustion:${terminalErrorCode}`)'),
+    );
+    expect(liveProbeTestSource).toEqual(
+      expect.stringContaining("catches budget exhaustion and terminal projection divergence"),
+    );
+    expect(liveProbeTestSource).toEqual(
+      expect.stringContaining('expect(result.failures).toContain("budget_exhaustion:agent_loop_budget_exhausted")'),
     );
     expect(routeSource).toEqual(
       expect.stringContaining("const missingRequiredArgFailure = railFailureCode.startsWith"),
@@ -1317,6 +1504,16 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     }
   });
 
+  it("keeps optional support-bound live-source tool args model-visible in runtime schemas", () => {
+    const routeSource = readRepoSource("server/routes/agi.plan.ts");
+    for (const entry of modelVisibleSupportBindingSchemaCoverage) {
+      for (const snippet of entry.routeSnippets) {
+        expect(routeSource, `${entry.capability}:model_visible_support_schema:${snippet}`)
+          .toEqual(expect.stringContaining(snippet));
+      }
+    }
+  });
+
   it("keeps reflection and civilization runtime admission plus required-arg guards aligned", () => {
     const routeSource = readRepoSource("server/routes/agi.plan.ts");
     const admissionSource = readRepoSource("server/services/helix-ask/tool-call-admission.ts");
@@ -1350,6 +1547,10 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     expect(plannerSource).toEqual(expect.stringContaining('if (family === "civilization_bounds")'));
     expect(plannerSource).toEqual(expect.stringContaining('contextualToolSuppressionBlocksFamily(suppression, "zen_graph_reflection")'));
     expect(plannerSource).toEqual(expect.stringContaining('contextualToolSuppressionBlocksFamily(suppression, "civilization_bounds")'));
+    expect(plannerSource).toEqual(expect.stringContaining('contextualToolSuppressionBlocksFamily(suppression, "situation_run")'));
+    expect(plannerSource).toEqual(expect.stringContaining('contextualToolSuppressionBlocksFamily(suppression, "workspace_diagnostic")'));
+    expect(plannerSource).toEqual(expect.stringContaining('contextualToolSuppressionBlocksFamily(suppression, "capability_catalog")'));
+    expect(plannerSource).toEqual(expect.stringContaining('contextualToolSuppressionBlocksFamily(suppression, "context_reflection")'));
     expect(planTypeSource).toEqual(expect.stringContaining('| "theory_locator"'));
     expect(planTypeSource).toEqual(expect.stringContaining('| "zen_graph_reflection"'));
     expect(planTypeSource).toEqual(expect.stringContaining('| "civilization_bounds"'));
@@ -1365,8 +1566,18 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     expect(explicitContractSource).toEqual(expect.stringContaining('plan_family: "civilization_bounds"'));
     expect(contextualAdmissionSource).toEqual(expect.stringContaining('"zen_graph_reflection"'));
     expect(contextualAdmissionSource).toEqual(expect.stringContaining('"civilization_bounds"'));
+    expect(contextualAdmissionSource).toEqual(expect.stringContaining('"visual_capture"'));
+    expect(contextualAdmissionSource).toEqual(expect.stringContaining('"workspace_diagnostic"'));
+    expect(contextualAdmissionSource).toEqual(expect.stringContaining('"capability_catalog"'));
+    expect(contextualAdmissionSource).toEqual(expect.stringContaining('"context_reflection"'));
+    expect(contextualAdmissionSource).toEqual(expect.stringContaining('"live_source_mail"'));
     expect(contextualAdmissionSource).toEqual(expect.stringContaining("ZEN_GRAPH_CUE_RE"));
     expect(contextualAdmissionSource).toEqual(expect.stringContaining("CIVILIZATION_BOUNDS_CUE_RE"));
+    expect(contextualAdmissionSource).toEqual(expect.stringContaining("VISUAL_CAPTURE_CUE_RE"));
+    expect(contextualAdmissionSource).toEqual(expect.stringContaining("WORKSPACE_STATUS_CUE_RE"));
+    expect(contextualAdmissionSource).toEqual(expect.stringContaining("CAPABILITY_CATALOG_CUE_RE"));
+    expect(contextualAdmissionSource).toEqual(expect.stringContaining("CONTEXT_REFLECTION_CUE_RE"));
+    expect(contextualAdmissionSource).toEqual(expect.stringContaining("LIVE_SOURCE_MAIL_CUE_RE"));
     expect(arbitrationSource).toEqual(expect.stringContaining("[contract.capability_family, ...contract.admission_families]"));
     expect(routeProductSource).toEqual(expect.stringContaining('sourceTarget === "theory_locator"'));
     expect(routeProductSource).toEqual(expect.stringContaining('sourceTarget === "context_reflection"'));
@@ -1624,6 +1835,7 @@ describe("Helix Ask tool-family parity goal coverage", () => {
 
   it("keeps compound live probe aligned with top-level rail-table compound mirrors", () => {
     const probeSource = readRepoSource("scripts/helix-ask-compound-capability-live-probe.ts");
+    const probeTestSource = readRepoSource("server/__tests__/helix.ask.compound-capability-live-probe.test.ts");
     expect(probeSource).toEqual(expect.stringContaining("const codexParityRailTableFor"));
     expect(probeSource).toEqual(expect.stringContaining("codex_parity_agent_spine_rail_table"));
     expect(probeSource).toEqual(expect.stringContaining("backend_visible_terminal_kind"));
@@ -1637,6 +1849,42 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     expect(probeSource).toEqual(expect.stringContaining("top_level_compound_rail_failure_code"));
     expect(probeSource).toEqual(expect.stringContaining("top_level_incomplete_subgoal_did_tool_run_mismatch"));
     expect(probeSource).toEqual(expect.stringContaining("unexpected_top_level_first_incomplete_subgoal_id"));
+    expect(probeSource).toEqual(expect.stringContaining("NON_MATH_CALCULATOR_ARG_PATTERN"));
+    expect(probeSource).toEqual(expect.stringContaining("helix_ask"));
+    expect(probeSource).toEqual(expect.stringContaining("internet[_-]?search"));
+    expect(probeSource).toEqual(expect.stringContaining("scholarly[-_]?research"));
+    expect(probeTestSource).toEqual(expect.stringContaining("const deterministicDebugFixtureByScenarioId"));
+    expect(probeTestSource).toEqual(
+      expect.stringContaining("COMPOUND_CAPABILITY_LIVE_SCENARIOS.map((scenario) => scenario.id).sort()"),
+    );
+    expect(probeTestSource).toEqual(expect.stringContaining("liveSourceMailReadProcessDecisionDebug"));
+    expect(probeTestSource).toEqual(expect.stringContaining("liveSourceMailCheckThenRawReadDebug"));
+    expect(probeTestSource).toEqual(expect.stringContaining("liveSourceDecisionThenVoiceCalloutDebug"));
+    expect(probeTestSource).toEqual(expect.stringContaining("liveSourceQualityGoalContextStateDebug"));
+    expect(probeTestSource).toEqual(expect.stringContaining("repoReflectionCalculatorDebug"));
+    expect(probeTestSource).toEqual(expect.stringContaining("docsReflectionCalculatorDebug"));
+    expect(probeTestSource).toEqual(expect.stringContaining('case "internet-search.search_web"'));
+    expect(probeTestSource).toEqual(expect.stringContaining('case "situation-room.describe_visual_capture"'));
+    expect(probeTestSource).not.toEqual(expect.stringContaining('optional_args: ["document_path", "doc"]'));
+    const fixtureContractCases = new Set(
+      [...probeTestSource.matchAll(/case "([^"]+)"/g)]
+        .map((match) => match[1])
+        .filter(Boolean),
+    );
+    const liveProbeRequestedAndRuntimeCapabilities = new Set(
+      COMPOUND_CAPABILITY_LIVE_SCENARIOS.flatMap((scenario) => [
+        ...flattenExpectedCapabilities(scenario.expectedRequested),
+        ...flattenExpectedCapabilities(scenario.expectedRuntime),
+      ]),
+    );
+    for (const capability of liveProbeRequestedAndRuntimeCapabilities) {
+      expect(fixtureContractCases.has(capability), `fixture_contract_terms:${capability}`).toBe(true);
+    }
+    for (const scenario of COMPOUND_CAPABILITY_LIVE_SCENARIOS) {
+      expect(probeTestSource, `deterministic_fixture:${scenario.id}`).toEqual(
+        expect.stringContaining(`${scenario.id}:`),
+      );
+    }
   });
 
   it("keeps UI/API debug parity comparisons aligned with compound rail-table mirrors", () => {
@@ -1692,6 +1940,11 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     expect(apiProbeSource).toEqual(expect.stringContaining("readCompoundSubgoalRailStatuses"));
     expect(apiProbeSource).toEqual(expect.stringContaining("compound_subgoal_rails"));
     expect(apiProbeSource).toEqual(expect.stringContaining("rail_compound_subgoal_rail_statuses_dropped"));
+    expect(apiProbeSource).toEqual(expect.stringContaining("satisfied_observation_ref_missing"));
+    expect(apiProbeSource).toEqual(expect.stringContaining("complete_observation_ref_missing"));
+    expect(probeSource).toEqual(expect.stringContaining("subgoalHasSatisfiedObservation"));
+    expect(probeSource).toEqual(expect.stringContaining("satisfied_observation_ref_missing"));
+    expect(probeSource).toEqual(expect.stringContaining("rail_complete_observation_ref_missing"));
     expect(apiProbeSource).toEqual(expect.stringContaining("_order_invalid"));
     expect(apiProbeSource).toEqual(expect.stringContaining("_args_field_missing"));
     expect(apiProbeSource).toEqual(expect.stringContaining("_first_broken_rail_missing"));
@@ -1699,13 +1952,39 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     expect(apiProbeSource).toEqual(expect.stringContaining("_repair_target_missing"));
     expect(harnessSource).toEqual(expect.stringContaining("collectUiDebugCompoundSubgoalRailStatuses"));
     expect(harnessSource).toEqual(expect.stringContaining("compoundSubgoalRailComparisonFields"));
+    expect(harnessSource).toEqual(expect.stringContaining("compoundSubgoalRailProofViolations"));
     expect(harnessSource).toEqual(expect.stringContaining('"order"'));
+    expect(harnessSource).toEqual(expect.stringContaining('"input_bindings"'));
+    expect(harnessSource).toEqual(expect.stringContaining('"bound_input_refs"'));
+    expect(harnessSource).toEqual(expect.stringContaining('"unresolved_input_bindings"'));
+    expect(harnessSource).toEqual(expect.stringContaining('"args_source"'));
+    expect(harnessSource).toEqual(expect.stringContaining('"planned_args"'));
+    expect(harnessSource).toEqual(expect.stringContaining('"selected_args"'));
+    expect(harnessSource).toEqual(expect.stringContaining('"required_args"'));
+    expect(harnessSource).toEqual(expect.stringContaining('"optional_args"'));
+    expect(harnessSource).toEqual(expect.stringContaining('"observation_provenance"'));
+    expect(harnessSource).toEqual(expect.stringContaining('"support_refs"'));
+    expect(harnessSource).toEqual(expect.stringContaining('"required_observation_kinds"'));
+    expect(harnessSource).toEqual(expect.stringContaining('"required_terminal_kind"'));
+    expect(harnessSource).toEqual(expect.stringContaining('"terminal_contribution_kind"'));
+    expect(harnessSource).toEqual(expect.stringContaining('"contribution_role"'));
+    expect(harnessSource).toEqual(expect.stringContaining('"allowed_substitutions"'));
+    expect(harnessSource).toEqual(expect.stringContaining('"forbidden_nearby_capabilities"'));
     expect(harnessSource).toEqual(expect.stringContaining("ui_api_compound_subgoal_rails_mismatch"));
+    expect(harnessSource).toEqual(expect.stringContaining("expectedCompoundSubgoalCount"));
+    expect(harnessSource).toEqual(expect.stringContaining("ui_compound_subgoal_rails_missing"));
+    expect(harnessSource).toEqual(expect.stringContaining("api_compound_subgoal_rails_missing"));
     expect(apiProbeTestSource).toEqual(expect.stringContaining("summarizes ordered compound subgoal rails for API parity diagnostics"));
+    expect(apiProbeTestSource).toEqual(expect.stringContaining("rejects complete compound subgoal rails without observation proof"));
     expect(apiProbeTestSource).toEqual(expect.stringContaining("rejects compound rails when the ordered subgoal rail statuses are dropped"));
     expect(apiProbeTestSource).toEqual(expect.stringContaining("rejects malformed compound subgoal rails without ordered args or fail-closed rail fields"));
     expect(harnessTestSource).toEqual(expect.stringContaining("flags UI/API ordered compound subgoal rail divergence even when top-level mirrors match"));
+    expect(harnessTestSource).toEqual(expect.stringContaining("flags UI/API compound subgoal contract and provenance divergence"));
+    expect(harnessTestSource).toEqual(expect.stringContaining("flags missing compound subgoal rail mirrors when top-level rails declare a compound turn"));
+    expect(harnessTestSource).toEqual(expect.stringContaining("flags shared UI/API complete compound subgoal rails without observation proof"));
     expect(harnessTestSource).toEqual(expect.stringContaining("flags UI/API compound subgoal order divergence"));
+    expect(harnessTestSource).toEqual(expect.stringContaining("flags UI/API compound subgoal binding divergence"));
+    expect(harnessTestSource).toEqual(expect.stringContaining("flags UI/API compound subgoal argument metadata divergence"));
     expect(apiProbeTestSource).toEqual(expect.stringContaining("rejects rails with visible projection kind but no projection proof source"));
     expect(apiProbeTestSource).toEqual(expect.stringContaining("rejects rails with visible projection kind but unproven projection source"));
     expect(harnessTestSource).toEqual(expect.stringContaining("ui_api_rail_first_incomplete_compound_subgoal_id_mismatch"));
@@ -1912,9 +2191,12 @@ describe("Helix Ask tool-family parity goal coverage", () => {
   });
 
   it("keeps governed live-environment controls resolving to their explicit contract family", () => {
+    const routeSource = readRepoSource("server/routes/agi.plan.ts");
     for (const capability of governedLiveEnvironmentCapabilities) {
       const explicit = explicitCapabilityContractForCapability(capability);
       const resolved = resolveToolFamilyContract({ toolName: capability });
+      expect(routeSource, `${capability}:model_visible_schema_case`)
+        .toEqual(expect.stringContaining(`case "${capability}":`));
       expect(explicit?.capability, `${capability}:explicit_contract`).toBe(capability);
       expect(explicit?.capability_family, `${capability}:explicit_family`).toBe("live_environment");
       expect(resolved?.toolFamily, `${capability}:resolved_family`).toBe("live_environment");
@@ -1951,6 +2233,12 @@ describe("Helix Ask tool-family parity goal coverage", () => {
         .toContain(explicit?.capability_family);
       expect(resolved?.toolFamily, `${capability}:resolved_family`).toBe(explicit?.capability_family);
       expect(explicit?.required_terminal_kind, `${capability}:terminal_kind`).toBe("model_synthesized_answer");
+      expect(resolved?.allowedTerminalKinds, `${capability}:resolved_synth_terminal`)
+        .toContain("model_synthesized_answer");
+      for (const receiptKind of specializedLiveEnvironmentReceiptTerminalKinds) {
+        expect(resolved?.allowedTerminalKinds ?? [], `${capability}:receipt_terminal_forbidden:${receiptKind}`)
+          .not.toContain(receiptKind);
+      }
       expect(explicit?.forbidden_nearby_capabilities, `${capability}:model_direct_answer_forbidden`)
         .toContain("model.direct_answer");
 
@@ -2085,8 +2373,11 @@ describe("Helix Ask tool-family parity goal coverage", () => {
   });
 
   it("keeps generated workstation context-feed query tools wired through explicit and tool-family contracts", () => {
+    const routeSource = readRepoSource("server/routes/agi.plan.ts");
     for (const spec of WORKSTATION_CONTEXT_FEED_QUERY_TOOL_CONTRACT_SPECS) {
       const explicit = explicitCapabilityContractForCapability(spec.capability);
+      expect(routeSource, `${spec.capability}:model_visible_schema_case`)
+        .toEqual(expect.stringContaining(`case "${spec.capability}":`));
       expect(explicit?.capability, `${spec.capability}:explicit_capability`).toBe(spec.capability);
       expect(explicit?.capability_family, `${spec.capability}:explicit_family`).toBe("live_environment");
       expect(explicit?.plan_family, `${spec.capability}:explicit_plan_family`).toBe("live_environment");
@@ -2398,6 +2689,22 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     expect(compound?.requires_all_subgoals).toBe(true);
   });
 
+  it("preserves a natural catalog request after an earlier explicit tool subgoal", () => {
+    const compound = buildHelixCompoundCapabilityContract({
+      turnId: "ask:tool-family-parity:workspace-then-natural-catalog",
+      promptText:
+        "Please                                                  use workspace_os.status to inspect workstation status, then tell me what tools are available for the Helix Ask to use.",
+    });
+    const subgoals = compound?.subgoals ?? [];
+    expect(compound?.schema).toBe("helix.compound_capability_contract.v1");
+    expect(compound?.prompt_shape).toBe("compound_capability");
+    expect(subgoals.map((subgoal) => subgoal.requested_capability)).toEqual([
+      "workspace_os.status",
+      "helix_ask.inspect_capability_catalog",
+    ]);
+    expect(compound?.requires_all_subgoals).toBe(true);
+  });
+
   it("keeps family-label catalog and workspace status prompts as ordered subgoals", () => {
     const compound = buildHelixCompoundCapabilityContract({
       turnId: "ask:tool-family-parity:catalog-family-then-workspace-family",
@@ -2412,6 +2719,33 @@ describe("Helix Ask tool-family parity goal coverage", () => {
       "workspace_os.status",
     ]);
     expect(compound?.requires_all_subgoals).toBe(true);
+  });
+
+  it("binds workspace status observations into a later calculator subgoal", () => {
+    const compound = buildHelixCompoundCapabilityContract({
+      turnId: "ask:tool-family-parity:workspace-status-then-calculator",
+      promptText:
+        "Use workspace_os.status to inspect workstation status, then call scientific-calculator.solve_expression with this exact expression: 14*23+8.",
+    });
+    const subgoals = compound?.subgoals ?? [];
+    expect(compound?.schema).toBe("helix.compound_capability_contract.v1");
+    expect(compound?.prompt_shape).toBe("compound_capability");
+    expect(subgoals.map((subgoal) => subgoal.requested_capability)).toEqual([
+      "workspace_os.status",
+      "scientific-calculator.solve_expression",
+    ]);
+    expect(subgoals[1]?.input_bindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        arg_name: "support_refs",
+        binding_kind: "support_ref",
+        from_capability: "workspace_os.status",
+        required: true,
+      }),
+    ]));
+    expect(subgoals[1]?.args_hint).toMatchObject({
+      latex: "14*23+8",
+      expression: "14*23+8",
+    });
   });
 
   it("keeps micro-reasoner preset query, draft, and route prompts ordered", () => {
@@ -2505,6 +2839,36 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     ]));
   });
 
+  it("binds live-source read and process observations into a later mail decision subgoal", () => {
+    const compound = buildHelixCompoundCapabilityContract({
+      turnId: "ask:tool-family-parity:live-source-mail-decision-chain",
+      promptText:
+        "Call live_env.read_processed_live_source_mail, then call live_env.process_live_source_mail, then call live_env.record_live_source_mail_decision.",
+    });
+    const subgoals = compound?.subgoals ?? [];
+    expect(compound?.schema).toBe("helix.compound_capability_contract.v1");
+    expect(compound?.prompt_shape).toBe("compound_capability");
+    expect(subgoals.map((subgoal) => subgoal.requested_capability)).toEqual([
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.record_live_source_mail_decision",
+    ]);
+    expect(subgoals[2]?.input_bindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        arg_name: "evidence_refs",
+        binding_kind: "support_ref",
+        from_capability: "live_env.read_processed_live_source_mail",
+        required: true,
+      }),
+      expect.objectContaining({
+        arg_name: "evidence_refs",
+        binding_kind: "support_ref",
+        from_capability: "live_env.process_live_source_mail",
+        required: true,
+      }),
+    ]));
+  });
+
   it("binds live-source quality and goal context into current-state summary", () => {
     const compound = buildHelixCompoundCapabilityContract({
       turnId: "ask:tool-family-parity:live-source-quality-goal-context-state",
@@ -2581,6 +2945,112 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     ]));
   });
 
+  it("binds repo evidence through reflection before calculator synthesis", () => {
+    const compound = buildHelixCompoundCapabilityContract({
+      turnId: "ask:tool-family-parity:repo-reflection-calculator-bindings",
+      promptText:
+        "Use repo-code.search_concept for query: terminal authority, then use helix_ask.reflect_theory_context to explain the repo evidence, then run scientific-calculator.solve_expression with this exact expression: 4*13.",
+    });
+    const subgoals = compound?.subgoals ?? [];
+    expect(compound?.schema).toBe("helix.compound_capability_contract.v1");
+    expect(compound?.prompt_shape).toBe("compound_capability");
+    expect(subgoals.map((subgoal) => subgoal.requested_capability)).toEqual([
+      "repo-code.search_concept",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ]);
+
+    const repoArgs = subgoals[0]?.args_hint as Record<string, unknown> | undefined;
+    expect(String(repoArgs?.query ?? "")).toContain("terminal authority");
+    expect(String(repoArgs?.query ?? "")).not.toContain("reflect_theory_context");
+
+    const reflectionArgs = subgoals[1]?.args_hint as Record<string, unknown> | undefined;
+    const reflectionPrompt = String(reflectionArgs?.prompt ?? "");
+    expect(reflectionPrompt).toContain("explain the repo evidence");
+    expect(reflectionPrompt).not.toContain("scientific-calculator");
+    expect(reflectionPrompt).not.toContain("4*13");
+    expect(subgoals[1]?.input_bindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        arg_name: "source_ref",
+        binding_kind: "source_ref",
+        from_capability: "repo-code.search_concept",
+        required: true,
+      }),
+    ]));
+
+    expect(subgoals[2]?.input_bindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        arg_name: "support_refs",
+        binding_kind: "support_ref",
+        from_capability: "repo-code.search_concept",
+        required: true,
+      }),
+      expect.objectContaining({
+        arg_name: "support_refs",
+        binding_kind: "support_ref",
+        from_capability: "helix_ask.reflect_theory_context",
+        required: true,
+      }),
+    ]));
+    expect(subgoals[2]?.args_hint).toMatchObject({
+      latex: "4*13",
+      expression: "4*13",
+    });
+  });
+
+  it("binds docs evidence through reflection before calculator synthesis", () => {
+    const compound = buildHelixCompoundCapabilityContract({
+      turnId: "ask:tool-family-parity:docs-reflection-calculator-bindings",
+      promptText:
+        "Use docs-viewer.locate_in_doc to locate query: receipts are observations, then use helix_ask.reflect_theory_context to explain the document evidence, then run scientific-calculator.solve_expression with this exact expression: 7*8.",
+    });
+    const subgoals = compound?.subgoals ?? [];
+    expect(compound?.schema).toBe("helix.compound_capability_contract.v1");
+    expect(compound?.prompt_shape).toBe("compound_capability");
+    expect(subgoals.map((subgoal) => subgoal.requested_capability)).toEqual([
+      "docs-viewer.locate_in_doc",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ]);
+
+    const docsArgs = subgoals[0]?.args_hint as Record<string, unknown> | undefined;
+    expect(String(docsArgs?.query ?? "")).toContain("receipts are observations");
+    expect(String(docsArgs?.query ?? "")).not.toContain("reflect_theory_context");
+
+    const reflectionArgs = subgoals[1]?.args_hint as Record<string, unknown> | undefined;
+    const reflectionPrompt = String(reflectionArgs?.prompt ?? "");
+    expect(reflectionPrompt).toContain("explain the document evidence");
+    expect(reflectionPrompt).not.toContain("scientific-calculator");
+    expect(reflectionPrompt).not.toContain("7*8");
+    expect(subgoals[1]?.input_bindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        arg_name: "source_ref",
+        binding_kind: "source_ref",
+        from_capability: "docs-viewer.locate_in_doc",
+        required: true,
+      }),
+    ]));
+
+    expect(subgoals[2]?.input_bindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        arg_name: "support_refs",
+        binding_kind: "support_ref",
+        from_capability: "docs-viewer.locate_in_doc",
+        required: true,
+      }),
+      expect.objectContaining({
+        arg_name: "support_refs",
+        binding_kind: "support_ref",
+        from_capability: "helix_ask.reflect_theory_context",
+        required: true,
+      }),
+    ]));
+    expect(subgoals[2]?.args_hint).toMatchObject({
+      latex: "7*8",
+      expression: "7*8",
+    });
+  });
+
   it("keeps research-reflection-calculator subgoal args bounded to their own instructions", () => {
     const compound = buildHelixCompoundCapabilityContract({
       turnId: "ask:tool-family-parity:internet-reflection-calculator-bounded-args",
@@ -2632,6 +3102,124 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     expect(subgoals[2]?.args_hint).toMatchObject({
       latex: "(9+3)*7-25",
       expression: "(9+3)*7-25",
+    });
+  });
+
+  it("binds scholarly lookup evidence into reflection and calculator subgoals without widening calculator args", () => {
+    const compound = buildHelixCompoundCapabilityContract({
+      turnId: "ask:tool-family-parity:scholarly-reflection-calculator-bounded-args",
+      promptText:
+        "Use scholarly-research.lookup_papers for Alcubierre metric energy estimates, then use helix_ask.reflect_theory_context to connect that scholarly source to the Helix Ask receipts-as-observations rule, then run scientific-calculator.solve_expression with this exact expression: (12+5)*3.",
+    });
+    const subgoals = compound?.subgoals ?? [];
+    expect(compound?.schema).toBe("helix.compound_capability_contract.v1");
+    expect(compound?.prompt_shape).toBe("compound_capability");
+    expect(subgoals.map((subgoal) => subgoal.requested_capability)).toEqual([
+      "scholarly-research.lookup_papers",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ]);
+
+    const lookupArgs = subgoals[0]?.args_hint as Record<string, unknown> | undefined;
+    expect(String(lookupArgs?.query ?? "")).toContain("Alcubierre metric energy estimates");
+    expect(String(lookupArgs?.query ?? "")).not.toContain("reflect_theory_context");
+
+    const reflectionArgs = subgoals[1]?.args_hint as Record<string, unknown> | undefined;
+    const reflectionPrompt = String(reflectionArgs?.prompt ?? "");
+    expect(reflectionPrompt).toContain("connect that scholarly source");
+    expect(reflectionPrompt).toContain("receipts-as-observations");
+    expect(reflectionPrompt).not.toContain("scientific-calculator");
+    expect(reflectionPrompt).not.toContain("(12+5)*3");
+    expect(subgoals[1]?.input_bindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        arg_name: "source_ref",
+        binding_kind: "source_ref",
+        from_capability: "scholarly-research.lookup_papers",
+        required: true,
+      }),
+    ]));
+
+    expect(subgoals[2]?.input_bindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        arg_name: "support_refs",
+        binding_kind: "support_ref",
+        from_capability: "scholarly-research.lookup_papers",
+        required: true,
+      }),
+      expect.objectContaining({
+        arg_name: "support_refs",
+        binding_kind: "support_ref",
+        from_capability: "helix_ask.reflect_theory_context",
+        required: true,
+      }),
+    ]));
+    expect(subgoals[2]?.args_hint).toMatchObject({
+      latex: "(12+5)*3",
+      expression: "(12+5)*3",
+    });
+  });
+
+  it("binds scholarly full-text evidence through reflection before calculator synthesis", () => {
+    const compound = buildHelixCompoundCapabilityContract({
+      turnId: "ask:tool-family-parity:scholarly-full-text-reflection-calculator-bindings",
+      promptText:
+        "Use scholarly-research.lookup_papers for Alcubierre metric energy estimates, then use scholarly-research.fetch_full_text, then use helix_ask.reflect_theory_context to connect that paper evidence to the Helix Ask receipts-as-observations rule, then run scientific-calculator.solve_expression with this exact expression: (2.5+1.5)*8.",
+    });
+    const subgoals = compound?.subgoals ?? [];
+    expect(compound?.schema).toBe("helix.compound_capability_contract.v1");
+    expect(compound?.prompt_shape).toBe("compound_capability");
+    expect(subgoals.map((subgoal) => subgoal.requested_capability)).toEqual([
+      "scholarly-research.lookup_papers",
+      "scholarly-research.fetch_full_text",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ]);
+
+    expect(subgoals[1]?.input_bindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        arg_name: "paper_result_or_source",
+        binding_kind: "source_ref",
+        from_capability: "scholarly-research.lookup_papers",
+        required: true,
+      }),
+    ]));
+    expect(subgoals[2]?.input_bindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        arg_name: "source_refs",
+        binding_kind: "source_ref",
+        from_capability: "scholarly-research.lookup_papers",
+        required: true,
+      }),
+      expect.objectContaining({
+        arg_name: "source_refs",
+        binding_kind: "source_ref",
+        from_capability: "scholarly-research.fetch_full_text",
+        required: true,
+      }),
+    ]));
+    expect(subgoals[3]?.input_bindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        arg_name: "support_refs",
+        binding_kind: "support_ref",
+        from_capability: "scholarly-research.lookup_papers",
+        required: true,
+      }),
+      expect.objectContaining({
+        arg_name: "support_refs",
+        binding_kind: "support_ref",
+        from_capability: "scholarly-research.fetch_full_text",
+        required: true,
+      }),
+      expect.objectContaining({
+        arg_name: "support_refs",
+        binding_kind: "support_ref",
+        from_capability: "helix_ask.reflect_theory_context",
+        required: true,
+      }),
+    ]));
+    expect(subgoals[3]?.args_hint).toMatchObject({
+      latex: "(2.5+1.5)*8",
+      expression: "(2.5+1.5)*8",
     });
   });
 
@@ -2902,6 +3490,13 @@ describe("Helix Ask tool-family parity goal coverage", () => {
       expect(scenario.expectedRequested.length, scenario.id).toBeGreaterThan(0);
       expect(scenario.expectedRuntime.length, scenario.id).toBe(scenario.expectedRequested.length);
       expect(scenario.expectedTerminalKind, `${scenario.id}:expected_terminal_kind`).toBeTruthy();
+      expect(
+        flattenExpectedCapabilities([scenario.expectedTerminalErrorCode ?? null]),
+        `${scenario.id}:budget_exhaustion_not_expected_terminal_error`,
+      ).not.toEqual(expect.arrayContaining([
+        "agent_loop_budget_exhausted",
+        "agent_tool_call_budget_exhausted",
+      ]));
       for (const terminalKind of flattenExpectedCapabilities([scenario.expectedTerminalKind ?? null])) {
         expect(
           forbiddenCompoundScenarioTerminalKinds.has(terminalKind),

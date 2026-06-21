@@ -3,6 +3,7 @@ import type { HelixToolCallAdmissionDecision, HelixToolCallAdmissionFamily } fro
 import { buildHelixCapabilityItinerary } from "../services/helix-ask/capability-itinerary";
 import { buildHelixCapabilityItineraryExecutionState } from "../services/helix-ask/capability-itinerary-execution";
 import { buildHelixCompoundCapabilityContract } from "../services/helix-ask/compound-capability-contract";
+import { applyCompoundTerminalPolicy, readCompoundTerminalPolicy } from "../services/helix-ask/compound-terminal-policy";
 import { resolveCompoundCapabilitySynthesisReadiness } from "../services/helix-ask/compound-capability-synthesis";
 import { explicitCapabilityContractsForTests } from "../services/helix-ask/explicit-capability-contract";
 import { TOOL_FAMILY_CONTRACTS } from "../services/helix-ask/tool-family-contract";
@@ -304,10 +305,18 @@ const assertPairContract = (first: ExplicitContract, second: ExplicitContract): 
     expect.arrayContaining([
       "final_answer_draft",
       "model_synthesized_answer",
-      first.required_terminal_kind,
-      second.required_terminal_kind,
     ]),
   );
+  for (const standaloneTerminalKind of [first.required_terminal_kind, second.required_terminal_kind]) {
+    if (
+      standaloneTerminalKind !== "final_answer_draft" &&
+      standaloneTerminalKind !== "model_synthesized_answer" &&
+      standaloneTerminalKind !== "doc_evidence_synthesis_answer"
+    ) {
+      expect(itinerary.terminal_success_criteria.allowed_terminal_artifact_kinds)
+        .not.toContain(standaloneTerminalKind);
+    }
+  }
   expect(itinerary.terminal_success_criteria.forbidden_terminal_artifact_kinds).toEqual(
     expect.arrayContaining(["tool_receipt"]),
   );
@@ -548,6 +557,289 @@ describe("Helix Ask compound capability family matrix", () => {
       .sort();
 
     expect(missing).toEqual([]);
+  });
+
+  it("defaults active compound terminal policy to synthesis terminals and receipt forbiddance", () => {
+    const payload = {
+      compound_capability_contract: {
+        subgoals: [
+          {
+            requested_capability: "docs-viewer.locate_in_doc",
+            runtime_capability: "docs-viewer.locate_in_doc",
+            capability_family: "docs_viewer",
+          },
+          {
+            requested_capability: "scientific-calculator.solve_expression",
+            runtime_capability: "scientific-calculator.solve_expression",
+            capability_family: "calculator",
+          },
+        ],
+      },
+    };
+    const policy = readCompoundTerminalPolicy(payload);
+    const applied = applyCompoundTerminalPolicy(payload, {
+      allowed: ["doc_summary", "calculator_receipt"],
+      forbidden: ["custom_route_forbidden_terminal"],
+      requiredTerminalKind: "doc_summary",
+    });
+
+    expect(policy.active).toBe(true);
+    expect(policy.source).toBe("compound_capability_contract_or_execution_state");
+    expect(policy.allowed_terminal_artifact_kinds).toEqual(expect.arrayContaining([
+      "final_answer_draft",
+      "model_synthesized_answer",
+      "doc_evidence_synthesis_answer",
+    ]));
+    expect(policy.required_terminal_kind).toBe("doc_evidence_synthesis_answer");
+    expect(applied.allowed).toEqual(policy.allowed_terminal_artifact_kinds);
+    expect(applied.allowed).not.toEqual(expect.arrayContaining(["doc_summary", "calculator_receipt"]));
+    expect(applied.forbidden).toEqual(expect.arrayContaining([
+      "tool_receipt",
+      "calculator_receipt",
+      "doc_open_receipt",
+      "workspace_action_receipt",
+      "custom_route_forbidden_terminal",
+    ]));
+  });
+
+  it("does not let stale compound terminal declarations re-allow receipt terminals", () => {
+    const payload = {
+      capability_itinerary: {
+        terminal_success_criteria: {
+          compound_terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          allowed_terminal_artifact_kinds: [
+            "tool_receipt",
+            "calculator_receipt",
+            "model_synthesized_answer",
+          ],
+          required_terminal_kind: "tool_receipt",
+        },
+      },
+      compound_capability_contract: {
+        subgoals: [
+          {
+            requested_capability: "internet_search.web_research",
+            runtime_capability: "internet_search.web_research",
+            capability_family: "internet_search",
+          },
+          {
+            requested_capability: "helix_ask.reflect_theory_context",
+            runtime_capability: "helix_ask.reflect_theory_context",
+            capability_family: "theory_locator",
+          },
+          {
+            requested_capability: "scientific-calculator.solve_expression",
+            runtime_capability: "scientific-calculator.solve_expression",
+            capability_family: "calculator",
+          },
+        ],
+      },
+      compound_capability_synthesis_readiness: {
+        applies: true,
+        required_terminal_kind: "calculator_receipt",
+        synthesis_terminal_kind: "model_synthesized_answer",
+      },
+    };
+
+    const policy = readCompoundTerminalPolicy(payload);
+    const applied = applyCompoundTerminalPolicy(payload, {
+      allowed: ["tool_receipt", "calculator_receipt"],
+      forbidden: [],
+      requiredTerminalKind: "tool_receipt",
+    });
+
+    expect(policy.active).toBe(true);
+    expect(policy.allowed_terminal_artifact_kinds).toEqual([
+      "final_answer_draft",
+      "model_synthesized_answer",
+    ]);
+    expect(policy.allowed_terminal_artifact_kinds).not.toContain("compound_research_locator_answer");
+    expect(policy.forbidden_terminal_artifact_kinds).toEqual(expect.arrayContaining([
+      "tool_receipt",
+      "calculator_receipt",
+    ]));
+    expect(policy.required_terminal_kind).toBe("model_synthesized_answer");
+    expect(applied.allowed).toEqual([
+      "final_answer_draft",
+      "model_synthesized_answer",
+    ]);
+    expect(applied.requiredTerminalKind).toBe("model_synthesized_answer");
+  });
+
+  it("allows compound research locator terminal only for research plus theory without docs or calculator", () => {
+    const payload = {
+      capability_itinerary: {
+        terminal_success_criteria: {
+          compound_terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          allowed_terminal_artifact_kinds: [
+            "compound_research_locator_answer",
+            "model_synthesized_answer",
+          ],
+          required_terminal_kind: "compound_research_locator_answer",
+        },
+      },
+      compound_capability_contract: {
+        subgoals: [
+          {
+            requested_capability: "internet_search.web_research",
+            runtime_capability: "internet_search.web_research",
+            capability_family: "internet_search",
+          },
+          {
+            requested_capability: "helix_ask.reflect_theory_context",
+            runtime_capability: "helix_ask.reflect_theory_context",
+            capability_family: "theory_locator",
+          },
+        ],
+      },
+    };
+
+    const policy = readCompoundTerminalPolicy(payload);
+
+    expect(policy.active).toBe(true);
+    expect(policy.allowed_terminal_artifact_kinds).toEqual(expect.arrayContaining([
+      "final_answer_draft",
+      "model_synthesized_answer",
+      "compound_research_locator_answer",
+    ]));
+    expect(policy.required_terminal_kind).toBe("compound_research_locator_answer");
+  });
+
+  it("keeps compound required terminal kind inside the sanitized allowed terminal set", () => {
+    const payload = {
+      capability_itinerary: {
+        terminal_success_criteria: {
+          compound_terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          allowed_terminal_artifact_kinds: ["doc_summary", "model_synthesized_answer"],
+          required_terminal_kind: "model_synthesized_answer",
+        },
+      },
+      compound_capability_contract: {
+        subgoals: [
+          {
+            requested_capability: "docs-viewer.locate_in_doc",
+            runtime_capability: "docs-viewer.locate_in_doc",
+            capability_family: "docs_viewer",
+          },
+          {
+            requested_capability: "scientific-calculator.solve_expression",
+            runtime_capability: "scientific-calculator.solve_expression",
+            capability_family: "calculator",
+          },
+        ],
+      },
+    };
+
+    const policy = readCompoundTerminalPolicy(payload);
+
+    expect(policy.active).toBe(true);
+    expect(policy.allowed_terminal_artifact_kinds).toEqual(expect.arrayContaining([
+      "final_answer_draft",
+      "model_synthesized_answer",
+      "doc_evidence_synthesis_answer",
+    ]));
+    expect(policy.allowed_terminal_artifact_kinds).not.toContain("doc_summary");
+    expect(policy.required_terminal_kind).toBe("doc_evidence_synthesis_answer");
+  });
+
+  it("does not activate compound terminal policy for a single explicit subgoal contract", () => {
+    const payload = {
+      compound_capability_contract: {
+        terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+        subgoals: [
+          {
+            requested_capability: "scientific-calculator.solve_expression",
+            runtime_capability: "scientific-calculator.solve_expression",
+            capability_family: "calculator",
+          },
+        ],
+      },
+    };
+    const policy = readCompoundTerminalPolicy(payload);
+    const applied = applyCompoundTerminalPolicy(payload, {
+      allowed: ["workstation_tool_evaluation"],
+      forbidden: [],
+      requiredTerminalKind: "workstation_tool_evaluation",
+    });
+
+    expect(policy).toMatchObject({
+      active: false,
+      allowed_terminal_artifact_kinds: [],
+      forbidden_terminal_artifact_kinds: [],
+      required_terminal_kind: null,
+      source: null,
+    });
+    expect(applied).toMatchObject({
+      allowed: ["workstation_tool_evaluation"],
+      forbidden: [],
+      requiredTerminalKind: "workstation_tool_evaluation",
+    });
+  });
+
+  it("does not let stale itinerary criteria activate compound terminal policy for one subgoal", () => {
+    const payload = {
+      capability_itinerary: {
+        terminal_success_criteria: {
+          compound_terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          allowed_terminal_artifact_kinds: ["model_synthesized_answer"],
+          required_terminal_kind: "model_synthesized_answer",
+        },
+      },
+      compound_capability_contract: {
+        subgoals: [
+          {
+            requested_capability: "workspace_os.status",
+            runtime_capability: "workspace_os.status",
+            capability_family: "workspace_os",
+          },
+        ],
+      },
+    };
+    const policy = readCompoundTerminalPolicy(payload);
+    const applied = applyCompoundTerminalPolicy(payload, {
+      allowed: ["workspace_status_answer"],
+      forbidden: [],
+      requiredTerminalKind: "workspace_status_answer",
+    });
+
+    expect(policy.active).toBe(false);
+    expect(applied).toMatchObject({
+      allowed: ["workspace_status_answer"],
+      forbidden: [],
+      requiredTerminalKind: "workspace_status_answer",
+    });
+  });
+
+  it("does not let stale synthesis readiness activate compound terminal policy for one subgoal", () => {
+    const payload = {
+      compound_capability_contract: {
+        subgoals: [
+          {
+            requested_capability: "scientific-calculator.solve_expression",
+            runtime_capability: "scientific-calculator.solve_expression",
+            capability_family: "calculator",
+          },
+        ],
+      },
+      compound_capability_synthesis_readiness: {
+        applies: true,
+        required_terminal_kind: "model_synthesized_answer",
+        synthesis_terminal_kind: "model_synthesized_answer",
+      },
+    };
+    const policy = readCompoundTerminalPolicy(payload);
+    const applied = applyCompoundTerminalPolicy(payload, {
+      allowed: ["workstation_tool_evaluation"],
+      forbidden: [],
+      requiredTerminalKind: "workstation_tool_evaluation",
+    });
+
+    expect(policy.active).toBe(false);
+    expect(applied).toMatchObject({
+      allowed: ["workstation_tool_evaluation"],
+      forbidden: [],
+      requiredTerminalKind: "workstation_tool_evaluation",
+    });
   });
 
   it("preserves semantic objective families in compound itineraries instead of flattening to admission lanes", () => {
@@ -1108,6 +1400,24 @@ describe("Helix Ask compound capability family matrix", () => {
         consumer: "helix_ask.reflect_civilization_bounds",
         source: "helix_ask.build_civilization_scenario_frame",
       },
+      {
+        name: "live_source_decision_to_voice_callout",
+        capabilities: [
+          "live_env.record_live_source_mail_decision",
+          "live_env.request_interim_voice_callout",
+        ],
+        consumer: "live_env.request_interim_voice_callout",
+        source: "live_env.record_live_source_mail_decision",
+      },
+      {
+        name: "live_source_mail_to_decision",
+        capabilities: [
+          "live_env.read_processed_live_source_mail",
+          "live_env.record_live_source_mail_decision",
+        ],
+        consumer: "live_env.record_live_source_mail_decision",
+        source: "live_env.read_processed_live_source_mail",
+      },
     ];
 
     for (const scenario of scenarios) {
@@ -1135,6 +1445,81 @@ describe("Helix Ask compound capability family matrix", () => {
         }),
       ]));
     }
+  });
+
+  it("binds live-source voice callouts to prior mail decision evidence refs", () => {
+    const contracts = [
+      "live_env.record_live_source_mail_decision",
+      "live_env.request_interim_voice_callout",
+    ].map(contractByCapability);
+    const turnId = "ask:named-binding:live-source-decision-to-voice-evidence";
+    const compound = buildHelixCompoundCapabilityContract({
+      turnId,
+      promptText: promptForChain(contracts),
+    });
+    const subgoals = (compound?.subgoals ?? []) as Array<Record<string, unknown>>;
+    const decisionSubgoal = subgoals.find((subgoal) =>
+      subgoal.requested_capability === "live_env.record_live_source_mail_decision"
+    );
+    const voiceSubgoal = subgoals.find((subgoal) =>
+      subgoal.requested_capability === "live_env.request_interim_voice_callout"
+    );
+    const inputBindings = Array.isArray(voiceSubgoal?.input_bindings)
+      ? voiceSubgoal.input_bindings as Array<Record<string, unknown>>
+      : [];
+
+    expect(decisionSubgoal).toBeTruthy();
+    expect(voiceSubgoal).toBeTruthy();
+    expect(inputBindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        arg_name: "evidence_refs",
+        binding_kind: "support_ref",
+        from_subgoal_id: decisionSubgoal?.subgoal_id,
+        from_capability: "live_env.record_live_source_mail_decision",
+        required_observation_kinds: expect.arrayContaining(["stage_play_live_source_mail_decision"]),
+        required: true,
+        status: "pending",
+      }),
+    ]));
+  });
+
+  it("binds live-source mail observations into later mail decision evidence refs", () => {
+    const contracts = [
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.record_live_source_mail_decision",
+    ].map(contractByCapability);
+    const turnId = "ask:named-binding:live-source-mail-to-decision-evidence";
+    const compound = buildHelixCompoundCapabilityContract({
+      turnId,
+      promptText: promptForChain(contracts),
+    });
+    const subgoals = (compound?.subgoals ?? []) as Array<Record<string, unknown>>;
+    const mailSubgoals = subgoals.filter((subgoal) =>
+      subgoal.requested_capability === "live_env.read_processed_live_source_mail" ||
+      subgoal.requested_capability === "live_env.process_live_source_mail"
+    );
+    const decisionSubgoal = subgoals.find((subgoal) =>
+      subgoal.requested_capability === "live_env.record_live_source_mail_decision"
+    );
+    const inputBindings = Array.isArray(decisionSubgoal?.input_bindings)
+      ? decisionSubgoal.input_bindings as Array<Record<string, unknown>>
+      : [];
+
+    expect(mailSubgoals).toHaveLength(2);
+    expect(decisionSubgoal).toBeTruthy();
+    expect(inputBindings).toEqual(expect.arrayContaining(
+      mailSubgoals.map((subgoal) =>
+        expect.objectContaining({
+          arg_name: "evidence_refs",
+          binding_kind: "support_ref",
+          from_subgoal_id: subgoal.subgoal_id,
+          from_capability: subgoal.requested_capability,
+          required: true,
+          status: "pending",
+        })
+      ),
+    ));
   });
 
   it("binds multiple prior evidence observations into reflection source refs", () => {

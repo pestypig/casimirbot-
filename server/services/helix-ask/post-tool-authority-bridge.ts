@@ -76,6 +76,16 @@ const readString = (value: unknown): string =>
 
 const readArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
+const payloadArtifactPayloadByKind = (
+  payload: RecordLike,
+  kind: string,
+): RecordLike | null => {
+  const artifact = readArray(payload.current_turn_artifact_ledger)
+    .map(readRecord)
+    .find((entry) => readString(entry?.kind) === kind);
+  return readRecord(artifact?.payload);
+};
+
 const latestArtifact = (payload: RecordLike, pattern: RegExp): RecordLike | null => {
   const artifacts = readArray(payload.current_turn_artifact_ledger).map(readRecord).filter(Boolean) as RecordLike[];
   for (const artifact of [...artifacts].reverse()) {
@@ -761,10 +771,13 @@ export function applyPostToolAuthorityBridgeRepair(input: {
   const bridge = input.bridge ?? buildPostToolAuthorityBridge({ turnId: input.turnId, payload: input.payload });
   input.payload.post_tool_authority_bridge = bridge as unknown as RecordLike;
   if (!bridge.applies) return bridge;
-  const itinerary = readRecord(input.payload.capability_itinerary);
+  const itinerary =
+    readRecord(input.payload.capability_itinerary) ??
+    payloadArtifactPayloadByKind(input.payload, "capability_itinerary");
   const executionState =
     readRecord(input.payload.capability_itinerary_execution_state) ??
-    readRecord(itinerary?.execution_state);
+    readRecord(itinerary?.execution_state) ??
+    payloadArtifactPayloadByKind(input.payload, "capability_itinerary_execution_state");
   if (executionState?.applies === true && executionState?.complete === false) {
     return {
       ...bridge,

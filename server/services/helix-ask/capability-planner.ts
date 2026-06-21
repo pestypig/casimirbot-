@@ -462,9 +462,10 @@ const contextualSuppressionBlocksCapabilityFamily = (
   if (family === "live_source") return contextualToolSuppressionBlocksFamily(suppression, "live_pipeline");
   if (family === "workspace_directory") return contextualToolSuppressionBlocksFamily(suppression, "workspace_directory");
   if (family === "workspace_diagnostic") return contextualToolSuppressionBlocksFamily(suppression, "workspace_diagnostic");
+  if (family === "capability_catalog") return contextualToolSuppressionBlocksFamily(suppression, "capability_catalog");
   if (family === "process_graph") return contextualToolSuppressionBlocksFamily(suppression, "process_graph");
   if (family === "theory_locator") return contextualToolSuppressionBlocksFamily(suppression, "theory_locator");
-  if (family === "context_reflection") return false;
+  if (family === "context_reflection") return contextualToolSuppressionBlocksFamily(suppression, "context_reflection");
   if (family === "zen_graph_reflection") return contextualToolSuppressionBlocksFamily(suppression, "zen_graph_reflection");
   if (family === "civilization_bounds") return contextualToolSuppressionBlocksFamily(suppression, "civilization_bounds");
   if (family === "debug_export") return true;

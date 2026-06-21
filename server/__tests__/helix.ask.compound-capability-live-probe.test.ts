@@ -208,7 +208,7 @@ const invalidCalculatorArgsFailClosedDebug = (overrides: Record<string, unknown>
         query: "rule of thumb",
       },
       required_args: ["query"],
-      optional_args: ["document_path", "doc"],
+      optional_args: ["path", "anchor", "term", "text"],
       input_bindings: [],
       required_observation_kinds: ["doc_location_result", "doc_location_matches", "doc_evidence_location"],
       required_terminal_kind: "doc_location_matches",
@@ -294,7 +294,7 @@ const invalidCalculatorArgsFailClosedDebug = (overrides: Record<string, unknown>
     raw_content_included: false,
   }));
   const payload = {
-    terminal_error_code: "compound_subgoal_invalid_args_after_repair",
+    terminal_error_code: "invalid_arg:latex_is_prose",
     terminal_artifact_kind: "typed_failure",
     terminal_presentation: {
       terminal_artifact_kind: "typed_failure",
@@ -313,7 +313,7 @@ const invalidCalculatorArgsFailClosedDebug = (overrides: Record<string, unknown>
             query: "rule of thumb",
           },
           required_args: ["query"],
-          optional_args: ["document_path", "doc"],
+          optional_args: ["path", "anchor", "term", "text"],
           required_observation_kinds: ["doc_location_result", "doc_location_matches", "doc_evidence_location"],
           required_terminal_kind: "doc_location_matches",
           allowed_substitutions: [],
@@ -364,7 +364,7 @@ const invalidCalculatorArgsFailClosedDebug = (overrides: Record<string, unknown>
 
 const missingCalculatorArgsFailClosedDebug = () => {
   const base = invalidCalculatorArgsFailClosedDebug({
-    terminal_error_code: "compound_subgoal_missing_required_args",
+    terminal_error_code: "missing_required_arg:latex",
   });
   const payload = (base.debugExport as any).payload;
   const ledgerEntry = payload.capability_itinerary_execution_state.compound_subgoal_ledger[1];
@@ -424,6 +424,7 @@ const fixtureContractTermsForCapability = (
         allowed_substitutions: [],
       };
     case "internet_search.web_research":
+    case "internet-search.search_web":
       return {
         required_observation_kinds: ["internet_search_observation"],
         required_terminal_kind: "internet_search_answer",
@@ -540,6 +541,13 @@ const fixtureContractTermsForCapability = (
         required_terminal_kind: "model_synthesized_answer",
         allowed_substitutions: [],
       };
+    case "live_env.check_live_source_mail":
+    case "live_env.read_live_source_mail":
+      return {
+        required_observation_kinds: ["stage_play_live_source_mail_read_result"],
+        required_terminal_kind: "model_synthesized_answer",
+        allowed_substitutions: [],
+      };
     case "live_env.process_live_source_mail":
       return {
         required_observation_kinds: ["stage_play_live_source_mail_read_result", "stage_play_processed_mail_packet"],
@@ -552,11 +560,51 @@ const fixtureContractTermsForCapability = (
         required_terminal_kind: "model_synthesized_answer",
         allowed_substitutions: [],
       };
+    case "live_env.record_live_source_mail_decision":
+      return {
+        required_observation_kinds: ["stage_play_processed_mail_packet", "stage_play_live_source_mail_decision"],
+        required_terminal_kind: "model_synthesized_answer",
+        allowed_substitutions: [],
+      };
+    case "live_env.request_interim_voice_callout":
+      return {
+        required_observation_kinds: [
+          "stage_play_live_source_mail_decision",
+          "live_source_interim_voice_callout_receipt",
+          "voice_hold_receipt",
+          "voice_block_receipt",
+          "voice_receipt",
+        ],
+        required_terminal_kind: "model_synthesized_answer",
+        allowed_substitutions: [],
+      };
+    case "live_env.query_live_source_quality":
+      return {
+        required_observation_kinds: ["stage_play_live_source_quality", "helix.workstation_goal_context_update.v1"],
+        required_terminal_kind: "model_synthesized_answer",
+        allowed_substitutions: [],
+      };
+    case "live_env.query_workstation_goal_context":
+      return {
+        required_observation_kinds: [
+          "stage_play_workstation_goal_context_read_result",
+          "helix.agent_goal_session.v1",
+        ],
+        required_terminal_kind: "model_synthesized_answer",
+        allowed_substitutions: [],
+      };
+    case "live_env.summarize_live_source_current_state":
+      return {
+        required_observation_kinds: ["stage_play_live_source_current_state", "helix.workstation_goal_context_update.v1"],
+        required_terminal_kind: "model_synthesized_answer",
+        allowed_substitutions: [],
+      };
     case "image_lens.inspect":
+    case "situation-room.describe_visual_capture":
       return {
         required_observation_kinds: ["visual_frame_evidence", "situation_context_pack", "visual_capture_coverage"],
         required_terminal_kind: "situation_context_pack",
-        allowed_substitutions: ["situation-room.describe_visual_capture"],
+        allowed_substitutions: capability === "image_lens.inspect" ? ["situation-room.describe_visual_capture"] : [],
       };
     case "helix_ask.inspect_capability_catalog":
       return {
@@ -588,6 +636,7 @@ const fixtureRequiredArgsForCapability = (capability: string): string[] => {
     case "repo-code.search_concept":
     case "workspace-directory.resolve":
     case "internet_search.web_research":
+    case "internet-search.search_web":
     case "scholarly-research.lookup_papers":
       return ["query"];
     case "scholarly-research.fetch_full_text":
@@ -606,9 +655,9 @@ const fixtureOptionalArgsForCapability = (capability: string): string[] => {
     case "scientific-calculator.solve_expression":
       return ["expression", "equation"];
     case "docs-viewer.locate_in_doc":
-      return ["document_path", "doc"];
+      return ["path", "anchor", "term", "text"];
     case "docs-viewer.doc_equation_context":
-      return ["document_path", "doc", "path", "anchor", "term", "text"];
+      return ["path", "anchor", "query", "selected_text"];
     case "helix_ask.inspect_capability_catalog":
       return ["query", "family", "include_hidden"];
     case "helix_ask.reflect_workstation_tool_alignment":
@@ -630,6 +679,7 @@ const fixtureOptionalArgsForCapability = (capability: string): string[] => {
     case "scholarly-research.fetch_full_text":
       return ["paper_result_id", "paper_id", "result_id", "doi", "arxiv_id", "arxivId", "source_url", "pdf_url", "full_text_url", "url"];
     case "image_lens.inspect":
+    case "situation-room.describe_visual_capture":
       return ["view_state", "source_id", "regions"];
     default:
       return [];
@@ -1467,6 +1517,231 @@ const repoPlusDocsDebug = (overrides: Record<string, unknown> = {}) => {
   });
 };
 
+const repoReflectionCalculatorDebug = (overrides: Record<string, unknown> = {}) => {
+  const turnId = "ask:test:repo-reflection-calculator";
+  const repoSubgoalId = `${turnId}:compound_capability_subgoal:1:repo-code_search_concept`;
+  const reflectionSubgoalId = `${turnId}:compound_capability_subgoal:2:helix_ask_reflect_theory_context`;
+  const reflectionBindingId = `${reflectionSubgoalId}:input_binding:1`;
+  const calculatorSubgoalId = `${turnId}:compound_capability_subgoal:3:scientific-calculator_solve_expression`;
+  const calculatorRepoBindingId = `${calculatorSubgoalId}:input_binding:1`;
+  const calculatorReflectionBindingId = `${calculatorSubgoalId}:input_binding:2`;
+  return compoundDebug({
+    turnId,
+    terminalArtifactKind: "model_synthesized_answer",
+    subgoals: [
+      {
+        requested_capability: "repo-code.search_concept",
+        executed_capability: "repo-code.search_concept",
+        args: {
+          query: "terminal authority",
+          concept: "terminal authority",
+        },
+        observation_kind: "repo_code_evidence_observation",
+        observation_ref: "obs:repo-evidence",
+      },
+      {
+        requested_capability: "helix_ask.reflect_theory_context",
+        executed_capability: "helix_ask.reflect_theory_context",
+        args: {
+          prompt: "explain the repo evidence",
+          source_ref: "obs:repo-evidence",
+        },
+        input_bindings: [
+          {
+            binding_id: reflectionBindingId,
+            arg_name: "source_ref",
+            binding_kind: "source_ref",
+            from_subgoal_id: repoSubgoalId,
+            from_capability: "repo-code.search_concept",
+            required_observation_kinds: ["repo_code_evidence_observation"],
+            required: true,
+            status: "pending",
+          },
+        ],
+        observation_kind: "theory_context_reflection",
+        observation_ref: "obs:reflection",
+        bound_input_refs: [
+          {
+            binding_id: reflectionBindingId,
+            arg_name: "source_ref",
+            binding_kind: "source_ref",
+            from_subgoal_id: repoSubgoalId,
+            from_capability: "repo-code.search_concept",
+            ref: "obs:repo-evidence",
+          },
+        ],
+      },
+      {
+        requested_capability: "scientific-calculator.solve_expression",
+        executed_capability: "scientific-calculator.solve_expression",
+        args: {
+          latex: "4*13",
+          expression: "4*13",
+        },
+        required_args: ["latex"],
+        optional_args: ["expression", "equation"],
+        input_bindings: [
+          {
+            binding_id: calculatorRepoBindingId,
+            arg_name: "support_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: repoSubgoalId,
+            from_capability: "repo-code.search_concept",
+            required_observation_kinds: ["repo_code_evidence_observation"],
+            required: true,
+            status: "pending",
+          },
+          {
+            binding_id: calculatorReflectionBindingId,
+            arg_name: "support_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: reflectionSubgoalId,
+            from_capability: "helix_ask.reflect_theory_context",
+            required_observation_kinds: ["helix_theory_context_reflection_tool_receipt", "theory_context_reflection"],
+            required: true,
+            status: "pending",
+          },
+        ],
+        observation_kind: "calculator_receipt",
+        observation_ref: "obs:calculator",
+        support_refs: ["obs:repo-evidence", "obs:reflection", "obs:calculator"],
+        bound_input_refs: [
+          {
+            binding_id: calculatorRepoBindingId,
+            arg_name: "support_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: repoSubgoalId,
+            from_capability: "repo-code.search_concept",
+            ref: "obs:repo-evidence",
+          },
+          {
+            binding_id: calculatorReflectionBindingId,
+            arg_name: "support_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: reflectionSubgoalId,
+            from_capability: "helix_ask.reflect_theory_context",
+            ref: "obs:reflection",
+          },
+        ],
+      },
+    ],
+    overrides,
+  });
+};
+
+const docsReflectionCalculatorDebug = (overrides: Record<string, unknown> = {}) => {
+  const turnId = "ask:test:docs-reflection-calculator";
+  const docsSubgoalId = `${turnId}:compound_capability_subgoal:1:docs-viewer_locate_in_doc`;
+  const reflectionSubgoalId = `${turnId}:compound_capability_subgoal:2:helix_ask_reflect_theory_context`;
+  const reflectionBindingId = `${reflectionSubgoalId}:input_binding:1`;
+  const calculatorSubgoalId = `${turnId}:compound_capability_subgoal:3:scientific-calculator_solve_expression`;
+  const calculatorDocsBindingId = `${calculatorSubgoalId}:input_binding:1`;
+  const calculatorReflectionBindingId = `${calculatorSubgoalId}:input_binding:2`;
+  return compoundDebug({
+    turnId,
+    terminalArtifactKind: "doc_evidence_synthesis_answer",
+    subgoals: [
+      {
+        requested_capability: "docs-viewer.locate_in_doc",
+        executed_capability: "docs-viewer.locate_in_doc",
+        args: {
+          query: "receipts are observations",
+        },
+        required_args: ["query"],
+        optional_args: ["path", "anchor", "term", "text"],
+        observation_kind: "doc_location_matches",
+        observation_ref: "obs:doc-location",
+      },
+      {
+        requested_capability: "helix_ask.reflect_theory_context",
+        executed_capability: "helix_ask.reflect_theory_context",
+        args: {
+          prompt: "explain the document evidence",
+          source_ref: "obs:doc-location",
+        },
+        input_bindings: [
+          {
+            binding_id: reflectionBindingId,
+            arg_name: "source_ref",
+            binding_kind: "source_ref",
+            from_subgoal_id: docsSubgoalId,
+            from_capability: "docs-viewer.locate_in_doc",
+            required_observation_kinds: ["doc_location_result", "doc_location_matches", "doc_evidence_location"],
+            required: true,
+            status: "pending",
+          },
+        ],
+        observation_kind: "theory_context_reflection",
+        observation_ref: "obs:reflection",
+        bound_input_refs: [
+          {
+            binding_id: reflectionBindingId,
+            arg_name: "source_ref",
+            binding_kind: "source_ref",
+            from_subgoal_id: docsSubgoalId,
+            from_capability: "docs-viewer.locate_in_doc",
+            ref: "obs:doc-location",
+          },
+        ],
+      },
+      {
+        requested_capability: "scientific-calculator.solve_expression",
+        executed_capability: "scientific-calculator.solve_expression",
+        args: {
+          latex: "7*8",
+          expression: "7*8",
+        },
+        required_args: ["latex"],
+        optional_args: ["expression", "equation"],
+        input_bindings: [
+          {
+            binding_id: calculatorDocsBindingId,
+            arg_name: "support_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: docsSubgoalId,
+            from_capability: "docs-viewer.locate_in_doc",
+            required_observation_kinds: ["doc_location_result", "doc_location_matches", "doc_evidence_location"],
+            required: true,
+            status: "pending",
+          },
+          {
+            binding_id: calculatorReflectionBindingId,
+            arg_name: "support_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: reflectionSubgoalId,
+            from_capability: "helix_ask.reflect_theory_context",
+            required_observation_kinds: ["helix_theory_context_reflection_tool_receipt", "theory_context_reflection"],
+            required: true,
+            status: "pending",
+          },
+        ],
+        observation_kind: "calculator_receipt",
+        observation_ref: "obs:calculator",
+        support_refs: ["obs:doc-location", "obs:reflection", "obs:calculator"],
+        bound_input_refs: [
+          {
+            binding_id: calculatorDocsBindingId,
+            arg_name: "support_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: docsSubgoalId,
+            from_capability: "docs-viewer.locate_in_doc",
+            ref: "obs:doc-location",
+          },
+          {
+            binding_id: calculatorReflectionBindingId,
+            arg_name: "support_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: reflectionSubgoalId,
+            from_capability: "helix_ask.reflect_theory_context",
+            ref: "obs:reflection",
+          },
+        ],
+      },
+    ],
+    overrides,
+  });
+};
+
 const contextReflectionCalculatorDebug = (overrides: Record<string, unknown> = {}) => {
   const turnId = "ask:test:context-reflection-calculator";
   const reflectionSubgoalId = `${turnId}:compound_capability_subgoal:1:helix_ask_reflect_context_attachments`;
@@ -1941,6 +2216,305 @@ const liveSourceMailReadProcessReflectDebug = (overrides: Record<string, unknown
   });
 };
 
+const liveSourceMailReadProcessDecisionDebug = (overrides: Record<string, unknown> = {}) => {
+  const turnId = "ask:test:live-source-mail-read-process-decision";
+  const readSubgoalId = `${turnId}:compound_capability_subgoal:1:live_env_read_processed_live_source_mail`;
+  const processSubgoalId = `${turnId}:compound_capability_subgoal:2:live_env_process_live_source_mail`;
+  const decisionSubgoalId = `${turnId}:compound_capability_subgoal:3:live_env_record_live_source_mail_decision`;
+  const processBindingId = `${processSubgoalId}:input_binding:1`;
+  const decisionReadBindingId = `${decisionSubgoalId}:input_binding:1`;
+  const decisionProcessBindingId = `${decisionSubgoalId}:input_binding:2`;
+  return compoundDebug({
+    turnId,
+    subgoals: [
+      {
+        requested_capability: "live_env.read_processed_live_source_mail",
+        executed_capability: "live_env.read_processed_live_source_mail",
+        args: {},
+        observation_kind: "stage_play_processed_mail_packet",
+        observation_ref: "obs:processed-mail",
+      },
+      {
+        requested_capability: "live_env.process_live_source_mail",
+        executed_capability: "live_env.process_live_source_mail",
+        args: {
+          source_ref: "obs:processed-mail",
+        },
+        input_bindings: [
+          {
+            binding_id: processBindingId,
+            arg_name: "source_ref",
+            binding_kind: "source_ref",
+            from_subgoal_id: readSubgoalId,
+            from_capability: "live_env.read_processed_live_source_mail",
+            required_observation_kinds: ["stage_play_processed_mail_packet"],
+            required: true,
+            status: "pending",
+          },
+        ],
+        observation_kind: "stage_play_live_source_mail_read_result",
+        observation_ref: "obs:mail-process-result",
+        support_refs: ["obs:processed-mail", "obs:mail-process-result"],
+        bound_input_refs: [
+          {
+            binding_id: processBindingId,
+            arg_name: "source_ref",
+            binding_kind: "source_ref",
+            from_subgoal_id: readSubgoalId,
+            from_capability: "live_env.read_processed_live_source_mail",
+            ref: "obs:processed-mail",
+          },
+        ],
+      },
+      {
+        requested_capability: "live_env.record_live_source_mail_decision",
+        executed_capability: "live_env.record_live_source_mail_decision",
+        args: {
+          evidence_refs: ["obs:processed-mail", "obs:mail-process-result"],
+        },
+        input_bindings: [
+          {
+            binding_id: decisionReadBindingId,
+            arg_name: "evidence_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: readSubgoalId,
+            from_capability: "live_env.read_processed_live_source_mail",
+            required_observation_kinds: ["stage_play_processed_mail_packet"],
+            required: true,
+            status: "pending",
+          },
+          {
+            binding_id: decisionProcessBindingId,
+            arg_name: "evidence_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: processSubgoalId,
+            from_capability: "live_env.process_live_source_mail",
+            required_observation_kinds: [
+              "stage_play_live_source_mail_read_result",
+              "stage_play_processed_mail_packet",
+            ],
+            required: true,
+            status: "pending",
+          },
+        ],
+        observation_kind: "stage_play_live_source_mail_decision",
+        observation_ref: "obs:mail-decision",
+        support_refs: ["obs:processed-mail", "obs:mail-process-result", "obs:mail-decision"],
+        bound_input_refs: [
+          {
+            binding_id: decisionReadBindingId,
+            arg_name: "evidence_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: readSubgoalId,
+            from_capability: "live_env.read_processed_live_source_mail",
+            ref: "obs:processed-mail",
+          },
+          {
+            binding_id: decisionProcessBindingId,
+            arg_name: "evidence_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: processSubgoalId,
+            from_capability: "live_env.process_live_source_mail",
+            ref: "obs:mail-process-result",
+          },
+        ],
+      },
+    ],
+    overrides,
+  });
+};
+
+const liveSourceMailCheckThenRawReadDebug = (overrides: Record<string, unknown> = {}) => {
+  const turnId = "ask:test:live-source-mail-check-then-raw-read";
+  const checkSubgoalId = `${turnId}:compound_capability_subgoal:1:live_env_check_live_source_mail`;
+  const readSubgoalId = `${turnId}:compound_capability_subgoal:2:live_env_read_live_source_mail`;
+  const readBindingId = `${readSubgoalId}:input_binding:1`;
+  return compoundDebug({
+    turnId,
+    subgoals: [
+      {
+        requested_capability: "live_env.check_live_source_mail",
+        executed_capability: "live_env.check_live_source_mail",
+        args: {},
+        observation_kind: "stage_play_live_source_mail_read_result",
+        observation_ref: "obs:live-mail-check",
+      },
+      {
+        requested_capability: "live_env.read_live_source_mail",
+        executed_capability: "live_env.read_live_source_mail",
+        args: {
+          source_ref: "obs:live-mail-check",
+        },
+        input_bindings: [
+          {
+            binding_id: readBindingId,
+            arg_name: "source_ref",
+            binding_kind: "source_ref",
+            from_subgoal_id: checkSubgoalId,
+            from_capability: "live_env.check_live_source_mail",
+            required_observation_kinds: ["stage_play_live_source_mail_read_result"],
+            required: true,
+            status: "pending",
+          },
+        ],
+        observation_kind: "stage_play_live_source_mail_read_result",
+        observation_ref: "obs:live-mail-read",
+        support_refs: ["obs:live-mail-check", "obs:live-mail-read"],
+        bound_input_refs: [
+          {
+            binding_id: readBindingId,
+            arg_name: "source_ref",
+            binding_kind: "source_ref",
+            from_subgoal_id: checkSubgoalId,
+            from_capability: "live_env.check_live_source_mail",
+            ref: "obs:live-mail-check",
+          },
+        ],
+      },
+    ],
+    overrides,
+  });
+};
+
+const liveSourceDecisionThenVoiceCalloutDebug = (overrides: Record<string, unknown> = {}) => {
+  const turnId = "ask:test:live-source-decision-then-voice-callout";
+  const decisionSubgoalId = `${turnId}:compound_capability_subgoal:1:live_env_record_live_source_mail_decision`;
+  const voiceSubgoalId = `${turnId}:compound_capability_subgoal:2:live_env_request_interim_voice_callout`;
+  const voiceBindingId = `${voiceSubgoalId}:input_binding:1`;
+  return compoundDebug({
+    turnId,
+    subgoals: [
+      {
+        requested_capability: "live_env.record_live_source_mail_decision",
+        executed_capability: "live_env.record_live_source_mail_decision",
+        args: {},
+        observation_kind: "stage_play_live_source_mail_decision",
+        observation_ref: "obs:mail-decision",
+      },
+      {
+        requested_capability: "live_env.request_interim_voice_callout",
+        executed_capability: "live_env.request_interim_voice_callout",
+        args: {
+          message: "Summarize the mailbox decision for the operator.",
+          evidence_refs: ["obs:mail-decision"],
+        },
+        input_bindings: [
+          {
+            binding_id: voiceBindingId,
+            arg_name: "evidence_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: decisionSubgoalId,
+            from_capability: "live_env.record_live_source_mail_decision",
+            required_observation_kinds: ["stage_play_live_source_mail_decision"],
+            required: true,
+            status: "pending",
+          },
+        ],
+        observation_kind: "live_source_interim_voice_callout_receipt",
+        observation_ref: "obs:voice-callout",
+        support_refs: ["obs:mail-decision", "obs:voice-callout"],
+        bound_input_refs: [
+          {
+            binding_id: voiceBindingId,
+            arg_name: "evidence_refs",
+            binding_kind: "support_ref",
+            from_subgoal_id: decisionSubgoalId,
+            from_capability: "live_env.record_live_source_mail_decision",
+            ref: "obs:mail-decision",
+          },
+        ],
+      },
+    ],
+    overrides,
+  });
+};
+
+const liveSourceQualityGoalContextStateDebug = (overrides: Record<string, unknown> = {}) => {
+  const turnId = "ask:test:live-source-quality-goal-context-state";
+  const qualitySubgoalId = `${turnId}:compound_capability_subgoal:1:live_env_query_live_source_quality`;
+  const goalContextSubgoalId = `${turnId}:compound_capability_subgoal:2:live_env_query_workstation_goal_context`;
+  const stateSubgoalId = `${turnId}:compound_capability_subgoal:3:live_env_summarize_live_source_current_state`;
+  const stateQualityBindingId = `${stateSubgoalId}:input_binding:1`;
+  const stateGoalContextBindingId = `${stateSubgoalId}:input_binding:2`;
+  return compoundDebug({
+    turnId,
+    subgoals: [
+      {
+        requested_capability: "live_env.query_live_source_quality",
+        executed_capability: "live_env.query_live_source_quality",
+        args: {},
+        observation_kind: "stage_play_live_source_quality",
+        observation_ref: "obs:live-source-quality",
+      },
+      {
+        requested_capability: "live_env.query_workstation_goal_context",
+        executed_capability: "live_env.query_workstation_goal_context",
+        args: {},
+        observation_kind: "stage_play_workstation_goal_context_read_result",
+        observation_ref: "obs:workstation-goal-context",
+      },
+      {
+        requested_capability: "live_env.summarize_live_source_current_state",
+        executed_capability: "live_env.summarize_live_source_current_state",
+        args: {
+          source_refs: ["obs:live-source-quality", "obs:workstation-goal-context"],
+        },
+        input_bindings: [
+          {
+            binding_id: stateQualityBindingId,
+            arg_name: "source_refs",
+            binding_kind: "source_ref",
+            from_subgoal_id: qualitySubgoalId,
+            from_capability: "live_env.query_live_source_quality",
+            required_observation_kinds: ["stage_play_live_source_quality", "helix.workstation_goal_context_update.v1"],
+            required: true,
+            status: "pending",
+          },
+          {
+            binding_id: stateGoalContextBindingId,
+            arg_name: "source_refs",
+            binding_kind: "source_ref",
+            from_subgoal_id: goalContextSubgoalId,
+            from_capability: "live_env.query_workstation_goal_context",
+            required_observation_kinds: [
+              "stage_play_workstation_goal_context_read_result",
+              "helix.agent_goal_session.v1",
+            ],
+            required: true,
+            status: "pending",
+          },
+        ],
+        observation_kind: "stage_play_live_source_current_state",
+        observation_ref: "obs:live-source-current-state",
+        support_refs: [
+          "obs:live-source-quality",
+          "obs:workstation-goal-context",
+          "obs:live-source-current-state",
+        ],
+        bound_input_refs: [
+          {
+            binding_id: stateQualityBindingId,
+            arg_name: "source_refs",
+            binding_kind: "source_ref",
+            from_subgoal_id: qualitySubgoalId,
+            from_capability: "live_env.query_live_source_quality",
+            ref: "obs:live-source-quality",
+          },
+          {
+            binding_id: stateGoalContextBindingId,
+            arg_name: "source_refs",
+            binding_kind: "source_ref",
+            from_subgoal_id: goalContextSubgoalId,
+            from_capability: "live_env.query_workstation_goal_context",
+            ref: "obs:workstation-goal-context",
+          },
+        ],
+      },
+    ],
+    overrides,
+  });
+};
+
 const visualThenCalculatorDebug = (overrides: Record<string, unknown> = {}) => {
   const turnId = "ask:test:visual-then-calculator";
   const visualSubgoalId = `${turnId}:compound_capability_subgoal:1:image_lens_inspect`;
@@ -2163,7 +2737,13 @@ const deterministicDebugFixtureByScenarioId = {
   micro_reasoner_presets_then_draft: microReasonerPresetsThenDraftDebug,
   micro_reasoner_presets_draft_route: microReasonerPresetsDraftRouteDebug,
   live_source_mail_read_process_reflect: liveSourceMailReadProcessReflectDebug,
+  live_source_mail_read_process_decision: liveSourceMailReadProcessDecisionDebug,
+  live_source_mail_check_then_raw_read: liveSourceMailCheckThenRawReadDebug,
+  live_source_decision_then_voice_callout: liveSourceDecisionThenVoiceCalloutDebug,
+  live_source_quality_goal_context_state: liveSourceQualityGoalContextStateDebug,
   repo_plus_docs: repoPlusDocsDebug,
+  repo_reflection_calculator: repoReflectionCalculatorDebug,
+  docs_reflection_calculator: docsReflectionCalculatorDebug,
   internet_reflection_calculator: internetReflectionCalculatorDebug,
   scholarly_reflection_calculator: scholarlyReflectionCalculatorDebug,
   scholarly_full_text_reflection_calculator: scholarlyFullTextReflectionCalculatorDebug,
@@ -2174,6 +2754,7 @@ const deterministicDebugFixtureByScenarioId = {
   civilization_bounds_reflection: civilizationBoundsReflectionDebug,
   zen_graph_reflection_bridge: zenGraphReflectionBridgeDebug,
   invalid_calculator_args_fail_closed: invalidCalculatorArgsFailClosedDebug,
+  missing_calculator_args_fail_closed: missingCalculatorArgsFailClosedDebug,
 } as const;
 
 describe("Helix Ask compound capability live probe", () => {
@@ -2653,6 +3234,96 @@ describe("Helix Ask compound capability live probe", () => {
     ]);
   });
 
+  it("accepts repo evidence plus theory reflection plus calculator with source binding", () => {
+    const { ask, debugExport } = repoReflectionCalculatorDebug();
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("repo_reflection_calculator"),
+      ask,
+      debugExport,
+    });
+
+    expect(result.failures).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.requested_capabilities).toEqual([
+      "repo-code.search_concept",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ]);
+    expect(result.executed_capabilities).toEqual([
+      "repo-code.search_concept",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ]);
+    expect(result.observation_kinds).toEqual([
+      "repo_code_evidence_observation",
+      "theory_context_reflection",
+      "calculator_receipt",
+    ]);
+    expect(result.observation_refs).toEqual(["obs:repo-evidence", "obs:reflection", "obs:calculator"]);
+    expect(result.subgoal_input_bindings[1]).toEqual([
+      expect.objectContaining({
+        arg_name: "source_ref",
+        from_capability: "repo-code.search_concept",
+      }),
+    ]);
+    expect(result.subgoal_input_bindings[2]).toEqual([
+      expect.objectContaining({
+        arg_name: "support_refs",
+        from_capability: "repo-code.search_concept",
+      }),
+      expect.objectContaining({
+        arg_name: "support_refs",
+        from_capability: "helix_ask.reflect_theory_context",
+      }),
+    ]);
+  });
+
+  it("accepts docs evidence plus theory reflection plus calculator with source binding", () => {
+    const { ask, debugExport } = docsReflectionCalculatorDebug();
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("docs_reflection_calculator"),
+      ask,
+      debugExport,
+    });
+
+    expect(result.failures).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.requested_capabilities).toEqual([
+      "docs-viewer.locate_in_doc",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ]);
+    expect(result.executed_capabilities).toEqual([
+      "docs-viewer.locate_in_doc",
+      "helix_ask.reflect_theory_context",
+      "scientific-calculator.solve_expression",
+    ]);
+    expect(result.observation_kinds).toEqual([
+      "doc_location_matches",
+      "theory_context_reflection",
+      "calculator_receipt",
+    ]);
+    expect(result.observation_refs).toEqual(["obs:doc-location", "obs:reflection", "obs:calculator"]);
+    expect(result.subgoal_input_bindings[1]).toEqual([
+      expect.objectContaining({
+        arg_name: "source_ref",
+        from_capability: "docs-viewer.locate_in_doc",
+      }),
+    ]);
+    expect(result.subgoal_input_bindings[2]).toEqual([
+      expect.objectContaining({
+        arg_name: "support_refs",
+        from_capability: "docs-viewer.locate_in_doc",
+      }),
+      expect.objectContaining({
+        arg_name: "support_refs",
+        from_capability: "helix_ask.reflect_theory_context",
+      }),
+    ]);
+  });
+
   it("accepts live-env micro-reasoner preset query plus draft without mailbox packet state", () => {
     const { ask, debugExport } = microReasonerPresetsThenDraftDebug();
 
@@ -2790,6 +3461,97 @@ describe("Helix Ask compound capability live probe", () => {
       }),
       expect.objectContaining({
         ref: "obs:mail-process-result",
+      }),
+    ]);
+  });
+
+  it("accepts live-source mailbox read plus process plus decision with ordered evidence bindings", () => {
+    const { ask, debugExport } = liveSourceMailReadProcessDecisionDebug();
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("live_source_mail_read_process_decision"),
+      ask,
+      debugExport,
+    });
+
+    expect(result.failures).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.requested_capabilities).toEqual([
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.record_live_source_mail_decision",
+    ]);
+    expect(result.executed_capabilities).toEqual([
+      "live_env.read_processed_live_source_mail",
+      "live_env.process_live_source_mail",
+      "live_env.record_live_source_mail_decision",
+    ]);
+    expect(result.observation_kinds).toEqual([
+      "stage_play_processed_mail_packet",
+      "stage_play_live_source_mail_read_result",
+      "stage_play_live_source_mail_decision",
+    ]);
+    expect(result.subgoal_input_bindings[2]).toEqual([
+      expect.objectContaining({
+        arg_name: "evidence_refs",
+        binding_kind: "support_ref",
+        from_capability: "live_env.read_processed_live_source_mail",
+      }),
+      expect.objectContaining({
+        arg_name: "evidence_refs",
+        binding_kind: "support_ref",
+        from_capability: "live_env.process_live_source_mail",
+      }),
+    ]);
+    expect(result.subgoal_bound_input_refs[2]).toEqual([
+      expect.objectContaining({
+        arg_name: "evidence_refs",
+        binding_kind: "support_ref",
+        ref: "obs:processed-mail",
+      }),
+      expect.objectContaining({
+        arg_name: "evidence_refs",
+        binding_kind: "support_ref",
+        ref: "obs:mail-process-result",
+      }),
+    ]);
+  });
+
+  it("accepts live-source decision plus voice callout with evidence binding", () => {
+    const { ask, debugExport } = liveSourceDecisionThenVoiceCalloutDebug();
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("live_source_decision_then_voice_callout"),
+      ask,
+      debugExport,
+    });
+
+    expect(result.failures).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.requested_capabilities).toEqual([
+      "live_env.record_live_source_mail_decision",
+      "live_env.request_interim_voice_callout",
+    ]);
+    expect(result.executed_capabilities).toEqual([
+      "live_env.record_live_source_mail_decision",
+      "live_env.request_interim_voice_callout",
+    ]);
+    expect(result.observation_kinds).toEqual([
+      "stage_play_live_source_mail_decision",
+      "live_source_interim_voice_callout_receipt",
+    ]);
+    expect(result.subgoal_input_bindings[1]).toEqual([
+      expect.objectContaining({
+        arg_name: "evidence_refs",
+        binding_kind: "support_ref",
+        from_capability: "live_env.record_live_source_mail_decision",
+      }),
+    ]);
+    expect(result.subgoal_bound_input_refs[1]).toEqual([
+      expect.objectContaining({
+        arg_name: "evidence_refs",
+        binding_kind: "support_ref",
+        ref: "obs:mail-decision",
       }),
     ]);
   });
@@ -2932,6 +3694,17 @@ describe("Helix Ask compound capability live probe", () => {
       "helix_ask.build_civilization_scenario_frame",
       "helix_ask.reflect_civilization_bounds",
     ]);
+    expect(result.subgoal_input_bindings[1]).toEqual([
+      expect.objectContaining({
+        arg_name: "source_ref",
+        from_capability: "helix_ask.build_civilization_scenario_frame",
+      }),
+    ]);
+    expect(result.subgoal_bound_input_refs[1]).toEqual([
+      expect.objectContaining({
+        ref: "obs:civilization-frame",
+      }),
+    ]);
   });
 
   it("accepts zen graph reflection plus theory-ideology bridge with source binding", () => {
@@ -2954,6 +3727,24 @@ describe("Helix Ask compound capability live probe", () => {
       "helix_ask.reflect_theory_context",
       "helix_ask.reflect_ideology_context",
       "helix_ask.bridge_theory_ideology_context",
+    ]);
+    expect(result.subgoal_input_bindings[2]).toEqual([
+      expect.objectContaining({
+        arg_name: "source_refs",
+        from_capability: "helix_ask.reflect_theory_context",
+      }),
+      expect.objectContaining({
+        arg_name: "source_refs",
+        from_capability: "helix_ask.reflect_ideology_context",
+      }),
+    ]);
+    expect(result.subgoal_bound_input_refs[2]).toEqual([
+      expect.objectContaining({
+        ref: "obs:theory-reflection",
+      }),
+      expect.objectContaining({
+        ref: "obs:zen-reflection",
+      }),
     ]);
   });
 
@@ -3240,6 +4031,29 @@ describe("Helix Ask compound capability live probe", () => {
     expect(result.ok).toBe(false);
     expect(result.failures).toContain(
       "calculator_expression_mismatch:Use workspace_os.status to inspect workstation status, then call scientific-calculator.solve_expression with this exact expression: 14*23+8.",
+    );
+    expect(result.failures).toContain("calculator_expression_contains_non_math_prompt_text");
+  });
+
+  it("catches reflection/search prompt text smuggled into calculator subgoal args", () => {
+    const base = workspaceThenCalculatorDebug();
+    const payload = (base.debugExport as any).payload;
+    payload.capability_itinerary_execution_state.compound_subgoal_ledger[1].args = {
+      latex:
+        "Use helix_ask.reflect_theory_context to connect internet_search evidence, then run scientific-calculator.solve_expression with this exact expression: (9+3)*7-25.",
+      expression:
+        "Use helix_ask.reflect_theory_context to connect internet_search evidence, then run scientific-calculator.solve_expression with this exact expression: (9+3)*7-25.",
+    };
+
+    const result = evaluateCompoundCapabilityScenario({
+      scenario: scenarioById("workspace_then_calculator"),
+      ask: base.ask,
+      debugExport: base.debugExport,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.failures).toContain(
+      "calculator_expression_mismatch:Use helix_ask.reflect_theory_context to connect internet_search evidence, then run scientific-calculator.solve_expression with this exact expression: (9+3)*7-25.",
     );
     expect(result.failures).toContain("calculator_expression_contains_non_math_prompt_text");
   });
@@ -3555,7 +4369,7 @@ describe("Helix Ask compound capability live probe", () => {
 
     expect(result.failures).toEqual([]);
     expect(result.ok).toBe(true);
-    expect(result.terminal_error_code).toBe("compound_subgoal_invalid_args_after_repair");
+    expect(result.terminal_error_code).toBe("invalid_arg:latex_is_prose");
     expect(result.final_answer_source).toBe("typed_failure");
     expect(result.executed_capabilities).toEqual(["docs-viewer.locate_in_doc", null]);
     expect(result.subgoal_satisfactions).toEqual(["satisfied", "failed"]);
@@ -3590,7 +4404,7 @@ describe("Helix Ask compound capability live probe", () => {
 
     expect(result.failures).toEqual([]);
     expect(result.ok).toBe(true);
-    expect(result.terminal_error_code).toBe("compound_subgoal_missing_required_args");
+    expect(result.terminal_error_code).toBe("missing_required_arg:latex");
     expect(result.final_answer_source).toBe("typed_failure");
     expect(result.executed_capabilities).toEqual(["docs-viewer.locate_in_doc", null]);
     expect(result.subgoal_satisfactions).toEqual(["satisfied", "failed"]);

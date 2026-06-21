@@ -5,6 +5,7 @@ import {
   type HelixSolverArtifactReentryAudit,
   type HelixSolverArtifactReentryFailureCode,
 } from "@shared/helix-solver-artifact-reentry-audit";
+import { applyCompoundTerminalPolicy } from "./compound-terminal-policy";
 
 type RecordLike = Record<string, unknown>;
 
@@ -48,21 +49,34 @@ const requiredTerminalKind = (payload: RecordLike): string => {
   const canonicalGoal = readRecord(payload.canonical_goal_frame);
   const universalGoal = readRecord(payload.universal_goal_frame);
   const universalUserGoal = readRecord(universalGoal?.user_goal);
-  return (
+  const fallback = (
     readString(canonicalGoal?.required_terminal_kind) ||
     readString(universalGoal?.required_terminal_kind) ||
     readString(universalUserGoal?.required_terminal_kind)
   );
+  return applyCompoundTerminalPolicy(payload, {
+    allowed: [],
+    forbidden: [],
+    requiredTerminalKind: fallback,
+  }).requiredTerminalKind ?? fallback;
 };
 
 const allowedTerminalKinds = (payload: RecordLike): string[] => {
   const contract = readRecord(payload.route_product_contract);
-  return readStringArray(contract?.allowed_terminal_artifact_kinds);
+  return applyCompoundTerminalPolicy(payload, {
+    allowed: readStringArray(contract?.allowed_terminal_artifact_kinds),
+    forbidden: readStringArray(contract?.forbidden_terminal_artifact_kinds),
+    requiredTerminalKind: readString(contract?.required_terminal_kind),
+  }).allowed;
 };
 
 const forbiddenTerminalKinds = (payload: RecordLike): string[] => {
   const contract = readRecord(payload.route_product_contract);
-  return readStringArray(contract?.forbidden_terminal_artifact_kinds);
+  return applyCompoundTerminalPolicy(payload, {
+    allowed: readStringArray(contract?.allowed_terminal_artifact_kinds),
+    forbidden: readStringArray(contract?.forbidden_terminal_artifact_kinds),
+    requiredTerminalKind: readString(contract?.required_terminal_kind),
+  }).forbidden;
 };
 
 const collectPayloadRefs = (payload: RecordLike | null): string[] =>

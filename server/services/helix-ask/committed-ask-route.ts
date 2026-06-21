@@ -7,6 +7,7 @@ import {
 } from "@shared/helix-committed-ask-route";
 import type { HelixPromptInterpretation } from "./prompt-interpretation";
 import type { HelixIntentArbitration } from "./intent-arbitration";
+import { applyCompoundTerminalPolicy } from "./compound-terminal-policy";
 
 type RecordLike = Record<string, unknown>;
 
@@ -236,7 +237,30 @@ export function buildCommittedAskRoute(input: {
   secondaryIntentKinds?: string[];
 }): HelixCommittedAskRoute {
   const existing = readCommittedAskRoute(input.payload);
-  if (existing) return existing;
+  if (existing) {
+    const compoundPolicy = applyCompoundTerminalPolicy(input.payload, {
+      allowed: existing.canonical_goal.allowed_terminal_artifact_kinds,
+      forbidden: existing.canonical_goal.forbidden_terminal_artifact_kinds,
+      requiredTerminalKind: existing.canonical_goal.required_terminal_kind,
+    });
+    if (!compoundPolicy.policy.active) return existing;
+    const requiredTerminalProduct =
+      compoundPolicy.requiredTerminalKind ||
+      existing.terminal_product.required_terminal_product;
+    return {
+      ...existing,
+      canonical_goal: {
+        ...existing.canonical_goal,
+        required_terminal_kind: requiredTerminalProduct,
+        allowed_terminal_artifact_kinds: compoundPolicy.allowed,
+        forbidden_terminal_artifact_kinds: compoundPolicy.forbidden,
+      },
+      terminal_product: {
+        ...existing.terminal_product,
+        required_terminal_product: requiredTerminalProduct,
+      },
+    };
+  }
 
   const route = readRouteSource(input.payload);
   const routeContract = readRecord(input.payload.route_product_contract);
@@ -269,17 +293,24 @@ export function buildCommittedAskRoute(input: {
       : [];
   const rawAllowedTerminalKinds = readStringArray(routeContract?.allowed_terminal_artifact_kinds);
   const rawForbiddenTerminalKinds = readStringArray(routeContract?.forbidden_terminal_artifact_kinds);
-  const allowedTerminalKinds = unique([
+  const rawAllowedTerminalKindsWithGoal = unique([
     ...(shouldUseModelOnlyGoal ? [] : rawAllowedTerminalKinds),
     ...modelOnlyTerminalAliases,
     goal.requiredTerminalKind !== "unknown" ? goal.requiredTerminalKind : "",
   ]);
-  const forbiddenTerminalKinds = shouldUseModelOnlyGoal
+  const rawForbiddenTerminalKindsWithGoal = shouldUseModelOnlyGoal
     ? unique([
         ...rawForbiddenTerminalKinds.filter((kind) => !MODEL_ONLY_TERMINAL_ALIASES.has(normalizeCommittedRouteTerminalKind(kind))),
         ...MODEL_ONLY_FORBIDDEN_SOURCE_TERMINALS,
       ])
     : rawForbiddenTerminalKinds;
+  const compoundPolicy = applyCompoundTerminalPolicy(input.payload, {
+    allowed: rawAllowedTerminalKindsWithGoal,
+    forbidden: rawForbiddenTerminalKindsWithGoal,
+    requiredTerminalKind: goal.requiredTerminalKind !== "unknown" ? goal.requiredTerminalKind : null,
+  });
+  const allowedTerminalKinds = compoundPolicy.allowed;
+  const forbiddenTerminalKinds = compoundPolicy.forbidden;
   const suppressedFamilies = suppressedFamiliesFromPayload(input.payload, input.promptInterpretation);
   const allowedFamilies = allowedFamiliesFromPayload(input.payload, route.sourceTarget)
     .filter((family) => !suppressedFamilies.includes(family));
@@ -287,9 +318,10 @@ export function buildCommittedAskRoute(input: {
   const negativeConstraints = input.promptInterpretation?.negative_constraints ?? [];
   const sourceBacked = sourceBackedTargets.has(route.sourceTarget);
   const requiredTerminalProduct =
-    goal.requiredTerminalKind !== "unknown"
+    compoundPolicy.requiredTerminalKind ||
+    (goal.requiredTerminalKind !== "unknown"
       ? goal.requiredTerminalKind
-      : allowedTerminalKinds[0] ?? "unknown";
+      : allowedTerminalKinds[0] ?? "unknown");
   const violations: string[] = [];
 
   if (sourceBacked && goal.goalKind === "model_only_concept") {

@@ -50,6 +50,7 @@ import {
   evaluateCommittedAskRouteCompatibility,
   readCommittedAskRoute,
 } from "./committed-ask-route";
+import { applyCompoundTerminalPolicy } from "./compound-terminal-policy";
 
 type RecordLike = Record<string, unknown>;
 
@@ -371,8 +372,13 @@ const terminalMatchesEvidenceProductContract = (payload: RecordLike, terminalArt
   if (/receipt/i.test(terminalArtifactKind)) return false;
   const contract = readRecord(payload.route_product_contract);
   if (readString(contract?.schema) !== "helix.route_product_contract.v1") return false;
-  const allowed = readStringArray(contract?.allowed_terminal_artifact_kinds);
-  const forbidden = readStringArray(contract?.forbidden_terminal_artifact_kinds);
+  const terminalPolicy = applyCompoundTerminalPolicy(payload, {
+    allowed: readStringArray(contract?.allowed_terminal_artifact_kinds),
+    forbidden: readStringArray(contract?.forbidden_terminal_artifact_kinds),
+    requiredTerminalKind: readString(contract?.required_terminal_kind),
+  });
+  const allowed = terminalPolicy.allowed;
+  const forbidden = terminalPolicy.forbidden;
   const evidenceTerminals = new Set([
     "active_doc_identity",
     "doc_location_result",
@@ -699,13 +705,37 @@ const sourceTargetFromPayload = (payload: RecordLike): { sourceTarget: string; t
   };
 };
 
-const allowedTerminalProducts = (payload: RecordLike): string[] =>
-  readCommittedAskRoute(payload)?.canonical_goal.allowed_terminal_artifact_kinds ??
-  readStringArray(readRecord(payload.route_product_contract)?.allowed_terminal_artifact_kinds);
+const allowedTerminalProducts = (payload: RecordLike): string[] => {
+  const committedRoute = readCommittedAskRoute(payload);
+  const contract = readRecord(payload.route_product_contract);
+  return applyCompoundTerminalPolicy(payload, {
+    allowed:
+      committedRoute?.canonical_goal.allowed_terminal_artifact_kinds ??
+      readStringArray(contract?.allowed_terminal_artifact_kinds),
+    forbidden:
+      committedRoute?.canonical_goal.forbidden_terminal_artifact_kinds ??
+      readStringArray(contract?.forbidden_terminal_artifact_kinds),
+    requiredTerminalKind:
+      committedRoute?.canonical_goal.required_terminal_kind ??
+      readString(contract?.required_terminal_kind),
+  }).allowed;
+};
 
-const forbiddenTerminalProducts = (payload: RecordLike): string[] =>
-  readCommittedAskRoute(payload)?.canonical_goal.forbidden_terminal_artifact_kinds ??
-  readStringArray(readRecord(payload.route_product_contract)?.forbidden_terminal_artifact_kinds);
+const forbiddenTerminalProducts = (payload: RecordLike): string[] => {
+  const committedRoute = readCommittedAskRoute(payload);
+  const contract = readRecord(payload.route_product_contract);
+  return applyCompoundTerminalPolicy(payload, {
+    allowed:
+      committedRoute?.canonical_goal.allowed_terminal_artifact_kinds ??
+      readStringArray(contract?.allowed_terminal_artifact_kinds),
+    forbidden:
+      committedRoute?.canonical_goal.forbidden_terminal_artifact_kinds ??
+      readStringArray(contract?.forbidden_terminal_artifact_kinds),
+    requiredTerminalKind:
+      committedRoute?.canonical_goal.required_terminal_kind ??
+      readString(contract?.required_terminal_kind),
+  }).forbidden;
+};
 
 const isHardSourceTarget = (payload: RecordLike, trace: HelixAskTurnSolverTrace | null): boolean => {
   const sourceTarget = readRecord(payload.source_target_intent);

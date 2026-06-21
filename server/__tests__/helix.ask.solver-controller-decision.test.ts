@@ -825,6 +825,170 @@ describe("helix ask solver controller decision", () => {
     expect(decision.compound_prompt_coverage_superseded_ref).toBe(scholarlyAnswerRef);
   });
 
+  it("blocks scholarly answer coverage when ledger-only itinerary execution state is incomplete", () => {
+    const turnId = "ask:scholarly-incomplete-ledger-controller";
+    const scholarlyObservationRef = `${turnId}:runtime_tool_call:1:scholarly_research_observation`;
+    const scholarlyAnswerRef = `${turnId}:scholarly_research_answer`;
+    const finalDraftRef = `${turnId}:final_answer_draft`;
+    const finalText = "Scholarly research was summarized before all required compound subgoals completed.";
+    const executionState = {
+      schema: "helix.capability_itinerary_execution_state.v1",
+      applies: true,
+      complete: false,
+      required_observation_families: ["scholarly_research", "theory_locator"],
+      admitted_tool_families: ["scholarly_research", "theory_locator"],
+      observed_families: ["scholarly_research"],
+      missing_observation_families: ["theory_locator"],
+    };
+    const payload = {
+      active_prompt:
+        "Use scholarly research to find papers, then use the Theory Badge Graph locator and synthesize.",
+      canonical_goal_frame: {
+        turn_id: turnId,
+        goal_kind: "scholarly_research_lookup",
+        answer_scope: "external_scholarly_research",
+        required_terminal_kind: "scholarly_research_answer",
+      },
+      route_reason_code: "conversation:simple",
+      source_target_intent: {
+        schema: "helix.ask_source_target_intent.v1",
+        target_source: "scholarly_research",
+        target_kind: "scholarly_research_lookup",
+        strength: "hard",
+        must_enter_backend_ask: true,
+        allow_no_tool_direct: false,
+      },
+      terminal_artifact_kind: "scholarly_research_answer",
+      terminal_artifact_id: scholarlyAnswerRef,
+      final_answer_source: "final_answer_draft",
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        artifact_id: finalDraftRef,
+        text: finalText,
+        authority: "llm_post_observation_composer",
+        composer_scope: "source_tool_backed",
+        support_refs: [scholarlyObservationRef],
+        grounded_in_observation_refs: [scholarlyObservationRef],
+      },
+      scholarly_research_answer: {
+        schema: "helix.scholarly_research_answer.v1",
+        artifact_id: scholarlyAnswerRef,
+        text: finalText,
+        answer_text: finalText,
+        final_answer_draft_ref: finalDraftRef,
+        support_refs: [scholarlyObservationRef],
+        source_observation_refs: [scholarlyObservationRef],
+        terminal_source: "final_answer_draft",
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        turn_id: turnId,
+        route: "conversation:simple",
+        terminal_artifact_kind: "scholarly_research_answer",
+        final_answer_source: "final_answer_draft",
+        terminal_kind: "answer",
+        server_authoritative: true,
+      },
+      terminal_consistency_check: {
+        schema: "helix.terminal_consistency_check.v1",
+        turn_id: turnId,
+        goal_kind: "scholarly_research_lookup",
+        required_terminal_kind: "scholarly_research_answer",
+        selected_terminal_kind: "scholarly_research_answer",
+        satisfaction_terminal_kind: "final_answer",
+        final_answer_source: "final_answer_draft",
+        consistent: true,
+        violations: [],
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: turnId,
+        capability_family: "scholarly_research",
+        requested_action: "lookup_papers",
+        selected_capability: "scholarly-research.lookup_papers",
+        admission_status: "admitted",
+      },
+      poison_audit: { schema: "helix.turn_poison_audit.v1", ok: true, violations: [] },
+      route_authority_audit: { schema: "helix.route_authority_audit.v1", route_authority_ok: true },
+      ask_turn_solver_trace: { schema: "helix.ask_turn_solver_trace.v1", turn_id: turnId, completed_solver_path: true },
+      goal_satisfaction_evaluation: satisfiedGoal("scholarly_research_lookup", "scholarly_research_answer"),
+      terminal_equivalence_harness_result: terminalEquivalenceOk,
+      agent_step_decision: {
+        schema: "helix.agent_step_decision.v1",
+        decision_id: `${turnId}:decision:2`,
+        chosen_capability: "answer",
+        next_step: "answer",
+        decision_authority: "llm",
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            decision_id: `${turnId}:decision:1`,
+            chosen_capability: "scholarly-research.lookup_papers",
+            decision_authority: "llm",
+            decision_timing: "pre_action",
+            observed_artifact_refs: [scholarlyObservationRef],
+          },
+          {
+            decision_id: `${turnId}:decision:2`,
+            chosen_capability: "answer",
+            decision_authority: "llm",
+            decision_timing: "post_observation",
+          },
+        ],
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: scholarlyObservationRef,
+          turn_id: turnId,
+          kind: "scholarly_research_observation",
+          payload: { schema: "helix.scholarly_research_observation.v1" },
+        },
+        {
+          artifact_id: finalDraftRef,
+          turn_id: turnId,
+          kind: "final_answer_draft",
+          payload: {
+            schema: "helix.final_answer_draft.v1",
+            authority: "llm_post_observation_composer",
+            composer_scope: "source_tool_backed",
+            text: finalText,
+            support_refs: [scholarlyObservationRef],
+          },
+        },
+        {
+          artifact_id: scholarlyAnswerRef,
+          turn_id: turnId,
+          kind: "scholarly_research_answer",
+          payload: {
+            schema: "helix.scholarly_research_answer.v1",
+            support_refs: [scholarlyObservationRef],
+            source_observation_refs: [scholarlyObservationRef],
+          },
+        },
+        {
+          artifact_id: `${turnId}:capability_itinerary_execution_state`,
+          turn_id: turnId,
+          kind: "capability_itinerary_execution_state",
+          payload: executionState,
+        },
+      ],
+    };
+
+    const decision = buildSolverControllerDecision({
+      turnId,
+      finalRoute: "conversation:simple",
+      payload,
+      turnIdIntegrityAudit: buildTurnIdIntegrityAudit({ turnId, payload }),
+      finalRouteReconciliation: buildFinalRouteReconciliation({ turnId, finalRoute: "conversation:simple", payload }),
+    });
+
+    expect(decision.decision).toBe("fail_closed");
+    expect(decision.blocking_reasons).toContain("capability_lifecycle_incomplete");
+    expect(decision.compound_prompt_coverage_gate_superseded_by_answer_artifact).not.toBe(true);
+  });
+
   it("allows workstation action receipts after plan, adapter result, lifecycle, and re-entry are complete", () => {
     const payload = {
       active_prompt: "Open the docs panel.",

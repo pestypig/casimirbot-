@@ -35,6 +35,7 @@ export type HelixCompoundCapabilitySubgoal = {
       | "source_ref"
       | "source_refs"
       | "target_ref"
+      | "evidence_refs"
       | "support_refs"
       | "scenarioFrameRef"
       | "theory_reflection_ref"
@@ -468,6 +469,7 @@ const SUBGOAL_BINDING_SOURCE_FAMILIES = new Set([
   "docs_viewer",
   "repo_code",
   "visual_capture",
+  "workspace_diagnostic",
   "workspace_directory",
   "capability_catalog",
   "live_source_mail",
@@ -484,6 +486,8 @@ const SUBGOAL_BINDING_CONSUMER_FAMILIES = new Set([
   "theory_locator",
   "scholarly_research",
   "live_source_mail",
+  "live_source_decision",
+  "voice_delivery",
   "zen_graph_reflection",
   "civilization_bounds",
 ]);
@@ -498,6 +502,7 @@ const bindingShapeForConsumer = (
     | "source_ref"
     | "source_refs"
     | "target_ref"
+    | "evidence_refs"
     | "support_refs"
     | "scenarioFrameRef"
     | "theory_reflection_ref"
@@ -520,6 +525,18 @@ const bindingShapeForConsumer = (
     return {
       arg_name: "target_ref",
       binding_kind: "target_ref",
+    };
+  }
+  if (contract.capability === "live_env.request_interim_voice_callout") {
+    return {
+      arg_name: "evidence_refs",
+      binding_kind: "support_ref",
+    };
+  }
+  if (contract.capability === "live_env.record_live_source_mail_decision") {
+    return {
+      arg_name: "evidence_refs",
+      binding_kind: "support_ref",
     };
   }
   if (
@@ -568,6 +585,12 @@ const canBindSourceToConsumer = (
     return source.capability === "scholarly-research.lookup_papers";
   }
   if (consumer.capability_family === "scholarly_research") return false;
+  if (consumer.capability === "live_env.request_interim_voice_callout") {
+    return source.capability === "live_env.record_live_source_mail_decision";
+  }
+  if (consumer.capability === "live_env.record_live_source_mail_decision") {
+    return source.capability_family === "live_source_mail";
+  }
   return SUBGOAL_BINDING_SOURCE_FAMILIES.has(source.capability_family);
 };
 

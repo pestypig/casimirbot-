@@ -11,27 +11,38 @@ const stripWholePromptWrappingQuotes = (promptText: string): string | null => {
   return inner || null;
 };
 
+const CAPABILITY_CATALOG_REQUEST_PATTERNS = [
+  /\bwhat\s+tools\s+are\s+available\s+for\s+(?:the\s+)?helix\s+ask\s+to\s+use\b/i,
+  /\bwhat\s+can\s+i\s+do\s+with\s+helix\s+ask\b/i,
+  /\bwhat\s+can\s+(?:helix\s+ask|ask|this\s+agent|the\s+agent)\s+do\b/i,
+  /\bhow\s+can\s+(?:helix\s+ask|ask|this\s+agent|the\s+agent)\s+help\b/i,
+  /\bwhat\s+(?:tools?|tool\s+calls?|capabilities)\s+(?:are\s+)?(?:available|visible|admissible)\b/i,
+  /\bwhat\s+(?:tools?|tool\s+calls?|capabilities)\s+can\s+(?:helix\s+ask|ask|agent)\s+(?:use|call|run|see|access)\b/i,
+  /\bwhat\s+(?:tools?|tool\s+calls?|capabilities)\s+can\s+(?:you|i|we)\s+(?:use|call|run|see|access)\b[\s\S]{0,100}\b(?:as|for|from|in)\s+(?:the\s+)?(?:helix\s+ask|ask|agent)\b/i,
+  /\b(?:what|which)\s+(?:tools?|tool\s+calls?|capabilities)\s+(?:are\s+)?(?:available|visible|admissible|exposed)\s+to\s+(?:you|me|us)\b/i,
+  /\b(?:what|which)\s+(?:runtime\s+)?(?:tools?|tool\s+calls?|capabilities)\s+(?:does|do|can)\s+(?:this\s+agent|the\s+agent|helix\s+ask|ask)\s+(?:have|expose|see|access|use|call|run)\b/i,
+  /\b(?:list|show|inspect|tell\s+me)\b[\s\S]{0,60}\b(?:tools?|tool\s+calls?|capabilities)\b/i,
+] as const;
+
+const capabilityCatalogRequestMatchIndex = (promptText: string): number | null => {
+  const prompt = promptText.trim();
+  if (!prompt) return null;
+  const mentionsAskSurface = /\b(?:helix\s+ask|ask\s+turn|this\s+agent|the\s+agent)\b/i.test(prompt);
+  const patterns = mentionsAskSurface
+    ? CAPABILITY_CATALOG_REQUEST_PATTERNS
+    : [CAPABILITY_CATALOG_REQUEST_PATTERNS[0]];
+  let bestIndex: number | null = null;
+  for (const pattern of patterns) {
+    const matchIndex = prompt.search(pattern);
+    if (matchIndex >= 0 && (bestIndex === null || matchIndex < bestIndex)) {
+      bestIndex = matchIndex;
+    }
+  }
+  return bestIndex;
+};
+
 const isCapabilityCatalogRequestText = (promptText: string): boolean => {
-  const normalized = promptText.trim().toLowerCase().replace(/[?!.]+$/g, "").replace(/\s+/g, " ");
-  if (!normalized) return false;
-  const mentionsAskSurface = /\b(?:helix\s+ask|ask\s+turn|this\s+agent|the\s+agent)\b/i.test(normalized);
-  return (
-    /\bwhat\s+tools\s+are\s+available\s+for\s+(?:the\s+)?helix\s+ask\s+to\s+use\b/i.test(normalized) ||
-    (
-      mentionsAskSurface &&
-      (
-        /\bwhat\s+can\s+i\s+do\s+with\s+helix\s+ask\b/i.test(normalized) ||
-        /\bwhat\s+can\s+(?:helix\s+ask|ask|this\s+agent|the\s+agent)\s+do\b/i.test(normalized) ||
-        /\bhow\s+can\s+(?:helix\s+ask|ask|this\s+agent|the\s+agent)\s+help\b/i.test(normalized) ||
-        /\bwhat\s+(?:tools?|tool\s+calls?|capabilities)\s+(?:are\s+)?(?:available|visible|admissible)\b/i.test(normalized) ||
-        /\bwhat\s+(?:tools?|tool\s+calls?|capabilities)\s+can\s+(?:helix\s+ask|ask|agent)\s+(?:use|call|run|see|access)\b/i.test(normalized) ||
-        /\bwhat\s+(?:tools?|tool\s+calls?|capabilities)\s+can\s+(?:you|i|we)\s+(?:use|call|run|see|access)\b[\s\S]{0,100}\b(?:as|for|from|in)\s+(?:the\s+)?(?:helix\s+ask|ask|agent)\b/i.test(normalized) ||
-        /\b(?:what|which)\s+(?:tools?|tool\s+calls?|capabilities)\s+(?:are\s+)?(?:available|visible|admissible|exposed)\s+to\s+(?:you|me|us)\b/i.test(normalized) ||
-        /\b(?:what|which)\s+(?:runtime\s+)?(?:tools?|tool\s+calls?|capabilities)\s+(?:does|do|can)\s+(?:this\s+agent|the\s+agent|helix\s+ask|ask)\s+(?:have|expose|see|access|use|call|run)\b/i.test(normalized) ||
-        /\b(?:list|show|inspect|tell\s+me)\b[\s\S]{0,60}\b(?:tools?|tool\s+calls?|capabilities)\b/i.test(normalized)
-      )
-    )
-  );
+  return capabilityCatalogRequestMatchIndex(promptText) !== null;
 };
 
 const hasContextualCapabilityCatalogCue = (promptText: string): boolean => {
@@ -49,6 +60,14 @@ const hasContextualCapabilityCatalogCue = (promptText: string): boolean => {
 };
 
 export const isAskCapabilityCatalogPrompt = (promptText: string): boolean => {
-  if (hasContextualCapabilityCatalogCue(promptText)) return false;
-  return isCapabilityCatalogRequestText(stripWholePromptWrappingQuotes(promptText) ?? promptText);
+  return askCapabilityCatalogPromptMatchIndex(promptText) !== null;
+};
+
+export const askCapabilityCatalogPromptMatchIndex = (promptText: string): number | null => {
+  if (hasContextualCapabilityCatalogCue(promptText)) return null;
+  const wholeQuotedPrompt = stripWholePromptWrappingQuotes(promptText);
+  if (wholeQuotedPrompt) {
+    return isCapabilityCatalogRequestText(wholeQuotedPrompt) ? 0 : null;
+  }
+  return capabilityCatalogRequestMatchIndex(promptText);
 };

@@ -39,6 +39,18 @@ const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)));
 
+const artifactPayloadByKind = (
+  artifacts: HelixCapabilityItineraryArtifactLike[],
+  kind: string,
+): Record<string, unknown> | null => {
+  const artifact = artifacts.find((entry) => readString(entry.kind) === kind);
+  return readRecord(artifact?.payload);
+};
+
+const subgoalHasSatisfiedObservation = (entry: Record<string, unknown> | null | undefined): boolean =>
+  readString(entry?.satisfaction) === "satisfied" &&
+  Boolean(readString(entry?.observation_ref));
+
 const materializeBoundInputArgs = (
   baseArgs: Record<string, unknown>,
   boundInputRefs: Array<Record<string, unknown>>,
@@ -53,7 +65,7 @@ const materializeBoundInputArgs = (
     refsByArg.set(argName, uniqueStrings([...(refsByArg.get(argName) ?? []), ref]));
   }
   for (const [argName, refs] of refsByArg.entries()) {
-    if (argName === "source_refs" || argName === "support_refs") {
+    if (argName === "source_refs" || argName === "support_refs" || argName === "evidence_refs") {
       const existingScalar = readString(nextArgs[argName]);
       nextArgs[argName] = uniqueStrings([
         existingScalar,
@@ -953,7 +965,7 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       const sourceEntry = rawCompoundSubgoalLedger.find((candidate: Record<string, unknown>) =>
         readString(candidate.subgoal_id) === readString(binding.from_subgoal_id)
       );
-      if (readString(sourceEntry?.satisfaction) !== "satisfied") return [];
+      if (!subgoalHasSatisfiedObservation(sourceEntry)) return [];
       const refs = uniqueStrings([
         readString(sourceEntry?.observation_ref),
         ...readArray(sourceEntry?.support_refs).map(readString),
@@ -1001,7 +1013,9 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       unresolved_input_bindings: unresolvedInputBindings,
     };
   });
-  const missingSubgoals = compoundSubgoalLedger.filter((entry: Record<string, unknown>) => readString(entry.satisfaction) !== "satisfied");
+  const missingSubgoals = compoundSubgoalLedger.filter((entry: Record<string, unknown>) =>
+    !subgoalHasSatisfiedObservation(entry)
+  );
   const missingFamilies = requiredFamilies.filter((family: string) => !observedFamilies.includes(family));
   const missingSubgoalIds = missingSubgoals
     .map((entry: Record<string, unknown>) => readString(entry.subgoal_id))
@@ -1038,14 +1052,17 @@ export const attachHelixCapabilityItineraryExecutionState = (
   payload: Record<string, unknown>,
   artifacts: HelixCapabilityItineraryArtifactLike[],
 ): string[] => {
+  const itinerary =
+    readRecord(payload.capability_itinerary) ??
+    artifactPayloadByKind(artifacts, "capability_itinerary");
   const executionState = buildHelixCapabilityItineraryExecutionState({
-    capabilityItinerary: payload.capability_itinerary,
+    capabilityItinerary: itinerary,
     artifacts,
   });
   if (!executionState.applies) return [];
   payload.capability_itinerary_execution_state = executionState;
-  const itinerary = readRecord(payload.capability_itinerary);
   if (itinerary) {
+    payload.capability_itinerary = itinerary;
     itinerary.execution_state = {
       required_observation_families: executionState.required_observation_families,
       required_observation_kinds: executionState.required_observation_kinds,

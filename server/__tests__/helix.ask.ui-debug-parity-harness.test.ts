@@ -107,8 +107,24 @@ const compoundSubgoalRails = (): Array<Record<string, unknown>> => [
     selected_capability: "docs-viewer.locate_in_doc",
     executed_capability: "docs-viewer.locate_in_doc",
     args: { query: "receipts are observations" },
+    args_source: "compound_itinerary_execution",
+    planned_args: { query: "receipts are observations" },
+    selected_args: { query: "receipts are observations" },
+    required_args: ["query"],
+    optional_args: ["path", "anchor", "term", "text"],
+    input_bindings: [],
+    bound_input_refs: [],
+    unresolved_input_bindings: [],
     observation_kind: "doc_location_matches",
     observation_ref: "ask:ui-api-parity:doc_location_matches",
+    observation_provenance: "docs-viewer.locate_in_doc",
+    support_refs: ["ask:ui-api-parity:doc_location_matches"],
+    required_observation_kinds: ["doc_location_matches"],
+    required_terminal_kind: "doc_evidence_synthesis_answer",
+    terminal_contribution_kind: "doc_evidence_location",
+    contribution_role: "evidence",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["docs-viewer.summarize_doc", "model.direct_answer"],
     satisfaction: "satisfied",
     rail_status: "complete",
     first_broken_rail: null,
@@ -123,8 +139,44 @@ const compoundSubgoalRails = (): Array<Record<string, unknown>> => [
     selected_capability: "scientific-calculator.solve_expression",
     executed_capability: null,
     args: { latex: "explain why receipts matter" },
+    args_source: "compound_itinerary_execution",
+    planned_args: { latex: "explain why receipts matter" },
+    selected_args: { latex: "explain why receipts matter" },
+    required_args: ["latex"],
+    optional_args: ["expression", "equation"],
+    input_bindings: [
+      {
+        arg_name: "support_refs",
+        binding_kind: "support_ref",
+        from_subgoal_id: "subgoal:1",
+        from_capability: "docs-viewer.locate_in_doc",
+        required_observation_kinds: ["doc_location_matches"],
+        required: true,
+        status: "pending",
+      },
+    ],
+    bound_input_refs: [],
+    unresolved_input_bindings: [
+      {
+        arg_name: "support_refs",
+        binding_kind: "support_ref",
+        from_subgoal_id: "subgoal:1",
+        from_capability: "docs-viewer.locate_in_doc",
+        required_observation_kinds: ["doc_location_matches"],
+        required: true,
+        status: "pending",
+      },
+    ],
     observation_kind: null,
     observation_ref: null,
+    observation_provenance: null,
+    support_refs: [],
+    required_observation_kinds: ["calculator_receipt", "workstation_tool_evaluation"],
+    required_terminal_kind: "workstation_tool_evaluation",
+    terminal_contribution_kind: "calculator_result",
+    contribution_role: "calculation",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
     satisfaction: "not_satisfied",
     rail_status: "fail_closed",
     first_broken_rail: "capability_execution",
@@ -389,18 +441,18 @@ describe("Helix Ask UI debug parity harness", () => {
         active_turn_id: "ask:ui-api-parity:shared",
         active_prompt:
           "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
-        selected_final_answer: "I could not complete that turn.\nCause: compound_subgoal_invalid_args_after_repair.",
+        selected_final_answer: "I could not complete that turn.\nCause: invalid_arg:latex_is_prose.",
         terminal_artifact_kind: "typed_failure",
-        terminal_error_code: "compound_subgoal_invalid_args_after_repair",
+        terminal_error_code: "invalid_arg:latex_is_prose",
         codex_parity_agent_spine_rail_table: uiRail,
       },
       apiResponse: {
         turn_id: "ask:ui-api-parity:shared",
         question:
           "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
-        selected_final_answer: "I could not complete that turn.\nCause: compound_subgoal_invalid_args_after_repair.",
+        selected_final_answer: "I could not complete that turn.\nCause: invalid_arg:latex_is_prose.",
         terminal_artifact_kind: "typed_failure",
-        terminal_error_code: "compound_subgoal_invalid_args_after_repair",
+        terminal_error_code: "invalid_arg:latex_is_prose",
         codex_parity_agent_spine_rail_table: apiRail,
       },
     });
@@ -439,9 +491,9 @@ describe("Helix Ask UI debug parity harness", () => {
         active_turn_id: "ask:ui-api-parity:shared",
         active_prompt:
           "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
-        selected_final_answer: "I could not complete that turn.\nCause: compound_subgoal_invalid_args_after_repair.",
+        selected_final_answer: "I could not complete that turn.\nCause: invalid_arg:latex_is_prose.",
         terminal_artifact_kind: "typed_failure",
-        terminal_error_code: "compound_subgoal_invalid_args_after_repair",
+        terminal_error_code: "invalid_arg:latex_is_prose",
         codex_parity_agent_spine_rail_table: rail,
         compound_subgoal_rail_statuses: uiRails,
       },
@@ -449,15 +501,107 @@ describe("Helix Ask UI debug parity harness", () => {
         turn_id: "ask:ui-api-parity:shared",
         question:
           "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
-        selected_final_answer: "I could not complete that turn.\nCause: compound_subgoal_invalid_args_after_repair.",
+        selected_final_answer: "I could not complete that turn.\nCause: invalid_arg:latex_is_prose.",
         terminal_artifact_kind: "typed_failure",
-        terminal_error_code: "compound_subgoal_invalid_args_after_repair",
+        terminal_error_code: "invalid_arg:latex_is_prose",
         codex_parity_agent_spine_rail_table: rail,
         compound_subgoal_rail_statuses: apiRails,
       },
     });
 
     expect(violations).toContain("ui_api_compound_subgoal_rails_mismatch");
+  });
+
+  it("flags UI/API compound subgoal contract and provenance divergence", () => {
+    const rail = compoundFailureRail();
+    const uiRails = compoundSubgoalRails();
+    const apiRails = compoundSubgoalRails().map((entry) =>
+      entry.subgoal_id === "subgoal:1"
+        ? {
+            ...entry,
+            observation_provenance: "model_generated_location",
+            required_observation_kinds: ["doc_summary"],
+            required_terminal_kind: "doc_summary",
+            terminal_contribution_kind: "doc_summary",
+            contribution_role: "summary",
+            forbidden_nearby_capabilities: ["model.direct_answer"],
+          }
+        : entry,
+    );
+
+    const violations = collectUiApiTerminalParityViolations({
+      uiDebugExport: {
+        active_turn_id: "ask:ui-api-parity:shared",
+        active_prompt:
+          "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
+        selected_final_answer: "I could not complete that turn.\nCause: invalid_arg:latex_is_prose.",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "invalid_arg:latex_is_prose",
+        codex_parity_agent_spine_rail_table: rail,
+        compound_subgoal_rail_statuses: uiRails,
+      },
+      apiResponse: {
+        turn_id: "ask:ui-api-parity:shared",
+        question:
+          "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
+        selected_final_answer: "I could not complete that turn.\nCause: invalid_arg:latex_is_prose.",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "invalid_arg:latex_is_prose",
+        codex_parity_agent_spine_rail_table: rail,
+        compound_subgoal_rail_statuses: apiRails,
+      },
+    });
+
+    expect(violations).toEqual(expect.arrayContaining([
+      "ui_api_compound_subgoal_rails_mismatch",
+    ]));
+  });
+
+  it("flags shared UI/API complete compound subgoal rails without observation proof", () => {
+    const rail = compoundFailureRail();
+    const badRails = compoundSubgoalRails().map((entry) =>
+      entry.subgoal_id === "subgoal:1"
+        ? {
+            ...entry,
+            observation_ref: null,
+            satisfaction: "satisfied",
+            rail_status: "complete",
+          }
+        : entry,
+    );
+
+    const violations = collectUiApiTerminalParityViolations({
+      uiDebugExport: {
+        active_turn_id: "ask:ui-api-parity:shared",
+        active_prompt:
+          "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
+        selected_final_answer: "I could not complete that turn.\nCause: invalid_arg:latex_is_prose.",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "invalid_arg:latex_is_prose",
+        codex_parity_agent_spine_rail_table: rail,
+        compound_subgoal_rail_statuses: badRails,
+      },
+      apiResponse: {
+        turn_id: "ask:ui-api-parity:shared",
+        question:
+          "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
+        selected_final_answer: "I could not complete that turn.\nCause: invalid_arg:latex_is_prose.",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "invalid_arg:latex_is_prose",
+        codex_parity_agent_spine_rail_table: rail,
+        compound_subgoal_rail_statuses: badRails,
+      },
+    });
+
+    expect(violations).toEqual(
+      expect.arrayContaining([
+        "ui_compound_subgoal_1_satisfied_observation_ref_missing",
+        "ui_compound_subgoal_1_complete_observation_ref_missing",
+        "api_compound_subgoal_1_satisfied_observation_ref_missing",
+        "api_compound_subgoal_1_complete_observation_ref_missing",
+      ]),
+    );
+    expect(violations).not.toContain("ui_api_compound_subgoal_rails_mismatch");
   });
 
   it("flags UI/API compound subgoal order divergence", () => {
@@ -480,9 +624,9 @@ describe("Helix Ask UI debug parity harness", () => {
         active_turn_id: "ask:ui-api-parity:shared",
         active_prompt:
           "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
-        selected_final_answer: "I could not complete that turn.\nCause: compound_subgoal_invalid_args_after_repair.",
+        selected_final_answer: "I could not complete that turn.\nCause: invalid_arg:latex_is_prose.",
         terminal_artifact_kind: "typed_failure",
-        terminal_error_code: "compound_subgoal_invalid_args_after_repair",
+        terminal_error_code: "invalid_arg:latex_is_prose",
         codex_parity_agent_spine_rail_table: rail,
         compound_subgoal_rail_statuses: uiRails,
       },
@@ -490,15 +634,126 @@ describe("Helix Ask UI debug parity harness", () => {
         turn_id: "ask:ui-api-parity:shared",
         question:
           "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
-        selected_final_answer: "I could not complete that turn.\nCause: compound_subgoal_invalid_args_after_repair.",
+        selected_final_answer: "I could not complete that turn.\nCause: invalid_arg:latex_is_prose.",
         terminal_artifact_kind: "typed_failure",
-        terminal_error_code: "compound_subgoal_invalid_args_after_repair",
+        terminal_error_code: "invalid_arg:latex_is_prose",
         codex_parity_agent_spine_rail_table: rail,
         compound_subgoal_rail_statuses: apiRails,
       },
     });
 
     expect(violations).toContain("ui_api_compound_subgoal_rails_mismatch");
+  });
+
+  it("flags UI/API compound subgoal binding divergence", () => {
+    const rail = compoundFailureRail();
+    const uiRails = compoundSubgoalRails();
+    const apiRails = compoundSubgoalRails().map((entry) =>
+      entry.subgoal_id === "subgoal:2"
+        ? {
+            ...entry,
+            input_bindings: [],
+            unresolved_input_bindings: [],
+          }
+        : entry,
+    );
+
+    const violations = collectUiApiTerminalParityViolations({
+      uiDebugExport: {
+        active_turn_id: "ask:ui-api-parity:shared",
+        active_prompt:
+          "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
+        selected_final_answer: "I could not complete that turn.\nCause: invalid_arg:latex_is_prose.",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "invalid_arg:latex_is_prose",
+        codex_parity_agent_spine_rail_table: rail,
+        compound_subgoal_rail_statuses: uiRails,
+      },
+      apiResponse: {
+        turn_id: "ask:ui-api-parity:shared",
+        question:
+          "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
+        selected_final_answer: "I could not complete that turn.\nCause: invalid_arg:latex_is_prose.",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "invalid_arg:latex_is_prose",
+        codex_parity_agent_spine_rail_table: rail,
+        compound_subgoal_rail_statuses: apiRails,
+      },
+    });
+
+    expect(violations).toContain("ui_api_compound_subgoal_rails_mismatch");
+  });
+
+  it("flags UI/API compound subgoal argument metadata divergence", () => {
+    const rail = compoundFailureRail();
+    const uiRails = compoundSubgoalRails();
+    const apiRails = compoundSubgoalRails().map((entry) =>
+      entry.subgoal_id === "subgoal:2"
+        ? {
+            ...entry,
+            args_source: "ui_projection",
+            planned_args: { latex: "2+2" },
+            required_args: [],
+          }
+        : entry,
+    );
+
+    const violations = collectUiApiTerminalParityViolations({
+      uiDebugExport: {
+        active_turn_id: "ask:ui-api-parity:shared",
+        active_prompt:
+          "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
+        selected_final_answer: "I could not complete that turn.\nCause: invalid_arg:latex_is_prose.",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "invalid_arg:latex_is_prose",
+        codex_parity_agent_spine_rail_table: rail,
+        compound_subgoal_rail_statuses: uiRails,
+      },
+      apiResponse: {
+        turn_id: "ask:ui-api-parity:shared",
+        question:
+          "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
+        selected_final_answer: "I could not complete that turn.\nCause: invalid_arg:latex_is_prose.",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "invalid_arg:latex_is_prose",
+        codex_parity_agent_spine_rail_table: rail,
+        compound_subgoal_rail_statuses: apiRails,
+      },
+    });
+
+    expect(violations).toContain("ui_api_compound_subgoal_rails_mismatch");
+  });
+
+  it("flags missing compound subgoal rail mirrors when top-level rails declare a compound turn", () => {
+    const rail = compoundFailureRail();
+
+    const violations = collectUiApiTerminalParityViolations({
+      uiDebugExport: {
+        active_turn_id: "ask:ui-api-parity:shared",
+        active_prompt:
+          "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
+        selected_final_answer: "I could not complete that turn.\nCause: invalid_arg:latex_is_prose.",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "invalid_arg:latex_is_prose",
+        codex_parity_agent_spine_rail_table: rail,
+      },
+      apiResponse: {
+        turn_id: "ask:ui-api-parity:shared",
+        question:
+          "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
+        selected_final_answer: "I could not complete that turn.\nCause: invalid_arg:latex_is_prose.",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "invalid_arg:latex_is_prose",
+        codex_parity_agent_spine_rail_table: rail,
+      },
+    });
+
+    expect(violations).toEqual(
+      expect.arrayContaining([
+        "ui_compound_subgoal_rails_missing:0<2",
+        "api_compound_subgoal_rails_missing:0<2",
+      ]),
+    );
   });
 
   it("does not require exact answer text for separate turns with matching terminal semantics", () => {

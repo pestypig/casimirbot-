@@ -5,7 +5,10 @@ import {
   HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
 } from "@shared/helix-scholarly-research-observation";
 import type { HelixToolCallAdmissionFamily } from "@shared/helix-tool-call-admission";
-import { isAskCapabilityCatalogPrompt } from "./capability-catalog-intent";
+import {
+  askCapabilityCatalogPromptMatchIndex,
+  isAskCapabilityCatalogPrompt,
+} from "./capability-catalog-intent";
 import {
   contextualToolSuppressionBlocksFamily,
   detectContextualToolAdmissionSuppression,
@@ -211,6 +214,10 @@ const optionalArgsForCapability = (capability: string): string[] => {
       return ["source_ref", "source_refs", "source_id", "source_ids", "expected_cadence_ms", "mailbox_thread_id"];
     case "live_env.summarize_live_source_current_state":
       return ["source_ref", "source_refs", "source_id", "source_ids", "goal_id", "mail_limit", "limit", "query"];
+    case "live_env.record_live_source_mail_decision":
+      return ["evidence_refs", "mail_ids", "processed_packet_ids", "wake_request_id", "mailbox_thread_id", "route_metadata"];
+    case "live_env.request_interim_voice_callout":
+      return ["text", "message", "callout_text", "evidence_refs", "wake_request_id", "mailbox_thread_id", "route_metadata", "kind", "max_chars"];
     case "helix_ask.reflect_theory_context":
       return ["source_ref", "source_refs", "refs", "question", "topic"];
     case "helix.theory.frontierVectorFieldTrace":
@@ -1180,6 +1187,7 @@ export const extractExplicitCapabilityContracts = (
   if (!prompt) return [];
   const matches: ExtractedExplicitCapabilityContract[] = [];
   const capabilityCatalogContract = explicitCapabilityContractForCapability("helix_ask.inspect_capability_catalog");
+  const capabilityCatalogMatchIndex = askCapabilityCatalogPromptMatchIndex(prompt);
   if (
     capabilityCatalogContract &&
     isAskCapabilityCatalogPrompt(prompt) &&
@@ -1189,8 +1197,8 @@ export const extractExplicitCapabilityContracts = (
       contract: capabilityCatalogContract,
       capability: capabilityCatalogContract.capability,
       matched_name: "capability_catalog_prompt",
-      match_index: 0,
-      match_end_index: 0,
+      match_index: capabilityCatalogMatchIndex ?? 0,
+      match_end_index: capabilityCatalogMatchIndex ?? 0,
       source: "capability_catalog_prompt",
     });
   }

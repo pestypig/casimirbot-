@@ -628,6 +628,8 @@ const addRailTableFailures = (input: {
       const subgoalFirstBrokenRail = readString(subgoalRail.first_broken_rail);
       const subgoalRailFailureCode = readString(subgoalRail.rail_failure_code);
       const subgoalRepairTarget = readString(subgoalRail.repair_target);
+      const subgoalObservationRef = readString(subgoalRail.observation_ref);
+      const subgoalSatisfaction = readString(subgoalRail.satisfaction);
       if (!readString(subgoalRail.subgoal_id)) failures.push(`${prefix}_subgoal_id_missing`);
       if (readNonNegativeInteger(subgoalRail.order) === null) failures.push(`${prefix}_order_invalid`);
       if (!readString(subgoalRail.requested_capability)) failures.push(`${prefix}_requested_capability_missing`);
@@ -645,12 +647,17 @@ const addRailTableFailures = (input: {
       if (!Object.prototype.hasOwnProperty.call(subgoalRail, "observation_ref")) {
         failures.push(`${prefix}_observation_ref_field_missing`);
       }
-      if (!readString(subgoalRail.satisfaction)) failures.push(`${prefix}_satisfaction_missing`);
+      if (!subgoalSatisfaction) failures.push(`${prefix}_satisfaction_missing`);
       if (!subgoalRailStatus) failures.push(`${prefix}_rail_status_missing`);
       if (subgoalRailStatus && !CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES.includes(subgoalRailStatus as never)) {
         failures.push(`${prefix}_rail_status_invalid:${subgoalRailStatus}`);
       }
+      if (subgoalSatisfaction === "satisfied" && !subgoalObservationRef) {
+        failures.push(`${prefix}_satisfied_observation_ref_missing`);
+      }
       if (subgoalRailStatus === "complete") {
+        if (subgoalSatisfaction !== "satisfied") failures.push(`${prefix}_complete_satisfaction_not_satisfied`);
+        if (!subgoalObservationRef) failures.push(`${prefix}_complete_observation_ref_missing`);
         if (subgoalFirstBrokenRail) failures.push(`${prefix}_complete_first_broken_rail_present`);
         if (subgoalRailFailureCode) failures.push(`${prefix}_complete_rail_failure_code_present`);
         if (subgoalRepairTarget) failures.push(`${prefix}_complete_repair_target_present`);

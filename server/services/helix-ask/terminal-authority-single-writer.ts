@@ -29,6 +29,7 @@ import { hashHelixTerminalText } from "./turn-terminal-authority";
 import { evaluateCalculatorToolAnswerSupport, routeMetadataIndicatesCalculator } from "./calculator-tool-answer-support";
 import { synthesizeWorkstationToolAnswer } from "./workstation-answer-synthesizer";
 import { isWorkstationObservationTerminalKind } from "./tool-family-terminal-policy";
+import { applyCompoundTerminalPolicy, readCompoundTerminalPolicy } from "./compound-terminal-policy";
 
 type ArtifactLike = {
   artifact_id?: unknown;
@@ -54,35 +55,38 @@ const readString = (value: unknown): string | null =>
 
 const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
 
+const artifactLedgerPayloadByKind = (
+  artifacts: unknown,
+  kind: string,
+): Record<string, unknown> | null => {
+  const artifact = readArray(artifacts)
+    .map(readRecord)
+    .find((entry) => readString(entry?.kind) === kind);
+  return readRecord(artifact?.payload);
+};
+
+const payloadArtifactPayloadByKind = (
+  payload: Record<string, unknown>,
+  kind: string,
+): Record<string, unknown> | null =>
+  artifactLedgerPayloadByKind(payload.current_turn_artifact_ledger, kind);
+
 const compoundTerminalSynthesisPolicyActive = (payload: Record<string, unknown>): boolean => {
-  const itinerary = readRecord(payload.capability_itinerary);
-  const contract =
-    readRecord(payload.compound_capability_contract) ??
-    readRecord(itinerary?.compound_capability_contract);
-  const synthesisReadiness = readRecord(payload.compound_capability_synthesis_readiness);
-  const executionState =
-    readRecord(payload.capability_itinerary_execution_state) ??
-    readRecord(itinerary?.execution_state);
-  const terminalCriteria = readRecord(itinerary?.terminal_success_criteria);
-  const subgoalCount = readArray(contract?.subgoals).length;
-  const ledgerCount = readArray(executionState?.compound_subgoal_ledger).length;
-  return (
-    subgoalCount > 1 ||
-    ledgerCount > 1 ||
-    readString(contract?.terminal_policy) === "synthesize_from_satisfied_subgoal_observations" ||
-    terminalCriteria?.compound_terminal_policy === "synthesize_from_satisfied_subgoal_observations" ||
-    synthesisReadiness?.applies === true
-  );
+  return readCompoundTerminalPolicy(payload).active;
 };
 
 const multiSubgoalCompoundTerminalSynthesisActive = (payload: Record<string, unknown>): boolean => {
-  const itinerary = readRecord(payload.capability_itinerary);
+  const itinerary =
+    readRecord(payload.capability_itinerary) ??
+    payloadArtifactPayloadByKind(payload, "capability_itinerary");
   const contract =
     readRecord(payload.compound_capability_contract) ??
-    readRecord(itinerary?.compound_capability_contract);
+    readRecord(itinerary?.compound_capability_contract) ??
+    payloadArtifactPayloadByKind(payload, "compound_capability_contract");
   const executionState =
     readRecord(payload.capability_itinerary_execution_state) ??
-    readRecord(itinerary?.execution_state);
+    readRecord(itinerary?.execution_state) ??
+    payloadArtifactPayloadByKind(payload, "capability_itinerary_execution_state");
   const terminalCriteria = readRecord(itinerary?.terminal_success_criteria);
   const subgoalCount = readArray(contract?.subgoals).length;
   const ledgerCount = readArray(executionState?.compound_subgoal_ledger).length;
@@ -137,6 +141,151 @@ const readTerminalBlockingToolRailFailure = (
     selectedCapability: readString(triage?.selected_capability) ?? readString(audit?.selected_capability) ?? null,
     executedCapability: readString(triage?.executed_capability) ?? readString(audit?.executed_capability) ?? null,
   };
+};
+
+type FirstIncompleteCompoundSubgoalRailFailure = {
+  subgoalId: string | null;
+  requestedCapability: string | null;
+  selectedCapability: string | null;
+  executedCapability: string | null;
+  railFailureCode: string;
+  firstBrokenRail: string | null;
+  repairTarget: string | null;
+};
+
+const compoundSubgoalRailHasSatisfiedObservation = (entry: Record<string, unknown>): boolean => {
+  const railStatus = readString(entry.rail_status);
+  return (
+    readString(entry.satisfaction) === "satisfied" &&
+    Boolean(readString(entry.observation_ref)) &&
+    (!railStatus || railStatus === "complete")
+  );
+};
+
+const readCompoundSubgoalRailStatuses = (payload: Record<string, unknown>): Record<string, unknown>[] => {
+  const debug = readRecord(payload.debug);
+  const artifactQueryIndex = readRecord(payload.artifact_query_index);
+  const debugArtifactQueryIndex = readRecord(debug?.artifact_query_index);
+  const itinerary =
+    readRecord(payload.capability_itinerary) ??
+    payloadArtifactPayloadByKind(payload, "capability_itinerary");
+  const executionState =
+    readRecord(payload.capability_itinerary_execution_state) ??
+    readRecord(itinerary?.execution_state) ??
+    payloadArtifactPayloadByKind(payload, "capability_itinerary_execution_state");
+  const candidates = [
+    payload.compound_subgoal_rail_statuses,
+    debug?.compound_subgoal_rail_statuses,
+    artifactQueryIndex?.compound_subgoal_rail_statuses,
+    debugArtifactQueryIndex?.compound_subgoal_rail_statuses,
+    executionState?.compound_subgoal_ledger,
+  ];
+  for (const candidate of candidates) {
+    const entries = readArray(candidate)
+      .map(readRecord)
+      .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+    if (entries.length > 0) return entries;
+  }
+  return [];
+};
+
+const defaultCompoundSubgoalRailFailureCode = (entry: Record<string, unknown>): string =>
+  readString(entry.rail_failure_code) ??
+  (readString(entry.executed_capability) ? "subgoal_observation_missing" : "compound_subgoal_dropped");
+
+const defaultCompoundSubgoalFirstBrokenRail = (
+  railFailureCode: string,
+  entry: Record<string, unknown>,
+): string | null => {
+  const existing = readString(entry.first_broken_rail);
+  if (existing) return existing;
+  if (railFailureCode.startsWith("missing_required_arg:") || railFailureCode.startsWith("invalid_arg:")) {
+    return "capability_execution";
+  }
+  if (railFailureCode === "subgoal_observation_missing") return "observation_artifact";
+  if (railFailureCode === "compound_subgoal_dropped") return "capability_execution";
+  return null;
+};
+
+const defaultCompoundSubgoalRepairTarget = (
+  railFailureCode: string,
+  entry: Record<string, unknown>,
+): string | null => {
+  const existing = readString(entry.repair_target);
+  if (existing) return existing;
+  if (railFailureCode.startsWith("missing_required_arg:") || railFailureCode.startsWith("invalid_arg:")) {
+    return "subgoal_argument_extraction";
+  }
+  if (railFailureCode === "subgoal_observation_missing") return "observation_materializer";
+  if (railFailureCode === "compound_subgoal_dropped") return "agent_step_selection";
+  return null;
+};
+
+const readFirstIncompleteCompoundSubgoalRailFailure = (
+  payload: Record<string, unknown>,
+): FirstIncompleteCompoundSubgoalRailFailure | null => {
+  const firstIncomplete = readCompoundSubgoalRailStatuses(payload).find((entry) =>
+    !compoundSubgoalRailHasSatisfiedObservation(entry)
+  );
+  if (!firstIncomplete) return null;
+  const railFailureCode = defaultCompoundSubgoalRailFailureCode(firstIncomplete);
+  return {
+    subgoalId: readString(firstIncomplete.subgoal_id),
+    requestedCapability: readString(firstIncomplete.requested_capability) ?? readString(firstIncomplete.runtime_capability),
+    selectedCapability: readString(firstIncomplete.selected_capability),
+    executedCapability: readString(firstIncomplete.executed_capability),
+    railFailureCode,
+    firstBrokenRail: defaultCompoundSubgoalFirstBrokenRail(railFailureCode, firstIncomplete),
+    repairTarget: defaultCompoundSubgoalRepairTarget(railFailureCode, firstIncomplete),
+  };
+};
+
+const compoundSubgoalRailFailureTerminalText = (
+  failure: FirstIncompleteCompoundSubgoalRailFailure,
+): string => {
+  const capability = failure.requestedCapability ?? failure.selectedCapability ?? failure.subgoalId ?? "a required subgoal";
+  const missingArg = failure.railFailureCode.startsWith("missing_required_arg:")
+    ? failure.railFailureCode.slice("missing_required_arg:".length)
+    : null;
+  const invalidArg = failure.railFailureCode.startsWith("invalid_arg:")
+    ? failure.railFailureCode.slice("invalid_arg:".length)
+    : null;
+  if (missingArg) {
+    return `I could not complete this compound turn because ${capability} is missing required argument ${missingArg}.`;
+  }
+  if (invalidArg) {
+    return `I could not complete this compound turn because ${capability} has invalid argument ${invalidArg}.`;
+  }
+  if (failure.railFailureCode === "compound_subgoal_dropped") {
+    return `I could not complete this compound turn because ${capability} was dropped before execution.`;
+  }
+  if (failure.railFailureCode === "subgoal_observation_missing") {
+    return `I could not complete this compound turn because ${capability} did not produce a required observation.`;
+  }
+  return `I could not complete this compound turn because ${capability} did not satisfy its required rail. Cause: ${failure.railFailureCode}.`;
+};
+
+const writeCompoundSubgoalRailFailureDetails = (
+  target: Record<string, unknown>,
+  failure: FirstIncompleteCompoundSubgoalRailFailure | null,
+): void => {
+  if (!failure) return;
+  target.compound_subgoal_terminal_failure = {
+    schema: "helix.compound_subgoal_terminal_failure.v1",
+    subgoal_id: failure.subgoalId,
+    requested_capability: failure.requestedCapability,
+    selected_capability: failure.selectedCapability,
+    executed_capability: failure.executedCapability,
+    rail_failure_code: failure.railFailureCode,
+    first_broken_rail: failure.firstBrokenRail,
+    repair_target: failure.repairTarget,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  target.compound_rail_failure_code = failure.railFailureCode;
+  target.compound_first_broken_rail = failure.firstBrokenRail;
+  target.compound_repair_target = failure.repairTarget;
+  target.first_incomplete_compound_subgoal_id = failure.subgoalId;
 };
 
 const toolRailFailureTerminalText = (
@@ -321,6 +470,9 @@ export function syncHelixTypedFailureAuthorityPublicMirrors(
   if (!typedFailureAuthorityApplies(authority)) return false;
   const compoundCoverageGate = readRecord(payload.compound_prompt_coverage_gate);
   const compoundCoverageFailedClosed = readString(compoundCoverageGate?.decision) === "FAIL_CLOSED";
+  const compoundSubgoalRailFailure = compoundCoverageFailedClosed
+    ? readFirstIncompleteCompoundSubgoalRailFailure(payload)
+    : null;
   const typedFailure = readRecord(payload.typed_failure);
   const localizedFailureText = buildHelixLocalizedTypedFailureTextForPayload(payload);
   const candidateFailureText =
@@ -331,20 +483,27 @@ export function syncHelixTypedFailureAuthorityPublicMirrors(
     readString(payload.selected_final_answer) ??
     localizedFailureText;
   const liveSourceFailureRepair = liveSourceModelSynthesisMissingFailure(payload, candidateFailureText);
-  const failureText = liveSourceFailureRepair?.text ?? (localizedFailureText !== "I could not produce a terminal answer for this turn."
-    ? localizedFailureText
-    : isHelixGenericTypedFailureText(candidateFailureText)
-    ? localizedFailureText
-    : candidateFailureText);
+  const compoundSubgoalRailFailureText = compoundSubgoalRailFailure
+    ? compoundSubgoalRailFailureTerminalText(compoundSubgoalRailFailure)
+    : null;
+  const failureText = liveSourceFailureRepair?.text ??
+    compoundSubgoalRailFailureText ??
+    (localizedFailureText !== "I could not produce a terminal answer for this turn."
+      ? localizedFailureText
+      : isHelixGenericTypedFailureText(candidateFailureText)
+      ? localizedFailureText
+      : candidateFailureText);
   const existingErrorCode = readString(typedFailure?.error_code) ?? readString(payload.terminal_error_code);
-  const errorCode =
-    liveSourceFailureRepair?.code ?? (
-      compoundCoverageFailedClosed && (!existingErrorCode || existingErrorCode === "terminal_consistency_violation")
+  const fallbackErrorCode =
+    compoundCoverageFailedClosed && (!existingErrorCode || existingErrorCode === "terminal_consistency_violation")
       ? "compound_prompt_coverage_incomplete"
       : existingErrorCode === "terminal_consistency_violation"
         ? "typed_failure"
-      : existingErrorCode ?? "typed_failure"
-    );
+        : existingErrorCode ?? "typed_failure";
+  const errorCode =
+    liveSourceFailureRepair?.code ??
+    compoundSubgoalRailFailure?.railFailureCode ??
+    fallbackErrorCode;
 
   payload.ok = false;
   payload.response_type = "final_failure";
@@ -362,12 +521,18 @@ export function syncHelixTypedFailureAuthorityPublicMirrors(
     ...(typedFailure ?? {}),
     schema: "helix.typed_failure.v1",
     error_code: errorCode,
-    message: liveSourceFailureRepair ? failureText : readString(typedFailure?.message) ?? failureText,
+    message: liveSourceFailureRepair || compoundSubgoalRailFailure
+      ? failureText
+      : readString(typedFailure?.message) ?? failureText,
     text: failureText,
     answer_text: failureText,
     assistant_answer: false,
     raw_content_included: false,
   };
+  writeCompoundSubgoalRailFailureDetails(
+    readRecord(payload.typed_failure) ?? (payload.typed_failure as Record<string, unknown>),
+    compoundSubgoalRailFailure,
+  );
   payload.terminal_answer_authority = {
     ...(authority ?? {}),
     terminal_kind: "failure",
@@ -377,6 +542,7 @@ export function syncHelixTypedFailureAuthorityPublicMirrors(
     terminal_text_hash: hashHelixTerminalText(failureText),
     server_authoritative: authority?.server_authoritative !== false,
   };
+  writeCompoundSubgoalRailFailureDetails(payload, compoundSubgoalRailFailure);
 
   const resolvedTurnSummary = readRecord(payload.resolved_turn_summary);
   if (resolvedTurnSummary) {
@@ -991,13 +1157,25 @@ const isStagePlayPostObservationSynthesisText = (value: unknown): boolean =>
   );
 
 const routeContractAllowedTerminalKinds = (payload: Record<string, unknown>): string[] =>
-  readArray(
-    readRecord(payload.committed_ask_route)?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA
-      ? readRecord(readRecord(payload.committed_ask_route)?.canonical_goal)?.allowed_terminal_artifact_kinds
-      : readRecord(payload.route_product_contract)?.allowed_terminal_artifact_kinds,
-  )
-    .map(readString)
-    .filter((entry): entry is string => Boolean(entry));
+  applyCompoundTerminalPolicy(payload, {
+    allowed: readArray(
+      readRecord(payload.committed_ask_route)?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA
+        ? readRecord(readRecord(payload.committed_ask_route)?.canonical_goal)?.allowed_terminal_artifact_kinds
+        : readRecord(payload.route_product_contract)?.allowed_terminal_artifact_kinds,
+    )
+      .map(readString)
+      .filter((entry): entry is string => Boolean(entry)),
+    forbidden: readArray(
+      readRecord(payload.committed_ask_route)?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA
+        ? readRecord(readRecord(payload.committed_ask_route)?.canonical_goal)?.forbidden_terminal_artifact_kinds
+        : readRecord(payload.route_product_contract)?.forbidden_terminal_artifact_kinds,
+    )
+      .map(readString)
+      .filter((entry): entry is string => Boolean(entry)),
+    requiredTerminalKind:
+      readString(readRecord(readRecord(payload.committed_ask_route)?.canonical_goal)?.required_terminal_kind) ??
+      readString(readRecord(payload.route_product_contract)?.required_terminal_kind),
+  }).allowed;
 
 const routeProductContractAllowedTerminalKinds = (payload: Record<string, unknown>): string[] =>
   readArray(readRecord(payload.route_product_contract)?.allowed_terminal_artifact_kinds)
@@ -1005,9 +1183,15 @@ const routeProductContractAllowedTerminalKinds = (payload: Record<string, unknow
     .filter((entry): entry is string => Boolean(entry));
 
 const committedRouteForbiddenTerminalKinds = (payload: Record<string, unknown>): string[] =>
-  readArray(readRecord(readRecord(payload.committed_ask_route)?.canonical_goal)?.forbidden_terminal_artifact_kinds)
-    .map(readString)
-    .filter((entry): entry is string => Boolean(entry));
+  applyCompoundTerminalPolicy(payload, {
+    allowed: readArray(readRecord(readRecord(payload.committed_ask_route)?.canonical_goal)?.allowed_terminal_artifact_kinds)
+      .map(readString)
+      .filter((entry): entry is string => Boolean(entry)),
+    forbidden: readArray(readRecord(readRecord(payload.committed_ask_route)?.canonical_goal)?.forbidden_terminal_artifact_kinds)
+      .map(readString)
+      .filter((entry): entry is string => Boolean(entry)),
+    requiredTerminalKind: readString(readRecord(readRecord(payload.committed_ask_route)?.canonical_goal)?.required_terminal_kind),
+  }).forbidden;
 
 const existingDocEvidenceSynthesisTerminal = (
   payload: Record<string, unknown>,
@@ -1048,6 +1232,17 @@ const routeContractAllowsTerminalKind = (
   payload: Record<string, unknown>,
   kind: string,
 ): boolean => {
+  const compoundPolicy = applyCompoundTerminalPolicy(payload, {
+    allowed: routeContractAllowedTerminalKinds(payload),
+    forbidden: committedRouteForbiddenTerminalKinds(payload),
+    requiredTerminalKind: readString(readRecord(payload.canonical_goal_frame)?.required_terminal_kind),
+  });
+  if (compoundPolicy.policy.active) {
+    if (compoundPolicy.forbidden.includes(kind)) return false;
+    return compoundPolicy.allowed.length === 0 ||
+      compoundPolicy.allowed.includes(kind) ||
+      (kind === "doc_evidence_synthesis_answer" && compoundPolicy.allowed.includes("doc_evidence_synthesis"));
+  }
   const committedRoute = readRecord(payload.committed_ask_route);
   if (committedRoute?.schema === HELIX_COMMITTED_ASK_ROUTE_SCHEMA) {
     return committedRouteAllowsTerminalKind({
@@ -1614,7 +1809,12 @@ const resolveCompoundSubgoalDraftSupportCoverage = (input: {
   artifactLedger?: ArtifactLike[] | null;
   finalAnswerDraftRef?: string | null;
 }): CompoundSubgoalDraftSupportCoverage => {
-  const executionState = readRecord(input.payload.capability_itinerary_execution_state);
+  const artifactLedger = input.artifactLedger ?? readArray(input.payload.current_turn_artifact_ledger)
+    .map(readRecord)
+    .filter((entry): entry is ArtifactLike => Boolean(entry));
+  const executionState =
+    readRecord(input.payload.capability_itinerary_execution_state) ??
+    artifactLedgerPayloadByKind(artifactLedger, "capability_itinerary_execution_state");
   const ledger = readArray(executionState?.compound_subgoal_ledger)
     .map(readRecord)
     .filter((entry): entry is Record<string, unknown> => Boolean(entry));
@@ -1629,9 +1829,6 @@ const resolveCompoundSubgoalDraftSupportCoverage = (input: {
     ledger.length > 1 &&
     requiredObservationRefs.length > 0;
   const draftSupportRefs = collectExplicitFinalAnswerDraftSupportRefs(input.draft);
-  const artifactLedger = input.artifactLedger ?? readArray(input.payload.current_turn_artifact_ledger)
-    .map(readRecord)
-    .filter((entry): entry is ArtifactLike => Boolean(entry));
   const missingObservationRefs = applies
     ? requiredObservationRefs.filter((observationRef) => {
         const equivalentRefs = collectObservationEquivalentSupportRefs(artifactLedger, observationRef);
@@ -2487,6 +2684,9 @@ export function applyHelixTerminalAuthoritySingleWriter(
         finalAnswerDraftRef: compoundPreferredDraftCandidate?.ref ?? undefined,
       });
   const missingItineraryFamilies = attachItineraryExecutionState(input.payload, artifacts);
+  const firstIncompleteCompoundSubgoalRailFailure = compoundCoverageFailedClosed
+    ? readFirstIncompleteCompoundSubgoalRailFailure(input.payload)
+    : null;
   const itineraryObservationCriteriaSatisfied = missingItineraryFamilies.length === 0;
   const acceptedObservationArtifacts = artifacts.filter(isAcceptedObservationPacket);
   const hasAcceptedObservation = acceptedObservationArtifacts.length > 0;
@@ -3252,10 +3452,13 @@ export function applyHelixTerminalAuthoritySingleWriter(
       .map((entry) => readString(entry.requirement_id))
       .filter((entry): entry is string => Boolean(entry));
     const missingRequirements = unresolved.length > 0 ? unresolved : failedClosed;
-    const terminalErrorCode = "compound_prompt_coverage_incomplete";
-    const terminalErrorText = missingRequirements.length > 0
-      ? `I could not complete this compound turn because required prompt items failed closed or remain unresolved: ${missingRequirements.join(", ")}.`
-      : "I could not complete this compound turn because required prompt coverage failed closed.";
+    const terminalErrorCode =
+      firstIncompleteCompoundSubgoalRailFailure?.railFailureCode ?? "compound_prompt_coverage_incomplete";
+    const terminalErrorText = firstIncompleteCompoundSubgoalRailFailure
+      ? compoundSubgoalRailFailureTerminalText(firstIncompleteCompoundSubgoalRailFailure)
+      : missingRequirements.length > 0
+        ? `I could not complete this compound turn because required prompt items failed closed or remain unresolved: ${missingRequirements.join(", ")}.`
+        : "I could not complete this compound turn because required prompt coverage failed closed.";
     const latestDraft = findLatestFinalAnswerDraftCandidate(artifacts);
     if (latestDraft) {
       rejectedCandidates.push({
@@ -3288,6 +3491,10 @@ export function applyHelixTerminalAuthoritySingleWriter(
       assistant_answer: false,
       raw_content_included: false,
     };
+    writeCompoundSubgoalRailFailureDetails(
+      readRecord(input.payload.typed_failure) ?? (input.payload.typed_failure as Record<string, unknown>),
+      firstIncompleteCompoundSubgoalRailFailure,
+    );
     input.payload.terminal_presentation = {
       ...(readRecord(input.payload.terminal_presentation) ?? {}),
       schema: "helix.terminal_presentation.v1",
@@ -3297,6 +3504,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       assistant_answer: false,
       raw_content_included: false,
     };
+    writeCompoundSubgoalRailFailureDetails(input.payload, firstIncompleteCompoundSubgoalRailFailure);
     selectedArtifactKind = "typed_failure";
     selectedSource = "typed_failure";
   } else if (!solverContinuationPending && selectedWorkstationToolEvaluation) {
