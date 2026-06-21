@@ -3,6 +3,7 @@ import {
   inferCommittedRouteToolFamily,
   readCommittedAskRoute,
 } from "./committed-ask-route";
+import { explicitCapabilityMatches } from "./explicit-capability-contract";
 
 export type HelixRuntimeAuthoritySeverity = "pass" | "p0" | "p1" | "p2";
 
@@ -51,6 +52,8 @@ const SOURCE_CAPABILITY_GOAL_KINDS = new Set([
   "active_doc_summary",
   "calculator_live_source",
   "calculator_solve",
+  "capability_help",
+  "context_attachment_reflection",
   "debug_diagnosis",
   "doc_evidence_location",
   "doc_evidence_synthesis",
@@ -58,6 +61,7 @@ const SOURCE_CAPABILITY_GOAL_KINDS = new Set([
   "doc_open_best",
   "doc_summary",
   "docs_panel_open",
+  "doc_equation_context",
   "latest_doc_navigation",
   "live_interval_set",
   "live_environment_review",
@@ -69,9 +73,16 @@ const SOURCE_CAPABILITY_GOAL_KINDS = new Set([
   "repo_code_evidence_question",
   "repo_entity_definition",
   "scholarly_research_lookup",
+  "scholarly_full_text_lookup",
   "internet_search_lookup",
   "situation_context_question",
+  "theory_context_reflection",
+  "theory_frontier_vector_field",
+  "theory_ideology_bridge_reflection",
   "visual_capture_describe",
+  "workspace_directory_resolution",
+  "workspace_status_diagnostic",
+  "civilization_bounds_reflection",
   "zen_graph_reflection",
 ]);
 
@@ -186,14 +197,28 @@ const artifactKindMatchesCapability = (
   if (capability === "repo-code.search_concept") return /repo_code_evidence_observation|helix\.repo_code_evidence_observation\.v1|repo_search/i.test(joined);
   if (capability === "scholarly-research.lookup_papers") return /scholarly_research_observation|helix\.scholarly_research_observation\.v1|scholarly_research/i.test(joined);
   if (capability === "scholarly-research.fetch_full_text") return /scholarly_full_text_observation|helix\.scholarly_full_text_observation\.v1|scholarly_research/i.test(joined);
-  if (capability === "internet-search.search_web") return /internet_search_observation|helix\.internet_search_observation\.v1|internet_search/i.test(joined);
+  if (capability === "internet_search.web_research" || capability === "internet-search.search_web") {
+    return /internet_search_observation|web_research_observation|helix\.internet_search_observation\.v1|internet_search|web_research/i.test(joined);
+  }
   if (capability === "helix_ask.inspect_capability_catalog") return /capability_registry|capability_help_summary|helix\.capability_catalog_observation\.v1|inspect_capability_catalog/i.test(joined);
+  if (capability === "helix_ask.reflect_workstation_tool_alignment") {
+    return /capability_registry|capability_help_summary|workstation_tool_alignment|toolchain_matrix|tool_regression_matrix|helix\.capability_catalog_observation\.v1/i.test(joined);
+  }
+  if (capability === "workspace_os.status") {
+    return /workspace_os_status_observation|workspace_status|workspace[-_]os[-_.:]status|workstation_tool_evaluation/i.test(joined);
+  }
   if (capability === "workspace-directory.resolve") return /workspace_directory_resolution|helix\.workspace_directory_resolution\.v1/i.test(joined);
   if (capability === "helix_ask.reflect_theory_context") {
     return /helix_theory_context_reflection_tool_receipt|theory_context_reflection|reflect_theory_context/i.test(joined);
   }
   if (capability === "helix.theory.frontierVectorFieldTrace") {
     return /helix_theory_frontier_vector_field_tool_receipt|theory_frontier_vector_field|frontierVectorFieldTrace|relation_tensor_trace/i.test(joined);
+  }
+  if (capability === "helix_ask.reflect_live_synthetic_data") {
+    return /helix_context_reflection_tool_receipt|bounded_context_reference|live_synthetic_data/i.test(joined);
+  }
+  if (capability === "helix_ask.reflect_context_attachments") {
+    return /helix_context_reflection_tool_receipt|context_attachment|bounded_context_reference/i.test(joined);
   }
   if (capability === "helix_ask.reflect_ideology_context") {
     return /helix_zen_graph_reflection_tool_result|ideology_context_reflection|procedural_zen_classification|zen_badge_locator|fruition_procedure_expression|reflect_ideology_context|workstation_tool_evaluation/i.test(joined);
@@ -213,6 +238,24 @@ const artifactKindMatchesCapability = (
   if (capability === "live_env.reflect_live_source_mail_loop") {
     return /stage_play_live_source_mail_loop_reflection|reflect_live_source_mail_loop/i.test(joined);
   }
+  if (capability === "live_env.check_live_source_mail" || capability === "live_env.read_live_source_mail") {
+    return /stage_play_live_source_mail_read_result|live_env\.(?:check_live_source_mail|read_live_source_mail)/i.test(joined);
+  }
+  if (capability === "live_env.read_processed_live_source_mail") {
+    return /stage_play_processed_mail_packet|read_processed_live_source_mail/i.test(joined);
+  }
+  if (capability === "live_env.process_live_source_mail") {
+    return /stage_play_live_source_mail_read_result|stage_play_processed_mail_packet|process_live_source_mail/i.test(joined);
+  }
+  if (capability === "live_env.query_live_source_quality") {
+    return /stage_play_live_source_quality|query_live_source_quality|helix\.workstation_goal_context_update\.v1/i.test(joined);
+  }
+  if (capability === "live_env.query_workstation_goal_context") {
+    return /stage_play_workstation_goal_context_read_result|query_workstation_goal_context|helix\.agent_goal_session\.v1|helix\.workstation_goal_context_update\.v1/i.test(joined);
+  }
+  if (capability === "live_env.summarize_live_source_current_state") {
+    return /stage_play_live_source_current_state|summarize_live_source_current_state|helix\.workstation_goal_context_update\.v1/i.test(joined);
+  }
   if (capability === "docs-viewer.open") return /workspace_action_receipt|docs-viewer|docs_viewer|open/i.test(joined);
   if (capability === "docs-viewer.identify_current_doc") return /active_doc_identity|active_doc_path|doc_summary/i.test(joined);
   if (capability === "docs-viewer.search_docs") return /doc_search_results|doc_candidate_validation|retrieval_context/i.test(joined);
@@ -223,6 +266,9 @@ const artifactKindMatchesCapability = (
   if (capability === "docs-viewer.doc_equation_context") return /doc_equation_context|doc_equation_context\/v1/i.test(joined);
   if (capability === "conversation-memory.recall") return /conversation_memory_packet|helix\.conversation_memory_packet\.v1|context_resume_frame/i.test(joined);
   if (capability.startsWith("scientific-calculator.")) return /calculator_receipt|calculator_result|workstation_tool_evaluation|tool_evaluation/i.test(joined);
+  if (capability === "image_lens.inspect" || capability === "situation-room.describe_visual_capture") {
+    return /visual_frame_evidence|visual_capture_coverage|situation_context_pack|visual_capture|image_lens|situation[-_]room[-_.:]describe[-_]visual[-_]capture/i.test(joined);
+  }
   if (capability.startsWith("workstation-notes.")) return /note_update_receipt|workspace_action_receipt|note_/i.test(joined);
   if (capability.startsWith("live_env.")) return /live_environment_tool_observation|live_environment_agent_loop|interpreted_log|minecraft_navigation_state|source_capability|runtime_tool_observation|tool_observation/i.test(joined);
   if (capability === "situation-room-pipelines.observer.attach" || capability === "situation-room-pipelines.observer.detach") {
@@ -316,10 +362,25 @@ const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): 
     return "scholarly-research.lookup_papers";
   }
   if (/internet_search_observation|helix\.internet_search_observation\.v1|internet_search/i.test(joined)) {
-    return "internet-search.search_web";
+    return "internet_search.web_research";
+  }
+  if (/workspace_os_status_observation|workspace_status|workspace[-_]os[-_.:]status/i.test(joined)) {
+    return "workspace_os.status";
   }
   if (/workspace_directory_resolution|helix\.workspace_directory_resolution\.v1/i.test(joined)) {
     return "workspace-directory.resolve";
+  }
+  if (/workstation_tool_alignment|toolchain_matrix|tool_regression_matrix/i.test(joined)) {
+    return "helix_ask.reflect_workstation_tool_alignment";
+  }
+  if (/capability_registry|capability_help_summary|helix\.capability_catalog_observation\.v1/i.test(joined)) {
+    return "helix_ask.inspect_capability_catalog";
+  }
+  if (/context_attachment/i.test(joined)) {
+    return "helix_ask.reflect_context_attachments";
+  }
+  if (/helix_context_reflection_tool_receipt|bounded_context_reference|live_synthetic_data/i.test(joined)) {
+    return "helix_ask.reflect_live_synthetic_data";
   }
   if (/helix_zen_graph_reflection_tool_result|ideology_context_reflection|procedural_zen_classification|zen_badge_locator|fruition_procedure_expression|reflect_ideology_context/i.test(joined)) {
     return "helix_ask.reflect_ideology_context";
@@ -329,6 +390,24 @@ const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): 
   }
   if (/stage_play_live_source_mail_loop_reflection|reflect_live_source_mail_loop/i.test(joined)) {
     return "live_env.reflect_live_source_mail_loop";
+  }
+  if (/stage_play_processed_mail_packet|read_processed_live_source_mail/i.test(joined)) {
+    return "live_env.read_processed_live_source_mail";
+  }
+  if (/check_live_source_mail/i.test(joined)) {
+    return "live_env.check_live_source_mail";
+  }
+  if (/read_live_source_mail/i.test(joined)) {
+    return "live_env.read_live_source_mail";
+  }
+  if (/stage_play_live_source_quality|query_live_source_quality/i.test(joined)) {
+    return "live_env.query_live_source_quality";
+  }
+  if (/stage_play_workstation_goal_context_read_result|query_workstation_goal_context|helix\.agent_goal_session\.v1/i.test(joined)) {
+    return "live_env.query_workstation_goal_context";
+  }
+  if (/stage_play_live_source_current_state|summarize_live_source_current_state/i.test(joined)) {
+    return "live_env.summarize_live_source_current_state";
   }
   if (/stage_play_reflection_result|stage_play_badge_graph|stage_play_output_lane_projection|stage_play_job_plan|stage_play_checkpoint_request_result|stage_play_checkpoint_request|stage_play_checkpoint_queue|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation|reflect_stage_play_context|plan_stage_play_job|request_stage_play_checkpoint|describe_stage_builder|query_stage_sources|draft_stage_play_graph|validate_stage_play_graph/i.test(joined)) {
     return "helix_ask.reflect_stage_play_context";
@@ -349,11 +428,11 @@ const capabilityFamilyForArtifact = (artifact: Record<string, unknown> | null): 
   if (/doc_summary/i.test(joined)) return "docs-viewer.summarize_doc";
   if (/doc_equation_context|doc_equation_context\/v1/i.test(joined)) return "docs-viewer.doc_equation_context";
   if (/doc_location_result|doc_location_matches|doc_evidence_location|line_backed_locations/i.test(joined)) return "docs-viewer.locate_in_doc";
-  if (/doc_open_receipt|active_doc_path/i.test(joined)) return "docs-viewer.open_doc_by_path";
+  if (/doc_open_receipt|active_doc_path/i.test(joined)) return "docs-viewer.open";
   if (/doc_search_results|doc_candidate_validation/i.test(joined)) return "docs-viewer.search_docs";
   if (/note_update_receipt|note_/i.test(joined)) return "workstation-notes.append";
   if (/process_graph_overview/i.test(joined)) return "process-graph.inspect";
-  if (/live_pipeline_receipt|live_source|visual_context_pack|situation_context_pack|permission_denied/i.test(joined)) return "situation-room.describe_visual_capture";
+  if (/visual_context_pack|situation_context_pack|visual_capture|image_lens|permission_denied/i.test(joined)) return "situation-room.describe_visual_capture";
   if (/workspace_action_receipt/i.test(joined) && /docs-viewer|docs_viewer/i.test(joined)) return "docs-viewer.open";
   if (/workspace_action_receipt/i.test(joined) && /scientific-calculator/i.test(joined)) return "scientific-calculator.open";
   if (/workspace_action_receipt/i.test(joined) && /workstation-notes/i.test(joined)) return "workstation-notes.open";
@@ -380,6 +459,7 @@ const selectedRepoEvidenceCapabilityHasCurrentTurnObservation = (
     capability !== "repo-code.search_concept" &&
     capability !== "scholarly-research.lookup_papers" &&
     capability !== "scholarly-research.fetch_full_text" &&
+    capability !== "internet_search.web_research" &&
     capability !== "internet-search.search_web"
   ) return false;
   return artifacts.some((artifact) => {
@@ -500,6 +580,20 @@ const capabilityFromRecord = (record: Record<string, unknown> | null): string | 
   readString(record?.chosen_capability) ??
   readString(record?.executed_action_key);
 
+const capabilityKeyMatchesExpected = (
+  actualCapability: string | null | undefined,
+  expectedCapability: string | null | undefined,
+): boolean => {
+  const actual = readString(actualCapability);
+  const expected = readString(expectedCapability);
+  if (!actual || !expected) return false;
+  return (
+    actual === expected ||
+    explicitCapabilityMatches(expected, actual) ||
+    explicitCapabilityMatches(actual, expected)
+  );
+};
+
 const artifactCapability = (artifact: Record<string, unknown> | null): string | null => {
   const payload = readRecord(artifact?.payload);
   return capabilityFromRecord(payload) ?? capabilityFromRecord(artifact);
@@ -509,10 +603,10 @@ const selectedCapabilityMatches = (payload: Record<string, unknown>, capability:
   const topLevelDecision = readRecord(payload.agent_step_decision);
   const topLevelModelDecision = readRecord(topLevelDecision?.model_decision);
   if (
-    readString(payload.selected_capability) === capability ||
-    readString(topLevelDecision?.chosen_capability) === capability ||
-    readString(topLevelModelDecision?.chosen_capability) === capability ||
-    readString(readRecord(payload.runtime_tool_call)?.capability_key) === capability
+    capabilityKeyMatchesExpected(readString(payload.selected_capability), capability) ||
+    capabilityKeyMatchesExpected(readString(topLevelDecision?.chosen_capability), capability) ||
+    capabilityKeyMatchesExpected(readString(topLevelModelDecision?.chosen_capability), capability) ||
+    capabilityKeyMatchesExpected(readString(readRecord(payload.runtime_tool_call)?.capability_key), capability)
   ) {
     return true;
   }
@@ -522,23 +616,25 @@ const selectedCapabilityMatches = (payload: Record<string, unknown>, capability:
     return Boolean(
       record &&
         (
-          readString(record.chosen_capability) === capability ||
-          readString(record.executed_action_key) === capability ||
-          capabilityFromRecord(readRecord(record.runtime_tool_call)) === capability
+          capabilityKeyMatchesExpected(readString(record.chosen_capability), capability) ||
+          capabilityKeyMatchesExpected(readString(record.executed_action_key), capability) ||
+          capabilityKeyMatchesExpected(capabilityFromRecord(readRecord(record.runtime_tool_call)), capability)
         ),
     );
   });
 };
 
 export function hasRuntimeToolCallForSelectedCapability(payload: Record<string, unknown>, capability: string): boolean {
-  if (readString(readRecord(payload.runtime_tool_call)?.capability_key) === capability) return true;
+  if (capabilityKeyMatchesExpected(readString(readRecord(payload.runtime_tool_call)?.capability_key), capability)) {
+    return true;
+  }
   const loop = readRecord(payload.agent_runtime_loop);
   if (readArray(loop?.iterations).some((iteration) => {
     const record = readRecord(iteration);
     if (!record) return false;
     return (
-      capabilityFromRecord(readRecord(record.runtime_tool_call)) === capability ||
-      readString(record.executed_action_key) === capability
+      capabilityKeyMatchesExpected(capabilityFromRecord(readRecord(record.runtime_tool_call)), capability) ||
+      capabilityKeyMatchesExpected(readString(record.executed_action_key), capability)
     );
   })) {
     return true;
@@ -546,7 +642,10 @@ export function hasRuntimeToolCallForSelectedCapability(payload: Record<string, 
   return readArray(payload.current_turn_artifact_ledger).some((artifact) => {
     const record = readRecord(artifact);
     if (!record) return false;
-    return readString(record.kind) === "runtime_tool_call" && artifactCapability(record) === capability;
+    return (
+      readString(record.kind) === "runtime_tool_call" &&
+      capabilityKeyMatchesExpected(artifactCapability(record), capability)
+    );
   });
 }
 

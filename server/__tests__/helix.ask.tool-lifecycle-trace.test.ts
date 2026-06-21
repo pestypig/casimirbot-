@@ -1799,6 +1799,92 @@ describe("Helix Ask tool lifecycle trace", () => {
     });
   });
 
+  it("does not treat payload terminal kind alone as proven visible projection", () => {
+    const payload: Record<string, unknown> = {
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "workspace_status_diagnostic",
+        required_terminal_kind: "model_synthesized_answer",
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:payload-only-visible-projection",
+        capability_family: "workspace_diagnostic",
+        requested_action: "workspace_os.status",
+        selected_capability: "workspace_os.status",
+        admission_status: "admitted",
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            iteration: 1,
+            chosen_capability: "workspace_os.status",
+            executed_action_key: "workspace_os.status",
+            observed_artifact_refs: ["workspace_os_status_observation:payload-only"],
+          },
+        ],
+        executed_tool_call_count: 1,
+      },
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        draft_id: "ask:test:payload-only-visible-projection:final_answer_draft",
+        support_refs: ["workspace_os_status_observation:payload-only"],
+      },
+      terminal_artifact_kind: "model_synthesized_answer",
+      terminal_answer_authority: {
+        schema: "helix.terminal_answer_authority.v1",
+        terminal_artifact_kind: "model_synthesized_answer",
+        final_answer_source: "final_answer_draft",
+      },
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer_result.v1",
+        selected_terminal_artifact_kind: "model_synthesized_answer",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "workspace_os_status_observation:payload-only",
+          kind: "workspace_os_status_observation",
+          producer_item_id: "workspace_os.status",
+          payload: {
+            schema: "helix.workspace_os_status_observation.v1",
+            capability_key: "workspace_os.status",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:payload-only-visible-projection", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:payload-only-visible-projection", payload });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      terminal_authority_kind: "model_synthesized_answer",
+      visible_terminal_kind: "model_synthesized_answer",
+      visible_projection_source: "payload.terminal_artifact_kind",
+      visible_projection_proven: false,
+      rail_status: "broken",
+      rail_failure_code: "terminal_projection_mismatch",
+    });
+    expect(index.tool_rail_failure_triage).toMatchObject({
+      first_broken_rail: "visible_projection",
+      failure_bucket: "F_terminal_projection_mismatch",
+      repair_target: "presenter_boundary",
+      rail_failure_code: "terminal_projection_mismatch",
+    });
+    expect(index.codex_parity_agent_spine_rail_table).toMatchObject({
+      selected_terminal_kind: "model_synthesized_answer",
+      visible_terminal_kind: "model_synthesized_answer",
+      visible_projection_source: "payload.terminal_artifact_kind",
+      visible_projection_proven: false,
+      first_broken_rail: "visible_projection",
+      codex_parity_class: "visible_projection_mismatch",
+      rail_status: "broken",
+      rail_failure_code: "terminal_projection_mismatch",
+    });
+  });
+
   it("classifies a materialized terminal product that violates the route contract", () => {
     const payload: Record<string, unknown> = {
       canonical_goal_frame: {
@@ -3165,9 +3251,12 @@ describe("Helix Ask tool lifecycle trace", () => {
           subgoal_id: `${turnId}:compound_capability_subgoal:1:workspace_os_status`,
           order: 1,
           requested_capability: "workspace_os.status",
+          runtime_capability: "workspace_os.status",
           selected_capability: "workspace_os.status",
           executed_capability: "workspace_os.status",
           args: {},
+          planned_args: {},
+          selected_args: {},
           required_args: [],
           optional_args: [],
           observation_kind: "workspace_os_status_observation",
@@ -3176,6 +3265,7 @@ describe("Helix Ask tool lifecycle trace", () => {
           input_bindings: [],
           bound_input_refs: [],
           unresolved_input_bindings: [],
+          forbidden_nearby_capabilities: ["debug.inspect_current_turn", "model.direct_answer"],
           satisfaction: "satisfied",
           rail_status: "complete",
           rail_failure_code: null,
@@ -3184,9 +3274,12 @@ describe("Helix Ask tool lifecycle trace", () => {
           subgoal_id: `${turnId}:compound_capability_subgoal:2:scientific-calculator_solve_expression`,
           order: 2,
           requested_capability: "scientific-calculator.solve_expression",
+          runtime_capability: "scientific-calculator.solve_expression",
           selected_capability: "scientific-calculator.solve_expression",
           executed_capability: "scientific-calculator.solve_expression",
           args: { latex: "2+2", expression: "2+2" },
+          planned_args: { latex: "2+2", expression: "2+2" },
+          selected_args: { latex: "2+2", expression: "2+2" },
           required_args: ["latex"],
           optional_args: ["expression", "equation"],
           input_bindings: [],
@@ -3195,6 +3288,7 @@ describe("Helix Ask tool lifecycle trace", () => {
           support_refs: [],
           bound_input_refs: [],
           unresolved_input_bindings: [],
+          forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
           satisfaction: "pending",
           rail_status: "pending",
           rail_failure_code: "subgoal_observation_missing",
@@ -3234,8 +3328,11 @@ describe("Helix Ask tool lifecycle trace", () => {
     expect(index.compound_subgoal_rail_statuses).toEqual([
       expect.objectContaining({
         requested_capability: "workspace_os.status",
+        runtime_capability: "workspace_os.status",
         executed_capability: "workspace_os.status",
         args: {},
+        planned_args: {},
+        selected_args: {},
         required_args: [],
         optional_args: [],
         observation_kind: "workspace_os_status_observation",
@@ -3244,6 +3341,8 @@ describe("Helix Ask tool lifecycle trace", () => {
         input_bindings: [],
         bound_input_refs: [],
         unresolved_input_bindings: [],
+        contribution_role: "evidence",
+        terminal_contribution_kind: "model_synthesized_answer",
         satisfaction: "satisfied",
         rail_status: "complete",
         rail_failure_code: null,
@@ -3253,9 +3352,12 @@ describe("Helix Ask tool lifecycle trace", () => {
       }),
       expect.objectContaining({
         requested_capability: "scientific-calculator.solve_expression",
+        runtime_capability: "scientific-calculator.solve_expression",
         selected_capability: "scientific-calculator.solve_expression",
         executed_capability: "scientific-calculator.solve_expression",
         args: { latex: "2+2", expression: "2+2" },
+        planned_args: { latex: "2+2", expression: "2+2" },
+        selected_args: { latex: "2+2", expression: "2+2" },
         required_args: ["latex"],
         optional_args: ["expression", "equation"],
         observation_kind: null,
@@ -3264,6 +3366,8 @@ describe("Helix Ask tool lifecycle trace", () => {
         input_bindings: [],
         bound_input_refs: [],
         unresolved_input_bindings: [],
+        contribution_role: "terminal_component",
+        terminal_contribution_kind: "workstation_tool_evaluation",
         satisfaction: "pending",
         rail_status: "pending",
         rail_failure_code: "subgoal_observation_missing",
@@ -3272,6 +3376,559 @@ describe("Helix Ask tool lifecycle trace", () => {
         raw_content_included: false,
       }),
     ]);
+    expect(index.tool_turn_chain_family_matrix).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          route_family: "workspace_diagnostic",
+          observed: true,
+          requested_capability: "workspace_os.status",
+          did_tool_run: true,
+          artifact_produced: true,
+          artifact_reentered: true,
+          rail_status: "complete",
+          compound_subgoal_count: 1,
+          compound_requested_capabilities: ["workspace_os.status"],
+          compound_executed_capabilities: ["workspace_os.status"],
+          compound_observation_refs: [`${turnId}:workspace_status`],
+          compound_required_terminal_kinds: [],
+          compound_terminal_contribution_kinds: ["model_synthesized_answer"],
+          compound_contribution_roles: ["evidence"],
+          compound_forbidden_nearby_capabilities: ["debug.inspect_current_turn", "model.direct_answer"],
+          compound_rail_statuses: ["complete"],
+          compound_rail_failure_codes: [null],
+        }),
+        expect.objectContaining({
+          route_family: "calculator",
+          observed: true,
+          requested_capability: "scientific-calculator.solve_expression",
+          did_tool_run: true,
+          artifact_produced: false,
+          artifact_reentered: false,
+          rail_status: "pending",
+          rail_failure_code: "subgoal_observation_missing",
+          compound_subgoal_count: 1,
+          compound_requested_capabilities: ["scientific-calculator.solve_expression"],
+          compound_executed_capabilities: ["scientific-calculator.solve_expression"],
+          compound_observation_refs: [],
+          compound_required_terminal_kinds: [],
+          compound_terminal_contribution_kinds: ["workstation_tool_evaluation"],
+          compound_contribution_roles: ["terminal_component"],
+          compound_forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
+          compound_rail_statuses: ["pending"],
+          compound_rail_failure_codes: ["subgoal_observation_missing"],
+        }),
+      ]),
+    );
+  });
+
+  it("does not complete compound rail mirrors from satisfied rows without observation refs", () => {
+    const turnId = "ask:test:compound-debug-index:satisfied-without-observation";
+    const workspaceSubgoalId = `${turnId}:compound_capability_subgoal:1:workspace_os_status`;
+    const calculatorSubgoalId = `${turnId}:compound_capability_subgoal:2:scientific-calculator_solve_expression`;
+    const compoundContract = {
+      schema: "helix.compound_capability_contract.v1",
+      turn_id: turnId,
+      prompt_shape: "compound_capability",
+      requires_all_subgoals: true,
+      terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+      subgoals: [
+        {
+          subgoal_id: workspaceSubgoalId,
+          order: 1,
+          requested_capability: "workspace_os.status",
+          runtime_capability: "workspace_os.status",
+          required_observation_kinds: ["workspace_os_status_observation"],
+          mandatory: true,
+        },
+        {
+          subgoal_id: calculatorSubgoalId,
+          order: 2,
+          requested_capability: "scientific-calculator.solve_expression",
+          runtime_capability: "scientific-calculator.solve_expression",
+          required_observation_kinds: ["calculator_receipt", "workstation_tool_evaluation"],
+          required_terminal_kind: "workstation_tool_evaluation",
+          mandatory: true,
+        },
+      ],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const executionState = {
+      schema: "helix.capability_itinerary_execution_state.v1",
+      applies: true,
+      complete: true,
+      compound_subgoal_ledger: [
+        {
+          subgoal_id: workspaceSubgoalId,
+          order: 1,
+          requested_capability: "workspace_os.status",
+          runtime_capability: "workspace_os.status",
+          selected_capability: "workspace_os.status",
+          executed_capability: "workspace_os.status",
+          observation_kind: "workspace_os_status_observation",
+          observation_ref: `${turnId}:workspace_status`,
+          satisfaction: "satisfied",
+          rail_status: "complete",
+          rail_failure_code: null,
+        },
+        {
+          subgoal_id: calculatorSubgoalId,
+          order: 2,
+          requested_capability: "scientific-calculator.solve_expression",
+          runtime_capability: "scientific-calculator.solve_expression",
+          selected_capability: "scientific-calculator.solve_expression",
+          executed_capability: "scientific-calculator.solve_expression",
+          observation_kind: "calculator_receipt",
+          observation_ref: null,
+          satisfaction: "satisfied",
+          rail_status: "complete",
+          rail_failure_code: null,
+        },
+      ],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+
+    const index = buildArtifactQueryIndex({
+      turnId,
+      payload: {
+        compound_capability_contract: compoundContract,
+        capability_itinerary: {
+          schema: "helix.capability_itinerary.v1",
+          compound_capability_contract: compoundContract,
+          execution_state: executionState,
+        },
+        capability_itinerary_execution_state: executionState,
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: `${turnId}:workspace_status`,
+            kind: "workspace_os_status_observation",
+            payload: {
+              schema: "helix.workspace_os_status_observation.v1",
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          },
+        ],
+      },
+    });
+
+    expect(index.compound_subgoal_missing_summary).toMatchObject({
+      missing_compound_subgoal_ids: [calculatorSubgoalId],
+      missing_required_capabilities: ["scientific-calculator.solve_expression"],
+      next_missing_subgoal_id: calculatorSubgoalId,
+      complete: false,
+    });
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      first_incomplete_compound_subgoal_id: calculatorSubgoalId,
+      compound_rail_failure_code: null,
+      rail_failure_code: "observation_missing",
+      rail_status: "broken",
+    });
+    expect(index.tool_turn_chain_family_matrix).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          route_family: "calculator",
+          observed: true,
+          requested_capability: "scientific-calculator.solve_expression",
+          did_tool_run: true,
+          artifact_produced: false,
+          artifact_reentered: false,
+          rail_status: "broken",
+          compound_subgoal_count: 1,
+          compound_observation_refs: [],
+        }),
+      ]),
+    );
+  });
+
+  it("synthesizes fail-closed rail status for required compound subgoals dropped from the execution ledger", () => {
+    const turnId = "ask:test:compound-debug-index:dropped-subgoal";
+    const workspaceSubgoalId = `${turnId}:compound_capability_subgoal:1:workspace_os_status`;
+    const calculatorSubgoalId = `${turnId}:compound_capability_subgoal:2:scientific-calculator_solve_expression`;
+    const compoundContract = {
+      schema: "helix.compound_capability_contract.v1",
+      turn_id: turnId,
+      prompt_shape: "compound_capability",
+      requires_all_subgoals: true,
+      terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+      subgoals: [
+        {
+          subgoal_id: workspaceSubgoalId,
+          order: 1,
+          requested_capability: "workspace_os.status",
+          runtime_capability: "workspace_os.status",
+          required_args: [],
+          optional_args: [],
+          required_observation_kinds: ["workspace_os_status_observation"],
+          required_terminal_kind: "model_synthesized_answer",
+          contribution_role: "evidence",
+          terminal_contribution_kind: "model_synthesized_answer",
+          allowed_substitutions: [],
+          forbidden_nearby_capabilities: ["debug.inspect_current_turn", "model.direct_answer"],
+          mandatory: true,
+        },
+        {
+          subgoal_id: calculatorSubgoalId,
+          order: 2,
+          requested_capability: "scientific-calculator.solve_expression",
+          runtime_capability: "scientific-calculator.solve_expression",
+          required_args: ["latex"],
+          optional_args: ["expression", "equation"],
+          args_hint: { latex: "2+2", expression: "2+2" },
+          required_observation_kinds: ["calculator_receipt", "workstation_tool_evaluation"],
+          required_terminal_kind: "workstation_tool_evaluation",
+          contribution_role: "terminal_component",
+          terminal_contribution_kind: "workstation_tool_evaluation",
+          allowed_substitutions: [],
+          forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
+          mandatory: true,
+        },
+      ],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const executionState = {
+      schema: "helix.capability_itinerary_execution_state.v1",
+      applies: true,
+      complete: true,
+      compound_subgoal_ledger: [
+        {
+          subgoal_id: workspaceSubgoalId,
+          order: 1,
+          requested_capability: "workspace_os.status",
+          runtime_capability: "workspace_os.status",
+          selected_capability: "workspace_os.status",
+          executed_capability: "workspace_os.status",
+          args: {},
+          planned_args: {},
+          selected_args: {},
+          required_args: [],
+          optional_args: [],
+          required_observation_kinds: ["workspace_os_status_observation"],
+          required_terminal_kind: "model_synthesized_answer",
+          observation_kind: "workspace_os_status_observation",
+          observation_ref: `${turnId}:workspace_status`,
+          support_refs: [`${turnId}:workspace_status`],
+          satisfaction: "satisfied",
+          rail_status: "complete",
+          first_broken_rail: null,
+          rail_failure_code: null,
+          repair_target: null,
+        },
+      ],
+      assistant_answer: false,
+      raw_content_included: false,
+    };
+    const index = buildArtifactQueryIndex({
+      turnId,
+      payload: {
+        compound_capability_contract: compoundContract,
+        capability_itinerary: {
+          schema: "helix.capability_itinerary.v1",
+          compound_capability_contract: compoundContract,
+          execution_state: executionState,
+        },
+        capability_itinerary_execution_state: executionState,
+        current_turn_artifact_ledger: [
+          {
+            artifact_id: `${turnId}:workspace_status`,
+            kind: "workspace_os_status_observation",
+            payload: {
+              schema: "helix.workspace_os_status_observation.v1",
+              assistant_answer: false,
+              raw_content_included: false,
+            },
+          },
+        ],
+      },
+    });
+
+    expect(index.compound_subgoal_ledger).toHaveLength(1);
+    expect(index.compound_subgoal_rail_statuses).toEqual([
+      expect.objectContaining({
+        subgoal_id: workspaceSubgoalId,
+        requested_capability: "workspace_os.status",
+        executed_capability: "workspace_os.status",
+        satisfaction: "satisfied",
+        rail_status: "complete",
+      }),
+      expect.objectContaining({
+        subgoal_id: calculatorSubgoalId,
+        requested_capability: "scientific-calculator.solve_expression",
+        runtime_capability: "scientific-calculator.solve_expression",
+        selected_capability: null,
+        executed_capability: null,
+        args: { latex: "2+2", expression: "2+2" },
+        args_source: "compound_contract_missing_ledger",
+        planned_args: { latex: "2+2", expression: "2+2" },
+        selected_args: null,
+        required_args: ["latex"],
+        required_observation_kinds: ["calculator_receipt", "workstation_tool_evaluation"],
+        required_terminal_kind: "workstation_tool_evaluation",
+        observation_kind: null,
+        observation_ref: null,
+        support_refs: [],
+        satisfaction: "missing",
+        rail_status: "fail_closed",
+        first_broken_rail: "capability_execution",
+        rail_failure_code: "compound_subgoal_dropped",
+        repair_target: "agent_step_selection",
+      }),
+    ]);
+    expect(index.compound_subgoal_missing_summary).toMatchObject({
+      missing_compound_subgoal_ids: [calculatorSubgoalId],
+      missing_required_capabilities: ["scientific-calculator.solve_expression"],
+      next_missing_subgoal_id: calculatorSubgoalId,
+      complete: false,
+    });
+    expect(index.tool_turn_chain_family_matrix).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          route_family: "calculator",
+          observed: true,
+          requested_capability: "scientific-calculator.solve_expression",
+          did_tool_run: false,
+          artifact_produced: false,
+          artifact_reentered: false,
+          rail_status: "fail_closed",
+          rail_failure_code: "compound_subgoal_dropped",
+          compound_rail_failure_codes: ["compound_subgoal_dropped"],
+        }),
+      ]),
+    );
+  });
+
+  it("exposes extended compound subgoal families in the family matrix", () => {
+    const turnId = "ask:test:compound-debug-index:extended-families";
+    const compoundSubgoalLedger = [
+      {
+        subgoal_id: `${turnId}:subgoal:1:capability_catalog`,
+        order: 1,
+        requested_capability: "helix_ask.inspect_capability_catalog",
+        selected_capability: "helix_ask.inspect_capability_catalog",
+        executed_capability: "helix_ask.inspect_capability_catalog",
+        observation_kind: "capability_registry",
+        observation_ref: `${turnId}:capability_registry`,
+        required_terminal_kind: "capability_help_summary",
+        contribution_role: "evidence",
+        terminal_contribution_kind: "capability_help_summary",
+        forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        rail_failure_code: null,
+      },
+      {
+        subgoal_id: `${turnId}:subgoal:2:scholarly_research`,
+        order: 2,
+        requested_capability: "scholarly-research.lookup_papers",
+        selected_capability: "scholarly-research.lookup_papers",
+        executed_capability: "scholarly-research.lookup_papers",
+        observation_kind: "scholarly_research_observation",
+        observation_ref: `${turnId}:scholarly`,
+        required_terminal_kind: "scholarly_research_answer",
+        contribution_role: "evidence",
+        terminal_contribution_kind: "scholarly_research_answer",
+        forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        rail_failure_code: null,
+      },
+      {
+        subgoal_id: `${turnId}:subgoal:3:theory_locator`,
+        order: 3,
+        requested_capability: "helix_ask.reflect_theory_context",
+        selected_capability: "helix_ask.reflect_theory_context",
+        executed_capability: "helix_ask.reflect_theory_context",
+        observation_kind: "theory_context_reflection",
+        observation_ref: `${turnId}:theory`,
+        required_terminal_kind: "theory_context_reflection_answer",
+        contribution_role: "evidence",
+        terminal_contribution_kind: "theory_context_reflection_answer",
+        forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        rail_failure_code: null,
+      },
+      {
+        subgoal_id: `${turnId}:subgoal:4:civilization_bounds`,
+        order: 4,
+        requested_capability: "helix_ask.reflect_civilization_bounds",
+        selected_capability: "helix_ask.reflect_civilization_bounds",
+        executed_capability: "helix_ask.reflect_civilization_bounds",
+        observation_kind: "civilization_bounds_roadmap/v1",
+        observation_ref: `${turnId}:civilization`,
+        required_terminal_kind: "model_synthesized_answer",
+        contribution_role: "evidence",
+        terminal_contribution_kind: "model_synthesized_answer",
+        forbidden_nearby_capabilities: ["model.direct_answer"],
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        rail_failure_code: null,
+      },
+      {
+        subgoal_id: `${turnId}:subgoal:5:zen_graph_reflection`,
+        order: 5,
+        requested_capability: "helix_ask.reflect_ideology_context",
+        selected_capability: "helix_ask.reflect_ideology_context",
+        executed_capability: "helix_ask.reflect_ideology_context",
+        observation_kind: "ideology_context_reflection/v1",
+        observation_ref: `${turnId}:zen`,
+        required_terminal_kind: "model_synthesized_answer",
+        contribution_role: "evidence",
+        terminal_contribution_kind: "model_synthesized_answer",
+        forbidden_nearby_capabilities: ["model.direct_answer"],
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        rail_failure_code: null,
+      },
+      {
+        subgoal_id: `${turnId}:subgoal:6:visual_capture`,
+        order: 6,
+        requested_capability: "image_lens.inspect",
+        selected_capability: "situation-room.describe_visual_capture",
+        executed_capability: "situation-room.describe_visual_capture",
+        observation_kind: "situation_context_pack",
+        observation_ref: `${turnId}:visual`,
+        required_terminal_kind: "situation_context_pack",
+        contribution_role: "evidence",
+        terminal_contribution_kind: "situation_context_pack",
+        forbidden_nearby_capabilities: ["model.direct_answer"],
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        rail_failure_code: null,
+      },
+      {
+        subgoal_id: `${turnId}:subgoal:7:context_reflection`,
+        order: 7,
+        requested_capability: "helix_ask.reflect_context_attachments",
+        selected_capability: "helix_ask.reflect_context_attachments",
+        executed_capability: "helix_ask.reflect_context_attachments",
+        observation_kind: "helix_context_reflection_tool_receipt/v1",
+        observation_ref: `${turnId}:context-reflection`,
+        required_terminal_kind: "model_synthesized_answer",
+        contribution_role: "evidence",
+        terminal_contribution_kind: "model_synthesized_answer",
+        forbidden_nearby_capabilities: ["model.direct_answer"],
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        rail_failure_code: null,
+      },
+      {
+        subgoal_id: `${turnId}:subgoal:8:live_env`,
+        order: 8,
+        requested_capability: "live_env.read_processed_live_source_mail",
+        selected_capability: "live_env.read_processed_live_source_mail",
+        executed_capability: "live_env.read_processed_live_source_mail",
+        observation_kind: "stage_play_processed_mail_packet",
+        observation_ref: `${turnId}:live-mail`,
+        required_terminal_kind: "model_synthesized_answer",
+        contribution_role: "terminal_component",
+        terminal_contribution_kind: "model_synthesized_answer",
+        forbidden_nearby_capabilities: ["model.direct_answer"],
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        rail_failure_code: null,
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      active_prompt: "Run a compound tool-family parity fixture.",
+      capability_itinerary_execution_state: {
+        schema: "helix.capability_itinerary_execution_state.v1",
+        applies: true,
+        complete: true,
+        compound_subgoal_ledger: compoundSubgoalLedger,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    };
+
+    const index = buildArtifactQueryIndex({ turnId, payload });
+
+    expect(index.tool_turn_chain_family_matrix).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          route_family: "capability_catalog",
+          observed: true,
+          requested_capability: "helix_ask.inspect_capability_catalog",
+          compound_observation_refs: [`${turnId}:capability_registry`],
+          compound_terminal_contribution_kinds: ["capability_help_summary"],
+          compound_contribution_roles: ["evidence"],
+          compound_forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
+          rail_status: "complete",
+        }),
+        expect.objectContaining({
+          route_family: "scholarly_research",
+          observed: true,
+          requested_capability: "scholarly-research.lookup_papers",
+          compound_observation_refs: [`${turnId}:scholarly`],
+          compound_terminal_contribution_kinds: ["scholarly_research_answer"],
+          compound_contribution_roles: ["evidence"],
+          compound_forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
+          rail_status: "complete",
+        }),
+        expect.objectContaining({
+          route_family: "theory_locator",
+          observed: true,
+          requested_capability: "helix_ask.reflect_theory_context",
+          compound_observation_refs: [`${turnId}:theory`],
+          compound_terminal_contribution_kinds: ["theory_context_reflection_answer"],
+          compound_contribution_roles: ["evidence"],
+          compound_forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
+          rail_status: "complete",
+        }),
+        expect.objectContaining({
+          route_family: "civilization_bounds",
+          observed: true,
+          requested_capability: "helix_ask.reflect_civilization_bounds",
+          compound_observation_refs: [`${turnId}:civilization`],
+          compound_terminal_contribution_kinds: ["model_synthesized_answer"],
+          compound_contribution_roles: ["evidence"],
+          compound_forbidden_nearby_capabilities: ["model.direct_answer"],
+          rail_status: "complete",
+        }),
+        expect.objectContaining({
+          route_family: "zen_graph_reflection",
+          observed: true,
+          requested_capability: "helix_ask.reflect_ideology_context",
+          compound_observation_refs: [`${turnId}:zen`],
+          compound_terminal_contribution_kinds: ["model_synthesized_answer"],
+          compound_contribution_roles: ["evidence"],
+          compound_forbidden_nearby_capabilities: ["model.direct_answer"],
+          rail_status: "complete",
+        }),
+        expect.objectContaining({
+          route_family: "image_lens / visual_capture",
+          observed: true,
+          requested_capability: "image_lens.inspect",
+          compound_observation_refs: [`${turnId}:visual`],
+          compound_terminal_contribution_kinds: ["situation_context_pack"],
+          compound_contribution_roles: ["evidence"],
+          compound_forbidden_nearby_capabilities: ["model.direct_answer"],
+          rail_status: "complete",
+        }),
+        expect.objectContaining({
+          route_family: "context_reflection",
+          observed: true,
+          requested_capability: "helix_ask.reflect_context_attachments",
+          compound_observation_refs: [`${turnId}:context-reflection`],
+          compound_terminal_contribution_kinds: ["model_synthesized_answer"],
+          compound_contribution_roles: ["evidence"],
+          compound_forbidden_nearby_capabilities: ["model.direct_answer"],
+          rail_status: "complete",
+        }),
+        expect.objectContaining({
+          route_family: "live_env",
+          observed: true,
+          requested_capability: "live_env.read_processed_live_source_mail",
+          compound_observation_refs: [`${turnId}:live-mail`],
+          compound_terminal_contribution_kinds: ["model_synthesized_answer"],
+          compound_contribution_roles: ["terminal_component"],
+          compound_forbidden_nearby_capabilities: ["model.direct_answer"],
+          rail_status: "complete",
+        }),
+      ]),
+    );
   });
 
   it("normalizes a completed internet_search.web_research turn through the same rail table", () => {
@@ -3470,6 +4127,104 @@ describe("Helix Ask tool lifecycle trace", () => {
         }),
       ]),
     );
+  });
+
+  it("records explicit capability substitutions as completed contract rails", () => {
+    const payload: Record<string, unknown> = {
+      active_prompt: "Use image_lens.inspect to inspect the current visual capture.",
+      tool_call_admission_decision: {
+        schema: "helix.tool_call_admission_decision.v1",
+        requested_capability: "image_lens.inspect",
+        requested_capability_family: "visual_capture",
+        requested_capability_source: "explicit_user_command",
+        requested_capability_confidence: 1,
+        required_observation_kinds_for_requested_capability: [
+          "situation_context_pack",
+          "visual_frame_evidence",
+        ],
+      },
+      capability_plan: {
+        schema: "helix.capability_plan.v1",
+        turn_id: "ask:test:visual-substitution",
+        capability_family: "visual_capture",
+        requested_capability: "image_lens.inspect",
+        requested_action: "image_lens.inspect",
+        selected_capability: "situation-room.describe_visual_capture",
+        admission_status: "admitted",
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            iteration: 1,
+            chosen_capability: "situation-room.describe_visual_capture",
+            executed_action_key: "situation-room.describe_visual_capture",
+            observed_artifact_refs: ["situation_context_pack:1"],
+          },
+        ],
+        executed_tool_call_count: 1,
+      },
+      runtime_tool_call: {
+        tool_call_id: "tool:visual-substitution",
+        capability_key: "situation-room.describe_visual_capture",
+        status: "completed",
+      },
+      final_answer_draft: {
+        schema: "helix.final_answer_draft.v1",
+        draft_id: "ask:test:visual-substitution:final_answer_draft",
+        support_refs: ["situation_context_pack:1"],
+      },
+      terminal_artifact_kind: "situation_context_pack",
+      terminal_authority_single_writer: {
+        schema: "helix.terminal_authority_single_writer.v1",
+        selected_terminal_artifact_kind: "situation_context_pack",
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "situation_context_pack",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "situation_context_pack:1",
+          kind: "situation_context_pack",
+          producer_item_id: "situation-room.describe_visual_capture",
+          payload: {
+            schema: "helix.situation_context_pack.v1",
+            summary: "A visual capture context pack is available.",
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    refreshToolLifecycleRecords({ turnId: "ask:test:visual-substitution", payload });
+    const index = buildArtifactQueryIndex({ turnId: "ask:test:visual-substitution", payload });
+
+    expect(index.tool_turn_chain_audit).toMatchObject({
+      requested_capability: "image_lens.inspect",
+      selected_capability: "situation-room.describe_visual_capture",
+      executed_capability: "situation-room.describe_visual_capture",
+      requested_selected_match: true,
+      selected_executed_match: true,
+      substitution_rule_applied: true,
+      substitution_rule_id: "runtime_capability:situation-room.describe_visual_capture",
+      observation_artifact_kind: "situation_context_pack",
+      observation_ref: "situation_context_pack:1",
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
+    expect(index.tool_rail_failure_triage).toMatchObject({
+      requested_capability: "image_lens.inspect",
+      selected_capability: "situation-room.describe_visual_capture",
+      executed_capability: "situation-room.describe_visual_capture",
+      substitution_rule_applied: true,
+      substitution_rule_id: "runtime_capability:situation-room.describe_visual_capture",
+      first_broken_rail: null,
+      failure_bucket: null,
+      rail_status: "complete",
+      rail_failure_code: null,
+    });
   });
 
   it("normalizes a completed capability catalog turn through the same rail table", () => {

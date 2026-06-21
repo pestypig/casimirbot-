@@ -104,13 +104,20 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
 
   switch (capability) {
     case "helix_ask.inspect_capability_catalog":
+    case "helix_ask.reflect_workstation_tool_alignment":
       return "capability_help";
     case "scientific-calculator.solve_expression":
       return "calculator_solve";
     case "workspace_os.status":
       return "workspace_status_diagnostic";
+    case "docs-viewer.open":
+      return "doc_open";
     case "docs-viewer.locate_in_doc":
       return "locate_in_doc";
+    case "docs-viewer.summarize_doc":
+      return "doc_summary";
+    case "docs-viewer.doc_equation_context":
+      return "doc_equation_context";
     case "repo-code.search_concept":
       return "repo_code_evidence_question";
     case "workspace-directory.resolve":
@@ -122,13 +129,34 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
       return "scholarly_research_lookup";
     case "scholarly-research.fetch_full_text":
       return "scholarly_full_text_lookup";
+    case "live_env.check_live_source_mail":
+    case "live_env.read_live_source_mail":
     case "live_env.read_processed_live_source_mail":
     case "live_env.process_live_source_mail":
     case "live_env.reflect_live_source_mail_loop":
+    case "live_env.query_micro_reasoner_presets":
+    case "live_env.draft_micro_reasoner_preset":
+    case "live_env.route_micro_reasoner_prompt":
+    case "live_env.query_live_source_quality":
+    case "live_env.summarize_live_source_current_state":
       return "live_source_mailbox_review";
     case "image_lens.inspect":
     case "situation-room.describe_visual_capture":
       return "visual_capture_describe";
+    case "helix_ask.reflect_theory_context":
+      return "theory_context_reflection";
+    case "helix.theory.frontierVectorFieldTrace":
+      return "theory_frontier_vector_field";
+    case "helix_ask.reflect_live_synthetic_data":
+    case "helix_ask.reflect_context_attachments":
+      return "context_attachment_reflection";
+    case "helix_ask.reflect_ideology_context":
+      return "zen_graph_reflection";
+    case "helix_ask.bridge_theory_ideology_context":
+      return "theory_ideology_bridge_reflection";
+    case "helix_ask.build_civilization_scenario_frame":
+    case "helix_ask.reflect_civilization_bounds":
+      return "civilization_bounds_reflection";
     default:
       return null;
   }
@@ -139,12 +167,17 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
 
   switch (capability) {
     case "helix_ask.inspect_capability_catalog":
+    case "helix_ask.reflect_workstation_tool_alignment":
       return "runtime_evidence";
     case "scientific-calculator.solve_expression":
       return "current_turn_action";
     case "workspace_os.status":
       return "workspace_state";
+    case "docs-viewer.open":
+    case "docs-viewer.summarize_doc":
+    case "docs-viewer.doc_equation_context":
     case "docs-viewer.locate_in_doc":
+      return "current_turn_doc";
     case "repo-code.search_concept":
       return "current_turn_doc";
     case "internet_search.web_research":
@@ -153,13 +186,32 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
     case "scholarly-research.lookup_papers":
     case "scholarly-research.fetch_full_text":
       return "external_scholarly_research";
+    case "live_env.check_live_source_mail":
+    case "live_env.read_live_source_mail":
     case "live_env.read_processed_live_source_mail":
     case "live_env.process_live_source_mail":
     case "live_env.reflect_live_source_mail_loop":
+    case "live_env.query_micro_reasoner_presets":
+    case "live_env.draft_micro_reasoner_preset":
+    case "live_env.route_micro_reasoner_prompt":
+    case "live_env.query_live_source_quality":
+    case "live_env.summarize_live_source_current_state":
       return "live_source_mail";
     case "image_lens.inspect":
     case "situation-room.describe_visual_capture":
       return "visual_capture";
+    case "helix_ask.reflect_theory_context":
+    case "helix.theory.frontierVectorFieldTrace":
+      return "theory_context";
+    case "helix_ask.reflect_live_synthetic_data":
+    case "helix_ask.reflect_context_attachments":
+      return "context_reflection";
+    case "helix_ask.reflect_ideology_context":
+    case "helix_ask.bridge_theory_ideology_context":
+      return "zen_graph_reflection";
+    case "helix_ask.build_civilization_scenario_frame":
+    case "helix_ask.reflect_civilization_bounds":
+      return "civilization_bounds";
     default:
       return "workspace_state";
   }
@@ -181,8 +233,8 @@ const suppressionBlocksContract = (
   if (!suppression) return false;
   if (!contract) return false;
   if (suppression.suppression_reason === "explanatory_only") return false;
-  return contract.admission_families.some((family: ExplicitCapabilityContract["admission_families"][number]) =>
-    contextualToolSuppressionBlocksFamily(suppression, family)
+  return [contract.capability_family, ...contract.admission_families].some((family) =>
+    contextualToolSuppressionBlocksFamily(suppression, family),
   );
 };
 

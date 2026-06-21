@@ -65,7 +65,10 @@ const sourceBackedTargets = new Set([
   "visual_scene_memory",
   "repo_code",
   "runtime_evidence",
+  "workspace_directory",
   "workspace_diagnostic",
+  "theory_locator",
+  "context_reflection",
   "docs_viewer",
   "active_doc",
   "internet_search",
@@ -88,6 +91,10 @@ export const inferCommittedRouteToolFamily = (capabilityId: string): string => {
   if (/process[-_.]?graph/i.test(capabilityId)) return "process_graph";
   if (/workspace[-_.]?directory/i.test(capabilityId)) return "workspace_directory";
   if (/workspace[_-]?os|workspace_diagnostic/i.test(capabilityId)) return "workspace_diagnostic";
+  if (/inspect[_-]?capability[_-]?catalog|capability[_-]?catalog|tool[_-]?alignment/i.test(capabilityId)) return "capability_catalog";
+  if (/reflect[_-]?ideology[_-]?context|bridge[_-]?theory[_-]?ideology|zen[-_.]?graph|ideology_context_reflection/i.test(capabilityId)) return "zen_graph_reflection";
+  if (/civilization[-_.]?bounds|civilization[-_.]?scenario|reflect[_-]?civilization|build[_-]?civilization/i.test(capabilityId)) return "civilization_bounds";
+  if (/reflect[_-]?context[_-]?attachments|reflect[_-]?live[_-]?synthetic[_-]?data|context[_-]?reflection/i.test(capabilityId)) return "context_reflection";
   if (/click|open|close|panel|workspace-action|workspace_action/i.test(capabilityId)) return "workstation_action";
   if (/workstation-notes|note/i.test(capabilityId)) return "notes";
   if (/repo|code|source-tree/i.test(capabilityId)) return "repo_code";
@@ -104,7 +111,10 @@ const familyForSourceTarget = (sourceTarget: string): string => {
   if (sourceTarget === "live_environment" || sourceTarget === "live_source_mailbox") return "live_environment";
   if (sourceTarget === "live_pipeline") return "live_pipeline";
   if (sourceTarget === "process_graph") return "process_graph";
+  if (sourceTarget === "workspace_directory") return "workspace_directory";
   if (sourceTarget === "workspace_diagnostic") return "workspace_diagnostic";
+  if (sourceTarget === "theory_locator") return "theory_locator";
+  if (sourceTarget === "context_reflection") return "context_reflection";
   if (sourceTarget === "calculator_stream") return "scientific_calculator";
   if (sourceTarget === "active_note") return "notes";
   if (sourceTarget === "workstation_state" || sourceTarget === "workstation_panel" || sourceTarget === "workspace_panel") return "workstation_action";

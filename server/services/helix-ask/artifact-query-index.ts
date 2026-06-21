@@ -54,8 +54,15 @@ const TOOL_TURN_CHAIN_MATRIX_FAMILIES = [
   "repo_code",
   "live_env",
   "workspace_directory",
+  "workspace_diagnostic",
+  "capability_catalog",
   "calculator",
   "internet_search",
+  "scholarly_research",
+  "theory_locator",
+  "context_reflection",
+  "civilization_bounds",
+  "zen_graph_reflection",
   "image_lens / visual_capture",
 ] as const;
 
@@ -250,6 +257,25 @@ const preferConcreteCapability = (
   return candidateCapability;
 };
 
+const explicitCapabilitySubstitutionRuleId = (
+  requestedCapability: string | null | undefined,
+  actualCapability: string | null | undefined,
+): string | null => {
+  const requested = readString(requestedCapability);
+  const actual = readString(actualCapability);
+  if (!requested || !actual || normalizedEqual(requested, actual)) return null;
+  const contract = explicitCapabilityContractForCapability(requested);
+  if (!contract) return null;
+  if (normalizedEqual(contract.runtime_capability, actual)) return `runtime_capability:${actual}`;
+  if (contract.allowed_substitutions.some((substitution) => normalizedEqual(substitution, actual))) {
+    return `allowed_substitution:${actual}`;
+  }
+  if ((contract.aliases ?? []).some((alias) => normalizedEqual(alias, actual))) {
+    return `alias:${actual}`;
+  }
+  return null;
+};
+
 const runtimeLoopExecutedCapability = (payload: RecordLike): string | null => {
   const loop = readRecord(payload.agent_runtime_loop);
   const iterations = Array.isArray(loop?.iterations)
@@ -377,6 +403,12 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   if (/docs[-_]viewer[-_.:]doc[-_]equation[-_]context|doc_equation_context/.test(haystack)) {
     return "docs-viewer.doc_equation_context";
   }
+  if (/docs[-_]viewer[-_.:]open|doc_open_receipt/.test(haystack)) {
+    return "docs-viewer.open";
+  }
+  if (/helix_ask[-_.:]reflect_workstation_tool_alignment|workstation_tool_alignment|toolchain_matrix|tool_regression_matrix/.test(haystack)) {
+    return "helix_ask.reflect_workstation_tool_alignment";
+  }
   if (/helix_ask[-_.:]inspect_capability_catalog|capability_catalog_observation|capability_registry|helix\.capability_catalog_observation\.v1/.test(haystack)) {
     return "helix_ask.inspect_capability_catalog";
   }
@@ -389,10 +421,58 @@ const capabilityFromArtifacts = (artifacts: RecordLike[]): string | null => {
   if (/internet[-_]search[-_.:]web[-_]research|web_research_observation|internet_search_observation/.test(haystack)) {
     return "internet_search.web_research";
   }
+  if (/workspace[-_]os[-_.:]status|workspace_os_status_observation|workspace_status_observation/.test(haystack)) {
+    return "workspace_os.status";
+  }
   if (/workspace[-_]directory[-_.:]resolve|workspace_directory_resolution/.test(haystack)) {
     return "workspace-directory.resolve";
   }
-  if (/live_env[-_.:]process_live_source_mail|stage_play_live_source_mail_read_result/.test(haystack)) {
+  if (/scholarly[-_]research[-_.:]fetch[-_]full[-_]text|scholarly_full_text_observation|fetch_full_text/.test(haystack)) {
+    return "scholarly-research.fetch_full_text";
+  }
+  if (/scholarly[-_]research[-_.:]lookup[-_]papers|scholarly_research_observation|lookup_papers/.test(haystack)) {
+    return "scholarly-research.lookup_papers";
+  }
+  if (/helix[-_.:]theory[-_.:]frontiervectorfieldtrace|frontiervectorfieldtrace|theory_frontier_vector_field|helix_theory_frontier_vector_field_tool_receipt/.test(haystack)) {
+    return "helix.theory.frontierVectorFieldTrace";
+  }
+  if (/helix_ask[-_.:]reflect[-_]theory[-_]context|helix_theory_context_reflection_tool_receipt|theory_context_reflection/.test(haystack)) {
+    return "helix_ask.reflect_theory_context";
+  }
+  if (/helix_ask[-_.:]reflect[-_]live[-_]synthetic[-_]data|live_synthetic_data_reflection|live_synthetic_data/.test(haystack)) {
+    return "helix_ask.reflect_live_synthetic_data";
+  }
+  if (/helix_ask[-_.:]reflect[-_]context[-_]attachments|context_attachment_reflection|context_attachment/.test(haystack)) {
+    return "helix_ask.reflect_context_attachments";
+  }
+  if (/helix_ask[-_.:]bridge[-_]theory[-_]ideology[-_]context|helix_theory_ideology_bridge_tool_result|theory_ideology_bridge/.test(haystack)) {
+    return "helix_ask.bridge_theory_ideology_context";
+  }
+  if (/helix_ask[-_.:]reflect[-_]ideology[-_]context|ideology_context_reflection|procedural_zen_classification|helix_zen_graph_reflection_tool_result/.test(haystack)) {
+    return "helix_ask.reflect_ideology_context";
+  }
+  if (/helix_ask[-_.:]build[-_]civilization[-_]scenario[-_]frame|civilization_scenario_frame|helix_civilization_scenario_frame_tool_result/.test(haystack)) {
+    return "helix_ask.build_civilization_scenario_frame";
+  }
+  if (/helix_ask[-_.:]reflect[-_]civilization[-_]bounds|civilization_bounds_roadmap|helix_civilization_bounds_tool_result/.test(haystack)) {
+    return "helix_ask.reflect_civilization_bounds";
+  }
+  if (/live_env[-_.:]query_micro_reasoner_presets|stage_play_micro_reasoner_prompt_preset_query_result/.test(haystack)) {
+    return "live_env.query_micro_reasoner_presets";
+  }
+  if (/live_env[-_.:]draft_micro_reasoner_preset|stage_play_micro_reasoner_prompt_preset_draft/.test(haystack)) {
+    return "live_env.draft_micro_reasoner_preset";
+  }
+  if (/live_env[-_.:]route_micro_reasoner_prompt|stage_play_micro_reasoner_prompt_delegation_result/.test(haystack)) {
+    return "live_env.route_micro_reasoner_prompt";
+  }
+  if (/live_env[-_.:]check_live_source_mail/.test(haystack)) {
+    return "live_env.check_live_source_mail";
+  }
+  if (/live_env[-_.:]read_live_source_mail/.test(haystack)) {
+    return "live_env.read_live_source_mail";
+  }
+  if (/live_env[-_.:]process_live_source_mail/.test(haystack)) {
     return "live_env.process_live_source_mail";
   }
   if (/live_env[-_.:]read_processed_live_source_mail|stage_play_processed_mail_packet/.test(haystack)) {
@@ -628,6 +708,12 @@ const artifactSupportsCapabilityObservation = (artifact: RecordLike, capability:
   if (normalizedCapability === "docs_viewer_summarize_doc") {
     return /docs[-_]viewer[-_.:]summarize[-_]doc|doc_summary/.test(text);
   }
+  if (normalizedCapability === "docs_viewer_open") {
+    return /docs[-_]viewer[-_.:]open|doc_open_receipt|docs_viewer_receipt/.test(text);
+  }
+  if (normalizedCapability === "docs_viewer_doc_equation_context") {
+    return /docs[-_]viewer[-_.:]doc[-_]equation[-_]context|doc_equation_context/.test(text);
+  }
   if (normalizedCapability === "repo_code_search_concept") {
     return /repo[-_]code[-_.:]search[-_]concept|repo_code_search|repo_code_evidence/.test(text);
   }
@@ -640,11 +726,44 @@ const artifactSupportsCapabilityObservation = (artifact: RecordLike, capability:
   if (normalizedCapability === "internet_search_web_research") {
     return /internet[-_]search[-_.:]web[-_]research|web_research_observation|internet_search_observation/.test(text);
   }
-  if (normalizedCapability === "helix_ask_inspect_capability_catalog") {
-    return /capability_registry|capability_catalog_observation|helix\.capability_catalog_observation\.v1/.test(text);
+  if (normalizedCapability === "scholarly_research_lookup_papers") {
+    return /scholarly[-_]research[-_.:]lookup[-_]papers|scholarly_research_observation|lookup_papers/.test(text);
+  }
+  if (normalizedCapability === "scholarly_research_fetch_full_text") {
+    return /scholarly[-_]research[-_.:]fetch[-_]full[-_]text|scholarly_full_text_observation|fetch_full_text/.test(text);
+  }
+  if (
+    normalizedCapability === "helix_ask_inspect_capability_catalog" ||
+    normalizedCapability === "helix_ask_reflect_workstation_tool_alignment"
+  ) {
+    return /capability_registry|capability_catalog_observation|helix\.capability_catalog_observation\.v1|workstation_tool_alignment|toolchain_matrix|tool_regression_matrix/.test(text);
   }
   if (normalizedCapability === "image_lens_inspect" || normalizedCapability === "situation_room_describe_visual_capture") {
     return /situation_context_pack|helix\.situation_context_pack\.v1|situation[-_]room[-_.:]describe[-_]visual[-_]capture|visual_capture|image_lens/.test(text);
+  }
+  if (normalizedCapability === "helix_ask_reflect_theory_context") {
+    return /helix_theory_context_reflection_tool_receipt|theory_context_reflection|reflect_theory_context/.test(text);
+  }
+  if (normalizedCapability === "helix_theory_frontiervectorfieldtrace") {
+    return /helix_theory_frontier_vector_field_tool_receipt|theory_frontier_vector_field|frontiervectorfieldtrace/.test(text);
+  }
+  if (normalizedCapability === "helix_ask_reflect_live_synthetic_data") {
+    return /helix_context_reflection_tool_receipt|bounded_context_reference|live_synthetic_data/.test(text);
+  }
+  if (normalizedCapability === "helix_ask_reflect_context_attachments") {
+    return /helix_context_reflection_tool_receipt|context_attachment|bounded_context_reference/.test(text);
+  }
+  if (normalizedCapability === "helix_ask_reflect_ideology_context") {
+    return /ideology_context_reflection|procedural_zen_classification|helix_zen_graph_reflection_tool_result/.test(text);
+  }
+  if (normalizedCapability === "helix_ask_bridge_theory_ideology_context") {
+    return /helix_theory_ideology_bridge_tool_result|theory_ideology_bridge/.test(text);
+  }
+  if (normalizedCapability === "helix_ask_build_civilization_scenario_frame") {
+    return /civilization_scenario_frame|helix_civilization_scenario_frame_tool_result/.test(text);
+  }
+  if (normalizedCapability === "helix_ask_reflect_civilization_bounds") {
+    return /civilization_bounds_roadmap|helix_civilization_bounds_tool_result/.test(text);
   }
   if (normalizedCapability.startsWith("live_env_")) {
     return text.includes(normalizedCapability) || /stage_play|live_source|mail_packet|mailbox|live_env/.test(text);
@@ -834,15 +953,15 @@ const terminalAuthorityKind = (payload: RecordLike): string | null => {
 const visibleTerminalEvidence = (payload: RecordLike): { kind: string | null; source: string | null; proven: boolean } => {
   const presentation = readRecord(payload.terminal_presentation);
   const resolvedSummary = readRecord(payload.resolved_turn_summary);
-  const candidates: Array<{ kind: unknown; source: string }> = [
-    { kind: presentation?.terminal_artifact_kind, source: "terminal_presentation.terminal_artifact_kind" },
-    { kind: resolvedSummary?.terminal_artifact_kind, source: "resolved_turn_summary.terminal_artifact_kind" },
-    { kind: payload.terminal_artifact_kind, source: "payload.terminal_artifact_kind" },
+  const candidates: Array<{ kind: unknown; source: string; proven: boolean }> = [
+    { kind: presentation?.terminal_artifact_kind, source: "terminal_presentation.terminal_artifact_kind", proven: true },
+    { kind: resolvedSummary?.terminal_artifact_kind, source: "resolved_turn_summary.terminal_artifact_kind", proven: true },
+    { kind: payload.terminal_artifact_kind, source: "payload.terminal_artifact_kind", proven: false },
   ];
   for (const candidate of candidates) {
     const kind = readString(candidate.kind);
     if (kind) {
-      return { kind, source: candidate.source, proven: true };
+      return { kind, source: candidate.source, proven: candidate.proven };
     }
   }
   return { kind: null, source: null, proven: false };
@@ -921,6 +1040,15 @@ const contextualToolReferenceSuppressed = (payload: RecordLike, capabilityPlan: 
   );
 };
 
+const compoundSubgoalHasSatisfiedObservation = (entry: RecordLike): boolean => {
+  const railStatus = readString(entry.rail_status);
+  return (
+    readString(entry.satisfaction) === "satisfied" &&
+    Boolean(readString(entry.observation_ref)) &&
+    (!railStatus || railStatus === "complete")
+  );
+};
+
 const buildToolTurnChainAudit = (input: {
   payload: RecordLike;
   artifacts: RecordLike[];
@@ -931,6 +1059,7 @@ const buildToolTurnChainAudit = (input: {
   contract: ToolFamilyContract | null;
   requiredObservationCoverage: RecordLike[];
   requiredObservationsSatisfied: boolean;
+  compoundSubgoalRailStatuses?: RecordLike[];
 }): RecordLike => {
   const admission = readRecord(input.payload.tool_call_admission_decision);
   const capabilityPlan = readRecord(input.payload.capability_plan);
@@ -970,9 +1099,15 @@ const buildToolTurnChainAudit = (input: {
     selectedCapability ?? requestedCapability ?? input.capability,
     requestedObservationKinds,
   );
+  const selectedCapabilityContract = explicitCapabilityContractForCapability(selectedCapability);
+  const selectedCapabilityIsCatalog =
+    selectedCapabilityContract?.capability_family === "capability_catalog" ||
+    requestedCapabilityContract?.capability_family === "capability_catalog" ||
+    normalizedEqual(selectedCapability, "helix_ask.inspect_capability_catalog") ||
+    normalizedEqual(selectedCapability, "helix_ask.reflect_workstation_tool_alignment");
   const rawExecutedCapability = firstString(
-    selectedCapability === "helix_ask.inspect_capability_catalog" && capabilityCatalogArtifact
-      ? "helix_ask.inspect_capability_catalog"
+    selectedCapabilityIsCatalog && capabilityCatalogArtifact && selectedCapability
+      ? selectedCapability
       : null,
     !contextualSuppression && selectedCapability && selectedCapabilityObservationArtifact && nonModelToolCapability(selectedCapability)
       ? selectedCapability
@@ -989,18 +1124,28 @@ const buildToolTurnChainAudit = (input: {
       : requestedCapability
         ? false
         : null;
-  const selectedExecutedMatch =
-    selectedCapability && executedCapability
-      ? normalizedEqual(selectedCapability, executedCapability)
-      : selectedCapability
-        ? false
-        : null;
   const requestedExecutedMatch =
     requestedCapability && executedCapability
       ? explicitCapabilityMatches(requestedCapability, executedCapability)
       : requestedCapability
         ? false
         : null;
+  const selectedExecutedMatch =
+    selectedCapability && executedCapability
+      ? normalizedEqual(selectedCapability, executedCapability) ||
+        Boolean(requestedCapability && requestedSelectedMatch === true && requestedExecutedMatch === true)
+      : selectedCapability
+        ? false
+        : null;
+  const selectedSubstitutionRuleId = explicitCapabilitySubstitutionRuleId(
+    requestedCapability,
+    selectedCapability,
+  );
+  const executedSubstitutionRuleId = explicitCapabilitySubstitutionRuleId(
+    requestedCapability,
+    executedCapability,
+  );
+  const substitutionRuleId = executedSubstitutionRuleId ?? selectedSubstitutionRuleId;
   const selectedFamily = inferToolFamilyFromToolName(selectedCapability);
   const rawRouteFamily = firstString(input.toolFamily, input.contract?.toolFamily, selectedFamily);
   const routeFamily = contextualSuppression
@@ -1014,7 +1159,7 @@ const buildToolTurnChainAudit = (input: {
   const observationArtifactKind =
     toolExecutionRejected
       ? null
-      : selectedCapability === "helix_ask.inspect_capability_catalog" && capabilityCatalogArtifact
+      : selectedCapabilityIsCatalog && capabilityCatalogArtifact
         ? "capability_registry"
       : selectedCapabilityObservationArtifact
         ? artifactDisplayKind(selectedCapabilityObservationArtifact)
@@ -1026,7 +1171,7 @@ const buildToolTurnChainAudit = (input: {
   const observationRef =
     toolExecutionRejected
       ? null
-      : selectedCapability === "helix_ask.inspect_capability_catalog" && capabilityCatalogArtifact
+      : selectedCapabilityIsCatalog && capabilityCatalogArtifact
         ? artifactRef(capabilityCatalogArtifact)
       : selectedCapabilityObservationArtifact
         ? artifactRef(selectedCapabilityObservationArtifact)
@@ -1047,6 +1192,7 @@ const buildToolTurnChainAudit = (input: {
   const visibleTerminalProjection = visibleTerminalEvidence(input.payload);
   const authorityTerminal = authorityTerminalEvidence.kind;
   const visibleTerminal = visibleTerminalProjection.kind;
+  const visibleTerminalUnproven = Boolean(visibleTerminal && !visibleTerminalProjection.proven);
   const staleDebugMirrors = staleTerminalDebugMirrors(input.payload, authorityTerminal);
   const finalDraftRef = finalAnswerDraftRef(input.payload, input.artifacts);
   const modelDirectAnswerMaterialized = Boolean(
@@ -1055,7 +1201,7 @@ const buildToolTurnChainAudit = (input: {
       (!requiredTerminal || normalizedEqual(requiredTerminal, "direct_answer_text")),
   );
   const capabilityCatalogSummaryMaterialized = Boolean(
-    normalizedEqual(selectedCapability, "helix_ask.inspect_capability_catalog") &&
+    selectedCapabilityIsCatalog &&
       capabilityCatalogArtifact &&
       observationRef &&
       normalizedEqual(requiredTerminal, "capability_help_summary") &&
@@ -1106,6 +1252,7 @@ const buildToolTurnChainAudit = (input: {
       terminalProductAllowed &&
       authorityTerminal &&
       visibleTerminal &&
+      visibleTerminalProjection.proven &&
       normalizedEqual(authorityTerminal, visibleTerminal),
   );
   const contextualSuppressionComplete = Boolean(
@@ -1114,6 +1261,7 @@ const buildToolTurnChainAudit = (input: {
       terminalProductAllowed &&
       authorityTerminal &&
       visibleTerminal &&
+      visibleTerminalProjection.proven &&
       normalizedEqual(authorityTerminal, visibleTerminal),
   );
   const routeFamilyMismatch = Boolean(
@@ -1122,7 +1270,7 @@ const buildToolTurnChainAudit = (input: {
   const toolAdmissionDrift = Boolean(
     selectedCapability &&
       executedCapability &&
-      !normalizedEqual(selectedCapability, executedCapability) &&
+      selectedExecutedMatch === false &&
       !routeFamilyMismatch,
   );
   const configMissing = likelyInternetSearchConfigMissing(input.payload, routeFamily);
@@ -1149,11 +1297,36 @@ const buildToolTurnChainAudit = (input: {
     Boolean(finalDraftRef) &&
     Boolean(materializedTerminal) &&
     !["typed_failure", "direct_answer_text", "tool_receipt"].some((kind) => normalizedEqual(kind, materializedTerminal));
+  const firstIncompleteCompoundSubgoal = (input.compoundSubgoalRailStatuses ?? []).find((entry) =>
+    !compoundSubgoalHasSatisfiedObservation(entry)
+  ) ?? null;
+  const compoundFirstBrokenRail = readNullableString(firstIncompleteCompoundSubgoal?.first_broken_rail);
+  const compoundRepairTarget = readNullableString(firstIncompleteCompoundSubgoal?.repair_target);
+  const compoundRailFailureCodeRaw = readNullableString(firstIncompleteCompoundSubgoal?.rail_failure_code);
+  const compoundRailFailureCode: RailFailureCode | null =
+    !firstIncompleteCompoundSubgoal
+      ? null
+      : compoundRailFailureCodeRaw === "input_binding_missing"
+        ? "reentry_step_not_executed"
+        : compoundRailFailureCodeRaw?.startsWith("invalid_arg:") ||
+            compoundRailFailureCodeRaw?.startsWith("missing_required_arg:")
+          ? "tool_execution_rejected"
+          : compoundRailFailureCodeRaw === "compound_subgoal_dropped"
+            ? "tool_execution_rejected"
+            : compoundRailFailureCodeRaw === "subgoal_observation_missing"
+              ? "observation_missing"
+              : (TOOL_TURN_CHAIN_FAILURE_CODES as readonly string[]).includes(compoundRailFailureCodeRaw ?? "")
+                ? compoundRailFailureCodeRaw as RailFailureCode
+                : readNullableString(firstIncompleteCompoundSubgoal.executed_capability)
+                  ? "observation_missing"
+                  : "tool_execution_rejected";
   const railFailureCode: RailFailureCode | null =
     configMissing
       ? "config_missing"
       : contextualSuppressionComplete
         ? null
+        : compoundRailFailureCode
+          ? compoundRailFailureCode
         : requestedCapability && requestedSelectedMatch === false
         ? "explicit_capability_not_selected"
         : requestedCapability && executedCapability && requestedExecutedMatch === false
@@ -1183,12 +1356,14 @@ const buildToolTurnChainAudit = (input: {
                               : !materializedTerminal
                                 ? "terminal_not_materialized"
                                 : !authorityTerminal
-                                  ? "terminal_authority_missing"
+                                ? "terminal_authority_missing"
                                   : terminalProjectionMismatch
                                     ? "terminal_projection_mismatch"
-                                    : staleDebugMirrors.length > 0
-                                      ? "debug_mirror_stale"
-                                      : null;
+                                    : visibleTerminalUnproven
+                                      ? "terminal_projection_mismatch"
+                                      : staleDebugMirrors.length > 0
+                                        ? "debug_mirror_stale"
+                                        : null;
   const railStatus: RailStatus =
     railFailureCode === null ? "complete" : materializedTerminal === "typed_failure" ? "fail_closed" : "broken";
 
@@ -1208,10 +1383,19 @@ const buildToolTurnChainAudit = (input: {
     requested_capability_confidence: readNumber(admission?.requested_capability_confidence),
     selected_capability: selectedCapability,
     executed_capability: executedCapability,
+    compound_subgoal_count: input.compoundSubgoalRailStatuses?.length ?? 0,
+    first_incomplete_compound_subgoal_id: readNullableString(firstIncompleteCompoundSubgoal?.subgoal_id),
+    first_incomplete_compound_requested_capability: readNullableString(firstIncompleteCompoundSubgoal?.requested_capability),
+    first_incomplete_compound_runtime_capability: readNullableString(firstIncompleteCompoundSubgoal?.runtime_capability),
+    first_incomplete_compound_selected_capability: readNullableString(firstIncompleteCompoundSubgoal?.selected_capability),
+    first_incomplete_compound_executed_capability: readNullableString(firstIncompleteCompoundSubgoal?.executed_capability),
+    compound_first_broken_rail: compoundFirstBrokenRail,
+    compound_rail_failure_code: compoundRailFailureCodeRaw,
+    compound_repair_target: compoundRepairTarget,
     requested_selected_match: requestedSelectedMatch,
     selected_executed_match: selectedExecutedMatch,
-    substitution_rule_applied: false,
-    substitution_rule_id: null,
+    substitution_rule_applied: Boolean(substitutionRuleId),
+    substitution_rule_id: substitutionRuleId,
     required_observation_kinds_for_requested_capability: requestedObservationKinds,
     observed_artifact_supports_requested_capability: requestedCapability
       ? observedArtifactSupportsRequestedCapability
@@ -1244,30 +1428,110 @@ const buildToolTurnChainAudit = (input: {
   };
 };
 
-const buildToolTurnChainFamilyMatrix = (audit: RecordLike): RecordLike[] => {
+const matrixStatusForCompoundEntries = (entries: RecordLike[]): string | null => {
+  const statuses = entries.map((entry) => readString(entry.rail_status)).filter(Boolean);
+  if (statuses.length === 0) return null;
+  if (entries.some((entry) => !compoundSubgoalHasSatisfiedObservation(entry))) {
+    if (statuses.includes("fail_closed")) return "fail_closed";
+    if (statuses.includes("pending")) return "pending";
+    return "broken";
+  }
+  if (statuses.includes("fail_closed")) return "fail_closed";
+  if (statuses.includes("broken")) return "broken";
+  if (statuses.includes("pending")) return "pending";
+  return statuses.every((status) => status === "complete") ? "complete" : statuses[0] ?? null;
+};
+
+const matrixFamilyForCompoundSubgoal = (entry: RecordLike): string | null =>
+  canonicalAuditFamily(
+    firstString(entry.capability_family, entry.plan_family),
+    firstString(entry.executed_capability, entry.selected_capability, entry.requested_capability),
+  );
+
+const buildToolTurnChainFamilyMatrix = (
+  audit: RecordLike,
+  compoundSubgoalRailStatuses: RecordLike[] = [],
+): RecordLike[] => {
   const family = canonicalAuditFamily(audit.route_family, audit.executed_capability);
   return TOOL_TURN_CHAIN_MATRIX_FAMILIES.map((matrixFamily) => {
-    const observed = family === matrixFamily;
+    const primaryObserved = family === matrixFamily;
+    const compoundEntries = compoundSubgoalRailStatuses.filter((entry) =>
+      matrixFamilyForCompoundSubgoal(entry) === matrixFamily
+    );
+    const observed = primaryObserved || compoundEntries.length > 0;
     const authority = readString(audit.terminal_authority_kind);
     const visible = readString(audit.visible_terminal_kind);
+    const compoundRequestedCapabilities = unique(compoundEntries
+      .map((entry) => readString(entry.requested_capability))
+      .filter((entry): entry is string => Boolean(entry)));
+    const compoundExecutedCapabilities = unique(compoundEntries
+      .map((entry) => readString(entry.executed_capability))
+      .filter((entry): entry is string => Boolean(entry)));
+    const compoundObservationRefs = unique(compoundEntries
+      .map((entry) => readString(entry.observation_ref))
+      .filter((entry): entry is string => Boolean(entry)));
+    const compoundRequiredTerminalKinds = unique(compoundEntries
+      .map((entry) => readString(entry.required_terminal_kind))
+      .filter((entry): entry is string => Boolean(entry)));
+    const compoundTerminalContributionKinds = unique(compoundEntries
+      .map((entry) => readString(entry.terminal_contribution_kind))
+      .filter((entry): entry is string => Boolean(entry)));
+    const compoundContributionRoles = unique(compoundEntries
+      .map((entry) => readString(entry.contribution_role))
+      .filter((entry): entry is string => Boolean(entry)));
+    const compoundForbiddenNearbyCapabilities = unique(compoundEntries
+      .flatMap((entry) => readStringArray(entry.forbidden_nearby_capabilities))
+      .filter((entry): entry is string => Boolean(entry)));
+    const compoundRailFailureCodes = unique(compoundEntries
+      .map((entry) => readString(entry.rail_failure_code))
+      .filter((entry): entry is string => Boolean(entry)));
+    const compoundStatus = matrixStatusForCompoundEntries(compoundEntries);
     return {
       route_family: matrixFamily,
       observed,
-      requested_capability: observed ? audit.requested_capability ?? null : null,
-      requested_selected_match: observed ? audit.requested_selected_match ?? null : null,
-      selected_executed_match: observed ? audit.selected_executed_match ?? null : null,
-      did_tool_run: observed ? Boolean(readString(audit.executed_capability)) : null,
-      artifact_produced: observed ? Boolean(readString(audit.observation_ref)) : null,
-      observation_artifact_kind: observed ? audit.observation_artifact_kind ?? null : null,
-      observation_ref: observed ? audit.observation_ref ?? null : null,
-      artifact_reentered: observed ? audit.reentry_executed === true : null,
-      required_terminal_kind: observed ? audit.required_terminal_kind ?? null : null,
+      requested_capability: primaryObserved ? audit.requested_capability ?? null : compoundRequestedCapabilities[0] ?? null,
+      requested_selected_match: primaryObserved ? audit.requested_selected_match ?? null : null,
+      selected_executed_match: primaryObserved ? audit.selected_executed_match ?? null : null,
+      did_tool_run: observed
+        ? primaryObserved
+          ? Boolean(readString(audit.executed_capability))
+          : compoundExecutedCapabilities.length > 0
+        : null,
+      artifact_produced: observed
+        ? primaryObserved
+          ? Boolean(readString(audit.observation_ref))
+          : compoundObservationRefs.length > 0
+        : null,
+      observation_artifact_kind: primaryObserved ? audit.observation_artifact_kind ?? null : null,
+      observation_ref: primaryObserved ? audit.observation_ref ?? null : compoundObservationRefs[0] ?? null,
+      artifact_reentered: observed
+        ? primaryObserved
+          ? audit.reentry_executed === true
+          : compoundEntries.every((entry) =>
+              compoundSubgoalHasSatisfiedObservation(entry)
+            )
+        : null,
+      required_terminal_kind: primaryObserved ? audit.required_terminal_kind ?? null : compoundRequiredTerminalKinds[0] ?? null,
       materialized: observed ? Boolean(readString(audit.materialized_terminal_artifact_kind)) : null,
       materialized_terminal_artifact_kind: observed ? audit.materialized_terminal_artifact_kind ?? null : null,
       terminal_authority_selected: observed ? Boolean(authority) : null,
       visible_projection_matches: observed && authority && visible ? normalizedEqual(authority, visible) : observed ? null : null,
-      rail_status: observed ? audit.rail_status ?? "broken" : "not_applicable",
-      rail_failure_code: observed ? audit.rail_failure_code ?? null : null,
+      rail_status: observed
+        ? primaryObserved
+          ? audit.rail_status ?? "broken"
+          : compoundStatus ?? "broken"
+        : "not_applicable",
+      rail_failure_code: primaryObserved ? audit.rail_failure_code ?? null : compoundRailFailureCodes[0] ?? null,
+      compound_subgoal_count: compoundEntries.length,
+      compound_requested_capabilities: compoundRequestedCapabilities,
+      compound_executed_capabilities: compoundExecutedCapabilities,
+      compound_observation_refs: compoundObservationRefs,
+      compound_required_terminal_kinds: compoundRequiredTerminalKinds,
+      compound_terminal_contribution_kinds: compoundTerminalContributionKinds,
+      compound_contribution_roles: compoundContributionRoles,
+      compound_forbidden_nearby_capabilities: compoundForbiddenNearbyCapabilities,
+      compound_rail_statuses: compoundEntries.map((entry) => readNullableString(entry.rail_status)),
+      compound_rail_failure_codes: compoundEntries.map((entry) => readNullableString(entry.rail_failure_code)),
     };
   });
 };
@@ -1428,6 +1692,9 @@ const buildToolRailFailureTriage = (input: {
   const triage = triageFromAudit(input.audit);
   const executedCapability = readString(input.audit.executed_capability);
   const observationRef = readString(input.audit.observation_ref);
+  const firstIncompleteCompoundExecutedCapability = readNullableString(
+    input.audit.first_incomplete_compound_executed_capability,
+  );
   return {
     schema: "helix.tool_rail_failure_triage.v1",
     turn_id: input.turnId,
@@ -1439,6 +1706,20 @@ const buildToolRailFailureTriage = (input: {
     requested_capability_confidence: readNumber(input.audit.requested_capability_confidence),
     selected_capability: readNullableString(input.audit.selected_capability),
     executed_capability: executedCapability || null,
+    compound_subgoal_count: readNumber(input.audit.compound_subgoal_count) ?? 0,
+    first_incomplete_compound_subgoal_id: readNullableString(input.audit.first_incomplete_compound_subgoal_id),
+    first_incomplete_compound_requested_capability: readNullableString(input.audit.first_incomplete_compound_requested_capability),
+    first_incomplete_compound_runtime_capability: readNullableString(input.audit.first_incomplete_compound_runtime_capability),
+    first_incomplete_compound_selected_capability: readNullableString(input.audit.first_incomplete_compound_selected_capability),
+    first_incomplete_compound_executed_capability: firstIncompleteCompoundExecutedCapability,
+    compound_first_broken_rail: readNullableString(input.audit.compound_first_broken_rail),
+    compound_rail_failure_code: readNullableString(input.audit.compound_rail_failure_code),
+    compound_repair_target: readNullableString(input.audit.compound_repair_target),
+    compound_incomplete_subgoal_did_tool_run: firstIncompleteCompoundExecutedCapability
+      ? true
+      : readNullableString(input.audit.first_incomplete_compound_subgoal_id)
+        ? false
+        : null,
     requested_selected_match:
       typeof input.audit.requested_selected_match === "boolean" ? input.audit.requested_selected_match : null,
     selected_executed_match:
@@ -1786,6 +2067,36 @@ const buildCodexParityAgentSpineRailTable = (input: {
     admission_proof_source: admissionProof.source,
     admission_proven: admissionProof.proven,
     executed_capability: executedCapability,
+    compound_subgoal_count:
+      readNumber(input.audit.compound_subgoal_count) ?? readNumber(input.triage.compound_subgoal_count) ?? 0,
+    first_incomplete_compound_subgoal_id:
+      readNullableString(input.audit.first_incomplete_compound_subgoal_id) ??
+      readNullableString(input.triage.first_incomplete_compound_subgoal_id),
+    first_incomplete_compound_requested_capability:
+      readNullableString(input.audit.first_incomplete_compound_requested_capability) ??
+      readNullableString(input.triage.first_incomplete_compound_requested_capability),
+    first_incomplete_compound_runtime_capability:
+      readNullableString(input.audit.first_incomplete_compound_runtime_capability) ??
+      readNullableString(input.triage.first_incomplete_compound_runtime_capability),
+    first_incomplete_compound_selected_capability:
+      readNullableString(input.audit.first_incomplete_compound_selected_capability) ??
+      readNullableString(input.triage.first_incomplete_compound_selected_capability),
+    first_incomplete_compound_executed_capability:
+      readNullableString(input.audit.first_incomplete_compound_executed_capability) ??
+      readNullableString(input.triage.first_incomplete_compound_executed_capability),
+    compound_first_broken_rail:
+      readNullableString(input.audit.compound_first_broken_rail) ??
+      readNullableString(input.triage.compound_first_broken_rail),
+    compound_rail_failure_code:
+      readNullableString(input.audit.compound_rail_failure_code) ??
+      readNullableString(input.triage.compound_rail_failure_code),
+    compound_repair_target:
+      readNullableString(input.audit.compound_repair_target) ??
+      readNullableString(input.triage.compound_repair_target),
+    compound_incomplete_subgoal_did_tool_run:
+      typeof input.triage.compound_incomplete_subgoal_did_tool_run === "boolean"
+        ? input.triage.compound_incomplete_subgoal_did_tool_run
+        : null,
     observation_kind: readNullableString(input.audit.observation_artifact_kind),
     observation_ref: readNullableString(input.audit.observation_ref),
     required_observation_kinds_for_requested_capability:
@@ -1929,10 +2240,14 @@ export const buildArtifactQueryIndex = (input: {
   const compoundSubgoalLedger = readArray(capabilityItineraryExecutionState?.compound_subgoal_ledger)
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry));
-  const compoundSubgoalRailStatuses = compoundSubgoalLedger.map((entry) => ({
+  const compoundContractSubgoals = readArray(compoundCapabilityContract?.subgoals)
+    .map((entry) => readRecord(entry))
+    .filter((entry): entry is RecordLike => Boolean(entry));
+  const compoundSubgoalRailStatusFromLedgerEntry = (entry: RecordLike): RecordLike => ({
     subgoal_id: readNullableString(entry.subgoal_id),
     order: readNumber(entry.order),
     requested_capability: readNullableString(entry.requested_capability),
+    runtime_capability: readNullableString(entry.runtime_capability),
     selected_capability: readNullableString(entry.selected_capability),
     executed_capability: readNullableString(entry.executed_capability),
     args: readRecord(entry.args),
@@ -1941,6 +2256,10 @@ export const buildArtifactQueryIndex = (input: {
     selected_args: readRecord(entry.selected_args),
     required_args: readStringArray(entry.required_args),
     optional_args: readStringArray(entry.optional_args),
+    required_observation_kinds: readStringArray(entry.required_observation_kinds),
+    required_terminal_kind: readNullableString(entry.required_terminal_kind),
+    allowed_substitutions: readStringArray(entry.allowed_substitutions),
+    forbidden_nearby_capabilities: readStringArray(entry.forbidden_nearby_capabilities),
     input_bindings: readArray(entry.input_bindings)
       .map((binding) => readRecord(binding))
       .filter((binding): binding is RecordLike => Boolean(binding)),
@@ -1964,7 +2283,109 @@ export const buildArtifactQueryIndex = (input: {
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,
-  }));
+  });
+  const compoundSubgoalRepresentedInLedger = (subgoal: RecordLike): boolean => {
+    const subgoalId = readNullableString(subgoal.subgoal_id);
+    if (subgoalId && compoundSubgoalLedger.some((entry) => readNullableString(entry.subgoal_id) === subgoalId)) {
+      return true;
+    }
+    const requested = readNullableString(subgoal.requested_capability);
+    const runtime = readNullableString(subgoal.runtime_capability);
+    const order = readNumber(subgoal.order);
+    return compoundSubgoalLedger.some((entry) => {
+      const sameOrder = order === null || readNumber(entry.order) === order;
+      return sameOrder && (
+        (requested && (
+          readNullableString(entry.requested_capability) === requested ||
+          readNullableString(entry.runtime_capability) === requested ||
+          readNullableString(entry.selected_capability) === requested ||
+          readNullableString(entry.executed_capability) === requested
+        )) ||
+        (runtime && (
+          readNullableString(entry.requested_capability) === runtime ||
+          readNullableString(entry.runtime_capability) === runtime ||
+          readNullableString(entry.selected_capability) === runtime ||
+          readNullableString(entry.executed_capability) === runtime
+        ))
+      );
+    });
+  };
+  const compoundSubgoalRailStatusFromMissingContractSubgoal = (subgoal: RecordLike): RecordLike => {
+    const inputBindings = readArray(subgoal.input_bindings)
+      .map((binding) => readRecord(binding))
+      .filter((binding): binding is RecordLike => Boolean(binding));
+    const args = readRecord(subgoal.args_hint);
+    return {
+      subgoal_id: readNullableString(subgoal.subgoal_id),
+      order: readNumber(subgoal.order),
+      requested_capability: readNullableString(subgoal.requested_capability),
+      runtime_capability: readNullableString(subgoal.runtime_capability),
+      selected_capability: null,
+      executed_capability: null,
+      args,
+      args_source: "compound_contract_missing_ledger",
+      planned_args: args,
+      selected_args: null,
+      required_args: readStringArray(subgoal.required_args),
+      optional_args: readStringArray(subgoal.optional_args),
+      required_observation_kinds: readStringArray(subgoal.required_observation_kinds),
+      required_terminal_kind: readNullableString(subgoal.required_terminal_kind),
+      allowed_substitutions: readStringArray(subgoal.allowed_substitutions),
+      forbidden_nearby_capabilities: readStringArray(subgoal.forbidden_nearby_capabilities),
+      input_bindings: inputBindings,
+      observation_kind: null,
+      observation_ref: null,
+      observation_provenance: null,
+      support_refs: [],
+      bound_input_refs: [],
+      unresolved_input_bindings: inputBindings,
+      satisfaction: "missing",
+      contribution_role: readNullableString(subgoal.contribution_role),
+      terminal_contribution_kind: readNullableString(subgoal.terminal_contribution_kind),
+      rail_status: "fail_closed",
+      first_broken_rail: "capability_execution",
+      rail_failure_code: "compound_subgoal_dropped",
+      repair_target: "agent_step_selection",
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+  };
+  const compoundSubgoalRailStatuses = [
+    ...compoundSubgoalLedger.map(compoundSubgoalRailStatusFromLedgerEntry),
+    ...compoundContractSubgoals
+      .filter((subgoal) => subgoal.mandatory !== false)
+      .filter((subgoal) => !compoundSubgoalRepresentedInLedger(subgoal))
+      .map(compoundSubgoalRailStatusFromMissingContractSubgoal),
+  ].sort((left, right) => (readNumber(left.order) ?? 0) - (readNumber(right.order) ?? 0));
+  const derivedMissingCompoundSubgoalIds = compoundSubgoalRailStatuses
+    .filter((entry) => !compoundSubgoalHasSatisfiedObservation(entry))
+    .map((entry) => readNullableString(entry.subgoal_id))
+    .filter((entry): entry is string => Boolean(entry));
+  const derivedMissingRequiredCapabilities = compoundSubgoalRailStatuses
+    .filter((entry) => !compoundSubgoalHasSatisfiedObservation(entry))
+    .map((entry) => readNullableString(entry.requested_capability))
+    .filter((entry): entry is string => Boolean(entry));
+  const missingCompoundSubgoalIds = readStringArray(
+    capabilityItineraryExecutionState?.missing_compound_subgoal_ids,
+  );
+  const missingRequiredCapabilities = readStringArray(
+    capabilityItineraryExecutionState?.missing_required_capabilities,
+  );
+  const effectiveMissingCompoundSubgoalIds = missingCompoundSubgoalIds.length > 0
+    ? missingCompoundSubgoalIds
+    : derivedMissingCompoundSubgoalIds;
+  const effectiveMissingRequiredCapabilities = missingRequiredCapabilities.length > 0
+    ? missingRequiredCapabilities
+    : derivedMissingRequiredCapabilities;
+  const nextMissingSubgoalId =
+    readNullableString(capabilityItineraryExecutionState?.next_missing_subgoal_id) ??
+    effectiveMissingCompoundSubgoalIds[0] ??
+    null;
+  const compoundSubgoalMissingSummaryComplete =
+    capabilityItineraryExecutionState?.complete === true &&
+    effectiveMissingCompoundSubgoalIds.length === 0 &&
+    effectiveMissingRequiredCapabilities.length === 0;
   const admission = readRecord(input.payload.tool_call_admission_decision);
   const artifacts = artifactsForPayload(input.payload);
   const lifecycleCapability = capabilityFromPayload(input.payload, lifecycleTrace);
@@ -2037,6 +2458,7 @@ export const buildArtifactQueryIndex = (input: {
     contract,
     requiredObservationCoverage,
     requiredObservationsSatisfied,
+    compoundSubgoalRailStatuses,
   });
   const toolRailFailureTriage = buildToolRailFailureTriage({
     turnId: input.turnId,
@@ -2064,6 +2486,14 @@ export const buildArtifactQueryIndex = (input: {
     capability_itinerary_execution_state: capabilityItineraryExecutionState,
     compound_subgoal_ledger: compoundSubgoalLedger,
     compound_subgoal_rail_statuses: compoundSubgoalRailStatuses,
+    compound_subgoal_missing_summary: {
+      missing_compound_subgoal_ids: effectiveMissingCompoundSubgoalIds,
+      missing_required_capabilities: effectiveMissingRequiredCapabilities,
+      next_missing_subgoal_id: nextMissingSubgoalId,
+      complete: compoundSubgoalMissingSummaryComplete,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
     tool_family_contract: contractSummary(contract),
     requested_capability_contract: requestedCapabilityContract,
     required_observation_coverage_mode: requiredObservationCoverageMode,
@@ -2089,7 +2519,10 @@ export const buildArtifactQueryIndex = (input: {
     codex_parity_agent_spine_rail_table: codexParityAgentSpineRailTable,
     tool_turn_chain_audit: toolTurnChainAudit,
     tool_rail_failure_triage: toolRailFailureTriage,
-    tool_turn_chain_family_matrix: buildToolTurnChainFamilyMatrix(toolTurnChainAudit),
+    tool_turn_chain_family_matrix: buildToolTurnChainFamilyMatrix(
+      toolTurnChainAudit,
+      compoundSubgoalRailStatuses,
+    ),
     assistant_answer: false,
     terminal_eligible: false,
     raw_content_included: false,

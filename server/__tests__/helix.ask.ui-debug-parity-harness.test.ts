@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildUiApiParitySessionId,
   collectCompleteRailEnvelopeViolations,
+  collectRailTableViolations,
   collectUiApiTerminalParityViolations,
+  collectUiDebugCompoundSubgoalRailStatuses,
   collectUiDebugRailCandidates,
   collectUiDebugRailMirrorViolations,
   BROAD_PARITY_PROMPTS,
@@ -36,6 +38,16 @@ const baseRail = (): Record<string, unknown> => ({
   admission_proof_source: "capability_plan.selected_capability",
   admission_proven: true,
   executed_capability: "helix_ask.inspect_capability_catalog",
+  compound_subgoal_count: 0,
+  first_incomplete_compound_subgoal_id: null,
+  first_incomplete_compound_requested_capability: null,
+  first_incomplete_compound_runtime_capability: null,
+  first_incomplete_compound_selected_capability: null,
+  first_incomplete_compound_executed_capability: null,
+  compound_first_broken_rail: null,
+  compound_rail_failure_code: null,
+  compound_repair_target: null,
+  compound_incomplete_subgoal_did_tool_run: null,
   observation_kind: "capability_registry",
   observation_ref: "ask:ui-debug-parity:test:capability_registry",
   required_observation_kinds_for_requested_capability: ["capability_registry"],
@@ -62,6 +74,65 @@ const baseRail = (): Record<string, unknown> => ({
   raw_content_included: false,
 });
 
+const compoundFailureRail = (): Record<string, unknown> => ({
+  ...baseRail(),
+  requested_capability: "docs-viewer.locate_in_doc",
+  selected_capability: "docs-viewer.locate_in_doc",
+  executed_capability: "docs-viewer.locate_in_doc",
+  compound_subgoal_count: 2,
+  first_incomplete_compound_subgoal_id: "subgoal:2",
+  first_incomplete_compound_requested_capability: "scientific-calculator.solve_expression",
+  first_incomplete_compound_runtime_capability: "scientific-calculator.solve_expression",
+  first_incomplete_compound_selected_capability: "scientific-calculator.solve_expression",
+  first_incomplete_compound_executed_capability: null,
+  compound_first_broken_rail: "capability_execution",
+  compound_rail_failure_code: "invalid_arg:latex_is_prose",
+  compound_repair_target: "subgoal_argument_extraction",
+  compound_incomplete_subgoal_did_tool_run: false,
+  selected_terminal_kind: "typed_failure",
+  visible_terminal_kind: "typed_failure",
+  codex_parity_class: "broken",
+  first_broken_rail: "capability_execution",
+  repair_target: "subgoal_argument_extraction",
+  rail_status: "fail_closed",
+  rail_failure_code: "invalid_arg:latex_is_prose",
+});
+
+const compoundSubgoalRails = (): Array<Record<string, unknown>> => [
+  {
+    subgoal_id: "subgoal:1",
+    order: 1,
+    requested_capability: "docs-viewer.locate_in_doc",
+    runtime_capability: "docs-viewer.locate_in_doc",
+    selected_capability: "docs-viewer.locate_in_doc",
+    executed_capability: "docs-viewer.locate_in_doc",
+    args: { query: "receipts are observations" },
+    observation_kind: "doc_location_matches",
+    observation_ref: "ask:ui-api-parity:doc_location_matches",
+    satisfaction: "satisfied",
+    rail_status: "complete",
+    first_broken_rail: null,
+    rail_failure_code: null,
+    repair_target: null,
+  },
+  {
+    subgoal_id: "subgoal:2",
+    order: 2,
+    requested_capability: "scientific-calculator.solve_expression",
+    runtime_capability: "scientific-calculator.solve_expression",
+    selected_capability: "scientific-calculator.solve_expression",
+    executed_capability: null,
+    args: { latex: "explain why receipts matter" },
+    observation_kind: null,
+    observation_ref: null,
+    satisfaction: "not_satisfied",
+    rail_status: "fail_closed",
+    first_broken_rail: "capability_execution",
+    rail_failure_code: "invalid_arg:latex_is_prose",
+    repair_target: "subgoal_argument_extraction",
+  },
+];
+
 describe("Helix Ask UI debug parity harness", () => {
   it("collects rail tables from top-level, payload, and nested debug mirrors", () => {
     const rail = baseRail();
@@ -82,6 +153,20 @@ describe("Helix Ask UI debug parity harness", () => {
 
     expect(rails).toHaveLength(4);
     expect(rails.every((entry) => entry.turn_id === "ask:ui-debug-parity:test")).toBe(true);
+  });
+
+  it("collects ordered compound subgoal rails from top-level, payload, and artifact mirrors", () => {
+    const rails = compoundSubgoalRails();
+
+    expect(
+      collectUiDebugCompoundSubgoalRailStatuses({
+        payload: {
+          artifact_query_index: {
+            compound_subgoal_rail_statuses: rails,
+          },
+        },
+      }),
+    ).toEqual(rails);
   });
 
   it("flags stale UI debug rail mirrors", () => {
@@ -159,6 +244,47 @@ describe("Helix Ask UI debug parity harness", () => {
         visibleFinalAnswer: "I could not complete that turn.\nCause: observation_missing.",
       }),
     ).toEqual([]);
+  });
+
+  it("rejects visible rail projections without a projection proof source", () => {
+    const rail = {
+      ...baseRail(),
+      visible_projection_source: null,
+    };
+
+    expect(collectRailTableViolations(rail, null)).toContain("rail_visible_projection_source_missing");
+  });
+
+  it("rejects visible rail projections whose projection source is not proven", () => {
+    const rail = {
+      ...baseRail(),
+      visible_projection_proven: false,
+    };
+
+    expect(collectRailTableViolations(rail, null)).toContain("rail_visible_projection_not_proven");
+  });
+
+  it("rejects incomplete compound rails without first-incomplete subgoal mirrors", () => {
+    const rail = {
+      ...compoundFailureRail(),
+      first_incomplete_compound_subgoal_id: null,
+      first_incomplete_compound_requested_capability: null,
+      first_incomplete_compound_runtime_capability: null,
+      compound_first_broken_rail: null,
+      compound_rail_failure_code: null,
+      compound_repair_target: null,
+      compound_incomplete_subgoal_did_tool_run: null,
+    };
+
+    expect(collectRailTableViolations(rail, null)).toEqual(
+      expect.arrayContaining([
+        "rail_incomplete_compound_first_incomplete_subgoal_missing",
+        "rail_incomplete_compound_requested_capability_missing",
+        "rail_incomplete_compound_runtime_capability_missing",
+        "rail_incomplete_compound_rail_failure_code_missing",
+        "rail_incomplete_compound_did_tool_run_missing",
+      ]),
+    );
   });
 
   it("flags complete rails that have no visible final answer text", () => {
@@ -247,6 +373,132 @@ describe("Helix Ask UI debug parity harness", () => {
         "ui_api_visible_answer_mismatch",
       ]),
     );
+  });
+
+  it("flags stale UI/API compound first-incomplete subgoal rail mirrors", () => {
+    const uiRail = {
+      ...compoundFailureRail(),
+      first_incomplete_compound_subgoal_id: "subgoal:1",
+      first_incomplete_compound_requested_capability: "docs-viewer.locate_in_doc",
+      compound_rail_failure_code: "observation_missing",
+    };
+    const apiRail = compoundFailureRail();
+
+    const violations = collectUiApiTerminalParityViolations({
+      uiDebugExport: {
+        active_turn_id: "ask:ui-api-parity:shared",
+        active_prompt:
+          "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
+        selected_final_answer: "I could not complete that turn.\nCause: compound_subgoal_invalid_args_after_repair.",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "compound_subgoal_invalid_args_after_repair",
+        codex_parity_agent_spine_rail_table: uiRail,
+      },
+      apiResponse: {
+        turn_id: "ask:ui-api-parity:shared",
+        question:
+          "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
+        selected_final_answer: "I could not complete that turn.\nCause: compound_subgoal_invalid_args_after_repair.",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "compound_subgoal_invalid_args_after_repair",
+        codex_parity_agent_spine_rail_table: apiRail,
+      },
+    });
+
+    expect(violations).toEqual(
+      expect.arrayContaining([
+        "ui_api_rail_first_incomplete_compound_subgoal_id_mismatch:subgoal:1!=subgoal:2",
+        "ui_api_rail_first_incomplete_compound_requested_capability_mismatch:docs-viewer.locate_in_doc!=scientific-calculator.solve_expression",
+        "ui_api_rail_compound_rail_failure_code_mismatch:observation_missing!=invalid_arg:latex_is_prose",
+      ]),
+    );
+  });
+
+  it("flags UI/API ordered compound subgoal rail divergence even when top-level mirrors match", () => {
+    const rail = compoundFailureRail();
+    const uiRails = compoundSubgoalRails();
+    const apiRails = compoundSubgoalRails().map((entry) =>
+      entry.subgoal_id === "subgoal:2"
+        ? {
+            ...entry,
+            args: { latex: "2+2" },
+            executed_capability: "scientific-calculator.solve_expression",
+            observation_kind: "calculator_receipt",
+            observation_ref: "ask:ui-api-parity:calculator_receipt",
+            satisfaction: "satisfied",
+            rail_status: "complete",
+            first_broken_rail: null,
+            rail_failure_code: null,
+            repair_target: null,
+          }
+        : entry,
+    );
+
+    const violations = collectUiApiTerminalParityViolations({
+      uiDebugExport: {
+        active_turn_id: "ask:ui-api-parity:shared",
+        active_prompt:
+          "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
+        selected_final_answer: "I could not complete that turn.\nCause: compound_subgoal_invalid_args_after_repair.",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "compound_subgoal_invalid_args_after_repair",
+        codex_parity_agent_spine_rail_table: rail,
+        compound_subgoal_rail_statuses: uiRails,
+      },
+      apiResponse: {
+        turn_id: "ask:ui-api-parity:shared",
+        question:
+          "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
+        selected_final_answer: "I could not complete that turn.\nCause: compound_subgoal_invalid_args_after_repair.",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "compound_subgoal_invalid_args_after_repair",
+        codex_parity_agent_spine_rail_table: rail,
+        compound_subgoal_rail_statuses: apiRails,
+      },
+    });
+
+    expect(violations).toContain("ui_api_compound_subgoal_rails_mismatch");
+  });
+
+  it("flags UI/API compound subgoal order divergence", () => {
+    const rail = compoundFailureRail();
+    const uiRails = compoundSubgoalRails();
+    const apiRails = compoundSubgoalRails().map((entry) =>
+      entry.subgoal_id === "subgoal:2"
+        ? {
+            ...entry,
+            order: 1,
+          }
+        : {
+            ...entry,
+            order: 2,
+          },
+    );
+
+    const violations = collectUiApiTerminalParityViolations({
+      uiDebugExport: {
+        active_turn_id: "ask:ui-api-parity:shared",
+        active_prompt:
+          "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
+        selected_final_answer: "I could not complete that turn.\nCause: compound_subgoal_invalid_args_after_repair.",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "compound_subgoal_invalid_args_after_repair",
+        codex_parity_agent_spine_rail_table: rail,
+        compound_subgoal_rail_statuses: uiRails,
+      },
+      apiResponse: {
+        turn_id: "ask:ui-api-parity:shared",
+        question:
+          "Use docs-viewer.locate_in_doc, then call scientific-calculator.solve_expression with this exact expression: explain why receipts matter.",
+        selected_final_answer: "I could not complete that turn.\nCause: compound_subgoal_invalid_args_after_repair.",
+        terminal_artifact_kind: "typed_failure",
+        terminal_error_code: "compound_subgoal_invalid_args_after_repair",
+        codex_parity_agent_spine_rail_table: rail,
+        compound_subgoal_rail_statuses: apiRails,
+      },
+    });
+
+    expect(violations).toContain("ui_api_compound_subgoal_rails_mismatch");
   });
 
   it("does not require exact answer text for separate turns with matching terminal semantics", () => {

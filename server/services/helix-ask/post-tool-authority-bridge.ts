@@ -24,6 +24,15 @@ export type HelixPostToolAuthorityBridge = {
     | "repo_docs"
     | "scholarly_research"
     | "internet_search"
+    | "workspace_directory"
+    | "workspace_diagnostic"
+    | "capability_catalog"
+    | "theory_locator"
+    | "context_reflection"
+    | "zen_graph_reflection"
+    | "civilization_bounds"
+    | "visual_capture"
+    | "live_environment"
     | "workstation_panel"
     | "unknown";
   required_terminal_kind:
@@ -475,11 +484,20 @@ const inferRouteFamily = (payload: RecordLike, capability: string): HelixPostToo
   const prompt = readString(payload.active_prompt) || readString(payload.prompt) || readString(payload.question);
   const toolChain = artifactLedger(payload).map((artifact) => artifactToolName(artifact)).filter(Boolean).join(" ");
   const haystack = `${sourceTarget} ${targetSource} ${goalKind} ${phaseGoal} ${capability} ${toolChain} ${readString(payload.route_reason_code)} ${readString(payload.route)} ${prompt}`;
-  if (/live_source_mailbox|live_source_processed_mail_interpretation|processed_mail_voice_decision|stage_play_processed_mail_packet|stage_play_live_source_mail_loop_reflection|record_live_source_mail_decision|read_processed_live_source_mail|reflect_live_source_mail_loop/i.test(haystack)) return "live_source_mailbox";
+  if (/live_source_mailbox|live_source_processed_mail_interpretation|processed_mail_voice_decision|stage_play_live_source_mail_read_result|stage_play_processed_mail_packet|stage_play_live_source_mail_loop_reflection|record_live_source_mail_decision|check_live_source_mail|read_live_source_mail|read_processed_live_source_mail|process_live_source_mail|reflect_live_source_mail_loop/i.test(haystack)) return "live_source_mailbox";
+  if (/capability_catalog|capability_registry|capability_help_summary|inspect_capability_catalog/i.test(haystack)) return "capability_catalog";
+  if (/workspace_directory|workspace-directory\.resolve|workspace_directory_resolution/i.test(haystack)) return "workspace_directory";
+  if (/workspace_diagnostic|workspace_os\.status|workspace_os_status|workspace[- ]status/i.test(haystack)) return "workspace_diagnostic";
   if (/scholarly_research|scholarly-research|doi|arxiv|citation|journal/i.test(haystack)) return "scholarly_research";
   if (/internet_search|internet-search|search_web|google_custom_search|web_search/i.test(haystack)) return "internet_search";
+  if (/theory_locator|reflect_theory_context|theory_context_reflection|frontierVectorFieldTrace|theory_frontier_vector_field/i.test(haystack)) return "theory_locator";
+  if (/context_reflection|reflect_context_attachments|reflect_live_synthetic_data|bounded_context_reference/i.test(haystack)) return "context_reflection";
+  if (/zen_graph_reflection|ideology_context_reflection|procedural_zen_classification|bridge_theory_ideology_context|theory_ideology_bridge/i.test(haystack)) return "zen_graph_reflection";
+  if (/civilization_bounds|civilization_scenario_frame|civilization_bounds_roadmap/i.test(haystack)) return "civilization_bounds";
   if (/calculator|scientific-calculator/i.test(haystack)) return "calculator";
   if (/voice_delivery|confirm_speak|read.+out loud|voice/i.test(haystack)) return "voice_delivery";
+  if (/visual_capture|image_lens|visual_frame_evidence|situation_context_pack/i.test(haystack)) return "visual_capture";
+  if (/live_environment|micro_reasoner|workstation_goal|agent_goal|route_watch|loop_state/i.test(haystack)) return "live_environment";
   if (/dottie|situation-room|minecraft|live_pipeline|stage_play_badge_graph|stage_play_job_plan|stage_play_checkpoint_request_result|stage_play_checkpoint_request|stage_play_checkpoint_queue|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation|reflect_stage_play_context|plan_stage_play_job|request_stage_play_checkpoint/i.test(haystack)) return "situation_room_setup";
   if (
     sourceTarget === "docs_viewer" ||
@@ -498,8 +516,8 @@ export function buildPostToolAuthorityBridge(input: {
 }): HelixPostToolAuthorityBridge {
   const capability = selectedCapability(input.payload);
   const routeFamily = inferRouteFamily(input.payload, capability);
-  const toolObservationRefs = artifactRefs(input.payload, /agent_step_observation_packet|runtime_tool_observation|live_environment_tool_observation|workspace_action_receipt|calculator_receipt|doc_summary|doc_location_result|doc_evidence_location|doc_location_matches|doc_equation_context|doc_equation_location|doc_calculator_evidence|scholarly_research_observation|scholarly_full_text_observation|internet_search_observation|dottie_|voice_delivery|workstation_tool_evaluation|stage_play_badge_graph|stage_play_live_source_mail_loop_reflection|stage_play_job_plan|stage_play_checkpoint_request_result|stage_play_checkpoint_request|stage_play_checkpoint_queue|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation/);
-  const answerDraftRefs = artifactRefs(input.payload, /final_answer_draft|direct_answer_text|doc_evidence_synthesis_answer|repo_code_evidence_answer|scholarly_research_answer|internet_search_answer/);
+  const toolObservationRefs = artifactRefs(input.payload, /agent_step_observation_packet|runtime_tool_observation|live_environment_tool_observation|workspace_action_receipt|calculator_receipt|calculator_result|doc_summary|doc_open_receipt|docs_viewer_receipt|doc_location_result|doc_evidence_location|doc_location_matches|doc_equation_context|doc_equation_location|doc_calculator_evidence|repo_code_evidence_observation|repo_code_search_result|repo_evidence_relevance_gate|workspace_directory_resolution|workspace_os_status_observation|capability_registry|capability_help_summary|scholarly_research_observation|scholarly_full_text_observation|internet_search_observation|web_research_observation|helix_theory_context_reflection_tool_receipt|theory_context_reflection|helix_theory_frontier_vector_field_tool_receipt|theory_frontier_vector_field|helix_context_reflection_tool_receipt|bounded_context_reference|ideology_context_reflection|procedural_zen_classification|helix_zen_graph_reflection_tool_result|helix_theory_ideology_bridge_tool_result|civilization_scenario_frame|helix_civilization_scenario_frame_tool_result|civilization_bounds_roadmap|helix_civilization_bounds_tool_result|visual_frame_evidence|situation_context_pack|visual_capture_coverage|dottie_|voice_delivery|workstation_tool_evaluation|stage_play_badge_graph|stage_play_live_source_mail_loop_reflection|stage_play_job_plan|stage_play_checkpoint_request_result|stage_play_checkpoint_request|stage_play_checkpoint_queue|stage_play_builder_catalog|stage_play_source_query|stage_play_graph_draft_validation/);
+  const answerDraftRefs = artifactRefs(input.payload, /final_answer_draft|direct_answer_text|doc_evidence_synthesis_answer|repo_code_evidence_answer|scholarly_research_answer|internet_search_answer|compound_research_locator_answer|model_synthesized_answer|capability_help_summary|theory_context_reflection_answer|workspace_directory_resolution/);
   const liveSourceReflectionSynthesis = liveSourceMailLoopReflectionSynthesisText(input.payload);
   const liveSourceSynthesis = liveSourceReflectionSynthesis || liveSourceMailboxSynthesisText(input.payload);
   const calculatorSupport = evaluateCalculatorToolAnswerSupport({ turnId: input.turnId, payload: input.payload });

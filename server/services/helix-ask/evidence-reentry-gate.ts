@@ -265,6 +265,123 @@ const collectCapabilityHelpEvidenceRefs = (input: {
     .filter(Boolean);
 };
 
+const capabilityItineraryEvidencePatterns: Array<{ family: string; pattern: RegExp }> = [
+  {
+    family: "calculator",
+    pattern:
+      /calculator_receipt|calculator_result|workstation_tool_evaluation|scientific[-_.:]calculator[-_.:]solve[-_.:]expression/i,
+  },
+  {
+    family: "docs_viewer",
+    pattern:
+      /docs_viewer_receipt|doc_open_receipt|doc_location_result|doc_location_matches|doc_evidence_location|doc_equation_context|doc_summary|observation_review/i,
+  },
+  {
+    family: "repo_code",
+    pattern:
+      /repo_code_evidence_observation|repo_code_search_result|repo_evidence_relevance_gate|repo[-_.:]code[-_.:]search[-_.:]concept/i,
+  },
+  {
+    family: "workspace_directory",
+    pattern: /workspace_directory_resolution|workspace[-_.:]directory[-_.:]resolve/i,
+  },
+  {
+    family: "workspace_diagnostic",
+    pattern: /workspace_os_status_observation|workspace_os\.status|workspace[-_]os[-_]status|workspace_status/i,
+  },
+  {
+    family: "workstation",
+    pattern: /workspace_action_receipt|workstation_tool_evaluation|tool_evaluation|note_update_receipt|note_action_receipt/i,
+  },
+  {
+    family: "workstation_action",
+    pattern: /workspace_action_receipt|workstation_tool_evaluation|tool_evaluation|note_update_receipt|note_action_receipt/i,
+  },
+  {
+    family: "capability_catalog",
+    pattern: /capability_registry|capability_help_summary|inspect_capability_catalog/i,
+  },
+  {
+    family: "internet_search",
+    pattern: /internet_search_observation|web_research_observation|internet_search|web_research/i,
+  },
+  {
+    family: "scholarly_research",
+    pattern: /scholarly_research_observation|scholarly_full_text_observation|lookup_papers|fetch_full_text/i,
+  },
+  {
+    family: "theory_locator",
+    pattern:
+      /helix_theory_context_reflection_tool_receipt|theory_context_reflection|reflect_theory_context|helix_theory_frontier_vector_field_tool_receipt|theory_frontier_vector_field|frontierVectorFieldTrace/i,
+  },
+  {
+    family: "context_reflection",
+    pattern:
+      /helix_context_reflection_tool_receipt|bounded_context_reference|context_attachment|live_synthetic_data/i,
+  },
+  {
+    family: "zen_graph_reflection",
+    pattern:
+      /ideology_context_reflection|procedural_zen_classification|helix_zen_graph_reflection_tool_result|helix_theory_ideology_bridge_tool_result|theory_ideology_bridge/i,
+  },
+  {
+    family: "civilization_bounds",
+    pattern:
+      /civilization_scenario_frame|helix_civilization_scenario_frame_tool_result|civilization_bounds_roadmap|helix_civilization_bounds_tool_result/i,
+  },
+  {
+    family: "visual_capture",
+    pattern:
+      /visual_frame_evidence|situation_context_pack|visual_capture_coverage|image_lens\.inspect|situation[-_]room[-_.:]describe[-_]visual[-_]capture/i,
+  },
+  {
+    family: "situation_run",
+    pattern:
+      /visual_frame_evidence|situation_context_pack|visual_capture_coverage|situation[-_]room[-_.:]describe[-_]visual[-_]capture|situation_run/i,
+  },
+  {
+    family: "live_environment",
+    pattern:
+      /live_environment_tool_observation|stage_play_|micro_reasoner|workstation_goal|agent_goal|narrator|voice_|route_watch|loop_state/i,
+  },
+  {
+    family: "live_source_mail",
+    pattern:
+      /processed_live_source_mail|stage_play_processed_mail_packet|live_source_mail|read_processed_live_source_mail|reflect_live_source_mail_loop/i,
+  },
+  {
+    family: "live_pipeline",
+    pattern: /live_pipeline|live_source_pipeline|stage_play_live_source|stage_play_source_query/i,
+  },
+  {
+    family: "live_source_decision",
+    pattern: /live_source_decision|checkpoint|stage_play_checkpoint|arbiter/i,
+  },
+  {
+    family: "process_graph",
+    pattern: /stage_play_badge_graph|badge_graph|process_graph/i,
+  },
+  {
+    family: "voice_delivery",
+    pattern: /voice_delivery|voice_|narrator/i,
+  },
+  {
+    family: "notes",
+    pattern: /note_update_receipt|note_action_receipt|workstation[-_]notes[-_.:]append[-_]to[-_]note/i,
+  },
+];
+
+const capabilityItineraryEntryMatchesObservedFamily = (entry: RecordLike, requiredObserved: Set<string>): boolean => {
+  const payloadRecord = readRecord(entry.payload);
+  const haystack = [
+    readString(entry.kind),
+    readString(payloadRecord?.schema),
+    readString(payloadRecord?.capability),
+    readString(payloadRecord?.tool_id),
+  ].join(" ");
+  return capabilityItineraryEvidencePatterns.some(({ family, pattern }) => requiredObserved.has(family) && pattern.test(haystack));
+};
+
 const collectCapabilityItineraryEvidenceRefs = (payload: RecordLike): string[] => {
   const itinerary = readRecord(payload.capability_itinerary);
   const executionState = readRecord(itinerary?.execution_state);
@@ -283,22 +400,7 @@ const collectCapabilityItineraryEvidenceRefs = (payload: RecordLike): string[] =
   return ledger
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry))
-    .filter((entry) => {
-      const payloadRecord = readRecord(entry.payload);
-      const haystack = [
-        readString(entry.kind),
-        readString(payloadRecord?.schema),
-        readString(payloadRecord?.capability),
-        readString(payloadRecord?.tool_id),
-      ].join(" ");
-      return (
-        (requiredObserved.has("scholarly_research") &&
-          /scholarly_research_observation|scholarly_full_text_observation/i.test(haystack)) ||
-        (requiredObserved.has("internet_search") && /internet_search_observation/i.test(haystack)) ||
-        (requiredObserved.has("theory_locator") &&
-          /helix_theory_context_reflection_tool_receipt|theory_context_reflection|reflect_theory_context|helix_theory_frontier_vector_field_tool_receipt|theory_frontier_vector_field|frontierVectorFieldTrace/i.test(haystack))
-      );
-    })
+    .filter((entry) => capabilityItineraryEntryMatchesObservedFamily(entry, requiredObserved))
     .flatMap((entry) => {
       const payloadRecord = readRecord(entry.payload);
       return [

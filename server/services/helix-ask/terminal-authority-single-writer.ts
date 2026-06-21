@@ -1528,6 +1528,15 @@ type CompoundSubgoalDraftSupportCoverage = {
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.filter((entry): entry is string => Boolean(entry))));
 
+const compoundSubgoalHasSatisfiedObservation = (entry: Record<string, unknown>): boolean => {
+  const railStatus = readString(entry.rail_status);
+  return (
+    readString(entry.satisfaction) === "satisfied" &&
+    Boolean(readString(entry.observation_ref)) &&
+    (!railStatus || railStatus === "complete")
+  );
+};
+
 const collectRefsFromRecord = (record: Record<string, unknown> | null): string[] => {
   if (!record) return [];
   const directRefs = [
@@ -1538,7 +1547,6 @@ const collectRefsFromRecord = (record: Record<string, unknown> | null): string[]
     readString(record.source_observation_ref),
     readString(record.citation_ref),
     readString(record.evaluation_id),
-    readString(record.receipt_id),
     readString(record.coverage_ref),
     readString(record.result_ref),
     readString(record.source_ref),
@@ -1547,8 +1555,6 @@ const collectRefsFromRecord = (record: Record<string, unknown> | null): string[]
     ...readArray(record.support_refs).map(readString),
     ...readArray(record.artifact_refs).map(readString),
     ...readArray(record.evidence_refs).map(readString),
-    ...readArray(record.receipt_ids).map(readString),
-    ...readArray(record.receipt_refs).map(readString),
     ...readArray(record.coverage_refs).map(readString),
     ...readArray(record.observation_refs).map(readString),
     ...readArray(record.source_observation_refs).map(readString),
@@ -1614,7 +1620,7 @@ const resolveCompoundSubgoalDraftSupportCoverage = (input: {
     .filter((entry): entry is Record<string, unknown> => Boolean(entry));
   const requiredObservationRefs = uniqueStrings(
     ledger
-      .filter((entry) => readString(entry.satisfaction) === "satisfied")
+      .filter(compoundSubgoalHasSatisfiedObservation)
       .map((entry) => readString(entry.observation_ref)),
   );
   const applies =
@@ -2025,6 +2031,81 @@ const findGoalSatisfyingDocumentArtifact = (
     const text = documentTerminalText(artifact);
     if (!text || isStaleWorkspaceFailureText(text)) continue;
     return { artifact, kind: kind as DocumentTerminalArtifactKind, text, ref: artifactId(artifact) };
+  }
+  return null;
+};
+
+const workspaceDirectoryResolutionText = (artifact: ArtifactLike): string | null => {
+  const payload = artifactPayload(artifact);
+  const text = artifactText(artifact);
+  if (text) return text;
+  const status = readString(payload?.status);
+  const query = readString(payload?.query) ?? readString(payload?.normalized_query);
+  const selectedUri =
+    readString(payload?.selected_uri) ??
+    readString(payload?.selected_doc_path) ??
+    readString(payload?.selected_artifact_id);
+  const candidates = readArray(payload?.candidates)
+    .map(readRecord)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    .slice(0, 5)
+    .map((entry, index) => {
+      const uri =
+        readString(entry.uri) ??
+        readString(entry.doc_path) ??
+        readString(entry.panel_id) ??
+        readString(entry.artifact_id) ??
+        "unresolved";
+      const label = readString(entry.label) ?? readString(entry.title) ?? readString(entry.target_kind);
+      return `- ${index + 1}. ${label ? `${label}: ` : ""}${uri}`;
+    });
+  const lines = [
+    "Workspace directory resolution:",
+    status ? `Status: ${status}` : "",
+    query ? `Query: ${query}` : "",
+    selectedUri ? `Selected: ${selectedUri}` : "",
+    candidates.length > 0 ? "Candidates:" : "",
+    ...candidates,
+  ].filter(Boolean);
+  return lines.length > 1 ? lines.join("\n") : null;
+};
+
+const findGoalSatisfyingWorkspaceDirectoryResolutionArtifact = (
+  payload: Record<string, unknown>,
+  artifacts: ArtifactLike[],
+): { artifact: ArtifactLike; kind: "workspace_directory_resolution"; text: string; ref: string | null } | null => {
+  const goal = readRecord(payload.canonical_goal_frame);
+  if (readString(goal?.required_terminal_kind) !== "workspace_directory_resolution") return null;
+  if (!routeContractAllowsTerminalKind(payload, "workspace_directory_resolution")) return null;
+  const goalEvaluation = readRecord(payload.goal_satisfaction_evaluation);
+  if (
+    readString(goalEvaluation?.satisfaction) !== "satisfied" &&
+    readString(goalEvaluation?.next_decision) !== "allow_terminal"
+  ) {
+    return null;
+  }
+  const stepResultResolutionArtifacts = readArray(payload.step_results)
+    .map(readRecord)
+    .filter((step): step is Record<string, unknown> => Boolean(step))
+    .map((step) => {
+      const resultArtifact = readRecord(step.result_artifact);
+      if (!resultArtifact || readString(resultArtifact.kind) !== "workspace_directory_resolution") return null;
+      return {
+        artifact_id:
+          readString(resultArtifact.artifact_id) ??
+          `${readString(step.step_id) ?? "step_result"}:workspace_directory_resolution`,
+        kind: "workspace_directory_resolution",
+        payload: resultArtifact,
+      } satisfies ArtifactLike;
+    })
+    .filter((artifact): artifact is ArtifactLike => Boolean(artifact));
+  const candidates = [...artifacts, ...stepResultResolutionArtifacts];
+  for (let index = candidates.length - 1; index >= 0; index -= 1) {
+    const artifact = candidates[index];
+    if (!artifact || artifactKind(artifact) !== "workspace_directory_resolution") continue;
+    const text = workspaceDirectoryResolutionText(artifact);
+    if (!text || isStaleWorkspaceFailureText(text)) continue;
+    return { artifact, kind: "workspace_directory_resolution", text, ref: artifactId(artifact) };
   }
   return null;
 };
@@ -2465,6 +2546,15 @@ export function applyHelixTerminalAuthoritySingleWriter(
       docsDraftMaterializationMatchesRequiredGoal ||
       repoDraftMaterializationMatchesRequiredGoal
     );
+  const draftMaterializationBlockedReason = materializedDraftRejectedForStaleObservation
+    ? "composer_claimed_no_observations_but_receipts_exist"
+    : compoundSubgoalDraftSupportMissing
+      ? "compound_subgoal_support_refs_missing"
+      : draftMaterialization?.blocked_reason
+        ? draftMaterialization.blocked_reason
+      : !itineraryObservationCriteriaSatisfied && !repoDraftMaterializationMatchesRequiredGoal
+        ? "capability_itinerary_observations_missing"
+        : null;
   if (draftMaterialization) {
     input.payload.final_answer_draft_selection = {
       candidate_count: artifacts.filter(isFinalAnswerDraft).length,
@@ -2481,13 +2571,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
         usableDraftMaterialization && latestDirectAnswerSequence(artifacts) >= 0
           ? "later_valid_final_answer_draft"
           : null,
-      blocked_reason: materializedDraftRejectedForStaleObservation
-        ? "composer_claimed_no_observations_but_receipts_exist"
-        : compoundSubgoalDraftSupportMissing
-          ? "compound_subgoal_support_refs_missing"
-        : !itineraryObservationCriteriaSatisfied && !repoDraftMaterializationMatchesRequiredGoal
-          ? "capability_itinerary_observations_missing"
-        : draftMaterialization.blocked_reason ?? null,
+      blocked_reason: draftMaterializationBlockedReason,
       compound_subgoal_support_coverage: compoundSubgoalDraftSupportCoverage.applies
         ? compoundSubgoalDraftSupportCoverage
         : null,
@@ -2499,9 +2583,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       allowed_terminal_artifact_kinds: draftMaterialization.route_allowed_terminal_artifact_kinds,
       materialization_attempted: true,
       materialization_ok: usableDraftMaterialization,
-      materialization_blocked_reason: compoundSubgoalDraftSupportMissing
-        ? "compound_subgoal_support_refs_missing"
-        : draftMaterialization.blocked_reason ?? null,
+      materialization_blocked_reason: draftMaterializationBlockedReason,
       capability_itinerary_observation_missing_families: missingItineraryFamilies,
       compound_subgoal_support_refs_missing: compoundSubgoalDraftSupportMissing,
       compound_subgoal_missing_support_refs: compoundSubgoalDraftSupportCoverage.missing_observation_refs,
@@ -2568,6 +2650,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const selectedReceiptTerminal = compoundReceiptTerminalBlocked ? null : rawSelectedReceiptTerminal;
   const selectedGoalArtifact =
     findGoalSatisfyingCapabilityHelpArtifact(input.payload, artifacts) ??
+    findGoalSatisfyingWorkspaceDirectoryResolutionArtifact(input.payload, artifacts) ??
     findGoalSatisfyingDocumentArtifact(input.payload, artifacts) ??
     findGoalSatisfyingVisualSituationArtifact(input.payload, artifacts);
   const goalArtifactTerminalMaterialized =
@@ -3604,6 +3687,10 @@ export function applyHelixTerminalAuthoritySingleWriter(
       selectedArtifactKind === "compound_research_locator_answer"
         ? readRecord(input.payload.compound_research_locator_answer)
         : null;
+    const materializedTheoryContextReflectionAnswer =
+      selectedArtifactKind === "theory_context_reflection_answer"
+        ? readRecord(input.payload.theory_context_reflection_answer)
+        : null;
     const baseText =
       readString(materializedCompoundResearchLocatorAnswer?.answer_text) ??
       readString(materializedCompoundResearchLocatorAnswer?.text) ??
@@ -3613,6 +3700,8 @@ export function applyHelixTerminalAuthoritySingleWriter(
       readString(materializedScholarlyAnswer?.text) ??
       readString(materializedInternetSearchAnswer?.answer_text) ??
       readString(materializedInternetSearchAnswer?.text) ??
+      readString(materializedTheoryContextReflectionAnswer?.answer_text) ??
+      readString(materializedTheoryContextReflectionAnswer?.text) ??
       selectedMaterializationDraft?.text ??
       readString(input.payload.selected_final_answer) ??
       "I could not produce a terminal answer for this turn.";
@@ -3641,6 +3730,10 @@ export function applyHelixTerminalAuthoritySingleWriter(
     if (materializedDocEvidenceSynthesisAnswer) {
       materializedDocEvidenceSynthesisAnswer.text = text;
       materializedDocEvidenceSynthesisAnswer.answer_text = text;
+    }
+    if (materializedTheoryContextReflectionAnswer) {
+      materializedTheoryContextReflectionAnswer.text = text;
+      materializedTheoryContextReflectionAnswer.answer_text = text;
     }
     selectedSource = "final_answer_draft";
     quarantineStaleRequestUserInput(input.payload);

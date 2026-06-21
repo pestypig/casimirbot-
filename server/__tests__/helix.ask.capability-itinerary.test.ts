@@ -901,6 +901,7 @@ describe("Helix Ask capability itinerary", () => {
       satisfaction: "failed",
       rail_status: "fail_closed",
       rail_failure_code: "invalid_arg:latex_is_prose",
+      repair_target: "subgoal_argument_extraction",
     });
     expect(state.complete).toBe(false);
     expect(state.missing_required_capabilities).toContain("scientific-calculator.solve_expression");

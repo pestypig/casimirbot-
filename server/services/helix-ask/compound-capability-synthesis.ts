@@ -17,12 +17,27 @@ export type HelixCompoundCapabilitySynthesisReadiness = {
   has_materialized_terminal_artifact: boolean;
   has_docs_subgoal: boolean;
   has_failed_subgoal: boolean;
+  missing_compound_subgoal_ids: string[];
+  missing_required_capabilities: string[];
+  incomplete_compound_subgoal_ids: string[];
   support_refs: string[];
   subgoal_terminal_kinds: string[];
   terminal_contribution_kinds: string[];
-  synthesis_terminal_kind: "doc_evidence_synthesis_answer" | "model_synthesized_answer" | undefined;
-  goal_kind: "doc_evidence_synthesis" | "compound_evidence_synthesis" | undefined;
-  required_terminal_kind: "doc_evidence_synthesis_answer" | "model_synthesized_answer" | undefined;
+  synthesis_terminal_kind:
+    | "compound_research_locator_answer"
+    | "doc_evidence_synthesis_answer"
+    | "model_synthesized_answer"
+    | undefined;
+  goal_kind:
+    | "compound_research_locator"
+    | "doc_evidence_synthesis"
+    | "compound_evidence_synthesis"
+    | undefined;
+  required_terminal_kind:
+    | "compound_research_locator_answer"
+    | "doc_evidence_synthesis_answer"
+    | "model_synthesized_answer"
+    | undefined;
   assistant_answer: false;
   raw_content_included: false;
 };
@@ -127,18 +142,28 @@ const itineraryCapabilityText = (itinerary: RecordLike | null): string =>
     capabilityText(readArray(readRecord(itinerary?.execution_state)?.compound_subgoal_ledger)),
   ].join(" ");
 
+const ledgerEntryHasSatisfiedObservation = (entry: RecordLike): boolean => {
+  const satisfaction = readString(entry.satisfaction);
+  const railStatus = readString(entry.rail_status);
+  return (
+    satisfaction === "satisfied" &&
+    Boolean(readString(entry.observation_ref)) &&
+    (!railStatus || railStatus === "complete")
+  );
+};
+
 const supportRefsFromLedger = (ledger: RecordLike[]): string[] =>
-  unique(ledger.flatMap((entry) => [
-    readString(entry.observation_ref),
-    ...readArray(entry.support_refs).map(readString),
-    ...readArray(entry.evidence_refs).map(readString),
-    ...readArray(entry.receipt_refs).map(readString),
-    ...readArray(entry.receipt_ids).map(readString),
-    ...readArray(entry.coverage_refs).map(readString),
-    ...readArray(entry.bound_input_refs)
-      .map(readRecord)
-      .map((binding) => readString(binding?.ref)),
-  ].filter((ref): ref is string => Boolean(ref))));
+  unique(ledger
+    .filter(ledgerEntryHasSatisfiedObservation)
+    .flatMap((entry) => [
+      readString(entry.observation_ref),
+      ...readArray(entry.support_refs).map(readString),
+      ...readArray(entry.evidence_refs).map(readString),
+      ...readArray(entry.coverage_refs).map(readString),
+      ...readArray(entry.bound_input_refs)
+        .map(readRecord)
+        .map((binding) => readString(binding?.ref)),
+    ].filter((ref): ref is string => Boolean(ref))));
 
 const supportRefsFromArtifacts = (artifacts: ArtifactLike[]): string[] =>
   unique(artifacts.flatMap((artifact) => {
@@ -152,6 +177,7 @@ const supportRefsFromArtifacts = (artifacts: ArtifactLike[]): string[] =>
         "final_answer_draft",
         "typed_failure",
       ].includes(kind)
+      || /(?:^|_)(?:receipt|receipts)$/i.test(kind)
     ) {
       return [];
     }
@@ -173,7 +199,8 @@ const terminalContributionKindsFromLedger = (ledger: RecordLike[]): string[] =>
 const satisfiedSubgoalCount = (state: RecordLike | null): number =>
   readArray(state?.compound_subgoal_ledger)
     .map(readRecord)
-    .filter((entry) => readString(entry?.satisfaction) === "satisfied" || readString(entry?.rail_status) === "complete")
+    .filter((entry): entry is RecordLike => Boolean(entry))
+    .filter(ledgerEntryHasSatisfiedObservation)
     .length;
 
 const preferFreshExecutionState = (args: {
@@ -217,6 +244,20 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
   const ledger = readArray(state.compound_subgoal_ledger)
     .map(readRecord)
     .filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry));
+  const railStatuses = readArray(input.payload.compound_subgoal_rail_statuses)
+    .map(readRecord)
+    .filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry));
+  const artifactQueryIndex = readRecord(input.payload.artifact_query_index);
+  const missingSummary =
+    readRecord(input.payload.compound_subgoal_missing_summary) ??
+    readRecord(artifactQueryIndex?.compound_subgoal_missing_summary);
+  const missingSummaryIds = readArray(missingSummary?.missing_compound_subgoal_ids)
+    .map(readString)
+    .filter((entry: string | null): entry is string => Boolean(entry));
+  const missingSummaryCapabilities = readArray(missingSummary?.missing_required_capabilities)
+    .map(readString)
+    .filter((entry: string | null): entry is string => Boolean(entry));
+  const compoundRows = [...ledger, ...railStatuses];
   const requiredFamilies = readArray(state.required_observation_families)
     .map(readString)
     .filter((entry: string | null): entry is string => Boolean(entry));
@@ -225,29 +266,117 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
   const terminalCriteria = readRecord(itinerary?.terminal_success_criteria);
   const itineraryRequiresSynthesis = terminalCriteria?.requires_post_observation_synthesis === true;
   const subgoals = readArray(contract?.subgoals);
-  const applies = (state.applies === true || itineraryRequiresSynthesis) && (ledger.length > 1 || requiredFamilies.length > 1);
-  const complete = applies && state.complete === true;
-  const hasFailedSubgoal = ledger.some((entry) => readString(entry.satisfaction) === "failed" || readString(entry.rail_status) === "fail_closed");
+  const contractSubgoals = subgoals
+    .map(readRecord)
+    .filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry));
+  const contractRequiresSynthesis =
+    readString(contract?.terminal_policy) === "synthesize_from_satisfied_subgoal_observations" ||
+    (contract?.requires_all_subgoals !== false && contractSubgoals.length > 1);
+  const compoundRowRepresentsContractSubgoal = (subgoal: RecordLike): boolean => {
+    const subgoalId = readString(subgoal.subgoal_id);
+    const requestedCapability = readString(subgoal.requested_capability);
+    const runtimeCapability = readString(subgoal.runtime_capability);
+    return compoundRows.some((row) => {
+      if (subgoalId && readString(row.subgoal_id) === subgoalId) return true;
+      const rowCapabilities = [
+        readString(row.requested_capability),
+        readString(row.runtime_capability),
+        readString(row.selected_capability),
+        readString(row.executed_capability),
+      ].filter((entry): entry is string => Boolean(entry));
+      return Boolean(
+        (requestedCapability && rowCapabilities.includes(requestedCapability)) ||
+        (runtimeCapability && rowCapabilities.includes(runtimeCapability)),
+      );
+    });
+  };
+  const missingContractSubgoals =
+    contract?.requires_all_subgoals !== false && contractSubgoals.length > 1
+      ? contractSubgoals.filter((subgoal) =>
+          subgoal.mandatory !== false && !compoundRowRepresentsContractSubgoal(subgoal)
+        )
+      : [];
+  const missingContractSubgoalIds = missingContractSubgoals
+    .map((subgoal) => readString(subgoal.subgoal_id))
+    .filter((entry: string | null): entry is string => Boolean(entry));
+  const missingContractCapabilities = missingContractSubgoals
+    .map((subgoal) => readString(subgoal.requested_capability) ?? readString(subgoal.runtime_capability))
+    .filter((entry: string | null): entry is string => Boolean(entry));
+  const incompleteCompoundRows = compoundRows.filter((entry) => !ledgerEntryHasSatisfiedObservation(entry));
+  const incompleteCompoundRowIds = incompleteCompoundRows
+    .map((entry) => readString(entry.subgoal_id))
+    .filter((entry: string | null): entry is string => Boolean(entry));
+  const incompleteCompoundRowCapabilities = incompleteCompoundRows
+    .map((entry) =>
+      readString(entry.requested_capability) ??
+      readString(entry.runtime_capability) ??
+      readString(entry.selected_capability)
+    )
+    .filter((entry: string | null): entry is string => Boolean(entry));
+  const missingCompoundSubgoalIds = unique([
+    ...missingSummaryIds,
+    ...missingContractSubgoalIds,
+  ]);
+  const missingRequiredCapabilities = unique([
+    ...missingSummaryCapabilities,
+    ...missingContractCapabilities,
+  ]);
+  const incompleteCompoundSubgoalIds = unique([
+    ...missingCompoundSubgoalIds,
+    ...incompleteCompoundRowIds,
+  ]);
+  const applies = (state.applies === true || itineraryRequiresSynthesis || contractRequiresSynthesis) &&
+    (ledger.length > 1 || railStatuses.length > 1 || requiredFamilies.length > 1 || contractSubgoals.length > 1);
+  const hasFailedSubgoal =
+    missingCompoundSubgoalIds.length > 0 ||
+    missingRequiredCapabilities.length > 0 ||
+    compoundRows.some((entry) => {
+      const satisfaction = readString(entry.satisfaction);
+      const railStatus = readString(entry.rail_status);
+      return satisfaction === "failed" ||
+        satisfaction === "missing" ||
+        railStatus === "fail_closed" ||
+        railStatus === "broken";
+    });
+  const hasIncompleteSubgoal = compoundRows.length > 1 && incompleteCompoundRows.length > 0;
+  const complete = applies && state.complete === true && !hasFailedSubgoal && !hasIncompleteSubgoal;
   const subgoalTerminalKinds = terminalKindsFromSubgoals(subgoals);
-  const terminalContributionKinds = terminalContributionKindsFromLedger(ledger);
-  const hasDocsSubgoal = /docs-viewer\.locate_in_doc|docs-viewer\.summarize_doc|docs-viewer\.search_docs/i.test([
+  const terminalContributionKinds = terminalContributionKindsFromLedger(compoundRows);
+  const allTerminalContributionKinds = unique([...terminalContributionKinds, ...subgoalTerminalKinds]);
+  const combinedCapabilityText = [
     capabilityText(ledger),
+    capabilityText(railStatuses),
     capabilityText(subgoals),
     itineraryCapabilityText(itinerary),
-  ].join(" "));
+    requiredFamilies.join(" "),
+  ].join(" ");
+  const hasDocsSubgoal =
+    /docs-viewer\.(?:locate_in_doc|summarize_doc|search_docs|doc_equation_context)|doc_equation_context/i.test([
+      combinedCapabilityText,
+    ].join(" "));
+  const hasCalculatorSubgoal = /scientific-calculator\.solve_expression|\bcalculator\b/i.test(combinedCapabilityText);
+  const hasTheoryLocatorSubgoal = /theory_locator|helix_ask\.reflect_theory_context|theory_context_reflection/i.test(combinedCapabilityText);
+  const hasResearchSourceSubgoal =
+    /internet_search|internet-search|web_research|scholarly_research|scholarly-research/i.test(combinedCapabilityText);
+  const hasResearchLocatorSubgoal =
+    hasResearchSourceSubgoal && hasTheoryLocatorSubgoal && !hasDocsSubgoal && !hasCalculatorSubgoal;
   const requiredTerminalKind = applies
     ? hasDocsSubgoal
       ? "doc_evidence_synthesis_answer"
-      : "model_synthesized_answer"
+      : hasResearchLocatorSubgoal
+        ? "compound_research_locator_answer"
+        : "model_synthesized_answer"
     : undefined;
   const synthesisTerminalKind = complete
     ? hasDocsSubgoal
       ? "doc_evidence_synthesis_answer"
-      : "model_synthesized_answer"
+      : hasResearchLocatorSubgoal
+        ? "compound_research_locator_answer"
+        : "model_synthesized_answer"
     : undefined;
   const hasDraft = hasFinalAnswerDraft(input.payload, artifacts);
-  const supportRefs = ledger.length > 0
-    ? supportRefsFromLedger(ledger)
+  const supportRefs = compoundRows.length > 0
+    ? supportRefsFromLedger(compoundRows)
     : supportRefsFromArtifacts(artifacts);
   const hasTerminalArtifact = hasMaterializedTerminalArtifact(input.payload, artifacts, requiredTerminalKind, supportRefs);
   return {
@@ -259,14 +388,22 @@ export function resolveCompoundCapabilitySynthesisReadiness(input: {
     has_materialized_terminal_artifact: hasTerminalArtifact,
     has_docs_subgoal: hasDocsSubgoal,
     has_failed_subgoal: hasFailedSubgoal,
+    missing_compound_subgoal_ids: missingCompoundSubgoalIds,
+    missing_required_capabilities: unique([
+      ...missingRequiredCapabilities,
+      ...incompleteCompoundRowCapabilities,
+    ]),
+    incomplete_compound_subgoal_ids: incompleteCompoundSubgoalIds,
     support_refs: supportRefs,
     subgoal_terminal_kinds: subgoalTerminalKinds,
-    terminal_contribution_kinds: terminalContributionKinds.length > 0 ? terminalContributionKinds : subgoalTerminalKinds,
+    terminal_contribution_kinds: allTerminalContributionKinds,
     synthesis_terminal_kind: synthesisTerminalKind,
     goal_kind: applies
       ? hasDocsSubgoal
         ? "doc_evidence_synthesis"
-        : "compound_evidence_synthesis"
+        : hasResearchLocatorSubgoal
+          ? "compound_research_locator"
+          : "compound_evidence_synthesis"
       : undefined,
     required_terminal_kind: requiredTerminalKind,
     assistant_answer: false,

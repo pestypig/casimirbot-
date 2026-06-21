@@ -7,11 +7,11 @@ import {
   CODEX_PARITY_AGENT_SPINE_CLASSES,
   CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS,
   CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES,
-  CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES,
   CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
   CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES,
   CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS,
   CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS,
+  isCodexParityAgentSpineRailFailureCode,
 } from "../services/helix-ask/codex-parity-agent-spine-contract";
 import { runtimeMemoryGovernor } from "../services/runtime/runtime-memory-governor";
 import {
@@ -92,7 +92,7 @@ const expectCodexParityRailTableShape = (railTable: Record<string, unknown>, tur
     expect(CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS).toContain(railTable.first_broken_rail as never);
     expect(typeof railTable.rail_failure_code).toBe("string");
     expect(String(railTable.rail_failure_code).length).toBeGreaterThan(0);
-    expect(CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES).toContain(railTable.rail_failure_code as never);
+    expect(isCodexParityAgentSpineRailFailureCode(railTable.rail_failure_code)).toBe(true);
     expect(typeof railTable.repair_target).toBe("string");
     expect(String(railTable.repair_target).length).toBeGreaterThan(0);
     expect(CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS).toContain(railTable.repair_target as never);

@@ -6,6 +6,7 @@ export type FinalAnswerDraftQualityViolation =
   | "missing_support_refs_for_repo_route"
   | "missing_support_refs_for_scholarly_route"
   | "missing_support_refs_for_internet_search_route"
+  | "missing_support_refs_for_source_route"
   | "contradicts_observed_scholarly_full_text"
   | "unsupported_repo_claim"
   | "receipt_like_answer"
@@ -17,6 +18,14 @@ export type FinalAnswerDraftRouteFamily =
   | "repo_evidence"
   | "scholarly_research"
   | "internet_search"
+  | "theory_locator"
+  | "context_reflection"
+  | "zen_graph_reflection"
+  | "civilization_bounds"
+  | "workspace_directory"
+  | "workspace_diagnostic"
+  | "visual_capture"
+  | "live_environment"
   | "docs_source"
   | "workstation_tool"
   | "calculator_tool"
@@ -111,6 +120,30 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
   if (committedSourceTarget === "internet_search") {
     return "internet_search";
   }
+  if (committedSourceTarget === "theory_locator") {
+    return "theory_locator";
+  }
+  if (committedSourceTarget === "context_reflection") {
+    return "context_reflection";
+  }
+  if (committedSourceTarget === "workspace_directory") {
+    return "workspace_directory";
+  }
+  if (committedSourceTarget === "workspace_diagnostic") {
+    return "workspace_diagnostic";
+  }
+  if (committedSourceTarget === "visual_capture") {
+    return "visual_capture";
+  }
+  if (/context_reflection|context_attachment|live_synthetic_data/i.test(committedGoalKind ?? "")) {
+    return "context_reflection";
+  }
+  if (/zen_graph|ideology_context|procedural_zen|theory_ideology_bridge/i.test(committedGoalKind ?? "")) {
+    return "zen_graph_reflection";
+  }
+  if (/civilization_bounds|civilization_scenario|civilization_roadmap/i.test(committedGoalKind ?? "")) {
+    return "civilization_bounds";
+  }
   if (committedSourceTarget === "docs_viewer" || committedSourceTarget === "active_doc") {
     return "docs_source";
   }
@@ -168,6 +201,27 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
   if (sourceTarget === "internet_search" || /internet_search|internet-search|web_search|google_custom_search|search_web/i.test(routeText)) {
     return "internet_search";
   }
+  if (sourceTarget === "theory_locator" || /theory_locator|reflect_theory_context|theory_context_reflection|frontierVectorFieldTrace|theory_frontier_vector_field/i.test(routeText)) {
+    return "theory_locator";
+  }
+  if (sourceTarget === "context_reflection" || /context_reflection|reflect_context_attachments|reflect_live_synthetic_data|bounded_context_reference/i.test(routeText)) {
+    return "context_reflection";
+  }
+  if (/zen_graph_reflection|ideology_context_reflection|procedural_zen_classification|bridge_theory_ideology_context|theory_ideology_bridge/i.test(routeText)) {
+    return "zen_graph_reflection";
+  }
+  if (/civilization_bounds|civilization_scenario_frame|civilization_bounds_roadmap/i.test(routeText)) {
+    return "civilization_bounds";
+  }
+  if (sourceTarget === "workspace_directory" || /workspace_directory|workspace-directory\.resolve|workspace_directory_resolution/i.test(routeText)) {
+    return "workspace_directory";
+  }
+  if (sourceTarget === "workspace_diagnostic" || /workspace_diagnostic|workspace_os\.status|workspace_os_status|workspace[- ]status/i.test(routeText)) {
+    return "workspace_diagnostic";
+  }
+  if (sourceTarget === "visual_capture" || /visual_capture|image_lens|visual_frame_evidence|situation_context_pack/i.test(routeText)) {
+    return "visual_capture";
+  }
   if (sourceTarget === "docs_viewer" || sourceTarget === "active_doc" || /\bdoc|docs_viewer|active_doc/i.test(routeText)) {
     return "docs_source";
   }
@@ -177,7 +231,10 @@ export const inferFinalAnswerDraftRouteFamily = (input: {
   if (sourceTarget === "workstation_panel" || sourceTarget === "workspace_action" || sourceTarget === "workstation_state" || /panel_control|workspace_action/i.test(routeText)) {
     return "workstation_tool";
   }
-  if (sourceTarget === "live_environment" || sourceTarget === "live_source_mailbox" || sourceTarget === "live_pipeline" || sourceTarget === "world_event" || /situation|live_environment|live_source_mailbox|live_job|dottie/i.test(routeText)) {
+  if (/live_environment|micro_reasoner|workstation_goal|agent_goal|route_watch|loop_state/i.test(routeText)) {
+    return "live_environment";
+  }
+  if (sourceTarget === "live_environment" || sourceTarget === "live_source_mailbox" || sourceTarget === "live_pipeline" || sourceTarget === "world_event" || /situation|live_source_mailbox|live_job|dottie/i.test(routeText)) {
     return "situation_room";
   }
   if (sourceTarget === "model_only" || sourceTarget === "general_background" || goalKind === "model_only_concept") {
@@ -299,6 +356,20 @@ const compoundComparisonCovered = (text: string): boolean =>
   textIncludesAny(text, [/\b(?:nucleus|atomic number|element identity|identity of the element)\b/i]) &&
   textIncludesAny(text, [/\b(?:consequence|therefore|because|this means|practical)\b/i]);
 
+const sourceBackedModelSynthesisRouteFamilies = new Set<FinalAnswerDraftRouteFamily>([
+  "capability_catalog",
+  "context_reflection",
+  "zen_graph_reflection",
+  "civilization_bounds",
+  "workspace_directory",
+  "workspace_diagnostic",
+  "visual_capture",
+  "live_environment",
+  "workstation_tool",
+  "calculator_tool",
+  "situation_room",
+]);
+
 export function evaluateFinalAnswerDraftQualityGate(input: {
   turnId: string;
   finalAnswerDraftRef: string;
@@ -347,6 +418,15 @@ export function evaluateFinalAnswerDraftQualityGate(input: {
     ) {
       violations.push("contradicts_observed_scholarly_full_text");
     }
+  }
+  if (
+    sourceBackedModelSynthesisRouteFamilies.has(routeFamily) &&
+    collectFinalAnswerDraftSupportRefs({
+      draftPayload: input.draftPayload,
+      artifactLedger: input.artifactLedger,
+    }).length === 0
+  ) {
+    violations.push("missing_support_refs_for_source_route");
   }
   return {
     schema: "helix.final_answer_draft_quality_gate.v1",

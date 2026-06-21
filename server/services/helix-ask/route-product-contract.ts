@@ -32,6 +32,7 @@ export const CORE_TERMINAL_PRODUCTS = [
   "note_location_result",
   "calculator_stream_result",
   "calculation_trace",
+  "theory_context_reflection_answer",
   "process_node_detail",
   "source_binding_status",
   "source_binding_repair_candidate",
@@ -165,7 +166,10 @@ const normalizeSourceTarget = (
     sourceTarget === "scholarly_research" ||
     sourceTarget === "internet_search" ||
     sourceTarget === "runtime_evidence" ||
+    sourceTarget === "workspace_directory" ||
     sourceTarget === "workspace_diagnostic" ||
+    sourceTarget === "theory_locator" ||
+    sourceTarget === "context_reflection" ||
     sourceTarget === "situation_epoch" ||
     sourceTarget === "visual_scene_memory" ||
     sourceTarget === "process_graph" ||
@@ -676,6 +680,111 @@ export function buildRouteProductContract(input: {
         "internet_search_synthesis_attempt",
         "internet_search_claim_support",
         "helix_theory_context_reflection_tool_receipt",
+      ],
+    });
+  }
+
+  if (sourceTarget === "theory_locator") {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget,
+      allowedCore: ["theory_context_reflection_answer"],
+      allowedExtra: ["model_synthesized_answer"],
+      forbiddenExtra: [
+        "direct_answer_text",
+        "no_tool_direct",
+        "model_only_concept",
+        "client_projection",
+        "panel_generated_answer",
+        "workspace_action_receipt",
+        "live_pipeline_receipt",
+        "docs_viewer_receipt",
+        "active_doc_identity",
+        "doc_open_receipt",
+        "doc_summary",
+        "doc_location_result",
+        "repo_code_evidence_answer",
+        "repo_entity_definition",
+        "scholarly_research_answer",
+        "internet_search_answer",
+      ],
+      precedenceReason: "theory_locator_source_target_requires_reflection_evidence_before_terminal_synthesis",
+      sideArtifactKindsAllowed: [
+        "helix_theory_context_reflection_tool_receipt",
+        "theory_context_reflection",
+        "helix_theory_frontier_vector_field_tool_receipt",
+        "theory_frontier_vector_field",
+        "theory_frontier_search",
+        "theory_frontier_candidate",
+      ],
+    });
+  }
+
+  if (sourceTarget === "context_reflection") {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget,
+      allowedCore: [],
+      allowedExtra: ["model_synthesized_answer"],
+      forbiddenExtra: [
+        "direct_answer_text",
+        "no_tool_direct",
+        "model_only_concept",
+        "client_projection",
+        "panel_generated_answer",
+        "workspace_action_receipt",
+        "live_pipeline_receipt",
+        "docs_viewer_receipt",
+        "active_doc_identity",
+        "doc_open_receipt",
+        "doc_summary",
+        "doc_location_result",
+        "repo_code_evidence_answer",
+        "repo_entity_definition",
+        "scholarly_research_answer",
+        "internet_search_answer",
+      ],
+      precedenceReason: "context_reflection_source_target_requires_context_observation_before_model_synthesis",
+      sideArtifactKindsAllowed: [
+        "helix_context_reflection_tool_receipt/v1",
+        "helix_context_reflection_tool_receipt",
+        "bounded_context_reference",
+        "context_attachment",
+      ],
+    });
+  }
+
+  if (sourceTarget === "workspace_directory") {
+    return makeContract({
+      turnId: input.turnId,
+      threadId: input.threadId,
+      sourceTarget,
+      allowedCore: [],
+      allowedExtra: ["workspace_directory_resolution", "model_synthesized_answer"],
+      forbiddenExtra: [
+        "direct_answer_text",
+        "no_tool_direct",
+        "model_only_concept",
+        "client_projection",
+        "panel_generated_answer",
+        "workspace_action_receipt",
+        "live_pipeline_receipt",
+        "docs_viewer_receipt",
+        "active_doc_identity",
+        "doc_open_receipt",
+        "doc_summary",
+        "doc_location_result",
+        "repo_code_evidence_answer",
+        "repo_entity_definition",
+        "scholarly_research_answer",
+        "internet_search_answer",
+      ],
+      precedenceReason: "workspace_directory_source_target_allows_only_directory_resolution_products",
+      sideArtifactKindsAllowed: [
+        "workspace_directory_resolution",
+        "helix.workspace_directory_resolution.v1",
       ],
     });
   }

@@ -2030,6 +2030,124 @@ describe("Helix terminal authority single writer", () => {
     ]));
   });
 
+  it("preserves compound incomplete-subgoal materializer reason in terminal mirrors", () => {
+    const turnId = "ask:test:compound-incomplete-materializer-reason";
+    const catalogSubgoalId = `${turnId}:compound_capability_subgoal:1:catalog`;
+    const workspaceSubgoalId = `${turnId}:compound_capability_subgoal:2:workspace`;
+    const catalogObservationRef = `${turnId}:capability_registry`;
+    const draftRef = `${turnId}:final_answer_draft`;
+    const draftText = "The capability catalog is ready, but workspace status is still missing.";
+    const artifacts = [
+      {
+        artifact_id: catalogObservationRef,
+        kind: "capability_registry",
+        payload: {
+          schema: "helix.capability_catalog_observation.v1",
+          capability_key: "helix_ask.inspect_capability_catalog",
+          compound_subgoal_id: catalogSubgoalId,
+        },
+      },
+      {
+        artifact_id: draftRef,
+        kind: "final_answer_draft",
+        payload: {
+          schema: "helix.final_answer_draft.v1",
+          text: draftText,
+          answer_text: draftText,
+          support_refs: [catalogObservationRef],
+          artifact_refs: [catalogObservationRef],
+          authority: "llm_post_observation_compound_synthesis",
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      route_product_contract: {
+        source_target: "runtime_evidence",
+        allowed_terminal_artifact_kinds: ["model_synthesized_answer"],
+      },
+      compound_capability_contract: {
+        schema: "helix.compound_capability_contract.v1",
+        turn_id: turnId,
+        prompt_shape: "compound_capability",
+        requires_all_subgoals: true,
+        terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+        subgoals: [
+          {
+            subgoal_id: catalogSubgoalId,
+            requested_capability: "helix_ask.inspect_capability_catalog",
+          },
+          {
+            subgoal_id: workspaceSubgoalId,
+            requested_capability: "workspace_os.status",
+          },
+        ],
+      },
+      compound_capability_synthesis_readiness: {
+        schema: "helix.compound_capability_synthesis_readiness.v1",
+        applies: true,
+        complete: false,
+        has_failed_subgoal: true,
+        support_refs: [catalogObservationRef],
+        required_terminal_kind: "model_synthesized_answer",
+        synthesis_terminal_kind: "model_synthesized_answer",
+        synthesis_required: false,
+      },
+      capability_itinerary_execution_state: {
+        applies: true,
+        complete: false,
+        required_observation_families: ["capability_catalog", "workspace_diagnostic"],
+        missing_observation_families: ["workspace_diagnostic"],
+        compound_subgoal_ledger: [
+          {
+            subgoal_id: catalogSubgoalId,
+            requested_capability: "helix_ask.inspect_capability_catalog",
+            selected_capability: "helix_ask.inspect_capability_catalog",
+            executed_capability: "helix_ask.inspect_capability_catalog",
+            observation_kind: "capability_registry",
+            observation_ref: catalogObservationRef,
+            satisfaction: "satisfied",
+            rail_status: "complete",
+          },
+          {
+            subgoal_id: workspaceSubgoalId,
+            requested_capability: "workspace_os.status",
+            selected_capability: "workspace_os.status",
+            executed_capability: null,
+            observation_kind: null,
+            observation_ref: null,
+            satisfaction: "missing",
+            rail_status: "fail_closed",
+            first_broken_rail: "observation_artifact",
+            rail_failure_code: "required_observation_missing",
+            repair_target: "observation_materializer",
+          },
+        ],
+      },
+      current_turn_artifact_ledger: artifacts,
+      goal_satisfaction_evaluation: {
+        satisfaction: "not_satisfied",
+        next_decision: "continue",
+      },
+    };
+
+    applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(payload.final_answer_draft_selection).toMatchObject({
+      blocked_reason: "compound_subgoal_incomplete",
+      materialized_terminal_artifact_kind: null,
+    });
+    expect(payload.route_terminal_materialization).toMatchObject({
+      materialization_ok: false,
+      materialization_blocked_reason: "compound_subgoal_incomplete",
+    });
+  });
+
   it("allows compound final drafts grounded in every satisfied subgoal observation", () => {
     const turnId = "ask:test:compound-draft-complete-subgoal-support";
     const workspaceSubgoalId = `${turnId}:compound_capability_subgoal:1:workspace_os_status`;

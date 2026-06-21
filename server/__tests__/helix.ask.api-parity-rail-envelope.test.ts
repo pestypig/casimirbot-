@@ -121,6 +121,247 @@ describe("Helix Ask API parity rail envelope invariants", () => {
       ]),
     );
   });
+
+  it("rejects rails with visible projection kind but no projection proof source", () => {
+    const scenario = liveSourceFailClosedScenario();
+    const askTurn = buildLiveSourceFailClosedTurn({ projectAsTypedFailure: true });
+    const railTable = askTurn.codex_parity_agent_spine_rail_table as Record<string, unknown>;
+    railTable.visible_projection_source = null;
+
+    const probe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: { payload: askTurn },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(probe.procedural_ok).toBe(false);
+    expect(probe.failures).toContain("rail_visible_projection_source_missing");
+  });
+
+  it("rejects rails with visible projection kind but unproven projection source", () => {
+    const scenario = liveSourceFailClosedScenario();
+    const askTurn = buildLiveSourceFailClosedTurn({ projectAsTypedFailure: true });
+    const railTable = askTurn.codex_parity_agent_spine_rail_table as Record<string, unknown>;
+    railTable.visible_projection_proven = false;
+
+    const probe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: { payload: askTurn },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(probe.procedural_ok).toBe(false);
+    expect(probe.failures).toContain("rail_visible_projection_not_proven");
+  });
+
+  it("rejects incomplete compound rails without first-incomplete subgoal mirrors", () => {
+    const scenario = liveSourceFailClosedScenario();
+    const askTurn = buildLiveSourceFailClosedTurn({ projectAsTypedFailure: true });
+    askTurn.codex_parity_agent_spine_rail_table = {
+      ...(askTurn.codex_parity_agent_spine_rail_table as Record<string, unknown>),
+      compound_subgoal_count: 2,
+      first_incomplete_compound_subgoal_id: null,
+      first_incomplete_compound_requested_capability: null,
+      first_incomplete_compound_runtime_capability: null,
+      first_incomplete_compound_selected_capability: null,
+      first_incomplete_compound_executed_capability: null,
+      compound_first_broken_rail: null,
+      compound_rail_failure_code: null,
+      compound_repair_target: null,
+      compound_incomplete_subgoal_did_tool_run: null,
+    };
+
+    const probe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: { payload: askTurn },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(probe.procedural_ok).toBe(false);
+    expect(probe.failures).toEqual(
+      expect.arrayContaining([
+        "rail_incomplete_compound_first_incomplete_subgoal_missing",
+        "rail_incomplete_compound_requested_capability_missing",
+        "rail_incomplete_compound_rail_failure_code_missing",
+        "rail_incomplete_compound_did_tool_run_missing",
+      ]),
+    );
+  });
+
+  it("summarizes ordered compound subgoal rails for API parity diagnostics", () => {
+    const scenario = liveSourceFailClosedScenario();
+    const askTurn = buildLiveSourceFailClosedTurn({ projectAsTypedFailure: true });
+    askTurn.codex_parity_agent_spine_rail_table = {
+      ...(askTurn.codex_parity_agent_spine_rail_table as Record<string, unknown>),
+      compound_subgoal_count: 2,
+      first_incomplete_compound_subgoal_id: "ask:test:subgoal:mailbox",
+      first_incomplete_compound_requested_capability: "live_env.read_processed_live_source_mail",
+      first_incomplete_compound_runtime_capability: "live_env.read_processed_live_source_mail",
+      first_incomplete_compound_selected_capability: "live_env.read_processed_live_source_mail",
+      first_incomplete_compound_executed_capability: "live_env.read_processed_live_source_mail",
+      compound_first_broken_rail: "observation_artifact",
+      compound_rail_failure_code: "required_observation_missing",
+      compound_repair_target: "observation_materializer",
+      compound_incomplete_subgoal_did_tool_run: true,
+    };
+    askTurn.compound_subgoal_rail_statuses = [
+      {
+        subgoal_id: "ask:test:subgoal:catalog",
+        order: 1,
+        requested_capability: "helix_ask.inspect_capability_catalog",
+        runtime_capability: "helix_ask.inspect_capability_catalog",
+        selected_capability: "helix_ask.inspect_capability_catalog",
+        executed_capability: "helix_ask.inspect_capability_catalog",
+        args: {},
+        observation_kind: "capability_registry",
+        observation_ref: "ask:test:capability_registry",
+        observation_provenance: "capability_key",
+        satisfaction: "satisfied",
+        rail_status: "complete",
+        first_broken_rail: null,
+        rail_failure_code: null,
+        repair_target: null,
+      },
+      {
+        subgoal_id: "ask:test:subgoal:mailbox",
+        order: 2,
+        requested_capability: "live_env.read_processed_live_source_mail",
+        runtime_capability: "live_env.read_processed_live_source_mail",
+        selected_capability: "live_env.read_processed_live_source_mail",
+        executed_capability: "live_env.read_processed_live_source_mail",
+        args: {},
+        observation_kind: null,
+        observation_ref: null,
+        observation_provenance: null,
+        satisfaction: "not_satisfied",
+        rail_status: "fail_closed",
+        first_broken_rail: "observation_artifact",
+        rail_failure_code: "required_observation_missing",
+        repair_target: "observation_materializer",
+      },
+    ];
+
+    const probe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: { payload: askTurn },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(probe.procedural_ok).toBe(true);
+    expect(probe.rail_table.compound_subgoal_rails).toEqual([
+      expect.objectContaining({
+        subgoal_id: "ask:test:subgoal:catalog",
+        requested_capability: "helix_ask.inspect_capability_catalog",
+        selected_capability: "helix_ask.inspect_capability_catalog",
+        executed_capability: "helix_ask.inspect_capability_catalog",
+        observation_kind: "capability_registry",
+        observation_ref: "ask:test:capability_registry",
+        satisfaction: "satisfied",
+        rail_status: "complete",
+      }),
+      expect.objectContaining({
+        subgoal_id: "ask:test:subgoal:mailbox",
+        requested_capability: "live_env.read_processed_live_source_mail",
+        selected_capability: "live_env.read_processed_live_source_mail",
+        executed_capability: "live_env.read_processed_live_source_mail",
+        observation_kind: null,
+        observation_ref: null,
+        satisfaction: "not_satisfied",
+        rail_status: "fail_closed",
+        first_broken_rail: "observation_artifact",
+        rail_failure_code: "required_observation_missing",
+        repair_target: "observation_materializer",
+      }),
+    ]);
+  });
+
+  it("rejects compound rails when the ordered subgoal rail statuses are dropped", () => {
+    const scenario = liveSourceFailClosedScenario();
+    const askTurn = buildLiveSourceFailClosedTurn({ projectAsTypedFailure: true });
+    askTurn.codex_parity_agent_spine_rail_table = {
+      ...(askTurn.codex_parity_agent_spine_rail_table as Record<string, unknown>),
+      compound_subgoal_count: 2,
+      first_incomplete_compound_subgoal_id: "ask:test:subgoal:mailbox",
+      first_incomplete_compound_requested_capability: "live_env.read_processed_live_source_mail",
+      first_incomplete_compound_runtime_capability: "live_env.read_processed_live_source_mail",
+      first_incomplete_compound_selected_capability: "live_env.read_processed_live_source_mail",
+      first_incomplete_compound_executed_capability: "live_env.read_processed_live_source_mail",
+      compound_first_broken_rail: "observation_artifact",
+      compound_rail_failure_code: "required_observation_missing",
+      compound_repair_target: "observation_materializer",
+      compound_incomplete_subgoal_did_tool_run: true,
+    };
+
+    const probe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: { payload: askTurn },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(probe.procedural_ok).toBe(false);
+    expect(probe.failures).toContain("rail_compound_subgoal_rail_statuses_dropped:0<2");
+  });
+
+  it("rejects malformed compound subgoal rails without ordered args or fail-closed rail fields", () => {
+    const scenario = liveSourceFailClosedScenario();
+    const askTurn = buildLiveSourceFailClosedTurn({ projectAsTypedFailure: true });
+    askTurn.codex_parity_agent_spine_rail_table = {
+      ...(askTurn.codex_parity_agent_spine_rail_table as Record<string, unknown>),
+      compound_subgoal_count: 1,
+      first_incomplete_compound_subgoal_id: "ask:test:subgoal:mailbox",
+      first_incomplete_compound_requested_capability: "live_env.read_processed_live_source_mail",
+      first_incomplete_compound_runtime_capability: "live_env.read_processed_live_source_mail",
+      first_incomplete_compound_selected_capability: "live_env.read_processed_live_source_mail",
+      first_incomplete_compound_executed_capability: "live_env.read_processed_live_source_mail",
+      compound_first_broken_rail: "observation_artifact",
+      compound_rail_failure_code: "required_observation_missing",
+      compound_repair_target: "observation_materializer",
+      compound_incomplete_subgoal_did_tool_run: true,
+    };
+    askTurn.compound_subgoal_rail_statuses = [
+      {
+        subgoal_id: "ask:test:subgoal:mailbox",
+        requested_capability: "live_env.read_processed_live_source_mail",
+        runtime_capability: "live_env.read_processed_live_source_mail",
+        selected_capability: "live_env.read_processed_live_source_mail",
+        executed_capability: "live_env.read_processed_live_source_mail",
+        observation_kind: null,
+        observation_ref: null,
+        observation_provenance: null,
+        satisfaction: "not_satisfied",
+        rail_status: "fail_closed",
+      },
+    ];
+
+    const probe = buildApiParityProbeResult({
+      scenario,
+      askTurn,
+      debugExport: { payload: askTurn },
+      terminalEventSeen: true,
+      streamClosedAfterTerminal: true,
+    });
+
+    expect(probe.procedural_ok).toBe(false);
+    expect(probe.failures).toEqual(
+      expect.arrayContaining([
+        "rail_compound_subgoal_1_order_invalid",
+        "rail_compound_subgoal_1_args_field_missing",
+        "rail_compound_subgoal_1_first_broken_rail_missing",
+        "rail_compound_subgoal_1_rail_failure_code_missing",
+        "rail_compound_subgoal_1_repair_target_missing",
+      ]),
+    );
+  });
 });
 
 const liveSourceFailClosedScenario = (): HelixApiParityScenario => ({
@@ -155,6 +396,16 @@ const buildLiveSourceFailClosedTurn = (input: { projectAsTypedFailure: boolean }
     admission_proof_source: "tool_call_admission_decision.selected_capability",
     admission_proven: true,
     executed_capability: "live_env.read_processed_live_source_mail",
+    compound_subgoal_count: 0,
+    first_incomplete_compound_subgoal_id: null,
+    first_incomplete_compound_requested_capability: null,
+    first_incomplete_compound_runtime_capability: null,
+    first_incomplete_compound_selected_capability: null,
+    first_incomplete_compound_executed_capability: null,
+    compound_first_broken_rail: null,
+    compound_rail_failure_code: null,
+    compound_repair_target: null,
+    compound_incomplete_subgoal_did_tool_run: null,
     observation_kind: "reasoning_context",
     observation_ref: "ask:test:reasoning_context:1",
     required_observation_kinds_for_requested_capability: ["stage_play_processed_mail_packet"],

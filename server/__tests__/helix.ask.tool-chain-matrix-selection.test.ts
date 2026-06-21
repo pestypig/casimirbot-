@@ -11,6 +11,7 @@ import {
   serverBundleFreshnessWarnings,
   selectToolChainMatrixScenarios,
   summarizeToolChainMatrixWarnings,
+  toolChainRailTableAcceptanceFailures,
   toolChainMatrixGoalProofTrust,
   toolChainMatrixProcessExitCode,
   TOOL_CHAIN_MATRIX_SCENARIOS,
@@ -245,6 +246,35 @@ describe("Helix Ask tool-chain matrix scenario selection", () => {
       "specific_rail_failure_masked_by_terminal_projection_mismatch:observation_missing",
       "specific_rail_failure_visible_text_masked_by_projection_mismatch:observation_missing",
     ]);
+  });
+
+  it("rejects tool-chain rail tables that project a visible terminal without a projection source", () => {
+    expect(
+      toolChainRailTableAcceptanceFailures({
+        railTable: {
+          visible_terminal_kind: "model_synthesized_answer",
+          visible_projection_proven: true,
+        },
+        terminalKind: "model_synthesized_answer",
+        turnId: "ask:tool-chain:test",
+        prompt: "What tools are available for Helix Ask?",
+      }),
+    ).toContain("rail_visible_projection_source_missing");
+  });
+
+  it("rejects tool-chain rail tables that project a visible terminal from an unproven source", () => {
+    expect(
+      toolChainRailTableAcceptanceFailures({
+        railTable: {
+          visible_terminal_kind: "model_synthesized_answer",
+          visible_projection_source: "terminal_presentation",
+          visible_projection_proven: false,
+        },
+        terminalKind: "model_synthesized_answer",
+        turnId: "ask:tool-chain:test",
+        prompt: "What tools are available for Helix Ask?",
+      }),
+    ).toContain("rail_visible_projection_not_proven");
   });
 
   it("keeps Ask admission capacity responses classified as capacity stress", () => {

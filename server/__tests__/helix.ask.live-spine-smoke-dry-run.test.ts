@@ -64,6 +64,40 @@ describe("Helix Ask live spine smoke dry-run contract", () => {
     });
   });
 
+  it("fails fixture classification when visible projection source is missing", () => {
+    const scenario = LIVE_SPINE_SMOKE_SCENARIOS.find((entry) => entry.id === "capability_catalog_runtime");
+    expect(scenario).toBeTruthy();
+    const ask = buildCapabilityCatalogAskFixture({ includeRuntimeMarker: true });
+    const rail = ask.codex_parity_agent_spine_rail_table as Record<string, unknown>;
+    rail.visible_projection_source = null;
+
+    const result = classifyLiveSpineSmokeResult(
+      scenario!,
+      ask,
+      { payload: {} },
+    );
+
+    expect(result.verdict).toBe("FAIL");
+    expect(result.failures).toContain("visible_projection_source_missing");
+  });
+
+  it("fails fixture classification when visible projection source is not proven", () => {
+    const scenario = LIVE_SPINE_SMOKE_SCENARIOS.find((entry) => entry.id === "capability_catalog_runtime");
+    expect(scenario).toBeTruthy();
+    const ask = buildCapabilityCatalogAskFixture({ includeRuntimeMarker: true });
+    const rail = ask.codex_parity_agent_spine_rail_table as Record<string, unknown>;
+    rail.visible_projection_proven = false;
+
+    const result = classifyLiveSpineSmokeResult(
+      scenario!,
+      ask,
+      { payload: {} },
+    );
+
+    expect(result.verdict).toBe("FAIL");
+    expect(result.failures).toContain("visible_projection_not_proven");
+  });
+
   it("fails fixture classification when a debug rail mirror is stale", () => {
     const scenario = LIVE_SPINE_SMOKE_SCENARIOS.find((entry) => entry.id === "capability_catalog_runtime");
     expect(scenario).toBeTruthy();

@@ -9,11 +9,11 @@ import {
   CODEX_PARITY_AGENT_SPINE_CLASSES,
   CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS,
   CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES,
-  CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES,
   CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
   CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES,
   CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS,
   CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS,
+  isCodexParityAgentSpineRailFailureCode,
 } from "../services/helix-ask/codex-parity-agent-spine-contract";
 import { resetConversationalAnswerDistillationsForTest } from "../services/helix-ask/conversational-answer-distillation-store";
 import { resetLiveSourcePipelinesForTest } from "../services/helix-ask/live-source-pipeline-executor";
@@ -188,7 +188,7 @@ const expectCodexParityRailTableShape = (railTable: Record<string, unknown>, tur
     expect(CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS).toContain(railTable.first_broken_rail as never);
     expect(typeof railTable.rail_failure_code).toBe("string");
     expect(String(railTable.rail_failure_code).length).toBeGreaterThan(0);
-    expect(CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES).toContain(railTable.rail_failure_code as never);
+    expect(isCodexParityAgentSpineRailFailureCode(railTable.rail_failure_code)).toBe(true);
     expect(typeof railTable.repair_target).toBe("string");
     expect(String(railTable.repair_target).length).toBeGreaterThan(0);
     expect(CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS).toContain(railTable.repair_target as never);
@@ -633,7 +633,7 @@ describe("Helix Ask API parity matrix", () => {
       terminal_authority_proof_source: "terminal_answer_authority.terminal_artifact_kind",
       terminal_authority_proven: true,
       visible_terminal_kind: "capability_help_summary",
-      visible_projection_source: "payload.terminal_artifact_kind",
+      visible_projection_source: "terminal_presentation.terminal_artifact_kind",
       visible_projection_proven: true,
       first_broken_rail: null,
       repair_target: null,
@@ -732,7 +732,7 @@ describe("Helix Ask API parity matrix", () => {
       terminal_authority_proof_source: "terminal_answer_authority.terminal_artifact_kind",
       terminal_authority_proven: true,
       visible_terminal_kind: "capability_help_summary",
-      visible_projection_source: "payload.terminal_artifact_kind",
+      visible_projection_source: "terminal_presentation.terminal_artifact_kind",
       visible_projection_proven: true,
       first_broken_rail: null,
       repair_target: null,
@@ -891,7 +891,7 @@ describe("Helix Ask API parity matrix", () => {
       terminal_authority_proof_source: "terminal_answer_authority.terminal_artifact_kind",
       terminal_authority_proven: true,
       visible_terminal_kind: "capability_help_summary",
-      visible_projection_source: "payload.terminal_artifact_kind",
+      visible_projection_source: "terminal_presentation.terminal_artifact_kind",
       visible_projection_proven: true,
       first_broken_rail: null,
       repair_target: null,
@@ -982,7 +982,7 @@ describe("Helix Ask API parity matrix", () => {
       terminal_authority_proof_source: "terminal_answer_authority.terminal_artifact_kind",
       terminal_authority_proven: true,
       visible_terminal_kind: "typed_failure",
-      visible_projection_source: "payload.terminal_artifact_kind",
+      visible_projection_source: "terminal_presentation.terminal_artifact_kind",
       visible_projection_proven: true,
       first_broken_rail: "observation_artifact",
       repair_target: null,
@@ -1345,7 +1345,7 @@ describe("Helix Ask API parity matrix", () => {
       terminal_authority_proof_source: "terminal_answer_authority.terminal_artifact_kind",
       terminal_authority_proven: true,
       visible_terminal_kind: "model_synthesized_answer",
-      visible_projection_source: "payload.terminal_artifact_kind",
+      visible_projection_source: "terminal_presentation.terminal_artifact_kind",
       visible_projection_proven: true,
       first_broken_rail: null,
       repair_target: null,
@@ -1435,7 +1435,7 @@ describe("Helix Ask API parity matrix", () => {
       terminal_authority_proof_source: "terminal_answer_authority.terminal_artifact_kind",
       terminal_authority_proven: true,
       visible_terminal_kind: "doc_location_matches",
-      visible_projection_source: "payload.terminal_artifact_kind",
+      visible_projection_source: "terminal_presentation.terminal_artifact_kind",
       visible_projection_proven: true,
       first_broken_rail: null,
       repair_target: null,
@@ -1525,7 +1525,7 @@ describe("Helix Ask API parity matrix", () => {
       terminal_authority_proof_source: "terminal_answer_authority.terminal_artifact_kind",
       terminal_authority_proven: true,
       visible_terminal_kind: "repo_code_evidence_answer",
-      visible_projection_source: "payload.terminal_artifact_kind",
+      visible_projection_source: "terminal_presentation.terminal_artifact_kind",
       visible_projection_proven: true,
       first_broken_rail: null,
       repair_target: null,
@@ -1617,7 +1617,7 @@ describe("Helix Ask API parity matrix", () => {
       terminal_authority_proof_source: null,
       terminal_authority_proven: false,
       visible_terminal_kind: "model_synthesized_answer",
-      visible_projection_source: "payload.terminal_artifact_kind",
+      visible_projection_source: "terminal_presentation.terminal_artifact_kind",
       visible_projection_proven: true,
       first_broken_rail: null,
       repair_target: null,
@@ -1709,7 +1709,7 @@ describe("Helix Ask API parity matrix", () => {
       terminal_authority_proof_source: "terminal_answer_authority.terminal_artifact_kind",
       terminal_authority_proven: true,
       visible_terminal_kind: "typed_failure",
-      visible_projection_source: "payload.terminal_artifact_kind",
+      visible_projection_source: "terminal_presentation.terminal_artifact_kind",
       visible_projection_proven: true,
       first_broken_rail: "evidence_reentry",
       repair_target: "repo_retrieval_repair_policy",

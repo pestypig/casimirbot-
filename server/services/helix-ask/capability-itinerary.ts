@@ -171,6 +171,18 @@ const allowedTerminalKindsFor = (families: HelixCapabilityItineraryFamily[]): st
 const compoundTerminalKindsFor = (subgoals: RecordLike[]): string[] =>
   unique(subgoals.map((subgoal) => readString(subgoal.required_terminal_kind)).filter(Boolean));
 
+const COMPOUND_FORBIDDEN_RECEIPT_TERMINAL_KINDS = [
+  "tool_receipt",
+  "calculator_receipt",
+  "docs_viewer_receipt",
+  "doc_open_receipt",
+  "workspace_action_receipt",
+  "live_environment_tool_observation",
+  "live_pipeline_receipt",
+  "live_pipeline_turn_receipt",
+  "live_source_pipeline_receipt",
+] as const;
+
 const compoundHasDocsSubgoal = (subgoals: RecordLike[]): boolean =>
   subgoals.some((subgoal) =>
     readString(subgoal.capability_family) === "docs_viewer" ||
@@ -240,6 +252,12 @@ const stepForCompoundSubgoal = (input: {
       input.subgoal.args_hint && typeof input.subgoal.args_hint === "object" && !Array.isArray(input.subgoal.args_hint)
         ? (input.subgoal.args_hint as Record<string, unknown>)
         : {},
+    depends_on_subgoal_ids: Array.isArray(input.subgoal.depends_on_subgoal_ids)
+      ? input.subgoal.depends_on_subgoal_ids.map(readString).filter(Boolean)
+      : [],
+    input_bindings: Array.isArray(input.subgoal.input_bindings)
+      ? input.subgoal.input_bindings.map(readRecord).filter((entry): entry is RecordLike => Boolean(entry))
+      : [],
     purpose: requestedCapability
       ? `Execute explicit compound capability subgoal ${requestedCapability}.`
       : "Execute the explicit compound capability subgoal.",
@@ -247,6 +265,9 @@ const stepForCompoundSubgoal = (input: {
     required_observation_kinds: requiredObservationKinds,
     contribution_role: readString(input.subgoal.contribution_role) || null,
     terminal_contribution_kind: readString(input.subgoal.terminal_contribution_kind) || readString(input.subgoal.required_terminal_kind) || null,
+    forbidden_nearby_capabilities: Array.isArray(input.subgoal.forbidden_nearby_capabilities)
+      ? input.subgoal.forbidden_nearby_capabilities.map(readString).filter(Boolean)
+      : [],
     status: input.status,
     reason:
       input.status === "missing"
@@ -456,6 +477,10 @@ export function buildHelixCapabilityItinerary(input: {
   const compoundRequiredCapabilities = compoundSubgoals
     .map((subgoal) => readString(subgoal.requested_capability))
     .filter(Boolean);
+  const forbiddenTerminalArtifactKinds = compoundSubgoals.length > 1
+    ? [...COMPOUND_FORBIDDEN_RECEIPT_TERMINAL_KINDS]
+    : [];
+  const forbiddenTerminalArtifactKindSet = new Set<string>(forbiddenTerminalArtifactKinds);
   const allowedTerminalArtifactKinds = unique([
     ...allowedTerminalKindsFor(relevantFamilies),
     ...compoundTerminalKindsFor(compoundSubgoals),
@@ -463,7 +488,7 @@ export function buildHelixCapabilityItinerary(input: {
     ...(compoundSubgoals.length > 1 && compoundHasDocsSubgoal(compoundSubgoals)
       ? ["doc_evidence_synthesis_answer"]
       : []),
-  ]);
+  ]).filter((kind) => !forbiddenTerminalArtifactKindSet.has(kind));
   return {
     schema: HELIX_CAPABILITY_ITINERARY_SCHEMA,
     turn_id: input.turnId,
@@ -524,7 +549,7 @@ export function buildHelixCapabilityItinerary(input: {
       required_observation_families: relevantFamilies,
       required_capabilities: compoundRequiredCapabilities,
       allowed_terminal_artifact_kinds: allowedTerminalArtifactKinds,
-      forbidden_terminal_artifact_kinds: compoundSubgoals.length > 1 ? ["tool_receipt"] : [],
+      forbidden_terminal_artifact_kinds: forbiddenTerminalArtifactKinds,
       ...(compoundSubgoals.length > 1
         ? { compound_terminal_policy: "synthesize_from_satisfied_subgoal_observations" }
         : {}),

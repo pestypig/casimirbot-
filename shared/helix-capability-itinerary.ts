@@ -34,11 +34,14 @@ export type HelixCapabilityItineraryStep = {
   runtime_capability?: string | null;
   compound_subgoal_id?: string | null;
   args_hint?: Record<string, unknown>;
+  depends_on_subgoal_ids?: string[];
+  input_bindings?: Array<Record<string, unknown>>;
   purpose: string;
   execution_group: HelixCapabilityItineraryExecutionGroup;
   required_observation_kinds: string[];
   contribution_role?: string | null;
   terminal_contribution_kind?: string | null;
+  forbidden_nearby_capabilities?: string[];
   status: HelixCapabilityItineraryStepStatus;
   reason: string;
 };

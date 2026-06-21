@@ -11,9 +11,12 @@ export type HelixCapabilityFamily =
   | "repo_evidence"
   | "scholarly_research"
   | "internet_search"
+  | "theory_locator"
   | "process_graph"
   | "debug_export"
   | "context_reflection"
+  | "zen_graph_reflection"
+  | "civilization_bounds"
   | "capability_catalog"
   | "workspace_diagnostic"
   | "subagent_runtime_adapter";

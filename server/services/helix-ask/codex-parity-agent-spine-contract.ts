@@ -58,6 +58,7 @@ export const CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS = [
   "observation_materializer",
   "reentry_gate",
   "repo_retrieval_repair_policy",
+  "subgoal_argument_extraction",
   "draft_builder",
   "terminal_materializer",
   "terminal_authority",
@@ -88,7 +89,21 @@ export const CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES = [
 ] as const;
 
 export type CodexParityAgentSpineRailFailureCode =
-  (typeof CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES)[number];
+  | (typeof CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES)[number]
+  | `invalid_arg:${string}`
+  | `missing_required_arg:${string}`;
+
+export const isCodexParityAgentSpineRailFailureCode = (
+  value: unknown,
+): value is CodexParityAgentSpineRailFailureCode =>
+  typeof value === "string" &&
+  (
+    CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES.includes(
+      value as (typeof CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES)[number],
+    ) ||
+    /^invalid_arg:[A-Za-z0-9_.:-]+$/.test(value) ||
+    /^missing_required_arg:[A-Za-z0-9_.:-]+$/.test(value)
+  );
 
 export const CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS = [
   "prompt",
@@ -108,4 +123,15 @@ export const CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS = [
   "first_broken_rail",
   "repair_target",
   "rail_failure_code",
+] as const;
+
+export const CODEX_PARITY_AGENT_SPINE_COMPOUND_STRING_OR_NULL_FIELDS = [
+  "first_incomplete_compound_subgoal_id",
+  "first_incomplete_compound_requested_capability",
+  "first_incomplete_compound_runtime_capability",
+  "first_incomplete_compound_selected_capability",
+  "first_incomplete_compound_executed_capability",
+  "compound_first_broken_rail",
+  "compound_rail_failure_code",
+  "compound_repair_target",
 ] as const;

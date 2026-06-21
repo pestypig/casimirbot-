@@ -1,17 +1,36 @@
 import type { HelixApiParityExpected, HelixApiParityScenario } from "./api-parity-matrix";
 import {
   CODEX_PARITY_AGENT_SPINE_CLASSES,
+  CODEX_PARITY_AGENT_SPINE_COMPOUND_STRING_OR_NULL_FIELDS,
   CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS,
   CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES,
-  CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES,
   CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
   CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES,
   CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS,
   CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS,
+  isCodexParityAgentSpineRailFailureCode,
 } from "./codex-parity-agent-spine-contract";
 import { HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION } from "./terminal-rail-failure-reconciliation";
 
 type RecordLike = Record<string, unknown>;
+
+export type HelixApiParityCompoundSubgoalRailSummary = {
+  subgoal_id: string | null;
+  order: number | null;
+  requested_capability: string | null;
+  runtime_capability: string | null;
+  selected_capability: string | null;
+  executed_capability: string | null;
+  args_present: boolean;
+  observation_kind: string | null;
+  observation_ref: string | null;
+  observation_provenance: string | null;
+  satisfaction: string | null;
+  rail_status: string | null;
+  first_broken_rail: string | null;
+  rail_failure_code: string | null;
+  repair_target: string | null;
+};
 
 export type HelixApiParityRailTableSummary = {
   present: boolean;
@@ -26,6 +45,17 @@ export type HelixApiParityRailTableSummary = {
   admission_proof_source: string | null;
   admission_proven: boolean;
   executed_capability: string | null;
+  compound_subgoal_count: number | null;
+  first_incomplete_compound_subgoal_id: string | null;
+  first_incomplete_compound_requested_capability: string | null;
+  first_incomplete_compound_runtime_capability: string | null;
+  first_incomplete_compound_selected_capability: string | null;
+  first_incomplete_compound_executed_capability: string | null;
+  compound_first_broken_rail: string | null;
+  compound_rail_failure_code: string | null;
+  compound_repair_target: string | null;
+  compound_incomplete_subgoal_did_tool_run: boolean | null;
+  compound_subgoal_rails: HelixApiParityCompoundSubgoalRailSummary[];
   observation_kind: string | null;
   observation_ref: string | null;
   required_observation_kinds_for_requested_capability: string[];
@@ -120,6 +150,11 @@ const readString = (value: unknown): string | null =>
 
 const readStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry: unknown): entry is string => typeof entry === "string" && entry.trim().length > 0) : [];
+
+const readRecordArray = (value: unknown): RecordLike[] =>
+  Array.isArray(value)
+    ? value.map((entry: unknown) => readRecord(entry)).filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry))
+    : [];
 
 const isNonEmptyStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((entry) => typeof entry === "string" && entry.trim().length > 0);
@@ -276,6 +311,31 @@ const readRailTables = (ask: RecordLike, debug: RecordLike | null, rawDebugExpor
   );
 };
 
+const readCompoundSubgoalRailStatuses = (
+  ask: RecordLike,
+  debug: RecordLike | null,
+  rawDebugExport?: unknown,
+): RecordLike[] => {
+  const rawDebug = readRecord(rawDebugExport);
+  for (const candidate of [
+    ask.compound_subgoal_rail_statuses,
+    debug?.compound_subgoal_rail_statuses,
+    getPath(debug, ["debug", "compound_subgoal_rail_statuses"]),
+    getPath(debug, ["artifact_query_index", "compound_subgoal_rail_statuses"]),
+    getPath(debug, ["debug", "artifact_query_index", "compound_subgoal_rail_statuses"]),
+    getPath(rawDebug, ["compound_subgoal_rail_statuses"]),
+    getPath(rawDebug, ["payload", "compound_subgoal_rail_statuses"]),
+    getPath(rawDebug, ["payload", "debug", "compound_subgoal_rail_statuses"]),
+    getPath(rawDebug, ["payload", "artifact_query_index", "compound_subgoal_rail_statuses"]),
+    getPath(rawDebug, ["payload", "debug", "artifact_query_index", "compound_subgoal_rail_statuses"]),
+    getPath(rawDebug, ["debug", "compound_subgoal_rail_statuses"]),
+  ]) {
+    const records = readRecordArray(candidate);
+    if (records.length > 0) return records;
+  }
+  return [];
+};
+
 const RAIL_MIRROR_COMPARISON_FIELDS = [
   "schema",
   "turn_id",
@@ -289,6 +349,9 @@ const RAIL_MIRROR_COMPARISON_FIELDS = [
   "admission_proof_source",
   "admission_proven",
   "executed_capability",
+  "compound_subgoal_count",
+  ...CODEX_PARITY_AGENT_SPINE_COMPOUND_STRING_OR_NULL_FIELDS,
+  "compound_incomplete_subgoal_did_tool_run",
   "observation_kind",
   "observation_ref",
   "required_observation_kinds_for_requested_capability",
@@ -317,6 +380,29 @@ const RAIL_MIRROR_COMPARISON_FIELDS = [
 
 const railMirrorComparableValue = (value: unknown): unknown => value === undefined ? null : value;
 
+const readFiniteNumber = (value: unknown): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const buildCompoundSubgoalRailSummary = (
+  entry: RecordLike,
+): HelixApiParityCompoundSubgoalRailSummary => ({
+  subgoal_id: readString(entry.subgoal_id),
+  order: readFiniteNumber(entry.order),
+  requested_capability: readString(entry.requested_capability),
+  runtime_capability: readString(entry.runtime_capability),
+  selected_capability: readString(entry.selected_capability),
+  executed_capability: readString(entry.executed_capability),
+  args_present: readRecord(entry.args) !== null,
+  observation_kind: readString(entry.observation_kind),
+  observation_ref: readString(entry.observation_ref),
+  observation_provenance: readString(entry.observation_provenance),
+  satisfaction: readString(entry.satisfaction),
+  rail_status: readString(entry.rail_status),
+  first_broken_rail: readString(entry.first_broken_rail),
+  rail_failure_code: readString(entry.rail_failure_code),
+  repair_target: readString(entry.repair_target),
+});
+
 const addRailMirrorFailures = (input: {
   failures: string[];
   railTables: RecordLike[];
@@ -336,7 +422,10 @@ const addRailMirrorFailures = (input: {
   }
 };
 
-const buildRailTableSummary = (railTable: RecordLike | null): HelixApiParityRailTableSummary => ({
+const buildRailTableSummary = (
+  railTable: RecordLike | null,
+  compoundSubgoalRailStatuses: RecordLike[] = [],
+): HelixApiParityRailTableSummary => ({
   present: Boolean(railTable),
   turn_id: readString(railTable?.turn_id),
   prompt: readString(railTable?.prompt),
@@ -353,6 +442,20 @@ const buildRailTableSummary = (railTable: RecordLike | null): HelixApiParityRail
   admission_proof_source: readString(railTable?.admission_proof_source),
   admission_proven: railTable?.admission_proven === true,
   executed_capability: readString(railTable?.executed_capability),
+  compound_subgoal_count: readNonNegativeInteger(railTable?.compound_subgoal_count),
+  first_incomplete_compound_subgoal_id: readString(railTable?.first_incomplete_compound_subgoal_id),
+  first_incomplete_compound_requested_capability: readString(railTable?.first_incomplete_compound_requested_capability),
+  first_incomplete_compound_runtime_capability: readString(railTable?.first_incomplete_compound_runtime_capability),
+  first_incomplete_compound_selected_capability: readString(railTable?.first_incomplete_compound_selected_capability),
+  first_incomplete_compound_executed_capability: readString(railTable?.first_incomplete_compound_executed_capability),
+  compound_first_broken_rail: readString(railTable?.compound_first_broken_rail),
+  compound_rail_failure_code: readString(railTable?.compound_rail_failure_code),
+  compound_repair_target: readString(railTable?.compound_repair_target),
+  compound_incomplete_subgoal_did_tool_run:
+    typeof railTable?.compound_incomplete_subgoal_did_tool_run === "boolean"
+      ? railTable.compound_incomplete_subgoal_did_tool_run
+      : null,
+  compound_subgoal_rails: compoundSubgoalRailStatuses.map(buildCompoundSubgoalRailSummary),
   observation_kind: readString(railTable?.observation_kind),
   observation_ref: readString(railTable?.observation_ref),
   required_observation_kinds_for_requested_capability: readStringArray(railTable?.required_observation_kinds_for_requested_capability),
@@ -385,10 +488,12 @@ const buildRailTableSummary = (railTable: RecordLike | null): HelixApiParityRail
 const addRailTableFailures = (input: {
   failures: string[];
   railTable: RecordLike | null;
+  compoundSubgoalRailStatuses?: RecordLike[];
   turnId?: string | null;
   prompt?: string | null;
 }): void => {
   const { failures, railTable, turnId, prompt } = input;
+  const compoundSubgoalRailStatuses = input.compoundSubgoalRailStatuses ?? [];
   if (!railTable) {
     failures.push("codex_parity_agent_spine_rail_table_missing");
     return;
@@ -467,13 +572,144 @@ const addRailTableFailures = (input: {
   ) {
     failures.push(`rail_repair_target_invalid:${repairTarget}`);
   }
-  const railFailureCode = readString(railTable.rail_failure_code);
+  const compoundSubgoalCount = readNonNegativeInteger(railTable.compound_subgoal_count);
+  const firstIncompleteCompoundSubgoalId = readString(railTable.first_incomplete_compound_subgoal_id);
+  const firstIncompleteCompoundRequestedCapability = readString(railTable.first_incomplete_compound_requested_capability);
+  const firstIncompleteCompoundRuntimeCapability = readString(railTable.first_incomplete_compound_runtime_capability);
+  const compoundFirstBrokenRail = readString(railTable.compound_first_broken_rail);
+  const compoundRailFailureCode = readString(railTable.compound_rail_failure_code);
+  const compoundRepairTarget = readString(railTable.compound_repair_target);
+  const compoundDidToolRun =
+    typeof railTable.compound_incomplete_subgoal_did_tool_run === "boolean"
+      ? railTable.compound_incomplete_subgoal_did_tool_run
+      : null;
+  const railStatus = readString(railTable.rail_status);
+  const compoundMirrorDeclared =
+    railTable.compound_subgoal_count !== undefined ||
+    firstIncompleteCompoundSubgoalId !== null ||
+    firstIncompleteCompoundRequestedCapability !== null ||
+    firstIncompleteCompoundRuntimeCapability !== null ||
+    compoundFirstBrokenRail !== null ||
+    compoundRailFailureCode !== null ||
+    compoundRepairTarget !== null ||
+    railTable.compound_incomplete_subgoal_did_tool_run !== undefined;
+  if (compoundSubgoalCount === null && compoundMirrorDeclared) {
+    failures.push("rail_compound_subgoal_count_invalid");
+  }
+  if (compoundMirrorDeclared) {
+    for (const key of CODEX_PARITY_AGENT_SPINE_COMPOUND_STRING_OR_NULL_FIELDS) {
+      const value = railTable[key];
+      if (value !== null && typeof value !== "string") {
+        failures.push(`rail_compound_string_or_null_field_invalid:${key}`);
+      }
+    }
+  }
+  if (compoundSubgoalCount === 0) {
+    if (firstIncompleteCompoundSubgoalId) failures.push("rail_noncompound_first_incomplete_subgoal_present");
+    if (compoundFirstBrokenRail) failures.push("rail_noncompound_first_broken_rail_present");
+    if (compoundRailFailureCode) failures.push("rail_noncompound_rail_failure_code_present");
+    if (compoundRepairTarget) failures.push("rail_noncompound_repair_target_present");
+    if (compoundDidToolRun !== null) failures.push("rail_noncompound_did_tool_run_present");
+  }
+  if (compoundSubgoalCount !== null && compoundSubgoalCount > 0 && railStatus === "complete") {
+    if (firstIncompleteCompoundSubgoalId) failures.push("rail_complete_compound_first_incomplete_subgoal_present");
+    if (compoundFirstBrokenRail) failures.push("rail_complete_compound_first_broken_rail_present");
+    if (compoundRailFailureCode) failures.push("rail_complete_compound_rail_failure_code_present");
+    if (compoundRepairTarget) failures.push("rail_complete_compound_repair_target_present");
+    if (compoundDidToolRun !== null) failures.push("rail_complete_compound_did_tool_run_present");
+  }
+  if (compoundSubgoalCount !== null && compoundSubgoalCount > 0) {
+    if (compoundSubgoalRailStatuses.length < compoundSubgoalCount) {
+      failures.push(`rail_compound_subgoal_rail_statuses_dropped:${compoundSubgoalRailStatuses.length}<${compoundSubgoalCount}`);
+    }
+    for (const [index, subgoalRail] of compoundSubgoalRailStatuses.entries()) {
+      const prefix = `rail_compound_subgoal_${index + 1}`;
+      const subgoalRailStatus = readString(subgoalRail.rail_status);
+      const subgoalFirstBrokenRail = readString(subgoalRail.first_broken_rail);
+      const subgoalRailFailureCode = readString(subgoalRail.rail_failure_code);
+      const subgoalRepairTarget = readString(subgoalRail.repair_target);
+      if (!readString(subgoalRail.subgoal_id)) failures.push(`${prefix}_subgoal_id_missing`);
+      if (readNonNegativeInteger(subgoalRail.order) === null) failures.push(`${prefix}_order_invalid`);
+      if (!readString(subgoalRail.requested_capability)) failures.push(`${prefix}_requested_capability_missing`);
+      if (!readString(subgoalRail.runtime_capability)) failures.push(`${prefix}_runtime_capability_missing`);
+      if (!readString(subgoalRail.selected_capability)) failures.push(`${prefix}_selected_capability_missing`);
+      if (!Object.prototype.hasOwnProperty.call(subgoalRail, "args")) {
+        failures.push(`${prefix}_args_field_missing`);
+      }
+      if (!Object.prototype.hasOwnProperty.call(subgoalRail, "executed_capability")) {
+        failures.push(`${prefix}_executed_capability_field_missing`);
+      }
+      if (!Object.prototype.hasOwnProperty.call(subgoalRail, "observation_kind")) {
+        failures.push(`${prefix}_observation_kind_field_missing`);
+      }
+      if (!Object.prototype.hasOwnProperty.call(subgoalRail, "observation_ref")) {
+        failures.push(`${prefix}_observation_ref_field_missing`);
+      }
+      if (!readString(subgoalRail.satisfaction)) failures.push(`${prefix}_satisfaction_missing`);
+      if (!subgoalRailStatus) failures.push(`${prefix}_rail_status_missing`);
+      if (subgoalRailStatus && !CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES.includes(subgoalRailStatus as never)) {
+        failures.push(`${prefix}_rail_status_invalid:${subgoalRailStatus}`);
+      }
+      if (subgoalRailStatus === "complete") {
+        if (subgoalFirstBrokenRail) failures.push(`${prefix}_complete_first_broken_rail_present`);
+        if (subgoalRailFailureCode) failures.push(`${prefix}_complete_rail_failure_code_present`);
+        if (subgoalRepairTarget) failures.push(`${prefix}_complete_repair_target_present`);
+      } else if (subgoalRailStatus) {
+        if (!subgoalFirstBrokenRail) failures.push(`${prefix}_first_broken_rail_missing`);
+        if (!subgoalRailFailureCode) failures.push(`${prefix}_rail_failure_code_missing`);
+        if (!subgoalRepairTarget) failures.push(`${prefix}_repair_target_missing`);
+      }
+      if (
+        subgoalFirstBrokenRail &&
+        !CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS.includes(
+          subgoalFirstBrokenRail as (typeof CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS)[number],
+        )
+      ) {
+        failures.push(`${prefix}_first_broken_rail_invalid:${subgoalFirstBrokenRail}`);
+      }
+      if (
+        subgoalRepairTarget &&
+        !CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS.includes(
+          subgoalRepairTarget as (typeof CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS)[number],
+        )
+      ) {
+        failures.push(`${prefix}_repair_target_invalid:${subgoalRepairTarget}`);
+      }
+      if (subgoalRailFailureCode && !isCodexParityAgentSpineRailFailureCode(subgoalRailFailureCode)) {
+        failures.push(`${prefix}_rail_failure_code_invalid:${subgoalRailFailureCode}`);
+      }
+    }
+  }
+  if (compoundSubgoalCount !== null && compoundSubgoalCount > 0 && railStatus !== "complete") {
+    if (!firstIncompleteCompoundSubgoalId) failures.push("rail_incomplete_compound_first_incomplete_subgoal_missing");
+    if (!firstIncompleteCompoundRequestedCapability) failures.push("rail_incomplete_compound_requested_capability_missing");
+    if (!firstIncompleteCompoundRuntimeCapability) failures.push("rail_incomplete_compound_runtime_capability_missing");
+    if (!compoundFirstBrokenRail) failures.push("rail_incomplete_compound_first_broken_rail_missing");
+    if (!compoundRailFailureCode) failures.push("rail_incomplete_compound_rail_failure_code_missing");
+    if (!compoundRepairTarget) failures.push("rail_incomplete_compound_repair_target_missing");
+    if (compoundDidToolRun === null) failures.push("rail_incomplete_compound_did_tool_run_missing");
+  }
   if (
-    railFailureCode &&
-    !CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES.includes(
-      railFailureCode as (typeof CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES)[number],
+    compoundFirstBrokenRail &&
+    !CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS.includes(
+      compoundFirstBrokenRail as (typeof CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS)[number],
     )
   ) {
+    failures.push(`rail_compound_first_broken_rail_invalid:${compoundFirstBrokenRail}`);
+  }
+  if (
+    compoundRepairTarget &&
+    !CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS.includes(
+      compoundRepairTarget as (typeof CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS)[number],
+    )
+  ) {
+    failures.push(`rail_compound_repair_target_invalid:${compoundRepairTarget}`);
+  }
+  if (compoundRailFailureCode && !isCodexParityAgentSpineRailFailureCode(compoundRailFailureCode)) {
+    failures.push(`rail_compound_rail_failure_code_invalid:${compoundRailFailureCode}`);
+  }
+  const railFailureCode = readString(railTable.rail_failure_code);
+  if (railFailureCode && !isCodexParityAgentSpineRailFailureCode(railFailureCode)) {
     failures.push(`rail_failure_code_invalid:${railFailureCode}`);
   }
   const parityClass = readString(railTable.codex_parity_class);
@@ -488,7 +724,6 @@ const addRailTableFailures = (input: {
   const executedCapability = readString(railTable.executed_capability);
   const requestedCapability = readString(railTable.requested_capability);
   const goalSatisfaction = readString(railTable.goal_satisfaction);
-  const railStatus = readString(railTable.rail_status);
   const reentryStatus = readString(railTable.reentry_status);
   const reentryProofSource = readString(railTable.reentry_proof_source);
   const reentryProven = railTable.reentry_proven === true;
@@ -790,6 +1025,7 @@ export function buildApiParityProbeResult(input: {
     terminalFailureReconciliationRuntimeVersion === HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION;
   const railTables = readRailTables(ask, debug, input.debugExport);
   const railTable = railTables[0] ?? null;
+  const compoundSubgoalRailStatuses = readCompoundSubgoalRailStatuses(ask, debug, input.debugExport);
   const capabilitySelectionResult = readCapabilitySelectionResult(ask, debug);
   const selectedCapabilities = [
     readString(capabilitySelectionResult?.capability_id),
@@ -843,6 +1079,7 @@ export function buildApiParityProbeResult(input: {
   addRailTableFailures({
     failures,
     railTable,
+    compoundSubgoalRailStatuses,
     turnId: nonStreamTurnId,
     prompt: input.scenario.prompt,
   });
@@ -940,7 +1177,7 @@ export function buildApiParityProbeResult(input: {
       version: terminalFailureReconciliationRuntimeVersion,
       current: terminalFailureReconciliationRuntimeCurrent,
     },
-    rail_table: buildRailTableSummary(railTable),
+    rail_table: buildRailTableSummary(railTable, compoundSubgoalRailStatuses),
     solver_continuation_count: Number(ask.solver_continuation_count ?? debug?.solver_continuation_count ?? 0),
     solver_continuation_observation: solverContinuation
       ? {

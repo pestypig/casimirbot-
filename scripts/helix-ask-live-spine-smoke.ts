@@ -5,11 +5,12 @@ import {
   CODEX_PARITY_AGENT_SPINE_CLASSES,
   CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS,
   CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES,
-  CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES,
   CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
   CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES,
   CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS,
+  CODEX_PARITY_AGENT_SPINE_COMPOUND_STRING_OR_NULL_FIELDS,
   CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS,
+  isCodexParityAgentSpineRailFailureCode,
 } from "../server/services/helix-ask/codex-parity-agent-spine-contract";
 import { HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION } from "../server/services/helix-ask/terminal-rail-failure-reconciliation";
 
@@ -351,6 +352,9 @@ const isNonEmptyStringArray = (value: unknown): value is string[] =>
 const readNonNegativeInteger = (value: unknown): number | null =>
   typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
 
+const hasOwn = (record: RecordLike, key: string): boolean =>
+  Object.prototype.hasOwnProperty.call(record, key);
+
 const getPath = (value: unknown, pathParts: string[]): unknown =>
   pathParts.reduce<unknown>((current, key) => {
     if (!current || typeof current !== "object") return undefined;
@@ -581,6 +585,61 @@ const terminalArtifactKindFor = (ask: RecordLike, debugExport: unknown): string 
   );
 };
 
+const collectCompoundRailShapeFailures = (rail: RecordLike, railComplete: boolean): string[] => {
+  const compoundMirrorDeclared =
+    hasOwn(rail, "compound_subgoal_count") ||
+    hasOwn(rail, "compound_incomplete_subgoal_did_tool_run") ||
+    CODEX_PARITY_AGENT_SPINE_COMPOUND_STRING_OR_NULL_FIELDS.some((key) => hasOwn(rail, key));
+  if (!compoundMirrorDeclared) return [];
+
+  const failures: string[] = [];
+  const compoundSubgoalCount = readNonNegativeInteger(rail.compound_subgoal_count);
+  if (compoundSubgoalCount === null) failures.push("compound_subgoal_count_invalid");
+
+  for (const key of CODEX_PARITY_AGENT_SPINE_COMPOUND_STRING_OR_NULL_FIELDS) {
+    const value = rail[key];
+    if (value !== null && typeof value !== "string") failures.push(`compound_string_or_null_field_invalid:${key}`);
+  }
+
+  const didToolRun = rail.compound_incomplete_subgoal_did_tool_run;
+  if (didToolRun !== null && typeof didToolRun !== "boolean") {
+    failures.push("compound_incomplete_subgoal_did_tool_run_invalid");
+  }
+
+  const hasFirstIncompleteSubgoal =
+    CODEX_PARITY_AGENT_SPINE_COMPOUND_STRING_OR_NULL_FIELDS.some((key) => Boolean(readString(rail[key]))) ||
+    typeof didToolRun === "boolean";
+
+  if (compoundSubgoalCount === 0 && hasFirstIncompleteSubgoal) {
+    failures.push("compound_zero_with_first_incomplete_subgoal");
+  }
+  if (compoundSubgoalCount !== null && compoundSubgoalCount > 0 && railComplete && hasFirstIncompleteSubgoal) {
+    failures.push("compound_complete_with_stale_first_incomplete_subgoal");
+  }
+  if (compoundSubgoalCount !== null && compoundSubgoalCount > 0 && !railComplete) {
+    for (const key of [
+      "first_incomplete_compound_subgoal_id",
+      "first_incomplete_compound_requested_capability",
+      "first_incomplete_compound_runtime_capability",
+      "compound_first_broken_rail",
+      "compound_rail_failure_code",
+      "compound_repair_target",
+    ]) {
+      if (!readString(rail[key])) failures.push(`compound_incomplete_missing:${key}`);
+    }
+    if (typeof didToolRun !== "boolean") {
+      failures.push("compound_incomplete_did_tool_run_missing");
+    }
+  }
+
+  const compoundRailFailureCode = readString(rail.compound_rail_failure_code);
+  if (compoundRailFailureCode && !isCodexParityAgentSpineRailFailureCode(compoundRailFailureCode)) {
+    failures.push(`compound_rail_failure_code_invalid:${compoundRailFailureCode}`);
+  }
+
+  return failures;
+};
+
 const shapeFailures = (rail: RecordLike, turnId: string, prompt: string): string[] => {
   const failures: string[] = [];
   if (rail.schema !== CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA) failures.push("rail_schema_mismatch");
@@ -660,12 +719,7 @@ const shapeFailures = (rail: RecordLike, turnId: string, prompt: string): string
     failures.push(`invalid_repair_target:${repairTarget}`);
   }
   const railFailureCode = readString(rail.rail_failure_code);
-  if (
-    railFailureCode &&
-    !CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES.includes(
-      railFailureCode as (typeof CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES)[number],
-    )
-  ) {
+  if (railFailureCode && !isCodexParityAgentSpineRailFailureCode(railFailureCode)) {
     failures.push(`invalid_rail_failure_code:${railFailureCode}`);
   }
   if (!CODEX_PARITY_CLASSES.includes(rail.codex_parity_class as (typeof CODEX_PARITY_CLASSES)[number])) {
@@ -736,6 +790,8 @@ const shapeFailures = (rail: RecordLike, turnId: string, prompt: string): string
   if ((rail.codex_parity_class === "complete" || rail.rail_status === "complete") && !visibleTerminalKind) {
     failures.push("complete_without_visible_projection");
   }
+  const railComplete = rail.codex_parity_class === "complete" || rail.rail_status === "complete";
+  failures.push(...collectCompoundRailShapeFailures(rail, railComplete));
   if (rail.codex_parity_class !== "complete" && !firstBrokenRail) {
     failures.push("non_complete_without_first_broken_rail");
   }
@@ -781,6 +837,9 @@ const RAIL_MIRROR_COMPARISON_FIELDS = [
   "repair_target",
   "rail_status",
   "rail_failure_code",
+  "compound_subgoal_count",
+  ...CODEX_PARITY_AGENT_SPINE_COMPOUND_STRING_OR_NULL_FIELDS,
+  "compound_incomplete_subgoal_did_tool_run",
   "normalized_codex_parity_classes",
   "assistant_answer",
   "terminal_eligible",
@@ -933,6 +992,21 @@ export const classifyLiveSpineSmokeResult = (
           repair_target: rail.repair_target ?? null,
           rail_status: rail.rail_status ?? null,
           rail_failure_code: rail.rail_failure_code ?? null,
+          compound_subgoal_count: rail.compound_subgoal_count ?? null,
+          first_incomplete_compound_subgoal_id: rail.first_incomplete_compound_subgoal_id ?? null,
+          first_incomplete_compound_requested_capability:
+            rail.first_incomplete_compound_requested_capability ?? null,
+          first_incomplete_compound_runtime_capability:
+            rail.first_incomplete_compound_runtime_capability ?? null,
+          first_incomplete_compound_selected_capability:
+            rail.first_incomplete_compound_selected_capability ?? null,
+          first_incomplete_compound_executed_capability:
+            rail.first_incomplete_compound_executed_capability ?? null,
+          compound_first_broken_rail: rail.compound_first_broken_rail ?? null,
+          compound_rail_failure_code: rail.compound_rail_failure_code ?? null,
+          compound_repair_target: rail.compound_repair_target ?? null,
+          compound_incomplete_subgoal_did_tool_run:
+            rail.compound_incomplete_subgoal_did_tool_run ?? null,
           codex_parity_class: rail.codex_parity_class ?? null,
           normalized_codex_parity_classes: rail.normalized_codex_parity_classes ?? [],
         }

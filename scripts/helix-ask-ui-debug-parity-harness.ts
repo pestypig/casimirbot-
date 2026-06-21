@@ -5,13 +5,14 @@ import { pathToFileURL } from "node:url";
 import { chromium, type Page } from "@playwright/test";
 import {
   CODEX_PARITY_AGENT_SPINE_CLASSES,
+  CODEX_PARITY_AGENT_SPINE_COMPOUND_STRING_OR_NULL_FIELDS,
   CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS,
   CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES,
-  CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES,
   CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA,
   CODEX_PARITY_AGENT_SPINE_REENTRY_STATUSES,
   CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS,
   CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS,
+  isCodexParityAgentSpineRailFailureCode,
 } from "../server/services/helix-ask/codex-parity-agent-spine-contract";
 
 export type HarnessPrompt = {
@@ -547,8 +548,78 @@ export const collectUiDebugRailCandidates = (
   ].filter((entry): entry is Record<string, unknown> => Boolean(entry));
 };
 
+const asRecordArray = (value: unknown): Record<string, unknown>[] =>
+  Array.isArray(value)
+    ? value.map((entry) => asRecord(entry)).filter((entry): entry is Record<string, unknown> => Boolean(entry))
+    : [];
+
+export const collectUiDebugCompoundSubgoalRailStatuses = (
+  debugExport: Record<string, unknown> | null,
+): Record<string, unknown>[] => {
+  const payload = asRecord(debugExport?.payload);
+  for (const candidate of [
+    debugExport?.compound_subgoal_rail_statuses,
+    getPath(debugExport, ["debug", "compound_subgoal_rail_statuses"]),
+    getPath(debugExport, ["artifact_query_index", "compound_subgoal_rail_statuses"]),
+    getPath(debugExport, ["debug", "artifact_query_index", "compound_subgoal_rail_statuses"]),
+    payload?.compound_subgoal_rail_statuses,
+    getPath(payload, ["debug", "compound_subgoal_rail_statuses"]),
+    getPath(payload, ["artifact_query_index", "compound_subgoal_rail_statuses"]),
+    getPath(payload, ["debug", "artifact_query_index", "compound_subgoal_rail_statuses"]),
+  ]) {
+    const records = asRecordArray(candidate);
+    if (records.length > 0) return records;
+  }
+  return [];
+};
+
 const findRailTable = (debugExport: Record<string, unknown> | null): Record<string, unknown> | null =>
   collectUiDebugRailCandidates(debugExport)[0] ?? null;
+
+const compoundSubgoalRailComparisonFields = [
+  "subgoal_id",
+  "order",
+  "requested_capability",
+  "runtime_capability",
+  "selected_capability",
+  "executed_capability",
+  "args",
+  "observation_kind",
+  "observation_ref",
+  "satisfaction",
+  "rail_status",
+  "first_broken_rail",
+  "rail_failure_code",
+  "repair_target",
+] as const;
+
+const comparableCompoundSubgoalRails = (
+  rails: Record<string, unknown>[],
+): Array<Record<string, unknown>> =>
+  rails.map((rail) =>
+    Object.fromEntries(
+      compoundSubgoalRailComparisonFields.map((field) => [
+        field,
+        comparableRailValue(rail[field]),
+      ]),
+    ),
+  );
+
+const collectApiCompoundSubgoalRailStatuses = (
+  apiResponse: Record<string, unknown> | null,
+  apiDebugExport: Record<string, unknown> | null,
+): Record<string, unknown>[] => {
+  for (const candidate of [
+    apiResponse?.compound_subgoal_rail_statuses,
+    getPath(apiResponse, ["artifact_query_index", "compound_subgoal_rail_statuses"]),
+    getPath(apiResponse, ["debug", "compound_subgoal_rail_statuses"]),
+    getPath(apiResponse, ["debug", "artifact_query_index", "compound_subgoal_rail_statuses"]),
+  ]) {
+    const records = asRecordArray(candidate);
+    if (records.length > 0) return records;
+  }
+  return collectUiDebugCompoundSubgoalRailStatuses(apiDebugExport);
+};
 
 const readTerminalArtifactKind = (
   response: Record<string, unknown> | null,
@@ -659,6 +730,9 @@ export const collectUiApiTerminalParityViolations = (input: {
     "requested_capability",
     "selected_capability",
     "executed_capability",
+    "compound_subgoal_count",
+    ...CODEX_PARITY_AGENT_SPINE_COMPOUND_STRING_OR_NULL_FIELDS,
+    "compound_incomplete_subgoal_did_tool_run",
     "observation_kind",
     "selected_terminal_kind",
     "visible_terminal_kind",
@@ -672,6 +746,15 @@ export const collectUiApiTerminalParityViolations = (input: {
       if (JSON.stringify(uiValue) !== JSON.stringify(apiValue)) {
         violations.push(`ui_api_rail_${field}_mismatch:${String(uiValue ?? "null")}!=${String(apiValue ?? "null")}`);
       }
+    }
+  }
+  const uiCompoundSubgoalRails = collectUiDebugCompoundSubgoalRailStatuses(uiDebugExport);
+  const apiCompoundSubgoalRails = collectApiCompoundSubgoalRailStatuses(apiResponse, apiDebugExport);
+  if (uiCompoundSubgoalRails.length > 0 || apiCompoundSubgoalRails.length > 0) {
+    const uiComparableRails = comparableCompoundSubgoalRails(uiCompoundSubgoalRails);
+    const apiComparableRails = comparableCompoundSubgoalRails(apiCompoundSubgoalRails);
+    if (JSON.stringify(uiComparableRails) !== JSON.stringify(apiComparableRails)) {
+      violations.push("ui_api_compound_subgoal_rails_mismatch");
     }
   }
 
@@ -702,6 +785,9 @@ const RAIL_MIRROR_COMPARISON_FIELDS = [
   "admission_proof_source",
   "admission_proven",
   "executed_capability",
+  "compound_subgoal_count",
+  ...CODEX_PARITY_AGENT_SPINE_COMPOUND_STRING_OR_NULL_FIELDS,
+  "compound_incomplete_subgoal_did_tool_run",
   "observation_kind",
   "observation_ref",
   "required_observation_kinds_for_requested_capability",
@@ -830,13 +916,82 @@ export const collectRailTableViolations = (
   ) {
     violations.push("rail_repair_target_invalid");
   }
-  const railFailureCode = readString(railTable.rail_failure_code);
+  const compoundSubgoalCount = readNonNegativeInteger(railTable.compound_subgoal_count);
+  const railStatus = readString(railTable.rail_status);
+  const firstIncompleteCompoundSubgoalId = readString(railTable.first_incomplete_compound_subgoal_id);
+  const firstIncompleteCompoundRequestedCapability = readString(railTable.first_incomplete_compound_requested_capability);
+  const firstIncompleteCompoundRuntimeCapability = readString(railTable.first_incomplete_compound_runtime_capability);
+  const compoundFirstBrokenRail = readString(railTable.compound_first_broken_rail);
+  const compoundRailFailureCode = readString(railTable.compound_rail_failure_code);
+  const compoundRepairTarget = readString(railTable.compound_repair_target);
+  const compoundDidToolRun =
+    typeof railTable.compound_incomplete_subgoal_did_tool_run === "boolean"
+      ? railTable.compound_incomplete_subgoal_did_tool_run
+      : null;
+  const compoundMirrorDeclared =
+    railTable.compound_subgoal_count !== undefined ||
+    firstIncompleteCompoundSubgoalId !== null ||
+    firstIncompleteCompoundRequestedCapability !== null ||
+    firstIncompleteCompoundRuntimeCapability !== null ||
+    compoundFirstBrokenRail !== null ||
+    compoundRailFailureCode !== null ||
+    compoundRepairTarget !== null ||
+    railTable.compound_incomplete_subgoal_did_tool_run !== undefined;
+  if (compoundSubgoalCount === null && compoundMirrorDeclared) {
+    violations.push("rail_compound_subgoal_count_invalid");
+  }
+  if (compoundMirrorDeclared) {
+    for (const key of CODEX_PARITY_AGENT_SPINE_COMPOUND_STRING_OR_NULL_FIELDS) {
+      const value = railTable[key];
+      if (value !== null && typeof value !== "string") {
+        violations.push(`rail_compound_string_or_null_field_invalid:${key}`);
+      }
+    }
+  }
+  if (compoundSubgoalCount === 0) {
+    if (firstIncompleteCompoundSubgoalId) violations.push("rail_noncompound_first_incomplete_subgoal_present");
+    if (compoundFirstBrokenRail) violations.push("rail_noncompound_first_broken_rail_present");
+    if (compoundRailFailureCode) violations.push("rail_noncompound_rail_failure_code_present");
+    if (compoundRepairTarget) violations.push("rail_noncompound_repair_target_present");
+    if (compoundDidToolRun !== null) violations.push("rail_noncompound_did_tool_run_present");
+  }
+  if (compoundSubgoalCount !== null && compoundSubgoalCount > 0 && railStatus === "complete") {
+    if (firstIncompleteCompoundSubgoalId) violations.push("rail_complete_compound_first_incomplete_subgoal_present");
+    if (compoundFirstBrokenRail) violations.push("rail_complete_compound_first_broken_rail_present");
+    if (compoundRailFailureCode) violations.push("rail_complete_compound_rail_failure_code_present");
+    if (compoundRepairTarget) violations.push("rail_complete_compound_repair_target_present");
+    if (compoundDidToolRun !== null) violations.push("rail_complete_compound_did_tool_run_present");
+  }
+  if (compoundSubgoalCount !== null && compoundSubgoalCount > 0 && railStatus !== "complete") {
+    if (!firstIncompleteCompoundSubgoalId) violations.push("rail_incomplete_compound_first_incomplete_subgoal_missing");
+    if (!firstIncompleteCompoundRequestedCapability) violations.push("rail_incomplete_compound_requested_capability_missing");
+    if (!firstIncompleteCompoundRuntimeCapability) violations.push("rail_incomplete_compound_runtime_capability_missing");
+    if (!compoundFirstBrokenRail) violations.push("rail_incomplete_compound_first_broken_rail_missing");
+    if (!compoundRailFailureCode) violations.push("rail_incomplete_compound_rail_failure_code_missing");
+    if (!compoundRepairTarget) violations.push("rail_incomplete_compound_repair_target_missing");
+    if (compoundDidToolRun === null) violations.push("rail_incomplete_compound_did_tool_run_missing");
+  }
   if (
-    railFailureCode &&
-    !CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES.includes(
-      railFailureCode as (typeof CODEX_PARITY_AGENT_SPINE_RAIL_FAILURE_CODES)[number],
+    compoundFirstBrokenRail &&
+    !CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS.includes(
+      compoundFirstBrokenRail as (typeof CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS)[number],
     )
   ) {
+    violations.push("rail_compound_first_broken_rail_invalid");
+  }
+  if (
+    compoundRepairTarget &&
+    !CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS.includes(
+      compoundRepairTarget as (typeof CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS)[number],
+    )
+  ) {
+    violations.push("rail_compound_repair_target_invalid");
+  }
+  if (compoundRailFailureCode && !isCodexParityAgentSpineRailFailureCode(compoundRailFailureCode)) {
+    violations.push("rail_compound_rail_failure_code_invalid");
+  }
+  const railFailureCode = readString(railTable.rail_failure_code);
+  if (railFailureCode && !isCodexParityAgentSpineRailFailureCode(railFailureCode)) {
     violations.push("rail_failure_code_invalid");
   }
   const normalizedClasses = readStringArray(railTable.normalized_codex_parity_classes);

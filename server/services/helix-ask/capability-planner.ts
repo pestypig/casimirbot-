@@ -111,13 +111,19 @@ const classifySourceFamily = (input: {
     return "scholarly_research";
   }
   if (
+    input.sourceTarget === "theory_locator" ||
+    input.admittedFamilies.includes("theory_locator") ||
+    isTheoryFrontierVectorFieldTracePrompt(input.promptText) ||
+    /\b(?:theory\s+badge\s+graph|theory\s+badges?|badge\s+graph|physics\s+graph|theory\s+graph|theory_context_reflection|reflect_theory_context|helix_ask\.reflect_theory_context|graph\s+placement|scale\s+bands?|semantic\s+chunks?|uncertainty\s+mode|locate\b[\s\S]{0,80}\b(?:theory|badge|graph)|place\b[\s\S]{0,80}\b(?:theory|badge|graph|claims?)|map\b[\s\S]{0,80}\b(?:theory|badge|graph)|where\s+(?:does|do)\b[\s\S]{0,100}\b(?:fit|land|map))\b/i.test(input.promptText)
+  ) {
+    return "theory_locator";
+  }
+  if (
     input.sourceTarget === "context_reflection" ||
     input.sourceTarget === "context_attachment" ||
-    input.sourceTarget === "theory_locator" ||
     input.targetKind === "context_reflection" ||
     input.targetKind === "context_attachment" ||
     input.admittedFamilies.includes("context_reflection") ||
-    input.admittedFamilies.includes("theory_locator") ||
     /\b(?:selected\s+context|context\s+attachment|dragged\s+cutout|selected\s+ui\s+region|this\s+microreasoner|this\s+micro[-\s]?deck|macro[-\s]?reasoner\s+deck)\b/.test(prompt)
   ) {
     return "context_reflection";
@@ -258,7 +264,22 @@ const requestedActionFor = (
   if (family === "workspace_diagnostic") return HELIX_WORKSPACE_OS_STATUS_CAPABILITY;
   if (family === "capability_catalog") return "helix_ask.inspect_capability_catalog";
   if (family === "subagent_runtime_adapter") return "delegate_subagent_runtime";
+  if (family === "theory_locator") {
+    return isTheoryFrontierVectorFieldTracePrompt(promptText)
+      ? HELIX_THEORY_FRONTIER_VECTOR_FIELD_TRACE_CAPABILITY
+      : "helix_ask.reflect_theory_context";
+  }
   if (family === "context_reflection") return "helix_ask.reflect_context_attachments";
+  if (family === "zen_graph_reflection") {
+    return /\b(?:bridge|theory[_\s-]+ideology|theory[_\s-]+zen)\b/i.test(promptText)
+      ? "helix_ask.bridge_theory_ideology_context"
+      : "helix_ask.reflect_ideology_context";
+  }
+  if (family === "civilization_bounds") {
+    return /\b(?:build|scenario\s+frame|civilization_scenario_frame)\b/i.test(promptText)
+      ? "helix_ask.build_civilization_scenario_frame"
+      : "helix_ask.reflect_civilization_bounds";
+  }
   return "diagnose_debug_or_runtime_evidence";
 };
 
@@ -406,13 +427,18 @@ const allowedFamilyByToolAdmission = (family: HelixCapabilityFamily, admittedFam
   if (family === "scholarly_research") return admittedFamilies.includes("scholarly_research");
   if (family === "internet_search") return admittedFamilies.includes("internet_search");
   if (family === "debug_export") return admittedFamilies.includes("runtime_evidence") || admittedFamilies.includes("repo_code");
+  if (family === "theory_locator") return admittedFamilies.includes("theory_locator");
   if (family === "context_reflection") {
     return admittedFamilies.includes("context_reflection") ||
+      admittedFamilies.includes("theory_locator") ||
+      admittedFamilies.includes("workstation_action") ||
       admittedFamilies.includes("capability_catalog") ||
       admittedFamilies.includes("live_environment") ||
       admittedFamilies.includes("live_source_mail") ||
       admittedFamilies.includes("workstation_panel");
   }
+  if (family === "zen_graph_reflection") return admittedFamilies.includes("workstation_action");
+  if (family === "civilization_bounds") return admittedFamilies.includes("workstation_action");
   if (family === "workspace_diagnostic") return admittedFamilies.includes("workspace_diagnostic");
   if (family === "capability_catalog") return admittedFamilies.includes("capability_catalog");
   if (family === "process_graph") return admittedFamilies.includes("process_graph");
@@ -437,7 +463,10 @@ const contextualSuppressionBlocksCapabilityFamily = (
   if (family === "workspace_directory") return contextualToolSuppressionBlocksFamily(suppression, "workspace_directory");
   if (family === "workspace_diagnostic") return contextualToolSuppressionBlocksFamily(suppression, "workspace_diagnostic");
   if (family === "process_graph") return contextualToolSuppressionBlocksFamily(suppression, "process_graph");
+  if (family === "theory_locator") return contextualToolSuppressionBlocksFamily(suppression, "theory_locator");
   if (family === "context_reflection") return false;
+  if (family === "zen_graph_reflection") return contextualToolSuppressionBlocksFamily(suppression, "zen_graph_reflection");
+  if (family === "civilization_bounds") return contextualToolSuppressionBlocksFamily(suppression, "civilization_bounds");
   if (family === "debug_export") return true;
   return false;
 };
@@ -479,7 +508,10 @@ const admissionFor = (input: {
     input.family === "visual_capture" ||
     input.family === "procedure_memory" ||
     input.family === "debug_export" ||
+    input.family === "theory_locator" ||
     input.family === "context_reflection" ||
+    input.family === "zen_graph_reflection" ||
+    input.family === "civilization_bounds" ||
     input.family === "capability_catalog" ||
     input.family === "workspace_diagnostic" ||
     input.family === "workspace_directory" ||

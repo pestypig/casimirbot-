@@ -330,8 +330,12 @@ describe("Helix capability plan contract", () => {
   it("routes Helix Ask tool availability prompts through the capability catalog contract", () => {
     for (const promptText of [
       "What tools are available for the helix ask to use?",
+      '"What tools are available for the helix ask to use?"',
       "Could you tell me what tools Helix Ask can use?",
       "Can you show what capabilities this agent can access?",
+      "What tool calls can you see to make as the agent?",
+      "What tool calls are visible to you as the agent right now?",
+      "Which capabilities are available to you in this Ask turn?",
     ]) {
       const admission = buildToolCallAdmissionDecision({
         turnId: "ask:capability-catalog",
@@ -380,9 +384,13 @@ describe("Helix capability plan contract", () => {
   it("does not execute capability catalog routing from contextual tool availability mentions", () => {
     const contextualPrompts = [
       'The document says "what tools are available for the helix ask to use"; summarize that label.',
+      'The UI label says "what tool calls can you see as the agent"; summarize that phrase.',
+      'Explain the phrase "what tools are available for the helix ask to use" without inspecting the runtime catalog.',
       "Could we ask what tools Helix Ask can use later?",
+      "Could we ask what tool calls are visible to you as the agent later?",
       "The screen shows text saying what capabilities the agent can use.",
       "Do not list Helix Ask tools for now; just explain why that would be useful.",
+      "Do not inspect what tool calls are visible to you as the agent; explain why that list matters.",
     ];
 
     for (const promptText of contextualPrompts) {

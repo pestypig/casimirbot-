@@ -124,6 +124,43 @@ describe("resolveHelixVisibleTerminal", () => {
     expect(terminal.source).toBe("terminal_answer_envelope");
   });
 
+  it("projects compound synthesis authority over stale receipt text", () => {
+    const terminal = resolveHelixVisibleTerminal({
+      selected_final_answer: "Calculator receipt: 42",
+      final_answer_source: "calculator_receipt",
+      terminal_artifact_kind: "calculator_receipt",
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+        terminal_success_criteria: {
+          compound_terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          forbidden_terminal_artifact_kinds: ["tool_receipt", "calculator_receipt"],
+        },
+      },
+      terminal_answer_envelope: {
+        schema: "helix.terminal_answer_envelope.v1",
+        terminal_text: "Located the document evidence and calculated 42 from the satisfied subgoal observations.",
+        terminal_kind: "answer",
+        terminal_artifact_kind: "doc_evidence_synthesis_answer",
+        final_answer_source: "doc_evidence_synthesis_answer",
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        server_authoritative: true,
+        terminal_kind: "answer",
+        terminal_text_preview: "Located the document evidence and calculated 42 from the satisfied subgoal observations.",
+        terminal_artifact_kind: "doc_evidence_synthesis_answer",
+        final_answer_source: "doc_evidence_synthesis_answer",
+      },
+    });
+
+    expect(terminal.text).toContain("satisfied subgoal observations");
+    expect(terminal.text).not.toContain("Calculator receipt");
+    expect(terminal.source).toBe("terminal_answer_envelope");
+    expect(terminal.terminalArtifactKind).toBe("doc_evidence_synthesis_answer");
+    expect(terminal.finalAnswerSource).toBe("doc_evidence_synthesis_answer");
+    expect(terminal.terminalErrorCode).toBeNull();
+  });
+
   it("uses authoritative doc summary terminal surfaces over stale authority-missing content", () => {
     const summary =
       "Summary of docs/helix-ask-flow.md:\n- Routing enters Helix Ask through source-target arbitration.\n- Evidence must re-enter the solver path before terminal authority.\n- Presentation mirrors the selected terminal artifact.";
@@ -203,6 +240,51 @@ describe("resolveHelixVisibleTerminal", () => {
     expect(terminal.source).toBe("terminal_authority_missing");
   });
 
+  it("does not let compound terminal presentation become visible truth without authority", () => {
+    const terminal = resolveHelixVisibleTerminal({
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        concise_text: "compound presentation-only answer",
+        terminal_artifact_kind: "model_synthesized_answer",
+      },
+      compound_capability_contract: {
+        schema: "helix.compound_capability_contract.v1",
+        subgoals: [
+          {
+            requested_capability: "docs-viewer.locate_in_doc",
+          },
+          {
+            requested_capability: "scientific-calculator.solve_expression",
+          },
+        ],
+      },
+    });
+
+    expect(terminal.text).toContain("terminal_authority_missing");
+    expect(terminal.text).not.toContain("compound presentation-only answer");
+    expect(terminal.source).toBe("terminal_authority_missing");
+  });
+
+  it("does not let source-targeted model-synthesized drafts become visible truth without authority", () => {
+    const terminal = resolveHelixVisibleTerminal({
+      selected_final_answer: "draft-only source/capability answer",
+      final_answer_source: "final_answer_draft",
+      terminal_artifact_kind: "model_synthesized_answer",
+      canonical_goal_frame: {
+        goal_kind: "repo_concept_explanation",
+      },
+      source_target_intent: {
+        target_source: "repo_code",
+        strength: "hard",
+      },
+    });
+
+    expect(terminal.text).toContain("terminal_authority_missing");
+    expect(terminal.text).not.toContain("draft-only source/capability answer");
+    expect(terminal.source).toBe("terminal_authority_missing");
+    expect(terminal.usedLegacyShadow).toBe(false);
+  });
+
   it("allows legacy shadows only for non-source compatibility turns", () => {
     const terminal = resolveHelixVisibleTerminal({
       content: "plain model-only answer",
@@ -262,6 +344,38 @@ describe("resolveHelixVisibleTerminal", () => {
     expect(terminal.terminalArtifactKind).toBe("workstation_tool_evaluation");
     expect(terminal.finalAnswerSource).toBe("workstation_tool_evaluation");
     expect(terminal.terminalErrorCode).toBeNull();
+    expect(terminal.authorityVerified).toBe(true);
+  });
+
+  it("uses single-writer terminal metadata over stale envelope and API labels", () => {
+    const terminal = resolveHelixVisibleTerminal({
+      terminal_artifact_kind: "model_synthesized_answer",
+      final_answer_source: "final_answer_draft",
+      terminal_answer_envelope: {
+        schema: "helix.terminal_answer_envelope.v1",
+        terminal_text:
+          "Calculator verification plan completed.\nExpression: 2*(3+4)\nResult: 14\nTrace source: scientific-calculator.solve_expression.",
+        terminal_artifact_kind: "model_synthesized_answer",
+        final_answer_source: "final_answer_draft",
+      },
+      debug: {
+        terminal_authority_single_writer: {
+          schema: "helix.terminal_authority_single_writer_result.v1",
+          selected_terminal_artifact_kind: "workstation_tool_evaluation",
+          source: "workstation_tool_evaluation",
+          integrity: {
+            single_writer_applied: true,
+            materialized_terminal_artifact_kind: "workstation_tool_evaluation",
+          },
+        },
+      },
+    });
+
+    expect(terminal.text).toContain("Result: 14");
+    expect(terminal.source).toBe("terminal_answer_envelope");
+    expect(terminal.terminalArtifactKind).toBe("workstation_tool_evaluation");
+    expect(terminal.finalAnswerSource).toBe("workstation_tool_evaluation");
+    expect(terminal.authorityVerified).toBe(true);
   });
 
   it("prefers specific debug observation failures over stale projection-mismatch shells", () => {
@@ -338,6 +452,83 @@ describe("formatHelixVisibleTerminalSourceLabel", () => {
         finalAnswerSource: "final_answer_draft",
       }),
     ).toBe("scholarly research answer");
+  });
+
+  it("labels compound doc-evidence synthesis by terminal product", () => {
+    expect(
+      formatHelixVisibleTerminalSourceLabel({
+        terminalArtifactKind: "doc_evidence_synthesis_answer",
+        finalAnswerSource: "calculator_receipt",
+      }),
+    ).toBe("doc evidence synthesis answer");
+  });
+
+  it("labels capability and synthesis products by terminal product", () => {
+    expect(
+      formatHelixVisibleTerminalSourceLabel({
+        terminalArtifactKind: "capability_help_summary",
+        finalAnswerSource: "repo_code_evidence_answer",
+      }),
+    ).toBe("capability help summary");
+
+    expect(
+      formatHelixVisibleTerminalSourceLabel({
+        terminalArtifactKind: "model_synthesized_answer",
+        finalAnswerSource: "calculator_receipt",
+      }),
+    ).toBe("model synthesized answer");
+
+    expect(
+      formatHelixVisibleTerminalSourceLabel({
+        terminalArtifactKind: "theory_context_reflection_answer",
+        finalAnswerSource: "tool_receipt",
+      }),
+    ).toBe("theory context reflection answer");
+  });
+
+  it("labels workspace and docs observation products by terminal product", () => {
+    expect(
+      formatHelixVisibleTerminalSourceLabel({
+        terminalArtifactKind: "workspace_status_answer",
+        finalAnswerSource: "model_synthesized_answer",
+      }),
+    ).toBe("workspace status answer");
+
+    expect(
+      formatHelixVisibleTerminalSourceLabel({
+        terminalArtifactKind: "workspace_directory_resolution",
+        finalAnswerSource: "workspace_action_receipt",
+      }),
+    ).toBe("workspace directory resolution");
+
+    expect(
+      formatHelixVisibleTerminalSourceLabel({
+        terminalArtifactKind: "doc_equation_context",
+        finalAnswerSource: "doc_summary",
+      }),
+    ).toBe("doc equation context");
+  });
+
+  it.each([
+    ["calculation_trace", "calculation trace"],
+    ["calculator_stream_result", "calculator stream result"],
+    ["docs_viewer_receipt", "docs viewer receipt"],
+    ["live_source_interim_voice_callout_receipt", "live-source interim voice callout receipt"],
+    ["narrator_bind_stream_receipt", "narrator bind stream receipt"],
+    ["narrator_say_receipt", "narrator say receipt"],
+    ["stage_play_agent_goal_session_receipt", "stage play agent goal session receipt"],
+    ["stage_play_live_source_watch_job_policy_config_result", "stage play live-source watch policy config"],
+    ["stage_play_workstation_control_receipt", "stage play workstation control receipt"],
+    ["voice_block_receipt", "voice block receipt"],
+    ["voice_hold_receipt", "voice hold receipt"],
+    ["voice_receipt", "voice receipt"],
+  ])("labels contract terminal product %s explicitly", (terminalArtifactKind, expectedLabel) => {
+    expect(
+      formatHelixVisibleTerminalSourceLabel({
+        terminalArtifactKind,
+        finalAnswerSource: "model_synthesized_answer",
+      }),
+    ).toBe(expectedLabel);
   });
 });
 

@@ -5,6 +5,7 @@ import {
   HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
 } from "@shared/helix-scholarly-research-observation";
 import type { HelixToolCallAdmissionFamily } from "@shared/helix-tool-call-admission";
+import { isAskCapabilityCatalogPrompt } from "./capability-catalog-intent";
 import {
   contextualToolSuppressionBlocksFamily,
   detectContextualToolAdmissionSuppression,
@@ -38,7 +39,7 @@ export type ExtractedExplicitCapabilityContract = {
   matched_name: string;
   match_index: number;
   match_end_index: number;
-  source: "command_mention" | "compound_command_chain";
+  source: "command_mention" | "compound_command_chain" | "capability_catalog_prompt";
 };
 
 const liveEnvironmentControlContract = (input: {
@@ -139,6 +140,8 @@ const requiredArgsForCapability = (capability: string): string[] => {
       return ["latex"];
     case "docs-viewer.locate_in_doc":
       return ["query"];
+    case "docs-viewer.doc_equation_context":
+      return ["query"];
     case "repo-code.search_concept":
       return ["query"];
     case "workspace-directory.resolve":
@@ -149,6 +152,26 @@ const requiredArgsForCapability = (capability: string): string[] => {
       return ["query"];
     case HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY:
       return ["paper_result_or_source"];
+    case "live_env.draft_micro_reasoner_preset":
+      return ["scenario_text"];
+    case "live_env.route_micro_reasoner_prompt":
+      return ["source_summary"];
+    case "helix_ask.reflect_theory_context":
+      return ["prompt"];
+    case "helix.theory.frontierVectorFieldTrace":
+      return ["query"];
+    case "helix_ask.reflect_live_synthetic_data":
+      return ["prompt"];
+    case "helix_ask.reflect_context_attachments":
+      return ["prompt"];
+    case "helix_ask.reflect_ideology_context":
+      return ["text"];
+    case "helix_ask.bridge_theory_ideology_context":
+      return ["prompt"];
+    case "helix_ask.build_civilization_scenario_frame":
+      return ["prompt"];
+    case "helix_ask.reflect_civilization_bounds":
+      return ["prompt"];
     case "workstation-notes.append_to_note":
       return ["text"];
     default:
@@ -178,6 +201,31 @@ const optionalArgsForCapability = (capability: string): string[] => {
       return ["doi", "arxiv_id", "arxivId", "title", "journal", "reference", "citation", "limit"];
     case HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY:
       return ["paper_result_id", "paper_id", "result_id", "doi", "arxiv_id", "arxivId", "source_url", "pdf_url", "full_text_url", "url"];
+    case "live_env.query_micro_reasoner_presets":
+      return ["query", "include_presets", "limit", "source_id", "source_ids", "preset_id"];
+    case "live_env.draft_micro_reasoner_preset":
+      return ["base_preset_id", "candidate_prompts", "confidence_threshold", "escalation_mode", "allow_none", "wake_prompt_contract", "wake_contract_prompt", "wake_contract_title"];
+    case "live_env.route_micro_reasoner_prompt":
+      return ["candidate_prompts", "confidence_threshold", "escalation_mode", "allow_none", "wake_prompt_contract", "wake_contract_prompt", "wake_contract_title"];
+    case "live_env.query_live_source_quality":
+      return ["source_ref", "source_refs", "source_id", "source_ids", "expected_cadence_ms", "mailbox_thread_id"];
+    case "live_env.summarize_live_source_current_state":
+      return ["source_ref", "source_refs", "source_id", "source_ids", "goal_id", "mail_limit", "limit", "query"];
+    case "helix_ask.reflect_theory_context":
+      return ["source_ref", "source_refs", "refs", "question", "topic"];
+    case "helix.theory.frontierVectorFieldTrace":
+      return ["question", "prompt", "topic"];
+    case "helix_ask.reflect_live_synthetic_data":
+    case "helix_ask.reflect_context_attachments":
+      return ["source_ref", "source_refs", "refs", "question", "topic"];
+    case "helix_ask.reflect_ideology_context":
+      return ["inputKind", "refs", "options", "prompt", "source_ref", "source_refs"];
+    case "helix_ask.bridge_theory_ideology_context":
+      return ["source_refs", "refs", "theory_reflection_ref", "ideology_reflection_ref"];
+    case "helix_ask.build_civilization_scenario_frame":
+      return ["refs", "options", "scenario", "scenario_text", "source_ref", "source_refs"];
+    case "helix_ask.reflect_civilization_bounds":
+      return ["scenarioFrameRef", "source_ref", "source_refs", "refs", "options"];
     case "image_lens.inspect":
       return ["view_state", "source_id", "regions"];
     case "workstation-notes.append_to_note":
@@ -199,7 +247,16 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "helix_ask.inspect_capability_catalog",
-    aliases: ["helix.ask.inspect_capability_catalog", "inspect_capability_catalog"],
+    aliases: [
+      "helix.ask.inspect_capability_catalog",
+      "inspect_capability_catalog",
+      "capability_catalog",
+      "capability catalog",
+      "runtime_capability_catalog",
+      "runtime capability catalog",
+      "tool_catalog",
+      "tool catalog",
+    ],
     capability_family: "capability_catalog",
     plan_family: "capability_catalog",
     source_target: "runtime_evidence",
@@ -231,6 +288,16 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "scientific-calculator.solve_expression",
+    aliases: [
+      "calculator",
+      "calculator.solve_expression",
+      "calculator solve expression",
+      "calculator_stream",
+      "calculator stream",
+      "scientific-calculator",
+      "scientific calculator",
+      "solve expression",
+    ],
     capability_family: "calculator",
     plan_family: "workstation_action",
     source_target: "calculator_stream",
@@ -243,6 +310,17 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "workspace_os.status",
+    aliases: [
+      "workspace_status",
+      "workspace status",
+      "workspace_diagnostic",
+      "workspace diagnostic",
+      "workspace_os status",
+      "workspace_os_status",
+      "workspace os status",
+      "workstation status",
+      "workstation diagnostic",
+    ],
     capability_family: "workspace_diagnostic",
     plan_family: "workspace_diagnostic",
     source_target: "workspace_diagnostic",
@@ -250,11 +328,18 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     required_observation_kinds: ["workspace_os_status_observation"],
     required_terminal_kind: "model_synthesized_answer",
     allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["debug.inspect_current_turn"],
+    forbidden_nearby_capabilities: ["debug.inspect_current_turn", "model.direct_answer"],
   },
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "docs-viewer.open",
+    aliases: [
+      "docs_viewer.open",
+      "docs_viewer open",
+      "docs_viewer to open",
+      "docs viewer open",
+      "docs viewer to open",
+    ],
     capability_family: "docs_viewer",
     plan_family: "docs",
     source_target: "docs_viewer",
@@ -267,6 +352,17 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "docs-viewer.locate_in_doc",
+    aliases: [
+      "docs_viewer.locate_in_doc",
+      "docs_viewer locate",
+      "docs_viewer to locate",
+      "docs viewer locate",
+      "docs viewer to locate",
+      "docs_viewer cite",
+      "docs_viewer to cite",
+      "docs viewer cite",
+      "docs viewer to cite",
+    ],
     capability_family: "docs_viewer",
     plan_family: "docs",
     source_target: "docs_viewer",
@@ -274,11 +370,18 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     required_observation_kinds: ["doc_location_result", "doc_location_matches", "doc_evidence_location"],
     required_terminal_kind: "doc_location_matches",
     allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["docs-viewer.summarize_doc"],
+    forbidden_nearby_capabilities: ["docs-viewer.summarize_doc", "model.direct_answer"],
   },
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "docs-viewer.summarize_doc",
+    aliases: [
+      "docs_viewer.summarize_doc",
+      "docs_viewer summarize",
+      "docs_viewer to summarize",
+      "docs viewer summarize",
+      "docs viewer to summarize",
+    ],
     capability_family: "docs_viewer",
     plan_family: "docs",
     source_target: "docs_viewer",
@@ -286,11 +389,18 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     required_observation_kinds: ["doc_summary", "observation_review"],
     required_terminal_kind: "doc_summary",
     allowed_substitutions: [],
-    forbidden_nearby_capabilities: ["docs-viewer.locate_in_doc"],
+    forbidden_nearby_capabilities: ["docs-viewer.locate_in_doc", "model.direct_answer"],
   },
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "docs-viewer.doc_equation_context",
+    aliases: [
+      "docs_viewer.doc_equation_context",
+      "docs_viewer equation context",
+      "docs_viewer to inspect equation context",
+      "docs viewer equation context",
+      "docs viewer to inspect equation context",
+    ],
     capability_family: "docs_viewer",
     plan_family: "docs",
     source_target: "docs_viewer",
@@ -303,6 +413,15 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "repo-code.search_concept",
+    aliases: [
+      "repo_code.search_concept",
+      "repo code search concept",
+      "repo_code",
+      "repo code",
+      "repo_evidence",
+      "repo evidence",
+      "repository code",
+    ],
     capability_family: "repo_code",
     plan_family: "repo_evidence",
     source_target: "repo_code",
@@ -315,6 +434,14 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "workspace-directory.resolve",
+    aliases: [
+      "workspace_directory.resolve",
+      "workspace directory resolve",
+      "workspace_directory",
+      "workspace directory",
+      "workspace_directory_resolution",
+      "workspace directory resolution",
+    ],
     capability_family: "workspace_directory",
     plan_family: "workspace_directory",
     source_target: "workspace_directory",
@@ -328,7 +455,15 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     schema: "helix.explicit_capability_contract.v1",
     capability: "internet_search.web_research",
     runtime_capability: HELIX_INTERNET_SEARCH_CAPABILITY,
-    aliases: [HELIX_INTERNET_SEARCH_CAPABILITY],
+    aliases: [
+      HELIX_INTERNET_SEARCH_CAPABILITY,
+      "internet_search",
+      "internet search",
+      "web_research",
+      "web research",
+      "web.search",
+      "web search",
+    ],
     capability_family: "internet_search",
     plan_family: "internet_search",
     source_target: "internet_search",
@@ -341,7 +476,13 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: HELIX_SCHOLARLY_RESEARCH_LOOKUP_CAPABILITY,
-    aliases: ["scholarly_research.lookup_papers", "scholarly_research", "lookup_papers"],
+    aliases: [
+      "scholarly_research.lookup_papers",
+      "scholarly_research",
+      "scholarly research",
+      "scholarly research lookup",
+      "lookup_papers",
+    ],
     capability_family: "scholarly_research",
     plan_family: "scholarly_research",
     source_target: "scholarly_research",
@@ -354,7 +495,15 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: HELIX_SCHOLARLY_FULL_TEXT_FETCH_CAPABILITY,
-    aliases: ["scholarly_research.fetch_full_text", "fetch_full_text", "scholarly_full_text"],
+    aliases: [
+      "scholarly_research.fetch_full_text",
+      "scholarly research fetch full text",
+      "fetch_full_text",
+      "fetch full text",
+      "scholarly_full_text",
+      "scholarly full text",
+      "scholarly research full text",
+    ],
     capability_family: "scholarly_research",
     plan_family: "scholarly_research",
     source_target: "scholarly_research",
@@ -369,6 +518,8 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     aliases: [
       "microdeck",
       "micro_reasoner_presets",
+      "micro reasoner presets",
+      "micro reasoner preset catalog",
       "earbud_microdeck",
       "audio_transcript_microdeck",
       "earbud_translation_presets",
@@ -381,6 +532,8 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     aliases: [
       "microdeck_draft",
       "micro_reasoner_preset_draft",
+      "micro reasoner preset draft",
+      "draft micro reasoner preset",
       "earbud_microdeck_draft",
       "audio_translation_preset_draft",
       "stage_play_micro_reasoner_prompt_preset_draft/v1",
@@ -391,6 +544,8 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     capability: "live_env.route_micro_reasoner_prompt",
     aliases: [
       "microdeck_prompt_router",
+      "microdeck prompt router",
+      "micro reasoner prompt router",
       "prompt_delegation",
       "stage_play_micro_reasoner_prompt_delegation_result/v1",
     ],
@@ -398,7 +553,74 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   }),
   {
     schema: "helix.explicit_capability_contract.v1",
+    capability: "live_env.check_live_source_mail",
+    aliases: [
+      "check_live_source_mail",
+      "live_source_mail.check",
+      "live_source_mail check",
+      "live_source_mail to check",
+      "live source mail check",
+      "live source mail to check",
+      "live source mailbox check",
+      "live source mailbox to check",
+      "check live source mail",
+      "check live source mailbox",
+      "check source mail",
+      "check mailbox",
+    ],
+    capability_family: "live_source_mail",
+    plan_family: "live_environment",
+    source_target: "live_source_mailbox",
+    admission_families: ["live_environment"],
+    required_observation_kinds: ["stage_play_live_source_mail_read_result"],
+    required_terminal_kind: "model_synthesized_answer",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: "live_env.read_live_source_mail",
+    aliases: [
+      "read_live_source_mail",
+      "live_source_mail.read_raw",
+      "live_source_mail raw read",
+      "live_source_mail read raw",
+      "live_source_mail to read raw",
+      "live source mail raw read",
+      "live source mail read raw",
+      "live source mail to read raw",
+      "live source mailbox raw read",
+      "live source mailbox read raw",
+      "live source mailbox to read raw",
+      "raw live source mail",
+      "raw mail",
+      "read raw mail",
+      "unprocessed live source mail",
+      "debug live source mail",
+    ],
+    capability_family: "live_source_mail",
+    plan_family: "live_environment",
+    source_target: "live_source_mailbox",
+    admission_families: ["live_environment"],
+    required_observation_kinds: ["stage_play_live_source_mail_read_result"],
+    required_terminal_kind: "model_synthesized_answer",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["internet_search.web_research", "model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
     capability: "live_env.read_processed_live_source_mail",
+    aliases: [
+      "read_processed_live_source_mail",
+      "processed_live_source_mail",
+      "live_source_mail.read_processed",
+      "live_source_mail read",
+      "live_source_mail to read",
+      "live source mail read",
+      "live source mail to read",
+      "live source mailbox read",
+      "live source mailbox to read",
+    ],
     capability_family: "live_source_mail",
     plan_family: "live_environment",
     source_target: "live_source_mailbox",
@@ -411,6 +633,16 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "live_env.process_live_source_mail",
+    aliases: [
+      "process_live_source_mail",
+      "live_source_mail.process",
+      "live_source_mail process",
+      "live_source_mail to process",
+      "live source mail process",
+      "live source mail to process",
+      "live source mailbox process",
+      "live source mailbox to process",
+    ],
     capability_family: "live_source_mail",
     plan_family: "live_environment",
     source_target: "live_source_mailbox",
@@ -459,6 +691,18 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "live_env.reflect_live_source_mail_loop",
+    aliases: [
+      "reflect_live_source_mail_loop",
+      "live_source_mail.reflect",
+      "live_source_mail reflect",
+      "live_source_mail to reflect",
+      "live source mail reflect",
+      "live source mail to reflect",
+      "live source mailbox reflect",
+      "live source mailbox to reflect",
+      "live_source_mail_loop_reflection",
+      "mailbox loop reflection",
+    ],
     capability_family: "live_source_mail",
     plan_family: "live_environment",
     source_target: "live_source_mailbox",
@@ -645,9 +889,15 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "helix_ask.reflect_theory_context",
-    aliases: ["reflect_theory_context", "theory_context_reflection", "theory_badge_graph"],
+    aliases: [
+      "reflect_theory_context",
+      "theory_context",
+      "theory_context_reflection",
+      "theory_locator",
+      "theory_badge_graph",
+    ],
     capability_family: "theory_locator",
-    plan_family: "context_reflection",
+    plan_family: "theory_locator",
     source_target: "theory_locator",
     admission_families: ["theory_locator"],
     required_observation_kinds: ["helix_theory_context_reflection_tool_receipt", "theory_context_reflection"],
@@ -667,7 +917,7 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
       "relation_tensor_trace",
     ],
     capability_family: "theory_locator",
-    plan_family: "context_reflection",
+    plan_family: "theory_locator",
     source_target: "theory_locator",
     admission_families: ["theory_locator"],
     required_observation_kinds: [
@@ -696,6 +946,9 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   contextReflectionEvidenceContract({
     capability: "helix_ask.reflect_context_attachments",
     aliases: [
+      "context_reflection.attachments",
+      "context_reflection attachments",
+      "context_reflection to inspect attachments",
       "context_attachment_reflection",
       "context_binding_reflection",
       "dragged_cutout_context",
@@ -712,9 +965,16 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "helix_ask.reflect_ideology_context",
-    aliases: ["reflect_ideology_context", "zen_graph_reflection", "zen_graph"],
+    aliases: [
+      "reflect_ideology_context",
+      "ideology_context_reflection",
+      "zen_graph_reflection",
+      "zen graph reflection",
+      "zen_graph",
+      "zen graph",
+    ],
     capability_family: "zen_graph_reflection",
-    plan_family: "context_reflection",
+    plan_family: "zen_graph_reflection",
     source_target: "workspace_action",
     admission_families: ["workstation_action"],
     required_observation_kinds: [
@@ -730,9 +990,17 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "helix_ask.bridge_theory_ideology_context",
-    aliases: ["bridge_theory_ideology_context", "theory_zen_bridge"],
+    aliases: [
+      "bridge_theory_ideology_context",
+      "bridge theory ideology context",
+      "bridge theory and ideology context",
+      "theory_ideology_bridge",
+      "theory ideology bridge",
+      "theory_zen_bridge",
+      "theory zen bridge",
+    ],
     capability_family: "zen_graph_reflection",
-    plan_family: "context_reflection",
+    plan_family: "zen_graph_reflection",
     source_target: "workspace_action",
     admission_families: ["workstation_action"],
     required_observation_kinds: ["helix_theory_ideology_bridge_tool_result", "theory_ideology_bridge"],
@@ -743,9 +1011,14 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "helix_ask.build_civilization_scenario_frame",
-    aliases: ["build_civilization_scenario_frame", "civilization_scenario_frame"],
+    aliases: [
+      "build_civilization_scenario_frame",
+      "build civilization scenario frame",
+      "civilization_scenario_frame",
+      "civilization scenario frame",
+    ],
     capability_family: "civilization_bounds",
-    plan_family: "context_reflection",
+    plan_family: "civilization_bounds",
     source_target: "workspace_action",
     admission_families: ["workstation_action"],
     required_observation_kinds: ["civilization_scenario_frame/v1", "helix_civilization_scenario_frame_tool_result"],
@@ -756,9 +1029,17 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "helix_ask.reflect_civilization_bounds",
-    aliases: ["reflect_civilization_bounds", "civilization_bounds_reflection", "civilization_bounds_roadmap/v1"],
+    aliases: [
+      "reflect_civilization_bounds",
+      "reflect civilization bounds",
+      "civilization_bounds",
+      "civilization bounds",
+      "civilization_bounds_reflection",
+      "civilization bounds reflection",
+      "civilization_bounds_roadmap/v1",
+    ],
     capability_family: "civilization_bounds",
-    plan_family: "context_reflection",
+    plan_family: "civilization_bounds",
     source_target: "workspace_action",
     admission_families: ["workstation_action"],
     required_observation_kinds: ["civilization_bounds_roadmap/v1", "helix_civilization_bounds_tool_result"],
@@ -770,7 +1051,17 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     schema: "helix.explicit_capability_contract.v1",
     capability: "image_lens.inspect",
     runtime_capability: "situation-room.describe_visual_capture",
-    aliases: ["image_lens", "image-lens", "visual_capture", "situation-room.describe_visual_capture"],
+    aliases: [
+      "image_lens",
+      "image lens",
+      "image-lens",
+      "visual_capture",
+      "visual capture",
+      "visual capture inspect",
+      "situation-room.describe_visual_capture",
+      "situation room visual capture",
+      "image lens inspect",
+    ],
     capability_family: "visual_capture",
     plan_family: "visual_capture",
     source_target: "visual_capture",
@@ -804,6 +1095,23 @@ const explicitCapabilityContracts: ExplicitCapabilityContract[] =
 const commandVerb = String.raw`(?:call|use|run|invoke|execute|inspect\s+using|locate\s+(?:in\s+doc\s+)?using|find\s+using)`;
 
 const uniqueStrings = (values: string[]): string[] => Array.from(new Set(values.filter(Boolean)));
+
+const normalizeCapabilityKey = (value: unknown): string =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s._:-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+const capabilityKeysMatch = (
+  left: unknown,
+  right: unknown,
+): boolean => {
+  const normalizedLeft = normalizeCapabilityKey(left);
+  const normalizedRight = normalizeCapabilityKey(right);
+  return Boolean(normalizedLeft && normalizedRight && normalizedLeft === normalizedRight);
+};
 
 const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -852,9 +1160,10 @@ export const explicitCapabilityContractForCapability = (
   const normalized = String(capability ?? "").trim();
   if (!normalized) return null;
   return explicitCapabilityContracts.find((contract: ExplicitCapabilityContract) =>
-    contract.capability === normalized ||
-    contract.runtime_capability === normalized ||
-    (contract.aliases ?? []).includes(normalized)
+    capabilityKeysMatch(contract.capability, normalized) ||
+    capabilityKeysMatch(contract.runtime_capability, normalized) ||
+    (contract.aliases ?? []).some((alias) => capabilityKeysMatch(alias, normalized)) ||
+    contract.allowed_substitutions.some((substitution) => capabilityKeysMatch(substitution, normalized))
   ) ?? null;
 };
 
@@ -870,6 +1179,21 @@ export const extractExplicitCapabilityContracts = (
   const prompt = String(promptText ?? "").trim();
   if (!prompt) return [];
   const matches: ExtractedExplicitCapabilityContract[] = [];
+  const capabilityCatalogContract = explicitCapabilityContractForCapability("helix_ask.inspect_capability_catalog");
+  if (
+    capabilityCatalogContract &&
+    isAskCapabilityCatalogPrompt(prompt) &&
+    !familySuppressed(prompt, capabilityCatalogContract)
+  ) {
+    matches.push({
+      contract: capabilityCatalogContract,
+      capability: capabilityCatalogContract.capability,
+      matched_name: "capability_catalog_prompt",
+      match_index: 0,
+      match_end_index: 0,
+      source: "capability_catalog_prompt",
+    });
+  }
   for (const contract of explicitCapabilityContracts) {
     if (familySuppressed(prompt, contract)) continue;
     const names = uniqueStrings([
@@ -915,12 +1239,12 @@ export const explicitCapabilityMatches = (
   const requested = String(requestedCapability ?? "").trim();
   const actual = String(actualCapability ?? "").trim();
   if (!requested || !actual) return false;
-  if (requested === actual) return true;
+  if (capabilityKeysMatch(requested, actual)) return true;
   const contract = explicitCapabilityContractForCapability(requested);
   return Boolean(
-    contract?.runtime_capability === actual ||
-      contract?.allowed_substitutions.includes(actual) ||
-      contract?.aliases?.includes(actual),
+    capabilityKeysMatch(contract?.runtime_capability, actual) ||
+      contract?.allowed_substitutions.some((substitution) => capabilityKeysMatch(substitution, actual)) ||
+      contract?.aliases?.some((alias) => capabilityKeysMatch(alias, actual)),
   );
 };
 

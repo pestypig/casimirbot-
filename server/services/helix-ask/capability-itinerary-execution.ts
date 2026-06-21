@@ -39,6 +39,34 @@ const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : 
 const uniqueStrings = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)));
 
+const materializeBoundInputArgs = (
+  baseArgs: Record<string, unknown>,
+  boundInputRefs: Array<Record<string, unknown>>,
+): Record<string, unknown> => {
+  if (boundInputRefs.length === 0) return baseArgs;
+  const nextArgs: Record<string, unknown> = { ...baseArgs };
+  const refsByArg = new Map<string, string[]>();
+  for (const bound of boundInputRefs) {
+    const argName = readString(bound.arg_name);
+    const ref = readString(bound.ref);
+    if (!argName || !ref) continue;
+    refsByArg.set(argName, uniqueStrings([...(refsByArg.get(argName) ?? []), ref]));
+  }
+  for (const [argName, refs] of refsByArg.entries()) {
+    if (argName === "source_refs" || argName === "support_refs") {
+      const existingScalar = readString(nextArgs[argName]);
+      nextArgs[argName] = uniqueStrings([
+        existingScalar,
+        ...readArray(nextArgs[argName]).map(readString),
+        ...refs,
+      ]);
+      continue;
+    }
+    nextArgs[argName] = readString(nextArgs[argName]) ?? refs[0] ?? nextArgs[argName];
+  }
+  return nextArgs;
+};
+
 const subgoalFirstBrokenRailFor = (failureCode: string | null, satisfaction: string): string | null => {
   if (satisfaction === "satisfied" || !failureCode) return null;
   if (failureCode === "config_missing") return "config";
@@ -52,7 +80,7 @@ const subgoalFirstBrokenRailFor = (failureCode: string | null, satisfaction: str
 const subgoalRepairTargetFor = (failureCode: string | null, satisfaction: string): string | null => {
   if (satisfaction === "satisfied" || !failureCode) return null;
   if (failureCode === "config_missing") return "operator_config";
-  if (failureCode.startsWith("invalid_arg:")) return "tool_execution";
+  if (failureCode.startsWith("invalid_arg:")) return "subgoal_argument_extraction";
   if (failureCode.startsWith("missing_required_arg:")) return "subgoal_argument_extraction";
   if (failureCode === "input_binding_missing") return "reentry_gate";
   if (failureCode === "weak_evidence_repair_loop") return "repo_retrieval_repair_policy";
@@ -204,19 +232,91 @@ const observationKindBelongsToCapability = (
     return /docs[-_]viewer[-_.:]locate[-_]in[-_]doc|doc_location|doc_evidence_location/i.test(text) ||
       /^doc_(?:location|evidence)/i.test(kind);
   }
+  if (capability === "docs-viewer.open" || runtimeCapability === "docs-viewer.open") {
+    return /docs[-_]viewer[-_.:]open|doc_open_receipt|docs_viewer_receipt/i.test(text) ||
+      /^(?:doc_open_receipt|docs_viewer_receipt)$/i.test(kind);
+  }
+  if (capability === "docs-viewer.summarize_doc" || runtimeCapability === "docs-viewer.summarize_doc") {
+    return /docs[-_]viewer[-_.:]summarize[-_]doc|doc_summary|observation_review|docs_viewer_receipt/i.test(text) ||
+      /^(?:doc_summary|observation_review|docs_viewer_receipt)$/i.test(kind);
+  }
+  if (capability === "docs-viewer.doc_equation_context" || runtimeCapability === "docs-viewer.doc_equation_context") {
+    return /docs[-_]viewer[-_.:]doc[-_]equation[-_]context|doc_equation_context/i.test(text) ||
+      /^doc_equation_context$/i.test(kind);
+  }
   if (capability === "repo-code.search_concept" || runtimeCapability === "repo-code.search_concept") {
-    return /repo[-_]code[-_.:]search[-_]concept|repo_code_evidence/i.test(text) ||
-      /^repo_code_evidence_observation$/i.test(kind);
+    return /repo[-_]code[-_.:]search[-_]concept|repo_code_evidence|repo_evidence_relevance_gate/i.test(text) ||
+      /^(?:repo_code_evidence_observation|repo_code_search_result|repo_evidence_relevance_gate)$/i.test(kind);
   }
   if (capability === "helix_ask.inspect_capability_catalog" || runtimeCapability === "helix_ask.inspect_capability_catalog") {
     return /capability_catalog|capability_registry|capability_help_summary/i.test(text) ||
       /capability_(?:registry|help_summary)/i.test(kind);
   }
+  if (capability === "helix_ask.reflect_workstation_tool_alignment" || runtimeCapability === "helix_ask.reflect_workstation_tool_alignment") {
+    return /workstation_tool_alignment|toolchain_matrix|capability_registry|capability_help_summary/i.test(text) ||
+      /capability_(?:registry|help_summary)/i.test(kind);
+  }
+  if (capability === "workspace-directory.resolve" || runtimeCapability === "workspace-directory.resolve") {
+    return /workspace[-_]directory[-_.:]resolve|workspace_directory_resolution/i.test(text) ||
+      /^workspace_directory_resolution$/i.test(kind);
+  }
+  if (capability === "internet_search.web_research" || runtimeCapability === "internet_search.web_research" || runtimeCapability === "internet-search.search_web") {
+    return /internet_search|web_research|internet-search\.search_web/i.test(text) ||
+      /^(?:internet_search_observation|web_research_observation)$/i.test(kind);
+  }
+  if (capability === "scholarly-research.lookup_papers" || runtimeCapability === "scholarly-research.lookup_papers") {
+    return /scholarly_research|lookup_papers/i.test(text) ||
+      /^scholarly_research_observation$/i.test(kind);
+  }
+  if (capability === "scholarly-research.fetch_full_text" || runtimeCapability === "scholarly-research.fetch_full_text") {
+    return /scholarly_full_text|fetch_full_text/i.test(text) ||
+      /^scholarly_full_text_observation$/i.test(kind);
+  }
+  if (capability === "helix_ask.reflect_theory_context" || runtimeCapability === "helix_ask.reflect_theory_context") {
+    return /helix_theory_context_reflection_tool_receipt|theory_context_reflection/i.test(text) ||
+      /^(?:helix_theory_context_reflection_tool_receipt|theory_context_reflection)$/i.test(kind);
+  }
+  if (capability === "helix.theory.frontierVectorFieldTrace" || runtimeCapability === "helix.theory.frontierVectorFieldTrace") {
+    return /helix_theory_frontier_vector_field_tool_receipt|theory_frontier_vector_field|frontierVectorFieldTrace/i.test(text) ||
+      /^(?:helix_theory_frontier_vector_field_tool_receipt|theory_frontier_vector_field)$/i.test(kind);
+  }
+  if (capability === "helix_ask.reflect_live_synthetic_data" || runtimeCapability === "helix_ask.reflect_live_synthetic_data") {
+    return /helix_context_reflection_tool_receipt|bounded_context_reference|live_synthetic_data/i.test(text) ||
+      /^(?:helix_context_reflection_tool_receipt\/v1|bounded_context_reference)$/i.test(kind);
+  }
+  if (capability === "helix_ask.reflect_context_attachments" || runtimeCapability === "helix_ask.reflect_context_attachments") {
+    return /helix_context_reflection_tool_receipt|context_attachment|bounded_context_reference/i.test(text) ||
+      /^(?:helix_context_reflection_tool_receipt\/v1|context_attachment|bounded_context_reference)$/i.test(kind);
+  }
+  if (capability === "helix_ask.reflect_ideology_context" || runtimeCapability === "helix_ask.reflect_ideology_context") {
+    return /ideology_context_reflection|procedural_zen_classification|helix_zen_graph_reflection/i.test(text) ||
+      /^(?:ideology_context_reflection\/v1|procedural_zen_classification\/v1|helix_zen_graph_reflection_tool_result|workstation_tool_evaluation)$/i.test(kind);
+  }
+  if (capability === "helix_ask.bridge_theory_ideology_context" || runtimeCapability === "helix_ask.bridge_theory_ideology_context") {
+    return /helix_theory_ideology_bridge_tool_result|theory_ideology_bridge/i.test(text) ||
+      /^(?:helix_theory_ideology_bridge_tool_result|theory_ideology_bridge)$/i.test(kind);
+  }
+  if (capability === "helix_ask.build_civilization_scenario_frame" || runtimeCapability === "helix_ask.build_civilization_scenario_frame") {
+    return /civilization_scenario_frame|helix_civilization_scenario_frame_tool_result/i.test(text) ||
+      /^(?:civilization_scenario_frame\/v1|helix_civilization_scenario_frame_tool_result)$/i.test(kind);
+  }
+  if (capability === "helix_ask.reflect_civilization_bounds" || runtimeCapability === "helix_ask.reflect_civilization_bounds") {
+    return /civilization_bounds_roadmap|helix_civilization_bounds_tool_result/i.test(text) ||
+      /^(?:civilization_bounds_roadmap\/v1|helix_civilization_bounds_tool_result)$/i.test(kind);
+  }
   if (capability === "image_lens.inspect" || runtimeCapability === "situation-room.describe_visual_capture") {
     return /image_lens\.inspect|situation[-_]room[-_.:]describe[-_]visual[-_]capture|visual_frame|visual_capture|situation_context_pack/i.test(text) ||
       /visual_frame_evidence|visual_capture_coverage|situation_context_pack/i.test(kind);
   }
-  return true;
+  if (capability.startsWith("live_env.") || runtimeCapability.startsWith("live_env.")) {
+    return /live_environment|stage_play|live_source|micro_reasoner|workstation_goal|agent_goal|narrator|voice_|route_watch|loop_state/i.test(text) ||
+      /^(?:live_environment_tool_observation|stage_play_|helix\.|voice_|live_source_)/i.test(kind);
+  }
+  if (capability === "workstation-notes.append_to_note" || runtimeCapability === "workstation-notes.append_to_note") {
+    return /workstation[-_]notes[-_.:]append[-_]to[-_]note|note_update_receipt|note_action_receipt|workspace_action_receipt/i.test(text) ||
+      /^(?:note_update_receipt|note_action_receipt|workspace_action_receipt)$/i.test(kind);
+  }
+  return false;
 };
 
 const calculatorExpressionFromRecord = (record: Record<string, unknown> | null): string | null => {
@@ -427,17 +527,12 @@ const artifactSupportRefs = (artifact: HelixCapabilityItineraryArtifactLike | nu
     readString(payload?.source_ref),
     readString(payload?.target_ref),
     readString(payload?.result_ref),
-    readString(payload?.receipt_id),
     readString(payload?.evaluation_id),
     readString(observation?.source_ref),
-    readString(observation?.receipt_id),
     readString(result?.source_ref),
-    readString(result?.receipt_id),
     ...readArray(payload?.support_refs).map(readString),
     ...readArray(payload?.evidence_refs).map(readString),
     ...readArray(payload?.observation_refs).map(readString),
-    ...readArray(payload?.receipt_refs).map(readString),
-    ...readArray(payload?.tool_receipt_ids).map(readString),
   ];
   return uniqueStrings(refs);
 };
@@ -609,6 +704,15 @@ export const isHelixCapabilityItineraryFamilyObserved = (
       ].join(" ")),
     );
   }
+  if (family === "context_reflection") {
+    return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
+      /helix_context_reflection_tool_receipt|bounded_context_reference|context_attachment|live_synthetic_data/i.test([
+        artifactKind(artifact),
+        artifactSchema(artifact),
+        artifactId(artifact),
+      ].join(" ")),
+    );
+  }
   if (family === "civilization_bounds") {
     return artifacts.some((artifact: HelixCapabilityItineraryArtifactLike) =>
       /civilization_(?:scenario_frame|bounds)|helix_civilization_(?:scenario_frame|bounds)_tool_result/i.test([
@@ -703,6 +807,9 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
     const substitutions = readArray(subgoal.allowed_substitutions)
       .map(readString)
       .filter((entry: string | null): entry is string => Boolean(entry));
+    const forbiddenNearbyCapabilities = readArray(subgoal.forbidden_nearby_capabilities)
+      .map(readString)
+      .filter((entry: string | null): entry is string => Boolean(entry));
     const requiredObservationKinds = readArray(subgoal.required_observation_kinds)
       .map(readString)
       .filter((entry: string | null): entry is string => Boolean(entry));
@@ -779,12 +886,20 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
         ? artifactCapability(executedArtifact as HelixCapabilityItineraryArtifactLike) ?? runtimeCapability
         : null;
     const executedCapability = executed ? artifactCapability(executedArtifact as HelixCapabilityItineraryArtifactLike) ?? runtimeCapability : null;
+    const attemptedRuntimeProgress = runtimeCalls.length > 0 || validations.length > 0 || Boolean(executedArtifact);
+    const observationMissingAfterAttempt =
+      attemptedRuntimeProgress &&
+      railErrors.length === 0 &&
+      !countedObservationArtifact;
     const satisfaction = executed && countedObservationArtifact
       ? "satisfied"
-      : railErrors.length > 0
+      : observationMissingAfterAttempt
         ? "failed"
-        : "pending";
-    const railFailureCode = railErrors[0] ?? (satisfaction === "pending" ? "subgoal_observation_missing" : null);
+        : railErrors.length > 0
+          ? "failed"
+          : "pending";
+    const railFailureCode = railErrors[0] ??
+      (observationMissingAfterAttempt || satisfaction === "pending" ? "subgoal_observation_missing" : null);
     const supportRefs = artifactSupportRefs(countedObservationArtifact);
     const observationProvenance = countedObservationArtifact
       ? artifactSubgoalObservationProvenance(
@@ -800,6 +915,7 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       subgoal_id: subgoalId,
       order: Number(subgoal.order) || 0,
       requested_capability: requestedCapability,
+      runtime_capability: runtimeCapability,
       selected_capability: selectedCapability,
       executed_capability: executedCapability,
       args: selectedArgs,
@@ -808,6 +924,10 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       selected_args: selectedArgs,
       required_args: requiredArgs,
       optional_args: optionalArgs,
+      required_observation_kinds: requiredObservationKinds,
+      required_terminal_kind: readString(subgoal.required_terminal_kind),
+      allowed_substitutions: substitutions,
+      forbidden_nearby_capabilities: forbiddenNearbyCapabilities,
       input_bindings: readArray(subgoal.input_bindings),
       observation_kind: countedObservationArtifact ? artifactKind(countedObservationArtifact) : null,
       observation_ref: countedObservationArtifact ? artifactId(countedObservationArtifact) : null,
@@ -818,7 +938,6 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
       first_broken_rail: subgoalFirstBrokenRailFor(railFailureCode, satisfaction),
       rail_failure_code: railFailureCode,
       repair_target: subgoalRepairTargetFor(railFailureCode, satisfaction),
-      required_observation_kinds: requiredObservationKinds,
       contribution_role: readString(subgoal.contribution_role),
       terminal_contribution_kind: readString(subgoal.terminal_contribution_kind) ?? readString(subgoal.required_terminal_kind),
       assistant_answer: false,
@@ -854,11 +973,16 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
         readString(bound.binding_id) === readString(binding.binding_id)
       )
     );
+    const selectedArgs = readRecord(entry.selected_args) ?? readRecord(entry.args) ?? {};
+    const boundArgs = materializeBoundInputArgs(selectedArgs, boundInputRefs);
     if (readString(entry.satisfaction) === "satisfied" && unresolvedInputBindings.length > 0) {
       const railFailureCode = "input_binding_missing";
       const satisfaction = "failed";
       return {
         ...entry,
+        args: boundArgs,
+        selected_args: boundArgs,
+        bound_args: boundArgs,
         bound_input_refs: boundInputRefs,
         unresolved_input_bindings: unresolvedInputBindings,
         satisfaction,
@@ -870,6 +994,9 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
     }
     return {
       ...entry,
+      args: boundArgs,
+      selected_args: boundArgs,
+      bound_args: boundArgs,
       bound_input_refs: boundInputRefs,
       unresolved_input_bindings: unresolvedInputBindings,
     };

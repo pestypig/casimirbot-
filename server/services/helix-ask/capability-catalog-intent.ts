@@ -1,20 +1,17 @@
 const CAPABILITY_CATALOG_OBJECT_PATTERN =
   "(?:helix\\s+ask|ask\\s+turn|this\\s+agent|the\\s+agent|ask|agent)[\\s\\S]{0,120}(?:tools?|tool\\s+calls?|capabilities)|(?:tools?|tool\\s+calls?|capabilities)[\\s\\S]{0,120}(?:helix\\s+ask|ask\\s+turn|this\\s+agent|the\\s+agent|ask|agent)";
 
-const hasContextualCapabilityCatalogCue = (promptText: string): boolean => {
-  const object = CAPABILITY_CATALOG_OBJECT_PATTERN;
-  return (
-    new RegExp(`["'\`][^"'\`]*(?:${object})[^"'\`]*["'\`]`, "i").test(promptText) ||
-    new RegExp(`\\b(?:if|in\\s+the\\s+future|future|later|eventually|hypothetically|tomorrow|next\\s+time)\\b[\\s\\S]{0,160}\\b(?:${object})\\b`, "i").test(promptText) ||
-    new RegExp(`\\b(?:would|could|might|should)\\b[\\s\\S]{0,80}\\b(?:we|it|that|this)\\b[\\s\\S]{0,80}\\b(?:later|future|eventually|hypothetically|next\\s+time|if)\\b[\\s\\S]{0,160}\\b(?:${object})\\b`, "i").test(promptText) ||
-    new RegExp(`\\b(?:previously|earlier|last\\s+time|before|already|historically|was|were|had)\\b[\\s\\S]{0,180}\\b(?:listed|showed|inspected|asked|called|used|queried|viewed|checked)?\\b[\\s\\S]{0,120}\\b(?:${object})\\b`, "i").test(promptText) ||
-    new RegExp(`\\b(?:screen|page|button|label|ui|text|menu|dropdown|document|quote)\\b[\\s\\S]{0,100}\\b(?:says|shows|reads|contains|labeled|labelled|called|named)\\b[\\s\\S]{0,160}\\b(?:${object})\\b`, "i").test(promptText) ||
-    new RegExp(`\\b(?:do\\s+not|don't|dont|without|not\\s+asking\\s+to|no\\s+need\\s+to|for\\s+now)\\b[\\s\\S]{0,180}\\b(?:list|show|inspect|tell|explain|query|view|check|read)?\\b[\\s\\S]{0,140}\\b(?:${object})\\b`, "i").test(promptText)
-  );
+const stripWholePromptWrappingQuotes = (promptText: string): string | null => {
+  const trimmed = promptText.trim();
+  if (trimmed.length < 2) return null;
+  const first = trimmed[0];
+  const last = trimmed[trimmed.length - 1];
+  if (!["\"", "'", "`"].includes(first) || first !== last) return null;
+  const inner = trimmed.slice(1, -1).trim();
+  return inner || null;
 };
 
-export const isAskCapabilityCatalogPrompt = (promptText: string): boolean => {
-  if (hasContextualCapabilityCatalogCue(promptText)) return false;
+const isCapabilityCatalogRequestText = (promptText: string): boolean => {
   const normalized = promptText.trim().toLowerCase().replace(/[?!.]+$/g, "").replace(/\s+/g, " ");
   if (!normalized) return false;
   const mentionsAskSurface = /\b(?:helix\s+ask|ask\s+turn|this\s+agent|the\s+agent)\b/i.test(normalized);
@@ -28,8 +25,30 @@ export const isAskCapabilityCatalogPrompt = (promptText: string): boolean => {
         /\bhow\s+can\s+(?:helix\s+ask|ask|this\s+agent|the\s+agent)\s+help\b/i.test(normalized) ||
         /\bwhat\s+(?:tools?|tool\s+calls?|capabilities)\s+(?:are\s+)?(?:available|visible|admissible)\b/i.test(normalized) ||
         /\bwhat\s+(?:tools?|tool\s+calls?|capabilities)\s+can\s+(?:helix\s+ask|ask|agent)\s+(?:use|call|run|see|access)\b/i.test(normalized) ||
+        /\bwhat\s+(?:tools?|tool\s+calls?|capabilities)\s+can\s+(?:you|i|we)\s+(?:use|call|run|see|access)\b[\s\S]{0,100}\b(?:as|for|from|in)\s+(?:the\s+)?(?:helix\s+ask|ask|agent)\b/i.test(normalized) ||
+        /\b(?:what|which)\s+(?:tools?|tool\s+calls?|capabilities)\s+(?:are\s+)?(?:available|visible|admissible|exposed)\s+to\s+(?:you|me|us)\b/i.test(normalized) ||
+        /\b(?:what|which)\s+(?:runtime\s+)?(?:tools?|tool\s+calls?|capabilities)\s+(?:does|do|can)\s+(?:this\s+agent|the\s+agent|helix\s+ask|ask)\s+(?:have|expose|see|access|use|call|run)\b/i.test(normalized) ||
         /\b(?:list|show|inspect|tell\s+me)\b[\s\S]{0,60}\b(?:tools?|tool\s+calls?|capabilities)\b/i.test(normalized)
       )
     )
   );
+};
+
+const hasContextualCapabilityCatalogCue = (promptText: string): boolean => {
+  const object = CAPABILITY_CATALOG_OBJECT_PATTERN;
+  const wholeQuotedPrompt = stripWholePromptWrappingQuotes(promptText);
+  const standaloneQuotedCatalogRequest = Boolean(wholeQuotedPrompt && isCapabilityCatalogRequestText(wholeQuotedPrompt));
+  return (
+    (!standaloneQuotedCatalogRequest && new RegExp(`["'\`][^"'\`]*(?:${object})[^"'\`]*["'\`]`, "i").test(promptText)) ||
+    new RegExp(`\\b(?:if|in\\s+the\\s+future|future|later|eventually|hypothetically|tomorrow|next\\s+time)\\b[\\s\\S]{0,160}\\b(?:${object})\\b`, "i").test(promptText) ||
+    new RegExp(`\\b(?:would|could|might|should)\\b[\\s\\S]{0,80}\\b(?:we|it|that|this)\\b[\\s\\S]{0,80}\\b(?:later|future|eventually|hypothetically|next\\s+time|if)\\b[\\s\\S]{0,160}\\b(?:${object})\\b`, "i").test(promptText) ||
+    new RegExp(`\\b(?:previously|earlier|last\\s+time|before|already|historically|was|were|had)\\b[\\s\\S]{0,180}\\b(?:listed|showed|inspected|asked|called|used|queried|viewed|checked)?\\b[\\s\\S]{0,120}\\b(?:${object})\\b`, "i").test(promptText) ||
+    new RegExp(`\\b(?:screen|page|button|label|ui|text|menu|dropdown|document|quote)\\b[\\s\\S]{0,100}\\b(?:says|shows|reads|contains|labeled|labelled|called|named)\\b[\\s\\S]{0,160}\\b(?:${object})\\b`, "i").test(promptText) ||
+    new RegExp(`\\b(?:do\\s+not|don't|dont|without|not\\s+asking\\s+to|no\\s+need\\s+to|for\\s+now)\\b[\\s\\S]{0,180}\\b(?:list|show|inspect|tell|explain|query|view|check|read)?\\b[\\s\\S]{0,140}\\b(?:${object})\\b`, "i").test(promptText)
+  );
+};
+
+export const isAskCapabilityCatalogPrompt = (promptText: string): boolean => {
+  if (hasContextualCapabilityCatalogCue(promptText)) return false;
+  return isCapabilityCatalogRequestText(stripWholePromptWrappingQuotes(promptText) ?? promptText);
 };

@@ -112,22 +112,44 @@ export function formatHelixVisibleTerminalSourceLabel(
 
   const kindLabelByTerminalKind: Record<string, string> = {
     direct_answer_text: "model direct answer",
+    model_synthesized_answer: "model synthesized answer",
+    capability_help_summary: "capability help summary",
+    calculation_trace: "calculation trace",
     doc_summary: "doc summary",
     doc_open_receipt: "doc open receipt",
+    docs_viewer_receipt: "docs viewer receipt",
     doc_location_matches: "docs location",
     doc_location_result: "docs location",
     doc_evidence_location: "docs location",
+    doc_evidence_synthesis_answer: "doc evidence synthesis answer",
+    doc_equation_context: "doc equation context",
     doc_search_results: "docs search",
     workstation_tool_evaluation: "workstation tool evaluation",
+    workspace_status_answer: "workspace status answer",
+    workspace_directory_resolution: "workspace directory resolution",
     workspace_action_receipt: "workspace action receipt",
     note_update_receipt: "note update receipt",
+    note_action_receipt: "note action receipt",
     calculator_receipt: "calculator receipt",
+    calculator_stream_result: "calculator stream result",
     tool_evaluation: "tool evaluation",
+    stage_play_live_source_mail_decision: "stage play live-source mail decision",
+    stage_play_live_source_watch_job_policy_config_result: "stage play live-source watch policy config",
+    stage_play_agent_goal_session_receipt: "stage play agent goal session receipt",
+    stage_play_workstation_control_receipt: "stage play workstation control receipt",
+    live_source_interim_voice_callout_receipt: "live-source interim voice callout receipt",
     live_pipeline_receipt: "live pipeline receipt",
     live_environment_binding_diagnosis: "live environment diagnosis",
+    narrator_bind_stream_receipt: "narrator bind stream receipt",
+    narrator_say_receipt: "narrator say receipt",
+    voice_block_receipt: "voice block receipt",
+    voice_hold_receipt: "voice hold receipt",
+    voice_receipt: "voice receipt",
     situation_context_pack: "situation context",
+    visual_context_pack: "visual context",
     compound_research_locator_answer: "compound research locator answer",
     scholarly_research_answer: "scholarly research answer",
+    theory_context_reflection_answer: "theory context reflection answer",
     internet_search_answer: "internet search answer",
     repo_code_evidence_answer: "repo code evidence answer",
     typed_failure: "typed failure",
@@ -186,6 +208,12 @@ function isSourceOrCapabilityTurn(args: {
   const sourceTarget = readString(sourceIntent?.target_source ?? sourceIntent?.source_target);
   const sourceStrength = readString(sourceIntent?.strength);
   if (sourceTarget && sourceTarget !== "unknown" && sourceStrength !== "none") return true;
+
+  const compoundContract = firstRecord(args.record?.compound_capability_contract, args.debug?.compound_capability_contract);
+  if (compoundContract) return true;
+
+  const capabilityItinerary = firstRecord(args.record?.capability_itinerary, args.debug?.capability_itinerary);
+  if (capabilityItinerary) return true;
 
   const canonicalGoal = firstRecord(args.record?.canonical_goal_frame, args.debug?.canonical_goal_frame);
   const goalKind = readString(canonicalGoal?.goal_kind);
@@ -272,10 +300,10 @@ export function resolveHelixVisibleTerminal(
     ) || null;
   const terminalArtifactKind =
     firstText(
-      envelope?.terminal_artifact_kind,
-      authority?.terminal_artifact_kind,
       singleWriter?.selected_terminal_artifact_kind,
       singleWriter?.selectedArtifactKind,
+      authority?.terminal_artifact_kind,
+      envelope?.terminal_artifact_kind,
       presentation?.terminal_artifact_kind,
       record?.terminal_artifact_kind,
       debug?.terminal_artifact_kind,
@@ -283,9 +311,9 @@ export function resolveHelixVisibleTerminal(
     ) || null;
   const rawFinalAnswerSource =
     firstText(
-      envelope?.final_answer_source,
-      authority?.final_answer_source,
       singleWriter?.source,
+      authority?.final_answer_source,
+      envelope?.final_answer_source,
       record?.final_answer_source,
       debug?.final_answer_source,
     ) ||
@@ -303,6 +331,7 @@ export function resolveHelixVisibleTerminal(
     readString(singleWriter?.source) !== "typed_failure" &&
     readString(singleWriter?.selected_terminal_artifact_kind) !== "typed_failure" &&
     readString(singleWriter?.selectedArtifactKind) !== "typed_failure";
+  const authorityVerified = terminalAuthorityIndicatesSuccess || singleWriterIndicatesSuccess;
   const envelopeIndicatesSuccess =
     Boolean(envelopeText) &&
     readString(envelope?.terminal_kind) !== "failure" &&
@@ -319,6 +348,7 @@ export function resolveHelixVisibleTerminal(
     !envelope &&
     terminalArtifactKind === "model_synthesized_answer" &&
     effectiveFinalAnswerSource === "final_answer_draft" &&
+    (!sourceCapabilityTurn || terminalAuthorityIndicatesSuccess || singleWriterIndicatesSuccess) &&
     Boolean(selectedFinalAnswer);
 
   if (envelopeText) {
@@ -330,7 +360,7 @@ export function resolveHelixVisibleTerminal(
       terminalArtifactKind,
       finalAnswerSource: effectiveFinalAnswerSource,
       terminalErrorCode,
-      authorityVerified: Boolean(authority?.server_authoritative === true),
+      authorityVerified,
       usedLegacyShadow: false,
     };
   }
@@ -344,7 +374,7 @@ export function resolveHelixVisibleTerminal(
       terminalArtifactKind,
       finalAnswerSource: effectiveFinalAnswerSource,
       terminalErrorCode,
-      authorityVerified: Boolean(authority?.server_authoritative === true),
+      authorityVerified,
       usedLegacyShadow: false,
     };
   }
@@ -359,7 +389,7 @@ export function resolveHelixVisibleTerminal(
       terminalArtifactKind,
       finalAnswerSource: effectiveFinalAnswerSource,
       terminalErrorCode,
-      authorityVerified: Boolean(authority?.server_authoritative === true),
+      authorityVerified,
       usedLegacyShadow: false,
     };
   }
@@ -403,7 +433,7 @@ export function resolveHelixVisibleTerminal(
       terminalArtifactKind: terminalArtifactKind ?? "direct_answer_text",
       finalAnswerSource: effectiveFinalAnswerSource ?? "model_direct_answer",
       terminalErrorCode,
-      authorityVerified: Boolean(authority?.server_authoritative === true),
+      authorityVerified,
       usedLegacyShadow: false,
     };
   }

@@ -26,10 +26,19 @@ export type HelixCompoundCapabilitySubgoal = {
   contribution_role: string;
   terminal_contribution_kind: string;
   allowed_substitutions: string[];
+  forbidden_nearby_capabilities: string[];
   depends_on_subgoal_ids: string[];
   input_bindings: Array<{
     binding_id: string;
-    arg_name: "source_ref" | "source_refs" | "target_ref" | "support_refs";
+    arg_name:
+      | "paper_result_or_source"
+      | "source_ref"
+      | "source_refs"
+      | "target_ref"
+      | "support_refs"
+      | "scenarioFrameRef"
+      | "theory_reflection_ref"
+      | "ideology_reflection_ref";
     binding_kind: "source_ref" | "target_ref" | "support_ref";
     from_subgoal_id: string;
     from_capability: string;
@@ -108,7 +117,9 @@ export const extractCalculatorSubgoalExpression = (
   const markerTail =
     segment.match(/\b(?:with\s+this\s+exact\s+expression|exact\s+expression|expression|equation|latex|evaluate|calculate|compute|solve|for)\b\s*[:=]?\s*([\s\S]+)$/i)?.[1] ??
     segment;
-  const boundedTail = markerTail.split(/\b(?:then|followed\s+by|next)\b|(?:\s;\s)|(?:\n{2,})/i)[0] ?? markerTail;
+  const boundedTail = markerTail.split(
+    /\b(?:then|followed\s+by|next)\b|(?:\s;\s)|(?:\n{2,})|(?:,\s+(?:and\s+)?(?:explain|summarize|cite|connect|answer|return|report|show)\b)/i,
+  )[0] ?? markerTail;
   const candidates: string[] = Array.from(boundedTail.matchAll(/(?:\\frac|\\sqrt|sqrt|ln|log|sin|cos|tan|pi|e|\d|[+\-*/^=().,\s]){2,}/gi))
     .map((entry: RegExpMatchArray) => stripBoundaryPunctuation(entry[0]))
     .filter(Boolean)
@@ -273,6 +284,15 @@ const workstationNoteArgs = (
   return normalized ? { text: normalized } : {};
 };
 
+const boundedPromptArgForSubgoal = (
+  promptText: string,
+  match: ExtractedExplicitCapabilityContract,
+  ordered: ExtractedExplicitCapabilityContract[],
+): string => {
+  const segment = boundedSegmentForMatch(promptText, match, ordered);
+  return stripLeadingArgLabel(segment) || normalizeSpace(promptText);
+};
+
 const argsHintForSubgoal = (input: {
   turnId: string;
   promptText: string;
@@ -280,6 +300,8 @@ const argsHintForSubgoal = (input: {
   ordered: ExtractedExplicitCapabilityContract[];
 }): RecordLike => {
   const capability = input.match.contract.capability;
+  const boundedPromptArg = (): string =>
+    boundedPromptArgForSubgoal(input.promptText, input.match, input.ordered);
   if (capability === "scientific-calculator.solve_expression") {
     const expression = extractCalculatorSubgoalExpression(
       input.promptText,
@@ -292,6 +314,26 @@ const argsHintForSubgoal = (input: {
   }
   if (capability === "workspace_os.status") return {};
   if (capability === "helix_ask.inspect_capability_catalog") return {};
+  if (capability === "live_env.query_micro_reasoner_presets") {
+    return {
+      include_presets: true,
+      limit: 100,
+      query: boundedPromptArg(),
+    };
+  }
+  if (capability === "live_env.draft_micro_reasoner_preset") {
+    return {
+      scenario_text: boundedPromptArg(),
+      base_preset_id: "stage_play_micro_reasoner_prompt_preset:generic-live-source:v1",
+    };
+  }
+  if (capability === "live_env.route_micro_reasoner_prompt") {
+    const prompt = boundedPromptArg();
+    return {
+      source_summary: prompt,
+      candidate_prompts: [prompt],
+    };
+  }
   if (capability === "scholarly-research.lookup_papers") {
     return scholarlyLookupArgs(input.promptText, input.match, input.ordered);
   }
@@ -303,7 +345,7 @@ const argsHintForSubgoal = (input: {
   }
   if (capability === "helix_ask.reflect_theory_context") {
     return {
-      prompt: normalizeSpace(input.promptText),
+      prompt: boundedPromptArg(),
       build_explanation_plan: true,
       sync_panel: true,
       panel_overlay_mode: "live_answer_context",
@@ -312,14 +354,14 @@ const argsHintForSubgoal = (input: {
   }
   if (capability === "helix.theory.frontierVectorFieldTrace") {
     return {
-      query: normalizeSpace(input.promptText),
+      query: boundedPromptArg(),
       searchSeed: `ask:${stableTextHash(input.turnId)}:theory-frontier-vector-field`,
     };
   }
   if (capability === "helix_ask.reflect_ideology_context") {
     return {
       inputKind: "user_prompt",
-      text: normalizeSpace(input.promptText),
+      text: boundedPromptArg(),
       refs: ["helix-ask:current-turn"],
       options: {
         includeOverlay: true,
@@ -333,7 +375,7 @@ const argsHintForSubgoal = (input: {
   }
   if (capability === "helix_ask.bridge_theory_ideology_context") {
     return {
-      prompt: normalizeSpace(input.promptText),
+      prompt: boundedPromptArg(),
       refs: ["helix-ask:current-turn"],
       theory_reflection_ref: "step:reflect_theory_context",
       ideology_reflection_ref: "step:reflect_zen_graph_context",
@@ -341,7 +383,7 @@ const argsHintForSubgoal = (input: {
   }
   if (capability === "helix_ask.build_civilization_scenario_frame") {
     return {
-      prompt: normalizeSpace(input.promptText),
+      prompt: boundedPromptArg(),
       refs: ["helix-ask:current-turn"],
       options: {
         allowFictional: true,
@@ -352,8 +394,10 @@ const argsHintForSubgoal = (input: {
   }
   if (capability === "helix_ask.reflect_civilization_bounds") {
     return {
-      prompt: normalizeSpace(input.promptText),
+      prompt: boundedPromptArg(),
       scenarioFrameRef: "step:build_civilization_scenario_frame",
+      source_ref: "step:build_civilization_scenario_frame",
+      source_refs: ["step:build_civilization_scenario_frame"],
       refs: ["helix-ask:current-turn"],
       options: {
         includeBridgeContext: true,
@@ -364,11 +408,11 @@ const argsHintForSubgoal = (input: {
   }
   if (input.match.contract.capability_family === "context_reflection") {
     return {
-      prompt: normalizeSpace(input.promptText),
+      prompt: boundedPromptArg(),
       refs: ["helix-ask:current-turn"],
     };
   }
-  if (capability === "docs-viewer.locate_in_doc") {
+  if (capability === "docs-viewer.locate_in_doc" || capability === "docs-viewer.doc_equation_context") {
     return docsLocateArgs(input.promptText, input.match, input.ordered);
   }
   if (capability === "repo-code.search_concept") {
@@ -426,6 +470,7 @@ const SUBGOAL_BINDING_SOURCE_FAMILIES = new Set([
   "visual_capture",
   "workspace_directory",
   "capability_catalog",
+  "live_source_mail",
   "context_reflection",
   "theory_locator",
   "zen_graph_reflection",
@@ -437,6 +482,8 @@ const SUBGOAL_BINDING_CONSUMER_FAMILIES = new Set([
   "docs_viewer",
   "context_reflection",
   "theory_locator",
+  "scholarly_research",
+  "live_source_mail",
   "zen_graph_reflection",
   "civilization_bounds",
 ]);
@@ -444,10 +491,25 @@ const SUBGOAL_BINDING_CONSUMER_FAMILIES = new Set([
 const bindingShapeForConsumer = (
   contract: ExplicitCapabilityContract,
   sourceCount: number,
+  source?: ExplicitCapabilityContract | null,
 ): {
-  arg_name: "source_ref" | "source_refs" | "target_ref" | "support_refs";
+  arg_name:
+    | "paper_result_or_source"
+    | "source_ref"
+    | "source_refs"
+    | "target_ref"
+    | "support_refs"
+    | "scenarioFrameRef"
+    | "theory_reflection_ref"
+    | "ideology_reflection_ref";
   binding_kind: "source_ref" | "target_ref" | "support_ref";
 } => {
+  if (contract.capability === "scholarly-research.fetch_full_text") {
+    return {
+      arg_name: "paper_result_or_source",
+      binding_kind: "source_ref",
+    };
+  }
   if (contract.capability_family === "calculator") {
     return {
       arg_name: "support_refs",
@@ -460,6 +522,29 @@ const bindingShapeForConsumer = (
       binding_kind: "target_ref",
     };
   }
+  if (
+    contract.capability === "helix_ask.reflect_civilization_bounds" &&
+    source?.capability === "helix_ask.build_civilization_scenario_frame"
+  ) {
+    return {
+      arg_name: "scenarioFrameRef",
+      binding_kind: "source_ref",
+    };
+  }
+  if (contract.capability === "helix_ask.bridge_theory_ideology_context") {
+    if (source?.capability === "helix_ask.reflect_theory_context") {
+      return {
+        arg_name: "theory_reflection_ref",
+        binding_kind: "source_ref",
+      };
+    }
+    if (source?.capability === "helix_ask.reflect_ideology_context") {
+      return {
+        arg_name: "ideology_reflection_ref",
+        binding_kind: "source_ref",
+      };
+    }
+  }
   return {
     arg_name: sourceCount === 1 ? "source_ref" : "source_refs",
     binding_kind: "source_ref",
@@ -470,9 +555,19 @@ const canBindSourceToConsumer = (
   source: ExplicitCapabilityContract,
   consumer: ExplicitCapabilityContract,
 ): boolean => {
+  if (consumer.capability === "live_env.summarize_live_source_current_state") {
+    return (
+      source.capability === "live_env.query_live_source_quality" ||
+      source.capability === "live_env.query_workstation_goal_context"
+    );
+  }
   if (consumer.capability_family === "docs_viewer") {
     return source.capability_family === "workspace_directory";
   }
+  if (consumer.capability === "scholarly-research.fetch_full_text") {
+    return source.capability === "scholarly-research.lookup_papers";
+  }
+  if (consumer.capability_family === "scholarly_research") return false;
   return SUBGOAL_BINDING_SOURCE_FAMILIES.has(source.capability_family);
 };
 
@@ -487,11 +582,9 @@ const inputBindingsForSubgoal = (input: {
   const priorEvidenceSubgoals = input.ordered.slice(0, input.index)
     .map((entry: ExtractedExplicitCapabilityContract, priorIndex: number) => ({ entry, priorIndex }))
     .filter(({ entry }) => canBindSourceToConsumer(entry.contract, contract));
-  const bindingShape = bindingShapeForConsumer(contract, priorEvidenceSubgoals.length);
   return priorEvidenceSubgoals.map(({ entry, priorIndex }, bindingIndex: number) => ({
     binding_id: `${subgoalIdFor(input.turnId, input.index + 1, contract.capability)}:input_binding:${bindingIndex + 1}`,
-    arg_name: bindingShape.arg_name,
-    binding_kind: bindingShape.binding_kind,
+    ...bindingShapeForConsumer(contract, priorEvidenceSubgoals.length, entry.contract),
     from_subgoal_id: subgoalIdFor(input.turnId, priorIndex + 1, entry.contract.capability),
     from_capability: entry.contract.capability,
     required_observation_kinds: requiredObservationKindsForCompoundSubgoal(entry.contract, input.ordered.length),
@@ -538,6 +631,7 @@ export const buildHelixCompoundCapabilityContract = (input: {
       contribution_role: contributionRoleForContract(contract),
       terminal_contribution_kind: contract.required_terminal_kind,
       allowed_substitutions: [...contract.allowed_substitutions],
+      forbidden_nearby_capabilities: [...contract.forbidden_nearby_capabilities],
       depends_on_subgoal_ids: inputBindings.map((binding) => binding.from_subgoal_id),
       input_bindings: inputBindings,
       status: "pending",

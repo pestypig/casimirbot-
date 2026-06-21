@@ -99,7 +99,9 @@ const HARD_SOURCE_TARGETS = new Set([
   "repo_code",
   "scholarly_research",
   "internet_search",
+  "theory_locator",
   "runtime_evidence",
+  "context_reflection",
   "workspace_diagnostic",
   "docs_viewer",
   "workspace_directory",
@@ -129,6 +131,7 @@ const HELIX_TOOL_CALL_ADMISSION_FAMILIES = new Set<string>([
   "internet_search",
   "theory_locator",
   "runtime_evidence",
+  "context_reflection",
   "workspace_diagnostic",
   "capability_catalog",
   "live_environment",
@@ -157,6 +160,7 @@ const sourceTargetToolFamilies = (
     return ["capability_catalog", "runtime_evidence"];
   }
   if (sourceTarget === "live_environment" || sourceTarget === "live_source_mailbox") return ["live_environment"];
+  if (sourceTarget === "visual_capture") return ["situation_run"];
   if (sourceTarget === "active_note") return ["notes"];
   if (sourceTarget === "calculator" || sourceTarget === "calculator_solve" || sourceTarget === "calculator_stream") {
     return ["calculator", "workstation_action"];
@@ -535,6 +539,58 @@ export function buildToolCallAdmissionDecision(input: {
       "no_tool_direct",
     ];
     reason = "internet_search_requires_external_web_evidence_path";
+  } else if (effectiveSourceTarget === "theory_locator") {
+    admittedToolFamilies = ["theory_locator"];
+    extraForbiddenTerminalKinds = [
+      "direct_answer_text",
+      "no_tool_direct",
+      "model_only_concept",
+      "client_projection",
+      "panel_generated_answer",
+      "workspace_action_receipt",
+      "live_pipeline_receipt",
+      "docs_viewer_receipt",
+      "active_doc_identity",
+      "doc_open_receipt",
+      "doc_summary",
+      "doc_location_result",
+      "repo_code_evidence_answer",
+    ];
+    extraForbiddenRoutes = [
+      "active_doc_identity",
+      "active_doc_summary",
+      "doc_open_best",
+      "repo_code_evidence_question",
+      "model_only_concept",
+      "no_tool_direct",
+    ];
+    reason = "theory_locator_requires_reflection_tool_path";
+  } else if (effectiveSourceTarget === "context_reflection") {
+    admittedToolFamilies = ["context_reflection"];
+    extraForbiddenTerminalKinds = [
+      "direct_answer_text",
+      "no_tool_direct",
+      "model_only_concept",
+      "client_projection",
+      "panel_generated_answer",
+      "workspace_action_receipt",
+      "live_pipeline_receipt",
+      "docs_viewer_receipt",
+      "active_doc_identity",
+      "doc_open_receipt",
+      "doc_summary",
+      "doc_location_result",
+      "repo_code_evidence_answer",
+    ];
+    extraForbiddenRoutes = [
+      "active_doc_identity",
+      "active_doc_summary",
+      "doc_open_best",
+      "repo_code_evidence_question",
+      "model_only_concept",
+      "no_tool_direct",
+    ];
+    reason = "context_reflection_requires_reflection_tool_path";
   } else if (unknownSourceArtifactDiscoveryIntent) {
     required = true;
     admittedToolFamilies = ["workspace_directory", "docs_viewer", "repo_code", "runtime_evidence"];
