@@ -33,6 +33,22 @@ describe("NHM2 full-solve theory badges", () => {
     "nhm2.formal.negative_fixtures_fail_closed",
     "nhm2.formal.certificate_hashes_pinned",
   ];
+  const physicalEvidenceBadgeIds = [
+    "nhm2.experimental.physical_viability_campaign",
+    "nhm2.experimental.theory_solve_roadmap",
+    "nhm2.experimental.prediction_freeze",
+    "nhm2.experimental.tile_force_receipt",
+    "nhm2.experimental.tile_cycle_energy_balance",
+    "nhm2.experimental.array_scaling",
+    "nhm2.experimental.full_apparatus_tensor",
+    "nhm2.experimental.vacuum_weight",
+    "nhm2.experimental.metric_upper_bound",
+    "nhm2.experimental.invariant_metric_response",
+    "nhm2.experimental.geodesic_response",
+    "nhm2.experimental.independent_replication",
+    "nhm2.claim_boundary.physical_viability_locked",
+    "nhm2.claim_boundary.transport_locked",
+  ];
 
   it("builds NHM2 full-solve badges with no validation or promotion boundary", () => {
     const { badges, edges } = buildNhm2FullSolveTheoryBadgesV1();
@@ -86,6 +102,7 @@ describe("NHM2 full-solve theory badges", () => {
     expect(ids).toContain("nhm2.clock.trip_clocking_profile_index");
     expect(ids).toContain("nhm2.artifact.frozen_reference_run_provenance");
     expect(ids).toEqual(expect.arrayContaining(leanFormalBadgeIds));
+    expect(ids).toEqual(expect.arrayContaining(physicalEvidenceBadgeIds));
   });
 
   it("keeps promotion-sensitive routes blocked by claim boundaries", () => {
@@ -266,6 +283,36 @@ describe("NHM2 full-solve theory badges", () => {
           to: "nhm2.claim_boundary.diagnostic_only",
           relation: "documents",
         }),
+        expect.objectContaining({
+          from: "nhm2.dynamic.time_dependent_source_campaign",
+          to: "nhm2.experimental.physical_viability_campaign",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "nhm2.formal.claim_locks_closed",
+          to: "nhm2.experimental.physical_viability_campaign",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.prediction_freeze",
+          to: "nhm2.experimental.physical_viability_campaign",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.array_scaling",
+          to: "nhm2.experimental.vacuum_weight",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.invariant_metric_response",
+          to: "nhm2.claim_boundary.physical_viability_locked",
+          relation: "blocks",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.geodesic_response",
+          to: "nhm2.claim_boundary.transport_locked",
+          relation: "blocks",
+        }),
       ]),
     );
   });
@@ -291,6 +338,16 @@ describe("NHM2 full-solve theory badges", () => {
       "nhm2.natario.invariant_audit",
       "nhm2.clock.trip_clocking_profile_index",
       ...leanFormalBadgeIds,
+      "nhm2.experimental.physical_viability_campaign",
+      "nhm2.experimental.prediction_freeze",
+      "nhm2.experimental.tile_force_receipt",
+      "nhm2.experimental.full_apparatus_tensor",
+      "nhm2.experimental.vacuum_weight",
+      "nhm2.experimental.invariant_metric_response",
+      "nhm2.experimental.geodesic_response",
+      "nhm2.experimental.independent_replication",
+      "nhm2.claim_boundary.physical_viability_locked",
+      "nhm2.claim_boundary.transport_locked",
     ];
 
     for (const badgeId of nonScalarIds) {
@@ -340,6 +397,52 @@ describe("NHM2 full-solve theory badges", () => {
     expect(text).not.toMatch(/route ETA certified/i);
     expect(text).not.toMatch(/\bcertified speed\b/i);
     expect(text).not.toMatch(/material realization/i);
+  });
+
+  it("wires the physical evidence campaign without promoting diagnostic campaign pass", () => {
+    const badges = buildNhm2FullSolveTheoryBadgesV1().badges;
+    const byId = new Map(badges.map((badge: TheoryBadgeV1) => [badge.id, badge]));
+
+    for (const badgeId of physicalEvidenceBadgeIds) {
+      const badge = byId.get(badgeId);
+      expect(badge, badgeId).toBeDefined();
+      expect(badge?.claimBoundary).toMatchObject({
+        diagnosticOnly: true,
+        doesValidateNHM2: false,
+        validationClaimAllowed: false,
+        physicalMechanismClaimAllowed: false,
+        promotionAllowed: false,
+      });
+    }
+
+    const campaign = byId.get("nhm2.experimental.physical_viability_campaign");
+    expect(JSON.stringify(campaign)).toMatch(/diagnostic campaign can feed this ladder/i);
+    expect(JSON.stringify(campaign)).toMatch(/cannot substitute for experimental receipts/i);
+    expect(JSON.stringify(campaign?.sourceRefs)).toMatch(/nhm2-physical-viability-campaign\.json/);
+    expect(JSON.stringify(campaign?.sourceRefs)).toMatch(
+      /nhm2-experiment-facing-theory-roadmap\.json/,
+    );
+    expect(JSON.stringify(campaign?.sourceRefs)).toMatch(/nhm2-lean-campaign-certificate\.json/);
+
+    const roadmap = byId.get("nhm2.experimental.theory_solve_roadmap");
+    expect(roadmap?.calculatorPayloads).toEqual([]);
+    expect(JSON.stringify(roadmap?.sourceRefs)).toMatch(
+      /nhm2-experiment-facing-theory-roadmap\.v1\.ts/,
+    );
+    expect(JSON.stringify(roadmap?.sourceRefs)).toMatch(/nature10561/);
+    expect(JSON.stringify(roadmap?.sourceRefs)).toMatch(/0902\.4022/);
+    expect(JSON.stringify(roadmap?.sourceRefs)).toMatch(/gr-qc\/9702026/);
+    expect(JSON.stringify(roadmap)).toMatch(/roadmap is an experiment-planning artifact/i);
+
+    expect(byId.get("nhm2.experimental.tile_cycle_energy_balance")?.calculatorPayloads.map(
+      (payload) => payload.expression,
+    )).toEqual(["delta_m = DeltaE/c^2", "delta_F = g*DeltaE/c^2"]);
+    expect(byId.get("nhm2.experimental.array_scaling")?.calculatorPayloads.map(
+      (payload) => payload.expression,
+    )).toEqual(["array_scaling = DeltaE_N/(N*DeltaE_1)"]);
+    expect(byId.get("nhm2.experimental.metric_upper_bound")?.calculatorPayloads.map(
+      (payload) => payload.expression,
+    )).toEqual(["h00_proxy = 2*G*DeltaE/(r*c^4)"]);
   });
 
   it("keeps the centerline clocking target calculator-loadable but bounded", () => {
@@ -448,6 +551,19 @@ describe("NHM2 full-solve theory badges", () => {
         "nhm2.formal.claim_locks_closed",
         "nhm2.formal.negative_fixtures_fail_closed",
         "nhm2.formal.certificate_hashes_pinned",
+        "nhm2.experimental.physical_viability_campaign",
+        "nhm2.experimental.prediction_freeze",
+        "nhm2.experimental.tile_force_receipt",
+        "nhm2.experimental.tile_cycle_energy_balance",
+        "nhm2.experimental.array_scaling",
+        "nhm2.experimental.full_apparatus_tensor",
+        "nhm2.experimental.vacuum_weight",
+        "nhm2.experimental.metric_upper_bound",
+        "nhm2.experimental.invariant_metric_response",
+        "nhm2.experimental.geodesic_response",
+        "nhm2.experimental.independent_replication",
+        "nhm2.claim_boundary.physical_viability_locked",
+        "nhm2.claim_boundary.transport_locked",
         "nhm2.claim_boundary.diagonal_proxy_not_full_tensor",
       ]),
     );
@@ -662,6 +778,31 @@ describe("NHM2 full-solve theory badges", () => {
           to: "nhm2.claim_boundary.diagnostic_only",
           relation: "blocks",
         }),
+        expect.objectContaining({
+          from: "nhm2.dynamic.time_dependent_source_campaign",
+          to: "nhm2.experimental.physical_viability_campaign",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.prediction_freeze",
+          to: "nhm2.experimental.physical_viability_campaign",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.vacuum_weight",
+          to: "nhm2.experimental.invariant_metric_response",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.independent_replication",
+          to: "nhm2.claim_boundary.physical_viability_locked",
+          relation: "blocks",
+        }),
+        expect.objectContaining({
+          from: "nhm2.claim_boundary.physical_viability_locked",
+          to: "nhm2.claim_boundary.transport_locked",
+          relation: "blocks",
+        }),
       ]),
     );
   });
@@ -684,5 +825,7 @@ describe("NHM2 full-solve theory badges", () => {
     expect(text).not.toMatch(/transport certified/i);
     expect(text).not.toMatch(/route ETA certified/i);
     expect(text).not.toMatch(/material realization/i);
+    expect(text).not.toMatch(/physical viability unlocked/i);
+    expect(text).not.toMatch(/transport unlocked/i);
   });
 });

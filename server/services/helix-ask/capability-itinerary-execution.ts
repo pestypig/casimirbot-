@@ -400,7 +400,10 @@ const artifactSubgoalObservationProvenance = (
   if (calculatorSubgoalIdMismatchIsExpressionMatch(artifact, capability, runtimeCapability, argsHint)) {
     return "calculator_expression_match";
   }
-  return !subgoalId && observationKindBelongsToCapability(artifact, capability, runtimeCapability)
+  if (capability === "docs-viewer.locate_in_doc" || runtimeCapability === "docs-viewer.locate_in_doc") {
+    return null;
+  }
+  return observationKindBelongsToCapability(artifact, capability, runtimeCapability)
     ? "observation_kind_inference"
     : null;
 };
@@ -528,6 +531,17 @@ const missingRequiredArgsForSubgoal = (input: {
       requiredArgAliasesForCapability(input.capability, input.runtimeCapability, requiredArg),
     )
   );
+
+const boundRequiredArgsForSubgoal = (
+  subgoal: Record<string, unknown>,
+): string[] => uniqueStrings(
+  readArray(subgoal.input_bindings)
+    .map(readRecord)
+    .filter((entry: Record<string, unknown> | null): entry is Record<string, unknown> =>
+      Boolean(entry && entry.required === true)
+    )
+    .map((entry: Record<string, unknown>) => readString(entry.arg_name)),
+);
 
 const artifactSupportRefs = (artifact: HelixCapabilityItineraryArtifactLike | null): string[] => {
   if (!artifact) return [];
@@ -846,12 +860,13 @@ export const buildHelixCapabilityItineraryExecutionState = (args: {
     const argsSource = runtimeCalls.length > 0
       ? "runtime_tool_call"
       : "contract_args_hint";
+    const bindingCoveredRequiredArgs = boundRequiredArgsForSubgoal(subgoal);
     const missingRequiredArgs = missingRequiredArgsForSubgoal({
       capability: requestedCapability,
       runtimeCapability,
       requiredArgs,
       args: selectedArgs,
-    });
+    }).filter((requiredArg: string) => !bindingCoveredRequiredArgs.includes(requiredArg));
     const validationErrors = validations.flatMap(artifactValidationErrors);
     const railErrors = uniqueStrings([
       ...validationErrors,

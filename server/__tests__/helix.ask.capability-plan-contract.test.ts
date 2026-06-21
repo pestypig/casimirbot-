@@ -347,7 +347,7 @@ describe("Helix capability plan contract", () => {
       expect(admission).toMatchObject({
         source_target: "runtime_evidence",
         admitted_tool_families: expect.arrayContaining(["capability_catalog", "runtime_evidence"]),
-        reason: "capability_catalog_prompt_requires_runtime_catalog_observation",
+        reason: expect.stringContaining("capability_catalog_prompt_requires_runtime_catalog_observation"),
       });
       expect(admission.admitted_tool_families).not.toContain("model_only");
 
@@ -371,10 +371,12 @@ describe("Helix capability plan contract", () => {
         required_terminal_kind: "capability_help_summary",
         admission_status: "needs_evidence",
         capability_contract_arbitration: expect.objectContaining({
-          contract_state: "classifier_hypothesis",
+          contract_state: "explicit_capability_command",
+          requested_capability: "helix_ask.inspect_capability_catalog",
           selected_source_target: "runtime_evidence",
           selected_plan_family: "capability_catalog",
           canonical_goal_kind: "capability_help",
+          required_observation_kinds: ["capability_registry"],
           required_terminal_kind: "capability_help_summary",
         }),
       });

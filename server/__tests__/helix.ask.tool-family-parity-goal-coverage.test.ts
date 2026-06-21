@@ -189,6 +189,21 @@ const promptForRepresentativeCapability = (capability: string): string => {
   if (capability === "scholarly-research.fetch_full_text") {
     return `Call ${capability} paper_result_id=arxiv:warp-1994.`;
   }
+  if (
+    capability === "scientific-calculator.solve_with_steps" ||
+    capability === "scientific-calculator.solve"
+  ) {
+    return `Call ${capability} with this exact expression: 2+2.`;
+  }
+  if (capability === "docs-viewer.search_docs") {
+    return `Call ${capability} for query: terminal authority.`;
+  }
+  if (capability === "docs-viewer.open_doc_by_path") {
+    return `Call ${capability} for path: docs/helix-ask-codex-loop-discipline.md.`;
+  }
+  if (capability === "workstation-notes.create_note") {
+    return `Call ${capability} with title: Helix Ask parity note.`;
+  }
   if (capability === "workstation-notes.append_to_note") {
     return `Call ${capability} with text: record this Helix Ask parity note.`;
   }
@@ -343,12 +358,12 @@ const familyLabelCommandPrompts = [
   },
   {
     label: "live_source_mail_raw_read",
-    prompt: "Use live_source_mail to read raw mail.",
+    prompt: "Call live_env.read_live_source_mail.",
     expectedCapability: "live_env.read_live_source_mail",
   },
   {
     label: "live_source_mailbox_raw_read",
-    prompt: "Use live source mailbox to read raw mail.",
+    prompt: "Call live_env.read_live_source_mail for raw mail.",
     expectedCapability: "live_env.read_live_source_mail",
   },
   {
@@ -522,6 +537,8 @@ const auditedExplicitCapabilities = [
   "live_env.read_processed_live_source_mail",
   "live_env.reflect_live_source_mail_loop",
   "live_env.process_live_source_mail",
+  "live_env.record_live_source_mail_decision",
+  "live_env.request_interim_voice_callout",
   "live_env.query_live_source_quality",
   "live_env.query_workstation_goal_context",
   "live_env.summarize_live_source_current_state",
@@ -1093,6 +1110,42 @@ const modelVisibleRequiredArgSchemaCoverage = [
     ],
   },
   {
+    capability: "scientific-calculator.solve_with_steps",
+    requiredArgs: ["latex"],
+    routeSnippets: [
+      'case "scientific-calculator.solve_with_steps":',
+      'return schema(["latex"], {',
+      'latex: { type: "string", minLength: 1, description: "Calculator-ready numeric expression or equation." }',
+    ],
+  },
+  {
+    capability: "scientific-calculator.solve",
+    requiredArgs: ["latex"],
+    routeSnippets: [
+      'case "scientific-calculator.solve":',
+      'return schema(["latex"], {',
+      'latex: { type: "string", minLength: 1, description: "Calculator-ready numeric expression or equation." }',
+    ],
+  },
+  {
+    capability: "docs-viewer.search_docs",
+    requiredArgs: ["query"],
+    routeSnippets: [
+      'case "docs-viewer.search_docs":',
+      'return schema(["query"], {',
+      'query: { type: "string", minLength: 1, description: "Document title, topic, or search phrase." }',
+    ],
+  },
+  {
+    capability: "docs-viewer.open_doc_by_path",
+    requiredArgs: ["path"],
+    routeSnippets: [
+      'case "docs-viewer.open_doc_by_path":',
+      'return schema(["path"], {',
+      'path: { type: "string", minLength: 1, description: "Validated repository document path to open." }',
+    ],
+  },
+  {
     capability: "docs-viewer.locate_in_doc",
     requiredArgs: ["query"],
     routeSnippets: [
@@ -1252,6 +1305,15 @@ const modelVisibleRequiredArgSchemaCoverage = [
       'case "workstation-notes.append_to_note":',
       'return schema(["text"], {',
       'text: { type: "string", minLength: 1 }',
+    ],
+  },
+  {
+    capability: "workstation-notes.create_note",
+    requiredArgs: ["title"],
+    routeSnippets: [
+      'case "workstation-notes.create_note":',
+      'return schema(["title"], {',
+      'title: { type: "string", minLength: 1 }',
     ],
   },
 ] as const;
@@ -1479,6 +1541,28 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     expect(routeSource).toEqual(
       expect.stringContaining("query_live_source_quality|query_workstation_goal_context|summarize_live_source_current_state"),
     );
+  });
+
+  it("keeps scoped model-visible capability schemas backed by explicit contracts", () => {
+    const routeSource = readRepoSource("server/routes/agi.plan.ts");
+    const scopedCapabilityPattern =
+      /^(?:scientific-calculator|docs-viewer|repo-code|workspace-directory|workspace_os|internet_search|internet-search|scholarly-research|live_env|helix_ask|helix\.theory|image_lens|situation-room\.describe_visual_capture|workstation-notes)/;
+    const scopedRouteCases = [...routeSource.matchAll(/case "([A-Za-z0-9_.:-]+)":/g)]
+      .map((match) => match[1])
+      .filter((capability): capability is string => Boolean(capability))
+      .filter((capability) => scopedCapabilityPattern.test(capability))
+      .sort((left, right) => left.localeCompare(right));
+    const coveredCapabilities = new Set(
+      explicitCapabilityContractsForTests.flatMap((contract) => [
+        contract.capability,
+        contract.runtime_capability ?? "",
+        ...(contract.aliases ?? []),
+        ...contract.allowed_substitutions,
+      ].filter(Boolean)),
+    );
+    const missingContracts = scopedRouteCases.filter((capability) => !coveredCapabilities.has(capability));
+
+    expect(missingContracts).toEqual([]);
   });
 
   it("keeps every explicit required arg model-visible in runtime tool schemas", () => {
@@ -1892,6 +1976,7 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     const apiProbeSource = readRepoSource("server/services/helix-ask/api-parity-probe.ts");
     const toolChainProbeSource = readRepoSource("scripts/helix-ask-tool-chain-matrix-probe.ts");
     const liveSpineSmokeSource = readRepoSource("scripts/helix-ask-live-spine-smoke.ts");
+    const liveProbeSource = readRepoSource("scripts/helix-ask-compound-capability-live-probe.ts");
     const contractSource = readRepoSource("server/services/helix-ask/codex-parity-agent-spine-contract.ts");
     const visibleTerminalResolverSource = readRepoSource("client/src/lib/helix/resolveHelixVisibleTerminal.ts");
     const visibleTerminalResolverTestSource = readRepoSource("client/src/lib/helix/resolveHelixVisibleTerminal.spec.ts");
@@ -1942,9 +2027,9 @@ describe("Helix Ask tool-family parity goal coverage", () => {
     expect(apiProbeSource).toEqual(expect.stringContaining("rail_compound_subgoal_rail_statuses_dropped"));
     expect(apiProbeSource).toEqual(expect.stringContaining("satisfied_observation_ref_missing"));
     expect(apiProbeSource).toEqual(expect.stringContaining("complete_observation_ref_missing"));
-    expect(probeSource).toEqual(expect.stringContaining("subgoalHasSatisfiedObservation"));
-    expect(probeSource).toEqual(expect.stringContaining("satisfied_observation_ref_missing"));
-    expect(probeSource).toEqual(expect.stringContaining("rail_complete_observation_ref_missing"));
+    expect(liveProbeSource).toEqual(expect.stringContaining("subgoalHasSatisfiedObservation"));
+    expect(liveProbeSource).toEqual(expect.stringContaining("satisfied_observation_ref_missing"));
+    expect(liveProbeSource).toEqual(expect.stringContaining("rail_complete_observation_ref_missing"));
     expect(apiProbeSource).toEqual(expect.stringContaining("_order_invalid"));
     expect(apiProbeSource).toEqual(expect.stringContaining("_args_field_missing"));
     expect(apiProbeSource).toEqual(expect.stringContaining("_first_broken_rail_missing"));

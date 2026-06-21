@@ -144,6 +144,7 @@ const terminalReceiptAllowed = (input: {
   ) {
     input.payload.tool_family_terminal_policy = {
       schema: "helix.tool_family_terminal_policy.v1",
+      candidate_artifact_kind: terminalKind,
       allowed: true,
       reason: "doc_open_receipt_matches_doc_open_goal",
       assistant_answer: false,

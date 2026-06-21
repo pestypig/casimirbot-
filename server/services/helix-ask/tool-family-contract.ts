@@ -87,8 +87,12 @@ export const TOOL_FAMILY_DEFAULT_CONTRACTS: Record<ToolFamily, ToolFamilyContrac
     mutating: false,
     requiredObservationKinds: [
       "calculator_receipt",
+      "calculator_subgoal_receipt",
+      "calculator_plan_coverage",
       "calculator_result_trace",
       "calculator_result_validation",
+      "calculator_live_source_status",
+      "workspace_action_receipt",
       "workstation_tool_evaluation",
     ],
     allowedTerminalKinds: [
@@ -148,6 +152,11 @@ export const TOOL_FAMILY_DEFAULT_CONTRACTS: Record<ToolFamily, ToolFamilyContrac
     authority: "evidence_only",
     mutating: false,
     requiredObservationKinds: [
+      "active_doc_identity",
+      "doc_search_results",
+      "retrieval_context",
+      "doc_candidate_validation",
+      "doc_open_receipt",
       "doc_location_result",
       "doc_location_matches",
       "doc_evidence_location",
@@ -159,6 +168,7 @@ export const TOOL_FAMILY_DEFAULT_CONTRACTS: Record<ToolFamily, ToolFamilyContrac
     allowedTerminalKinds: [
       "doc_location_result",
       "doc_location_matches",
+      "doc_open_receipt",
       "doc_summary",
       "doc_equation_context",
       "doc_evidence_synthesis_answer",
@@ -202,7 +212,14 @@ export const TOOL_FAMILY_DEFAULT_CONTRACTS: Record<ToolFamily, ToolFamilyContrac
     toolFamily: "workstation",
     authority: "control_receipt",
     mutating: true,
-    requiredObservationKinds: ["workspace_action_receipt", "workstation_tool_evaluation"],
+    requiredObservationKinds: [
+      "workspace_action_receipt",
+      "workstation_tool_evaluation",
+      "note_context",
+      "note_create_receipt",
+      "note_update_receipt",
+      "note_action_receipt",
+    ],
     allowedTerminalKinds: ["workspace_action_receipt", "workstation_tool_evaluation", "tool_evaluation", ...evidenceOnlyTerminalKinds],
     requiredReentry: true,
     requiresGoalSatisfaction: true,
@@ -410,6 +427,36 @@ export const TOOL_FAMILY_DEFAULT_CONTRACTS: Record<ToolFamily, ToolFamilyContrac
   }),
 };
 
+const liveEnvExactContract = (input: {
+  toolName: string;
+  requiredObservationKinds: string[];
+  aliases?: string[];
+  authority?: ToolAuthority;
+  mutating?: boolean;
+  allowedTerminalKinds?: string[];
+}): ToolFamilyContract => {
+  const isControlReceipt = input.authority === "control_receipt";
+  return contract({
+    toolName: input.toolName,
+    toolFamily: "live_environment",
+    authority: input.authority ?? "evidence_only",
+    mutating: input.mutating ?? false,
+    requiredObservationKinds: Array.from(new Set([
+      "live_environment_tool_observation",
+      ...input.requiredObservationKinds,
+      "helix.workstation_goal_context_update.v1",
+      ...(isControlReceipt ? [
+        "stage_play_workstation_control_receipt",
+      ] : []),
+    ])),
+    allowedTerminalKinds: input.allowedTerminalKinds ??
+      (isControlReceipt ? ["workstation_tool_evaluation", ...evidenceOnlyTerminalKinds] : [...evidenceOnlyTerminalKinds]),
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+    aliases: input.aliases ?? [],
+  });
+};
+
 export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
   ...Object.values(TOOL_FAMILY_DEFAULT_CONTRACTS),
   contract({
@@ -457,6 +504,43 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
     requiredReentry: true,
     requiresGoalSatisfaction: true,
     aliases: ["microdeck_prompt_router", "prompt_delegation", "stage_play_micro_reasoner_prompt_delegation_result/v1"],
+  }),
+  contract({
+    toolName: "live_env.query_micro_reasoner_prompts",
+    toolFamily: "live_source_mail",
+    authority: "evidence_only",
+    mutating: false,
+    requiredObservationKinds: ["stage_play_micro_reasoner_prompt"],
+    allowedTerminalKinds: [...evidenceOnlyTerminalKinds],
+    requiredReentry: true,
+    requiresGoalSatisfaction: true,
+    aliases: ["micro_reasoner_prompts", "stage_play_micro_reasoner_prompt/v1"],
+  }),
+  liveEnvExactContract({
+    toolName: "live_env.apply_micro_reasoner_preset",
+    authority: "control_receipt",
+    mutating: true,
+    requiredObservationKinds: ["stage_play_micro_reasoner_prompt_preset"],
+    aliases: ["apply_micro_reasoner_preset"],
+  }),
+  liveEnvExactContract({
+    toolName: "live_env.create_micro_reasoner_preset",
+    authority: "control_receipt",
+    mutating: true,
+    requiredObservationKinds: ["stage_play_micro_reasoner_prompt_preset", "stage_play_micro_reasoner_prompt"],
+    aliases: ["create_micro_reasoner_preset"],
+  }),
+  liveEnvExactContract({
+    toolName: "live_env.update_micro_reasoner_prompt",
+    authority: "control_receipt",
+    mutating: true,
+    requiredObservationKinds: ["stage_play_micro_reasoner_prompt"],
+    aliases: ["update_micro_reasoner_prompt"],
+  }),
+  liveEnvExactContract({
+    toolName: "live_env.test_micro_reasoner_prompt",
+    requiredObservationKinds: ["stage_play_micro_reasoner_prompt_test"],
+    aliases: ["test_micro_reasoner_prompt"],
   }),
   contract({
     toolName: "live_env.check_live_source_mail",
@@ -660,6 +744,79 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
       "live_source_current_state",
       "stage_play_live_source_current_state/v1",
     ],
+  }),
+  liveEnvExactContract({
+    toolName: "live_env.plan_stage_play_job",
+    requiredObservationKinds: ["stage_play_job_plan"],
+    aliases: ["plan_stage_play_job"],
+  }),
+  liveEnvExactContract({
+    toolName: "live_env.configure_visual_observer_profile",
+    authority: "control_receipt",
+    mutating: true,
+    requiredObservationKinds: ["stage_play_visual_observer_profile"],
+    aliases: ["configure_visual_observer_profile", "visual_observer_profile"],
+  }),
+  liveEnvExactContract({
+    toolName: "live_env.apply_visual_observer_profile",
+    authority: "control_receipt",
+    mutating: true,
+    requiredObservationKinds: ["stage_play_visual_observer_profile"],
+    aliases: ["apply_visual_observer_profile"],
+  }),
+  liveEnvExactContract({
+    toolName: "live_env.query_visual_observer_profiles",
+    requiredObservationKinds: ["stage_play_visual_observer_profile"],
+    aliases: ["query_visual_observer_profiles"],
+  }),
+  liveEnvExactContract({
+    toolName: "live_env.test_visual_observer_profile",
+    requiredObservationKinds: ["stage_play_visual_observer_profile_test"],
+    aliases: ["test_visual_observer_profile"],
+  }),
+  liveEnvExactContract({
+    toolName: "live_env.compare_visual_observer_profiles",
+    requiredObservationKinds: ["stage_play_visual_observer_profile_test"],
+    aliases: ["compare_visual_observer_profiles"],
+  }),
+  liveEnvExactContract({
+    toolName: "live_env.request_visual_action_replay",
+    requiredObservationKinds: ["helix_visual_frame_action_replay_request"],
+    aliases: ["request_visual_action_replay"],
+  }),
+  liveEnvExactContract({
+    toolName: "live_env.configure_interpreter_profile",
+    authority: "control_receipt",
+    mutating: true,
+    requiredObservationKinds: ["stage_play_live_source_interpreter_profile"],
+    aliases: ["configure_interpreter_profile"],
+  }),
+  liveEnvExactContract({
+    toolName: "live_env.compare_mail_to_interpreter_profile",
+    requiredObservationKinds: ["stage_play_live_source_interpreter_profile_comparison"],
+    aliases: ["compare_mail_to_interpreter_profile"],
+  }),
+  liveEnvExactContract({
+    toolName: "live_env.request_stage_play_checkpoint",
+    requiredObservationKinds: ["stage_play_checkpoint_request"],
+    aliases: ["request_stage_play_checkpoint"],
+  }),
+  liveEnvExactContract({
+    toolName: "live_env.predict_live_source_immediate",
+    requiredObservationKinds: ["helix_live_source_immediate_prediction"],
+    aliases: ["predict_live_source_immediate"],
+  }),
+  liveEnvExactContract({
+    toolName: "live_env.compare_live_source_prediction",
+    requiredObservationKinds: ["helix_live_source_prediction_comparison"],
+    aliases: ["compare_live_source_prediction"],
+  }),
+  liveEnvExactContract({
+    toolName: "live_env.project_live_source_narrative",
+    authority: "control_receipt",
+    mutating: true,
+    requiredObservationKinds: ["stage_play_live_source_narrative_state"],
+    aliases: ["project_live_source_narrative"],
   }),
   contract({
     toolName: "live_env.evaluate_goal_satisfaction",
@@ -1016,6 +1173,7 @@ export const TOOL_FAMILY_CONTRACTS: ToolFamilyContract[] = [
     mutating: false,
     requiredObservationKinds: [
       "calculator_receipt",
+      "calculator_subgoal_receipt",
       "calculator_result_trace",
       "calculator_result_validation",
       "workstation_tool_evaluation",

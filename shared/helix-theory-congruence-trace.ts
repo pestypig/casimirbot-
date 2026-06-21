@@ -130,13 +130,14 @@ export type TheoryCongruenceTraceV1 = {
     missing_evidence: string[];
     next_best_tool?: TheoryToolKind;
   };
-  terminal_authority: {
-    eligible: boolean;
-    terminal_artifact_kind:
+  solver_boundary: {
+    eligible_for_answer: false;
+    candidate_answer_kind:
       | "direct_answer"
       | "repo_code_evidence_answer"
       | "theory_congruence_answer"
       | "typed_failure";
+    completed_solver_path_required: true;
     reason: string;
   };
   assistant_answer: false;
@@ -235,7 +236,29 @@ export function validateTheoryCongruenceTraceV1(value: unknown): string[] {
     }
   }
   if (!isRecord(value.goal_satisfaction)) issues.push("goal_satisfaction must be an object");
-  if (!isRecord(value.terminal_authority)) issues.push("terminal_authority must be an object");
+  if (!isRecord(value.solver_boundary)) {
+    issues.push("solver_boundary must be an object");
+  } else {
+    if (value.solver_boundary.eligible_for_answer !== false) {
+      issues.push("solver_boundary.eligible_for_answer must be false");
+    }
+    if (
+      ![
+        "direct_answer",
+        "repo_code_evidence_answer",
+        "theory_congruence_answer",
+        "typed_failure",
+      ].includes(String(value.solver_boundary.candidate_answer_kind))
+    ) {
+      issues.push("solver_boundary.candidate_answer_kind is invalid");
+    }
+    if (value.solver_boundary.completed_solver_path_required !== true) {
+      issues.push("solver_boundary.completed_solver_path_required must be true");
+    }
+    if (!isNonEmptyString(value.solver_boundary.reason)) {
+      issues.push("solver_boundary.reason must be a non-empty string");
+    }
+  }
   if (value.assistant_answer !== false) issues.push("assistant_answer must be false");
   if (value.raw_content_included !== false) issues.push("raw_content_included must be false");
   if (value.terminal_eligible !== false) issues.push("terminal_eligible must be false");

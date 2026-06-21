@@ -196,13 +196,15 @@ describe("Helix Ask capability itinerary", () => {
       "helix_ask.reflect_theory_context",
       "scientific-calculator.solve_expression",
     ]);
-    expect(subgoals[1]?.args_hint).toEqual(expect.objectContaining({
-      prompt: promptText,
+    const reflectionArgs = subgoals[1]?.args_hint as Record<string, unknown>;
+    expect(reflectionArgs).toEqual(expect.objectContaining({
       build_explanation_plan: true,
       sync_panel: true,
       panel_overlay_mode: "live_answer_context",
       open_panel: false,
     }));
+    expect(reflectionArgs.prompt).toEqual(expect.stringContaining("receipts are observations before terminal authority"));
+    expect(String(reflectionArgs.prompt)).not.toContain("scientific-calculator.solve_expression");
     expect(subgoals[1]?.depends_on_subgoal_ids).toEqual([subgoals[0]?.subgoal_id]);
     expect(subgoals[1]?.input_bindings).toEqual([
       expect.objectContaining({
@@ -407,7 +409,7 @@ describe("Helix Ask capability itinerary", () => {
     });
 
     const researchEntry = state.compound_subgoal_ledger.find((entry) =>
-      entry.requested_capability === HELIX_INTERNET_SEARCH_CAPABILITY
+      entry.requested_capability === "internet_search.web_research"
     );
     const reflectionEntry = state.compound_subgoal_ledger.find((entry) =>
       entry.requested_capability === "helix_ask.reflect_theory_context"
@@ -428,7 +430,7 @@ describe("Helix Ask capability itinerary", () => {
       complete: false,
       missing_compound_subgoal_ids: expect.arrayContaining([researchSubgoalId, reflectionSubgoalId]),
       missing_required_capabilities: expect.arrayContaining([
-        HELIX_INTERNET_SEARCH_CAPABILITY,
+        "internet_search.web_research",
         "helix_ask.reflect_theory_context",
       ]),
     });
@@ -620,8 +622,8 @@ describe("Helix Ask capability itinerary", () => {
       "helix_ask.build_civilization_scenario_frame",
       "helix_ask.reflect_civilization_bounds",
     ]);
-    expect(subgoals[0]?.args_hint).toEqual(expect.objectContaining({
-      prompt: promptText,
+    const scenarioArgs = subgoals[0]?.args_hint as Record<string, unknown>;
+    expect(scenarioArgs).toEqual(expect.objectContaining({
       refs: ["helix-ask:current-turn"],
       options: expect.objectContaining({
         allowFictional: true,
@@ -629,8 +631,9 @@ describe("Helix Ask capability itinerary", () => {
         includeNeedleScenarioFallback: true,
       }),
     }));
-    expect(subgoals[1]?.args_hint).toEqual(expect.objectContaining({
-      prompt: promptText,
+    expect(scenarioArgs.prompt).toEqual(expect.stringContaining("long-range settlement scenario"));
+    const boundsArgs = subgoals[1]?.args_hint as Record<string, unknown>;
+    expect(boundsArgs).toEqual(expect.objectContaining({
       scenarioFrameRef: "step:build_civilization_scenario_frame",
       refs: ["helix-ask:current-turn"],
       options: expect.objectContaining({
@@ -639,10 +642,11 @@ describe("Helix Ask capability itinerary", () => {
         includeFalsificationHooks: true,
       }),
     }));
+    expect(boundsArgs.prompt).toEqual(expect.stringContaining("collaboration and falsification bounds"));
     expect(subgoals[1]?.depends_on_subgoal_ids).toEqual([subgoals[0]?.subgoal_id]);
     expect(subgoals[1]?.input_bindings).toEqual([
       expect.objectContaining({
-        arg_name: "source_ref",
+        arg_name: "scenarioFrameRef",
         binding_kind: "source_ref",
         from_subgoal_id: subgoals[0]?.subgoal_id,
         from_capability: "helix_ask.build_civilization_scenario_frame",
@@ -897,7 +901,7 @@ describe("Helix Ask capability itinerary", () => {
     expect(mismatchedCalculatorEntry).toMatchObject({
       executed_capability: "scientific-calculator.solve_expression",
       observation_ref: null,
-      satisfaction: "pending",
+      satisfaction: "failed",
       rail_failure_code: "subgoal_observation_missing",
     });
     expect(mismatched.complete).toBe(false);
@@ -1282,8 +1286,7 @@ describe("Helix Ask capability itinerary", () => {
     expect(state.missing_observation_families).not.toContain("theory_locator");
     expect(state.complete).toBe(false);
     expect(state.missing_required_observation_kinds).toEqual([
-      "theory_frontier_candidate",
-      "theory_frontier_exact_contract_verification",
+      "theory_frontier_vector_field",
     ]);
   });
 

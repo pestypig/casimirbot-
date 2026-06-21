@@ -15,6 +15,17 @@ import {
   isCodexParityAgentSpineRailFailureCode,
 } from "../server/services/helix-ask/codex-parity-agent-spine-contract";
 
+const UI_DEBUG_COMPOUND_STRING_OR_NULL_FIELDS = [
+  "first_incomplete_compound_subgoal_id",
+  "first_incomplete_compound_requested_capability",
+  "first_incomplete_compound_runtime_capability",
+  "first_incomplete_compound_selected_capability",
+  "first_incomplete_compound_executed_capability",
+  "compound_first_broken_rail",
+  "compound_rail_failure_code",
+  "compound_repair_target",
+] as const satisfies readonly (typeof CODEX_PARITY_AGENT_SPINE_COMPOUND_STRING_OR_NULL_FIELDS)[number][];
+
 export type HarnessPrompt = {
   prompt: string;
   expectCoverage?: boolean;
@@ -779,7 +790,7 @@ export const collectUiApiTerminalParityViolations = (input: {
     "selected_capability",
     "executed_capability",
     "compound_subgoal_count",
-    ...CODEX_PARITY_AGENT_SPINE_COMPOUND_STRING_OR_NULL_FIELDS,
+    ...UI_DEBUG_COMPOUND_STRING_OR_NULL_FIELDS,
     "compound_incomplete_subgoal_did_tool_run",
     "observation_kind",
     "selected_terminal_kind",
@@ -849,7 +860,7 @@ const RAIL_MIRROR_COMPARISON_FIELDS = [
   "admission_proven",
   "executed_capability",
   "compound_subgoal_count",
-  ...CODEX_PARITY_AGENT_SPINE_COMPOUND_STRING_OR_NULL_FIELDS,
+  ...UI_DEBUG_COMPOUND_STRING_OR_NULL_FIELDS,
   "compound_incomplete_subgoal_did_tool_run",
   "observation_kind",
   "observation_ref",

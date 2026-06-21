@@ -12,7 +12,7 @@ export type ToolFamilyTerminalPolicyDecision = {
   tool_name: string | null;
   tool_family: string | null;
   authority: ToolAuthority;
-  terminal_artifact_kind: string;
+  candidate_artifact_kind: string;
   allowed: boolean;
   reason:
     | "non_receipt_terminal_deferred_to_route_authority"
@@ -173,7 +173,7 @@ export function evaluateToolFamilyTerminalPolicy(input: {
     tool_name: toolName,
     tool_family: toolFamily,
     authority: contract?.authority ?? ("evidence_only" as ToolAuthority),
-    terminal_artifact_kind: terminalArtifactKind,
+    candidate_artifact_kind: terminalArtifactKind,
     contract,
     assistant_answer: false as const,
     terminal_eligible: false as const,

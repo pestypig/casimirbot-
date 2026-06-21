@@ -121,7 +121,7 @@ function sourceRole(
   return "definition";
 }
 
-function terminalKind(depth: HelixAskDepth): TheoryCongruenceTraceV1["terminal_authority"]["terminal_artifact_kind"] {
+function candidateAnswerKind(depth: HelixAskDepth): TheoryCongruenceTraceV1["solver_boundary"]["candidate_answer_kind"] {
   if (depth === "direct") return "direct_answer";
   if (depth === "source_grounded") return "repo_code_evidence_answer";
   return "theory_congruence_answer";
@@ -319,9 +319,10 @@ export function buildTheoryCongruenceTrace(
       ]),
       ...(requiredBlocked[0] ? { next_best_tool: requiredBlocked[0].tool } : {}),
     },
-    terminal_authority: {
-      eligible: false,
-      terminal_artifact_kind: forbiddenScan.status === "fail" ? "typed_failure" : terminalKind(depthSelection.depth),
+    solver_boundary: {
+      eligible_for_answer: false,
+      candidate_answer_kind: forbiddenScan.status === "fail" ? "typed_failure" : candidateAnswerKind(depthSelection.depth),
+      completed_solver_path_required: true,
       reason: forbiddenScan.status === "fail"
         ? "Forbidden claim language must be repaired before terminal synthesis."
         : "Theory congruence trace is non-terminal evidence; completed Ask solver path owns the final answer.",

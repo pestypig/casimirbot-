@@ -5,6 +5,7 @@ import {
   canonicalGoalKindForExplicitCapability,
 } from "../services/helix-ask/capability-contract-arbitration";
 import {
+  explicitCapabilityContractsForTests,
   explicitCapabilityContractForCapability,
   extractExplicitCapabilityContracts,
 } from "../services/helix-ask/explicit-capability-contract";
@@ -23,8 +24,16 @@ describe("Helix capability contract arbitration", () => {
       ["helix_ask.reflect_workstation_tool_alignment", "capability_help", "runtime_evidence"],
       ["helix_ask.inspect_capability_catalog", "capability_help", "runtime_evidence"],
       ["scientific-calculator.solve_expression", "calculator_solve", "current_turn_action"],
+      ["scientific-calculator.solve_with_steps", "calculator_solve", "current_turn_action"],
+      ["scientific-calculator.solve", "calculator_solve", "current_turn_action"],
+      ["scientific-calculator.open", "calculator_open", "current_turn_action"],
+      ["scientific-calculator.start_equation_live_source", "calculator_live_source_setup", "current_turn_action"],
       ["workspace_os.status", "workspace_status_diagnostic", "workspace_state"],
       ["docs-viewer.open", "doc_open", "current_turn_doc"],
+      ["docs-viewer.open_doc_by_path", "doc_open", "current_turn_doc"],
+      ["docs-viewer.identify_current_doc", "active_doc_identity", "current_turn_doc"],
+      ["docs-viewer.search_docs", "docs_search", "current_turn_doc"],
+      ["docs-viewer.validate_doc_candidates", "doc_candidate_validation", "current_turn_doc"],
       ["docs-viewer.locate_in_doc", "locate_in_doc", "current_turn_doc"],
       ["docs-viewer.summarize_doc", "doc_summary", "current_turn_doc"],
       ["docs-viewer.doc_equation_context", "doc_equation_context", "current_turn_doc"],
@@ -49,17 +58,51 @@ describe("Helix capability contract arbitration", () => {
       ["live_env.process_live_source_mail", "live_source_mailbox_review", "live_source_mail"],
       ["live_env.reflect_live_source_mail_loop", "live_source_mailbox_review", "live_source_mail"],
       ["live_env.query_micro_reasoner_presets", "live_source_mailbox_review", "live_source_mail"],
+      ["live_env.query_micro_reasoner_prompts", "live_source_mailbox_review", "live_source_mail"],
       ["live_env.draft_micro_reasoner_preset", "live_source_mailbox_review", "live_source_mail"],
       ["live_env.route_micro_reasoner_prompt", "live_source_mailbox_review", "live_source_mail"],
       ["live_env.query_live_source_quality", "live_source_mailbox_review", "live_source_mail"],
       ["live_env.summarize_live_source_current_state", "live_source_mailbox_review", "live_source_mail"],
+      ["live_env.apply_micro_reasoner_preset", "live_environment_review", "live_environment_state"],
+      ["live_env.create_micro_reasoner_preset", "live_environment_review", "live_environment_state"],
+      ["live_env.update_micro_reasoner_prompt", "live_environment_review", "live_environment_state"],
+      ["live_env.test_micro_reasoner_prompt", "live_environment_review", "live_environment_state"],
+      ["live_env.read_card", "live_environment_review", "live_environment_state"],
+      ["live_env.query_event_log", "live_environment_review", "live_environment_state"],
+      ["live_env.query_world_events", "live_environment_review", "live_environment_state"],
+      ["live_env.query_navigation_state", "live_environment_review", "live_environment_state"],
+      ["live_env.plan_stage_play_job", "live_environment_review", "live_environment_state"],
+      ["live_env.configure_visual_observer_profile", "live_environment_review", "live_environment_state"],
+      ["live_env.apply_visual_observer_profile", "live_environment_review", "live_environment_state"],
+      ["live_env.query_visual_observer_profiles", "live_environment_review", "live_environment_state"],
+      ["live_env.test_visual_observer_profile", "live_environment_review", "live_environment_state"],
+      ["live_env.compare_visual_observer_profiles", "live_environment_review", "live_environment_state"],
+      ["live_env.request_visual_action_replay", "live_environment_review", "live_environment_state"],
+      ["live_env.configure_interpreter_profile", "live_environment_review", "live_environment_state"],
+      ["live_env.compare_mail_to_interpreter_profile", "live_environment_review", "live_environment_state"],
+      ["live_env.request_stage_play_checkpoint", "live_environment_review", "live_environment_state"],
+      ["live_env.predict_live_source_immediate", "live_environment_review", "live_environment_state"],
+      ["live_env.compare_live_source_prediction", "live_environment_review", "live_environment_state"],
+      ["live_env.project_live_source_narrative", "live_environment_review", "live_environment_state"],
       ["live_env.record_live_source_mail_decision", "processed_mail_voice_decision", "live_source_mail"],
       ["live_env.request_interim_voice_callout", "processed_mail_voice_decision", "live_environment_state"],
+      ["workstation-notes.append_to_note", "workstation_note_edit", "workspace_state"],
+      ["workstation-notes.create_note", "workstation_note_edit", "workspace_state"],
+      ["workstation-notes.open", "workstation_note_open", "workspace_state"],
     ] as const;
 
     for (const [capability, goalKind, answerScope] of cases) {
       expect(canonicalGoalKindForExplicitCapability(capability), capability).toBe(goalKind);
       expect(answerScopeForExplicitCapability(capability), capability).toBe(answerScope);
+    }
+  });
+
+  it("keeps every explicit capability contract mapped to a canonical goal and answer scope", () => {
+    for (const contract of explicitCapabilityContractsForTests) {
+      expect(canonicalGoalKindForExplicitCapability(contract.capability), contract.capability)
+        .toEqual(expect.any(String));
+      expect(answerScopeForExplicitCapability(contract.capability), contract.capability)
+        .toEqual(expect.any(String));
     }
   });
 

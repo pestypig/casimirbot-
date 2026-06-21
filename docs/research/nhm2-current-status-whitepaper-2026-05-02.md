@@ -18,6 +18,10 @@ The June pass-path / smoke-chain state should be read as pinned local evidence, 
 
 The Lean formalization lane is now a certificate-backed claim-boundary bridge. The runtime exporter `tools/nhm2/emit-lean-campaign-certificate.ts` reads the current `0p7000_observer_compatible_source` campaign artifacts and emits exact rational / Boolean proof facts into `formal/lean/NHM2Formal/Generated/CurrentCampaignCertificate.lean`. Lean verifies diagnostic campaign admissibility from the emitted certificate through the chain: runtime campaign artifacts -> certificate export -> Lean verification -> diagnostic admissibility -> claim locks remain closed. Physical viability, route ETA, propulsion, transport, material credibility, and speed-authority locks remain closed. This still does not verify the floating-point GR/tensor solver from scratch and does not replace runtime artifacts or external physical validation.
 
+The next solve-campaign layer is therefore a physical evidence campaign, not a stronger reading of the diagnostic campaign. `nhm2_physical_viability_campaign/v1` treats the current diagnostic campaign and Lean certificate as upstream inputs, then asks for experimental receipts: pre-registered predictions, tile metrology, closed tile energy cycles, array scaling, full apparatus stress-energy, vacuum-weight response, invariant metric response, bounded prototype replication, and neutral-test-system transport precursors. In the current repo state those stages are unattempted or planned evidence rows, so `physicalViabilityClaimAllowed=false` and `transportClaimAllowed=false` remain hard claim locks.
+
+The experiment-facing theory roadmap makes that next layer more explicit. `nhm2_experiment_facing_theory_roadmap/v1` lists the pre-hardware solves that must be frozen before any apparatus result can be reviewed: predicted `Delta T_mu_nu(x,t)`, optical phase, clock shift, force transfer, weak metric-response bounds, null controls, tile metrology observables, full apparatus `T00/T0i/Tij`, vacuum-weight signatures, QEI/worldline receipts, observer-family energy-condition checks, and independent replication / falsification handling. Its research anchors include dynamical-Casimir energy accounting, regulated Casimir gravitational mass, real-material Lifshitz and arbitrary-geometry Casimir computation, patch-potential systematics, Archimedes-style vacuum-weight balances, LIGO sensitivity scale comparisons, silicon Casimir metrology, millimetre-scale gravitational coupling, Pfenning-Ford warp QI limits, stationary-worldline QEIs, and generic-warp NEC caution. This roadmap is not an experimental success receipt. It is a typed planning surface that says what has to be predicted, measured, bounded, or falsified before physical evidence can be reviewed.
+
 ## Executive scientific claim boundary
 
 NHM2 is treated here as a repository-measured 3+1 same-chart metric-evaluation framework. The paper does not claim physical viability, experimental validation, max speed, route ETA, black-hole operation, arbitrary external-field operation, strong-field survivability, or lower-alpha profile promotion. Repository artifacts define which NHM2 rows are pass-level under a named contract, review-level, diagnostic, runtime-blocked, or unsupported.
@@ -844,6 +848,17 @@ qei_{\rm margin}=qei_{\rm bound}-qei_{\rm sample}.
 \land \mathrm{ClaimLocksClosed}.
 \]
 
+<!-- helix-doc-equation-action/v1 id=nhm2-physical-evidence-campaign-ladder -->
+
+\[
+\mathrm{DiagnosticCampaignAdmissible}
+\rightarrow \mathrm{PredictionFreeze}
+\rightarrow \mathrm{TileMetrology}
+\rightarrow \mathrm{VacuumWeight}
+\rightarrow \mathrm{MetricResponse}
+\rightarrow \mathrm{TransportPrecursor}.
+\]
+
 ## 6. Centerline-lapse clocking calculation
 
 ### 6.1 General 3+1 normalization
@@ -1133,6 +1148,52 @@ That would still not automatically imply experimental propulsion, ambient causal
 
 The next useful whitepaper update after this one should not be based on better mission-time numbers. It should be based on a frozen ledger whose primary blocker has moved from `tile_counterpart` to a later, more physical surface such as `qei`, `conservation_unknown`, or `residual_exceeded`. That would mean the semantic counterpart problem has been replaced by an auditable physics or numerical mismatch.
 
+## 9. Experiment-facing physical evidence campaign
+
+This section turns the physical-evidence ladder into a next-work map. It does not add a new NHM2 pass result. It explains what each experiment-facing solve must predict, measure, falsify, and receipt before hardware evidence can be reviewed. The corresponding runtime contract is `nhm2_experiment_facing_theory_roadmap/v1`; its scalar calculator rows are sanity checks only.
+
+<!-- helix-doc-equation-action/v1 id=nhm2-experiment-facing-theory-roadmap -->
+
+\[
+\mathrm{PredictionFreeze}\rightarrow\mathrm{TileMetrology}\rightarrow\mathrm{EnergyLedger}\rightarrow\mathrm{ArrayScaling}\rightarrow T_{\mu\nu}^{apparatus}\rightarrow\mathrm{VacuumWeight}\rightarrow\mathrm{MetricResponse}.
+\]
+
+### 9.1 Stage 0: prediction freeze
+
+The first experiment is a document and artifact discipline: freeze predictions before data exist. A useful prediction freeze must declare `Delta T_mu_nu(x,t)`, optical phase response `delta_phi(f)`, clock shift `delta_tau`, force transfer `delta_F`, weak metric-response bounds, null controls, and uncertainty budget. Its falsifiers include post-hoc parameter fitting, sign or phase changes after data collection, and missing null controls. This stage draws on the current diagnostic campaign artifacts, the Casimir gravitational-mass literature, LIGO-scale sensitivity comparisons, and millimetre-scale gravitational-coupling metrology as planning references. A prediction freeze can start an experiment campaign; it is not experimental success.
+
+### 9.2 Stage 1: tile metrology
+
+Tile metrology asks whether a fabricated or proposed tile has a real-material source model. Required observables include calibrated gap, force-versus-distance, dielectric response, finite-conductivity and finite-temperature inputs, roughness, patch-potential maps, hysteresis, creep, pull-in, heat, and mechanical loss. The expected receipts are gap metrology, dielectric response, roughness, patch-potential, and force-gap curve receipts. The key falsifiers are a Lifshitz/material model outside uncertainty, patch potentials dominating the measured force delta, or unbounded mechanical hysteresis. Real-material Casimir reviews, arbitrary-material Casimir computation, lithographic silicon Casimir force sensors, and patch-potential metrology are the relevant references. This stage can establish a tile mechanism candidate, not a macroscopic spacetime source.
+
+### 9.3 Stage 2: cycle energy balance
+
+The cycle ledger must close electrical input, mechanical work, heat, radiation, elastic energy, and losses for a full modulation cycle. Dynamical Casimir observations are useful here because real emitted energy comes from driven boundary conditions, not free energy. The scalar rows `Delta m = DeltaE/c^2` and `Delta F = g DeltaE/c^2` may be loaded into the calculator as scale checks, but they cannot substitute for a cycle energy receipt. Falsifiers include an unclosed energy ledger, an apparent output that tracks a drive artifact, or an unbounded thermal or elastic channel.
+
+### 9.4 Stage 3: array scaling
+
+Array scaling asks whether one-tile behavior survives when the source is expanded to tens, hundreds, and larger modules. The core sanity scalar is `array_scaling = DeltaE_N/(N DeltaE_1)`, but the real receipt must also bound cross-coupling, heat flow, screening, coupled modes, elastic stresses, support energy, and geometry corrections. A successful array stage would show predictive scaling and a bounded support model. A failure here means the scalar tile count cannot be lifted into a hull-scale source tensor.
+
+### 9.5 Stage 4: full apparatus tensor
+
+The source of curvature is the whole apparatus, not only the ideal negative interaction energy between plates. The full apparatus tensor stage must derive source-side `T00`, momentum density `T0i`, diagonal spatial stresses, and off-diagonal spatial stresses, including plates, supports, drive fields, elastic stresses, and Casimir interaction energy. Required receipts include a full apparatus tensor, component authority ledger, same-basis metadata, and no metric-target echo. Diagonal-only evidence, omitted supports, omitted drive-field momentum, or a tensor fitted from the metric-required target are blockers. This is where a tile model becomes eligible to be compared with the NHM2 metric-required tensor.
+
+### 9.6 Stage 5: vacuum-weight test
+
+The first directly gravitational source experiment should test whether a controlled vacuum-related energy change weighs as `Delta F = g DeltaE/c^2`, with correct sign, phase, scaling, and orientation. The Archimedes-style balance program is the closest planning reference: use active and dummy samples, lock-in readout, thermal and electromagnetic null channels, orientation reversals, and independent replication. A positive result would test ordinary gravitational coupling of a controlled energy difference. It would still not prove NHM2 physical viability, because physical viability requires the longer source-to-geometry bridge.
+
+### 9.7 Stage 6: invariant metric response
+
+Metric response is not established by one optical phase line. A credible metric-response experiment needs multiple probe families, such as optical phase, clock or atom response, and mechanical free-mass response, to agree with one predicted local metric model. The weak-field calculator row `h00_proxy = 2G DeltaE/(r c^4)` is only a sensitivity triage bound. Scharnhorst-style light propagation between plates is a boundary-QED caution, not NHM2 gravity evidence. Falsifiers include a wavelength- or polarization-specific optical artifact, a single-probe-only response, or a predicted signal far below the detector noise floor without a credible sensitivity plan.
+
+### 9.8 Stage 7: QEI and observer admissibility
+
+Any measured or simulated apparatus tensor must still pass QEI and observer-family admissibility. The QEI side needs worldline sampling functions, sampled density, bound provenance, tau consistency, and region coverage. The observer side needs WEC/NEC/SEC/DEC checks beyond a friendly Eulerian frame, with a robust observer-family method or equivalent algebraic receipt. Pfenning-Ford warp QI limits, stationary-worldline QEI work, and generic-warp NEC analyses are caution rails. Falsifiers include scalar `qei_margin` without worldlines, Eulerian-only energy-condition language, or a non-Eulerian observer-family violation.
+
+### 9.9 Stage 8: independent replication and falsification
+
+Independent replication is a stage, not an afterthought. A positive local result remains unpromoted until a separate apparatus and analysis team reproduces the amplitude, phase, sign, scaling, spatial falloff, and null-control behavior. A null result is also useful if it reaches pre-registered sensitivity: it can falsify a tile model, array scaling law, vacuum-weight prediction, metric-response claim, or NHM2 source architecture. The artifact should record the falsified model ID rather than merely saying "no signal." Until replication and falsification disposition exist, physical viability and transport claim locks remain closed.
+
 ## Appendix A. Repository artifact status and claim-tier table
 
 The detailed implementation state belongs in an appendix because it is evidence metadata, not the scientific argument itself.
@@ -1396,6 +1457,8 @@ This artifact, `nhm2_full_solve_claim_admission/v1`, formalizes the boundary bet
 | `nhm2_campaign_profile_search/v1` | campaign profile-search sidecar | screens candidate profiles against the current projected `T0i` frontier and ranks only candidates that reduce the metric-momentum blocker | steering surface only; screen pass requires a full frozen campaign run and does not validate a profile |
 | `nhm2_profile_campaign_frontier/v1` | campaign profile-frontier sidecar | ranks generated campaign profiles and records the fastest diagnostic campaign-admissible profile, blocked profile, rejected profile, first blocker, and claim locks | diagnostic frontier only; no physical viability, route ETA, transport, propulsion, or speed authority |
 | `nhm2_time_dependent_source_campaign/v1` | frozen time-dependent source campaign harness | checks source independence, switching conservation, frequency convergence, dynamic/effective geometry agreement, full regional tensor closure, observer-family checks, QEI receipts, and stability | campaign pass is diagnostic and artifact-scoped; not material-source proof, physical viability, route ETA, transport, propulsion, or speed authority |
+| `nhm2_physical_viability_campaign/v1` | downstream physical evidence campaign | tracks prediction freeze, tile metrology, energy-cycle balance, array scaling, full apparatus tensor, vacuum-weight, metric-response, replication, and transport-precursor receipts | diagnostic campaign and Lean certificate are inputs only; physical and transport claim locks remain closed until experimental receipts exist |
+| `nhm2_experiment_facing_theory_roadmap/v1` | pre-hardware theory solve roadmap | lists required observables, receipts, falsifiers, scalar sanity checks, and research anchors for prediction freeze, tile metrology, cycle energy balance, array scaling, full apparatus tensor, vacuum-weight, metric response, QEI/observer admissibility, and independent replication | roadmap/planning only; scalar checks, diagnostic campaign pass, and Lean certificate cannot substitute for experimental receipts |
 | `nhm2_candidate_metric_profile_spec/v1` | candidate metric profile spec sidecar | records profile levers, diagnostic clocking replay, executable geometry refs, ADM-route entry state, and campaign clocking quantities such as `tau = alpha_centerline * T_coordinate` | profile-definition and ADM-entry governance only; trip clocking is not route ETA, speed, transport, propulsion, or physical viability |
 | `nhm2_campaign_profile_run_manifest/v1` | campaign profile run-manifest sidecar | turns screened candidate profiles into generated campaign evidence rows and next-run roots | evidence governance only; generated local rows do not replace external reproduction or physical validation |
 | `nhm2_observer_robust_energy_conditions/v1` | observer-family energy-condition scope | separates Eulerian-only checks from robust-family checks | no continuous-optimizer claim unless implemented |

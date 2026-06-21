@@ -16,6 +16,17 @@ import { HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION } from "../serv
 
 type RecordLike = Record<string, unknown>;
 
+const LIVE_SPINE_COMPOUND_STRING_OR_NULL_FIELDS = [
+  "first_incomplete_compound_subgoal_id",
+  "first_incomplete_compound_requested_capability",
+  "first_incomplete_compound_runtime_capability",
+  "first_incomplete_compound_selected_capability",
+  "first_incomplete_compound_executed_capability",
+  "compound_first_broken_rail",
+  "compound_rail_failure_code",
+  "compound_repair_target",
+] as const satisfies readonly (typeof CODEX_PARITY_AGENT_SPINE_COMPOUND_STRING_OR_NULL_FIELDS)[number][];
+
 type Verdict = "PASS" | "FAIL";
 type ExpectedValue = string | null | Array<string | null>;
 export type LiveSpineCoverage =
@@ -838,7 +849,7 @@ const RAIL_MIRROR_COMPARISON_FIELDS = [
   "rail_status",
   "rail_failure_code",
   "compound_subgoal_count",
-  ...CODEX_PARITY_AGENT_SPINE_COMPOUND_STRING_OR_NULL_FIELDS,
+  ...LIVE_SPINE_COMPOUND_STRING_OR_NULL_FIELDS,
   "compound_incomplete_subgoal_did_tool_run",
   "normalized_codex_parity_classes",
   "assistant_answer",

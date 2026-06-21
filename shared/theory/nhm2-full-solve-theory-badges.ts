@@ -100,6 +100,32 @@ const NHM2_LEAN_CERTIFICATE_TEST =
   "tests/nhm2/lean-campaign-certificate.spec.ts";
 const NHM2_LEAN_CERTIFICATE_CHECK_COMMAND =
   "npm run formal:nhm2:certificate:check";
+const NHM2_PHYSICAL_VIABILITY_CAMPAIGN =
+  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-physical-viability-campaign.json`;
+const NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT =
+  "shared/contracts/nhm2-physical-viability-campaign.v1.ts";
+const NHM2_EXPERIMENT_FACING_THEORY_ROADMAP =
+  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-experiment-facing-theory-roadmap.json`;
+const NHM2_EXPERIMENT_FACING_THEORY_ROADMAP_CONTRACT =
+  "shared/contracts/nhm2-experiment-facing-theory-roadmap.v1.ts";
+const NHM2_RESEARCH_DYNAMICAL_CASIMIR_NATURE_2011 =
+  "https://www.nature.com/articles/nature10561";
+const NHM2_RESEARCH_CASIMIR_GRAVITATIONAL_MASS = "https://arxiv.org/abs/0710.3841";
+const NHM2_RESEARCH_SCHARNHORST_CAUTION =
+  "https://www.sciencedirect.com/science/article/pii/037026939090997K";
+const NHM2_RESEARCH_ARCHIMEDES_BALANCE_PROTOTYPE =
+  "https://link.springer.com/article/10.1140/epjp/s13360-024-04920-x";
+const NHM2_RESEARCH_ARCHIMEDES_2025_STATUS = "https://iris.uniss.it/handle/11388/372656";
+const NHM2_RESEARCH_ADVANCED_LIGO_SENSITIVITY = "https://dcc.ligo.org/LIGO-P1500260/public";
+const NHM2_RESEARCH_SILICON_CASIMIR_CHIP = "https://www.nature.com/articles/ncomms2842";
+const NHM2_RESEARCH_PATCH_POTENTIALS = "https://arxiv.org/abs/1409.5012";
+const NHM2_RESEARCH_MILLIMETRE_GRAVITY =
+  "https://www.nature.com/articles/s41586-021-03250-7";
+const NHM2_RESEARCH_PFENNING_FORD_QI = "https://arxiv.org/abs/gr-qc/9702026";
+const NHM2_RESEARCH_REAL_MATERIAL_CASIMIR = "https://arxiv.org/abs/0902.4022";
+const NHM2_RESEARCH_ARBITRARY_MATERIAL_CASIMIR = "https://arxiv.org/abs/1010.5539";
+const NHM2_RESEARCH_STATIONARY_WORLDLINE_QEI = "https://arxiv.org/abs/2301.01698";
+const NHM2_RESEARCH_GENERIC_WARP_NEC = "https://arxiv.org/abs/2105.03079";
 
 const NHM2_FULL_SOLVE_BOUNDARY: TheoryBadgeClaimBoundaryV1 = {
   diagnosticOnly: true,
@@ -134,6 +160,13 @@ const artifactRef = (path: string, id?: string, note?: string): TheoryBadgeV1["s
   kind: "artifact",
   path,
   id: id ?? null,
+  note: note ?? null,
+});
+
+const literatureRef = (path: string, id: string, note?: string): TheoryBadgeV1["sourceRefs"][number] => ({
+  kind: "literature_ref",
+  path,
+  id,
   note: note ?? null,
 });
 
@@ -2282,6 +2315,753 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   nhm2FullSolveBadge({
+    id: "nhm2.experimental.physical_viability_campaign",
+    title: "Physical Evidence Campaign",
+    plainMeaning:
+      "Tracks the experimental evidence ladder required after diagnostic campaign admission: prediction freeze, tile metrology, array scaling, vacuum weight, metric response, bounded prototype, and transport precursor.",
+    whyItMatters:
+      "It prevents the diagnostic campaign pass from being mistaken for fabricated-source or transport evidence.",
+    subjects: ["nhm2", "experiment", "physical_viability", "claim_boundary"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    equationFamilies: ["physical_viability_campaign", "experimental_receipts"],
+    tags: ["experimental_ladder", "claim_boundary", "runtime_reference", "noncomputable_reference"],
+    equations: [
+      {
+        id: "physical_viability_campaign_ladder",
+        role: "noncomputable_reference",
+        displayLatex:
+          "\\mathrm{DiagnosticCampaign}\\rightarrow\\mathrm{PredictionFreeze}\\rightarrow\\mathrm{TileMetrology}\\rightarrow\\mathrm{VacuumWeight}\\rightarrow\\mathrm{MetricResponse}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["DiagnosticCampaign", "ExperimentalReceipts"],
+        outputSymbols: ["PhysicalEvidenceCampaignStatus"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "The current diagnostic campaign can feed this ladder but cannot substitute for experimental receipts.",
+      "Current state is blocked until prediction, metrology, scaling, vacuum-weight, metric-response, and replication receipts exist.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      repoRef(
+        NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT,
+        "nhm2_physical_viability_campaign/v1",
+        "Typed physical evidence campaign contract.",
+      ),
+      repoRef(
+        NHM2_EXPERIMENT_FACING_THEORY_ROADMAP_CONTRACT,
+        "nhm2_experiment_facing_theory_roadmap/v1",
+        "Pre-hardware theory solve roadmap consumed by this campaign.",
+      ),
+      artifactRef(
+        NHM2_PHYSICAL_VIABILITY_CAMPAIGN,
+        "physical-viability-campaign-target",
+        "Expected runtime artifact target for the physical evidence ladder.",
+      ),
+      artifactRef(
+        NHM2_EXPERIMENT_FACING_THEORY_ROADMAP,
+        "experiment-facing-theory-roadmap-target",
+        "Expected roadmap artifact target for planning observables and falsifiers.",
+      ),
+      artifactRef(
+        `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-time-dependent-source-campaign.json`,
+        "diagnostic-campaign-input",
+        "Diagnostic campaign input; not a physical evidence substitute.",
+      ),
+      artifactRef(
+        NHM2_LEAN_CAMPAIGN_CERTIFICATE,
+        "lean-diagnostic-certificate-input",
+        "Formal diagnostic admissibility certificate; claim locks remain closed.",
+      ),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "physical-evidence-campaign-ladder",
+        "Whitepaper physical/experimental evidence ladder.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "experiment", "physical_viability", "claim_boundary"],
+      symbols: ["PhysicalEvidenceCampaignStatus", "ExperimentalReceipts"],
+      unitSignatures: [],
+      repoPaths: [
+        NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT,
+        NHM2_EXPERIMENT_FACING_THEORY_ROADMAP_CONTRACT,
+        NHM2_PHYSICAL_VIABILITY_CAMPAIGN,
+        NHM2_EXPERIMENT_FACING_THEORY_ROADMAP,
+        `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-time-dependent-source-campaign.json`,
+        NHM2_LEAN_CAMPAIGN_CERTIFICATE,
+        NHM2_FULL_SOLVE_WHITEPAPER,
+      ],
+      equationFamilies: ["physical_viability_campaign", "experimental_receipts"],
+      simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.experimental.theory_solve_roadmap",
+    title: "Experiment-Facing Theory Solve Roadmap",
+    plainMeaning:
+      "Defines the pre-hardware theory solves, observables, falsifiers, receipts, and scalar sanity checks needed before NHM2 physical evidence can be reviewed.",
+    whyItMatters:
+      "It turns the physical campaign into falsifiable experimental planning instead of allowing diagnostic, Lean, or scalar rows to stand in for material evidence.",
+    subjects: ["nhm2", "experiment", "roadmap", "falsifier", "claim_boundary"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    equationFamilies: ["experiment_facing_theory_roadmap", "physical_viability_campaign"],
+    tags: ["experimental_ladder", "roadmap", "runtime_reference", "noncomputable_reference"],
+    equations: [
+      {
+        id: "experiment_facing_solve_chain",
+        role: "noncomputable_reference",
+        displayLatex:
+          "\\mathrm{PredictionFreeze}\\rightarrow\\mathrm{TileMetrology}\\rightarrow\\mathrm{EnergyLedger}\\rightarrow\\mathrm{ArrayScaling}\\rightarrow T_{\\mu\\nu}^{apparatus}\\rightarrow\\mathrm{MetricResponse}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["ExperimentalPlan", "Receipts", "Falsifiers"],
+        outputSymbols: ["TheoryRoadmapStatus"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "The roadmap is an experiment-planning artifact; it does not certify that any source has been fabricated or measured.",
+      "Only scalar sanity checks are calculator-loadable; tile, tensor, QEI, observer, metric-response, and replication rows require runtime receipts.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      repoRef(
+        NHM2_EXPERIMENT_FACING_THEORY_ROADMAP_CONTRACT,
+        "nhm2_experiment_facing_theory_roadmap/v1",
+        "Typed roadmap for experiment-facing theoretical solves.",
+      ),
+      artifactRef(
+        NHM2_EXPERIMENT_FACING_THEORY_ROADMAP,
+        "experiment-facing-theory-roadmap-target",
+        "Expected roadmap artifact target; missing receipts remain blockers.",
+      ),
+      repoRef(
+        NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT,
+        "nhm2_physical_viability_campaign/v1",
+        "Physical evidence campaign consumed by the roadmap.",
+      ),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "physical-evidence-campaign-ladder",
+        "Whitepaper section that exposes the experimental ladder.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_DYNAMICAL_CASIMIR_NATURE_2011,
+        "nature_2011_dynamical_casimir_effect",
+        "Dynamical Casimir energy comes from driven boundary conditions.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_CASIMIR_GRAVITATIONAL_MASS,
+        "arxiv_0710_3841_casimir_gravitational_inertial_mass",
+        "Whole regulated apparatus energy is the gravitational source.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_REAL_MATERIAL_CASIMIR,
+        "arxiv_0902_4022_real_material_casimir_review",
+        "Real-material Lifshitz/Casimir metrology constraints.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_ARBITRARY_MATERIAL_CASIMIR,
+        "arxiv_1010_5539_arbitrary_material_casimir",
+        "Arbitrary material and geometry Casimir computation.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_PATCH_POTENTIALS,
+        "arxiv_1409_5012_patch_potentials",
+        "Patch potentials as a Casimir metrology systematic.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_ARCHIMEDES_BALANCE_PROTOTYPE,
+        "epjp_2024_archimedes_balance_prototype",
+        "Vacuum-weight balance sensitivity planning.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_ARCHIMEDES_2025_STATUS,
+        "archimedes_2025_status",
+        "Current Archimedes development status.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_ADVANCED_LIGO_SENSITIVITY,
+        "ligo_p1500260_advanced_ligo_sensitivity",
+        "Detector sensitivity comparison for metric-response bounds.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_SILICON_CASIMIR_CHIP,
+        "nature_communications_2013_silicon_casimir_chip",
+        "Lithographic Casimir force sensor precedent.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_MILLIMETRE_GRAVITY,
+        "nature_2021_millimetre_scale_gravitational_coupling",
+        "Small-source gravitational coupling metrology precedent.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_PFENNING_FORD_QI,
+        "gr-qc_9702026_pfenning_ford_warp_qi",
+        "QEI constraints on warp-drive negative energy.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_STATIONARY_WORLDLINE_QEI,
+        "arxiv_2301_01698_stationary_worldline_qei",
+        "Worldline QEI bound planning reference.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_GENERIC_WARP_NEC,
+        "arxiv_2105_03079_generic_warp_nec",
+        "Observer-family energy-condition caution.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_SCHARNHORST_CAUTION,
+        "scharnhorst_light_between_plates_caution",
+        "Boundary-QED light propagation is not itself NHM2 gravity evidence.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "experiment", "roadmap", "falsifier", "claim_boundary"],
+      symbols: ["DeltaTmunu", "delta_phi", "delta_tau", "DeltaF", "h00_proxy", "QEI"],
+      unitSignatures: ["J", "N", "Pa", "s"],
+      repoPaths: [
+        NHM2_EXPERIMENT_FACING_THEORY_ROADMAP_CONTRACT,
+        NHM2_EXPERIMENT_FACING_THEORY_ROADMAP,
+        NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT,
+        NHM2_FULL_SOLVE_WHITEPAPER,
+      ],
+      equationFamilies: ["experiment_facing_theory_roadmap", "physical_viability_campaign"],
+      simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.experimental.prediction_freeze",
+    title: "Experimental Prediction Freeze",
+    plainMeaning:
+      "Requires pre-registered source, metric-response, force, phase, clock, and falsifier predictions before experimental data are used.",
+    whyItMatters:
+      "It prevents fitting material or source parameters after the fact to imitate NHM2 closure.",
+    subjects: ["nhm2", "experiment", "prediction_freeze", "falsifier"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    equationFamilies: ["physical_viability_campaign", "prediction_freeze"],
+    tags: ["experimental_ladder", "falsifier", "noncomputable_reference"],
+    equations: [
+      {
+        id: "prediction_freeze_receipt",
+        role: "noncomputable_reference",
+        displayLatex:
+          "\\Delta T_{\\mu\\nu}(x,t),\\delta\\phi,\\delta\\tau,R_{\\hat0\\hat i\\hat0\\hat j}\\ \\mathrm{frozen\\ before\\ data}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["DeltaTmunu", "observables", "falsifiers"],
+        outputSymbols: ["PredictionFreezeReceipt"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Predictions must be frozen before data collection; post-hoc fitting is a blocker.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "stage0_prediction_freeze")],
+    hintKeys: {
+      subjects: ["nhm2", "experiment", "prediction_freeze", "falsifier"],
+      symbols: ["DeltaTmunu", "delta_phi", "delta_tau", "R_0i0j"],
+      unitSignatures: [],
+      repoPaths: [NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT],
+      equationFamilies: ["physical_viability_campaign", "prediction_freeze"],
+      simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.experimental.tile_force_receipt",
+    title: "Tile Force Receipt",
+    plainMeaning:
+      "Requires measured force-versus-gap/material/temperature behavior for the fabricated tile before it can support source credibility.",
+    whyItMatters:
+      "A Casimir tile is an intensely stressed nanogap apparatus; ideal scalar plate math is not enough.",
+    subjects: ["nhm2", "casimir", "tile_metrology", "experiment"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "casimir"],
+    equationFamilies: ["tile_metrology", "physical_viability_campaign"],
+    tags: ["experimental_ladder", "tile_metrology", "runtime_reference"],
+    equations: [
+      {
+        id: "tile_force_receipt_curve",
+        role: "noncomputable_reference",
+        displayLatex: "F(a,T,\\epsilon,roughness,patches)\\ \\mathrm{measured}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["gap", "temperature", "dielectricResponse", "roughness", "patchPotential"],
+        outputSymbols: ["TileForceReceipt"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Measured force, dielectric response, roughness, patch potentials, and energy-cycle closure are required before material-source credibility can be reviewed.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "stage1_tile_metrology"),
+      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "tile-metrology"),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "casimir", "tile_metrology", "experiment"],
+      symbols: ["F_gap", "dielectricResponse", "roughness", "patchPotential"],
+      unitSignatures: ["N", "m", "K"],
+      repoPaths: [NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, NHM2_FULL_SOLVE_WHITEPAPER],
+      equationFamilies: ["tile_metrology", "physical_viability_campaign"],
+      simulationOwners: ["NHM2", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.experimental.tile_cycle_energy_balance",
+    title: "Tile Cycle Energy Balance",
+    plainMeaning:
+      "Tracks the full cyclic energy ledger for a modulated tile, including input work, heat, radiation, elastic energy, and losses.",
+    whyItMatters:
+      "The Casimir source should be framed as controlled energy conversion, not free energy creation.",
+    subjects: ["nhm2", "casimir", "energy_balance", "experiment"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "casimir"],
+    equationFamilies: ["energy_balance", "physical_viability_campaign"],
+    tags: ["experimental_ladder", "calculator_scalar", "energy_ledger"],
+    equations: [
+      {
+        id: "mass_equivalent_energy_delta",
+        role: "calculator_demo",
+        displayLatex: "\\Delta m=\\Delta E/c^2",
+        computableExpression: "delta_m = DeltaE/c^2",
+        operatorKind: "scalar_expression",
+        inputSymbols: ["DeltaE", "c"],
+        outputSymbols: ["delta_m"],
+      },
+      {
+        id: "weight_equivalent_energy_delta",
+        role: "calculator_demo",
+        displayLatex: "\\Delta F=g\\Delta E/c^2",
+        computableExpression: "delta_F = g*DeltaE/c^2",
+        operatorKind: "scalar_expression",
+        inputSymbols: ["g", "DeltaE", "c"],
+        outputSymbols: ["delta_F"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Scalar energy conversion rows are sanity checks and cannot substitute for full apparatus stress-energy receipts.",
+    ],
+    calculatorPayloads: [
+      payload({
+        id: "delta_m_energy_equivalent_payload",
+        expression: "delta_m = DeltaE/c^2",
+        displayLatex: "\\Delta m=\\Delta E/c^2",
+        targetVariable: "delta_m",
+      }),
+      payload({
+        id: "delta_F_weight_equivalent_payload",
+        expression: "delta_F = g*DeltaE/c^2",
+        displayLatex: "\\Delta F=g\\Delta E/c^2",
+        targetVariable: "delta_F",
+      }),
+    ],
+    sourceRefs: [
+      repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "tile_cycle_energy_balance"),
+      docRef(NHM2_FULL_SOLVE_WHITEPAPER, "energy-conversion-not-creation"),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "casimir", "energy_balance", "experiment"],
+      symbols: ["DeltaE", "delta_m", "delta_F"],
+      unitSignatures: ["J", "kg", "N"],
+      repoPaths: [NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, NHM2_FULL_SOLVE_WHITEPAPER],
+      equationFamilies: ["energy_balance", "physical_viability_campaign"],
+      simulationOwners: ["NHM2", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.experimental.array_scaling",
+    title: "Array Scaling Receipt",
+    plainMeaning:
+      "Requires measured scaling from one cavity to arrays while bounding cross-coupling, heat, elastic stress, and geometry effects.",
+    whyItMatters:
+      "A full hull source cannot assume that many ideal cavities scale linearly without measurement.",
+    subjects: ["nhm2", "casimir", "array_scaling", "experiment"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "casimir"],
+    equationFamilies: ["array_scaling", "physical_viability_campaign"],
+    tags: ["experimental_ladder", "calculator_scalar", "array_scaling"],
+    equations: [
+      {
+        id: "array_scaling_ratio",
+        role: "calculator_demo",
+        displayLatex: "S_N=\\Delta E_N/(N\\Delta E_1)",
+        computableExpression: "array_scaling = DeltaE_N/(N*DeltaE_1)",
+        operatorKind: "scalar_expression",
+        inputSymbols: ["DeltaE_N", "N", "DeltaE_1"],
+        outputSymbols: ["array_scaling"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Array scaling must be measured; cross-cavity corrections and support stresses are not optional.",
+    ],
+    calculatorPayloads: [
+      payload({
+        id: "array_scaling_ratio_payload",
+        expression: "array_scaling = DeltaE_N/(N*DeltaE_1)",
+        displayLatex: "S_N=\\Delta E_N/(N\\Delta E_1)",
+        targetVariable: "array_scaling",
+      }),
+    ],
+    sourceRefs: [repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "stage2_array_scaling")],
+    hintKeys: {
+      subjects: ["nhm2", "casimir", "array_scaling", "experiment"],
+      symbols: ["DeltaE_N", "DeltaE_1", "N", "array_scaling"],
+      unitSignatures: ["J"],
+      repoPaths: [NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT],
+      equationFamilies: ["array_scaling", "physical_viability_campaign"],
+      simulationOwners: ["NHM2", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.experimental.full_apparatus_tensor",
+    title: "Full Apparatus Tensor",
+    plainMeaning:
+      "Requires a material/source tensor for the whole apparatus, including plates, supports, fields, stresses, heat, and interaction energy.",
+    whyItMatters:
+      "GR sources the full apparatus stress-energy, not only the negative ideal interaction-energy row.",
+    subjects: ["nhm2", "stress_energy", "apparatus_tensor", "experiment"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    equationFamilies: ["full_apparatus_tensor", "physical_viability_campaign"],
+    tags: ["experimental_ladder", "full_tensor", "runtime_reference"],
+    equations: [
+      {
+        id: "full_apparatus_tensor_receipt",
+        role: "noncomputable_reference",
+        displayLatex: "T^{apparatus}_{\\hat a\\hat b}=E,J_{\\hat i},S_{\\hat i\\hat j}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["E", "J_i", "S_ij"],
+        outputSymbols: ["T_ab_apparatus"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Full apparatus tensor authority is required before physical source credibility can be reviewed.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "full_apparatus_tensor")],
+    hintKeys: {
+      subjects: ["nhm2", "stress_energy", "apparatus_tensor", "experiment"],
+      symbols: ["T_ab_apparatus", "E", "J_i", "S_ij"],
+      unitSignatures: ["J/m^3", "Pa"],
+      repoPaths: [NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT],
+      equationFamilies: ["full_apparatus_tensor", "physical_viability_campaign"],
+      simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.experimental.vacuum_weight",
+    title: "Vacuum Weight Receipt",
+    plainMeaning:
+      "Requires a modulated vacuum-related energy change with measured weight response, correct phase/sign/scaling, dummy rejection, and independent replication.",
+    whyItMatters:
+      "This is the first genuinely gravitational bridge from controlled source energy to measured gravitational coupling.",
+    subjects: ["nhm2", "casimir", "vacuum_weight", "experiment"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    equationFamilies: ["vacuum_weight", "physical_viability_campaign"],
+    tags: ["experimental_ladder", "runtime_reference", "gravity_coupling"],
+    equations: [
+      {
+        id: "vacuum_weight_receipt",
+        role: "noncomputable_reference",
+        displayLatex: "\\Delta F_{measured}\\stackrel{?}{=}g\\Delta E/c^2",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["DeltaE", "g", "DeltaF_measured"],
+        outputSymbols: ["VacuumWeightReceipt"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "A vacuum-weight receipt must reject thermal, electromagnetic, mechanical, and ordinary-mass dummy paths.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "stage3_vacuum_weight")],
+    hintKeys: {
+      subjects: ["nhm2", "casimir", "vacuum_weight", "experiment"],
+      symbols: ["DeltaF_measured", "DeltaE", "g"],
+      unitSignatures: ["N", "J"],
+      repoPaths: [NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT],
+      equationFamilies: ["vacuum_weight", "physical_viability_campaign"],
+      simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.experimental.metric_upper_bound",
+    title: "Metric Upper Bound Sanity Check",
+    plainMeaning:
+      "Provides a weak-field scale check for source energy near a sensor; it is a sanity bound, not a detector-response model.",
+    whyItMatters:
+      "It keeps LIGO-like or optical-path proposals numerically grounded before they become experimental badges.",
+    subjects: ["nhm2", "metric_response", "weak_field", "experiment"],
+    level: "diagnostic_gate",
+    status: "diagnostic",
+    simulationOwners: ["NHM2", "general_relativity"],
+    equationFamilies: ["metric_upper_bound", "physical_viability_campaign"],
+    tags: ["experimental_ladder", "calculator_scalar", "weak_field"],
+    equations: [
+      {
+        id: "weak_field_h00_proxy",
+        role: "calculator_demo",
+        displayLatex: "h_{00}\\simeq2G\\Delta E/(rc^4)",
+        computableExpression: "h00_proxy = 2*G*DeltaE/(r*c^4)",
+        operatorKind: "scalar_expression",
+        inputSymbols: ["G", "DeltaE", "r", "c"],
+        outputSymbols: ["h00_proxy"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Weak-field scalar bounds are proposal triage only and cannot substitute for invariant metric-response measurements.",
+    ],
+    calculatorPayloads: [
+      payload({
+        id: "h00_proxy_weak_field_payload",
+        expression: "h00_proxy = 2*G*DeltaE/(r*c^4)",
+        displayLatex: "h_{00}\\simeq2G\\Delta E/(rc^4)",
+        targetVariable: "h00_proxy",
+      }),
+    ],
+    sourceRefs: [repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "metric_upper_bound")],
+    hintKeys: {
+      subjects: ["nhm2", "metric_response", "weak_field", "experiment"],
+      symbols: ["h00_proxy", "G", "DeltaE", "r", "c"],
+      unitSignatures: [],
+      repoPaths: [NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT],
+      equationFamilies: ["metric_upper_bound", "physical_viability_campaign"],
+      simulationOwners: ["NHM2", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.experimental.invariant_metric_response",
+    title: "Invariant Metric Response",
+    plainMeaning:
+      "Requires multiple probe families to agree with one predicted local metric response rather than a wavelength- or material-specific artifact.",
+    whyItMatters:
+      "A phase line alone is not evidence of NHM2 geometry unless clock, atom, mechanical, or tidal probes agree with the same metric model.",
+    subjects: ["nhm2", "metric_response", "experiment", "invariant_observable"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity"],
+    equationFamilies: ["metric_response", "physical_viability_campaign"],
+    tags: ["experimental_ladder", "runtime_reference", "invariant_metric"],
+    equations: [
+      {
+        id: "invariant_metric_response_receipt",
+        role: "noncomputable_reference",
+        displayLatex: "\\delta\\phi,\\delta\\tau,\\delta a^{\\hat i}\\rightarrow g_{\\mu\\nu}^{measured}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["delta_phi", "delta_tau", "delta_a"],
+        outputSymbols: ["MetricResponseReceipt"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Thermal, electromagnetic, mechanical, optical-dispersion, and Newtonian paths must be bounded below the reported signal.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "stage4_metric_response")],
+    hintKeys: {
+      subjects: ["nhm2", "metric_response", "experiment", "invariant_observable"],
+      symbols: ["delta_phi", "delta_tau", "delta_a", "g_mu_nu_measured"],
+      unitSignatures: [],
+      repoPaths: [NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT],
+      equationFamilies: ["metric_response", "physical_viability_campaign"],
+      simulationOwners: ["NHM2", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.experimental.geodesic_response",
+    title: "Neutral Geodesic Response",
+    plainMeaning:
+      "Requires a neutral test body or clock worldline response in the predicted direction and magnitude without a conventional force path.",
+    whyItMatters:
+      "This is the first transport-precursor evidence class and must remain separate from route, propulsion, or speed claims.",
+    subjects: ["nhm2", "transport_precursor", "geodesic_response", "experiment"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity"],
+    equationFamilies: ["transport_precursor", "physical_viability_campaign"],
+    tags: ["experimental_ladder", "runtime_reference", "transport_locked"],
+    equations: [
+      {
+        id: "neutral_geodesic_response_receipt",
+        role: "noncomputable_reference",
+        displayLatex: "\\delta x^{\\mu}_{test}\\stackrel{?}{=}\\delta x^{\\mu}_{metric}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["testWorldline", "metricPrediction"],
+        outputSymbols: ["TransportPrecursorReceipt"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "A transport precursor requires composition independence, recoil accounting, and reversible control before transport review can even begin.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "stage6_transport_precursor")],
+    hintKeys: {
+      subjects: ["nhm2", "transport_precursor", "geodesic_response", "experiment"],
+      symbols: ["testWorldline", "metricPrediction", "delta_x_mu"],
+      unitSignatures: [],
+      repoPaths: [NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT],
+      equationFamilies: ["transport_precursor", "physical_viability_campaign"],
+      simulationOwners: ["NHM2", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.experimental.independent_replication",
+    title: "Independent Replication",
+    plainMeaning:
+      "Requires a separate apparatus and analysis team to reproduce the physical evidence before stronger claim review.",
+    whyItMatters:
+      "A local generated or positive-unreplicated result cannot unlock physical or transport claims.",
+    subjects: ["nhm2", "replication", "experiment", "claim_boundary"],
+    level: "claim_boundary",
+    status: "blocked",
+    simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    equationFamilies: ["independent_replication", "physical_viability_campaign"],
+    tags: ["experimental_ladder", "replication", "noncomputable_reference"],
+    equations: [
+      {
+        id: "independent_replication_receipt",
+        role: "noncomputable_reference",
+        displayLatex: "\\mathrm{replicated}_{independent}=true",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["independentApparatus", "independentAnalysis"],
+        outputSymbols: ["ReplicationReceipt"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Replication is an experimental receipt, not a calculator row.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "independent_replication")],
+    hintKeys: {
+      subjects: ["nhm2", "replication", "experiment", "claim_boundary"],
+      symbols: ["replicated_independent"],
+      unitSignatures: [],
+      repoPaths: [NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT],
+      equationFamilies: ["independent_replication", "physical_viability_campaign"],
+      simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.claim_boundary.physical_viability_locked",
+    title: "Physical Viability Locked",
+    plainMeaning:
+      "Keeps physical viability locked until the physical evidence campaign has replicated experimental source, metric, and stability receipts.",
+    whyItMatters:
+      "It separates diagnostic campaign admissibility from fabricated-source credibility.",
+    subjects: ["nhm2", "claim_boundary", "physical_viability", "experiment"],
+    level: "claim_boundary",
+    status: "blocked",
+    simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    equationFamilies: ["claim_boundary", "physical_viability_campaign"],
+    tags: ["claim_boundary", "physical_viability_locked", "noncomputable_reference"],
+    equations: [
+      {
+        id: "physical_viability_lock",
+        role: "noncomputable_reference",
+        displayLatex: "\\mathrm{physicalViabilityClaimAllowed}=false",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["PhysicalEvidenceCampaignStatus"],
+        outputSymbols: ["physicalViabilityClaimAllowed"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Diagnostic campaign admission and Lean certificate admission cannot unlock this claim boundary.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "physicalViabilityClaimAllowed=false")],
+    hintKeys: {
+      subjects: ["nhm2", "claim_boundary", "physical_viability", "experiment"],
+      symbols: ["physicalViabilityClaimAllowed"],
+      unitSignatures: [],
+      repoPaths: [NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT],
+      equationFamilies: ["claim_boundary", "physical_viability_campaign"],
+      simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.claim_boundary.transport_locked",
+    title: "Transport Locked",
+    plainMeaning:
+      "Keeps transport, route, propulsion, and speed-authority claims locked until a neutral geodesic/clock response is measured and replicated.",
+    whyItMatters:
+      "A measured source or local metric response would still not be a route or transport claim by itself.",
+    subjects: ["nhm2", "claim_boundary", "transport", "experiment"],
+    level: "claim_boundary",
+    status: "blocked",
+    simulationOwners: ["NHM2", "general_relativity"],
+    equationFamilies: ["claim_boundary", "transport_precursor"],
+    tags: ["claim_boundary", "transport_locked", "noncomputable_reference"],
+    equations: [
+      {
+        id: "transport_lock",
+        role: "noncomputable_reference",
+        displayLatex: "\\mathrm{transportClaimAllowed}=false",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["TransportPrecursorReceipt"],
+        outputSymbols: ["transportClaimAllowed"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Transport remains separate from physical source and metric-response evidence.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [repoRef(NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT, "transportClaimAllowed=false")],
+    hintKeys: {
+      subjects: ["nhm2", "claim_boundary", "transport", "experiment"],
+      symbols: ["transportClaimAllowed"],
+      unitSignatures: [],
+      repoPaths: [NHM2_PHYSICAL_VIABILITY_CAMPAIGN_CONTRACT],
+      equationFamilies: ["claim_boundary", "transport_precursor"],
+      simulationOwners: ["NHM2", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
     id: "nhm2.regional_atlas.available",
     title: "Regional Support-Function Atlas",
     plainMeaning:
@@ -3923,6 +4703,134 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "documents",
     label: "Lean diagnostic admissibility documents the policy-scoped campaign result.",
     claimBoundaryNote: "The result remains diagnostic/reduced-order evidence only.",
+  },
+  {
+    id: "diagnostic_campaign_feeds_physical_evidence_campaign",
+    from: "nhm2.dynamic.time_dependent_source_campaign",
+    to: "nhm2.experimental.physical_viability_campaign",
+    relation: "documents",
+    label: "The diagnostic campaign provides the computational input to the physical evidence ladder.",
+    claimBoundaryNote: "Diagnostic campaign admission cannot substitute for experimental receipts.",
+  },
+  {
+    id: "lean_certificate_documents_physical_claim_lock",
+    from: "nhm2.formal.claim_locks_closed",
+    to: "nhm2.experimental.physical_viability_campaign",
+    relation: "documents",
+    label: "Lean claim locks document that the physical evidence ladder starts with physical and transport claims closed.",
+    claimBoundaryNote: "Formal diagnostic admissibility does not unlock physical evidence stages.",
+  },
+  {
+    id: "physical_campaign_documents_theory_solve_roadmap",
+    from: "nhm2.experimental.physical_viability_campaign",
+    to: "nhm2.experimental.theory_solve_roadmap",
+    relation: "documents",
+    label: "The physical evidence campaign points to the experiment-facing theory roadmap for pre-hardware observables, receipts, and falsifiers.",
+    claimBoundaryNote: "A roadmap is planning evidence only and cannot substitute for experimental receipts.",
+  },
+  {
+    id: "theory_solve_roadmap_feeds_prediction_freeze",
+    from: "nhm2.experimental.theory_solve_roadmap",
+    to: "nhm2.experimental.prediction_freeze",
+    relation: "documents",
+    label: "The roadmap enumerates the theoretical solves that must be frozen before experimental data are used.",
+    claimBoundaryNote: "A frozen prediction can start an experiment campaign but is not an experimental success result.",
+  },
+  {
+    id: "physical_campaign_requires_prediction_freeze",
+    from: "nhm2.experimental.prediction_freeze",
+    to: "nhm2.experimental.physical_viability_campaign",
+    relation: "requires",
+    label: "The physical evidence campaign requires pre-registered predictions and falsifiers before data collection.",
+    claimBoundaryNote: "Prediction freeze is not experimental success.",
+  },
+  {
+    id: "prediction_freeze_precedes_tile_force_receipt",
+    from: "nhm2.experimental.prediction_freeze",
+    to: "nhm2.experimental.tile_force_receipt",
+    relation: "requires",
+    label: "Tile metrology must be evaluated against frozen predictions rather than post-hoc target fitting.",
+    claimBoundaryNote: "Tile metrology remains mechanism evidence, not spacetime response evidence.",
+  },
+  {
+    id: "tile_force_receipt_requires_cycle_energy_balance",
+    from: "nhm2.experimental.tile_cycle_energy_balance",
+    to: "nhm2.experimental.tile_force_receipt",
+    relation: "requires",
+    label: "The measured tile force receipt requires closed cyclic energy accounting.",
+    claimBoundaryNote: "Energy conversion bookkeeping is not free-energy evidence.",
+  },
+  {
+    id: "tile_metrology_feeds_array_scaling",
+    from: "nhm2.experimental.tile_force_receipt",
+    to: "nhm2.experimental.array_scaling",
+    relation: "requires",
+    label: "Array scaling can only be reviewed after individual tile metrology is receipted.",
+    claimBoundaryNote: "Array scaling does not by itself measure gravity.",
+  },
+  {
+    id: "array_scaling_requires_full_apparatus_tensor",
+    from: "nhm2.experimental.full_apparatus_tensor",
+    to: "nhm2.experimental.array_scaling",
+    relation: "requires",
+    label: "Array scaling must include full apparatus stress-energy, not only ideal interaction energy.",
+    claimBoundaryNote: "Full apparatus tensor evidence remains source credibility, not transport evidence.",
+  },
+  {
+    id: "array_scaling_feeds_vacuum_weight",
+    from: "nhm2.experimental.array_scaling",
+    to: "nhm2.experimental.vacuum_weight",
+    relation: "requires",
+    label: "Vacuum-weight review requires a characterized source array and energy ledger.",
+    claimBoundaryNote: "A vacuum-weight result would test gravity coupling, not NHM2 transport.",
+  },
+  {
+    id: "metric_upper_bound_informs_metric_response",
+    from: "nhm2.experimental.metric_upper_bound",
+    to: "nhm2.experimental.invariant_metric_response",
+    relation: "documents",
+    label: "Weak-field scalar estimates inform detector scale before invariant metric-response receipts are available.",
+    claimBoundaryNote: "A weak-field scalar estimate is not a detector response or measured metric.",
+  },
+  {
+    id: "vacuum_weight_feeds_invariant_metric_response",
+    from: "nhm2.experimental.vacuum_weight",
+    to: "nhm2.experimental.invariant_metric_response",
+    relation: "requires",
+    label: "A metric-response experiment should follow a characterized source and vacuum-weight receipt.",
+    claimBoundaryNote: "Metric response requires multiple probes agreeing with one metric prediction.",
+  },
+  {
+    id: "invariant_metric_response_feeds_physical_lock",
+    from: "nhm2.experimental.invariant_metric_response",
+    to: "nhm2.claim_boundary.physical_viability_locked",
+    relation: "blocks",
+    label: "Physical viability remains locked until replicated source and invariant metric-response receipts exist.",
+    claimBoundaryNote: "Measured metric response would still require full policy and replication review.",
+  },
+  {
+    id: "independent_replication_blocks_physical_lock",
+    from: "nhm2.experimental.independent_replication",
+    to: "nhm2.claim_boundary.physical_viability_locked",
+    relation: "blocks",
+    label: "Independent replication is required before physical viability review can proceed.",
+    claimBoundaryNote: "Local or unreplicated positive results cannot unlock physical viability.",
+  },
+  {
+    id: "physical_viability_lock_blocks_transport_lock",
+    from: "nhm2.claim_boundary.physical_viability_locked",
+    to: "nhm2.claim_boundary.transport_locked",
+    relation: "blocks",
+    label: "Transport review remains downstream of physical-source and metric-response evidence.",
+    claimBoundaryNote: "A physical-source review cannot automatically become a transport claim.",
+  },
+  {
+    id: "geodesic_response_blocks_transport_lock",
+    from: "nhm2.experimental.geodesic_response",
+    to: "nhm2.claim_boundary.transport_locked",
+    relation: "blocks",
+    label: "Transport remains locked until neutral test-worldline response is measured and replicated.",
+    claimBoundaryNote: "Geodesic response is a transport precursor, not route ETA or speed authority.",
   },
   {
     id: "natario_invariants_document_observer_authority",

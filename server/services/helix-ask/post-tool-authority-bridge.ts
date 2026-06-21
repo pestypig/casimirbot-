@@ -118,10 +118,22 @@ const artifactRefs = (payload: RecordLike, pattern: RegExp): string[] =>
     .map((artifact) => readString(artifact.artifact_id))
     .filter(Boolean);
 
+const isNonAuthoritativeFinalDraft = (draft: RecordLike | null): boolean => {
+  const authority = readString(draft?.authority);
+  const text = readString(draft?.text) || readString(draft?.answer_text);
+  return (
+    authority === "deterministic_receipt_fallback" ||
+    /^Stage Play tool receipt:\s*live_env\.reflect_stage_play_context\b/i.test(text)
+  );
+};
+
 const finalDraftText = (payload: RecordLike): string => {
   const artifact = latestArtifact(payload, /final_answer_draft|helix\.final_answer_draft\.v1/);
   const artifactPayload = readRecord(artifact?.payload);
   const directPayload = readRecord(payload.final_answer_draft);
+  if (isNonAuthoritativeFinalDraft(artifactPayload) || isNonAuthoritativeFinalDraft(directPayload)) {
+    return "";
+  }
   return (
     readString(artifactPayload?.text) ||
     readString(artifactPayload?.answer_text) ||

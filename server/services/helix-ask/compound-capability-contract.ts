@@ -154,8 +154,10 @@ const boundedSegmentForMatch = (
   );
 };
 
-const firstWorkspacePath = (value: string): string | null =>
-  value.match(/\b((?:docs|server|client|shared|scripts|external)\/[^\s,.;)]+)/i)?.[1] ?? null;
+const firstWorkspacePath = (value: string): string | null => {
+  const path = value.match(/\b((?:docs|server|client|shared|scripts|external)\/[^\s,;)]+)/i)?.[1] ?? null;
+  return path ? stripBoundaryPunctuation(path) : null;
+};
 
 const stripLeadingArgLabel = (value: string): string =>
   normalizeSpace(
@@ -190,14 +192,55 @@ const docsLocateArgs = (
   };
 };
 
+const docsSearchArgs = (
+  promptText: string,
+  match: ExtractedExplicitCapabilityContract,
+  ordered: ExtractedExplicitCapabilityContract[],
+): RecordLike => {
+  const segment = boundedSegmentForMatch(promptText, match, ordered);
+  const query = queryAfterMarker(
+    segment,
+    /\b(?:query|topic|title|for|about|on|search(?:\s+for)?)\b\s*[:=]?\s*["']?([^"'\n.;]+)["']?/i,
+  );
+  return {
+    query,
+    limit: 8,
+  };
+};
+
+const docsOpenDocByPathArgs = (
+  promptText: string,
+  match: ExtractedExplicitCapabilityContract,
+  ordered: ExtractedExplicitCapabilityContract[],
+): RecordLike => {
+  const segment = boundedSegmentForMatch(promptText, match, ordered);
+  const path = firstWorkspacePath(segment) ??
+    stripLeadingArgLabel(queryAfterMarker(segment, /\b(?:path|target|for|open)\b\s*[:=]?\s*["']?([^"'\n.;]+)["']?/i));
+  return path ? { path } : {};
+};
+
 const repoSearchArgs = (
   promptText: string,
   match: ExtractedExplicitCapabilityContract,
   ordered: ExtractedExplicitCapabilityContract[],
 ): RecordLike => {
   const segment = boundedSegmentForMatch(promptText, match, ordered);
+  const commandWindow = promptText.slice(
+    match.match_index,
+    findNextCapabilityIndex(promptText, match, ordered),
+  );
+  const fallbackSegment = normalizeSpace(
+    stripBoundaryPunctuation(
+      commandWindow
+        .replace(
+          /\b(?:use|call|run|invoke|execute)?\s*(?:repo-code\.search_concept|repo_code\.search_concept|repo\s+code\s+search\s+concept|repo[_\s]+code|repo[_\s]+evidence|repository\s+code)\b(?:\s+to)?/i,
+          "",
+        ),
+    ),
+  );
+  const querySource = segment || fallbackSegment || promptText;
   const rawQuery = queryAfterMarker(
-    segment,
+    querySource,
     /\b(?:query|concept|for|about|on|find|search(?:\s+for)?|where)\b\s*[:=]?\s*["']?([^"'\n.;]+)["']?/i,
   );
   const query = normalizeSpace(rawQuery.replace(/^where\s+/i, ""));
@@ -277,12 +320,25 @@ const workstationNoteArgs = (
   match: ExtractedExplicitCapabilityContract,
   ordered: ExtractedExplicitCapabilityContract[],
 ): RecordLike => {
-  const segment = segmentForMatch(promptText, match, ordered);
+  const segment = boundedSegmentForMatch(promptText, match, ordered);
   const text =
     segment.match(/\b(?:with\s+text|text|body|content)\b\s*[:=]?\s*["']?([^"'\n]+)["']?/i)?.[1] ??
     segment;
   const normalized = normalizeSpace(stripBoundaryPunctuation(text));
   return normalized ? { text: normalized } : {};
+};
+
+const workstationNoteCreateArgs = (
+  promptText: string,
+  match: ExtractedExplicitCapabilityContract,
+  ordered: ExtractedExplicitCapabilityContract[],
+): RecordLike => {
+  const segment = boundedSegmentForMatch(promptText, match, ordered);
+  const title =
+    segment.match(/\b(?:with\s+title|title|name)\b\s*[:=]?\s*["']?([^"'\n.;]+)["']?/i)?.[1] ??
+    stripLeadingArgLabel(segment);
+  const normalized = normalizeSpace(stripBoundaryPunctuation(title));
+  return normalized ? { title: normalized } : {};
 };
 
 const boundedPromptArgForSubgoal = (
@@ -303,7 +359,7 @@ const argsHintForSubgoal = (input: {
   const capability = input.match.contract.capability;
   const boundedPromptArg = (): string =>
     boundedPromptArgForSubgoal(input.promptText, input.match, input.ordered);
-  if (capability === "scientific-calculator.solve_expression") {
+  if (input.match.contract.capability_family === "calculator") {
     const expression = extractCalculatorSubgoalExpression(
       input.promptText,
       input.match,
@@ -340,6 +396,9 @@ const argsHintForSubgoal = (input: {
   }
   if (capability === "scholarly-research.fetch_full_text") {
     return scholarlyFullTextArgs(input.promptText, input.match, input.ordered);
+  }
+  if (capability === "workstation-notes.create" || capability === "workstation-notes.create_note") {
+    return workstationNoteCreateArgs(input.promptText, input.match, input.ordered);
   }
   if (capability === "workstation-notes.append_to_note") {
     return workstationNoteArgs(input.promptText, input.match, input.ordered);
@@ -415,6 +474,12 @@ const argsHintForSubgoal = (input: {
   }
   if (capability === "docs-viewer.locate_in_doc" || capability === "docs-viewer.doc_equation_context") {
     return docsLocateArgs(input.promptText, input.match, input.ordered);
+  }
+  if (capability === "docs-viewer.search_docs") {
+    return docsSearchArgs(input.promptText, input.match, input.ordered);
+  }
+  if (capability === "docs-viewer.open_doc_by_path") {
+    return docsOpenDocByPathArgs(input.promptText, input.match, input.ordered);
   }
   if (capability === "repo-code.search_concept") {
     return repoSearchArgs(input.promptText, input.match, input.ordered);

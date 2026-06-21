@@ -53,6 +53,7 @@ const hasContextualCapabilityCatalogCue = (promptText: string): boolean => {
     (!standaloneQuotedCatalogRequest && new RegExp(`["'\`][^"'\`]*(?:${object})[^"'\`]*["'\`]`, "i").test(promptText)) ||
     new RegExp(`\\b(?:if|in\\s+the\\s+future|future|later|eventually|hypothetically|tomorrow|next\\s+time)\\b[\\s\\S]{0,160}\\b(?:${object})\\b`, "i").test(promptText) ||
     new RegExp(`\\b(?:would|could|might|should)\\b[\\s\\S]{0,80}\\b(?:we|it|that|this)\\b[\\s\\S]{0,80}\\b(?:later|future|eventually|hypothetically|next\\s+time|if)\\b[\\s\\S]{0,160}\\b(?:${object})\\b`, "i").test(promptText) ||
+    new RegExp(`\\b(?:would|could|might|should)\\s+(?:we|i)\\s+ask\\b[\\s\\S]{0,160}\\b(?:${object})\\b[\\s\\S]{0,100}\\b(?:later|future|eventually|hypothetically|next\\s+time|tomorrow)\\b`, "i").test(promptText) ||
     new RegExp(`\\b(?:previously|earlier|last\\s+time|before|already|historically|was|were|had)\\b[\\s\\S]{0,180}\\b(?:listed|showed|inspected|asked|called|used|queried|viewed|checked)?\\b[\\s\\S]{0,120}\\b(?:${object})\\b`, "i").test(promptText) ||
     new RegExp(`\\b(?:screen|page|button|label|ui|text|menu|dropdown|document|quote)\\b[\\s\\S]{0,100}\\b(?:says|shows|reads|contains|labeled|labelled|called|named)\\b[\\s\\S]{0,160}\\b(?:${object})\\b`, "i").test(promptText) ||
     new RegExp(`\\b(?:do\\s+not|don't|dont|without|not\\s+asking\\s+to|no\\s+need\\s+to|for\\s+now)\\b[\\s\\S]{0,180}\\b(?:list|show|inspect|tell|explain|query|view|check|read)?\\b[\\s\\S]{0,140}\\b(?:${object})\\b`, "i").test(promptText)

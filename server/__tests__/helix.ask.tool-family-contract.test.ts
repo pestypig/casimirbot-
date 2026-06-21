@@ -60,41 +60,41 @@ describe("Helix Ask tool-family contract registry", () => {
       ["live_env.read_live_source_mail", "live_source_mail", "evidence_only"],
       ["live_env.read_processed_live_source_mail", "live_source_mail", "evidence_only"],
       ["live_env.reflect_live_source_mail_loop", "live_source_mail", "evidence_only"],
-      ["live_env.query_workstation_goal_context", "live_source_mail", "evidence_only"],
-      ["live_env.start_agent_goal_session", "live_source_mail", "control_receipt"],
-      ["live_env.query_source_health", "live_source_mail", "evidence_only"],
+      ["live_env.query_workstation_goal_context", "live_environment", "evidence_only"],
+      ["live_env.start_agent_goal_session", "live_environment", "control_receipt"],
+      ["live_env.query_source_health", "live_environment", "evidence_only"],
       ["live_env.query_live_source_quality", "live_source_mail", "evidence_only"],
       ["live_env.summarize_live_source_current_state", "live_source_mail", "evidence_only"],
-      ["live_env.query_trace_memory", "live_source_mail", "evidence_only"],
-      ["live_env.evaluate_goal_satisfaction", "live_source_mail", "evidence_only"],
-      ["live_env.query_packet_traces", "live_source_mail", "evidence_only"],
-      ["live_env.query_visual_summaries", "live_source_mail", "evidence_only"],
-      ["live_env.query_audio_transcripts", "live_source_mail", "evidence_only"],
-      ["live_env.query_translation_segments", "live_source_mail", "evidence_only"],
-      ["live_env.query_microdeck_outputs", "live_source_mail", "evidence_only"],
-      ["live_env.query_live_answer_state", "live_source_mail", "evidence_only"],
-      ["live_env.query_narrator_events", "live_source_mail", "evidence_only"],
-      ["live_env.query_route_evidence", "live_source_mail", "evidence_only"],
-      ["live_env.query_automation_policies", "live_source_mail", "evidence_only"],
-      ["live_env.configure_route_watch", "live_source_mail", "control_receipt"],
-      ["live_env.configure_live_source_watch_job", "live_source_mail", "control_receipt"],
-      ["live_env.change_workstation_preset", "live_source_mail", "control_receipt"],
-      ["live_env.set_visual_preset", "live_source_mail", "control_receipt"],
-      ["live_env.set_audio_preset", "live_source_mail", "control_receipt"],
-      ["live_env.bind_workstation_source", "live_source_mail", "control_receipt"],
-      ["live_env.unbind_workstation_source", "live_source_mail", "control_receipt"],
-      ["live_env.pause_workstation_loop", "live_source_mail", "control_receipt"],
-      ["live_env.resume_workstation_loop", "live_source_mail", "control_receipt"],
-      ["live_env.set_workstation_loop_state", "live_source_mail", "control_receipt"],
-      ["live_env.repair_loop", "live_source_mail", "control_receipt"],
-      ["live_env.repair_workstation_source", "live_source_mail", "control_receipt"],
-      ["live_env.update_live_answer_projection", "live_source_mail", "control_receipt"],
-      ["live_env.focus_process_graph", "live_source_mail", "control_receipt"],
+      ["live_env.query_trace_memory", "live_environment", "evidence_only"],
+      ["live_env.evaluate_goal_satisfaction", "live_environment", "evidence_only"],
+      ["live_env.query_packet_traces", "live_environment", "evidence_only"],
+      ["live_env.query_visual_summaries", "live_environment", "evidence_only"],
+      ["live_env.query_audio_transcripts", "live_environment", "evidence_only"],
+      ["live_env.query_translation_segments", "live_environment", "evidence_only"],
+      ["live_env.query_microdeck_outputs", "live_environment", "evidence_only"],
+      ["live_env.query_live_answer_state", "live_environment", "evidence_only"],
+      ["live_env.query_narrator_events", "live_environment", "evidence_only"],
+      ["live_env.query_route_evidence", "live_environment", "evidence_only"],
+      ["live_env.query_automation_policies", "live_environment", "evidence_only"],
+      ["live_env.configure_route_watch", "live_environment", "control_receipt"],
+      ["live_env.configure_live_source_watch_job", "live_environment", "control_receipt"],
+      ["live_env.change_workstation_preset", "live_environment", "control_receipt"],
+      ["live_env.set_visual_preset", "live_environment", "control_receipt"],
+      ["live_env.set_audio_preset", "live_environment", "control_receipt"],
+      ["live_env.bind_workstation_source", "live_environment", "control_receipt"],
+      ["live_env.unbind_workstation_source", "live_environment", "control_receipt"],
+      ["live_env.pause_workstation_loop", "live_environment", "control_receipt"],
+      ["live_env.resume_workstation_loop", "live_environment", "control_receipt"],
+      ["live_env.set_workstation_loop_state", "live_environment", "control_receipt"],
+      ["live_env.repair_loop", "live_environment", "control_receipt"],
+      ["live_env.repair_workstation_source", "live_environment", "control_receipt"],
+      ["live_env.update_live_answer_projection", "live_environment", "control_receipt"],
+      ["live_env.focus_process_graph", "live_environment", "control_receipt"],
       ["live_env.process_live_source_mail", "live_source_mail", "evidence_only"],
       ["live_env.record_live_source_mail_decision", "live_source_decision", "control_receipt"],
       ["live_env.request_interim_voice_callout", "voice_delivery", "control_receipt"],
-      ["live_env.narrator_say", "voice_delivery", "control_receipt"],
-      ["live_env.narrator_bind_stream", "voice_delivery", "control_receipt"],
+      ["live_env.narrator_say", "live_environment", "control_receipt"],
+      ["live_env.narrator_bind_stream", "live_environment", "control_receipt"],
       ["scientific-calculator.solve_expression", "calculator", "evidence_only"],
       ["repo-code.search_concept", "repo_code", "evidence_only"],
       ["docs-viewer.open", "docs_viewer", "control_receipt"],
@@ -147,7 +147,7 @@ describe("Helix Ask tool-family contract registry", () => {
       const familyContract = resolveToolFamilyContract({ toolName: spec?.capability });
       expect(familyContract).toMatchObject({
         toolName: spec?.capability,
-        toolFamily: "live_source_mail",
+        toolFamily: "live_environment",
         authority: "evidence_only",
         mutating: false,
         allowedTerminalKinds: ["model_synthesized_answer"],
@@ -157,7 +157,11 @@ describe("Helix Ask tool-family contract registry", () => {
         defaultTerminalEligible: false,
         defaultRawContentIncluded: false,
       });
-      expect(familyContract?.requiredObservationKinds).toEqual(spec?.toolFamilyRequiredObservationKinds);
+      expect(familyContract?.requiredObservationKinds).toEqual([
+        "live_environment_tool_observation",
+        ...(spec?.toolFamilyRequiredObservationKinds ?? []),
+        spec?.explicitRequiredObservationKind,
+      ]);
       expect(familyContract?.aliases).toEqual(spec?.aliases);
 
       const explicitContract = explicitCapabilityContractForCapability(spec?.capability);
@@ -216,6 +220,8 @@ describe("Helix Ask tool-family contract registry", () => {
       expect(decision.assistant_answer).toBe(false);
       expect(decision.terminal_eligible).toBe(false);
       expect(decision.raw_content_included).toBe(false);
+      expect(decision.candidate_artifact_kind).toBe(receiptKind);
+      expect((decision as unknown as { terminal_artifact_kind?: unknown }).terminal_artifact_kind).toBeUndefined();
     }
   });
 

@@ -68,6 +68,27 @@ const LIVE_ENVIRONMENT_OPERATOR_CAPABILITIES = new Set([
   "live_env.reflect_stage_play_context",
   "live_env.narrator_say",
   "live_env.narrator_bind_stream",
+  "live_env.apply_micro_reasoner_preset",
+  "live_env.create_micro_reasoner_preset",
+  "live_env.update_micro_reasoner_prompt",
+  "live_env.test_micro_reasoner_prompt",
+  "live_env.read_card",
+  "live_env.query_event_log",
+  "live_env.query_world_events",
+  "live_env.query_navigation_state",
+  "live_env.plan_stage_play_job",
+  "live_env.configure_visual_observer_profile",
+  "live_env.apply_visual_observer_profile",
+  "live_env.query_visual_observer_profiles",
+  "live_env.test_visual_observer_profile",
+  "live_env.compare_visual_observer_profiles",
+  "live_env.request_visual_action_replay",
+  "live_env.configure_interpreter_profile",
+  "live_env.compare_mail_to_interpreter_profile",
+  "live_env.request_stage_play_checkpoint",
+  "live_env.predict_live_source_immediate",
+  "live_env.compare_live_source_prediction",
+  "live_env.project_live_source_narrative",
   "live_env.change_workstation_preset",
   "live_env.set_visual_preset",
   "live_env.set_audio_preset",
@@ -83,6 +104,11 @@ const LIVE_ENVIRONMENT_OPERATOR_CAPABILITIES = new Set([
   "live_env.update_live_answer_projection",
   "live_env.focus_process_graph",
   "live_env.start_agent_goal_session",
+  "live_env.query_constructs",
+  "live_env.query_job_evidence",
+  "live_env.request_probe",
+  "live_env.record_commentary",
+  "live_env.spawn_field_worker",
   "live_env.evaluate_goal_satisfaction",
 ]);
 
@@ -107,11 +133,24 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
     case "helix_ask.reflect_workstation_tool_alignment":
       return "capability_help";
     case "scientific-calculator.solve_expression":
+    case "scientific-calculator.solve_with_steps":
+    case "scientific-calculator.solve":
       return "calculator_solve";
+    case "scientific-calculator.open":
+      return "calculator_open";
+    case "scientific-calculator.start_equation_live_source":
+      return "calculator_live_source_setup";
     case "workspace_os.status":
       return "workspace_status_diagnostic";
     case "docs-viewer.open":
+    case "docs-viewer.open_doc_by_path":
       return "doc_open";
+    case "docs-viewer.identify_current_doc":
+      return "active_doc_identity";
+    case "docs-viewer.search_docs":
+      return "docs_search";
+    case "docs-viewer.validate_doc_candidates":
+      return "doc_candidate_validation";
     case "docs-viewer.locate_in_doc":
       return "locate_in_doc";
     case "docs-viewer.summarize_doc":
@@ -135,6 +174,7 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
     case "live_env.process_live_source_mail":
     case "live_env.reflect_live_source_mail_loop":
     case "live_env.query_micro_reasoner_presets":
+    case "live_env.query_micro_reasoner_prompts":
     case "live_env.draft_micro_reasoner_preset":
     case "live_env.route_micro_reasoner_prompt":
     case "live_env.query_live_source_quality":
@@ -160,6 +200,11 @@ export const canonicalGoalKindForExplicitCapability = (capability: string | null
     case "helix_ask.build_civilization_scenario_frame":
     case "helix_ask.reflect_civilization_bounds":
       return "civilization_bounds_reflection";
+    case "workstation-notes.append_to_note":
+    case "workstation-notes.create_note":
+      return "workstation_note_edit";
+    case "workstation-notes.open":
+      return "workstation_note_open";
     default:
       return null;
   }
@@ -173,10 +218,18 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
     case "helix_ask.reflect_workstation_tool_alignment":
       return "runtime_evidence";
     case "scientific-calculator.solve_expression":
+    case "scientific-calculator.solve_with_steps":
+    case "scientific-calculator.solve":
+    case "scientific-calculator.open":
+    case "scientific-calculator.start_equation_live_source":
       return "current_turn_action";
     case "workspace_os.status":
       return "workspace_state";
     case "docs-viewer.open":
+    case "docs-viewer.open_doc_by_path":
+    case "docs-viewer.identify_current_doc":
+    case "docs-viewer.search_docs":
+    case "docs-viewer.validate_doc_candidates":
     case "docs-viewer.summarize_doc":
     case "docs-viewer.doc_equation_context":
     case "docs-viewer.locate_in_doc":
@@ -196,6 +249,7 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
     case "live_env.reflect_live_source_mail_loop":
     case "live_env.record_live_source_mail_decision":
     case "live_env.query_micro_reasoner_presets":
+    case "live_env.query_micro_reasoner_prompts":
     case "live_env.draft_micro_reasoner_preset":
     case "live_env.route_micro_reasoner_prompt":
     case "live_env.query_live_source_quality":
@@ -218,6 +272,10 @@ export const answerScopeForExplicitCapability = (capability: string | null | und
     case "helix_ask.build_civilization_scenario_frame":
     case "helix_ask.reflect_civilization_bounds":
       return "civilization_bounds";
+    case "workstation-notes.append_to_note":
+    case "workstation-notes.create_note":
+    case "workstation-notes.open":
+      return "workspace_state";
     default:
       return "workspace_state";
   }

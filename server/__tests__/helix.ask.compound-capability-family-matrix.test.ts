@@ -19,8 +19,26 @@ const promptFor = (contract: ExplicitContract): string => {
   if (contract.capability === "scientific-calculator.solve_expression") {
     return "Call scientific-calculator.solve_expression with this exact expression: 6*7.";
   }
+  if (
+    contract.capability === "scientific-calculator.solve_with_steps" ||
+    contract.capability === "scientific-calculator.solve"
+  ) {
+    return `Call ${contract.capability} with this exact expression: 6*7.`;
+  }
+  if (contract.capability === "scientific-calculator.start_equation_live_source") {
+    return "Call scientific-calculator.start_equation_live_source with this exact expression: 6*7.";
+  }
   if (contract.capability === "docs-viewer.locate_in_doc") {
     return "Call docs-viewer.locate_in_doc to locate the rule of thumb in docs/helix-ask-codex-loop-discipline.md.";
+  }
+  if (contract.capability === "docs-viewer.search_docs") {
+    return "Call docs-viewer.search_docs for query: terminal authority.";
+  }
+  if (contract.capability === "docs-viewer.open_doc_by_path") {
+    return "Call docs-viewer.open_doc_by_path for path: docs/helix-ask-codex-loop-discipline.md.";
+  }
+  if (contract.capability === "docs-viewer.doc_equation_context") {
+    return "Call docs-viewer.doc_equation_context to locate equation context for query: warp bubble energy in docs/helix-ask-codex-loop-discipline.md.";
   }
   if (contract.capability === "repo-code.search_concept") {
     return "Call repo-code.search_concept to find terminal authority enforcement.";
@@ -45,6 +63,9 @@ const promptFor = (contract: ExplicitContract): string => {
   }
   if (contract.capability === "workstation-notes.append_to_note") {
     return "Call workstation-notes.append_to_note with text: record this Helix Ask parity note.";
+  }
+  if (contract.capability === "workstation-notes.create_note") {
+    return "Call workstation-notes.create_note with title: Helix Ask parity note.";
   }
   return `Call ${contract.capability}.`;
 };
@@ -92,7 +113,7 @@ const expectedTerminalKindsByFamily: Record<string, string[]> = {
   capability_catalog: ["capability_help_summary"],
   calculator: ["workstation_tool_evaluation"],
   workspace_diagnostic: ["model_synthesized_answer"],
-  docs_viewer: ["doc_open_receipt", "doc_location_matches", "doc_summary", "doc_equation_context"],
+  docs_viewer: ["doc_open_receipt", "doc_location_matches", "doc_summary", "doc_equation_context", "model_synthesized_answer"],
   repo_code: ["repo_code_evidence_answer"],
   workspace_directory: ["workspace_directory_resolution"],
   internet_search: ["internet_search_answer"],
@@ -106,7 +127,7 @@ const expectedTerminalKindsByFamily: Record<string, string[]> = {
   zen_graph_reflection: ["model_synthesized_answer"],
   civilization_bounds: ["model_synthesized_answer"],
   visual_capture: ["situation_context_pack"],
-  workstation: ["model_synthesized_answer"],
+  workstation: ["model_synthesized_answer", "workstation_tool_evaluation"],
 };
 
 const argValuePresent = (value: unknown): boolean => {
@@ -287,7 +308,10 @@ const assertPairContract = (first: ExplicitContract, second: ExplicitContract): 
   });
 
   const subgoals = (itinerary.compound_capability_contract?.subgoals ?? []) as Array<Record<string, unknown>>;
-  expect(itinerary.prompt_shape).toBe("compound_tool");
+  expect(
+    itinerary.prompt_shape,
+    `${first.capability}->${second.capability}:${promptForPair(first, second)}`,
+  ).toBe("compound_tool");
   expect(subgoals.map((subgoal) => subgoal.requested_capability)).toEqual([
     first.capability,
     second.capability,
@@ -517,8 +541,8 @@ describe("Helix Ask compound capability family matrix", () => {
       observation_kind: null,
       observation_ref: null,
       observation_provenance: null,
-      satisfaction: "pending",
-      rail_status: "pending",
+      satisfaction: "failed",
+      rail_status: "fail_closed",
     });
   });
 
@@ -1299,8 +1323,9 @@ describe("Helix Ask compound capability family matrix", () => {
       );
       expect(itinerary.terminal_success_criteria.allowed_terminal_artifact_kinds, contract.capability_family)
         .toEqual(expect.arrayContaining([
-          contract.required_terminal_kind,
-          partner.required_terminal_kind,
+          requiresDocEvidenceSynthesis([contract, partner])
+            ? "doc_evidence_synthesis_answer"
+            : "model_synthesized_answer",
         ]));
     }
   });
@@ -1592,7 +1617,7 @@ describe("Helix Ask compound capability family matrix", () => {
     expect(bridgeSubgoal).toBeTruthy();
     expect(inputBindings).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        arg_name: "source_refs",
+        arg_name: "theory_reflection_ref",
         binding_kind: "source_ref",
         from_subgoal_id: theorySubgoal?.subgoal_id,
         from_capability: "helix_ask.reflect_theory_context",
@@ -1600,7 +1625,7 @@ describe("Helix Ask compound capability family matrix", () => {
         status: "pending",
       }),
       expect.objectContaining({
-        arg_name: "source_refs",
+        arg_name: "ideology_reflection_ref",
         binding_kind: "source_ref",
         from_subgoal_id: ideologySubgoal?.subgoal_id,
         from_capability: "helix_ask.reflect_ideology_context",

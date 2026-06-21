@@ -14,6 +14,17 @@ import { HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION } from "./termi
 
 type RecordLike = Record<string, unknown>;
 
+const API_PARITY_COMPOUND_STRING_OR_NULL_FIELDS = [
+  "first_incomplete_compound_subgoal_id",
+  "first_incomplete_compound_requested_capability",
+  "first_incomplete_compound_runtime_capability",
+  "first_incomplete_compound_selected_capability",
+  "first_incomplete_compound_executed_capability",
+  "compound_first_broken_rail",
+  "compound_rail_failure_code",
+  "compound_repair_target",
+] as const satisfies readonly (typeof CODEX_PARITY_AGENT_SPINE_COMPOUND_STRING_OR_NULL_FIELDS)[number][];
+
 export type HelixApiParityCompoundSubgoalRailSummary = {
   subgoal_id: string | null;
   order: number | null;
@@ -350,7 +361,7 @@ const RAIL_MIRROR_COMPARISON_FIELDS = [
   "admission_proven",
   "executed_capability",
   "compound_subgoal_count",
-  ...CODEX_PARITY_AGENT_SPINE_COMPOUND_STRING_OR_NULL_FIELDS,
+  ...API_PARITY_COMPOUND_STRING_OR_NULL_FIELDS,
   "compound_incomplete_subgoal_did_tool_run",
   "observation_kind",
   "observation_ref",

@@ -923,6 +923,16 @@ export function buildSolverControllerDecision(input: {
     "live_source_turn_phase_resolution",
     ...(committedRoute ? ["committed_ask_route"] : []),
   ];
+  const routeProductContractPresent =
+    Boolean(committedRoute) ||
+    Boolean(
+      readString(canonicalGoal?.goal_kind) &&
+        (
+          readString(canonicalGoal?.required_terminal_kind) ||
+          readStringArray(canonicalGoal?.allowed_terminal_artifact_kinds).length > 0
+        )
+    ) ||
+    hasRequiredArtifactContract(terminalContract);
 
   if (liveSourcePhaseRequiresMailDecision(payload)) {
     pushUnique(liveSourcePhaseBlockingReasons, "missing_required_live_source_mail_decision");
@@ -941,7 +951,7 @@ export function buildSolverControllerDecision(input: {
   }
 
   if (!nonAnswerTerminal) {
-    if (!committedRoute && disciplineGuardRequired) {
+    if (!committedRoute && disciplineGuardRequired && !routeProductContractPresent) {
       pushUnique(blockingReasons, "committed_route_missing");
     }
     if (

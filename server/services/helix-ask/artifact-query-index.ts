@@ -129,6 +129,21 @@ const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : 
 
 const supplementalPayloadArtifacts = (payload: RecordLike): RecordLike[] => {
   const entries: RecordLike[] = [];
+  for (const capabilitySurface of [
+    payload.available_capabilities,
+    payload.final_available_capabilities,
+    payload.initial_available_capabilities,
+  ]) {
+    const record = readRecord(capabilitySurface);
+    if (!record) continue;
+    entries.push({
+      artifact_id: readString(record.artifact_id) || `${readString(record.turn_id) || "turn"}:available_capabilities`,
+      kind: "available_capabilities",
+      schema: readString(record.schema) || "helix.available_capabilities.v1",
+      source_scope: "debug_payload",
+      payload: record,
+    });
+  }
   for (const validation of readArray(payload.calculator_result_validations)) {
     const record = readRecord(validation);
     if (!record) continue;
@@ -800,6 +815,11 @@ const capabilityObservationArtifact = (
       if (capabilityMatch) score += 100;
       if (requiredKindMatch) score += 70;
       if (exactArtifactKindMatch) score += 45;
+      if (normalizedCapability === "docs_viewer_locate_in_doc") {
+        if (normalizedArtifactKind === "doc_location_matches") score += 90;
+        else if (normalizedArtifactKind === "doc_location_result") score += 45;
+        else if (normalizedArtifactKind === "doc_evidence_location") score += 20;
+      }
       if (genericObservation) score += 20;
       if (normalizedCapability.startsWith("live_env_") && normalizedArtifactKind === "reasoning_context") score += 140;
       if (ref.includes("agent_runtime")) score += 30;
@@ -1079,7 +1099,7 @@ const buildToolTurnChainAudit = (input: {
     nonModelToolCapability(input.lifecycleTrace?.executed_capability),
     nonModelToolCapability(operationalTrace?.executed_capability),
   );
-  const selectedCapability =
+  let selectedCapability =
     preferConcreteCapability(
       firstString(
         capabilityPlan?.selected_capability,
@@ -1099,6 +1119,15 @@ const buildToolTurnChainAudit = (input: {
     selectedCapability ?? requestedCapability ?? input.capability,
     requestedObservationKinds,
   );
+  if (
+    !selectedCapability &&
+    !contextualSuppression &&
+    requestedCapability &&
+    selectedCapabilityObservationArtifact &&
+    nonModelToolCapability(requestedCapability)
+  ) {
+    selectedCapability = requestedCapability;
+  }
   const selectedCapabilityContract = explicitCapabilityContractForCapability(selectedCapability);
   const selectedCapabilityIsCatalog =
     selectedCapabilityContract?.capability_family === "capability_catalog" ||
@@ -1177,8 +1206,24 @@ const buildToolTurnChainAudit = (input: {
         ? artifactRef(selectedCapabilityObservationArtifact)
       : readStringArray(observationCoverage?.artifact_refs)[0] ||
         (observationArtifactKind ? artifactRef(artifactForKind(input.artifacts, observationArtifactKind) ?? {}) : null);
+  const observationArtifact =
+    selectedCapabilityIsCatalog && capabilityCatalogArtifact
+      ? capabilityCatalogArtifact
+      : selectedCapabilityObservationArtifact ??
+        (observationRef
+          ? input.artifacts.find((artifact) => artifactRef(artifact) === observationRef) ?? null
+          : null);
+  const selectedObservationSupportsRequestedCapability = Boolean(
+    requestedCapability &&
+      observationArtifact &&
+      (
+        artifactSupportsCapabilityObservation(observationArtifact, requestedCapability) ||
+        requestedObservationKinds.some((kind) => observationKindMatches(observationArtifact, kind))
+      ),
+  );
   const observedArtifactSupportsRequestedCapability =
     requestedObservationKinds.length === 0 ||
+    selectedObservationSupportsRequestedCapability ||
     input.artifacts.some((artifact) =>
       requestedObservationKinds.some((kind) => observationKindMatches(artifact, kind)),
     );
@@ -1313,8 +1358,10 @@ const buildToolTurnChainAudit = (input: {
           ? "tool_execution_rejected"
           : compoundRailFailureCodeRaw === "compound_subgoal_dropped"
             ? "tool_execution_rejected"
-            : compoundRailFailureCodeRaw === "subgoal_observation_missing"
-              ? "observation_missing"
+          : compoundRailFailureCodeRaw === "subgoal_observation_missing"
+              ? readNullableString(firstIncompleteCompoundSubgoal.requested_capability)
+                ? "required_observation_missing"
+                : "observation_missing"
               : (TOOL_TURN_CHAIN_FAILURE_CODES as readonly string[]).includes(compoundRailFailureCodeRaw ?? "")
                 ? compoundRailFailureCodeRaw as RailFailureCode
                 : readNullableString(firstIncompleteCompoundSubgoal.executed_capability)
@@ -1342,7 +1389,9 @@ const buildToolTurnChainAudit = (input: {
                   : repoWeakEvidenceRepairLoop
                     ? "weak_evidence_repair_loop"
                     : !input.requiredObservationsSatisfied && !concreteTurnChainComplete
-                      ? "observation_missing"
+                      ? requestedCapability
+                        ? "required_observation_missing"
+                        : "observation_missing"
                       : observationRef && !reentryExecuted
                         ? "observation_not_reentered"
                         : expectedReentry && !reentryExecuted
@@ -2250,47 +2299,108 @@ export const buildArtifactQueryIndex = (input: {
   const compoundContractSubgoals = readArray(compoundCapabilityContract?.subgoals)
     .map((entry) => readRecord(entry))
     .filter((entry): entry is RecordLike => Boolean(entry));
-  const compoundSubgoalRailStatusFromLedgerEntry = (entry: RecordLike): RecordLike => ({
-    subgoal_id: readNullableString(entry.subgoal_id),
-    order: readNumber(entry.order),
-    requested_capability: readNullableString(entry.requested_capability),
-    runtime_capability: readNullableString(entry.runtime_capability),
-    selected_capability: readNullableString(entry.selected_capability),
-    executed_capability: readNullableString(entry.executed_capability),
-    args: readRecord(entry.args),
-    args_source: readNullableString(entry.args_source),
-    planned_args: readRecord(entry.planned_args),
-    selected_args: readRecord(entry.selected_args),
-    required_args: readStringArray(entry.required_args),
-    optional_args: readStringArray(entry.optional_args),
-    required_observation_kinds: readStringArray(entry.required_observation_kinds),
-    required_terminal_kind: readNullableString(entry.required_terminal_kind),
-    allowed_substitutions: readStringArray(entry.allowed_substitutions),
-    forbidden_nearby_capabilities: readStringArray(entry.forbidden_nearby_capabilities),
-    input_bindings: readArray(entry.input_bindings)
-      .map((binding) => readRecord(binding))
-      .filter((binding): binding is RecordLike => Boolean(binding)),
-    observation_kind: readNullableString(entry.observation_kind),
-    observation_ref: readNullableString(entry.observation_ref),
-    observation_provenance: readNullableString(entry.observation_provenance),
-    support_refs: readStringArray(entry.support_refs),
-    bound_input_refs: readArray(entry.bound_input_refs)
-      .map((binding) => readRecord(binding))
-      .filter((binding): binding is RecordLike => Boolean(binding)),
-    unresolved_input_bindings: readArray(entry.unresolved_input_bindings)
-      .map((binding) => readRecord(binding))
-      .filter((binding): binding is RecordLike => Boolean(binding)),
-    satisfaction: readNullableString(entry.satisfaction),
-    contribution_role: readNullableString(entry.contribution_role),
-    terminal_contribution_kind: readNullableString(entry.terminal_contribution_kind),
-    rail_status: readNullableString(entry.rail_status),
-    first_broken_rail: readNullableString(entry.first_broken_rail),
-    rail_failure_code: readNullableString(entry.rail_failure_code),
-    repair_target: readNullableString(entry.repair_target),
-    assistant_answer: false,
-    terminal_eligible: false,
-    raw_content_included: false,
-  });
+  const subgoalObservationCoverageSatisfied = (
+    capability: string | null,
+    requiredObservationKinds: string[],
+  ): boolean => {
+    if (requiredObservationKinds.length === 0) return false;
+    const mode = explicitObservationCoverageMode(capability);
+    const requiredCoverage = requiredObservationKinds.map((kind) =>
+      artifacts.some((artifact) => observationKindMatches(artifact, kind)),
+    );
+    return mode === "any"
+      ? requiredCoverage.some(Boolean)
+      : requiredCoverage.every(Boolean);
+  };
+  const compoundSubgoalRailStatusFromLedgerEntry = (entry: RecordLike): RecordLike => {
+    const requestedCapability = readNullableString(entry.requested_capability);
+    const runtimeCapability = readNullableString(entry.runtime_capability);
+    const effectiveCapability = runtimeCapability ?? requestedCapability;
+    const requiredObservationKinds = readStringArray(entry.required_observation_kinds);
+    const existingObservationRef = readNullableString(entry.observation_ref);
+    const observationArtifact =
+      (existingObservationRef
+        ? artifacts.find((artifact) => artifactRef(artifact) === existingObservationRef) ?? null
+        : null) ??
+      capabilityObservationArtifact(artifacts, effectiveCapability, requiredObservationKinds) ??
+      (requiredObservationKinds.length
+        ? artifacts.find((artifact) =>
+            requiredObservationKinds.some((kind) => observationKindMatches(artifact, kind)),
+          ) ?? null
+        : null);
+    const observedKind = observationArtifact
+      ? firstString(
+          readString(observationArtifact.kind),
+          readString(artifactPayload(observationArtifact)?.kind),
+          requiredObservationKinds.find((kind) => observationKindMatches(observationArtifact, kind)),
+        )
+      : null;
+    const observedRef = observationArtifact ? artifactRef(observationArtifact) : null;
+    const artifactSupportsSubgoal = Boolean(
+      observationArtifact &&
+        (
+          artifactSupportsCapabilityObservation(observationArtifact, effectiveCapability) ||
+          requiredObservationKinds.some((kind) => observationKindMatches(observationArtifact, kind))
+        ),
+    );
+    const canReconcileFromArtifacts =
+      Boolean(observedRef && effectiveCapability && artifactSupportsSubgoal) &&
+      subgoalObservationCoverageSatisfied(effectiveCapability, requiredObservationKinds);
+    const selectedCapability =
+      readNullableString(entry.selected_capability) ??
+      (canReconcileFromArtifacts ? effectiveCapability : null);
+    const executedCapability =
+      readNullableString(entry.executed_capability) ??
+      (canReconcileFromArtifacts ? effectiveCapability : null);
+    const railStatus =
+      canReconcileFromArtifacts && selectedCapability && executedCapability
+        ? "complete"
+        : readNullableString(entry.rail_status);
+
+    return {
+      subgoal_id: readNullableString(entry.subgoal_id),
+      order: readNumber(entry.order),
+      requested_capability: requestedCapability,
+      runtime_capability: runtimeCapability,
+      selected_capability: selectedCapability,
+      executed_capability: executedCapability,
+      args: readRecord(entry.args),
+      args_source: readNullableString(entry.args_source),
+      planned_args: readRecord(entry.planned_args),
+      selected_args: readRecord(entry.selected_args),
+      required_args: readStringArray(entry.required_args),
+      optional_args: readStringArray(entry.optional_args),
+      required_observation_kinds: requiredObservationKinds,
+      required_terminal_kind: readNullableString(entry.required_terminal_kind),
+      allowed_substitutions: readStringArray(entry.allowed_substitutions),
+      forbidden_nearby_capabilities: readStringArray(entry.forbidden_nearby_capabilities),
+      input_bindings: readArray(entry.input_bindings)
+        .map((binding) => readRecord(binding))
+        .filter((binding): binding is RecordLike => Boolean(binding)),
+      observation_kind: readNullableString(entry.observation_kind) ?? (canReconcileFromArtifacts ? observedKind : null),
+      observation_ref: existingObservationRef ?? (canReconcileFromArtifacts ? observedRef : null),
+      observation_provenance:
+        readNullableString(entry.observation_provenance) ??
+        (canReconcileFromArtifacts ? "artifact_query_index.subgoal_observation_reconciliation" : null),
+      support_refs: unique([...readStringArray(entry.support_refs), ...(canReconcileFromArtifacts && observedRef ? [observedRef] : [])]),
+      bound_input_refs: readArray(entry.bound_input_refs)
+        .map((binding) => readRecord(binding))
+        .filter((binding): binding is RecordLike => Boolean(binding)),
+      unresolved_input_bindings: readArray(entry.unresolved_input_bindings)
+        .map((binding) => readRecord(binding))
+        .filter((binding): binding is RecordLike => Boolean(binding)),
+      satisfaction: canReconcileFromArtifacts ? "satisfied" : readNullableString(entry.satisfaction),
+      contribution_role: readNullableString(entry.contribution_role),
+      terminal_contribution_kind: readNullableString(entry.terminal_contribution_kind),
+      rail_status: railStatus,
+      first_broken_rail: railStatus === "complete" ? null : readNullableString(entry.first_broken_rail),
+      rail_failure_code: railStatus === "complete" ? null : readNullableString(entry.rail_failure_code),
+      repair_target: railStatus === "complete" ? null : readNullableString(entry.repair_target),
+      assistant_answer: false,
+      terminal_eligible: false,
+      raw_content_included: false,
+    };
+  };
   const compoundSubgoalRepresentedInLedger = (subgoal: RecordLike): boolean => {
     const subgoalId = readNullableString(subgoal.subgoal_id);
     if (subgoalId && compoundSubgoalLedger.some((entry) => readNullableString(entry.subgoal_id) === subgoalId)) {
@@ -2322,37 +2432,52 @@ export const buildArtifactQueryIndex = (input: {
       .map((binding) => readRecord(binding))
       .filter((binding): binding is RecordLike => Boolean(binding));
     const args = readRecord(subgoal.args_hint);
+    const requiredObservationKinds = readStringArray(subgoal.required_observation_kinds);
+    const observedArtifact = requiredObservationKinds.length
+      ? artifacts.find((artifact) => requiredObservationKinds.some((kind) => observationKindMatches(artifact, kind))) ?? null
+      : null;
+    const observedKind = observedArtifact
+      ? firstString(
+        readString(observedArtifact.kind),
+        readString(artifactPayload(observedArtifact)?.kind),
+        requiredObservationKinds.find((kind) => observationKindMatches(observedArtifact, kind)),
+      )
+      : null;
+    const observedRef = observedArtifact ? artifactRef(observedArtifact) : null;
+    const requestedCapability = readNullableString(subgoal.requested_capability);
+    const runtimeCapability = readNullableString(subgoal.runtime_capability);
+    const observedRuntimeCapability = observedArtifact ? runtimeCapability ?? requestedCapability : null;
     return {
       subgoal_id: readNullableString(subgoal.subgoal_id),
       order: readNumber(subgoal.order),
-      requested_capability: readNullableString(subgoal.requested_capability),
-      runtime_capability: readNullableString(subgoal.runtime_capability),
-      selected_capability: null,
-      executed_capability: null,
+      requested_capability: requestedCapability,
+      runtime_capability: runtimeCapability,
+      selected_capability: observedRuntimeCapability,
+      executed_capability: observedRuntimeCapability,
       args,
       args_source: "compound_contract_missing_ledger",
       planned_args: args,
-      selected_args: null,
+      selected_args: observedArtifact ? args : null,
       required_args: readStringArray(subgoal.required_args),
       optional_args: readStringArray(subgoal.optional_args),
-      required_observation_kinds: readStringArray(subgoal.required_observation_kinds),
+      required_observation_kinds: requiredObservationKinds,
       required_terminal_kind: readNullableString(subgoal.required_terminal_kind),
       allowed_substitutions: readStringArray(subgoal.allowed_substitutions),
       forbidden_nearby_capabilities: readStringArray(subgoal.forbidden_nearby_capabilities),
       input_bindings: inputBindings,
-      observation_kind: null,
-      observation_ref: null,
-      observation_provenance: null,
-      support_refs: [],
+      observation_kind: observedKind,
+      observation_ref: observedRef,
+      observation_provenance: observedArtifact ? "artifact_query_index.required_observation_fallback" : null,
+      support_refs: observedRef ? [observedRef] : [],
       bound_input_refs: [],
       unresolved_input_bindings: inputBindings,
-      satisfaction: "missing",
+      satisfaction: observedArtifact ? "satisfied" : "missing",
       contribution_role: readNullableString(subgoal.contribution_role),
       terminal_contribution_kind: readNullableString(subgoal.terminal_contribution_kind),
-      rail_status: "fail_closed",
-      first_broken_rail: "capability_execution",
-      rail_failure_code: "compound_subgoal_dropped",
-      repair_target: "agent_step_selection",
+      rail_status: observedArtifact ? "complete" : "fail_closed",
+      first_broken_rail: observedArtifact ? null : "capability_execution",
+      rail_failure_code: observedArtifact ? null : "compound_subgoal_dropped",
+      repair_target: observedArtifact ? null : "agent_step_selection",
       assistant_answer: false,
       terminal_eligible: false,
       raw_content_included: false,

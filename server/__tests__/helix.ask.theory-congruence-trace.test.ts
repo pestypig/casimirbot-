@@ -22,7 +22,10 @@ describe("Helix Ask theory congruence trace", () => {
     expect(trace?.depth_selected).toBe("congruence_trace");
     expect(trace?.assistant_answer).toBe(false);
     expect(trace?.terminal_eligible).toBe(false);
-    expect(trace?.terminal_authority.eligible).toBe(false);
+    expect((trace as unknown as { terminal_authority?: unknown })?.terminal_authority).toBeUndefined();
+    expect(trace?.solver_boundary.eligible_for_answer).toBe(false);
+    expect(trace?.solver_boundary.completed_solver_path_required).toBe(true);
+    expect(trace?.solver_boundary.candidate_answer_kind).toBe("theory_congruence_answer");
     expect(trace?.observations.every((observation) => observation.terminal_eligible === false)).toBe(true);
     expect(trace?.candidate_tools.some((decision) =>
       decision.tool === "theory_badge_graph" && decision.status === "admitted"

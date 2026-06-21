@@ -101,6 +101,33 @@ const liveEnvironmentQueryContract = (input: {
   ],
 });
 
+const liveEnvironmentEvidenceContract = (input: {
+  capability: string;
+  aliases?: string[];
+  requiredObservationKinds?: string[];
+  requiredTerminalKind?: string;
+}): ExplicitCapabilityContractDefinition => ({
+  schema: "helix.explicit_capability_contract.v1",
+  capability: input.capability,
+  ...(input.aliases ? { aliases: input.aliases } : {}),
+  capability_family: "live_environment",
+  plan_family: "live_environment",
+  source_target: "live_environment",
+  admission_families: ["live_environment"],
+  required_observation_kinds: [
+    "live_environment_tool_observation",
+    ...(input.requiredObservationKinds ?? []),
+  ],
+  required_terminal_kind: input.requiredTerminalKind ?? "model_synthesized_answer",
+  allowed_substitutions: [],
+  forbidden_nearby_capabilities: [
+    "live_env.read_processed_live_source_mail",
+    "live_env.read_live_source_mail",
+    "live_env.process_live_source_mail",
+    "model.direct_answer",
+  ],
+});
+
 const liveSourceMailEvidenceContract = (input: {
   capability: string;
   aliases?: string[];
@@ -140,11 +167,17 @@ const contextReflectionEvidenceContract = (input: {
 const requiredArgsForCapability = (capability: string): string[] => {
   switch (capability) {
     case "scientific-calculator.solve_expression":
+    case "scientific-calculator.solve_with_steps":
+    case "scientific-calculator.solve":
       return ["latex"];
     case "docs-viewer.locate_in_doc":
       return ["query"];
     case "docs-viewer.doc_equation_context":
       return ["query"];
+    case "docs-viewer.search_docs":
+      return ["query"];
+    case "docs-viewer.open_doc_by_path":
+      return ["path"];
     case "repo-code.search_concept":
       return ["query"];
     case "workspace-directory.resolve":
@@ -175,6 +208,10 @@ const requiredArgsForCapability = (capability: string): string[] => {
       return ["prompt"];
     case "helix_ask.reflect_civilization_bounds":
       return ["prompt"];
+    case "workstation-notes.create":
+    case "workstation-notes.create_note":
+      return ["title"];
+    case "workstation-notes.append":
     case "workstation-notes.append_to_note":
       return ["text"];
     default:
@@ -185,11 +222,23 @@ const requiredArgsForCapability = (capability: string): string[] => {
 const optionalArgsForCapability = (capability: string): string[] => {
   switch (capability) {
     case "scientific-calculator.solve_expression":
+    case "scientific-calculator.solve_with_steps":
+    case "scientific-calculator.solve":
       return ["expression", "equation"];
+    case "scientific-calculator.start_equation_live_source":
+      return ["latex", "expression", "equation"];
     case "docs-viewer.open":
+      return ["path", "anchor", "selected_text"];
+    case "docs-viewer.identify_current_doc":
       return ["path", "anchor", "selected_text"];
     case "docs-viewer.locate_in_doc":
       return ["path", "anchor", "term", "text"];
+    case "docs-viewer.search_docs":
+      return ["limit", "topic", "title"];
+    case "docs-viewer.validate_doc_candidates":
+      return ["query", "selected_path", "path"];
+    case "docs-viewer.open_doc_by_path":
+      return ["anchor", "selected_text"];
     case "docs-viewer.summarize_doc":
       return ["path", "anchor", "selected_text"];
     case "docs-viewer.doc_equation_context":
@@ -210,6 +259,37 @@ const optionalArgsForCapability = (capability: string): string[] => {
       return ["base_preset_id", "candidate_prompts", "confidence_threshold", "escalation_mode", "allow_none", "wake_prompt_contract", "wake_contract_prompt", "wake_contract_title"];
     case "live_env.route_micro_reasoner_prompt":
       return ["candidate_prompts", "confidence_threshold", "escalation_mode", "allow_none", "wake_prompt_contract", "wake_contract_prompt", "wake_contract_title"];
+    case "live_env.query_micro_reasoner_prompts":
+    case "live_env.apply_micro_reasoner_preset":
+    case "live_env.create_micro_reasoner_preset":
+    case "live_env.update_micro_reasoner_prompt":
+    case "live_env.test_micro_reasoner_prompt":
+      return ["query", "source_id", "source_ids", "preset_id", "role", "candidate_prompts", "base_preset_id", "scenario_text", "include_presets", "limit"];
+    case "live_env.read_card":
+    case "live_env.query_event_log":
+    case "live_env.query_world_events":
+    case "live_env.query_navigation_state":
+    case "live_env.query_constructs":
+    case "live_env.query_job_evidence":
+    case "live_env.request_probe":
+    case "live_env.record_commentary":
+      return ["environment_id", "room_id", "world_id", "line_keys", "event_types", "title", "summary", "reason", "evidence_refs", "limit"];
+    case "live_env.plan_stage_play_job":
+    case "live_env.request_stage_play_checkpoint":
+      return ["objective", "objective_text", "room_id", "environment_id", "source_id", "job_id", "reason", "evidence_refs"];
+    case "live_env.configure_visual_observer_profile":
+    case "live_env.apply_visual_observer_profile":
+    case "live_env.query_visual_observer_profiles":
+    case "live_env.test_visual_observer_profile":
+    case "live_env.compare_visual_observer_profiles":
+    case "live_env.request_visual_action_replay":
+      return ["profile_id", "profile_ids", "source_id", "source_ids", "title", "domain", "prompt", "summary", "include_presets", "limit"];
+    case "live_env.configure_interpreter_profile":
+    case "live_env.compare_mail_to_interpreter_profile":
+    case "live_env.predict_live_source_immediate":
+    case "live_env.compare_live_source_prediction":
+    case "live_env.project_live_source_narrative":
+      return ["profile_id", "mail_ids", "narrative_state_id", "policy_id", "job_id", "source_id", "room_id", "environment_id", "objective", "objective_text", "evidence_refs", "limit"];
     case "live_env.query_live_source_quality":
       return ["source_ref", "source_refs", "source_id", "source_ids", "expected_cadence_ms", "mailbox_thread_id"];
     case "live_env.summarize_live_source_current_state":
@@ -235,6 +315,10 @@ const optionalArgsForCapability = (capability: string): string[] => {
       return ["scenarioFrameRef", "source_ref", "source_refs", "refs", "options"];
     case "image_lens.inspect":
       return ["view_state", "source_id", "regions"];
+    case "workstation-notes.create":
+    case "workstation-notes.create_note":
+      return ["text", "body", "content"];
+    case "workstation-notes.append":
     case "workstation-notes.append_to_note":
       return ["body", "content", "note_id", "title"];
     default:
@@ -316,6 +400,58 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   },
   {
     schema: "helix.explicit_capability_contract.v1",
+    capability: "scientific-calculator.solve_with_steps",
+    aliases: ["calculator.solve_with_steps", "scientific calculator solve with steps", "solve with calculator steps"],
+    capability_family: "calculator",
+    plan_family: "workstation_action",
+    source_target: "calculator_stream",
+    admission_families: ["calculator", "workstation_action"],
+    required_observation_kinds: ["calculator_receipt", "calculator_subgoal_receipt", "workstation_tool_evaluation"],
+    required_terminal_kind: "workstation_tool_evaluation",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: "scientific-calculator.solve",
+    aliases: ["calculator.solve", "scientific calculator solve"],
+    capability_family: "calculator",
+    plan_family: "workstation_action",
+    source_target: "calculator_stream",
+    admission_families: ["calculator", "workstation_action"],
+    required_observation_kinds: ["calculator_receipt", "calculator_subgoal_receipt", "workstation_tool_evaluation"],
+    required_terminal_kind: "workstation_tool_evaluation",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["repo-code.search_concept", "model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: "scientific-calculator.open",
+    aliases: ["calculator.open", "open scientific calculator", "open calculator"],
+    capability_family: "calculator",
+    plan_family: "workstation_action",
+    source_target: "calculator_stream",
+    admission_families: ["calculator", "workstation_action"],
+    required_observation_kinds: ["workspace_action_receipt"],
+    required_terminal_kind: "workstation_tool_evaluation",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: "scientific-calculator.start_equation_live_source",
+    aliases: ["calculator.start_equation_live_source", "calculator live source", "start equation live source"],
+    capability_family: "calculator",
+    plan_family: "workstation_action",
+    source_target: "calculator_stream",
+    admission_families: ["calculator", "workstation_action"],
+    required_observation_kinds: ["workspace_action_receipt", "calculator_live_source_status"],
+    required_terminal_kind: "workstation_tool_evaluation",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
     capability: "workspace_os.status",
     aliases: [
       "workspace_status",
@@ -352,6 +488,58 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     source_target: "docs_viewer",
     admission_families: ["docs_viewer"],
     required_observation_kinds: ["doc_open_receipt", "docs_viewer_receipt"],
+    required_terminal_kind: "doc_open_receipt",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: "docs-viewer.identify_current_doc",
+    aliases: ["docs_viewer.identify_current_doc", "docs viewer identify current doc", "identify current doc"],
+    capability_family: "docs_viewer",
+    plan_family: "docs",
+    source_target: "docs_viewer",
+    admission_families: ["docs_viewer"],
+    required_observation_kinds: ["active_doc_identity", "doc_open_receipt", "docs_viewer_receipt"],
+    required_terminal_kind: "doc_open_receipt",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: "docs-viewer.search_docs",
+    aliases: ["docs_viewer.search_docs", "docs viewer search docs", "search docs"],
+    capability_family: "docs_viewer",
+    plan_family: "docs",
+    source_target: "docs_viewer",
+    admission_families: ["docs_viewer"],
+    required_observation_kinds: ["doc_search_results", "retrieval_context"],
+    required_terminal_kind: "model_synthesized_answer",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["docs-viewer.summarize_doc", "model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: "docs-viewer.validate_doc_candidates",
+    aliases: ["docs_viewer.validate_doc_candidates", "docs viewer validate candidates", "validate doc candidates"],
+    capability_family: "docs_viewer",
+    plan_family: "docs",
+    source_target: "docs_viewer",
+    admission_families: ["docs_viewer"],
+    required_observation_kinds: ["doc_candidate_validation"],
+    required_terminal_kind: "model_synthesized_answer",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["docs-viewer.summarize_doc", "model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: "docs-viewer.open_doc_by_path",
+    aliases: ["docs_viewer.open_doc_by_path", "docs viewer open doc by path", "open doc by path"],
+    capability_family: "docs_viewer",
+    plan_family: "docs",
+    source_target: "docs_viewer",
+    admission_families: ["docs_viewer"],
+    required_observation_kinds: ["doc_open_receipt"],
     required_terminal_kind: "doc_open_receipt",
     allowed_substitutions: [],
     forbidden_nearby_capabilities: ["model.direct_answer"],
@@ -426,7 +614,6 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
       "repo_code",
       "repo code",
       "repo_evidence",
-      "repo evidence",
       "repository code",
     ],
     capability_family: "repo_code",
@@ -557,6 +744,35 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
       "stage_play_micro_reasoner_prompt_delegation_result/v1",
     ],
     requiredObservationKinds: ["stage_play_micro_reasoner_prompt_delegation_result"],
+  }),
+  liveSourceMailEvidenceContract({
+    capability: "live_env.query_micro_reasoner_prompts",
+    aliases: [
+      "micro_reasoner_prompts",
+      "micro reasoner prompts",
+      "stage_play_micro_reasoner_prompt/v1",
+    ],
+    requiredObservationKinds: ["stage_play_micro_reasoner_prompt"],
+  }),
+  liveEnvironmentControlContract({
+    capability: "live_env.apply_micro_reasoner_preset",
+    aliases: ["apply_micro_reasoner_preset", "apply micro reasoner preset"],
+    requiredObservationKind: "stage_play_micro_reasoner_prompt_preset",
+  }),
+  liveEnvironmentControlContract({
+    capability: "live_env.create_micro_reasoner_preset",
+    aliases: ["create_micro_reasoner_preset", "create micro reasoner preset"],
+    requiredObservationKind: "stage_play_micro_reasoner_prompt_preset",
+  }),
+  liveEnvironmentControlContract({
+    capability: "live_env.update_micro_reasoner_prompt",
+    aliases: ["update_micro_reasoner_prompt", "update micro reasoner prompt"],
+    requiredObservationKind: "stage_play_micro_reasoner_prompt",
+  }),
+  liveEnvironmentQueryContract({
+    capability: "live_env.test_micro_reasoner_prompt",
+    aliases: ["test_micro_reasoner_prompt", "test micro reasoner prompt"],
+    requiredObservationKind: "stage_play_micro_reasoner_prompt_test",
   }),
   {
     schema: "helix.explicit_capability_contract.v1",
@@ -694,6 +910,91 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
       "stage_play_live_source_current_state",
       "helix.workstation_goal_context_update.v1",
     ],
+  }),
+  liveEnvironmentQueryContract({
+    capability: "live_env.read_card",
+    aliases: ["read_card", "live_card", "live card"],
+    requiredObservationKind: "live_environment_tool_observation",
+  }),
+  liveEnvironmentQueryContract({
+    capability: "live_env.query_event_log",
+    aliases: ["query_event_log", "event_log", "live event log"],
+    requiredObservationKind: "live_environment_tool_observation",
+  }),
+  liveEnvironmentQueryContract({
+    capability: "live_env.query_world_events",
+    aliases: ["query_world_events", "world_events", "world events"],
+    requiredObservationKind: "live_environment_tool_observation",
+  }),
+  liveEnvironmentQueryContract({
+    capability: "live_env.query_navigation_state",
+    aliases: ["query_navigation_state", "navigation_state", "navigation state"],
+    requiredObservationKind: "live_environment_tool_observation",
+  }),
+  liveEnvironmentEvidenceContract({
+    capability: "live_env.plan_stage_play_job",
+    aliases: ["plan_stage_play_job", "stage play job plan"],
+    requiredObservationKinds: ["stage_play_job_plan"],
+  }),
+  liveEnvironmentControlContract({
+    capability: "live_env.configure_visual_observer_profile",
+    aliases: ["configure_visual_observer_profile", "visual_observer_profile", "visual observer profile"],
+    requiredObservationKind: "stage_play_visual_observer_profile",
+  }),
+  liveEnvironmentControlContract({
+    capability: "live_env.apply_visual_observer_profile",
+    aliases: ["apply_visual_observer_profile", "apply visual observer profile", "apply visual observer shades"],
+    requiredObservationKind: "stage_play_visual_observer_profile",
+  }),
+  liveEnvironmentQueryContract({
+    capability: "live_env.query_visual_observer_profiles",
+    aliases: ["query_visual_observer_profiles", "visual observer profiles", "visual observer shades"],
+    requiredObservationKind: "stage_play_visual_observer_profile",
+  }),
+  liveEnvironmentQueryContract({
+    capability: "live_env.test_visual_observer_profile",
+    aliases: ["test_visual_observer_profile", "test visual observer profile"],
+    requiredObservationKind: "stage_play_visual_observer_profile_test",
+  }),
+  liveEnvironmentQueryContract({
+    capability: "live_env.compare_visual_observer_profiles",
+    aliases: ["compare_visual_observer_profiles", "compare visual observer profiles"],
+    requiredObservationKind: "stage_play_visual_observer_profile_test",
+  }),
+  liveEnvironmentEvidenceContract({
+    capability: "live_env.request_visual_action_replay",
+    aliases: ["request_visual_action_replay", "visual action replay"],
+    requiredObservationKinds: ["helix_visual_frame_action_replay_request"],
+  }),
+  liveEnvironmentControlContract({
+    capability: "live_env.configure_interpreter_profile",
+    aliases: ["configure_interpreter_profile", "interpreter profile"],
+    requiredObservationKind: "stage_play_live_source_interpreter_profile",
+  }),
+  liveEnvironmentQueryContract({
+    capability: "live_env.compare_mail_to_interpreter_profile",
+    aliases: ["compare_mail_to_interpreter_profile", "mail interpreter profile comparison"],
+    requiredObservationKind: "stage_play_live_source_interpreter_profile_comparison",
+  }),
+  liveEnvironmentEvidenceContract({
+    capability: "live_env.request_stage_play_checkpoint",
+    aliases: ["request_stage_play_checkpoint", "stage play checkpoint"],
+    requiredObservationKinds: ["stage_play_checkpoint_request"],
+  }),
+  liveEnvironmentQueryContract({
+    capability: "live_env.predict_live_source_immediate",
+    aliases: ["predict_live_source_immediate", "predict live source immediate"],
+    requiredObservationKind: "helix_live_source_immediate_prediction",
+  }),
+  liveEnvironmentQueryContract({
+    capability: "live_env.compare_live_source_prediction",
+    aliases: ["compare_live_source_prediction", "compare live source prediction"],
+    requiredObservationKind: "helix_live_source_prediction_comparison",
+  }),
+  liveEnvironmentControlContract({
+    capability: "live_env.project_live_source_narrative",
+    aliases: ["project_live_source_narrative", "live source narrative state"],
+    requiredObservationKind: "stage_play_live_source_narrative_state",
   }),
   {
     schema: "helix.explicit_capability_contract.v1",
@@ -836,6 +1137,28 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
     capability: "live_env.start_agent_goal_session",
     aliases: ["start_agent_goal_session"],
     requiredObservationKind: "stage_play_agent_goal_session_tool_result",
+  }),
+  liveEnvironmentQueryContract({
+    capability: "live_env.query_constructs",
+    aliases: ["query_constructs", "situation room constructs"],
+    requiredObservationKind: "live_environment_tool_observation",
+  }),
+  liveEnvironmentQueryContract({
+    capability: "live_env.query_job_evidence",
+    aliases: ["query_job_evidence", "live job evidence"],
+    requiredObservationKind: "live_environment_tool_observation",
+  }),
+  liveEnvironmentEvidenceContract({
+    capability: "live_env.request_probe",
+    aliases: ["request_probe", "bounded live evidence probe"],
+  }),
+  liveEnvironmentEvidenceContract({
+    capability: "live_env.record_commentary",
+    aliases: ["record_commentary", "live evidence commentary"],
+  }),
+  liveEnvironmentEvidenceContract({
+    capability: "live_env.spawn_field_worker",
+    aliases: ["spawn_field_worker", "spawn field worker"],
   }),
   {
     schema: "helix.explicit_capability_contract.v1",
@@ -1081,6 +1404,7 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
   {
     schema: "helix.explicit_capability_contract.v1",
     capability: "workstation-notes.append_to_note",
+    aliases: ["workstation-notes.append", "workstation notes append"],
     capability_family: "workstation",
     plan_family: "workstation_action",
     source_target: "workspace_action",
@@ -1091,6 +1415,36 @@ const explicitCapabilityContractDefinitions: ExplicitCapabilityContractDefinitio
       "note_action_receipt",
     ],
     required_terminal_kind: "model_synthesized_answer",
+    allowed_substitutions: [],
+    forbidden_nearby_capabilities: ["model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: "workstation-notes.create_note",
+    aliases: ["workstation-notes.create", "workstation notes create", "create workstation note"],
+    capability_family: "workstation",
+    plan_family: "workstation_action",
+    source_target: "workspace_action",
+    admission_families: ["notes", "workstation_action"],
+    required_observation_kinds: [
+      "workspace_action_receipt",
+      "note_context",
+      "note_create_receipt",
+    ],
+    required_terminal_kind: "model_synthesized_answer",
+    allowed_substitutions: ["workstation-notes.create"],
+    forbidden_nearby_capabilities: ["model.direct_answer"],
+  },
+  {
+    schema: "helix.explicit_capability_contract.v1",
+    capability: "workstation-notes.open",
+    aliases: ["workstation notes open", "open workstation notes"],
+    capability_family: "workstation",
+    plan_family: "workstation_action",
+    source_target: "workspace_action",
+    admission_families: ["notes", "workstation_action"],
+    required_observation_kinds: ["workspace_action_receipt"],
+    required_terminal_kind: "workstation_tool_evaluation",
     allowed_substitutions: [],
     forbidden_nearby_capabilities: ["model.direct_answer"],
   },
@@ -1143,6 +1497,13 @@ const compoundCommandChainMentionsCapabilityAt = (prompt: string, matchIndex: nu
   return /\b(?:then|and|plus|after|before|followed\s+by|next)\b[\s\S]{0,80}$/i.test(before);
 };
 
+const commandClauseOrdinal = (prompt: string, matchIndex: number): number => {
+  const before = prompt.slice(0, Math.max(0, matchIndex));
+  return Array.from(
+    before.matchAll(/\b(?:then|next|followed\s+by|and\s+then|plus)\b\s+(?:call|use|run|invoke|execute)?\b/gi),
+  ).length;
+};
+
 const commandMentionsContract = (prompt: string, contract: ExplicitCapabilityContract): boolean => {
   const names = uniqueStrings([
     contract.capability,
@@ -1153,6 +1514,7 @@ const commandMentionsContract = (prompt: string, contract: ExplicitCapabilityCon
 };
 
 const familySuppressed = (prompt: string, contract: ExplicitCapabilityContract): boolean => {
+  if (commandMentionsContract(prompt, contract)) return false;
   const suppression = detectContextualToolAdmissionSuppression(prompt);
   if (!suppression) return false;
   if (suppression.suppression_reason === "explanatory_only") return false;
@@ -1209,7 +1571,6 @@ export const extractExplicitCapabilityContracts = (
       contract.runtime_capability ?? "",
       ...(contract.aliases ?? []),
     ]);
-    let best: ExtractedExplicitCapabilityContract | null = null;
     for (const name of names) {
       const matcher = capabilityMentionRegex(name);
       for (const match of prompt.matchAll(matcher)) {
@@ -1226,18 +1587,39 @@ export const extractExplicitCapabilityContracts = (
           match_end_index: matchIndex + name.length,
           source: commandMention ? "command_mention" : "compound_command_chain",
         };
-        if (!best || candidate.match_index < best.match_index) {
-          best = candidate;
-        }
+        matches.push(candidate);
       }
     }
-    if (best) matches.push(best);
   }
-  return matches
-    .sort((left, right) => left.match_index - right.match_index)
-    .filter((match, index, ordered) =>
-      ordered.findIndex((entry) => entry.contract.capability === match.contract.capability) === index
-    );
+  const seen = new Set<string>();
+  const orderedMatches = matches
+    .sort((left, right) =>
+      left.match_index - right.match_index ||
+      (right.match_end_index - right.match_index) - (left.match_end_index - left.match_index)
+    )
+    .filter((match) => {
+      const key = `${match.contract.capability}:${match.match_index}:${match.match_end_index}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  const clauseSeen = new Set<string>();
+  const clauseDedupeMatches = orderedMatches.filter((match) => {
+    const key = `${match.contract.capability}:${commandClauseOrdinal(prompt, match.match_index)}`;
+    if (clauseSeen.has(key)) return false;
+    clauseSeen.add(key);
+    return true;
+  });
+  return clauseDedupeMatches.filter((match, index, ordered) =>
+    !ordered.some((other, otherIndex) => {
+      if (otherIndex === index) return false;
+      const matchLength = Math.max(0, match.match_end_index - match.match_index);
+      const otherLength = Math.max(0, other.match_end_index - other.match_index);
+      return other.match_index <= match.match_index &&
+        other.match_end_index >= match.match_end_index &&
+        otherLength > matchLength;
+    })
+  );
 };
 
 export const explicitCapabilityMatches = (

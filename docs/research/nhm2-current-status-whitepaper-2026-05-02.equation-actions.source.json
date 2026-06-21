@@ -429,6 +429,94 @@
       ]
     },
     {
+      "equationId": "nhm2-experiment-facing-theory-roadmap",
+      "label": "NHM2 experiment-facing theory roadmap",
+      "aliases": [
+        "PredictionFreeze -> TileMetrology -> EnergyLedger -> ArrayScaling -> T_mu_nu apparatus -> VacuumWeight -> MetricResponse",
+        "nhm2_experiment_facing_theory_roadmap/v1",
+        "pre-hardware theory solves and falsifiers"
+      ],
+      "actions": [
+        {
+          "actionId": "open-experiment-facing-theory-roadmap",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open experiment-facing roadmap",
+          "badgeIds": [
+            "nhm2.experimental.theory_solve_roadmap",
+            "nhm2.experimental.prediction_freeze",
+            "nhm2.experimental.tile_force_receipt",
+            "nhm2.experimental.tile_cycle_energy_balance",
+            "nhm2.experimental.array_scaling",
+            "nhm2.experimental.full_apparatus_tensor",
+            "nhm2.experimental.vacuum_weight",
+            "nhm2.experimental.metric_upper_bound",
+            "nhm2.experimental.invariant_metric_response",
+            "nhm2.experimental.geodesic_response",
+            "nhm2.experimental.independent_replication",
+            "nhm2.claim_boundary.physical_viability_locked",
+            "nhm2.claim_boundary.transport_locked"
+          ],
+          "preferredBadgeId": "nhm2.experimental.theory_solve_roadmap",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "The roadmap names pre-hardware theory solves and falsifiers; it is not an experimental receipt or physical-viability result."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Roadmap rows are planning surfaces, not measured source evidence.",
+        "Scalar calculator rows remain sanity checks and cannot substitute for receipts."
+      ]
+    },
+    {
+      "equationId": "nhm2-physical-evidence-campaign-ladder",
+      "label": "NHM2 physical evidence campaign ladder",
+      "aliases": [
+        "DiagnosticCampaignAdmissible -> PredictionFreeze -> TileMetrology -> VacuumWeight -> MetricResponse -> TransportPrecursor",
+        "nhm2_physical_viability_campaign/v1",
+        "nhm2_experiment_facing_theory_roadmap/v1",
+        "physical viability and transport claim locks remain closed"
+      ],
+      "actions": [
+        {
+          "actionId": "open-physical-evidence-campaign-theory-path",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open physical evidence campaign path",
+          "badgeIds": [
+            "nhm2.dynamic.time_dependent_source_campaign",
+            "nhm2.formal.diagnostic_campaign_admissible",
+            "nhm2.experimental.physical_viability_campaign",
+            "nhm2.experimental.theory_solve_roadmap",
+            "nhm2.experimental.prediction_freeze",
+            "nhm2.experimental.tile_force_receipt",
+            "nhm2.experimental.tile_cycle_energy_balance",
+            "nhm2.experimental.array_scaling",
+            "nhm2.experimental.full_apparatus_tensor",
+            "nhm2.experimental.vacuum_weight",
+            "nhm2.experimental.metric_upper_bound",
+            "nhm2.experimental.invariant_metric_response",
+            "nhm2.experimental.geodesic_response",
+            "nhm2.experimental.independent_replication",
+            "nhm2.claim_boundary.physical_viability_locked",
+            "nhm2.claim_boundary.transport_locked"
+          ],
+          "preferredBadgeId": "nhm2.experimental.physical_viability_campaign",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": ["theory-badge-graph", "scientific-calculator"],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "The diagnostic campaign can feed the physical evidence ladder, but experimental receipts are still missing and claim locks remain closed."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Physical viability requires experimental receipts beyond diagnostic campaign admission.",
+        "Transport remains locked until a neutral geodesic or clock-worldline response is measured and replicated."
+      ]
+    },
+    {
       "equationId": "nhm2-trip-clocking-tau",
       "label": "Trip clocking proper time",
       "aliases": [
