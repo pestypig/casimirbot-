@@ -24,6 +24,14 @@ const generatedAt = "2026-06-22T00:00:00.000Z";
 const selectedProfileId =
   "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1";
 
+const subsystemReceiptRefs = {
+  materialCoupon: "receipt://material-coupon/tin/v1",
+  forceGapPullIn: "receipt://force-gap/8nm/v1",
+  roughnessPatch: "receipt://roughness-patch/tin/v1",
+  activeControl: "receipt://active-control/gap-lock-v1",
+  fatigueLayerScaling: "receipt://fatigue-layer-scaling/v1",
+};
+
 const tensor = (scale: number): Nhm2RegionalTensor => ({
   T00: -scale,
   T01: scale * 0.001,
@@ -263,6 +271,7 @@ describe("NHM2 tile-source full-apparatus tensor values", () => {
     const evidence = buildFullApparatusTensorEvidenceFromTensorValues({
       artifact: values,
       evidenceTier: "validated_simulation",
+      subsystemReceiptRefs,
     });
     const receipts = buildNhm2TileSourceMaterialEvidenceReceipts({
       generatedAt,
@@ -303,6 +312,9 @@ describe("NHM2 tile-source full-apparatus tensor values", () => {
             selectedProfileId,
             candidateId: "nhm2_447_layer_topology_optimized_lattice_tin_v1",
             fullApparatusTensorValues: values,
+            fullApparatusTensor: {
+              subsystemReceiptRefs,
+            },
           },
           null,
           2,

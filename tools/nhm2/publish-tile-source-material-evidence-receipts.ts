@@ -511,6 +511,7 @@ export const publishNhm2TileSourceMaterialEvidenceReceipts = (args: {
               fullApparatusTensorValues.artifactRef ??
               outputRefs.fullApparatusTensorValues ??
               null,
+            subsystemReceiptRefs: evidence.fullApparatusTensor?.subsystemReceiptRefs,
           }),
         };
   const materialEvidenceReceipts = buildNhm2TileSourceMaterialEvidenceReceipts({

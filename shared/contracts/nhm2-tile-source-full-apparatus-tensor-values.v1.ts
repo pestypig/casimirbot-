@@ -371,6 +371,7 @@ export const buildFullApparatusTensorEvidenceFromTensorValues = (args: {
   artifact: Nhm2TileSourceFullApparatusTensorValuesV1;
   evidenceTier: Extract<Nhm2TileSourceEvidenceTier, "measured" | "validated_simulation">;
   evidenceRef?: string | null;
+  subsystemReceiptRefs?: Nhm2TileSourceFullApparatusTensorEvidenceV1["subsystemReceiptRefs"];
 }): Nhm2TileSourceFullApparatusTensorEvidenceV1 => {
   const artifact = args.artifact;
   const componentAvailable = (componentIds: readonly Nhm2TensorComponent[]): boolean =>
@@ -470,6 +471,7 @@ export const buildFullApparatusTensorEvidenceFromTensorValues = (args: {
         artifact.regions.find((region) => region.regionId === "exterior_shell")?.regionSupportRef ??
         null,
     },
+    subsystemReceiptRefs: args.subsystemReceiptRefs,
   };
 };
 
