@@ -832,9 +832,9 @@ describe("NHM2 tile source material evidence receipts", () => {
       expect(result.experimentalCampaignPackage.summary.measurementDocketCount).toBeGreaterThan(
         result.experimentalCampaignPackage.summary.measurementCount,
       );
-      expect(result.experimentalCampaignPackage.summary.requiredTargetAvailableCount).toBe(18);
-      expect(result.experimentalCampaignPackage.summary.requiredTargetPendingCount).toBe(2);
-      expect(result.experimentalCampaignPackage.summary.requiredTargetNotApplicableCount).toBe(3);
+      expect(result.experimentalCampaignPackage.summary.requiredTargetAvailableCount).toBe(45);
+      expect(result.experimentalCampaignPackage.summary.requiredTargetPendingCount).toBe(0);
+      expect(result.experimentalCampaignPackage.summary.requiredTargetNotApplicableCount).toBe(4);
       expect(result.experimentalCampaignPackage.summary.requiredTargetNotDeclaredCount).toBe(0);
       expect(result.experimentalCampaignPackage.summary.missingMeasurementCount).toBeGreaterThan(0);
       expect(result.experimentalCampaignPackage.summary.failingMeasurementCount).toBe(0);
@@ -842,11 +842,11 @@ describe("NHM2 tile source material evidence receipts", () => {
       expect(result.experimentalCampaignPackage.summary.objectiveCoverageCount).toBe(9);
       expect(result.experimentalCampaignPackage.summary.campaignDomainLedgerCount).toBe(8);
       expect(result.experimentalCampaignPackage.summary.receiptAcquisitionDomainCount).toBe(8);
-      expect(result.experimentalCampaignPackage.summary.receiptArtifactRequirementCount).toBe(23);
+      expect(result.experimentalCampaignPackage.summary.receiptArtifactRequirementCount).toBe(49);
       expect(result.experimentalCampaignPackage.summary.domainsWithPendingDerivedTargetsCount).toBe(
-        2,
+        0,
       );
-      expect(result.experimentalCampaignPackage.summary.targetGapMeasurementCount).toBe(2);
+      expect(result.experimentalCampaignPackage.summary.targetGapMeasurementCount).toBe(0);
       expect(result.experimentalCampaignPackage.summary.missingReceiptDomainCount).toBe(7);
       expect(result.experimentalCampaignPackage.summary.downstreamBlockedDomainCount).toBe(1);
       expect(result.experimentalCampaignPackage.summary.noGoDomainCount).toBe(0);
@@ -879,40 +879,118 @@ describe("NHM2 tile source material evidence receipts", () => {
             decision: "review",
             nextEvidenceArtifact: "receipt://material_coupon/provenance_v1",
             requiredEvidenceArtifacts: expect.arrayContaining([
+              "receipt://material_coupon/447_layer_load_case_compatibility_v1",
+              "receipt://material_coupon/tensile_stress_4k_v1",
               "receipt://material_coupon/fracture_yield_margin_v1",
               "receipt://material_coupon/fatigue_cycle_margin_v1",
+              "receipt://material_coupon/cryogenic_4k_state_v1",
               "receipt://material_coupon/material_response_15ghz_4k_v1",
+              "receipt://material_coupon/roughness_rms_v1",
+              "receipt://material_coupon/fabrication_tolerance_v1",
             ]),
             openMeasurementIds: expect.arrayContaining([
+              "coupon_stack_compatibility",
+              "coupon_tensile_stress_margin",
               "coupon_fracture_yield_margin",
               "coupon_fatigue_cycle_margin",
+              "coupon_cryogenic_state",
               "coupon_material_response",
+              "coupon_roughness_rms",
+              "coupon_fabrication_tolerance",
             ]),
-            requiredTargetAvailableCount: 3,
+            requiredTargetAvailableCount: 8,
             requiredTargetPendingCount: 0,
             blocksCampaignPass: true,
           }),
           expect.objectContaining({
-            campaignDomain: "active_control_energy_noise_heat_timing",
+            campaignDomain: "force_gap_pull_in",
             requiredEvidenceArtifacts: expect.arrayContaining([
-              "receipt://active_control/bandwidth_15ghz_switching_v1",
-              "receipt://active_control/gap_noise_spectrum_v1",
-              "receipt://active_control/heat_load_sink_capacity_v1",
+              "receipt://force_gap_pull_in/gap_metrology_8nm_v1",
+              "receipt://force_gap_pull_in/force_gap_curve_8nm_v1",
+              "receipt://force_gap_pull_in/force_gradient_8nm_v1",
+              "receipt://force_gap_pull_in/stiffness_model_8nm_v1",
+              "receipt://force_gap_pull_in/pull_in_margin_8nm_v1",
+              "receipt://force_gap_pull_in/stiction_margin_8nm_v1",
+              "receipt://force_gap_pull_in/active_authority_447_layer_v1",
             ]),
             openMeasurementIds: expect.arrayContaining([
-              "active_control_bandwidth",
-              "gap_noise_margin",
-              "thermal_sink_capacity",
+              "gap_metrology_8nm",
+              "force_curve_brackets_8nm",
+              "force_gradient_curve_8nm",
+              "stiffness_model_8nm",
+              "pull_in_margin",
+              "stiction_margin",
+              "active_gap_authority",
             ]),
-            requiredTargetPendingCount: 1,
-            pendingTargetGaps: [
-              {
-                measurementId: "thermal_sink_capacity",
-                requiredTargetKey: "heatSinkCapacityMinW",
-                requiredTargetGapReason:
-                  "heatSinkCapacityMinW_missing_from_required_corrections",
-              },
-            ],
+            requiredTargetAvailableCount: 6,
+            requiredTargetPendingCount: 0,
+            pendingTargetGaps: [],
+          }),
+          expect.objectContaining({
+            campaignDomain: "roughness_patch_potential",
+            requiredEvidenceArtifacts: expect.arrayContaining([
+              "receipt://roughness_patch_metrology/gap_metrology_8nm_v1",
+              "receipt://roughness_patch_metrology/roughness_map_resolution_v1",
+              "receipt://roughness_patch_metrology/scan_area_coverage_v1",
+              "receipt://roughness_patch_metrology/roughness_rms_map_v1",
+              "receipt://roughness_patch_metrology/asperity_p99_tail_v1",
+              "receipt://roughness_patch_metrology/asperity_p999_tail_v1",
+              "receipt://roughness_patch_metrology/asperity_tail_map_v1",
+              "receipt://roughness_patch_metrology/patch_voltage_rms_v1",
+              "receipt://roughness_patch_metrology/patch_derived_electrostatic_fraction_v1",
+              "receipt://roughness_patch_metrology/patch_potential_force_v1",
+            ]),
+            openMeasurementIds: expect.arrayContaining([
+              "roughness_gap_metrology_8nm",
+              "roughness_map_resolution",
+              "roughness_scan_area",
+              "roughness_rms_margin",
+              "asperity_p99_tail",
+              "asperity_p999_tail",
+              "asperity_tail_clearance",
+              "patch_voltage_rms",
+              "patch_derived_electrostatic_fraction",
+              "patch_potential_force_fraction",
+            ]),
+            requiredTargetAvailableCount: 9,
+            requiredTargetPendingCount: 0,
+            pendingTargetGaps: [],
+          }),
+          expect.objectContaining({
+            campaignDomain: "active_control_energy_noise_heat_timing",
+            requiredEvidenceArtifacts: expect.arrayContaining([
+              "receipt://active_control/trace_refs_v1",
+              "receipt://active_control/switching_rate_sync_v1",
+              "receipt://active_control/bandwidth_15ghz_switching_v1",
+              "receipt://active_control/gap_control_authority_v1",
+              "receipt://active_control/gap_noise_spectrum_v1",
+              "receipt://active_control/timing_jitter_v1",
+              "receipt://active_control/phase_noise_v1",
+              "receipt://active_control/controller_phase_margin_v1",
+              "receipt://active_control/controller_gain_margin_v1",
+              "receipt://active_control/heat_load_v1",
+              "receipt://active_control/heat_load_sink_capacity_v1",
+              "receipt://active_control/energy_per_cycle_heat_limit_v1",
+              "receipt://active_control/failure_mode_coverage_v1",
+            ]),
+            openMeasurementIds: expect.arrayContaining([
+              "active_control_trace_refs",
+              "switching_rate_sync",
+              "active_control_bandwidth",
+              "gap_control_authority",
+              "gap_noise_margin",
+              "timing_jitter_margin",
+              "phase_noise_margin",
+              "controller_phase_margin",
+              "controller_gain_margin",
+              "active_control_heat_load",
+              "thermal_sink_capacity",
+              "energy_per_cycle_heat_limit",
+              "failure_mode_coverage",
+            ]),
+            requiredTargetAvailableCount: 13,
+            requiredTargetPendingCount: 0,
+            pendingTargetGaps: [],
           }),
           expect.objectContaining({
             campaignDomain: "fatigue_layer_scaling",
@@ -932,14 +1010,9 @@ describe("NHM2 tile source material evidence receipts", () => {
               "active_area_retention",
               "source_tensor_retention",
             ]),
-            requiredTargetPendingCount: 1,
-            pendingTargetGaps: [
-              {
-                measurementId: "fatigue_cycle_margin",
-                requiredTargetKey: "cycleCountRequired",
-                requiredTargetGapReason: "cycleCountRequired_missing_from_required_corrections",
-              },
-            ],
+            requiredTargetAvailableCount: 6,
+            requiredTargetPendingCount: 0,
+            pendingTargetGaps: [],
           }),
           expect.objectContaining({
             campaignDomain: "full_apparatus_tensor",
@@ -962,6 +1035,24 @@ describe("NHM2 tile source material evidence receipts", () => {
         expect.arrayContaining([
           expect.objectContaining({
             campaignDomain: "material_coupon_behavior",
+            measurementId: "coupon_stack_compatibility",
+            target: "2 compatibility refs: load case and layer stack",
+            requiredCorrectionKey: "missingCampaignCompatibilityRefCount",
+            requiredTargetKey: "requiredCampaignCompatibilityRefCount",
+            requiredTargetValue: 2,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "material_coupon_behavior",
+            measurementId: "coupon_tensile_stress_margin",
+            target: "measured tensile stress >= 5.45707087858e8 Pa",
+            requiredCorrectionKey: "tensileStressShortfallPa",
+            requiredTargetKey: "tensileStressMinPa",
+            requiredTargetValue: 545707087.858,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "material_coupon_behavior",
             measurementId: "coupon_fracture_yield_margin",
             target: "fracture/yield stress >= 1.09141417572e9 Pa",
             requiredCorrectionKey: "fractureOrYieldStressShortfallPa",
@@ -982,13 +1073,62 @@ describe("NHM2 tile source material evidence receipts", () => {
             requiredTargetStatus: "available",
           }),
           expect.objectContaining({
+            campaignDomain: "material_coupon_behavior",
+            measurementId: "coupon_cryogenic_state",
+            requiredCorrectionKey: "cryogenicTemperatureReductionK",
+            requiredTargetKey: "operatingTemperatureK",
+            requiredTargetValue: 4,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "material_coupon_behavior",
+            measurementId: "coupon_roughness_rms",
+            requiredCorrectionKey: "roughnessRmsReductionMeters",
+            requiredTargetKey: "roughnessRmsMaxMeters",
+            requiredTargetValue: 1e-10,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "material_coupon_behavior",
+            measurementId: "coupon_fabrication_tolerance",
+            requiredCorrectionKey: "fabricationToleranceReductionMeters",
+            requiredTargetKey: "fabricationToleranceMaxMeters",
+            requiredTargetValue: 5e-10,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
             campaignDomain: "force_gap_pull_in",
-            measurementId: "force_curve_brackets_8nm",
+            measurementId: "gap_metrology_8nm",
             requiredCorrectionKey: null,
             requiredTargetKey: null,
             requiredTargetValue: null,
             requiredTargetStatus: "not_applicable",
             requiredTargetGapReason: null,
+          }),
+          expect.objectContaining({
+            campaignDomain: "force_gap_pull_in",
+            measurementId: "force_curve_brackets_8nm",
+            requiredCorrectionKey: "suppliedForceDeltaFromIdealStackForceN",
+            requiredTargetKey: "suppliedForceAbsTargetN",
+            requiredTargetValue: 14188.3842843,
+            requiredTargetStatus: "available",
+            requiredTargetGapReason: null,
+          }),
+          expect.objectContaining({
+            campaignDomain: "force_gap_pull_in",
+            measurementId: "force_gradient_curve_8nm",
+            requiredCorrectionKey: "forceGradientConsistencyShortfall",
+            requiredTargetKey: "forceGradientConsistencyMin",
+            requiredTargetValue: 0.75,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "force_gap_pull_in",
+            measurementId: "stiffness_model_8nm",
+            requiredCorrectionKey: "springConstantShortfallNPerM",
+            requiredTargetKey: "springConstantMinNPerM",
+            requiredTargetValue: 7094192142150,
+            requiredTargetStatus: "available",
           }),
           expect.objectContaining({
             campaignDomain: "force_gap_pull_in",
@@ -1003,6 +1143,14 @@ describe("NHM2 tile source material evidence receipts", () => {
           }),
           expect.objectContaining({
             campaignDomain: "force_gap_pull_in",
+            measurementId: "stiction_margin",
+            requiredCorrectionKey: "stictionMarginShortfall",
+            requiredTargetKey: "stictionMarginMin",
+            requiredTargetValue: 1,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "force_gap_pull_in",
             measurementId: "active_gap_authority",
             requiredCorrectionKey: "activeGapControlAuthorityShortfallN",
             requiredCorrectionValue: null,
@@ -1013,10 +1161,74 @@ describe("NHM2 tile source material evidence receipts", () => {
           }),
           expect.objectContaining({
             campaignDomain: "roughness_patch_potential",
+            measurementId: "roughness_gap_metrology_8nm",
+            requiredCorrectionKey: null,
+            requiredTargetKey: null,
+            requiredTargetValue: null,
+            requiredTargetStatus: "not_applicable",
+          }),
+          expect.objectContaining({
+            campaignDomain: "roughness_patch_potential",
+            measurementId: "roughness_map_resolution",
+            requiredCorrectionKey: "roughnessMapResolutionReductionMeters",
+            requiredTargetKey: "roughnessMapLateralResolutionMaxMeters",
+            requiredTargetValue: 5e-10,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "roughness_patch_potential",
+            measurementId: "roughness_scan_area",
+            requiredCorrectionKey: "roughnessScanAreaFractionShortfall",
+            requiredTargetKey: "roughnessScanAreaFractionMin",
+            requiredTargetValue: 0.95,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "roughness_patch_potential",
             measurementId: "roughness_rms_margin",
             requiredCorrectionKey: "roughnessRmsReductionMeters",
             requiredTargetKey: "roughnessRmsMaxMeters",
             requiredTargetValue: 1e-10,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "roughness_patch_potential",
+            measurementId: "asperity_p99_tail",
+            requiredCorrectionKey: "asperityP99ReductionMeters",
+            requiredTargetKey: "asperityP99MaxMeters",
+            requiredTargetValue: 2e-9,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "roughness_patch_potential",
+            measurementId: "asperity_p999_tail",
+            requiredCorrectionKey: "asperityP999ReductionMeters",
+            requiredTargetKey: "asperityP999MaxMeters",
+            requiredTargetValue: 3e-9,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "roughness_patch_potential",
+            measurementId: "asperity_tail_clearance",
+            requiredCorrectionKey: "gapClearanceShortfallMeters",
+            requiredTargetKey: "minimumGapClearanceRequiredMeters",
+            requiredTargetValue: 4e-9,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "roughness_patch_potential",
+            measurementId: "patch_voltage_rms",
+            requiredCorrectionKey: "patchVoltageReductionVolts",
+            requiredTargetKey: "patchVoltageRmsMaxVolts",
+            requiredTargetValue: 0.01,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "roughness_patch_potential",
+            measurementId: "patch_derived_electrostatic_fraction",
+            requiredCorrectionKey: "patchVoltageDerivedElectrostaticFractionReduction",
+            requiredTargetKey: "patchVoltageDerivedElectrostaticFractionMax",
+            requiredTargetValue: 0.05,
             requiredTargetStatus: "available",
           }),
           expect.objectContaining({
@@ -1029,10 +1241,34 @@ describe("NHM2 tile source material evidence receipts", () => {
           }),
           expect.objectContaining({
             campaignDomain: "active_control_energy_noise_heat_timing",
+            measurementId: "active_control_trace_refs",
+            requiredCorrectionKey: "missingTraceRefCount",
+            requiredTargetKey: "requiredTraceRefCount",
+            requiredTargetValue: 14,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "active_control_energy_noise_heat_timing",
+            measurementId: "switching_rate_sync",
+            requiredCorrectionKey: "switchingRateAbsDeltaHz",
+            requiredTargetKey: "switchingRateTargetHz",
+            requiredTargetValue: 15e9,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "active_control_energy_noise_heat_timing",
             measurementId: "active_control_bandwidth",
             requiredCorrectionKey: "bandwidthShortfallHz",
             requiredTargetKey: "bandwidthMinHz",
             requiredTargetValue: 30e9,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "active_control_energy_noise_heat_timing",
+            measurementId: "gap_control_authority",
+            requiredCorrectionKey: "gapControlAuthorityShortfallN",
+            requiredTargetKey: "gapControlAuthorityMinN",
+            requiredTargetValue: 17026.0611412,
             requiredTargetStatus: "available",
           }),
           expect.objectContaining({
@@ -1045,21 +1281,80 @@ describe("NHM2 tile source material evidence receipts", () => {
           }),
           expect.objectContaining({
             campaignDomain: "active_control_energy_noise_heat_timing",
+            measurementId: "timing_jitter_margin",
+            requiredCorrectionKey: "timingJitterReductionSeconds",
+            requiredTargetKey: "timingJitterMaxSeconds",
+            requiredTargetValue: 6.666666666666667e-12,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "active_control_energy_noise_heat_timing",
+            measurementId: "phase_noise_margin",
+            requiredCorrectionKey: "phaseNoiseReductionSeconds",
+            requiredTargetKey: "phaseNoiseMaxSeconds",
+            requiredTargetValue: 3.3333333333333335e-12,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "active_control_energy_noise_heat_timing",
+            measurementId: "controller_phase_margin",
+            requiredCorrectionKey: "controllerPhaseMarginShortfallDegrees",
+            requiredTargetKey: "controllerPhaseMarginMinDegrees",
+            requiredTargetValue: 45,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "active_control_energy_noise_heat_timing",
+            measurementId: "controller_gain_margin",
+            requiredCorrectionKey: "controllerGainMarginShortfallDb",
+            requiredTargetKey: "controllerGainMarginMinDb",
+            requiredTargetValue: 6,
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "active_control_energy_noise_heat_timing",
+            measurementId: "active_control_heat_load",
+            requiredCorrectionKey: "heatLoadShortfallW",
+            requiredTargetKey: "heatSinkCapacityCriterion",
+            requiredTargetValue:
+              "heatSinkCapacityW >= 1.2 * max(heatLoadW, energyPerCycleJ * switchingRateHz)",
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "active_control_energy_noise_heat_timing",
             measurementId: "thermal_sink_capacity",
             requiredCorrectionKey: "heatSinkCapacityShortfallW",
-            requiredTargetKey: "heatSinkCapacityMinW",
-            requiredTargetValue: null,
-            requiredTargetStatus: "derived_target_pending",
-            requiredTargetGapReason: "heatSinkCapacityMinW_missing_from_required_corrections",
+            requiredTargetKey: "heatSinkCapacityCriterion",
+            requiredTargetValue:
+              "heatSinkCapacityW >= 1.2 * max(heatLoadW, energyPerCycleJ * switchingRateHz)",
+            requiredTargetStatus: "available",
+            requiredTargetGapReason: null,
+          }),
+          expect.objectContaining({
+            campaignDomain: "active_control_energy_noise_heat_timing",
+            measurementId: "energy_per_cycle_heat_limit",
+            requiredCorrectionKey: "energyPerCycleReductionJ",
+            requiredTargetKey: "heatSinkCapacityCriterion",
+            requiredTargetValue:
+              "heatSinkCapacityW >= 1.2 * max(heatLoadW, energyPerCycleJ * switchingRateHz)",
+            requiredTargetStatus: "available",
+          }),
+          expect.objectContaining({
+            campaignDomain: "active_control_energy_noise_heat_timing",
+            measurementId: "failure_mode_coverage",
+            requiredCorrectionKey: "missingFailureModeCount",
+            requiredTargetKey: "requiredFailureModeCount",
+            requiredTargetValue: 5,
+            requiredTargetStatus: "available",
           }),
           expect.objectContaining({
             campaignDomain: "fatigue_layer_scaling",
             measurementId: "fatigue_cycle_margin",
             requiredCorrectionKey: "cycleCountShortfall",
             requiredTargetKey: "cycleCountRequired",
-            requiredTargetValue: null,
-            requiredTargetStatus: "derived_target_pending",
-            requiredTargetGapReason: "cycleCountRequired_missing_from_required_corrections",
+            requiredTargetValue: 1e9,
+            requiredTargetStatus: "available",
+            requiredTargetGapReason: null,
           }),
           expect.objectContaining({
             campaignDomain: "fatigue_layer_scaling",
@@ -1778,11 +2073,40 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(forceGap?.decisiveMeasurements).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
+          measurementId: "gap_metrology_8nm",
+          evidenceArtifact: "receipt://force_gap_pull_in/gap_metrology_8nm_v1",
+          target: "gap metrology ref tied to 8e-9 m operating point",
+        }),
+        expect.objectContaining({
+          measurementId: "force_curve_brackets_8nm",
+          evidenceArtifact: "receipt://force_gap_pull_in/force_gap_curve_8nm_v1",
+          requiredCorrectionKey: "suppliedForceDeltaFromIdealStackForceN",
+          target: expect.stringContaining("absolute force matches the 447-layer load budget"),
+        }),
+        expect.objectContaining({
+          measurementId: "force_gradient_curve_8nm",
+          evidenceArtifact: "receipt://force_gap_pull_in/force_gradient_8nm_v1",
+          requiredCorrectionKey: "forceGradientConsistencyShortfall",
+          target: "force-gradient consistency margin >= 0.75",
+        }),
+        expect.objectContaining({
+          measurementId: "stiffness_model_8nm",
+          evidenceArtifact: "receipt://force_gap_pull_in/stiffness_model_8nm_v1",
+          requiredCorrectionKey: "springConstantShortfallNPerM",
+          target: "effective stiffness >= ideal force-gradient requirement",
+        }),
+        expect.objectContaining({
           measurementId: "pull_in_margin",
           evidenceArtifact: "receipt://force_gap_pull_in/pull_in_margin_8nm_v1",
           target: "pull-in margin >= 1",
           noGoCriterion: "pull-in margin < 1",
           falsificationConsequence: expect.stringContaining("gap collapses"),
+        }),
+        expect.objectContaining({
+          measurementId: "stiction_margin",
+          evidenceArtifact: "receipt://force_gap_pull_in/stiction_margin_8nm_v1",
+          requiredCorrectionKey: "stictionMarginShortfall",
+          target: "stiction margin >= 1",
         }),
         expect.objectContaining({
           measurementId: "active_gap_authority",
@@ -3513,6 +3837,10 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.requiredCorrections.phaseNoiseReductionSeconds).toBeNull();
     expect(budget.requiredCorrections.controllerPhaseMarginMinDegrees).toBe(45);
     expect(budget.requiredCorrections.controllerGainMarginMinDb).toBe(6);
+    expect(budget.requiredCorrections.heatSinkCapacityCriterion).toBe(
+      "heatSinkCapacityW >= 1.2 * max(heatLoadW, energyPerCycleJ * switchingRateHz)",
+    );
+    expect(budget.requiredCorrections.heatSinkCapacityMinW).toBeNull();
     expect(budget.requiredCorrections.requiredTraceRefCount).toBe(14);
     expect(budget.requiredCorrections.missingTraceRefCount).toBe(14);
     expect(budget.requiredCorrections.requiredFailureModeCount).toBe(5);
@@ -3568,6 +3896,9 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.requiredCorrections.controllerPhaseMarginShortfallDegrees).toBe(0);
     expect(budget.requiredCorrections.controllerGainMarginShortfallDb).toBe(0);
     expect(budget.requiredCorrections.heatLoadShortfallW).toBe(0);
+    expect(budget.requiredCorrections.heatSinkCapacityCriterion).toBe(
+      "heatSinkCapacityW >= 1.2 * max(heatLoadW, energyPerCycleJ * switchingRateHz)",
+    );
     expect(budget.requiredCorrections.heatSinkCapacityShortfallW).toBe(0);
     expect(budget.requiredCorrections.energyPerCycleReductionJ).toBe(0);
     expect(budget.requiredCorrections.missingTraceRefCount).toBe(0);
@@ -4030,10 +4361,11 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(budget.operatingTargets.creepDriftFractionMax).toBe(0.01);
     expect(budget.operatingTargets.delaminationMarginMin).toBe(1);
     expect(budget.operatingTargets.interlayerAdhesionMarginMin).toBe(1);
+    expect(budget.operatingTargets.requiredCycleCount).toBe(1e9);
     expect(budget.operatingTargets.effectiveActiveLayerCountMin).toBeCloseTo(217.242, 3);
     expect(budget.operatingTargets.effectiveSourceTensorLayerCountMin).toBeCloseTo(402.3, 3);
     expect(budget.requiredCorrections.cycleMarginMin).toBe(1);
-    expect(budget.requiredCorrections.cycleCountRequired).toBeNull();
+    expect(budget.requiredCorrections.cycleCountRequired).toBe(1e9);
     expect(budget.requiredCorrections.cycleCountShortfall).toBeNull();
     expect(budget.requiredCorrections.thermalCycleDriftFractionMax).toBe(0.01);
     expect(budget.requiredCorrections.thermalCycleDriftReduction).toBeNull();

@@ -430,7 +430,8 @@ const isCompoundRuntimeDocEvidenceArtifact = (input: {
     pathsFromPayload(payload).length > 0 ||
     anchorsFromPayload(payload).length > 0 ||
     readArray(payload?.matches).length > 0 ||
-    readArray(payload?.locations).length > 0,
+    readArray(payload?.locations).length > 0 ||
+    refListIncludes(input.finalAnswerDraftSupportRefs ?? [], ref),
   );
 };
 
@@ -680,11 +681,13 @@ export function collectDocEvidenceForSynthesis(input: {
   finalAnswerDraftSupportRefs?: string[];
 }): ArtifactLike[] {
   return input.artifactLedger.filter((artifact) => {
-    if (!isDocsEvidenceArtifact(artifact) && !isCompoundRuntimeDocEvidenceArtifact({
+    const compoundRuntimeDocEvidence = isCompoundRuntimeDocEvidenceArtifact({
       artifact,
       payload: input.payload,
       finalAnswerDraftSupportRefs: input.finalAnswerDraftSupportRefs,
-    })) return false;
+    });
+    if (!isDocsEvidenceArtifact(artifact) && !compoundRuntimeDocEvidence) return false;
+    if (compoundRuntimeDocEvidence) return true;
     const text = artifactText(artifact);
     const paths = pathsFromPayload(artifactPayload(artifact));
     return Boolean(text || paths.length > 0 || anchorsFromPayload(artifactPayload(artifact)).length > 0);

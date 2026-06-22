@@ -3001,4 +3001,240 @@ describe("Helix terminal authority single writer", () => {
       materialized_terminal_artifact_kind: "compound_evidence_synthesis_answer",
     });
   });
+
+  it("materializes docs-plus-calculator compound synthesis from satisfied doc subgoal refs", () => {
+    const turnId = "ask:test:docs-calculator-compound-doc-ref-synthesis";
+    const docsSubgoalId = `${turnId}:compound_capability_subgoal:1:docs-viewer_locate_in_doc`;
+    const calculatorSubgoalId = `${turnId}:compound_capability_subgoal:2:scientific-calculator_solve_expression`;
+    const docObservationRef = `${turnId}:agent_runtime_2_docs_viewer_locate_in_doc:doc_location_matches:1`;
+    const calculatorObservationRef = `${turnId}:agent_runtime_3_scientific_calculator_solve_expression:calculator_receipt:1`;
+    const compoundLedger = [
+      {
+        subgoal_id: docsSubgoalId,
+        order: 1,
+        requested_capability: "docs-viewer.locate_in_doc",
+        runtime_capability: "docs-viewer.locate_in_doc",
+        selected_capability: "docs-viewer.locate_in_doc",
+        executed_capability: "docs-viewer.locate_in_doc",
+        observation_kind: "doc_location_matches",
+        observation_ref: docObservationRef,
+        satisfaction: "satisfied",
+        terminal_contribution_kind: "doc_location_matches",
+        rail_status: "complete",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      {
+        subgoal_id: calculatorSubgoalId,
+        order: 2,
+        requested_capability: "scientific-calculator.solve_expression",
+        runtime_capability: "scientific-calculator.solve_expression",
+        selected_capability: "scientific-calculator.solve_expression",
+        executed_capability: "scientific-calculator.solve_expression",
+        observation_kind: "calculator_receipt",
+        observation_ref: calculatorObservationRef,
+        satisfaction: "satisfied",
+        terminal_contribution_kind: "workstation_tool_evaluation",
+        rail_status: "complete",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+    ];
+    const artifacts = [
+      {
+        artifact_id: docObservationRef,
+        kind: "doc_location_matches",
+        source_scope: "current_turn",
+        payload: {
+          schema: "helix.doc_location_matches.v1",
+          artifact_id: docObservationRef,
+          capability_key: "docs-viewer.locate_in_doc",
+          compound_subgoal_id: docsSubgoalId,
+          status: "located",
+          match_count: 1,
+          matches: [
+            {
+              ref: docObservationRef,
+              path: "docs/helix-ask-turn-solver-spine.md",
+              start_line: 30,
+              end_line: 34,
+              snippet: "Only the completed solver path may answer.",
+            },
+          ],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: calculatorObservationRef,
+        kind: "calculator_receipt",
+        payload: {
+          schema: "helix.calculator_receipt.v1",
+          artifact_id: calculatorObservationRef,
+          capability_key: "scientific-calculator.solve_expression",
+          compound_subgoal_id: calculatorSubgoalId,
+          expression: "19 + 23",
+          result: 42,
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+      {
+        artifact_id: `${turnId}:direct_answer_text`,
+        kind: "direct_answer_text",
+        payload: {
+          schema: "helix.direct_answer_text.v1",
+          artifact_id: `${turnId}:direct_answer_text`,
+          text: "The docs location and calculation are complete.",
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      },
+    ];
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      thread_id: "thread:test",
+      active_prompt:
+        "Use docs-viewer.locate_in_doc to find where terminal authority is discussed, then call scientific-calculator.solve_expression with this exact expression: 19 + 23.",
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        route_family: "docs_source",
+        source_target: "docs_viewer",
+        allowed_terminal_artifact_kinds: [
+          "final_answer_draft",
+          "compound_evidence_synthesis_answer",
+          "model_synthesized_answer",
+          "doc_evidence_synthesis_answer",
+          "typed_failure",
+        ],
+        forbidden_terminal_artifact_kinds: [
+          "doc_location_matches",
+          "calculator_receipt",
+          "workstation_tool_evaluation",
+          "direct_answer_text",
+        ],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      canonical_goal_frame: {
+        goal_kind: "locate_in_doc",
+        required_terminal_kind: "doc_location_matches",
+      },
+      capability_itinerary: {
+        schema: "helix.capability_itinerary.v1",
+        prompt_shape: "compound_tool",
+        terminal_success_criteria: {
+          required_capabilities: [
+            "docs-viewer.locate_in_doc",
+            "scientific-calculator.solve_expression",
+          ],
+          required_observation_families: ["docs_viewer", "calculator"],
+          requires_post_observation_synthesis: true,
+          compound_terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          allowed_terminal_artifact_kinds: [
+            "final_answer_draft",
+            "compound_evidence_synthesis_answer",
+            "model_synthesized_answer",
+            "doc_evidence_synthesis_answer",
+            "typed_failure",
+          ],
+        },
+        compound_capability_contract: {
+          schema: "helix.compound_capability_contract.v1",
+          turn_id: turnId,
+          requires_all_subgoals: true,
+          terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          subgoals: [
+            {
+              subgoal_id: docsSubgoalId,
+              order: 1,
+              requested_capability: "docs-viewer.locate_in_doc",
+              runtime_capability: "docs-viewer.locate_in_doc",
+              required_observation_kinds: [
+                "doc_location_result",
+                "doc_location_matches",
+                "doc_evidence_location",
+              ],
+              terminal_contribution_kind: "doc_location_matches",
+            },
+            {
+              subgoal_id: calculatorSubgoalId,
+              order: 2,
+              requested_capability: "scientific-calculator.solve_expression",
+              runtime_capability: "scientific-calculator.solve_expression",
+              required_observation_kinds: ["calculator_receipt", "workstation_tool_evaluation"],
+              terminal_contribution_kind: "workstation_tool_evaluation",
+            },
+          ],
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+        execution_state: {
+          applies: true,
+          complete: true,
+          compound_subgoal_ledger: compoundLedger,
+        },
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      capability_itinerary_execution_state: {
+        schema: "helix.capability_itinerary_execution_state.v1",
+        applies: true,
+        complete: true,
+        required_observation_families: ["docs_viewer", "calculator"],
+        missing_observation_families: [],
+        compound_subgoal_ledger: compoundLedger,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      compound_capability_contract: {
+        schema: "helix.compound_capability_contract.v1",
+        turn_id: turnId,
+        requires_all_subgoals: true,
+        terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+        subgoals: [
+          {
+            subgoal_id: docsSubgoalId,
+            requested_capability: "docs-viewer.locate_in_doc",
+          },
+          {
+            subgoal_id: calculatorSubgoalId,
+            requested_capability: "scientific-calculator.solve_expression",
+          },
+        ],
+      },
+      compound_subgoal_rail_statuses: compoundLedger,
+      current_turn_artifact_ledger: artifacts,
+      selected_final_answer: "I could not produce a terminal answer for this turn.",
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      final_answer_source: "workstation_tool_evaluation",
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      threadId: "thread:test",
+      payload,
+      artifactLedger: artifacts,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+    expect(result.selected_terminal_artifact_ref).toBe(`${turnId}:doc_evidence_synthesis_answer:from_final_answer_draft`);
+    expect(payload.terminal_artifact_kind).toBe("doc_evidence_synthesis_answer");
+    expect(payload.final_answer_source).toBe("final_answer_draft");
+    expect(payload.terminal_error_code).toBeUndefined();
+    expect(payload.ledger_backed_compound_final_answer_draft).toMatchObject({
+      terminal_artifact_kind: "doc_evidence_synthesis_answer",
+      subgoal_observation_refs: [docObservationRef, calculatorObservationRef],
+    });
+    expect(payload.doc_evidence_synthesis_coverage).toMatchObject({
+      sufficient: true,
+      observed_artifact_refs: [docObservationRef],
+      missing_requirements: [],
+      support_refs_count: expect.any(Number),
+    });
+    expect(payload.doc_evidence_synthesis_answer).toMatchObject({
+      terminal_artifact_kind: "doc_evidence_synthesis_answer",
+      support_refs: expect.arrayContaining([docObservationRef, calculatorObservationRef]),
+    });
+  });
 });

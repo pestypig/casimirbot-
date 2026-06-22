@@ -109,6 +109,7 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
     controlPowerW: number | null;
     heatLoadMinW: number | null;
     heatLoadShortfallW: number | null;
+    heatSinkCapacityCriterion: string;
     heatSinkCapacityMinW: number | null;
     heatSinkCapacityShortfallW: number | null;
     energyPerCycleHeatLimitedMaxJ: number | null;
@@ -154,6 +155,8 @@ const PHASE_NOISE_MAX_SECONDS = 0.05 / SWITCHING_RATE_HZ;
 const CONTROLLER_PHASE_MARGIN_MIN_DEGREES = 45;
 const CONTROLLER_GAIN_MARGIN_MIN_DB = 6;
 const THERMAL_SINK_CAPACITY_FACTOR_MIN = 1.2;
+const HEAT_SINK_CAPACITY_CRITERION =
+  "heatSinkCapacityW >= 1.2 * max(heatLoadW, energyPerCycleJ * switchingRateHz)";
 
 const round = (value: number, digits = 12): number => Number(value.toPrecision(digits));
 
@@ -238,8 +241,11 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       ? null
       : round(gapControlAuthorityMargin * requiredGapControlAuthorityN);
   const heatLoadMinW = controlPowerW;
+  const heatSinkReferenceLoadW = evidence?.heatLoadW ?? controlPowerW;
   const heatSinkCapacityMinW =
-    evidence?.heatLoadW == null ? null : round(evidence.heatLoadW * THERMAL_SINK_CAPACITY_FACTOR_MIN);
+    heatSinkReferenceLoadW == null
+      ? null
+      : round(heatSinkReferenceLoadW * THERMAL_SINK_CAPACITY_FACTOR_MIN);
   const thermalSinkCapacityMargin = safeRatio(
     evidence?.heatSinkCapacityW ?? null,
     heatSinkCapacityMinW,
@@ -570,6 +576,7 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
         heatLoadMinW == null || evidence?.heatLoadW == null
           ? null
           : round(Math.max(0, heatLoadMinW - evidence.heatLoadW)),
+      heatSinkCapacityCriterion: HEAT_SINK_CAPACITY_CRITERION,
       energyPerCycleHeatLimitedMaxJ,
       heatSinkCapacityMinW,
       heatSinkCapacityShortfallW:
@@ -675,6 +682,7 @@ export const isNhm2TileSourceActiveControlOperatingBudget = (
     isNumberOrNull(requiredCorrections.controlPowerW) &&
     isNumberOrNull(requiredCorrections.heatLoadMinW) &&
     isNumberOrNull(requiredCorrections.heatLoadShortfallW) &&
+    requiredCorrections.heatSinkCapacityCriterion === HEAT_SINK_CAPACITY_CRITERION &&
     isNumberOrNull(requiredCorrections.heatSinkCapacityMinW) &&
     isNumberOrNull(requiredCorrections.heatSinkCapacityShortfallW) &&
     isNumberOrNull(requiredCorrections.energyPerCycleHeatLimitedMaxJ) &&

@@ -502,6 +502,72 @@ describe("helix ask turn input integrity audit", () => {
     expect(response.body.terminal_answer_authority?.server_authoritative).toBe(true);
   });
 
+  it("does not let context-resume memory terminalize over an explicit calculator command", async () => {
+    const sentinel = "HELIX_PASTED_TEXT_RESUME_SENTINEL_WITH_CALCULATOR";
+    const threadId = "test:turn-input-integrity:resume-frame-plus-calculator";
+    appendHelixThreadServerRequestEvent({
+      thread_id: threadId,
+      route: "/ask",
+      event_type: "server_request_created",
+      turn_id: "turn-pause-resume-frame-plus-calculator",
+      session_id: threadId,
+      trace_id: "turn-pause-resume-frame-plus-calculator",
+      turn_kind: "ask",
+      request_id: "turn-pause-resume-frame-plus-calculator:context_compaction:pause",
+      request_kind: "request_user_input",
+      item_status: "in_progress",
+      request_payload: {
+        schema: "helix.pending_server_request.v1",
+        request_id: "turn-pause-resume-frame-plus-calculator:context_compaction:pause",
+        kind: "context_compaction_pause",
+        prompt: "Context is compacting before the next Ask turn.",
+        reason: "active_context_page_file_compaction",
+        resume_frame: {
+          schema: "helix.pasted_text_attachment_resume_frame.v1",
+          original_prompt: "Use the attached pasted text.",
+          attachment_artifact_refs: ["thread:pasted_text_attachment:calculator-sentinel"],
+          turn_input_items: [
+            { type: "text", text: "Use the attached pasted text.", source: "user" },
+            {
+              type: "attachment",
+              attachment_id: "pasted-text-calculator-sentinel",
+              attachment_kind: "text",
+              file_name: "pasted-text-calculator-sentinel.txt",
+              mime_type: "text/plain",
+              size_bytes: 1024,
+              preview: `${sentinel}\nThis is compacted pasted text.`,
+              raw_content_included: true,
+              raw_content_scope: "turn_input_only",
+              assistant_answer: false,
+            },
+          ],
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        },
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      },
+    });
+
+    const response = await request(createApp())
+      .post("/api/agi/ask/turn")
+      .send({
+        thread_id: threadId,
+        session_id: threadId,
+        turn_id: "turn-followup-resume-frame-plus-calculator",
+        question:
+          "What exact sentinel token was in the attached pasted text, and then use scientific-calculator.solve_expression with this exact expression: 2 + 2.",
+        debug: true,
+      })
+      .expect(200);
+
+    expect(response.body.final_answer_source).not.toBe("conversation_memory_recall_answer");
+    expect(response.body.answer).not.toBe(sentinel);
+    expect(String(response.body.selected_final_answer ?? response.body.answer ?? "")).not.toBe(sentinel);
+  });
+
   it("admits stream conversation-memory resume intent without requiring an echoed frame", async () => {
     const sentinel = "HELIX_PASTED_TEXT_RESUME_SENTINEL_STREAM_LEDGER";
     const threadId = "test:turn-input-integrity:stream-ledger-resume-frame";

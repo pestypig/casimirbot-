@@ -269,6 +269,21 @@ const completedArtifactsForItinerary = (
           capability_key: runtime,
           compound_subgoal_id: subgoalId,
           status: "completed",
+          ...(runtime === "docs-viewer.locate_in_doc"
+            ? {
+                status: "located",
+                match_count: 1,
+                matches: [
+                  {
+                    ref: `${artifactBase}:declared_observation`,
+                    path: "docs/helix-ask-turn-solver-spine.md",
+                    start_line: 30,
+                    end_line: 34,
+                    snippet: "Only the completed solver path may answer.",
+                  },
+                ],
+              }
+            : {}),
         },
       },
     ];

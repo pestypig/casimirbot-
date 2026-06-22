@@ -2,10 +2,73 @@ import { describe, expect, it } from "vitest";
 import { resolveCompoundCapabilitySynthesisReadiness } from "../services/helix-ask/compound-capability-synthesis";
 import { buildHelixCompoundCapabilityContract } from "../services/helix-ask/compound-capability-contract";
 import { resolveAskCapabilityContractArbitration } from "../services/helix-ask/capability-contract-arbitration";
+import { buildHelixCapabilityItineraryExecutionState } from "../services/helix-ask/capability-itinerary-execution";
 import { materializeFinalAnswerDraftTerminal } from "../services/helix-ask/final-answer-draft-terminal-materializer";
 import { inferFinalAnswerDraftRouteFamily } from "../services/helix-ask/final-answer-draft-quality-gate";
 
 describe("compound capability synthesis readiness", () => {
+  it("does not satisfy docs locate subgoals with empty location matches", () => {
+    const turnId = "ask:test:empty-doc-location-subgoal";
+    const docsSubgoalId = `${turnId}:compound_capability_subgoal:1:docs-viewer_locate_in_doc`;
+    const state = buildHelixCapabilityItineraryExecutionState({
+      capabilityItinerary: {
+        terminal_success_criteria: {
+          requires_post_observation_synthesis: true,
+          required_observation_families: ["docs_viewer"],
+          required_capabilities: ["docs-viewer.locate_in_doc"],
+        },
+        compound_capability_contract: {
+          subgoals: [
+            {
+              subgoal_id: docsSubgoalId,
+              order: 1,
+              requested_capability: "docs-viewer.locate_in_doc",
+              runtime_capability: "docs-viewer.locate_in_doc",
+              required_args: ["query"],
+              args_hint: { query: "terminal authority" },
+              required_observation_kinds: ["doc_location_matches"],
+              required_terminal_kind: "doc_location_matches",
+            },
+          ],
+        },
+      },
+      artifacts: [
+        {
+          artifact_id: `${turnId}:runtime_tool_call:1`,
+          kind: "runtime_tool_call",
+          payload: {
+            capability_key: "docs-viewer.locate_in_doc",
+            args: { query: "terminal authority" },
+          },
+        },
+        {
+          artifact_id: `${turnId}:doc_location_matches`,
+          kind: "doc_location_matches",
+          payload: {
+            schema: "helix.doc_location_matches.v1",
+            kind: "doc_location_matches",
+            capability_key: "docs-viewer.locate_in_doc",
+            match_count: 0,
+            matches: [],
+            snippets: [],
+          },
+        },
+      ],
+    });
+
+    expect(state.complete).toBe(false);
+    expect(state.missing_compound_subgoal_ids).toContain(docsSubgoalId);
+    expect(state.compound_subgoal_ledger[0]).toMatchObject({
+      requested_capability: "docs-viewer.locate_in_doc",
+      selected_capability: "docs-viewer.locate_in_doc",
+      executed_capability: null,
+      observation_ref: null,
+      satisfaction: "failed",
+      rail_status: "fail_closed",
+      rail_failure_code: "subgoal_observation_missing",
+    });
+  });
+
   it("requires synthesis when all compound subgoals are satisfied but no final draft exists", () => {
     const turnId = "ask:test:compound-synthesis";
     const docsSubgoalId = `${turnId}:compound_capability_subgoal:1:docs-viewer_locate_in_doc`;

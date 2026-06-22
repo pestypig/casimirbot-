@@ -30,6 +30,7 @@ export type Nhm2TileSourceFatigueLayerScalingOperatingBudgetV1 = {
     delaminationMarginMin: 1;
     interlayerAdhesionMarginMin: 1;
     supportCouplingStatusRequired: "pass";
+    requiredCycleCount: 1e9;
     effectiveActiveLayerCountMin: number;
     effectiveSourceTensorLayerCountMin: number;
   };
@@ -169,6 +170,7 @@ const THERMAL_CYCLE_DRIFT_FRACTION_MAX = 0.01;
 const CREEP_DRIFT_FRACTION_MAX = 0.01;
 const DELAMINATION_MARGIN_MIN = 1;
 const INTERLAYER_ADHESION_MARGIN_MIN = 1;
+const REQUIRED_CYCLE_COUNT = 1e9;
 const EFFECTIVE_ACTIVE_LAYER_COUNT_MIN =
   LAYER_COUNT *
   LAYER_SCALING_EFFICIENCY_MIN *
@@ -209,9 +211,10 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
   input: BuildNhm2TileSourceFatigueLayerScalingOperatingBudgetInput = {},
 ): Nhm2TileSourceFatigueLayerScalingOperatingBudgetV1 => {
   const evidence = input.fatigueLayerScalingEvidence ?? null;
+  const requiredCycleCount = evidence?.requiredCycleCount ?? REQUIRED_CYCLE_COUNT;
   const cycleMargin = safeRatio(
     evidence?.cycleCountToFailure ?? null,
-    evidence?.requiredCycleCount ?? null,
+    requiredCycleCount,
   );
   const thermalCycleDriftMargin = upperBoundMargin(
     THERMAL_CYCLE_DRIFT_FRACTION_MAX,
@@ -317,9 +320,6 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
       : []),
     ...(evidence?.cycleCountToFailure == null
       ? ["cycle_count_to_failure_missing_for_operating_budget"]
-      : []),
-    ...(evidence?.requiredCycleCount == null
-      ? ["required_cycle_count_missing_for_operating_budget"]
       : []),
     ...(evidence?.loadSpectrumRef == null
       ? ["fatigue_load_spectrum_ref_missing_for_operating_budget"]
@@ -490,6 +490,7 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
       delaminationMarginMin: DELAMINATION_MARGIN_MIN,
       interlayerAdhesionMarginMin: INTERLAYER_ADHESION_MARGIN_MIN,
       supportCouplingStatusRequired: "pass",
+      requiredCycleCount: REQUIRED_CYCLE_COUNT,
       effectiveActiveLayerCountMin: round(EFFECTIVE_ACTIVE_LAYER_COUNT_MIN),
       effectiveSourceTensorLayerCountMin: round(EFFECTIVE_SOURCE_TENSOR_LAYER_COUNT_MIN),
     },
@@ -567,11 +568,11 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     },
     requiredCorrections: {
       cycleMarginMin: 1,
-      cycleCountRequired: evidence?.requiredCycleCount ?? null,
+      cycleCountRequired: requiredCycleCount,
       cycleCountShortfall:
-        evidence?.cycleCountToFailure == null || evidence?.requiredCycleCount == null
+        evidence?.cycleCountToFailure == null
           ? null
-          : round(Math.max(0, evidence.requiredCycleCount - evidence.cycleCountToFailure)),
+          : round(Math.max(0, requiredCycleCount - evidence.cycleCountToFailure)),
       thermalCycleDriftFractionMax: THERMAL_CYCLE_DRIFT_FRACTION_MAX,
       thermalCycleDriftReduction: reductionToMaximum(
         evidence?.thermalCycleDriftFraction,
@@ -717,6 +718,7 @@ export const isNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     typeof supplied.evidenceTier === "string" &&
     budget != null &&
     requiredCorrections != null &&
+    targets.requiredCycleCount === REQUIRED_CYCLE_COUNT &&
     requiredCorrections.cycleMarginMin === 1 &&
     isNumberOrNull(requiredCorrections.cycleCountRequired) &&
     isNumberOrNull(requiredCorrections.cycleCountShortfall) &&

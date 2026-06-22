@@ -124,6 +124,97 @@ describe("Helix Ask context economy", () => {
     expect(JSON.stringify(context.exact_excerpts)).not.toContain("RAW_SPAN_DUMP_SHOULD_NOT_APPEAR");
   });
 
+  it("compacts direct docs and calculator artifacts for post-observation synthesis", () => {
+    const context = buildHelixModelPromptContext({
+      turnId: "turn-docs-calculator",
+      userGoal: "Locate terminal authority, then calculate 19 + 23.",
+      selectedArtifacts: [
+        {
+          artifact_id: "obs:doc-location",
+          kind: "doc_location_matches",
+          payload: {
+            kind: "doc_location_matches",
+            artifact_id: "obs:doc-location",
+            query: "terminal authority",
+            match_count: 1,
+            matches: [
+              {
+                path: "docs/helix-ask-turn-solver-spine.md",
+                start_line: 30,
+                snippet: "Only the completed solver path may answer.",
+                ref: "docs/helix-ask-turn-solver-spine.md:30",
+              },
+            ],
+          },
+        },
+        {
+          artifact_id: "obs:calculator",
+          kind: "calculator_receipt",
+          payload: {
+            kind: "calculator_receipt",
+            receipt_id: "receipt:calculator",
+            expression: "19 + 23",
+            result_text: "42",
+            status: "completed",
+            action_key: "scientific-calculator.solve_expression",
+          },
+        },
+      ],
+    });
+
+    expect(context.compact_observations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          observation_ref: "obs:doc-location",
+          source: "docs",
+          status: "succeeded",
+          support_refs: expect.arrayContaining(["obs:doc-location", "docs/helix-ask-turn-solver-spine.md:30"]),
+        }),
+        expect.objectContaining({
+          observation_ref: "obs:calculator",
+          source: "tool",
+          source_target: "calculator",
+          status: "succeeded",
+          found: expect.arrayContaining(["Calculator evaluated 19 + 23 = 42."]),
+        }),
+      ]),
+    );
+    expect(context.economy_report.selected_observation_refs).toEqual(
+      expect.arrayContaining(["obs:doc-location", "obs:calculator"]),
+    );
+  });
+
+  it("marks empty docs locate artifacts as failed compact observations", () => {
+    const context = buildHelixModelPromptContext({
+      turnId: "turn-empty-doc-location",
+      userGoal: "Locate terminal authority in the active doc.",
+      selectedArtifacts: [
+        {
+          artifact_id: "obs:empty-doc-location",
+          kind: "doc_location_matches",
+          payload: {
+            kind: "doc_location_matches",
+            artifact_id: "obs:empty-doc-location",
+            query: "terminal authority",
+            match_count: 0,
+            matches: [],
+            snippets: [],
+          },
+        },
+      ],
+    });
+
+    expect(context.compact_observations).toEqual([
+      expect.objectContaining({
+        observation_ref: "obs:empty-doc-location",
+        source: "docs",
+        status: "failed",
+        missing_or_uncertain: expect.arrayContaining(["No doc match, snippet, location, or line span was returned."]),
+        suggested_next_steps: expect.arrayContaining(["fail_closed"]),
+      }),
+    ]);
+  });
+
   it("includes exact excerpts only through the escape hatch", () => {
     const context = buildHelixModelPromptContext({
       turnId: "turn-exact",

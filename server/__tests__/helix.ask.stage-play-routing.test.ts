@@ -91,6 +91,68 @@ beforeEach(() => {
   resetStagePlayGoalContextStoreForTest();
 });
 
+it("creates an agent goal session from a prompt-only Ask goal command", async () => {
+  const app = createApp();
+  const sessionId = "helix-ask:goal-session-prompt-regression";
+  const prompt =
+    "Create a goal to refactor the goal-session UI so it supports pause, resume, edit, archive, and expanded details. Work until tests pass.";
+
+  const ask = await request(app)
+    .post("/api/agi/ask/turn")
+    .send({
+      sessionId,
+      question: prompt,
+      prompt,
+      mode: "read",
+      debug: true,
+    })
+    .expect(200);
+
+  const debug = await request(app)
+    .get(`/api/agi/ask/turn/${encodeURIComponent(String(ask.body.turn_id))}/debug-export`)
+    .expect(200);
+  const payload = debug.body.payload ?? debug.body;
+
+  expect(payload.canonical_goal_frame).toMatchObject({
+    goal_kind: "workstation_goal_context",
+    required_terminal_kind: "workstation_tool_evaluation",
+  });
+  expect(payload.source_target_intent).toMatchObject({
+    target_source: "live_environment",
+  });
+  expect(payload.capability_plan).toMatchObject({
+    selected_capability: "live_env.start_agent_goal_session",
+    admission_status: "needs_evidence",
+    operator_command_present: true,
+  });
+  expect(payload.current_turn_artifact_ledger).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        kind: "live_environment_tool_observation",
+        payload: expect.objectContaining({
+          tool_name: "live_env.start_agent_goal_session",
+          observation: expect.objectContaining({
+            schema: "stage_play_agent_goal_session_tool_result/v1",
+          }),
+        }),
+      }),
+    ]),
+  );
+
+  const context = await request(app)
+    .get("/api/helix/stage-play/goal-context")
+    .query({ threadId: sessionId, limit: 20 })
+    .expect(200);
+
+  expect(context.body.agentGoalSessions).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        objective: prompt,
+      }),
+    ]),
+  );
+});
+
 it("starts Stage Play goal sessions with explicit context feeds and actuator policy", async () => {
   const response = await request(createApp())
     .post("/api/helix/stage-play/goal-session")

@@ -108,6 +108,24 @@ const normalizeCalculatorExpression = (value: string | null): string | null => {
 const artifactPayload = (artifact: HelixCapabilityItineraryArtifactLike): Record<string, unknown> | null =>
   readRecord(artifact.payload);
 
+const docLocationArtifactHasConcreteEvidence = (artifact: HelixCapabilityItineraryArtifactLike): boolean => {
+  const payload = artifactPayload(artifact);
+  if (!payload) return false;
+  const status = readString(payload.status);
+  if (status === "located") return true;
+  const matchCount = Number(payload.match_count);
+  if (Number.isFinite(matchCount) && matchCount > 0) return true;
+  return [
+    payload.matches,
+    payload.snippets,
+    payload.locations,
+    payload.line_spans,
+  ].some((value) => readArray(value).length > 0);
+};
+
+const isDocsLocateCapability = (capability: string, runtimeCapability: string): boolean =>
+  capability === "docs-viewer.locate_in_doc" || runtimeCapability === "docs-viewer.locate_in_doc";
+
 const artifactSchema = (artifact: HelixCapabilityItineraryArtifactLike): string | null =>
   readString(artifactPayload(artifact)?.schema);
 
@@ -382,13 +400,14 @@ const runtimeProvenDocsLocateObservation = (
   capability: string,
   runtimeCapability: string,
 ): boolean => {
-  if (capability !== "docs-viewer.locate_in_doc" && runtimeCapability !== "docs-viewer.locate_in_doc") {
+  if (!isDocsLocateCapability(capability, runtimeCapability)) {
     return false;
   }
   const kind = artifactKind(artifact);
   if (!/^doc_(?:location|evidence)/i.test(kind)) return false;
   const haystack = artifactCapabilityHaystack(artifact);
   return (
+    docLocationArtifactHasConcreteEvidence(artifact) &&
     /docs[-_]viewer[-_.:]locate[-_]in[-_]doc|docs_viewer_locate_in_doc/i.test(haystack) &&
     /agent_runtime|runtime_tool_observation|agent_step_observation_packet/i.test(haystack) &&
     !/model_step/i.test(haystack)
@@ -404,6 +423,9 @@ const artifactSubgoalObservationProvenance = (
   argsHint: Record<string, unknown> | null,
 ): string | null => {
   const actualCapability = artifactCapability(artifact);
+  if (isDocsLocateCapability(capability, runtimeCapability) && !docLocationArtifactHasConcreteEvidence(artifact)) {
+    return null;
+  }
   if (actualCapability && !artifactMatchesCapability(artifact, capability, runtimeCapability, substitutions)) {
     return null;
   }
@@ -610,6 +632,13 @@ const artifactProvesCompletedCapability = (
     artifactMatchesCapability(artifact, capability, runtimeCapability, substitutions) ||
     Boolean(artifactSubgoalId && subgoalId && artifactSubgoalId === subgoalId);
   const status = readString(artifactPayload(artifact)?.status);
+  if (
+    isDocsLocateCapability(capability, runtimeCapability) &&
+    artifactMatchesRequiredObservationKind(artifact, requiredObservationKinds, capability, runtimeCapability) &&
+    !docLocationArtifactHasConcreteEvidence(artifact)
+  ) {
+    return false;
+  }
   if (
     hasCapabilityProof &&
     requiredObservationKinds.length > 0 &&

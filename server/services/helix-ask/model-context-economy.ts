@@ -225,6 +225,161 @@ export const compactAgentStepObservationPacketForModel = (input: {
   };
 };
 
+const compactDocsEvidenceArtifactForModel = (input: {
+  turnId: string;
+  artifact: unknown;
+  userRequested?: string;
+}): HelixModelObservationPacket | null => {
+  const artifact = readRecord(input.artifact);
+  const payload = readRecord(artifact?.payload) ?? artifact;
+  if (!payload) return null;
+  const cfg = config();
+  const kind = readString(artifact?.kind) ?? readString(payload.kind) ?? "doc_location_matches";
+  const observationRef =
+    readString(artifact?.artifact_id) ??
+    readString(payload.artifact_id) ??
+    readString(payload.observation_id) ??
+    `${input.turnId}:${kind}`;
+  const matches = readArray(payload.matches).map(readRecord).filter(Boolean) as Record<string, unknown>[];
+  const snippets = readArray(payload.snippets).map(readRecord).filter(Boolean) as Record<string, unknown>[];
+  const locations = readArray(payload.locations).map(readRecord).filter(Boolean) as Record<string, unknown>[];
+  const lineSpans = readArray(payload.line_spans).map(readRecord).filter(Boolean) as Record<string, unknown>[];
+  const matchCount = Number(payload.match_count);
+  const hasConcreteLocation =
+    (Number.isFinite(matchCount) && matchCount > 0) ||
+    matches.length > 0 ||
+    snippets.length > 0 ||
+    locations.length > 0 ||
+    lineSpans.length > 0 ||
+    readString(payload.status) === "located";
+  const compactMatch = (record: Record<string, unknown>, fallback: string): string => {
+    const path = readString(record.path) ?? readString(record.source_path);
+    const line =
+      readString(record.line) ??
+      readString(record.line_number) ??
+      readString(record.start_line) ??
+      readString(record.line_start);
+    const text =
+      readString(record.snippet) ??
+      readString(record.text) ??
+      readString(record.excerpt) ??
+      readString(record.raw_excerpt);
+    return compactText([path, line ? `line ${line}` : null, text ?? fallback].filter(Boolean).join(" - "), 420);
+  };
+  const found = hasConcreteLocation
+    ? [
+        ...matches.map((entry, index) => compactMatch(entry, `Document match ${index + 1}`)),
+        ...snippets.map((entry, index) => compactMatch(entry, `Document snippet ${index + 1}`)),
+        ...locations.map((entry, index) => compactMatch(entry, `Document location ${index + 1}`)),
+        ...lineSpans.map((entry, index) => compactMatch(entry, `Document line span ${index + 1}`)),
+      ].filter(Boolean).slice(0, cfg.observationMaxFindings)
+    : [
+        compactText(
+          `No document locations were found for ${readString(payload.query) ?? readString(payload.locate_query) ?? "the requested location"}.`,
+          360,
+        ),
+      ];
+  const supportRefs = unique([
+    observationRef,
+    readString(payload.source_ref),
+    readString(payload.target_ref),
+    readString(payload.path),
+    readString(payload.source_path),
+    ...readStringArray(payload.support_refs),
+    ...readStringArray(payload.evidence_refs),
+    ...matches.map((entry) => readString(entry.ref)),
+    ...snippets.map((entry) => readString(entry.ref)),
+    ...locations.map((entry) => readString(entry.ref)),
+    ...lineSpans.map((entry) => readString(entry.ref)),
+  ], 96);
+  return {
+    schema: HELIX_MODEL_OBSERVATION_PACKET_SCHEMA,
+    turn_id: readString(payload.turn_id) ?? input.turnId,
+    observation_ref: observationRef,
+    source: "docs",
+    source_target: "docs_viewer",
+    capability_key: readString(payload.capability_key) ?? "docs-viewer.locate_in_doc",
+    status: hasConcreteLocation ? "succeeded" : "failed",
+    user_requested: compactText(input.userRequested ?? readString(payload.query) ?? readString(payload.locate_query) ?? "", 320),
+    found,
+    proves: hasConcreteLocation
+      ? ["Document location evidence is available for final synthesis."]
+      : ["The docs locate tool executed but returned no concrete matches."],
+    support_refs: supportRefs,
+    missing_or_uncertain: hasConcreteLocation
+      ? []
+      : ["No doc match, snippet, location, or line span was returned."],
+    suggested_next_steps: hasConcreteLocation ? ["answer", "repair"] : ["repair", "use_another_tool", "fail_closed"],
+    raw_debug_ref: `${observationRef}:raw_doc_location_payload`,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
+const compactCalculatorArtifactForModel = (input: {
+  turnId: string;
+  artifact: unknown;
+  userRequested?: string;
+}): HelixModelObservationPacket | null => {
+  const artifact = readRecord(input.artifact);
+  const payload = readRecord(artifact?.payload) ?? artifact;
+  if (!payload) return null;
+  const kind = readString(artifact?.kind) ?? readString(payload.kind) ?? "calculator_receipt";
+  const observationRef =
+    readString(artifact?.artifact_id) ??
+    readString(payload.artifact_id) ??
+    readString(payload.receipt_id) ??
+    `${input.turnId}:${kind}`;
+  const expression =
+    readString(payload.expression) ??
+    readString(payload.latex) ??
+    readString(payload.equation) ??
+    readString(readRecord(payload.calculator_setup)?.expression);
+  const result =
+    readString(payload.result_text) ??
+    readString(payload.result) ??
+    (typeof payload.result_value === "number" && Number.isFinite(payload.result_value) ? String(payload.result_value) : null) ??
+    readString(payload.result_box_output);
+  const status = readString(payload.status);
+  const succeeded = Boolean(result) && !/^(?:failed|error|blocked|rejected)$/i.test(status ?? "");
+  const supportRefs = unique([
+    observationRef,
+    readString(payload.receipt_id),
+    readString(payload.evaluation_id),
+    ...readStringArray(payload.support_refs),
+    ...readStringArray(payload.evidence_refs),
+  ], 96);
+  return {
+    schema: HELIX_MODEL_OBSERVATION_PACKET_SCHEMA,
+    turn_id: readString(payload.turn_id) ?? input.turnId,
+    observation_ref: observationRef,
+    source: "tool",
+    source_target: "calculator",
+    capability_key: readString(payload.action_key) ?? readString(payload.trace_source) ?? "scientific-calculator.solve_expression",
+    panel_id: readString(payload.panel_id) ?? "scientific-calculator",
+    action: readString(payload.action_id) ?? "solve_expression",
+    status: succeeded ? "succeeded" : "failed",
+    user_requested: compactText(input.userRequested ?? expression ?? "", 320),
+    found: [
+      compactText(
+        `Calculator evaluated${expression ? ` ${expression}` : ""}${result ? ` = ${result}` : ""}.`,
+        360,
+      ),
+    ],
+    proves: result
+      ? [`Calculator result is ${result}${expression ? ` for ${expression}` : ""}.`]
+      : ["Calculator receipt did not include a usable result."],
+    support_refs: supportRefs,
+    missing_or_uncertain: result ? [] : ["Calculator result text/value is missing."],
+    suggested_next_steps: result ? ["answer"] : ["repair", "fail_closed"],
+    raw_debug_ref: `${observationRef}:raw_calculator_payload`,
+    terminal_eligible: false,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+};
+
 export const compactRepoEvidenceArtifactForModel = (input: {
   turnId: string;
   artifact: unknown;
@@ -599,6 +754,20 @@ export const buildHelixModelPromptContext = (input: {
       }
       if (/internet_search_observation/i.test(kind ?? "")) {
         return compactInternetSearchArtifactForModel({
+          turnId: input.turnId,
+          artifact,
+          userRequested: input.userGoal,
+        });
+      }
+      if (/doc_location_result|doc_evidence_location|doc_location_matches|doc_equation_context/i.test(kind ?? "")) {
+        return compactDocsEvidenceArtifactForModel({
+          turnId: input.turnId,
+          artifact,
+          userRequested: input.userGoal,
+        });
+      }
+      if (/calculator_receipt|calculator_subgoal_receipt|calculator_result_trace|workstation_tool_evaluation/i.test(kind ?? "")) {
+        return compactCalculatorArtifactForModel({
           turnId: input.turnId,
           artifact,
           userRequested: input.userGoal,
