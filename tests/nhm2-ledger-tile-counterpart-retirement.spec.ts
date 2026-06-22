@@ -29,6 +29,7 @@ const base = (overrides = {}) =>
       conservationArtifact: null,
       sourceSideSameBasisTensorAuthority: null,
       sourceClosurePassReadiness: null,
+      coupledClosurePassCandidate: null,
       referenceRunValidation: "validation.json",
     },
     tileCounterpartSource: {
@@ -49,6 +50,12 @@ const base = (overrides = {}) =>
       sourceClosurePassSignalAllowed: null,
       firstRetirableBlocker: null,
       preflightBlockers: [],
+      coupledClosurePassCandidateRef: null,
+      coupledClosurePassCandidate: null,
+      coupledClosureFirstBlocker: null,
+      coupledClosureBlockers: [],
+      coupledClosureFirstRequiredCorrections: {},
+      coupledClosureRequiredCorrections: {},
     },
     gateSummary: [],
     regionalBlockers: ["global", "hull", "wall", "exterior_shell"].map((regionId) => ({
@@ -106,6 +113,7 @@ describe("ledger tile-counterpart blocker retirement states", () => {
         conservationArtifact: null,
         sourceSideSameBasisTensorAuthority: "source-authority.json",
         sourceClosurePassReadiness: "readiness.json",
+        coupledClosurePassCandidate: null,
         referenceRunValidation: "validation.json",
       },
       tileCounterpartSource: {
@@ -126,6 +134,12 @@ describe("ledger tile-counterpart blocker retirement states", () => {
         sourceClosurePassSignalAllowed: true,
         firstRetirableBlocker: "none",
         preflightBlockers: [],
+        coupledClosurePassCandidateRef: null,
+        coupledClosurePassCandidate: null,
+        coupledClosureFirstBlocker: null,
+        coupledClosureBlockers: [],
+        coupledClosureFirstRequiredCorrections: {},
+        coupledClosureRequiredCorrections: {},
       },
       gateSummary: [{
         gateId: "GATE_QEI_DOSSIER_PRESENT",

@@ -2109,6 +2109,123 @@ describe("final_answer_draft terminal selection", () => {
     expect(payload.terminal_error_code).toBeUndefined();
   });
 
+  it("mirrors workstation terminal authority into single-writer selected fields", () => {
+    const turnId = "ask:test:workstation-authority-mirror";
+    const terminalRef = `${turnId}:workstation_tool_evaluation`;
+    const terminalText = [
+      "I located this discussion in the Theory Badge Graph, then built a first-principles explanation route from that reflection.",
+      "The graph route supports a workstation terminal answer.",
+    ].join("\n");
+    const payload: Record<string, unknown> = {
+      turn_id: turnId,
+      active_prompt: "Tell me about the Needle Hull Mark 2 full solve in the badge graph.",
+      canonical_goal_frame: {
+        schema: "helix.canonical_goal_frame.v1",
+        goal_kind: "theory_context_reflection",
+      },
+      route_product_contract: {
+        ...modelOnlyContract(turnId),
+        source_target: "theory_context_reflection",
+        allowed_terminal_artifact_kinds: ["workstation_tool_evaluation", "model_synthesized_answer", "typed_failure"],
+      },
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        canonical_goal_kind: "theory_context_reflection",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      agent_step_decision: {
+        schema: "helix.agent_step_decision.v1",
+        decision_id: `${turnId}:agent_step_decision:answer`,
+        decision_timing: "post_observation_terminal_review",
+        decision_authority: "deterministic_policy_fallback",
+        next_step: "answer",
+        chosen_capability: "model.direct_answer",
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      agent_runtime_loop: {
+        schema: "helix.agent_runtime_loop.v1",
+        iterations: [
+          {
+            decision_id: `${turnId}:agent_runtime_loop:decision:1`,
+            chosen_capability: "helix_ask.reflect_theory_context",
+            executed_action_key: "helix_ask.reflect_theory_context",
+            next_step: "tool",
+            decision_authority: "deterministic_policy_fallback",
+            decision_timing: "post_observation",
+            observed_artifact_refs: [
+              `${turnId}:theory_context_reflection_tool_receipt`,
+              terminalRef,
+            ],
+          },
+          {
+            decision_id: `${turnId}:agent_runtime_loop:decision:2`,
+            chosen_capability: "model.direct_answer",
+            next_step: "answer",
+            decision_authority: "deterministic_policy_fallback",
+            decision_timing: "terminal_review",
+            observation_role: "model_answer_draft",
+          },
+        ],
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_answer_authority: {
+        schema: "helix.turn_terminal_authority.v1",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        final_answer_source: "workstation_tool_evaluation",
+        terminal_artifact_id: terminalRef,
+        terminal_text_preview: terminalText,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      terminal_presentation: {
+        schema: "helix.terminal_presentation.v1",
+        terminal_artifact_kind: "workstation_tool_evaluation",
+        final_answer_source: "workstation_tool_evaluation",
+        concise_text: terminalText,
+        assistant_answer: false,
+        raw_content_included: false,
+      },
+      selected_final_answer: terminalText,
+      answer: terminalText,
+      text: terminalText,
+      final_answer_source: "workstation_tool_evaluation",
+      terminal_artifact_kind: "workstation_tool_evaluation",
+      terminal_artifact_id: terminalRef,
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: `${turnId}:theory_context_reflection_tool_receipt`,
+          kind: "helix_theory_context_reflection_tool_receipt",
+          payload: {
+            schema: "helix.theory_context_reflection_tool_receipt.v1",
+            capability: "helix_ask.reflect_theory_context",
+            tool_id: "helix_ask.reflect_theory_context",
+            assistant_answer: false,
+            terminal_eligible: false,
+          },
+        },
+      ],
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId,
+      payload,
+      artifactLedger: payload.current_turn_artifact_ledger as unknown[],
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(result.selected_terminal_artifact_ref).toBe(terminalRef);
+    expect(result.source).toBe("workstation_tool_evaluation");
+    expect(result.audit?.selectedArtifactKind).toBe("workstation_tool_evaluation");
+    expect(result.audit?.selectedArtifactRef).toBe(terminalRef);
+    expect(result.integrity.materialized_terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(result.integrity.materialized_terminal_artifact_ref).toBe(terminalRef);
+    expect(payload.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(payload.final_answer_source).toBe("workstation_tool_evaluation");
+  });
+
   it("keeps calculator receipts as side artifacts when a final draft explains the result", () => {
     const turnId = "ask:test:calculator-draft";
     const artifacts = [

@@ -33,6 +33,7 @@ const validLedger = () =>
       conservationArtifact: null,
       sourceSideSameBasisTensorAuthority: null,
       sourceClosurePassReadiness: null,
+      coupledClosurePassCandidate: null,
       referenceRunValidation: "validation.json",
     },
     tileCounterpartSource: {
@@ -53,6 +54,12 @@ const validLedger = () =>
       sourceClosurePassSignalAllowed: null,
       firstRetirableBlocker: null,
       preflightBlockers: [],
+      coupledClosurePassCandidateRef: null,
+      coupledClosurePassCandidate: null,
+      coupledClosureFirstBlocker: null,
+      coupledClosureBlockers: [],
+      coupledClosureFirstRequiredCorrections: {},
+      coupledClosureRequiredCorrections: {},
     },
     gateSummary: [
       {

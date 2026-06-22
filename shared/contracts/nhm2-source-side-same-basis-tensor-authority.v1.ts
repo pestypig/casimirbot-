@@ -20,6 +20,7 @@ import {
   NHM2_FULL_APPARATUS_SYMMETRIC_TENSOR_COMPONENTS,
   type Nhm2TileSourceFullApparatusTensorValuesV1,
 } from "./nhm2-tile-source-full-apparatus-tensor-values.v1";
+import type { Nhm2TileSourceOperatingBudgetCorrectionValueV1 } from "./nhm2-tile-source-operating-budget-readiness.v1";
 
 export const NHM2_SOURCE_SIDE_SAME_BASIS_TENSOR_AUTHORITY_CONTRACT_VERSION =
   "nhm2_source_side_same_basis_tensor_authority/v1";
@@ -73,6 +74,7 @@ export type Nhm2SourceSideSameBasisTensorAuthorityRegionV1 = {
   missingComponentIds: string[];
   materialReceiptRef?: string;
   materialReceiptStatus?: CasimirMaterialReceiptStatus;
+  handoffRequiredCorrections?: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
   blockers: string[];
   warnings: string[];
 };
@@ -97,6 +99,10 @@ export type Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 = {
     anyProxy: boolean;
     anyMissingCounterpart: boolean;
     missingRegionIds: string[];
+    tileSourceHandoffRequiredCorrections: Record<
+      string,
+      Nhm2TileSourceOperatingBudgetCorrectionValueV1
+    >;
     blockerCount: number;
   };
   claimBoundary: {
@@ -176,6 +182,58 @@ const normalizeList = (values: string[] | null | undefined): string[] =>
         .filter((entry): entry is string => entry != null),
     ),
   );
+
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value);
+
+const isCorrectionValue = (
+  value: unknown,
+): value is Nhm2TileSourceOperatingBudgetCorrectionValueV1 =>
+  value === null ||
+  typeof value === "string" ||
+  typeof value === "boolean" ||
+  isFiniteNumber(value) ||
+  (Array.isArray(value) && value.every((entry) => typeof entry === "string"));
+
+const correctionRecord = (
+  value: unknown,
+): Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> => {
+  const record = isRecord(value) ? value : {};
+  return Object.fromEntries(
+    Object.entries(record).filter(([, entry]) => isCorrectionValue(entry)),
+  ) as Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
+};
+
+const mergeCorrectionRecords = (
+  records: Array<Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> | null | undefined>,
+): Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> => {
+  const merged: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> = {};
+  for (const record of records) {
+    for (const [key, value] of Object.entries(correctionRecord(record))) {
+      merged[key] = value;
+    }
+  }
+  return merged;
+};
+
+const handoffRequiredCorrections = (
+  handoff: Nhm2TileSourceAuthorityHandoffV1,
+): Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> => {
+  if (handoff.summary.handoffReadyForSameBasisAuthority) return {};
+  return mergeCorrectionRecords([
+    handoff.summary.firstRequiredCorrections,
+    ...handoff.gates
+      .filter((gate) => gate.status !== "pass")
+      .map((gate) =>
+        Object.fromEntries(
+          Object.entries(gate.requiredCorrections).map(([key, value]) => [
+            `${gate.gateId}.${key}`,
+            value,
+          ]),
+        ),
+      ),
+  ]);
+};
 
 const normalizeStatus = (
   value: unknown,
@@ -492,6 +550,7 @@ const buildRegionFromTileSourceHandoff = (args: {
   warnings: string[];
 }): Nhm2SourceSideSameBasisTensorAuthorityRegionV1 => {
   const blockers = new Set<string>();
+  const requiredCorrections = handoffRequiredCorrections(args.handoff);
   if (!args.handoff.summary.handoffReadyForSameBasisAuthority) {
     blockers.add("tile_source_authority_handoff_not_ready");
     const firstBlocker = toText(args.handoff.summary.firstBlocker);
@@ -520,6 +579,7 @@ const buildRegionFromTileSourceHandoff = (args: {
       args.handoff.summary.handoffReadyForSameBasisAuthority ? true : null,
     hasFullTensorComponents: false,
     missingComponentIds: [...NHM2_SOURCE_SIDE_SAME_BASIS_FULL_TENSOR_COMPONENTS],
+    handoffRequiredCorrections: requiredCorrections,
     blockers: normalizeList(Array.from(blockers)),
     warnings: normalizeList([
       ...args.warnings,
@@ -553,6 +613,10 @@ const applyHandoffAdmissionGate = (
     ...region.blockers,
     ...handoffAdmissionBlockers(handoff),
   ]);
+  const requiredCorrections = mergeCorrectionRecords([
+    region.handoffRequiredCorrections,
+    handoffRequiredCorrections(handoff),
+  ]);
   const warnings = normalizeList([
     ...region.warnings,
     "tile_source_handoff_admission_gate_blocks_source_authority",
@@ -566,6 +630,7 @@ const applyHandoffAdmissionGate = (
     status,
     notDerivedFromMetricRequiredTensor:
       region.notDerivedFromMetricRequiredTensor === true ? true : null,
+    handoffRequiredCorrections: requiredCorrections,
     blockers,
     warnings,
   };
@@ -687,6 +752,8 @@ export const buildNhm2SourceSideSameBasisTensorAuthorityArtifact = (
   const blockerCount =
     normalizeList(input.blockers).length +
     regions.reduce((sum, region) => sum + region.blockers.length, 0);
+  const tileSourceHandoffRequiredCorrections =
+    tileSourceAuthorityHandoff == null ? {} : handoffRequiredCorrections(tileSourceAuthorityHandoff);
 
   return {
     contractVersion: NHM2_SOURCE_SIDE_SAME_BASIS_TENSOR_AUTHORITY_CONTRACT_VERSION,
@@ -722,6 +789,7 @@ export const buildNhm2SourceSideSameBasisTensorAuthorityArtifact = (
       anyProxy,
       anyMissingCounterpart,
       missingRegionIds,
+      tileSourceHandoffRequiredCorrections,
       blockerCount,
     },
     claimBoundary: {
@@ -780,6 +848,9 @@ export const isNhm2SourceSideSameBasisTensorAuthorityArtifact = (
         typeof region.hasFullTensorComponents === "boolean" &&
         Array.isArray(region.missingComponentIds) &&
         region.missingComponentIds.every((component) => toText(component) != null) &&
+        (region.handoffRequiredCorrections === undefined ||
+          (isRecord(region.handoffRequiredCorrections) &&
+            Object.values(region.handoffRequiredCorrections).every(isCorrectionValue))) &&
         Array.isArray(region.blockers) &&
         region.blockers.every((blocker) => toText(blocker) != null) &&
         Array.isArray(region.warnings) &&
@@ -795,6 +866,8 @@ export const isNhm2SourceSideSameBasisTensorAuthorityArtifact = (
     typeof summary.anyMissingCounterpart === "boolean" &&
     Array.isArray(summary.missingRegionIds) &&
     summary.missingRegionIds.every((entry) => toText(entry) != null) &&
+    isRecord(summary.tileSourceHandoffRequiredCorrections) &&
+    Object.values(summary.tileSourceHandoffRequiredCorrections).every(isCorrectionValue) &&
     typeof summary.blockerCount === "number" &&
     Number.isFinite(summary.blockerCount) &&
     claimBoundary?.diagnosticOnly === true &&

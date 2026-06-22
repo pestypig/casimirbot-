@@ -13,6 +13,7 @@ import {
 import type { Nhm2SourceComponentAuthorityLedgerArtifactV1 } from "./nhm2-source-component-authority-ledger.v1";
 import type { Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 } from "./nhm2-source-side-same-basis-tensor-authority.v1";
 import type { Nhm2TileCounterpartConservationArtifact } from "./nhm2-tile-counterpart-conservation.v1";
+import type { Nhm2TileSourceOperatingBudgetCorrectionValueV1 } from "./nhm2-tile-source-operating-budget-readiness.v1";
 
 export const NHM2_COUPLED_CLOSURE_PASS_CANDIDATE_CONTRACT_VERSION =
   "nhm2_coupled_closure_pass_candidate/v1";
@@ -50,6 +51,7 @@ export type Nhm2CoupledClosureGateV1 = {
   blockers: string[];
   warnings: string[];
   primaryMetric: string | null;
+  requiredCorrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
 };
 
 export type Nhm2CoupledClosurePassCandidateArtifactRefsV1 = {
@@ -94,6 +96,7 @@ export type Nhm2CoupledClosurePassCandidateArtifactV1 = {
     materialReceipted: boolean;
     atlasConsumerCongruencePass: boolean;
     firstBlocker: string;
+    firstRequiredCorrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
     blockerCount: number;
   };
   claimBoundary: {
@@ -152,12 +155,34 @@ const uniqueText = (values: Array<string | null | undefined>): string[] =>
     ),
   );
 
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value);
+
+const isCorrectionValue = (
+  value: unknown,
+): value is Nhm2TileSourceOperatingBudgetCorrectionValueV1 =>
+  value === null ||
+  typeof value === "string" ||
+  typeof value === "boolean" ||
+  isFiniteNumber(value) ||
+  (Array.isArray(value) && value.every((entry) => typeof entry === "string"));
+
+const correctionRecord = (
+  value: unknown,
+): Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> => {
+  const record = isRecord(value) ? value : {};
+  return Object.fromEntries(
+    Object.entries(record).filter(([, entry]) => isCorrectionValue(entry)),
+  ) as Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
+};
+
 const gate = (input: {
   gateId: Nhm2CoupledClosureGateId;
   status: Nhm2CoupledClosureGateStatus;
   blockers?: Array<string | null | undefined>;
   warnings?: Array<string | null | undefined>;
   primaryMetric?: string | null;
+  requiredCorrections?: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> | null;
 }): Nhm2CoupledClosureGateV1 => ({
   gateId: input.gateId,
   status: input.status,
@@ -165,6 +190,7 @@ const gate = (input: {
   blockers: uniqueText(input.blockers ?? []),
   warnings: uniqueText(input.warnings ?? []),
   primaryMetric: asText(input.primaryMetric),
+  requiredCorrections: input.status === "pass" ? {} : correctionRecord(input.requiredCorrections),
 });
 
 const componentLedgerRegionHasFullSourceAuthority = (
@@ -354,6 +380,7 @@ const sourceAuthorityGate = (
     primaryMetric: `regions_authoritative=${
       artifact.summary.allRequiredRegionsAuthoritative || ledgerAuthorityComplete
     }`,
+    requiredCorrections: artifact.summary.tileSourceHandoffRequiredCorrections,
   });
 };
 
@@ -405,6 +432,7 @@ const tileSourceAuthorityHandoffGate = (
     ]),
     warnings: ["tile_source_handoff_does_not_run_downstream_gates"],
     primaryMetric: `handoffStatus=${status}`,
+    requiredCorrections: artifact.summary.tileSourceHandoffRequiredCorrections,
   });
 };
 
@@ -786,6 +814,7 @@ export const buildNhm2CoupledClosurePassCandidate = (
         gates.find((entry) => entry.gateId === "regional_support_function_atlas")
           ?.pass === true,
       firstBlocker: firstNonPass?.blockers[0] ?? firstNonPass?.gateId ?? "none",
+      firstRequiredCorrections: correctionRecord(firstNonPass?.requiredCorrections ?? {}),
       blockerCount,
     },
     claimBoundary: {
@@ -821,7 +850,9 @@ const isGate = (value: unknown): value is Nhm2CoupledClosureGateV1 => {
     record.pass === (record.status === "pass") &&
     isStringArray(record.blockers) &&
     isStringArray(record.warnings) &&
-    isNullableText(record.primaryMetric)
+    isNullableText(record.primaryMetric) &&
+    isRecord(record.requiredCorrections) &&
+    Object.values(record.requiredCorrections).every(isCorrectionValue)
   );
 };
 
@@ -875,6 +906,8 @@ export const isNhm2CoupledClosurePassCandidateArtifact = (
     typeof summary.materialReceipted !== "boolean" ||
     typeof summary.atlasConsumerCongruencePass !== "boolean" ||
     asText(summary.firstBlocker) == null ||
+    !isRecord(summary.firstRequiredCorrections) ||
+    !Object.values(summary.firstRequiredCorrections).every(isCorrectionValue) ||
     typeof summary.blockerCount !== "number" ||
     !Number.isFinite(summary.blockerCount) ||
     claimBoundary?.diagnosticOnly !== true ||

@@ -1,3 +1,5 @@
+import type { Nhm2TileSourceOperatingBudgetCorrectionValueV1 } from "./nhm2-tile-source-operating-budget-readiness.v1";
+
 export const NHM2_BLOCKER_LEDGER_ARTIFACT_ID = "nhm2_blocker_ledger";
 export const NHM2_BLOCKER_LEDGER_SCHEMA_VERSION = "nhm2_blocker_ledger/v1";
 
@@ -91,6 +93,14 @@ export type Nhm2BlockerLedgerArtifact = {
     coupledClosurePassCandidate: boolean | null;
     coupledClosureFirstBlocker: string | null;
     coupledClosureBlockers: string[];
+    coupledClosureFirstRequiredCorrections: Record<
+      string,
+      Nhm2TileSourceOperatingBudgetCorrectionValueV1
+    >;
+    coupledClosureRequiredCorrections: Record<
+      string,
+      Nhm2TileSourceOperatingBudgetCorrectionValueV1
+    >;
   };
   gateSummary: Array<{
     gateId: string;
@@ -167,6 +177,18 @@ const isNullableNumber = (value: unknown): value is number | null =>
 
 const isNullableBoolean = (value: unknown): value is boolean | null =>
   value === null || typeof value === "boolean";
+
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value);
+
+const isCorrectionValue = (
+  value: unknown,
+): value is Nhm2TileSourceOperatingBudgetCorrectionValueV1 =>
+  value === null ||
+  typeof value === "string" ||
+  typeof value === "boolean" ||
+  isFiniteNumber(value) ||
+  (Array.isArray(value) && value.every((entry) => typeof entry === "string"));
 
 const isState = (value: unknown): value is Nhm2BlockerLedgerState =>
   value === "pass" || value === "review" || value === "fail";
@@ -379,6 +401,14 @@ export const isNhm2BlockerLedgerArtifact = (
     !isNullableText(tileCounterpartSource.coupledClosureFirstBlocker) ||
     !Array.isArray(tileCounterpartSource.coupledClosureBlockers) ||
     !tileCounterpartSource.coupledClosureBlockers.every(isText) ||
+    !isRecord(tileCounterpartSource.coupledClosureFirstRequiredCorrections) ||
+    !Object.values(tileCounterpartSource.coupledClosureFirstRequiredCorrections).every(
+      isCorrectionValue,
+    ) ||
+    !isRecord(tileCounterpartSource.coupledClosureRequiredCorrections) ||
+    !Object.values(tileCounterpartSource.coupledClosureRequiredCorrections).every(
+      isCorrectionValue,
+    ) ||
     !Array.isArray(record.gateSummary) ||
     !record.gateSummary.every(isGate) ||
     !Array.isArray(record.regionalBlockers) ||

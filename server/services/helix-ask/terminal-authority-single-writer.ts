@@ -4269,6 +4269,17 @@ export function applyHelixTerminalAuthoritySingleWriter(
     return Boolean(text && text === visibleText);
   });
   const wroteVisibleFields = [...VISIBLE_ANSWER_FIELDS];
+  const terminalAuthorityForEnvelopeMirror = readRecord(input.payload.terminal_answer_authority);
+  const terminalPresentationForEnvelopeMirror = readRecord(input.payload.terminal_presentation);
+  const workstationEnvelopeSelectionKind =
+    appliedEnvelope.terminal_artifact_kind === "workstation_tool_evaluation" &&
+    appliedEnvelope.final_answer_source === "workstation_tool_evaluation" &&
+    (
+      readString(terminalAuthorityForEnvelopeMirror?.terminal_artifact_kind) === "workstation_tool_evaluation" ||
+      readString(terminalPresentationForEnvelopeMirror?.terminal_artifact_kind) === "workstation_tool_evaluation"
+    )
+      ? "workstation_tool_evaluation" as const
+      : null;
   const envelopeTerminalKind =
     appliedEnvelope.terminal_artifact_kind === "typed_failure" ||
     appliedEnvelope.final_answer_source === "typed_failure" ||
@@ -4276,6 +4287,8 @@ export function applyHelixTerminalAuthoritySingleWriter(
     appliedEnvelope.terminal_artifact_kind === "direct_answer_text" ||
     appliedEnvelope.terminal_artifact_kind === "repo_code_evidence_answer"
       ? appliedEnvelope.terminal_artifact_kind
+      : workstationEnvelopeSelectionKind
+        ? workstationEnvelopeSelectionKind
       : null;
   const selectedTerminalArtifactKind = envelopeTerminalKind ?? selectedArtifactKind ?? null;
   const resultSource =
@@ -4286,8 +4299,10 @@ export function applyHelixTerminalAuthoritySingleWriter(
         ? "request_user_input"
       : appliedEnvelope.terminal_artifact_kind === "direct_answer_text"
         ? "direct_answer_text"
-        : appliedEnvelope.terminal_artifact_kind === "repo_code_evidence_answer"
-          ? "repo_code_evidence_answer"
+      : appliedEnvelope.terminal_artifact_kind === "repo_code_evidence_answer"
+        ? "repo_code_evidence_answer"
+        : workstationEnvelopeSelectionKind
+          ? "workstation_tool_evaluation"
           : selectedSource === "terminal_authority_repair_failure"
             ? selectedSource
             : selectedSource;
@@ -4295,6 +4310,10 @@ export function applyHelixTerminalAuthoritySingleWriter(
     appliedEnvelope.terminal_artifact_kind === "repo_code_evidence_answer"
       ? readString(input.payload.terminal_artifact_id) ??
         readString(readRecord(input.payload.repo_code_evidence_answer)?.artifact_id)
+      : workstationEnvelopeSelectionKind
+        ? readString(input.payload.terminal_artifact_id) ??
+          readString(readRecord(input.payload.workstation_tool_evaluation)?.evaluation_id) ??
+          readString(terminalAuthorityForEnvelopeMirror?.terminal_artifact_id)
       : null;
   const selectedArtifactRefForResult =
     envelopeSelectedArtifactRef ??

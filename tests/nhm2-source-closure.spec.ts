@@ -61,6 +61,7 @@ const makeTileSourceAuthorityHandoff = (args: {
     args.fullApparatusComponentDetailRefsReady ?? args.ready;
   const firstBlocker = args.ready ? "none" : args.firstBlocker ?? "material_coupon_receipt_missing";
   const gateStatus = args.ready ? "pass" : "missing";
+  const firstRequiredCorrections = args.ready ? {} : { missingReceiptSurface: firstBlocker };
   return {
     contractVersion: "nhm2_tile_source_authority_handoff/v1",
     generatedAt: "2026-06-11T00:00:00.000Z",
@@ -120,6 +121,15 @@ const makeTileSourceAuthorityHandoff = (args: {
             ? []
             : [firstBlocker],
       requiredChange: "Supply material-source evidence before same-basis authority.",
+      requiredCorrections:
+        args.ready
+          ? {}
+          : gateId === "component_detail_refs" && !fullApparatusComponentDetailRefsReady
+            ? {
+                tensorComponentRefMissingCount: 1,
+                missingTensorComponentIds: ["T01"],
+              }
+            : firstRequiredCorrections,
     })),
     summary: {
       handoffStatus: args.ready ? "handoff_ready" : "blocked",
@@ -133,6 +143,7 @@ const makeTileSourceAuthorityHandoff = (args: {
       operatingBudgetsFalsifyCurrentCandidate: false,
       physicalValidationStillRequired: true,
       firstBlocker,
+      firstRequiredCorrections,
       physicalViabilityClaimAllowed: false,
       transportClaimAllowed: false,
       propulsionClaimAllowed: false,
@@ -428,6 +439,11 @@ describe("nhm2 source-side same-basis tensor authority receipt", () => {
     expect(isNhm2SourceSideSameBasisTensorAuthorityArtifact(receipt)).toBe(true);
     expect(receipt.tileSourceAuthorityHandoffStatus).toBe("blocked");
     expect(receipt.summary.tileSourceHandoffReady).toBe(false);
+    expect(receipt.summary.tileSourceHandoffRequiredCorrections).toMatchObject({
+      missingReceiptSurface: "thermal_cycle_drift_above_0p01_operating_budget",
+      "material_receipts.missingReceiptSurface":
+        "thermal_cycle_drift_above_0p01_operating_budget",
+    });
     expect(receipt.summary.hasWallAuthority).toBe(false);
     expect(receipt.summary.allRequiredRegionsAuthoritative).toBe(false);
     expect(receipt.regions[0]).toMatchObject({
@@ -436,6 +452,9 @@ describe("nhm2 source-side same-basis tensor authority receipt", () => {
       sourceTensorRef: "artifact://tile-wall/full-tensor",
       hasFullTensorComponents: true,
       notDerivedFromMetricRequiredTensor: true,
+    });
+    expect(receipt.regions[0]?.handoffRequiredCorrections).toMatchObject({
+      missingReceiptSurface: "thermal_cycle_drift_above_0p01_operating_budget",
     });
     expect(receipt.regions[0]?.blockers).toEqual(
       expect.arrayContaining([
@@ -502,9 +521,18 @@ describe("nhm2 source-side same-basis tensor authority receipt", () => {
 
     expect(receipt.tileSourceAuthorityHandoffStatus).toBe("blocked");
     expect(receipt.summary.tileSourceHandoffReady).toBe(false);
+    expect(receipt.summary.tileSourceHandoffRequiredCorrections).toMatchObject({
+      missingReceiptSurface: "full_apparatus_T01_ref_missing_for_operating_budget",
+      "component_detail_refs.tensorComponentRefMissingCount": 1,
+      "component_detail_refs.missingTensorComponentIds": ["T01"],
+    });
     expect(receipt.summary.hasWallAuthority).toBe(false);
     expect(receipt.regions[0]?.status).toBe("blocked");
     expect(receipt.regions[0]?.notDerivedFromMetricRequiredTensor).toBeNull();
+    expect(receipt.regions[0]?.handoffRequiredCorrections).toMatchObject({
+      missingReceiptSurface: "full_apparatus_T01_ref_missing_for_operating_budget",
+      "component_detail_refs.tensorComponentRefMissingCount": 1,
+    });
     expect(receipt.regions[0]?.blockers).toEqual(
       expect.arrayContaining([
         "tile_source_authority_handoff_not_ready",

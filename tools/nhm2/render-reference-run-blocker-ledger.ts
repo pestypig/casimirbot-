@@ -33,6 +33,17 @@ const asString = (value: unknown): string | null =>
 const safe = (value: unknown): string =>
   value == null ? "null" : String(value).replace(/\|/g, "\\|");
 
+const renderCorrections = (corrections: Record<string, unknown>): string => {
+  const entries = Object.entries(corrections);
+  if (entries.length === 0) return "none";
+  return entries
+    .map(([key, value]) => {
+      const rendered = Array.isArray(value) ? value.join(",") : safe(value);
+      return `\`${key}=${rendered}\``;
+    })
+    .join(", ");
+};
+
 export const renderReferenceRunBlockerLedger = (
   ledger: Nhm2BlockerLedgerArtifact,
 ): string => {
@@ -128,6 +139,8 @@ export const renderReferenceRunBlockerLedger = (
     `Pass candidate: \`${safe(ledger.tileCounterpartSource.coupledClosurePassCandidate)}\``,
     `First coupled blocker: \`${safe(ledger.tileCounterpartSource.coupledClosureFirstBlocker)}\``,
     `Coupled blockers: ${ledger.tileCounterpartSource.coupledClosureBlockers.map((blocker) => `\`${blocker}\``).join(", ") || "none"}`,
+    `First coupled required corrections: ${renderCorrections(ledger.tileCounterpartSource.coupledClosureFirstRequiredCorrections)}`,
+    `Coupled required corrections: ${renderCorrections(ledger.tileCounterpartSource.coupledClosureRequiredCorrections)}`,
     "",
     "## Observer Audit Consistency",
     "",

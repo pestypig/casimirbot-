@@ -18,6 +18,7 @@ import {
 } from "../shared/contracts/nhm2-tile-effective-counterpart.v1";
 import { buildNhm2SourceSideSameBasisTensorAuthorityArtifact } from "../shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1";
 import { buildReferenceRunBlockerLedger } from "../tools/nhm2/build-reference-run-blocker-ledger";
+import { renderReferenceRunBlockerLedger } from "../tools/nhm2/render-reference-run-blocker-ledger";
 import { assessNhm2SourceClosurePassReadiness } from "../tools/nhm2/source-closure-pass-readiness";
 import type { Nhm2ReferenceRunValidationArtifact } from "../tools/nhm2/validate-reference-run";
 
@@ -230,6 +231,20 @@ const coupledClosurePassCandidate = () =>
     regionalEvidence: regionalEvidence(),
   });
 
+const coupledClosurePassCandidateWithCorrections = () => {
+  const artifact = coupledClosurePassCandidate();
+  const firstNonPass = artifact.gates.find((gate) => gate.status !== "pass");
+  if (firstNonPass != null) {
+    firstNonPass.requiredCorrections = {
+      effectiveSourceTensorLayerCountShortfall: 42,
+    };
+    artifact.summary.firstRequiredCorrections = {
+      effectiveSourceTensorLayerCountShortfall: 42,
+    };
+  }
+  return artifact;
+};
+
 const qei = () =>
   buildNhm2QeiDossierArtifact({
     runId: "ledger-run",
@@ -359,7 +374,7 @@ const withTemp = (fn: (root: string) => void) => {
     writeFileSync(join(root, "readiness.json"), JSON.stringify(passReadiness()), "utf8");
     writeFileSync(
       join(root, "coupled.json"),
-      JSON.stringify(coupledClosurePassCandidate()),
+      JSON.stringify(coupledClosurePassCandidateWithCorrections()),
       "utf8",
     );
     writeFileSync(join(root, "qei.json"), JSON.stringify(qei()), "utf8");
@@ -510,6 +525,18 @@ describe("build reference-run blocker ledger", () => {
       expect(ledger.artifactRefs.coupledClosurePassCandidate).toBe("coupled.json");
       expect(ledger.tileCounterpartSource.coupledClosurePassCandidate).toBe(false);
       expect(ledger.tileCounterpartSource.coupledClosureFirstBlocker).not.toBe("none");
+      expect(
+        ledger.tileCounterpartSource.coupledClosureFirstRequiredCorrections
+          .effectiveSourceTensorLayerCountShortfall,
+      ).toBe(42);
+      expect(
+        ledger.tileCounterpartSource.coupledClosureRequiredCorrections[
+          "regional_support_function_atlas.effectiveSourceTensorLayerCountShortfall"
+        ],
+      ).toBe(42);
+      expect(renderReferenceRunBlockerLedger(ledger)).toMatch(
+        /effectiveSourceTensorLayerCountShortfall=42/,
+      );
       expect(
         ledger.gateSummary.find(
           (gate) => gate.gateId === "GATE_COUPLED_CLOSURE_PASS_CANDIDATE",

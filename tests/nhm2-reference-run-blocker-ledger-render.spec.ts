@@ -30,6 +30,7 @@ const ledger = () =>
       conservationArtifact: null,
       sourceSideSameBasisTensorAuthority: "source-authority.json",
       sourceClosurePassReadiness: "readiness.json",
+      coupledClosurePassCandidate: "coupled.json",
       referenceRunValidation: "validation.json",
     },
     tileCounterpartSource: {
@@ -50,6 +51,16 @@ const ledger = () =>
       sourceClosurePassSignalAllowed: false,
       firstRetirableBlocker: "wall_source_side_authority_incomplete",
       preflightBlockers: ["wall_source_side_authority_incomplete"],
+      coupledClosurePassCandidateRef: "coupled.json",
+      coupledClosurePassCandidate: false,
+      coupledClosureFirstBlocker: "tile_source_authority_handoff_not_ready",
+      coupledClosureBlockers: ["tile_source_authority_handoff:operating_budget_missing"],
+      coupledClosureFirstRequiredCorrections: {
+        effectiveSourceTensorLayerCountShortfall: 42,
+      },
+      coupledClosureRequiredCorrections: {
+        "tile_source_authority_handoff.effectiveSourceTensorLayerCountShortfall": 42,
+      },
     },
     gateSummary: [
       {
@@ -119,6 +130,13 @@ describe("render reference-run blocker ledger", () => {
     expect(report).toMatch(/Source-Side Same-Basis Authority/);
     expect(report).toMatch(/Tile-local source elements ref/);
     expect(report).toMatch(/wall_source_side_authority_incomplete/);
+  });
+
+  it("renders coupled closure correction evidence", () => {
+    const report = renderReferenceRunBlockerLedger(ledger());
+    expect(report).toMatch(/First coupled required corrections/);
+    expect(report).toMatch(/effectiveSourceTensorLayerCountShortfall=42/);
+    expect(report).toMatch(/tile_source_authority_handoff\.effectiveSourceTensorLayerCountShortfall=42/);
   });
 
   it("renders literature non-validation boundary", () => {

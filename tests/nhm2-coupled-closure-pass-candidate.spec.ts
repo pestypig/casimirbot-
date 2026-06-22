@@ -184,7 +184,25 @@ const materialReceipt = () =>
     },
   });
 
-const tileSourceAuthorityHandoff = (): Nhm2TileSourceAuthorityHandoffV1 => ({
+const tileSourceAuthorityHandoff = (
+  args: {
+    ready?: boolean;
+    status?: Nhm2TileSourceAuthorityHandoffV1["summary"]["handoffStatus"];
+    firstBlocker?: string;
+  } = {},
+): Nhm2TileSourceAuthorityHandoffV1 => {
+  const ready = args.ready ?? true;
+  const handoffStatus = args.status ?? (ready ? "handoff_ready" : "blocked");
+  const firstBlocker = ready
+    ? "none"
+    : args.firstBlocker ?? "material_coupon_receipt_missing_for_operating_budget";
+  const firstRequiredCorrections = ready
+    ? {}
+    : {
+        missingReceiptSurface: firstBlocker,
+        missingCurveAndMapRefCount: 5,
+      };
+  return {
   contractVersion: "nhm2_tile_source_authority_handoff/v1",
   generatedAt: "2026-06-12T00:00:00.000Z",
   laneId: "nhm2_shift_lapse",
@@ -231,22 +249,24 @@ const tileSourceAuthorityHandoff = (): Nhm2TileSourceAuthorityHandoffV1 => ({
     "falsification_report",
   ].map((gateId) => ({
     gateId: gateId as Nhm2TileSourceAuthorityHandoffV1["gates"][number]["gateId"],
-    status: "pass",
-    blockers: [],
+    status: ready ? "pass" : "review",
+    blockers: ready ? [] : [firstBlocker],
     requiredChange: "No change required for coupled-closure fixture.",
+    requiredCorrections: firstRequiredCorrections,
   })),
   summary: {
-    handoffStatus: "handoff_ready",
-    handoffReadyForSameBasisAuthority: true,
-    materialEvidenceReady: true,
-    fullApparatusTensorReady: true,
-    fullApparatusComponentDetailRefsReady: true,
-    sourceAuthorityEvidenceReady: true,
-    allReceiptsPresent: true,
-    operatingBudgetsReady: true,
+    handoffStatus,
+    handoffReadyForSameBasisAuthority: ready,
+    materialEvidenceReady: ready,
+    fullApparatusTensorReady: ready,
+    fullApparatusComponentDetailRefsReady: ready,
+    sourceAuthorityEvidenceReady: ready,
+    allReceiptsPresent: ready,
+    operatingBudgetsReady: ready,
     operatingBudgetsFalsifyCurrentCandidate: false,
     physicalValidationStillRequired: true,
-    firstBlocker: "none",
+    firstBlocker,
+    firstRequiredCorrections,
     physicalViabilityClaimAllowed: false,
     transportClaimAllowed: false,
     propulsionClaimAllowed: false,
@@ -263,7 +283,8 @@ const tileSourceAuthorityHandoff = (): Nhm2TileSourceAuthorityHandoffV1 => ({
     transportClaimAllowed: false,
     propulsionClaimAllowed: false,
   },
-});
+  };
+};
 
 const tileRegion = (
   regionId: Nhm2RegionalSourceClosureRegionId,
@@ -375,7 +396,9 @@ const regionalEvidence = (relLInf = 0) =>
     literatureRefs: ["natario_2001_zero_expansion"],
   });
 
-const sourceAuthority = (args: { includeHandoff?: boolean } = {}) =>
+const sourceAuthority = (
+  args: { includeHandoff?: boolean; handoff?: Nhm2TileSourceAuthorityHandoffV1 } = {},
+) =>
   buildNhm2SourceSideSameBasisTensorAuthorityArtifact({
     generatedAt: "2026-06-12T00:00:00.000Z",
     laneId: "nhm2_shift_lapse",
@@ -387,7 +410,7 @@ const sourceAuthority = (args: { includeHandoff?: boolean } = {}) =>
       ? {}
       : {
           tileSourceAuthorityHandoffRef: "tile-source-authority-handoff.json",
-          tileSourceAuthorityHandoff: tileSourceAuthorityHandoff(),
+          tileSourceAuthorityHandoff: args.handoff ?? tileSourceAuthorityHandoff(),
         }),
     counterpartArtifact: tileCounterpart(),
     casimirMaterialReceipt: materialReceipt(),
@@ -722,6 +745,42 @@ describe("NHM2 coupled closure pass-candidate artifact", () => {
     expect(handoffGate?.warnings).toContain(
       "tile_source_handoff_is_required_for_material_evidence_campaign",
     );
+  });
+
+  it("carries tile-source handoff corrections into coupled closure blockers", () => {
+    const artifact = buildNhm2CoupledClosurePassCandidate({
+      regionalSupportFunctionAtlas: atlas(),
+      sourceAuthority: sourceAuthority({
+        handoff: tileSourceAuthorityHandoff({
+          ready: false,
+          firstBlocker: "material_coupon_receipt_missing_for_operating_budget",
+        }),
+      }),
+      sourceComponentAuthorityLedger: sourceComponentAuthorityLedger(),
+      sourceClosurePassReadiness: readiness(),
+      regionalEvidence: regionalEvidence(),
+      conservation: conservation(),
+      qeiWorldlineDossier: qeiWorldlineDossier(),
+      observerRobustEnergyConditions: robustObserver(),
+      casimirMaterialReceipt: materialReceipt(),
+    });
+    const handoffGate = artifact.gates.find(
+      (gate) => gate.gateId === "tile_source_authority_handoff",
+    );
+
+    expect(artifact.summary.passCandidate).toBe(false);
+    expect(artifact.summary.tileSourceHandoffReady).toBe(false);
+    expect(artifact.summary.tileSourceHandoffStatus).toBe("blocked");
+    expect(handoffGate?.status).toBe("blocked");
+    expect(handoffGate?.requiredCorrections).toMatchObject({
+      missingReceiptSurface: "material_coupon_receipt_missing_for_operating_budget",
+      missingCurveAndMapRefCount: 5,
+    });
+    expect(artifact.summary.firstRequiredCorrections).toMatchObject({
+      missingReceiptSurface: "material_coupon_receipt_missing_for_operating_budget",
+      missingCurveAndMapRefCount: 5,
+    });
+    expect(artifact.claimBoundary.physicalViabilityClaimAllowed).toBe(false);
   });
 
   it("does not use stale source authority fallback without a complete component ledger", () => {

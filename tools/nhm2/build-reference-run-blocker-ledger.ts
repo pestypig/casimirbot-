@@ -34,6 +34,7 @@ import {
   isNhm2TileLocalSourceElementsArtifact,
   type Nhm2TileLocalSourceElementsArtifactV1,
 } from "../../shared/contracts/nhm2-tile-local-source-element.v1";
+import type { Nhm2TileSourceOperatingBudgetCorrectionValueV1 } from "../../shared/contracts/nhm2-tile-source-operating-budget-readiness.v1";
 import { isNhm2TileCounterpartConservationArtifact } from "../../shared/contracts/nhm2-tile-counterpart-conservation.v1";
 import {
   classifySourceToGeometryDivergence,
@@ -71,6 +72,37 @@ const asString = (value: unknown): string | null =>
 
 const asNumber = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const isCorrectionValue = (
+  value: unknown,
+): value is Nhm2TileSourceOperatingBudgetCorrectionValueV1 =>
+  value === null ||
+  typeof value === "string" ||
+  typeof value === "boolean" ||
+  (typeof value === "number" && Number.isFinite(value)) ||
+  (Array.isArray(value) && value.every((entry) => typeof entry === "string"));
+
+const correctionRecord = (
+  value: unknown,
+): Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> => {
+  const record = asRecord(value) ? value : {};
+  return Object.fromEntries(
+    Object.entries(record).filter(([, entry]) => isCorrectionValue(entry)),
+  ) as Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
+};
+
+const coupledClosureRequiredCorrections = (
+  artifact: Nhm2CoupledClosurePassCandidateArtifactV1 | null,
+): Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> => {
+  if (artifact == null) return {};
+  const corrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> = {};
+  for (const gate of artifact.gates.filter((entry) => entry.status !== "pass")) {
+    for (const [key, value] of Object.entries(correctionRecord(gate.requiredCorrections))) {
+      corrections[`${gate.gateId}.${key}`] = value;
+    }
+  }
+  return corrections;
+};
 
 const resolvePath = (repoRoot: string, path: string): string =>
   isAbsolute(path) ? path : join(repoRoot, path);
@@ -834,6 +866,12 @@ export const buildReferenceRunBlockerLedger = (args: {
               ? gate.blockers.map((blocker) => `${gate.gateId}:${blocker}`)
               : [`${gate.gateId}:non_pass`],
         ) ?? [],
+      coupledClosureFirstRequiredCorrections: correctionRecord(
+        coupledClosurePassCandidateArtifact?.summary.firstRequiredCorrections ?? {},
+      ),
+      coupledClosureRequiredCorrections: coupledClosureRequiredCorrections(
+        coupledClosurePassCandidateArtifact,
+      ),
     },
     gateSummary,
     regionalBlockers,
