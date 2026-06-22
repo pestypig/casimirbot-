@@ -1358,6 +1358,19 @@ describe("NHM2 tile source material evidence receipts", () => {
       "force_gap_load.stictionMarginShortfall": expect.any(Number),
       "force_gap_load.activeGapControlAuthorityShortfallN": expect.any(Number),
     });
+    expect(handoff.summary.firstFrontierResolutionMode).toBe(
+      "revise_architecture_or_operating_margin",
+    );
+    expect(handoff.summary.firstFrontierCampaignDomain).toBe("force_gap_pull_in");
+    expect(handoff.frontierResolutionQueue).toEqual(report.frontierResolutionQueue);
+    expect(handoff.frontierResolutionQueue[0]).toMatchObject({
+      campaignDomain: "force_gap_pull_in",
+      evidenceState: "failing_margin",
+      resolutionMode: "revise_architecture_or_operating_margin",
+      requiredCorrections: expect.objectContaining({
+        "force_gap_load.stictionMarginShortfall": expect.any(Number),
+      }),
+    });
     expect(operatingPullIn?.requiredChange).toContain("corrections:");
     expect(operatingPullIn?.requiredChange).toContain("stictionMarginShortfall=");
     expect(downstream?.downstreamGateId).toBe("regional_residual_closure");
@@ -1425,6 +1438,17 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(handoff.summary.handoffStatus).toBe("blocked");
     expect(handoff.summary.handoffReadyForSameBasisAuthority).toBe(false);
     expect(handoff.summary.firstBlocker).toBe("material_coupon_receipt_missing");
+    expect(handoff.summary.firstFrontierResolutionMode).toBe("supply_experimental_receipt");
+    expect(handoff.summary.firstFrontierCampaignDomain).toBe("material_coupon_behavior");
+    expect(handoff.summary.frontierResolutionItemCount).toBe(report.frontierResolutionQueue.length);
+    expect(handoff.frontierResolutionQueue[0]).toMatchObject({
+      rank: 1,
+      campaignDomain: "material_coupon_behavior",
+      evidenceState: "missing_receipt",
+      resolutionMode: "supply_experimental_receipt",
+      firstBlocker: "material_coupon_receipt_missing",
+      blocksCampaignPass: true,
+    });
     expect(materialGate?.status).toBe("missing");
     expect(materialGate?.blockers).toContain("material_coupon_receipt_missing");
     expect(tensorGate?.status).toBe("missing");
@@ -1453,6 +1477,7 @@ describe("NHM2 tile source material evidence receipts", () => {
     });
     expect(handoff.claimBoundary.handoffDoesNotRunSameBasisAuthority).toBe(true);
     expect(handoff.claimBoundary.operatingBudgetReadinessDoesNotValidateMaterialSource).toBe(true);
+    expect(handoff.claimBoundary.handoffCarriesFrontierQueueOnly).toBe(true);
     expect(handoff.summary.physicalViabilityClaimAllowed).toBe(false);
   });
 
@@ -1491,6 +1516,10 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(handoff.summary.sourceAuthorityEvidenceReady).toBe(true);
     expect(handoff.summary.operatingBudgetsReady).toBe(true);
     expect(handoff.summary.physicalValidationStillRequired).toBe(true);
+    expect(handoff.summary.firstFrontierResolutionMode).toBe("none");
+    expect(handoff.summary.firstFrontierCampaignDomain).toBe("none");
+    expect(handoff.summary.frontierResolutionItemCount).toBe(0);
+    expect(handoff.frontierResolutionQueue).toEqual([]);
     expect(handoff.gates.every((gate) => gate.status === "pass")).toBe(true);
     expect(handoff.gates.every((gate) => Object.keys(gate.requiredCorrections).length === 0)).toBe(
       true,
@@ -1515,6 +1544,7 @@ describe("NHM2 tile source material evidence receipts", () => {
       "artifact://full-apparatus-tensor-budget",
     );
     expect(handoff.claimBoundary.handoffReadyIsNotPhysicalCredibility).toBe(true);
+    expect(handoff.claimBoundary.handoffCarriesFrontierQueueOnly).toBe(true);
     expect(handoff.summary.transportClaimAllowed).toBe(false);
   });
 
