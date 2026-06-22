@@ -4370,6 +4370,27 @@ describe("NHM2 tile source material evidence receipts", () => {
     expect(activeSurface?.numericalMargins.heatSinkReferenceLoadW).toBe(15);
   });
 
+  it("falsifies active-control receipts when energy per cycle is nonpositive", () => {
+    const receipts = buildNhm2TileSourceMaterialEvidenceReceipts({
+      ...passingEvidence,
+      activeControl: {
+        ...passingEvidence.activeControl!,
+        energyPerCycleJ: -1e-9,
+      },
+    });
+    const activeSurface = receipts.receiptSurfaces.find(
+      (surface) => surface.surfaceId === "active_control_energy",
+    );
+
+    expect(receipts.summary.candidateDisposition).toBe("falsified");
+    expect(receipts.summary.materialEvidenceReady).toBe(false);
+    expect(activeSurface?.status).toBe("fail");
+    expect(activeSurface?.blockers).toContain("active_control_energy_per_cycle_invalid");
+    expect(activeSurface?.numericalMargins.energyPerCycleJ).toBe(-1e-9);
+    expect(activeSurface?.numericalMargins.controlPowerW).toBeNull();
+    expect(activeSurface?.numericalMargins.thermalAccountingMargin).toBeNull();
+  });
+
   it("falsifies active-control receipts when actuator authority is below the frozen 447-layer load", () => {
     const receipts = buildNhm2TileSourceMaterialEvidenceReceipts({
       ...passingEvidence,

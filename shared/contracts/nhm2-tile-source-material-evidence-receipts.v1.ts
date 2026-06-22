@@ -888,8 +888,8 @@ const activeControlSurface = (
   const controlPowerW =
     evidence.energyPerCycleJ == null ||
     evidence.switchingRateHz == null ||
-    !Number.isFinite(evidence.energyPerCycleJ) ||
-    !Number.isFinite(evidence.switchingRateHz)
+    !isPositiveFinite(evidence.energyPerCycleJ) ||
+    !isPositiveFinite(evidence.switchingRateHz)
       ? null
       : round(evidence.energyPerCycleJ * evidence.switchingRateHz);
   const thermalAccountingMargin =
@@ -957,7 +957,11 @@ const activeControlSurface = (
     ...(evidence.lockAcquisitionTraceRef == null
       ? ["active_control_lock_acquisition_trace_ref_missing"]
       : []),
-    ...(evidence.energyPerCycleJ == null || !Number.isFinite(evidence.energyPerCycleJ) ? ["active_control_energy_per_cycle_missing"] : []),
+    ...(evidence.energyPerCycleJ == null
+      ? ["active_control_energy_per_cycle_missing"]
+      : !isPositiveFinite(evidence.energyPerCycleJ)
+        ? ["active_control_energy_per_cycle_invalid"]
+        : []),
     ...(evidence.actuatorAuthorityN == null || evidence.actuatorAuthorityN <= 0
       ? ["active_control_actuator_authority_missing"]
       : activeControlActuatorAuthorityMargin == null
