@@ -47,6 +47,8 @@ describe("Warp / GR / NHM2 map", () => {
         "nhm2.experimental.physical_viability_campaign",
         "nhm2.experimental.theory_solve_roadmap",
         "nhm2.experimental.parameter_targets",
+        "nhm2.experimental.research_gap_ledger",
+        "nhm2.experimental.layer_stack_mechanical_receipt",
         "nhm2.experimental.prediction_freeze",
         "nhm2.experimental.tile_force_receipt",
         "nhm2.experimental.tile_cycle_energy_balance",
@@ -72,6 +74,8 @@ describe("Warp / GR / NHM2 map", () => {
       expect(ref.badgeId).not.toBe("nhm2.experimental.physical_viability_campaign");
       expect(ref.badgeId).not.toBe("nhm2.experimental.theory_solve_roadmap");
       expect(ref.badgeId).not.toBe("nhm2.experimental.parameter_targets");
+      expect(ref.badgeId).not.toBe("nhm2.experimental.research_gap_ledger");
+      expect(ref.badgeId).not.toBe("nhm2.experimental.layer_stack_mechanical_receipt");
       expect(ref.badgeId).not.toBe("nhm2.experimental.vacuum_weight");
       expect(ref.badgeId).not.toBe("nhm2.experimental.invariant_metric_response");
       expect(ref.badgeId).not.toBe("nhm2.experimental.geodesic_response");

@@ -15,351 +15,110 @@ const scenarioById = (id: string): CompoundCapabilityScenario => {
   return scenario;
 };
 
+const readString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim() ? value.trim() : null;
+
 const workspaceThenCalculatorDebug = (overrides: Record<string, unknown> = {}) => {
   const turnId = "ask:test:compound-live";
   const workspaceSubgoalId = `${turnId}:compound_capability_subgoal:1:workspace_os_status`;
-  const calculatorSubgoalId = `${turnId}:compound_capability_subgoal:2:scientific-calculator_solve_expression`;
-  const compoundSubgoalLedger = [
-    {
-      subgoal_id: workspaceSubgoalId,
-      order: 1,
-      requested_capability: "workspace_os.status",
-      runtime_capability: "workspace_os.status",
-      selected_capability: "workspace_os.status",
-      executed_capability: "workspace_os.status",
-      args: {},
-      required_args: [],
-      optional_args: [],
-      input_bindings: [],
-      required_observation_kinds: ["workspace_os_status_observation"],
-      required_terminal_kind: "model_synthesized_answer",
-      allowed_substitutions: [],
-      forbidden_nearby_capabilities: ["model.direct_answer"],
-      contribution_role: "evidence",
-      terminal_contribution_kind: "model_synthesized_answer",
-      observation_kind: "workspace_os_status_observation",
-      observation_ref: "obs:workspace-status",
-      observation_provenance: "compound_subgoal_id",
-      support_refs: ["obs:workspace-status"],
-      bound_input_refs: [],
-      unresolved_input_bindings: [],
-      satisfaction: "satisfied",
-      rail_status: "complete",
-      first_broken_rail: null,
-      rail_failure_code: null,
-      repair_target: null,
-    },
-    {
-      subgoal_id: calculatorSubgoalId,
-      order: 2,
-      requested_capability: "scientific-calculator.solve_expression",
-      runtime_capability: "scientific-calculator.solve_expression",
-      selected_capability: "scientific-calculator.solve_expression",
-      executed_capability: "scientific-calculator.solve_expression",
-      args: {
-        latex: "14*23+8",
-        expression: "14*23+8",
+  return compoundDebug({
+    turnId,
+    subgoals: [
+      {
+        requested_capability: "workspace_os.status",
+        executed_capability: "workspace_os.status",
+        observation_kind: "workspace_os_status_observation",
+        observation_ref: "obs:workspace-status",
+        observation_provenance: "compound_subgoal_id",
       },
-      required_args: ["latex"],
-      optional_args: ["expression", "equation"],
-      input_bindings: [],
-      required_observation_kinds: ["calculator_receipt", "workstation_tool_evaluation"],
-      required_terminal_kind: "workstation_tool_evaluation",
-      allowed_substitutions: [],
-      forbidden_nearby_capabilities: ["model.direct_answer"],
-      contribution_role: "terminal_component",
-      terminal_contribution_kind: "workstation_tool_evaluation",
-      observation_kind: "calculator_receipt",
-      observation_ref: "obs:calculator",
-      observation_provenance: "capability_key",
-      support_refs: ["obs:calculator"],
-      bound_input_refs: [],
-      unresolved_input_bindings: [],
-      satisfaction: "satisfied",
-      rail_status: "complete",
-      first_broken_rail: null,
-      rail_failure_code: null,
-      repair_target: null,
-    },
-  ];
-  const compoundSubgoalRailStatuses = compoundSubgoalLedger.map((entry) => ({
-    subgoal_id: entry.subgoal_id,
-    order: entry.order,
-    requested_capability: entry.requested_capability,
-    runtime_capability: entry.runtime_capability,
-    selected_capability: entry.selected_capability,
-    executed_capability: entry.executed_capability,
-    args: entry.args,
-    required_args: entry.required_args,
-    optional_args: entry.optional_args,
-    input_bindings: entry.input_bindings,
-    required_observation_kinds: entry.required_observation_kinds,
-    required_terminal_kind: entry.required_terminal_kind,
-    allowed_substitutions: entry.allowed_substitutions,
-    forbidden_nearby_capabilities: entry.forbidden_nearby_capabilities,
-    contribution_role: entry.contribution_role,
-    terminal_contribution_kind: entry.terminal_contribution_kind,
-    observation_kind: entry.observation_kind,
-    observation_ref: entry.observation_ref,
-    observation_provenance: entry.observation_provenance,
-    support_refs: entry.support_refs,
-    bound_input_refs: entry.bound_input_refs,
-    unresolved_input_bindings: entry.unresolved_input_bindings,
-    satisfaction: entry.satisfaction,
-    rail_status: entry.rail_status,
-    first_broken_rail: entry.first_broken_rail,
-    rail_failure_code: entry.rail_failure_code,
-    repair_target: entry.repair_target,
-    assistant_answer: false,
-    terminal_eligible: false,
-    raw_content_included: false,
-  }));
-  const payload = {
-    terminal_artifact_kind: "model_synthesized_answer",
-    terminal_presentation: {
-      terminal_artifact_kind: "model_synthesized_answer",
-    },
-    final_answer_source: "final_answer_draft",
-    compound_capability_contract: {
-      schema: "helix.compound_capability_contract.v1",
-      turn_id: turnId,
-      subgoals: [
-        {
-          subgoal_id: workspaceSubgoalId,
-          order: 1,
-          requested_capability: "workspace_os.status",
-          runtime_capability: "workspace_os.status",
-          args_hint: {},
-          required_args: [],
-          optional_args: [],
-          required_observation_kinds: ["workspace_os_status_observation"],
-          required_terminal_kind: "model_synthesized_answer",
-          allowed_substitutions: [],
-          forbidden_nearby_capabilities: ["model.direct_answer"],
-          contribution_role: "evidence",
-          terminal_contribution_kind: "model_synthesized_answer",
+      {
+        requested_capability: "scientific-calculator.solve_expression",
+        executed_capability: "scientific-calculator.solve_expression",
+        args: {
+          latex: "14*23+8",
+          expression: "14*23+8",
         },
-        {
-          subgoal_id: calculatorSubgoalId,
-          order: 2,
-          requested_capability: "scientific-calculator.solve_expression",
-          runtime_capability: "scientific-calculator.solve_expression",
-          args_hint: {
-            latex: "14*23+8",
-            expression: "14*23+8",
+        input_bindings: [
+          {
+            binding_id: `${turnId}:compound_capability_subgoal:2:scientific-calculator_solve_expression:input_binding:1`,
+            from_subgoal_id: workspaceSubgoalId,
+            from_capability: "workspace_os.status",
+            required_observation_kinds: ["workspace_os_status_observation"],
+            arg_name: "source_ref",
+            binding_kind: "source_ref",
+            required: true,
+            status: "bound",
           },
-          required_args: ["latex"],
-          optional_args: ["expression", "equation"],
-          required_observation_kinds: ["calculator_receipt", "workstation_tool_evaluation"],
-          required_terminal_kind: "workstation_tool_evaluation",
-          allowed_substitutions: [],
-          forbidden_nearby_capabilities: ["model.direct_answer"],
-          contribution_role: "terminal_component",
-          terminal_contribution_kind: "workstation_tool_evaluation",
-        },
-      ],
-    },
-    capability_itinerary_execution_state: {
-      complete: true,
-      missing_compound_subgoal_ids: [],
-      missing_required_capabilities: [],
-      next_missing_subgoal_id: null,
-      compound_subgoal_ledger: compoundSubgoalLedger,
-    },
-    artifact_query_index: {
-      compound_subgoal_rail_statuses: compoundSubgoalRailStatuses,
-      compound_subgoal_missing_summary: {
-        missing_compound_subgoal_ids: [],
-        missing_required_capabilities: [],
-        next_missing_subgoal_id: null,
-        complete: true,
-        assistant_answer: false,
-        raw_content_included: false,
+        ],
+        bound_input_refs: [
+          {
+            binding_id: `${turnId}:compound_capability_subgoal:2:scientific-calculator_solve_expression:input_binding:1`,
+            from_subgoal_id: workspaceSubgoalId,
+            from_capability: "workspace_os.status",
+            ref: "obs:workspace-status",
+            observation_kind: "workspace_os_status_observation",
+          },
+        ],
+        observation_kind: "calculator_receipt",
+        observation_ref: "obs:calculator",
+        observation_provenance: "capability_key",
       },
-    },
-    ...overrides,
-  };
-  return {
-    ask: {
-      turn_id: turnId,
-      terminal_artifact_kind: "model_synthesized_answer",
-      final_answer_source: "final_answer_draft",
-    },
-    debugExport: {
-      schema: "helix.ask.debug_export.v1",
-      payload,
-    },
-  };
+    ],
+    overrides,
+  });
 };
 
 const invalidCalculatorArgsFailClosedDebug = (overrides: Record<string, unknown> = {}) => {
   const turnId = "ask:test:compound-invalid-args";
   const docsSubgoalId = `${turnId}:compound_capability_subgoal:1:docs-viewer_locate_in_doc`;
-  const calculatorSubgoalId = `${turnId}:compound_capability_subgoal:2:scientific-calculator_solve_expression`;
-  const compoundSubgoalLedger = [
-    {
-      subgoal_id: docsSubgoalId,
-      order: 1,
-      requested_capability: "docs-viewer.locate_in_doc",
-      runtime_capability: "docs-viewer.locate_in_doc",
-      selected_capability: "docs-viewer.locate_in_doc",
-      executed_capability: "docs-viewer.locate_in_doc",
-      args: {
-        query: "rule of thumb",
+  return compoundDebug({
+    turnId,
+    terminalArtifactKind: "typed_failure",
+    finalAnswerSource: "typed_failure",
+    subgoals: [
+      {
+        requested_capability: "docs-viewer.locate_in_doc",
+        executed_capability: "docs-viewer.locate_in_doc",
+        args: { query: "rule of thumb" },
+        observation_kind: "doc_location_matches",
+        observation_ref: "obs:doc-location",
+        observation_provenance: "compound_subgoal_id",
       },
-      required_args: ["query"],
-      optional_args: ["path", "anchor", "term", "text"],
-      input_bindings: [],
-      required_observation_kinds: ["doc_location_result", "doc_location_matches", "doc_evidence_location"],
-      required_terminal_kind: "doc_location_matches",
-      allowed_substitutions: [],
-      forbidden_nearby_capabilities: ["model.direct_answer"],
-      contribution_role: "evidence",
-      terminal_contribution_kind: "doc_location_matches",
-      observation_kind: "doc_location_matches",
-      observation_ref: "obs:doc-location",
-      observation_provenance: "compound_subgoal_id",
-      support_refs: ["obs:doc-location"],
-      bound_input_refs: [],
-      unresolved_input_bindings: [],
-      satisfaction: "satisfied",
-      rail_status: "complete",
-      first_broken_rail: null,
-      rail_failure_code: null,
-      repair_target: null,
-    },
-    {
-      subgoal_id: calculatorSubgoalId,
-      order: 2,
-      requested_capability: "scientific-calculator.solve_expression",
-      runtime_capability: "scientific-calculator.solve_expression",
-      selected_capability: "scientific-calculator.solve_expression",
-      executed_capability: null,
-      args: {
-        latex: "explain why receipts matter",
-        expression: "explain why receipts matter",
+      {
+        requested_capability: "scientific-calculator.solve_expression",
+        executed_capability: null,
+        args: {
+          latex: "explain why receipts matter",
+          expression: "explain why receipts matter",
+        },
+        input_bindings: [
+          {
+            binding_id: `${turnId}:compound_capability_subgoal:2:scientific-calculator_solve_expression:input_binding:1`,
+            from_subgoal_id: docsSubgoalId,
+            from_capability: "docs-viewer.locate_in_doc",
+            required_observation_kinds: ["doc_location_result", "doc_location_matches", "doc_evidence_location"],
+            arg_name: "source_ref",
+            binding_kind: "source_ref",
+            required: true,
+            status: "bound",
+          },
+        ],
+        observation_kind: null,
+        observation_ref: null,
+        observation_provenance: null,
+        support_refs: [],
+        satisfaction: "failed",
+        rail_status: "fail_closed",
+        first_broken_rail: "capability_execution",
+        rail_failure_code: readString(overrides.terminal_error_code) ?? "invalid_arg:latex_is_prose",
+        repair_target: "subgoal_argument_extraction",
       },
-      required_args: ["latex"],
-      optional_args: ["expression", "equation"],
-      input_bindings: [],
-      required_observation_kinds: ["calculator_receipt", "workstation_tool_evaluation"],
-      required_terminal_kind: "workstation_tool_evaluation",
-      allowed_substitutions: [],
-      forbidden_nearby_capabilities: ["model.direct_answer"],
-      contribution_role: "terminal_component",
-      terminal_contribution_kind: "workstation_tool_evaluation",
-      observation_kind: null,
-      observation_ref: null,
-      observation_provenance: null,
-      support_refs: [],
-      bound_input_refs: [],
-      unresolved_input_bindings: [],
-      satisfaction: "failed",
-      rail_status: "fail_closed",
-      first_broken_rail: "capability_execution",
-      rail_failure_code: "invalid_arg:latex_is_prose",
-      repair_target: "subgoal_argument_extraction",
+    ],
+    overrides: {
+      terminal_error_code: readString(overrides.terminal_error_code) ?? "invalid_arg:latex_is_prose",
+      ...overrides,
     },
-  ];
-  const compoundSubgoalRailStatuses = compoundSubgoalLedger.map((entry) => ({
-    subgoal_id: entry.subgoal_id,
-    order: entry.order,
-    requested_capability: entry.requested_capability,
-    runtime_capability: entry.runtime_capability,
-    selected_capability: entry.selected_capability,
-    executed_capability: entry.executed_capability,
-    args: entry.args,
-    required_args: entry.required_args,
-    optional_args: entry.optional_args,
-    required_observation_kinds: entry.required_observation_kinds,
-    required_terminal_kind: entry.required_terminal_kind,
-    allowed_substitutions: entry.allowed_substitutions,
-    forbidden_nearby_capabilities: entry.forbidden_nearby_capabilities,
-    contribution_role: entry.contribution_role,
-    terminal_contribution_kind: entry.terminal_contribution_kind,
-    input_bindings: entry.input_bindings,
-    observation_kind: entry.observation_kind,
-    observation_ref: entry.observation_ref,
-    observation_provenance: entry.observation_provenance,
-    support_refs: entry.support_refs,
-    bound_input_refs: entry.bound_input_refs,
-    unresolved_input_bindings: entry.unresolved_input_bindings,
-    satisfaction: entry.satisfaction,
-    rail_status: entry.rail_status,
-    first_broken_rail: entry.first_broken_rail,
-    rail_failure_code: entry.rail_failure_code,
-    repair_target: entry.repair_target,
-    assistant_answer: false,
-    terminal_eligible: false,
-    raw_content_included: false,
-  }));
-  const payload = {
-    terminal_error_code: "invalid_arg:latex_is_prose",
-    terminal_artifact_kind: "typed_failure",
-    terminal_presentation: {
-      terminal_artifact_kind: "typed_failure",
-    },
-    final_answer_source: "typed_failure",
-    compound_capability_contract: {
-      schema: "helix.compound_capability_contract.v1",
-      turn_id: turnId,
-      subgoals: [
-        {
-          subgoal_id: docsSubgoalId,
-          order: 1,
-          requested_capability: "docs-viewer.locate_in_doc",
-          runtime_capability: "docs-viewer.locate_in_doc",
-          args_hint: {
-            query: "rule of thumb",
-          },
-          required_args: ["query"],
-          optional_args: ["path", "anchor", "term", "text"],
-          required_observation_kinds: ["doc_location_result", "doc_location_matches", "doc_evidence_location"],
-          required_terminal_kind: "doc_location_matches",
-          allowed_substitutions: [],
-          forbidden_nearby_capabilities: ["model.direct_answer"],
-          contribution_role: "evidence",
-          terminal_contribution_kind: "doc_location_matches",
-        },
-        {
-          subgoal_id: calculatorSubgoalId,
-          order: 2,
-          requested_capability: "scientific-calculator.solve_expression",
-          runtime_capability: "scientific-calculator.solve_expression",
-          args_hint: {
-            latex: "explain why receipts matter",
-            expression: "explain why receipts matter",
-          },
-          required_args: ["latex"],
-          optional_args: ["expression", "equation"],
-          required_observation_kinds: ["calculator_receipt", "workstation_tool_evaluation"],
-          required_terminal_kind: "workstation_tool_evaluation",
-          allowed_substitutions: [],
-          forbidden_nearby_capabilities: ["model.direct_answer"],
-          contribution_role: "terminal_component",
-          terminal_contribution_kind: "workstation_tool_evaluation",
-        },
-      ],
-    },
-    capability_itinerary_execution_state: {
-      compound_subgoal_ledger: compoundSubgoalLedger,
-    },
-    artifact_query_index: {
-      compound_subgoal_rail_statuses: compoundSubgoalRailStatuses,
-    },
-    ...overrides,
-  };
-  return {
-    ask: {
-      turn_id: turnId,
-      terminal_artifact_kind: "typed_failure",
-      final_answer_source: "typed_failure",
-    },
-    debugExport: {
-      schema: "helix.ask.debug_export.v1",
-      payload,
-    },
-  };
+  });
 };
 
 const missingCalculatorArgsFailClosedDebug = () => {
@@ -725,6 +484,7 @@ const compoundDebug = (input: {
     const contractTerms = fixtureContractTermsForCapability(entry.requested_capability, entry.observation_kind);
     const requiredArgs = entry.required_args ?? fixtureRequiredArgsForCapability(entry.requested_capability);
     const optionalArgs = entry.optional_args ?? fixtureOptionalArgsForCapability(entry.requested_capability);
+    const args = entry.args ?? {};
     return {
       subgoal_id: subgoalId,
       order: index + 1,
@@ -732,7 +492,9 @@ const compoundDebug = (input: {
       runtime_capability: entry.runtime_capability ?? entry.requested_capability,
       selected_capability: entry.runtime_capability ?? entry.requested_capability,
       executed_capability: entry.executed_capability,
-      args: entry.args ?? {},
+      args,
+      planned_args: args,
+      selected_args: args,
       required_args: requiredArgs,
       optional_args: optionalArgs,
       required_observation_kinds: entry.required_observation_kinds ?? contractTerms.required_observation_kinds,
@@ -774,6 +536,9 @@ const compoundDebug = (input: {
     requested_capability: entry.requested_capability,
     runtime_capability: input.subgoals[entry.order - 1]?.runtime_capability ?? entry.requested_capability,
     args_hint: entry.args,
+    args: entry.args,
+    planned_args: entry.planned_args,
+    selected_args: entry.selected_args,
     required_args: entry.required_args,
     optional_args: entry.optional_args,
     required_observation_kinds: entry.required_observation_kinds,
@@ -795,6 +560,9 @@ const compoundDebug = (input: {
     runtime_capability: entry.runtime_capability,
     compound_subgoal_id: entry.subgoal_id,
     args_hint: entry.args_hint,
+    args: entry.args_hint,
+    planned_args: entry.planned_args,
+    selected_args: entry.selected_args,
     depends_on_subgoal_ids: entry.depends_on_subgoal_ids,
     input_bindings: entry.input_bindings,
     required_observation_kinds: entry.required_observation_kinds,
@@ -802,6 +570,34 @@ const compoundDebug = (input: {
     forbidden_nearby_capabilities: entry.forbidden_nearby_capabilities,
     status: "planned",
   }));
+  const incompleteRows = ledger.filter((entry) =>
+    entry.satisfaction !== "satisfied" ||
+    entry.rail_status !== "complete" ||
+    !entry.observation_ref
+  );
+  const firstIncomplete = incompleteRows[0] ?? null;
+  const missingSummary = {
+    missing_compound_subgoal_ids: incompleteRows.map((entry) => entry.subgoal_id),
+    missing_required_capabilities: incompleteRows.map((entry) => entry.requested_capability),
+    next_missing_subgoal_id: firstIncomplete?.subgoal_id ?? null,
+    complete: incompleteRows.length === 0,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  const codexParityRailTable = {
+    compound_subgoal_count: ledger.length,
+    first_incomplete_compound_subgoal_id: firstIncomplete?.subgoal_id ?? null,
+    first_incomplete_compound_requested_capability: firstIncomplete?.requested_capability ?? null,
+    first_incomplete_compound_runtime_capability: firstIncomplete?.runtime_capability ?? null,
+    first_incomplete_compound_selected_capability: firstIncomplete?.selected_capability ?? null,
+    first_incomplete_compound_executed_capability: firstIncomplete?.executed_capability ?? null,
+    compound_incomplete_subgoal_did_tool_run: firstIncomplete ? Boolean(firstIncomplete.executed_capability) : null,
+    compound_first_broken_rail: firstIncomplete?.first_broken_rail ?? null,
+    compound_rail_failure_code: firstIncomplete?.rail_failure_code ?? null,
+    compound_repair_target: firstIncomplete?.repair_target ?? null,
+    assistant_answer: false,
+    raw_content_included: false,
+  };
   const payload = {
     terminal_artifact_kind: terminalArtifactKind,
     terminal_presentation: {
@@ -817,6 +613,14 @@ const compoundDebug = (input: {
       schema: "helix.capability_itinerary.v1",
       turn_id: input.turnId,
       planned_steps: plannedSteps,
+      terminal_success_criteria: {
+        requires_post_observation_synthesis: true,
+        compound_terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+        required_observation_families: [],
+        required_capabilities: ledger.map((entry) => entry.requested_capability),
+        allowed_terminal_artifact_kinds: [terminalArtifactKind, "model_synthesized_answer", "compound_evidence_synthesis_answer"],
+        forbidden_terminal_artifact_kinds: ["tool_receipt", "calculator_receipt", "doc_open_receipt", "workspace_action_receipt"],
+      },
       compound_capability_contract: {
         schema: "helix.compound_capability_contract.v1",
         turn_id: input.turnId,
@@ -824,10 +628,17 @@ const compoundDebug = (input: {
       },
     },
     capability_itinerary_execution_state: {
+      complete: incompleteRows.length === 0,
+      missing_compound_subgoal_ids: missingSummary.missing_compound_subgoal_ids,
+      missing_required_capabilities: missingSummary.missing_required_capabilities,
+      next_missing_subgoal_id: missingSummary.next_missing_subgoal_id,
       compound_subgoal_ledger: ledger,
     },
+    codex_parity_agent_spine_rail_table: codexParityRailTable,
     artifact_query_index: {
       compound_subgoal_rail_statuses: railStatuses,
+      compound_subgoal_missing_summary: missingSummary,
+      codex_parity_agent_spine_rail_table: codexParityRailTable,
     },
     ...(input.overrides ?? {}),
   };
@@ -2785,6 +2596,24 @@ describe("Helix Ask compound capability live probe", () => {
     expect(filtered.availableIds).toContain("scholarly_full_text_reflection_calculator");
     expect(filtered.availableIds).toContain("civilization_bounds_reflection");
     expect(filtered.availableIds).toContain("zen_graph_reflection_bridge");
+  });
+
+  it("keeps the active goal representative compound scenarios in the live probe set", () => {
+    const scenarioIds = new Set(COMPOUND_CAPABILITY_LIVE_SCENARIOS.map((scenario) => scenario.id));
+    const requiredByGoal = [
+      "docs_then_calculator",
+      "catalog_then_workspace",
+      "repo_plus_docs",
+      "internet_reflection_calculator",
+      "visual_then_calculator",
+      "civilization_bounds_reflection",
+      "invalid_calculator_args_fail_closed",
+      "missing_calculator_args_fail_closed",
+    ];
+
+    for (const scenarioId of requiredByGoal) {
+      expect(scenarioIds.has(scenarioId), scenarioId).toBe(true);
+    }
   });
 
   it("has deterministic debug fixture coverage for every live-probe scenario", () => {

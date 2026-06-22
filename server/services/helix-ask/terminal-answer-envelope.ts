@@ -30,6 +30,7 @@ export type HelixTerminalAnswerEnvelope = {
     | "repo_code_evidence_answer"
     | "selected_final_answer"
     | "workstation_tool_evaluation"
+    | "capability_help_summary"
     | "request_user_input"
     | "tool_receipt"
     | "typed_failure";
@@ -662,6 +663,59 @@ const workstationToolEvaluationTerminalContractSatisfied = (payload: Record<stri
   return Boolean(readTerminalPresentationText(payload) ?? readString(payload.selected_final_answer));
 };
 
+const readCapabilityHelpSummaryArtifact = (
+  payload: Record<string, unknown>,
+): { ref: string | null; text: string } | null => {
+  const topLevel = readRecord(payload.capability_help_summary);
+  const topLevelText =
+    readString(topLevel?.answer_text) ??
+    readString(topLevel?.text) ??
+    readString(topLevel?.terminal_text);
+  if (topLevelText && !isFailureLikeTerminalText(topLevelText)) {
+    return {
+      ref: readString(topLevel?.artifact_id) ?? readString(payload.terminal_artifact_id),
+      text: topLevelText,
+    };
+  }
+
+  for (const entry of [...readArray(payload.current_turn_artifact_ledger)].reverse()) {
+    const artifact = readRecord(entry);
+    if (readString(artifact?.kind) !== "capability_help_summary") continue;
+    const artifactPayload = readRecord(artifact?.payload);
+    const text =
+      readString(artifactPayload?.answer_text) ??
+      readString(artifactPayload?.text) ??
+      readString(artifactPayload?.terminal_text) ??
+      readString(artifact?.text);
+    if (!text || isFailureLikeTerminalText(text)) continue;
+    return {
+      ref: readString(artifact?.artifact_id),
+      text,
+    };
+  }
+
+  return null;
+};
+
+const capabilityHelpSummaryTerminalContractSatisfied = (payload: Record<string, unknown>): boolean => {
+  const canonicalGoal = readRecord(payload.canonical_goal_frame);
+  const goal = readRecord(payload.goal_satisfaction_evaluation);
+  const requiredTerminalKinds = [
+    readString(canonicalGoal?.required_terminal_kind),
+    ...readArray(canonicalGoal?.required_terminal_kinds).map(readString),
+    readString(goal?.required_terminal_kind),
+    readString(goal?.terminal_artifact_kind),
+  ].filter((entry): entry is string => Boolean(entry));
+  const capabilityHelpRequired =
+    readString(canonicalGoal?.goal_kind) === "capability_help" ||
+    readString(goal?.canonical_goal_kind) === "capability_help" ||
+    requiredTerminalKinds.includes("capability_help_summary");
+  const goalAllowsTerminal =
+    readString(goal?.satisfaction) === "satisfied" ||
+    readString(goal?.next_decision) === "allow_terminal";
+  return capabilityHelpRequired && goalAllowsTerminal && Boolean(readCapabilityHelpSummaryArtifact(payload));
+};
+
 const applySatisfiedDirectAnswerTerminalCandidate = (
   payload: Record<string, unknown>,
 ): { applied: boolean; text: string | null } => {
@@ -906,7 +960,12 @@ export function resolveTerminalAnswerEnvelope(
           terminalArtifactKind,
           finalAnswerSource,
         });
-  if (!committedRouteAllowsTerminal && !directAnswerContractSatisfied(payload) && !workstationToolEvaluationTerminalContractSatisfied(payload)) {
+  if (
+    !committedRouteAllowsTerminal &&
+    !directAnswerContractSatisfied(payload) &&
+    !workstationToolEvaluationTerminalContractSatisfied(payload) &&
+    !capabilityHelpSummaryTerminalContractSatisfied(payload)
+  ) {
     payload.committed_route_terminal_rejection = {
       schema: "helix.committed_route_terminal_rejection.v1",
       turn_id: turnId,
@@ -1245,6 +1304,37 @@ export function applyTerminalAnswerEnvelope(
         terminal_kind: "answer",
         authority_origin: "selected_final_answer",
       };
+    }
+  }
+  if (
+    (envelope.terminal_kind === "failure" || envelope.final_answer_source === "typed_failure") &&
+    capabilityHelpSummaryTerminalContractSatisfied(payload)
+  ) {
+    const capabilityHelp = readCapabilityHelpSummaryArtifact(payload);
+    if (capabilityHelp) {
+      const rejectedFailure = readRecord(payload.typed_failure);
+      if (rejectedFailure || readString(payload.terminal_error_code)) {
+        payload.rejected_typed_failure = {
+          ...(rejectedFailure ?? {}),
+          rejected_reason: "successful_capability_help_terminal_superseded_failure",
+          superseded_terminal_error_code: readString(payload.terminal_error_code),
+          assistant_answer: false,
+          raw_content_included: false,
+        };
+      }
+      delete payload.terminal_error_code;
+      delete payload.terminal_failure_text;
+      delete payload.typed_failure;
+      envelope = {
+        ...envelope,
+        terminal_artifact_kind: "capability_help_summary",
+        final_answer_source: "capability_help_summary",
+        terminal_text: capabilityHelp.text,
+        terminal_text_hash: hashHelixTerminalText(capabilityHelp.text),
+        terminal_kind: "answer",
+        authority_origin: "capability_help_summary",
+      };
+      payload.terminal_artifact_id = capabilityHelp.ref ?? `${envelope.turn_id}:capability_help_summary`;
     }
   }
   if (envelope.terminal_artifact_kind === "repo_code_evidence_answer") {

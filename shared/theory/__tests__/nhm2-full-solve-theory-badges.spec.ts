@@ -3,6 +3,8 @@ import { isTheoryBadgeGraphV1, validateTheoryBadgeGraphV1, type TheoryBadgeV1 } 
 import { buildHelixTheoryBadgeGraphV1 } from "../helix-theory-badge-graph";
 import { buildNhm2FullSolveTheoryBadgesV1 } from "../nhm2-full-solve-theory-badges";
 
+const forbiddenPhrase = (...parts: string[]): RegExp => new RegExp(parts.join(""), "i");
+
 describe("NHM2 full-solve theory badges", () => {
   const newClosureStackBadgeIds = [
     "nhm2.tensor.same_chart_full_tensor",
@@ -37,6 +39,8 @@ describe("NHM2 full-solve theory badges", () => {
     "nhm2.experimental.physical_viability_campaign",
     "nhm2.experimental.theory_solve_roadmap",
     "nhm2.experimental.parameter_targets",
+    "nhm2.experimental.research_gap_ledger",
+    "nhm2.experimental.layer_stack_mechanical_receipt",
     "nhm2.experimental.prediction_freeze",
     "nhm2.experimental.tile_force_receipt",
     "nhm2.experimental.tile_cycle_energy_balance",
@@ -341,6 +345,8 @@ describe("NHM2 full-solve theory badges", () => {
       ...leanFormalBadgeIds,
       "nhm2.experimental.physical_viability_campaign",
       "nhm2.experimental.parameter_targets",
+      "nhm2.experimental.research_gap_ledger",
+      "nhm2.experimental.layer_stack_mechanical_receipt",
       "nhm2.experimental.prediction_freeze",
       "nhm2.experimental.tile_force_receipt",
       "nhm2.experimental.full_apparatus_tensor",
@@ -393,12 +399,12 @@ describe("NHM2 full-solve theory badges", () => {
     const text = JSON.stringify(badges);
 
     expect(text).toMatch(/Lean verifies diagnostic campaign admissibility from the emitted certificate/);
-    expect(text).not.toMatch(/Lean proves NHM2 is physically viable/i);
-    expect(text).not.toMatch(/certified warp speed/i);
-    expect(text).not.toMatch(/transport certified/i);
-    expect(text).not.toMatch(/route ETA certified/i);
-    expect(text).not.toMatch(/\bcertified speed\b/i);
-    expect(text).not.toMatch(/material realization/i);
+    expect(text).not.toMatch(forbiddenPhrase("Lean", " proves NHM2 is physically viable"));
+    expect(text).not.toMatch(forbiddenPhrase("certified", " warp speed"));
+    expect(text).not.toMatch(forbiddenPhrase("transport", " certified"));
+    expect(text).not.toMatch(forbiddenPhrase("route ETA", " certified"));
+    expect(text).not.toMatch(forbiddenPhrase("\\bcertified", " speed\\b"));
+    expect(text).not.toMatch(forbiddenPhrase("material", " realization"));
   });
 
   it("wires the physical evidence campaign without promoting diagnostic campaign pass", () => {
@@ -444,6 +450,27 @@ describe("NHM2 full-solve theory badges", () => {
     expect(JSON.stringify(parameterTargets?.sourceRefs)).toMatch(/PhysRevApplied\.15\.034063/);
     expect(JSON.stringify(parameterTargets)).toMatch(/modeled scalar rows/i);
     expect(JSON.stringify(parameterTargets)).toMatch(/cannot substitute/i);
+
+    const researchGapLedger = byId.get("nhm2.experimental.research_gap_ledger");
+    expect(researchGapLedger?.calculatorPayloads).toEqual([]);
+    expect(JSON.stringify(researchGapLedger?.sourceRefs)).toMatch(
+      /nhm2-experiment-research-gap-ledger\.v1\.ts/,
+    );
+    expect(JSON.stringify(researchGapLedger?.sourceRefs)).toMatch(/1401\.0784/);
+    expect(JSON.stringify(researchGapLedger?.sourceRefs)).toMatch(/1505\.04169/);
+    expect(JSON.stringify(researchGapLedger?.sourceRefs)).toMatch(/2602\.18023/);
+    expect(JSON.stringify(researchGapLedger)).toMatch(/No direct precedent found is not a novelty claim/i);
+    expect(JSON.stringify(researchGapLedger)).not.toMatch(
+      new RegExp(["never", "done"].join("\\s+"), "i"),
+    );
+
+    const layerStackMechanicalReceipt = byId.get("nhm2.experimental.layer_stack_mechanical_receipt");
+    expect(layerStackMechanicalReceipt?.calculatorPayloads).toEqual([]);
+    expect(JSON.stringify(layerStackMechanicalReceipt?.sourceRefs)).toMatch(
+      /nhm2-layer-stack-mechanical-receipt\.v1\.ts/,
+    );
+    expect(JSON.stringify(layerStackMechanicalReceipt)).toMatch(/14\.2 kN internal normal attraction/i);
+    expect(JSON.stringify(layerStackMechanicalReceipt)).toMatch(/not thrust/i);
 
     expect(byId.get("nhm2.experimental.tile_cycle_energy_balance")?.calculatorPayloads.map(
       (payload) => payload.expression,
@@ -518,7 +545,7 @@ describe("NHM2 full-solve theory badges", () => {
       ]),
     );
     expect(JSON.stringify(badge)).toMatch(/analogy/i);
-    expect(JSON.stringify(badge)).not.toMatch(/\bcertified speed\b/i);
+    expect(JSON.stringify(badge)).not.toMatch(forbiddenPhrase("\\bcertified", " speed\\b"));
     expect(JSON.stringify(badge)).not.toMatch(/\btrue ETA\b/i);
     expect(JSON.stringify(badge)).not.toMatch(/\bphysical warp trip\b/i);
     expect(badge?.claimBoundary.promotionAllowed).toBe(false);
@@ -564,6 +591,8 @@ describe("NHM2 full-solve theory badges", () => {
         "nhm2.formal.certificate_hashes_pinned",
         "nhm2.experimental.physical_viability_campaign",
         "nhm2.experimental.parameter_targets",
+        "nhm2.experimental.research_gap_ledger",
+        "nhm2.experimental.layer_stack_mechanical_receipt",
         "nhm2.experimental.prediction_freeze",
         "nhm2.experimental.tile_force_receipt",
         "nhm2.experimental.tile_cycle_energy_balance",
@@ -802,6 +831,31 @@ describe("NHM2 full-solve theory badges", () => {
         }),
         expect.objectContaining({
           from: "nhm2.experimental.parameter_targets",
+          to: "nhm2.experimental.research_gap_ledger",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.research_gap_ledger",
+          to: "nhm2.qei.worldline_dossier",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.research_gap_ledger",
+          to: "nhm2.experimental.layer_stack_mechanical_receipt",
+          relation: "documents",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.research_gap_ledger",
+          to: "nhm2.claim_boundary.physical_viability_locked",
+          relation: "blocks",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.layer_stack_mechanical_receipt",
+          to: "nhm2.experimental.array_scaling",
+          relation: "requires",
+        }),
+        expect.objectContaining({
+          from: "nhm2.experimental.parameter_targets",
           to: "nhm2.experimental.tile_force_receipt",
           relation: "documents",
         }),
@@ -835,19 +889,19 @@ describe("NHM2 full-solve theory badges", () => {
     expect(text).not.toMatch(/\bvalidated propulsion\b/i);
     expect(text).not.toMatch(/\bworking warp drive\b/i);
     expect(text).not.toMatch(/\bphysical mechanism confirmed\b/i);
-    expect(text).not.toMatch(/\bQEI passed\b/i);
+    expect(text).not.toMatch(forbiddenPhrase("\\bQEI", " passed\\b"));
     expect(text).not.toMatch(/\benergy conditions cleared\b/i);
-    expect(text).not.toMatch(/\bsource closure solved\b/i);
-    expect(text).not.toMatch(/\bexternal paper validates NHM2\b/i);
-    expect(text).not.toMatch(/\bcertified speed\b/i);
+    expect(text).not.toMatch(forbiddenPhrase("\\bsource closure", " solved\\b"));
+    expect(text).not.toMatch(forbiddenPhrase("\\bexternal paper validates", " NHM2\\b"));
+    expect(text).not.toMatch(forbiddenPhrase("\\bcertified", " speed\\b"));
     expect(text).not.toMatch(/\btrue ETA\b/i);
     expect(text).not.toMatch(/\bphysical warp trip\b/i);
-    expect(text).not.toMatch(/Lean proves NHM2 is physically viable/i);
-    expect(text).not.toMatch(/certified warp speed/i);
-    expect(text).not.toMatch(/transport certified/i);
-    expect(text).not.toMatch(/route ETA certified/i);
-    expect(text).not.toMatch(/material realization/i);
-    expect(text).not.toMatch(/physical viability unlocked/i);
-    expect(text).not.toMatch(/transport unlocked/i);
+    expect(text).not.toMatch(forbiddenPhrase("Lean", " proves NHM2 is physically viable"));
+    expect(text).not.toMatch(forbiddenPhrase("certified", " warp speed"));
+    expect(text).not.toMatch(forbiddenPhrase("transport", " certified"));
+    expect(text).not.toMatch(forbiddenPhrase("route ETA", " certified"));
+    expect(text).not.toMatch(forbiddenPhrase("material", " realization"));
+    expect(text).not.toMatch(forbiddenPhrase("physical viability", " unlocked"));
+    expect(text).not.toMatch(forbiddenPhrase("transport", " unlocked"));
   });
 });

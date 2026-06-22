@@ -483,6 +483,13 @@ const readString = (value: unknown): string | null =>
 const readStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry: unknown): entry is string => typeof entry === "string" && entry.trim().length > 0) : [];
 
+const readRecordArray = (value: unknown): RecordLike[] =>
+  Array.isArray(value)
+    ? value
+        .map((entry) => readRecord(entry))
+        .filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry))
+    : [];
+
 const isNonEmptyStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((entry) => typeof entry === "string" && entry.trim().length > 0);
 
@@ -599,6 +606,28 @@ const railCandidates = (ask: RecordLike, debugExport: unknown): RecordLike[] => 
     readRecord(getPath(rawDebug, ["payload", "artifact_query_index", "codex_parity_agent_spine_rail_table"])),
     readRecord(getPath(rawDebug, ["debug", "codex_parity_agent_spine_rail_table"])),
   ].filter((entry: RecordLike | null): entry is RecordLike => Boolean(entry));
+};
+
+const compoundSubgoalRailCandidates = (ask: RecordLike, debugExport: unknown): RecordLike[] => {
+  const rawDebug = readRecord(debugExport);
+  const payload = extractPayload(debugExport);
+  for (const candidate of [
+    ask.compound_subgoal_rail_statuses,
+    payload?.compound_subgoal_rail_statuses,
+    getPath(payload, ["debug", "compound_subgoal_rail_statuses"]),
+    getPath(payload, ["artifact_query_index", "compound_subgoal_rail_statuses"]),
+    getPath(payload, ["debug", "artifact_query_index", "compound_subgoal_rail_statuses"]),
+    rawDebug?.compound_subgoal_rail_statuses,
+    getPath(rawDebug, ["payload", "compound_subgoal_rail_statuses"]),
+    getPath(rawDebug, ["payload", "debug", "compound_subgoal_rail_statuses"]),
+    getPath(rawDebug, ["payload", "artifact_query_index", "compound_subgoal_rail_statuses"]),
+    getPath(rawDebug, ["payload", "debug", "artifact_query_index", "compound_subgoal_rail_statuses"]),
+    getPath(rawDebug, ["debug", "compound_subgoal_rail_statuses"]),
+  ]) {
+    const records = readRecordArray(candidate);
+    if (records.length > 0) return records;
+  }
+  return [];
 };
 
 const terminalErrorCode = (ask: RecordLike, debugExport: unknown): string | null => {
@@ -722,7 +751,11 @@ const terminalArtifactKindFor = (ask: RecordLike, debugExport: unknown): string 
   );
 };
 
-const collectCompoundRailShapeFailures = (rail: RecordLike, railComplete: boolean): string[] => {
+const collectCompoundRailShapeFailures = (
+  rail: RecordLike,
+  railComplete: boolean,
+  compoundSubgoalRailStatuses: RecordLike[] = [],
+): string[] => {
   const compoundMirrorDeclared =
     hasOwn(rail, "compound_subgoal_count") ||
     hasOwn(rail, "compound_incomplete_subgoal_did_tool_run") ||
@@ -769,6 +802,70 @@ const collectCompoundRailShapeFailures = (rail: RecordLike, railComplete: boolea
     }
   }
 
+  if (compoundSubgoalCount !== null && compoundSubgoalCount > 0) {
+    if (compoundSubgoalRailStatuses.length < compoundSubgoalCount) {
+      failures.push(`compound_subgoal_rail_statuses_dropped:${compoundSubgoalRailStatuses.length}<${compoundSubgoalCount}`);
+    }
+
+    for (const [index, subgoalRail] of compoundSubgoalRailStatuses.entries()) {
+      const prefix = `compound_subgoal_${index + 1}`;
+      const order = readNonNegativeInteger(subgoalRail.order);
+      const satisfaction = readString(subgoalRail.satisfaction);
+      const railStatus = readString(subgoalRail.rail_status);
+      const firstBrokenRail = readString(subgoalRail.first_broken_rail);
+      const railFailureCode = readString(subgoalRail.rail_failure_code);
+      const repairTarget = readString(subgoalRail.repair_target);
+      const observationRef = readString(subgoalRail.observation_ref);
+
+      if (!readString(subgoalRail.subgoal_id)) failures.push(`${prefix}_subgoal_id_missing`);
+      if (order === null) failures.push(`${prefix}_order_invalid`);
+      if (order !== null && order !== index + 1) failures.push(`${prefix}_order_mismatch:${order}!=${index + 1}`);
+      if (!readString(subgoalRail.requested_capability)) failures.push(`${prefix}_requested_capability_missing`);
+      if (!readString(subgoalRail.runtime_capability)) failures.push(`${prefix}_runtime_capability_missing`);
+      if (!readString(subgoalRail.selected_capability)) failures.push(`${prefix}_selected_capability_missing`);
+      if (!hasOwn(subgoalRail, "args")) failures.push(`${prefix}_args_field_missing`);
+      if (!hasOwn(subgoalRail, "executed_capability")) failures.push(`${prefix}_executed_capability_field_missing`);
+      if (!hasOwn(subgoalRail, "observation_kind")) failures.push(`${prefix}_observation_kind_field_missing`);
+      if (!hasOwn(subgoalRail, "observation_ref")) failures.push(`${prefix}_observation_ref_field_missing`);
+      if (!satisfaction) failures.push(`${prefix}_satisfaction_missing`);
+      if (!railStatus) failures.push(`${prefix}_rail_status_missing`);
+      if (railStatus && !CODEX_PARITY_AGENT_SPINE_RAIL_STATUSES.includes(railStatus as never)) {
+        failures.push(`${prefix}_rail_status_invalid:${railStatus}`);
+      }
+      if (satisfaction === "satisfied" && !observationRef) {
+        failures.push(`${prefix}_satisfied_observation_ref_missing`);
+      }
+      if (railStatus === "complete") {
+        if (satisfaction !== "satisfied") failures.push(`${prefix}_complete_satisfaction_not_satisfied`);
+        if (!observationRef) failures.push(`${prefix}_complete_observation_ref_missing`);
+      }
+      if (railStatus === "fail_closed") {
+        if (!firstBrokenRail) failures.push(`${prefix}_first_broken_rail_missing`);
+        if (!railFailureCode) failures.push(`${prefix}_rail_failure_code_missing`);
+        if (!repairTarget) failures.push(`${prefix}_repair_target_missing`);
+      }
+      if (
+        firstBrokenRail &&
+        !CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS.includes(
+          firstBrokenRail as (typeof CODEX_PARITY_AGENT_SPINE_FIRST_BROKEN_RAILS)[number],
+        )
+      ) {
+        failures.push(`${prefix}_first_broken_rail_invalid:${firstBrokenRail}`);
+      }
+      if (railFailureCode && !isCodexParityAgentSpineRailFailureCode(railFailureCode)) {
+        failures.push(`${prefix}_rail_failure_code_invalid:${railFailureCode}`);
+      }
+      if (
+        repairTarget &&
+        !CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS.includes(
+          repairTarget as (typeof CODEX_PARITY_AGENT_SPINE_REPAIR_TARGETS)[number],
+        )
+      ) {
+        failures.push(`${prefix}_repair_target_invalid:${repairTarget}`);
+      }
+    }
+  }
+
   const compoundRailFailureCode = readString(rail.compound_rail_failure_code);
   if (compoundRailFailureCode && !isCodexParityAgentSpineRailFailureCode(compoundRailFailureCode)) {
     failures.push(`compound_rail_failure_code_invalid:${compoundRailFailureCode}`);
@@ -777,7 +874,12 @@ const collectCompoundRailShapeFailures = (rail: RecordLike, railComplete: boolea
   return failures;
 };
 
-const shapeFailures = (rail: RecordLike, turnId: string, prompt: string): string[] => {
+const shapeFailures = (
+  rail: RecordLike,
+  turnId: string,
+  prompt: string,
+  compoundSubgoalRailStatuses: RecordLike[] = [],
+): string[] => {
   const failures: string[] = [];
   if (rail.schema !== CODEX_PARITY_AGENT_SPINE_RAIL_TABLE_SCHEMA) failures.push("rail_schema_mismatch");
   if (rail.turn_id !== turnId) failures.push(`rail_turn_id_mismatch:${String(rail.turn_id ?? "missing")}!=${turnId}`);
@@ -928,7 +1030,7 @@ const shapeFailures = (rail: RecordLike, turnId: string, prompt: string): string
     failures.push("complete_without_visible_projection");
   }
   const railComplete = rail.codex_parity_class === "complete" || rail.rail_status === "complete";
-  failures.push(...collectCompoundRailShapeFailures(rail, railComplete));
+  failures.push(...collectCompoundRailShapeFailures(rail, railComplete, compoundSubgoalRailStatuses));
   if (rail.codex_parity_class !== "complete" && !firstBrokenRail) {
     failures.push("non_complete_without_first_broken_rail");
   }
@@ -1012,6 +1114,7 @@ export const classifyLiveSpineSmokeResult = (
   const turnId = readString(ask.turn_id) ?? "missing";
   const rails = railCandidates(ask, debugExport);
   const rail = rails[0];
+  const compoundSubgoalRailStatuses = compoundSubgoalRailCandidates(ask, debugExport);
   const errorCode = terminalErrorCode(ask, debugExport);
   const terminalArtifactKind = terminalArtifactKindFor(ask, debugExport);
   const reconciliationRuntime = terminalFailureReconciliationRuntime(ask, debugExport);
@@ -1029,7 +1132,7 @@ export const classifyLiveSpineSmokeResult = (
   if (!rail) {
     failures.push("codex_parity_agent_spine_rail_table_missing");
   } else {
-    failures.push(...shapeFailures(rail, turnId, scenario.prompt), ...compareRailMirrors(rails));
+    failures.push(...shapeFailures(rail, turnId, scenario.prompt, compoundSubgoalRailStatuses), ...compareRailMirrors(rails));
     expectField(failures, rail, "requested_capability", scenario.expected.requestedCapability);
     expectField(failures, rail, "selected_capability", scenario.expected.selectedCapability);
     expectField(failures, rail, "admitted_capability", scenario.expected.admittedCapability);
@@ -1144,6 +1247,23 @@ export const classifyLiveSpineSmokeResult = (
           compound_repair_target: rail.compound_repair_target ?? null,
           compound_incomplete_subgoal_did_tool_run:
             rail.compound_incomplete_subgoal_did_tool_run ?? null,
+          compound_subgoal_rail_statuses_count: compoundSubgoalRailStatuses.length,
+          compound_subgoal_rail_statuses: compoundSubgoalRailStatuses.map((entry) => ({
+            subgoal_id: entry.subgoal_id ?? null,
+            order: entry.order ?? null,
+            requested_capability: entry.requested_capability ?? null,
+            runtime_capability: entry.runtime_capability ?? null,
+            selected_capability: entry.selected_capability ?? null,
+            executed_capability: entry.executed_capability ?? null,
+            observation_kind: entry.observation_kind ?? null,
+            observation_ref: entry.observation_ref ?? null,
+            observation_provenance: entry.observation_provenance ?? null,
+            satisfaction: entry.satisfaction ?? null,
+            rail_status: entry.rail_status ?? null,
+            first_broken_rail: entry.first_broken_rail ?? null,
+            rail_failure_code: entry.rail_failure_code ?? null,
+            repair_target: entry.repair_target ?? null,
+          })),
           codex_parity_class: rail.codex_parity_class ?? null,
           normalized_codex_parity_classes: rail.normalized_codex_parity_classes ?? [],
         }

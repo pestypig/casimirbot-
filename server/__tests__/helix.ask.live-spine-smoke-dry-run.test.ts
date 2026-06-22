@@ -6,6 +6,7 @@ import {
   REQUIRED_LIVE_SPINE_COVERAGE,
   selectLiveSpineSmokeScenarios,
   summarizeLiveSpineSmokeCoverage,
+  type LiveSpineScenario,
 } from "../../scripts/helix-ask-live-spine-smoke";
 import { CODEX_PARITY_AGENT_SPINE_CLASSES } from "../services/helix-ask/codex-parity-agent-spine-contract";
 import { HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION } from "../services/helix-ask/terminal-rail-failure-reconciliation";
@@ -208,6 +209,56 @@ describe("Helix Ask live spine smoke dry-run contract", () => {
     expect(result.failures).toEqual([]);
   });
 
+  it("fails fixture classification when ordered compound subgoal rail statuses are dropped", () => {
+    const scenario = compoundCatalogWorkspaceScenario();
+    const result = classifyLiveSpineSmokeResult(
+      scenario,
+      buildCompoundCatalogWorkspaceAskFixture({ includeSubgoalRails: false }),
+      { payload: {} },
+    );
+
+    expect(result.verdict).toBe("FAIL");
+    expect(result.failures).toContain("compound_subgoal_rail_statuses_dropped:0<2");
+  });
+
+  it("accepts fixture classification when ordered compound subgoal rail statuses are preserved", () => {
+    const scenario = compoundCatalogWorkspaceScenario();
+    const result = classifyLiveSpineSmokeResult(
+      scenario,
+      buildCompoundCatalogWorkspaceAskFixture({ includeSubgoalRails: true }),
+      { payload: {} },
+    );
+
+    expect(result.verdict).toBe("PASS");
+    expect(result.failures).toEqual([]);
+    expect(result.rail_table).toMatchObject({
+      compound_subgoal_count: 2,
+      compound_subgoal_rail_statuses_count: 2,
+      compound_subgoal_rail_statuses: [
+        expect.objectContaining({
+          order: 1,
+          requested_capability: "helix_ask.inspect_capability_catalog",
+          selected_capability: "helix_ask.inspect_capability_catalog",
+          executed_capability: "helix_ask.inspect_capability_catalog",
+          observation_kind: "capability_registry",
+          observation_ref: "obs:capability-registry",
+          satisfaction: "satisfied",
+          rail_status: "complete",
+        }),
+        expect.objectContaining({
+          order: 2,
+          requested_capability: "workspace_os.status",
+          selected_capability: "workspace_os.status",
+          executed_capability: "workspace_os.status",
+          observation_kind: "workspace_os_status_observation",
+          observation_ref: "obs:workspace-status",
+          satisfaction: "satisfied",
+          rail_status: "complete",
+        }),
+      ],
+    });
+  });
+
   it("selects all scenarios by default and preserves requested scenario filters", () => {
     const all = selectLiveSpineSmokeScenarios([]);
     expect(all.unknownIds).toEqual([]);
@@ -244,6 +295,27 @@ describe("Helix Ask live spine smoke dry-run contract", () => {
       REQUIRED_LIVE_SPINE_COVERAGE.filter((coverage) => coverage !== "capability_catalog"),
     );
   });
+});
+
+const compoundCatalogWorkspaceScenario = (): LiveSpineScenario => ({
+  id: "compound_catalog_workspace_fixture",
+  prompt: "Call helix_ask.inspect_capability_catalog, then use workspace_os.status to inspect workstation status.",
+  coverage: ["capability_catalog", "workspace_status"],
+  expected: {
+    selectedCapability: "model.synthesize_from_compound_subgoal_observations",
+    admittedCapability: "model.synthesize_from_compound_subgoal_observations",
+    executedCapability: "model.synthesize_from_compound_subgoal_observations",
+    requiredTerminalKind: "compound_evidence_synthesis_answer",
+    selectedTerminalKind: "compound_evidence_synthesis_answer",
+    visibleTerminalKind: "compound_evidence_synthesis_answer",
+    railStatus: "complete",
+    codexParityClass: "complete",
+    firstBrokenRail: null,
+    visibleToolSurfaceIncludes: [
+      "helix_ask.inspect_capability_catalog",
+      "workspace_os.status",
+    ],
+  },
 });
 
 const buildCapabilityCatalogAskFixture = (input: { includeRuntimeMarker: boolean }): Record<string, unknown> => {
@@ -306,6 +378,125 @@ const buildCapabilityCatalogAskFixture = (input: { includeRuntimeMarker: boolean
           },
         }
       : {}),
+  };
+};
+
+const buildCompoundCatalogWorkspaceAskFixture = (
+  input: { includeSubgoalRails: boolean },
+): Record<string, unknown> => {
+  const turnId = "ask:compound-catalog-workspace-fixture";
+  const prompt = compoundCatalogWorkspaceScenario().prompt;
+  const terminalKind = "compound_evidence_synthesis_answer";
+  const rail = {
+    schema: "helix.codex_parity_agent_spine_rail_table.v1",
+    turn_id: turnId,
+    prompt,
+    requested_capability: null,
+    visible_tool_surface: [
+      "helix_ask.inspect_capability_catalog",
+      "workspace_os.status",
+      "model.synthesize_from_compound_subgoal_observations",
+    ],
+    visible_tool_surface_original_count: 3,
+    visible_tool_surface_truncated: false,
+    selected_capability: "model.synthesize_from_compound_subgoal_observations",
+    admitted_capability: "model.synthesize_from_compound_subgoal_observations",
+    admission_proof_source: "compound_capability_contract.subgoals",
+    admission_proven: true,
+    executed_capability: "model.synthesize_from_compound_subgoal_observations",
+    observation_kind: "compound_evidence_synthesis_answer",
+    observation_ref: `${turnId}:compound_evidence_synthesis_answer`,
+    required_observation_kinds_for_requested_capability: [
+      "capability_registry",
+      "workspace_os_status_observation",
+    ],
+    observed_artifact_supports_requested_capability: true,
+    reentry_status: "reentered",
+    reentry_proof_source: "compound_subgoal_rail_statuses",
+    reentry_proven: true,
+    goal_satisfaction: "satisfied",
+    required_terminal_kind: terminalKind,
+    selected_terminal_kind: terminalKind,
+    terminal_authority_proof_source: "terminal_answer_authority.terminal_artifact_kind",
+    terminal_authority_proven: true,
+    visible_terminal_kind: terminalKind,
+    visible_projection_source: "terminal_presentation.terminal_artifact_kind",
+    visible_projection_proven: true,
+    first_broken_rail: null,
+    repair_target: null,
+    rail_status: "complete",
+    rail_failure_code: null,
+    codex_parity_class: "complete",
+    compound_subgoal_count: 2,
+    first_incomplete_compound_subgoal_id: null,
+    first_incomplete_compound_requested_capability: null,
+    first_incomplete_compound_runtime_capability: null,
+    first_incomplete_compound_selected_capability: null,
+    first_incomplete_compound_executed_capability: null,
+    compound_first_broken_rail: null,
+    compound_rail_failure_code: null,
+    compound_repair_target: null,
+    compound_incomplete_subgoal_did_tool_run: null,
+    normalized_codex_parity_classes: CODEX_PARITY_AGENT_SPINE_CLASSES,
+    assistant_answer: false,
+    terminal_eligible: false,
+    raw_content_included: false,
+  };
+  return {
+    turn_id: turnId,
+    final_status: "final_answer",
+    response_type: "final_answer",
+    final_answer_source: terminalKind,
+    terminal_artifact_kind: terminalKind,
+    selected_final_answer: "The capability catalog and workspace status observations are ready for synthesis.",
+    codex_parity_agent_spine_rail_table: rail,
+    ...(input.includeSubgoalRails
+      ? {
+          compound_subgoal_rail_statuses: [
+            {
+              subgoal_id: `${turnId}:compound_capability_subgoal:1:helix_ask_inspect_capability_catalog`,
+              order: 1,
+              requested_capability: "helix_ask.inspect_capability_catalog",
+              runtime_capability: "helix_ask.inspect_capability_catalog",
+              selected_capability: "helix_ask.inspect_capability_catalog",
+              executed_capability: "helix_ask.inspect_capability_catalog",
+              args: {},
+              observation_kind: "capability_registry",
+              observation_ref: "obs:capability-registry",
+              observation_provenance: "capability_key",
+              satisfaction: "satisfied",
+              rail_status: "complete",
+              first_broken_rail: null,
+              rail_failure_code: null,
+              repair_target: null,
+            },
+            {
+              subgoal_id: `${turnId}:compound_capability_subgoal:2:workspace_os_status`,
+              order: 2,
+              requested_capability: "workspace_os.status",
+              runtime_capability: "workspace_os.status",
+              selected_capability: "workspace_os.status",
+              executed_capability: "workspace_os.status",
+              args: {},
+              observation_kind: "workspace_os_status_observation",
+              observation_ref: "obs:workspace-status",
+              observation_provenance: "capability_key",
+              satisfaction: "satisfied",
+              rail_status: "complete",
+              first_broken_rail: null,
+              rail_failure_code: null,
+              repair_target: null,
+            },
+          ],
+        }
+      : {}),
+    tool_rail_terminal_failure_reconciliation_runtime: {
+      schema: "helix.tool_rail_terminal_failure_reconciliation.runtime.v1",
+      version: HELIX_TOOL_RAIL_TERMINAL_FAILURE_RECONCILIATION_VERSION,
+      available: true,
+      assistant_answer: false,
+      raw_content_included: false,
+    },
   };
 };
 

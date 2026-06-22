@@ -112,15 +112,29 @@ const NHM2_EXPERIMENT_PARAMETER_TARGETS =
   `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-experiment-parameter-targets.json`;
 const NHM2_EXPERIMENT_PARAMETER_TARGETS_CONTRACT =
   "shared/contracts/nhm2-experiment-parameter-targets.v1.ts";
+const NHM2_EXPERIMENT_RESEARCH_GAP_LEDGER =
+  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-experiment-research-gap-ledger.json`;
+const NHM2_EXPERIMENT_RESEARCH_GAP_LEDGER_CONTRACT =
+  "shared/contracts/nhm2-experiment-research-gap-ledger.v1.ts";
+const NHM2_LAYER_STACK_MECHANICAL_RECEIPT =
+  `${NHM2_0P7000_OBSERVER_COMPATIBLE_SOURCE_RUN_ROOT}/nhm2-layer-stack-mechanical-receipt.json`;
+const NHM2_LAYER_STACK_MECHANICAL_RECEIPT_CONTRACT =
+  "shared/contracts/nhm2-layer-stack-mechanical-receipt.v1.ts";
 const NHM2_RESEARCH_DYNAMICAL_CASIMIR_NATURE_2011 =
   "https://www.nature.com/articles/nature10561";
 const NHM2_RESEARCH_CASIMIR_GRAVITATIONAL_MASS = "https://arxiv.org/abs/0710.3841";
+const NHM2_RESEARCH_REGULARIZED_CASIMIR_GRAVITY = "https://arxiv.org/abs/1401.0784";
+const NHM2_RESEARCH_CONDUCTIVE_PLANE_STACK_CASIMIR = "https://arxiv.org/abs/1505.04169";
 const NHM2_RESEARCH_SCHARNHORST_CAUTION =
   "https://www.sciencedirect.com/science/article/pii/037026939090997K";
 const NHM2_RESEARCH_ARCHIMEDES_BALANCE_PROTOTYPE =
   "https://link.springer.com/article/10.1140/epjp/s13360-024-04920-x";
 const NHM2_RESEARCH_ARCHIMEDES_2025_STATUS = "https://iris.uniss.it/handle/11388/372656";
+const NHM2_RESEARCH_ARCHIMEDES_2025_EPJ =
+  "https://www.epj-conferences.org/articles/epjconf/abs/2025/04/epjconf_ricap2024_09003/epjconf_ricap2024_09003.html";
 const NHM2_RESEARCH_ADVANCED_LIGO_SENSITIVITY = "https://dcc.ligo.org/LIGO-P1500260/public";
+const NHM2_RESEARCH_ADVANCED_LIGO_PHYSREVD_93_112004 =
+  "https://journals.aps.org/prd/abstract/10.1103/PhysRevD.93.112004";
 const NHM2_RESEARCH_SILICON_CASIMIR_CHIP = "https://www.nature.com/articles/ncomms2842";
 const NHM2_RESEARCH_PATCH_POTENTIALS = "https://arxiv.org/abs/1409.5012";
 const NHM2_RESEARCH_MILLIMETRE_GRAVITY =
@@ -129,6 +143,7 @@ const NHM2_RESEARCH_PFENNING_FORD_QI = "https://arxiv.org/abs/gr-qc/9702026";
 const NHM2_RESEARCH_REAL_MATERIAL_CASIMIR = "https://arxiv.org/abs/0902.4022";
 const NHM2_RESEARCH_ARBITRARY_MATERIAL_CASIMIR = "https://arxiv.org/abs/1010.5539";
 const NHM2_RESEARCH_STATIONARY_WORLDLINE_QEI = "https://arxiv.org/abs/2301.01698";
+const NHM2_RESEARCH_WARPAX_OBSERVER_ROBUST = "https://arxiv.org/abs/2602.18023";
 const NHM2_RESEARCH_GENERIC_WARP_NEC = "https://arxiv.org/abs/2105.03079";
 const NHM2_RESEARCH_HIGH_STRESS_NANOMECHANICAL_RESONATORS =
   "https://link.aps.org/doi/10.1103/PhysRevApplied.15.034063";
@@ -136,6 +151,10 @@ const NHM2_RESEARCH_ALN_CMOS_MEMS_REVIEW =
   "https://www.tandfonline.com/doi/full/10.1080/10408436.2024.2406247";
 const NHM2_RESEARCH_TIN_MEMBRANE_RESONATORS =
   "https://pubs.aip.org/aip/apl/article/127/22/222202/3373788/High-Q-membrane-resonators-using-ultra-high-stress";
+const NHM2_RESEARCH_CASIMIR_MEMS_REVIEW = "https://pmc.ncbi.nlm.nih.gov/articles/PMC11278474/";
+const NHM2_RESEARCH_ROUGHNESS_MEMS_ACTUATION =
+  "https://link.aps.org/doi/10.1103/PhysRevB.87.125413";
+const NHM2_RESEARCH_SURFACE_POTENTIAL_NANOMEMBRANE = "https://arxiv.org/abs/1207.4429";
 
 const NHM2_FULL_SOLVE_BOUNDARY: TheoryBadgeClaimBoundaryV1 = {
   diagnosticOnly: true,
@@ -149,7 +168,7 @@ const COMMON_ASSUMPTIONS = [
   "NHM2 full-solve rows are same-chart diagnostic context.",
   "Repository artifacts define row status and blocker state.",
   "External literature supplies formalism, context, and limitations only.",
-  "No row validates NHM2, propulsion, physical feasibility, QEI completion, or a transport route.",
+  "No row establishes NHM2 validation, propulsion, physical feasibility, QEI completion, or a transport route.",
 ];
 
 const docRef = (path: string, id?: string, note?: string): TheoryBadgeV1["sourceRefs"][number] => ({
@@ -2693,6 +2712,229 @@ export const NHM2_FULL_SOLVE_THEORY_BADGES: TheoryBadgeV1[] = [
     },
   }),
   nhm2FullSolveBadge({
+    id: "nhm2.experimental.research_gap_ledger",
+    title: "Experiment Research Gap Ledger",
+    plainMeaning:
+      "Maps each NHM2 parameter target to the remaining research gap, nearest independent precedents, uncovered regime, earliest falsifier, null-result meaning, and claim impact.",
+    whyItMatters:
+      "It keeps the experiment campaign pointed at high-value measurements and falsifiers without treating literature comparators or target feasibility as NHM2 validation.",
+    subjects: ["nhm2", "experiment", "research_gap", "value_of_information", "claim_boundary"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    equationFamilies: ["experiment_research_gap_ledger", "experiment_parameter_targets"],
+    tags: [
+      "experimental_ladder",
+      "research_gap_ledger",
+      "value_of_information",
+      "runtime_reference",
+      "noncomputable_reference",
+      "claim_boundary",
+    ],
+    equations: [
+      {
+        id: "experiment_research_gap_row",
+        role: "noncomputable_reference",
+        displayLatex:
+          "\\mathrm{Gap}_{target}=\\{\\mathrm{Precedent},\\mathrm{UncoveredRegime},\\mathrm{Receipt},\\mathrm{NullMeaning},\\mathrm{ClaimImpact}\\}",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["targetId", "stageId", "precedent", "null_result", "claimImpact"],
+        outputSymbols: ["ResearchGapStatus"],
+      },
+    ],
+    units: [],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "Research-gap rows are planning and falsification surfaces, not experiment results.",
+      "No direct precedent found is not a novelty claim and requires a search receipt before stronger language.",
+      "External references identify nearby methods, parameter regimes, and systematics; they do not validate NHM2.",
+      "High-information null results are campaign evidence and may close a route rather than support it.",
+      "This badge is a runtime reference row and has no calculator payload.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      repoRef(
+        NHM2_EXPERIMENT_RESEARCH_GAP_LEDGER_CONTRACT,
+        "nhm2_experiment_research_gap_ledger/v1",
+        "Typed research-gap/value-of-information ledger keyed to experiment parameter targets.",
+      ),
+      artifactRef(
+        NHM2_EXPERIMENT_RESEARCH_GAP_LEDGER,
+        "experiment-research-gap-ledger-target",
+        "Expected runtime artifact target for research gaps, search receipts, falsifiers, and claim impacts.",
+      ),
+      repoRef(
+        NHM2_EXPERIMENT_PARAMETER_TARGETS_CONTRACT,
+        "nhm2_experiment_parameter_targets/v1",
+        "Parameter target rows consumed by the research-gap ledger.",
+      ),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "research-gaps-and-value-of-information",
+        "Whitepaper research-gap/value-of-information section.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_REGULARIZED_CASIMIR_GRAVITY,
+        "arxiv_1401_0784_regularized_casimir_gravity",
+        "Regularized Casimir/vacuum-energy gravity context for full apparatus accounting.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_CONDUCTIVE_PLANE_STACK_CASIMIR,
+        "arxiv_1505_04169_conductive_plane_stack_casimir",
+        "Conductive-plane stack Casimir scaling comparator.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_ARCHIMEDES_2025_EPJ,
+        "epjconf_2025_archimedes_vacuum_gravity",
+        "Vacuum-gravity pathfinder context for detector-facing gaps.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_ADVANCED_LIGO_PHYSREVD_93_112004,
+        "physrevd_93_112004_advanced_ligo_sensitivity",
+        "Detector sensitivity comparator for metric-response planning.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_STATIONARY_WORLDLINE_QEI,
+        "arxiv_2301_01698_stationary_worldline_qei",
+        "Stationary-worldline QEI applicability context.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_WARPAX_OBSERVER_ROBUST,
+        "arxiv_2602_18023_warpax_observer_robust",
+        "Observer-robust warp energy-condition integration context.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_GENERIC_WARP_NEC,
+        "arxiv_2105_03079_generic_warp_nec",
+        "Generic warp NEC caution and observer-family falsification context.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "experiment", "research_gap", "value_of_information", "claim_boundary"],
+      symbols: ["Gap_target", "NullResult", "ClaimImpact", "SearchReceipt"],
+      unitSignatures: [],
+      repoPaths: [
+        NHM2_EXPERIMENT_RESEARCH_GAP_LEDGER_CONTRACT,
+        NHM2_EXPERIMENT_RESEARCH_GAP_LEDGER,
+        NHM2_EXPERIMENT_PARAMETER_TARGETS_CONTRACT,
+        NHM2_FULL_SOLVE_WHITEPAPER,
+      ],
+      equationFamilies: ["experiment_research_gap_ledger", "experiment_parameter_targets"],
+      simulationOwners: ["NHM2", "casimir", "general_relativity"],
+    },
+  }),
+  nhm2FullSolveBadge({
+    id: "nhm2.experimental.layer_stack_mechanical_receipt",
+    title: "Layer Stack Mechanical Receipt",
+    plainMeaning:
+      "Computes the ideal internal load for the 447-layer wall-source candidate and records the missing mechanical receipts needed before the stack can count as material/source evidence.",
+    whyItMatters:
+      "The scalar 447-layer lead implies roughly 14.2 kN internal normal attraction and about 142 MPa projected stress; survivability, pull-in, support, thermal, fatigue, and active-control receipts are therefore front-door engineering blockers.",
+    subjects: ["nhm2", "casimir", "layer_stack", "mechanical_receipt", "pull_in"],
+    level: "diagnostic_gate",
+    status: "blocked",
+    simulationOwners: ["NHM2", "casimir"],
+    equationFamilies: ["layer_stack_mechanical_receipt", "experiment_parameter_targets"],
+    tags: [
+      "experimental_ladder",
+      "mechanical_receipt",
+      "layer_stack",
+      "runtime_reference",
+      "noncomputable_reference",
+      "claim_boundary",
+    ],
+    equations: [
+      {
+        id: "ideal_casimir_pressure_load",
+        role: "noncomputable_reference",
+        displayLatex:
+          "P_{ideal}=\\pi^2\\hbar c/(240a^4),\\quad F_{stack}=N_{layer}P_{ideal}A",
+        computableExpression: null,
+        operatorKind: "noncomputable_reference",
+        inputSymbols: ["a", "A", "N_layer"],
+        outputSymbols: ["P_ideal", "F_stack"],
+      },
+    ],
+    units: [
+      { symbol: "P_ideal", unit: "Pa", quantity: "ideal Casimir pressure", dimensionSignature: "M L^-1 T^-2" },
+      { symbol: "F_stack", unit: "N", quantity: "internal stack load", dimensionSignature: "M L T^-2" },
+    ],
+    assumptions: [
+      ...COMMON_ASSUMPTIONS,
+      "The 14.2 kN scalar load is internal plate attraction, not thrust.",
+      "The ideal pressure and force are perfect-conductor scalar diagnostics until real-material force-gap and mechanical receipts exist.",
+      "Linear multiplication by 447 layers remains blocked until nonadditivity, support fraction, cross-coupling, thermal load, and active-control energy are receipted.",
+      "Mechanical survivability cannot substitute for same-basis full tensor source authority.",
+    ],
+    calculatorPayloads: [],
+    sourceRefs: [
+      repoRef(
+        NHM2_LAYER_STACK_MECHANICAL_RECEIPT_CONTRACT,
+        "nhm2_layer_stack_mechanical_receipt/v1",
+        "Typed diagnostic mechanical receipt for the 447-layer scalar candidate.",
+      ),
+      artifactRef(
+        NHM2_LAYER_STACK_MECHANICAL_RECEIPT,
+        "layer-stack-mechanical-receipt-target",
+        "Expected runtime artifact target for stack load, stress, and mechanical receipt blockers.",
+      ),
+      repoRef(
+        NHM2_EXPERIMENT_PARAMETER_TARGETS_CONTRACT,
+        "array_scaling.layer_count",
+        "Parameter target source for 447 layers and stack thickness.",
+      ),
+      docRef(
+        NHM2_FULL_SOLVE_WHITEPAPER,
+        "wall-source-layering-sweep",
+        "Whitepaper layering sweep and 447-layer scalar lead.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_REAL_MATERIAL_CASIMIR,
+        "revmodphys_81_1827_real_material_casimir",
+        "Real-material Casimir review and systematics context.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_CASIMIR_MEMS_REVIEW,
+        "pmc_2024_casimir_mems_review",
+        "Casimir/MEMS materials, geometry, metrology, and stiction review.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_ROUGHNESS_MEMS_ACTUATION,
+        "physrevb_87_125413_roughness_mems_actuation",
+        "Roughness and Casimir/electrostatic effects in MEMS actuation.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_SURFACE_POTENTIAL_NANOMEMBRANE,
+        "arxiv_1207_4429_surface_potential_nanomebrane",
+        "Nanomembrane Casimir force and surface potential measurement comparator.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_HIGH_STRESS_NANOMECHANICAL_RESONATORS,
+        "physrevapplied_15_034063_high_stress_sin",
+        "High-stress film comparator for mechanical stress plausibility.",
+      ),
+      literatureRef(
+        NHM2_RESEARCH_TIN_MEMBRANE_RESONATORS,
+        "apl_127_222202_high_stress_tin",
+        "Ultra-high-stress TiN membrane comparator.",
+      ),
+    ],
+    hintKeys: {
+      subjects: ["nhm2", "casimir", "layer_stack", "mechanical_receipt", "pull_in"],
+      symbols: ["P_ideal", "F_tile", "F_stack", "N_layer", "sigma_effective"],
+      unitSignatures: ["Pa", "N", "m"],
+      repoPaths: [
+        NHM2_LAYER_STACK_MECHANICAL_RECEIPT_CONTRACT,
+        NHM2_LAYER_STACK_MECHANICAL_RECEIPT,
+        NHM2_EXPERIMENT_PARAMETER_TARGETS_CONTRACT,
+        NHM2_FULL_SOLVE_WHITEPAPER,
+      ],
+      equationFamilies: ["layer_stack_mechanical_receipt", "experiment_parameter_targets"],
+      simulationOwners: ["NHM2", "casimir"],
+    },
+  }),
+  nhm2FullSolveBadge({
     id: "nhm2.experimental.prediction_freeze",
     title: "Experimental Prediction Freeze",
     plainMeaning:
@@ -4891,6 +5133,70 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     claimBoundaryNote: "Parameter targets are planning rows and cannot substitute for experimental receipts.",
   },
   {
+    id: "parameter_targets_feed_research_gap_ledger",
+    from: "nhm2.experimental.parameter_targets",
+    to: "nhm2.experimental.research_gap_ledger",
+    relation: "documents",
+    label: "Parameter targets are refined into research gaps, precedent receipts, falsifiers, null-result meanings, and claim-impact rows.",
+    claimBoundaryNote: "Research-gap rows guide value-of-information planning and cannot substitute for measurements.",
+  },
+  {
+    id: "research_gap_ledger_prioritizes_full_apparatus_tensor",
+    from: "nhm2.experimental.research_gap_ledger",
+    to: "nhm2.experimental.full_apparatus_tensor",
+    relation: "documents",
+    label: "The research-gap ledger marks full apparatus T_mu_nu authority as a P0 source-side gap.",
+    claimBoundaryNote: "A priority gap is not a material tensor receipt.",
+  },
+  {
+    id: "research_gap_ledger_prioritizes_array_scaling",
+    from: "nhm2.experimental.research_gap_ledger",
+    to: "nhm2.experimental.array_scaling",
+    relation: "documents",
+    label: "The research-gap ledger marks 447-layer stack scaling as a P0 parameter-regime gap.",
+    claimBoundaryNote: "Layer-count planning cannot replace stack scaling evidence.",
+  },
+  {
+    id: "research_gap_ledger_prioritizes_layer_stack_mechanics",
+    from: "nhm2.experimental.research_gap_ledger",
+    to: "nhm2.experimental.layer_stack_mechanical_receipt",
+    relation: "documents",
+    label: "The research-gap ledger identifies mechanical survivability of the 447-layer stack as a value-of-information target.",
+    claimBoundaryNote: "A mechanical receipt target is not a material source tensor or physical pass.",
+  },
+  {
+    id: "research_gap_ledger_prioritizes_metric_upper_bound",
+    from: "nhm2.experimental.research_gap_ledger",
+    to: "nhm2.experimental.metric_upper_bound",
+    relation: "documents",
+    label: "The research-gap ledger connects detector-scale h00_proxy bounds to metric-response planning.",
+    claimBoundaryNote: "A detector bound plan is not a measured metric response.",
+  },
+  {
+    id: "research_gap_ledger_prioritizes_qei_dossier",
+    from: "nhm2.experimental.research_gap_ledger",
+    to: "nhm2.qei.worldline_dossier",
+    relation: "documents",
+    label: "The research-gap ledger records QEI worldline applicability and null-result meaning as a P0 theory-to-measurement gap.",
+    claimBoundaryNote: "QEI applicability planning is not a universal QEI pass.",
+  },
+  {
+    id: "research_gap_ledger_prioritizes_observer_robust_gate",
+    from: "nhm2.experimental.research_gap_ledger",
+    to: "nhm2.energy_condition.observer_robust_gate",
+    relation: "documents",
+    label: "The research-gap ledger records observer-robust integration as a P0 blocker for energy-condition language.",
+    claimBoundaryNote: "Observer-robust planning cannot promote Eulerian-only or incomplete observer checks.",
+  },
+  {
+    id: "research_gap_ledger_blocks_physical_viability_lock",
+    from: "nhm2.experimental.research_gap_ledger",
+    to: "nhm2.claim_boundary.physical_viability_locked",
+    relation: "blocks",
+    label: "Open research gaps keep physical viability locked until receipts and null-result dispositions are produced.",
+    claimBoundaryNote: "Research-gap closure is necessary planning evidence, not automatic physical viability.",
+  },
+  {
     id: "parameter_targets_feed_prediction_freeze",
     from: "nhm2.experimental.parameter_targets",
     to: "nhm2.experimental.prediction_freeze",
@@ -4905,6 +5211,14 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "documents",
     label: "Parameter targets expose the gap, area, pressure, material, and systematic receipts required by tile metrology.",
     claimBoundaryNote: "Ideal scalar tile rows remain non-receipted targets.",
+  },
+  {
+    id: "parameter_targets_feed_layer_stack_mechanical_receipt",
+    from: "nhm2.experimental.parameter_targets",
+    to: "nhm2.experimental.layer_stack_mechanical_receipt",
+    relation: "documents",
+    label: "Parameter targets expose the 8 nm, 10 mm x 10 mm, and 447-layer scalar load inputs consumed by the mechanical receipt.",
+    claimBoundaryNote: "Scalar load computation cannot substitute for pull-in, support, fatigue, thermal, or material receipts.",
   },
   {
     id: "parameter_targets_feed_metric_response",
@@ -4953,6 +5267,22 @@ export const NHM2_FULL_SOLVE_THEORY_EDGES: TheoryBadgeEdgeV1[] = [
     relation: "requires",
     label: "Array scaling can only be reviewed after individual tile metrology is receipted.",
     claimBoundaryNote: "Array scaling does not by itself measure gravity.",
+  },
+  {
+    id: "layer_stack_mechanical_receipt_feeds_array_scaling",
+    from: "nhm2.experimental.layer_stack_mechanical_receipt",
+    to: "nhm2.experimental.array_scaling",
+    relation: "requires",
+    label: "Array scaling review requires the 447-layer stack to survive pull-in, support, thermal, fatigue, and active-control constraints.",
+    claimBoundaryNote: "Mechanical survivability does not establish source tensor authority.",
+  },
+  {
+    id: "layer_stack_mechanical_receipt_blocks_physical_lock",
+    from: "nhm2.experimental.layer_stack_mechanical_receipt",
+    to: "nhm2.claim_boundary.physical_viability_locked",
+    relation: "blocks",
+    label: "Open mechanical receipt blockers keep physical viability locked even when scalar wall T00 arithmetic improves.",
+    claimBoundaryNote: "Internal Casimir load is not thrust, propulsion, or transport evidence.",
   },
   {
     id: "array_scaling_requires_full_apparatus_tensor",

@@ -2588,4 +2588,178 @@ describe("compound capability synthesis readiness", () => {
       model_step_capability: "model.synthesize_from_compound_subgoal_observations",
     });
   });
+
+  it("materializes civilization bounds plus zen graph reflection as compound evidence synthesis", () => {
+    const turnId = "ask:test:civilization-zen-compound-materializer";
+    const civilizationSubgoalId =
+      `${turnId}:compound_capability_subgoal:1:helix_ask_reflect_civilization_bounds`;
+    const zenSubgoalId =
+      `${turnId}:compound_capability_subgoal:2:helix_ask_reflect_ideology_context`;
+    const finalAnswerDraft = {
+      artifact_id: `${turnId}:final_answer_draft`,
+      kind: "final_answer_draft",
+      payload: {
+        schema: "helix.final_answer_draft.v1",
+        text: "The civilization bounds roadmap and zen graph reflection jointly support the final synthesis.",
+        answer_text: "The civilization bounds roadmap and zen graph reflection jointly support the final synthesis.",
+        goal_kind: "compound_evidence_synthesis",
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+        support_refs: ["obs:civilization-bounds", "obs:zen-reflection"],
+        artifact_refs: ["obs:civilization-bounds", "obs:zen-reflection"],
+        authority: "llm_post_observation_compound_synthesis",
+      },
+    };
+    const artifactLedger = [
+      {
+        artifact_id: "obs:civilization-bounds",
+        kind: "helix_civilization_bounds_tool_result",
+        payload: {
+          schema: "helix.civilization_bounds_roadmap_tool_result.v1",
+          capability_key: "helix_ask.reflect_civilization_bounds",
+          compound_subgoal_id: civilizationSubgoalId,
+        },
+      },
+      {
+        artifact_id: "obs:zen-reflection",
+        kind: "helix_zen_graph_reflection_tool_result",
+        payload: {
+          schema: "helix.ideology_context_reflection_tool_result.v1",
+          capability_key: "helix_ask.reflect_ideology_context",
+          compound_subgoal_id: zenSubgoalId,
+        },
+      },
+      finalAnswerDraft,
+    ];
+    const payload: Record<string, unknown> = {
+      route_product_contract: {
+        source_target: "civilization_bounds",
+        allowed_terminal_artifact_kinds: [
+          "compound_evidence_synthesis_answer",
+          "model_synthesized_answer",
+          "tool_receipt",
+          "helix_civilization_bounds_tool_result",
+          "helix_zen_graph_reflection_tool_result",
+        ],
+      },
+      capability_itinerary: {
+        terminal_success_criteria: {
+          requires_post_observation_synthesis: true,
+          compound_terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+          required_observation_families: ["civilization_bounds", "zen_graph_reflection"],
+          required_capabilities: [
+            "helix_ask.reflect_civilization_bounds",
+            "helix_ask.reflect_ideology_context",
+          ],
+          allowed_terminal_artifact_kinds: [
+            "compound_evidence_synthesis_answer",
+            "model_synthesized_answer",
+            "tool_receipt",
+            "helix_civilization_bounds_tool_result",
+            "helix_zen_graph_reflection_tool_result",
+          ],
+          forbidden_terminal_artifact_kinds: [
+            "tool_receipt",
+            "helix_civilization_bounds_tool_result",
+            "helix_zen_graph_reflection_tool_result",
+          ],
+        },
+      },
+      compound_capability_synthesis_readiness: {
+        applies: true,
+        complete: true,
+        support_refs: ["obs:civilization-bounds", "obs:zen-reflection"],
+        required_terminal_kind: "compound_evidence_synthesis_answer",
+        synthesis_terminal_kind: "compound_evidence_synthesis_answer",
+      },
+      compound_capability_contract: {
+        schema: "helix.compound_capability_contract.v1",
+        requires_all_subgoals: true,
+        terminal_policy: "synthesize_from_satisfied_subgoal_observations",
+        subgoals: [
+          {
+            subgoal_id: civilizationSubgoalId,
+            capability_family: "civilization_bounds",
+            requested_capability: "helix_ask.reflect_civilization_bounds",
+            runtime_capability: "helix_ask.reflect_civilization_bounds",
+            required_observation_kinds: ["civilization_bounds_roadmap/v1"],
+            required_terminal_kind: "model_synthesized_answer",
+            terminal_contribution_kind: "model_synthesized_answer",
+            mandatory: true,
+          },
+          {
+            subgoal_id: zenSubgoalId,
+            capability_family: "zen_graph_reflection",
+            requested_capability: "helix_ask.reflect_ideology_context",
+            runtime_capability: "helix_ask.reflect_ideology_context",
+            required_observation_kinds: ["ideology_context_reflection/v1"],
+            required_terminal_kind: "model_synthesized_answer",
+            terminal_contribution_kind: "model_synthesized_answer",
+            mandatory: true,
+          },
+        ],
+      },
+      capability_itinerary_execution_state: {
+        applies: true,
+        complete: true,
+        required_observation_families: ["civilization_bounds", "zen_graph_reflection"],
+        observed_families: ["civilization_bounds", "zen_graph_reflection"],
+        compound_subgoal_ledger: [
+          {
+            subgoal_id: civilizationSubgoalId,
+            requested_capability: "helix_ask.reflect_civilization_bounds",
+            runtime_capability: "helix_ask.reflect_civilization_bounds",
+            selected_capability: "helix_ask.reflect_civilization_bounds",
+            executed_capability: "helix_ask.reflect_civilization_bounds",
+            args: { prompt: "Assess long-range civilization bounds." },
+            observation_kind: "helix_civilization_bounds_tool_result",
+            observation_ref: "obs:civilization-bounds",
+            support_refs: ["obs:civilization-bounds"],
+            satisfaction: "satisfied",
+            rail_status: "complete",
+            terminal_contribution_kind: "model_synthesized_answer",
+          },
+          {
+            subgoal_id: zenSubgoalId,
+            requested_capability: "helix_ask.reflect_ideology_context",
+            runtime_capability: "helix_ask.reflect_ideology_context",
+            selected_capability: "helix_ask.reflect_ideology_context",
+            executed_capability: "helix_ask.reflect_ideology_context",
+            args: { text: "Reflect the review-policy implications." },
+            observation_kind: "helix_zen_graph_reflection_tool_result",
+            observation_ref: "obs:zen-reflection",
+            support_refs: ["obs:zen-reflection"],
+            satisfaction: "satisfied",
+            rail_status: "complete",
+            terminal_contribution_kind: "model_synthesized_answer",
+          },
+        ],
+      },
+      current_turn_artifact_ledger: artifactLedger,
+    };
+
+    const result = materializeFinalAnswerDraftTerminal({
+      turnId,
+      payload,
+      artifactLedger,
+      routeProductContract: payload.route_product_contract as Record<string, unknown>,
+      finalAnswerDraftRef: `${turnId}:final_answer_draft`,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      materialized_terminal_artifact_kind: "compound_evidence_synthesis_answer",
+    });
+    expect(result.route_allowed_terminal_artifact_kinds).toContain("compound_evidence_synthesis_answer");
+    expect(result.route_allowed_terminal_artifact_kinds).not.toContain("tool_receipt");
+    expect(result.route_allowed_terminal_artifact_kinds).not.toContain("helix_civilization_bounds_tool_result");
+    expect(result.route_allowed_terminal_artifact_kinds).not.toContain("helix_zen_graph_reflection_tool_result");
+    expect(payload.compound_evidence_synthesis_answer).toMatchObject({
+      support_refs: ["obs:civilization-bounds", "obs:zen-reflection"],
+      support_refs_count: 2,
+      subgoal_observation_refs: ["obs:civilization-bounds", "obs:zen-reflection"],
+      subgoal_observation_refs_count: 2,
+      source_families: ["civilization_bounds", "zen_graph_reflection"],
+      model_step_capability: "model.synthesize_from_compound_subgoal_observations",
+    });
+  });
 });

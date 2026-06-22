@@ -484,7 +484,6 @@ const capabilityHelpTerminalPathMaterialized = (input: {
   if (!terminalUsesCapabilityHelp) return false;
   if (!terminalMatchesCanonicalGoalContract(input.payload, "capability_help_summary")) return false;
   if (!ledgerHasArtifactKind(input.payload, "capability_registry")) return false;
-  if (!ledgerHasArtifactKind(input.payload, "capability_help_summary")) return false;
 
   const terminalAuthority = readRecord(input.payload.terminal_answer_authority);
   const terminalWriter = readRecord(input.payload.terminal_authority_single_writer);

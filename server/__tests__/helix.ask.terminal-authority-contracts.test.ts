@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { auditHelixAskContextForPoison } from "../services/helix-ask/ask-context-poison-audit";
 import { auditTerminalPresentationCoverage } from "../services/helix-ask/terminal-presentation-coverage-audit";
 import { applyTerminalAnswerEnvelope, resolveTerminalAnswerEnvelope } from "../services/helix-ask/terminal-answer-envelope";
+import { applyHelixTerminalAuthoritySingleWriter } from "../services/helix-ask/terminal-authority-single-writer";
 import { buildHelixTurnTerminalAuthority } from "../services/helix-ask/turn-terminal-authority";
 import {
   ALL_ROUTE_TERMINAL_PRODUCTS,
@@ -32,6 +33,214 @@ const allTerminalSurfacesEqual = (body: Record<string, any>): void => {
 };
 
 describe("Helix Ask terminal authority contracts", () => {
+  it("materializes capability help from a registry observation when the catalog route requires it", () => {
+    const payload: Record<string, unknown> = {
+      turn_id: "ask:test:capability-help-from-registry",
+      thread_id: "thread:test",
+      canonical_goal_frame: {
+        goal_kind: "capability_help",
+        required_terminal_kind: "capability_help_summary",
+      },
+      route_product_contract: {
+        schema: "helix.route_product_contract.v1",
+        required_terminal_kind: "capability_help_summary",
+        allowed_terminal_artifact_kinds: ["capability_help_summary"],
+        forbidden_terminal_artifact_kinds: ["tool_receipt"],
+      },
+      goal_satisfaction_evaluation: {
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+      },
+      source_target_intent: {
+        target_source: "runtime_evidence",
+      },
+      tool_call_admission_decision: {
+        selected_capability: "helix_ask.inspect_capability_catalog",
+      },
+      agent_step_decision: {
+        decision_id: "decision:catalog:answer",
+        chosen_capability: "helix_ask.inspect_capability_catalog",
+        next_step: "answer",
+        decision_timing: "post_observation_terminal_review",
+        decision_authority: "deterministic_policy_fallback",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "decision:catalog:inspect",
+            chosen_capability: "helix_ask.inspect_capability_catalog",
+            observed_artifact_refs: ["obs:capability-registry"],
+          },
+        ],
+      },
+      tool_turn_chain_audit: {
+        rail_status: "fail_closed",
+        rail_failure_code: "terminal_not_materialized",
+        first_broken_rail: "terminal_materialization",
+        repair_target: "terminal_materializer",
+        selected_capability: "helix_ask.inspect_capability_catalog",
+        executed_capability: "helix_ask.inspect_capability_catalog",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "obs:capability-registry",
+          kind: "capability_registry",
+          payload: {
+            kind: "capability_registry",
+            capability_catalog_observation: {
+              schema: "helix.capability_catalog_observation.v1",
+              active_dynamic_tool_count: 59,
+              retired_dynamic_tool_count: 91,
+              information_reflection: [
+                "docs-viewer.locate_in_doc",
+                "repo-code.search_concept",
+                "scientific-calculator.solve_expression",
+              ],
+              utility: ["workspace.restore_view_state", "live_env.record_live_source_mail_decision"],
+              assistant_answer: false,
+              terminal_eligible: false,
+              raw_content_included: false,
+            },
+            assistant_answer: false,
+            terminal_eligible: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    const result = applyHelixTerminalAuthoritySingleWriter({
+      turnId: "ask:test:capability-help-from-registry",
+      threadId: "thread:test",
+      payload,
+    });
+
+    expect(result.selected_terminal_artifact_kind).toBe("capability_help_summary");
+    expect(result.visible_text).toContain("Helix Ask capability catalog is available");
+    expect(result.visible_text).toContain("Active tool records: 59");
+    expect(payload.terminal_authority_single_writer).toMatchObject({
+      selected_terminal_artifact_kind: "capability_help_summary",
+    });
+
+    const envelope = applyTerminalAnswerEnvelope(payload, resolveTerminalAnswerEnvelope(payload));
+    expect(envelope.terminal_artifact_kind).toBe("capability_help_summary");
+    expect(envelope.final_answer_source).toBe("capability_help_summary");
+    expect(envelope.terminal_text).toContain("Helix Ask capability catalog is available");
+    expect(payload.terminal_artifact_kind).toBe("capability_help_summary");
+    expect(payload.final_answer_source).toBe("capability_help_summary");
+  });
+
+  it("recovers capability help through the envelope when a stale typed failure is still mirrored", () => {
+    const payload: Record<string, unknown> = {
+      turn_id: "ask:test:capability-help-envelope-repair",
+      thread_id: "thread:test",
+      ok: false,
+      response_type: "final_failure",
+      final_status: "final_failure",
+      terminal_artifact_kind: "typed_failure",
+      final_answer_source: "typed_failure",
+      terminal_error_code: "committed_route_terminal_product_mismatch",
+      selected_final_answer: "I could not produce a terminal answer because the selected terminal product did not match the committed Ask route.",
+      text: "I could not produce a terminal answer because the selected terminal product did not match the committed Ask route.",
+      canonical_goal_frame: {
+        goal_kind: "capability_help",
+        required_terminal_kind: "capability_help_summary",
+      },
+      goal_satisfaction_evaluation: {
+        schema: "helix.goal_satisfaction_evaluation.v1",
+        canonical_goal_kind: "capability_help",
+        required_terminal_kind: "capability_help_summary",
+        satisfaction: "satisfied",
+        next_decision: "allow_terminal",
+        required_evidence: [
+          {
+            kind: "capability_help_summary",
+            required: true,
+            satisfied: true,
+            evidence_ref: "ask:test:capability-help-envelope-repair:capability_help_summary",
+          },
+        ],
+      },
+      tool_call_admission_decision: {
+        selected_capability: "helix_ask.inspect_capability_catalog",
+      },
+      agent_step_decision: {
+        decision_id: "decision:capability-help:terminal",
+        chosen_capability: "helix_ask.inspect_capability_catalog",
+        next_step: "answer",
+        decision_timing: "post_observation_terminal_review",
+        decision_authority: "deterministic_policy_fallback",
+      },
+      agent_runtime_loop: {
+        iterations: [
+          {
+            decision_id: "decision:capability-help:inspect",
+            chosen_capability: "helix_ask.inspect_capability_catalog",
+            observed_artifact_refs: ["ask:test:capability-help-envelope-repair:capability_registry"],
+          },
+        ],
+      },
+      tool_lifecycle_trace: {
+        lifecycle_stage: "observation_reentered",
+        selected_capability: "helix_ask.inspect_capability_catalog",
+        executed_capability: "helix_ask.inspect_capability_catalog",
+        observation_ref: "ask:test:capability-help-envelope-repair:capability_registry",
+      },
+      post_tool_observation_reviews: [
+        {
+          schema: "helix.post_tool_observation_review.v1",
+          review_id: "ask:test:capability-help-envelope-repair:post_tool_observation_review:1",
+          next_step: "answer",
+          selected_capability: "model.direct_answer",
+          decision_authority: "llm_post_observation_review",
+          assistant_answer: false,
+          raw_content_included: false,
+        },
+      ],
+      tool_turn_chain_audit: {
+        rail_status: "fail_closed",
+        rail_failure_code: "terminal_not_materialized",
+        first_broken_rail: "terminal_materialization",
+        repair_target: "terminal_materializer",
+        selected_capability: "helix_ask.inspect_capability_catalog",
+        executed_capability: "helix_ask.inspect_capability_catalog",
+        observation_ref: "ask:test:capability-help-envelope-repair:capability_registry",
+      },
+      current_turn_artifact_ledger: [
+        {
+          artifact_id: "ask:test:capability-help-envelope-repair:capability_registry",
+          kind: "capability_registry",
+          payload: {
+            kind: "capability_registry",
+            terminal_eligible: false,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+        {
+          artifact_id: "ask:test:capability-help-envelope-repair:capability_help_summary",
+          kind: "capability_help_summary",
+          payload: {
+            schema: "helix.capability_help_summary.v1",
+            kind: "capability_help_summary",
+            text: "Helix Ask capability catalog is available from the runtime registry.",
+            terminal_eligible: true,
+            assistant_answer: false,
+            raw_content_included: false,
+          },
+        },
+      ],
+    };
+
+    const envelope = applyTerminalAnswerEnvelope(payload, resolveTerminalAnswerEnvelope(payload));
+    expect(envelope.terminal_artifact_kind).toBe("capability_help_summary");
+    expect(envelope.final_answer_source).toBe("capability_help_summary");
+    expect(envelope.terminal_text).toBe("Helix Ask capability catalog is available from the runtime registry.");
+    expect(payload.terminal_artifact_kind).toBe("capability_help_summary");
+    expect(payload.final_answer_source).toBe("capability_help_summary");
+    expect(payload.terminal_error_code).toBeUndefined();
+  });
+
   it("does not let poison audit mint missing terminal authority from visible text", () => {
     const audit = auditHelixAskContextForPoison({
       thread_id: "thread:test",

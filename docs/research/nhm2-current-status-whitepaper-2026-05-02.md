@@ -1219,6 +1219,40 @@ The roadmap now has a companion parameter-target layer, `nhm2_experiment_paramet
 
 The target layer does not change claim status. It makes the experimental next steps more inspectable: missing receipts produce blockers, scalar targets cannot substitute for measurements, and physical viability, transport, route ETA, propulsion, and speed-authority claims remain false.
 
+### 9.11 Research gaps and value of information
+
+The parameter-target layer now has a research-gap companion, `nhm2_experiment_research_gap_ledger/v1`. Its job is to answer a different question than the target table: not "what number do we want," but "what evidence would move or falsify this stage, and what independent precedent is closest without validating NHM2." A direct-precedent search miss is not an absolute absence claim. It is a dated search receipt plus uncovered parameter regime that can be revised by better retrieval.
+
+<!-- helix-doc-equation-action/v1 id=nhm2-experiment-research-gap-ledger -->
+
+\[
+\mathrm{Gap}_{target}=
+\{\mathrm{Precedent},\mathrm{UncoveredRegime},\mathrm{Receipt},\mathrm{NullMeaning},\mathrm{ClaimImpact}\}.
+\]
+
+| P0 gap row | current target or frontier | nearest independent precedent | null result / falsifier meaning |
+|---|---|---|---|
+| full apparatus `T_mu_nu` | source-side `T00`, `T0i`, diagonal `Tij`, and off-diagonal `Tij` for plates, supports, drive fields, material stresses, and interaction energy | regularized Casimir/vacuum-energy gravity work and arbitrary-material Casimir computation motivate whole-apparatus accounting, but do not provide NHM2 source authority | any missing, scalar-proxy, silently-zeroed, or metric-target-derived component blocks source authority even if regional `T00` looks aligned |
+| `447`-layer stack scaling | fixed-control-volume layer candidate and about `1.345 mm` stack thickness | conductive-plane stack Casimir scaling and arbitrary-geometry/material Casimir methods are adjacent comparators | a scaling null, nonadditive coupling, or support/thermal/wiring dominance falsifies layer-count amplification as the route to source closure |
+| detector-scale forward bound | `h00_proxy = 2G DeltaE/(r c^4)` as a weak-field sensitivity triage row | Advanced LIGO sensitivity and millimetre-scale gravity measurements are detector-scale comparators, not NHM2 metric evidence | a bounded detector null sets an upper bound on the proposed metric response even if source-side receipts improve |
+| QEI worldline applicability | wall/transition worldlines, sampling function, bound provenance, tau consistency, and same-tensor coverage | stationary-worldline QEI work is an applicability anchor | a failed wall or transition margin keeps the campaign diagnostic even with regional residual progress |
+| observer-robust integration | WEC/NEC/SEC/DEC checks over observer families against the same apparatus tensor | WarpAX-style observer-robust checks and generic-warp NEC results are caution rails | a non-Eulerian observer-family violation blocks broad energy-condition language and keeps physical claim locks closed |
+
+This ledger is a value-of-information layer. It can prioritize theory, simulation, bench, pathfinder, or facility-scale work, and it can record decisive null results. It still cannot unlock physical viability, transport, route ETA, propulsion, speed authority, material implementation, or positive experiment-result language. Literature anchors remain context and retrieval guidance only.
+
+### 9.12 Layer-stack mechanical receipt
+
+The `447`-layer lead also needs a mechanical receipt. At the ideal `8 nm`, `10 mm x 10 mm` scalar replay, the perfect-conductor pressure scale is about `3.17e5 Pa` per layer. That is about `31.7 N` of internal normal attraction per projected tile, or about `14.2 kN` for a naive `447`-layer fixed-control-volume stack column. The effective projected stress scale is about `142 MPa`, and the stack thickness remains about `1.345 mm`.
+
+<!-- helix-doc-equation-action/v1 id=nhm2-layer-stack-mechanical-receipt -->
+
+\[
+P_{ideal}=\frac{\pi^2\hbar c}{240a^4},\qquad
+F_{stack}=N_{layer}P_{ideal}A.
+\]
+
+This is not thrust. It is an internal load that the tile stack, spacers, supports, active gap control, and material films must survive while still preserving the source tensor. The required receipt is therefore not just "high pressure exists." It must include force-gap curves, pull-in margin, support fraction, roughness and patch-potential bounds, thermal load, fatigue margin, active-control energy, and a linear/nonlinear stack-scaling disposition. A failed support, pull-in, or nonadditivity result would falsify the `447`-layer route even if the scalar wall `T00` arithmetic remains attractive.
+
 ## Appendix A. Repository artifact status and claim-tier table
 
 The detailed implementation state belongs in an appendix because it is evidence metadata, not the scientific argument itself.

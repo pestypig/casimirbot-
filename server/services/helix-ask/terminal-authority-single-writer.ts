@@ -2353,6 +2353,50 @@ const findGoalSatisfyingCapabilityHelpArtifact = (
     if (!text || isStaleWorkspaceFailureText(text)) continue;
     return { artifact, kind: "capability_help_summary", text, ref: artifactId(artifact) };
   }
+  const registryArtifact = [...artifacts].reverse().find((artifact) => artifactKind(artifact) === "capability_registry");
+  const registryPayload = registryArtifact ? artifactPayload(registryArtifact) : null;
+  const catalogObservation = readRecord(registryPayload?.capability_catalog_observation);
+  const readScalar = (value: unknown): string | null =>
+    typeof value === "number" && Number.isFinite(value) ? String(value) : readString(value);
+  const activeToolCount = readScalar(catalogObservation?.active_dynamic_tool_count);
+  const retiredToolCount = readScalar(catalogObservation?.retired_dynamic_tool_count);
+  const informationReflection = readArray(catalogObservation?.information_reflection)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  const utility = readArray(catalogObservation?.utility)
+    .map(readString)
+    .filter((entry): entry is string => Boolean(entry));
+  if (registryArtifact && catalogObservation) {
+    const lines = [
+      "Helix Ask capability catalog is available from the runtime registry.",
+      activeToolCount ? `Active tool records: ${activeToolCount}.` : null,
+      retiredToolCount ? `Retired or legacy records: ${retiredToolCount}.` : null,
+      informationReflection.length
+        ? `Information/reflection examples: ${informationReflection.slice(0, 5).join("; ")}.`
+        : null,
+      utility.length ? `Utility examples: ${utility.slice(0, 4).join("; ")}.` : null,
+    ].filter((line): line is string => Boolean(line));
+    const text = lines.join("\n");
+    const ref = `${artifactId(registryArtifact) ?? "capability_registry"}:capability_help_summary`;
+    return {
+      artifact: {
+        artifact_id: ref,
+        kind: "capability_help_summary",
+        payload: {
+          schema: "helix.capability_help_summary.v1",
+          kind: "capability_help_summary",
+          text,
+          capability_catalog_ref: artifactId(registryArtifact),
+          assistant_answer: false,
+          terminal_eligible: true,
+          raw_content_included: false,
+        },
+      },
+      kind: "capability_help_summary",
+      text,
+      ref,
+    };
+  }
   return null;
 };
 
@@ -3207,13 +3251,29 @@ export function applyHelixTerminalAuthoritySingleWriter(
         rawTerminalBlockingToolRailFailure.repairTarget === "presenter_boundary"
       ),
     );
+  const capabilityHelpGoalArtifactSupersedesToolRailFailure =
+    Boolean(
+      selectedGoalArtifact?.kind === "capability_help_summary" &&
+      goalAllowsTerminal &&
+      rawTerminalBlockingToolRailFailure &&
+      (
+        rawTerminalBlockingToolRailFailure.railFailureCode === "terminal_not_materialized" ||
+        rawTerminalBlockingToolRailFailure.firstBrokenRail === "terminal_materialization" ||
+        rawTerminalBlockingToolRailFailure.firstBrokenRail === "terminal_authority" ||
+        rawTerminalBlockingToolRailFailure.firstBrokenRail === "visible_projection" ||
+        rawTerminalBlockingToolRailFailure.repairTarget === "terminal_materializer" ||
+        rawTerminalBlockingToolRailFailure.repairTarget === "terminal_authority" ||
+        rawTerminalBlockingToolRailFailure.repairTarget === "presenter_boundary"
+      ),
+    );
   const terminalBlockingToolRailFailure =
     noteMutationDraftSupersedesToolRailFailure ||
     repoDraftSupersedesToolRailFailure ||
     compoundDraftSupersedesToolRailFailure ||
     workstationTerminalSupersedesToolRailFailure ||
     receiptTerminalSupersedesToolRailFailure ||
-    visualGoalArtifactSupersedesToolRailFailure
+    visualGoalArtifactSupersedesToolRailFailure ||
+    capabilityHelpGoalArtifactSupersedesToolRailFailure
       ? null
       : rawTerminalBlockingToolRailFailure?.railFailureCode === "terminal_projection_mismatch" &&
     (

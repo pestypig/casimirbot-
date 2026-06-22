@@ -597,6 +597,92 @@
       ]
     },
     {
+      "equationId": "nhm2-experiment-research-gap-ledger",
+      "label": "NHM2 experiment research gap ledger",
+      "sectionAnchor": "911-research-gaps-and-value-of-information",
+      "latex": "\\mathrm{Gap}_{target}= \\{\\mathrm{Precedent},\\mathrm{UncoveredRegime},\\mathrm{Receipt},\\mathrm{NullMeaning},\\mathrm{ClaimImpact}\\}.",
+      "aliases": [
+        "Gap_target = {Precedent, UncoveredRegime, Receipt, NullMeaning, ClaimImpact}",
+        "nhm2_experiment_research_gap_ledger/v1",
+        "research gaps and value of information"
+      ],
+      "actions": [
+        {
+          "actionId": "open-experiment-research-gap-ledger",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open experiment research-gap ledger",
+          "badgeIds": [
+            "nhm2.experimental.parameter_targets",
+            "nhm2.experimental.research_gap_ledger",
+            "nhm2.experimental.full_apparatus_tensor",
+            "nhm2.experimental.array_scaling",
+            "nhm2.experimental.metric_upper_bound",
+            "nhm2.qei.worldline_dossier",
+            "nhm2.energy_condition.observer_robust_gate",
+            "nhm2.claim_boundary.physical_viability_locked",
+            "nhm2.claim_boundary.transport_locked"
+          ],
+          "preferredBadgeId": "nhm2.experimental.research_gap_ledger",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": [
+            "theory-badge-graph",
+            "scientific-calculator"
+          ],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "Research-gap rows are value-of-information and falsifier planning surfaces; they cannot unlock physical viability, transport, route, propulsion, or speed claims."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "No direct precedent found is not a novelty claim.",
+        "Independent literature anchors are context and retrieval guidance, not NHM2 validation.",
+        "Null results are stage evidence and must remain visible."
+      ]
+    },
+    {
+      "equationId": "nhm2-layer-stack-mechanical-receipt",
+      "label": "NHM2 layer-stack mechanical receipt",
+      "sectionAnchor": "912-layer-stack-mechanical-receipt",
+      "latex": "P_{ideal}=\\frac{\\pi^2\\hbar c}{240a^4},\\qquad F_{stack}=N_{layer}P_{ideal}A.",
+      "aliases": [
+        "P_ideal = pi^2 hbar c/(240 a^4); F_stack = N_layer P_ideal A",
+        "nhm2_layer_stack_mechanical_receipt/v1",
+        "447 layer internal Casimir load"
+      ],
+      "actions": [
+        {
+          "actionId": "open-layer-stack-mechanical-receipt",
+          "kind": "artifact_backed_theory_run",
+          "label": "Open layer-stack mechanical receipt",
+          "badgeIds": [
+            "nhm2.experimental.parameter_targets",
+            "nhm2.experimental.research_gap_ledger",
+            "nhm2.experimental.layer_stack_mechanical_receipt",
+            "nhm2.experimental.array_scaling",
+            "nhm2.experimental.full_apparatus_tensor",
+            "nhm2.claim_boundary.physical_viability_locked",
+            "nhm2.claim_boundary.transport_locked"
+          ],
+          "preferredBadgeId": "nhm2.experimental.layer_stack_mechanical_receipt",
+          "compoundRunMode": "dependency_path",
+          "atlasLensId": "warp_gr_nhm2",
+          "atlasGroupId": "warp.nhm2.diagnostic_path",
+          "openPanels": [
+            "theory-badge-graph",
+            "scientific-calculator"
+          ],
+          "alsoIngestLatex": true,
+          "claimBoundaryNote": "The 447-layer force calculation is an internal-load diagnostic; it cannot substitute for material, pull-in, support, thermal, fatigue, active-control, or full-tensor receipts."
+        }
+      ],
+      "claimBoundaryNotes": [
+        "Internal Casimir attraction is not thrust.",
+        "Ideal scalar load is not a material receipt.",
+        "Linear layer scaling must be receipted rather than assumed."
+      ]
+    },
+    {
       "equationId": "nhm2-physical-evidence-campaign-ladder",
       "label": "NHM2 physical evidence campaign ladder",
       "sectionAnchor": "57-workstation-equation-anchors",
