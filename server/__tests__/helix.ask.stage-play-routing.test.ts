@@ -2677,6 +2677,11 @@ describe("Helix Ask Stage Play routing", () => {
       finalAnswerSource: response.body?.final_answer_source,
       terminalArtifactKind: response.body?.terminal_artifact_kind,
       finalAnswerDraftAuthority: response.body?.final_answer_draft?.authority,
+      finalAnswerDraftText: response.body?.final_answer_draft?.text,
+      receiptStatusText: response.body?.receipt_status_text,
+      terminalProjectionGuard: response.body?.terminal_projection_guard,
+      terminalAuthoritySingleWriter: response.body?.terminal_authority_single_writer,
+      runtimeAuthorityAuditChecks: response.body?.runtime_authority_audit?.checks,
       runtimeLoopIterations: response.body?.agent_runtime_loop?.iterations?.map((iteration: any) => ({
         chosen_capability: iteration?.chosen_capability,
         executed_action_key: iteration?.executed_action_key,
@@ -2775,6 +2780,9 @@ describe("Helix Ask Stage Play routing", () => {
     expect(response.body?.answer).toContain("Stage Play reflected the active visual source");
     expect(response.body?.answer).toContain("queued a checkpoint");
     expect(response.body?.answer).not.toContain("visual capture evidence is unavailable");
+    expect(response.body?.receipt_status_text, routeDebug).toContain("Stage Play reflected the active visual source");
+    expect(response.body?.selected_final_answer, routeDebug).toBeUndefined();
+    expect(response.body?.finalAnswer, routeDebug).toBeUndefined();
     expect(response.body?.terminal_error_code).not.toBe("visual_evidence_missing");
     expect(response.body?.answer).not.toContain("\"artifactId\":\"stage_play_badge_graph\"");
     expect(response.body?.final_answer_draft?.authority, routeDebug).toBe("deterministic_receipt_fallback");

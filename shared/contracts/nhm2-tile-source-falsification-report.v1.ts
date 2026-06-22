@@ -440,7 +440,7 @@ const nextEvidenceArtifactFromDomain = (
         ? "receipt://full_apparatus_tensor/component_detail_refs_v1"
         : "receipt://full_apparatus_tensor/provenance_v1";
     case "downstream_residual_conservation_qei_observer":
-      return "artifact://nhm2/downstream-gates/frozen-chain-rerun-v1";
+      return "artifact://nhm2/downstream-gates/regional-residual-closure-v1";
     case "campaign_coordination":
       return "artifact://nhm2/campaign/reference-capsule-congruence-v1";
   }
@@ -707,28 +707,131 @@ const roadmapItemDomain = (
 
 const fallbackDecisiveMeasurementsForDomain = (
   campaignDomain: Nhm2TileSourceExperimentalCampaignDomainV1,
-): Nhm2TileSourceEvidenceGapRoadmapItemV1["decisiveMeasurements"] => [
-  {
-    measurementId: `${campaignDomain}_frontier_receipt`,
-    quantity: evidenceTargetFromDomain(campaignDomain),
-    target: measurementTargetSummaryFromDomain(campaignDomain),
-    unit: null,
-    evidenceArtifact: nextEvidenceArtifactFromDomain(
-      campaignDomain,
-      "domain_frontier_unresolved",
-      campaignDomain === "downstream_residual_conservation_qei_observer"
-        ? "downstream_blocked"
-        : "open_review",
-    ),
-    marginKey: null,
-    currentMargin: null,
-    requiredCorrectionKey: null,
-    requiredCorrectionValue: null,
-    goCriterion: "all required evidence receipts and downstream gates for this domain pass in the same frozen chain",
-    noGoCriterion: falsificationRuleFromDomain(campaignDomain),
-    falsificationConsequence: falsificationRuleFromDomain(campaignDomain),
-  },
-];
+): Nhm2TileSourceEvidenceGapRoadmapItemV1["decisiveMeasurements"] => {
+  if (campaignDomain === "downstream_residual_conservation_qei_observer") {
+    return [
+      {
+        measurementId: "regional_residual_closure_artifact",
+        quantity: "same-chain regional residual closure artifact",
+        target: "regional residual closure pass for wall, hull, and exterior_shell",
+        unit: null,
+        evidenceArtifact: "artifact://nhm2/downstream-gates/regional-residual-closure-v1",
+        marginKey: null,
+        currentMargin: null,
+        requiredCorrectionKey: null,
+        requiredCorrectionValue: null,
+        goCriterion: "regional residual closure passes against the same source tensor/support atlas",
+        noGoCriterion: "regional residual closure is missing, stale, or failing",
+        falsificationConsequence: "source candidate cannot enter coupled closure without regional residual closure",
+      },
+      {
+        measurementId: "wall_t00_closure_artifact",
+        quantity: "same-chain wall T00 closure artifact",
+        target: "wall T00 closure pass without broad wall-closure overclaim",
+        unit: null,
+        evidenceArtifact: "artifact://nhm2/downstream-gates/wall-t00-closure-v1",
+        marginKey: null,
+        currentMargin: null,
+        requiredCorrectionKey: null,
+        requiredCorrectionValue: null,
+        goCriterion: "wall T00 closure passes in the same frozen chain",
+        noGoCriterion: "wall T00 closure is missing, stale, or failing",
+        falsificationConsequence: "global/source residuals cannot override a wall-region failure",
+      },
+      {
+        measurementId: "covariant_conservation_artifact",
+        quantity: "same-chain covariant conservation artifact",
+        target: "covariant conservation pass with support/control/electrostatic/thermal terms",
+        unit: null,
+        evidenceArtifact: "artifact://nhm2/downstream-gates/covariant-conservation-v1",
+        marginKey: null,
+        currentMargin: null,
+        requiredCorrectionKey: null,
+        requiredCorrectionValue: null,
+        goCriterion: "covariant conservation passes for the full apparatus tensor and regional supports",
+        noGoCriterion: "conservation is missing, stale, failing, or omits apparatus terms",
+        falsificationConsequence: "the source tensor cannot be admitted as a conserved stress-energy candidate",
+      },
+      {
+        measurementId: "qei_worldline_dossier_artifact",
+        quantity: "same-chain QEI worldline dossier",
+        target: "wall and transition worldline QEI dossier pass with bound provenance",
+        unit: null,
+        evidenceArtifact: "artifact://nhm2/downstream-gates/qei-worldline-dossier-v1",
+        marginKey: null,
+        currentMargin: null,
+        requiredCorrectionKey: null,
+        requiredCorrectionValue: null,
+        goCriterion: "QEI dossier passes with worldlines, sampling, tau/applicability, and bound receipts",
+        noGoCriterion: "QEI is scalar-only, missing, stale, failing, or lacks bound provenance",
+        falsificationConsequence: "scalar qei_margin cannot substitute for a worldline dossier",
+      },
+      {
+        measurementId: "observer_family_energy_conditions_artifact",
+        quantity: "same-chain observer-family energy-condition artifact",
+        target: "observer-family WEC/NEC/SEC/DEC diagnostics pass or report violations",
+        unit: null,
+        evidenceArtifact: "artifact://nhm2/downstream-gates/observer-family-energy-conditions-v1",
+        marginKey: null,
+        currentMargin: null,
+        requiredCorrectionKey: null,
+        requiredCorrectionValue: null,
+        goCriterion: "observer-family diagnostics pass for the same full apparatus tensor",
+        noGoCriterion: "observer check is missing, Eulerian-only, stale, failing, or optimizer scope is misrepresented",
+        falsificationConsequence: "friendly-observer checks cannot support robust energy-condition claims",
+      },
+      {
+        measurementId: "material_credibility_artifact",
+        quantity: "same-chain material credibility artifact",
+        target: "material credibility pass over all supplied tile-source receipts",
+        unit: null,
+        evidenceArtifact: "artifact://nhm2/downstream-gates/material-credibility-v1",
+        marginKey: null,
+        currentMargin: null,
+        requiredCorrectionKey: null,
+        requiredCorrectionValue: null,
+        goCriterion: "material credibility passes over coupon, gap, roughness, control, fatigue, scaling, and tensor receipts",
+        noGoCriterion: "material credibility is missing, stale, failing, or backed only by ideal scalar Casimir math",
+        falsificationConsequence: "diagnostic source tensors cannot be treated as material evidence",
+      },
+      {
+        measurementId: "coupled_closure_artifact",
+        quantity: "same-chain coupled closure artifact",
+        target: "coupled closure pass after source authority, residuals, conservation, QEI, observer, and material gates",
+        unit: null,
+        evidenceArtifact: "artifact://nhm2/downstream-gates/coupled-closure-v1",
+        marginKey: null,
+        currentMargin: null,
+        requiredCorrectionKey: null,
+        requiredCorrectionValue: null,
+        goCriterion: "coupled closure passes in one frozen run/profile/artifact chain",
+        noGoCriterion: "coupled closure is missing, stale, false, or mixes incompatible artifacts",
+        falsificationConsequence: "no physical, transport, propulsion, route ETA, speed, or wall-closure claim is allowed",
+      },
+    ];
+  }
+
+  return [
+    {
+      measurementId: `${campaignDomain}_frontier_receipt`,
+      quantity: evidenceTargetFromDomain(campaignDomain),
+      target: measurementTargetSummaryFromDomain(campaignDomain),
+      unit: null,
+      evidenceArtifact: nextEvidenceArtifactFromDomain(
+        campaignDomain,
+        "domain_frontier_unresolved",
+        "open_review",
+      ),
+      marginKey: null,
+      currentMargin: null,
+      requiredCorrectionKey: null,
+      requiredCorrectionValue: null,
+      goCriterion: "all required evidence receipts and downstream gates for this domain pass in the same frozen chain",
+      noGoCriterion: falsificationRuleFromDomain(campaignDomain),
+      falsificationConsequence: falsificationRuleFromDomain(campaignDomain),
+    },
+  ];
+};
 
 const decisiveMeasurementsFromRoadmap = (
   roadmap: Nhm2TileSourceEvidenceGapRoadmapV1,

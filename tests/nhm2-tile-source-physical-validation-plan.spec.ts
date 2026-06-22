@@ -190,8 +190,12 @@ describe("NHM2 tile source physical validation plan", () => {
             "447-layer TiN support stack is mechanically inadmissible",
         }),
         expect.objectContaining({
-          measurementId: "coupon_material_response",
-          evidenceArtifact: "receipt://material_coupon/material_response_15ghz_4k_v1",
+          measurementId: "coupon_dielectric_response",
+          evidenceArtifact: "receipt://material_coupon/dielectric_response_v1",
+        }),
+        expect.objectContaining({
+          measurementId: "coupon_conductivity_response",
+          evidenceArtifact: "receipt://material_coupon/conductivity_v1",
         }),
       ]),
     );
@@ -250,11 +254,19 @@ describe("NHM2 tile source physical validation plan", () => {
       falsificationRule: expect.stringContaining("source-side same-basis T_munu"),
       decisiveMeasurements: expect.arrayContaining([
         expect.objectContaining({
-          measurementId: "tensor_component_coverage",
+          measurementId: "tensor_value_artifact",
+          evidenceArtifact: "receipt://full_apparatus_tensor/tensor_value_artifact_v1",
+        }),
+        expect.objectContaining({
+          measurementId: "tensor_authority_metadata",
+          evidenceArtifact: "receipt://full_apparatus_tensor/authority_metadata_v1",
+        }),
+        expect.objectContaining({
+          measurementId: "tensor_component_detail_refs",
           evidenceArtifact: "receipt://full_apparatus_tensor/component_detail_refs_v1",
         }),
         expect.objectContaining({
-          measurementId: "apparatus_stress_energy_terms",
+          measurementId: "apparatus_stress_energy_term_refs",
           evidenceArtifact: "receipt://full_apparatus_tensor/stress_energy_terms_v1",
         }),
       ]),
@@ -282,14 +294,27 @@ describe("NHM2 tile source physical validation plan", () => {
       source: "downstream_gate",
       downstreamGateId: "regional_residual_closure",
       firstBlocker: "regional_residual_closure_not_run",
-      nextEvidenceArtifact: "artifact://nhm2/downstream-gates/frozen-chain-rerun-v1",
+      nextEvidenceArtifact: "artifact://nhm2/downstream-gates/regional-residual-closure-v1",
       measurementTargetSummary: expect.stringContaining("observer-family WEC/NEC/SEC/DEC"),
       falsificationRule: expect.stringContaining("do not pass together"),
       decisiveMeasurements: expect.arrayContaining([
         expect.objectContaining({
-          measurementId: "same_chain_downstream_gate_pass",
-          evidenceArtifact: "artifact://nhm2/downstream-gates/frozen-chain-rerun-v1",
-          noGoCriterion: "any downstream gate is missing, stale, or failing",
+          measurementId: "regional_residual_closure_artifact",
+          evidenceArtifact: "artifact://nhm2/downstream-gates/regional-residual-closure-v1",
+          noGoCriterion: "regional residual closure is missing, stale, or failing",
+          requiredCorrectionKey: null,
+        }),
+        expect.objectContaining({
+          measurementId: "qei_worldline_dossier_artifact",
+          evidenceArtifact: "artifact://nhm2/downstream-gates/qei-worldline-dossier-v1",
+          noGoCriterion: "QEI is scalar-only, missing, stale, failing, or lacks bound provenance",
+          requiredCorrectionKey: null,
+        }),
+        expect.objectContaining({
+          measurementId: "coupled_closure_artifact",
+          evidenceArtifact: "artifact://nhm2/downstream-gates/coupled-closure-v1",
+          noGoCriterion: "coupled closure is missing, stale, false, or mixes incompatible artifacts",
+          requiredCorrectionKey: null,
         }),
       ]),
     });

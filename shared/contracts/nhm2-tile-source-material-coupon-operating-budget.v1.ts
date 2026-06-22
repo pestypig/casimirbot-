@@ -100,6 +100,12 @@ export type Nhm2TileSourceMaterialCouponOperatingBudgetV1 = {
     missingCurveAndMapRefCount: number;
     requiredCampaignCompatibilityRefCount: 2;
     missingCampaignCompatibilityRefCount: number;
+    dielectricResponseRefRequired: true;
+    dielectricResponseReceiptComplete: boolean;
+    dielectricResponseNumericValueAvailable: boolean;
+    conductivityRefRequired: true;
+    conductivityReceiptComplete: boolean;
+    conductivityNumericValueAvailable: boolean;
     requiredMaterialResponseRefCount: 2;
     missingMaterialResponseRefCount: number;
     materialResponseNumericValuesAvailable: boolean;
@@ -207,13 +213,30 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
     OPERATING_TEMPERATURE_K,
     evidence?.conductivityTemperatureK ?? null,
   );
-  const materialResponseValuesAvailable =
+  const dielectricResponseNumericValueAvailable =
     evidence?.dielectricLossTangent != null &&
     Number.isFinite(evidence.dielectricLossTangent) &&
-    evidence.dielectricLossTangent >= 0 &&
-    evidence.conductivitySiemensPerMeter != null &&
+    evidence.dielectricLossTangent >= 0;
+  const conductivityNumericValueAvailable =
+    evidence?.conductivitySiemensPerMeter != null &&
     Number.isFinite(evidence.conductivitySiemensPerMeter) &&
     evidence.conductivitySiemensPerMeter > 0;
+  const dielectricResponseReceiptComplete =
+    evidence?.dielectricResponseRef != null &&
+    materialResponseFrequencyMargin != null &&
+    materialResponseFrequencyMargin >= 1 &&
+    dielectricTemperatureMargin != null &&
+    dielectricTemperatureMargin >= 1 &&
+    dielectricResponseNumericValueAvailable;
+  const conductivityReceiptComplete =
+    evidence?.conductivityRef != null &&
+    materialResponseFrequencyMargin != null &&
+    materialResponseFrequencyMargin >= 1 &&
+    conductivityTemperatureMargin != null &&
+    conductivityTemperatureMargin >= 1 &&
+    conductivityNumericValueAvailable;
+  const materialResponseValuesAvailable =
+    dielectricResponseNumericValueAvailable && conductivityNumericValueAvailable;
   const roughnessRmsMargin = safeRatio(
     ROUGHNESS_RMS_MAX_METERS,
     evidence?.roughnessRmsMeters ?? null,
@@ -483,6 +506,12 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
       missingCurveAndMapRefCount,
       requiredCampaignCompatibilityRefCount: 2,
       missingCampaignCompatibilityRefCount,
+      dielectricResponseRefRequired: true,
+      dielectricResponseReceiptComplete,
+      dielectricResponseNumericValueAvailable,
+      conductivityRefRequired: true,
+      conductivityReceiptComplete,
+      conductivityNumericValueAvailable,
       requiredMaterialResponseRefCount: 2,
       missingMaterialResponseRefCount,
       materialResponseNumericValuesAvailable: materialResponseValuesAvailable,
@@ -579,6 +608,12 @@ export const isNhm2TileSourceMaterialCouponOperatingBudget = (
     typeof requiredCorrections.missingCurveAndMapRefCount === "number" &&
     requiredCorrections.requiredCampaignCompatibilityRefCount === 2 &&
     typeof requiredCorrections.missingCampaignCompatibilityRefCount === "number" &&
+    requiredCorrections.dielectricResponseRefRequired === true &&
+    typeof requiredCorrections.dielectricResponseReceiptComplete === "boolean" &&
+    typeof requiredCorrections.dielectricResponseNumericValueAvailable === "boolean" &&
+    requiredCorrections.conductivityRefRequired === true &&
+    typeof requiredCorrections.conductivityReceiptComplete === "boolean" &&
+    typeof requiredCorrections.conductivityNumericValueAvailable === "boolean" &&
     requiredCorrections.requiredMaterialResponseRefCount === 2 &&
     typeof requiredCorrections.missingMaterialResponseRefCount === "number" &&
     typeof requiredCorrections.materialResponseNumericValuesAvailable === "boolean" &&

@@ -191,6 +191,9 @@ describe("Helix Ask deterministic fallback demotion", () => {
     expect(payload.assistant_answer).toBe(false);
     expect(payload.answer).toContain("Stage Play reflected the active visual source and queued a checkpoint.");
     expect(payload.answer).toContain("No model-reviewed answer snapshot exists yet.");
+    expect(payload.receipt_status_text).toContain("Stage Play reflected the active visual source and queued a checkpoint.");
+    expect(payload.selected_final_answer).toBeUndefined();
+    expect(payload.finalAnswer).toBeUndefined();
     expect(payload.terminal_answer_authority).toMatchObject({
       terminal_artifact_kind: "tool_receipt",
       final_answer_source: "deterministic_receipt_fallback",

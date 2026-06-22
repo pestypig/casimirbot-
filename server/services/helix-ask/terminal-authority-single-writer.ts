@@ -1201,7 +1201,7 @@ const isStaleModelOnlyNoObservationText = (value: unknown): boolean =>
   );
 
 const isStagePlayPostObservationSynthesisText = (value: unknown): boolean =>
-  /^(?:Stage Play reflected\b|Stage Play tool receipt:\s*live_env\.reflect_stage_play_context\b|Stage Play checkpoint request (?:queued|running|completed):)/i.test(
+  /^(?:Stage Play\b|Stage Play tool receipt:\s*live_env\.reflect_stage_play_context\b|Stage Play checkpoint request (?:queued|running|completed):)/i.test(
     readString(value) ?? "",
   );
 
@@ -1930,7 +1930,9 @@ const stagePlayReceiptTextForDraft = (artifact: ArtifactLike): string => {
       ? text!
     : /^Stage Play/i.test(text ?? "")
       ? stagePlayReceiptPendingText
-      : text || stagePlayReceiptPendingText;
+      : text && !/\b(?:I could not|could not produce|terminal answer|typed_failure|selected terminal product)\b/i.test(text)
+        ? text
+        : stagePlayReceiptPendingText;
 };
 
 const isScholarlyFullTextObservation = (artifact: ArtifactLike): boolean =>
@@ -3527,6 +3529,18 @@ export function applyHelixTerminalAuthoritySingleWriter(
       readString(input.payload.final_answer_source) === "pending_server_request" ||
       /clarify:missing_args|request_user_input|pending_server_request/i.test(readString(input.payload.route_reason_code) ?? "")
     );
+  const earlyDeterministicReceiptFallbackDraft = findDeterministicReceiptFallbackDraftAfterRequiredObservation(artifacts);
+  const earlyDeterministicReceiptFallbackCanSurface =
+    Boolean(earlyDeterministicReceiptFallbackDraft) &&
+    (
+      isStagePlayPostObservationSynthesisText(artifactText(earlyDeterministicReceiptFallbackDraft!.artifact)) ||
+      readString(canonicalGoal?.goal_kind) === "live_environment_review" ||
+      readString(capabilityPlan?.requested_action) === "live_env.reflect_stage_play_context" ||
+      (
+        !compoundTerminalSynthesisActive &&
+        routeContractAllowedTerminalKinds(input.payload).includes("tool_receipt")
+      )
+    );
   const solverContinuationPending =
     rawSolverContinuationPending &&
     !(
@@ -3539,6 +3553,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
       workstationTerminalMaterialized ||
       goalArtifactTerminalMaterialized ||
       Boolean(selectedReceiptTerminal && goalAllowsTerminal) ||
+      earlyDeterministicReceiptFallbackCanSurface ||
       noteMutationTerminalMaterialized
     );
   if (solverContinuationPending) {
@@ -3595,6 +3610,11 @@ export function applyHelixTerminalAuthoritySingleWriter(
       kind: "typed_failure",
       reason: "stale_solver_continuation_superseded_by_required_receipt_terminal",
     });
+  } else if (rawSolverContinuationPending && earlyDeterministicReceiptFallbackCanSurface) {
+    rejectedCandidates.push({
+      kind: "typed_failure",
+      reason: "stale_solver_continuation_superseded_by_deterministic_receipt_status",
+    });
   } else if (rawSolverContinuationPending && noteMutationTerminalMaterialized) {
     rejectedCandidates.push({
       kind: "typed_failure",
@@ -3629,7 +3649,11 @@ export function applyHelixTerminalAuthoritySingleWriter(
   const selectedDraft =
     selectedDraftRejectedForStaleObservation ||
     compoundSubgoalDraftSupportMissing ||
-    (!itineraryObservationCriteriaSatisfied && !repoDraftMaterializationMatchesRequiredGoal)
+    (!itineraryObservationCriteriaSatisfied && !repoDraftMaterializationMatchesRequiredGoal) ||
+    (
+      selectedDraftCandidate &&
+      isDeterministicReceiptFallbackDraft(selectedDraftCandidate.artifact)
+    )
       ? null
       : selectedDraftCandidate;
   const noteMutationDraftCandidate =
@@ -3644,18 +3668,13 @@ export function applyHelixTerminalAuthoritySingleWriter(
     );
   const deterministicReceiptFallbackDraft = selectedDraft
     ? null
-    : findDeterministicReceiptFallbackDraftAfterRequiredObservation(artifacts);
+    : earlyDeterministicReceiptFallbackDraft;
   const selectedLiveEnvironmentBindingDiagnosis = findLiveEnvironmentBindingDiagnosisTerminal(input.payload);
   const latestRequiredObservationSequence = selectedDraft?.latestObservationSequence ??
     artifacts.reduce((latest, artifact, index) => isAcceptedObservationPacket(artifact) ? index : latest, -1);
   const routeAllowsModelSynthesizedAnswer = routeContractAllowsTerminalKind(input.payload, "model_synthesized_answer");
   const deterministicReceiptFallbackCanSurface =
-    Boolean(deterministicReceiptFallbackDraft) &&
-    !compoundTerminalSynthesisActive &&
-    (
-      routeContractAllowedTerminalKinds(input.payload).includes("tool_receipt") ||
-      isStagePlayPostObservationSynthesisText(artifactText(deterministicReceiptFallbackDraft!.artifact))
-    );
+    Boolean(deterministicReceiptFallbackDraft) && earlyDeterministicReceiptFallbackCanSurface;
   const scholarlyAnswerSynthesisMissing =
     routeContractRequiresScholarlyResearchAnswer(input.payload) &&
     hasObservedScholarlyFullText(artifacts);
@@ -3832,6 +3851,21 @@ export function applyHelixTerminalAuthoritySingleWriter(
         rawTerminalBlockingToolRailFailure.repairTarget === "presenter_boundary"
       ),
     );
+  const deterministicReceiptFallbackStatusSupersedesToolRailFailure =
+    Boolean(
+      deterministicReceiptFallbackCanSurface &&
+      rawTerminalBlockingToolRailFailure &&
+      (
+        rawTerminalBlockingToolRailFailure.railFailureCode === "terminal_product_mismatch" ||
+        rawTerminalBlockingToolRailFailure.railFailureCode === "terminal_not_materialized" ||
+        rawTerminalBlockingToolRailFailure.firstBrokenRail === "terminal_materialization" ||
+        rawTerminalBlockingToolRailFailure.firstBrokenRail === "terminal_authority" ||
+        rawTerminalBlockingToolRailFailure.firstBrokenRail === "visible_projection" ||
+        rawTerminalBlockingToolRailFailure.repairTarget === "terminal_materializer" ||
+        rawTerminalBlockingToolRailFailure.repairTarget === "terminal_authority" ||
+        rawTerminalBlockingToolRailFailure.repairTarget === "presenter_boundary"
+      ),
+    );
   const visualGoalArtifactSupersedesToolRailFailure =
     Boolean(
       selectedGoalArtifact &&
@@ -3884,6 +3918,7 @@ export function applyHelixTerminalAuthoritySingleWriter(
     compoundDraftSupersedesToolRailFailure ||
     workstationTerminalSupersedesToolRailFailure ||
     receiptTerminalSupersedesToolRailFailure ||
+    deterministicReceiptFallbackStatusSupersedesToolRailFailure ||
     visualGoalArtifactSupersedesToolRailFailure ||
     capabilityHelpGoalArtifactSupersedesToolRailFailure ||
     theoryGoalArtifactSupersedesToolRailFailure
@@ -4756,12 +4791,14 @@ export function applyHelixTerminalAuthoritySingleWriter(
     selectedSource = "tool_receipt";
     input.payload.terminal_artifact_kind = "tool_receipt";
     input.payload.final_answer_source = "deterministic_receipt_fallback";
-    input.payload.selected_final_answer = text;
+    input.payload.receipt_status_text = text;
     input.payload.answer = text;
     input.payload.text = text;
     input.payload.assistant_answer = false;
     input.payload.terminal_eligible = false;
     input.payload.terminal_artifact_id = draftRef ?? undefined;
+    delete input.payload.selected_final_answer;
+    delete input.payload.finalAnswer;
     input.payload.terminal_presentation = {
       ...(readRecord(input.payload.terminal_presentation) ?? {}),
       schema: "helix.terminal_presentation.v1",

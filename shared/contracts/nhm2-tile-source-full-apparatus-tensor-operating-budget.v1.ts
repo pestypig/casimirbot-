@@ -21,6 +21,7 @@ export type Nhm2TileSourceFullApparatusTensorOperatingBudgetV1 = {
     requiredTensorComponentCount: 10;
     requiredTermCount: 9;
     requiredRegionCount: 3;
+    requiredAuthorityMetadataCount: 4;
     requiredRegions: ["wall", "hull", "exterior_shell"];
     sourceSideOnly: true;
     targetEchoForbidden: true;
@@ -126,6 +127,7 @@ export type Nhm2TileSourceFullApparatusTensorOperatingBudgetV1 = {
     missingRegionIds: string[];
     regionalSupportRefMissingCount: number;
     missingRegionalSupportRefIds: string[];
+    requiredAuthorityMetadataCount: 4;
     authorityMetadataMissingCount: number;
     missingAuthorityMetadataIds: string[];
     componentCoverageFractionShortfall: number;
@@ -489,6 +491,7 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
       requiredTensorComponentCount: 10,
       requiredTermCount: 9,
       requiredRegionCount: 3,
+      requiredAuthorityMetadataCount: 4,
       requiredRegions: ["wall", "hull", "exterior_shell"],
       sourceSideOnly: true,
       targetEchoForbidden: true,
@@ -576,6 +579,7 @@ export const buildNhm2TileSourceFullApparatusTensorOperatingBudget = (
       missingRegionIds,
       regionalSupportRefMissingCount: missingRegionalSupportRefIds.length,
       missingRegionalSupportRefIds,
+      requiredAuthorityMetadataCount: 4,
       authorityMetadataMissingCount: missingAuthorityMetadataIds.length,
       missingAuthorityMetadataIds,
       componentCoverageFractionShortfall: round(Math.max(0, 1 - componentCoverageFraction)),
@@ -640,6 +644,7 @@ export const isNhm2TileSourceFullApparatusTensorOperatingBudget = (
     targets.requiredTensorComponentCount === 10 &&
     targets.requiredTermCount === 9 &&
     targets.requiredRegionCount === 3 &&
+    targets.requiredAuthorityMetadataCount === 4 &&
     Array.isArray(targets.requiredRegions) &&
     targets.requiredRegions.length === 3 &&
     targets.sourceSideOnly === true &&
@@ -681,6 +686,7 @@ export const isNhm2TileSourceFullApparatusTensorOperatingBudget = (
     Array.isArray(requiredCorrections.missingRegionIds) &&
     typeof requiredCorrections.regionalSupportRefMissingCount === "number" &&
     Array.isArray(requiredCorrections.missingRegionalSupportRefIds) &&
+    requiredCorrections.requiredAuthorityMetadataCount === 4 &&
     typeof requiredCorrections.authorityMetadataMissingCount === "number" &&
     Array.isArray(requiredCorrections.missingAuthorityMetadataIds) &&
     typeof requiredCorrections.componentCoverageFractionShortfall === "number" &&
