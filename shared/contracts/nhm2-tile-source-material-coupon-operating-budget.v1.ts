@@ -18,10 +18,13 @@ export type Nhm2TileSourceMaterialCouponOperatingBudgetV1 = {
     material: "ultra_high_stress_tin";
     layerCount: 447;
     operatingTemperatureK: 4;
+    campaignLoadCaseRefRequired: true;
+    layerStackCompatibilityRefRequired: true;
     supportStressPa: number;
     tensileStressMinPa: number;
     materialSafetyFactor: 2;
     requiredFractureOrYieldStressPa: number;
+    couponRequiredCycleCount: number;
     roughnessRmsMaxMeters: 1e-10;
     fabricationToleranceMaxMeters: 5e-10;
     materialResponseFrequencyHz: 15e9;
@@ -31,15 +34,21 @@ export type Nhm2TileSourceMaterialCouponOperatingBudgetV1 = {
   };
   suppliedMaterialCouponEvidence: {
     evidenceTier: string;
+    loadCaseRef: string | null;
+    layerStackCompatibilityRef: string | null;
     tensileStressCurveRef: string | null;
     fractureYieldCurveRef: string | null;
     cryogenicStateRef: string | null;
+    cryogenicCycleRef: string | null;
+    couponFatigueCurveRef: string | null;
     roughnessMapRef: string | null;
     fabricationToleranceMapRef: string | null;
     material: string | null;
     measuredTensileStressPa: number | null;
     fractureOrYieldStressPa: number | null;
     supportStressPa: number | null;
+    couponCycleCountToFailure: number | null;
+    couponRequiredCycleCount: number | null;
     cryogenicTemperatureK: number | null;
     dielectricResponseRef: string | null;
     conductivityRef: string | null;
@@ -53,8 +62,10 @@ export type Nhm2TileSourceMaterialCouponOperatingBudgetV1 = {
   };
   derivedOperatingBudget: {
     curveAndMapRefsAvailable: boolean;
+    campaignCompatibilityRefsAvailable: boolean;
     tensileStressMargin: number | null;
     fractureOrYieldStressMargin: number | null;
+    couponFatigueCycleMargin: number | null;
     cryogenicTemperatureMargin: number | null;
     materialResponseFrequencyMargin: number | null;
     dielectricTemperatureMargin: number | null;
@@ -72,6 +83,8 @@ export type Nhm2TileSourceMaterialCouponOperatingBudgetV1 = {
     materialSafetyFactor: 2;
     requiredFractureOrYieldStressPa: number;
     fractureOrYieldStressShortfallPa: number | null;
+    couponRequiredCycleCount: number;
+    couponCycleCountShortfall: number | null;
     operatingTemperatureK: 4;
     cryogenicTemperatureReductionK: number | null;
     materialResponseFrequencyHz: 15e9;
@@ -83,8 +96,10 @@ export type Nhm2TileSourceMaterialCouponOperatingBudgetV1 = {
     roughnessRmsReductionMeters: number | null;
     fabricationToleranceMaxMeters: 5e-10;
     fabricationToleranceReductionMeters: number | null;
-    requiredCurveAndMapRefCount: 5;
+    requiredCurveAndMapRefCount: 7;
     missingCurveAndMapRefCount: number;
+    requiredCampaignCompatibilityRefCount: 2;
+    missingCampaignCompatibilityRefCount: number;
     requiredMaterialResponseRefCount: 2;
     missingMaterialResponseRefCount: number;
     materialResponseNumericValuesAvailable: boolean;
@@ -124,6 +139,7 @@ const ROUGHNESS_RMS_MAX_METERS = 1e-10;
 const FABRICATION_TOLERANCE_MAX_METERS = 5e-10;
 const OPERATING_TEMPERATURE_K = 4;
 const MATERIAL_RESPONSE_FREQUENCY_HZ = 15e9;
+const COUPON_REQUIRED_CYCLE_COUNT = 1e9;
 
 const round = (value: number, digits = 12): number => Number(value.toPrecision(digits));
 
@@ -163,6 +179,12 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
   const fractureOrYieldStressMargin = safeRatio(
     evidence?.fractureOrYieldStressPa ?? null,
     requiredFractureOrYieldStressPa,
+  );
+  const couponRequiredCycleCount =
+    evidence?.couponRequiredCycleCount ?? COUPON_REQUIRED_CYCLE_COUNT;
+  const couponFatigueCycleMargin = safeRatio(
+    evidence?.couponCycleCountToFailure ?? null,
+    couponRequiredCycleCount,
   );
   const cryogenicTemperatureMargin = safeRatio(
     OPERATING_TEMPERATURE_K,
@@ -204,14 +226,23 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
     evidence?.tensileStressCurveRef,
     evidence?.fractureYieldCurveRef,
     evidence?.cryogenicStateRef,
+    evidence?.cryogenicCycleRef,
+    evidence?.couponFatigueCurveRef,
     evidence?.roughnessMapRef,
     evidence?.fabricationToleranceMapRef,
+  ];
+  const campaignCompatibilityRefs = [
+    evidence?.loadCaseRef,
+    evidence?.layerStackCompatibilityRef,
   ];
   const materialResponseRefs = [
     evidence?.dielectricResponseRef,
     evidence?.conductivityRef,
   ];
   const missingCurveAndMapRefCount = curveAndMapRefs.filter((ref) => ref == null).length;
+  const missingCampaignCompatibilityRefCount = campaignCompatibilityRefs.filter(
+    (ref) => ref == null,
+  ).length;
   const missingMaterialResponseRefCount = materialResponseRefs.filter((ref) => ref == null).length;
   const blockers = [
     ...(evidence == null || evidence.evidenceTier === "missing"
@@ -224,6 +255,12 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
     ...(evidence?.material !== "ultra_high_stress_tin"
       ? ["material_coupon_candidate_material_mismatch_for_operating_budget"]
       : []),
+    ...(evidence?.loadCaseRef == null
+      ? ["candidate_stack_load_case_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence?.layerStackCompatibilityRef == null
+      ? ["candidate_stack_layer_compatibility_ref_missing_for_operating_budget"]
+      : []),
     ...(evidence?.tensileStressCurveRef == null
       ? ["tensile_stress_curve_ref_missing_for_operating_budget"]
       : []),
@@ -232,6 +269,12 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
       : []),
     ...(evidence?.cryogenicStateRef == null
       ? ["cryogenic_state_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence?.cryogenicCycleRef == null
+      ? ["cryogenic_cycle_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence?.couponFatigueCurveRef == null
+      ? ["coupon_fatigue_curve_ref_missing_for_operating_budget"]
       : []),
     ...(evidence?.roughnessMapRef == null
       ? ["coupon_roughness_map_ref_missing_for_operating_budget"]
@@ -248,6 +291,11 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
       ? ["fracture_or_yield_stress_missing_for_operating_budget"]
       : fractureOrYieldStressMargin < 1
         ? ["fracture_or_yield_margin_below_2x_support_stress_operating_budget"]
+        : []),
+    ...(couponFatigueCycleMargin == null
+      ? ["coupon_fatigue_cycle_margin_missing_for_operating_budget"]
+      : couponFatigueCycleMargin < 1
+        ? ["coupon_fatigue_cycle_margin_below_required_campaign_cycles_operating_budget"]
         : []),
     ...(cryogenicTemperatureMargin == null
       ? ["cryogenic_temperature_missing_for_operating_budget"]
@@ -297,6 +345,7 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
             "material_coupon_candidate_material_mismatch_for_operating_budget",
             "measured_tensile_stress_below_support_stress_operating_budget",
             "fracture_or_yield_margin_below_2x_support_stress_operating_budget",
+            "coupon_fatigue_cycle_margin_below_required_campaign_cycles_operating_budget",
             "cryogenic_temperature_above_4k_operating_budget",
             "material_response_frequency_not_15ghz_for_operating_budget",
             "dielectric_response_temperature_above_4k_for_operating_budget",
@@ -320,10 +369,13 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
       material: "ultra_high_stress_tin",
       layerCount: 447,
       operatingTemperatureK: OPERATING_TEMPERATURE_K,
+      campaignLoadCaseRefRequired: true,
+      layerStackCompatibilityRefRequired: true,
       supportStressPa,
       tensileStressMinPa: supportStressPa,
       materialSafetyFactor: 2,
       requiredFractureOrYieldStressPa,
+      couponRequiredCycleCount,
       roughnessRmsMaxMeters: ROUGHNESS_RMS_MAX_METERS,
       fabricationToleranceMaxMeters: FABRICATION_TOLERANCE_MAX_METERS,
       materialResponseFrequencyHz: MATERIAL_RESPONSE_FREQUENCY_HZ,
@@ -333,15 +385,21 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
     },
     suppliedMaterialCouponEvidence: {
       evidenceTier: evidence?.evidenceTier ?? "missing",
+      loadCaseRef: stringOrNull(evidence?.loadCaseRef),
+      layerStackCompatibilityRef: stringOrNull(evidence?.layerStackCompatibilityRef),
       tensileStressCurveRef: stringOrNull(evidence?.tensileStressCurveRef),
       fractureYieldCurveRef: stringOrNull(evidence?.fractureYieldCurveRef),
       cryogenicStateRef: stringOrNull(evidence?.cryogenicStateRef),
+      cryogenicCycleRef: stringOrNull(evidence?.cryogenicCycleRef),
+      couponFatigueCurveRef: stringOrNull(evidence?.couponFatigueCurveRef),
       roughnessMapRef: stringOrNull(evidence?.roughnessMapRef),
       fabricationToleranceMapRef: stringOrNull(evidence?.fabricationToleranceMapRef),
       material: stringOrNull(evidence?.material),
       measuredTensileStressPa: finiteOrNull(evidence?.measuredTensileStressPa),
       fractureOrYieldStressPa: finiteOrNull(evidence?.fractureOrYieldStressPa),
       supportStressPa: finiteOrNull(evidence?.supportStressPa),
+      couponCycleCountToFailure: finiteOrNull(evidence?.couponCycleCountToFailure),
+      couponRequiredCycleCount: finiteOrNull(evidence?.couponRequiredCycleCount),
       cryogenicTemperatureK: finiteOrNull(evidence?.cryogenicTemperatureK),
       dielectricResponseRef: stringOrNull(evidence?.dielectricResponseRef),
       conductivityRef: stringOrNull(evidence?.conductivityRef),
@@ -358,10 +416,15 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
         evidence?.tensileStressCurveRef != null &&
         evidence.fractureYieldCurveRef != null &&
         evidence.cryogenicStateRef != null &&
+        evidence.cryogenicCycleRef != null &&
+        evidence.couponFatigueCurveRef != null &&
         evidence.roughnessMapRef != null &&
         evidence.fabricationToleranceMapRef != null,
+      campaignCompatibilityRefsAvailable:
+        evidence?.loadCaseRef != null && evidence.layerStackCompatibilityRef != null,
       tensileStressMargin,
       fractureOrYieldStressMargin,
+      couponFatigueCycleMargin,
       cryogenicTemperatureMargin,
       materialResponseFrequencyMargin,
       dielectricTemperatureMargin,
@@ -381,6 +444,11 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
       fractureOrYieldStressShortfallPa: shortfallToMinimum(
         evidence?.fractureOrYieldStressPa,
         requiredFractureOrYieldStressPa,
+      ),
+      couponRequiredCycleCount,
+      couponCycleCountShortfall: shortfallToMinimum(
+        evidence?.couponCycleCountToFailure,
+        couponRequiredCycleCount,
       ),
       operatingTemperatureK: OPERATING_TEMPERATURE_K,
       cryogenicTemperatureReductionK: reductionToMaximum(
@@ -411,8 +479,10 @@ export const buildNhm2TileSourceMaterialCouponOperatingBudget = (
         evidence?.fabricationToleranceMeters,
         FABRICATION_TOLERANCE_MAX_METERS,
       ),
-      requiredCurveAndMapRefCount: 5,
+      requiredCurveAndMapRefCount: 7,
       missingCurveAndMapRefCount,
+      requiredCampaignCompatibilityRefCount: 2,
+      missingCampaignCompatibilityRefCount,
       requiredMaterialResponseRefCount: 2,
       missingMaterialResponseRefCount,
       materialResponseNumericValuesAvailable: materialResponseValuesAvailable,
@@ -467,10 +537,13 @@ export const isNhm2TileSourceMaterialCouponOperatingBudget = (
     targets.material === "ultra_high_stress_tin" &&
     targets.layerCount === 447 &&
     targets.operatingTemperatureK === 4 &&
+    targets.campaignLoadCaseRefRequired === true &&
+    targets.layerStackCompatibilityRefRequired === true &&
     typeof targets.supportStressPa === "number" &&
     typeof targets.tensileStressMinPa === "number" &&
     targets.materialSafetyFactor === 2 &&
     typeof targets.requiredFractureOrYieldStressPa === "number" &&
+    typeof targets.couponRequiredCycleCount === "number" &&
     targets.roughnessRmsMaxMeters === 1e-10 &&
     targets.fabricationToleranceMaxMeters === 5e-10 &&
     targets.materialResponseFrequencyHz === 15e9 &&
@@ -489,6 +562,8 @@ export const isNhm2TileSourceMaterialCouponOperatingBudget = (
     requiredCorrections.materialSafetyFactor === 2 &&
     typeof requiredCorrections.requiredFractureOrYieldStressPa === "number" &&
     isNumberOrNull(requiredCorrections.fractureOrYieldStressShortfallPa) &&
+    typeof requiredCorrections.couponRequiredCycleCount === "number" &&
+    isNumberOrNull(requiredCorrections.couponCycleCountShortfall) &&
     requiredCorrections.operatingTemperatureK === 4 &&
     isNumberOrNull(requiredCorrections.cryogenicTemperatureReductionK) &&
     requiredCorrections.materialResponseFrequencyHz === 15e9 &&
@@ -500,8 +575,10 @@ export const isNhm2TileSourceMaterialCouponOperatingBudget = (
     isNumberOrNull(requiredCorrections.roughnessRmsReductionMeters) &&
     requiredCorrections.fabricationToleranceMaxMeters === 5e-10 &&
     isNumberOrNull(requiredCorrections.fabricationToleranceReductionMeters) &&
-    requiredCorrections.requiredCurveAndMapRefCount === 5 &&
+    requiredCorrections.requiredCurveAndMapRefCount === 7 &&
     typeof requiredCorrections.missingCurveAndMapRefCount === "number" &&
+    requiredCorrections.requiredCampaignCompatibilityRefCount === 2 &&
+    typeof requiredCorrections.missingCampaignCompatibilityRefCount === "number" &&
     requiredCorrections.requiredMaterialResponseRefCount === 2 &&
     typeof requiredCorrections.missingMaterialResponseRefCount === "number" &&
     typeof requiredCorrections.materialResponseNumericValuesAvailable === "boolean" &&

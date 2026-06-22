@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -16,6 +16,7 @@ import { buildRegionalSourceTransitionKernel } from "./build-regional-source-tra
 import { publishTileCounterpartConservation } from "./publish-tile-counterpart-conservation";
 import { publishTileEffectiveCounterpart } from "./publish-tile-effective-counterpart";
 import { publishSourceComponentAuthorityLedger } from "./publish-source-component-authority-ledger";
+import { publishSourceSideSameBasisTensorAuthority } from "./publish-source-side-same-basis-authority";
 import { publishSourceOffDiagonalShearAudit } from "./build-source-off-diagonal-shear-audit";
 import { publishSourceMomentumDensityAudit } from "./build-source-momentum-density-audit";
 import { publishMomentumFrameProjectionReceipt } from "./build-momentum-frame-projection-receipt";
@@ -29,6 +30,10 @@ import { runNhm2CandidateDynamicEffectiveGeometryAgreement } from "./build-candi
 import { buildAtlasBoundObserverRobustEnergyConditions } from "./build-atlas-bound-observer-robust-energy-conditions";
 import { publishNhm2CampaignStabilityEvidence } from "./build-campaign-stability-evidence";
 import { publishNhm2TileSourceMaterialEvidenceReceipts } from "./publish-tile-source-material-evidence-receipts";
+import {
+  buildNhm2TileSourceFalsificationReport,
+  isNhm2TileSourceFalsificationReport,
+} from "../../shared/contracts/nhm2-tile-source-falsification-report.v1";
 import {
   runNhm2TimeDependentSourceCampaign,
   type Nhm2TimeDependentSourceCampaignArtifactV1,
@@ -131,6 +136,9 @@ export const runNhm2CandidateProfileCampaignRun = (args: {
   const counterpartPath = path("nhm2-tile-effective-counterpart.json");
   const ledgerPath = path("nhm2-source-component-authority-ledger.json");
   const fullCounterpartPath = path("nhm2-tile-effective-full-tensor-counterpart.json");
+  const sourceSideAuthorityPath = path(
+    "nhm2-source-side-same-basis-tensor-authority.json",
+  );
   const shearAuditPath = path("nhm2-source-off-diagonal-shear-audit.json");
   const momentumAuditPath = path("nhm2-source-momentum-density-audit.json");
   const projectionEvidencePath = path("nhm2-momentum-frame-projection-evidence.json");
@@ -276,6 +284,41 @@ export const runNhm2CandidateProfileCampaignRun = (args: {
     atlasRef: atlasPath,
     atlasHash: atlas.provenance.atlasHash,
   });
+  const sourceSideAuthority = publishSourceSideSameBasisTensorAuthority({
+    repoRoot: args.repoRoot,
+    referenceRunPath,
+    tileEffectiveCounterpartPath: counterpartPath,
+    sourceClosurePath,
+    tileSourceAuthorityHandoffPath:
+      tileSourceMaterialEvidence.outputRefs.authorityHandoff,
+    fullApparatusTensorValuesPath:
+      tileSourceMaterialEvidence.outputRefs.fullApparatusTensorValues,
+    outPath: sourceSideAuthorityPath,
+    auditOnly: args.auditOnly,
+  });
+  const authorityAwareFalsificationReport = buildNhm2TileSourceFalsificationReport({
+    materialEvidenceReceipts: tileSourceMaterialEvidence.materialEvidenceReceipts,
+    physicalValidationPlan: tileSourceMaterialEvidence.physicalValidationPlan,
+    evidenceGapRoadmap: tileSourceMaterialEvidence.evidenceGapRoadmap,
+    operatingBudgetReadiness: tileSourceMaterialEvidence.operatingBudgetReadiness,
+    materialEvidenceReceiptsRef:
+      tileSourceMaterialEvidence.outputRefs.materialEvidenceReceipts,
+    physicalValidationPlanRef:
+      tileSourceMaterialEvidence.outputRefs.physicalValidationPlan,
+    evidenceGapRoadmapRef: tileSourceMaterialEvidence.outputRefs.evidenceGapRoadmap,
+    operatingBudgetReadinessRef:
+      tileSourceMaterialEvidence.outputRefs.operatingBudgetReadiness,
+    sourceSideSameBasisTensorAuthority: sourceSideAuthority,
+    sourceSideSameBasisTensorAuthorityRef: sourceSideAuthorityPath,
+  });
+  if (!isNhm2TileSourceFalsificationReport(authorityAwareFalsificationReport)) {
+    throw new Error("authority-aware tile-source falsification report failed validation");
+  }
+  writeFileSync(
+    tileSourceMaterialEvidence.outputRefs.falsificationReport,
+    `${JSON.stringify(authorityAwareFalsificationReport, null, 2)}\n`,
+    "utf8",
+  );
   publishSourceOffDiagonalShearAudit({
     repoRoot: args.repoRoot,
     sourceComponentAuthorityLedgerPath: ledgerPath,
@@ -405,6 +448,7 @@ export const runNhm2CandidateProfileCampaignRun = (args: {
     runId: args.candidateProfileId,
     chartId: "comoving_cartesian",
     sourceComponentAuthorityLedgerPath: ledgerPath,
+    sourceSideSameBasisTensorAuthorityPath: sourceSideAuthorityPath,
     regionalFullTensorResidualPath: residualPath,
     sourceOffDiagonalShearAuditPath: shearAuditPath,
     sourceMomentumDensityAuditPath: momentumAuditPath,

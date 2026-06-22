@@ -134,7 +134,7 @@ describe("Helix Ask theory reflection route", () => {
     );
   }, 15_000);
 
-  it("routes reflection-only theory graph prompts through non-terminal reflection receipts", async () => {
+  it("routes reflection-only theory graph prompts through synthesized theory answers", async () => {
     const app = createApp();
 
     const response = await request(app)
@@ -152,8 +152,11 @@ describe("Helix Ask theory reflection route", () => {
     const actions = body?.action_envelope?.workstation_actions ?? [];
 
     expect(body?.route_reason_code).toBe("theory_context_reflection");
-    expect(body?.final_answer_source).toBe("workstation_tool_evaluation");
-    expect(body?.terminal_artifact_kind).toBe("workstation_tool_evaluation");
+    expect(body?.final_answer_source).toBe("final_answer_draft");
+    expect(body?.terminal_artifact_kind).toBe("theory_context_reflection_answer");
+    expect(body?.terminal_answer_authority?.terminal_artifact_kind).toBe("theory_context_reflection_answer");
+    expect(body?.debug?.terminal_artifact_kind).toBe("theory_context_reflection_answer");
+    expect(body?.debug?.terminal_answer_authority?.terminal_artifact_kind).toBe("theory_context_reflection_answer");
     expect(body?.canonical_goal_frame?.goal_kind).toBe("theory_context_reflection");
     expect(body?.goal_satisfaction_evaluation?.canonical_goal_kind).toBe("theory_context_reflection");
     expect(body?.goal_satisfaction_evaluation?.terminal_contract?.goal_kind).toBe("theory_context_reflection");

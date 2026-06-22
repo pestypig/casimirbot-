@@ -2,6 +2,7 @@ export type HelixTerminalCandidateSource =
   | "final_answer_draft"
   | "doc_evidence_synthesis_answer"
   | "repo_code_evidence_answer"
+  | "compound_evidence_synthesis_answer"
   | "compound_research_locator_answer"
   | "scholarly_research_answer"
   | "internet_search_answer"
@@ -136,6 +137,7 @@ export type HelixTerminalAuthoritySingleWriterResult = {
     | "model_synthesized_answer"
     | "doc_evidence_synthesis_answer"
     | "repo_code_evidence_answer"
+    | "compound_evidence_synthesis_answer"
     | "compound_research_locator_answer"
     | "scholarly_research_answer"
     | "internet_search_answer"
@@ -182,10 +184,16 @@ export type HelixTerminalAuthoritySingleWriterResult = {
     | null;
   visible_text: string;
   assistant_answer: false;
+  selected_terminal_support_refs?: string[];
+  selected_terminal_support_refs_count?: number;
+  selected_terminal_subgoal_observation_refs?: string[];
+  selected_terminal_subgoal_observation_refs_count?: number;
+  selected_terminal_source_families?: string[];
   source:
     | "final_answer_draft"
     | "doc_evidence_synthesis_answer"
     | "repo_code_evidence_answer"
+    | "compound_evidence_synthesis_answer"
     | "compound_research_locator_answer"
     | "scholarly_research_answer"
     | "internet_search_answer"

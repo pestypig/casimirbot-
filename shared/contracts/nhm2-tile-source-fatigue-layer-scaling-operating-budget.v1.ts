@@ -18,33 +18,54 @@ export type Nhm2TileSourceFatigueLayerScalingOperatingBudgetV1 = {
     layerCount: 447;
     cycleMarginMin: 1;
     layerScalingEfficiencyMin: 0.9;
+    perLayerVariationFractionMax: 0.05;
     layerNonadditivityFractionMax: 0.1;
     activeAreaRetentionMin: 0.6;
+    supportCouplingFractionMax: 0.1;
+    electromagneticCouplingFractionMax: 0.1;
+    mechanicalCouplingFractionMax: 0.1;
     sourceTensorRetentionFractionMin: 0.9;
     thermalCycleDriftFractionMax: 0.01;
     creepDriftFractionMax: 0.01;
+    delaminationMarginMin: 1;
+    interlayerAdhesionMarginMin: 1;
     supportCouplingStatusRequired: "pass";
     effectiveActiveLayerCountMin: number;
     effectiveSourceTensorLayerCountMin: number;
   };
   suppliedFatigueLayerScalingEvidence: {
     evidenceTier: string;
+    loadSpectrumRef: string | null;
     cycleProtocolRef: string | null;
+    cryogenicFatigueRef: string | null;
     fatigueCurveRef: string | null;
     thermalCycleRef: string | null;
     creepDriftRef: string | null;
+    delaminationProtocolRef: string | null;
+    interlayerAdhesionRef: string | null;
     layerScalingMapRef: string | null;
+    perLayerVariationMapRef: string | null;
     nonadditivityModelRef: string | null;
     activeAreaMapRef: string | null;
     supportCouplingMapRef: string | null;
+    electromagneticCouplingMapRef: string | null;
+    mechanicalCouplingMapRef: string | null;
     multiphysicsCouplingRef: string | null;
+    sourceTensorRetentionMapRef: string | null;
     cycleCountToFailure: number | null;
     requiredCycleCount: number | null;
     thermalCycleDriftFraction: number | null;
     creepDriftFraction: number | null;
+    delaminationMargin: number | null;
+    interlayerAdhesionMargin: number | null;
     layerScalingEfficiency: number | null;
+    perLayerVariationFraction: number | null;
     nonadditivityFraction: number | null;
     activeAreaRetention: number | null;
+    supportCouplingFraction: number | null;
+    electromagneticCouplingFraction: number | null;
+    mechanicalCouplingFraction: number | null;
+    sourceTensorRetentionFraction: number | null;
     supportCouplingStatus: "pass" | "review" | "fail" | "missing";
   };
   derivedOperatingBudget: {
@@ -53,9 +74,15 @@ export type Nhm2TileSourceFatigueLayerScalingOperatingBudgetV1 = {
     cycleMargin: number | null;
     thermalCycleDriftMargin: number | null;
     creepDriftMargin: number | null;
+    delaminationMargin: number | null;
+    interlayerAdhesionMargin: number | null;
     scalingMargin: number | null;
+    perLayerVariationMargin: number | null;
     nonadditivityMargin: number | null;
     activeAreaMargin: number | null;
+    supportCouplingMargin: number | null;
+    electromagneticCouplingMargin: number | null;
+    mechanicalCouplingMargin: number | null;
     effectiveActiveLayerCount: number | null;
     effectiveActiveLayerCountMargin: number | null;
     sourceTensorRetentionFraction: number | null;
@@ -69,21 +96,33 @@ export type Nhm2TileSourceFatigueLayerScalingOperatingBudgetV1 = {
     thermalCycleDriftReduction: number | null;
     creepDriftFractionMax: 0.01;
     creepDriftReduction: number | null;
+    delaminationMarginMin: 1;
+    delaminationMarginShortfall: number | null;
+    interlayerAdhesionMarginMin: 1;
+    interlayerAdhesionMarginShortfall: number | null;
     layerScalingEfficiencyMin: 0.9;
     layerScalingEfficiencyShortfall: number | null;
+    perLayerVariationFractionMax: 0.05;
+    perLayerVariationReduction: number | null;
     layerNonadditivityFractionMax: 0.1;
     layerNonadditivityReduction: number | null;
     activeAreaRetentionMin: 0.6;
     activeAreaRetentionShortfall: number | null;
+    supportCouplingFractionMax: 0.1;
+    supportCouplingFractionReduction: number | null;
+    electromagneticCouplingFractionMax: 0.1;
+    electromagneticCouplingFractionReduction: number | null;
+    mechanicalCouplingFractionMax: 0.1;
+    mechanicalCouplingFractionReduction: number | null;
     effectiveActiveLayerCountMin: number;
     effectiveActiveLayerCountShortfall: number | null;
     sourceTensorRetentionFractionMin: 0.9;
     sourceTensorRetentionFractionShortfall: number | null;
     effectiveSourceTensorLayerCountMin: number;
     effectiveSourceTensorLayerCountShortfall: number | null;
-    requiredFatigueProvenanceRefCount: 4;
+    requiredFatigueProvenanceRefCount: 8;
     missingFatigueProvenanceRefCount: number;
-    requiredLayerScalingProvenanceRefCount: 5;
+    requiredLayerScalingProvenanceRefCount: 9;
     missingLayerScalingProvenanceRefCount: number;
     supportCouplingStatusRequired: "pass";
     supportCouplingStatusSatisfied: boolean;
@@ -119,11 +158,17 @@ const DEFAULT_SELECTED_PROFILE_ID =
   "stage1_centerline_alpha_0p7000_observer_compatible_source_campaign_screen_v1";
 const LAYER_COUNT = 447;
 const LAYER_SCALING_EFFICIENCY_MIN = 0.9;
+const PER_LAYER_VARIATION_FRACTION_MAX = 0.05;
 const LAYER_NONADDITIVITY_FRACTION_MAX = 0.1;
 const ACTIVE_AREA_RETENTION_MIN = 0.6;
+const SUPPORT_COUPLING_FRACTION_MAX = 0.1;
+const ELECTROMAGNETIC_COUPLING_FRACTION_MAX = 0.1;
+const MECHANICAL_COUPLING_FRACTION_MAX = 0.1;
 const SOURCE_TENSOR_RETENTION_FRACTION_MIN = 0.9;
 const THERMAL_CYCLE_DRIFT_FRACTION_MAX = 0.01;
 const CREEP_DRIFT_FRACTION_MAX = 0.01;
+const DELAMINATION_MARGIN_MIN = 1;
+const INTERLAYER_ADHESION_MARGIN_MIN = 1;
 const EFFECTIVE_ACTIVE_LAYER_COUNT_MIN =
   LAYER_COUNT *
   LAYER_SCALING_EFFICIENCY_MIN *
@@ -176,9 +221,21 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     CREEP_DRIFT_FRACTION_MAX,
     evidence?.creepDriftFraction,
   );
+  const delaminationMargin = safeRatio(
+    evidence?.delaminationMargin ?? null,
+    DELAMINATION_MARGIN_MIN,
+  );
+  const interlayerAdhesionMargin = safeRatio(
+    evidence?.interlayerAdhesionMargin ?? null,
+    INTERLAYER_ADHESION_MARGIN_MIN,
+  );
   const scalingMargin = safeRatio(
     evidence?.layerScalingEfficiency ?? null,
     LAYER_SCALING_EFFICIENCY_MIN,
+  );
+  const perLayerVariationMargin = upperBoundMargin(
+    PER_LAYER_VARIATION_FRACTION_MAX,
+    evidence?.perLayerVariationFraction,
   );
   const nonadditivityMargin = safeRatio(
     LAYER_NONADDITIVITY_FRACTION_MAX,
@@ -187,6 +244,18 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
   const activeAreaMargin = safeRatio(
     evidence?.activeAreaRetention ?? null,
     ACTIVE_AREA_RETENTION_MIN,
+  );
+  const supportCouplingMargin = upperBoundMargin(
+    SUPPORT_COUPLING_FRACTION_MAX,
+    evidence?.supportCouplingFraction,
+  );
+  const electromagneticCouplingMargin = upperBoundMargin(
+    ELECTROMAGNETIC_COUPLING_FRACTION_MAX,
+    evidence?.electromagneticCouplingFraction,
+  );
+  const mechanicalCouplingMargin = upperBoundMargin(
+    MECHANICAL_COUPLING_FRACTION_MAX,
+    evidence?.mechanicalCouplingFraction,
   );
   const effectiveActiveLayerCount =
     evidence?.layerScalingEfficiency == null ||
@@ -204,7 +273,9 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     EFFECTIVE_ACTIVE_LAYER_COUNT_MIN,
   );
   const sourceTensorRetentionFraction =
-    effectiveActiveLayerCount == null ? null : round(effectiveActiveLayerCount / LAYER_COUNT);
+    evidence?.sourceTensorRetentionFraction == null
+      ? null
+      : round(evidence.sourceTensorRetentionFraction);
   const sourceTensorRetentionMargin = safeRatio(
     sourceTensorRetentionFraction,
     SOURCE_TENSOR_RETENTION_FRACTION_MIN,
@@ -214,17 +285,25 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
       ? null
       : round(sourceTensorRetentionFraction * LAYER_COUNT);
   const fatigueRefs = [
+    evidence?.loadSpectrumRef,
     evidence?.cycleProtocolRef,
+    evidence?.cryogenicFatigueRef,
     evidence?.fatigueCurveRef,
     evidence?.thermalCycleRef,
     evidence?.creepDriftRef,
+    evidence?.delaminationProtocolRef,
+    evidence?.interlayerAdhesionRef,
   ];
   const layerScalingRefs = [
     evidence?.layerScalingMapRef,
+    evidence?.perLayerVariationMapRef,
     evidence?.nonadditivityModelRef,
     evidence?.activeAreaMapRef,
     evidence?.supportCouplingMapRef,
+    evidence?.electromagneticCouplingMapRef,
+    evidence?.mechanicalCouplingMapRef,
     evidence?.multiphysicsCouplingRef,
+    evidence?.sourceTensorRetentionMapRef,
   ];
   const missingFatigueProvenanceRefCount = fatigueRefs.filter((ref) => ref == null).length;
   const missingLayerScalingProvenanceRefCount = layerScalingRefs.filter((ref) => ref == null).length;
@@ -242,8 +321,14 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     ...(evidence?.requiredCycleCount == null
       ? ["required_cycle_count_missing_for_operating_budget"]
       : []),
+    ...(evidence?.loadSpectrumRef == null
+      ? ["fatigue_load_spectrum_ref_missing_for_operating_budget"]
+      : []),
     ...(evidence?.cycleProtocolRef == null
       ? ["fatigue_cycle_protocol_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence?.cryogenicFatigueRef == null
+      ? ["cryogenic_fatigue_ref_missing_for_operating_budget"]
       : []),
     ...(evidence?.fatigueCurveRef == null
       ? ["fatigue_curve_ref_missing_for_operating_budget"]
@@ -253,6 +338,12 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
       : []),
     ...(evidence?.creepDriftRef == null
       ? ["creep_drift_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence?.delaminationProtocolRef == null
+      ? ["delamination_protocol_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence?.interlayerAdhesionRef == null
+      ? ["interlayer_adhesion_ref_missing_for_operating_budget"]
       : []),
     ...(cycleMargin != null && cycleMargin < 1
       ? ["fatigue_cycle_margin_below_one_operating_budget"]
@@ -267,6 +358,16 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
       : creepDriftMargin < 1
         ? ["creep_drift_above_0p01_operating_budget"]
         : []),
+    ...(delaminationMargin == null
+      ? ["delamination_margin_missing_for_operating_budget"]
+      : delaminationMargin < 1
+        ? ["delamination_margin_below_one_operating_budget"]
+        : []),
+    ...(interlayerAdhesionMargin == null
+      ? ["interlayer_adhesion_margin_missing_for_operating_budget"]
+      : interlayerAdhesionMargin < 1
+        ? ["interlayer_adhesion_margin_below_one_operating_budget"]
+        : []),
     ...(evidence?.layerScalingEfficiency == null
       ? ["layer_scaling_efficiency_missing_for_operating_budget"]
       : scalingMargin != null && scalingMargin < 1
@@ -274,6 +375,14 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
         : []),
     ...(evidence?.layerScalingMapRef == null
       ? ["layer_scaling_map_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence?.perLayerVariationFraction == null
+      ? ["per_layer_variation_fraction_missing_for_operating_budget"]
+      : perLayerVariationMargin != null && perLayerVariationMargin < 1
+        ? ["per_layer_variation_above_0p05_operating_budget"]
+        : []),
+    ...(evidence?.perLayerVariationMapRef == null
+      ? ["per_layer_variation_map_ref_missing_for_operating_budget"]
       : []),
     ...(evidence?.nonadditivityFraction == null
       ? ["layer_nonadditivity_fraction_missing_for_operating_budget"]
@@ -305,8 +414,32 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     ...(evidence?.supportCouplingMapRef == null
       ? ["support_coupling_map_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.supportCouplingFraction == null
+      ? ["support_coupling_fraction_missing_for_operating_budget"]
+      : supportCouplingMargin != null && supportCouplingMargin < 1
+        ? ["support_coupling_fraction_above_0p1_operating_budget"]
+        : []),
+    ...(evidence?.electromagneticCouplingFraction == null
+      ? ["electromagnetic_coupling_fraction_missing_for_operating_budget"]
+      : electromagneticCouplingMargin != null && electromagneticCouplingMargin < 1
+        ? ["electromagnetic_coupling_fraction_above_0p1_operating_budget"]
+        : []),
+    ...(evidence?.electromagneticCouplingMapRef == null
+      ? ["electromagnetic_coupling_map_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence?.mechanicalCouplingFraction == null
+      ? ["mechanical_coupling_fraction_missing_for_operating_budget"]
+      : mechanicalCouplingMargin != null && mechanicalCouplingMargin < 1
+        ? ["mechanical_coupling_fraction_above_0p1_operating_budget"]
+        : []),
+    ...(evidence?.mechanicalCouplingMapRef == null
+      ? ["mechanical_coupling_map_ref_missing_for_operating_budget"]
+      : []),
     ...(evidence?.multiphysicsCouplingRef == null
       ? ["multiphysics_coupling_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence?.sourceTensorRetentionMapRef == null
+      ? ["source_tensor_retention_map_ref_missing_for_operating_budget"]
       : []),
   ];
   const falsifiesCurrentCandidate =
@@ -317,10 +450,16 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
             "fatigue_cycle_margin_below_one_operating_budget",
             "thermal_cycle_drift_above_0p01_operating_budget",
             "creep_drift_above_0p01_operating_budget",
+            "delamination_margin_below_one_operating_budget",
+            "interlayer_adhesion_margin_below_one_operating_budget",
             "layer_scaling_efficiency_below_0p9_operating_budget",
+            "per_layer_variation_above_0p05_operating_budget",
             "layer_nonadditivity_above_0p1_operating_budget",
             "active_area_retention_below_0p6_operating_budget",
             "effective_active_layer_count_below_operating_budget",
+            "support_coupling_fraction_above_0p1_operating_budget",
+            "electromagnetic_coupling_fraction_above_0p1_operating_budget",
+            "mechanical_coupling_fraction_above_0p1_operating_budget",
             "source_tensor_retention_below_0p9_operating_budget",
             "support_coupling_status_not_pass_for_operating_budget",
           ].includes(blocker),
@@ -339,53 +478,88 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
       layerCount: 447,
       cycleMarginMin: 1,
       layerScalingEfficiencyMin: LAYER_SCALING_EFFICIENCY_MIN,
+      perLayerVariationFractionMax: PER_LAYER_VARIATION_FRACTION_MAX,
       layerNonadditivityFractionMax: LAYER_NONADDITIVITY_FRACTION_MAX,
       activeAreaRetentionMin: ACTIVE_AREA_RETENTION_MIN,
+      supportCouplingFractionMax: SUPPORT_COUPLING_FRACTION_MAX,
+      electromagneticCouplingFractionMax: ELECTROMAGNETIC_COUPLING_FRACTION_MAX,
+      mechanicalCouplingFractionMax: MECHANICAL_COUPLING_FRACTION_MAX,
       sourceTensorRetentionFractionMin: SOURCE_TENSOR_RETENTION_FRACTION_MIN,
       thermalCycleDriftFractionMax: THERMAL_CYCLE_DRIFT_FRACTION_MAX,
       creepDriftFractionMax: CREEP_DRIFT_FRACTION_MAX,
+      delaminationMarginMin: DELAMINATION_MARGIN_MIN,
+      interlayerAdhesionMarginMin: INTERLAYER_ADHESION_MARGIN_MIN,
       supportCouplingStatusRequired: "pass",
       effectiveActiveLayerCountMin: round(EFFECTIVE_ACTIVE_LAYER_COUNT_MIN),
       effectiveSourceTensorLayerCountMin: round(EFFECTIVE_SOURCE_TENSOR_LAYER_COUNT_MIN),
     },
     suppliedFatigueLayerScalingEvidence: {
       evidenceTier: evidence?.evidenceTier ?? "missing",
+      loadSpectrumRef: stringOrNull(evidence?.loadSpectrumRef),
       cycleProtocolRef: stringOrNull(evidence?.cycleProtocolRef),
+      cryogenicFatigueRef: stringOrNull(evidence?.cryogenicFatigueRef),
       fatigueCurveRef: stringOrNull(evidence?.fatigueCurveRef),
       thermalCycleRef: stringOrNull(evidence?.thermalCycleRef),
       creepDriftRef: stringOrNull(evidence?.creepDriftRef),
+      delaminationProtocolRef: stringOrNull(evidence?.delaminationProtocolRef),
+      interlayerAdhesionRef: stringOrNull(evidence?.interlayerAdhesionRef),
       layerScalingMapRef: stringOrNull(evidence?.layerScalingMapRef),
+      perLayerVariationMapRef: stringOrNull(evidence?.perLayerVariationMapRef),
       nonadditivityModelRef: stringOrNull(evidence?.nonadditivityModelRef),
       activeAreaMapRef: stringOrNull(evidence?.activeAreaMapRef),
       supportCouplingMapRef: stringOrNull(evidence?.supportCouplingMapRef),
+      electromagneticCouplingMapRef: stringOrNull(evidence?.electromagneticCouplingMapRef),
+      mechanicalCouplingMapRef: stringOrNull(evidence?.mechanicalCouplingMapRef),
       multiphysicsCouplingRef: stringOrNull(evidence?.multiphysicsCouplingRef),
+      sourceTensorRetentionMapRef: stringOrNull(evidence?.sourceTensorRetentionMapRef),
       cycleCountToFailure: finiteOrNull(evidence?.cycleCountToFailure),
       requiredCycleCount: finiteOrNull(evidence?.requiredCycleCount),
       thermalCycleDriftFraction: finiteOrNull(evidence?.thermalCycleDriftFraction),
       creepDriftFraction: finiteOrNull(evidence?.creepDriftFraction),
+      delaminationMargin: finiteOrNull(evidence?.delaminationMargin),
+      interlayerAdhesionMargin: finiteOrNull(evidence?.interlayerAdhesionMargin),
       layerScalingEfficiency: finiteOrNull(evidence?.layerScalingEfficiency),
+      perLayerVariationFraction: finiteOrNull(evidence?.perLayerVariationFraction),
       nonadditivityFraction: finiteOrNull(evidence?.nonadditivityFraction),
       activeAreaRetention: finiteOrNull(evidence?.activeAreaRetention),
+      supportCouplingFraction: finiteOrNull(evidence?.supportCouplingFraction),
+      electromagneticCouplingFraction: finiteOrNull(evidence?.electromagneticCouplingFraction),
+      mechanicalCouplingFraction: finiteOrNull(evidence?.mechanicalCouplingFraction),
+      sourceTensorRetentionFraction: finiteOrNull(evidence?.sourceTensorRetentionFraction),
       supportCouplingStatus: evidence?.supportCouplingStatus ?? "missing",
     },
     derivedOperatingBudget: {
       fatigueProvenanceRefsAvailable:
-        evidence?.cycleProtocolRef != null &&
+        evidence?.loadSpectrumRef != null &&
+        evidence.cycleProtocolRef != null &&
+        evidence.cryogenicFatigueRef != null &&
         evidence.fatigueCurveRef != null &&
         evidence.thermalCycleRef != null &&
-        evidence.creepDriftRef != null,
+        evidence.creepDriftRef != null &&
+        evidence.delaminationProtocolRef != null &&
+        evidence.interlayerAdhesionRef != null,
       layerScalingProvenanceRefsAvailable:
         evidence?.layerScalingMapRef != null &&
+        evidence.perLayerVariationMapRef != null &&
         evidence.nonadditivityModelRef != null &&
         evidence.activeAreaMapRef != null &&
         evidence.supportCouplingMapRef != null &&
-        evidence.multiphysicsCouplingRef != null,
+        evidence.electromagneticCouplingMapRef != null &&
+        evidence.mechanicalCouplingMapRef != null &&
+        evidence.multiphysicsCouplingRef != null &&
+        evidence.sourceTensorRetentionMapRef != null,
       cycleMargin,
       thermalCycleDriftMargin,
       creepDriftMargin,
+      delaminationMargin,
+      interlayerAdhesionMargin,
       scalingMargin,
+      perLayerVariationMargin,
       nonadditivityMargin,
       activeAreaMargin,
+      supportCouplingMargin,
+      electromagneticCouplingMargin,
+      mechanicalCouplingMargin,
       effectiveActiveLayerCount,
       effectiveActiveLayerCountMargin,
       sourceTensorRetentionFraction,
@@ -408,10 +582,25 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
         evidence?.creepDriftFraction,
         CREEP_DRIFT_FRACTION_MAX,
       ),
+      delaminationMarginMin: DELAMINATION_MARGIN_MIN,
+      delaminationMarginShortfall: shortfallToMinimum(
+        evidence?.delaminationMargin,
+        DELAMINATION_MARGIN_MIN,
+      ),
+      interlayerAdhesionMarginMin: INTERLAYER_ADHESION_MARGIN_MIN,
+      interlayerAdhesionMarginShortfall: shortfallToMinimum(
+        evidence?.interlayerAdhesionMargin,
+        INTERLAYER_ADHESION_MARGIN_MIN,
+      ),
       layerScalingEfficiencyMin: LAYER_SCALING_EFFICIENCY_MIN,
       layerScalingEfficiencyShortfall: shortfallToMinimum(
         evidence?.layerScalingEfficiency,
         LAYER_SCALING_EFFICIENCY_MIN,
+      ),
+      perLayerVariationFractionMax: PER_LAYER_VARIATION_FRACTION_MAX,
+      perLayerVariationReduction: reductionToMaximum(
+        evidence?.perLayerVariationFraction,
+        PER_LAYER_VARIATION_FRACTION_MAX,
       ),
       layerNonadditivityFractionMax: LAYER_NONADDITIVITY_FRACTION_MAX,
       layerNonadditivityReduction: reductionToMaximum(
@@ -422,6 +611,21 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
       activeAreaRetentionShortfall: shortfallToMinimum(
         evidence?.activeAreaRetention,
         ACTIVE_AREA_RETENTION_MIN,
+      ),
+      supportCouplingFractionMax: SUPPORT_COUPLING_FRACTION_MAX,
+      supportCouplingFractionReduction: reductionToMaximum(
+        evidence?.supportCouplingFraction,
+        SUPPORT_COUPLING_FRACTION_MAX,
+      ),
+      electromagneticCouplingFractionMax: ELECTROMAGNETIC_COUPLING_FRACTION_MAX,
+      electromagneticCouplingFractionReduction: reductionToMaximum(
+        evidence?.electromagneticCouplingFraction,
+        ELECTROMAGNETIC_COUPLING_FRACTION_MAX,
+      ),
+      mechanicalCouplingFractionMax: MECHANICAL_COUPLING_FRACTION_MAX,
+      mechanicalCouplingFractionReduction: reductionToMaximum(
+        evidence?.mechanicalCouplingFraction,
+        MECHANICAL_COUPLING_FRACTION_MAX,
       ),
       effectiveActiveLayerCountMin: round(EFFECTIVE_ACTIVE_LAYER_COUNT_MIN),
       effectiveActiveLayerCountShortfall: shortfallToMinimum(
@@ -438,9 +642,9 @@ export const buildNhm2TileSourceFatigueLayerScalingOperatingBudget = (
         effectiveSourceTensorLayerCount,
         EFFECTIVE_SOURCE_TENSOR_LAYER_COUNT_MIN,
       ),
-      requiredFatigueProvenanceRefCount: 4,
+      requiredFatigueProvenanceRefCount: 8,
       missingFatigueProvenanceRefCount,
-      requiredLayerScalingProvenanceRefCount: 5,
+      requiredLayerScalingProvenanceRefCount: 9,
       missingLayerScalingProvenanceRefCount,
       supportCouplingStatusRequired: "pass",
       supportCouplingStatusSatisfied: evidence?.supportCouplingStatus === "pass",
@@ -495,11 +699,17 @@ export const isNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     targets.layerCount === 447 &&
     targets.cycleMarginMin === 1 &&
     targets.layerScalingEfficiencyMin === 0.9 &&
+    targets.perLayerVariationFractionMax === 0.05 &&
     targets.layerNonadditivityFractionMax === 0.1 &&
     targets.activeAreaRetentionMin === 0.6 &&
+    targets.supportCouplingFractionMax === 0.1 &&
+    targets.electromagneticCouplingFractionMax === 0.1 &&
+    targets.mechanicalCouplingFractionMax === 0.1 &&
     targets.sourceTensorRetentionFractionMin === 0.9 &&
     targets.thermalCycleDriftFractionMax === 0.01 &&
     targets.creepDriftFractionMax === 0.01 &&
+    targets.delaminationMarginMin === 1 &&
+    targets.interlayerAdhesionMarginMin === 1 &&
     targets.supportCouplingStatusRequired === "pass" &&
     typeof targets.effectiveActiveLayerCountMin === "number" &&
     typeof targets.effectiveSourceTensorLayerCountMin === "number" &&
@@ -514,21 +724,33 @@ export const isNhm2TileSourceFatigueLayerScalingOperatingBudget = (
     isNumberOrNull(requiredCorrections.thermalCycleDriftReduction) &&
     requiredCorrections.creepDriftFractionMax === 0.01 &&
     isNumberOrNull(requiredCorrections.creepDriftReduction) &&
+    requiredCorrections.delaminationMarginMin === 1 &&
+    isNumberOrNull(requiredCorrections.delaminationMarginShortfall) &&
+    requiredCorrections.interlayerAdhesionMarginMin === 1 &&
+    isNumberOrNull(requiredCorrections.interlayerAdhesionMarginShortfall) &&
     requiredCorrections.layerScalingEfficiencyMin === 0.9 &&
     isNumberOrNull(requiredCorrections.layerScalingEfficiencyShortfall) &&
+    requiredCorrections.perLayerVariationFractionMax === 0.05 &&
+    isNumberOrNull(requiredCorrections.perLayerVariationReduction) &&
     requiredCorrections.layerNonadditivityFractionMax === 0.1 &&
     isNumberOrNull(requiredCorrections.layerNonadditivityReduction) &&
     requiredCorrections.activeAreaRetentionMin === 0.6 &&
     isNumberOrNull(requiredCorrections.activeAreaRetentionShortfall) &&
+    requiredCorrections.supportCouplingFractionMax === 0.1 &&
+    isNumberOrNull(requiredCorrections.supportCouplingFractionReduction) &&
+    requiredCorrections.electromagneticCouplingFractionMax === 0.1 &&
+    isNumberOrNull(requiredCorrections.electromagneticCouplingFractionReduction) &&
+    requiredCorrections.mechanicalCouplingFractionMax === 0.1 &&
+    isNumberOrNull(requiredCorrections.mechanicalCouplingFractionReduction) &&
     typeof requiredCorrections.effectiveActiveLayerCountMin === "number" &&
     isNumberOrNull(requiredCorrections.effectiveActiveLayerCountShortfall) &&
     requiredCorrections.sourceTensorRetentionFractionMin === 0.9 &&
     isNumberOrNull(requiredCorrections.sourceTensorRetentionFractionShortfall) &&
     typeof requiredCorrections.effectiveSourceTensorLayerCountMin === "number" &&
     isNumberOrNull(requiredCorrections.effectiveSourceTensorLayerCountShortfall) &&
-    requiredCorrections.requiredFatigueProvenanceRefCount === 4 &&
+    requiredCorrections.requiredFatigueProvenanceRefCount === 8 &&
     typeof requiredCorrections.missingFatigueProvenanceRefCount === "number" &&
-    requiredCorrections.requiredLayerScalingProvenanceRefCount === 5 &&
+    requiredCorrections.requiredLayerScalingProvenanceRefCount === 9 &&
     typeof requiredCorrections.missingLayerScalingProvenanceRefCount === "number" &&
     requiredCorrections.supportCouplingStatusRequired === "pass" &&
     typeof requiredCorrections.supportCouplingStatusSatisfied === "boolean" &&

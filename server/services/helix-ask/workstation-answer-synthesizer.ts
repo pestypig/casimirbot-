@@ -420,6 +420,12 @@ function synthesizeTheoryContextReflectionAnswer(input: SynthesizeWorkstationAns
     input.postToolSynthesisPlan?.answerIntent === "mixed" ||
     input.postToolSynthesisPlan?.answerIntent === "concept_explanation" ||
     input.postToolSynthesisPlan?.secondaryIntents.includes("concept_explanation") === true;
+  const asksForMainComponents =
+    /\b(?:main|major|core|key)\s+(?:components?|parts?|pieces?|elements?)\b/i.test(input.prompt) ||
+    /\bwhat\s+are\s+(?:its|the)\s+(?:components?|parts?|pieces?|elements?)\b/i.test(input.prompt);
+  const mentionsNeedleHull =
+    /\b(?:Needle\s+Hull\s+Mark\s*2|NHM2)\b/i.test(input.prompt) ||
+    /\b(?:Needle\s+Hull\s+Mark\s*2|NHM2)\b/i.test(cleanSummary);
   if (evaluationResult === "insufficient") {
     return [
       "The theory reflection receipt was not accepted as final-answer evidence.",
@@ -434,6 +440,19 @@ function synthesizeTheoryContextReflectionAnswer(input: SynthesizeWorkstationAns
       "In the Theory Badge Graph, this belongs near the quantum/constants/radiation roots, then branches into photon-energy rows, spectrum rows such as solar lines, and cavity-mode photon-energy cuts. The related wavelength form is E = hc/lambda when frequency is expressed as c/lambda.",
       `The graph reflection observed: ${cleanSummary || "this prompt overlaps mapped photon-energy and radiation badges."}`,
       "That graph placement is context evidence, not a solve. Numeric photon energies still need calculator receipts, and runtime or claim-bearing rows still need their own receipts.",
+    ].join("\n");
+  }
+  if (asksForMainComponents && mentionsNeedleHull) {
+    return [
+      "The Theory Badge Graph reflection supports reading Needle Hull Mark 2 as a multi-part solve frame, not as one finished proof.",
+      "Main components:",
+      "- Hull geometry and boundary setup: the shape, scale, and coordinate assumptions that define what is being solved.",
+      "- Casimir cavity coupling: the negative-energy/source-side model that has to be connected to the hull instead of asserted globally.",
+      "- Stability and closure checks: the constraints that decide whether a candidate source/geometry pairing remains diagnostic or becomes a stronger solve claim.",
+      "- Runtime or calculator-backed scalar cuts: numerical subchecks that need receipts before they can support an answer.",
+      "- Terminal solver policy: the authority layer that decides which observations are enough for a final claim and which remain only evidence.",
+      `Reflection support: ${cleanSummary || "the theory graph located the claim near hull geometry, Casimir coupling, stability, and solver-policy badges."}`,
+      "Boundary: this is a graph-grounded explanation of the components. Any stronger physical or numeric conclusion still needs the relevant calculator, tensor, or runtime receipts.",
     ].join("\n");
   }
   if (hasExplanationPlan) {

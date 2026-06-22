@@ -240,11 +240,46 @@ describe("Helix Ask workstation answer synthesizer", () => {
       },
     });
 
-    expect(answer).toContain("I located this discussion in the Theory Badge Graph, then built a first-principles explanation route");
-    expect(answer).toContain("The graph route suggests:");
-    expect(answer).toContain("Read that route as evidence, not as a solve");
+    expect(answer).toContain("E = hf means a photon's energy is proportional to its frequency.");
+    expect(answer).toContain("Here, E is the photon energy, h is Planck's constant, and f is the light frequency.");
+    expect(answer).toContain("The graph reflection observed: The discussion appears near quantum energy and Solar Spectrum.");
+    expect(answer).toContain("That graph placement is context evidence, not a solve.");
     expect(answer).not.toBe(receipt.reflectionV1.evidenceForAsk.summary);
-    expect(answer).toMatch(/context locator|evidence|not as a solve/i);
+    expect(answer).toMatch(/evidence|not a solve/i);
+  });
+
+  it("answers main-components theory prompts as synthesis instead of raw graph placement", () => {
+    const prompt =
+      "Tell me about the Needle Hull Mark 2 full solve in the badge graph. What are its main components?";
+    const plan = planWorkstationToolUse(prompt).tool_plan;
+
+    expect(plan).toBeTruthy();
+    const answer = synthesizeWorkstationToolAnswer({
+      prompt,
+      plan: plan!,
+      evaluation: {
+        schema: "helix.workstation_tool_evaluation.v1",
+        evaluation_id: "eval:nhm2-components",
+        thread_id: "thread:test",
+        tool_receipt_id: "receipt:nhm2-components",
+        result: "supports_subgoal",
+        summary:
+          "Theory reflection located discussion context as evidence only: The discussion appears near hull geometry, Casimir cavity coupling, stability checks, and terminal solver policy.",
+        evidence_refs: ["workstation:theory-badge-graph.reflect_discussion_context"],
+        model_invoked: false,
+        deterministic_gate: true,
+        created_at: new Date().toISOString(),
+      },
+    });
+
+    expect(answer).toContain("Theory Badge Graph");
+    expect(answer).toContain("hull geometry");
+    expect(answer).toContain("Casimir cavity coupling");
+    expect(answer).toContain("stability checks");
+    expect(answer).toContain("terminal solver policy");
+    expect(answer).toContain("Reflection support:");
+    expect(answer).toContain("Any stronger physical or numeric conclusion still needs");
+    expect(answer).not.toBe("The discussion appears near hull geometry, Casimir cavity coupling, stability checks, and terminal solver policy.");
   });
 
   it("keeps calculator numeric authority separate from theory reflection context", () => {

@@ -41,9 +41,15 @@ export type Nhm2TileSourceForceGapLoadBudgetV1 = {
   suppliedForceGapEvidence: {
     evidenceTier: string;
     evidenceRef: string | null;
+    gapMetrologyRef: string | null;
     forceGapCurveRef: string | null;
     forceGradientCurveRef: string | null;
     stiffnessModelRef: string | null;
+    pullInSweepRef: string | null;
+    stictionProtocolRef: string | null;
+    activeControlAuthorityRef: string | null;
+    curveMinGapMeters: number | null;
+    curveMaxGapMeters: number | null;
     casimirForceN: number | null;
     forceGradientNPerM: number | null;
     effectiveSpringConstantNPerM: number | null;
@@ -52,6 +58,7 @@ export type Nhm2TileSourceForceGapLoadBudgetV1 = {
   };
   margins: {
     curveModelRefsAvailable: boolean;
+    curveBracketsOperatingGap: boolean;
     suppliedForceToIdealStackForce: number | null;
     suppliedGradientToIdealGradient: number | null;
     suppliedGradientConsistencyWithForceCurve: number | null;
@@ -154,9 +161,18 @@ export const buildNhm2TileSourceForceGapLoadBudget = (
   const suppliedStictionMargin = forceGapEvidence?.stictionMargin ?? null;
   const suppliedAuthority = forceGapEvidence?.activeGapControlAuthorityN ?? null;
   const curveModelRefsAvailable =
+    forceGapEvidence?.gapMetrologyRef != null &&
     forceGapEvidence?.forceGapCurveRef != null &&
     forceGapEvidence.forceGradientCurveRef != null &&
-    forceGapEvidence.stiffnessModelRef != null;
+    forceGapEvidence.stiffnessModelRef != null &&
+    forceGapEvidence.pullInSweepRef != null &&
+    forceGapEvidence.stictionProtocolRef != null &&
+    forceGapEvidence.activeControlAuthorityRef != null;
+  const curveBracketsOperatingGap =
+    forceGapEvidence?.curveMinGapMeters != null &&
+    forceGapEvidence.curveMaxGapMeters != null &&
+    forceGapEvidence.curveMinGapMeters <= gapMeters &&
+    forceGapEvidence.curveMaxGapMeters >= gapMeters;
   const pullInMarginToIdealGradient = safeRatio(suppliedSpring, idealGradient);
   const expectedGradientFromSuppliedForce =
     suppliedForce == null ? null : round((4 * Math.abs(suppliedForce)) / gapMeters);
@@ -178,6 +194,9 @@ export const buildNhm2TileSourceForceGapLoadBudget = (
     forceGapEvidence?.evidenceTier !== "validated_simulation"
       ? ["force_gap_load_budget_tier_not_measured_or_validated"]
       : []),
+    ...(forceGapEvidence?.gapMetrologyRef == null
+      ? ["force_gap_metrology_ref_missing_for_load_budget"]
+      : []),
     ...(forceGapEvidence?.forceGapCurveRef == null
       ? ["force_gap_curve_ref_missing_for_load_budget"]
       : []),
@@ -186,6 +205,18 @@ export const buildNhm2TileSourceForceGapLoadBudget = (
       : []),
     ...(forceGapEvidence?.stiffnessModelRef == null
       ? ["force_gap_stiffness_model_ref_missing_for_load_budget"]
+      : []),
+    ...(forceGapEvidence?.pullInSweepRef == null
+      ? ["force_gap_pull_in_sweep_ref_missing_for_load_budget"]
+      : []),
+    ...(forceGapEvidence?.stictionProtocolRef == null
+      ? ["force_gap_stiction_protocol_ref_missing_for_load_budget"]
+      : []),
+    ...(forceGapEvidence?.activeControlAuthorityRef == null
+      ? ["force_gap_active_control_authority_ref_missing_for_load_budget"]
+      : []),
+    ...(!curveBracketsOperatingGap
+      ? ["force_gap_curve_does_not_bracket_8nm_for_load_budget"]
       : []),
     ...(suppliedForce == null ? ["force_gap_casimir_force_missing_for_447_layer_budget"] : []),
     ...(suppliedGradient == null ? ["force_gap_gradient_missing_for_447_layer_budget"] : []),
@@ -253,9 +284,15 @@ export const buildNhm2TileSourceForceGapLoadBudget = (
     suppliedForceGapEvidence: {
       evidenceTier: forceGapEvidence?.evidenceTier ?? "missing",
       evidenceRef: forceGapEvidence?.evidenceRef ?? null,
+      gapMetrologyRef: forceGapEvidence?.gapMetrologyRef ?? null,
       forceGapCurveRef: forceGapEvidence?.forceGapCurveRef ?? null,
       forceGradientCurveRef: forceGapEvidence?.forceGradientCurveRef ?? null,
       stiffnessModelRef: forceGapEvidence?.stiffnessModelRef ?? null,
+      pullInSweepRef: forceGapEvidence?.pullInSweepRef ?? null,
+      stictionProtocolRef: forceGapEvidence?.stictionProtocolRef ?? null,
+      activeControlAuthorityRef: forceGapEvidence?.activeControlAuthorityRef ?? null,
+      curveMinGapMeters: finiteOrNull(forceGapEvidence?.curveMinGapMeters),
+      curveMaxGapMeters: finiteOrNull(forceGapEvidence?.curveMaxGapMeters),
       casimirForceN: finiteOrNull(suppliedForce),
       forceGradientNPerM: finiteOrNull(suppliedGradient),
       effectiveSpringConstantNPerM: finiteOrNull(suppliedSpring),
@@ -264,6 +301,7 @@ export const buildNhm2TileSourceForceGapLoadBudget = (
     },
     margins: {
       curveModelRefsAvailable,
+      curveBracketsOperatingGap,
       suppliedForceToIdealStackForce: safeRatio(
         suppliedForce == null ? null : Math.abs(suppliedForce),
         idealStackForceN == null ? null : Math.abs(idealStackForceN),
@@ -351,12 +389,20 @@ export const isNhm2TileSourceForceGapLoadBudget = (
     idealLoadBudget.activeControlAuthorityFactorMin === 1.2 &&
     supplied != null &&
     typeof supplied.evidenceTier === "string" &&
+    (supplied.gapMetrologyRef === null || typeof supplied.gapMetrologyRef === "string") &&
     (supplied.forceGapCurveRef === null || typeof supplied.forceGapCurveRef === "string") &&
     (supplied.forceGradientCurveRef === null ||
       typeof supplied.forceGradientCurveRef === "string") &&
     (supplied.stiffnessModelRef === null || typeof supplied.stiffnessModelRef === "string") &&
+    (supplied.pullInSweepRef === null || typeof supplied.pullInSweepRef === "string") &&
+    (supplied.stictionProtocolRef === null || typeof supplied.stictionProtocolRef === "string") &&
+    (supplied.activeControlAuthorityRef === null ||
+      typeof supplied.activeControlAuthorityRef === "string") &&
+    (supplied.curveMinGapMeters === null || typeof supplied.curveMinGapMeters === "number") &&
+    (supplied.curveMaxGapMeters === null || typeof supplied.curveMaxGapMeters === "number") &&
     margins != null &&
     typeof margins.curveModelRefsAvailable === "boolean" &&
+    typeof margins.curveBracketsOperatingGap === "boolean" &&
     requiredCorrections != null &&
     requiredCorrections.pullInMarginDefinition ===
       "effectiveSpringConstantNPerM / idealForceGradientNPerM" &&

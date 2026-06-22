@@ -38,6 +38,10 @@ export type Nhm2TileSourceRoughnessPatchTestPlanV1 = {
   roughnessPatchTarget: {
     operatingGapMeters: 8e-9;
     roughnessRmsMaxMeters: 1e-10;
+    roughnessMapLateralResolutionMaxMeters: 5e-10;
+    roughnessScanAreaFractionMin: 0.95;
+    asperityP99MaxMeters: 2e-9;
+    asperityP999MaxMeters: 3e-9;
     asperityMaxMeters: 4e-9;
     patchVoltageRmsMaxVolts: 0.01;
     residualElectrostaticForceFractionMax: 0.05;
@@ -90,37 +94,59 @@ const TEST_POLICY: Record<
     blockers: [
       "roughness_asperity_tail_and_patch_potential_map_missing",
       "roughness_patch_tier_not_measured_or_validated",
+      "roughness_gap_metrology_ref_missing",
+      "roughness_surface_pairing_ref_missing",
       "roughness_map_ref_missing",
       "asperity_tail_distribution_ref_missing",
+      "asperity_tail_fit_ref_missing",
       "patch_voltage_map_ref_missing",
+      "patch_voltage_calibration_ref_missing",
+      "residual_electrostatic_model_ref_missing",
     ],
     requiredMeasurement:
-      "Measured or validated-simulation roughness, asperity-tail, patch-voltage, and residual electrostatic map with provenance.",
+      "Measured or validated-simulation paired-surface 8 nm gap metrology, roughness, asperity-tail, patch-voltage, and residual electrostatic maps with provenance.",
     acceptanceCriterion: "Evidence tier is measured or validated_simulation, not declared_model or missing.",
     artifactToProduce: "receipt://roughness_patch_metrology/provenance_v1",
   },
   roughness_rms: {
-    blockers: ["roughness_rms_above_0p1nm_or_missing"],
-    requiredMeasurement: "RMS roughness metrology for the 8 nm operating-gap surfaces.",
-    acceptanceCriterion: "RMS roughness is supplied and no greater than 0.1 nm.",
+    blockers: [
+      "roughness_map_lateral_resolution_missing",
+      "roughness_map_lateral_resolution_above_0p5nm",
+      "roughness_scan_area_fraction_missing",
+      "roughness_scan_area_fraction_below_0p95",
+      "roughness_rms_above_0p1nm_or_missing",
+    ],
+    requiredMeasurement:
+      "Registered RMS roughness metrology for the paired 8 nm operating-gap surfaces.",
+    acceptanceCriterion:
+      "Map lateral resolution is at most 0.5 nm, scan coverage is at least 95%, and RMS roughness is supplied and no greater than 0.1 nm.",
     artifactToProduce: "receipt://roughness_patch_metrology/roughness_rms_v1",
   },
   asperity_p99: {
-    blockers: ["asperity_p99_missing"],
+    blockers: ["asperity_p99_missing", "asperity_p99_above_2nm"],
     requiredMeasurement: "Asperity p99 map for the 8 nm operating-gap surfaces.",
-    acceptanceCriterion: "Asperity p99 is supplied with surface-map provenance.",
+    acceptanceCriterion: "Asperity p99 is supplied with surface-map provenance and is no greater than 2 nm.",
     artifactToProduce: "receipt://roughness_patch_metrology/asperity_p99_v1",
   },
   asperity_tail: {
-    blockers: ["asperity_tail_margin_missing", "asperity_tail_exceeds_half_gap"],
+    blockers: [
+      "asperity_p999_missing",
+      "asperity_p999_above_3nm",
+      "asperity_tail_margin_missing",
+      "asperity_tail_exceeds_half_gap",
+    ],
     requiredMeasurement: "Maximum asperity-tail map for the 8 nm operating-gap surfaces.",
-    acceptanceCriterion: "Maximum asperity remains below half the 8 nm gap.",
+    acceptanceCriterion: "Asperity p999 is no greater than 3 nm and maximum asperity remains below half the 8 nm gap.",
     artifactToProduce: "receipt://roughness_patch_metrology/asperity_tail_v1",
   },
   patch_voltage_rms: {
-    blockers: ["patch_voltage_rms_above_10mv_or_missing"],
+    blockers: [
+      "patch_voltage_correlation_length_missing",
+      "patch_voltage_rms_above_10mv_or_missing",
+    ],
     requiredMeasurement: "Patch-voltage RMS map for the selected material stack.",
-    acceptanceCriterion: "Patch voltage RMS is supplied and no greater than 10 mV.",
+    acceptanceCriterion:
+      "Patch voltage RMS is supplied and no greater than 10 mV with a correlation-length receipt.",
     artifactToProduce: "receipt://roughness_patch_metrology/patch_voltage_rms_v1",
   },
   residual_electrostatic_force: {
@@ -191,6 +217,10 @@ export const buildNhm2TileSourceRoughnessPatchTestPlan = (
     roughnessPatchTarget: {
       operatingGapMeters: 8e-9,
       roughnessRmsMaxMeters: 1e-10,
+      roughnessMapLateralResolutionMaxMeters: 5e-10,
+      roughnessScanAreaFractionMin: 0.95,
+      asperityP99MaxMeters: 2e-9,
+      asperityP999MaxMeters: 3e-9,
       asperityMaxMeters: 4e-9,
       patchVoltageRmsMaxVolts: 0.01,
       residualElectrostaticForceFractionMax: 0.05,
@@ -244,6 +274,10 @@ export const isNhm2TileSourceRoughnessPatchTestPlan = (
     target != null &&
     target.operatingGapMeters === 8e-9 &&
     target.roughnessRmsMaxMeters === 1e-10 &&
+    target.roughnessMapLateralResolutionMaxMeters === 5e-10 &&
+    target.roughnessScanAreaFractionMin === 0.95 &&
+    target.asperityP99MaxMeters === 2e-9 &&
+    target.asperityP999MaxMeters === 3e-9 &&
     target.asperityMaxMeters === 4e-9 &&
     target.patchVoltageRmsMaxVolts === 0.01 &&
     target.residualElectrostaticForceFractionMax === 0.05 &&

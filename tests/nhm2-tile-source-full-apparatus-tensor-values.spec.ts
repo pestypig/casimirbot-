@@ -55,7 +55,7 @@ const termContributions = (scale: number): Nhm2FullApparatusTensorValueRegionV1[
   Object.fromEntries(
     NHM2_FULL_APPARATUS_REQUIRED_TERM_IDS.map((termId, index) => [
       termId,
-      tensor(scale * (index + 1) * 0.001),
+      tensor(scale * (index === 0 ? 0.2 : 0.1)),
     ]),
   );
 
@@ -125,6 +125,9 @@ describe("NHM2 tile-source full-apparatus tensor values", () => {
     expect(built.summary.allRequiredRegionsPresent).toBe(true);
     expect(built.summary.allRequiredRegionsFullTensor).toBe(true);
     expect(built.summary.allRequiredRegionsTermComplete).toBe(true);
+    expect(built.summary.termBalanceMaxRelativeResidual).toBeLessThanOrEqual(
+      built.summary.termBalanceToleranceRelative,
+    );
     expect(built.claimBoundary.valueArtifactDoesNotValidateMaterialMechanism).toBe(true);
     expect(built.claimBoundary.physicalViabilityClaimAllowed).toBe(false);
   });
@@ -177,6 +180,82 @@ describe("NHM2 tile-source full-apparatus tensor values", () => {
     expect(built.summary.anyMetricEchoComponent).toBe(true);
     expect(built.summary.anyScalarProxyComponent).toBe(true);
     expect(built.summary.firstBlocker).toBe("wall:T00:metric_echo_forbidden");
+  });
+
+  it("blocks aggregate tensor values that do not balance against apparatus term sums", () => {
+    const built = artifact({
+      regions: [
+        region("global", 1.0e9),
+        region("hull", 1.1e9),
+        region("wall", 1.6995e9, {
+          termContributions: termContributions(1.0e9),
+        }),
+        region("exterior_shell", 9.5e8),
+      ],
+    });
+    const evidence = buildFullApparatusTensorEvidenceFromTensorValues({
+      artifact: built,
+      evidenceTier: "validated_simulation",
+    });
+
+    expect(built.summary.valueArtifactReadyForReceipt).toBe(false);
+    expect(built.summary.allRequiredRegionsFullTensor).toBe(true);
+    expect(built.summary.allRequiredRegionsTermComplete).toBe(true);
+    expect(built.summary.termBalanceMaxRelativeResidual).toBeGreaterThan(
+      built.summary.termBalanceToleranceRelative,
+    );
+    expect(built.summary.firstBlocker).toBe(
+      "wall:T00:term_sum_balance_residual_exceeds_tolerance",
+    );
+    expect(evidence.components.T00).toBe(false);
+    expect(evidence.termCoverage.casimirInteractionStressEnergy).toBe(false);
+    expect(evidence.componentDetailRefs?.T00).toBeNull();
+  });
+
+  it("blocks apparatus terms that do not provide full tensor component coverage", () => {
+    const incompleteControlTerm = tensor(1.6995e9 * 0.003);
+    delete incompleteControlTerm.T12;
+    const built = artifact({
+      regions: [
+        region("global", 1.0e9),
+        region("hull", 1.1e9),
+        region("wall", 1.6995e9, {
+          termContributions: {
+            ...termContributions(1.6995e9),
+            activeControlFieldEnergy: incompleteControlTerm,
+          },
+        }),
+        region("exterior_shell", 9.5e8),
+      ],
+    });
+    const evidence = buildFullApparatusTensorEvidenceFromTensorValues({
+      artifact: built,
+      evidenceTier: "validated_simulation",
+    });
+    const budget = buildNhm2TileSourceFullApparatusTensorOperatingBudget({
+      generatedAt,
+      fullApparatusTensorEvidence: evidence,
+    });
+
+    expect(built.summary.valueArtifactReadyForReceipt).toBe(false);
+    expect(built.summary.allRequiredRegionsFullTensor).toBe(true);
+    expect(built.summary.allRequiredRegionsTermComplete).toBe(false);
+    expect(built.summary.missingTermRefs).toEqual([]);
+    expect(built.summary.missingTermComponentRefs).toContain(
+      "wall:activeControlFieldEnergy:T12",
+    );
+    expect(built.summary.firstBlocker).toBe(
+      "wall:activeControlFieldEnergy:T12:term_component_value_missing",
+    );
+    expect(evidence.termCoverage.activeControlFieldEnergy).toBe(false);
+    expect(evidence.termRefs?.activeControlFieldEnergy).toBeNull();
+    expect(budget.summary.fullApparatusTensorEvidenceReady).toBe(false);
+    expect(budget.blockers).toContain(
+      "full_apparatus_active_control_field_energy_missing_for_operating_budget",
+    );
+    expect(budget.requiredCorrections.missingStressEnergyTermIds).toContain(
+      "activeControlFieldEnergy",
+    );
   });
 
   it("feeds a ready tensor-values artifact into receipt and operating-budget gates", () => {

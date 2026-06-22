@@ -112,6 +112,10 @@ export type Nhm2TileSourceFullApparatusTensorValuesV1 = {
     missingRegionIds: Nhm2RegionalSourceClosureRegionId[];
     missingComponentRefs: string[];
     missingTermRefs: string[];
+    missingTermComponentRefs: string[];
+    termBalanceMaxAbsResidualSI: number | null;
+    termBalanceMaxRelativeResidual: number | null;
+    termBalanceToleranceRelative: number;
     valueArtifactReadyForReceipt: boolean;
     firstBlocker: string;
   };
@@ -158,6 +162,23 @@ const finiteTensorValue = (
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 };
 
+const TERM_BALANCE_RELATIVE_TOLERANCE = 1e-9;
+
+const termComponentSum = (
+  region: Nhm2FullApparatusTensorValueRegionV1,
+  componentId: Nhm2TensorComponent,
+): number | null => {
+  let sum = 0;
+  for (const termId of NHM2_FULL_APPARATUS_REQUIRED_TERM_IDS) {
+    const contribution = region.termContributions[termId];
+    if (contribution == null) return null;
+    const value = finiteTensorValue(contribution, componentId);
+    if (value == null) return null;
+    sum += value;
+  }
+  return sum;
+};
+
 const missingComponents = (region: Nhm2FullApparatusTensorValueRegionV1): string[] =>
   NHM2_FULL_APPARATUS_SYMMETRIC_TENSOR_COMPONENTS.filter((componentId) => {
     const status = region.componentStatus[componentId];
@@ -177,6 +198,49 @@ const missingTerms = (region: Nhm2FullApparatusTensorValueRegionV1): string[] =>
       (componentId) => finiteTensorValue(contribution, componentId) == null,
     );
   }).map((termId) => `${region.regionId}:${termId}`);
+
+const missingTermComponents = (region: Nhm2FullApparatusTensorValueRegionV1): string[] =>
+  NHM2_FULL_APPARATUS_REQUIRED_TERM_IDS.flatMap((termId) => {
+    const contribution = region.termContributions[termId];
+    if (contribution == null) {
+      return NHM2_FULL_APPARATUS_SYMMETRIC_TENSOR_COMPONENTS.map(
+        (componentId) => `${region.regionId}:${termId}:${componentId}`,
+      );
+    }
+    return NHM2_FULL_APPARATUS_SYMMETRIC_TENSOR_COMPONENTS.filter(
+      (componentId) => finiteTensorValue(contribution, componentId) == null,
+    ).map((componentId) => `${region.regionId}:${termId}:${componentId}`);
+  });
+
+const termBalanceResiduals = (
+  region: Nhm2FullApparatusTensorValueRegionV1,
+): Array<{
+  componentId: Nhm2TensorComponent;
+  absResidual: number;
+  relativeResidual: number;
+}> =>
+  NHM2_FULL_APPARATUS_SYMMETRIC_TENSOR_COMPONENTS.flatMap((componentId) => {
+    const total = finiteTensorValue(region.tensor, componentId);
+    const termSum = termComponentSum(region, componentId);
+    if (total == null || termSum == null) return [];
+    const absResidual = Math.abs(total - termSum);
+    const denominator = Math.max(Math.abs(total), Math.abs(termSum), 1);
+    return [
+      {
+        componentId,
+        absResidual,
+        relativeResidual: absResidual / denominator,
+      },
+    ];
+  });
+
+const termBalanceBlockers = (region: Nhm2FullApparatusTensorValueRegionV1): string[] =>
+  termBalanceResiduals(region)
+    .filter((entry) => entry.relativeResidual > TERM_BALANCE_RELATIVE_TOLERANCE)
+    .map(
+      (entry) =>
+        `${region.regionId}:${entry.componentId}:term_sum_balance_residual_exceeds_tolerance`,
+    );
 
 const regionBlockers = (region: Nhm2FullApparatusTensorValueRegionV1): string[] => {
   const missing = missingComponents(region);
@@ -201,6 +265,10 @@ const regionBlockers = (region: Nhm2FullApparatusTensorValueRegionV1): string[] 
     ...(region.sampleCount == null ? [`${region.regionId}:sample_count_missing`] : []),
     ...missing.map((componentRef) => `${componentRef}:component_value_missing`),
     ...terms.map((termRef) => `${termRef}:term_contribution_missing`),
+    ...missingTermComponents(region).map(
+      (termComponentRef) => `${termComponentRef}:term_component_value_missing`,
+    ),
+    ...termBalanceBlockers(region),
     ...metricEcho.map((componentId) => `${region.regionId}:${componentId}:metric_echo_forbidden`),
     ...scalarProxy.map((componentId) => `${region.regionId}:${componentId}:scalar_proxy_forbidden`),
   ];
@@ -216,9 +284,20 @@ export const buildNhm2TileSourceFullApparatusTensorValues = (
   const regionBlockerRows = input.regions.flatMap(regionBlockers);
   const missingComponentRefs = input.regions.flatMap(missingComponents);
   const missingTermRefs = input.regions.flatMap(missingTerms);
+  const missingTermComponentRefs = input.regions.flatMap(missingTermComponents);
+  const balanceResiduals = input.regions.flatMap(termBalanceResiduals);
+  const termBalanceMaxAbsResidualSI =
+    balanceResiduals.length === 0
+      ? null
+      : Math.max(...balanceResiduals.map((entry) => entry.absResidual));
+  const termBalanceMaxRelativeResidual =
+    balanceResiduals.length === 0
+      ? null
+      : Math.max(...balanceResiduals.map((entry) => entry.relativeResidual));
   const allRequiredRegionsPresent = missingRegionIds.length === 0;
   const allRequiredRegionsFullTensor = missingComponentRefs.length === 0;
-  const allRequiredRegionsTermComplete = missingTermRefs.length === 0;
+  const allRequiredRegionsTermComplete =
+    missingTermRefs.length === 0 && missingTermComponentRefs.length === 0;
   const allRequiredRegionsSameBasis = input.regions.every(
     (region) =>
       region.chartRef === "comoving_cartesian" &&
@@ -267,6 +346,10 @@ export const buildNhm2TileSourceFullApparatusTensorValues = (
       missingRegionIds,
       missingComponentRefs,
       missingTermRefs,
+      missingTermComponentRefs,
+      termBalanceMaxAbsResidualSI,
+      termBalanceMaxRelativeResidual,
+      termBalanceToleranceRelative: TERM_BALANCE_RELATIVE_TOLERANCE,
       valueArtifactReadyForReceipt: topLevelBlockers.length === 0,
       firstBlocker: topLevelBlockers[0] ?? "none",
     },
@@ -291,6 +374,7 @@ export const buildFullApparatusTensorEvidenceFromTensorValues = (args: {
 }): Nhm2TileSourceFullApparatusTensorEvidenceV1 => {
   const artifact = args.artifact;
   const componentAvailable = (componentIds: readonly Nhm2TensorComponent[]): boolean =>
+    artifact.summary.valueArtifactReadyForReceipt &&
     artifact.regions.every((region) =>
       componentIds.every(
         (componentId) =>
@@ -302,7 +386,16 @@ export const buildFullApparatusTensorEvidenceFromTensorValues = (args: {
       ),
     );
   const termAvailable = (termId: Nhm2FullApparatusTensorTermId): boolean =>
-    artifact.regions.every((region) => region.termContributions[termId] != null);
+    artifact.summary.valueArtifactReadyForReceipt &&
+    artifact.regions.every((region) => {
+      const contribution = region.termContributions[termId];
+      return (
+        contribution != null &&
+        NHM2_FULL_APPARATUS_SYMMETRIC_TENSOR_COMPONENTS.every(
+          (componentId) => finiteTensorValue(contribution, componentId) != null,
+        )
+      );
+    });
   const regionAvailable = (regionId: Nhm2RegionalSourceClosureRegionId): boolean =>
     artifact.regions.some((region) => region.regionId === regionId && region.status !== "missing");
   return {
@@ -504,6 +597,16 @@ export const isNhm2TileSourceFullApparatusTensorValues = (
     summary.missingComponentRefs.every((entry) => typeof entry === "string") &&
     Array.isArray(summary.missingTermRefs) &&
     summary.missingTermRefs.every((entry) => typeof entry === "string") &&
+    Array.isArray(summary.missingTermComponentRefs) &&
+    summary.missingTermComponentRefs.every((entry) => typeof entry === "string") &&
+    (summary.termBalanceMaxAbsResidualSI === null ||
+      (typeof summary.termBalanceMaxAbsResidualSI === "number" &&
+        Number.isFinite(summary.termBalanceMaxAbsResidualSI))) &&
+    (summary.termBalanceMaxRelativeResidual === null ||
+      (typeof summary.termBalanceMaxRelativeResidual === "number" &&
+        Number.isFinite(summary.termBalanceMaxRelativeResidual))) &&
+    typeof summary.termBalanceToleranceRelative === "number" &&
+    Number.isFinite(summary.termBalanceToleranceRelative) &&
     typeof summary.valueArtifactReadyForReceipt === "boolean" &&
     typeof summary.firstBlocker === "string" &&
     boundary != null &&

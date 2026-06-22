@@ -1,4 +1,7 @@
-import type { Nhm2TileSourceFalsificationReportV1 } from "./nhm2-tile-source-falsification-report.v1";
+import type {
+  Nhm2TileSourceFalsificationReportV1,
+  Nhm2TileSourceFrontierResolutionItemV1,
+} from "./nhm2-tile-source-falsification-report.v1";
 import type { Nhm2TileSourceMaterialEvidenceReceiptsV1 } from "./nhm2-tile-source-material-evidence-receipts.v1";
 import type {
   Nhm2TileSourceOperatingBudgetCorrectionValueV1,
@@ -68,6 +71,7 @@ export type Nhm2TileSourceAuthorityHandoffV1 = {
     metricTargetEchoForbidden: true;
   };
   gates: Nhm2TileSourceAuthorityHandoffGateV1[];
+  frontierResolutionQueue: Nhm2TileSourceFrontierResolutionItemV1[];
   summary: {
     handoffStatus: Nhm2TileSourceAuthorityHandoffStatus;
     handoffReadyForSameBasisAuthority: boolean;
@@ -81,6 +85,9 @@ export type Nhm2TileSourceAuthorityHandoffV1 = {
     physicalValidationStillRequired: boolean;
     firstBlocker: string;
     firstRequiredCorrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
+    firstFrontierResolutionMode: Nhm2TileSourceFrontierResolutionItemV1["resolutionMode"] | "none";
+    firstFrontierCampaignDomain: Nhm2TileSourceFrontierResolutionItemV1["campaignDomain"] | "none";
+    frontierResolutionItemCount: number;
     physicalViabilityClaimAllowed: false;
     transportClaimAllowed: false;
     propulsionClaimAllowed: false;
@@ -92,6 +99,7 @@ export type Nhm2TileSourceAuthorityHandoffV1 = {
     handoffDoesNotRunDownstreamGates: true;
     operatingBudgetReadinessDoesNotValidateMaterialSource: true;
     handoffReadyIsNotPhysicalCredibility: true;
+    handoffCarriesFrontierQueueOnly: true;
     idealScalarCasimirIsNotMaterialEvidence: true;
     physicalViabilityClaimAllowed: false;
     transportClaimAllowed: false;
@@ -129,6 +137,58 @@ const isCorrectionValue = (
   typeof value === "boolean" ||
   isFiniteNumber(value) ||
   (Array.isArray(value) && value.every((entry) => typeof entry === "string"));
+
+const isFrontierResolutionItem = (
+  value: unknown,
+): value is Nhm2TileSourceFrontierResolutionItemV1 => {
+  if (!isRecord(value)) return false;
+  const boundary = isRecord(value.claimBoundary) ? value.claimBoundary : null;
+  return (
+    typeof value.rank === "number" &&
+    Number.isInteger(value.rank) &&
+    value.rank > 0 &&
+    typeof value.campaignDomain === "string" &&
+    ["go", "review", "no_go"].includes(String(value.decision)) &&
+    [
+      "ready",
+      "missing_receipt",
+      "failing_margin",
+      "source_authority_blocked",
+      "downstream_blocked",
+      "operating_budget_blocked",
+      "open_review",
+    ].includes(String(value.evidenceState)) &&
+    [
+      "supply_experimental_receipt",
+      "revise_architecture_or_operating_margin",
+      "supply_same_basis_full_apparatus_tensor",
+      "rerun_downstream_gate",
+      "supply_operating_budget_receipt",
+      "resolve_open_review",
+    ].includes(String(value.resolutionMode)) &&
+    typeof value.firstBlocker === "string" &&
+    Array.isArray(value.blockerIds) &&
+    value.blockerIds.every((entry) => typeof entry === "string") &&
+    (value.numericalMargin === null ||
+      (typeof value.numericalMargin === "number" && Number.isFinite(value.numericalMargin))) &&
+    ["below_one_fails", "boolean_or_missing", "not_numeric"].includes(
+      String(value.marginInterpretation),
+    ) &&
+    typeof value.evidenceTarget === "string" &&
+    typeof value.requiredChange === "string" &&
+    isRecord(value.requiredCorrections) &&
+    Object.values(value.requiredCorrections).every(isCorrectionValue) &&
+    Array.isArray(value.prevents) &&
+    value.prevents.every((entry) => typeof entry === "string") &&
+    Array.isArray(value.evidenceRefs) &&
+    value.evidenceRefs.every((entry) => typeof entry === "string") &&
+    value.blocksCampaignPass === true &&
+    boundary != null &&
+    boundary.diagnosticOnly === true &&
+    boundary.resolutionQueueDoesNotSupplyEvidence === true &&
+    boundary.resolvingItemRequiresNewReceiptOrArtifact === true
+  );
+};
 
 const correctionRecord = (
   value: unknown,
@@ -391,6 +451,8 @@ export const buildNhm2TileSourceAuthorityHandoff = (
     }),
   ];
   const firstFailedGate = gates.find((entry) => entry.status !== "pass");
+  const frontierResolutionQueue = report.frontierResolutionQueue;
+  const firstFrontierItem = frontierResolutionQueue[0] ?? null;
   const handoffReady = gates.every((entry) => entry.status === "pass") && sourceAuthorityEvidenceReady;
   const handoffStatus: Nhm2TileSourceAuthorityHandoffStatus =
     report.disposition.reportStatus === "falsified" || gates.some((entry) => entry.status === "fail")
@@ -437,6 +499,7 @@ export const buildNhm2TileSourceAuthorityHandoff = (
       metricTargetEchoForbidden: true,
     },
     gates,
+    frontierResolutionQueue,
     summary: {
       handoffStatus,
       handoffReadyForSameBasisAuthority: handoffReady,
@@ -451,6 +514,9 @@ export const buildNhm2TileSourceAuthorityHandoff = (
       physicalValidationStillRequired: true,
       firstBlocker: firstFailedGate?.blockers[0] ?? firstFailedGate?.gateId ?? "none",
       firstRequiredCorrections: correctionRecord(firstFailedGate?.requiredCorrections ?? {}),
+      firstFrontierResolutionMode: firstFrontierItem?.resolutionMode ?? "none",
+      firstFrontierCampaignDomain: firstFrontierItem?.campaignDomain ?? "none",
+      frontierResolutionItemCount: frontierResolutionQueue.length,
       physicalViabilityClaimAllowed: false,
       transportClaimAllowed: false,
       propulsionClaimAllowed: false,
@@ -462,6 +528,7 @@ export const buildNhm2TileSourceAuthorityHandoff = (
       handoffDoesNotRunDownstreamGates: true,
       operatingBudgetReadinessDoesNotValidateMaterialSource: true,
       handoffReadyIsNotPhysicalCredibility: true,
+      handoffCarriesFrontierQueueOnly: true,
       idealScalarCasimirIsNotMaterialEvidence: true,
       physicalViabilityClaimAllowed: false,
       transportClaimAllowed: false,
@@ -508,6 +575,8 @@ export const isNhm2TileSourceAuthorityHandoff = (
         isRecord(entry.requiredCorrections) &&
         Object.values(entry.requiredCorrections).every(isCorrectionValue)
     ) &&
+    Array.isArray(value.frontierResolutionQueue) &&
+    value.frontierResolutionQueue.every((entry) => isFrontierResolutionItem(entry)) &&
     summary != null &&
     typeof summary.handoffStatus === "string" &&
     typeof summary.handoffReadyForSameBasisAuthority === "boolean" &&
@@ -522,6 +591,9 @@ export const isNhm2TileSourceAuthorityHandoff = (
     typeof summary.firstBlocker === "string" &&
     isRecord(summary.firstRequiredCorrections) &&
     Object.values(summary.firstRequiredCorrections).every(isCorrectionValue) &&
+    typeof summary.firstFrontierResolutionMode === "string" &&
+    typeof summary.firstFrontierCampaignDomain === "string" &&
+    typeof summary.frontierResolutionItemCount === "number" &&
     summary.physicalViabilityClaimAllowed === false &&
     summary.transportClaimAllowed === false &&
     summary.propulsionClaimAllowed === false &&
@@ -532,6 +604,7 @@ export const isNhm2TileSourceAuthorityHandoff = (
     boundary.handoffDoesNotRunDownstreamGates === true &&
     boundary.operatingBudgetReadinessDoesNotValidateMaterialSource === true &&
     boundary.handoffReadyIsNotPhysicalCredibility === true &&
+    boundary.handoffCarriesFrontierQueueOnly === true &&
     boundary.idealScalarCasimirIsNotMaterialEvidence === true &&
     boundary.physicalViabilityClaimAllowed === false &&
     boundary.transportClaimAllowed === false &&

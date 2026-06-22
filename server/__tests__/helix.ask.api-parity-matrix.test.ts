@@ -15,6 +15,7 @@ import {
   CODEX_PARITY_AGENT_SPINE_STRING_OR_NULL_FIELDS,
   isCodexParityAgentSpineRailFailureCode,
 } from "../services/helix-ask/codex-parity-agent-spine-contract";
+import { resetHelixAskTurnAdmissionForTests } from "../services/helix-ask/ask-turn-admission";
 import { resetConversationalAnswerDistillationsForTest } from "../services/helix-ask/conversational-answer-distillation-store";
 import { resetLiveSourcePipelinesForTest } from "../services/helix-ask/live-source-pipeline-executor";
 import { resetReceiptPresentationSnapshotsForTest } from "../services/helix-ask/receipt-presentation-snapshot-store";
@@ -44,6 +45,7 @@ import { resetVisualProducerSchedulerAdoptionsForTest } from "../services/situat
 import { resetVisualSceneMemoryForTest } from "../services/situation-room/visual-scene-memory-store";
 import { resetVisualSnapshotStoreForTest } from "../services/situation-room/visual-snapshot-store";
 import { resetVoiceLiveHandoffsForTest } from "../services/situation-room/voice-live-handoff-router";
+import { resetRuntimeMemoryGovernorForTests } from "../services/runtime/runtime-memory-governor";
 
 const createApp = (): express.Express => {
   const app = express();
@@ -79,6 +81,21 @@ const resetAll = (): void => {
   resetClientCapabilityAdoptionsForTest();
   resetReceiptPresentationSnapshotsForTest();
   resetInterpretationCardsForTest();
+  resetHelixAskTurnAdmissionForTests();
+  resetRuntimeMemoryGovernorForTests({
+    memoryReader: () => ({
+      rss: 300 * 1024 * 1024,
+      heapTotal: 180 * 1024 * 1024,
+      heapUsed: 120 * 1024 * 1024,
+      external: 8 * 1024 * 1024,
+      arrayBuffers: 4 * 1024 * 1024,
+    }),
+    hostMemoryReader: () => ({
+      freeMiB: 4096,
+      totalMiB: 8192,
+      freeRatio: 0.5,
+    }),
+  });
 };
 
 const expectNullableStringField = (record: Record<string, unknown>, key: string): void => {

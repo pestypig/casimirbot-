@@ -26,23 +26,39 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
     bandwidthMinHz: 30e9;
     gapNoiseRmsMaxMeters: 8e-11;
     timingJitterMaxSeconds: number;
+    phaseNoiseMaxSeconds: number;
+    controllerPhaseMarginMinDegrees: 45;
+    controllerGainMarginMinDb: 6;
+    thermalSinkCapacityFactorMin: 1.2;
     requiredGapControlAuthorityN: number;
   };
   suppliedActiveControlEvidence: {
     evidenceTier: string;
     energyWaveformRef: string | null;
+    actuatorAuthorityTraceRef: string | null;
+    gapSensorCalibrationRef: string | null;
     controlTransferFunctionRef: string | null;
+    controllerStabilityRef: string | null;
     gapNoiseTraceRef: string | null;
     thermalModelRef: string | null;
+    heatSinkCapacityTraceRef: string | null;
     heatLoadTraceRef: string | null;
     timingSyncTraceRef: string | null;
+    phaseNoiseSpectrumRef: string | null;
+    lockAcquisitionTraceRef: string | null;
     energyPerCycleJ: number | null;
+    actuatorAuthorityN: number | null;
     bandwidthHz: number | null;
     switchingRateHz: number | null;
     gapNoiseRmsMeters: number | null;
     noiseSpectrumRef: string | null;
     heatLoadW: number | null;
+    heatSinkCapacityW: number | null;
     timingJitterSeconds: number | null;
+    phaseNoiseRmsSeconds: number | null;
+    controllerPhaseMarginDegrees: number | null;
+    controllerGainMarginDb: number | null;
+    lockAcquisitionTimeSeconds: number | null;
     failureModeRef: string | null;
     failureModeCoverage: {
       lossOfLock: boolean;
@@ -55,14 +71,20 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
   derivedOperatingBudget: {
     controlPowerW: number | null;
     gapControlAuthorityMargin: number | null;
+    suppliedActuatorAuthorityMargin: number | null;
     activeControlTraceRefsAvailable: boolean;
+    activeControlCalibrationRefsAvailable: boolean;
     noiseSpectrumAvailable: boolean;
     failureModeCoverageComplete: boolean;
     switchingRateMargin: number | null;
     bandwidthMargin: number | null;
     noiseMargin: number | null;
     timingMargin: number | null;
+    phaseNoiseMargin: number | null;
+    controllerPhaseMargin: number | null;
+    controllerGainMargin: number | null;
     thermalAccountingMargin: number | null;
+    thermalSinkCapacityMargin: number | null;
   };
   requiredCorrections: {
     switchingRateTargetHz: 15e9;
@@ -71,17 +93,27 @@ export type Nhm2TileSourceActiveControlOperatingBudgetV1 = {
     bandwidthShortfallHz: number | null;
     gapControlAuthorityMinN: number;
     suppliedGapControlAuthorityN: number | null;
+    suppliedActuatorAuthorityN: number | null;
     gapControlAuthorityShortfallN: number | null;
+    actuatorAuthorityShortfallN: number | null;
     gapNoiseRmsMaxMeters: 8e-11;
     gapNoiseRmsReductionMeters: number | null;
     timingJitterMaxSeconds: number;
     timingJitterReductionSeconds: number | null;
+    phaseNoiseMaxSeconds: number;
+    phaseNoiseReductionSeconds: number | null;
+    controllerPhaseMarginMinDegrees: 45;
+    controllerPhaseMarginShortfallDegrees: number | null;
+    controllerGainMarginMinDb: 6;
+    controllerGainMarginShortfallDb: number | null;
     controlPowerW: number | null;
     heatLoadMinW: number | null;
     heatLoadShortfallW: number | null;
+    heatSinkCapacityMinW: number | null;
+    heatSinkCapacityShortfallW: number | null;
     energyPerCycleHeatLimitedMaxJ: number | null;
     energyPerCycleReductionJ: number | null;
-    requiredTraceRefCount: 8;
+    requiredTraceRefCount: 14;
     missingTraceRefCount: number;
     requiredFailureModeCount: 5;
     missingFailureModeCount: number;
@@ -118,6 +150,10 @@ const SWITCHING_RATE_HZ = 15e9;
 const BANDWIDTH_MIN_HZ = 30e9;
 const GAP_NOISE_MAX_METERS = 8e-11;
 const TIMING_JITTER_MAX_SECONDS = 0.1 / SWITCHING_RATE_HZ;
+const PHASE_NOISE_MAX_SECONDS = 0.05 / SWITCHING_RATE_HZ;
+const CONTROLLER_PHASE_MARGIN_MIN_DEGREES = 45;
+const CONTROLLER_GAIN_MARGIN_MIN_DB = 6;
+const THERMAL_SINK_CAPACITY_FACTOR_MIN = 1.2;
 
 const round = (value: number, digits = 12): number => Number(value.toPrecision(digits));
 
@@ -159,6 +195,10 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
   const evidence = input.activeControlEvidence ?? null;
   const gapControlAuthorityMargin =
     forceGapLoadBudget.margins.activeAuthorityMarginToIdealLoad;
+  const suppliedActuatorAuthorityMargin = safeRatio(
+    evidence?.actuatorAuthorityN ?? null,
+    forceGapLoadBudget.idealLoadBudget.requiredActiveGapControlAuthorityN,
+  );
   const evidenceSwitchingRate = evidence?.switchingRateHz ?? null;
   const controlPowerW =
     evidence?.energyPerCycleJ == null || evidenceSwitchingRate == null
@@ -177,6 +217,18 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     TIMING_JITTER_MAX_SECONDS,
     evidence?.timingJitterSeconds ?? null,
   );
+  const phaseNoiseMargin = safeRatio(
+    PHASE_NOISE_MAX_SECONDS,
+    evidence?.phaseNoiseRmsSeconds ?? null,
+  );
+  const controllerPhaseMargin = safeRatio(
+    evidence?.controllerPhaseMarginDegrees ?? null,
+    CONTROLLER_PHASE_MARGIN_MIN_DEGREES,
+  );
+  const controllerGainMargin = safeRatio(
+    evidence?.controllerGainMarginDb ?? null,
+    CONTROLLER_GAIN_MARGIN_MIN_DB,
+  );
   const thermalAccountingMargin = safeRatio(evidence?.heatLoadW ?? null, controlPowerW);
   const failureModeCoverage = evidence?.failureModeCoverage ?? null;
   const requiredGapControlAuthorityN =
@@ -186,18 +238,30 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       ? null
       : round(gapControlAuthorityMargin * requiredGapControlAuthorityN);
   const heatLoadMinW = controlPowerW;
+  const heatSinkCapacityMinW =
+    evidence?.heatLoadW == null ? null : round(evidence.heatLoadW * THERMAL_SINK_CAPACITY_FACTOR_MIN);
+  const thermalSinkCapacityMargin = safeRatio(
+    evidence?.heatSinkCapacityW ?? null,
+    heatSinkCapacityMinW,
+  );
   const energyPerCycleHeatLimitedMaxJ =
     evidence?.heatLoadW == null || evidenceSwitchingRate == null || evidenceSwitchingRate === 0
       ? null
       : round(evidence.heatLoadW / evidenceSwitchingRate);
   const traceRefs = [
     evidence?.energyWaveformRef,
+    evidence?.actuatorAuthorityTraceRef,
+    evidence?.gapSensorCalibrationRef,
     evidence?.controlTransferFunctionRef,
+    evidence?.controllerStabilityRef,
     evidence?.gapNoiseTraceRef,
     evidence?.noiseSpectrumRef,
     evidence?.thermalModelRef,
+    evidence?.heatSinkCapacityTraceRef,
     evidence?.heatLoadTraceRef,
     evidence?.timingSyncTraceRef,
+    evidence?.phaseNoiseSpectrumRef,
+    evidence?.lockAcquisitionTraceRef,
     evidence?.failureModeRef,
   ];
   const missingTraceRefCount = traceRefs.filter((ref) => ref == null).length;
@@ -226,6 +290,12 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     ...(evidence?.energyWaveformRef == null
       ? ["active_control_energy_waveform_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.actuatorAuthorityTraceRef == null
+      ? ["active_control_actuator_authority_trace_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence?.gapSensorCalibrationRef == null
+      ? ["active_control_gap_sensor_calibration_ref_missing_for_operating_budget"]
+      : []),
     ...(evidenceSwitchingRate == null
       ? ["active_control_switching_rate_missing_for_operating_budget"]
       : switchingRateMatchesTarget(evidenceSwitchingRate)
@@ -237,6 +307,11 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       : gapControlAuthorityMargin < 1
         ? ["active_control_gap_authority_below_447_layer_load"]
         : []),
+    ...(suppliedActuatorAuthorityMargin == null
+      ? ["active_control_actuator_authority_missing_for_operating_budget"]
+      : suppliedActuatorAuthorityMargin < 1
+        ? ["active_control_supplied_actuator_authority_below_447_layer_load"]
+        : []),
     ...(bandwidthMargin == null
       ? ["active_control_bandwidth_missing_for_operating_budget"]
       : bandwidthMargin < 1
@@ -245,6 +320,19 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     ...(evidence?.controlTransferFunctionRef == null
       ? ["active_control_transfer_function_ref_missing_for_operating_budget"]
       : []),
+    ...(evidence?.controllerStabilityRef == null
+      ? ["active_control_controller_stability_ref_missing_for_operating_budget"]
+      : []),
+    ...(controllerPhaseMargin == null
+      ? ["active_control_controller_phase_margin_missing_for_operating_budget"]
+      : controllerPhaseMargin < 1
+        ? ["active_control_controller_phase_margin_below_45deg"]
+        : []),
+    ...(controllerGainMargin == null
+      ? ["active_control_controller_gain_margin_missing_for_operating_budget"]
+      : controllerGainMargin < 1
+        ? ["active_control_controller_gain_margin_below_6db"]
+        : []),
     ...(noiseMargin == null
       ? ["active_control_gap_noise_missing_for_operating_budget"]
       : noiseMargin < 1
@@ -266,14 +354,37 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       : thermalAccountingMargin < 1
         ? ["active_control_heat_load_below_computed_control_power"]
         : []),
+    ...(thermalSinkCapacityMargin == null
+      ? ["active_control_heat_sink_capacity_missing_for_operating_budget"]
+      : thermalSinkCapacityMargin < 1
+        ? ["active_control_heat_sink_capacity_below_1p2x_heat_load"]
+        : []),
     ...(evidence?.thermalModelRef == null
       ? ["active_control_thermal_model_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence?.heatSinkCapacityTraceRef == null
+      ? ["active_control_heat_sink_capacity_trace_ref_missing_for_operating_budget"]
       : []),
     ...(evidence?.heatLoadTraceRef == null
       ? ["active_control_heat_load_trace_ref_missing_for_operating_budget"]
       : []),
     ...(evidence?.timingSyncTraceRef == null
       ? ["active_control_timing_sync_trace_ref_missing_for_operating_budget"]
+      : []),
+    ...(phaseNoiseMargin == null
+      ? ["active_control_phase_noise_missing_for_operating_budget"]
+      : phaseNoiseMargin < 1
+        ? ["active_control_phase_noise_above_0p05_cycle"]
+        : []),
+    ...(evidence?.phaseNoiseSpectrumRef == null
+      ? ["active_control_phase_noise_spectrum_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence?.lockAcquisitionTraceRef == null
+      ? ["active_control_lock_acquisition_trace_ref_missing_for_operating_budget"]
+      : []),
+    ...(evidence?.lockAcquisitionTimeSeconds == null ||
+    evidence.lockAcquisitionTimeSeconds <= 0
+      ? ["active_control_lock_acquisition_time_missing_for_operating_budget"]
       : []),
     ...(evidence?.failureModeRef == null ? ["active_control_failure_mode_ref_missing_for_operating_budget"] : []),
     ...(failureModeCoverage?.lossOfLock === true
@@ -300,9 +411,14 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
             "active_control_bandwidth_below_30ghz",
             "active_control_switching_rate_not_15ghz",
             "active_control_gap_authority_below_447_layer_load",
+            "active_control_supplied_actuator_authority_below_447_layer_load",
             "active_control_gap_noise_above_80pm",
             "active_control_timing_jitter_above_0p1_cycle",
+            "active_control_phase_noise_above_0p05_cycle",
+            "active_control_controller_phase_margin_below_45deg",
+            "active_control_controller_gain_margin_below_6db",
             "active_control_heat_load_below_computed_control_power",
+            "active_control_heat_sink_capacity_below_1p2x_heat_load",
           ].includes(blocker),
         )
       : false;
@@ -322,23 +438,39 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       bandwidthMinHz: BANDWIDTH_MIN_HZ,
       gapNoiseRmsMaxMeters: GAP_NOISE_MAX_METERS,
       timingJitterMaxSeconds: TIMING_JITTER_MAX_SECONDS,
+      phaseNoiseMaxSeconds: PHASE_NOISE_MAX_SECONDS,
+      controllerPhaseMarginMinDegrees: CONTROLLER_PHASE_MARGIN_MIN_DEGREES,
+      controllerGainMarginMinDb: CONTROLLER_GAIN_MARGIN_MIN_DB,
+      thermalSinkCapacityFactorMin: THERMAL_SINK_CAPACITY_FACTOR_MIN,
       requiredGapControlAuthorityN,
     },
     suppliedActiveControlEvidence: {
       evidenceTier: evidence?.evidenceTier ?? "missing",
       energyWaveformRef: stringOrNull(evidence?.energyWaveformRef),
+      actuatorAuthorityTraceRef: stringOrNull(evidence?.actuatorAuthorityTraceRef),
+      gapSensorCalibrationRef: stringOrNull(evidence?.gapSensorCalibrationRef),
       controlTransferFunctionRef: stringOrNull(evidence?.controlTransferFunctionRef),
+      controllerStabilityRef: stringOrNull(evidence?.controllerStabilityRef),
       gapNoiseTraceRef: stringOrNull(evidence?.gapNoiseTraceRef),
       thermalModelRef: stringOrNull(evidence?.thermalModelRef),
+      heatSinkCapacityTraceRef: stringOrNull(evidence?.heatSinkCapacityTraceRef),
       heatLoadTraceRef: stringOrNull(evidence?.heatLoadTraceRef),
       timingSyncTraceRef: stringOrNull(evidence?.timingSyncTraceRef),
+      phaseNoiseSpectrumRef: stringOrNull(evidence?.phaseNoiseSpectrumRef),
+      lockAcquisitionTraceRef: stringOrNull(evidence?.lockAcquisitionTraceRef),
       energyPerCycleJ: finiteOrNull(evidence?.energyPerCycleJ),
+      actuatorAuthorityN: finiteOrNull(evidence?.actuatorAuthorityN),
       bandwidthHz: finiteOrNull(evidence?.bandwidthHz),
       switchingRateHz: finiteOrNull(evidence?.switchingRateHz),
       gapNoiseRmsMeters: finiteOrNull(evidence?.gapNoiseRmsMeters),
       noiseSpectrumRef: evidence?.noiseSpectrumRef ?? null,
       heatLoadW: finiteOrNull(evidence?.heatLoadW),
+      heatSinkCapacityW: finiteOrNull(evidence?.heatSinkCapacityW),
       timingJitterSeconds: finiteOrNull(evidence?.timingJitterSeconds),
+      phaseNoiseRmsSeconds: finiteOrNull(evidence?.phaseNoiseRmsSeconds),
+      controllerPhaseMarginDegrees: finiteOrNull(evidence?.controllerPhaseMarginDegrees),
+      controllerGainMarginDb: finiteOrNull(evidence?.controllerGainMarginDb),
+      lockAcquisitionTimeSeconds: finiteOrNull(evidence?.lockAcquisitionTimeSeconds),
       failureModeRef: evidence?.failureModeRef ?? null,
       failureModeCoverage:
         failureModeCoverage == null
@@ -354,22 +486,39 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
     derivedOperatingBudget: {
       controlPowerW,
       gapControlAuthorityMargin,
+      suppliedActuatorAuthorityMargin,
       activeControlTraceRefsAvailable:
         evidence?.energyWaveformRef != null &&
+        evidence.actuatorAuthorityTraceRef != null &&
+        evidence.gapSensorCalibrationRef != null &&
         evidence.controlTransferFunctionRef != null &&
+        evidence.controllerStabilityRef != null &&
         evidence.gapNoiseTraceRef != null &&
         evidence.noiseSpectrumRef != null &&
         evidence.thermalModelRef != null &&
+        evidence.heatSinkCapacityTraceRef != null &&
         evidence.heatLoadTraceRef != null &&
         evidence.timingSyncTraceRef != null &&
+        evidence.phaseNoiseSpectrumRef != null &&
+        evidence.lockAcquisitionTraceRef != null &&
         evidence.failureModeRef != null,
+      activeControlCalibrationRefsAvailable:
+        evidence?.actuatorAuthorityTraceRef != null &&
+        evidence.gapSensorCalibrationRef != null &&
+        evidence.controllerStabilityRef != null &&
+        evidence.heatSinkCapacityTraceRef != null &&
+        evidence.phaseNoiseSpectrumRef != null,
       noiseSpectrumAvailable: evidence?.noiseSpectrumRef != null,
       failureModeCoverageComplete,
       switchingRateMargin,
       bandwidthMargin,
       noiseMargin,
       timingMargin,
+      phaseNoiseMargin,
+      controllerPhaseMargin,
+      controllerGainMargin,
       thermalAccountingMargin,
+      thermalSinkCapacityMargin,
     },
     requiredCorrections: {
       switchingRateTargetHz: SWITCHING_RATE_HZ,
@@ -381,8 +530,13 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
       bandwidthShortfallHz: shortfallToMinimum(evidence?.bandwidthHz, BANDWIDTH_MIN_HZ),
       gapControlAuthorityMinN: requiredGapControlAuthorityN,
       suppliedGapControlAuthorityN,
+      suppliedActuatorAuthorityN: evidence?.actuatorAuthorityN ?? null,
       gapControlAuthorityShortfallN: shortfallToMinimum(
         suppliedGapControlAuthorityN,
+        requiredGapControlAuthorityN,
+      ),
+      actuatorAuthorityShortfallN: shortfallToMinimum(
+        evidence?.actuatorAuthorityN,
         requiredGapControlAuthorityN,
       ),
       gapNoiseRmsMaxMeters: GAP_NOISE_MAX_METERS,
@@ -395,6 +549,21 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
         evidence?.timingJitterSeconds,
         TIMING_JITTER_MAX_SECONDS,
       ),
+      phaseNoiseMaxSeconds: PHASE_NOISE_MAX_SECONDS,
+      phaseNoiseReductionSeconds: reductionToMaximum(
+        evidence?.phaseNoiseRmsSeconds,
+        PHASE_NOISE_MAX_SECONDS,
+      ),
+      controllerPhaseMarginMinDegrees: CONTROLLER_PHASE_MARGIN_MIN_DEGREES,
+      controllerPhaseMarginShortfallDegrees: shortfallToMinimum(
+        evidence?.controllerPhaseMarginDegrees,
+        CONTROLLER_PHASE_MARGIN_MIN_DEGREES,
+      ),
+      controllerGainMarginMinDb: CONTROLLER_GAIN_MARGIN_MIN_DB,
+      controllerGainMarginShortfallDb: shortfallToMinimum(
+        evidence?.controllerGainMarginDb,
+        CONTROLLER_GAIN_MARGIN_MIN_DB,
+      ),
       controlPowerW,
       heatLoadMinW,
       heatLoadShortfallW:
@@ -402,11 +571,16 @@ export const buildNhm2TileSourceActiveControlOperatingBudget = (
           ? null
           : round(Math.max(0, heatLoadMinW - evidence.heatLoadW)),
       energyPerCycleHeatLimitedMaxJ,
+      heatSinkCapacityMinW,
+      heatSinkCapacityShortfallW:
+        heatSinkCapacityMinW == null || evidence?.heatSinkCapacityW == null
+          ? null
+          : round(Math.max(0, heatSinkCapacityMinW - evidence.heatSinkCapacityW)),
       energyPerCycleReductionJ:
         evidence?.energyPerCycleJ == null || energyPerCycleHeatLimitedMaxJ == null
           ? null
           : round(Math.max(0, evidence.energyPerCycleJ - energyPerCycleHeatLimitedMaxJ)),
-      requiredTraceRefCount: 8,
+      requiredTraceRefCount: 14,
       missingTraceRefCount,
       requiredFailureModeCount: 5,
       missingFailureModeCount,
@@ -462,12 +636,19 @@ export const isNhm2TileSourceActiveControlOperatingBudget = (
     targets.bandwidthMinHz === 30e9 &&
     targets.gapNoiseRmsMaxMeters === 8e-11 &&
     typeof targets.timingJitterMaxSeconds === "number" &&
+    typeof targets.phaseNoiseMaxSeconds === "number" &&
+    targets.controllerPhaseMarginMinDegrees === 45 &&
+    targets.controllerGainMarginMinDb === 6 &&
+    targets.thermalSinkCapacityFactorMin === 1.2 &&
     typeof targets.requiredGapControlAuthorityN === "number" &&
     supplied != null &&
     typeof supplied.evidenceTier === "string" &&
     budget != null &&
     (budget.gapControlAuthorityMargin === null ||
       typeof budget.gapControlAuthorityMargin === "number") &&
+    (budget.suppliedActuatorAuthorityMargin === null ||
+      typeof budget.suppliedActuatorAuthorityMargin === "number") &&
+    typeof budget.activeControlCalibrationRefsAvailable === "boolean" &&
     typeof budget.noiseSpectrumAvailable === "boolean" &&
     typeof budget.failureModeCoverageComplete === "boolean" &&
     (budget.switchingRateMargin === null || typeof budget.switchingRateMargin === "number") &&
@@ -478,17 +659,27 @@ export const isNhm2TileSourceActiveControlOperatingBudget = (
     isNumberOrNull(requiredCorrections.bandwidthShortfallHz) &&
     typeof requiredCorrections.gapControlAuthorityMinN === "number" &&
     isNumberOrNull(requiredCorrections.suppliedGapControlAuthorityN) &&
+    isNumberOrNull(requiredCorrections.suppliedActuatorAuthorityN) &&
     isNumberOrNull(requiredCorrections.gapControlAuthorityShortfallN) &&
+    isNumberOrNull(requiredCorrections.actuatorAuthorityShortfallN) &&
     requiredCorrections.gapNoiseRmsMaxMeters === 8e-11 &&
     isNumberOrNull(requiredCorrections.gapNoiseRmsReductionMeters) &&
     typeof requiredCorrections.timingJitterMaxSeconds === "number" &&
     isNumberOrNull(requiredCorrections.timingJitterReductionSeconds) &&
+    typeof requiredCorrections.phaseNoiseMaxSeconds === "number" &&
+    isNumberOrNull(requiredCorrections.phaseNoiseReductionSeconds) &&
+    requiredCorrections.controllerPhaseMarginMinDegrees === 45 &&
+    isNumberOrNull(requiredCorrections.controllerPhaseMarginShortfallDegrees) &&
+    requiredCorrections.controllerGainMarginMinDb === 6 &&
+    isNumberOrNull(requiredCorrections.controllerGainMarginShortfallDb) &&
     isNumberOrNull(requiredCorrections.controlPowerW) &&
     isNumberOrNull(requiredCorrections.heatLoadMinW) &&
     isNumberOrNull(requiredCorrections.heatLoadShortfallW) &&
+    isNumberOrNull(requiredCorrections.heatSinkCapacityMinW) &&
+    isNumberOrNull(requiredCorrections.heatSinkCapacityShortfallW) &&
     isNumberOrNull(requiredCorrections.energyPerCycleHeatLimitedMaxJ) &&
     isNumberOrNull(requiredCorrections.energyPerCycleReductionJ) &&
-    requiredCorrections.requiredTraceRefCount === 8 &&
+    requiredCorrections.requiredTraceRefCount === 14 &&
     typeof requiredCorrections.missingTraceRefCount === "number" &&
     requiredCorrections.requiredFailureModeCount === 5 &&
     typeof requiredCorrections.missingFailureModeCount === "number" &&

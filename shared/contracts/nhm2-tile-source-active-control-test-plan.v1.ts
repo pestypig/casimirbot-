@@ -41,6 +41,10 @@ export type Nhm2TileSourceActiveControlTestPlanV1 = {
     bandwidthFactorMin: 2;
     gapNoiseRmsMaxMeters: number;
     timingJitterMaxSeconds: number;
+    phaseNoiseMaxSeconds: number;
+    controllerPhaseMarginMinDegrees: 45;
+    controllerGainMarginMinDb: 6;
+    thermalSinkCapacityFactorMin: 1.2;
     evidenceTierRequired: "measured_or_validated_simulation";
   };
   testItems: Nhm2ActiveControlTestPlanItemV1[];
@@ -83,6 +87,10 @@ const SWITCHING_RATE_HZ = 15e9;
 const BANDWIDTH_FACTOR_MIN = 2;
 const GAP_NOISE_FRACTION_MAX = 0.01;
 const TIMING_JITTER_CYCLE_FRACTION_MAX = 0.1;
+const PHASE_NOISE_CYCLE_FRACTION_MAX = 0.05;
+const CONTROLLER_PHASE_MARGIN_MIN_DEGREES = 45;
+const CONTROLLER_GAIN_MARGIN_MIN_DB = 6;
+const THERMAL_SINK_CAPACITY_FACTOR_MIN = 1.2;
 
 const TEST_POLICY: Record<
   Nhm2ActiveControlTestId,
@@ -98,22 +106,33 @@ const TEST_POLICY: Record<
       "active_gap_control_energy_and_noise_missing",
       "active_control_tier_not_measured_or_validated",
       "active_control_energy_waveform_ref_missing",
+      "active_control_actuator_authority_trace_ref_missing",
+      "active_control_gap_sensor_calibration_ref_missing",
       "active_control_transfer_function_ref_missing",
+      "active_control_controller_stability_ref_missing",
       "active_control_gap_noise_trace_ref_missing",
       "active_control_noise_spectrum_ref_missing",
       "active_control_thermal_model_ref_missing",
+      "active_control_heat_sink_capacity_trace_ref_missing",
       "active_control_heat_load_trace_ref_missing",
       "active_control_timing_sync_trace_ref_missing",
+      "active_control_phase_noise_spectrum_ref_missing",
+      "active_control_lock_acquisition_trace_ref_missing",
       "active_control_failure_mode_ref_missing",
     ],
     requiredMeasurement:
-      "Measured or validated-simulation active-control receipt with apparatus, controller transfer function, energy waveform, noise trace/spectrum, thermal model, heat trace, timing trace, and failure-mode provenance.",
+      "Measured or validated-simulation active-control receipt with actuator authority, sensor calibration, controller transfer/stability, energy waveform, noise trace/spectrum, thermal model/sink, heat trace, timing/phase trace, lock acquisition, and failure-mode provenance.",
     acceptanceCriterion:
       "Evidence tier is measured or validated_simulation and all required active-control trace/model refs are present.",
     artifactToProduce: "receipt://active_control/provenance_v1",
   },
   energy_per_cycle: {
-    blockers: ["active_control_energy_per_cycle_missing", "active_control_energy_waveform_ref_missing"],
+    blockers: [
+      "active_control_energy_per_cycle_missing",
+      "active_control_energy_waveform_ref_missing",
+      "active_control_actuator_authority_missing",
+      "active_control_actuator_authority_trace_ref_missing",
+    ],
     requiredMeasurement:
       "Active-control energy per cycle and waveform trace for the selected 447-layer operating mode.",
     acceptanceCriterion: "Finite energy per cycle is supplied with waveform provenance.",
@@ -124,6 +143,11 @@ const TEST_POLICY: Record<
       "gap_lock_bandwidth_missing",
       "gap_lock_bandwidth_below_2x_switching_rate",
       "active_control_transfer_function_ref_missing",
+      "active_control_controller_stability_ref_missing",
+      "controller_phase_margin_missing",
+      "controller_phase_margin_below_45deg",
+      "controller_gain_margin_missing",
+      "controller_gain_margin_below_6db",
     ],
     requiredMeasurement:
       "Closed-loop gap-lock bandwidth and controller transfer function at the selected switching rate.",
@@ -137,6 +161,7 @@ const TEST_POLICY: Record<
       "gap_noise_above_1pct_gap",
       "active_control_gap_noise_trace_ref_missing",
       "active_control_noise_spectrum_ref_missing",
+      "active_control_gap_sensor_calibration_ref_missing",
     ],
     requiredMeasurement: "Gap-noise RMS trace and spectrum for the 8 nm operating gap.",
     acceptanceCriterion:
@@ -146,7 +171,10 @@ const TEST_POLICY: Record<
   heat_load: {
     blockers: [
       "active_control_heat_load_missing",
+      "active_control_heat_sink_capacity_missing",
+      "active_control_heat_sink_capacity_below_1p2x_heat_load",
       "active_control_thermal_model_ref_missing",
+      "active_control_heat_sink_capacity_trace_ref_missing",
       "active_control_heat_load_trace_ref_missing",
     ],
     requiredMeasurement: "Thermal model and heat-load trace from active control at operating cadence.",
@@ -157,7 +185,12 @@ const TEST_POLICY: Record<
     blockers: [
       "timing_jitter_receipt_missing",
       "timing_jitter_above_0p1_cycle",
+      "phase_noise_receipt_missing",
+      "phase_noise_above_0p05_cycle",
       "active_control_timing_sync_trace_ref_missing",
+      "active_control_phase_noise_spectrum_ref_missing",
+      "active_control_lock_acquisition_trace_ref_missing",
+      "active_control_lock_acquisition_time_missing",
     ],
     requiredMeasurement: "Timing-jitter and synchronization trace for control action relative to switching cycle.",
     acceptanceCriterion: "Timing jitter is no greater than 0.1 cycle at 15 GHz with trace provenance.",
@@ -237,6 +270,10 @@ export const buildNhm2TileSourceActiveControlTestPlan = (
       bandwidthFactorMin: BANDWIDTH_FACTOR_MIN,
       gapNoiseRmsMaxMeters: OPERATING_GAP_METERS * GAP_NOISE_FRACTION_MAX,
       timingJitterMaxSeconds: TIMING_JITTER_CYCLE_FRACTION_MAX / SWITCHING_RATE_HZ,
+      phaseNoiseMaxSeconds: PHASE_NOISE_CYCLE_FRACTION_MAX / SWITCHING_RATE_HZ,
+      controllerPhaseMarginMinDegrees: CONTROLLER_PHASE_MARGIN_MIN_DEGREES,
+      controllerGainMarginMinDb: CONTROLLER_GAIN_MARGIN_MIN_DB,
+      thermalSinkCapacityFactorMin: THERMAL_SINK_CAPACITY_FACTOR_MIN,
       evidenceTierRequired: "measured_or_validated_simulation",
     },
     testItems,
@@ -290,6 +327,10 @@ export const isNhm2TileSourceActiveControlTestPlan = (
     target.bandwidthFactorMin === 2 &&
     typeof target.gapNoiseRmsMaxMeters === "number" &&
     typeof target.timingJitterMaxSeconds === "number" &&
+    typeof target.phaseNoiseMaxSeconds === "number" &&
+    target.controllerPhaseMarginMinDegrees === 45 &&
+    target.controllerGainMarginMinDb === 6 &&
+    target.thermalSinkCapacityFactorMin === 1.2 &&
     target.evidenceTierRequired === "measured_or_validated_simulation" &&
     Array.isArray(value.testItems) &&
     value.testItems.length === 7 &&

@@ -8,9 +8,11 @@ export const NHM2_TILE_SOURCE_MATERIAL_COUPON_TEST_PLAN_CONTRACT_VERSION =
 
 export type Nhm2MaterialCouponTestId =
   | "coupon_provenance"
+  | "candidate_stack_load_case"
   | "candidate_material_identity"
   | "tensile_stress"
   | "fracture_yield_margin"
+  | "coupon_fatigue_cycling"
   | "cryogenic_state"
   | "dielectric_response"
   | "conductivity"
@@ -41,9 +43,11 @@ export type Nhm2TileSourceMaterialCouponTestPlanV1 = {
     material: "ultra_high_stress_tin";
     layerCount: 447;
     operatingTemperatureK: 4;
+    campaignLoadCaseRequired: true;
     supportStressPa: number;
     materialSafetyFactor: 2;
     requiredFractureOrYieldStressPa: number;
+    couponRequiredCycleCount: number;
     roughnessRmsMaxMeters: 1e-10;
     materialResponseFrequencyHz: 15e9;
     evidenceTierRequired: "measured_or_validated_simulation";
@@ -94,9 +98,13 @@ const TEST_POLICY: Record<
     blockers: [
       "material_coupon_receipt_missing",
       "material_coupon_tier_not_measured_or_validated",
+      "candidate_stack_load_case_ref_missing",
+      "candidate_stack_layer_compatibility_ref_missing",
       "tensile_stress_curve_ref_missing",
       "fracture_yield_curve_ref_missing",
       "cryogenic_state_ref_missing",
+      "cryogenic_cycle_ref_missing",
+      "coupon_fatigue_curve_ref_missing",
       "coupon_roughness_map_ref_missing",
       "fabrication_tolerance_map_ref_missing",
     ],
@@ -105,6 +113,17 @@ const TEST_POLICY: Record<
     acceptanceCriterion:
       "Evidence tier is measured or validated_simulation and all required coupon curve/map provenance refs are present.",
     artifactToProduce: "receipt://material_coupon/provenance_v1",
+  },
+  candidate_stack_load_case: {
+    blockers: [
+      "candidate_stack_load_case_ref_missing",
+      "candidate_stack_layer_compatibility_ref_missing",
+    ],
+    requiredMeasurement:
+      "Load-case and layer-stack compatibility receipt tying the coupon specimen to the frozen 447-layer TiN candidate at 8 nm, 4 K, and 15 GHz.",
+    acceptanceCriterion:
+      "Coupon evidence includes both the campaign load-case reference and the selected 447-layer stack compatibility reference.",
+    artifactToProduce: "receipt://material_coupon/447_layer_load_case_compatibility_v1",
   },
   candidate_material_identity: {
     blockers: ["candidate_material_mismatch"],
@@ -128,6 +147,19 @@ const TEST_POLICY: Record<
     requiredMeasurement: "Fracture or yield stress measurement for the coupon stack.",
     acceptanceCriterion: "Fracture/yield stress is at least 2x the selected support stress.",
     artifactToProduce: "receipt://material_coupon/fracture_yield_margin_v1",
+  },
+  coupon_fatigue_cycling: {
+    blockers: [
+      "coupon_fatigue_curve_ref_missing",
+      "cryogenic_cycle_ref_missing",
+      "coupon_fatigue_cycle_margin_missing",
+      "coupon_fatigue_cycle_margin_below_required_campaign_cycles",
+    ],
+    requiredMeasurement:
+      "Coupon-level fatigue/cycling curve for the selected TiN stack under the frozen campaign load case and cryogenic cycling protocol.",
+    acceptanceCriterion:
+      "Coupon cycle count to failure is at least the required campaign cycle count, with fatigue and cryogenic-cycle provenance refs.",
+    artifactToProduce: "receipt://material_coupon/fatigue_cycling_447_layer_v1",
   },
   cryogenic_state: {
     blockers: ["cryogenic_4k_coupon_receipt_missing", "cryogenic_state_ref_missing"],
@@ -239,9 +271,14 @@ export const buildNhm2TileSourceMaterialCouponTestPlan = (
       material: "ultra_high_stress_tin",
       layerCount: 447,
       operatingTemperatureK: 4,
+      campaignLoadCaseRequired: true,
       supportStressPa,
       materialSafetyFactor: MATERIAL_SAFETY_FACTOR,
       requiredFractureOrYieldStressPa: supportStressPa * MATERIAL_SAFETY_FACTOR,
+      couponRequiredCycleCount:
+        surface.numericalMargins.couponRequiredCycleCount == null
+          ? 1e9
+          : surface.numericalMargins.couponRequiredCycleCount,
       roughnessRmsMaxMeters: 1e-10,
       materialResponseFrequencyHz: 15e9,
       evidenceTierRequired: "measured_or_validated_simulation",
@@ -290,14 +327,16 @@ export const isNhm2TileSourceMaterialCouponTestPlan = (
     target.material === "ultra_high_stress_tin" &&
     target.layerCount === 447 &&
     target.operatingTemperatureK === 4 &&
+    target.campaignLoadCaseRequired === true &&
     typeof target.supportStressPa === "number" &&
     target.materialSafetyFactor === 2 &&
     typeof target.requiredFractureOrYieldStressPa === "number" &&
+    typeof target.couponRequiredCycleCount === "number" &&
     target.roughnessRmsMaxMeters === 1e-10 &&
     target.materialResponseFrequencyHz === 15e9 &&
     target.evidenceTierRequired === "measured_or_validated_simulation" &&
     Array.isArray(value.testItems) &&
-    value.testItems.length === 9 &&
+    value.testItems.length === 11 &&
     value.testItems.every(
       (item) =>
         isRecord(item) &&

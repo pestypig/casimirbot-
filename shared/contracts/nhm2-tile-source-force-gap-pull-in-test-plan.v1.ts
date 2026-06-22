@@ -90,9 +90,13 @@ const TEST_POLICY: Record<
     blockers: [
       "force_gap_curve_and_pull_in_margin_at_8nm_missing",
       "force_gap_tier_not_measured_or_validated",
+      "force_gap_metrology_ref_missing",
       "force_gap_curve_ref_missing",
       "force_gradient_curve_ref_missing",
       "force_gap_stiffness_model_ref_missing",
+      "pull_in_sweep_ref_missing",
+      "stiction_protocol_ref_missing",
+      "active_gap_control_authority_ref_missing",
     ],
     requiredMeasurement:
       "Measured or validated-simulation force-gap receipt with apparatus, F(g) curve, dF/dg curve, stiffness model, and data provenance.",
@@ -100,7 +104,7 @@ const TEST_POLICY: Record<
     artifactToProduce: "receipt://force_gap_pull_in/provenance_v1",
   },
   operating_gap: {
-    blockers: ["force_gap_not_at_8nm"],
+    blockers: ["force_gap_not_at_8nm", "force_gap_curve_does_not_bracket_8nm"],
     requiredMeasurement: "Gap metrology tying the force-gap curve to the 8 nm operating gap.",
     acceptanceCriterion: "Gap measurement is within 1 pm of 8 nm in the current reduced-order policy.",
     artifactToProduce: "receipt://force_gap_pull_in/operating_gap_8nm_v1",
@@ -130,13 +134,13 @@ const TEST_POLICY: Record<
     artifactToProduce: "receipt://force_gap_pull_in/effective_spring_constant_v1",
   },
   pull_in_margin: {
-    blockers: ["pull_in_margin_missing", "pull_in_margin_below_one"],
+    blockers: ["pull_in_sweep_ref_missing", "pull_in_margin_missing", "pull_in_margin_below_one"],
     requiredMeasurement: "Pull-in margin computed from effective spring constant divided by force gradient.",
     acceptanceCriterion: "Pull-in margin is at least 1.",
     artifactToProduce: "receipt://force_gap_pull_in/pull_in_margin_v1",
   },
   stiction_margin: {
-    blockers: ["stiction_margin_missing", "stiction_margin_below_one"],
+    blockers: ["stiction_protocol_ref_missing", "stiction_margin_missing", "stiction_margin_below_one"],
     requiredMeasurement: "Stiction margin for the 8 nm gap stack.",
     acceptanceCriterion: "Stiction margin is at least 1.",
     artifactToProduce: "receipt://force_gap_pull_in/stiction_margin_v1",
@@ -144,6 +148,7 @@ const TEST_POLICY: Record<
   active_gap_control_authority: {
     blockers: [
       "active_gap_control_authority_missing",
+      "active_gap_control_authority_ref_missing",
       "active_gap_control_authority_below_1p2x_force",
     ],
     requiredMeasurement: "Active gap-control authority compared against the absolute Casimir load.",

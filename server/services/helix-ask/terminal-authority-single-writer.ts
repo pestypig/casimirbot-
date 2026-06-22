@@ -55,6 +55,54 @@ const readString = (value: unknown): string | null =>
 
 const readArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
 
+const terminalKindForSelectedArtifact = (selectedArtifactKind: string | null): string => {
+  if (selectedArtifactKind === "typed_failure") return "failure";
+  if (selectedArtifactKind === "request_user_input") return "request_user_input";
+  if (selectedArtifactKind === "workstation_tool_evaluation") return "tool_evaluation";
+  if (selectedArtifactKind?.includes("receipt")) return "tool_receipt";
+  return "answer";
+};
+
+const syncTerminalAnswerAuthorityFromSingleWriterResult = (
+  payload: Record<string, unknown>,
+  result: HelixTerminalAuthoritySingleWriterResult,
+): void => {
+  const selectedArtifactKind = readString(result.selected_terminal_artifact_kind);
+  if (!selectedArtifactKind) return;
+
+  const visibleText = readString(result.visible_text);
+  const finalAnswerSource = readString(result.source) ?? selectedArtifactKind;
+  const selectedArtifactRef = readString(result.selected_terminal_artifact_ref);
+  const terminalKind = terminalKindForSelectedArtifact(selectedArtifactKind);
+  const authority = readRecord(payload.terminal_answer_authority);
+
+  payload.terminal_answer_authority = {
+    ...(authority ?? {}),
+    schema: "helix.turn_terminal_authority.v1",
+    turn_id: readString(result.turn_id) ?? readString(authority?.turn_id) ?? null,
+    terminal_kind: terminalKind,
+    final_answer_source: finalAnswerSource,
+    terminal_artifact_kind: selectedArtifactKind,
+    ...(selectedArtifactRef ? { terminal_artifact_ref: selectedArtifactRef } : {}),
+    ...(visibleText
+      ? {
+        terminal_text_preview: visibleText.slice(0, 240),
+        terminal_text_hash: hashHelixTerminalText(visibleText),
+      }
+      : {}),
+    authority_origin:
+      selectedArtifactKind === "typed_failure"
+        ? "typed_failure"
+        : finalAnswerSource === "final_answer_draft"
+          ? "selected_final_answer"
+          : finalAnswerSource,
+    server_authoritative: terminalKind !== "tool_receipt",
+    assistant_answer: false,
+    raw_content_included: false,
+    single_writer_synchronized: true,
+  };
+};
+
 const artifactLedgerPayloadByKind = (
   artifacts: unknown,
   kind: string,
@@ -1759,6 +1807,142 @@ const collectRefsFromRecord = (record: Record<string, unknown> | null): string[]
     ...readArray(record.subgoal_observation_refs).map(readString),
   ];
   return uniqueStrings([...directRefs, ...arrayRefs]);
+};
+
+const terminalPayloadKeyForKind = (kind: string | null): string | null => {
+  switch (kind) {
+    case "model_synthesized_answer":
+    case "doc_evidence_synthesis_answer":
+    case "repo_code_evidence_answer":
+    case "compound_evidence_synthesis_answer":
+    case "compound_research_locator_answer":
+    case "scholarly_research_answer":
+    case "internet_search_answer":
+    case "theory_context_reflection_answer":
+    case "capability_help_summary":
+    case "workspace_status_answer":
+    case "workstation_tool_evaluation":
+      return kind;
+    default:
+      return null;
+  }
+};
+
+const supportRefsFromTerminalRecord = (record: Record<string, unknown> | null): {
+  supportRefs: string[];
+  subgoalObservationRefs: string[];
+  sourceFamilies: string[];
+} => ({
+  supportRefs: uniqueStrings([
+    ...readArray(record?.support_refs).map(readString),
+    ...readArray(record?.evidence_refs).map(readString),
+    ...readArray(record?.artifact_refs).map(readString),
+    ...readArray(record?.source_artifact_refs).map(readString),
+    ...readArray(record?.observation_refs).map(readString),
+    ...readArray(record?.source_observation_refs).map(readString),
+    ...readArray(record?.selected_evidence_refs).map(readString),
+    ...readArray(record?.grounded_observation_refs).map(readString),
+    ...readArray(record?.grounded_in_observation_refs).map(readString),
+  ]),
+  subgoalObservationRefs: uniqueStrings([
+    ...readArray(record?.subgoal_observation_refs).map(readString),
+    ...readArray(record?.source_observation_refs).map(readString),
+    ...readArray(record?.grounded_observation_refs).map(readString),
+    ...readArray(record?.grounded_in_observation_refs).map(readString),
+  ]),
+  sourceFamilies: uniqueStrings([
+    ...readArray(record?.source_families).map(readString),
+  ]),
+});
+
+const terminalKindCanMirrorSupport = (kind: string | null): kind is string =>
+  Boolean(
+    kind &&
+      kind !== "typed_failure" &&
+      kind !== "request_user_input" &&
+      kind !== "pending_server_request" &&
+      kind !== "direct_answer_text" &&
+      kind !== "tool_receipt",
+  );
+
+const artifactMatchesTerminalSelection = (
+  artifact: ArtifactLike,
+  selectedTerminalArtifactKind: string,
+  selectedTerminalArtifactRef: string | null,
+): boolean => {
+  if (artifactKind(artifact) !== selectedTerminalArtifactKind) return false;
+  if (!selectedTerminalArtifactRef) return false;
+  return artifactId(artifact) === selectedTerminalArtifactRef;
+};
+
+const selectedTerminalPayloadRecords = (input: {
+  payload: Record<string, unknown>;
+  selectedTerminalArtifactKind: string;
+  selectedTerminalArtifactRef: string | null;
+  artifactLedger: ArtifactLike[];
+}): Array<Record<string, unknown>> => {
+  const terminalPayloadKey = terminalPayloadKeyForKind(input.selectedTerminalArtifactKind);
+  const explicitPayload = terminalPayloadKey
+    ? readRecord(input.payload[terminalPayloadKey])
+    : readRecord(input.payload[input.selectedTerminalArtifactKind]);
+  const selectedArtifactPayload = input.artifactLedger
+    .filter((artifact) =>
+      artifactMatchesTerminalSelection(
+        artifact,
+        input.selectedTerminalArtifactKind,
+        input.selectedTerminalArtifactRef,
+      ))
+    .map(artifactPayload)
+    .find((record): record is Record<string, unknown> => Boolean(record));
+  const latestKindPayload = input.artifactLedger
+    .slice()
+    .reverse()
+    .find((artifact) => artifactKind(artifact) === input.selectedTerminalArtifactKind);
+  return [
+    explicitPayload,
+    selectedArtifactPayload,
+    latestKindPayload ? artifactPayload(latestKindPayload) : null,
+  ].filter((record): record is Record<string, unknown> => Boolean(record));
+};
+
+const selectedTerminalSupportMirror = (input: {
+  payload: Record<string, unknown>;
+  selectedTerminalArtifactKind: string | null;
+  selectedTerminalArtifactRef: string | null;
+  artifactLedger: ArtifactLike[];
+}): {
+  supportRefs: string[];
+  subgoalObservationRefs: string[];
+  sourceFamilies: string[];
+} => {
+  const terminalPresentation = readRecord(input.payload.terminal_presentation);
+  if (!terminalKindCanMirrorSupport(input.selectedTerminalArtifactKind)) {
+    return {
+      supportRefs: [],
+      subgoalObservationRefs: [],
+      sourceFamilies: [],
+    };
+  }
+  const terminalPayloadMirrors = selectedTerminalPayloadRecords({
+    payload: input.payload,
+    selectedTerminalArtifactKind: input.selectedTerminalArtifactKind,
+    selectedTerminalArtifactRef: input.selectedTerminalArtifactRef,
+    artifactLedger: input.artifactLedger,
+  }).map(supportRefsFromTerminalRecord);
+  return {
+    supportRefs: uniqueStrings([
+      ...terminalPayloadMirrors.flatMap((mirror) => mirror.supportRefs),
+      ...readArray(terminalPresentation?.support_refs).map(readString),
+    ]),
+    subgoalObservationRefs: uniqueStrings([
+      ...terminalPayloadMirrors.flatMap((mirror) => mirror.subgoalObservationRefs),
+      ...readArray(terminalPresentation?.subgoal_observation_refs).map(readString),
+    ]),
+    sourceFamilies: uniqueStrings([
+      ...terminalPayloadMirrors.flatMap((mirror) => mirror.sourceFamilies),
+      ...readArray(terminalPresentation?.source_families).map(readString),
+    ]),
+  };
 };
 
 const collectExplicitFinalAnswerDraftSupportRefs = (draft: ArtifactLike | null | undefined): string[] => {
@@ -4397,15 +4581,99 @@ export function applyHelixTerminalAuthoritySingleWriter(
     },
   };
   result = applyTerminalProjectionKindGuard(input.payload, result);
+  const selectedTerminalArtifactKindForMirror = readString(result.selected_terminal_artifact_kind);
+  const selectedTerminalArtifactRefForMirror = readString(result.selected_terminal_artifact_ref);
+  const selectedTerminalPayloadForMirror = terminalKindCanMirrorSupport(selectedTerminalArtifactKindForMirror)
+    ? selectedTerminalPayloadRecords({
+      payload: input.payload,
+      selectedTerminalArtifactKind: selectedTerminalArtifactKindForMirror,
+      selectedTerminalArtifactRef: selectedTerminalArtifactRefForMirror,
+      artifactLedger: artifacts,
+    })[0] ?? null
+    : null;
+  if (
+    selectedTerminalArtifactKindForMirror &&
+    selectedTerminalPayloadForMirror &&
+    !readRecord(input.payload[selectedTerminalArtifactKindForMirror])
+  ) {
+    input.payload[selectedTerminalArtifactKindForMirror] = selectedTerminalPayloadForMirror;
+  }
+  const finalSelectedTerminalSupport = selectedTerminalSupportMirror({
+    payload: input.payload,
+    selectedTerminalArtifactKind: selectedTerminalArtifactKindForMirror,
+    selectedTerminalArtifactRef: selectedTerminalArtifactRefForMirror,
+    artifactLedger: artifacts,
+  });
+  input.payload.selected_terminal_support_refs = finalSelectedTerminalSupport.supportRefs;
+  input.payload.selected_terminal_support_refs_count = finalSelectedTerminalSupport.supportRefs.length;
+  input.payload.terminal_synthesis_support_refs = finalSelectedTerminalSupport.supportRefs;
+  input.payload.terminal_synthesis_support_refs_count = finalSelectedTerminalSupport.supportRefs.length;
+  input.payload.selected_terminal_subgoal_observation_refs = finalSelectedTerminalSupport.subgoalObservationRefs;
+  input.payload.selected_terminal_subgoal_observation_refs_count =
+    finalSelectedTerminalSupport.subgoalObservationRefs.length;
+  input.payload.terminal_synthesis_subgoal_observation_refs = finalSelectedTerminalSupport.subgoalObservationRefs;
+  input.payload.terminal_synthesis_subgoal_observation_refs_count =
+    finalSelectedTerminalSupport.subgoalObservationRefs.length;
+  input.payload.selected_terminal_source_families = finalSelectedTerminalSupport.sourceFamilies;
+  result = {
+    ...result,
+    selected_terminal_support_refs: finalSelectedTerminalSupport.supportRefs,
+    selected_terminal_support_refs_count: finalSelectedTerminalSupport.supportRefs.length,
+    selected_terminal_subgoal_observation_refs: finalSelectedTerminalSupport.subgoalObservationRefs,
+    selected_terminal_subgoal_observation_refs_count: finalSelectedTerminalSupport.subgoalObservationRefs.length,
+    selected_terminal_source_families: finalSelectedTerminalSupport.sourceFamilies,
+  };
 
+  syncTerminalAnswerAuthorityFromSingleWriterResult(input.payload, result);
   input.payload.terminal_authority_single_writer = result;
   input.payload.terminal_candidate_rejections = auditRejectedCandidates;
   input.payload.legacy_terminal_candidates = legacyCandidates;
   const debug = readRecord(input.payload.debug);
   if (debug) {
+    debug.terminal_answer_authority = input.payload.terminal_answer_authority;
     debug.terminal_authority_single_writer = result;
     debug.terminal_candidate_rejections = auditRejectedCandidates;
     debug.legacy_terminal_candidates = legacyCandidates;
+    debug.terminal_artifact_kind = input.payload.terminal_artifact_kind;
+    debug.final_answer_source = input.payload.final_answer_source;
+    debug.selected_final_answer = input.payload.selected_final_answer;
+    debug.answer = input.payload.answer;
+    debug.text = input.payload.text;
+    debug.terminal_presentation = input.payload.terminal_presentation;
+    debug.selected_terminal_support_refs = input.payload.selected_terminal_support_refs;
+    debug.selected_terminal_support_refs_count = input.payload.selected_terminal_support_refs_count;
+    debug.terminal_synthesis_support_refs = input.payload.terminal_synthesis_support_refs;
+    debug.terminal_synthesis_support_refs_count = input.payload.terminal_synthesis_support_refs_count;
+    debug.selected_terminal_subgoal_observation_refs = input.payload.selected_terminal_subgoal_observation_refs;
+    debug.selected_terminal_subgoal_observation_refs_count =
+      input.payload.selected_terminal_subgoal_observation_refs_count;
+    debug.terminal_synthesis_subgoal_observation_refs = input.payload.terminal_synthesis_subgoal_observation_refs;
+    debug.terminal_synthesis_subgoal_observation_refs_count =
+      input.payload.terminal_synthesis_subgoal_observation_refs_count;
+    debug.selected_terminal_source_families = input.payload.selected_terminal_source_families;
+    if (input.payload.model_synthesized_answer) debug.model_synthesized_answer = input.payload.model_synthesized_answer;
+    if (input.payload.compound_evidence_synthesis_answer) {
+      debug.compound_evidence_synthesis_answer = input.payload.compound_evidence_synthesis_answer;
+    }
+    if (input.payload.compound_research_locator_answer) {
+      debug.compound_research_locator_answer = input.payload.compound_research_locator_answer;
+    }
+    if (input.payload.doc_evidence_synthesis_answer) {
+      debug.doc_evidence_synthesis_answer = input.payload.doc_evidence_synthesis_answer;
+    }
+    if (input.payload.repo_code_evidence_answer) debug.repo_code_evidence_answer = input.payload.repo_code_evidence_answer;
+    if (input.payload.scholarly_research_answer) debug.scholarly_research_answer = input.payload.scholarly_research_answer;
+    if (input.payload.internet_search_answer) debug.internet_search_answer = input.payload.internet_search_answer;
+    if (input.payload.theory_context_reflection_answer) {
+      debug.theory_context_reflection_answer = input.payload.theory_context_reflection_answer;
+    }
+    if (
+      selectedTerminalArtifactKindForMirror &&
+      selectedTerminalPayloadForMirror &&
+      !readRecord(debug[selectedTerminalArtifactKindForMirror])
+    ) {
+      debug[selectedTerminalArtifactKindForMirror] = selectedTerminalPayloadForMirror;
+    }
     if (input.payload.terminal_projection_guard) {
       debug.terminal_projection_guard = input.payload.terminal_projection_guard;
     }

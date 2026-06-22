@@ -22,9 +22,11 @@ import {
   buildNhm2BackreactionResidualReceipt,
   isNhm2BackreactionResidualReceipt,
 } from "../shared/contracts/nhm2-backreaction-residual-receipt.v1";
+import type { Nhm2CoupledClosurePassCandidateArtifactV1 } from "../shared/contracts/nhm2-coupled-closure-pass-candidate.v1";
 import { buildNhm2TileEffectiveFullTensorSourceArtifact } from "../shared/contracts/nhm2-tile-effective-full-tensor-source.v1";
 import type { Nhm2RegionalFullTensorResidualArtifactV1 } from "../shared/contracts/nhm2-regional-full-tensor-residual.v1";
 import type { Nhm2SourceComponentAuthorityLedgerArtifactV1 } from "../shared/contracts/nhm2-source-component-authority-ledger.v1";
+import type { Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 } from "../shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1";
 import type { Nhm2MetricRequiredMomentumDemandAuditV1 } from "../shared/contracts/nhm2-metric-required-momentum-demand-audit.v1";
 import type { Nhm2MomentumFrameProjectionReceiptV1 } from "../shared/contracts/nhm2-momentum-frame-projection-receipt.v1";
 import type { Nhm2SourceMomentumDensityAuditArtifactV1 } from "../shared/contracts/nhm2-source-momentum-density-audit.v1";
@@ -296,6 +298,142 @@ const completeLedger = (
       missingComponentsCannotBeZeroFilled: true,
     },
   }) as Nhm2SourceComponentAuthorityLedgerArtifactV1;
+
+const sourceAuthorityRegion = (
+  regionId: string,
+  blockers: string[] = [],
+): Nhm2SourceSideSameBasisTensorAuthorityArtifactV1["regions"][number] => ({
+  regionId,
+  status: blockers.length === 0 ? "authoritative_same_basis" : "blocked",
+  sourceTensorRef: `full-apparatus-tensor-values.json#regions/${regionId}`,
+  expectedMetricCounterpartRole: "tile_effective_counterpart",
+  comparisonRole: "full_apparatus_material_source_tensor",
+  chartId: "comoving_cartesian",
+  basisRef: "atlas.json#basisAndUnits",
+  units: "J/m^3",
+  regionMaskRef: `atlas.json#regions/${regionId}`,
+  aggregationMode: "support_weighted",
+  normalizationBasis: "sum_weights",
+  tensorAuthorityMode: "source_side_full_apparatus_tensor",
+  derivationMode: "full_apparatus_tensor_values",
+  notDerivedFromMetricRequiredTensor: true,
+  hasFullTensorComponents: blockers.length === 0,
+  missingComponentIds: [],
+  materialReceiptRef: "material-receipts.json",
+  materialReceiptStatus: "material_receipted",
+  blockers,
+  warnings: [],
+});
+
+const sourceAuthority = (
+  summary?: Partial<Nhm2SourceSideSameBasisTensorAuthorityArtifactV1["summary"]>,
+  regionBlockers: Record<string, string[]> = {},
+): Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 => {
+  const regions = ["global", "hull", "wall", "exterior_shell"].map((regionId) =>
+    sourceAuthorityRegion(regionId, regionBlockers[regionId] ?? []),
+  );
+  const anyBlocked = regions.some((region) => region.blockers.length > 0);
+  return {
+    contractVersion: "nhm2_source_side_same_basis_tensor_authority/v1",
+    generatedAt: "2026-06-18T00:00:00.000Z",
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+    chartId: "comoving_cartesian",
+    sourceModelId: "full_apparatus_material_source_tensor",
+    sourceTensorArtifactRef: "full-apparatus-tensor-values.json",
+    counterpartArtifactRef: "counterpart.json",
+    tileSourceAuthorityHandoffRef: "tile-source-handoff.json",
+    tileSourceAuthorityHandoffStatus: "ready",
+    regions,
+    summary: {
+      hasWallAuthority: !anyBlocked,
+      allRequiredRegionsAuthoritative: !anyBlocked,
+      tileSourceHandoffReady: true,
+      anyMetricEcho: false,
+      anyProxy: false,
+      anyMissingCounterpart: false,
+      missingRegionIds: [],
+      tileSourceHandoffRequiredCorrections: {},
+      blockerCount: regions.reduce((sum, region) => sum + region.blockers.length, 0),
+      ...summary,
+    },
+    claimBoundary: {
+      diagnosticOnly: true,
+      doesNotValidatePhysicalSource: true,
+      metricEchoForbidden: true,
+      wallT00ClosureRequiresWallAuthority: true,
+    },
+  };
+};
+
+const coupledClosureWithTileSourceCorrections = (): Nhm2CoupledClosurePassCandidateArtifactV1 =>
+  ({
+    contractVersion: "nhm2_coupled_closure_pass_candidate/v1",
+    generatedAt: "2026-06-18T00:00:00.000Z",
+    laneId: "nhm2_shift_lapse",
+    selectedProfileId: "stage1_centerline_alpha_0p995_v1",
+    runId: "campaign-test",
+    artifactRefs: {
+      regionalSupportFunctionAtlas: null,
+      regionalMaterialSourceTensorModel: null,
+      tileLocalSourceElements: null,
+      tileEffectiveCounterpart: null,
+      tileSourceAuthorityHandoff: "tile-source-handoff.json",
+      sourceComponentAuthorityLedger: null,
+      sourceSideSameBasisTensorAuthority: null,
+      regionalSourceClosureEvidence: null,
+      sourceClosurePassReadiness: null,
+      conservation: null,
+      qeiWorldlineDossier: null,
+      observerRobustEnergyConditions: null,
+      casimirMaterialReceipt: null,
+    },
+    gates: [
+      {
+        gateId: "tile_source_authority_handoff",
+        status: "blocked",
+        pass: false,
+        blockers: ["tile_source_authority_handoff_status_blocked"],
+        warnings: ["tile_source_handoff_does_not_run_downstream_gates"],
+        primaryMetric: "handoffStatus=blocked",
+        requiredCorrections: {
+          effectiveSourceTensorLayerCountShortfall: 88.506,
+          activeAreaRetentionShortfall: 0.1,
+          missingFatigueProvenanceRefCount: 4,
+        },
+      },
+    ],
+    summary: {
+      passCandidate: false,
+      sourceClosurePassSignalAllowed: false,
+      tileSourceHandoffReady: false,
+      tileSourceHandoffStatus: "blocked",
+      allRequiredRegionsAuthoritative: true,
+      sourceComponentAuthorityComplete: true,
+      wallAuthorityPresent: true,
+      wallClosureReady: true,
+      regionalResidualsPass: true,
+      conservationPass: true,
+      qeiDossierPass: true,
+      observerRobustPass: true,
+      materialReceipted: true,
+      atlasConsumerCongruencePass: true,
+      firstBlocker: "tile_source_authority_handoff_status_blocked",
+      firstRequiredCorrections: {
+        effectiveSourceTensorLayerCountShortfall: 88.506,
+        activeAreaRetentionShortfall: 0.1,
+        missingFatigueProvenanceRefCount: 4,
+      },
+      blockerCount: 1,
+    },
+    claimBoundary: {
+      diagnosticOnly: true,
+      physicalViabilityClaimAllowed: false,
+      transportClaimAllowed: false,
+      doesNotRecomputePhysics: true,
+      requiresSameRunSameChartEvidence: true,
+    },
+  }) as Nhm2CoupledClosurePassCandidateArtifactV1;
 
 const momentumAudit = (): Nhm2SourceMomentumDensityAuditArtifactV1 =>
   ({
@@ -1287,9 +1425,57 @@ describe("NHM2 time-dependent source campaign", () => {
     expect(artifact.claimBoundary.transportClaimAllowed).toBe(false);
   });
 
+  it("keeps source independence missing when the same-basis source authority artifact is absent", () => {
+    const artifact = buildNhm2TimeDependentSourceCampaign({
+      sourceComponentAuthorityLedger: completeLedger(),
+    });
+
+    expect(artifact.summary.sourceIndependencePass).toBe(false);
+    expect(artifact.summary.firstBlocker).toBe(
+      "source_side_same_basis_tensor_authority_missing",
+    );
+    expect(artifact.sourceIndependence.sameBasisAuthorityReady).toBeNull();
+    expect(artifact.sourceIndependence.blockers).toContain(
+      "source_side_same_basis_tensor_authority_missing",
+    );
+  });
+
+  it("blocks source independence when same-basis source authority is not authoritative", () => {
+    const artifact = buildNhm2TimeDependentSourceCampaign({
+      artifactRefs: {
+        sourceSideSameBasisTensorAuthority: "source-authority.json",
+        tileSourceAuthorityHandoff: "tile-source-handoff.json",
+      },
+      sourceComponentAuthorityLedger: completeLedger(),
+      sourceSideSameBasisTensorAuthority: sourceAuthority(
+        {
+          allRequiredRegionsAuthoritative: false,
+          tileSourceHandoffReady: true,
+          blockerCount: 1,
+        },
+        {
+          wall: ["T12:full_apparatus_term_missing"],
+        },
+      ),
+    });
+
+    expect(artifact.summary.sourceIndependencePass).toBe(false);
+    expect(artifact.summary.firstBlocker).toBe(
+      "source_side_same_basis_tensor_authority_not_authoritative",
+    );
+    expect(artifact.sourceIndependence.sameBasisAuthorityReady).toBe(false);
+    expect(artifact.sourceIndependence.sameBasisAuthorityRef).toBe(
+      "source-authority.json",
+    );
+    expect(artifact.sourceIndependence.sourceAuthorityBlockers).toContain(
+      "wall:T12:full_apparatus_term_missing",
+    );
+  });
+
   it("does not let static source, tensor, QEI, and observer evidence pass the dynamic campaign", () => {
     const artifact = buildNhm2TimeDependentSourceCampaign({
       sourceComponentAuthorityLedger: completeLedger(),
+      sourceSideSameBasisTensorAuthority: sourceAuthority(),
       regionalFullTensorResidual: fullTensorResidual(),
       qeiWorldlineDossier: qeiDossier(),
       observerRobustEnergyConditions: observerArtifact(),
@@ -1304,9 +1490,43 @@ describe("NHM2 time-dependent source campaign", () => {
     expect(artifact.frequencyLadder.blockers).toContain("frequency_convergence_evidence_missing");
   });
 
+  it("carries coupled-closure material/source required corrections into the campaign ledger", () => {
+    const artifact = buildNhm2TimeDependentSourceCampaign({
+      sourceComponentAuthorityLedger: completeLedger(),
+      sourceSideSameBasisTensorAuthority: sourceAuthority(),
+      regionalFullTensorResidual: fullTensorResidual(),
+      frequencyConvergence: frequencyEvidence(),
+      switchingConservation: switchingEvidence(),
+      dynamicEffectiveGeometry: dynamicGeometryEvidence(),
+      qeiWorldlineDossier: qeiDossier(),
+      observerRobustEnergyConditions: observerArtifact(),
+      campaignStability: stabilityEvidence(),
+      coupledClosurePassCandidate: coupledClosureWithTileSourceCorrections(),
+    });
+
+    expect(isNhm2TimeDependentSourceCampaignArtifact(artifact)).toBe(true);
+    expect(artifact.summary.campaignPass).toBe(false);
+    expect(artifact.summary.sourceIndependencePass).toBe(false);
+    expect(artifact.summary.firstBlocker).toBe(
+      "tile_source_authority_handoff:tile_source_authority_handoff_status_blocked",
+    );
+    expect(artifact.summary.firstRequiredCorrections).toMatchObject({
+      "tile_source_authority_handoff.effectiveSourceTensorLayerCountShortfall": 88.506,
+      "tile_source_authority_handoff.activeAreaRetentionShortfall": 0.1,
+    });
+    expect(artifact.summary.coupledClosureRequiredCorrections).toMatchObject({
+      "tile_source_authority_handoff.effectiveSourceTensorLayerCountShortfall": 88.506,
+      "tile_source_authority_handoff.activeAreaRetentionShortfall": 0.1,
+      "tile_source_authority_handoff.missingFatigueProvenanceRefCount": 4,
+    });
+    expect(artifact.claimBoundary.physicalViabilityClaimAllowed).toBe(false);
+    expect(artifact.claimBoundary.transportClaimAllowed).toBe(false);
+  });
+
   it("moves the first blocker past switching when valid switching evidence is supplied", () => {
     const artifact = buildNhm2TimeDependentSourceCampaign({
       sourceComponentAuthorityLedger: completeLedger(),
+      sourceSideSameBasisTensorAuthority: sourceAuthority(),
       regionalFullTensorResidual: fullTensorResidual(),
       qeiWorldlineDossier: qeiDossier(),
       observerRobustEnergyConditions: observerArtifact(),
@@ -1321,6 +1541,7 @@ describe("NHM2 time-dependent source campaign", () => {
   it("moves the first blocker from missing dynamic evidence to typed dynamic blockers", () => {
     const artifact = buildNhm2TimeDependentSourceCampaign({
       sourceComponentAuthorityLedger: completeLedger(),
+      sourceSideSameBasisTensorAuthority: sourceAuthority(),
       regionalFullTensorResidual: fullTensorResidual(),
       qeiWorldlineDossier: qeiDossier(),
       observerRobustEnergyConditions: observerArtifact(),
@@ -1351,6 +1572,7 @@ describe("NHM2 time-dependent source campaign", () => {
     });
     const artifact = buildNhm2TimeDependentSourceCampaign({
       sourceComponentAuthorityLedger: completeLedger(),
+      sourceSideSameBasisTensorAuthority: sourceAuthority(),
       regionalFullTensorResidual: fullTensorResidual(),
       qeiWorldlineDossier: qeiDossier(),
       observerRobustEnergyConditions: observerArtifact(),
@@ -1385,6 +1607,7 @@ describe("NHM2 time-dependent source campaign", () => {
         firstBlocker: "wall:T00:metric_echo",
         blockerCount: 1,
       }),
+      sourceSideSameBasisTensorAuthority: sourceAuthority(),
     });
 
     expect(artifact.sourceIndependence.copiedFromMetricRequiredTensor).toBe(true);
@@ -1396,6 +1619,7 @@ describe("NHM2 time-dependent source campaign", () => {
   it("blocks full regional tensor closure when T0i or off-diagonal Tij are missing", () => {
     const artifact = buildNhm2TimeDependentSourceCampaign({
       sourceComponentAuthorityLedger: completeLedger(),
+      sourceSideSameBasisTensorAuthority: sourceAuthority(),
       regionalFullTensorResidual: fullTensorResidual(
         {
           allRequiredComponentsPresent: false,
@@ -1435,6 +1659,7 @@ describe("NHM2 time-dependent source campaign", () => {
   it("surfaces off-diagonal fractional shear ansatz evidence in the full tensor campaign gate", () => {
     const artifact = buildNhm2TimeDependentSourceCampaign({
       sourceComponentAuthorityLedger: completeLedger(),
+      sourceSideSameBasisTensorAuthority: sourceAuthority(),
       regionalFullTensorResidual: fullTensorResidual({
         fullTensorResidualsPass: false,
         worstRegionId: "hull",
@@ -1478,6 +1703,7 @@ describe("NHM2 time-dependent source campaign", () => {
   it("surfaces momentum-density ansatz evidence in the full tensor campaign gate", () => {
     const artifact = buildNhm2TimeDependentSourceCampaign({
       sourceComponentAuthorityLedger: completeLedger(),
+      sourceSideSameBasisTensorAuthority: sourceAuthority(),
       regionalFullTensorResidual: fullTensorResidual({
         fullTensorResidualsPass: false,
         worstRegionId: "hull",
@@ -1522,6 +1748,7 @@ describe("NHM2 time-dependent source campaign", () => {
   it("uses a momentum frame projection receipt to distinguish blocked local-frame evidence", () => {
     const artifact = buildNhm2TimeDependentSourceCampaign({
       sourceComponentAuthorityLedger: completeLedger(),
+      sourceSideSameBasisTensorAuthority: sourceAuthority(),
       regionalFullTensorResidual: fullTensorResidual({
         fullTensorResidualsPass: false,
         worstRegionId: "hull",
@@ -1564,6 +1791,7 @@ describe("NHM2 time-dependent source campaign", () => {
   it("promotes applicable metric momentum demand audit failures to current-profile falsifiers", () => {
     const artifact = buildNhm2TimeDependentSourceCampaign({
       sourceComponentAuthorityLedger: completeLedger(),
+      sourceSideSameBasisTensorAuthority: sourceAuthority(),
       regionalFullTensorResidual: fullTensorResidual({
         fullTensorResidualsPass: false,
         worstRegionId: "hull",
@@ -1610,6 +1838,7 @@ describe("NHM2 time-dependent source campaign", () => {
         campaignFrontierDisposition: "frontier-disposition.json",
       },
       sourceComponentAuthorityLedger: completeLedger(),
+      sourceSideSameBasisTensorAuthority: sourceAuthority(),
       regionalFullTensorResidual: fullTensorResidual({
         fullTensorResidualsPass: false,
         worstRegionId: "hull",
@@ -1662,6 +1891,7 @@ describe("NHM2 time-dependent source campaign", () => {
   it("can pass only when explicit dynamic, tensor, observer, QEI, and stability evidence pass together", () => {
     const artifact = buildNhm2TimeDependentSourceCampaign({
       sourceComponentAuthorityLedger: completeLedger(),
+      sourceSideSameBasisTensorAuthority: sourceAuthority(),
       regionalFullTensorResidual: fullTensorResidual(),
       frequencyConvergence: frequencyEvidence(),
       switchingConservation: switchingEvidence(),
@@ -1692,3 +1922,4 @@ describe("NHM2 time-dependent source campaign", () => {
     });
   });
 });
+

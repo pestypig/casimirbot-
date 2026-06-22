@@ -14,6 +14,7 @@ import type {
   Nhm2TileSourceOperatingBudgetCorrectionValueV1,
   Nhm2TileSourceOperatingBudgetSurfaceIdV1,
 } from "./nhm2-tile-source-operating-budget-readiness.v1";
+import type { Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 } from "./nhm2-source-side-same-basis-tensor-authority.v1";
 
 export const NHM2_TILE_SOURCE_FALSIFICATION_REPORT_CONTRACT_VERSION =
   "nhm2_tile_source_falsification_report/v1";
@@ -40,11 +41,71 @@ export type Nhm2TileSourceCampaignDomainSummaryV1 = {
   evidenceRefs: string[];
 };
 
+export type Nhm2TileSourceCampaignDecisionV1 = {
+  campaignDomain: Nhm2TileSourceExperimentalCampaignDomainV1;
+  decision: "go" | "review" | "no_go";
+  evidenceState:
+    | "ready"
+    | "missing_receipt"
+    | "failing_margin"
+    | "source_authority_blocked"
+    | "downstream_blocked"
+    | "operating_budget_blocked"
+    | "open_review";
+  firstBlocker: string;
+  blockerCount: number;
+  falsifyingBlockerCount: number;
+  minimumNumericalMargin: number | null;
+  evidenceTarget: string;
+  nextRequiredChange: string;
+  prevents: string[];
+  requiredCorrectionKeys: string[];
+  evidenceRefs: string[];
+  blocksCampaignPass: boolean;
+  claimBoundary: {
+    diagnosticOnly: true;
+    decisionMatrixDoesNotSupplyEvidence: true;
+    noGoMeansCurrentCandidateOnly: true;
+  };
+};
+
+export type Nhm2TileSourceFrontierResolutionModeV1 =
+  | "supply_experimental_receipt"
+  | "revise_architecture_or_operating_margin"
+  | "supply_same_basis_full_apparatus_tensor"
+  | "rerun_downstream_gate"
+  | "supply_operating_budget_receipt"
+  | "resolve_open_review";
+
+export type Nhm2TileSourceFrontierResolutionItemV1 = {
+  rank: number;
+  campaignDomain: Nhm2TileSourceExperimentalCampaignDomainV1;
+  decision: Nhm2TileSourceCampaignDecisionV1["decision"];
+  evidenceState: Nhm2TileSourceCampaignDecisionV1["evidenceState"];
+  resolutionMode: Nhm2TileSourceFrontierResolutionModeV1;
+  firstBlocker: string;
+  blockerIds: string[];
+  numericalMargin: number | null;
+  marginInterpretation: "below_one_fails" | "boolean_or_missing" | "not_numeric";
+  evidenceTarget: string;
+  requiredChange: string;
+  requiredCorrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
+  prevents: string[];
+  evidenceRefs: string[];
+  blocksCampaignPass: true;
+  claimBoundary: {
+    diagnosticOnly: true;
+    resolutionQueueDoesNotSupplyEvidence: true;
+    resolvingItemRequiresNewReceiptOrArtifact: true;
+  };
+};
+
 export type Nhm2TileSourceFalsificationReportRowV1 = {
   blockerId: string;
   source:
     | "material_evidence_receipts"
     | "physical_validation_plan"
+    | "source_side_same_basis_authority"
     | "downstream_gate"
     | "evidence_gap_roadmap"
     | "operating_budget_readiness";
@@ -94,6 +155,7 @@ export type Nhm2TileSourceFalsificationReportV1 = {
     physicalValidationPlanRef: string | null;
     evidenceGapRoadmapRef: string | null;
     operatingBudgetReadinessRef: string | null;
+    sourceSideSameBasisTensorAuthorityRef: string | null;
   };
   disposition: {
     materialEvidenceDisposition: "receipt_ready" | "review" | "falsified";
@@ -102,8 +164,11 @@ export type Nhm2TileSourceFalsificationReportV1 = {
     firstBlocker: string;
   };
   currentBlocker: Nhm2TileSourceFalsificationCurrentBlockerV1;
+  correctionSummary: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
   blockerRows: Nhm2TileSourceFalsificationReportRowV1[];
   campaignDomainSummary: Nhm2TileSourceCampaignDomainSummaryV1[];
+  goNoGoMatrix: Nhm2TileSourceCampaignDecisionV1[];
+  frontierResolutionQueue: Nhm2TileSourceFrontierResolutionItemV1[];
   readiness: {
     materialEvidenceReady: boolean;
     fullApparatusTensorReady: boolean;
@@ -151,10 +216,12 @@ export type BuildNhm2TileSourceFalsificationReportInput = {
   physicalValidationPlan: Nhm2TileSourcePhysicalValidationPlanV1;
   evidenceGapRoadmap: Nhm2TileSourceEvidenceGapRoadmapV1;
   operatingBudgetReadiness?: Nhm2TileSourceOperatingBudgetReadinessV1 | null;
+  sourceSideSameBasisTensorAuthority?: Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 | null;
   materialEvidenceReceiptsRef?: string | null;
   physicalValidationPlanRef?: string | null;
   evidenceGapRoadmapRef?: string | null;
   operatingBudgetReadinessRef?: string | null;
+  sourceSideSameBasisTensorAuthorityRef?: string | null;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -243,7 +310,7 @@ const marginSummary = (margins: Record<string, number | boolean | null>): string
     : entries.map(([key, value]) => `${key}=${String(value)}`).join(", ");
 };
 
-const correctionSummary = (
+const formatCorrectionSummary = (
   corrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>,
 ): string => {
   const entries = Object.entries(corrections).filter(([, value]) => {
@@ -376,6 +443,203 @@ const buildCampaignDomainSummary = (
     };
   });
 
+const preventsFromDomain = (
+  domain: Nhm2TileSourceExperimentalCampaignDomainV1,
+): string[] => {
+  switch (domain) {
+    case "material_coupon_behavior":
+      return [
+        "force_gap_pull_in",
+        "roughness_patch_potential",
+        "fatigue_layer_scaling",
+        "full_apparatus_tensor",
+        "material_credibility_gate",
+      ];
+    case "force_gap_pull_in":
+      return [
+        "active_control_energy_noise_heat_timing",
+        "full_apparatus_tensor",
+        "covariant_conservation",
+      ];
+    case "roughness_patch_potential":
+      return ["force_gap_pull_in", "full_apparatus_tensor", "material_credibility_gate"];
+    case "active_control_energy_noise_heat_timing":
+      return [
+        "time_dependent_source_campaign",
+        "covariant_conservation",
+        "full_apparatus_tensor",
+      ];
+    case "fatigue_layer_scaling":
+      return ["full_apparatus_tensor", "material_credibility_gate"];
+    case "full_apparatus_tensor":
+      return [
+        "source_side_same_basis_authority",
+        "regional_residual_closure",
+        "qei_worldline_dossier",
+        "observer_robustness",
+      ];
+    case "downstream_residual_conservation_qei_observer":
+      return ["coupled_closure", "claim_admission"];
+    case "campaign_coordination":
+      return ["frozen_reference_capsule", "same_run_artifact_congruence"];
+  }
+};
+
+const evidenceStateFromRows = (
+  domainRows: Nhm2TileSourceFalsificationReportRowV1[],
+): Nhm2TileSourceCampaignDecisionV1["evidenceState"] => {
+  if (domainRows.length === 0) return "ready";
+  if (domainRows.some((row) => row.source === "source_side_same_basis_authority")) {
+    return "source_authority_blocked";
+  }
+  if (domainRows.some((row) => row.source === "downstream_gate")) {
+    return "downstream_blocked";
+  }
+  if (
+    domainRows.some(
+      (row) =>
+        row.status === "missing" ||
+        row.blockerId.includes("_missing") ||
+        row.blockerId.includes("missing_"),
+    )
+  ) {
+    return "missing_receipt";
+  }
+  if (domainRows.some((row) => row.falsifiesCurrentCandidate || row.status === "fail")) {
+    return "failing_margin";
+  }
+  if (domainRows.some((row) => row.source === "operating_budget_readiness")) {
+    return "operating_budget_blocked";
+  }
+  return "open_review";
+};
+
+const decisionFromRows = (
+  domainRows: Nhm2TileSourceFalsificationReportRowV1[],
+): Nhm2TileSourceCampaignDecisionV1["decision"] => {
+  if (domainRows.some((row) => row.falsifiesCurrentCandidate || row.status === "falsifying")) {
+    return "no_go";
+  }
+  return domainRows.length > 0 ? "review" : "go";
+};
+
+const requiredCorrectionKeys = (
+  rows: Nhm2TileSourceFalsificationReportRowV1[],
+): string[] =>
+  uniqueText(
+    rows.flatMap((row) =>
+      Object.keys(row.requiredCorrections).map(
+        (key) => `${correctionNamespace(row)}.${key}`,
+      ),
+    ),
+  );
+
+const buildGoNoGoMatrix = (
+  rows: Nhm2TileSourceFalsificationReportRowV1[],
+  summaries: Nhm2TileSourceCampaignDomainSummaryV1[],
+): Nhm2TileSourceCampaignDecisionV1[] =>
+  summaries.map((summary) => {
+    const domainRows = rows.filter((row) => row.campaignDomain === summary.campaignDomain);
+    const decision = decisionFromRows(domainRows);
+    return {
+      campaignDomain: summary.campaignDomain,
+      decision,
+      evidenceState: evidenceStateFromRows(domainRows),
+      firstBlocker: summary.firstBlocker,
+      blockerCount: summary.blockerCount,
+      falsifyingBlockerCount: summary.falsifyingBlockerCount,
+      minimumNumericalMargin: summary.minimumNumericalMargin,
+      evidenceTarget: summary.evidenceTarget,
+      nextRequiredChange: summary.nextRequiredChange,
+      prevents: decision === "go" ? [] : preventsFromDomain(summary.campaignDomain),
+      requiredCorrectionKeys: requiredCorrectionKeys(domainRows),
+      evidenceRefs: summary.evidenceRefs,
+      blocksCampaignPass: decision !== "go",
+      claimBoundary: {
+        diagnosticOnly: true,
+        decisionMatrixDoesNotSupplyEvidence: true,
+        noGoMeansCurrentCandidateOnly: true,
+      },
+    };
+  });
+
+const resolutionModeFromEvidenceState = (
+  evidenceState: Nhm2TileSourceCampaignDecisionV1["evidenceState"],
+): Nhm2TileSourceFrontierResolutionModeV1 => {
+  switch (evidenceState) {
+    case "missing_receipt":
+      return "supply_experimental_receipt";
+    case "failing_margin":
+      return "revise_architecture_or_operating_margin";
+    case "source_authority_blocked":
+      return "supply_same_basis_full_apparatus_tensor";
+    case "downstream_blocked":
+      return "rerun_downstream_gate";
+    case "operating_budget_blocked":
+      return "supply_operating_budget_receipt";
+    case "open_review":
+    case "ready":
+      return "resolve_open_review";
+  }
+};
+
+const marginInterpretation = (
+  rows: Nhm2TileSourceFalsificationReportRowV1[],
+  margin: number | null,
+): Nhm2TileSourceFrontierResolutionItemV1["marginInterpretation"] => {
+  if (typeof margin === "number" && Number.isFinite(margin)) {
+    return "below_one_fails";
+  }
+  return rows.some((row) => Object.keys(row.numericalMargins).length > 0)
+    ? "boolean_or_missing"
+    : "not_numeric";
+};
+
+const correctionValuesForRows = (
+  rows: Nhm2TileSourceFalsificationReportRowV1[],
+): Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> => {
+  const values: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> = {};
+  for (const row of rows) {
+    for (const [key, value] of Object.entries(row.requiredCorrections)) {
+      values[`${correctionNamespace(row)}.${key}`] = value;
+    }
+  }
+  return values;
+};
+
+const buildFrontierResolutionQueue = (
+  rows: Nhm2TileSourceFalsificationReportRowV1[],
+  matrix: Nhm2TileSourceCampaignDecisionV1[],
+): Nhm2TileSourceFrontierResolutionItemV1[] =>
+  matrix
+    .filter((entry) => entry.blocksCampaignPass)
+    .map((entry) => {
+      const domainRows = rows.filter((row) => row.campaignDomain === entry.campaignDomain);
+      return {
+        rank: 0,
+        campaignDomain: entry.campaignDomain,
+        decision: entry.decision,
+        evidenceState: entry.evidenceState,
+        resolutionMode: resolutionModeFromEvidenceState(entry.evidenceState),
+        firstBlocker: entry.firstBlocker,
+        blockerIds: domainRows.map((row) => row.blockerId),
+        numericalMargin: entry.minimumNumericalMargin,
+        marginInterpretation: marginInterpretation(domainRows, entry.minimumNumericalMargin),
+        evidenceTarget: entry.evidenceTarget,
+        requiredChange: entry.nextRequiredChange,
+        requiredCorrections: correctionValuesForRows(domainRows),
+        prevents: entry.prevents,
+        evidenceRefs: entry.evidenceRefs,
+        blocksCampaignPass: true,
+        claimBoundary: {
+          diagnosticOnly: true,
+          resolutionQueueDoesNotSupplyEvidence: true,
+          resolvingItemRequiresNewReceiptOrArtifact: true,
+        },
+      };
+    })
+    .map((entry, index) => ({ ...entry, rank: index + 1 }));
+
 const operatingBudgetRows = (
   readiness: Nhm2TileSourceOperatingBudgetReadinessV1 | null | undefined,
 ): Nhm2TileSourceFalsificationReportRowV1[] =>
@@ -395,11 +659,103 @@ const operatingBudgetRows = (
           marginUnit: "ratio_or_boolean_margin",
           requiredChange: `supply or revise ${status.surfaceId} operating evidence; ${marginSummary(
             status.numericalMargins,
-          )}; corrections: ${correctionSummary(status.requiredCorrections)}`,
+          )}; corrections: ${formatCorrectionSummary(status.requiredCorrections)}`,
           falsifiesCurrentCandidate: status.falsifiesCurrentCandidate,
           evidenceRef: status.artifactRef,
         })),
   ) ?? [];
+
+const sourceAuthorityRows = (
+  artifact: Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 | null | undefined,
+  artifactRef: string | null | undefined,
+): Nhm2TileSourceFalsificationReportRowV1[] => {
+  if (artifact == null || artifact.summary.allRequiredRegionsAuthoritative) {
+    return [];
+  }
+  const rows = artifact.regions.flatMap((region) => {
+    if (region.status === "authoritative_same_basis") return [];
+    const blockers =
+      region.blockers.length > 0
+        ? region.blockers
+        : ["source_side_same_basis_region_not_authoritative"];
+    return blockers.map((blocker) => {
+      const echoOrProxy =
+        region.status === "metric_echo_forbidden" ||
+        region.status === "proxy_limited" ||
+        artifact.summary.anyMetricEcho ||
+        artifact.summary.anyProxy;
+      return {
+        blockerId: `${region.regionId}:${blocker}`,
+        source: "source_side_same_basis_authority" as const,
+        surfaceId: "full_apparatus_tensor" as const,
+        operatingBudgetSurfaceId: null,
+        downstreamGateId: null,
+        status: echoOrProxy ? ("falsifying" as const) : ("review" as const),
+        numericalMargin: null,
+        numericalMargins: {
+          hasFullTensorComponents: region.hasFullTensorComponents,
+          notDerivedFromMetricRequiredTensor: region.notDerivedFromMetricRequiredTensor,
+          allRequiredRegionsAuthoritative:
+            artifact.summary.allRequiredRegionsAuthoritative,
+          tileSourceHandoffReady: artifact.summary.tileSourceHandoffReady,
+        },
+        requiredCorrections: region.handoffRequiredCorrections ?? {},
+        marginUnit: "boolean_authority_margin",
+        requiredChange:
+          `supply source-side same-basis full apparatus tensor authority for ` +
+          `${region.regionId}; regionStatus=${region.status}; blocker=${blocker}`,
+        campaignDomain: "full_apparatus_tensor" as const,
+        evidenceTarget: evidenceTargetFromDomain("full_apparatus_tensor"),
+        falsifiesCurrentCandidate: echoOrProxy,
+        evidenceRef: region.sourceTensorRef ?? artifactRef ?? null,
+      };
+    });
+  });
+  if (rows.length > 0) return rows;
+  return [
+    {
+      blockerId: "source_side_same_basis_tensor_authority_not_authoritative",
+      source: "source_side_same_basis_authority",
+      surfaceId: "full_apparatus_tensor",
+      operatingBudgetSurfaceId: null,
+      downstreamGateId: null,
+      status: "review",
+      numericalMargin: null,
+      numericalMargins: {
+        allRequiredRegionsAuthoritative:
+          artifact.summary.allRequiredRegionsAuthoritative,
+        tileSourceHandoffReady: artifact.summary.tileSourceHandoffReady,
+      },
+      requiredCorrections: artifact.summary.tileSourceHandoffRequiredCorrections,
+      marginUnit: "boolean_authority_margin",
+      requiredChange:
+        "supply authoritative same-basis full apparatus source tensor regions before treating the candidate as source-authoritative",
+      campaignDomain: "full_apparatus_tensor",
+      evidenceTarget: evidenceTargetFromDomain("full_apparatus_tensor"),
+      falsifiesCurrentCandidate: false,
+      evidenceRef: artifactRef ?? null,
+    },
+  ];
+};
+
+const correctionNamespace = (row: Nhm2TileSourceFalsificationReportRowV1): string =>
+  row.operatingBudgetSurfaceId ??
+  row.surfaceId ??
+  row.downstreamGateId ??
+  row.campaignDomain ??
+  row.source;
+
+const buildCorrectionSummary = (
+  rows: Nhm2TileSourceFalsificationReportRowV1[],
+): Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> => {
+  const summary: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> = {};
+  for (const row of rows) {
+    for (const [key, value] of Object.entries(row.requiredCorrections)) {
+      summary[`${correctionNamespace(row)}.${key}`] = value;
+    }
+  }
+  return summary;
+};
 
 const currentBlockerFromRow = (
   row: Nhm2TileSourceFalsificationReportRowV1 | null,
@@ -445,14 +801,18 @@ const reportStatus = (args: {
   validationStatus: "physically_credible_source_candidate" | "review" | "falsified";
   allReceiptsPresent: boolean;
   downstreamGatesPass: boolean;
+  sourceSideAuthorityPass: boolean;
 }): Nhm2TileSourceFalsificationReportV1["disposition"]["reportStatus"] => {
   if (args.materialDisposition === "falsified" || args.validationStatus === "falsified") {
     return "falsified";
   }
-  if (args.validationStatus === "physically_credible_source_candidate") {
+  if (
+    args.validationStatus === "physically_credible_source_candidate" &&
+    args.sourceSideAuthorityPass
+  ) {
     return "candidate_evidence_complete";
   }
-  if (args.allReceiptsPresent && !args.downstreamGatesPass) {
+  if (args.allReceiptsPresent && (!args.downstreamGatesPass || !args.sourceSideAuthorityPass)) {
     return "receipt_ready_pending_downstream";
   }
   return "review";
@@ -465,6 +825,7 @@ export const buildNhm2TileSourceFalsificationReport = (
   const plan = input.physicalValidationPlan;
   const roadmap = input.evidenceGapRoadmap;
   const budgetReadiness = input.operatingBudgetReadiness ?? null;
+  const sourceAuthority = input.sourceSideSameBasisTensorAuthority ?? null;
   const receiptBlockers = receiptRows(receipts);
   const receiptBlockerIds = new Set(receiptBlockers.map((row) => row.blockerId));
   const downstreamBlockerIds = new Set(
@@ -472,15 +833,23 @@ export const buildNhm2TileSourceFalsificationReport = (
   );
   const budgetBlockers = operatingBudgetRows(budgetReadiness);
   const budgetBlockerIds = new Set(budgetBlockers.map((row) => row.blockerId));
+  const sourceAuthorityBlockers = sourceAuthorityRows(
+    sourceAuthority,
+    input.sourceSideSameBasisTensorAuthorityRef,
+  );
   const rows = [
     ...receiptBlockers,
     ...validationRows(plan, receiptBlockerIds, downstreamBlockerIds, budgetBlockerIds),
     ...budgetBlockers,
+    ...sourceAuthorityBlockers,
     ...downstreamRows(plan),
   ].map(annotateRow);
   const firstRow = rows[0] ?? null;
   const currentBlocker = currentBlockerFromRow(firstRow);
+  const allRequiredCorrections = buildCorrectionSummary(rows);
   const campaignDomainSummary = buildCampaignDomainSummary(rows);
+  const goNoGoMatrix = buildGoNoGoMatrix(rows, campaignDomainSummary);
+  const frontierResolutionQueue = buildFrontierResolutionQueue(rows, goNoGoMatrix);
   const nextRoadmapItem = roadmap.roadmapItems.find(
     (item) => item.itemId === roadmap.summary.nextBestItemId,
   );
@@ -500,6 +869,10 @@ export const buildNhm2TileSourceFalsificationReport = (
     validationStatus: plan.summary.sourceCandidateStatus,
     allReceiptsPresent: plan.summary.allReceiptsPresent,
     downstreamGatesPass: plan.summary.downstreamGatesPass,
+    sourceSideAuthorityPass:
+      sourceAuthority == null
+        ? receipts.summary.sourceAuthorityEvidenceReady
+        : sourceAuthority.summary.allRequiredRegionsAuthoritative,
   });
   return {
     contractVersion: NHM2_TILE_SOURCE_FALSIFICATION_REPORT_CONTRACT_VERSION,
@@ -512,6 +885,8 @@ export const buildNhm2TileSourceFalsificationReport = (
       physicalValidationPlanRef: input.physicalValidationPlanRef ?? null,
       evidenceGapRoadmapRef: input.evidenceGapRoadmapRef ?? null,
       operatingBudgetReadinessRef: input.operatingBudgetReadinessRef ?? null,
+      sourceSideSameBasisTensorAuthorityRef:
+        input.sourceSideSameBasisTensorAuthorityRef ?? null,
     },
     disposition: {
       materialEvidenceDisposition: receipts.summary.candidateDisposition,
@@ -520,12 +895,18 @@ export const buildNhm2TileSourceFalsificationReport = (
       firstBlocker: firstRow?.blockerId ?? "none",
     },
     currentBlocker,
+    correctionSummary: allRequiredCorrections,
     blockerRows: rows,
     campaignDomainSummary,
+    goNoGoMatrix,
+    frontierResolutionQueue,
     readiness: {
       materialEvidenceReady: receipts.summary.materialEvidenceReady,
       fullApparatusTensorReady: receipts.summary.fullApparatusTensorReady,
-      sourceAuthorityEvidenceReady: receipts.summary.sourceAuthorityEvidenceReady,
+      sourceAuthorityEvidenceReady:
+        sourceAuthority == null
+          ? receipts.summary.sourceAuthorityEvidenceReady
+          : sourceAuthority.summary.allRequiredRegionsAuthoritative,
       allReceiptsPresent: plan.summary.allReceiptsPresent,
       operatingBudgetsReady: budgetReadiness?.summary.allOperatingBudgetsReady ?? false,
       operatingBudgetsFalsifyCurrentCandidate:
@@ -627,6 +1008,7 @@ export const isNhm2TileSourceFalsificationReport = (
       typeof currentBlocker.evidenceTarget === "string") &&
     typeof currentBlocker.falsifiesCurrentCandidate === "boolean" &&
     (currentBlocker.evidenceRef === null || typeof currentBlocker.evidenceRef === "string") &&
+    isCorrectionRecord(value.correctionSummary) &&
     Array.isArray(value.blockerRows) &&
     value.blockerRows.every(
       (row) =>
@@ -670,6 +1052,89 @@ export const isNhm2TileSourceFalsificationReport = (
         typeof entry.nextRequiredChange === "string" &&
         Array.isArray(entry.evidenceRefs) &&
         entry.evidenceRefs.every((ref) => typeof ref === "string"),
+    ) &&
+    Array.isArray(value.goNoGoMatrix) &&
+    value.goNoGoMatrix.every(
+      (entry) =>
+        isRecord(entry) &&
+        typeof entry.campaignDomain === "string" &&
+        ["go", "review", "no_go"].includes(String(entry.decision)) &&
+        [
+          "ready",
+          "missing_receipt",
+          "failing_margin",
+          "source_authority_blocked",
+          "downstream_blocked",
+          "operating_budget_blocked",
+          "open_review",
+        ].includes(String(entry.evidenceState)) &&
+        typeof entry.firstBlocker === "string" &&
+        typeof entry.blockerCount === "number" &&
+        typeof entry.falsifyingBlockerCount === "number" &&
+        (entry.minimumNumericalMargin === null ||
+          (typeof entry.minimumNumericalMargin === "number" &&
+            Number.isFinite(entry.minimumNumericalMargin))) &&
+        typeof entry.evidenceTarget === "string" &&
+        typeof entry.nextRequiredChange === "string" &&
+        Array.isArray(entry.prevents) &&
+        entry.prevents.every((item) => typeof item === "string") &&
+        Array.isArray(entry.requiredCorrectionKeys) &&
+        entry.requiredCorrectionKeys.every((item) => typeof item === "string") &&
+        Array.isArray(entry.evidenceRefs) &&
+        entry.evidenceRefs.every((ref) => typeof ref === "string") &&
+        typeof entry.blocksCampaignPass === "boolean" &&
+        isRecord(entry.claimBoundary) &&
+        entry.claimBoundary.diagnosticOnly === true &&
+        entry.claimBoundary.decisionMatrixDoesNotSupplyEvidence === true &&
+        entry.claimBoundary.noGoMeansCurrentCandidateOnly === true,
+    ) &&
+    Array.isArray(value.frontierResolutionQueue) &&
+    value.frontierResolutionQueue.every(
+      (entry) =>
+        isRecord(entry) &&
+        typeof entry.rank === "number" &&
+        Number.isInteger(entry.rank) &&
+        entry.rank > 0 &&
+        typeof entry.campaignDomain === "string" &&
+        ["go", "review", "no_go"].includes(String(entry.decision)) &&
+        [
+          "ready",
+          "missing_receipt",
+          "failing_margin",
+          "source_authority_blocked",
+          "downstream_blocked",
+          "operating_budget_blocked",
+          "open_review",
+        ].includes(String(entry.evidenceState)) &&
+        [
+          "supply_experimental_receipt",
+          "revise_architecture_or_operating_margin",
+          "supply_same_basis_full_apparatus_tensor",
+          "rerun_downstream_gate",
+          "supply_operating_budget_receipt",
+          "resolve_open_review",
+        ].includes(String(entry.resolutionMode)) &&
+        typeof entry.firstBlocker === "string" &&
+        Array.isArray(entry.blockerIds) &&
+        entry.blockerIds.every((item) => typeof item === "string") &&
+        (entry.numericalMargin === null ||
+          (typeof entry.numericalMargin === "number" &&
+            Number.isFinite(entry.numericalMargin))) &&
+        ["below_one_fails", "boolean_or_missing", "not_numeric"].includes(
+          String(entry.marginInterpretation),
+        ) &&
+        typeof entry.evidenceTarget === "string" &&
+        typeof entry.requiredChange === "string" &&
+        isCorrectionRecord(entry.requiredCorrections) &&
+        Array.isArray(entry.prevents) &&
+        entry.prevents.every((item) => typeof item === "string") &&
+        Array.isArray(entry.evidenceRefs) &&
+        entry.evidenceRefs.every((ref) => typeof ref === "string") &&
+        entry.blocksCampaignPass === true &&
+        isRecord(entry.claimBoundary) &&
+        entry.claimBoundary.diagnosticOnly === true &&
+        entry.claimBoundary.resolutionQueueDoesNotSupplyEvidence === true &&
+        entry.claimBoundary.resolvingItemRequiresNewReceiptOrArtifact === true,
     ) &&
     readiness != null &&
     typeof readiness.materialEvidenceReady === "boolean" &&

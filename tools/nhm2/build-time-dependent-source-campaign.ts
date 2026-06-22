@@ -59,6 +59,10 @@ import {
   type Nhm2SourceComponentAuthorityLedgerArtifactV1,
 } from "../../shared/contracts/nhm2-source-component-authority-ledger.v1";
 import {
+  isNhm2SourceSideSameBasisTensorAuthorityArtifact,
+  type Nhm2SourceSideSameBasisTensorAuthorityArtifactV1,
+} from "../../shared/contracts/nhm2-source-side-same-basis-tensor-authority.v1";
+import {
   isNhm2SourceOffDiagonalShearAudit,
   type Nhm2SourceOffDiagonalShearAuditArtifactV1,
 } from "../../shared/contracts/nhm2-source-off-diagonal-shear-audit.v1";
@@ -132,6 +136,7 @@ export const runNhm2TimeDependentSourceCampaign = (args: {
   runId?: string | null;
   chartId?: string | null;
   sourceComponentAuthorityLedgerPath?: string | null;
+  sourceSideSameBasisTensorAuthorityPath?: string | null;
   regionalFullTensorResidualPath?: string | null;
   sourceOffDiagonalShearAuditPath?: string | null;
   sourceMomentumDensityAuditPath?: string | null;
@@ -168,6 +173,13 @@ export const runNhm2TimeDependentSourceCampaign = (args: {
       args.sourceComponentAuthorityLedgerPath ?? null,
       isNhm2SourceComponentAuthorityLedger,
       "source component authority ledger",
+    );
+  const sourceSideSameBasisTensorAuthority =
+    readOptional<Nhm2SourceSideSameBasisTensorAuthorityArtifactV1>(
+      args.repoRoot,
+      args.sourceSideSameBasisTensorAuthorityPath ?? null,
+      isNhm2SourceSideSameBasisTensorAuthorityArtifact,
+      "source-side same-basis tensor authority",
     );
   const regionalFullTensorResidual =
     readOptional<Nhm2RegionalFullTensorResidualArtifactV1>(
@@ -304,6 +316,8 @@ export const runNhm2TimeDependentSourceCampaign = (args: {
     chartId: args.chartId ?? null,
     artifactRefs: {
       sourceComponentAuthorityLedger: args.sourceComponentAuthorityLedgerPath ?? null,
+      sourceSideSameBasisTensorAuthority:
+        args.sourceSideSameBasisTensorAuthorityPath ?? null,
       regionalFullTensorResidual: args.regionalFullTensorResidualPath ?? null,
       sourceOffDiagonalShearAudit: args.sourceOffDiagonalShearAuditPath ?? null,
       sourceMomentumDensityAudit: args.sourceMomentumDensityAuditPath ?? null,
@@ -342,6 +356,7 @@ export const runNhm2TimeDependentSourceCampaign = (args: {
       campaignStability: args.campaignStabilityPath ?? null,
     },
     sourceComponentAuthorityLedger,
+    sourceSideSameBasisTensorAuthority,
     regionalFullTensorResidual,
     sourceOffDiagonalShearAudit,
     sourceMomentumDensityAudit,
@@ -388,6 +403,9 @@ if (normalize(process.argv[1] ?? "") === normalize(fileURLToPath(import.meta.url
     chartId: asString(args["chart-id"]),
     sourceComponentAuthorityLedgerPath: asString(
       args["source-component-authority-ledger"],
+    ),
+    sourceSideSameBasisTensorAuthorityPath: asString(
+      args["source-side-same-basis-authority"],
     ),
     regionalFullTensorResidualPath: asString(args["regional-full-tensor-residual"]),
     sourceOffDiagonalShearAuditPath: asString(

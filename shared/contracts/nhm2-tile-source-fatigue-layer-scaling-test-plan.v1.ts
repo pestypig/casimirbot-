@@ -14,10 +14,14 @@ export type Nhm2FatigueLayerScalingTestId =
   | "cycle_margin"
   | "thermal_cycle_drift"
   | "creep_drift"
+  | "delamination_and_adhesion"
   | "layer_scaling_efficiency"
+  | "per_layer_variation"
   | "nonadditivity_fraction"
   | "active_area_retention"
-  | "support_coupling";
+  | "support_coupling"
+  | "coupling_loss_budget"
+  | "source_tensor_retention";
 
 export type Nhm2FatigueLayerScalingTestStatus = "satisfied" | "open" | "falsifying";
 
@@ -42,10 +46,17 @@ export type Nhm2TileSourceFatigueLayerScalingTestPlanV1 = {
   fatigueLayerScalingTarget: {
     layerCount: 447;
     layerScalingEfficiencyMin: 0.9;
+    perLayerVariationFractionMax: 0.05;
     layerNonadditivityFractionMax: 0.1;
     activeAreaRetentionMin: 0.6;
+    supportCouplingFractionMax: 0.1;
+    electromagneticCouplingFractionMax: 0.1;
+    mechanicalCouplingFractionMax: 0.1;
+    sourceTensorRetentionFractionMin: 0.9;
     thermalCycleDriftFractionMax: 0.01;
     creepDriftFractionMax: 0.01;
+    delaminationMarginMin: 1;
+    interlayerAdhesionMarginMin: 1;
     supportCouplingStatusRequired: "pass";
     evidenceTierRequired: "measured_or_validated_simulation";
   };
@@ -101,18 +112,26 @@ const TEST_POLICY: Record<
       "fatigue_lifetime_receipt_missing",
       "layer_scaling_nonadditivity_measurement_missing",
       "fatigue_layer_scaling_tier_not_measured_or_validated",
+      "fatigue_load_spectrum_ref_missing",
       "fatigue_cycle_protocol_ref_missing",
+      "cryogenic_fatigue_ref_missing",
       "fatigue_curve_ref_missing",
       "thermal_cycle_ref_missing",
       "creep_drift_ref_missing",
+      "delamination_protocol_ref_missing",
+      "interlayer_adhesion_ref_missing",
       "layer_scaling_map_ref_missing",
+      "per_layer_variation_map_ref_missing",
       "layer_nonadditivity_model_ref_missing",
       "active_area_map_ref_missing",
       "support_coupling_map_ref_missing",
+      "electromagnetic_coupling_map_ref_missing",
+      "mechanical_coupling_map_ref_missing",
       "multiphysics_coupling_ref_missing",
+      "source_tensor_retention_map_ref_missing",
     ],
     requiredMeasurement:
-      "Measured or validated-simulation fatigue and layer-scaling receipt with cycle protocol, fatigue curve, thermal-cycle, creep/drift, layer map, nonadditivity model, support-coupling map, active-area map, and multiphysics coupling provenance.",
+      "Measured or validated-simulation fatigue and layer-scaling receipt with load spectrum, cryogenic fatigue, cycle protocol, fatigue curve, thermal-cycle, creep/drift, delamination, adhesion, layer map, variation map, nonadditivity, support/electromagnetic/mechanical coupling, active-area, source-retention, and multiphysics provenance.",
     acceptanceCriterion:
       "Evidence tier is measured or validated_simulation and all fatigue/layer-scaling provenance refs are present.",
     artifactToProduce: "receipt://fatigue_layer_scaling/provenance_v1",
@@ -161,6 +180,21 @@ const TEST_POLICY: Record<
       "Creep/drift fraction is finite, positive, no greater than 0.01, and traceable to creep/drift evidence.",
     artifactToProduce: "receipt://fatigue_layer_scaling/creep_drift_v1",
   },
+  delamination_and_adhesion: {
+    blockers: [
+      "delamination_margin_missing",
+      "delamination_margin_below_one",
+      "delamination_protocol_ref_missing",
+      "interlayer_adhesion_margin_missing",
+      "interlayer_adhesion_margin_below_one",
+      "interlayer_adhesion_ref_missing",
+    ],
+    requiredMeasurement:
+      "Delamination and interlayer adhesion margins for the 447-layer stack under cryogenic cycling and campaign load spectrum.",
+    acceptanceCriterion:
+      "Delamination and interlayer adhesion margins are both at least 1 with protocol provenance.",
+    artifactToProduce: "receipt://fatigue_layer_scaling/delamination_adhesion_margin_v1",
+  },
   layer_scaling_efficiency: {
     blockers: [
       "layer_scaling_efficiency_missing",
@@ -173,6 +207,18 @@ const TEST_POLICY: Record<
     acceptanceCriterion:
       "Layer scaling efficiency is at least 0.9 and traceable to a layer map plus multiphysics coupling receipt.",
     artifactToProduce: "receipt://fatigue_layer_scaling/scaling_efficiency_v1",
+  },
+  per_layer_variation: {
+    blockers: [
+      "per_layer_variation_fraction_missing",
+      "per_layer_variation_above_0p05",
+      "per_layer_variation_map_ref_missing",
+    ],
+    requiredMeasurement:
+      "Per-layer source variation map for the 447-layer stack.",
+    acceptanceCriterion:
+      "Per-layer variation fraction is finite and no greater than 0.05 with map provenance.",
+    artifactToProduce: "receipt://fatigue_layer_scaling/per_layer_variation_v1",
   },
   nonadditivity_fraction: {
     blockers: [
@@ -201,6 +247,36 @@ const TEST_POLICY: Record<
       "Support-coupling map and multiphysics receipt for mechanical, thermal, and electromagnetic cross-coupling across layers.",
     acceptanceCriterion: "Support-coupling status is pass with map and multiphysics provenance.",
     artifactToProduce: "receipt://fatigue_layer_scaling/support_coupling_v1",
+  },
+  coupling_loss_budget: {
+    blockers: [
+      "support_coupling_fraction_missing",
+      "support_coupling_fraction_above_0p1",
+      "electromagnetic_coupling_fraction_missing",
+      "electromagnetic_coupling_fraction_above_0p1",
+      "mechanical_coupling_fraction_missing",
+      "mechanical_coupling_fraction_above_0p1",
+      "electromagnetic_coupling_map_ref_missing",
+      "mechanical_coupling_map_ref_missing",
+      "multiphysics_coupling_ref_missing",
+    ],
+    requiredMeasurement:
+      "Support, electromagnetic, and mechanical coupling-loss budget across the 447-layer stack.",
+    acceptanceCriterion:
+      "Each coupling-loss fraction is finite and no greater than 0.1 with map and multiphysics provenance.",
+    artifactToProduce: "receipt://fatigue_layer_scaling/coupling_loss_budget_v1",
+  },
+  source_tensor_retention: {
+    blockers: [
+      "source_tensor_retention_fraction_missing",
+      "source_tensor_retention_below_0p9",
+      "source_tensor_retention_map_ref_missing",
+    ],
+    requiredMeasurement:
+      "Source tensor retention fraction after fatigue damage, active-area loss, layer variation, nonadditivity, and coupling cross-terms.",
+    acceptanceCriterion:
+      "Source tensor retention fraction is at least 0.9 and traceable to a source-retention map.",
+    artifactToProduce: "receipt://fatigue_layer_scaling/source_tensor_retention_v1",
   },
 };
 
@@ -278,10 +354,17 @@ export const buildNhm2TileSourceFatigueLayerScalingTestPlan = (
     fatigueLayerScalingTarget: {
       layerCount: 447,
       layerScalingEfficiencyMin: 0.9,
+      perLayerVariationFractionMax: 0.05,
       layerNonadditivityFractionMax: 0.1,
       activeAreaRetentionMin: 0.6,
+      supportCouplingFractionMax: 0.1,
+      electromagneticCouplingFractionMax: 0.1,
+      mechanicalCouplingFractionMax: 0.1,
+      sourceTensorRetentionFractionMin: 0.9,
       thermalCycleDriftFractionMax: 0.01,
       creepDriftFractionMax: 0.01,
+      delaminationMarginMin: 1,
+      interlayerAdhesionMarginMin: 1,
       supportCouplingStatusRequired: "pass",
       evidenceTierRequired: "measured_or_validated_simulation",
     },
@@ -340,14 +423,21 @@ export const isNhm2TileSourceFatigueLayerScalingTestPlan = (
     target != null &&
     target.layerCount === 447 &&
     target.layerScalingEfficiencyMin === 0.9 &&
+    target.perLayerVariationFractionMax === 0.05 &&
     target.layerNonadditivityFractionMax === 0.1 &&
     target.activeAreaRetentionMin === 0.6 &&
+    target.supportCouplingFractionMax === 0.1 &&
+    target.electromagneticCouplingFractionMax === 0.1 &&
+    target.mechanicalCouplingFractionMax === 0.1 &&
+    target.sourceTensorRetentionFractionMin === 0.9 &&
     target.thermalCycleDriftFractionMax === 0.01 &&
     target.creepDriftFractionMax === 0.01 &&
+    target.delaminationMarginMin === 1 &&
+    target.interlayerAdhesionMarginMin === 1 &&
     target.supportCouplingStatusRequired === "pass" &&
     target.evidenceTierRequired === "measured_or_validated_simulation" &&
     Array.isArray(value.testItems) &&
-    value.testItems.length === 10 &&
+    value.testItems.length === 14 &&
     value.testItems.every(
       (item) =>
         isRecord(item) &&

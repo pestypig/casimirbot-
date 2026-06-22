@@ -27,15 +27,21 @@ export type Nhm2TileSourceReceiptSurfaceStatusV1 = {
 export type Nhm2TileSourceMaterialCouponEvidenceV1 = {
   evidenceTier: Nhm2TileSourceEvidenceTier;
   evidenceRef?: string | null;
+  loadCaseRef?: string | null;
+  layerStackCompatibilityRef?: string | null;
   tensileStressCurveRef?: string | null;
   fractureYieldCurveRef?: string | null;
   cryogenicStateRef?: string | null;
+  cryogenicCycleRef?: string | null;
+  couponFatigueCurveRef?: string | null;
   roughnessMapRef?: string | null;
   fabricationToleranceMapRef?: string | null;
   material: "ultra_high_stress_tin" | "sin" | "aln_alscn" | "custom";
   measuredTensileStressPa: number | null;
   fractureOrYieldStressPa: number | null;
   supportStressPa: number | null;
+  couponCycleCountToFailure?: number | null;
+  couponRequiredCycleCount?: number | null;
   cryogenicTemperatureK: number | null;
   dielectricResponseRef?: string | null;
   conductivityRef?: string | null;
@@ -51,9 +57,15 @@ export type Nhm2TileSourceMaterialCouponEvidenceV1 = {
 export type Nhm2TileSourceForceGapPullInEvidenceV1 = {
   evidenceTier: Nhm2TileSourceEvidenceTier;
   evidenceRef?: string | null;
+  gapMetrologyRef?: string | null;
   forceGapCurveRef?: string | null;
   forceGradientCurveRef?: string | null;
   stiffnessModelRef?: string | null;
+  pullInSweepRef?: string | null;
+  stictionProtocolRef?: string | null;
+  activeControlAuthorityRef?: string | null;
+  curveMinGapMeters?: number | null;
+  curveMaxGapMeters?: number | null;
   gapMeters: number | null;
   casimirForceN: number | null;
   forceGradientNPerM: number | null;
@@ -65,13 +77,22 @@ export type Nhm2TileSourceForceGapPullInEvidenceV1 = {
 export type Nhm2TileSourceRoughnessPatchEvidenceV1 = {
   evidenceTier: Nhm2TileSourceEvidenceTier;
   evidenceRef?: string | null;
+  gapMetrologyRef?: string | null;
+  surfacePairingRef?: string | null;
   roughnessMapRef?: string | null;
   asperityDistributionRef?: string | null;
+  asperityTailFitRef?: string | null;
   patchVoltageMapRef?: string | null;
+  patchVoltageCalibrationRef?: string | null;
+  residualElectrostaticModelRef?: string | null;
+  mapLateralResolutionMeters?: number | null;
+  scanAreaFraction?: number | null;
   roughnessRmsMeters: number | null;
   asperityP99Meters: number | null;
+  asperityP999Meters?: number | null;
   asperityMaxMeters: number | null;
   patchVoltageRmsVolts: number | null;
+  patchVoltageCorrelationLengthMeters?: number | null;
   residualElectrostaticForceFraction: number | null;
   correctionRef?: string | null;
 };
@@ -80,18 +101,30 @@ export type Nhm2TileSourceActiveControlEvidenceV1 = {
   evidenceTier: Nhm2TileSourceEvidenceTier;
   evidenceRef?: string | null;
   energyWaveformRef?: string | null;
+  actuatorAuthorityTraceRef?: string | null;
+  gapSensorCalibrationRef?: string | null;
   controlTransferFunctionRef?: string | null;
+  controllerStabilityRef?: string | null;
   gapNoiseTraceRef?: string | null;
   thermalModelRef?: string | null;
+  heatSinkCapacityTraceRef?: string | null;
   heatLoadTraceRef?: string | null;
   timingSyncTraceRef?: string | null;
+  phaseNoiseSpectrumRef?: string | null;
+  lockAcquisitionTraceRef?: string | null;
   energyPerCycleJ: number | null;
+  actuatorAuthorityN?: number | null;
   bandwidthHz: number | null;
   switchingRateHz: number | null;
   gapNoiseRmsMeters: number | null;
   noiseSpectrumRef?: string | null;
   heatLoadW: number | null;
+  heatSinkCapacityW?: number | null;
   timingJitterSeconds: number | null;
+  phaseNoiseRmsSeconds?: number | null;
+  controllerPhaseMarginDegrees?: number | null;
+  controllerGainMarginDb?: number | null;
+  lockAcquisitionTimeSeconds?: number | null;
   failureModeRef?: string | null;
   failureModeCoverage?: {
     lossOfLock: boolean;
@@ -105,22 +138,37 @@ export type Nhm2TileSourceActiveControlEvidenceV1 = {
 export type Nhm2TileSourceFatigueLayerScalingEvidenceV1 = {
   evidenceTier: Nhm2TileSourceEvidenceTier;
   evidenceRef?: string | null;
+  loadSpectrumRef?: string | null;
   cycleProtocolRef?: string | null;
+  cryogenicFatigueRef?: string | null;
   fatigueCurveRef?: string | null;
   thermalCycleRef?: string | null;
   creepDriftRef?: string | null;
+  delaminationProtocolRef?: string | null;
+  interlayerAdhesionRef?: string | null;
   layerScalingMapRef?: string | null;
+  perLayerVariationMapRef?: string | null;
   nonadditivityModelRef?: string | null;
   activeAreaMapRef?: string | null;
   supportCouplingMapRef?: string | null;
+  electromagneticCouplingMapRef?: string | null;
+  mechanicalCouplingMapRef?: string | null;
   multiphysicsCouplingRef?: string | null;
+  sourceTensorRetentionMapRef?: string | null;
   cycleCountToFailure: number | null;
   requiredCycleCount: number | null;
   thermalCycleDriftFraction?: number | null;
   creepDriftFraction?: number | null;
+  delaminationMargin?: number | null;
+  interlayerAdhesionMargin?: number | null;
   layerScalingEfficiency: number | null;
+  perLayerVariationFraction?: number | null;
   nonadditivityFraction: number | null;
   activeAreaRetention: number | null;
+  supportCouplingFraction?: number | null;
+  electromagneticCouplingFraction?: number | null;
+  mechanicalCouplingFraction?: number | null;
+  sourceTensorRetentionFraction?: number | null;
   supportCouplingStatus: "pass" | "review" | "fail" | "missing";
 };
 
@@ -208,6 +256,10 @@ export type Nhm2TileSourceMaterialEvidenceReceiptsV1 = {
     requiredGapMeters: 8e-9;
     materialSafetyFactor: 2;
     roughnessRmsMaxMeters: 1e-10;
+    roughnessMapLateralResolutionMaxMeters: 5e-10;
+    roughnessScanAreaFractionMin: 0.95;
+    asperityP99MaxMeters: 2e-9;
+    asperityP999MaxMeters: 3e-9;
     asperityMaxFractionOfGap: 0.5;
     materialResponseFrequencyHz: 15e9;
     materialResponseTemperatureK: 4;
@@ -219,12 +271,22 @@ export type Nhm2TileSourceMaterialEvidenceReceiptsV1 = {
     activeControlBandwidthFactorMin: 2;
     gapNoiseFractionMax: 0.01;
     timingJitterCycleFractionMax: 0.1;
+    phaseNoiseCycleFractionMax: 0.05;
+    controllerPhaseMarginMinDegrees: 45;
+    controllerGainMarginMinDb: 6;
+    thermalSinkCapacityFactorMin: 1.2;
     layerScalingEfficiencyMin: 0.9;
+    perLayerVariationFractionMax: 0.05;
     layerNonadditivityFractionMax: 0.1;
     activeAreaRetentionMin: 0.6;
+    supportCouplingFractionMax: 0.1;
+    electromagneticCouplingFractionMax: 0.1;
+    mechanicalCouplingFractionMax: 0.1;
     sourceTensorRetentionFractionMin: 0.9;
     thermalCycleDriftFractionMax: 0.01;
     creepDriftFractionMax: 0.01;
+    delaminationMarginMin: 1;
+    interlayerAdhesionMarginMin: 1;
   };
   receiptSurfaces: Nhm2TileSourceReceiptSurfaceStatusV1[];
   derivedReceiptInputs: {
@@ -269,6 +331,10 @@ export type Nhm2TileSourceMaterialEvidenceReceiptsV1 = {
 const REQUIRED_GAP_METERS = 8e-9;
 const MATERIAL_SAFETY_FACTOR = 2;
 const ROUGHNESS_RMS_MAX_METERS = 1e-10;
+const ROUGHNESS_MAP_LATERAL_RESOLUTION_MAX_METERS = 5e-10;
+const ROUGHNESS_SCAN_AREA_FRACTION_MIN = 0.95;
+const ASPERITY_P99_MAX_METERS = 2e-9;
+const ASPERITY_P999_MAX_METERS = 3e-9;
 const ASPERITY_MAX_FRACTION_OF_GAP = 0.5;
 const MATERIAL_RESPONSE_FREQUENCY_HZ = 15e9;
 const MATERIAL_RESPONSE_TEMPERATURE_K = 4;
@@ -280,13 +346,23 @@ const ACTIVE_CONTROL_AUTHORITY_FACTOR_MIN = 1.2;
 const ACTIVE_CONTROL_BANDWIDTH_FACTOR_MIN = 2;
 const GAP_NOISE_FRACTION_MAX = 0.01;
 const TIMING_JITTER_CYCLE_FRACTION_MAX = 0.1;
+const PHASE_NOISE_CYCLE_FRACTION_MAX = 0.05;
+const CONTROLLER_PHASE_MARGIN_MIN_DEGREES = 45;
+const CONTROLLER_GAIN_MARGIN_MIN_DB = 6;
+const THERMAL_SINK_CAPACITY_FACTOR_MIN = 1.2;
 const SWITCHING_RATE_HZ = 15e9;
 const LAYER_SCALING_EFFICIENCY_MIN = 0.9;
+const PER_LAYER_VARIATION_FRACTION_MAX = 0.05;
 const LAYER_NONADDITIVITY_FRACTION_MAX = 0.1;
 const ACTIVE_AREA_RETENTION_MIN = 0.6;
+const SUPPORT_COUPLING_FRACTION_MAX = 0.1;
+const ELECTROMAGNETIC_COUPLING_FRACTION_MAX = 0.1;
+const MECHANICAL_COUPLING_FRACTION_MAX = 0.1;
 const SOURCE_TENSOR_RETENTION_FRACTION_MIN = 0.9;
 const THERMAL_CYCLE_DRIFT_FRACTION_MAX = 0.01;
 const CREEP_DRIFT_FRACTION_MAX = 0.01;
+const DELAMINATION_MARGIN_MIN = 1;
+const INTERLAYER_ADHESION_MARGIN_MIN = 1;
 const EPSILON_0_SI = 8.8541878128e-12;
 const HBAR_SI = 1.054571817e-34;
 const C_SI = 299792458;
@@ -308,6 +384,11 @@ const symmetricRatioMargin = (actual: number | null, expected: number | null): n
 const upperBoundMargin = (limit: number, value: number | null | undefined): number | null => {
   if (value == null || !Number.isFinite(value) || value <= 0) return null;
   return round(limit / value);
+};
+
+const lowerBoundMargin = (minimum: number, value: number | null | undefined): number | null => {
+  if (value == null || !Number.isFinite(value)) return null;
+  return round(value / minimum);
 };
 
 const missingSurface = (
@@ -378,17 +459,34 @@ const materialCouponSurface = (
     evidence.conductivitySiemensPerMeter != null &&
     Number.isFinite(evidence.conductivitySiemensPerMeter) &&
     evidence.conductivitySiemensPerMeter > 0;
+  const couponFatigueCycleMargin =
+    evidence.couponCycleCountToFailure == null ||
+    evidence.couponRequiredCycleCount == null ||
+    evidence.couponRequiredCycleCount <= 0
+      ? null
+      : round(evidence.couponCycleCountToFailure / evidence.couponRequiredCycleCount);
   const blockers = [
     ...(!measuredOrValidated(evidence.evidenceTier) ? ["material_coupon_tier_not_measured_or_validated"] : []),
     ...evidenceRefBlocker(evidence, "material_coupon_evidence_ref_missing"),
+    ...(evidence.loadCaseRef == null ? ["candidate_stack_load_case_ref_missing"] : []),
+    ...(evidence.layerStackCompatibilityRef == null
+      ? ["candidate_stack_layer_compatibility_ref_missing"]
+      : []),
     ...(evidence.tensileStressCurveRef == null ? ["tensile_stress_curve_ref_missing"] : []),
     ...(evidence.fractureYieldCurveRef == null ? ["fracture_yield_curve_ref_missing"] : []),
     ...(evidence.cryogenicStateRef == null ? ["cryogenic_state_ref_missing"] : []),
+    ...(evidence.cryogenicCycleRef == null ? ["cryogenic_cycle_ref_missing"] : []),
+    ...(evidence.couponFatigueCurveRef == null ? ["coupon_fatigue_curve_ref_missing"] : []),
     ...(evidence.roughnessMapRef == null ? ["coupon_roughness_map_ref_missing"] : []),
     ...(evidence.fabricationToleranceMapRef == null ? ["fabrication_tolerance_map_ref_missing"] : []),
     ...(evidence.material !== "ultra_high_stress_tin" ? ["candidate_material_mismatch"] : []),
     ...(stressMargin == null ? ["fracture_or_yield_margin_missing"] : stressMargin < 1 ? ["fracture_or_yield_margin_below_2x_support_stress"] : []),
     ...(evidence.measuredTensileStressPa == null ? ["measured_tensile_stress_missing"] : []),
+    ...(couponFatigueCycleMargin == null
+      ? ["coupon_fatigue_cycle_margin_missing"]
+      : couponFatigueCycleMargin < 1
+        ? ["coupon_fatigue_cycle_margin_below_required_campaign_cycles"]
+        : []),
     ...(evidence.cryogenicTemperatureK == null || evidence.cryogenicTemperatureK > 4 ? ["cryogenic_4k_coupon_receipt_missing"] : []),
     ...(evidence.dielectricResponseRef == null ? ["dielectric_response_ref_missing"] : []),
     ...(evidence.conductivityRef == null ? ["conductivity_ref_missing"] : []),
@@ -423,6 +521,9 @@ const materialCouponSurface = (
       stressMargin,
       requiredStressPa,
       measuredTensileStressPa: evidence.measuredTensileStressPa,
+      couponFatigueCycleMargin,
+      couponCycleCountToFailure: evidence.couponCycleCountToFailure ?? null,
+      couponRequiredCycleCount: evidence.couponRequiredCycleCount ?? null,
       materialResponseFrequencyMargin,
       dielectricTemperatureMargin,
       conductivityTemperatureMargin,
@@ -431,9 +532,13 @@ const materialCouponSurface = (
       materialResponseValuesAvailable: materialResponseValuesAvailable ? 1 : 0,
       roughnessRmsMeters: evidence.roughnessRmsMeters,
       couponProvenanceRefsAvailable:
+        evidence.loadCaseRef != null &&
+        evidence.layerStackCompatibilityRef != null &&
         evidence.tensileStressCurveRef != null &&
         evidence.fractureYieldCurveRef != null &&
         evidence.cryogenicStateRef != null &&
+        evidence.cryogenicCycleRef != null &&
+        evidence.couponFatigueCurveRef != null &&
         evidence.roughnessMapRef != null &&
         evidence.fabricationToleranceMapRef != null
           ? 1
@@ -468,12 +573,24 @@ const forceGapSurface = (
     evidence.forceGradientNPerM,
     expectedGradientFromSuppliedForce,
   );
+  const curveBracketsOperatingGap =
+    evidence.curveMinGapMeters == null || evidence.curveMaxGapMeters == null
+      ? false
+      : evidence.curveMinGapMeters <= REQUIRED_GAP_METERS &&
+        evidence.curveMaxGapMeters >= REQUIRED_GAP_METERS;
   const blockers = [
     ...(!measuredOrValidated(evidence.evidenceTier) ? ["force_gap_tier_not_measured_or_validated"] : []),
     ...evidenceRefBlocker(evidence, "force_gap_evidence_ref_missing"),
+    ...(evidence.gapMetrologyRef == null ? ["force_gap_metrology_ref_missing"] : []),
     ...(evidence.forceGapCurveRef == null ? ["force_gap_curve_ref_missing"] : []),
     ...(evidence.forceGradientCurveRef == null ? ["force_gradient_curve_ref_missing"] : []),
     ...(evidence.stiffnessModelRef == null ? ["force_gap_stiffness_model_ref_missing"] : []),
+    ...(evidence.pullInSweepRef == null ? ["pull_in_sweep_ref_missing"] : []),
+    ...(evidence.stictionProtocolRef == null ? ["stiction_protocol_ref_missing"] : []),
+    ...(evidence.activeControlAuthorityRef == null
+      ? ["active_gap_control_authority_ref_missing"]
+      : []),
+    ...(!curveBracketsOperatingGap ? ["force_gap_curve_does_not_bracket_8nm"] : []),
     ...(evidence.gapMeters == null || Math.abs(evidence.gapMeters - REQUIRED_GAP_METERS) > 1e-12 ? ["force_gap_not_at_8nm"] : []),
     ...(evidence.casimirForceN == null ? ["casimir_force_at_gap_missing"] : []),
     ...(forceGradientConsistencyMargin == null
@@ -498,10 +615,17 @@ const forceGapSurface = (
       expectedGradientFromSuppliedForce,
       forceGradientConsistencyMargin,
       gapMeters: evidence.gapMeters,
+      curveMinGapMeters: evidence.curveMinGapMeters ?? null,
+      curveMaxGapMeters: evidence.curveMaxGapMeters ?? null,
+      curveBracketsOperatingGap: curveBracketsOperatingGap ? 1 : 0,
       curveRefsAvailable:
+        evidence.gapMetrologyRef != null &&
         evidence.forceGapCurveRef != null &&
         evidence.forceGradientCurveRef != null &&
-        evidence.stiffnessModelRef != null
+        evidence.stiffnessModelRef != null &&
+        evidence.pullInSweepRef != null &&
+        evidence.stictionProtocolRef != null &&
+        evidence.activeControlAuthorityRef != null
           ? 1
           : 0,
     },
@@ -513,10 +637,26 @@ const roughnessPatchSurface = (
   evidence: Nhm2TileSourceRoughnessPatchEvidenceV1 | null | undefined,
 ): Nhm2TileSourceReceiptSurfaceStatusV1 => {
   const requiredChange =
-    "Supply measured or validated roughness, asperity-tail, patch-voltage, and residual electrostatic correction maps for the 8 nm gap.";
+    "Supply measured or validated paired-surface 8 nm gap metrology, roughness maps, asperity-tail fits, patch-voltage calibration, and residual electrostatic correction maps for the operating stack.";
   if (evidence == null) {
     return missingSurface("roughness_patch_metrology", "roughness_asperity_tail_and_patch_potential_map_missing", requiredChange);
   }
+  const roughnessMapResolutionMargin =
+    evidence.mapLateralResolutionMeters == null || evidence.mapLateralResolutionMeters <= 0
+      ? null
+      : round(ROUGHNESS_MAP_LATERAL_RESOLUTION_MAX_METERS / evidence.mapLateralResolutionMeters);
+  const scanAreaCoverageMargin =
+    evidence.scanAreaFraction == null || evidence.scanAreaFraction <= 0
+      ? null
+      : round(evidence.scanAreaFraction / ROUGHNESS_SCAN_AREA_FRACTION_MIN);
+  const asperityP99Margin =
+    evidence.asperityP99Meters == null || evidence.asperityP99Meters <= 0
+      ? null
+      : round(ASPERITY_P99_MAX_METERS / evidence.asperityP99Meters);
+  const asperityP999Margin =
+    evidence.asperityP999Meters == null || evidence.asperityP999Meters <= 0
+      ? null
+      : round(ASPERITY_P999_MAX_METERS / evidence.asperityP999Meters);
   const asperityMaxMargin =
     evidence.asperityMaxMeters == null
       ? null
@@ -540,12 +680,44 @@ const roughnessPatchSurface = (
   const blockers = [
     ...(!measuredOrValidated(evidence.evidenceTier) ? ["roughness_patch_tier_not_measured_or_validated"] : []),
     ...evidenceRefBlocker(evidence, "roughness_patch_evidence_ref_missing"),
+    ...(evidence.gapMetrologyRef == null ? ["roughness_gap_metrology_ref_missing"] : []),
+    ...(evidence.surfacePairingRef == null ? ["roughness_surface_pairing_ref_missing"] : []),
     ...(evidence.roughnessMapRef == null ? ["roughness_map_ref_missing"] : []),
     ...(evidence.asperityDistributionRef == null ? ["asperity_tail_distribution_ref_missing"] : []),
+    ...(evidence.asperityTailFitRef == null ? ["asperity_tail_fit_ref_missing"] : []),
     ...(evidence.patchVoltageMapRef == null ? ["patch_voltage_map_ref_missing"] : []),
+    ...(evidence.patchVoltageCalibrationRef == null
+      ? ["patch_voltage_calibration_ref_missing"]
+      : []),
+    ...(evidence.residualElectrostaticModelRef == null
+      ? ["residual_electrostatic_model_ref_missing"]
+      : []),
+    ...(roughnessMapResolutionMargin == null
+      ? ["roughness_map_lateral_resolution_missing"]
+      : roughnessMapResolutionMargin < 1
+        ? ["roughness_map_lateral_resolution_above_0p5nm"]
+        : []),
+    ...(scanAreaCoverageMargin == null
+      ? ["roughness_scan_area_fraction_missing"]
+      : scanAreaCoverageMargin < 1
+        ? ["roughness_scan_area_fraction_below_0p95"]
+        : []),
     ...(evidence.roughnessRmsMeters == null || evidence.roughnessRmsMeters > ROUGHNESS_RMS_MAX_METERS ? ["roughness_rms_above_0p1nm_or_missing"] : []),
-    ...(evidence.asperityP99Meters == null ? ["asperity_p99_missing"] : []),
+    ...(asperityP99Margin == null
+      ? ["asperity_p99_missing"]
+      : asperityP99Margin < 1
+        ? ["asperity_p99_above_2nm"]
+        : []),
+    ...(asperityP999Margin == null
+      ? ["asperity_p999_missing"]
+      : asperityP999Margin < 1
+        ? ["asperity_p999_above_3nm"]
+        : []),
     ...(asperityMaxMargin == null ? ["asperity_tail_margin_missing"] : asperityMaxMargin < 1 ? ["asperity_tail_exceeds_half_gap"] : []),
+    ...(evidence.patchVoltageCorrelationLengthMeters == null ||
+    evidence.patchVoltageCorrelationLengthMeters <= 0
+      ? ["patch_voltage_correlation_length_missing"]
+      : []),
     ...(evidence.patchVoltageRmsVolts == null || evidence.patchVoltageRmsVolts > PATCH_VOLTAGE_RMS_MAX_VOLTS ? ["patch_voltage_rms_above_10mv_or_missing"] : []),
     ...(evidence.residualElectrostaticForceFraction == null ||
     evidence.residualElectrostaticForceFraction > RESIDUAL_ELECTROSTATIC_FORCE_FRACTION_MAX
@@ -567,16 +739,30 @@ const roughnessPatchSurface = (
     blockers,
     numericalMargins: {
       roughnessRmsMeters: evidence.roughnessRmsMeters,
+      roughnessMapResolutionMargin,
+      scanAreaCoverageMargin,
+      asperityP99Margin,
+      asperityP999Margin,
       asperityMaxMargin,
+      mapLateralResolutionMeters: evidence.mapLateralResolutionMeters ?? null,
+      scanAreaFraction: evidence.scanAreaFraction ?? null,
+      asperityP999Meters: evidence.asperityP999Meters ?? null,
       patchVoltageRmsVolts: evidence.patchVoltageRmsVolts,
+      patchVoltageCorrelationLengthMeters:
+        evidence.patchVoltageCorrelationLengthMeters ?? null,
       residualElectrostaticForceFraction: evidence.residualElectrostaticForceFraction,
       patchVoltageDerivedElectrostaticPressurePa,
       patchVoltageDerivedElectrostaticForceFraction,
       patchVoltageDerivedElectrostaticMargin,
       mapRefsAvailable:
+        evidence.gapMetrologyRef != null &&
+        evidence.surfacePairingRef != null &&
         evidence.roughnessMapRef != null &&
         evidence.asperityDistributionRef != null &&
-        evidence.patchVoltageMapRef != null
+        evidence.asperityTailFitRef != null &&
+        evidence.patchVoltageMapRef != null &&
+        evidence.patchVoltageCalibrationRef != null &&
+        evidence.residualElectrostaticModelRef != null
           ? 1
           : 0,
     },
@@ -588,7 +774,7 @@ const activeControlSurface = (
   evidence: Nhm2TileSourceActiveControlEvidenceV1 | null | undefined,
 ): Nhm2TileSourceReceiptSurfaceStatusV1 => {
   const requiredChange =
-    "Supply active-control energy waveform, controller transfer function, noise spectrum/trace, thermal model, heat-load trace, timing synchronization trace, and failure-mode receipts.";
+    "Supply active-control actuator authority, sensor calibration, energy waveform, controller transfer/stability, noise spectrum/trace, thermal sink, heat-load trace, timing synchronization, phase-noise, lock-acquisition, and failure-mode receipts.";
   if (evidence == null) {
     return missingSurface("active_control_energy", "active_gap_control_energy_and_noise_missing", requiredChange);
   }
@@ -605,6 +791,25 @@ const activeControlSurface = (
       ? null
       : (TIMING_JITTER_CYCLE_FRACTION_MAX / evidence.switchingRateHz) /
         evidence.timingJitterSeconds;
+  const phaseNoiseMargin =
+    evidence.phaseNoiseRmsSeconds == null || evidence.switchingRateHz == null
+      ? null
+      : (PHASE_NOISE_CYCLE_FRACTION_MAX / evidence.switchingRateHz) /
+        evidence.phaseNoiseRmsSeconds;
+  const controllerPhaseMargin =
+    evidence.controllerPhaseMarginDegrees == null
+      ? null
+      : round(evidence.controllerPhaseMarginDegrees / CONTROLLER_PHASE_MARGIN_MIN_DEGREES);
+  const controllerGainMargin =
+    evidence.controllerGainMarginDb == null
+      ? null
+      : round(evidence.controllerGainMarginDb / CONTROLLER_GAIN_MARGIN_MIN_DB);
+  const thermalSinkMargin =
+    evidence.heatSinkCapacityW == null ||
+    evidence.heatLoadW == null ||
+    evidence.heatLoadW <= 0
+      ? null
+      : round(evidence.heatSinkCapacityW / (evidence.heatLoadW * THERMAL_SINK_CAPACITY_FACTOR_MIN));
   const switchingRateMargin =
     evidence.switchingRateHz == null
       ? null
@@ -623,12 +828,33 @@ const activeControlSurface = (
     ...(!measuredOrValidated(evidence.evidenceTier) ? ["active_control_tier_not_measured_or_validated"] : []),
     ...evidenceRefBlocker(evidence, "active_control_evidence_ref_missing"),
     ...(evidence.energyWaveformRef == null ? ["active_control_energy_waveform_ref_missing"] : []),
+    ...(evidence.actuatorAuthorityTraceRef == null
+      ? ["active_control_actuator_authority_trace_ref_missing"]
+      : []),
+    ...(evidence.gapSensorCalibrationRef == null
+      ? ["active_control_gap_sensor_calibration_ref_missing"]
+      : []),
     ...(evidence.controlTransferFunctionRef == null ? ["active_control_transfer_function_ref_missing"] : []),
+    ...(evidence.controllerStabilityRef == null
+      ? ["active_control_controller_stability_ref_missing"]
+      : []),
     ...(evidence.gapNoiseTraceRef == null ? ["active_control_gap_noise_trace_ref_missing"] : []),
     ...(evidence.thermalModelRef == null ? ["active_control_thermal_model_ref_missing"] : []),
+    ...(evidence.heatSinkCapacityTraceRef == null
+      ? ["active_control_heat_sink_capacity_trace_ref_missing"]
+      : []),
     ...(evidence.heatLoadTraceRef == null ? ["active_control_heat_load_trace_ref_missing"] : []),
     ...(evidence.timingSyncTraceRef == null ? ["active_control_timing_sync_trace_ref_missing"] : []),
+    ...(evidence.phaseNoiseSpectrumRef == null
+      ? ["active_control_phase_noise_spectrum_ref_missing"]
+      : []),
+    ...(evidence.lockAcquisitionTraceRef == null
+      ? ["active_control_lock_acquisition_trace_ref_missing"]
+      : []),
     ...(evidence.energyPerCycleJ == null || !Number.isFinite(evidence.energyPerCycleJ) ? ["active_control_energy_per_cycle_missing"] : []),
+    ...(evidence.actuatorAuthorityN == null || evidence.actuatorAuthorityN <= 0
+      ? ["active_control_actuator_authority_missing"]
+      : []),
     ...(evidence.switchingRateHz == null
       ? ["active_control_switching_rate_missing"]
       : switchingRateMatchesTarget
@@ -638,7 +864,31 @@ const activeControlSurface = (
     ...(noiseMargin == null ? ["gap_noise_receipt_missing"] : noiseMargin < 1 ? ["gap_noise_above_1pct_gap"] : []),
     ...(evidence.noiseSpectrumRef == null ? ["active_control_noise_spectrum_ref_missing"] : []),
     ...(evidence.heatLoadW == null || !Number.isFinite(evidence.heatLoadW) ? ["active_control_heat_load_missing"] : []),
+    ...(thermalSinkMargin == null
+      ? ["active_control_heat_sink_capacity_missing"]
+      : thermalSinkMargin < 1
+        ? ["active_control_heat_sink_capacity_below_1p2x_heat_load"]
+        : []),
     ...(timingMargin == null ? ["timing_jitter_receipt_missing"] : timingMargin < 1 ? ["timing_jitter_above_0p1_cycle"] : []),
+    ...(phaseNoiseMargin == null
+      ? ["phase_noise_receipt_missing"]
+      : phaseNoiseMargin < 1
+        ? ["phase_noise_above_0p05_cycle"]
+        : []),
+    ...(controllerPhaseMargin == null
+      ? ["controller_phase_margin_missing"]
+      : controllerPhaseMargin < 1
+        ? ["controller_phase_margin_below_45deg"]
+        : []),
+    ...(controllerGainMargin == null
+      ? ["controller_gain_margin_missing"]
+      : controllerGainMargin < 1
+        ? ["controller_gain_margin_below_6db"]
+        : []),
+    ...(evidence.lockAcquisitionTimeSeconds == null ||
+    evidence.lockAcquisitionTimeSeconds <= 0
+      ? ["active_control_lock_acquisition_time_missing"]
+      : []),
     ...(evidence.failureModeRef == null ? ["active_control_failure_mode_ref_missing"] : []),
     ...(failureModeCoverage?.lossOfLock === true
       ? []
@@ -667,17 +917,31 @@ const activeControlSurface = (
       switchingRateMargin,
       noiseMargin,
       timingMargin,
+      phaseNoiseMargin,
+      controllerPhaseMargin,
+      controllerGainMargin,
+      thermalSinkMargin,
       energyPerCycleJ: evidence.energyPerCycleJ,
+      actuatorAuthorityN: evidence.actuatorAuthorityN ?? null,
       heatLoadW: evidence.heatLoadW,
+      heatSinkCapacityW: evidence.heatSinkCapacityW ?? null,
+      phaseNoiseRmsSeconds: evidence.phaseNoiseRmsSeconds ?? null,
+      lockAcquisitionTimeSeconds: evidence.lockAcquisitionTimeSeconds ?? null,
       failureModeCoverageComplete: failureModeCoverageComplete ? 1 : 0,
       activeControlProvenanceRefsAvailable:
         evidence.energyWaveformRef != null &&
+        evidence.actuatorAuthorityTraceRef != null &&
+        evidence.gapSensorCalibrationRef != null &&
         evidence.controlTransferFunctionRef != null &&
+        evidence.controllerStabilityRef != null &&
         evidence.gapNoiseTraceRef != null &&
         evidence.noiseSpectrumRef != null &&
         evidence.thermalModelRef != null &&
+        evidence.heatSinkCapacityTraceRef != null &&
         evidence.heatLoadTraceRef != null &&
         evidence.timingSyncTraceRef != null &&
+        evidence.phaseNoiseSpectrumRef != null &&
+        evidence.lockAcquisitionTraceRef != null &&
         evidence.failureModeRef != null
           ? 1
           : 0,
@@ -690,9 +954,9 @@ const fatigueLayerScalingSurfaces = (
   evidence: Nhm2TileSourceFatigueLayerScalingEvidenceV1 | null | undefined,
 ): [Nhm2TileSourceReceiptSurfaceStatusV1, Nhm2TileSourceReceiptSurfaceStatusV1] => {
   const fatigueRequiredChange =
-    "Supply fatigue curve, cycle protocol, thermal cycling, creep/drift, and cycling lifetime evidence for the selected 447-layer architecture.";
+    "Supply load spectrum, cryogenic fatigue curve, cycle protocol, thermal cycling, creep/drift, delamination, interlayer adhesion, and cycling lifetime evidence for the selected 447-layer architecture.";
   const scalingRequiredChange =
-    "Supply 447-layer scaling maps, nonadditivity model, support-coupling map, active-area-retention map, and multiphysics coupling evidence.";
+    "Supply 447-layer scaling maps, per-layer variation map, nonadditivity model, support/electromagnetic/mechanical coupling maps, active-area-retention map, source-tensor-retention map, and multiphysics coupling evidence.";
   if (evidence == null) {
     return [
       missingSurface("fatigue_lifetime", "fatigue_lifetime_receipt_missing", fatigueRequiredChange),
@@ -711,10 +975,22 @@ const fatigueLayerScalingSurfaces = (
     CREEP_DRIFT_FRACTION_MAX,
     evidence.creepDriftFraction,
   );
+  const delaminationMargin = lowerBoundMargin(
+    DELAMINATION_MARGIN_MIN,
+    evidence.delaminationMargin,
+  );
+  const interlayerAdhesionMargin = lowerBoundMargin(
+    INTERLAYER_ADHESION_MARGIN_MIN,
+    evidence.interlayerAdhesionMargin,
+  );
   const scalingMargin =
     evidence.layerScalingEfficiency == null
       ? null
       : evidence.layerScalingEfficiency / LAYER_SCALING_EFFICIENCY_MIN;
+  const perLayerVariationMargin = upperBoundMargin(
+    PER_LAYER_VARIATION_FRACTION_MAX,
+    evidence.perLayerVariationFraction,
+  );
   const nonadditivityMargin =
     evidence.nonadditivityFraction == null
       ? null
@@ -723,7 +999,19 @@ const fatigueLayerScalingSurfaces = (
     evidence.activeAreaRetention == null
       ? null
       : evidence.activeAreaRetention / ACTIVE_AREA_RETENTION_MIN;
-  const sourceTensorRetentionFraction =
+  const supportCouplingMargin = upperBoundMargin(
+    SUPPORT_COUPLING_FRACTION_MAX,
+    evidence.supportCouplingFraction,
+  );
+  const electromagneticCouplingMargin = upperBoundMargin(
+    ELECTROMAGNETIC_COUPLING_FRACTION_MAX,
+    evidence.electromagneticCouplingFraction,
+  );
+  const mechanicalCouplingMargin = upperBoundMargin(
+    MECHANICAL_COUPLING_FRACTION_MAX,
+    evidence.mechanicalCouplingFraction,
+  );
+  const scalarRetentionEstimate =
     evidence.layerScalingEfficiency == null ||
     evidence.nonadditivityFraction == null ||
     evidence.activeAreaRetention == null
@@ -733,6 +1021,7 @@ const fatigueLayerScalingSurfaces = (
             (1 - evidence.nonadditivityFraction) *
             evidence.activeAreaRetention,
         );
+  const sourceTensorRetentionFraction = evidence.sourceTensorRetentionFraction ?? null;
   const sourceTensorRetentionMargin =
     sourceTensorRetentionFraction == null
       ? null
@@ -747,10 +1036,14 @@ const fatigueLayerScalingSurfaces = (
   const fatigueBlockers = [
     ...tierBlockers,
     ...receiptRefBlockers,
+    ...(evidence.loadSpectrumRef == null ? ["fatigue_load_spectrum_ref_missing"] : []),
     ...(evidence.cycleProtocolRef == null ? ["fatigue_cycle_protocol_ref_missing"] : []),
+    ...(evidence.cryogenicFatigueRef == null ? ["cryogenic_fatigue_ref_missing"] : []),
     ...(evidence.fatigueCurveRef == null ? ["fatigue_curve_ref_missing"] : []),
     ...(evidence.thermalCycleRef == null ? ["thermal_cycle_ref_missing"] : []),
     ...(evidence.creepDriftRef == null ? ["creep_drift_ref_missing"] : []),
+    ...(evidence.delaminationProtocolRef == null ? ["delamination_protocol_ref_missing"] : []),
+    ...(evidence.interlayerAdhesionRef == null ? ["interlayer_adhesion_ref_missing"] : []),
     ...(cycleMargin == null ? ["fatigue_cycle_margin_missing"] : cycleMargin < 1 ? ["fatigue_cycle_margin_below_required"] : []),
     ...(thermalCycleDriftMargin == null
       ? ["thermal_cycle_drift_fraction_missing"]
@@ -762,18 +1055,52 @@ const fatigueLayerScalingSurfaces = (
       : creepDriftMargin < 1
         ? ["creep_drift_above_0p01"]
         : []),
+    ...(delaminationMargin == null
+      ? ["delamination_margin_missing"]
+      : delaminationMargin < 1
+        ? ["delamination_margin_below_one"]
+        : []),
+    ...(interlayerAdhesionMargin == null
+      ? ["interlayer_adhesion_margin_missing"]
+      : interlayerAdhesionMargin < 1
+        ? ["interlayer_adhesion_margin_below_one"]
+        : []),
   ];
   const scalingBlockers = [
     ...tierBlockers,
     ...receiptRefBlockers,
     ...(evidence.layerScalingMapRef == null ? ["layer_scaling_map_ref_missing"] : []),
+    ...(evidence.perLayerVariationMapRef == null ? ["per_layer_variation_map_ref_missing"] : []),
     ...(evidence.nonadditivityModelRef == null ? ["layer_nonadditivity_model_ref_missing"] : []),
     ...(evidence.activeAreaMapRef == null ? ["active_area_map_ref_missing"] : []),
     ...(evidence.supportCouplingMapRef == null ? ["support_coupling_map_ref_missing"] : []),
+    ...(evidence.electromagneticCouplingMapRef == null ? ["electromagnetic_coupling_map_ref_missing"] : []),
+    ...(evidence.mechanicalCouplingMapRef == null ? ["mechanical_coupling_map_ref_missing"] : []),
     ...(evidence.multiphysicsCouplingRef == null ? ["multiphysics_coupling_ref_missing"] : []),
+    ...(evidence.sourceTensorRetentionMapRef == null ? ["source_tensor_retention_map_ref_missing"] : []),
     ...(scalingMargin == null ? ["layer_scaling_efficiency_missing"] : scalingMargin < 1 ? ["layer_scaling_efficiency_below_0p9"] : []),
+    ...(perLayerVariationMargin == null
+      ? ["per_layer_variation_fraction_missing"]
+      : perLayerVariationMargin < 1
+        ? ["per_layer_variation_above_0p05"]
+        : []),
     ...(nonadditivityMargin == null ? ["layer_nonadditivity_fraction_missing"] : nonadditivityMargin < 1 ? ["layer_nonadditivity_above_0p1"] : []),
     ...(activeAreaMargin == null ? ["active_area_retention_missing"] : activeAreaMargin < 1 ? ["active_area_retention_below_0p6"] : []),
+    ...(supportCouplingMargin == null
+      ? ["support_coupling_fraction_missing"]
+      : supportCouplingMargin < 1
+        ? ["support_coupling_fraction_above_0p1"]
+        : []),
+    ...(electromagneticCouplingMargin == null
+      ? ["electromagnetic_coupling_fraction_missing"]
+      : electromagneticCouplingMargin < 1
+        ? ["electromagnetic_coupling_fraction_above_0p1"]
+        : []),
+    ...(mechanicalCouplingMargin == null
+      ? ["mechanical_coupling_fraction_missing"]
+      : mechanicalCouplingMargin < 1
+        ? ["mechanical_coupling_fraction_above_0p1"]
+        : []),
     ...(sourceTensorRetentionMargin == null
       ? ["source_tensor_retention_fraction_missing"]
       : sourceTensorRetentionMargin < 1
@@ -794,11 +1121,17 @@ const fatigueLayerScalingSurfaces = (
         thermalCycleDriftMargin,
         creepDriftFraction: evidence.creepDriftFraction ?? null,
         creepDriftMargin,
+        delaminationMargin,
+        interlayerAdhesionMargin,
         fatigueProvenanceRefsAvailable:
+          evidence.loadSpectrumRef != null &&
           evidence.cycleProtocolRef != null &&
+          evidence.cryogenicFatigueRef != null &&
           evidence.fatigueCurveRef != null &&
           evidence.thermalCycleRef != null &&
-          evidence.creepDriftRef != null
+          evidence.creepDriftRef != null &&
+          evidence.delaminationProtocolRef != null &&
+          evidence.interlayerAdhesionRef != null
             ? 1
             : 0,
       },
@@ -812,16 +1145,25 @@ const fatigueLayerScalingSurfaces = (
       blockers: scalingBlockers,
       numericalMargins: {
         scalingMargin,
+        perLayerVariationMargin,
         nonadditivityMargin,
         activeAreaMargin,
+        supportCouplingMargin,
+        electromagneticCouplingMargin,
+        mechanicalCouplingMargin,
+        scalarRetentionEstimate,
         sourceTensorRetentionFraction,
         sourceTensorRetentionMargin,
         layerScalingProvenanceRefsAvailable:
           evidence.layerScalingMapRef != null &&
+          evidence.perLayerVariationMapRef != null &&
           evidence.nonadditivityModelRef != null &&
           evidence.activeAreaMapRef != null &&
           evidence.supportCouplingMapRef != null &&
-          evidence.multiphysicsCouplingRef != null
+          evidence.electromagneticCouplingMapRef != null &&
+          evidence.mechanicalCouplingMapRef != null &&
+          evidence.multiphysicsCouplingRef != null &&
+          evidence.sourceTensorRetentionMapRef != null
             ? 1
             : 0,
       },
@@ -1097,6 +1439,10 @@ export const buildNhm2TileSourceMaterialEvidenceReceipts = (
       requiredGapMeters: REQUIRED_GAP_METERS,
       materialSafetyFactor: MATERIAL_SAFETY_FACTOR,
       roughnessRmsMaxMeters: ROUGHNESS_RMS_MAX_METERS,
+      roughnessMapLateralResolutionMaxMeters: ROUGHNESS_MAP_LATERAL_RESOLUTION_MAX_METERS,
+      roughnessScanAreaFractionMin: ROUGHNESS_SCAN_AREA_FRACTION_MIN,
+      asperityP99MaxMeters: ASPERITY_P99_MAX_METERS,
+      asperityP999MaxMeters: ASPERITY_P999_MAX_METERS,
       asperityMaxFractionOfGap: ASPERITY_MAX_FRACTION_OF_GAP,
       materialResponseFrequencyHz: MATERIAL_RESPONSE_FREQUENCY_HZ,
       materialResponseTemperatureK: MATERIAL_RESPONSE_TEMPERATURE_K,
@@ -1108,12 +1454,22 @@ export const buildNhm2TileSourceMaterialEvidenceReceipts = (
       activeControlBandwidthFactorMin: ACTIVE_CONTROL_BANDWIDTH_FACTOR_MIN,
       gapNoiseFractionMax: GAP_NOISE_FRACTION_MAX,
       timingJitterCycleFractionMax: TIMING_JITTER_CYCLE_FRACTION_MAX,
+      phaseNoiseCycleFractionMax: PHASE_NOISE_CYCLE_FRACTION_MAX,
+      controllerPhaseMarginMinDegrees: CONTROLLER_PHASE_MARGIN_MIN_DEGREES,
+      controllerGainMarginMinDb: CONTROLLER_GAIN_MARGIN_MIN_DB,
+      thermalSinkCapacityFactorMin: THERMAL_SINK_CAPACITY_FACTOR_MIN,
       layerScalingEfficiencyMin: LAYER_SCALING_EFFICIENCY_MIN,
+      perLayerVariationFractionMax: PER_LAYER_VARIATION_FRACTION_MAX,
       layerNonadditivityFractionMax: LAYER_NONADDITIVITY_FRACTION_MAX,
       activeAreaRetentionMin: ACTIVE_AREA_RETENTION_MIN,
+      supportCouplingFractionMax: SUPPORT_COUPLING_FRACTION_MAX,
+      electromagneticCouplingFractionMax: ELECTROMAGNETIC_COUPLING_FRACTION_MAX,
+      mechanicalCouplingFractionMax: MECHANICAL_COUPLING_FRACTION_MAX,
       sourceTensorRetentionFractionMin: SOURCE_TENSOR_RETENTION_FRACTION_MIN,
       thermalCycleDriftFractionMax: THERMAL_CYCLE_DRIFT_FRACTION_MAX,
       creepDriftFractionMax: CREEP_DRIFT_FRACTION_MAX,
+      delaminationMarginMin: DELAMINATION_MARGIN_MIN,
+      interlayerAdhesionMarginMin: INTERLAYER_ADHESION_MARGIN_MIN,
     },
     receiptSurfaces,
     derivedReceiptInputs: {

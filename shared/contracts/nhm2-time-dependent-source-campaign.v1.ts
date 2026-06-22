@@ -13,8 +13,10 @@ import type { Nhm2RegionalSupportFunctionAtlasV1 } from "./nhm2-regional-support
 import { getNhm2RegionalSupportFunctionAtlasHash } from "./nhm2-regional-support-function-atlas.v1";
 import type { Nhm2RegionalTensorPassPathHarnessArtifactV1 } from "./nhm2-regional-tensor-pass-path-harness.v1";
 import type { Nhm2SourceComponentAuthorityLedgerArtifactV1 } from "./nhm2-source-component-authority-ledger.v1";
+import type { Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 } from "./nhm2-source-side-same-basis-tensor-authority.v1";
 import type { Nhm2SourceMomentumDensityAuditArtifactV1 } from "./nhm2-source-momentum-density-audit.v1";
 import type { Nhm2SourceOffDiagonalShearAuditArtifactV1 } from "./nhm2-source-off-diagonal-shear-audit.v1";
+import type { Nhm2TileSourceOperatingBudgetCorrectionValueV1 } from "./nhm2-tile-source-operating-budget-readiness.v1";
 
 export const NHM2_TIME_DEPENDENT_SOURCE_CAMPAIGN_CONTRACT_VERSION =
   "nhm2_time_dependent_source_campaign/v1";
@@ -50,6 +52,7 @@ export type Nhm2TimeDependentSourceCampaignGateV1 = {
   blockers: string[];
   warnings: string[];
   primaryMetric: string | null;
+  requiredCorrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
 };
 
 export type Nhm2FrequencyConvergenceEvidenceV1 = {
@@ -136,6 +139,7 @@ export type Nhm2CampaignStabilityEvidenceV1 = {
 
 export type Nhm2TimeDependentSourceCampaignArtifactRefsV1 = {
   sourceComponentAuthorityLedger: string | null;
+  sourceSideSameBasisTensorAuthority: string | null;
   regionalFullTensorResidual: string | null;
   sourceOffDiagonalShearAudit: string | null;
   sourceMomentumDensityAudit: string | null;
@@ -182,6 +186,9 @@ export type Nhm2TimeDependentSourceCampaignArtifactV1 = {
     copiedFromMetricRequiredTensor: boolean | null;
     fittedToMetricResidual: boolean | null;
     targetEchoDetected: boolean | null;
+    sameBasisAuthorityReady: boolean | null;
+    sameBasisAuthorityRef: string | null;
+    sourceAuthorityBlockers: string[];
     blockers: string[];
   };
   frequencyLadder: {
@@ -240,6 +247,11 @@ export type Nhm2TimeDependentSourceCampaignArtifactV1 = {
     qeiReceiptsPass: boolean;
     stabilityPass: boolean;
     firstBlocker: string;
+    firstRequiredCorrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
+    coupledClosureRequiredCorrections: Record<
+      string,
+      Nhm2TileSourceOperatingBudgetCorrectionValueV1
+    >;
     blockerCount: number;
   };
   claimBoundary: {
@@ -260,6 +272,7 @@ export type BuildNhm2TimeDependentSourceCampaignInput = {
   chartId?: string | null;
   artifactRefs?: Partial<Nhm2TimeDependentSourceCampaignArtifactRefsV1> | null;
   sourceComponentAuthorityLedger?: Nhm2SourceComponentAuthorityLedgerArtifactV1 | null;
+  sourceSideSameBasisTensorAuthority?: Nhm2SourceSideSameBasisTensorAuthorityArtifactV1 | null;
   regionalFullTensorResidual?: Nhm2RegionalFullTensorResidualArtifactV1 | null;
   sourceOffDiagonalShearAudit?: Nhm2SourceOffDiagonalShearAuditArtifactV1 | null;
   sourceMomentumDensityAudit?: Nhm2SourceMomentumDensityAuditArtifactV1 | null;
@@ -341,6 +354,39 @@ const uniqueText = (values: Array<string | null | undefined>): string[] =>
 
 const toFinite = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const isCorrectionValue = (
+  value: unknown,
+): value is Nhm2TileSourceOperatingBudgetCorrectionValueV1 =>
+  value === null ||
+  typeof value === "string" ||
+  typeof value === "boolean" ||
+  (typeof value === "number" && Number.isFinite(value)) ||
+  (Array.isArray(value) && value.every((entry) => typeof entry === "string"));
+
+const correctionRecord = (
+  value: unknown,
+): Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> => {
+  const record = value != null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+  return Object.fromEntries(
+    Object.entries(record).filter(([, entry]) => isCorrectionValue(entry)),
+  ) as Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
+};
+
+const coupledClosureRequiredCorrections = (
+  artifact: Nhm2CoupledClosurePassCandidateArtifactV1 | null | undefined,
+): Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> => {
+  if (artifact == null) return {};
+  const corrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> = {};
+  for (const gate of artifact.gates.filter((entry) => entry.status !== "pass")) {
+    for (const [key, value] of Object.entries(correctionRecord(gate.requiredCorrections))) {
+      corrections[`${gate.gateId}.${key}`] = value;
+    }
+  }
+  return corrections;
+};
 
 const DEFAULT_DYNAMIC_TOLERANCE_LINF = 0.1;
 
@@ -533,6 +579,8 @@ const refs = (
   input: Partial<Nhm2TimeDependentSourceCampaignArtifactRefsV1> | null | undefined,
 ): Nhm2TimeDependentSourceCampaignArtifactRefsV1 => ({
   sourceComponentAuthorityLedger: input?.sourceComponentAuthorityLedger ?? null,
+  sourceSideSameBasisTensorAuthority:
+    input?.sourceSideSameBasisTensorAuthority ?? null,
   regionalFullTensorResidual: input?.regionalFullTensorResidual ?? null,
   sourceOffDiagonalShearAudit: input?.sourceOffDiagonalShearAudit ?? null,
   sourceMomentumDensityAudit: input?.sourceMomentumDensityAudit ?? null,
@@ -573,6 +621,7 @@ const gate = (input: {
   blockers?: Array<string | null | undefined>;
   warnings?: Array<string | null | undefined>;
   primaryMetric?: string | null;
+  requiredCorrections?: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> | null;
 }): Nhm2TimeDependentSourceCampaignGateV1 => ({
   gateId: input.gateId,
   status: input.status,
@@ -580,6 +629,7 @@ const gate = (input: {
   blockers: uniqueText(input.blockers ?? []),
   warnings: uniqueText(input.warnings ?? []),
   primaryMetric: asText(input.primaryMetric),
+  requiredCorrections: input.status === "pass" ? {} : correctionRecord(input.requiredCorrections),
 });
 
 const firstNonPassingGateBlocker = (
@@ -590,17 +640,158 @@ const firstNonPassingGateBlocker = (
   return first.blockers[0] ?? `${first.gateId}:non_pass`;
 };
 
+const firstNonPassingGateCorrections = (
+  gates: Nhm2TimeDependentSourceCampaignGateV1[],
+): Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> => {
+  const first = gates.find((entry) => entry.status !== "pass");
+  return correctionRecord(first?.requiredCorrections ?? {});
+};
+
+const mergeGateCorrections = (
+  gate: Nhm2TimeDependentSourceCampaignGateV1,
+  corrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>,
+): Nhm2TimeDependentSourceCampaignGateV1 =>
+  gate.status === "pass"
+    ? gate
+    : {
+        ...gate,
+        requiredCorrections: {
+          ...gate.requiredCorrections,
+          ...corrections,
+        },
+      };
+
+const statusRank = (status: Nhm2TimeDependentSourceCampaignStatus): number => {
+  switch (status) {
+    case "pass":
+      return 0;
+    case "review":
+      return 1;
+    case "missing":
+      return 2;
+    case "blocked":
+      return 3;
+    case "fail":
+      return 4;
+  }
+};
+
+const strongerStatus = (
+  left: Nhm2TimeDependentSourceCampaignStatus,
+  right: Nhm2TimeDependentSourceCampaignStatus,
+): Nhm2TimeDependentSourceCampaignStatus =>
+  statusRank(left) >= statusRank(right) ? left : right;
+
+const coupledEvidenceForCampaignGate = (
+  artifact: Nhm2CoupledClosurePassCandidateArtifactV1 | null | undefined,
+  campaignGateId: Nhm2TimeDependentSourceCampaignGateId,
+): {
+  status: Nhm2TimeDependentSourceCampaignStatus | null;
+  blockers: string[];
+  warnings: string[];
+  requiredCorrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1>;
+} => {
+  if (artifact == null) {
+    return { status: null, blockers: [], warnings: [], requiredCorrections: {} };
+  }
+  const coupledGateIdsByCampaignGate: Partial<
+    Record<Nhm2TimeDependentSourceCampaignGateId, string[]>
+  > = {
+    source_independence: [
+      "regional_source_tensor_authority",
+      "tile_source_authority_handoff",
+      "source_component_authority_ledger",
+      "casimir_material_receipt",
+    ],
+    switching_covariant_conservation: ["conservation"],
+    full_regional_tensor_closure: ["regional_residuals"],
+    observer_family_energy_conditions: ["observer_robust_energy_conditions"],
+    qei_worldline_receipts: ["qei_worldline_dossier"],
+  };
+  const coupledGateIds = coupledGateIdsByCampaignGate[campaignGateId] ?? [];
+  const corrections: Record<string, Nhm2TileSourceOperatingBudgetCorrectionValueV1> = {};
+  const blockers: string[] = [];
+  const warnings: string[] = [];
+  let status: Nhm2TimeDependentSourceCampaignStatus | null = null;
+  for (const gate of artifact.gates.filter(
+    (entry) => entry.status !== "pass" && coupledGateIds.includes(entry.gateId),
+  )) {
+    status = status == null ? gate.status : strongerStatus(status, gate.status);
+    blockers.push(
+      ...(gate.blockers.length > 0
+        ? gate.blockers.map((blocker) => `${gate.gateId}:${blocker}`)
+        : [`${gate.gateId}:non_pass`]),
+    );
+    warnings.push(...gate.warnings.map((warning) => `${gate.gateId}:${warning}`));
+    for (const [key, value] of Object.entries(correctionRecord(gate.requiredCorrections))) {
+      corrections[`${gate.gateId}.${key}`] = value;
+    }
+  }
+  return {
+    status,
+    blockers: uniqueText(blockers),
+    warnings: uniqueText(warnings),
+    requiredCorrections: corrections,
+  };
+};
+
+const mergeGateCoupledEvidence = (
+  gate: Nhm2TimeDependentSourceCampaignGateV1,
+  evidence: ReturnType<typeof coupledEvidenceForCampaignGate>,
+): Nhm2TimeDependentSourceCampaignGateV1 => {
+  if (
+    evidence.status == null &&
+    evidence.blockers.length === 0 &&
+    evidence.warnings.length === 0 &&
+    Object.keys(evidence.requiredCorrections).length === 0
+  ) {
+    return gate;
+  }
+  const status =
+    evidence.status == null ? gate.status : strongerStatus(gate.status, evidence.status);
+  return mergeGateCorrections(
+    {
+      ...gate,
+      status,
+      pass: status === "pass",
+      blockers: uniqueText([...gate.blockers, ...evidence.blockers]),
+      warnings: uniqueText([...gate.warnings, ...evidence.warnings]),
+    },
+    evidence.requiredCorrections,
+  );
+};
+
 const sourceIndependenceGate = (
   ledger: Nhm2SourceComponentAuthorityLedgerArtifactV1 | null | undefined,
+  sourceAuthority:
+    | Nhm2SourceSideSameBasisTensorAuthorityArtifactV1
+    | null
+    | undefined,
+  options?: {
+    tileSourceAuthorityHandoffRequired?: boolean;
+  },
 ): Nhm2TimeDependentSourceCampaignGateV1 => {
-  if (ledger == null) {
+  const blockers = new Set<string>();
+  if (ledger == null) blockers.add("source_component_authority_ledger_missing");
+  if (sourceAuthority == null) {
+    blockers.add("source_side_same_basis_tensor_authority_missing");
+  }
+  if (ledger == null || sourceAuthority == null) {
     return gate({
       gateId: "source_independence",
       status: "missing",
-      blockers: ["source_component_authority_ledger_missing"],
+      blockers: Array.from(blockers),
     });
   }
-  const blockers = uniqueText([
+  const authorityRegionBlockers = sourceAuthority.regions.flatMap((region) =>
+    region.blockers.map((blocker) => `${region.regionId}:${blocker}`),
+  );
+  const handoffRequired =
+    options?.tileSourceAuthorityHandoffRequired === true ||
+    sourceAuthority.tileSourceAuthorityHandoffRef != null;
+  const handoffNotReady =
+    handoffRequired && sourceAuthority.summary.tileSourceHandoffReady !== true;
+  for (const blocker of [
     ledger.summary.anyMetricEcho ? "source_target_echo_detected" : null,
     ledger.summary.anyScalarProxy ? "source_component_scalar_proxy_present" : null,
     ledger.summary.anyMissing ? "source_component_missing" : null,
@@ -608,12 +799,41 @@ const sourceIndependenceGate = (
     ledger.summary.sourceSideComponentAuthorityComplete
       ? null
       : ledger.summary.firstBlocker ?? "source_side_component_authority_incomplete",
-  ]);
+    sourceAuthority.summary.anyMetricEcho
+      ? "source_side_same_basis_metric_echo_detected"
+      : null,
+    sourceAuthority.summary.anyProxy
+      ? "source_side_same_basis_proxy_present"
+      : null,
+    sourceAuthority.summary.anyMissingCounterpart
+      ? "source_side_same_basis_counterpart_missing"
+      : null,
+    sourceAuthority.summary.missingRegionIds.length > 0
+      ? `source_side_same_basis_regions_missing:${sourceAuthority.summary.missingRegionIds.join(",")}`
+      : null,
+    sourceAuthority.summary.allRequiredRegionsAuthoritative
+      ? null
+      : "source_side_same_basis_tensor_authority_not_authoritative",
+    handoffNotReady
+      ? "tile_source_authority_handoff_not_ready_for_same_basis_authority"
+      : null,
+    ...authorityRegionBlockers,
+  ]) {
+    const text = asText(blocker);
+    if (text != null) blockers.add(text);
+  }
   return gate({
     gateId: "source_independence",
-    status: ledger.summary.anyMetricEcho ? "fail" : blockers.length === 0 ? "pass" : "review",
-    blockers,
-    primaryMetric: `sourceSideComponentAuthorityComplete=${ledger.summary.sourceSideComponentAuthorityComplete}`,
+    status:
+      ledger.summary.anyMetricEcho || sourceAuthority.summary.anyMetricEcho
+        ? "fail"
+        : blockers.size === 0
+          ? "pass"
+          : "review",
+    blockers: Array.from(blockers),
+    primaryMetric:
+      `sourceSideComponentAuthorityComplete=${ledger.summary.sourceSideComponentAuthorityComplete};` +
+      `sameBasisAuthority=${sourceAuthority.summary.allRequiredRegionsAuthoritative}`,
   });
 };
 
@@ -975,7 +1195,14 @@ export const buildNhm2TimeDependentSourceCampaign = (
   input: BuildNhm2TimeDependentSourceCampaignInput,
 ): Nhm2TimeDependentSourceCampaignArtifactV1 => {
   const artifactRefs = refs(input.artifactRefs);
-  const sourceGate = sourceIndependenceGate(input.sourceComponentAuthorityLedger);
+  const sourceGate = sourceIndependenceGate(
+    input.sourceComponentAuthorityLedger,
+    input.sourceSideSameBasisTensorAuthority,
+    {
+      tileSourceAuthorityHandoffRequired:
+        artifactRefs.tileSourceAuthorityHandoff != null,
+    },
+  );
   const gates = [
     sourceGate,
     switchingGate(input.switchingConservation, input.covariantConservationDiagnostic),
@@ -993,12 +1220,18 @@ export const buildNhm2TimeDependentSourceCampaign = (
     observerGate(input.observerRobustEnergyConditions),
     qeiGate(input.qeiWorldlineDossier),
     stabilityGate(input.campaignStability, input.natarioInvariantAudit),
-  ];
+  ].map((entry) =>
+    mergeGateCoupledEvidence(
+      entry,
+      coupledEvidenceForCampaignGate(input.coupledClosurePassCandidate, entry.gateId),
+    ),
+  );
   const gateById = new Map(gates.map((entry) => [entry.gateId, entry]));
   const getPass = (gateId: Nhm2TimeDependentSourceCampaignGateId) =>
     gateById.get(gateId)?.pass === true;
   const blockerCount = gates.reduce((sum, entry) => sum + entry.blockers.length, 0);
   const sourceLedger = input.sourceComponentAuthorityLedger;
+  const sourceAuthority = input.sourceSideSameBasisTensorAuthority;
   const dynamic = input.dynamicEffectiveGeometry;
   const switching = input.switchingConservation;
   const frequency = input.frequencyConvergence;
@@ -1039,6 +1272,19 @@ export const buildNhm2TimeDependentSourceCampaign = (
       copiedFromMetricRequiredTensor: sourceLedger == null ? null : sourceLedger.summary.anyMetricEcho,
       fittedToMetricResidual: sourceLedger == null ? null : false,
       targetEchoDetected: sourceLedger == null ? null : sourceLedger.summary.anyMetricEcho,
+      sameBasisAuthorityReady:
+        sourceAuthority == null
+          ? null
+          : sourceAuthority.summary.allRequiredRegionsAuthoritative,
+      sameBasisAuthorityRef: artifactRefs.sourceSideSameBasisTensorAuthority,
+      sourceAuthorityBlockers:
+        sourceAuthority == null
+          ? sourceGate.blockers
+          : uniqueText(
+              sourceAuthority.regions.flatMap((region) =>
+                region.blockers.map((blocker) => `${region.regionId}:${blocker}`),
+              ),
+            ),
       blockers: sourceGate.blockers,
     },
     frequencyLadder: {
@@ -1109,6 +1355,10 @@ export const buildNhm2TimeDependentSourceCampaign = (
       qeiReceiptsPass: getPass("qei_worldline_receipts"),
       stabilityPass: getPass("horizon_blueshift_particle_stability"),
       firstBlocker: firstNonPassingGateBlocker(gates),
+      firstRequiredCorrections: firstNonPassingGateCorrections(gates),
+      coupledClosureRequiredCorrections: coupledClosureRequiredCorrections(
+        input.coupledClosurePassCandidate,
+      ),
       blockerCount,
     },
     claimBoundary: {
@@ -1155,7 +1405,9 @@ const isGate = (value: unknown): value is Nhm2TimeDependentSourceCampaignGateV1 
     record.pass === (record.status === "pass") &&
     isStringArray(record.blockers) &&
     isStringArray(record.warnings) &&
-    isNullableText(record.primaryMetric)
+    isNullableText(record.primaryMetric) &&
+    isRecord(record.requiredCorrections) &&
+    Object.values(record.requiredCorrections).every(isCorrectionValue)
   );
 };
 
@@ -1166,6 +1418,7 @@ const isArtifactRefs = (
   return (
     record != null &&
     isNullableText(record.sourceComponentAuthorityLedger) &&
+    isNullableText(record.sourceSideSameBasisTensorAuthority) &&
     isNullableText(record.regionalFullTensorResidual) &&
     isNullableText(record.sourceOffDiagonalShearAudit) &&
     isNullableText(record.sourceMomentumDensityAudit) &&
@@ -1355,6 +1608,10 @@ export const isNhm2TimeDependentSourceCampaignArtifact = (
       typeof sourceIndependence.fittedToMetricResidual === "boolean") &&
     (sourceIndependence.targetEchoDetected === null ||
       typeof sourceIndependence.targetEchoDetected === "boolean") &&
+    (sourceIndependence.sameBasisAuthorityReady === null ||
+      typeof sourceIndependence.sameBasisAuthorityReady === "boolean") &&
+    isNullableText(sourceIndependence.sameBasisAuthorityRef) &&
+    isStringArray(sourceIndependence.sourceAuthorityBlockers) &&
     isStringArray(sourceIndependence.blockers) &&
     frequencyLadder != null &&
     isNullableNumber(frequencyLadder.baseFrequencyHz) &&
@@ -1426,6 +1683,10 @@ export const isNhm2TimeDependentSourceCampaignArtifact = (
     typeof summary.qeiReceiptsPass === "boolean" &&
     typeof summary.stabilityPass === "boolean" &&
     typeof summary.firstBlocker === "string" &&
+    isRecord(summary.firstRequiredCorrections) &&
+    Object.values(summary.firstRequiredCorrections).every(isCorrectionValue) &&
+    isRecord(summary.coupledClosureRequiredCorrections) &&
+    Object.values(summary.coupledClosureRequiredCorrections).every(isCorrectionValue) &&
     typeof summary.blockerCount === "number" &&
     Number.isFinite(summary.blockerCount) &&
     claimBoundary?.diagnosticOnly === true &&
