@@ -2602,6 +2602,128 @@ const workstationToolEvaluationText = (artifact: ArtifactLike): string | null =>
   );
 };
 
+const theoryContextPromptText = (payload: Record<string, unknown>): string | null =>
+  readString(payload.active_prompt) ??
+  readString(payload.question) ??
+  readString(payload.prompt) ??
+  readString(payload.user_prompt) ??
+  readString(payload.input_text) ??
+  readString(readRecord(payload.canonical_goal_frame)?.user_goal_summary);
+
+const synthesizeTheoryContextReflectionTerminalText = (input: {
+  prompt: string | null;
+  evaluationSummary: string | null;
+  receiptText: string | null;
+}): string => {
+  const prompt = input.prompt ?? "";
+  const summary = input.evaluationSummary ?? input.receiptText ?? "The theory reflection located relevant graph context.";
+  const asksForMainComponents =
+    /\b(?:main|major|core|key)\s+(?:components?|parts?|pieces?|elements?)\b/i.test(prompt) ||
+    /\bwhat\s+are\s+(?:its|the)\s+(?:components?|parts?|pieces?|elements?)\b/i.test(prompt);
+  const mentionsNeedleHull =
+    /\b(?:Needle\s+Hull\s+Mark\s*2|NHM2)\b/i.test(prompt) ||
+    /\b(?:Needle\s+Hull\s+Mark\s*2|NHM2)\b/i.test(summary);
+  if (asksForMainComponents && mentionsNeedleHull) {
+    return [
+      "The Theory Badge Graph reflection supports reading Needle Hull Mark 2 as a multi-part solve frame, not as one finished proof.",
+      "Main components:",
+      "- Hull geometry and boundary setup: the shape, scale, and coordinate assumptions that define the target being discussed.",
+      "- Casimir cavity/source coupling: the negative-energy/source-side model that must be connected to the hull by evidence, not asserted from the badge route alone.",
+      "- Stability and closure checks: the diagnostics that separate a proxy-constrained explanation from a stronger solve claim.",
+      "- Scalar or runtime cuts: numerical subchecks that should be sent to calculator/runtime tools before supporting quantitative claims.",
+      "- Terminal solver policy: the answer-authority layer that decides which observations can support a final claim and which remain context evidence.",
+      `Reflection support: ${summary}`,
+      "Boundary: this is graph-grounded explanation. Stronger physical or numeric conclusions still need the relevant calculator, tensor, or runtime receipts.",
+    ].join("\n");
+  }
+  return [
+    "Theory context reflection answer:",
+    summary,
+    "Interpretation: use this reflection as graph/context evidence. It can explain where a concept sits and what follow-up routes are relevant, but any scalar, tensor, runtime, or claim-bearing conclusion still needs the matching tool receipt before it can support a stronger answer.",
+  ].join("\n");
+};
+
+const findGoalSatisfyingTheoryContextReflectionArtifact = (
+  payload: Record<string, unknown>,
+  artifacts: ArtifactLike[],
+): { artifact: ArtifactLike; kind: "theory_context_reflection_answer"; text: string; ref: string | null } | null => {
+  const goal = readRecord(payload.canonical_goal_frame);
+  if (
+    readString(goal?.goal_kind) !== "theory_context_reflection" &&
+    readString(goal?.required_terminal_kind) !== "theory_context_reflection_answer"
+  ) {
+    return null;
+  }
+  if (!routeContractAllowsTerminalKind(payload, "theory_context_reflection_answer")) return null;
+  const existingCandidates = [
+    readRecord(payload.theory_context_reflection_answer),
+    ...artifacts
+      .filter((artifact) => artifactKind(artifact) === "theory_context_reflection_answer")
+      .map(artifactPayload),
+  ].filter((entry): entry is Record<string, unknown> => Boolean(entry));
+  for (const candidate of existingCandidates) {
+    const text = readString(candidate.answer_text) ?? readString(candidate.text);
+    if (!text || isStaleWorkspaceFailureText(text)) continue;
+    const ref = readString(candidate.artifact_id) ?? `${readString(payload.turn_id) ?? "turn"}:theory_context_reflection_answer`;
+    return {
+      artifact: {
+        artifact_id: ref,
+        kind: "theory_context_reflection_answer",
+        payload: candidate,
+      },
+      kind: "theory_context_reflection_answer",
+      text,
+      ref,
+    };
+  }
+  const receipt = [...artifacts].reverse().find((artifact) =>
+    artifactKind(artifact) === "helix_theory_context_reflection_tool_receipt"
+  );
+  const evaluation = [...artifacts].reverse().find((artifact) =>
+    artifactKind(artifact) === "workstation_tool_evaluation" &&
+    /theory_context_reflection|reflect_theory_context|supports_subgoal/i.test(JSON.stringify(artifactPayload(artifact) ?? {}))
+  );
+  if (!receipt || !evaluation) return null;
+  const receiptRef = artifactId(receipt);
+  const evaluationRef = artifactId(evaluation) ?? readString(artifactPayload(evaluation)?.evaluation_id);
+  const supportRefs = uniqueStrings([receiptRef, evaluationRef]);
+  if (supportRefs.length < 2) return null;
+  const text = synthesizeTheoryContextReflectionTerminalText({
+    prompt: theoryContextPromptText(payload),
+    evaluationSummary: workstationToolEvaluationText(evaluation),
+    receiptText: artifactText(receipt),
+  });
+  if (!text || isStaleWorkspaceFailureText(text)) return null;
+  const ref = `${readString(payload.turn_id) ?? "turn"}:theory_context_reflection_answer:from_reflection_observation`;
+  const terminalPayload = {
+    schema: "helix.theory_context_reflection_answer.v1",
+    artifact_id: ref,
+    turn_id: readString(payload.turn_id),
+    text,
+    answer_text: text,
+    support_refs: supportRefs,
+    support_refs_count: supportRefs.length,
+    subgoal_observation_refs: supportRefs,
+    subgoal_observation_refs_count: supportRefs.length,
+    source_families: ["theory_locator"],
+    model_authored: false,
+    synthesis_mode: "deterministic_theory_reflection_materializer",
+    assistant_answer: false,
+    raw_content_included: false,
+  };
+  payload.theory_context_reflection_answer = terminalPayload;
+  return {
+    artifact: {
+      artifact_id: ref,
+      kind: "theory_context_reflection_answer",
+      payload: terminalPayload,
+    },
+    kind: "theory_context_reflection_answer",
+    text,
+    ref,
+  };
+};
+
 const readWorkstationToolPlanForTerminalSynthesis = (
   payload: Record<string, unknown>,
 ): HelixWorkstationToolPlan | null => {
